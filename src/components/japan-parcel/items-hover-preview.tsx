@@ -55,6 +55,7 @@ export function ItemsHoverPreview({
                 {it!.item_image_url ? (
                   <ClickableThumb
                     src={it!.item_image_url}
+                    thumbWidth={200}
                     className="aspect-square w-full rounded object-cover"
                   />
                 ) : (
