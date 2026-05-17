@@ -246,6 +246,7 @@ export function ParcelEditPanel({
           {it.item_image_url ? (
             <ClickableThumb
               src={it.item_image_url}
+              thumbWidth={200}
               className="h-[72px] w-[72px] flex-shrink-0 rounded-md object-cover ring-1 ring-border"
             />
           ) : (
