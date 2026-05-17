@@ -8,7 +8,10 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { Search, Bell, CheckCircle2, Command } from "lucide-react";
+import { useEffect } from "react";
+import { Search, Bell, CheckCircle2, Command, Loader2 } from "lucide-react";
+import { useAuthSession } from "@/hooks/use-auth-session";
+import { supabase } from "@/integrations/supabase/client";
 
 import appCss from "../styles.css?url";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -147,11 +150,48 @@ function Breadcrumbs() {
   );
 }
 
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { session, loading } = useAuthSession();
+  const isLoginRoute = pathname === "/login";
+
+  useEffect(() => {
+    if (!loading && !session && !isLoginRoute) {
+      router.navigate({ to: "/login", replace: true });
+    }
+  }, [loading, session, isLoginRoute, router]);
+
+  if (isLoginRoute) return <>{children}</>;
+  if (loading || !session) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+  return <>{children}</>;
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  // 登录页：不渲染侧栏/顶栏外壳
+  if (pathname === "/login") {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <AuthGate>
+          <Outlet />
+        </AuthGate>
+        <Toaster />
+      </QueryClientProvider>
+    );
+  }
 
   return (
     <QueryClientProvider client={queryClient}>
+      <AuthGate>
       <SidebarProvider>
         <div className="flex min-h-screen w-full bg-background">
           <AppSidebar />

@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as KnowledgeRouteImport } from './routes/knowledge'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
@@ -29,10 +30,16 @@ import { Route as PurchaseJapanParcelImportRouteImport } from './routes/purchase
 import { Route as PurchaseJapanParcelAccountsRouteImport } from './routes/purchase.japan-parcel.accounts'
 import { Route as PurchaseJapanParcelIdRouteImport } from './routes/purchase.japan-parcel.$id'
 import { Route as ApiPublicMerukiIngestRouteImport } from './routes/api/public/meruki-ingest'
+import { Route as ApiPublicBootstrapAdminRouteImport } from './routes/api/public/bootstrap-admin'
 
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const KnowledgeRoute = KnowledgeRouteImport.update({
@@ -133,11 +140,17 @@ const ApiPublicMerukiIngestRoute = ApiPublicMerukiIngestRouteImport.update({
   path: '/api/public/meruki-ingest',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicBootstrapAdminRoute = ApiPublicBootstrapAdminRouteImport.update({
+  id: '/api/public/bootstrap-admin',
+  path: '/api/public/bootstrap-admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/knowledge': typeof KnowledgeRoute
+  '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
   '/inventory/batches': typeof InventoryBatchesRoute
   '/inventory/products': typeof InventoryProductsRoute
@@ -149,6 +162,7 @@ export interface FileRoutesByFullPath {
   '/stores/franchisees': typeof StoresFranchiseesRoute
   '/stores/list': typeof StoresListRoute
   '/stores/youzan': typeof StoresYouzanRoute
+  '/api/public/bootstrap-admin': typeof ApiPublicBootstrapAdminRoute
   '/api/public/meruki-ingest': typeof ApiPublicMerukiIngestRoute
   '/purchase/japan-parcel/$id': typeof PurchaseJapanParcelIdRoute
   '/purchase/japan-parcel/accounts': typeof PurchaseJapanParcelAccountsRoute
@@ -160,6 +174,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/knowledge': typeof KnowledgeRoute
+  '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
   '/inventory/batches': typeof InventoryBatchesRoute
   '/inventory/products': typeof InventoryProductsRoute
@@ -170,6 +185,7 @@ export interface FileRoutesByTo {
   '/stores/franchisees': typeof StoresFranchiseesRoute
   '/stores/list': typeof StoresListRoute
   '/stores/youzan': typeof StoresYouzanRoute
+  '/api/public/bootstrap-admin': typeof ApiPublicBootstrapAdminRoute
   '/api/public/meruki-ingest': typeof ApiPublicMerukiIngestRoute
   '/purchase/japan-parcel/$id': typeof PurchaseJapanParcelIdRoute
   '/purchase/japan-parcel/accounts': typeof PurchaseJapanParcelAccountsRoute
@@ -182,6 +198,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/knowledge': typeof KnowledgeRoute
+  '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
   '/inventory/batches': typeof InventoryBatchesRoute
   '/inventory/products': typeof InventoryProductsRoute
@@ -193,6 +210,7 @@ export interface FileRoutesById {
   '/stores/franchisees': typeof StoresFranchiseesRoute
   '/stores/list': typeof StoresListRoute
   '/stores/youzan': typeof StoresYouzanRoute
+  '/api/public/bootstrap-admin': typeof ApiPublicBootstrapAdminRoute
   '/api/public/meruki-ingest': typeof ApiPublicMerukiIngestRoute
   '/purchase/japan-parcel/$id': typeof PurchaseJapanParcelIdRoute
   '/purchase/japan-parcel/accounts': typeof PurchaseJapanParcelAccountsRoute
@@ -206,6 +224,7 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/knowledge'
+    | '/login'
     | '/settings'
     | '/inventory/batches'
     | '/inventory/products'
@@ -217,6 +236,7 @@ export interface FileRouteTypes {
     | '/stores/franchisees'
     | '/stores/list'
     | '/stores/youzan'
+    | '/api/public/bootstrap-admin'
     | '/api/public/meruki-ingest'
     | '/purchase/japan-parcel/$id'
     | '/purchase/japan-parcel/accounts'
@@ -228,6 +248,7 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/knowledge'
+    | '/login'
     | '/settings'
     | '/inventory/batches'
     | '/inventory/products'
@@ -238,6 +259,7 @@ export interface FileRouteTypes {
     | '/stores/franchisees'
     | '/stores/list'
     | '/stores/youzan'
+    | '/api/public/bootstrap-admin'
     | '/api/public/meruki-ingest'
     | '/purchase/japan-parcel/$id'
     | '/purchase/japan-parcel/accounts'
@@ -249,6 +271,7 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/knowledge'
+    | '/login'
     | '/settings'
     | '/inventory/batches'
     | '/inventory/products'
@@ -260,6 +283,7 @@ export interface FileRouteTypes {
     | '/stores/franchisees'
     | '/stores/list'
     | '/stores/youzan'
+    | '/api/public/bootstrap-admin'
     | '/api/public/meruki-ingest'
     | '/purchase/japan-parcel/$id'
     | '/purchase/japan-parcel/accounts'
@@ -272,6 +296,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRoute
   KnowledgeRoute: typeof KnowledgeRoute
+  LoginRoute: typeof LoginRoute
   SettingsRoute: typeof SettingsRoute
   InventoryBatchesRoute: typeof InventoryBatchesRoute
   InventoryProductsRoute: typeof InventoryProductsRoute
@@ -283,6 +308,7 @@ export interface RootRouteChildren {
   StoresFranchiseesRoute: typeof StoresFranchiseesRoute
   StoresListRoute: typeof StoresListRoute
   StoresYouzanRoute: typeof StoresYouzanRoute
+  ApiPublicBootstrapAdminRoute: typeof ApiPublicBootstrapAdminRoute
   ApiPublicMerukiIngestRoute: typeof ApiPublicMerukiIngestRoute
 }
 
@@ -293,6 +319,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/knowledge': {
@@ -428,6 +461,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicMerukiIngestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/bootstrap-admin': {
+      id: '/api/public/bootstrap-admin'
+      path: '/api/public/bootstrap-admin'
+      fullPath: '/api/public/bootstrap-admin'
+      preLoaderRoute: typeof ApiPublicBootstrapAdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -454,6 +494,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRoute,
   KnowledgeRoute: KnowledgeRoute,
+  LoginRoute: LoginRoute,
   SettingsRoute: SettingsRoute,
   InventoryBatchesRoute: InventoryBatchesRoute,
   InventoryProductsRoute: InventoryProductsRoute,
@@ -465,6 +506,7 @@ const rootRouteChildren: RootRouteChildren = {
   StoresFranchiseesRoute: StoresFranchiseesRoute,
   StoresListRoute: StoresListRoute,
   StoresYouzanRoute: StoresYouzanRoute,
+  ApiPublicBootstrapAdminRoute: ApiPublicBootstrapAdminRoute,
   ApiPublicMerukiIngestRoute: ApiPublicMerukiIngestRoute,
 }
 export const routeTree = rootRouteImport
