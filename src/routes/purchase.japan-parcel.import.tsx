@@ -540,7 +540,7 @@ function ImportPage() {
                   <div key={idx} className="rounded-md border p-3">
                     <div className="mb-2 flex items-start gap-3">
                       {it.item_image_url ? (
-                        <ClickableThumb src={it.item_image_url} className="h-16 w-16 flex-shrink-0 rounded object-cover" />
+                        <ClickableThumb src={it.item_image_url} thumbWidth={200} className="h-16 w-16 flex-shrink-0 rounded object-cover" />
                       ) : (
                         <div className="h-16 w-16 flex-shrink-0 rounded bg-muted" />
                       )}
