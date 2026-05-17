@@ -1,61 +1,53 @@
 ## 目标
+把腾讯云服务器 `~/boomer-off-buddy-source/.env` 里的 Supabase 三件套切换成新版 `sb_` 格式，并补齐业务密钥，让 wrangler/PM2 跑起来后能正常访问后端。
 
-把这个 TanStack Start 项目部署到腾讯云（`erp.boomeroff.com`），同时解决"看不到 `SUPABASE_SERVICE_ROLE_KEY`"的问题。
+## 服务器上要执行的命令
 
-## 核心难点回顾
+```bash
+# 1. 备份当前 .env
+ssh -i ~/.ssh/tencent_boomer ubuntu@150.158.94.248 \
+  "cp ~/boomer-off-buddy-source/.env ~/boomer-off-buddy-source/.env.bak.$(date +%s)"
 
-这个项目不是纯前端 SPA，它是 **TanStack Start 全栈应用**：
-- 浏览器里跑的 React 页面 → 只需要 publishable key（已经有了）
-- 服务端 server functions（`src/lib/*.functions.ts`）→ 用 `supabaseAdmin` 客户端访问数据库，必须有 `SUPABASE_SERVICE_ROLE_KEY`
+# 2. 覆盖写入新的 .env
+ssh -i ~/.ssh/tencent_boomer ubuntu@150.158.94.248 \
+  "cat > ~/boomer-off-buddy-source/.env <<'EOF'
+SUPABASE_URL=\"https://sxddfcoiaboqcmeviykl.supabase.co\"
+SUPABASE_PUBLISHABLE_KEY=\"sb_publishable_8Spsd4RjtpxpmZ0kmYHFgQ_kBSRWz56\"
+SUPABASE_SERVICE_ROLE_KEY=\"sb_secret_byuOrbJuxkdwCeoCeDz6tA_MsGnLGGp\"
+VITE_SUPABASE_URL=\"https://sxddfcoiaboqcmeviykl.supabase.co\"
+VITE_SUPABASE_PUBLISHABLE_KEY=\"sb_publishable_8Spsd4RjtpxpmZ0kmYHFgQ_kBSRWz56\"
+VITE_SUPABASE_PROJECT_ID=\"sxddfcoiaboqcmeviykl\"
+MERUKI_ENC_KEY=\"pzy5565283\"
+LOVABLE_API_KEY=\"<把之前导出的 sk_... 完整值粘进来>\"
+EOF"
 
-所以腾讯云上必须跑一个 Node 服务（不能只是 nginx 发静态文件），它需要这 3 个环境变量：
-- `SUPABASE_URL`
-- `SUPABASE_PUBLISHABLE_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY` ← 这个 Lovable UI 里看不见
+# 3. 因为 VITE_* 变了，要重新构建前端
+ssh -i ~/.ssh/tencent_boomer ubuntu@150.158.94.248 \
+  "cd ~/boomer-off-buddy-source && npm run build"
 
-另外还有 2 个业务密钥也要带过去：
-- `MERUKI_ENC_KEY`（meruki 账号密码加密用）
-- `LOVABLE_API_KEY`（AI 识别调用）
-
-## 解决方案：用 Lovable 的轮换工具拿新 key
-
-Lovable 后台有个 `rotate_api_keys` 工具，可以**生成一套全新的 Supabase API keys**（包括 publishable + service_role），并自动写入项目的 `.env` 和 Lovable Cloud 部署。
-
-执行后我能在工具返回里看到新的 service_role key，直接告诉你，你拷贝到腾讯云的 `.env` 就行。
-
-**副作用**：
-- Lovable 自己托管的 `boomer-off-buddy.lovable.app` 会自动用新 key，无感切换，不会挂
-- 老的 service_role key 立即失效，外面如果有别处用就会断（这个项目应该没有）
-- 浏览器扩展、Edge Functions 等也自动用新 key
-
-## 执行步骤
-
-```text
-┌─ Lovable 端 ──────────────────────────────┐
-│ 1. 我调用 rotate_api_keys                  │
-│ 2. 拿到新 SERVICE_ROLE_KEY，发给你         │
-│ 3. Lovable Cloud 自动用新 key 重新部署     │
-└────────────────────────────────────────────┘
-                    ↓
-┌─ 腾讯云端（你执行）──────────────────────────┐
-│ 4. git clone 项目到服务器                   │
-│ 5. 写 .env（5 个环境变量）                  │
-│ 6. bun install && bun run build            │
-│ 7. PM2 跑 node .output/server/index.mjs    │
-│ 8. nginx 反代 erp.boomeroff.com → :3000    │
-└────────────────────────────────────────────┘
+# 4. 重启 PM2（wrangler 进程会重新读 .env）
+ssh -i ~/.ssh/tencent_boomer ubuntu@150.158.94.248 \
+  "pm2 restart all && pm2 logs --lines 30 --nostream"
 ```
 
-## 我会准备好给你的东西
+## 验证
 
-1. **新的 service_role key**（轮换后第一时间发你）
-2. **完整 `.env` 模板**，照抄改值即可
-3. **腾讯云一键部署脚本**：包含 git clone、依赖安装、build、PM2 启动、nginx 配置（SSL + WebSocket + 缓存）
-4. **回滚方案**：如果新 key 出问题，再调一次 rotate 就行
+```bash
+# 本机访问后端首页
+ssh -i ~/.ssh/tencent_boomer ubuntu@150.158.94.248 \
+  "curl -sI http://127.0.0.1:3001 | head -5"
 
-## 需要你确认两件事
+# 通过域名访问
+curl -sI https://erp.boomeroff.com | head -5
+```
 
-1. **是否 OK 轮换 Supabase keys**？（不会丢数据，只是换钥匙，Lovable 自己的部署无感切换）
-2. **腾讯云那台机器**：是不是有 Node 18+ 环境？没有的话我把 nvm 安装命令一起塞进脚本
+打开 https://erp.boomeroff.com/purchase/japan-parcel ：
+- 列表能加载 → `SUPABASE_SERVICE_ROLE_KEY` 生效
+- 智能识别能跑 → `LOVABLE_API_KEY` 生效
+- meruki 账号加密字段能解 → `MERUKI_ENC_KEY` 生效
 
-确认后我直接执行 `rotate_api_keys` 并把新 key + 脚本发你。
+## 注意
+
+- 旧 JWT 格式 (`eyJ...`) 的 anon/service_role key 不要再用，统一走 `sb_` 新格式。
+- 这次只改 `.env` + rebuild + restart，不动任何源码、不动 nginx、不动 PM2 配置。
+- 如果重启后 502，先 `pm2 logs` 看 wrangler 输出，最常见原因是 `LOVABLE_API_KEY` 粘贴时少了字符。
