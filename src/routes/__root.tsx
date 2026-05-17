@@ -221,29 +221,7 @@ function RootComponent() {
                     5
                   </span>
                 </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="flex items-center gap-2 rounded-md p-1 transition-colors hover:bg-muted">
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback className="bg-gradient-brand text-xs font-medium text-primary-foreground">
-                          管
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="hidden text-left lg:block">
-                        <div className="text-xs font-medium leading-tight">管理员</div>
-                        <div className="text-[10px] leading-tight text-muted-foreground">超级管理员</div>
-                      </div>
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuLabel>我的账户</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem>个人资料</DropdownMenuItem>
-                    <DropdownMenuItem>偏好设置</DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-destructive">退出登录</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <UserMenu />
               </div>
             </header>
             <main className="flex-1 overflow-auto">
@@ -255,6 +233,50 @@ function RootComponent() {
         </div>
         <Toaster />
       </SidebarProvider>
+      </AuthGate>
     </QueryClientProvider>
   );
 }
+
+function UserMenu() {
+  const router = useRouter();
+  const { session } = useAuthSession();
+  const email = session?.user?.email ?? "";
+  const initial = email ? email[0]!.toUpperCase() : "管";
+
+  async function handleSignOut() {
+    await supabase.auth.signOut();
+    router.navigate({ to: "/login", replace: true });
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className="flex items-center gap-2 rounded-md p-1 transition-colors hover:bg-muted">
+          <Avatar className="h-8 w-8">
+            <AvatarFallback className="bg-gradient-brand text-xs font-medium text-primary-foreground">
+              {initial}
+            </AvatarFallback>
+          </Avatar>
+          <div className="hidden text-left lg:block">
+            <div className="max-w-[160px] truncate text-xs font-medium leading-tight">
+              {email || "管理员"}
+            </div>
+            <div className="text-[10px] leading-tight text-muted-foreground">已登录</div>
+          </div>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel className="truncate">{email || "我的账户"}</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem disabled>个人资料</DropdownMenuItem>
+        <DropdownMenuItem disabled>偏好设置</DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem className="text-destructive" onClick={handleSignOut}>
+          退出登录
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
