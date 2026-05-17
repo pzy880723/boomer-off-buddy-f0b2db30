@@ -1,6 +1,7 @@
 import { ImageIcon } from "lucide-react";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { ClickableThumb } from "./image-lightbox";
+import { toThumbUrl } from "@/lib/image";
 
 export interface PreviewItem {
   id: string;
