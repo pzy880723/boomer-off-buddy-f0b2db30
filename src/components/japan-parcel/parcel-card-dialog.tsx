@@ -183,6 +183,7 @@ function OverviewItems({ items }: { items: ParcelCardItem[] }) {
           {it.item_image_url ? (
             <ClickableThumb
               src={it.item_image_url}
+              thumbWidth={200}
               className="h-20 w-20 flex-shrink-0 rounded object-cover"
             />
           ) : (

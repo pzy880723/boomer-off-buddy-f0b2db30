@@ -1,53 +1,79 @@
 ## 目标
-把腾讯云服务器 `~/boomer-off-buddy-source/.env` 里的 Supabase 三件套切换成新版 `sb_` 格式，并补齐业务密钥，让 wrangler/PM2 跑起来后能正常访问后端。
 
-## 服务器上要执行的命令
+小包裹相关界面里的商品图：
+- 列表/编辑面板里只加载 **缩略图**（小尺寸、低带宽）
+- 点击放大弹窗后才加载 **原图**
+- AI 拆包件数识别（`estimatePiecesFromImage`）继续用 **原图** 提交，保证识别精度
 
-```bash
-# 1. 备份当前 .env
-ssh -i ~/.ssh/tencent_boomer ubuntu@150.158.94.248 \
-  "cp ~/boomer-off-buddy-source/.env ~/boomer-off-buddy-source/.env.bak.$(date +%s)"
+## 现状
 
-# 2. 覆盖写入新的 .env
-ssh -i ~/.ssh/tencent_boomer ubuntu@150.158.94.248 \
-  "cat > ~/boomer-off-buddy-source/.env <<'EOF'
-SUPABASE_URL=\"https://sxddfcoiaboqcmeviykl.supabase.co\"
-SUPABASE_PUBLISHABLE_KEY=\"sb_publishable_8Spsd4RjtpxpmZ0kmYHFgQ_kBSRWz56\"
-SUPABASE_SERVICE_ROLE_KEY=\"sb_secret_byuOrbJuxkdwCeoCeDz6tA_MsGnLGGp\"
-VITE_SUPABASE_URL=\"https://sxddfcoiaboqcmeviykl.supabase.co\"
-VITE_SUPABASE_PUBLISHABLE_KEY=\"sb_publishable_8Spsd4RjtpxpmZ0kmYHFgQ_kBSRWz56\"
-VITE_SUPABASE_PROJECT_ID=\"sxddfcoiaboqcmeviykl\"
-MERUKI_ENC_KEY=\"pzy5565283\"
-LOVABLE_API_KEY=\"<把之前导出的 sk_... 完整值粘进来>\"
-EOF"
+- 图片都存在 Supabase Storage 的 `parcel-item-images` bucket，URL 形如  
+  `…/storage/v1/object/public/parcel-item-images/items/xxx.png`
+- 所有展示都走 `ClickableThumb`，目前缩略图和大图都直接用原图 URL（`<img src={原图} className="h-16 w-16">`），浏览器实际仍下载全尺寸文件，浪费带宽
+- AI 识别端 `estimatePiecesFromImage` 已经拿的就是 `item_image_url` 原图，**无需改动**
 
-# 3. 因为 VITE_* 变了，要重新构建前端
-ssh -i ~/.ssh/tencent_boomer ubuntu@150.158.94.248 \
-  "cd ~/boomer-off-buddy-source && npm run build"
+## 方案
 
-# 4. 重启 PM2（wrangler 进程会重新读 .env）
-ssh -i ~/.ssh/tencent_boomer ubuntu@150.158.94.248 \
-  "pm2 restart all && pm2 logs --lines 30 --nostream"
+利用 Supabase Storage 自带的图片转换接口：  
+把 `/object/public/` 替换为 `/render/image/public/`，加 `?width=&quality=&resize=contain`，即可拿到服务端生成的缩略图（webp，自动缓存）。非 Supabase URL（极少数手填的）回退使用原 URL。
+
+### 1. 新增 `src/lib/image.ts`
+
+```ts
+export function toThumbUrl(url: string | null, width = 256): string | null {
+  if (!url) return url;
+  // 只处理本项目 Supabase Storage 的 public 链接
+  if (url.includes("/storage/v1/object/public/")) {
+    const transformed = url.replace(
+      "/storage/v1/object/public/",
+      "/storage/v1/render/image/public/",
+    );
+    const sep = transformed.includes("?") ? "&" : "?";
+    return `${transformed}${sep}width=${width}&quality=70&resize=contain`;
+  }
+  return url;
+}
 ```
+
+### 2. 修改 `ClickableThumb`
+
+- 新增 `thumbWidth?: number`（默认 `256`）
+- 缩略图 `<img>` 的 src 用 `toThumbUrl(src, thumbWidth)`
+- 弹窗里的大图保持 `src`（原图）
+- 弹窗 `<img>` 加 `loading="eager"`，让大图在弹窗打开时才请求
+
+### 3. 调用点按显示尺寸传 `thumbWidth`
+
+预估出现位置和合适宽度（按 devicePixelRatio≈2 取展示尺寸的 2 倍）：
+
+| 文件 | 当前展示尺寸 | thumbWidth |
+| --- | --- | --- |
+| `routes/purchase.japan-parcel.index.tsx` 列表行 | h-12/h-16 | `160` |
+| `components/japan-parcel/items-hover-preview.tsx` 封面/缩略 | h-10–h-16 | `200` |
+| `components/japan-parcel/parcel-edit-panel.tsx` 编辑卡片 | 较大 | `320` |
+| `components/japan-parcel/parcel-card-dialog.tsx` 弹窗内列表 | h-16 | `200` |
+| `components/japan-parcel/pack-price-calculator-dialog.tsx` 商品概览 | h-16 | `200` |
+| `routes/purchase.japan-parcel.import.tsx` 导入预览 | h-16 | `200` |
+
+所有调用点替换为 `<ClickableThumb src={…} thumbWidth={…} … />`，不改原本的 `className` 控制的视觉尺寸。
+
+### 4. AI 识别保持原图
+
+`estimatePiecesFromImage` 入参直接传 `item.item_image_url`（原图 URL），不变。  
+`pack-price-calculator-dialog.tsx` 第 118 行的调用本身就是 `image_url: item.item_image_url`，确认无需修改。
+
+## 不在本次范围
+
+- 不修改任何后端 / Storage 配置
+- 不动 `extension/`、meruki 抓取链路
+- 不动数据库或字段
+
+## 风险 & 兜底
+
+- Supabase 图片转换需要项目启用 image transformations。Lovable Cloud 项目默认开启；若 render endpoint 返回 400，浏览器只会缩略图加载失败，原图弹窗仍正常。可在第一次部署后用 DevTools 看一眼网络面板的 `render/image/public/...` 是否 200。如果不可用，把 `toThumbUrl` 改为直接返回原 URL 即可一键回退。
 
 ## 验证
 
-```bash
-# 本机访问后端首页
-ssh -i ~/.ssh/tencent_boomer ubuntu@150.158.94.248 \
-  "curl -sI http://127.0.0.1:3001 | head -5"
-
-# 通过域名访问
-curl -sI https://erp.boomeroff.com | head -5
-```
-
-打开 https://erp.boomeroff.com/purchase/japan-parcel ：
-- 列表能加载 → `SUPABASE_SERVICE_ROLE_KEY` 生效
-- 智能识别能跑 → `LOVABLE_API_KEY` 生效
-- meruki 账号加密字段能解 → `MERUKI_ENC_KEY` 生效
-
-## 注意
-
-- 旧 JWT 格式 (`eyJ...`) 的 anon/service_role key 不要再用，统一走 `sb_` 新格式。
-- 这次只改 `.env` + rebuild + restart，不动任何源码、不动 nginx、不动 PM2 配置。
-- 如果重启后 502，先 `pm2 logs` 看 wrangler 输出，最常见原因是 `LOVABLE_API_KEY` 粘贴时少了字符。
+1. 打开 `/purchase/japan-parcel` 列表，DevTools Network 看 `render/image/public/...?width=160` 请求返回 webp、体积明显小于原 PNG
+2. 点击缩略图，弹窗加载原 `…/object/public/…png`，清晰可见
+3. 在某个商品上点"AI 拆包件数计算"，确认仍能识别成功（说明 AI 用的还是原图）

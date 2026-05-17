@@ -1,26 +1,30 @@
 import { useState } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { toThumbUrl } from "@/lib/image";
 
 /**
  * 点击缩略图后弹窗放大查看。
- * 用作 <img> 的近似替代：传 src/alt/className，渲染缩略图，点击打开 lightbox。
+ * 缩略图走 Supabase render/image 接口（webp、按 thumbWidth 缩放），弹窗里加载原图。
  */
 export function ClickableThumb({
   src,
   alt,
   className,
   loading = "lazy",
+  thumbWidth = 256,
 }: {
   src: string;
   alt?: string;
   className?: string;
   loading?: "lazy" | "eager";
+  thumbWidth?: number;
 }) {
   const [open, setOpen] = useState(false);
+  const thumb = toThumbUrl(src, thumbWidth) ?? src;
   return (
     <>
       <img
-        src={src}
+        src={thumb}
         alt={alt ?? ""}
         loading={loading}
         decoding="async"
@@ -35,11 +39,14 @@ export function ClickableThumb({
           className="max-w-[92vw] border-none bg-transparent p-0 shadow-none sm:max-w-[92vw]"
           onClick={() => setOpen(false)}
         >
-          <img
-            src={src}
-            alt={alt ?? ""}
-            className="mx-auto max-h-[90vh] w-auto max-w-full rounded object-contain"
-          />
+          {open && (
+            <img
+              src={src}
+              alt={alt ?? ""}
+              loading="eager"
+              className="mx-auto max-h-[90vh] w-auto max-w-full rounded object-contain"
+            />
+          )}
         </DialogContent>
       </Dialog>
     </>

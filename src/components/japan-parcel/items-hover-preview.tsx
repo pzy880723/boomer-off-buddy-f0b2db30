@@ -1,6 +1,7 @@
 import { ImageIcon } from "lucide-react";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { ClickableThumb } from "./image-lightbox";
+import { toThumbUrl } from "@/lib/image";
 
 export interface PreviewItem {
   id: string;
@@ -33,7 +34,7 @@ export function ItemsHoverPreview({
           aria-label="预览所有商品"
         >
           {cover ? (
-            <img src={cover} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+            <img src={toThumbUrl(cover, 128) ?? cover} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full w-full items-center justify-center bg-muted">
               <ImageIcon className="h-4 w-4 text-muted-foreground" />
@@ -54,6 +55,7 @@ export function ItemsHoverPreview({
                 {it!.item_image_url ? (
                   <ClickableThumb
                     src={it!.item_image_url}
+                    thumbWidth={200}
                     className="aspect-square w-full rounded object-cover"
                   />
                 ) : (
