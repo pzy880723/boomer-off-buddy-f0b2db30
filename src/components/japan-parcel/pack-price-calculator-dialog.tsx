@@ -182,6 +182,7 @@ export function PackPriceCalculatorDialog({ open, onOpenChange, item, landedCny 
             {item.item_image_url ? (
               <ClickableThumb
                 src={item.item_image_url}
+                thumbWidth={200}
                 alt={item.item_title ?? ""}
                 className="h-16 w-16 flex-shrink-0 rounded object-cover"
               />
