@@ -2,7 +2,12 @@ import { createServerFn } from "@tanstack/react-start";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { isSuperAdminPhone, PHONE_REGEX } from "./auth-config";
+import {
+  isSuperAdminPhone,
+  PHONE_REGEX,
+  phoneToEmail,
+  emailToPhone,
+} from "./auth-config";
 
 function admin() {
   const url = process.env.SUPABASE_URL!;
@@ -16,9 +21,10 @@ function admin() {
 async function assertSuperAdmin(context: { supabase: { auth: { getUser: () => Promise<any> } } }) {
   const { data, error } = await context.supabase.auth.getUser();
   if (error || !data?.user) throw new Error("未登录");
-  const phone = data.user.phone || data.user.user_metadata?.phone;
+  const u = data.user;
+  const phone = emailToPhone(u.email) || u.phone || u.user_metadata?.phone;
   if (!isSuperAdminPhone(phone)) throw new Error("无权操作：仅超级管理员可管理账号");
-  return data.user;
+  return u;
 }
 
 // ===== 列出所有用户 =====
@@ -37,14 +43,19 @@ export const listUsersFn = createServerFn({ method: "GET" })
       page += 1;
     }
     return all
-      .map((u) => ({
-        id: u.id,
-        phone: u.phone ?? null,
-        email: u.email ?? null,
-        created_at: u.created_at,
-        last_sign_in_at: u.last_sign_in_at ?? null,
-        must_change_password: !!u.user_metadata?.must_change_password,
-      }))
+      .map((u) => {
+        const derivedPhone = emailToPhone(u.email) || u.phone || null;
+        // 如果 email 是伪邮箱，UI 不显示原 email
+        const visibleEmail = emailToPhone(u.email) ? null : u.email ?? null;
+        return {
+          id: u.id,
+          phone: derivedPhone,
+          email: visibleEmail,
+          created_at: u.created_at,
+          last_sign_in_at: u.last_sign_in_at ?? null,
+          must_change_password: !!u.user_metadata?.must_change_password,
+        };
+      })
       .sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
   });
 
@@ -61,10 +72,10 @@ export const createUserFn = createServerFn({ method: "POST" })
     await assertSuperAdmin(context as any);
     const sb = admin();
     const { data: created, error } = await sb.auth.admin.createUser({
-      phone: data.phone,
+      email: phoneToEmail(data.phone),
       password: data.password,
-      phone_confirm: true,
-      user_metadata: { must_change_password: true },
+      email_confirm: true,
+      user_metadata: { phone: data.phone, must_change_password: true },
     });
     if (error) throw new Error(error.message);
     return { id: created.user?.id };

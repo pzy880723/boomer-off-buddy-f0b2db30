@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { PHONE_REGEX } from "@/lib/auth-config";
+import { PHONE_REGEX, phoneToEmail } from "@/lib/auth-config";
 import logo from "@/assets/logo-boomeroff.png";
 import logoWhite from "@/assets/logo-boomeroff-white.png";
 
@@ -62,7 +62,7 @@ function LoginPage() {
 
     setSubmitting(true);
     const { error: err } = await supabase.auth.signInWithPassword({
-      phone: cleanPhone,
+      email: phoneToEmail(cleanPhone),
       password,
     });
 

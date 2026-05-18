@@ -12,7 +12,7 @@ import { useEffect, useState } from "react";
 import { Search, Bell, CheckCircle2, Command, Loader2, Key, Users } from "lucide-react";
 import { useAuthSession } from "@/hooks/use-auth-session";
 import { supabase } from "@/integrations/supabase/client";
-import { isSuperAdminPhone } from "@/lib/auth-config";
+import { isSuperAdminPhone, resolveUserPhone } from "@/lib/auth-config";
 import { ChangePasswordDialog } from "@/components/change-password-dialog";
 
 import appCss from "../styles.css?url";
@@ -243,7 +243,7 @@ function RootComponent() {
 function UserMenu() {
   const router = useRouter();
   const { session } = useAuthSession();
-  const phone = session?.user?.phone ?? "";
+  const phone = resolveUserPhone(session?.user) ?? "";
   const email = session?.user?.email ?? "";
   const displayName = phone || email || "管理员";
   const initial = phone ? phone.slice(-1) : email ? email[0]!.toUpperCase() : "管";
