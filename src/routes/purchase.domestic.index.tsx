@@ -33,7 +33,7 @@ import {
 export const Route = createFileRoute("/purchase/domestic/")({
   head: () => ({
     meta: [
-      { title: "国内渠道 · 采购物流" },
+      { title: "国内小包 · 采购物流" },
       { name: "description", content: "闲鱼/抖音/小红书/微信 等国内订单截图智能导入" },
     ],
   }),
@@ -115,7 +115,7 @@ function DomesticListPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="国内渠道"
+        title="国内小包"
         description="闲鱼 / 抖音 / 小红书 / 微信 / 拼多多 订单截图智能识别 + 人工维护状态"
         actions={
           <div className="flex gap-2">

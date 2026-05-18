@@ -30,7 +30,7 @@ import {
 } from "@/lib/domestic-orders.functions";
 
 export const Route = createFileRoute("/purchase/domestic/$id")({
-  head: () => ({ meta: [{ title: "订单详情 · 国内渠道" }] }),
+  head: () => ({ meta: [{ title: "订单详情 · 国内小包" }] }),
   component: DomesticDetailPage,
 });
 
