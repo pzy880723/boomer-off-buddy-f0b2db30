@@ -567,7 +567,7 @@ function NewParcelPage() {
         </div>
       </div>
 
-      <AlertDialog open={status === "blocked"} onOpenChange={(o) => { if (!o) reset(); }}>
+      <AlertDialog open={status === "blocked"} onOpenChange={(o) => { if (!o) reset?.(); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>放弃当前修改？</AlertDialogTitle>
@@ -576,9 +576,9 @@ function NewParcelPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => reset()}>继续编辑</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => reset?.()}>继续编辑</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => proceed()}
+              onClick={() => proceed?.()}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               放弃并离开
