@@ -17,7 +17,6 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as StoresYouzanRouteImport } from './routes/stores.youzan'
 import { Route as StoresListRouteImport } from './routes/stores.list'
 import { Route as StoresFranchiseesRouteImport } from './routes/stores.franchisees'
-import { Route as PurchaseLogisticsRouteImport } from './routes/purchase.logistics'
 import { Route as PurchaseJapanParcelRouteImport } from './routes/purchase.japan-parcel'
 import { Route as PurchaseJapanBulkRouteImport } from './routes/purchase.japan-bulk'
 import { Route as PurchaseDomesticRouteImport } from './routes/purchase.domestic'
@@ -80,11 +79,6 @@ const StoresListRoute = StoresListRouteImport.update({
 const StoresFranchiseesRoute = StoresFranchiseesRouteImport.update({
   id: '/stores/franchisees',
   path: '/stores/franchisees',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PurchaseLogisticsRoute = PurchaseLogisticsRouteImport.update({
-  id: '/purchase/logistics',
-  path: '/purchase/logistics',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PurchaseJapanParcelRoute = PurchaseJapanParcelRouteImport.update({
@@ -221,7 +215,6 @@ export interface FileRoutesByFullPath {
   '/purchase/domestic': typeof PurchaseDomesticRouteWithChildren
   '/purchase/japan-bulk': typeof PurchaseJapanBulkRoute
   '/purchase/japan-parcel': typeof PurchaseJapanParcelRouteWithChildren
-  '/purchase/logistics': typeof PurchaseLogisticsRoute
   '/stores/franchisees': typeof StoresFranchiseesRoute
   '/stores/list': typeof StoresListRoute
   '/stores/youzan': typeof StoresYouzanRoute
@@ -251,7 +244,6 @@ export interface FileRoutesByTo {
   '/inventory/products': typeof InventoryProductsRoute
   '/inventory/transfers': typeof InventoryTransfersRoute
   '/purchase/japan-bulk': typeof PurchaseJapanBulkRoute
-  '/purchase/logistics': typeof PurchaseLogisticsRoute
   '/stores/franchisees': typeof StoresFranchiseesRoute
   '/stores/list': typeof StoresListRoute
   '/stores/youzan': typeof StoresYouzanRoute
@@ -286,7 +278,6 @@ export interface FileRoutesById {
   '/purchase/domestic': typeof PurchaseDomesticRouteWithChildren
   '/purchase/japan-bulk': typeof PurchaseJapanBulkRoute
   '/purchase/japan-parcel': typeof PurchaseJapanParcelRouteWithChildren
-  '/purchase/logistics': typeof PurchaseLogisticsRoute
   '/stores/franchisees': typeof StoresFranchiseesRoute
   '/stores/list': typeof StoresListRoute
   '/stores/youzan': typeof StoresYouzanRoute
@@ -322,7 +313,6 @@ export interface FileRouteTypes {
     | '/purchase/domestic'
     | '/purchase/japan-bulk'
     | '/purchase/japan-parcel'
-    | '/purchase/logistics'
     | '/stores/franchisees'
     | '/stores/list'
     | '/stores/youzan'
@@ -352,7 +342,6 @@ export interface FileRouteTypes {
     | '/inventory/products'
     | '/inventory/transfers'
     | '/purchase/japan-bulk'
-    | '/purchase/logistics'
     | '/stores/franchisees'
     | '/stores/list'
     | '/stores/youzan'
@@ -386,7 +375,6 @@ export interface FileRouteTypes {
     | '/purchase/domestic'
     | '/purchase/japan-bulk'
     | '/purchase/japan-parcel'
-    | '/purchase/logistics'
     | '/stores/franchisees'
     | '/stores/list'
     | '/stores/youzan'
@@ -421,7 +409,6 @@ export interface RootRouteChildren {
   PurchaseDomesticRoute: typeof PurchaseDomesticRouteWithChildren
   PurchaseJapanBulkRoute: typeof PurchaseJapanBulkRoute
   PurchaseJapanParcelRoute: typeof PurchaseJapanParcelRouteWithChildren
-  PurchaseLogisticsRoute: typeof PurchaseLogisticsRoute
   StoresFranchiseesRoute: typeof StoresFranchiseesRoute
   StoresListRoute: typeof StoresListRoute
   StoresYouzanRoute: typeof StoresYouzanRoute
@@ -484,13 +471,6 @@ declare module '@tanstack/react-router' {
       path: '/stores/franchisees'
       fullPath: '/stores/franchisees'
       preLoaderRoute: typeof StoresFranchiseesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/purchase/logistics': {
-      id: '/purchase/logistics'
-      path: '/purchase/logistics'
-      fullPath: '/purchase/logistics'
-      preLoaderRoute: typeof PurchaseLogisticsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/purchase/japan-parcel': {
@@ -735,7 +715,6 @@ const rootRouteChildren: RootRouteChildren = {
   PurchaseDomesticRoute: PurchaseDomesticRouteWithChildren,
   PurchaseJapanBulkRoute: PurchaseJapanBulkRoute,
   PurchaseJapanParcelRoute: PurchaseJapanParcelRouteWithChildren,
-  PurchaseLogisticsRoute: PurchaseLogisticsRoute,
   StoresFranchiseesRoute: StoresFranchiseesRoute,
   StoresListRoute: StoresListRoute,
   StoresYouzanRoute: StoresYouzanRoute,
@@ -744,3 +723,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
