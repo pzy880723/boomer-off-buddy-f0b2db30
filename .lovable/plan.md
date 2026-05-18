@@ -1,20 +1,28 @@
-我查到现在不是密码错，也不是后台没起来，而是上一轮迁移把手机号账号写进了认证表时，有几个 token 字段被写成了 NULL。认证服务读取用户时遇到 `confirmation_token` 为 NULL 会直接 500，所以登录请求失败。
+## 问题定位
 
-计划如下：
+用户点击"登录后台"按钮后：
+- 没有任何网络请求发往后台（确认无 `/token` 调用）
+- 页面 URL 变成 `/login?`，是浏览器**原生表单 GET 提交**导致的刷新
+- 手机号 / 密码被清空，是页面重新加载的副作用
 
-1. 修复超级管理员认证数据
-   - 把 `18657433310@users.local` 这条账号的认证 token 字段统一修正为空字符串，而不是 NULL。
-   - 保留现有密码不变。
-   - 保留手机号 `18657433310` 和内部邮箱映射。
+根本原因：浏览器装的 **沉浸式翻译** 和 **market-mate-for-1688** 扩展在 SSR HTML 上注入了 DOM（`<input id="tm1ine29geg">`、`data-immersive-translate-page-theme` 等），导致 React 水合失败。水合失败的那一刻，`<form onSubmit>` 还没绑定，点击按钮就退回到浏览器默认的表单提交行为。
 
-2. 顺手修正上一轮迁移方式
-   - 避免以后再直接把这些认证字段写成 NULL。
-   - 不再旋转密钥，不再改发布配置，不动业务数据。
+后台账号本身已经修好了，无需再动数据库。
 
-3. 验证登录链路
-   - 再查一次认证日志，确认不再出现 `Database error querying schema`。
-   - 登录页仍然保持用户看到的是“手机号 + 密码”，内部用邮箱映射只是为了绕过短信登录开关。
+## 修复方案（只改前端）
 
-技术细节：
-- 当前失败日志是：`error finding user: sql: Scan error on column index 3, name "confirmation_token": converting NULL to string is unsupported`。
-- 数据库里 `18657433310@users.local` 的 `confirmation_token` / `recovery_token` 等字段现在有 NULL，需要改成空字符串。
+### 1. 让登录页只在客户端渲染，绕开水合问题
+
+`src/routes/login.tsx` 中用 `useEffect` 把 `mounted` 设为 true，未挂载前只渲染一个静态骨架（不带表单事件），挂载后再渲染真正的表单。这样表单一定是客户端创建的，不会有水合失败的问题。
+
+### 2. 双保险：按钮也手动拦截
+
+把"登录后台"按钮改成 `type="button"`，把提交逻辑挂在 `onClick` 上同时保留 `<form onSubmit>`，确保即使浏览器扩展继续捣乱，按钮点击也走我们的 JS 而不是原生提交。
+
+### 3. 在根 `<body>` 加 `suppressHydrationWarning`
+
+`src/routes/__root.tsx` 的 `<body>` 标签加 `suppressHydrationWarning`，减少其它页面被翻译扩展污染时出现的水合警告。
+
+## 用户侧建议（非必须）
+
+修复后即可正常登录。如果之后还想彻底避免扩展干扰，可以在登录这一页临时关闭"沉浸式翻译"和"market-mate"插件，但代码层面这次修完就不会再被它们影响了。
