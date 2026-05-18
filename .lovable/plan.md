@@ -1,46 +1,22 @@
-## 现状
+## 替换侧边栏 Logo + 收起态只显示 "B"
 
-1. `src/components/app-sidebar.tsx` 里没有"账号管理"入口，只能手动输 `/admin/users` 进入 —— 这就是"找不到 / 好像不能用"的最直观原因。
-2. `/admin/users` 页面本身（`src/routes/admin.users.tsx` + `src/lib/admin-users.functions.ts`）逻辑是完整的：
-   - 客户端用 `resolveUserPhone(session.user)` 判断超级管理员；
-   - 服务端 `listUsersFn / createUserFn / resetUserPasswordFn / deleteUserFn` 都走 `requireSupabaseAuth` + `assertSuperAdmin` + Service Role key；
-   - 所需的 `SUPABASE_SERVICE_ROLE_KEY`、`SUPABASE_URL` Secrets 已存在。
-   - 目前没有任何日志报错。
+### 改动
 
-所以这次只需要：补上侧边栏入口，再在浏览器里跑一遍 CRUD 验证。
+1. **新增 Logo 资源**
+   - 把 `user-uploads://boomeroff_logo_group_left_画板_1-2.png` 拷贝到 `src/assets/logo-boomeroff-wide.png`（横版完整 logo，含文字）
+   - 旧的 `src/assets/logo-boomeroff.png` 保留不动（用于登录页等其它位置）
 
-## 方案
+2. **`src/components/app-sidebar.tsx` — `SidebarHeader` 区域**
+   - 展开态（`!collapsed`）：直接渲染新的横版 logo 图片，占满 header 宽度，移除右侧那段 `BOOMER·OFF / vintage group` 文字块（图本身已经包含这些字）
+   - 收起态（`collapsed`）：渲染一个方形容器，里面只显示一个大写 **"B"**（用与品牌一致的字重和颜色，例如白底/深色 `B`，或深底白字 `B`，跟 sidebar 主题协调）
+   - 整体仍然包在 `<Link to="/dashboard">` 里，hover/preload 行为保持不变
 
-### 1. 侧边栏底部加"账号管理"分组
+### 不动的部分
 
-改 `src/components/app-sidebar.tsx`：
+- 不改登录页、不改 favicon
+- 不改账号管理功能或其它菜单项
+- 不调整 sidebar 宽度变量
 
-- `NavTo` 联合类型新增 `"/admin/users"`。
-- `groups` 数组末尾追加一组（放在"运营"组之后，成为最后一组）：
-  ```ts
-  {
-    label: "系统",
-    items: [{ title: "账号管理", url: "/admin/users", icon: ShieldCheck }],
-  }
-  ```
-  图标从 `lucide-react` 引入 `ShieldCheck`（已有用户管理语义），保持和页面里 Badge 一致。
-- 因为这一项只对超级管理员有意义，菜单项渲染时用 `useAuthSession()` + `isSuperAdminPhone(resolveUserPhone(session?.user))` 判断；非超管自动隐藏，避免误点后看到"无权访问"。
-- 普通组依旧按 `groups` 渲染，新组单独条件渲染，逻辑写在 `AppSidebar` 内部，不破坏现有循环。
+### 视觉确认
 
-### 2. 验证 /admin/users 功能
-
-侧边栏改完后，让用户从菜单点进去，依次试：
-
-1. 进页面 → 列表能加载出当前账号（至少有 `18657433310`）。
-2. 「新增账号」→ 随便填一个 11 位手机号 + ≥6 位密码 → toast 成功 + 列表多一行 + 该行"状态"列显示"待修改密码"。
-3. 在新账号那行点「重置密码」→ 输入新密码 → toast 成功。
-4. 点新账号那行「删除」→ 确认 → toast 成功 + 该行消失。
-5. 用新账号在 `/login` 登一次，确认密码生效 + 触发首登改密弹窗（`change-password-dialog`）。
-
-我会在改完代码后用 server-function-logs / network 抓一遍，如果有 500 / 401 / RLS / Service Role 相关报错直接定位修复；目前预期是一切正常。
-
-## 仅改这一个文件
-
-- `src/components/app-sidebar.tsx`
-
-`admin.users.tsx` 和 `admin-users.functions.ts` 暂不动，等验证发现具体 bug 再说。
+实施后让你在展开和收起两种状态各看一眼，确认 logo 比例和 "B" 的样式 OK。
