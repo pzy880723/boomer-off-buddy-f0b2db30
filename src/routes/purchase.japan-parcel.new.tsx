@@ -512,7 +512,7 @@ function NewParcelPage() {
             <Button
               size="lg"
               className="w-full bg-gradient-brand shadow-elegant hover:opacity-90"
-              onClick={() => saveMut.mutate()}
+              onClick={() => saveMut.mutate({ continueAdding: false })}
               disabled={saveMut.isPending}
             >
               <Save className="mr-2 h-4 w-4" />
