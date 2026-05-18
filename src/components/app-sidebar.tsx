@@ -9,7 +9,7 @@ import {
   Plane,
   Mail,
   ShoppingBag,
-  Truck,
+  
   Tags,
   Layers,
   ArrowLeftRight,
@@ -42,7 +42,6 @@ type NavTo =
   | "/purchase/japan-bulk"
   | "/purchase/japan-parcel"
   | "/purchase/domestic"
-  | "/purchase/logistics"
   | "/inventory/skus"
   | "/inventory/inbound"
   | "/inventory/inbound/new"
@@ -63,8 +62,7 @@ const groups: { label: string; items: { title: string; url: NavTo; icon: LucideI
     items: [
       { title: "日本大宗", url: "/purchase/japan-bulk", icon: Plane },
       { title: "日本小包裹", url: "/purchase/japan-parcel", icon: Mail },
-      { title: "国内渠道", url: "/purchase/domestic", icon: ShoppingBag },
-      { title: "物流追踪", url: "/purchase/logistics", icon: Truck },
+      { title: "国内小包", url: "/purchase/domestic", icon: ShoppingBag },
     ],
     icon: Package,
   },

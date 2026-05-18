@@ -37,7 +37,7 @@ import {
 } from "@/lib/domestic-orders.functions";
 
 export const Route = createFileRoute("/purchase/domestic/import")({
-  head: () => ({ meta: [{ title: "国内渠道 · 截图导入" }] }),
+  head: () => ({ meta: [{ title: "国内小包 · 截图导入" }] }),
   component: ImportPage,
 });
 
