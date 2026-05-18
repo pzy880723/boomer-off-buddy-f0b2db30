@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import logo from "@/assets/logo-boomeroff.png";
+import logoWhite from "@/assets/logo-boomeroff-white.png";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -61,9 +62,9 @@ function LoginPage() {
 
         <div className="relative">
           <img
-            src={logo}
+            src={logoWhite}
             alt="BOOMER OFF"
-            className="h-20 w-auto brightness-0 invert opacity-90"
+            className="h-20 w-auto opacity-95"
           />
         </div>
 
