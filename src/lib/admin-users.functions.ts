@@ -51,6 +51,7 @@ export const listUsersFn = createServerFn({ method: "GET" })
           id: u.id,
           phone: derivedPhone,
           email: visibleEmail,
+          name: (u.user_metadata?.name as string | undefined) ?? null,
           created_at: u.created_at,
           last_sign_in_at: u.last_sign_in_at ?? null,
           must_change_password: !!u.user_metadata?.must_change_password,
@@ -63,6 +64,7 @@ export const listUsersFn = createServerFn({ method: "GET" })
 const createSchema = z.object({
   phone: z.string().regex(PHONE_REGEX, "手机号格式不正确"),
   password: z.string().min(6, "密码至少 6 位").max(72),
+  name: z.string().trim().min(1, "请填写姓名").max(50, "姓名过长"),
 });
 
 export const createUserFn = createServerFn({ method: "POST" })
@@ -75,7 +77,11 @@ export const createUserFn = createServerFn({ method: "POST" })
       email: phoneToEmail(data.phone),
       password: data.password,
       email_confirm: true,
-      user_metadata: { phone: data.phone, must_change_password: true },
+      user_metadata: {
+        phone: data.phone,
+        name: data.name,
+        must_change_password: true,
+      },
     });
     if (error) throw new Error(error.message);
     return { id: created.user?.id };
