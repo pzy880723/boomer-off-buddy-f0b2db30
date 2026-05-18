@@ -32,6 +32,7 @@ import { Route as PurchaseJapanParcelImportRouteImport } from './routes/purchase
 import { Route as PurchaseJapanParcelAccountsRouteImport } from './routes/purchase.japan-parcel.accounts'
 import { Route as PurchaseJapanParcelIdRouteImport } from './routes/purchase.japan-parcel.$id'
 import { Route as PurchaseDomesticImportRouteImport } from './routes/purchase.domestic.import'
+import { Route as PurchaseDomesticIdRouteImport } from './routes/purchase.domestic.$id'
 import { Route as ApiPublicMerukiIngestRouteImport } from './routes/api/public/meruki-ingest'
 
 const SettingsRoute = SettingsRouteImport.update({
@@ -152,6 +153,11 @@ const PurchaseDomesticImportRoute = PurchaseDomesticImportRouteImport.update({
   path: '/import',
   getParentRoute: () => PurchaseDomesticRoute,
 } as any)
+const PurchaseDomesticIdRoute = PurchaseDomesticIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => PurchaseDomesticRoute,
+} as any)
 const ApiPublicMerukiIngestRoute = ApiPublicMerukiIngestRouteImport.update({
   id: '/api/public/meruki-ingest',
   path: '/api/public/meruki-ingest',
@@ -176,6 +182,7 @@ export interface FileRoutesByFullPath {
   '/stores/list': typeof StoresListRoute
   '/stores/youzan': typeof StoresYouzanRoute
   '/api/public/meruki-ingest': typeof ApiPublicMerukiIngestRoute
+  '/purchase/domestic/$id': typeof PurchaseDomesticIdRoute
   '/purchase/domestic/import': typeof PurchaseDomesticImportRoute
   '/purchase/japan-parcel/$id': typeof PurchaseJapanParcelIdRoute
   '/purchase/japan-parcel/accounts': typeof PurchaseJapanParcelAccountsRoute
@@ -200,6 +207,7 @@ export interface FileRoutesByTo {
   '/stores/list': typeof StoresListRoute
   '/stores/youzan': typeof StoresYouzanRoute
   '/api/public/meruki-ingest': typeof ApiPublicMerukiIngestRoute
+  '/purchase/domestic/$id': typeof PurchaseDomesticIdRoute
   '/purchase/domestic/import': typeof PurchaseDomesticImportRoute
   '/purchase/japan-parcel/$id': typeof PurchaseJapanParcelIdRoute
   '/purchase/japan-parcel/accounts': typeof PurchaseJapanParcelAccountsRoute
@@ -227,6 +235,7 @@ export interface FileRoutesById {
   '/stores/list': typeof StoresListRoute
   '/stores/youzan': typeof StoresYouzanRoute
   '/api/public/meruki-ingest': typeof ApiPublicMerukiIngestRoute
+  '/purchase/domestic/$id': typeof PurchaseDomesticIdRoute
   '/purchase/domestic/import': typeof PurchaseDomesticImportRoute
   '/purchase/japan-parcel/$id': typeof PurchaseJapanParcelIdRoute
   '/purchase/japan-parcel/accounts': typeof PurchaseJapanParcelAccountsRoute
@@ -255,6 +264,7 @@ export interface FileRouteTypes {
     | '/stores/list'
     | '/stores/youzan'
     | '/api/public/meruki-ingest'
+    | '/purchase/domestic/$id'
     | '/purchase/domestic/import'
     | '/purchase/japan-parcel/$id'
     | '/purchase/japan-parcel/accounts'
@@ -279,6 +289,7 @@ export interface FileRouteTypes {
     | '/stores/list'
     | '/stores/youzan'
     | '/api/public/meruki-ingest'
+    | '/purchase/domestic/$id'
     | '/purchase/domestic/import'
     | '/purchase/japan-parcel/$id'
     | '/purchase/japan-parcel/accounts'
@@ -305,6 +316,7 @@ export interface FileRouteTypes {
     | '/stores/list'
     | '/stores/youzan'
     | '/api/public/meruki-ingest'
+    | '/purchase/domestic/$id'
     | '/purchase/domestic/import'
     | '/purchase/japan-parcel/$id'
     | '/purchase/japan-parcel/accounts'
@@ -497,6 +509,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PurchaseDomesticImportRouteImport
       parentRoute: typeof PurchaseDomesticRoute
     }
+    '/purchase/domestic/$id': {
+      id: '/purchase/domestic/$id'
+      path: '/$id'
+      fullPath: '/purchase/domestic/$id'
+      preLoaderRoute: typeof PurchaseDomesticIdRouteImport
+      parentRoute: typeof PurchaseDomesticRoute
+    }
     '/api/public/meruki-ingest': {
       id: '/api/public/meruki-ingest'
       path: '/api/public/meruki-ingest'
@@ -508,11 +527,13 @@ declare module '@tanstack/react-router' {
 }
 
 interface PurchaseDomesticRouteChildren {
+  PurchaseDomesticIdRoute: typeof PurchaseDomesticIdRoute
   PurchaseDomesticImportRoute: typeof PurchaseDomesticImportRoute
   PurchaseDomesticIndexRoute: typeof PurchaseDomesticIndexRoute
 }
 
 const PurchaseDomesticRouteChildren: PurchaseDomesticRouteChildren = {
+  PurchaseDomesticIdRoute: PurchaseDomesticIdRoute,
   PurchaseDomesticImportRoute: PurchaseDomesticImportRoute,
   PurchaseDomesticIndexRoute: PurchaseDomesticIndexRoute,
 }
