@@ -1,6 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { createClient } from "@supabase/supabase-js";
+
+function getAdmin() {
+  const url = process.env.SUPABASE_URL!;
+  const key = process.env.SUPABASE_SECRET_KEYS || process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+}
 
 const BodySchema = z.object({
   phone: z.string().regex(/^1[3-9]\d{9}$/, "手机号格式不正确"),
