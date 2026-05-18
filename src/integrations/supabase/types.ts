@@ -101,6 +101,182 @@ export type Database = {
         }
         Relationships: []
       }
+      inv_inbound_lines: {
+        Row: {
+          created_at: string
+          id: string
+          order_id: string
+          qty: number
+          sku_id: string
+          subtotal: number
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          order_id: string
+          qty: number
+          sku_id: string
+          subtotal?: number
+          unit_price?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          order_id?: string
+          qty?: number
+          sku_id?: string
+          subtotal?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inv_inbound_lines_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "inv_inbound_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inv_inbound_lines_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inv_inbound_orders: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          operator: string | null
+          scanned_at: string
+          source: string | null
+          total_qty: number
+          total_value_cny: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          operator?: string | null
+          scanned_at?: string
+          source?: string | null
+          total_qty?: number
+          total_value_cny?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          operator?: string | null
+          scanned_at?: string
+          source?: string | null
+          total_qty?: number
+          total_value_cny?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      inv_label_batches: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          operator: string | null
+          printed_at: string
+          qty: number
+          sku_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          operator?: string | null
+          printed_at?: string
+          qty: number
+          sku_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          operator?: string | null
+          printed_at?: string
+          qty?: number
+          sku_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inv_label_batches_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inv_skus: {
+        Row: {
+          category: string
+          created_at: string
+          epc: string
+          id: string
+          image_url: string | null
+          kind: string
+          name: string
+          notes: string | null
+          pack_pieces: number | null
+          price_tier: number
+          status: string
+          stock_qty: number
+          updated_at: string
+          weight_g: number | null
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          epc: string
+          id?: string
+          image_url?: string | null
+          kind?: string
+          name: string
+          notes?: string | null
+          pack_pieces?: number | null
+          price_tier: number
+          status?: string
+          stock_qty?: number
+          updated_at?: string
+          weight_g?: number | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          epc?: string
+          id?: string
+          image_url?: string | null
+          kind?: string
+          name?: string
+          notes?: string | null
+          pack_pieces?: number | null
+          price_tier?: number
+          status?: string
+          stock_qty?: number
+          updated_at?: string
+          weight_g?: number | null
+        }
+        Relationships: []
+      }
       japan_parcel_items: {
         Row: {
           addon_service: string | null
@@ -531,7 +707,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      inv_apply_inbound_stock: {
+        Args: { p_delta: number; p_sku_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
