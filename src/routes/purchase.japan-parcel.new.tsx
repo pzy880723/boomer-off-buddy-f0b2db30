@@ -1,9 +1,19 @@
-import { lazy, Suspense, useMemo, useState } from "react";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { createFileRoute, Link, useBlocker, useNavigate } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { ArrowLeft, Save, Plus, X } from "lucide-react";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -287,6 +297,41 @@ function NewParcelPage() {
   const updateItem = (key: string, patch: Partial<SubItem>) =>
     setItems((arr) => arr.map((it) => (it._key === key ? { ...it, ...patch } : it)));
 
+  // ====== Unsaved-changes guard ======
+  const isDirty = useMemo(() => {
+    const stripKey = (arr: SubItem[]) => arr.map(({ _key: _k, ...rest }) => rest);
+    const baseline = JSON.stringify({
+      parcel: emptyParcel(),
+      intl: emptyIntl(),
+      items: stripKey([emptyItem()]),
+    });
+    const current = JSON.stringify({
+      parcel,
+      intl,
+      items: stripKey(items),
+    });
+    return current !== baseline;
+  }, [parcel, intl, items]);
+
+  const shouldBlock = isDirty && !saveMut.isPending && !saveMut.isSuccess;
+
+  const { status, proceed, reset } = useBlocker({
+    shouldBlockFn: () => shouldBlock,
+    withResolver: true,
+    enableBeforeUnload: shouldBlock,
+  });
+
+  useEffect(() => {
+    if (!shouldBlock) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [shouldBlock]);
+
+
   return (
     <div className="space-y-5 pb-10">
       <PageHeader
@@ -521,6 +566,26 @@ function NewParcelPage() {
           </div>
         </div>
       </div>
+
+      <AlertDialog open={status === "blocked"} onOpenChange={(o) => { if (!o) reset?.(); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>放弃当前修改？</AlertDialogTitle>
+            <AlertDialogDescription>
+              你在这一单里录入的内容还没有保存，离开后将会丢失。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => reset?.()}>继续编辑</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => proceed?.()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              放弃并离开
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
