@@ -24,6 +24,7 @@ import { Route as PurchaseDomesticRouteImport } from './routes/purchase.domestic
 import { Route as InventoryTransfersRouteImport } from './routes/inventory.transfers'
 import { Route as InventoryProductsRouteImport } from './routes/inventory.products'
 import { Route as InventoryBatchesRouteImport } from './routes/inventory.batches'
+import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as PurchaseJapanParcelIndexRouteImport } from './routes/purchase.japan-parcel.index'
 import { Route as PurchaseJapanParcelNewRouteImport } from './routes/purchase.japan-parcel.new'
 import { Route as PurchaseJapanParcelImportRouteImport } from './routes/purchase.japan-parcel.import'
@@ -106,6 +107,11 @@ const InventoryBatchesRoute = InventoryBatchesRouteImport.update({
   path: '/inventory/batches',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/admin/users',
+  path: '/admin/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PurchaseJapanParcelIndexRoute =
   PurchaseJapanParcelIndexRouteImport.update({
     id: '/',
@@ -146,6 +152,7 @@ export interface FileRoutesByFullPath {
   '/knowledge': typeof KnowledgeRoute
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
+  '/admin/users': typeof AdminUsersRoute
   '/inventory/batches': typeof InventoryBatchesRoute
   '/inventory/products': typeof InventoryProductsRoute
   '/inventory/transfers': typeof InventoryTransfersRoute
@@ -169,6 +176,7 @@ export interface FileRoutesByTo {
   '/knowledge': typeof KnowledgeRoute
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
+  '/admin/users': typeof AdminUsersRoute
   '/inventory/batches': typeof InventoryBatchesRoute
   '/inventory/products': typeof InventoryProductsRoute
   '/inventory/transfers': typeof InventoryTransfersRoute
@@ -192,6 +200,7 @@ export interface FileRoutesById {
   '/knowledge': typeof KnowledgeRoute
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
+  '/admin/users': typeof AdminUsersRoute
   '/inventory/batches': typeof InventoryBatchesRoute
   '/inventory/products': typeof InventoryProductsRoute
   '/inventory/transfers': typeof InventoryTransfersRoute
@@ -217,6 +226,7 @@ export interface FileRouteTypes {
     | '/knowledge'
     | '/login'
     | '/settings'
+    | '/admin/users'
     | '/inventory/batches'
     | '/inventory/products'
     | '/inventory/transfers'
@@ -240,6 +250,7 @@ export interface FileRouteTypes {
     | '/knowledge'
     | '/login'
     | '/settings'
+    | '/admin/users'
     | '/inventory/batches'
     | '/inventory/products'
     | '/inventory/transfers'
@@ -262,6 +273,7 @@ export interface FileRouteTypes {
     | '/knowledge'
     | '/login'
     | '/settings'
+    | '/admin/users'
     | '/inventory/batches'
     | '/inventory/products'
     | '/inventory/transfers'
@@ -286,6 +298,7 @@ export interface RootRouteChildren {
   KnowledgeRoute: typeof KnowledgeRoute
   LoginRoute: typeof LoginRoute
   SettingsRoute: typeof SettingsRoute
+  AdminUsersRoute: typeof AdminUsersRoute
   InventoryBatchesRoute: typeof InventoryBatchesRoute
   InventoryProductsRoute: typeof InventoryProductsRoute
   InventoryTransfersRoute: typeof InventoryTransfersRoute
@@ -406,6 +419,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InventoryBatchesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/admin/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/purchase/japan-parcel/': {
       id: '/purchase/japan-parcel/'
       path: '/'
@@ -476,6 +496,7 @@ const rootRouteChildren: RootRouteChildren = {
   KnowledgeRoute: KnowledgeRoute,
   LoginRoute: LoginRoute,
   SettingsRoute: SettingsRoute,
+  AdminUsersRoute: AdminUsersRoute,
   InventoryBatchesRoute: InventoryBatchesRoute,
   InventoryProductsRoute: InventoryProductsRoute,
   InventoryTransfersRoute: InventoryTransfersRoute,
@@ -491,3 +512,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
