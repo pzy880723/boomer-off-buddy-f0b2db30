@@ -8,10 +8,12 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect } from "react";
-import { Search, Bell, CheckCircle2, Command, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Search, Bell, CheckCircle2, Command, Loader2, Key, Users } from "lucide-react";
 import { useAuthSession } from "@/hooks/use-auth-session";
 import { supabase } from "@/integrations/supabase/client";
+import { isSuperAdminPhone } from "@/lib/auth-config";
+import { ChangePasswordDialog } from "@/components/change-password-dialog";
 
 import appCss from "../styles.css?url";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -241,8 +243,13 @@ function RootComponent() {
 function UserMenu() {
   const router = useRouter();
   const { session } = useAuthSession();
+  const phone = session?.user?.phone ?? "";
   const email = session?.user?.email ?? "";
-  const initial = email ? email[0]!.toUpperCase() : "管";
+  const displayName = phone || email || "管理员";
+  const initial = phone ? phone.slice(-1) : email ? email[0]!.toUpperCase() : "管";
+  const isAdmin = isSuperAdminPhone(phone);
+  const [pwdOpen, setPwdOpen] = useState(false);
+  const mustChange = !!session?.user?.user_metadata?.must_change_password;
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -260,22 +267,39 @@ function UserMenu() {
           </Avatar>
           <div className="hidden text-left lg:block">
             <div className="max-w-[160px] truncate text-xs font-medium leading-tight">
-              {email || "管理员"}
+              {displayName}
             </div>
-            <div className="text-[10px] leading-tight text-muted-foreground">已登录</div>
+            <div className="text-[10px] leading-tight text-muted-foreground">
+              {isAdmin ? "超级管理员" : "已登录"}
+            </div>
           </div>
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel className="truncate">{email || "我的账户"}</DropdownMenuLabel>
+        <DropdownMenuLabel className="truncate">{displayName}</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem disabled>个人资料</DropdownMenuItem>
-        <DropdownMenuItem disabled>偏好设置</DropdownMenuItem>
+        {isAdmin && (
+          <DropdownMenuItem asChild>
+            <Link to="/admin/users" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              账号管理
+            </Link>
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem onClick={() => setPwdOpen(true)} className="gap-2">
+          <Key className="h-4 w-4" />
+          修改密码
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem className="text-destructive" onClick={handleSignOut}>
           退出登录
         </DropdownMenuItem>
       </DropdownMenuContent>
+      <ChangePasswordDialog
+        open={pwdOpen || mustChange}
+        onOpenChange={setPwdOpen}
+        force={mustChange}
+      />
     </DropdownMenu>
   );
 }
