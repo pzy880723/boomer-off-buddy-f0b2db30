@@ -566,6 +566,26 @@ function NewParcelPage() {
           </div>
         </div>
       </div>
+
+      <AlertDialog open={status === "blocked"} onOpenChange={(o) => { if (!o) reset(); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>放弃当前修改？</AlertDialogTitle>
+            <AlertDialogDescription>
+              你在这一单里录入的内容还没有保存，离开后将会丢失。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => reset()}>继续编辑</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => proceed()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              放弃并离开
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
