@@ -30,7 +30,6 @@ import { Route as PurchaseJapanParcelImportRouteImport } from './routes/purchase
 import { Route as PurchaseJapanParcelAccountsRouteImport } from './routes/purchase.japan-parcel.accounts'
 import { Route as PurchaseJapanParcelIdRouteImport } from './routes/purchase.japan-parcel.$id'
 import { Route as ApiPublicMerukiIngestRouteImport } from './routes/api/public/meruki-ingest'
-import { Route as ApiPublicEnvDebugRouteImport } from './routes/api/public/env-debug'
 import { Route as ApiPublicBootstrapAdminRouteImport } from './routes/api/public/bootstrap-admin'
 import { Route as ApiPublicAuthPrecheckRouteImport } from './routes/api/public/auth-precheck'
 
@@ -142,11 +141,6 @@ const ApiPublicMerukiIngestRoute = ApiPublicMerukiIngestRouteImport.update({
   path: '/api/public/meruki-ingest',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicEnvDebugRoute = ApiPublicEnvDebugRouteImport.update({
-  id: '/api/public/env-debug',
-  path: '/api/public/env-debug',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiPublicBootstrapAdminRoute = ApiPublicBootstrapAdminRouteImport.update({
   id: '/api/public/bootstrap-admin',
   path: '/api/public/bootstrap-admin',
@@ -176,7 +170,6 @@ export interface FileRoutesByFullPath {
   '/stores/youzan': typeof StoresYouzanRoute
   '/api/public/auth-precheck': typeof ApiPublicAuthPrecheckRoute
   '/api/public/bootstrap-admin': typeof ApiPublicBootstrapAdminRoute
-  '/api/public/env-debug': typeof ApiPublicEnvDebugRoute
   '/api/public/meruki-ingest': typeof ApiPublicMerukiIngestRoute
   '/purchase/japan-parcel/$id': typeof PurchaseJapanParcelIdRoute
   '/purchase/japan-parcel/accounts': typeof PurchaseJapanParcelAccountsRoute
@@ -201,7 +194,6 @@ export interface FileRoutesByTo {
   '/stores/youzan': typeof StoresYouzanRoute
   '/api/public/auth-precheck': typeof ApiPublicAuthPrecheckRoute
   '/api/public/bootstrap-admin': typeof ApiPublicBootstrapAdminRoute
-  '/api/public/env-debug': typeof ApiPublicEnvDebugRoute
   '/api/public/meruki-ingest': typeof ApiPublicMerukiIngestRoute
   '/purchase/japan-parcel/$id': typeof PurchaseJapanParcelIdRoute
   '/purchase/japan-parcel/accounts': typeof PurchaseJapanParcelAccountsRoute
@@ -228,7 +220,6 @@ export interface FileRoutesById {
   '/stores/youzan': typeof StoresYouzanRoute
   '/api/public/auth-precheck': typeof ApiPublicAuthPrecheckRoute
   '/api/public/bootstrap-admin': typeof ApiPublicBootstrapAdminRoute
-  '/api/public/env-debug': typeof ApiPublicEnvDebugRoute
   '/api/public/meruki-ingest': typeof ApiPublicMerukiIngestRoute
   '/purchase/japan-parcel/$id': typeof PurchaseJapanParcelIdRoute
   '/purchase/japan-parcel/accounts': typeof PurchaseJapanParcelAccountsRoute
@@ -256,7 +247,6 @@ export interface FileRouteTypes {
     | '/stores/youzan'
     | '/api/public/auth-precheck'
     | '/api/public/bootstrap-admin'
-    | '/api/public/env-debug'
     | '/api/public/meruki-ingest'
     | '/purchase/japan-parcel/$id'
     | '/purchase/japan-parcel/accounts'
@@ -281,7 +271,6 @@ export interface FileRouteTypes {
     | '/stores/youzan'
     | '/api/public/auth-precheck'
     | '/api/public/bootstrap-admin'
-    | '/api/public/env-debug'
     | '/api/public/meruki-ingest'
     | '/purchase/japan-parcel/$id'
     | '/purchase/japan-parcel/accounts'
@@ -307,7 +296,6 @@ export interface FileRouteTypes {
     | '/stores/youzan'
     | '/api/public/auth-precheck'
     | '/api/public/bootstrap-admin'
-    | '/api/public/env-debug'
     | '/api/public/meruki-ingest'
     | '/purchase/japan-parcel/$id'
     | '/purchase/japan-parcel/accounts'
@@ -334,7 +322,6 @@ export interface RootRouteChildren {
   StoresYouzanRoute: typeof StoresYouzanRoute
   ApiPublicAuthPrecheckRoute: typeof ApiPublicAuthPrecheckRoute
   ApiPublicBootstrapAdminRoute: typeof ApiPublicBootstrapAdminRoute
-  ApiPublicEnvDebugRoute: typeof ApiPublicEnvDebugRoute
   ApiPublicMerukiIngestRoute: typeof ApiPublicMerukiIngestRoute
 }
 
@@ -487,13 +474,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicMerukiIngestRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/env-debug': {
-      id: '/api/public/env-debug'
-      path: '/api/public/env-debug'
-      fullPath: '/api/public/env-debug'
-      preLoaderRoute: typeof ApiPublicEnvDebugRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/public/bootstrap-admin': {
       id: '/api/public/bootstrap-admin'
       path: '/api/public/bootstrap-admin'
@@ -548,9 +528,18 @@ const rootRouteChildren: RootRouteChildren = {
   StoresYouzanRoute: StoresYouzanRoute,
   ApiPublicAuthPrecheckRoute: ApiPublicAuthPrecheckRoute,
   ApiPublicBootstrapAdminRoute: ApiPublicBootstrapAdminRoute,
-  ApiPublicEnvDebugRoute: ApiPublicEnvDebugRoute,
   ApiPublicMerukiIngestRoute: ApiPublicMerukiIngestRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
