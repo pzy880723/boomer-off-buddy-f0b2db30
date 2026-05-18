@@ -8,10 +8,12 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect } from "react";
-import { Search, Bell, CheckCircle2, Command, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Search, Bell, CheckCircle2, Command, Loader2, Key, Users } from "lucide-react";
 import { useAuthSession } from "@/hooks/use-auth-session";
 import { supabase } from "@/integrations/supabase/client";
+import { isSuperAdminPhone } from "@/lib/auth-config";
+import { ChangePasswordDialog } from "@/components/change-password-dialog";
 
 import appCss from "../styles.css?url";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
