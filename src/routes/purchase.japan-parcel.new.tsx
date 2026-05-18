@@ -238,7 +238,7 @@ function NewParcelPage() {
 
   // ====== Save ======
   const saveMut = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (_vars: { continueAdding: boolean }) => {
       const r = await create({
         data: {
           source: usedAi ? "ai_ocr" : "manual",
@@ -267,9 +267,19 @@ function NewParcelPage() {
       }
       return r.row.id;
     },
-    onSuccess: () => {
-      toast.success("已保存，可在列表中继续编辑");
-      nav({ to: "/purchase/japan-parcel" });
+    onSuccess: (_id, vars) => {
+      if (vars.continueAdding) {
+        toast.success("已保存,继续添加下一单");
+        setParcel(emptyParcel());
+        setIntl(emptyIntl());
+        setItems([emptyItem()]);
+        setUsedAi(false);
+        setSmartOpen(false);
+        if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+      } else {
+        toast.success("已保存,可在列表中继续编辑");
+        nav({ to: "/purchase/japan-parcel" });
+      }
     },
     onError: (e) => toast.error((e as Error).message),
   });
@@ -291,8 +301,17 @@ function NewParcelPage() {
             </Button>
             <Button
               size="sm"
+              variant="outline"
+              onClick={() => saveMut.mutate({ continueAdding: true })}
+              disabled={saveMut.isPending}
+            >
+              <Plus className="mr-1.5 h-3.5 w-3.5" />
+              {saveMut.isPending ? "保存中…" : "保存并继续添加"}
+            </Button>
+            <Button
+              size="sm"
               className="bg-gradient-brand hover:opacity-90"
-              onClick={() => saveMut.mutate()}
+              onClick={() => saveMut.mutate({ continueAdding: false })}
               disabled={saveMut.isPending}
             >
               <Save className="mr-1.5 h-3.5 w-3.5" />
