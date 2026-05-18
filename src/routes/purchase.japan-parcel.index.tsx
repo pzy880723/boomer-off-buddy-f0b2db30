@@ -192,6 +192,9 @@ function JapanParcelList() {
     qc.invalidateQueries({ queryKey: ["jp-parcels"] });
     qc.invalidateQueries({ queryKey: ["jp-parcels-counts"] });
   };
+  const fetchingCount =
+    useIsFetching({ queryKey: ["jp-parcels"] }) +
+    useIsFetching({ queryKey: ["jp-parcels-counts"] });
 
   const switchTab = (next: ParcelTab) => {
     if (next === tab) return;
