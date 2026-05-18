@@ -14,6 +14,93 @@ export type Database = {
   }
   public: {
     Tables: {
+      domestic_orders: {
+        Row: {
+          carrier: string | null
+          chat_summary: string | null
+          completeness: number
+          created_at: string
+          deleted_at: string | null
+          id: string
+          item_image_url: string | null
+          item_title: string | null
+          notes: string | null
+          platform: string
+          price_cny: number | null
+          purchased_at: string | null
+          qty: number | null
+          raw_payload: Json | null
+          receiver_address: string | null
+          receiver_name: string | null
+          receiver_phone: string | null
+          screenshot_urls: Json | null
+          seller_handle: string | null
+          seller_name: string | null
+          shipping_cny: number | null
+          source_order_no: string | null
+          status: string
+          total_cny: number | null
+          tracking_no: string | null
+          updated_at: string
+        }
+        Insert: {
+          carrier?: string | null
+          chat_summary?: string | null
+          completeness?: number
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          item_image_url?: string | null
+          item_title?: string | null
+          notes?: string | null
+          platform: string
+          price_cny?: number | null
+          purchased_at?: string | null
+          qty?: number | null
+          raw_payload?: Json | null
+          receiver_address?: string | null
+          receiver_name?: string | null
+          receiver_phone?: string | null
+          screenshot_urls?: Json | null
+          seller_handle?: string | null
+          seller_name?: string | null
+          shipping_cny?: number | null
+          source_order_no?: string | null
+          status?: string
+          total_cny?: number | null
+          tracking_no?: string | null
+          updated_at?: string
+        }
+        Update: {
+          carrier?: string | null
+          chat_summary?: string | null
+          completeness?: number
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          item_image_url?: string | null
+          item_title?: string | null
+          notes?: string | null
+          platform?: string
+          price_cny?: number | null
+          purchased_at?: string | null
+          qty?: number | null
+          raw_payload?: Json | null
+          receiver_address?: string | null
+          receiver_name?: string | null
+          receiver_phone?: string | null
+          screenshot_urls?: Json | null
+          seller_handle?: string | null
+          seller_name?: string | null
+          shipping_cny?: number | null
+          source_order_no?: string | null
+          status?: string
+          total_cny?: number | null
+          tracking_no?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       japan_parcel_items: {
         Row: {
           addon_service: string | null
