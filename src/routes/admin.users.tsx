@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Plus, RotateCcw, Trash2, UserPlus, ShieldCheck } from "lucide-react";
+import { Loader2, Pencil, Plus, RotateCcw, Trash2, UserPlus, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -44,6 +44,7 @@ import {
   createUserFn,
   resetUserPasswordFn,
   deleteUserFn,
+  updateUserNameFn,
 } from "@/lib/admin-users.functions";
 
 export const Route = createFileRoute("/admin/users")({
@@ -83,6 +84,7 @@ function AdminUsersContent() {
   const createFn = useServerFn(createUserFn);
   const resetFn = useServerFn(resetUserPasswordFn);
   const deleteFn = useServerFn(deleteUserFn);
+  const updateNameFn = useServerFn(updateUserNameFn);
 
   const list = useQuery({
     queryKey: ["admin-users"],
@@ -114,6 +116,15 @@ function AdminUsersContent() {
       qc.invalidateQueries({ queryKey: ["admin-users"] });
     },
     onError: (e: any) => toast.error(e?.message ?? "删除失败"),
+  });
+
+  const updateNameMut = useMutation({
+    mutationFn: (vars: { userId: string; name: string }) => updateNameFn({ data: vars }),
+    onSuccess: () => {
+      toast.success("姓名已更新");
+      qc.invalidateQueries({ queryKey: ["admin-users"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "更新失败"),
   });
 
   return (
@@ -193,6 +204,11 @@ function AdminUsersContent() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
+                          <EditNameButton
+                            currentName={u.name}
+                            label={u.phone ?? u.email ?? ""}
+                            onSubmit={(name) => updateNameMut.mutateAsync({ userId: u.id, name })}
+                          />
                           <ResetPasswordButton
                             userId={u.id}
                             label={u.phone ?? u.email ?? ""}
@@ -444,5 +460,83 @@ function DeleteUserButton({ label, onConfirm }: { label: string; onConfirm: () =
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+  );
+}
+
+function EditNameButton({
+  currentName,
+  label,
+  onSubmit,
+}: {
+  currentName: string | null;
+  label: string;
+  onSubmit: (name: string) => Promise<unknown>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(currentName ?? "");
+  const [loading, setLoading] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const v = name.trim();
+    if (!v) {
+      toast.error("请填写姓名");
+      return;
+    }
+    setLoading(true);
+    try {
+      await onSubmit(v);
+      setOpen(false);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (o) setName(currentName ?? "");
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button size="sm" variant="ghost" className="h-8 gap-1">
+          <Pencil className="h-3.5 w-3.5" />
+          编辑姓名
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>编辑姓名</DialogTitle>
+          <DialogDescription>
+            修改 <span className="font-medium">{label}</span> 的姓名。
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={submit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-name">姓名</Label>
+            <Input
+              id="edit-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={50}
+              placeholder="张三"
+              required
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              取消
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+              保存
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
