@@ -14,6 +14,7 @@ import {
   ArrowUpDown,
   AlertTriangle,
   RotateCcw,
+  RefreshCw,
   Flag,
   Copy,
   Calculator,
