@@ -301,7 +301,6 @@ function CreateUserDialog({ onSubmit }: { onSubmit: (v: { phone: string; passwor
               onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
               placeholder="13800138000"
               required
-              autoFocus
             />
           </div>
           <div className="space-y-1.5">
