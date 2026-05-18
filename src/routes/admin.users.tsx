@@ -118,6 +118,15 @@ function AdminUsersContent() {
     onError: (e: any) => toast.error(e?.message ?? "删除失败"),
   });
 
+  const updateNameMut = useMutation({
+    mutationFn: (vars: { userId: string; name: string }) => updateNameFn({ data: vars }),
+    onSuccess: () => {
+      toast.success("姓名已更新");
+      qc.invalidateQueries({ queryKey: ["admin-users"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "更新失败"),
+  });
+
   return (
     <div className="space-y-4">
       <PageHeader
