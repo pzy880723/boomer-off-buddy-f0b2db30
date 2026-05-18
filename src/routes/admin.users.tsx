@@ -153,6 +153,9 @@ function AdminUsersContent() {
                   return (
                     <TableRow key={u.id}>
                       <TableCell className="font-medium">
+                        {u.name ?? <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell>
                         {u.phone ? (
                           <span>{u.phone}</span>
                         ) : (
