@@ -17,8 +17,11 @@ import {
   Users,
   Link2,
   Activity,
+  ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
+import { useAuthSession } from "@/hooks/use-auth-session";
+import { isSuperAdminPhone, resolveUserPhone } from "@/lib/auth-config";
 import {
   Sidebar,
   SidebarContent,
@@ -47,7 +50,8 @@ type NavTo =
   | "/stores/franchisees"
   | "/stores/youzan"
   | "/knowledge"
-  | "/settings";
+  | "/settings"
+  | "/admin/users";
 
 const groups: { label: string; items: { title: string; url: NavTo; icon: LucideIcon }[]; icon?: LucideIcon }[] = [
   {
@@ -95,9 +99,21 @@ export function AppSidebar() {
   const router = useRouter();
   const currentPath = useRouterState({ select: (s) => s.location.pathname });
   const { state } = useSidebar();
+  const { session } = useAuthSession();
+  const isSuperAdmin = isSuperAdminPhone(resolveUserPhone(session?.user));
   const collapsed = state === "collapsed";
   const isActive = (path: string) => currentPath === path || currentPath.startsWith(path + "/");
   const preload = (to: NavTo) => void router.preloadRoute({ to });
+
+  const allGroups = isSuperAdmin
+    ? [
+        ...groups,
+        {
+          label: "系统",
+          items: [{ title: "账号管理", url: "/admin/users" as NavTo, icon: ShieldCheck }],
+        },
+      ]
+    : groups;
 
   return (
     <Sidebar collapsible="icon" className="border-r-0">
@@ -120,7 +136,7 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="gap-1">
-        {groups.map((group) => (
+        {allGroups.map((group) => (
           <SidebarGroup key={group.label}>
             <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/45">
               {group.label}

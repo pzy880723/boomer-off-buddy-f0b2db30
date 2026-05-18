@@ -1,28 +1,46 @@
-## 问题定位
+## 现状
 
-用户点击"登录后台"按钮后：
-- 没有任何网络请求发往后台（确认无 `/token` 调用）
-- 页面 URL 变成 `/login?`，是浏览器**原生表单 GET 提交**导致的刷新
-- 手机号 / 密码被清空，是页面重新加载的副作用
+1. `src/components/app-sidebar.tsx` 里没有"账号管理"入口，只能手动输 `/admin/users` 进入 —— 这就是"找不到 / 好像不能用"的最直观原因。
+2. `/admin/users` 页面本身（`src/routes/admin.users.tsx` + `src/lib/admin-users.functions.ts`）逻辑是完整的：
+   - 客户端用 `resolveUserPhone(session.user)` 判断超级管理员；
+   - 服务端 `listUsersFn / createUserFn / resetUserPasswordFn / deleteUserFn` 都走 `requireSupabaseAuth` + `assertSuperAdmin` + Service Role key；
+   - 所需的 `SUPABASE_SERVICE_ROLE_KEY`、`SUPABASE_URL` Secrets 已存在。
+   - 目前没有任何日志报错。
 
-根本原因：浏览器装的 **沉浸式翻译** 和 **market-mate-for-1688** 扩展在 SSR HTML 上注入了 DOM（`<input id="tm1ine29geg">`、`data-immersive-translate-page-theme` 等），导致 React 水合失败。水合失败的那一刻，`<form onSubmit>` 还没绑定，点击按钮就退回到浏览器默认的表单提交行为。
+所以这次只需要：补上侧边栏入口，再在浏览器里跑一遍 CRUD 验证。
 
-后台账号本身已经修好了，无需再动数据库。
+## 方案
 
-## 修复方案（只改前端）
+### 1. 侧边栏底部加"账号管理"分组
 
-### 1. 让登录页只在客户端渲染，绕开水合问题
+改 `src/components/app-sidebar.tsx`：
 
-`src/routes/login.tsx` 中用 `useEffect` 把 `mounted` 设为 true，未挂载前只渲染一个静态骨架（不带表单事件），挂载后再渲染真正的表单。这样表单一定是客户端创建的，不会有水合失败的问题。
+- `NavTo` 联合类型新增 `"/admin/users"`。
+- `groups` 数组末尾追加一组（放在"运营"组之后，成为最后一组）：
+  ```ts
+  {
+    label: "系统",
+    items: [{ title: "账号管理", url: "/admin/users", icon: ShieldCheck }],
+  }
+  ```
+  图标从 `lucide-react` 引入 `ShieldCheck`（已有用户管理语义），保持和页面里 Badge 一致。
+- 因为这一项只对超级管理员有意义，菜单项渲染时用 `useAuthSession()` + `isSuperAdminPhone(resolveUserPhone(session?.user))` 判断；非超管自动隐藏，避免误点后看到"无权访问"。
+- 普通组依旧按 `groups` 渲染，新组单独条件渲染，逻辑写在 `AppSidebar` 内部，不破坏现有循环。
 
-### 2. 双保险：按钮也手动拦截
+### 2. 验证 /admin/users 功能
 
-把"登录后台"按钮改成 `type="button"`，把提交逻辑挂在 `onClick` 上同时保留 `<form onSubmit>`，确保即使浏览器扩展继续捣乱，按钮点击也走我们的 JS 而不是原生提交。
+侧边栏改完后，让用户从菜单点进去，依次试：
 
-### 3. 在根 `<body>` 加 `suppressHydrationWarning`
+1. 进页面 → 列表能加载出当前账号（至少有 `18657433310`）。
+2. 「新增账号」→ 随便填一个 11 位手机号 + ≥6 位密码 → toast 成功 + 列表多一行 + 该行"状态"列显示"待修改密码"。
+3. 在新账号那行点「重置密码」→ 输入新密码 → toast 成功。
+4. 点新账号那行「删除」→ 确认 → toast 成功 + 该行消失。
+5. 用新账号在 `/login` 登一次，确认密码生效 + 触发首登改密弹窗（`change-password-dialog`）。
 
-`src/routes/__root.tsx` 的 `<body>` 标签加 `suppressHydrationWarning`，减少其它页面被翻译扩展污染时出现的水合警告。
+我会在改完代码后用 server-function-logs / network 抓一遍，如果有 500 / 401 / RLS / Service Role 相关报错直接定位修复；目前预期是一切正常。
 
-## 用户侧建议（非必须）
+## 仅改这一个文件
 
-修复后即可正常登录。如果之后还想彻底避免扩展干扰，可以在登录这一页临时关闭"沉浸式翻译"和"market-mate"插件，但代码层面这次修完就不会再被它们影响了。
+- `src/components/app-sidebar.tsx`
+
+`admin.users.tsx` 和 `admin-users.functions.ts` 暂不动，等验证发现具体 bug 再说。
