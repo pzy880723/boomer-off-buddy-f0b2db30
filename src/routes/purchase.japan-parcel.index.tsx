@@ -318,6 +318,16 @@ function JapanParcelList() {
               <span className="text-xs text-muted-foreground">币种</span>
               <CurrencyToggle />
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => invalidateAll()}
+              disabled={fetchingCount > 0}
+              title="刷新列表"
+            >
+              <RefreshCw className={cn("mr-1.5 h-3.5 w-3.5", fetchingCount > 0 && "animate-spin")} />
+              刷新
+            </Button>
             <Button asChild size="sm" className="bg-gradient-brand hover:opacity-90">
               <Link
                 to="/purchase/japan-parcel/new"
