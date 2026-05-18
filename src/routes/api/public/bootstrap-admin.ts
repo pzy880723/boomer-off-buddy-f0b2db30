@@ -1,14 +1,29 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-const ADMIN_EMAIL = "87113911@qq.com";
-const ADMIN_PASSWORD = "pzy5565283";
+const PHONE_REGEX = /^1[3-9]\d{9}$/;
+const DEFAULT_PASSWORD = "pzy5565283";
 
 export const Route = createFileRoute("/api/public/bootstrap-admin")({
   server: {
     handlers: {
-      GET: async () => {
-        // 翻页查找该邮箱（listUsers 默认 50/页）
+      GET: async ({ request }) => {
+        const url = new URL(request.url);
+        const phone = (url.searchParams.get("phone") ?? "").trim();
+        const password = url.searchParams.get("password") ?? DEFAULT_PASSWORD;
+
+        if (!PHONE_REGEX.test(phone)) {
+          return Response.json(
+            {
+              ok: false,
+              error:
+                "请在 URL 中提供合法的中国大陆 11 位手机号，例如 /api/public/bootstrap-admin?phone=13800138000",
+            },
+            { status: 400, headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex" } },
+          );
+        }
+
+        // 翻页查找该手机号
         let exists = false;
         for (let page = 1; page <= 20; page++) {
           const { data, error } = await supabaseAdmin.auth.admin.listUsers({
@@ -18,7 +33,7 @@ export const Route = createFileRoute("/api/public/bootstrap-admin")({
           if (error) {
             return Response.json({ ok: false, error: error.message }, { status: 500 });
           }
-          if (data.users.some((u) => u.email?.toLowerCase() === ADMIN_EMAIL)) {
+          if (data.users.some((u) => u.phone === phone)) {
             exists = true;
             break;
           }
@@ -26,18 +41,24 @@ export const Route = createFileRoute("/api/public/bootstrap-admin")({
         }
 
         if (exists) {
-          return Response.json({ ok: true, already: true, email: ADMIN_EMAIL });
+          return Response.json(
+            { ok: true, already: true, phone },
+            { headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex" } },
+          );
         }
 
         const { error } = await supabaseAdmin.auth.admin.createUser({
-          email: ADMIN_EMAIL,
-          password: ADMIN_PASSWORD,
-          email_confirm: true,
+          phone,
+          password,
+          phone_confirm: true,
         });
         if (error) {
           return Response.json({ ok: false, error: error.message }, { status: 500 });
         }
-        return Response.json({ ok: true, created: true, email: ADMIN_EMAIL });
+        return Response.json(
+          { ok: true, created: true, phone },
+          { headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex" } },
+        );
       },
     },
   },
