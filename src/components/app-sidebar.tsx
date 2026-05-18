@@ -43,9 +43,9 @@ type NavTo =
   | "/purchase/japan-parcel"
   | "/purchase/domestic"
   | "/purchase/logistics"
-  | "/inventory/products"
-  | "/inventory/batches"
-  | "/inventory/transfers"
+  | "/inventory/skus"
+  | "/inventory/inbound"
+  | "/inventory/inbound/new"
   | "/stores/list"
   | "/stores/franchisees"
   | "/stores/youzan"
@@ -71,9 +71,9 @@ const groups: { label: string; items: { title: string; url: NavTo; icon: LucideI
   {
     label: "商品库存",
     items: [
-      { title: "商品档案", url: "/inventory/products", icon: Tags },
-      { title: "采购批次", url: "/inventory/batches", icon: Layers },
-      { title: "库存调拨", url: "/inventory/transfers", icon: ArrowLeftRight },
+      { title: "商品 SKU", url: "/inventory/skus", icon: Tags },
+      { title: "扫枪入库", url: "/inventory/inbound/new", icon: ArrowLeftRight },
+      { title: "入库记录", url: "/inventory/inbound", icon: Layers },
     ],
     icon: Boxes,
   },
