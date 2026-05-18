@@ -944,6 +944,39 @@ function JapanParcelList() {
           />
         </Suspense>
       )}
+
+      {itemCard && (() => {
+        const parcelRow = rows.find((p) => p.id === itemCard.parcelId) ?? null;
+        const siblings = (parcelRow?.japan_parcel_items ?? []) as ItemRow[];
+        return (
+          <Suspense fallback={null}>
+            <ItemCardDialog
+              open={!!itemCard}
+              onOpenChange={(o) => !o && setItemCard(null)}
+              item={itemCard.item}
+              parcel={
+                parcelRow
+                  ? {
+                      id: parcelRow.id,
+                      source_order_no: parcelRow.source_order_no,
+                      tracking_no: parcelRow.tracking_no,
+                      intl_total_jpy: parcelRow.intl_total_jpy ?? null,
+                      intl_exchange_rate: parcelRow.intl_exchange_rate ?? null,
+                    }
+                  : null
+              }
+              siblings={siblings}
+              onOpenParcel={() => {
+                const pid = itemCard.parcelId;
+                setItemCard(null);
+                void import("@/components/japan-parcel/parcel-card-dialog");
+                setOpenTab("overview");
+                setOpenCardId(pid);
+              }}
+            />
+          </Suspense>
+        );
+      })()}
     </div>
   );
 }
