@@ -462,3 +462,81 @@ function DeleteUserButton({ label, onConfirm }: { label: string; onConfirm: () =
     </AlertDialog>
   );
 }
+
+function EditNameButton({
+  currentName,
+  label,
+  onSubmit,
+}: {
+  currentName: string | null;
+  label: string;
+  onSubmit: (name: string) => Promise<unknown>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(currentName ?? "");
+  const [loading, setLoading] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const v = name.trim();
+    if (!v) {
+      toast.error("请填写姓名");
+      return;
+    }
+    setLoading(true);
+    try {
+      await onSubmit(v);
+      setOpen(false);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (o) setName(currentName ?? "");
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button size="sm" variant="ghost" className="h-8 gap-1">
+          <Pencil className="h-3.5 w-3.5" />
+          编辑姓名
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>编辑姓名</DialogTitle>
+          <DialogDescription>
+            修改 <span className="font-medium">{label}</span> 的姓名。
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={submit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-name">姓名</Label>
+            <Input
+              id="edit-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={50}
+              placeholder="张三"
+              required
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              取消
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+              保存
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
