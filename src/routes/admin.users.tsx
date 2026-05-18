@@ -44,6 +44,7 @@ import {
   createUserFn,
   resetUserPasswordFn,
   deleteUserFn,
+  updateUserNameFn,
 } from "@/lib/admin-users.functions";
 
 export const Route = createFileRoute("/admin/users")({
