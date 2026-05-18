@@ -30,6 +30,7 @@ import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as PurchaseJapanParcelIndexRouteImport } from './routes/purchase.japan-parcel.index'
 import { Route as PurchaseDomesticIndexRouteImport } from './routes/purchase.domestic.index'
 import { Route as InventorySkusIndexRouteImport } from './routes/inventory.skus.index'
+import { Route as InventoryInboundIndexRouteImport } from './routes/inventory.inbound.index'
 import { Route as PurchaseJapanParcelNewRouteImport } from './routes/purchase.japan-parcel.new'
 import { Route as PurchaseJapanParcelImportRouteImport } from './routes/purchase.japan-parcel.import'
 import { Route as PurchaseJapanParcelAccountsRouteImport } from './routes/purchase.japan-parcel.accounts'
@@ -37,6 +38,8 @@ import { Route as PurchaseJapanParcelIdRouteImport } from './routes/purchase.jap
 import { Route as PurchaseDomesticImportRouteImport } from './routes/purchase.domestic.import'
 import { Route as PurchaseDomesticIdRouteImport } from './routes/purchase.domestic.$id'
 import { Route as InventorySkusIdRouteImport } from './routes/inventory.skus.$id'
+import { Route as InventoryInboundNewRouteImport } from './routes/inventory.inbound.new'
+import { Route as InventoryInboundIdRouteImport } from './routes/inventory.inbound.$id'
 import { Route as ApiPublicMerukiIngestRouteImport } from './routes/api/public/meruki-ingest'
 
 const SettingsRoute = SettingsRouteImport.update({
@@ -145,6 +148,11 @@ const InventorySkusIndexRoute = InventorySkusIndexRouteImport.update({
   path: '/',
   getParentRoute: () => InventorySkusRoute,
 } as any)
+const InventoryInboundIndexRoute = InventoryInboundIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => InventoryInboundRoute,
+} as any)
 const PurchaseJapanParcelNewRoute = PurchaseJapanParcelNewRouteImport.update({
   id: '/new',
   path: '/new',
@@ -182,6 +190,16 @@ const InventorySkusIdRoute = InventorySkusIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => InventorySkusRoute,
 } as any)
+const InventoryInboundNewRoute = InventoryInboundNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => InventoryInboundRoute,
+} as any)
+const InventoryInboundIdRoute = InventoryInboundIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => InventoryInboundRoute,
+} as any)
 const ApiPublicMerukiIngestRoute = ApiPublicMerukiIngestRouteImport.update({
   id: '/api/public/meruki-ingest',
   path: '/api/public/meruki-ingest',
@@ -196,7 +214,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/admin/users': typeof AdminUsersRoute
   '/inventory/batches': typeof InventoryBatchesRoute
-  '/inventory/inbound': typeof InventoryInboundRoute
+  '/inventory/inbound': typeof InventoryInboundRouteWithChildren
   '/inventory/products': typeof InventoryProductsRoute
   '/inventory/skus': typeof InventorySkusRouteWithChildren
   '/inventory/transfers': typeof InventoryTransfersRoute
@@ -208,6 +226,8 @@ export interface FileRoutesByFullPath {
   '/stores/list': typeof StoresListRoute
   '/stores/youzan': typeof StoresYouzanRoute
   '/api/public/meruki-ingest': typeof ApiPublicMerukiIngestRoute
+  '/inventory/inbound/$id': typeof InventoryInboundIdRoute
+  '/inventory/inbound/new': typeof InventoryInboundNewRoute
   '/inventory/skus/$id': typeof InventorySkusIdRoute
   '/purchase/domestic/$id': typeof PurchaseDomesticIdRoute
   '/purchase/domestic/import': typeof PurchaseDomesticImportRoute
@@ -215,6 +235,7 @@ export interface FileRoutesByFullPath {
   '/purchase/japan-parcel/accounts': typeof PurchaseJapanParcelAccountsRoute
   '/purchase/japan-parcel/import': typeof PurchaseJapanParcelImportRoute
   '/purchase/japan-parcel/new': typeof PurchaseJapanParcelNewRoute
+  '/inventory/inbound/': typeof InventoryInboundIndexRoute
   '/inventory/skus/': typeof InventorySkusIndexRoute
   '/purchase/domestic/': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
@@ -227,7 +248,6 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/admin/users': typeof AdminUsersRoute
   '/inventory/batches': typeof InventoryBatchesRoute
-  '/inventory/inbound': typeof InventoryInboundRoute
   '/inventory/products': typeof InventoryProductsRoute
   '/inventory/transfers': typeof InventoryTransfersRoute
   '/purchase/japan-bulk': typeof PurchaseJapanBulkRoute
@@ -236,6 +256,8 @@ export interface FileRoutesByTo {
   '/stores/list': typeof StoresListRoute
   '/stores/youzan': typeof StoresYouzanRoute
   '/api/public/meruki-ingest': typeof ApiPublicMerukiIngestRoute
+  '/inventory/inbound/$id': typeof InventoryInboundIdRoute
+  '/inventory/inbound/new': typeof InventoryInboundNewRoute
   '/inventory/skus/$id': typeof InventorySkusIdRoute
   '/purchase/domestic/$id': typeof PurchaseDomesticIdRoute
   '/purchase/domestic/import': typeof PurchaseDomesticImportRoute
@@ -243,6 +265,7 @@ export interface FileRoutesByTo {
   '/purchase/japan-parcel/accounts': typeof PurchaseJapanParcelAccountsRoute
   '/purchase/japan-parcel/import': typeof PurchaseJapanParcelImportRoute
   '/purchase/japan-parcel/new': typeof PurchaseJapanParcelNewRoute
+  '/inventory/inbound': typeof InventoryInboundIndexRoute
   '/inventory/skus': typeof InventorySkusIndexRoute
   '/purchase/domestic': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel': typeof PurchaseJapanParcelIndexRoute
@@ -256,7 +279,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/admin/users': typeof AdminUsersRoute
   '/inventory/batches': typeof InventoryBatchesRoute
-  '/inventory/inbound': typeof InventoryInboundRoute
+  '/inventory/inbound': typeof InventoryInboundRouteWithChildren
   '/inventory/products': typeof InventoryProductsRoute
   '/inventory/skus': typeof InventorySkusRouteWithChildren
   '/inventory/transfers': typeof InventoryTransfersRoute
@@ -268,6 +291,8 @@ export interface FileRoutesById {
   '/stores/list': typeof StoresListRoute
   '/stores/youzan': typeof StoresYouzanRoute
   '/api/public/meruki-ingest': typeof ApiPublicMerukiIngestRoute
+  '/inventory/inbound/$id': typeof InventoryInboundIdRoute
+  '/inventory/inbound/new': typeof InventoryInboundNewRoute
   '/inventory/skus/$id': typeof InventorySkusIdRoute
   '/purchase/domestic/$id': typeof PurchaseDomesticIdRoute
   '/purchase/domestic/import': typeof PurchaseDomesticImportRoute
@@ -275,6 +300,7 @@ export interface FileRoutesById {
   '/purchase/japan-parcel/accounts': typeof PurchaseJapanParcelAccountsRoute
   '/purchase/japan-parcel/import': typeof PurchaseJapanParcelImportRoute
   '/purchase/japan-parcel/new': typeof PurchaseJapanParcelNewRoute
+  '/inventory/inbound/': typeof InventoryInboundIndexRoute
   '/inventory/skus/': typeof InventorySkusIndexRoute
   '/purchase/domestic/': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
@@ -301,6 +327,8 @@ export interface FileRouteTypes {
     | '/stores/list'
     | '/stores/youzan'
     | '/api/public/meruki-ingest'
+    | '/inventory/inbound/$id'
+    | '/inventory/inbound/new'
     | '/inventory/skus/$id'
     | '/purchase/domestic/$id'
     | '/purchase/domestic/import'
@@ -308,6 +336,7 @@ export interface FileRouteTypes {
     | '/purchase/japan-parcel/accounts'
     | '/purchase/japan-parcel/import'
     | '/purchase/japan-parcel/new'
+    | '/inventory/inbound/'
     | '/inventory/skus/'
     | '/purchase/domestic/'
     | '/purchase/japan-parcel/'
@@ -320,7 +349,6 @@ export interface FileRouteTypes {
     | '/settings'
     | '/admin/users'
     | '/inventory/batches'
-    | '/inventory/inbound'
     | '/inventory/products'
     | '/inventory/transfers'
     | '/purchase/japan-bulk'
@@ -329,6 +357,8 @@ export interface FileRouteTypes {
     | '/stores/list'
     | '/stores/youzan'
     | '/api/public/meruki-ingest'
+    | '/inventory/inbound/$id'
+    | '/inventory/inbound/new'
     | '/inventory/skus/$id'
     | '/purchase/domestic/$id'
     | '/purchase/domestic/import'
@@ -336,6 +366,7 @@ export interface FileRouteTypes {
     | '/purchase/japan-parcel/accounts'
     | '/purchase/japan-parcel/import'
     | '/purchase/japan-parcel/new'
+    | '/inventory/inbound'
     | '/inventory/skus'
     | '/purchase/domestic'
     | '/purchase/japan-parcel'
@@ -360,6 +391,8 @@ export interface FileRouteTypes {
     | '/stores/list'
     | '/stores/youzan'
     | '/api/public/meruki-ingest'
+    | '/inventory/inbound/$id'
+    | '/inventory/inbound/new'
     | '/inventory/skus/$id'
     | '/purchase/domestic/$id'
     | '/purchase/domestic/import'
@@ -367,6 +400,7 @@ export interface FileRouteTypes {
     | '/purchase/japan-parcel/accounts'
     | '/purchase/japan-parcel/import'
     | '/purchase/japan-parcel/new'
+    | '/inventory/inbound/'
     | '/inventory/skus/'
     | '/purchase/domestic/'
     | '/purchase/japan-parcel/'
@@ -380,7 +414,7 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   AdminUsersRoute: typeof AdminUsersRoute
   InventoryBatchesRoute: typeof InventoryBatchesRoute
-  InventoryInboundRoute: typeof InventoryInboundRoute
+  InventoryInboundRoute: typeof InventoryInboundRouteWithChildren
   InventoryProductsRoute: typeof InventoryProductsRoute
   InventorySkusRoute: typeof InventorySkusRouteWithChildren
   InventoryTransfersRoute: typeof InventoryTransfersRoute
@@ -543,6 +577,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InventorySkusIndexRouteImport
       parentRoute: typeof InventorySkusRoute
     }
+    '/inventory/inbound/': {
+      id: '/inventory/inbound/'
+      path: '/'
+      fullPath: '/inventory/inbound/'
+      preLoaderRoute: typeof InventoryInboundIndexRouteImport
+      parentRoute: typeof InventoryInboundRoute
+    }
     '/purchase/japan-parcel/new': {
       id: '/purchase/japan-parcel/new'
       path: '/new'
@@ -592,6 +633,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InventorySkusIdRouteImport
       parentRoute: typeof InventorySkusRoute
     }
+    '/inventory/inbound/new': {
+      id: '/inventory/inbound/new'
+      path: '/new'
+      fullPath: '/inventory/inbound/new'
+      preLoaderRoute: typeof InventoryInboundNewRouteImport
+      parentRoute: typeof InventoryInboundRoute
+    }
+    '/inventory/inbound/$id': {
+      id: '/inventory/inbound/$id'
+      path: '/$id'
+      fullPath: '/inventory/inbound/$id'
+      preLoaderRoute: typeof InventoryInboundIdRouteImport
+      parentRoute: typeof InventoryInboundRoute
+    }
     '/api/public/meruki-ingest': {
       id: '/api/public/meruki-ingest'
       path: '/api/public/meruki-ingest'
@@ -601,6 +656,21 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface InventoryInboundRouteChildren {
+  InventoryInboundIdRoute: typeof InventoryInboundIdRoute
+  InventoryInboundNewRoute: typeof InventoryInboundNewRoute
+  InventoryInboundIndexRoute: typeof InventoryInboundIndexRoute
+}
+
+const InventoryInboundRouteChildren: InventoryInboundRouteChildren = {
+  InventoryInboundIdRoute: InventoryInboundIdRoute,
+  InventoryInboundNewRoute: InventoryInboundNewRoute,
+  InventoryInboundIndexRoute: InventoryInboundIndexRoute,
+}
+
+const InventoryInboundRouteWithChildren =
+  InventoryInboundRoute._addFileChildren(InventoryInboundRouteChildren)
 
 interface InventorySkusRouteChildren {
   InventorySkusIdRoute: typeof InventorySkusIdRoute
@@ -658,7 +728,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   AdminUsersRoute: AdminUsersRoute,
   InventoryBatchesRoute: InventoryBatchesRoute,
-  InventoryInboundRoute: InventoryInboundRoute,
+  InventoryInboundRoute: InventoryInboundRouteWithChildren,
   InventoryProductsRoute: InventoryProductsRoute,
   InventorySkusRoute: InventorySkusRouteWithChildren,
   InventoryTransfersRoute: InventoryTransfersRoute,
@@ -674,3 +744,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
