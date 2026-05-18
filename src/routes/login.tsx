@@ -35,6 +35,11 @@ function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!sessionLoading && session) {
@@ -46,8 +51,8 @@ function LoginPage() {
 
   const inputsDisabled = submitting || redirecting;
 
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
+  async function doSubmit() {
+    if (submitting || redirecting) return;
     setError(null);
 
     const cleanPhone = phone.trim();
@@ -61,18 +66,29 @@ function LoginPage() {
     }
 
     setSubmitting(true);
-    const { error: err } = await supabase.auth.signInWithPassword({
-      email: phoneToEmail(cleanPhone),
-      password,
-    });
+    try {
+      const { error: err } = await supabase.auth.signInWithPassword({
+        email: phoneToEmail(cleanPhone),
+        password,
+      });
 
-    if (err) {
+      if (err) {
+        setSubmitting(false);
+        setError("手机号或密码错误，请重新输入或联系管理员");
+        return;
+      }
+      // 登录成功后由 useEffect 监听 session 跳转
+      setRedirecting(true);
+    } catch (err) {
       setSubmitting(false);
-      setError("手机号或密码错误，请重新输入或联系管理员");
-      return;
+      setError("登录请求失败，请稍后重试");
+      console.error("[login] signIn threw", err);
     }
-    // 登录成功后由 useEffect 监听 session 跳转
-    setRedirecting(true);
+  }
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    void doSubmit();
   }
 
   return (
@@ -130,7 +146,7 @@ function LoginPage() {
             <p className="text-sm text-muted-foreground">使用管理员分配的手机号登录后台</p>
           </div>
 
-          <form onSubmit={onSubmit} className="mt-8 space-y-4">
+          <form onSubmit={onSubmit} noValidate className="mt-8 space-y-4" suppressHydrationWarning>
             <div className="space-y-1.5">
               <Label htmlFor="phone">手机号</Label>
               <div className="relative">
@@ -188,8 +204,9 @@ function LoginPage() {
             )}
 
             <Button
-              type="submit"
-              disabled={inputsDisabled}
+              type="button"
+              disabled={inputsDisabled || !mounted}
+              onClick={() => void doSubmit()}
               className="h-11 w-full bg-gradient-brand shadow-elegant transition-transform hover:scale-[1.01]"
             >
               {submitting ? (
