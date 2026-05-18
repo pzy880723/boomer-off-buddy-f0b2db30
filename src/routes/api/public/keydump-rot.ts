@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 // TEMPORARY: one-time key dump for CVM redeployment after rotation.
 // DELETE this file immediately after use.
-export const Route = createFileRoute("/api/public/_keydump")({
+export const Route = createFileRoute("/api/public/keydump-rot")({
   server: {
     handlers: {
       GET: async ({ request }) => {
