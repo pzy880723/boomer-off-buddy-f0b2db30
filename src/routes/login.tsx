@@ -59,12 +59,12 @@ function LoginPage() {
           }}
         />
 
-        <div className="relative flex items-center gap-3">
-          <img src={logo} alt="BOOMER OFF" className="h-10 w-10 rounded-lg bg-white/10 p-1.5 backdrop-blur" />
-          <div>
-            <div className="text-base font-semibold tracking-wide">BOOMER OFF</div>
-            <div className="text-xs text-primary-foreground/70">品牌管理后台</div>
-          </div>
+        <div className="relative">
+          <img
+            src={logo}
+            alt="BOOMER OFF"
+            className="h-20 w-auto brightness-0 invert opacity-90"
+          />
         </div>
 
         <div className="relative space-y-6">
