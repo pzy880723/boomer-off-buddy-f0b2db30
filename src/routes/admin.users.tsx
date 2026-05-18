@@ -38,7 +38,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useAuthSession } from "@/hooks/use-auth-session";
-import { isSuperAdminPhone, PHONE_REGEX, SUPER_ADMIN_PHONES } from "@/lib/auth-config";
+import { isSuperAdminPhone, PHONE_REGEX, SUPER_ADMIN_PHONES, resolveUserPhone } from "@/lib/auth-config";
 import {
   listUsersFn,
   createUserFn,
@@ -53,7 +53,7 @@ export const Route = createFileRoute("/admin/users")({
 
 function AdminUsersPage() {
   const { session, loading } = useAuthSession();
-  const myPhone = session?.user?.phone ?? null;
+  const myPhone = resolveUserPhone(session?.user);
 
   if (loading) {
     return (
