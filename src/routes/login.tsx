@@ -64,7 +64,7 @@ function LoginPage() {
           <img
             src={logoWhite}
             alt="BOOMER OFF"
-            className="h-20 w-auto opacity-95"
+            className="h-14 w-auto opacity-95"
           />
         </div>
 
