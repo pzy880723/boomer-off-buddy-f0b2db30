@@ -157,8 +157,9 @@ export function PackPriceCalculatorDialog({ open, onOpenChange, item, landedCny 
         },
       });
       toast.success("已保存");
-      await qc.invalidateQueries({ queryKey: ["japan_parcels"] });
-      await qc.invalidateQueries({ queryKey: ["japan_parcel"] });
+      await qc.invalidateQueries({ queryKey: ["jp-parcels"] });
+      await qc.invalidateQueries({ queryKey: ["jp-parcels-counts"] });
+      await qc.invalidateQueries({ queryKey: ["jp-parcel"] });
       onOpenChange(false);
     } catch (e) {
       toast.error((e as Error).message);
