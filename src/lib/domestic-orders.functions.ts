@@ -191,7 +191,7 @@ export const updateDomesticOrder = createServerFn({ method: "POST" })
     if (current) {
       patch.completeness = computeCompleteness({ ...current, ...patch } as Partial<DomesticOrderInput>);
     }
-    const { error } = await supabase.from("domestic_orders").update(patch).eq("id", data.id);
+    const { error } = await supabase.from("domestic_orders").update(patch as never).eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
