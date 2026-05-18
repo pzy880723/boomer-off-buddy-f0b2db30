@@ -206,7 +206,6 @@ function DomesticListPage() {
       <DataTable
         rowKey={(r) => r.id}
         data={rows}
-        loading={listQ.isLoading}
         columns={[
           {
             header: "平台",
