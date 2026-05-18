@@ -160,7 +160,7 @@ export const bulkInsertDomesticOrders = createServerFn({ method: "POST" })
       }
       const { data: row, error } = await supabase
         .from("domestic_orders")
-        .insert(payload)
+        .insert(payload as never)
         .select("id")
         .single();
       if (error) throw new Error(error.message);
