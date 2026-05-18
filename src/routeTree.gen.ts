@@ -31,6 +31,7 @@ import { Route as PurchaseJapanParcelNewRouteImport } from './routes/purchase.ja
 import { Route as PurchaseJapanParcelImportRouteImport } from './routes/purchase.japan-parcel.import'
 import { Route as PurchaseJapanParcelAccountsRouteImport } from './routes/purchase.japan-parcel.accounts'
 import { Route as PurchaseJapanParcelIdRouteImport } from './routes/purchase.japan-parcel.$id'
+import { Route as PurchaseDomesticImportRouteImport } from './routes/purchase.domestic.import'
 import { Route as ApiPublicMerukiIngestRouteImport } from './routes/api/public/meruki-ingest'
 
 const SettingsRoute = SettingsRouteImport.update({
@@ -146,6 +147,11 @@ const PurchaseJapanParcelIdRoute = PurchaseJapanParcelIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => PurchaseJapanParcelRoute,
 } as any)
+const PurchaseDomesticImportRoute = PurchaseDomesticImportRouteImport.update({
+  id: '/import',
+  path: '/import',
+  getParentRoute: () => PurchaseDomesticRoute,
+} as any)
 const ApiPublicMerukiIngestRoute = ApiPublicMerukiIngestRouteImport.update({
   id: '/api/public/meruki-ingest',
   path: '/api/public/meruki-ingest',
@@ -170,6 +176,7 @@ export interface FileRoutesByFullPath {
   '/stores/list': typeof StoresListRoute
   '/stores/youzan': typeof StoresYouzanRoute
   '/api/public/meruki-ingest': typeof ApiPublicMerukiIngestRoute
+  '/purchase/domestic/import': typeof PurchaseDomesticImportRoute
   '/purchase/japan-parcel/$id': typeof PurchaseJapanParcelIdRoute
   '/purchase/japan-parcel/accounts': typeof PurchaseJapanParcelAccountsRoute
   '/purchase/japan-parcel/import': typeof PurchaseJapanParcelImportRoute
@@ -193,6 +200,7 @@ export interface FileRoutesByTo {
   '/stores/list': typeof StoresListRoute
   '/stores/youzan': typeof StoresYouzanRoute
   '/api/public/meruki-ingest': typeof ApiPublicMerukiIngestRoute
+  '/purchase/domestic/import': typeof PurchaseDomesticImportRoute
   '/purchase/japan-parcel/$id': typeof PurchaseJapanParcelIdRoute
   '/purchase/japan-parcel/accounts': typeof PurchaseJapanParcelAccountsRoute
   '/purchase/japan-parcel/import': typeof PurchaseJapanParcelImportRoute
@@ -219,6 +227,7 @@ export interface FileRoutesById {
   '/stores/list': typeof StoresListRoute
   '/stores/youzan': typeof StoresYouzanRoute
   '/api/public/meruki-ingest': typeof ApiPublicMerukiIngestRoute
+  '/purchase/domestic/import': typeof PurchaseDomesticImportRoute
   '/purchase/japan-parcel/$id': typeof PurchaseJapanParcelIdRoute
   '/purchase/japan-parcel/accounts': typeof PurchaseJapanParcelAccountsRoute
   '/purchase/japan-parcel/import': typeof PurchaseJapanParcelImportRoute
@@ -246,6 +255,7 @@ export interface FileRouteTypes {
     | '/stores/list'
     | '/stores/youzan'
     | '/api/public/meruki-ingest'
+    | '/purchase/domestic/import'
     | '/purchase/japan-parcel/$id'
     | '/purchase/japan-parcel/accounts'
     | '/purchase/japan-parcel/import'
@@ -269,6 +279,7 @@ export interface FileRouteTypes {
     | '/stores/list'
     | '/stores/youzan'
     | '/api/public/meruki-ingest'
+    | '/purchase/domestic/import'
     | '/purchase/japan-parcel/$id'
     | '/purchase/japan-parcel/accounts'
     | '/purchase/japan-parcel/import'
@@ -294,6 +305,7 @@ export interface FileRouteTypes {
     | '/stores/list'
     | '/stores/youzan'
     | '/api/public/meruki-ingest'
+    | '/purchase/domestic/import'
     | '/purchase/japan-parcel/$id'
     | '/purchase/japan-parcel/accounts'
     | '/purchase/japan-parcel/import'
@@ -478,6 +490,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PurchaseJapanParcelIdRouteImport
       parentRoute: typeof PurchaseJapanParcelRoute
     }
+    '/purchase/domestic/import': {
+      id: '/purchase/domestic/import'
+      path: '/import'
+      fullPath: '/purchase/domestic/import'
+      preLoaderRoute: typeof PurchaseDomesticImportRouteImport
+      parentRoute: typeof PurchaseDomesticRoute
+    }
     '/api/public/meruki-ingest': {
       id: '/api/public/meruki-ingest'
       path: '/api/public/meruki-ingest'
@@ -489,10 +508,12 @@ declare module '@tanstack/react-router' {
 }
 
 interface PurchaseDomesticRouteChildren {
+  PurchaseDomesticImportRoute: typeof PurchaseDomesticImportRoute
   PurchaseDomesticIndexRoute: typeof PurchaseDomesticIndexRoute
 }
 
 const PurchaseDomesticRouteChildren: PurchaseDomesticRouteChildren = {
+  PurchaseDomesticImportRoute: PurchaseDomesticImportRoute,
   PurchaseDomesticIndexRoute: PurchaseDomesticIndexRoute,
 }
 
@@ -540,3 +561,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
