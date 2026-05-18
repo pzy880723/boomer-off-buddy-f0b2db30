@@ -162,6 +162,7 @@ function JapanParcelList() {
   const [openCardId, setOpenCardId] = useState<string | null>(null);
   const [openTab, setOpenTab] = useState<"overview" | "edit">("overview");
   const [packCalc, setPackCalc] = useState<{ item: ItemRow; landedCny: number | null } | null>(null);
+  const [itemCard, setItemCard] = useState<{ item: ItemRow; parcelId: string } | null>(null);
   const [currency] = useCurrencyDisplay();
   const [viewMode] = useParcelViewMode();
   const [sort, setSort] = useState<SortState>({ field: "intl_pay_at", dir: "desc" });
