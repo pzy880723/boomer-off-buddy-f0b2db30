@@ -90,7 +90,7 @@ function AdminUsersContent() {
   });
 
   const createMut = useMutation({
-    mutationFn: (vars: { phone: string; password: string }) => createFn({ data: vars }),
+    mutationFn: (vars: { phone: string; password: string; name: string }) => createFn({ data: vars }),
     onSuccess: () => {
       toast.success("账号已创建");
       qc.invalidateQueries({ queryKey: ["admin-users"] });
@@ -138,6 +138,7 @@ function AdminUsersContent() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>姓名</TableHead>
                   <TableHead>手机号 / 邮箱</TableHead>
                   <TableHead>角色</TableHead>
                   <TableHead>状态</TableHead>
@@ -152,6 +153,9 @@ function AdminUsersContent() {
                   return (
                     <TableRow key={u.id}>
                       <TableCell className="font-medium">
+                        {u.name ?? <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell>
                         {u.phone ? (
                           <span>{u.phone}</span>
                         ) : (
@@ -207,7 +211,7 @@ function AdminUsersContent() {
                 })}
                 {(list.data ?? []).length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
                       暂无账号
                     </TableCell>
                   </TableRow>
@@ -225,14 +229,19 @@ function AdminUsersContent() {
   );
 }
 
-function CreateUserDialog({ onSubmit }: { onSubmit: (v: { phone: string; password: string }) => Promise<unknown> }) {
+function CreateUserDialog({ onSubmit }: { onSubmit: (v: { phone: string; password: string; name: string }) => Promise<unknown> }) {
   const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!name.trim()) {
+      toast.error("请填写姓名");
+      return;
+    }
     if (!PHONE_REGEX.test(phone)) {
       toast.error("手机号格式不正确");
       return;
@@ -243,8 +252,9 @@ function CreateUserDialog({ onSubmit }: { onSubmit: (v: { phone: string; passwor
     }
     setLoading(true);
     try {
-      await onSubmit({ phone, password });
+      await onSubmit({ phone, password, name: name.trim() });
       setOpen(false);
+      setName("");
       setPhone("");
       setPassword("");
     } finally {
@@ -264,10 +274,22 @@ function CreateUserDialog({ onSubmit }: { onSubmit: (v: { phone: string; passwor
         <DialogHeader>
           <DialogTitle>新增账号</DialogTitle>
           <DialogDescription>
-            录入用户的手机号与初始密码，用户首次登录系统会要求修改密码。
+            录入用户姓名、手机号与初始密码，用户首次登录系统会要求修改密码。
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="new-name">姓名</Label>
+            <Input
+              id="new-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="张三"
+              maxLength={50}
+              required
+              autoFocus
+            />
+          </div>
           <div className="space-y-1.5">
             <Label htmlFor="new-phone">手机号</Label>
             <Input
@@ -279,7 +301,6 @@ function CreateUserDialog({ onSubmit }: { onSubmit: (v: { phone: string; passwor
               onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
               placeholder="13800138000"
               required
-              autoFocus
             />
           </div>
           <div className="space-y-1.5">
