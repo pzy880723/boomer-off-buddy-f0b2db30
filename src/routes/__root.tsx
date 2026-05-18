@@ -267,22 +267,39 @@ function UserMenu() {
           </Avatar>
           <div className="hidden text-left lg:block">
             <div className="max-w-[160px] truncate text-xs font-medium leading-tight">
-              {email || "管理员"}
+              {displayName}
             </div>
-            <div className="text-[10px] leading-tight text-muted-foreground">已登录</div>
+            <div className="text-[10px] leading-tight text-muted-foreground">
+              {isAdmin ? "超级管理员" : "已登录"}
+            </div>
           </div>
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel className="truncate">{email || "我的账户"}</DropdownMenuLabel>
+        <DropdownMenuLabel className="truncate">{displayName}</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem disabled>个人资料</DropdownMenuItem>
-        <DropdownMenuItem disabled>偏好设置</DropdownMenuItem>
+        {isAdmin && (
+          <DropdownMenuItem asChild>
+            <Link to="/admin/users" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              账号管理
+            </Link>
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem onClick={() => setPwdOpen(true)} className="gap-2">
+          <Key className="h-4 w-4" />
+          修改密码
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem className="text-destructive" onClick={handleSignOut}>
           退出登录
         </DropdownMenuItem>
       </DropdownMenuContent>
+      <ChangePasswordDialog
+        open={pwdOpen || mustChange}
+        onOpenChange={setPwdOpen}
+        force={mustChange}
+      />
     </DropdownMenu>
   );
 }
