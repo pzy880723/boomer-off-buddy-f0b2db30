@@ -84,6 +84,7 @@ function AdminUsersContent() {
   const createFn = useServerFn(createUserFn);
   const resetFn = useServerFn(resetUserPasswordFn);
   const deleteFn = useServerFn(deleteUserFn);
+  const updateNameFn = useServerFn(updateUserNameFn);
 
   const list = useQuery({
     queryKey: ["admin-users"],
