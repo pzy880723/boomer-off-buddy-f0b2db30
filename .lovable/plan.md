@@ -1,69 +1,105 @@
-## 目标
 
-在 `/purchase/japan-parcel/new` 表单页，当用户有未保存内容时离开页面（点「返回」、点侧边栏跳转、浏览器后退、刷新、关闭标签），弹出确认弹窗：「有未保存的修改，确定放弃吗？」。确认后才离开，取消则停在原页。
+# 国内多渠道订单智能导入
 
-## 改动范围
+复用 meruki 那套「截图 + AI 识别 + 人工维护状态」的成熟模式，扩展到咸鱼、抖音、小红书、微信四个来源。最大差异：国内订单**本币就是 CNY、无国际运费、信息来源更杂**（既有标准订单截图，也有聊天截图）。
 
-仅改一个文件：`src/routes/purchase.japan-parcel.new.tsx`。纯前端 UI/交互，不动 server function、不动数据库。
+## 1. 数据模型
 
-## 具体方案
+新建独立表 `domestic_orders`（不混入 `japan_parcels`，避免日元/汇率/国际段字段污染）：
 
-### 1. 判断「脏」状态（dirty）
+| 字段 | 说明 |
+|---|---|
+| `id` uuid pk |  |
+| `platform` text | `xianyu` / `douyin` / `xiaohongshu` / `wechat` |
+| `source_order_no` text | 平台订单号；微信聊天截图可空 |
+| `seller_name`, `seller_handle` | 卖家昵称 / ID |
+| `item_title`, `item_image_url` | 商品 |
+| `price_cny`, `shipping_cny`, `total_cny` | 金额 |
+| `qty` int default 1 |  |
+| `purchased_at` timestamptz | 下单时间 |
+| `tracking_no`, `carrier` | 快递单号、承运商 |
+| `receiver_name`, `receiver_phone`, `receiver_address` |  |
+| `status` text | 见状态字典 |
+| `notes` text | 备注 / 议价记录 |
+| `chat_summary` text | 微信/咸鱼聊天关键摘要 |
+| `raw_payload` jsonb | AI 原始 JSON + 截图 url |
+| `screenshot_urls` text[] | 关联截图（存 storage 桶 `domestic-order-screenshots`） |
+| `completeness` int | 0-100 |
+| `created_at`, `updated_at` |  |
 
-新增 `const isDirty = useMemo(...)`：把当前 `parcel / intl / items` 序列化后跟初始空白基线对比。
+唯一约束：`(platform, source_order_no)`（订单号为空时不去重，由人工合并）。
 
-- 基线：`JSON.stringify({ parcel: emptyParcel(), intl: emptyIntl(), items: [emptyItem()] })`，因为 `emptyItem()` 里的 `_key` 是随机 UUID，比较前先把 items 的 `_key` 字段剥掉。
-- 脏的定义：序列化后的当前内容 ≠ 空白基线，且当前不在 `saveMut.isPending` 中。
-- 保存成功后会调用 `setParcel(emptyParcel())` 等重置，`isDirty` 自动回到 `false`，无需额外标记。
+**状态字典**（5 档，与日本包裹保持一致风格）：
+`pending_pay`（待付款/议价中） → `paid`（已付款） → `shipped`（已发货，有快递单号） → `delivered`（已签收） → `completed`（完成入库）。
 
-### 2. SPA 内部跳转拦截（TanStack Router）
+RLS：登录用户可读写（与现有 `japan_parcels` 一致）。
 
-使用 `useBlocker` from `@tanstack/react-router`：
+## 2. Storage
 
-```ts
-useBlocker({
-  shouldBlockFn: () => isDirty && !saveMut.isPending,
-  withResolver: true, // 返回 { status, proceed, reset }
-});
+新建 public bucket `domestic-order-screenshots`，路径 `{user_id}/{yyyy-mm}/{uuid}.{ext}`，复用现有 `parcel-item-images` 的 RLS 模式。
+
+## 3. 后端识别管线
+
+新建 `src/lib/domestic-recognize.functions.ts`，调用 Lovable AI Gateway（`google/gemini-2.5-pro` 多模态，识别失败/置信度低自动回退到 `gemini-3-flash-preview` 再试一次）。
+
+```text
+[N 张截图] 
+   ↓ uploadScreenshots()         上传到 storage，拿 public url
+   ↓ classifyPlatform()          先让模型猜平台（也接受用户在 UI 选好）
+   ↓ extractOrders(platform, urls)  
+                                  prompt 内嵌该平台 few-shot：
+                                  - 咸鱼：「我的-已买到」列表 / 订单详情 / 聊天议价
+                                  - 抖音：「订单中心」列表 / 详情页
+                                  - 小红书：「我的订单」 / 笔记下单
+                                  - 微信：聊天截图（卖家发的报价 + 转账记录 + 地址）
+                                  返回 OrderDraft[]
+   ↓ postProcess()               金额归一（"￥1,200" → 1200）、日期归一、
+                                  电话脱敏校验、按 source_order_no 去重
 ```
 
-- 拿到 blocker 后，在 `status === 'blocked'` 时弹一个 `AlertDialog`（已在 `components/ui/alert-dialog.tsx`）。
-- 「放弃更改」→ 调用 `proceed()`；「继续编辑」→ 调用 `reset()`。
-- 这会覆盖 PageHeader 里的「返回」`Link`、侧边栏导航、浏览器前进/后退等所有路由跳转。
+每个识别 serverFn 都返回 `{ step, status, ms, data, raw }`，前端用现成的 `RecognizeTimeline` 组件可视化每一步。
 
-### 3. 浏览器级离开拦截（刷新/关掉标签/跨域跳转）
+微信场景下 prompt 要专门提示：聊天截图里**没有平台订单号**，让模型生成临时号 `wx-{yyyymmdd}-{seller8}-{n}`，并把买家/卖家对话浓缩到 `chat_summary`。
 
-用 `useEffect` 注册 `beforeunload`：
+## 4. 前端
 
-```ts
-useEffect(() => {
-  if (!isDirty) return;
-  const handler = (e: BeforeUnloadEvent) => {
-    e.preventDefault();
-    e.returnValue = "";
-  };
-  window.addEventListener("beforeunload", handler);
-  return () => window.removeEventListener("beforeunload", handler);
-}, [isDirty]);
+```text
+/purchase/domestic                列表页（替换现在的 mock）
+  ├─ 头部 Tabs：全部 / 闲鱼 / 抖音 / 小红书 / 微信
+  ├─ 状态 Tabs（次级）：待付款 / 已付款 / 已发货 / 已签收 / 已完成
+  ├─ 搜索 + 刷新按钮
+  ├─ 表格：缩略图｜平台徽标｜商品｜卖家｜金额｜快递单号｜状态｜操作
+  └─ 顶部按钮「智能导入」→ /purchase/domestic/import
+
+/purchase/domestic/import         导入页
+  ├─ 平台选择器（必选，影响 prompt few-shot）
+  ├─ ScreenshotDropzone（复用现有组件，支持多图 + 粘贴）
+  ├─ RecognizeTimeline（复用）
+  ├─ 识别结果可编辑表格（每行可勾选是否入库、可改字段）
+  └─ 「批量入库」按钮 → bulkInsertDomesticOrders()
+
+/purchase/domestic/$id            详情/编辑页
+  ├─ 截图轮播
+  ├─ 字段编辑（与 ParcelEditPanel 同风格）
+  ├─ 状态切换按钮（5 档）
+  └─ 「打开聊天摘要」抽屉
 ```
 
-浏览器会弹出系统级原生确认框（文案由浏览器决定，无法自定义）。
+复用组件：`ScreenshotDropzone`、`RecognizeTimeline`、`DataTable`、`StatusBadge`、`PageHeader`、`CompletenessRing`。
 
-### 4. 两个「保存并继续添加」/「保存」按钮
+## 5. 实施顺序
 
-保存流程本身会先把 state 写回空白，再 toast 或 nav，所以 `saveMut.isPending` 期间 blocker 已经被关闭，不会误拦截 `nav({ to: "/purchase/japan-parcel" })`。无需额外处理。
+1. **DB migration**：建表 `domestic_orders` + storage bucket + RLS。
+2. **后端 serverFn**：`src/lib/domestic-recognize.functions.ts`、`domestic-orders.functions.ts`（CRUD + list + count）。
+3. **导入页** `/purchase/domestic/import`。
+4. **列表页**改造 `/purchase/domestic`（删除 mock、接真实数据）。
+5. **详情页** `/purchase/domestic/$id`。
+6. 把识别经验沉淀到 `.workspace/skills/domestic-order-recognizer/SKILL.md`（参考 meruki skill 的格式）。
 
-### 5. 弹窗 UI
+## 需要你确认 3 件事
 
-复用现有 `AlertDialog`：
+1. **微信订单**：通常是和卖家私聊的截图（议价 + 转账 + 地址），没有标准订单号。我打算让 AI 生成临时号 + 浓缩聊天摘要，可以吗？还是你希望微信单独一个最简表单（连 AI 都不跑）？
+2. **状态字典**：上面的 5 档（待付款 / 已付款 / 已发货 / 已签收 / 已完成）够用吗？要不要加「退款中」？
+3. 是否需要把**国内订单**也并入「日本包裹合单 / 物流」流程（比如一个包裹里同时有日本竞拍 + 国内闲鱼货品）？还是国内订单完全独立、签收即完成？
 
-- 标题：`放弃当前修改？`
-- 描述：`你在这一单里录入的内容还没有保存，离开后将会丢失。`
-- 取消按钮：`继续编辑`
-- 确认按钮：`放弃并离开`（`destructive` 样式）
-
-## 不做的事
-
-- 不持久化草稿到 localStorage（用户没要求，避免引入新机制和清理逻辑）。
-- 不改保存按钮、不调整识别面板、不改列表/详情页。
-- 不引入新的依赖。
+确认后我就按上面顺序开搞。
