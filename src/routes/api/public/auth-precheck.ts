@@ -32,13 +32,11 @@ export const Route = createFileRoute("/api/public/auth-precheck")({
         }
         const phone = parsed.data.phone;
 
+        const admin = getAdmin();
         let exists = false;
         let systemEmpty = false;
         for (let page = 1; page <= 20; page++) {
-          const { data, error } = await supabaseAdmin.auth.admin.listUsers({
-            page,
-            perPage: 200,
-          });
+          const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 });
           if (error) {
             return Response.json({ ok: false, error: error.message }, { status: 500, headers });
           }
