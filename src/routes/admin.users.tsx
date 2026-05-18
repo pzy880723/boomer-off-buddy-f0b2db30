@@ -90,7 +90,7 @@ function AdminUsersContent() {
   });
 
   const createMut = useMutation({
-    mutationFn: (vars: { phone: string; password: string }) => createFn({ data: vars }),
+    mutationFn: (vars: { phone: string; password: string; name: string }) => createFn({ data: vars }),
     onSuccess: () => {
       toast.success("账号已创建");
       qc.invalidateQueries({ queryKey: ["admin-users"] });
@@ -138,6 +138,7 @@ function AdminUsersContent() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>姓名</TableHead>
                   <TableHead>手机号 / 邮箱</TableHead>
                   <TableHead>角色</TableHead>
                   <TableHead>状态</TableHead>
