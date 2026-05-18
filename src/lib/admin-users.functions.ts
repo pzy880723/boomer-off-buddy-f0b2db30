@@ -87,6 +87,28 @@ export const createUserFn = createServerFn({ method: "POST" })
     return { id: created.user?.id };
   });
 
+// ===== 更新姓名 =====
+const updateNameSchema = z.object({
+  userId: z.string().uuid(),
+  name: z.string().trim().min(1, "请填写姓名").max(50, "姓名过长"),
+});
+
+export const updateUserNameFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => updateNameSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    await assertSuperAdmin(context as any);
+    const sb = admin();
+    const { data: cur, error: getErr } = await sb.auth.admin.getUserById(data.userId);
+    if (getErr) throw new Error(getErr.message);
+    const meta = { ...(cur.user?.user_metadata ?? {}), name: data.name };
+    const { error } = await sb.auth.admin.updateUserById(data.userId, {
+      user_metadata: meta,
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 // ===== 重置密码（管理员） =====
 const resetSchema = z.object({
   userId: z.string().uuid(),
