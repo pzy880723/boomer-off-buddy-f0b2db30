@@ -204,8 +204,9 @@ function LoginPage() {
             )}
 
             <Button
-              type="submit"
-              disabled={inputsDisabled}
+              type="button"
+              disabled={inputsDisabled || !mounted}
+              onClick={() => void doSubmit()}
               className="h-11 w-full bg-gradient-brand shadow-elegant transition-transform hover:scale-[1.01]"
             >
               {submitting ? (
