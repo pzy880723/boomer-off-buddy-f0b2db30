@@ -9,7 +9,7 @@ import {
   Plane,
   Mail,
   ShoppingBag,
-  Truck,
+  
   Tags,
   Layers,
   ArrowLeftRight,
