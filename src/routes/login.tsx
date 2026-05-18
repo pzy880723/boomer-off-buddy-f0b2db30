@@ -81,8 +81,8 @@ function LoginPage() {
               { icon: BarChart3, text: "实时利润、库存、物流多维仪表盘" },
               { icon: ShieldCheck, text: "权限受控，账号由管理员统一管理" },
             ].map(({ icon: Icon, text }) => (
-              <li key={text} className="flex items-start gap-3 text-sm text-primary-foreground/90">
-                <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white/15 backdrop-blur">
+              <li key={text} className="flex items-center gap-3 text-sm text-primary-foreground/90">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white/15 backdrop-blur">
                   <Icon className="h-3.5 w-3.5" />
                 </span>
                 <span>{text}</span>
