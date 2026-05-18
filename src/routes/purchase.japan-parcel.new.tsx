@@ -297,6 +297,41 @@ function NewParcelPage() {
   const updateItem = (key: string, patch: Partial<SubItem>) =>
     setItems((arr) => arr.map((it) => (it._key === key ? { ...it, ...patch } : it)));
 
+  // ====== Unsaved-changes guard ======
+  const isDirty = useMemo(() => {
+    const stripKey = (arr: SubItem[]) => arr.map(({ _key: _k, ...rest }) => rest);
+    const baseline = JSON.stringify({
+      parcel: emptyParcel(),
+      intl: emptyIntl(),
+      items: stripKey([emptyItem()]),
+    });
+    const current = JSON.stringify({
+      parcel,
+      intl,
+      items: stripKey(items),
+    });
+    return current !== baseline;
+  }, [parcel, intl, items]);
+
+  const shouldBlock = isDirty && !saveMut.isPending && !saveMut.isSuccess;
+
+  const { status, proceed, reset } = useBlocker({
+    shouldBlockFn: () => shouldBlock,
+    withResolver: true,
+    enableBeforeUnload: shouldBlock,
+  });
+
+  useEffect(() => {
+    if (!shouldBlock) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [shouldBlock]);
+
+
   return (
     <div className="space-y-5 pb-10">
       <PageHeader
