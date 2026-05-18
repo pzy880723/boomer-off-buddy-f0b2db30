@@ -118,19 +118,22 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r-0">
       <SidebarHeader className="border-b border-sidebar-border">
-        <Link to="/dashboard" preload="intent" onPointerDown={() => preload("/dashboard")} className="flex items-center gap-3 px-1 py-2">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white p-1.5 shadow-sm">
-            <img src={logo} alt="BOOMER OFF" className="h-full w-full object-contain" />
-          </div>
-          {!collapsed && (
-            <div className="flex min-w-0 flex-col">
-              <span className="text-sm font-bold tracking-wide text-sidebar-foreground">
-                BOOMER·OFF
-              </span>
-              <span className="text-[10px] uppercase tracking-[0.18em] text-sidebar-foreground/55">
-                vintage group
-              </span>
+        <Link
+          to="/dashboard"
+          preload="intent"
+          onPointerDown={() => preload("/dashboard")}
+          className="flex items-center px-1 py-2"
+        >
+          {collapsed ? (
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm">
+              <span className="text-lg font-black text-[#d32f2f] leading-none">B</span>
             </div>
+          ) : (
+            <img
+              src={logoWide}
+              alt="BOOMER OFF — vintage group"
+              className="h-10 w-auto max-w-full object-contain"
+            />
           )}
         </Link>
       </SidebarHeader>
