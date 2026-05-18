@@ -35,7 +35,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import logo from "@/assets/logo-boomeroff.png";
+import logoWide from "@/assets/logo-boomeroff-wide.png";
 
 type NavTo =
   | "/dashboard"
