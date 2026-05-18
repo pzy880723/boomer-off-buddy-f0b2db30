@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useIsFetching, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   Plus,
@@ -14,6 +14,7 @@ import {
   ArrowUpDown,
   AlertTriangle,
   RotateCcw,
+  RefreshCw,
   Flag,
   Copy,
   Calculator,
@@ -76,6 +77,11 @@ const ParcelCardDialog = lazy(() =>
 const PackPriceCalculatorDialog = lazy(() =>
   import("@/components/japan-parcel/pack-price-calculator-dialog").then((m) => ({
     default: m.PackPriceCalculatorDialog,
+  })),
+);
+const ItemCardDialog = lazy(() =>
+  import("@/components/japan-parcel/item-card-dialog").then((m) => ({
+    default: m.ItemCardDialog,
   })),
 );
 
@@ -156,6 +162,7 @@ function JapanParcelList() {
   const [openCardId, setOpenCardId] = useState<string | null>(null);
   const [openTab, setOpenTab] = useState<"overview" | "edit">("overview");
   const [packCalc, setPackCalc] = useState<{ item: ItemRow; landedCny: number | null } | null>(null);
+  const [itemCard, setItemCard] = useState<{ item: ItemRow; parcelId: string } | null>(null);
   const [currency] = useCurrencyDisplay();
   const [viewMode] = useParcelViewMode();
   const [sort, setSort] = useState<SortState>({ field: "intl_pay_at", dir: "desc" });
@@ -185,6 +192,9 @@ function JapanParcelList() {
     qc.invalidateQueries({ queryKey: ["jp-parcels"] });
     qc.invalidateQueries({ queryKey: ["jp-parcels-counts"] });
   };
+  const fetchingCount =
+    useIsFetching({ queryKey: ["jp-parcels"] }) +
+    useIsFetching({ queryKey: ["jp-parcels-counts"] });
 
   const switchTab = (next: ParcelTab) => {
     if (next === tab) return;
@@ -311,6 +321,16 @@ function JapanParcelList() {
               <span className="text-xs text-muted-foreground">币种</span>
               <CurrencyToggle />
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => invalidateAll()}
+              disabled={fetchingCount > 0}
+              title="刷新列表"
+            >
+              <RefreshCw className={cn("mr-1.5 h-3.5 w-3.5", fetchingCount > 0 && "animate-spin")} />
+              刷新
+            </Button>
             <Button asChild size="sm" className="bg-gradient-brand hover:opacity-90">
               <Link
                 to="/purchase/japan-parcel/new"
@@ -522,7 +542,7 @@ function JapanParcelList() {
                         <TableRow
                           key={`${r.id}-${it?.id ?? "empty"}-${idx}`}
                           className="group cursor-pointer transition-colors hover:bg-muted/40"
-                          onClick={() => openCard("overview")}
+                          onClick={() => it && setItemCard({ item: it, parcelId: r.id })}
                         >
                           <TableCell onClick={(e) => e.stopPropagation()}>
                             {it?.item_image_url ? (
@@ -924,6 +944,39 @@ function JapanParcelList() {
           />
         </Suspense>
       )}
+
+      {itemCard && (() => {
+        const parcelRow = rows.find((p) => p.id === itemCard.parcelId) ?? null;
+        const siblings = (parcelRow?.japan_parcel_items ?? []) as ItemRow[];
+        return (
+          <Suspense fallback={null}>
+            <ItemCardDialog
+              open={!!itemCard}
+              onOpenChange={(o) => !o && setItemCard(null)}
+              item={itemCard.item}
+              parcel={
+                parcelRow
+                  ? {
+                      id: parcelRow.id,
+                      source_order_no: parcelRow.source_order_no,
+                      tracking_no: parcelRow.tracking_no,
+                      intl_total_jpy: parcelRow.intl_total_jpy ?? null,
+                      intl_exchange_rate: parcelRow.intl_exchange_rate ?? null,
+                    }
+                  : null
+              }
+              siblings={siblings}
+              onOpenParcel={() => {
+                const pid = itemCard.parcelId;
+                setItemCard(null);
+                void import("@/components/japan-parcel/parcel-card-dialog");
+                setOpenTab("overview");
+                setOpenCardId(pid);
+              }}
+            />
+          </Suspense>
+        );
+      })()}
     </div>
   );
 }
