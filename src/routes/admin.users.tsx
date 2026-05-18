@@ -204,6 +204,11 @@ function AdminUsersContent() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
+                          <EditNameButton
+                            currentName={u.name}
+                            label={u.phone ?? u.email ?? ""}
+                            onSubmit={(name) => updateNameMut.mutateAsync({ userId: u.id, name })}
+                          />
                           <ResetPasswordButton
                             userId={u.id}
                             label={u.phone ?? u.email ?? ""}
