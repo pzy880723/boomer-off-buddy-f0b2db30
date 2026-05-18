@@ -542,7 +542,7 @@ function JapanParcelList() {
                         <TableRow
                           key={`${r.id}-${it?.id ?? "empty"}-${idx}`}
                           className="group cursor-pointer transition-colors hover:bg-muted/40"
-                          onClick={() => openCard("overview")}
+                          onClick={() => it && setItemCard({ item: it, parcelId: r.id })}
                         >
                           <TableCell onClick={(e) => e.stopPropagation()}>
                             {it?.item_image_url ? (
