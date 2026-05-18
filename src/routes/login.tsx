@@ -146,7 +146,7 @@ function LoginPage() {
             <p className="text-sm text-muted-foreground">使用管理员分配的手机号登录后台</p>
           </div>
 
-          <form onSubmit={onSubmit} className="mt-8 space-y-4">
+          <form onSubmit={onSubmit} noValidate className="mt-8 space-y-4" suppressHydrationWarning>
             <div className="space-y-1.5">
               <Label htmlFor="phone">手机号</Label>
               <div className="relative">
