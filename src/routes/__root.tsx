@@ -241,8 +241,13 @@ function RootComponent() {
 function UserMenu() {
   const router = useRouter();
   const { session } = useAuthSession();
+  const phone = session?.user?.phone ?? "";
   const email = session?.user?.email ?? "";
-  const initial = email ? email[0]!.toUpperCase() : "管";
+  const displayName = phone || email || "管理员";
+  const initial = phone ? phone.slice(-1) : email ? email[0]!.toUpperCase() : "管";
+  const isAdmin = isSuperAdminPhone(phone);
+  const [pwdOpen, setPwdOpen] = useState(false);
+  const mustChange = !!session?.user?.user_metadata?.must_change_password;
 
   async function handleSignOut() {
     await supabase.auth.signOut();
