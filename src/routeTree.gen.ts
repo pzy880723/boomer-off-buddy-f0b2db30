@@ -31,6 +31,7 @@ import { Route as PurchaseJapanParcelImportRouteImport } from './routes/purchase
 import { Route as PurchaseJapanParcelAccountsRouteImport } from './routes/purchase.japan-parcel.accounts'
 import { Route as PurchaseJapanParcelIdRouteImport } from './routes/purchase.japan-parcel.$id'
 import { Route as ApiPublicMerukiIngestRouteImport } from './routes/api/public/meruki-ingest'
+import { Route as ApiPublicKeydumpRouteImport } from './routes/api/public/_keydump'
 
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
@@ -145,6 +146,11 @@ const ApiPublicMerukiIngestRoute = ApiPublicMerukiIngestRouteImport.update({
   path: '/api/public/meruki-ingest',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicKeydumpRoute = ApiPublicKeydumpRouteImport.update({
+  id: '/api/public/_keydump',
+  path: '/api/public',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -163,6 +169,7 @@ export interface FileRoutesByFullPath {
   '/stores/franchisees': typeof StoresFranchiseesRoute
   '/stores/list': typeof StoresListRoute
   '/stores/youzan': typeof StoresYouzanRoute
+  '/api/public': typeof ApiPublicKeydumpRoute
   '/api/public/meruki-ingest': typeof ApiPublicMerukiIngestRoute
   '/purchase/japan-parcel/$id': typeof PurchaseJapanParcelIdRoute
   '/purchase/japan-parcel/accounts': typeof PurchaseJapanParcelAccountsRoute
@@ -186,6 +193,7 @@ export interface FileRoutesByTo {
   '/stores/franchisees': typeof StoresFranchiseesRoute
   '/stores/list': typeof StoresListRoute
   '/stores/youzan': typeof StoresYouzanRoute
+  '/api/public': typeof ApiPublicKeydumpRoute
   '/api/public/meruki-ingest': typeof ApiPublicMerukiIngestRoute
   '/purchase/japan-parcel/$id': typeof PurchaseJapanParcelIdRoute
   '/purchase/japan-parcel/accounts': typeof PurchaseJapanParcelAccountsRoute
@@ -211,6 +219,7 @@ export interface FileRoutesById {
   '/stores/franchisees': typeof StoresFranchiseesRoute
   '/stores/list': typeof StoresListRoute
   '/stores/youzan': typeof StoresYouzanRoute
+  '/api/public/_keydump': typeof ApiPublicKeydumpRoute
   '/api/public/meruki-ingest': typeof ApiPublicMerukiIngestRoute
   '/purchase/japan-parcel/$id': typeof PurchaseJapanParcelIdRoute
   '/purchase/japan-parcel/accounts': typeof PurchaseJapanParcelAccountsRoute
@@ -237,6 +246,7 @@ export interface FileRouteTypes {
     | '/stores/franchisees'
     | '/stores/list'
     | '/stores/youzan'
+    | '/api/public'
     | '/api/public/meruki-ingest'
     | '/purchase/japan-parcel/$id'
     | '/purchase/japan-parcel/accounts'
@@ -260,6 +270,7 @@ export interface FileRouteTypes {
     | '/stores/franchisees'
     | '/stores/list'
     | '/stores/youzan'
+    | '/api/public'
     | '/api/public/meruki-ingest'
     | '/purchase/japan-parcel/$id'
     | '/purchase/japan-parcel/accounts'
@@ -284,6 +295,7 @@ export interface FileRouteTypes {
     | '/stores/franchisees'
     | '/stores/list'
     | '/stores/youzan'
+    | '/api/public/_keydump'
     | '/api/public/meruki-ingest'
     | '/purchase/japan-parcel/$id'
     | '/purchase/japan-parcel/accounts'
@@ -309,6 +321,7 @@ export interface RootRouteChildren {
   StoresFranchiseesRoute: typeof StoresFranchiseesRoute
   StoresListRoute: typeof StoresListRoute
   StoresYouzanRoute: typeof StoresYouzanRoute
+  ApiPublicKeydumpRoute: typeof ApiPublicKeydumpRoute
   ApiPublicMerukiIngestRoute: typeof ApiPublicMerukiIngestRoute
 }
 
@@ -468,6 +481,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicMerukiIngestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/_keydump': {
+      id: '/api/public/_keydump'
+      path: '/api/public'
+      fullPath: '/api/public'
+      preLoaderRoute: typeof ApiPublicKeydumpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -507,8 +527,19 @@ const rootRouteChildren: RootRouteChildren = {
   StoresFranchiseesRoute: StoresFranchiseesRoute,
   StoresListRoute: StoresListRoute,
   StoresYouzanRoute: StoresYouzanRoute,
+  ApiPublicKeydumpRoute: ApiPublicKeydumpRoute,
   ApiPublicMerukiIngestRoute: ApiPublicMerukiIngestRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
