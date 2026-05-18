@@ -8,7 +8,7 @@ import { DataTable } from "@/components/data-table";
 import { StatusBadge } from "@/components/status-badge";
 import { domesticOrders } from "@/lib/mock-data";
 
-export const Route = createFileRoute("/purchase/domestic")({
+export const Route = createFileRoute("/purchase/domestic/")({
   head: () => ({ meta: [{ title: "国内渠道 · 采购物流" }, { name: "description", content: "国内电商平台采购订单聚合" }] }),
   component: DomesticPage,
 });
