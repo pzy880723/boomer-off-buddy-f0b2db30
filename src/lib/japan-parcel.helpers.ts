@@ -197,14 +197,32 @@ export function computeParcelItemLanded(
   const rate = Number(parcel.intl_exchange_rate) || 0;
   const intl = Number(parcel.intl_total_jpy) || 0;
 
-  // 按重量分摊：若所有 weight_g 都缺失则按 quantity 兜底（已在 itemWeightWeight 里处理）
-  const weights = items.map(itemWeightWeight);
-  const totalWeight = weights.reduce((s, w) => s + w, 0);
+  // 优先按重量分摊；若所有 weight_g 都缺失则改为按金额（item_total_jpy）比例分摊；
+  // 金额也都为 0 时退化为按 quantity 均摊（itemWeightWeight 已用 quantity 兜底）。
+  const anyWeight = items.some((it) => (Number(it.weight_g) || 0) > 0);
+  const amounts = items.map(itemAmountJpy);
+  const totalAmount = amounts.reduce((s, a) => s + a, 0);
+
+  let shares: number[];
+  if (anyWeight) {
+    const weights = items.map(itemWeightWeight);
+    const totalWeight = weights.reduce((s, w) => s + w, 0);
+    shares = items.map((_, i) =>
+      totalWeight > 0 ? (intl * weights[i]) / totalWeight : 0,
+    );
+  } else if (totalAmount > 0) {
+    shares = amounts.map((a) => (intl * a) / totalAmount);
+  } else {
+    const weights = items.map(itemWeightWeight);
+    const totalWeight = weights.reduce((s, w) => s + w, 0);
+    shares = items.map((_, i) =>
+      totalWeight > 0 ? (intl * weights[i]) / totalWeight : 0,
+    );
+  }
 
   items.forEach((it, idx) => {
-    const itemJpy = itemAmountJpy(it);
-    const freightShareJpy =
-      totalWeight > 0 ? (intl * weights[idx]) / totalWeight : 0;
+    const itemJpy = amounts[idx];
+    const freightShareJpy = shares[idx];
     const itemCny = rate > 0 ? itemJpy * rate : null;
     const freightShareCny = rate > 0 ? freightShareJpy * rate : null;
     const tariffRate = Number(it.tariff_rate) || 0;
