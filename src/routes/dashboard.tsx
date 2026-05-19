@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { DollarSign, CalendarRange, Wallet, ArrowRight, Mail, Plane, ShoppingBag } from "lucide-react";
+import { DollarSign, CalendarRange, Wallet, ArrowRight, Mail, Plane, ShoppingBag, PackageCheck } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Legend, XAxis, YAxis } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -25,6 +25,7 @@ const CHANNEL_META: Record<ChannelKey, { icon: typeof Mail; to: string; unit: st
   japan_parcel: { icon: Mail, to: "/purchase/japan-parcel", unit: "单" },
   japan_bulk: { icon: Plane, to: "/purchase/japan-bulk", unit: "票" },
   domestic: { icon: ShoppingBag, to: "/purchase/domestic", unit: "单" },
+  domestic_bulk: { icon: PackageCheck, to: "/purchase/domestic-bulk", unit: "单" },
 };
 
 function fmt(n: number) {
@@ -72,9 +73,9 @@ function DashboardPage() {
       </div>
 
       {/* 分渠道统计 */}
-      <div className="mb-6 grid gap-4 lg:grid-cols-3">
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {isLoading || !data
-          ? [0, 1, 2].map((i) => <Skeleton key={i} className="h-56 rounded-lg" />)
+          ? [0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-56 rounded-lg" />)
           : data.byChannel.map((c) => {
               const meta = CHANNEL_META[c.key];
               const Icon = meta.icon;
@@ -129,6 +130,7 @@ function DashboardPage() {
                 japan_parcel: { label: "日本小包裹", color: "var(--color-chart-1)" },
                 japan_bulk: { label: "日本大宗", color: "var(--color-chart-2)" },
                 domestic: { label: "国内小包", color: "var(--color-chart-3)" },
+                domestic_bulk: { label: "国内大宗", color: "var(--color-chart-4)" },
               }}
               className="h-[280px] w-full"
             >
@@ -138,9 +140,10 @@ function DashboardPage() {
                 <YAxis tickLine={false} axisLine={false} fontSize={11} />
                 <ChartTooltip content={<ChartTooltipContent />} />
                 <Legend />
-                <Bar dataKey="japan_parcel" stackId="a" fill="var(--color-chart-1)" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="japan_parcel" stackId="a" fill="var(--color-chart-1)" />
                 <Bar dataKey="japan_bulk" stackId="a" fill="var(--color-chart-2)" />
-                <Bar dataKey="domestic" stackId="a" fill="var(--color-chart-3)" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="domestic" stackId="a" fill="var(--color-chart-3)" />
+                <Bar dataKey="domestic_bulk" stackId="a" fill="var(--color-chart-4)" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ChartContainer>
           )}
