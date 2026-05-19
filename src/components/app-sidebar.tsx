@@ -63,9 +63,9 @@ const groups: { label: string; items: { title: string; url: NavTo; icon: LucideI
     label: "采购物流",
     items: [
       { title: "日本大宗", url: "/purchase/japan-bulk", icon: Plane },
-      { title: "日本小包裹", url: "/purchase/japan-parcel", icon: Mail },
-      { title: "国内小包", url: "/purchase/domestic", icon: ShoppingBag },
+      { title: "日本小包", url: "/purchase/japan-parcel", icon: Mail },
       { title: "国内大宗", url: "/purchase/domestic-bulk", icon: PackageCheck },
+      { title: "国内小包", url: "/purchase/domestic", icon: ShoppingBag },
     ],
     icon: Package,
   },
