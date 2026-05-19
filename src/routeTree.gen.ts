@@ -29,6 +29,7 @@ import { Route as InventoryBatchesRouteImport } from './routes/inventory.batches
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as PurchaseJapanParcelIndexRouteImport } from './routes/purchase.japan-parcel.index'
 import { Route as PurchaseDomesticIndexRouteImport } from './routes/purchase.domestic.index'
+import { Route as PurchaseDomesticBulkIndexRouteImport } from './routes/purchase.domestic-bulk.index'
 import { Route as InventorySkusIndexRouteImport } from './routes/inventory.skus.index'
 import { Route as InventoryInboundIndexRouteImport } from './routes/inventory.inbound.index'
 import { Route as PurchaseJapanParcelNewRouteImport } from './routes/purchase.japan-parcel.new'
@@ -143,6 +144,12 @@ const PurchaseDomesticIndexRoute = PurchaseDomesticIndexRouteImport.update({
   path: '/',
   getParentRoute: () => PurchaseDomesticRoute,
 } as any)
+const PurchaseDomesticBulkIndexRoute =
+  PurchaseDomesticBulkIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => PurchaseDomesticBulkRoute,
+  } as any)
 const InventorySkusIndexRoute = InventorySkusIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -219,7 +226,7 @@ export interface FileRoutesByFullPath {
   '/inventory/skus': typeof InventorySkusRouteWithChildren
   '/inventory/transfers': typeof InventoryTransfersRoute
   '/purchase/domestic': typeof PurchaseDomesticRouteWithChildren
-  '/purchase/domestic-bulk': typeof PurchaseDomesticBulkRoute
+  '/purchase/domestic-bulk': typeof PurchaseDomesticBulkRouteWithChildren
   '/purchase/japan-bulk': typeof PurchaseJapanBulkRoute
   '/purchase/japan-parcel': typeof PurchaseJapanParcelRouteWithChildren
   '/stores/franchisees': typeof StoresFranchiseesRoute
@@ -237,6 +244,7 @@ export interface FileRoutesByFullPath {
   '/purchase/japan-parcel/new': typeof PurchaseJapanParcelNewRoute
   '/inventory/inbound/': typeof InventoryInboundIndexRoute
   '/inventory/skus/': typeof InventorySkusIndexRoute
+  '/purchase/domestic-bulk/': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic/': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
 }
@@ -250,7 +258,6 @@ export interface FileRoutesByTo {
   '/inventory/batches': typeof InventoryBatchesRoute
   '/inventory/products': typeof InventoryProductsRoute
   '/inventory/transfers': typeof InventoryTransfersRoute
-  '/purchase/domestic-bulk': typeof PurchaseDomesticBulkRoute
   '/purchase/japan-bulk': typeof PurchaseJapanBulkRoute
   '/stores/franchisees': typeof StoresFranchiseesRoute
   '/stores/list': typeof StoresListRoute
@@ -267,6 +274,7 @@ export interface FileRoutesByTo {
   '/purchase/japan-parcel/new': typeof PurchaseJapanParcelNewRoute
   '/inventory/inbound': typeof InventoryInboundIndexRoute
   '/inventory/skus': typeof InventorySkusIndexRoute
+  '/purchase/domestic-bulk': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel': typeof PurchaseJapanParcelIndexRoute
 }
@@ -284,7 +292,7 @@ export interface FileRoutesById {
   '/inventory/skus': typeof InventorySkusRouteWithChildren
   '/inventory/transfers': typeof InventoryTransfersRoute
   '/purchase/domestic': typeof PurchaseDomesticRouteWithChildren
-  '/purchase/domestic-bulk': typeof PurchaseDomesticBulkRoute
+  '/purchase/domestic-bulk': typeof PurchaseDomesticBulkRouteWithChildren
   '/purchase/japan-bulk': typeof PurchaseJapanBulkRoute
   '/purchase/japan-parcel': typeof PurchaseJapanParcelRouteWithChildren
   '/stores/franchisees': typeof StoresFranchiseesRoute
@@ -302,6 +310,7 @@ export interface FileRoutesById {
   '/purchase/japan-parcel/new': typeof PurchaseJapanParcelNewRoute
   '/inventory/inbound/': typeof InventoryInboundIndexRoute
   '/inventory/skus/': typeof InventorySkusIndexRoute
+  '/purchase/domestic-bulk/': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic/': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
 }
@@ -338,6 +347,7 @@ export interface FileRouteTypes {
     | '/purchase/japan-parcel/new'
     | '/inventory/inbound/'
     | '/inventory/skus/'
+    | '/purchase/domestic-bulk/'
     | '/purchase/domestic/'
     | '/purchase/japan-parcel/'
   fileRoutesByTo: FileRoutesByTo
@@ -351,7 +361,6 @@ export interface FileRouteTypes {
     | '/inventory/batches'
     | '/inventory/products'
     | '/inventory/transfers'
-    | '/purchase/domestic-bulk'
     | '/purchase/japan-bulk'
     | '/stores/franchisees'
     | '/stores/list'
@@ -368,6 +377,7 @@ export interface FileRouteTypes {
     | '/purchase/japan-parcel/new'
     | '/inventory/inbound'
     | '/inventory/skus'
+    | '/purchase/domestic-bulk'
     | '/purchase/domestic'
     | '/purchase/japan-parcel'
   id:
@@ -402,6 +412,7 @@ export interface FileRouteTypes {
     | '/purchase/japan-parcel/new'
     | '/inventory/inbound/'
     | '/inventory/skus/'
+    | '/purchase/domestic-bulk/'
     | '/purchase/domestic/'
     | '/purchase/japan-parcel/'
   fileRoutesById: FileRoutesById
@@ -419,7 +430,7 @@ export interface RootRouteChildren {
   InventorySkusRoute: typeof InventorySkusRouteWithChildren
   InventoryTransfersRoute: typeof InventoryTransfersRoute
   PurchaseDomesticRoute: typeof PurchaseDomesticRouteWithChildren
-  PurchaseDomesticBulkRoute: typeof PurchaseDomesticBulkRoute
+  PurchaseDomesticBulkRoute: typeof PurchaseDomesticBulkRouteWithChildren
   PurchaseJapanBulkRoute: typeof PurchaseJapanBulkRoute
   PurchaseJapanParcelRoute: typeof PurchaseJapanParcelRouteWithChildren
   StoresFranchiseesRoute: typeof StoresFranchiseesRoute
@@ -570,6 +581,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PurchaseDomesticIndexRouteImport
       parentRoute: typeof PurchaseDomesticRoute
     }
+    '/purchase/domestic-bulk/': {
+      id: '/purchase/domestic-bulk/'
+      path: '/'
+      fullPath: '/purchase/domestic-bulk/'
+      preLoaderRoute: typeof PurchaseDomesticBulkIndexRouteImport
+      parentRoute: typeof PurchaseDomesticBulkRoute
+    }
     '/inventory/skus/': {
       id: '/inventory/skus/'
       path: '/'
@@ -701,6 +719,17 @@ const PurchaseDomesticRouteChildren: PurchaseDomesticRouteChildren = {
 const PurchaseDomesticRouteWithChildren =
   PurchaseDomesticRoute._addFileChildren(PurchaseDomesticRouteChildren)
 
+interface PurchaseDomesticBulkRouteChildren {
+  PurchaseDomesticBulkIndexRoute: typeof PurchaseDomesticBulkIndexRoute
+}
+
+const PurchaseDomesticBulkRouteChildren: PurchaseDomesticBulkRouteChildren = {
+  PurchaseDomesticBulkIndexRoute: PurchaseDomesticBulkIndexRoute,
+}
+
+const PurchaseDomesticBulkRouteWithChildren =
+  PurchaseDomesticBulkRoute._addFileChildren(PurchaseDomesticBulkRouteChildren)
+
 interface PurchaseJapanParcelRouteChildren {
   PurchaseJapanParcelIdRoute: typeof PurchaseJapanParcelIdRoute
   PurchaseJapanParcelAccountsRoute: typeof PurchaseJapanParcelAccountsRoute
@@ -733,7 +762,7 @@ const rootRouteChildren: RootRouteChildren = {
   InventorySkusRoute: InventorySkusRouteWithChildren,
   InventoryTransfersRoute: InventoryTransfersRoute,
   PurchaseDomesticRoute: PurchaseDomesticRouteWithChildren,
-  PurchaseDomesticBulkRoute: PurchaseDomesticBulkRoute,
+  PurchaseDomesticBulkRoute: PurchaseDomesticBulkRouteWithChildren,
   PurchaseJapanBulkRoute: PurchaseJapanBulkRoute,
   PurchaseJapanParcelRoute: PurchaseJapanParcelRouteWithChildren,
   StoresFranchiseesRoute: StoresFranchiseesRoute,
