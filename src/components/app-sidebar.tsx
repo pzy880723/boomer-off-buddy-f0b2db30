@@ -43,6 +43,7 @@ type NavTo =
   | "/purchase/japan-bulk"
   | "/purchase/japan-parcel"
   | "/purchase/domestic"
+  | "/purchase/domestic-bulk"
   | "/inventory/skus"
   | "/inventory/inbound"
   | "/inventory/inbound/new"
