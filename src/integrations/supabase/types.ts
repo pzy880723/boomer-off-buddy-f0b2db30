@@ -14,6 +14,131 @@ export type Database = {
   }
   public: {
     Tables: {
+      domestic_bulk_order_lines: {
+        Row: {
+          created_at: string
+          id: string
+          item_title: string | null
+          notes: string | null
+          order_id: string
+          position: number
+          qty: number
+          subtotal_cny: number | null
+          unit_price_cny: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          item_title?: string | null
+          notes?: string | null
+          order_id: string
+          position?: number
+          qty?: number
+          subtotal_cny?: number | null
+          unit_price_cny?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          item_title?: string | null
+          notes?: string | null
+          order_id?: string
+          position?: number
+          qty?: number
+          subtotal_cny?: number | null
+          unit_price_cny?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "domestic_bulk_order_lines_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "domestic_bulk_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      domestic_bulk_orders: {
+        Row: {
+          attachment_urls: Json
+          carrier: string | null
+          completeness: number
+          contract_no: string | null
+          created_at: string
+          deleted_at: string | null
+          delivered_at: string | null
+          id: string
+          invoice_no: string | null
+          notes: string | null
+          pay_method: string | null
+          purchased_at: string | null
+          raw_payload: Json | null
+          receiver_address: string | null
+          receiver_name: string | null
+          receiver_phone: string | null
+          shipping_cny: number | null
+          source_order_no: string | null
+          status: string
+          supplier_contact: string | null
+          supplier_name: string | null
+          total_cny: number | null
+          tracking_no: string | null
+          updated_at: string
+        }
+        Insert: {
+          attachment_urls?: Json
+          carrier?: string | null
+          completeness?: number
+          contract_no?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          delivered_at?: string | null
+          id?: string
+          invoice_no?: string | null
+          notes?: string | null
+          pay_method?: string | null
+          purchased_at?: string | null
+          raw_payload?: Json | null
+          receiver_address?: string | null
+          receiver_name?: string | null
+          receiver_phone?: string | null
+          shipping_cny?: number | null
+          source_order_no?: string | null
+          status?: string
+          supplier_contact?: string | null
+          supplier_name?: string | null
+          total_cny?: number | null
+          tracking_no?: string | null
+          updated_at?: string
+        }
+        Update: {
+          attachment_urls?: Json
+          carrier?: string | null
+          completeness?: number
+          contract_no?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          delivered_at?: string | null
+          id?: string
+          invoice_no?: string | null
+          notes?: string | null
+          pay_method?: string | null
+          purchased_at?: string | null
+          raw_payload?: Json | null
+          receiver_address?: string | null
+          receiver_name?: string | null
+          receiver_phone?: string | null
+          shipping_cny?: number | null
+          source_order_no?: string | null
+          status?: string
+          supplier_contact?: string | null
+          supplier_name?: string | null
+          total_cny?: number | null
+          tracking_no?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       domestic_orders: {
         Row: {
           carrier: string | null
