@@ -118,6 +118,7 @@ const breadcrumbMap: Record<string, string> = {
   "japan-bulk": "日本大宗",
   "japan-parcel": "日本小包裹",
   domestic: "国内小包",
+  "domestic-bulk": "国内大宗",
   inventory: "商品库存",
   products: "商品档案",
   batches: "采购批次",
