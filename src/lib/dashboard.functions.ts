@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 
-export type ChannelKey = "japan_parcel" | "japan_bulk" | "domestic";
+export type ChannelKey = "japan_parcel" | "japan_bulk" | "domestic" | "domestic_bulk";
 
 export type PurchaseStats = {
   totals: { month: number; ytd: number; all: number; count: number };
@@ -14,13 +14,20 @@ export type PurchaseStats = {
     count: number;
     placeholder?: boolean;
   }[];
-  monthlyTrend: { month: string; japan_parcel: number; japan_bulk: number; domestic: number }[];
+  monthlyTrend: {
+    month: string;
+    japan_parcel: number;
+    japan_bulk: number;
+    domestic: number;
+    domestic_bulk: number;
+  }[];
 };
 
 const CHANNEL_LABEL: Record<ChannelKey, string> = {
   japan_parcel: "日本小包裹",
   japan_bulk: "日本大宗",
   domestic: "国内小包",
+  domestic_bulk: "国内大宗",
 };
 
 function monthKey(d: Date) {
@@ -32,10 +39,9 @@ export const getPurchaseStats = createServerFn({ method: "GET" }).handler(async 
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
   const yearStart = new Date(now.getFullYear(), 0, 1).toISOString();
 
-  // 近 12 个月趋势的起点
   const trendStart = new Date(now.getFullYear(), now.getMonth() - 11, 1);
 
-  // 日本小包裹：按 item.pay_at + item_total_cny 统计，单数按父包裹去重
+  // 日本小包裹：按 item.pay_at + item_total_cny
   const { data: jpItems, error: jpErr } = await supabase
     .from("japan_parcel_items")
     .select("parent_id,pay_at,item_total_cny,japan_parcels!inner(deleted_at)")
@@ -43,7 +49,7 @@ export const getPurchaseStats = createServerFn({ method: "GET" }).handler(async 
     .is("japan_parcels.deleted_at", null);
   if (jpErr) throw new Error(jpErr.message);
 
-  // 国内小包：严格按 purchased_at
+  // 国内小包
   const { data: dmRows, error: dmErr } = await supabase
     .from("domestic_orders")
     .select("total_cny,purchased_at,deleted_at")
@@ -51,16 +57,37 @@ export const getPurchaseStats = createServerFn({ method: "GET" }).handler(async 
     .not("purchased_at", "is", null);
   if (dmErr) throw new Error(dmErr.message);
 
-  const trendMap = new Map<string, { japan_parcel: number; japan_bulk: number; domestic: number }>();
+  // 国内大宗
+  const { data: dbRows, error: dbErr } = await supabase
+    .from("domestic_bulk_orders")
+    .select("total_cny,purchased_at,deleted_at")
+    .is("deleted_at", null)
+    .not("purchased_at", "is", null);
+  if (dbErr) throw new Error(dbErr.message);
+
+  // 国内大宗的单数（即便没有 purchased_at 也要计入 count）
+  const { count: dbAllCount } = await supabase
+    .from("domestic_bulk_orders")
+    .select("id", { count: "exact", head: true })
+    .is("deleted_at", null);
+
+  const trendMap = new Map<
+    string,
+    { japan_parcel: number; japan_bulk: number; domestic: number; domestic_bulk: number }
+  >();
   for (let i = 0; i < 12; i++) {
     const d = new Date(trendStart.getFullYear(), trendStart.getMonth() + i, 1);
-    trendMap.set(monthKey(d), { japan_parcel: 0, japan_bulk: 0, domestic: 0 });
+    trendMap.set(monthKey(d), { japan_parcel: 0, japan_bulk: 0, domestic: 0, domestic_bulk: 0 });
   }
 
   const monthStartD = new Date(monthStart);
   const yearStartD = new Date(yearStart);
 
-  function bucket(ts: string, amt: number, channel: "japan_parcel" | "domestic") {
+  function bucket(
+    ts: string,
+    amt: number,
+    channel: "japan_parcel" | "domestic" | "domestic_bulk",
+  ) {
     const d = new Date(ts);
     const k = monthKey(d);
     if (trendMap.has(k)) trendMap.get(k)![channel] += amt;
@@ -92,23 +119,33 @@ export const getPurchaseStats = createServerFn({ method: "GET" }).handler(async 
     dmStat.month += b.month;
   }
 
-  const bulkStat = { month: 0, ytd: 0, all: 0, count: 0 };
+  const dbStat = { month: 0, ytd: 0, all: 0, count: dbAllCount ?? dbRows?.length ?? 0 };
+  for (const r of dbRows ?? []) {
+    const amt = Number(r.total_cny ?? 0);
+    if (!r.purchased_at) continue;
+    const b = bucket(r.purchased_at as string, amt, "domestic_bulk");
+    dbStat.all += b.all;
+    dbStat.ytd += b.ytd;
+    dbStat.month += b.month;
+  }
 
+  const bulkStat = { month: 0, ytd: 0, all: 0, count: 0 };
 
   const byChannel = [
     { key: "japan_parcel" as const, label: CHANNEL_LABEL.japan_parcel, ...jpStat },
     { key: "japan_bulk" as const, label: CHANNEL_LABEL.japan_bulk, ...bulkStat, placeholder: true },
     { key: "domestic" as const, label: CHANNEL_LABEL.domestic, ...dmStat },
+    { key: "domestic_bulk" as const, label: CHANNEL_LABEL.domestic_bulk, ...dbStat },
   ];
 
   const monthlyTrend = Array.from(trendMap.entries()).map(([month, v]) => ({ month, ...v }));
 
   return {
     totals: {
-      month: jpStat.month + dmStat.month,
-      ytd: jpStat.ytd + dmStat.ytd,
-      all: jpStat.all + dmStat.all,
-      count: jpStat.count + dmStat.count,
+      month: jpStat.month + dmStat.month + dbStat.month,
+      ytd: jpStat.ytd + dmStat.ytd + dbStat.ytd,
+      all: jpStat.all + dmStat.all + dbStat.all,
+      count: jpStat.count + dmStat.count + dbStat.count,
     },
     byChannel,
     monthlyTrend,
