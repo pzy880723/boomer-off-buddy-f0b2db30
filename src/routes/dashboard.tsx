@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { DollarSign, CalendarRange, Wallet, ArrowRight, Mail, Plane, ShoppingBag } from "lucide-react";
+import { DollarSign, CalendarRange, Wallet, ArrowRight, Mail, Plane, ShoppingBag, PackageCheck } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Legend, XAxis, YAxis } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
