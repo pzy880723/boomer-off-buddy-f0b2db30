@@ -116,7 +116,7 @@ const breadcrumbMap: Record<string, string> = {
   dashboard: "仪表盘",
   purchase: "采购物流",
   "japan-bulk": "日本大宗",
-  "japan-parcel": "日本小包裹",
+  "japan-parcel": "日本小包",
   domestic: "国内小包",
   "domestic-bulk": "国内大宗",
   inventory: "商品库存",
