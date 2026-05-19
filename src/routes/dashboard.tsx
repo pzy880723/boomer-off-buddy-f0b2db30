@@ -127,7 +127,7 @@ function DashboardPage() {
           ) : (
             <ChartContainer
               config={{
-                japan_parcel: { label: "日本小包裹", color: "var(--color-chart-1)" },
+                japan_parcel: { label: "日本小包", color: "var(--color-chart-1)" },
                 japan_bulk: { label: "日本大宗", color: "var(--color-chart-2)" },
                 domestic: { label: "国内小包", color: "var(--color-chart-3)" },
                 domestic_bulk: { label: "国内大宗", color: "var(--color-chart-4)" },

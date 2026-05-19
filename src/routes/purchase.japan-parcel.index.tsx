@@ -103,7 +103,7 @@ const listOptions = (tab: ParcelTab, search: string, sort: SortState) => ({
 export const Route = createFileRoute("/purchase/japan-parcel/")({
   head: () => ({
     meta: [
-      { title: "日本小包裹 · BOOMER OFF" },
+      { title: "日本小包 · BOOMER OFF" },
       { name: "description", content: "Meruki / Yahoo / Mercari 小包裹订单管理" },
     ],
   }),

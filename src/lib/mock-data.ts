@@ -19,7 +19,7 @@ export const kpis = {
 
 export const channelShare = [
   { name: "日本大宗", value: 42, amount: 162400, delta: 6.2, fill: "var(--color-chart-1)" },
-  { name: "日本小包裹", value: 18, amount: 69600, delta: 2.4, fill: "var(--color-chart-2)" },
+  { name: "日本小包", value: 18, amount: 69600, delta: 2.4, fill: "var(--color-chart-2)" },
   { name: "闲鱼", value: 16, amount: 61800, delta: -1.8, fill: "var(--color-chart-3)" },
   { name: "抖音", value: 12, amount: 46400, delta: 14.0, fill: "var(--color-chart-4)" },
   { name: "小红书/拼多多", value: 12, amount: 46400, delta: 3.6, fill: "var(--color-chart-5)" },

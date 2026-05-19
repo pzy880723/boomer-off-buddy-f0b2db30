@@ -24,7 +24,7 @@ export type PurchaseStats = {
 };
 
 const CHANNEL_LABEL: Record<ChannelKey, string> = {
-  japan_parcel: "日本小包裹",
+  japan_parcel: "日本小包",
   japan_bulk: "日本大宗",
   domestic: "国内小包",
   domestic_bulk: "国内大宗",
@@ -41,7 +41,7 @@ export const getPurchaseStats = createServerFn({ method: "GET" }).handler(async 
 
   const trendStart = new Date(now.getFullYear(), now.getMonth() - 11, 1);
 
-  // 日本小包裹：按 item.pay_at + item_total_cny
+  // 日本小包：按 item.pay_at + item_total_cny
   const { data: jpItems, error: jpErr } = await supabase
     .from("japan_parcel_items")
     .select("parent_id,pay_at,item_total_cny,japan_parcels!inner(deleted_at)")
@@ -134,8 +134,8 @@ export const getPurchaseStats = createServerFn({ method: "GET" }).handler(async 
   const byChannel = [
     { key: "japan_parcel" as const, label: CHANNEL_LABEL.japan_parcel, ...jpStat },
     { key: "japan_bulk" as const, label: CHANNEL_LABEL.japan_bulk, ...bulkStat, placeholder: true },
-    { key: "domestic" as const, label: CHANNEL_LABEL.domestic, ...dmStat },
     { key: "domestic_bulk" as const, label: CHANNEL_LABEL.domestic_bulk, ...dbStat },
+    { key: "domestic" as const, label: CHANNEL_LABEL.domestic, ...dmStat },
   ];
 
   const monthlyTrend = Array.from(trendMap.entries()).map(([month, v]) => ({ month, ...v }));
