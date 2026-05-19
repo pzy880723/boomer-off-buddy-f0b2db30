@@ -130,6 +130,7 @@ function DashboardPage() {
                 japan_parcel: { label: "日本小包裹", color: "var(--color-chart-1)" },
                 japan_bulk: { label: "日本大宗", color: "var(--color-chart-2)" },
                 domestic: { label: "国内小包", color: "var(--color-chart-3)" },
+                domestic_bulk: { label: "国内大宗", color: "var(--color-chart-4)" },
               }}
               className="h-[280px] w-full"
             >
@@ -139,9 +140,10 @@ function DashboardPage() {
                 <YAxis tickLine={false} axisLine={false} fontSize={11} />
                 <ChartTooltip content={<ChartTooltipContent />} />
                 <Legend />
-                <Bar dataKey="japan_parcel" stackId="a" fill="var(--color-chart-1)" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="japan_parcel" stackId="a" fill="var(--color-chart-1)" />
                 <Bar dataKey="japan_bulk" stackId="a" fill="var(--color-chart-2)" />
-                <Bar dataKey="domestic" stackId="a" fill="var(--color-chart-3)" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="domestic" stackId="a" fill="var(--color-chart-3)" />
+                <Bar dataKey="domestic_bulk" stackId="a" fill="var(--color-chart-4)" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ChartContainer>
           )}
