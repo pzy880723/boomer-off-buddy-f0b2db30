@@ -38,6 +38,7 @@ import { Route as PurchaseJapanParcelAccountsRouteImport } from './routes/purcha
 import { Route as PurchaseJapanParcelIdRouteImport } from './routes/purchase.japan-parcel.$id'
 import { Route as PurchaseDomesticImportRouteImport } from './routes/purchase.domestic.import'
 import { Route as PurchaseDomesticIdRouteImport } from './routes/purchase.domestic.$id'
+import { Route as PurchaseDomesticBulkNewRouteImport } from './routes/purchase.domestic-bulk.new'
 import { Route as InventorySkusIdRouteImport } from './routes/inventory.skus.$id'
 import { Route as InventoryInboundNewRouteImport } from './routes/inventory.inbound.new'
 import { Route as InventoryInboundIdRouteImport } from './routes/inventory.inbound.$id'
@@ -192,6 +193,11 @@ const PurchaseDomesticIdRoute = PurchaseDomesticIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => PurchaseDomesticRoute,
 } as any)
+const PurchaseDomesticBulkNewRoute = PurchaseDomesticBulkNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => PurchaseDomesticBulkRoute,
+} as any)
 const InventorySkusIdRoute = InventorySkusIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -236,6 +242,7 @@ export interface FileRoutesByFullPath {
   '/inventory/inbound/$id': typeof InventoryInboundIdRoute
   '/inventory/inbound/new': typeof InventoryInboundNewRoute
   '/inventory/skus/$id': typeof InventorySkusIdRoute
+  '/purchase/domestic-bulk/new': typeof PurchaseDomesticBulkNewRoute
   '/purchase/domestic/$id': typeof PurchaseDomesticIdRoute
   '/purchase/domestic/import': typeof PurchaseDomesticImportRoute
   '/purchase/japan-parcel/$id': typeof PurchaseJapanParcelIdRoute
@@ -266,6 +273,7 @@ export interface FileRoutesByTo {
   '/inventory/inbound/$id': typeof InventoryInboundIdRoute
   '/inventory/inbound/new': typeof InventoryInboundNewRoute
   '/inventory/skus/$id': typeof InventorySkusIdRoute
+  '/purchase/domestic-bulk/new': typeof PurchaseDomesticBulkNewRoute
   '/purchase/domestic/$id': typeof PurchaseDomesticIdRoute
   '/purchase/domestic/import': typeof PurchaseDomesticImportRoute
   '/purchase/japan-parcel/$id': typeof PurchaseJapanParcelIdRoute
@@ -302,6 +310,7 @@ export interface FileRoutesById {
   '/inventory/inbound/$id': typeof InventoryInboundIdRoute
   '/inventory/inbound/new': typeof InventoryInboundNewRoute
   '/inventory/skus/$id': typeof InventorySkusIdRoute
+  '/purchase/domestic-bulk/new': typeof PurchaseDomesticBulkNewRoute
   '/purchase/domestic/$id': typeof PurchaseDomesticIdRoute
   '/purchase/domestic/import': typeof PurchaseDomesticImportRoute
   '/purchase/japan-parcel/$id': typeof PurchaseJapanParcelIdRoute
@@ -339,6 +348,7 @@ export interface FileRouteTypes {
     | '/inventory/inbound/$id'
     | '/inventory/inbound/new'
     | '/inventory/skus/$id'
+    | '/purchase/domestic-bulk/new'
     | '/purchase/domestic/$id'
     | '/purchase/domestic/import'
     | '/purchase/japan-parcel/$id'
@@ -369,6 +379,7 @@ export interface FileRouteTypes {
     | '/inventory/inbound/$id'
     | '/inventory/inbound/new'
     | '/inventory/skus/$id'
+    | '/purchase/domestic-bulk/new'
     | '/purchase/domestic/$id'
     | '/purchase/domestic/import'
     | '/purchase/japan-parcel/$id'
@@ -404,6 +415,7 @@ export interface FileRouteTypes {
     | '/inventory/inbound/$id'
     | '/inventory/inbound/new'
     | '/inventory/skus/$id'
+    | '/purchase/domestic-bulk/new'
     | '/purchase/domestic/$id'
     | '/purchase/domestic/import'
     | '/purchase/japan-parcel/$id'
@@ -644,6 +656,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PurchaseDomesticIdRouteImport
       parentRoute: typeof PurchaseDomesticRoute
     }
+    '/purchase/domestic-bulk/new': {
+      id: '/purchase/domestic-bulk/new'
+      path: '/new'
+      fullPath: '/purchase/domestic-bulk/new'
+      preLoaderRoute: typeof PurchaseDomesticBulkNewRouteImport
+      parentRoute: typeof PurchaseDomesticBulkRoute
+    }
     '/inventory/skus/$id': {
       id: '/inventory/skus/$id'
       path: '/$id'
@@ -720,10 +739,12 @@ const PurchaseDomesticRouteWithChildren =
   PurchaseDomesticRoute._addFileChildren(PurchaseDomesticRouteChildren)
 
 interface PurchaseDomesticBulkRouteChildren {
+  PurchaseDomesticBulkNewRoute: typeof PurchaseDomesticBulkNewRoute
   PurchaseDomesticBulkIndexRoute: typeof PurchaseDomesticBulkIndexRoute
 }
 
 const PurchaseDomesticBulkRouteChildren: PurchaseDomesticBulkRouteChildren = {
+  PurchaseDomesticBulkNewRoute: PurchaseDomesticBulkNewRoute,
   PurchaseDomesticBulkIndexRoute: PurchaseDomesticBulkIndexRoute,
 }
 
@@ -773,3 +794,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
