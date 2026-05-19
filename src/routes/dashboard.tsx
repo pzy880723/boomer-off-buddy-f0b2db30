@@ -73,9 +73,9 @@ function DashboardPage() {
       </div>
 
       {/* 分渠道统计 */}
-      <div className="mb-6 grid gap-4 lg:grid-cols-3">
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {isLoading || !data
-          ? [0, 1, 2].map((i) => <Skeleton key={i} className="h-56 rounded-lg" />)
+          ? [0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-56 rounded-lg" />)
           : data.byChannel.map((c) => {
               const meta = CHANNEL_META[c.key];
               const Icon = meta.icon;
