@@ -25,6 +25,7 @@ const CHANNEL_META: Record<ChannelKey, { icon: typeof Mail; to: string; unit: st
   japan_parcel: { icon: Mail, to: "/purchase/japan-parcel", unit: "单" },
   japan_bulk: { icon: Plane, to: "/purchase/japan-bulk", unit: "票" },
   domestic: { icon: ShoppingBag, to: "/purchase/domestic", unit: "单" },
+  domestic_bulk: { icon: PackageCheck, to: "/purchase/domestic-bulk", unit: "单" },
 };
 
 function fmt(n: number) {
