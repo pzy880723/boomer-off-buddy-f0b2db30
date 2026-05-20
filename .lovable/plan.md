@@ -1,77 +1,53 @@
-## 目标
+## 改动概览（仅前端 + searchParcels 字段扩展）
 
-把 `/m/parcels` 改成「**待签收 / 已签收**」分页的工作清单，并升级 `/m/receive/$id`：子商品可点开看详情、签收时拍多张到货照片（最多 9 张），支持「拍照」和「相册选择」两种来源。
+### 1. 列表卡片标题改成「首件商品名 等 N 件商品」
+- `src/lib/mobile.functions.ts` 的 `searchParcels` select 增加嵌套子表，按 position 升序拿一条：
+  ```
+  japan_parcel_items(id, item_title_cn, item_title, position)
+  ```
+  返回时计算 `firstItemName`（取截断的中文名，没中文名退回日文名）和 `itemCount`。
+- `src/routes/m.parcels.tsx` 卡片标题渲染规则：
+  - `itemCount > 1` → `「首件中文名前 14 字」 等 N 件商品`
+  - `itemCount === 1` → 只显示首件名
+  - `itemCount === 0` → 显示 `(未填写商品名)`
+- 图片仍用 `parcel.item_image_url`（已经是首件图，无改动）。
 
----
-
-## 1. 包裹列表 `/m/parcels`
-
-顶部 segmented tabs：
-- **待签收**（默认）— `status ∈ {purchased, at_jp_warehouse, shipping_intl}`，按 `created_at desc`
-- **已签收** — `status ∈ {delivered, completed}`，按 `received_at desc`
-
-下方保留搜索框（在当前 tab 内过滤）。
-
-每张卡片显示：
-- 左：商品缩略图（80×80）
-- 右上：**单号**（tracking_no 或 source_order_no）
-- 右中：商品中文名（fallback 日文名）
-- 右下一行：**¥价格**（grand_total_cny）· **采购时间**（intl_pay_at，缺则 created_at，格式 MM-DD）
-- 已签收 tab 多显示一行小字「签收于 MM-DD HH:mm」
-
-点击卡片 → `/m/receive/$id`。
-
-## 2. 签收页 `/m/receive/$id`
-
-### 2.1 子商品可点开
-现在子商品只是只读列表。改成：
-- 每行右侧加 `›` 箭头，整行可点
-- 点击 → 从底部弹出 `ItemDetailSheet`（基于 shadcn `Sheet side="bottom"`）
-- Sheet 内容复用 `parcel-card-dialog` 里 `OverviewItems` 的字段排版：大图 + 名称 + 单价/数量/重量/汇率/手续费/国内运费/补差/关税/支付方式/支付时间/商户单号/平台/成色/备注。新建 `src/components/mobile/item-detail-sheet.tsx`，单条 item 版本。
-
-### 2.2 到货照片（最多 9 张）
-- 标题从「外包装照片」改为「**到货照片（最多 9 张，至少 1 张）**」
-- 改成 3×3 九宫格：已上传的格子显示缩略图 + 右上角 × 删除；下一格显示「+」按钮
-- 点「+」弹出底部 action sheet 两个选项：
-  - **拍照**（隐藏 input，`accept="image/*" capture="environment"`，单张）
-  - **从相册选择**（隐藏 input，`accept="image/*" multiple`，可一次选多张，自动截到剩余配额）
-- 上传走现有 `uploadParcelImage(file, "receive", id)`，并发上传 + 单张失败不阻塞其它
-- 状态：`photoUrls: string[]`，达到 9 张时隐藏「+」格
-
-### 2.3 签收提交
-- 签收按钮 disabled 条件改为 `photoUrls.length === 0`
-- 调用 `markParcelDelivered({ data: { id, photo_urls: photoUrls } })`
-- 异常提交同步支持 `photo_urls`
-
-## 3. 后端 `src/lib/mobile.functions.ts`
-
-### `searchParcels`
-- 入参加 `bucket: "pending" | "received"`（可选；不传等同当前行为）
-- select 增加 `intl_pay_at`
-- 根据 bucket 设 `.in("status", ...)`；`received` 按 `received_at desc`，`pending` 维持 `created_at desc`
-
-### `markParcelDelivered` / `markParcelProblem`
-- 入参 `photo_url` 旁新增 `photo_urls: z.array(z.string().url()).max(9).optional()`
-- 写 timeline 时存 `photo_urls`（数组），兼容保留 `photo_url`（=数组首张）
-- 不改库表结构（`status_timeline` 是 jsonb，直接装）
-
-## 4. 数据库
-
-无需 migration。所有照片以 URL 数组形式装进现有 `japan_parcels.status_timeline` jsonb。
-
----
-
-## 涉及文件
-
+### 2. 搜索框置顶 + Tab 下移
+`m.parcels.tsx` 顶部布局改成：
+```text
+[ 🔍 搜索框        ]   ← 最上面
+[ 待签收 | 已签收 ]    ← 下面
 ```
-新增  src/components/mobile/item-detail-sheet.tsx
-改动  src/routes/m.parcels.tsx          # tabs + 卡片字段
-改动  src/routes/m.receive.$id.tsx      # 多照片 + 子商品点击
-改动  src/lib/mobile.functions.ts       # searchParcels bucket、签收支持 photo_urls
-```
+（仅 sticky header 内调换两个 div 的顺序）
 
-## 非目标（本次不做）
+### 3. 详情页顶部「包裹全量信息」模块
+`src/routes/m.receive.$id.tsx` 把现有顶部小卡片扩成完整信息块：
+- 第一行：缩略图 + 标题（套用新的「首件名 等 N 件」规则）+ 异常徽标
+- 信息网格（label/value 两列，紧凑 11–12px）：
+  - 国际单号 / 来源订单号（点按可复制）
+  - 状态徽章
+  - 卖家
+  - 商品合计 ¥ / 国际运费 ¥ / 关税 ¥ / 合计 ¥
+  - 重量 g / 件数
+  - 购买时间 / 国际付款时间 / 签收时间
+  - 备注（如有）
+- 数据从 `getJapanParcel().row` 直接读，不需要后端改动；缺失字段隐藏行。
 
-- 不改 SKU / 分拣相关流程
-- 不做拍照模式下"连拍多张"（capture 标签浏览器侧实现各异，先用相册多选兜底）
-- 不做照片裁剪/标注
+### 4. 到货照片「连续拍摄」
+当前 `<input capture="environment">` 系统返回后只能拍一张。改造方案：
+- 新增一个 **「连拍」按钮**（picker 弹层里增加第三项 `📷 连拍`）。
+- 进入连拍模式后：
+  1. 触发隐藏的 capture input；
+  2. `onChange` 拿到文件 → 立即上传 → 上传成功后 **自动再次** `captureRef.current?.click()`；
+  3. 直到用户在系统相机里按「取消」（input 不返回文件，循环自然结束）或达到 `MAX_PHOTOS = 9`。
+- 同时把「拍照」按钮保留为单张模式；「相册选择」保持多选不变。
+- 上传过程中右下角悬浮一个 `已拍 X/9 · 点此结束` 的小条，方便用户中途手动结束（设置 `continuousRef.current = false`，下次 onChange 不再续拍）。
+
+### 不动的部分
+- 后端表结构、状态字典、RLS、分拣/入库流程：均不动。
+- 子商品详情 Sheet、异常流程、签收按钮 disabled 逻辑：均保留。
+- 桌面端 `/purchase/japan-parcel/*` 页面：不动。
+
+### 风险与注意
+- iOS Safari 在 `capture` input 取消时 `onChange` 不会触发，所以「用户在相机里点取消」=连拍自然停止，不需要额外处理。Android Chrome 行为一致。
+- `searchParcels` 嵌套查询会让单次返回稍大，但 `limit ≤ 50`、每条只多两个字符串字段，开销可忽略。
