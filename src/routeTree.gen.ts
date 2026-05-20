@@ -58,6 +58,7 @@ import { Route as InventorySkusIdRouteImport } from './routes/inventory.skus.$id
 import { Route as InventoryInboundNewRouteImport } from './routes/inventory.inbound.new'
 import { Route as InventoryInboundIdRouteImport } from './routes/inventory.inbound.$id'
 import { Route as ApiPublicMerukiIngestRouteImport } from './routes/api/public/meruki-ingest'
+import { Route as MSortItemItemIdRouteImport } from './routes/m.sort.item.$itemId'
 
 const StoreRoute = StoreRouteImport.update({
   id: '/store',
@@ -308,6 +309,11 @@ const ApiPublicMerukiIngestRoute = ApiPublicMerukiIngestRouteImport.update({
   path: '/api/public/meruki-ingest',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MSortItemItemIdRoute = MSortItemItemIdRouteImport.update({
+  id: '/sort/item/$itemId',
+  path: '/sort/item/$itemId',
+  getParentRoute: () => MRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -359,6 +365,7 @@ export interface FileRoutesByFullPath {
   '/purchase/domestic-bulk/': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic/': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
+  '/m/sort/item/$itemId': typeof MSortItemItemIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -403,6 +410,7 @@ export interface FileRoutesByTo {
   '/purchase/domestic-bulk': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel': typeof PurchaseJapanParcelIndexRoute
+  '/m/sort/item/$itemId': typeof MSortItemItemIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -455,6 +463,7 @@ export interface FileRoutesById {
   '/purchase/domestic-bulk/': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic/': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
+  '/m/sort/item/$itemId': typeof MSortItemItemIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -508,6 +517,7 @@ export interface FileRouteTypes {
     | '/purchase/domestic-bulk/'
     | '/purchase/domestic/'
     | '/purchase/japan-parcel/'
+    | '/m/sort/item/$itemId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -552,6 +562,7 @@ export interface FileRouteTypes {
     | '/purchase/domestic-bulk'
     | '/purchase/domestic'
     | '/purchase/japan-parcel'
+    | '/m/sort/item/$itemId'
   id:
     | '__root__'
     | '/'
@@ -603,6 +614,7 @@ export interface FileRouteTypes {
     | '/purchase/domestic-bulk/'
     | '/purchase/domestic/'
     | '/purchase/japan-parcel/'
+    | '/m/sort/item/$itemId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -974,6 +986,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicMerukiIngestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/m/sort/item/$itemId': {
+      id: '/m/sort/item/$itemId'
+      path: '/sort/item/$itemId'
+      fullPath: '/m/sort/item/$itemId'
+      preLoaderRoute: typeof MSortItemItemIdRouteImport
+      parentRoute: typeof MRoute
+    }
   }
 }
 
@@ -986,6 +1005,7 @@ interface MRouteChildren {
   MReceiveIdRoute: typeof MReceiveIdRoute
   MSortIdRoute: typeof MSortIdRoute
   MSortIndexRoute: typeof MSortIndexRoute
+  MSortItemItemIdRoute: typeof MSortItemItemIdRoute
 }
 
 const MRouteChildren: MRouteChildren = {
@@ -997,6 +1017,7 @@ const MRouteChildren: MRouteChildren = {
   MReceiveIdRoute: MReceiveIdRoute,
   MSortIdRoute: MSortIdRoute,
   MSortIndexRoute: MSortIndexRoute,
+  MSortItemItemIdRoute: MSortItemItemIdRoute,
 }
 
 const MRouteWithChildren = MRoute._addFileChildren(MRouteChildren)
