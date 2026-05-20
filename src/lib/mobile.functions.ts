@@ -97,7 +97,7 @@ export const markParcelDelivered = createServerFn({ method: "POST" })
       : (data.photo_url ? [data.photo_url] : []);
     const { data: cur } = await supabaseAdmin
       .from("japan_parcels")
-      .select("status_timeline")
+      .select("status_timeline, tracking_no, source_order_no, seller")
       .eq("id", data.id)
       .single();
     const timeline = Array.isArray(cur?.status_timeline) ? [...cur.status_timeline] : [];
@@ -118,6 +118,31 @@ export const markParcelDelivered = createServerFn({ method: "POST" })
       })
       .eq("id", data.id);
     if (error) throw new Error(error.message);
+
+    // 副作用：把这个包裹的每个子商品落地成「待分拣库存」一条
+    const { data: items } = await supabaseAdmin
+      .from("japan_parcel_items")
+      .select("id, item_title, item_title_cn, item_image_url")
+      .eq("parent_id", data.id);
+    if (items && items.length > 0) {
+      const sourceLabel = [cur?.tracking_no || cur?.source_order_no, cur?.seller]
+        .filter(Boolean)
+        .join(" · ") || null;
+      const receivedAt = new Date().toISOString();
+      const rows = items.map((it) => ({
+        parcel_id: data.id,
+        parcel_item_id: it.id,
+        title: it.item_title_cn || it.item_title || "(未命名)",
+        image_url: it.item_image_url,
+        source_label: sourceLabel,
+        status: "pending",
+        received_at: receivedAt,
+      }));
+      await supabaseAdmin
+        .from("pending_sort_items")
+        .upsert(rows as never, { onConflict: "parcel_item_id", ignoreDuplicates: true });
+    }
+
     return { ok: true };
   });
 
