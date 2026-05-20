@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useRef } from "react";
-import { Camera, Check, AlertTriangle, Loader2, ArrowRight } from "lucide-react";
+import { Camera, Check, AlertTriangle, Loader2, ArrowRight, X, Plus, ImageIcon, ChevronRight } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { MobileShell } from "@/components/mobile/mobile-shell";
@@ -11,10 +11,13 @@ import { uploadParcelImage } from "@/lib/image-upload";
 import { toThumbUrl } from "@/lib/image";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { ItemDetailSheet, type ItemDetailValue } from "@/components/mobile/item-detail-sheet";
 
 export const Route = createFileRoute("/m/receive/$id")({
   component: ReceivePage,
 });
+
+const MAX_PHOTOS = 9;
 
 function ReceivePage() {
   const { id } = Route.useParams();
@@ -29,31 +32,46 @@ function ReceivePage() {
     queryFn: () => fetchParcel({ data: { id } }),
   });
 
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
+  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(0);
   const [note, setNote] = useState("");
   const [showProblem, setShowProblem] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [detailItem, setDetailItem] = useState<ItemDetailValue | null>(null);
+  const captureRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
 
-  async function handleFile(file: File) {
-    setUploading(true);
-    try {
-      const url = await uploadParcelImage(file, "receive", id);
-      setPhotoUrl(url);
-      toast.success("照片已上传");
-    } catch (e) {
-      toast.error("上传失败：" + (e as Error).message);
-    } finally {
-      setUploading(false);
+  async function handleFiles(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    const remain = MAX_PHOTOS - photoUrls.length;
+    if (remain <= 0) {
+      toast.error(`最多 ${MAX_PHOTOS} 张`);
+      return;
     }
+    const list = Array.from(files).slice(0, remain);
+    setUploading((n) => n + list.length);
+    const results = await Promise.allSettled(
+      list.map((f) => uploadParcelImage(f, "receive", id)),
+    );
+    const ok: string[] = [];
+    let failed = 0;
+    for (const r of results) {
+      if (r.status === "fulfilled") ok.push(r.value);
+      else failed++;
+    }
+    if (ok.length) setPhotoUrls((prev) => [...prev, ...ok].slice(0, MAX_PHOTOS));
+    setUploading((n) => Math.max(0, n - list.length));
+    if (failed) toast.error(`${failed} 张上传失败`);
+    else if (ok.length) toast.success(`已添加 ${ok.length} 张`);
   }
 
   const deliverMut = useMutation({
-    mutationFn: () => doDelivered({ data: { id, photo_url: photoUrl } }),
+    mutationFn: () => doDelivered({ data: { id, photo_urls: photoUrls } }),
     onSuccess: () => {
       toast.success("已签收，可去分拣台");
       qc.invalidateQueries({ queryKey: ["mobile-counts"] });
       qc.invalidateQueries({ queryKey: ["mobile-parcel", id] });
+      qc.invalidateQueries({ queryKey: ["mobile-parcels"] });
       router.navigate({ to: "/m/sort/$id", params: { id } });
     },
     onError: (e) => toast.error((e as Error).message),
@@ -61,7 +79,7 @@ function ReceivePage() {
 
   const problemMut = useMutation({
     mutationFn: () =>
-      doProblem({ data: { id, note: note.trim(), photo_url: photoUrl } }),
+      doProblem({ data: { id, note: note.trim(), photo_urls: photoUrls } }),
     onSuccess: () => {
       toast.success("已标记异常");
       qc.invalidateQueries({ queryKey: ["mobile-parcel", id] });
@@ -72,8 +90,8 @@ function ReceivePage() {
   });
 
   const parcel = data?.row;
-  const items = data?.items ?? [];
-  const canDeliver = !!photoUrl && !deliverMut.isPending;
+  const items = (data?.items ?? []) as ItemDetailValue[];
+  const canDeliver = photoUrls.length > 0 && !deliverMut.isPending;
 
   return (
     <MobileShell title="到货签收" back>
@@ -123,28 +141,35 @@ function ReceivePage() {
               ) : (
                 <ul className="divide-y">
                   {items.map((it) => (
-                    <li key={it.id} className="flex items-center gap-3 px-3 py-2">
-                      {it.item_image_url ? (
-                        <img
-                          src={toThumbUrl(it.item_image_url, 128) ?? it.item_image_url}
-                          alt=""
-                          className="h-10 w-10 flex-none rounded border object-cover"
-                          loading="lazy"
-                          width={40}
-                          height={40}
-                        />
-                      ) : (
-                        <div className="h-10 w-10 flex-none rounded border bg-muted" />
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-xs">
-                          {it.item_title_cn || it.item_title}
+                    <li key={it.id}>
+                      <button
+                        type="button"
+                        onClick={() => setDetailItem(it)}
+                        className="flex w-full items-center gap-3 px-3 py-2 text-left active:bg-muted"
+                      >
+                        {it.item_image_url ? (
+                          <img
+                            src={toThumbUrl(it.item_image_url, 128) ?? it.item_image_url}
+                            alt=""
+                            className="h-10 w-10 flex-none rounded border object-cover"
+                            loading="lazy"
+                            width={40}
+                            height={40}
+                          />
+                        ) : (
+                          <div className="h-10 w-10 flex-none rounded border bg-muted" />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-xs">
+                            {it.item_title_cn || it.item_title}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground">
+                            ×{it.quantity ?? 1} · ¥
+                            {it.item_total_cny != null ? Number(it.item_total_cny).toFixed(2) : "—"}
+                          </div>
                         </div>
-                        <div className="text-[10px] text-muted-foreground">
-                          ×{it.quantity ?? 1} · ¥
-                          {it.item_total_cny != null ? Number(it.item_total_cny).toFixed(2) : "—"}
-                        </div>
-                      </div>
+                        <ChevronRight className="h-4 w-4 flex-none text-muted-foreground" />
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -153,36 +178,66 @@ function ReceivePage() {
           </section>
 
           <section className="space-y-2">
-            <h3 className="px-1 text-xs font-medium text-muted-foreground">外包装照片（必填）</h3>
-            <button
-              type="button"
-              onClick={() => inputRef.current?.click()}
-              className="relative flex h-44 w-full items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-muted-foreground/30 bg-muted/30 text-muted-foreground active:bg-muted"
-              disabled={uploading}
-            >
-              {photoUrl ? (
-                <img src={photoUrl} alt="外包装" className="h-full w-full object-cover" />
-              ) : uploading ? (
-                <Loader2 className="h-6 w-6 animate-spin" />
-              ) : (
-                <div className="flex flex-col items-center gap-1.5">
-                  <Camera className="h-7 w-7" />
-                  <span className="text-xs">拍照 / 选取照片</span>
+            <h3 className="px-1 text-xs font-medium text-muted-foreground">
+              到货照片（必填，最多 {MAX_PHOTOS} 张）
+            </h3>
+            <div className="grid grid-cols-3 gap-2">
+              {photoUrls.map((url, i) => (
+                <div
+                  key={url + i}
+                  className="relative aspect-square overflow-hidden rounded-xl border bg-muted"
+                >
+                  <img src={url} alt="" className="h-full w-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setPhotoUrls((prev) => prev.filter((_, idx) => idx !== i))}
+                    className="absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white"
+                    aria-label="删除"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
                 </div>
-              )}
-              <input
-                ref={inputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) handleFile(f);
-                  e.currentTarget.value = "";
-                }}
-              />
-            </button>
+              ))}
+              {photoUrls.length < MAX_PHOTOS ? (
+                <button
+                  type="button"
+                  onClick={() => setPickerOpen(true)}
+                  className="flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-muted-foreground/30 bg-muted/30 text-muted-foreground active:bg-muted"
+                  disabled={uploading > 0}
+                >
+                  {uploading > 0 ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <>
+                      <Plus className="h-5 w-5" />
+                      <span className="text-[10px]">添加</span>
+                    </>
+                  )}
+                </button>
+              ) : null}
+            </div>
+            <input
+              ref={captureRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                handleFiles(e.target.files);
+                e.currentTarget.value = "";
+              }}
+            />
+            <input
+              ref={galleryRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                handleFiles(e.target.files);
+                e.currentTarget.value = "";
+              }}
+            />
           </section>
 
           <div className="grid grid-cols-2 gap-2 pt-1">
@@ -241,6 +296,53 @@ function ReceivePage() {
           ) : null}
         </div>
       )}
+
+      {/* 拍照 / 相册 picker */}
+      {pickerOpen ? (
+        <div
+          className="fixed inset-0 z-40 flex items-end bg-black/50"
+          onClick={() => setPickerOpen(false)}
+        >
+          <div
+            className="w-full space-y-2 rounded-t-2xl bg-card p-3 pb-[calc(env(safe-area-inset-bottom)+12px)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border bg-background text-sm font-medium active:bg-muted"
+              onClick={() => {
+                setPickerOpen(false);
+                captureRef.current?.click();
+              }}
+            >
+              <Camera className="h-4 w-4" /> 拍照
+            </button>
+            <button
+              type="button"
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border bg-background text-sm font-medium active:bg-muted"
+              onClick={() => {
+                setPickerOpen(false);
+                galleryRef.current?.click();
+              }}
+            >
+              <ImageIcon className="h-4 w-4" /> 从相册选择
+            </button>
+            <button
+              type="button"
+              className="h-12 w-full rounded-xl text-sm text-muted-foreground"
+              onClick={() => setPickerOpen(false)}
+            >
+              取消
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      <ItemDetailSheet
+        open={!!detailItem}
+        onOpenChange={(o) => !o && setDetailItem(null)}
+        item={detailItem}
+      />
     </MobileShell>
   );
 }
