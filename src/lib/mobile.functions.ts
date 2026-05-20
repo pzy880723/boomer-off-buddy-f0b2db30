@@ -250,7 +250,7 @@ export const markPendingSortItemDone = createServerFn({ method: "POST" })
     if (data.notes != null) patch.notes = data.notes;
     const { error } = await supabaseAdmin
       .from("pending_sort_items")
-      .update(patch)
+      .update(patch as never)
       .eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
