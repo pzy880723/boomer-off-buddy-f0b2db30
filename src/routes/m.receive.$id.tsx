@@ -376,16 +376,6 @@ function ReceivePage() {
           >
             <button
               type="button"
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border bg-background text-sm font-medium active:bg-muted"
-              onClick={() => {
-                setPickerOpen(false);
-                captureRef.current?.click();
-              }}
-            >
-              <Camera className="h-4 w-4" /> 拍照
-            </button>
-            <button
-              type="button"
               className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border bg-primary text-sm font-medium text-primary-foreground active:opacity-80"
               onClick={() => {
                 setPickerOpen(false);
