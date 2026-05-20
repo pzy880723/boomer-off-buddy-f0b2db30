@@ -70,12 +70,16 @@ export const markParcelDelivered = createServerFn({ method: "POST" })
       .object({
         id: z.string().uuid(),
         photo_url: z.string().url().nullable().optional(),
+        photo_urls: z.array(z.string().url()).max(9).optional(),
         operator: z.string().nullable().optional(),
         note: z.string().nullable().optional(),
       })
       .parse(input),
   )
   .handler(async ({ data }) => {
+    const urls = data.photo_urls && data.photo_urls.length > 0
+      ? data.photo_urls
+      : (data.photo_url ? [data.photo_url] : []);
     const { data: cur } = await supabaseAdmin
       .from("japan_parcels")
       .select("status_timeline")
@@ -86,7 +90,8 @@ export const markParcelDelivered = createServerFn({ method: "POST" })
       step: "delivered",
       at: new Date().toISOString(),
       operator: data.operator ?? null,
-      photo_url: data.photo_url ?? null,
+      photo_url: urls[0] ?? null,
+      photo_urls: urls,
       note: data.note ?? null,
     });
     const { error } = await supabaseAdmin
@@ -109,11 +114,15 @@ export const markParcelProblem = createServerFn({ method: "POST" })
         id: z.string().uuid(),
         note: z.string().min(1).max(500),
         photo_url: z.string().url().nullable().optional(),
+        photo_urls: z.array(z.string().url()).max(9).optional(),
         operator: z.string().nullable().optional(),
       })
       .parse(input),
   )
   .handler(async ({ data }) => {
+    const urls = data.photo_urls && data.photo_urls.length > 0
+      ? data.photo_urls
+      : (data.photo_url ? [data.photo_url] : []);
     const { data: cur } = await supabaseAdmin
       .from("japan_parcels")
       .select("status_timeline, notes")
@@ -124,7 +133,8 @@ export const markParcelProblem = createServerFn({ method: "POST" })
       step: "problem",
       at: new Date().toISOString(),
       operator: data.operator ?? null,
-      photo_url: data.photo_url ?? null,
+      photo_url: urls[0] ?? null,
+      photo_urls: urls,
       note: data.note,
     });
     const newNotes = [cur?.notes, `[异常] ${data.note}`].filter(Boolean).join("\n");
