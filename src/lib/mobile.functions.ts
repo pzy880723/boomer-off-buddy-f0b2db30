@@ -70,6 +70,90 @@ export const getMobileCounts = createServerFn({ method: "GET" }).handler(async (
   };
 });
 
+/** 一键签收 + 写时间线（仅更新包裹状态/到货照片，不创建库存条目） */
+export const markParcelDelivered = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        photo_url: z.string().url().nullable().optional(),
+        photo_urls: z.array(z.string().url()).max(9).optional(),
+        operator: z.string().nullable().optional(),
+        note: z.string().nullable().optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const urls = data.photo_urls && data.photo_urls.length > 0
+      ? data.photo_urls
+      : (data.photo_url ? [data.photo_url] : []);
+    const { data: cur } = await supabaseAdmin
+      .from("japan_parcels")
+      .select("status_timeline")
+      .eq("id", data.id)
+      .single();
+    const timeline = Array.isArray(cur?.status_timeline) ? [...cur.status_timeline] : [];
+    timeline.push({
+      step: "delivered",
+      at: new Date().toISOString(),
+      operator: data.operator ?? null,
+      photo_url: urls[0] ?? null,
+      photo_urls: urls,
+      note: data.note ?? null,
+    });
+    const { error } = await supabaseAdmin
+      .from("japan_parcels")
+      .update({
+        status: "delivered",
+        received_at: new Date().toISOString(),
+        status_timeline: timeline,
+      })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/** 异常标记 + 时间线 */
+export const markParcelProblem = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        note: z.string().min(1).max(500),
+        photo_url: z.string().url().nullable().optional(),
+        photo_urls: z.array(z.string().url()).max(9).optional(),
+        operator: z.string().nullable().optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const urls = data.photo_urls && data.photo_urls.length > 0
+      ? data.photo_urls
+      : (data.photo_url ? [data.photo_url] : []);
+    const { data: cur } = await supabaseAdmin
+      .from("japan_parcels")
+      .select("status_timeline, notes")
+      .eq("id", data.id)
+      .single();
+    const timeline = Array.isArray(cur?.status_timeline) ? [...cur.status_timeline] : [];
+    timeline.push({
+      step: "problem",
+      at: new Date().toISOString(),
+      operator: data.operator ?? null,
+      photo_url: urls[0] ?? null,
+      photo_urls: urls,
+      note: data.note,
+    });
+    const newNotes = [cur?.notes, `[异常] ${data.note}`].filter(Boolean).join("\n");
+    const { error } = await supabaseAdmin
+      .from("japan_parcels")
+      .update({ is_problem: true, status_timeline: timeline, notes: newNotes })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+
 /** 拍照识图（MVP A：扫最近候选喂 Gemini 多模态对比） */
 export const photoSearch = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
