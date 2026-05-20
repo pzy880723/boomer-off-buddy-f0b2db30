@@ -313,6 +313,7 @@ export type Database = {
           id: string
           notes: string | null
           operator: string | null
+          parcel_item_id: string | null
           printed_at: string
           qty: number
           sku_id: string
@@ -324,6 +325,7 @@ export type Database = {
           id?: string
           notes?: string | null
           operator?: string | null
+          parcel_item_id?: string | null
           printed_at?: string
           qty: number
           sku_id: string
@@ -335,6 +337,7 @@ export type Database = {
           id?: string
           notes?: string | null
           operator?: string | null
+          parcel_item_id?: string | null
           printed_at?: string
           qty?: number
           sku_id?: string
