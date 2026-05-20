@@ -186,20 +186,6 @@ export const markParcelProblem = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-/** 待分拣（已签收）的包裹清单 */
-export const listSortQueue = createServerFn({ method: "GET" }).handler(async () => {
-  const { data, error } = await supabaseAdmin
-    .from("japan_parcels")
-    .select(
-      "id, source_order_no, tracking_no, item_title, item_title_cn, item_image_url, received_at, grand_total_cny, japan_parcel_items(id)",
-    )
-    .is("deleted_at", null)
-    .eq("status", "delivered")
-    .order("received_at", { ascending: false })
-    .limit(60);
-  if (error) throw new Error(error.message);
-  return { rows: data ?? [] };
-});
 
 /** 待分拣库存（袋子）列表 */
 export const listPendingSortItems = createServerFn({ method: "GET" })
