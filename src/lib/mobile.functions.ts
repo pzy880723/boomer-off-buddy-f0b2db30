@@ -3,25 +3,35 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { generateEpc, PRICE_TIERS } from "./inventory.helpers";
 
+const PENDING_STATUSES = ["purchased", "at_jp_warehouse", "shipping_intl"] as const;
+const RECEIVED_STATUSES = ["delivered", "completed"] as const;
+
 /** 包裹搜索（手机端通用） */
 export const searchParcels = createServerFn({ method: "GET" })
   .inputValidator((input: unknown) =>
     z
       .object({
         q: z.string().trim().max(200).optional(),
+        bucket: z.enum(["pending", "received", "all"]).default("all"),
         limit: z.number().min(1).max(50).default(30),
       })
       .parse(input ?? {}),
   )
   .handler(async ({ data }) => {
+    const orderCol = data.bucket === "received" ? "received_at" : "created_at";
     let q = supabaseAdmin
       .from("japan_parcels")
       .select(
         "id, source_order_no, tracking_no, status, item_title, item_title_cn, item_image_url, intl_pay_at, received_at, grand_total_cny, is_problem, created_at",
       )
       .is("deleted_at", null)
-      .order("created_at", { ascending: false })
+      .order(orderCol, { ascending: false, nullsFirst: false })
       .limit(data.limit);
+    if (data.bucket === "pending") {
+      q = q.in("status", PENDING_STATUSES as unknown as string[]);
+    } else if (data.bucket === "received") {
+      q = q.in("status", RECEIVED_STATUSES as unknown as string[]);
+    }
     if (data.q) {
       const s = `%${data.q}%`;
       q = q.or(
@@ -60,12 +70,16 @@ export const markParcelDelivered = createServerFn({ method: "POST" })
       .object({
         id: z.string().uuid(),
         photo_url: z.string().url().nullable().optional(),
+        photo_urls: z.array(z.string().url()).max(9).optional(),
         operator: z.string().nullable().optional(),
         note: z.string().nullable().optional(),
       })
       .parse(input),
   )
   .handler(async ({ data }) => {
+    const urls = data.photo_urls && data.photo_urls.length > 0
+      ? data.photo_urls
+      : (data.photo_url ? [data.photo_url] : []);
     const { data: cur } = await supabaseAdmin
       .from("japan_parcels")
       .select("status_timeline")
@@ -76,7 +90,8 @@ export const markParcelDelivered = createServerFn({ method: "POST" })
       step: "delivered",
       at: new Date().toISOString(),
       operator: data.operator ?? null,
-      photo_url: data.photo_url ?? null,
+      photo_url: urls[0] ?? null,
+      photo_urls: urls,
       note: data.note ?? null,
     });
     const { error } = await supabaseAdmin
@@ -99,11 +114,15 @@ export const markParcelProblem = createServerFn({ method: "POST" })
         id: z.string().uuid(),
         note: z.string().min(1).max(500),
         photo_url: z.string().url().nullable().optional(),
+        photo_urls: z.array(z.string().url()).max(9).optional(),
         operator: z.string().nullable().optional(),
       })
       .parse(input),
   )
   .handler(async ({ data }) => {
+    const urls = data.photo_urls && data.photo_urls.length > 0
+      ? data.photo_urls
+      : (data.photo_url ? [data.photo_url] : []);
     const { data: cur } = await supabaseAdmin
       .from("japan_parcels")
       .select("status_timeline, notes")
@@ -114,7 +133,8 @@ export const markParcelProblem = createServerFn({ method: "POST" })
       step: "problem",
       at: new Date().toISOString(),
       operator: data.operator ?? null,
-      photo_url: data.photo_url ?? null,
+      photo_url: urls[0] ?? null,
+      photo_urls: urls,
       note: data.note,
     });
     const newNotes = [cur?.notes, `[异常] ${data.note}`].filter(Boolean).join("\n");
