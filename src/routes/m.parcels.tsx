@@ -41,6 +41,15 @@ function ParcelsSearch() {
   return (
     <MobileShell title="包裹">
       <div className="sticky top-0 z-10 space-y-2 border-b bg-background/95 p-3 backdrop-blur">
+        <div className="flex h-10 items-center gap-2 rounded-xl border bg-muted/40 px-3">
+          <Search className="h-4 w-4 text-muted-foreground" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="单号 / 订单号 / 商品名 / 卖家"
+            className="h-full flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+          />
+        </div>
         <div className="grid grid-cols-2 gap-1 rounded-xl border bg-muted/30 p-1">
           {(
             [
@@ -60,15 +69,6 @@ function ParcelsSearch() {
             </button>
           ))}
         </div>
-        <div className="flex h-10 items-center gap-2 rounded-xl border bg-muted/40 px-3">
-          <Search className="h-4 w-4 text-muted-foreground" />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="单号 / 订单号 / 商品名 / 卖家"
-            className="h-full flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-          />
-        </div>
       </div>
       <ul className="divide-y">
         {(data?.rows ?? []).map((r) => {
@@ -76,6 +76,18 @@ function ParcelsSearch() {
           const orderNo = r.tracking_no || r.source_order_no || "无单号";
           const purchasedAt = fmtDate(r.intl_pay_at ?? r.created_at);
           const receivedAt = fmtDateTime(r.received_at);
+          const count = (r as { item_count?: number }).item_count ?? 0;
+          const firstName =
+            (r as { first_item_name?: string }).first_item_name ||
+            r.item_title_cn ||
+            r.item_title ||
+            "";
+          const head = firstName ? (firstName.length > 14 ? firstName.slice(0, 14) + "…" : firstName) : "";
+          const title = !firstName
+            ? "(未填写商品名)"
+            : count > 1
+              ? `${head} 等 ${count} 件商品`
+              : firstName;
           return (
             <li key={r.id}>
               <Link
@@ -105,9 +117,7 @@ function ParcelsSearch() {
                       <AlertTriangle className="h-3.5 w-3.5 flex-none text-destructive" />
                     ) : null}
                   </div>
-                  <div className="mt-0.5 line-clamp-2 text-sm font-medium">
-                    {r.item_title_cn || r.item_title || "(未填写商品名)"}
-                  </div>
+                  <div className="mt-0.5 line-clamp-2 text-sm font-medium">{title}</div>
                   <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
                     {r.grand_total_cny != null ? (
                       <span className="font-medium text-foreground">
