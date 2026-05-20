@@ -304,7 +304,7 @@ function ReceivePage() {
                 e.currentTarget.value = "";
               }}
             />
-            {continuousRef.current && uploading === 0 ? null : null}
+            
           </section>
 
           <div className="grid grid-cols-2 gap-2 pt-1">
