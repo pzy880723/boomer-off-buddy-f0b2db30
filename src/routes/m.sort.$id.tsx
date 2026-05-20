@@ -51,7 +51,8 @@ function SortDetail() {
     },
   });
 
-  const labelsByItem = new Map<string, typeof data.labels>();
+  type LabelRow = NonNullable<typeof data>["labels"][number];
+  const labelsByItem = new Map<string, LabelRow[]>();
   (data?.labels ?? []).forEach((l) => {
     if (!l.parcel_item_id) return;
     if (!labelsByItem.has(l.parcel_item_id)) labelsByItem.set(l.parcel_item_id, []);
