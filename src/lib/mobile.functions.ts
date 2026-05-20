@@ -67,10 +67,9 @@ export const getMobileCounts = createServerFn({ method: "GET" }).handler(async (
       .is("deleted_at", null)
       .in("status", ["shipping_intl", "purchased", "at_jp_warehouse"]),
     supabaseAdmin
-      .from("japan_parcels")
+      .from("pending_sort_items")
       .select("id", { count: "exact", head: true })
-      .is("deleted_at", null)
-      .eq("status", "delivered"),
+      .eq("status", "pending"),
   ]);
   return {
     pendingReceive: pendingReceive.count ?? 0,
