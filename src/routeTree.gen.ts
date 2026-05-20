@@ -9,18 +9,29 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as StoreRouteImport } from './routes/store'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as MRouteImport } from './routes/m'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as KnowledgeRouteImport } from './routes/knowledge'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as StoreIndexRouteImport } from './routes/store.index'
+import { Route as MIndexRouteImport } from './routes/m.index'
 import { Route as StoresYouzanRouteImport } from './routes/stores.youzan'
 import { Route as StoresListRouteImport } from './routes/stores.list'
 import { Route as StoresFranchiseesRouteImport } from './routes/stores.franchisees'
+import { Route as StoreScanRouteImport } from './routes/store.scan'
+import { Route as StoreInventoryRouteImport } from './routes/store.inventory'
+import { Route as StoreIncomingRouteImport } from './routes/store.incoming'
 import { Route as PurchaseJapanParcelRouteImport } from './routes/purchase.japan-parcel'
 import { Route as PurchaseJapanBulkRouteImport } from './routes/purchase.japan-bulk'
 import { Route as PurchaseDomesticBulkRouteImport } from './routes/purchase.domestic-bulk'
 import { Route as PurchaseDomesticRouteImport } from './routes/purchase.domestic'
+import { Route as MScanRouteImport } from './routes/m.scan'
+import { Route as MPhotoSearchRouteImport } from './routes/m.photo-search'
+import { Route as MParcelsRouteImport } from './routes/m.parcels'
+import { Route as MInboundRouteImport } from './routes/m.inbound'
 import { Route as InventoryTransfersRouteImport } from './routes/inventory.transfers'
 import { Route as InventorySkusRouteImport } from './routes/inventory.skus'
 import { Route as InventoryProductsRouteImport } from './routes/inventory.products'
@@ -30,6 +41,7 @@ import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as PurchaseJapanParcelIndexRouteImport } from './routes/purchase.japan-parcel.index'
 import { Route as PurchaseDomesticIndexRouteImport } from './routes/purchase.domestic.index'
 import { Route as PurchaseDomesticBulkIndexRouteImport } from './routes/purchase.domestic-bulk.index'
+import { Route as MSortIndexRouteImport } from './routes/m.sort.index'
 import { Route as InventorySkusIndexRouteImport } from './routes/inventory.skus.index'
 import { Route as InventoryInboundIndexRouteImport } from './routes/inventory.inbound.index'
 import { Route as PurchaseJapanParcelNewRouteImport } from './routes/purchase.japan-parcel.new'
@@ -40,14 +52,26 @@ import { Route as PurchaseDomesticImportRouteImport } from './routes/purchase.do
 import { Route as PurchaseDomesticIdRouteImport } from './routes/purchase.domestic.$id'
 import { Route as PurchaseDomesticBulkNewRouteImport } from './routes/purchase.domestic-bulk.new'
 import { Route as PurchaseDomesticBulkIdRouteImport } from './routes/purchase.domestic-bulk.$id'
+import { Route as MSortIdRouteImport } from './routes/m.sort.$id'
+import { Route as MReceiveIdRouteImport } from './routes/m.receive.$id'
 import { Route as InventorySkusIdRouteImport } from './routes/inventory.skus.$id'
 import { Route as InventoryInboundNewRouteImport } from './routes/inventory.inbound.new'
 import { Route as InventoryInboundIdRouteImport } from './routes/inventory.inbound.$id'
 import { Route as ApiPublicMerukiIngestRouteImport } from './routes/api/public/meruki-ingest'
 
+const StoreRoute = StoreRouteImport.update({
+  id: '/store',
+  path: '/store',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MRoute = MRouteImport.update({
+  id: '/m',
+  path: '/m',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -70,6 +94,16 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StoreIndexRoute = StoreIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => StoreRoute,
+} as any)
+const MIndexRoute = MIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => MRoute,
+} as any)
 const StoresYouzanRoute = StoresYouzanRouteImport.update({
   id: '/stores/youzan',
   path: '/stores/youzan',
@@ -84,6 +118,21 @@ const StoresFranchiseesRoute = StoresFranchiseesRouteImport.update({
   id: '/stores/franchisees',
   path: '/stores/franchisees',
   getParentRoute: () => rootRouteImport,
+} as any)
+const StoreScanRoute = StoreScanRouteImport.update({
+  id: '/scan',
+  path: '/scan',
+  getParentRoute: () => StoreRoute,
+} as any)
+const StoreInventoryRoute = StoreInventoryRouteImport.update({
+  id: '/inventory',
+  path: '/inventory',
+  getParentRoute: () => StoreRoute,
+} as any)
+const StoreIncomingRoute = StoreIncomingRouteImport.update({
+  id: '/incoming',
+  path: '/incoming',
+  getParentRoute: () => StoreRoute,
 } as any)
 const PurchaseJapanParcelRoute = PurchaseJapanParcelRouteImport.update({
   id: '/purchase/japan-parcel',
@@ -104,6 +153,26 @@ const PurchaseDomesticRoute = PurchaseDomesticRouteImport.update({
   id: '/purchase/domestic',
   path: '/purchase/domestic',
   getParentRoute: () => rootRouteImport,
+} as any)
+const MScanRoute = MScanRouteImport.update({
+  id: '/scan',
+  path: '/scan',
+  getParentRoute: () => MRoute,
+} as any)
+const MPhotoSearchRoute = MPhotoSearchRouteImport.update({
+  id: '/photo-search',
+  path: '/photo-search',
+  getParentRoute: () => MRoute,
+} as any)
+const MParcelsRoute = MParcelsRouteImport.update({
+  id: '/parcels',
+  path: '/parcels',
+  getParentRoute: () => MRoute,
+} as any)
+const MInboundRoute = MInboundRouteImport.update({
+  id: '/inbound',
+  path: '/inbound',
+  getParentRoute: () => MRoute,
 } as any)
 const InventoryTransfersRoute = InventoryTransfersRouteImport.update({
   id: '/inventory/transfers',
@@ -152,6 +221,11 @@ const PurchaseDomesticBulkIndexRoute =
     path: '/',
     getParentRoute: () => PurchaseDomesticBulkRoute,
   } as any)
+const MSortIndexRoute = MSortIndexRouteImport.update({
+  id: '/sort/',
+  path: '/sort/',
+  getParentRoute: () => MRoute,
+} as any)
 const InventorySkusIndexRoute = InventorySkusIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -204,6 +278,16 @@ const PurchaseDomesticBulkIdRoute = PurchaseDomesticBulkIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => PurchaseDomesticBulkRoute,
 } as any)
+const MSortIdRoute = MSortIdRouteImport.update({
+  id: '/sort/$id',
+  path: '/sort/$id',
+  getParentRoute: () => MRoute,
+} as any)
+const MReceiveIdRoute = MReceiveIdRouteImport.update({
+  id: '/receive/$id',
+  path: '/receive/$id',
+  getParentRoute: () => MRoute,
+} as any)
 const InventorySkusIdRoute = InventorySkusIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -230,24 +314,37 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/knowledge': typeof KnowledgeRoute
   '/login': typeof LoginRoute
+  '/m': typeof MRouteWithChildren
   '/settings': typeof SettingsRoute
+  '/store': typeof StoreRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
   '/inventory/batches': typeof InventoryBatchesRoute
   '/inventory/inbound': typeof InventoryInboundRouteWithChildren
   '/inventory/products': typeof InventoryProductsRoute
   '/inventory/skus': typeof InventorySkusRouteWithChildren
   '/inventory/transfers': typeof InventoryTransfersRoute
+  '/m/inbound': typeof MInboundRoute
+  '/m/parcels': typeof MParcelsRoute
+  '/m/photo-search': typeof MPhotoSearchRoute
+  '/m/scan': typeof MScanRoute
   '/purchase/domestic': typeof PurchaseDomesticRouteWithChildren
   '/purchase/domestic-bulk': typeof PurchaseDomesticBulkRouteWithChildren
   '/purchase/japan-bulk': typeof PurchaseJapanBulkRoute
   '/purchase/japan-parcel': typeof PurchaseJapanParcelRouteWithChildren
+  '/store/incoming': typeof StoreIncomingRoute
+  '/store/inventory': typeof StoreInventoryRoute
+  '/store/scan': typeof StoreScanRoute
   '/stores/franchisees': typeof StoresFranchiseesRoute
   '/stores/list': typeof StoresListRoute
   '/stores/youzan': typeof StoresYouzanRoute
+  '/m/': typeof MIndexRoute
+  '/store/': typeof StoreIndexRoute
   '/api/public/meruki-ingest': typeof ApiPublicMerukiIngestRoute
   '/inventory/inbound/$id': typeof InventoryInboundIdRoute
   '/inventory/inbound/new': typeof InventoryInboundNewRoute
   '/inventory/skus/$id': typeof InventorySkusIdRoute
+  '/m/receive/$id': typeof MReceiveIdRoute
+  '/m/sort/$id': typeof MSortIdRoute
   '/purchase/domestic-bulk/$id': typeof PurchaseDomesticBulkIdRoute
   '/purchase/domestic-bulk/new': typeof PurchaseDomesticBulkNewRoute
   '/purchase/domestic/$id': typeof PurchaseDomesticIdRoute
@@ -258,6 +355,7 @@ export interface FileRoutesByFullPath {
   '/purchase/japan-parcel/new': typeof PurchaseJapanParcelNewRoute
   '/inventory/inbound/': typeof InventoryInboundIndexRoute
   '/inventory/skus/': typeof InventorySkusIndexRoute
+  '/m/sort/': typeof MSortIndexRoute
   '/purchase/domestic-bulk/': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic/': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
@@ -272,14 +370,25 @@ export interface FileRoutesByTo {
   '/inventory/batches': typeof InventoryBatchesRoute
   '/inventory/products': typeof InventoryProductsRoute
   '/inventory/transfers': typeof InventoryTransfersRoute
+  '/m/inbound': typeof MInboundRoute
+  '/m/parcels': typeof MParcelsRoute
+  '/m/photo-search': typeof MPhotoSearchRoute
+  '/m/scan': typeof MScanRoute
   '/purchase/japan-bulk': typeof PurchaseJapanBulkRoute
+  '/store/incoming': typeof StoreIncomingRoute
+  '/store/inventory': typeof StoreInventoryRoute
+  '/store/scan': typeof StoreScanRoute
   '/stores/franchisees': typeof StoresFranchiseesRoute
   '/stores/list': typeof StoresListRoute
   '/stores/youzan': typeof StoresYouzanRoute
+  '/m': typeof MIndexRoute
+  '/store': typeof StoreIndexRoute
   '/api/public/meruki-ingest': typeof ApiPublicMerukiIngestRoute
   '/inventory/inbound/$id': typeof InventoryInboundIdRoute
   '/inventory/inbound/new': typeof InventoryInboundNewRoute
   '/inventory/skus/$id': typeof InventorySkusIdRoute
+  '/m/receive/$id': typeof MReceiveIdRoute
+  '/m/sort/$id': typeof MSortIdRoute
   '/purchase/domestic-bulk/$id': typeof PurchaseDomesticBulkIdRoute
   '/purchase/domestic-bulk/new': typeof PurchaseDomesticBulkNewRoute
   '/purchase/domestic/$id': typeof PurchaseDomesticIdRoute
@@ -290,6 +399,7 @@ export interface FileRoutesByTo {
   '/purchase/japan-parcel/new': typeof PurchaseJapanParcelNewRoute
   '/inventory/inbound': typeof InventoryInboundIndexRoute
   '/inventory/skus': typeof InventorySkusIndexRoute
+  '/m/sort': typeof MSortIndexRoute
   '/purchase/domestic-bulk': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel': typeof PurchaseJapanParcelIndexRoute
@@ -300,24 +410,37 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/knowledge': typeof KnowledgeRoute
   '/login': typeof LoginRoute
+  '/m': typeof MRouteWithChildren
   '/settings': typeof SettingsRoute
+  '/store': typeof StoreRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
   '/inventory/batches': typeof InventoryBatchesRoute
   '/inventory/inbound': typeof InventoryInboundRouteWithChildren
   '/inventory/products': typeof InventoryProductsRoute
   '/inventory/skus': typeof InventorySkusRouteWithChildren
   '/inventory/transfers': typeof InventoryTransfersRoute
+  '/m/inbound': typeof MInboundRoute
+  '/m/parcels': typeof MParcelsRoute
+  '/m/photo-search': typeof MPhotoSearchRoute
+  '/m/scan': typeof MScanRoute
   '/purchase/domestic': typeof PurchaseDomesticRouteWithChildren
   '/purchase/domestic-bulk': typeof PurchaseDomesticBulkRouteWithChildren
   '/purchase/japan-bulk': typeof PurchaseJapanBulkRoute
   '/purchase/japan-parcel': typeof PurchaseJapanParcelRouteWithChildren
+  '/store/incoming': typeof StoreIncomingRoute
+  '/store/inventory': typeof StoreInventoryRoute
+  '/store/scan': typeof StoreScanRoute
   '/stores/franchisees': typeof StoresFranchiseesRoute
   '/stores/list': typeof StoresListRoute
   '/stores/youzan': typeof StoresYouzanRoute
+  '/m/': typeof MIndexRoute
+  '/store/': typeof StoreIndexRoute
   '/api/public/meruki-ingest': typeof ApiPublicMerukiIngestRoute
   '/inventory/inbound/$id': typeof InventoryInboundIdRoute
   '/inventory/inbound/new': typeof InventoryInboundNewRoute
   '/inventory/skus/$id': typeof InventorySkusIdRoute
+  '/m/receive/$id': typeof MReceiveIdRoute
+  '/m/sort/$id': typeof MSortIdRoute
   '/purchase/domestic-bulk/$id': typeof PurchaseDomesticBulkIdRoute
   '/purchase/domestic-bulk/new': typeof PurchaseDomesticBulkNewRoute
   '/purchase/domestic/$id': typeof PurchaseDomesticIdRoute
@@ -328,6 +451,7 @@ export interface FileRoutesById {
   '/purchase/japan-parcel/new': typeof PurchaseJapanParcelNewRoute
   '/inventory/inbound/': typeof InventoryInboundIndexRoute
   '/inventory/skus/': typeof InventorySkusIndexRoute
+  '/m/sort/': typeof MSortIndexRoute
   '/purchase/domestic-bulk/': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic/': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
@@ -339,24 +463,37 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/knowledge'
     | '/login'
+    | '/m'
     | '/settings'
+    | '/store'
     | '/admin/users'
     | '/inventory/batches'
     | '/inventory/inbound'
     | '/inventory/products'
     | '/inventory/skus'
     | '/inventory/transfers'
+    | '/m/inbound'
+    | '/m/parcels'
+    | '/m/photo-search'
+    | '/m/scan'
     | '/purchase/domestic'
     | '/purchase/domestic-bulk'
     | '/purchase/japan-bulk'
     | '/purchase/japan-parcel'
+    | '/store/incoming'
+    | '/store/inventory'
+    | '/store/scan'
     | '/stores/franchisees'
     | '/stores/list'
     | '/stores/youzan'
+    | '/m/'
+    | '/store/'
     | '/api/public/meruki-ingest'
     | '/inventory/inbound/$id'
     | '/inventory/inbound/new'
     | '/inventory/skus/$id'
+    | '/m/receive/$id'
+    | '/m/sort/$id'
     | '/purchase/domestic-bulk/$id'
     | '/purchase/domestic-bulk/new'
     | '/purchase/domestic/$id'
@@ -367,6 +504,7 @@ export interface FileRouteTypes {
     | '/purchase/japan-parcel/new'
     | '/inventory/inbound/'
     | '/inventory/skus/'
+    | '/m/sort/'
     | '/purchase/domestic-bulk/'
     | '/purchase/domestic/'
     | '/purchase/japan-parcel/'
@@ -381,14 +519,25 @@ export interface FileRouteTypes {
     | '/inventory/batches'
     | '/inventory/products'
     | '/inventory/transfers'
+    | '/m/inbound'
+    | '/m/parcels'
+    | '/m/photo-search'
+    | '/m/scan'
     | '/purchase/japan-bulk'
+    | '/store/incoming'
+    | '/store/inventory'
+    | '/store/scan'
     | '/stores/franchisees'
     | '/stores/list'
     | '/stores/youzan'
+    | '/m'
+    | '/store'
     | '/api/public/meruki-ingest'
     | '/inventory/inbound/$id'
     | '/inventory/inbound/new'
     | '/inventory/skus/$id'
+    | '/m/receive/$id'
+    | '/m/sort/$id'
     | '/purchase/domestic-bulk/$id'
     | '/purchase/domestic-bulk/new'
     | '/purchase/domestic/$id'
@@ -399,6 +548,7 @@ export interface FileRouteTypes {
     | '/purchase/japan-parcel/new'
     | '/inventory/inbound'
     | '/inventory/skus'
+    | '/m/sort'
     | '/purchase/domestic-bulk'
     | '/purchase/domestic'
     | '/purchase/japan-parcel'
@@ -408,24 +558,37 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/knowledge'
     | '/login'
+    | '/m'
     | '/settings'
+    | '/store'
     | '/admin/users'
     | '/inventory/batches'
     | '/inventory/inbound'
     | '/inventory/products'
     | '/inventory/skus'
     | '/inventory/transfers'
+    | '/m/inbound'
+    | '/m/parcels'
+    | '/m/photo-search'
+    | '/m/scan'
     | '/purchase/domestic'
     | '/purchase/domestic-bulk'
     | '/purchase/japan-bulk'
     | '/purchase/japan-parcel'
+    | '/store/incoming'
+    | '/store/inventory'
+    | '/store/scan'
     | '/stores/franchisees'
     | '/stores/list'
     | '/stores/youzan'
+    | '/m/'
+    | '/store/'
     | '/api/public/meruki-ingest'
     | '/inventory/inbound/$id'
     | '/inventory/inbound/new'
     | '/inventory/skus/$id'
+    | '/m/receive/$id'
+    | '/m/sort/$id'
     | '/purchase/domestic-bulk/$id'
     | '/purchase/domestic-bulk/new'
     | '/purchase/domestic/$id'
@@ -436,6 +599,7 @@ export interface FileRouteTypes {
     | '/purchase/japan-parcel/new'
     | '/inventory/inbound/'
     | '/inventory/skus/'
+    | '/m/sort/'
     | '/purchase/domestic-bulk/'
     | '/purchase/domestic/'
     | '/purchase/japan-parcel/'
@@ -446,7 +610,9 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   KnowledgeRoute: typeof KnowledgeRoute
   LoginRoute: typeof LoginRoute
+  MRoute: typeof MRouteWithChildren
   SettingsRoute: typeof SettingsRoute
+  StoreRoute: typeof StoreRouteWithChildren
   AdminUsersRoute: typeof AdminUsersRoute
   InventoryBatchesRoute: typeof InventoryBatchesRoute
   InventoryInboundRoute: typeof InventoryInboundRouteWithChildren
@@ -465,11 +631,25 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/store': {
+      id: '/store'
+      path: '/store'
+      fullPath: '/store'
+      preLoaderRoute: typeof StoreRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings': {
       id: '/settings'
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/m': {
+      id: '/m'
+      path: '/m'
+      fullPath: '/m'
+      preLoaderRoute: typeof MRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -500,6 +680,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/store/': {
+      id: '/store/'
+      path: '/'
+      fullPath: '/store/'
+      preLoaderRoute: typeof StoreIndexRouteImport
+      parentRoute: typeof StoreRoute
+    }
+    '/m/': {
+      id: '/m/'
+      path: '/'
+      fullPath: '/m/'
+      preLoaderRoute: typeof MIndexRouteImport
+      parentRoute: typeof MRoute
+    }
     '/stores/youzan': {
       id: '/stores/youzan'
       path: '/stores/youzan'
@@ -520,6 +714,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/stores/franchisees'
       preLoaderRoute: typeof StoresFranchiseesRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/store/scan': {
+      id: '/store/scan'
+      path: '/scan'
+      fullPath: '/store/scan'
+      preLoaderRoute: typeof StoreScanRouteImport
+      parentRoute: typeof StoreRoute
+    }
+    '/store/inventory': {
+      id: '/store/inventory'
+      path: '/inventory'
+      fullPath: '/store/inventory'
+      preLoaderRoute: typeof StoreInventoryRouteImport
+      parentRoute: typeof StoreRoute
+    }
+    '/store/incoming': {
+      id: '/store/incoming'
+      path: '/incoming'
+      fullPath: '/store/incoming'
+      preLoaderRoute: typeof StoreIncomingRouteImport
+      parentRoute: typeof StoreRoute
     }
     '/purchase/japan-parcel': {
       id: '/purchase/japan-parcel'
@@ -548,6 +763,34 @@ declare module '@tanstack/react-router' {
       fullPath: '/purchase/domestic'
       preLoaderRoute: typeof PurchaseDomesticRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/m/scan': {
+      id: '/m/scan'
+      path: '/scan'
+      fullPath: '/m/scan'
+      preLoaderRoute: typeof MScanRouteImport
+      parentRoute: typeof MRoute
+    }
+    '/m/photo-search': {
+      id: '/m/photo-search'
+      path: '/photo-search'
+      fullPath: '/m/photo-search'
+      preLoaderRoute: typeof MPhotoSearchRouteImport
+      parentRoute: typeof MRoute
+    }
+    '/m/parcels': {
+      id: '/m/parcels'
+      path: '/parcels'
+      fullPath: '/m/parcels'
+      preLoaderRoute: typeof MParcelsRouteImport
+      parentRoute: typeof MRoute
+    }
+    '/m/inbound': {
+      id: '/m/inbound'
+      path: '/inbound'
+      fullPath: '/m/inbound'
+      preLoaderRoute: typeof MInboundRouteImport
+      parentRoute: typeof MRoute
     }
     '/inventory/transfers': {
       id: '/inventory/transfers'
@@ -611,6 +854,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/purchase/domestic-bulk/'
       preLoaderRoute: typeof PurchaseDomesticBulkIndexRouteImport
       parentRoute: typeof PurchaseDomesticBulkRoute
+    }
+    '/m/sort/': {
+      id: '/m/sort/'
+      path: '/sort'
+      fullPath: '/m/sort/'
+      preLoaderRoute: typeof MSortIndexRouteImport
+      parentRoute: typeof MRoute
     }
     '/inventory/skus/': {
       id: '/inventory/skus/'
@@ -682,6 +932,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PurchaseDomesticBulkIdRouteImport
       parentRoute: typeof PurchaseDomesticBulkRoute
     }
+    '/m/sort/$id': {
+      id: '/m/sort/$id'
+      path: '/sort/$id'
+      fullPath: '/m/sort/$id'
+      preLoaderRoute: typeof MSortIdRouteImport
+      parentRoute: typeof MRoute
+    }
+    '/m/receive/$id': {
+      id: '/m/receive/$id'
+      path: '/receive/$id'
+      fullPath: '/m/receive/$id'
+      preLoaderRoute: typeof MReceiveIdRouteImport
+      parentRoute: typeof MRoute
+    }
     '/inventory/skus/$id': {
       id: '/inventory/skus/$id'
       path: '/$id'
@@ -712,6 +976,46 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface MRouteChildren {
+  MInboundRoute: typeof MInboundRoute
+  MParcelsRoute: typeof MParcelsRoute
+  MPhotoSearchRoute: typeof MPhotoSearchRoute
+  MScanRoute: typeof MScanRoute
+  MIndexRoute: typeof MIndexRoute
+  MReceiveIdRoute: typeof MReceiveIdRoute
+  MSortIdRoute: typeof MSortIdRoute
+  MSortIndexRoute: typeof MSortIndexRoute
+}
+
+const MRouteChildren: MRouteChildren = {
+  MInboundRoute: MInboundRoute,
+  MParcelsRoute: MParcelsRoute,
+  MPhotoSearchRoute: MPhotoSearchRoute,
+  MScanRoute: MScanRoute,
+  MIndexRoute: MIndexRoute,
+  MReceiveIdRoute: MReceiveIdRoute,
+  MSortIdRoute: MSortIdRoute,
+  MSortIndexRoute: MSortIndexRoute,
+}
+
+const MRouteWithChildren = MRoute._addFileChildren(MRouteChildren)
+
+interface StoreRouteChildren {
+  StoreIncomingRoute: typeof StoreIncomingRoute
+  StoreInventoryRoute: typeof StoreInventoryRoute
+  StoreScanRoute: typeof StoreScanRoute
+  StoreIndexRoute: typeof StoreIndexRoute
+}
+
+const StoreRouteChildren: StoreRouteChildren = {
+  StoreIncomingRoute: StoreIncomingRoute,
+  StoreInventoryRoute: StoreInventoryRoute,
+  StoreScanRoute: StoreScanRoute,
+  StoreIndexRoute: StoreIndexRoute,
+}
+
+const StoreRouteWithChildren = StoreRoute._addFileChildren(StoreRouteChildren)
 
 interface InventoryInboundRouteChildren {
   InventoryInboundIdRoute: typeof InventoryInboundIdRoute
@@ -796,7 +1100,9 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   KnowledgeRoute: KnowledgeRoute,
   LoginRoute: LoginRoute,
+  MRoute: MRouteWithChildren,
   SettingsRoute: SettingsRoute,
+  StoreRoute: StoreRouteWithChildren,
   AdminUsersRoute: AdminUsersRoute,
   InventoryBatchesRoute: InventoryBatchesRoute,
   InventoryInboundRoute: InventoryInboundRouteWithChildren,
@@ -815,13 +1121,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

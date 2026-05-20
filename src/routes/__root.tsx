@@ -179,8 +179,10 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
-  // 登录页：不渲染侧栏/顶栏外壳
-  if (pathname === "/login") {
+  const isMobileShell = pathname === "/login" || pathname.startsWith("/m") || pathname.startsWith("/store");
+
+  // 登录页 + 手机端 PWA：不渲染侧栏/顶栏外壳
+  if (isMobileShell) {
     return (
       <QueryClientProvider client={queryClient}>
         <AuthGate>

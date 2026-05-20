@@ -1,62 +1,125 @@
-## 结论先说
+## 目标
 
-**不需要做"批量重压老图"**这种麻烦事。Supabase Storage 自带 `render/image/public/...?width=...&quality=...` 转换接口，对**已经在桶里的原图**也立即生效，第一次访问后会被 CDN 缓存。
+打造一条手机端贯穿的商品业务链工作流，覆盖**采购到货 → 分拣分装贴 RFID → 扫码入库**三个环节，外加**拍照识图找包裹/找均价**。门店端单独做 `/store` 子站，先只做"收货确认 + 我店库存查询"，调拨留 V2。
 
-项目里已经有 `src/lib/image.ts → toThumbUrl()` 这个工具，只是**大部分展示位还在直接用原图 URL**，所以才慢。把这些点全部走 `toThumbUrl` 就行——老数据立刻提速，不动数据库、不动 Storage。
+## 两个独立 PWA
 
-## 当前漏网的地方（全部 `<img src={item_image_url}>` 直连原图）
-
-| 文件 | 行 | 显示尺寸 | 建议 thumbWidth |
-|---|---|---|---|
-| `components/japan-parcel/item-image-uploader.tsx` | 199 | 112×112 / 64×64 预览 | 256 |
-| `components/japan-parcel/item-card-dialog.tsx` | 97 | 弹窗大图 | 800 |
-| `components/japan-parcel/parcel-card-dialog.tsx` | 185 | 卡片中等图 | 400 |
-| `components/japan-parcel/parcel-edit-panel.tsx` | 248 | 编辑面板小图 | 200 |
-| `components/japan-parcel/pack-price-calculator-dialog.tsx` | 185 | 拆包对话框中图 | 400 |
-| `components/japan-parcel/items-hover-preview.tsx` | 57 | hover 网格 200px | 已封装 `ClickableThumb`，无需动 |
-| `routes/purchase.japan-parcel.index.tsx` | 550 | 列表小图 | 128 |
-
-已经正确走 `toThumbUrl` 的：`image-lightbox.tsx`、`items-hover-preview.tsx` 封面那张。
-
-## 改动方案（只动展示层，不动数据/上传链路）
-
-### 1. 统一展示走 `toThumbUrl`
-
-把上表 7 个 `<img src={item_image_url} ...>` 改成：
-
-```tsx
-<img
-  src={toThumbUrl(item_image_url, <对应宽度>) ?? item_image_url}
-  loading="lazy"
-  decoding="async"
-  ...
-/>
+```text
+/m       仓库 + 采购通用工作台（不分角色，所有功能瓦片直出）
+/store   门店专用（登录后只看到本店相关数据）
 ```
 
-对大图弹窗类（item-card-dialog、parcel-card-dialog）可以直接换成 `ClickableThumb`——缩略图走 webp，点开后再加载原图，体验最自然。
+两站都只加 manifest.webmanifest + 图标，不启 Service Worker（遵循平台 PWA 规范，避免预览 iframe 缓存污染）。桌面浏览器也能打开调试，移动端给二维码"添加到主屏幕"。
 
-### 2. AI 调用也用缩略图（关键）
+## /m 主站结构
 
-`pack-price-calculator-dialog.tsx` 把 `item.item_image_url`（原图 URL）传给后端 `recognize.functions`。AI 视觉模型对 1024px 以内的图识别效果已经饱和，传原图浪费一次"服务端 fetch 5MB"的耗时。
+```text
+/m                      首页：5 个业务阶段瓦片 + 今日待办计数
+/m/scan                 通用扫码入口（条码 / 二维码 / RFID 蓝牙枪 / OCR）
+/m/parcels              小包裹搜索列表（按单号、订单号、商品名）
+/m/receive/$parcelId    到货签收：清单 + 强制外包装照片 + 状态时间线 + 异常标记
+/m/sort                 分拣台首页：今日已签收待分拣包裹清单
+/m/sort/$parcelId       分拣详情：列出子商品 → 每件扫/打 RFID → 形成 inv_skus
+/m/inbound              扫枪聚合入库（复用现有 /inventory/inbound/new 的扫码逻辑，移动端 UI）
+/m/photo-search         拍照识图（MVP 方案 A：AI 直接对比）
+```
 
-改成传 `toThumbUrl(item.item_image_url, 1024) ?? item.item_image_url` 即可，服务端代码、prompt、模型全部不动。
+### 1. 到货签收 `/m/receive/$id`
 
-### 3. 不做的事
+- 头部：包裹卡 + 子商品缩略图（`toThumbUrl(item, 256)`）
+- 三个动作：
+  - **拍外包装照** → 压缩后上传 `parcel-item-images/receive/{parcelId}/{uuid}.webp`，URL 写入 `status_timeline`
+  - **一键签收** → `status='delivered'`、`received_at=now()`、`status_timeline` 追加 `{step,at,operator,photo_url}`
+  - **异常** → `is_problem=true` + 备注 + 拍照
 
-- **不**做 Storage 批量迁移脚本——Supabase 转换接口已经覆盖老图。
-- **不**改 `item-image-uploader.tsx` 上传逻辑（上一轮刚加的客户端压缩继续生效，新图就直接是 webp 小图）。
-- **不**改数据库字段、不改 RLS、不改 bucket。
-- **不**碰 `screenshot-dropzone.tsx`（那是识别面板，base64 直接给 AI，跟商品图无关）。
+### 2. 分拣台 `/m/sort/$parcelId`（新增的关键环节）
 
-## 预期效果
+这是把"日本小包裹的子商品"翻译成"inv_skus 库存"的桥梁。
 
-- 列表 / 卡片 / 弹窗里**老数据**的图片从 3-8MB 原图变成 20-150KB webp，**首屏快 10-30 倍**，第二次因 CDN 命中接近瞬开。
-- AI 拆包识别的服务端时延也会下降一截（少一次大文件 fetch）。
-- 用户无感知，URL 形态、点击放大、保存、编辑全部不变。
+流程：
+1. 扫包裹单号 / 从待分拣列表进入
+2. 屏幕列出 `japan_parcel_items`（每行：缩略图、中文名、数量、单价、品类提示）
+3. 对每一行点击"拆分为 SKU"：
+   - 自动按 `kind` 推断（pack_pieces>1 即 `pack`，否则 `single`）
+   - 默认带入 `name = item_title_cn`、`category`（从子商品 raw_payload 或人手选）、`price_tier`（从 `item_total_cny` 推档位）、`image_url=item_image_url`、`weight_g`
+   - **关键**：复用现有 EPC 规则——按"类目+价格档+品名"查重，存在则复用，否则新建 SKU
+   - 调用打印桥/蓝牙打印机出 RFID 标签（这一步沿用现有 `inv_label_batches` 逻辑）
+4. 操作员把 RFID 贴到实物上，扫一下 RFID 校验绑定 → `inv_label_batches.status='applied'`
+5. 全部分拣完 → 包裹 `status='completed'`，时间线追加 `sorted_at`
 
-## 验证
+不改 `japan_parcel_items` 表结构；只新增 `inv_label_batches.parcel_item_id`（uuid，可空）做关联溯源。
 
-打开 `/purchase/japan-parcel`：
-1. DevTools → Network → Img，应该看到请求 URL 形如 `…/storage/v1/render/image/public/parcel-item-images/…?width=128&quality=70`，响应类型 `image/webp`，大小几十 KB。
-2. 点开任意包裹卡片大图、拆包对话框，图片同样走 render/image。
-3. 老的、上一轮压缩前上传的大 PNG 也立刻变快。
+### 3. 扫码入库 `/m/inbound`
+
+直接复用现在已经能跑的 `inv_apply_inbound_stock` RPC。手机版只是把扫枪输入框聚合 EPC、按 SKU 分组、提交一次 RPC。
+
+### 4. 拍照识图 `/m/photo-search`
+
+MVP 方案 A（保持上一轮已确认）：压缩图 → server fn 取最近 200-400 件 `japan_parcel_items` 缩略图 → 喂 `google/gemini-3-flash-preview` 一次对比 → Top 5 命中（包含包裹号、商品名、均价、商品现有 SKU 关联）。
+
+## /store 子站
+
+```text
+/store                  本店首页：在途待收 / 库存件数 / 今日销售（占位）
+/store/incoming         待收货清单（来自 V2 调拨；MVP 阶段先空着或显示提示）
+/store/inventory        本店 SKU 库存查询（按 EPC、品名、类目搜索）
+/store/scan             扫 RFID / 条码定位单件商品（看采购均价、来源包裹）
+```
+
+由于"调拨"留到 V2，门店端 MVP 主要做**库存查询和单件溯源**。底层共用 `inv_skus`，等 V2 给 `inv_skus` 加 `location` 字段后再按门店过滤。
+
+## 数据库变更
+
+最小化，只加 1 列 + 1 个可选字段：
+
+```sql
+-- 关联分拣出的标签到原始子商品，便于溯源
+ALTER TABLE public.inv_label_batches
+  ADD COLUMN parcel_item_id uuid;
+
+-- 给签收/分拣的步骤一个统一存放位置（已存在则跳过）
+-- japan_parcels.status_timeline 已是 jsonb[]，直接追加新事件即可
+```
+
+不引入 stores 表、不引入 user_roles。门店区分留 V2。
+
+## 新增 Server Functions
+
+```text
+src/lib/mobile.functions.ts
+  searchParcels({q})                     按单号/订单号/商品名糊查
+  markParcelDelivered({id, photoUrl})    写状态 + 时间线
+  markParcelProblem({id, note, photo})   异常标记
+  sortItemToSku({parcelItemId, skuPatch})从子商品建/复用 SKU + 关联 label
+  bindLabelEpc({labelId, epc})           扫 RFID 校验绑定
+  photoSearch({imageBase64})             MVP A，调 Lovable AI Gateway
+  ocrTrackingNo({imageBase64})           扫码失败时的 OCR fallback
+```
+
+入库与 SKU 写入沿用已有 `inv_apply_inbound_stock` + 直接 upsert，不重复造轮子。
+
+## 技术细节
+
+- PWA：仅 `public/manifest.webmanifest` + 2 张图标，`index.html` link 引入；不注册 SW
+- 摄像头：`BarcodeDetector`（iOS Safari 16.4+）→ fallback `<input type="file" capture>` + AI OCR
+- 蓝牙扫枪：在 `/m/scan` 和 `/m/inbound` 用隐藏 input 接管 keypress，回车提交
+- 图片：统一走现有 `compressImage()`（1600px / webp 0.82）+ `toThumbUrl()` 显示
+- AI：所有 AI 调用走 `recognize.functions`/新增 `mobile.functions` 模板（model: `google/gemini-3-flash-preview`，关键回退 `gemini-2.5-pro`）
+- 路由：所有 `/m/*` 和 `/store/*` 文件路由用 TanStack flat 命名，不创建 `_app` 等保留前缀
+
+## 交付顺序
+
+1. **PWA 外壳 + /m 首页 + /m/parcels 搜索 + /m/receive 签收**（半天）
+2. **/m/scan 通用扫码（条码/RFID/OCR）**（1 天）
+3. **/m/sort 分拣台 + RFID 标签关联**（1.5 天，最复杂）
+4. **/m/inbound 扫码入库手机版**（半天，复用 RPC）
+5. **/m/photo-search**（1 天）
+6. **/store 子站 MVP（首页 + 库存查询 + 单件溯源）**（半天）
+7. **真机回归测试 + 二维码登录**（半天）
+
+## 待你确认后再动手的两个细节
+
+- **分拣台是否允许"批量按 N 件同 SKU 一次出 N 张标签"**？现有桌面流程支持，移动端要不要保留
+- **RFID 蓝牙枪型号**？需要确认是否是 HID 键盘模式（多数支持）。若是 BLE 私有协议，会需要 Web Bluetooth API，复杂度+1
+
+如果以上没问题，点 Approve 我就按交付顺序开干。

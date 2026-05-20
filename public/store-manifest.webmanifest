@@ -1,0 +1,15 @@
+{
+  "name": "BOOMER OFF · 门店工作台",
+  "short_name": "BO 门店",
+  "description": "本店库存 / 收货确认 / 单件溯源",
+  "start_url": "/store",
+  "scope": "/store",
+  "display": "standalone",
+  "background_color": "#0F172A",
+  "theme_color": "#0F172A",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/m-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/m-icon-512.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
