@@ -283,6 +283,17 @@ function ReceivePage() {
               }}
             />
             <input
+              ref={burstRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                handleFiles(e.target.files, { burst: true });
+                e.currentTarget.value = "";
+              }}
+            />
+            <input
               ref={galleryRef}
               type="file"
               accept="image/*"
@@ -293,6 +304,7 @@ function ReceivePage() {
                 e.currentTarget.value = "";
               }}
             />
+            {continuousRef.current && uploading === 0 ? null : null}
           </section>
 
           <div className="grid grid-cols-2 gap-2 pt-1">
