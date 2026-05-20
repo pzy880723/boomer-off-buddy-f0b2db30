@@ -92,7 +92,7 @@ function ReceivePage() {
       qc.invalidateQueries({ queryKey: ["mobile-counts"] });
       qc.invalidateQueries({ queryKey: ["mobile-parcel", id] });
       qc.invalidateQueries({ queryKey: ["mobile-parcels"] });
-      router.navigate({ to: "/m/sort/$id", params: { id } });
+      router.navigate({ to: "/m/sort" });
     },
     onError: (e) => toast.error((e as Error).message),
   });
@@ -354,8 +354,7 @@ function ReceivePage() {
 
           {parcel.status === "delivered" || parcel.status === "completed" ? (
             <Link
-              to="/m/sort/$id"
-              params={{ id }}
+              to="/m/sort"
               className="flex h-12 items-center justify-center gap-1 rounded-xl border bg-muted/40 text-sm font-medium active:bg-muted"
             >
               去分拣台 <ArrowRight className="h-4 w-4" />

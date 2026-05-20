@@ -67,10 +67,9 @@ export const getMobileCounts = createServerFn({ method: "GET" }).handler(async (
       .is("deleted_at", null)
       .in("status", ["shipping_intl", "purchased", "at_jp_warehouse"]),
     supabaseAdmin
-      .from("japan_parcels")
+      .from("pending_sort_items")
       .select("id", { count: "exact", head: true })
-      .is("deleted_at", null)
-      .eq("status", "delivered"),
+      .eq("status", "pending"),
   ]);
   return {
     pendingReceive: pendingReceive.count ?? 0,
@@ -97,7 +96,7 @@ export const markParcelDelivered = createServerFn({ method: "POST" })
       : (data.photo_url ? [data.photo_url] : []);
     const { data: cur } = await supabaseAdmin
       .from("japan_parcels")
-      .select("status_timeline")
+      .select("status_timeline, tracking_no, source_order_no, seller")
       .eq("id", data.id)
       .single();
     const timeline = Array.isArray(cur?.status_timeline) ? [...cur.status_timeline] : [];
@@ -118,6 +117,31 @@ export const markParcelDelivered = createServerFn({ method: "POST" })
       })
       .eq("id", data.id);
     if (error) throw new Error(error.message);
+
+    // 副作用：把这个包裹的每个子商品落地成「待分拣库存」一条
+    const { data: items } = await supabaseAdmin
+      .from("japan_parcel_items")
+      .select("id, item_title, item_title_cn, item_image_url")
+      .eq("parent_id", data.id);
+    if (items && items.length > 0) {
+      const sourceLabel = [cur?.tracking_no || cur?.source_order_no, cur?.seller]
+        .filter(Boolean)
+        .join(" · ") || null;
+      const receivedAt = new Date().toISOString();
+      const rows = items.map((it) => ({
+        parcel_id: data.id,
+        parcel_item_id: it.id,
+        title: it.item_title_cn || it.item_title || "(未命名)",
+        image_url: it.item_image_url,
+        source_label: sourceLabel,
+        status: "pending",
+        received_at: receivedAt,
+      }));
+      await supabaseAdmin
+        .from("pending_sort_items")
+        .upsert(rows as never, { onConflict: "parcel_item_id", ignoreDuplicates: true });
+    }
+
     return { ok: true };
   });
 
@@ -161,20 +185,75 @@ export const markParcelProblem = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-/** 待分拣（已签收）的包裹清单 */
-export const listSortQueue = createServerFn({ method: "GET" }).handler(async () => {
-  const { data, error } = await supabaseAdmin
-    .from("japan_parcels")
-    .select(
-      "id, source_order_no, tracking_no, item_title, item_title_cn, item_image_url, received_at, grand_total_cny, japan_parcel_items(id)",
-    )
-    .is("deleted_at", null)
-    .eq("status", "delivered")
-    .order("received_at", { ascending: false })
-    .limit(60);
-  if (error) throw new Error(error.message);
-  return { rows: data ?? [] };
-});
+
+/** 待分拣库存（袋子）列表 */
+export const listPendingSortItems = createServerFn({ method: "GET" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        status: z.enum(["pending", "sorted", "discarded"]).default("pending"),
+        q: z.string().trim().max(200).optional(),
+        limit: z.number().min(1).max(200).default(100),
+      })
+      .parse(input ?? {}),
+  )
+  .handler(async ({ data }) => {
+    let q = supabaseAdmin
+      .from("pending_sort_items")
+      .select("id, title, image_url, source_label, status, received_at, sorted_at, parcel_id, parcel_item_id")
+      .eq("status", data.status)
+      .order("received_at", { ascending: false })
+      .limit(data.limit);
+    if (data.q) {
+      const s = `%${data.q}%`;
+      q = q.or(`title.ilike.${s},source_label.ilike.${s}`);
+    }
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+    return { rows: rows ?? [] };
+  });
+
+/** 取单个袋子 + 已生成的标签批次 */
+export const getPendingSortItem = createServerFn({ method: "GET" })
+  .inputValidator((input: unknown) =>
+    z.object({ id: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { data: row, error } = await supabaseAdmin
+      .from("pending_sort_items")
+      .select("*")
+      .eq("id", data.id)
+      .single();
+    if (error) throw new Error(error.message);
+    const { data: labels } = await supabaseAdmin
+      .from("inv_label_batches")
+      .select("id, qty, status, printed_at, sku_id, inv_skus(id, name, epc, category, price_tier, kind)")
+      .eq("parcel_item_id", row.parcel_item_id)
+      .order("printed_at", { ascending: false });
+    return { row, labels: labels ?? [] };
+  });
+
+/** 标记袋子分拣完成 / 作废 */
+export const markPendingSortItemDone = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        action: z.enum(["sorted", "discarded"]).default("sorted"),
+        notes: z.string().max(500).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const patch: Record<string, unknown> = { status: data.action, sorted_at: new Date().toISOString() };
+    if (data.notes != null) patch.notes = data.notes;
+    const { error } = await supabaseAdmin
+      .from("pending_sort_items")
+      .update(patch as never)
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
 
 /** 分拣：把一条子商品转成 SKU（按类目+档位+品名查重复用），并生成一条标签批次 */
 const SortSkuSchema = z.object({
@@ -193,7 +272,6 @@ const SortSkuSchema = z.object({
 export const sortItemToSku = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => SortSkuSchema.parse(input))
   .handler(async ({ data }) => {
-    // 1. 找/建 SKU：按 (category, price_tier, name) 唯一
     const { data: existing } = await supabaseAdmin
       .from("inv_skus")
       .select("id, epc, name, category, price_tier, kind")
@@ -225,7 +303,6 @@ export const sortItemToSku = createServerFn({ method: "POST" })
       sku = created;
     }
 
-    // 2. 生成一条标签批次（即"待打印"），关联回子商品
     const { data: batch, error: be } = await supabaseAdmin
       .from("inv_label_batches")
       .insert({
@@ -252,58 +329,6 @@ export const undoSortLabel = createServerFn({ method: "POST" })
       .from("inv_label_batches")
       .delete()
       .eq("id", data.batch_id);
-    if (error) throw new Error(error.message);
-    return { ok: true };
-  });
-
-/** 取某个包裹的分拣进度（每条子商品对应的标签批次） */
-export const getSortDetail = createServerFn({ method: "GET" })
-  .inputValidator((input: unknown) =>
-    z.object({ parcel_id: z.string().uuid() }).parse(input),
-  )
-  .handler(async ({ data }) => {
-    const { data: parcel, error: pe } = await supabaseAdmin
-      .from("japan_parcels")
-      .select("id, source_order_no, tracking_no, item_title_cn, item_title, status, received_at")
-      .eq("id", data.parcel_id)
-      .single();
-    if (pe) throw new Error(pe.message);
-    const { data: items } = await supabaseAdmin
-      .from("japan_parcel_items")
-      .select(
-        "id, item_title, item_title_cn, item_image_url, unit_price_jpy, item_total_cny, quantity, weight_g, pack_pieces, tariff_category, position",
-      )
-      .eq("parent_id", data.parcel_id)
-      .order("position", { ascending: true });
-    const itemIds = (items ?? []).map((i) => i.id);
-    let labels: Array<{ id: string; sku_id: string; qty: number; status: string; parcel_item_id: string | null; printed_at: string }> = [];
-    if (itemIds.length) {
-      const { data: lb } = await supabaseAdmin
-        .from("inv_label_batches")
-        .select("id, sku_id, qty, status, parcel_item_id, printed_at, inv_skus(id, name, epc, category, price_tier, kind)")
-        .in("parcel_item_id", itemIds);
-      labels = (lb ?? []) as never;
-    }
-    return { parcel, items: items ?? [], labels };
-  });
-
-/** 标记包裹整体完成分拣 */
-export const markParcelSorted = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) =>
-    z.object({ id: z.string().uuid(), operator: z.string().nullable().optional() }).parse(input),
-  )
-  .handler(async ({ data }) => {
-    const { data: cur } = await supabaseAdmin
-      .from("japan_parcels")
-      .select("status_timeline")
-      .eq("id", data.id)
-      .single();
-    const tl = Array.isArray(cur?.status_timeline) ? [...cur.status_timeline] : [];
-    tl.push({ step: "sorted", at: new Date().toISOString(), operator: data.operator ?? null });
-    const { error } = await supabaseAdmin
-      .from("japan_parcels")
-      .update({ status: "completed", status_timeline: tl })
-      .eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
