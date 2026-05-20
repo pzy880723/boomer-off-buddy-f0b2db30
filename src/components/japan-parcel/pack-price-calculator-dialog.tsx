@@ -20,6 +20,7 @@ import {
 import { updateParcelItem } from "@/lib/japan-parcel.functions";
 import { computePiecePrice } from "@/lib/japan-parcel.helpers";
 import { ClickableThumb } from "@/components/japan-parcel/image-lightbox";
+import { toThumbUrl } from "@/lib/image";
 
 export interface PackCalcItem {
   id: string;
@@ -115,7 +116,8 @@ export function PackPriceCalculatorDialog({ open, onOpenChange, item, landedCny 
     setImageStep({ status: "running" });
     const r = await fnImage({
       data: {
-        image_url: item.item_image_url,
+        // 走 Supabase 缩略图（webp, ≤1024px），AI 识别效果已饱和，传原图只会拖慢服务端 fetch
+        image_url: toThumbUrl(item.item_image_url, 1024) ?? item.item_image_url,
         title: item.item_title,
         title_cn: item.item_title_cn,
       },

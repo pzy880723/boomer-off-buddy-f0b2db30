@@ -3,6 +3,7 @@ import { Upload, X, Loader2, ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { toThumbUrl } from "@/lib/image";
 
 const BUCKET = "parcel-item-images";
 const MAX_DIM = 1600;
@@ -196,7 +197,13 @@ export function ItemImageUploader({
         />
         {value ? (
           <>
-            <img src={value} alt="" className="h-full w-full object-cover" />
+            <img
+              src={toThumbUrl(value, 256) ?? value}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              className="h-full w-full object-cover"
+            />
             {!uploading && (
               <button
                 type="button"
