@@ -28,8 +28,9 @@ function SortDetail() {
     queryFn: () => fnDetail({ data: { parcel_id: id } }),
   });
 
+  type SortInput = { parcel_item_id: string; category: string; price_tier: number; name: string; kind: "single" | "pack"; pack_pieces: number | null; image_url: string | null; weight_g: number | null; qty: number };
   const sortMut = useMutation({
-    mutationFn: (input: Parameters<typeof fnSort>[0]["data"]) => fnSort({ data: input }),
+    mutationFn: (input: SortInput) => fnSort({ data: input }),
     onSuccess: () => {
       toast.success("已生成 SKU + 标签批次");
       qc.invalidateQueries({ queryKey: ["sort-detail", id] });
