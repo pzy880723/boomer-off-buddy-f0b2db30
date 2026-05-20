@@ -1,132 +1,45 @@
-## 背景与定位
+# 解耦"包裹入库"与"分拣入库"
 
-把"分拣"从「依附于包裹」的流程，重构成「依附于待分拣库存」的流程。
+## 业务模型修正
 
-```text
-[ 包裹签收 ]                          [ 后期分拣 / 零售上架 ]
-     │                                        │
-     │ 自动展开每个 parcel_item               │
-     ▼                                        ▼
-[pending_sort_items 待分拣库存(袋子)] ──→ [ 拆 SKU + 打 RFID + /inventory/inbound/new 扫枪入库 ]
-                                                │
-                                                ▼
-                                        [ inv_skus.stock_qty++ ]
-```
+- **包裹入库（已有 m.receive）**：包裹到货 → 拍到货照片 → 标记签收。系统仅记录"这个包裹到了，里面声明的子商品列表如下"，止步于此，不产生任何库存条目、不产生任何待分拣条目。
+- **分拣入库（已有 inventory.skus + inventory.inbound）**：与包裹完全脱钩。员工线下拆包 → 拆出最小颗粒商品 → 二次包装 → 在 SKU 详情页打印 RFID 价格标签 → /inventory/inbound/new 扫枪聚合 → 提交入库单，库存累加。
 
-两端**完全解耦**：
-- 签收阶段：只生成"袋子"条目，**不算成本**，不动 inv_skus。
-- 分拣阶段：只看待分拣袋子，按价格档生 SKU、贴标、入库。袋子拆完后置 `sorted`，**不删除**留档。
+两条流程之间**不存在任何数据/UI 链路**，包裹层面不再追踪"是否分拣完毕"。
 
-包裹的总成本只用于采购统计 / 仪表盘，和零售 SKU 不分摊。
+## 需要删除/回滚的内容（上一轮做反了的）
 
----
+1. **路由删除**
+   - `src/routes/m.sort.index.tsx`
+   - `src/routes/m.sort.$id.tsx`
+   - `src/routes/m.sort.item.$itemId.tsx`
+2. **mobile.functions.ts** 删除：`listPendingSortItems` / `getPendingSortItem` / `markPendingSortItemDone` / `sortItemToSku`（这一组都是建立在 pending_sort_items 上的）。
+3. **markParcelDelivered** 移除"自动 upsert pending_sort_items"的副作用，只更新 parcel 状态/时间线/到货照片。
+4. **getMobileCounts** 去掉 `pendingSort` 字段。
+5. **m.index.tsx** 去掉「分拣台」磁贴和「待分拣」统计卡；用「扫码入库」入口替代（指向 `/m/inbound` 或 `/inventory/inbound/new`）。
+6. **m.receive.$id.tsx** 签收完成后跳回 `/m/parcels`（不再跳到 sort 详情）。
+7. **数据库迁移**：`DROP TABLE public.pending_sort_items;`（无业务意义，且会持续产生孤儿数据）。
+8. **inv_label_batches.parcel_item_id**：保留列即可（历史数据），新流程不再写入，不强制清理。
 
-## 1. 数据库：新建 pending_sort_items 表
+## 保留 / 不动
 
-```sql
-create table public.pending_sort_items (
-  id uuid primary key default gen_random_uuid(),
-  parcel_id uuid not null,                  -- 来源包裹（不加 FK，沿用项目风格）
-  parcel_item_id uuid not null,             -- 来源 japan_parcel_items.id
-  title text,                               -- 冗余存：中文名优先，回退日文
-  image_url text,
-  source_label text,                        -- "包裹单号 · 卖家" 之类，方便分拣时认袋子
-  status text not null default 'pending',   -- pending | sorted | discarded
-  notes text,
-  received_at timestamptz not null default now(),
-  sorted_at timestamptz,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-create index pending_sort_items_status_idx
-  on public.pending_sort_items(status, received_at desc);
-create unique index pending_sort_items_uniq_pi
-  on public.pending_sort_items(parcel_item_id);   -- 同一子商品只生成一条
-alter table public.pending_sort_items enable row level security;
--- 沿用项目当前的 open_* RLS 模板（select/insert/update/delete = true）
-```
+- `japan_parcels` / `japan_parcel_items` 字段不动，子商品列表只是包裹声明信息。
+- `inv_skus` / `inv_inbound_orders` / `inv_inbound_lines` / `inv_label_batches` / `inv_apply_inbound_stock` 全部保留。
+- `/inventory/skus*`、`/inventory/inbound*` 全部保留，是分拣入库的唯一入口。
 
-不做的事：
-- 不存任何成本字段（价格、汇率、税费一律不冗余）。
-- 不和 inv_skus 建外键关联：分拣是"以这个袋子为参考新建 N 个 SKU"，没有 1:1 数量挂钩。
-
-## 2. 签收阶段：自动落地待分拣条目
-
-在 `markParcelDelivered`（`src/lib/mobile.functions.ts`）成功更新 parcel 状态后，追加一步：
+## 文件改动清单
 
 ```text
-拉取 japan_parcel_items where parent_id = parcelId
-  → 对每行 upsert 一条 pending_sort_items(parcel_id, parcel_item_id, …)
-     · onConflict: parcel_item_id  → 已存在则跳过，保证幂等
-     · title = item_title_cn || item_title || '(未命名)'
-     · source_label = `${tracking_no || source_order_no} · ${seller ?? ''}`
+删除  src/routes/m.sort.index.tsx
+删除  src/routes/m.sort.$id.tsx
+删除  src/routes/m.sort.item.$itemId.tsx
+迁移  DROP TABLE pending_sort_items
+改    src/lib/mobile.functions.ts   去掉 4 个 fn + markParcelDelivered 副作用 + counts.pendingSort
+改    src/routes/m.index.tsx        去掉分拣磁贴/统计，新增扫码入库入口
+改    src/routes/m.receive.$id.tsx  签收成功 → /m/parcels
 ```
 
-- 一个 parcel_item 不论 quantity 多少，固定生成 1 条。
-- 签收页（`/m/receive/$id`）UI 不动，只是签收成功后多了这步副作用。
-- 如果 parcel 没有子商品（极端情况），不生成任何条目，签收照常完成。
+## 待确认
 
-## 3. /m/sort 重构为"待分拣库存"列表
-
-`src/routes/m.sort.index.tsx`：
-- 不再调用 `listSortQueue`（按包裹聚合），改调新的 `listPendingSortItems()`：
-  ```text
-  SELECT id, title, image_url, source_label, received_at
-    FROM pending_sort_items
-   WHERE status = 'pending'
-   ORDER BY received_at DESC
-   LIMIT 200
-  ```
-- 卡片：图片 + 标题 + 来源（包裹号 · 卖家） + 入库时间。
-- 顶部加一个"已分拣"小 Tab（可选 v2，先只做 pending）。
-
-详情页路由从 `/m/sort/$id`（id=parcel）改成 `/m/sort/item/$itemId`（id=pending_sort_items.id）：
-- 顶部展示这个袋子的图片、标题、来源、备注。
-- 中间是"拆 SKU"区：
-  - 复用现有 `SortItemRow` 的表单（类目 / 价格档 / 名称 / single|pack / 标签份数）。
-  - 可以多次添加，每次生成一个 inv_skus + inv_label_batches 行（已有 `sortItemToSku`，参数里 parcel_item_id 仍传袋子背后的 parcel_item_id 仅作溯源）。
-- 底部一个按钮「这个袋子分拣完成」：把 pending_sort_items.status 置 `sorted`，写 sorted_at。
-- 「这个袋子作废/丢弃」二级按钮：置 `discarded`。
-
-旧的「整包分拣完成」按钮和 `markParcelSorted` 流程移除（包裹层面不再有"分拣"概念）。
-
-## 4. mobile.functions.ts 接口调整
-
-新增：
-- `listPendingSortItems({ status?: 'pending' | 'sorted' })`
-- `getPendingSortItem({ id })` → 返回袋子 + 已经在它身上生成的 label_batches（按 parcel_item_id 反查）
-- `markPendingSortItemDone({ id, action: 'sorted' | 'discarded' })`
-
-保留：
-- `sortItemToSku` 不变（parcel_item_id 仍当作"来源溯源"，不再代表"包裹的子项"语义）。
-- `undoSortLabel` 不变。
-
-废弃：
-- `listSortQueue`、`markParcelSorted`、`getSortDetail` 中按 parcel 维度聚合的逻辑 → 删除。
-- 包裹列表 / 包裹详情上一切「分拣进度 / 标记整包分拣完成」UI → 移除。
-
-## 5. 包裹端清理
-
-- `/m/parcels` 已签收 Tab、`/m/receive/$id` 详情页：去掉任何"待分拣 / 已分拣"徽标。包裹生命周期到「已签收」就结束。
-- 桌面 `/purchase/japan-parcel/$id`：不动业务字段，只移除（如果有）「分拣完成」相关按钮/状态。
-
-## 6. 不做的事
-
-- 不引入成本分摊、不在 inv_skus 上记任何"来源成本"。
-- 不动 inv_apply_inbound_stock RPC、不动 /inventory/inbound/new 扫枪入库流程。
-- 不动包裹的 5 档状态字典。
-- 不删除已经被 `sortItemToSku` 创建的历史 SKU/标签。
-
-## 7. 风险与回滚
-
-- 已经签收但分拣未完成的老包裹：上线时跑一次性脚本（一次性 SQL），把它们的 japan_parcel_items 也补成 pending_sort_items，避免数据断层。脚本在迁移同一个 migration 内执行。
-- 如果未来要做"成本核算"，留了 parcel_id / parcel_item_id 两个溯源字段，能反查回包裹拿到 item_total_cny / 汇率，不会卡死。
-- 改完后旧路由 `/m/sort/$id` 立刻 redirect 到 `/m/sort`，避免 PWA 缓存的旧链接 404。
-
-## 实现顺序
-
-1. migration：建表 + 回填历史数据。
-2. mobile.functions.ts：加 3 个新 fn，删 2 个旧 fn，改 markParcelDelivered。
-3. 路由：新建 `src/routes/m.sort.item.$itemId.tsx`，重写 `m.sort.index.tsx`，删 `m.sort.$id.tsx`。
-4. 包裹页清理"分拣"相关 UI。
-5. 手动验：签收一个测试包裹 → /m/sort 看到 N 个袋子 → 拆其中一个生 SKU + 标签 → 标记完成 → 回到列表它消失。
+1. `pending_sort_items` 表是直接 DROP 还是先保留观察？（推荐 DROP，新逻辑下完全没有写入方）
+2. 手机首页 5 个磁贴中"分拣台"被移除后，是否用「新建入库单」(`/inventory/inbound/new`) 替代占位？还是直接缩减为 4 个？
