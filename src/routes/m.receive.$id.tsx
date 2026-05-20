@@ -135,7 +135,15 @@ function ReceivePage() {
               ) : null}
               <div className="min-w-0 flex-1">
                 <div className="line-clamp-2 text-sm font-semibold">
-                  {parcel.item_title_cn || parcel.item_title || "(未填商品名)"}
+                  {(() => {
+                    const first = items[0];
+                    const name = first
+                      ? first.item_title_cn || first.item_title || ""
+                      : parcel.item_title_cn || parcel.item_title || "";
+                    if (!name) return "(未填商品名)";
+                    const head = name.length > 14 ? name.slice(0, 14) + "…" : name;
+                    return items.length > 1 ? `${head} 等 ${items.length} 件商品` : name;
+                  })()}
                 </div>
                 <div className="mt-1 truncate text-[11px] text-muted-foreground">
                   {parcel.tracking_no || parcel.source_order_no || "无单号"}
@@ -147,7 +155,34 @@ function ReceivePage() {
                 ) : null}
               </div>
             </div>
+            <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 border-t pt-3 text-[11px]">
+              {[
+                ["状态", parcel.status],
+                ["国际单号", parcel.tracking_no],
+                ["来源订单号", parcel.source_order_no],
+                ["卖家", parcel.seller],
+                ["商品合计", parcel.total_cny != null ? `¥${Number(parcel.total_cny).toFixed(2)}` : null],
+                ["国际运费", parcel.intl_total_cny != null ? `¥${Number(parcel.intl_total_cny).toFixed(2)}` : null],
+                ["关税", parcel.tariff_cny != null ? `¥${Number(parcel.tariff_cny).toFixed(2)}` : null],
+                ["合计", parcel.grand_total_cny != null ? `¥${Number(parcel.grand_total_cny).toFixed(2)}` : null],
+                ["重量", parcel.weight_g != null ? `${parcel.weight_g} g` : (parcel.total_weight_g != null ? `${parcel.total_weight_g} g` : null)],
+                ["件数", items.length || null],
+                ["购买时间", parcel.purchased_at ? new Date(parcel.purchased_at).toLocaleString("zh-CN") : null],
+                ["付款时间", parcel.intl_pay_at ? new Date(parcel.intl_pay_at).toLocaleString("zh-CN") : null],
+                ["签收时间", parcel.received_at ? new Date(parcel.received_at).toLocaleString("zh-CN") : null],
+                ["仓位", parcel.warehouse_location],
+                ["备注", parcel.notes],
+              ]
+                .filter(([, v]) => v !== null && v !== undefined && v !== "")
+                .map(([k, v]) => (
+                  <Fragment key={k as string}>
+                    <dt className="text-muted-foreground">{k}</dt>
+                    <dd className="min-w-0 break-words text-foreground">{String(v)}</dd>
+                  </Fragment>
+                ))}
+            </dl>
           </section>
+
 
           <section className="space-y-2">
             <h3 className="px-1 text-xs font-medium text-muted-foreground">
