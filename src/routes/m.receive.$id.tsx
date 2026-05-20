@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useRef } from "react";
+import { useState, useRef, Fragment } from "react";
 import { Camera, Check, AlertTriangle, Loader2, ArrowRight, X, Plus, ImageIcon, ChevronRight } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -39,30 +39,50 @@ function ReceivePage() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [detailItem, setDetailItem] = useState<ItemDetailValue | null>(null);
   const captureRef = useRef<HTMLInputElement>(null);
+  const burstRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
+  const continuousRef = useRef(false);
 
-  async function handleFiles(files: FileList | null) {
-    if (!files || files.length === 0) return;
-    const remain = MAX_PHOTOS - photoUrls.length;
-    if (remain <= 0) {
-      toast.error(`最多 ${MAX_PHOTOS} 张`);
+  async function handleFiles(files: FileList | null, opts?: { burst?: boolean }) {
+    if (!files || files.length === 0) {
+      if (opts?.burst) continuousRef.current = false;
       return;
     }
-    const list = Array.from(files).slice(0, remain);
-    setUploading((n) => n + list.length);
-    const results = await Promise.allSettled(
-      list.map((f) => uploadParcelImage(f, "receive", id)),
-    );
-    const ok: string[] = [];
-    let failed = 0;
-    for (const r of results) {
-      if (r.status === "fulfilled") ok.push(r.value);
-      else failed++;
-    }
-    if (ok.length) setPhotoUrls((prev) => [...prev, ...ok].slice(0, MAX_PHOTOS));
-    setUploading((n) => Math.max(0, n - list.length));
-    if (failed) toast.error(`${failed} 张上传失败`);
-    else if (ok.length) toast.success(`已添加 ${ok.length} 张`);
+    setPhotoUrls((prev) => {
+      const remain = MAX_PHOTOS - prev.length;
+      if (remain <= 0) {
+        toast.error(`最多 ${MAX_PHOTOS} 张`);
+        return prev;
+      }
+      const list = Array.from(files).slice(0, remain);
+      setUploading((n) => n + list.length);
+      void (async () => {
+        const results = await Promise.allSettled(
+          list.map((f) => uploadParcelImage(f, "receive", id)),
+        );
+        const ok: string[] = [];
+        let failed = 0;
+        for (const r of results) {
+          if (r.status === "fulfilled") ok.push(r.value);
+          else failed++;
+        }
+        if (ok.length) setPhotoUrls((p) => [...p, ...ok].slice(0, MAX_PHOTOS));
+        setUploading((n) => Math.max(0, n - list.length));
+        if (failed) toast.error(`${failed} 张上传失败`);
+        // 连拍：上传完成后自动再次唤起相机，直到达到上限或用户取消
+        if (opts?.burst && continuousRef.current) {
+          setTimeout(() => {
+            setPhotoUrls((cur) => {
+              if (cur.length < MAX_PHOTOS && continuousRef.current) {
+                burstRef.current?.click();
+              }
+              return cur;
+            });
+          }, 150);
+        }
+      })();
+      return prev;
+    });
   }
 
   const deliverMut = useMutation({
@@ -115,7 +135,15 @@ function ReceivePage() {
               ) : null}
               <div className="min-w-0 flex-1">
                 <div className="line-clamp-2 text-sm font-semibold">
-                  {parcel.item_title_cn || parcel.item_title || "(未填商品名)"}
+                  {(() => {
+                    const first = items[0];
+                    const name = first
+                      ? first.item_title_cn || first.item_title || ""
+                      : parcel.item_title_cn || parcel.item_title || "";
+                    if (!name) return "(未填商品名)";
+                    const head = name.length > 14 ? name.slice(0, 14) + "…" : name;
+                    return items.length > 1 ? `${head} 等 ${items.length} 件商品` : name;
+                  })()}
                 </div>
                 <div className="mt-1 truncate text-[11px] text-muted-foreground">
                   {parcel.tracking_no || parcel.source_order_no || "无单号"}
@@ -127,7 +155,34 @@ function ReceivePage() {
                 ) : null}
               </div>
             </div>
+            <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 border-t pt-3 text-[11px]">
+              {[
+                ["状态", parcel.status],
+                ["国际单号", parcel.tracking_no],
+                ["来源订单号", parcel.source_order_no],
+                ["卖家", parcel.seller],
+                ["商品合计", parcel.total_cny != null ? `¥${Number(parcel.total_cny).toFixed(2)}` : null],
+                ["国际运费", parcel.intl_total_cny != null ? `¥${Number(parcel.intl_total_cny).toFixed(2)}` : null],
+                ["关税", parcel.tariff_cny != null ? `¥${Number(parcel.tariff_cny).toFixed(2)}` : null],
+                ["合计", parcel.grand_total_cny != null ? `¥${Number(parcel.grand_total_cny).toFixed(2)}` : null],
+                ["重量", parcel.weight_g != null ? `${parcel.weight_g} g` : (parcel.total_weight_g != null ? `${parcel.total_weight_g} g` : null)],
+                ["件数", items.length || null],
+                ["购买时间", parcel.purchased_at ? new Date(parcel.purchased_at).toLocaleString("zh-CN") : null],
+                ["付款时间", parcel.intl_pay_at ? new Date(parcel.intl_pay_at).toLocaleString("zh-CN") : null],
+                ["签收时间", parcel.received_at ? new Date(parcel.received_at).toLocaleString("zh-CN") : null],
+                ["仓位", parcel.warehouse_location],
+                ["备注", parcel.notes],
+              ]
+                .filter(([, v]) => v !== null && v !== undefined && v !== "")
+                .map(([k, v]) => (
+                  <Fragment key={k as string}>
+                    <dt className="text-muted-foreground">{k}</dt>
+                    <dd className="min-w-0 break-words text-foreground">{String(v)}</dd>
+                  </Fragment>
+                ))}
+            </dl>
           </section>
+
 
           <section className="space-y-2">
             <h3 className="px-1 text-xs font-medium text-muted-foreground">
@@ -228,6 +283,17 @@ function ReceivePage() {
               }}
             />
             <input
+              ref={burstRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                handleFiles(e.target.files, { burst: true });
+                e.currentTarget.value = "";
+              }}
+            />
+            <input
               ref={galleryRef}
               type="file"
               accept="image/*"
@@ -238,6 +304,7 @@ function ReceivePage() {
                 e.currentTarget.value = "";
               }}
             />
+            
           </section>
 
           <div className="grid grid-cols-2 gap-2 pt-1">
@@ -309,13 +376,25 @@ function ReceivePage() {
           >
             <button
               type="button"
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border bg-primary text-sm font-medium text-primary-foreground active:opacity-80"
+              onClick={() => {
+                setPickerOpen(false);
+                continuousRef.current = true;
+                burstRef.current?.click();
+              }}
+            >
+              <Camera className="h-4 w-4" /> 连拍（自动续拍直到完成）
+            </button>
+            <button
+              type="button"
               className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border bg-background text-sm font-medium active:bg-muted"
               onClick={() => {
                 setPickerOpen(false);
+                continuousRef.current = false;
                 captureRef.current?.click();
               }}
             >
-              <Camera className="h-4 w-4" /> 拍照
+              <Camera className="h-4 w-4" /> 拍一张
             </button>
             <button
               type="button"
@@ -325,7 +404,7 @@ function ReceivePage() {
                 galleryRef.current?.click();
               }}
             >
-              <ImageIcon className="h-4 w-4" /> 从相册选择
+              <ImageIcon className="h-4 w-4" /> 从相册选择（多选）
             </button>
             <button
               type="button"

@@ -22,7 +22,7 @@ export const searchParcels = createServerFn({ method: "GET" })
     let q = supabaseAdmin
       .from("japan_parcels")
       .select(
-        "id, source_order_no, tracking_no, status, item_title, item_title_cn, item_image_url, intl_pay_at, received_at, grand_total_cny, is_problem, created_at",
+        "id, source_order_no, tracking_no, status, item_title, item_title_cn, item_image_url, intl_pay_at, received_at, grand_total_cny, is_problem, created_at, japan_parcel_items(id, item_title, item_title_cn, position)",
       )
       .is("deleted_at", null)
       .order(orderCol, { ascending: false, nullsFirst: false })
@@ -40,7 +40,22 @@ export const searchParcels = createServerFn({ method: "GET" })
     }
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
-    return { rows: rows ?? [] };
+    const mapped = (rows ?? []).map((r) => {
+      const children = ((r as { japan_parcel_items?: Array<{ item_title: string | null; item_title_cn: string | null; position: number | null }> }).japan_parcel_items ?? [])
+        .slice()
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+      const first = children[0];
+      const firstItemName = first
+        ? (first.item_title_cn || first.item_title || "")
+        : (r.item_title_cn || r.item_title || "");
+      return {
+        ...r,
+        japan_parcel_items: undefined,
+        first_item_name: firstItemName,
+        item_count: children.length,
+      };
+    });
+    return { rows: mapped };
   });
 
 /** 待签收 / 待分拣计数（首页用） */
