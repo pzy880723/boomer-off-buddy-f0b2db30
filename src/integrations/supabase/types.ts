@@ -830,51 +830,6 @@ export type Database = {
           },
         ]
       }
-      pending_sort_items: {
-        Row: {
-          created_at: string
-          id: string
-          image_url: string | null
-          notes: string | null
-          parcel_id: string
-          parcel_item_id: string
-          received_at: string
-          sorted_at: string | null
-          source_label: string | null
-          status: string
-          title: string | null
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          image_url?: string | null
-          notes?: string | null
-          parcel_id: string
-          parcel_item_id: string
-          received_at?: string
-          sorted_at?: string | null
-          source_label?: string | null
-          status?: string
-          title?: string | null
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          image_url?: string | null
-          notes?: string | null
-          parcel_id?: string
-          parcel_item_id?: string
-          received_at?: string
-          sorted_at?: string | null
-          source_label?: string | null
-          status?: string
-          title?: string | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
     }
     Views: {
       [_ in never]: never

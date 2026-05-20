@@ -19,7 +19,7 @@ function MobileHome() {
   const tiles = [
     { to: "/m/parcels", icon: Package, label: "包裹搜索", desc: "按单号/订单号/商品名找包裹", color: "bg-blue-500/10 text-blue-600" },
     { to: "/m/scan", icon: ScanLine, label: "通用扫码", desc: "条码 / RFID / 订单号 OCR", color: "bg-emerald-500/10 text-emerald-600" },
-    { to: "/m/sort", icon: Boxes, label: "分拣台", desc: `${data?.pendingSort ?? "—"} 个待分拣`, color: "bg-amber-500/10 text-amber-600", badge: data?.pendingSort },
+    { to: "/inventory/inbound/new", icon: Boxes, label: "新建入库单", desc: "分拣后扫枪入库", color: "bg-amber-500/10 text-amber-600" },
     { to: "/m/inbound", icon: ArrowDownToLine, label: "扫码入库", desc: "扫枪聚合提交", color: "bg-violet-500/10 text-violet-600" },
     { to: "/m/photo-search", icon: Camera, label: "拍照识图", desc: "找包裹·查均价", color: "bg-pink-500/10 text-pink-600" },
   ];
@@ -36,7 +36,6 @@ function MobileHome() {
 
         <div className="grid grid-cols-2 gap-3">
           <StatCard label="待签收" value={data?.pendingReceive} accent="text-blue-600" />
-          <StatCard label="待分拣" value={data?.pendingSort} accent="text-amber-600" />
         </div>
 
         <div className="space-y-2">
@@ -54,11 +53,6 @@ function MobileHome() {
                 <div>
                   <div className="flex items-center gap-1.5">
                     <span className="text-sm font-semibold">{t.label}</span>
-                    {t.badge ? (
-                      <span className="rounded-full bg-primary/10 px-1.5 text-[10px] font-medium text-primary">
-                        {t.badge}
-                      </span>
-                    ) : null}
                   </div>
                   <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground">{t.desc}</p>
                 </div>

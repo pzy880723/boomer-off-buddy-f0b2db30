@@ -88,11 +88,11 @@ function ReceivePage() {
   const deliverMut = useMutation({
     mutationFn: () => doDelivered({ data: { id, photo_urls: photoUrls } }),
     onSuccess: () => {
-      toast.success("已签收，可去分拣台");
+      toast.success("已签收");
       qc.invalidateQueries({ queryKey: ["mobile-counts"] });
       qc.invalidateQueries({ queryKey: ["mobile-parcel", id] });
       qc.invalidateQueries({ queryKey: ["mobile-parcels"] });
-      router.navigate({ to: "/m/sort" });
+      router.navigate({ to: "/m/parcels" });
     },
     onError: (e) => toast.error((e as Error).message),
   });
@@ -354,10 +354,10 @@ function ReceivePage() {
 
           {parcel.status === "delivered" || parcel.status === "completed" ? (
             <Link
-              to="/m/sort"
+              to="/inventory/inbound/new"
               className="flex h-12 items-center justify-center gap-1 rounded-xl border bg-muted/40 text-sm font-medium active:bg-muted"
             >
-              去分拣台 <ArrowRight className="h-4 w-4" />
+              去新建入库单 <ArrowRight className="h-4 w-4" />
             </Link>
           ) : null}
         </div>
