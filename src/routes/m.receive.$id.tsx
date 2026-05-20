@@ -39,30 +39,50 @@ function ReceivePage() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [detailItem, setDetailItem] = useState<ItemDetailValue | null>(null);
   const captureRef = useRef<HTMLInputElement>(null);
+  const burstRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
+  const continuousRef = useRef(false);
 
-  async function handleFiles(files: FileList | null) {
-    if (!files || files.length === 0) return;
-    const remain = MAX_PHOTOS - photoUrls.length;
-    if (remain <= 0) {
-      toast.error(`最多 ${MAX_PHOTOS} 张`);
+  async function handleFiles(files: FileList | null, opts?: { burst?: boolean }) {
+    if (!files || files.length === 0) {
+      if (opts?.burst) continuousRef.current = false;
       return;
     }
-    const list = Array.from(files).slice(0, remain);
-    setUploading((n) => n + list.length);
-    const results = await Promise.allSettled(
-      list.map((f) => uploadParcelImage(f, "receive", id)),
-    );
-    const ok: string[] = [];
-    let failed = 0;
-    for (const r of results) {
-      if (r.status === "fulfilled") ok.push(r.value);
-      else failed++;
-    }
-    if (ok.length) setPhotoUrls((prev) => [...prev, ...ok].slice(0, MAX_PHOTOS));
-    setUploading((n) => Math.max(0, n - list.length));
-    if (failed) toast.error(`${failed} 张上传失败`);
-    else if (ok.length) toast.success(`已添加 ${ok.length} 张`);
+    setPhotoUrls((prev) => {
+      const remain = MAX_PHOTOS - prev.length;
+      if (remain <= 0) {
+        toast.error(`最多 ${MAX_PHOTOS} 张`);
+        return prev;
+      }
+      const list = Array.from(files).slice(0, remain);
+      setUploading((n) => n + list.length);
+      void (async () => {
+        const results = await Promise.allSettled(
+          list.map((f) => uploadParcelImage(f, "receive", id)),
+        );
+        const ok: string[] = [];
+        let failed = 0;
+        for (const r of results) {
+          if (r.status === "fulfilled") ok.push(r.value);
+          else failed++;
+        }
+        if (ok.length) setPhotoUrls((p) => [...p, ...ok].slice(0, MAX_PHOTOS));
+        setUploading((n) => Math.max(0, n - list.length));
+        if (failed) toast.error(`${failed} 张上传失败`);
+        // 连拍：上传完成后自动再次唤起相机，直到达到上限或用户取消
+        if (opts?.burst && continuousRef.current) {
+          setTimeout(() => {
+            setPhotoUrls((cur) => {
+              if (cur.length < MAX_PHOTOS && continuousRef.current) {
+                burstRef.current?.click();
+              }
+              return cur;
+            });
+          }, 150);
+        }
+      })();
+      return prev;
+    });
   }
 
   const deliverMut = useMutation({
