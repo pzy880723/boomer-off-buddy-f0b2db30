@@ -53,11 +53,6 @@ function MobileHome() {
                 <div>
                   <div className="flex items-center gap-1.5">
                     <span className="text-sm font-semibold">{t.label}</span>
-                    {t.badge ? (
-                      <span className="rounded-full bg-primary/10 px-1.5 text-[10px] font-medium text-primary">
-                        {t.badge}
-                      </span>
-                    ) : null}
                   </div>
                   <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground">{t.desc}</p>
                 </div>
