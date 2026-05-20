@@ -5,14 +5,96 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 
 const BUCKET = "parcel-item-images";
+const MAX_DIM = 1600;
+const QUALITY = 0.82;
+const SKIP_COMPRESS_BELOW = 200 * 1024; // 200KB
+
+/**
+ * 客户端压缩：长边缩到 MAX_DIM，编码 webp。
+ * - 已经很小、GIF、SVG → 原样返回
+ * - 任何失败 → 退回原 File
+ */
+async function compressImage(
+  file: File,
+): Promise<{ blob: Blob; ext: string; mime: string }> {
+  const passthrough = () => ({
+    blob: file,
+    ext: (file.name.split(".").pop() || file.type.split("/").pop() || "png").toLowerCase(),
+    mime: file.type || "application/octet-stream",
+  });
+  if (
+    file.size < SKIP_COMPRESS_BELOW ||
+    file.type === "image/gif" ||
+    file.type === "image/svg+xml" ||
+    !file.type.startsWith("image/")
+  ) {
+    return passthrough();
+  }
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, MAX_DIM / Math.max(bitmap.width, bitmap.height));
+    const w = Math.max(1, Math.round(bitmap.width * scale));
+    const h = Math.max(1, Math.round(bitmap.height * scale));
+
+    let blob: Blob | null = null;
+    let mime = "image/webp";
+
+    // OffscreenCanvas 优先（不阻塞主线程）
+    if (typeof OffscreenCanvas !== "undefined") {
+      try {
+        const oc = new OffscreenCanvas(w, h);
+        const ctx = oc.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(bitmap, 0, 0, w, h);
+          try {
+            blob = await oc.convertToBlob({ type: "image/webp", quality: QUALITY });
+          } catch {
+            blob = await oc.convertToBlob({ type: "image/jpeg", quality: 0.85 });
+            mime = "image/jpeg";
+          }
+        }
+      } catch {
+        // ignore, fallback below
+      }
+    }
+
+    // 普通 canvas 兜底
+    if (!blob) {
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        bitmap.close?.();
+        return passthrough();
+      }
+      ctx.drawImage(bitmap, 0, 0, w, h);
+      blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob((b) => resolve(b), "image/webp", QUALITY),
+      );
+      if (!blob) {
+        blob = await new Promise<Blob | null>((resolve) =>
+          canvas.toBlob((b) => resolve(b), "image/jpeg", 0.85),
+        );
+        mime = "image/jpeg";
+      }
+    }
+    bitmap.close?.();
+
+    if (!blob || blob.size >= file.size) return passthrough();
+    return { blob, ext: mime === "image/webp" ? "webp" : "jpg", mime };
+  } catch {
+    return passthrough();
+  }
+}
 
 async function uploadFile(file: File): Promise<string> {
-  const ext = (file.name.split(".").pop() || file.type.split("/").pop() || "png").toLowerCase();
+  const { blob, ext, mime } = await compressImage(file);
   const path = `items/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
-  const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
+  const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
     cacheControl: "3600",
     upsert: false,
-    contentType: file.type || `image/${ext}`,
+    contentType: mime,
   });
   if (error) throw new Error(error.message);
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
@@ -40,8 +122,8 @@ export function ItemImageUploader({
         toast.error("仅支持图片文件");
         return;
       }
-      if (file.size > 8 * 1024 * 1024) {
-        toast.error("图片需小于 8MB");
+      if (file.size > 20 * 1024 * 1024) {
+        toast.error("原图需小于 20MB");
         return;
       }
       setUploading(true);
