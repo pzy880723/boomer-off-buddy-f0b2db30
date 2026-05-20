@@ -92,7 +92,7 @@ function ReceivePage() {
       qc.invalidateQueries({ queryKey: ["mobile-counts"] });
       qc.invalidateQueries({ queryKey: ["mobile-parcel", id] });
       qc.invalidateQueries({ queryKey: ["mobile-parcels"] });
-      router.navigate({ to: "/m/sort/$id", params: { id } });
+      router.navigate({ to: "/m/sort" });
     },
     onError: (e) => toast.error((e as Error).message),
   });
