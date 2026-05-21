@@ -190,7 +190,6 @@ function YouzanPage() {
           <DataTable
             rowKey={(r) => r.id}
             data={shops}
-            empty={
               shopsQ.isLoading ? "加载中…" : "还没有添加任何门店，先点右上角「添加门店」"
             }
             columns={[
@@ -310,7 +309,6 @@ function YouzanPage() {
           <DataTable
             rowKey={(r) => r.id}
             data={logs}
-            empty="暂无日志"
             columns={[
               {
                 header: "时间",
