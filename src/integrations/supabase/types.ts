@@ -830,6 +830,121 @@ export type Database = {
           },
         ]
       }
+      youzan_items: {
+        Row: {
+          created_at: string
+          id: string
+          is_listed: boolean
+          item_id: number
+          kdt_id: number
+          pic_url: string | null
+          price: number | null
+          raw: Json | null
+          shop_id: string
+          stock_qty: number
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_listed?: boolean
+          item_id: number
+          kdt_id: number
+          pic_url?: string | null
+          price?: number | null
+          raw?: Json | null
+          shop_id: string
+          stock_qty?: number
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_listed?: boolean
+          item_id?: number
+          kdt_id?: number
+          pic_url?: string | null
+          price?: number | null
+          raw?: Json | null
+          shop_id?: string
+          stock_qty?: number
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "youzan_items_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "youzan_shops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      youzan_orders: {
+        Row: {
+          buyer_nick: string | null
+          created_time: string | null
+          id: string
+          inserted_at: string
+          kdt_id: number
+          num: number | null
+          pay_time: string | null
+          pay_type: number | null
+          payment: number | null
+          raw: Json | null
+          shop_id: string
+          status: string | null
+          tid: string
+          total_fee: number | null
+          updated_at: string
+        }
+        Insert: {
+          buyer_nick?: string | null
+          created_time?: string | null
+          id?: string
+          inserted_at?: string
+          kdt_id: number
+          num?: number | null
+          pay_time?: string | null
+          pay_type?: number | null
+          payment?: number | null
+          raw?: Json | null
+          shop_id: string
+          status?: string | null
+          tid: string
+          total_fee?: number | null
+          updated_at?: string
+        }
+        Update: {
+          buyer_nick?: string | null
+          created_time?: string | null
+          id?: string
+          inserted_at?: string
+          kdt_id?: number
+          num?: number | null
+          pay_time?: string | null
+          pay_type?: number | null
+          payment?: number | null
+          raw?: Json | null
+          shop_id?: string
+          status?: string | null
+          tid?: string
+          total_fee?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "youzan_orders_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "youzan_shops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       youzan_shops: {
         Row: {
           access_token: string | null

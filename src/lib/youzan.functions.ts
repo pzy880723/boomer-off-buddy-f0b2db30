@@ -291,3 +291,172 @@ export const removeYouzanShop = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+// ============================================================
+// listAuthorizedShopsFromHQ — 用总部 token 拉取连锁分店列表
+// ------------------------------------------------------------
+// 自用型应用走 grant_type=silent，所有「已在有赞云后台勾选授权」
+// 的 kdt_id 都能直接换 token。这里尝试用总部 token 调连锁 API
+// 枚举所有子店铺；如果接口不可用，前端就给出引导文案。
+// ============================================================
+type ChainShop = {
+  kdt_id: number;
+  shop_name: string;
+  shop_type?: string | null;
+  address?: string | null;
+  already_added: boolean;
+};
+
+export const listAuthorizedShopsFromHQ = createServerFn({ method: "POST" })
+  .handler(async (): Promise<{ shops: ChainShop[]; error: string | null }> => {
+    // 1. 找总部
+    const { data: hq, error: hqErr } = await supabase
+      .from("youzan_shops")
+      .select("*")
+      .eq("role", "hq")
+      .maybeSingle();
+    if (hqErr) throw new Error(hqErr.message);
+    if (!hq) {
+      return {
+        shops: [],
+        error: "尚未配置总部门店。请先在有赞云后台授权总部 kdt_id 并添加。",
+      };
+    }
+    const hqRow = hq as ShopRow;
+
+    // 2. 取总部 token
+    let token: string;
+    try {
+      token = await ensureAccessToken(hqRow);
+    } catch (e) {
+      return {
+        shops: [],
+        error: e instanceof Error ? e.message : String(e),
+      };
+    }
+
+    // 3. 查本地已有 kdt_id
+    const { data: existing } = await supabase
+      .from("youzan_shops")
+      .select("kdt_id");
+    const existingSet = new Set(
+      ((existing ?? []) as Array<{ kdt_id: number }>).map((r) => r.kdt_id),
+    );
+
+    // 4. 调有赞连锁 API（多个备选方法，按可用性逐个尝试）
+    const candidates: Array<{ method: string; version: string }> = [
+      { method: "youzan.retail.shop.list.query", version: "1.0.0" },
+      { method: "youzan.retail.shop.query", version: "1.0.0" },
+      { method: "youzan.shop.list.get", version: "1.0.0" },
+    ];
+
+    let raw: unknown = null;
+    let lastErr = "";
+    for (const c of candidates) {
+      try {
+        raw = await callYouzanApi({
+          accessToken: token,
+          method: c.method,
+          version: c.version,
+          params: { page_no: 1, page_size: 200 },
+        });
+        lastErr = "";
+        break;
+      } catch (e) {
+        lastErr = e instanceof Error ? e.message : String(e);
+      }
+    }
+
+    if (!raw) {
+      return {
+        shops: [],
+        error: `无法从有赞拉取分店列表（${lastErr}）。请在有赞云后台「自用型应用 → 授权店铺」勾选分店后重试。`,
+      };
+    }
+
+    // 5. 解析（有赞返回结构有多种，做容错）
+    const list =
+      (raw as { shop_list?: unknown[] }).shop_list ??
+      (raw as { shops?: unknown[] }).shops ??
+      (raw as { list?: unknown[] }).list ??
+      [];
+
+    const shops: ChainShop[] = (list as Array<Record<string, unknown>>).map(
+      (s) => {
+        const kdtId = Number(
+          s.kdt_id ?? s.shop_id ?? s.id ?? 0,
+        );
+        return {
+          kdt_id: kdtId,
+          shop_name: String(s.shop_name ?? s.name ?? `店铺 ${kdtId}`),
+          shop_type: (s.shop_type as string) ?? null,
+          address: (s.address as string) ?? null,
+          already_added: existingSet.has(kdtId),
+        };
+      },
+    ).filter((s) => s.kdt_id > 0);
+
+    return { shops, error: null };
+  });
+
+// ============================================================
+// batchImportShops — 一次批量授权并入库
+// ============================================================
+export const batchImportShops = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        shops: z
+          .array(
+            z.object({
+              kdt_id: z.number().int().positive(),
+              shop_name: z.string().min(1).max(120),
+              parent_kdt_id: z.number().int().positive().nullable().optional(),
+            }),
+          )
+          .min(1)
+          .max(50),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    let added = 0;
+    let failed = 0;
+    const errors: Array<{ kdt_id: number; error: string }> = [];
+
+    for (const s of data.shops) {
+      try {
+        // 先 upsert 一条记录（如果存在就跳过）
+        const { data: existing } = await supabase
+          .from("youzan_shops")
+          .select("id")
+          .eq("kdt_id", s.kdt_id)
+          .maybeSingle();
+        if (existing) continue;
+
+        // 试着换一次 token 验证授权
+        const t = await fetchSilentToken(s.kdt_id);
+
+        const { error } = await supabase.from("youzan_shops").insert({
+          kdt_id: s.kdt_id,
+          shop_name: s.shop_name,
+          role: "branch",
+          parent_kdt_id: s.parent_kdt_id ?? null,
+          status: "active",
+          access_token: t.access_token,
+          refresh_token: t.refresh_token,
+          token_expires_at: t.token_expires_at,
+          authorized_at: new Date().toISOString(),
+        } as never);
+        if (error) throw new Error(error.message);
+        added += 1;
+      } catch (e) {
+        failed += 1;
+        errors.push({
+          kdt_id: s.kdt_id,
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
+    return { added, failed, errors };
+  });
