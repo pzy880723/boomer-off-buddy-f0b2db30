@@ -190,8 +190,6 @@ function YouzanPage() {
           <DataTable
             rowKey={(r) => r.id}
             data={shops}
-              shopsQ.isLoading ? "加载中…" : "还没有添加任何门店，先点右上角「添加门店」"
-            }
             columns={[
               {
                 header: "店铺",
