@@ -27,37 +27,61 @@ async function fetchSilentToken(kdtId: number) {
   if (!clientId || !clientSecret) {
     throw new Error("YOUZAN_CLIENT_ID / YOUZAN_CLIENT_SECRET 未配置");
   }
-  const body = new URLSearchParams({
-    client_id: clientId,
-    client_secret: clientSecret,
-    grant_type: "silent",
-    kdt_id: String(kdtId),
-  });
   const res = await fetch(YZ_OAUTH_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
+    headers: { "Content-Type": "application/json;charset=UTF-8" },
+    body: JSON.stringify({
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: "silent",
+      kdt_id: kdtId,
+    }),
   });
-  const json = (await res.json()) as {
+  const text = await res.text();
+  let json: {
     access_token?: string;
     refresh_token?: string;
     expires_in?: number;
     expires?: number;
+    success?: boolean;
+    code?: number;
+    message?: string;
+    data?: {
+      access_token?: string;
+      refresh_token?: string;
+      expires_in?: number;
+    } | null;
     error?: string;
     error_response?: { code?: number; msg?: string };
-  };
-  if (!res.ok || !json.access_token) {
+  } = {};
+  try {
+    json = JSON.parse(text);
+  } catch {
+    throw new Error(`有赞响应不是 JSON（HTTP ${res.status}）：${text.slice(0, 200)}`);
+  }
+  // 兼容两种返回结构：旧的直接顶层、新的 {success, code, data:{...}}
+  const access_token = json.access_token ?? json.data?.access_token;
+  const refresh_token = json.refresh_token ?? json.data?.refresh_token ?? null;
+  const expires_in = json.expires_in ?? json.data?.expires_in;
+
+  const isFailed =
+    !res.ok ||
+    !access_token ||
+    json.success === false ||
+    (typeof json.code === "number" && json.code !== 0);
+  if (isFailed) {
     const msg =
+      json.message ||
       json.error_response?.msg ||
       json.error ||
-      `HTTP ${res.status} ${JSON.stringify(json)}`;
+      `HTTP ${res.status}`;
     throw new Error(`有赞换 token 失败：${msg}`);
   }
-  const expiresInSec = json.expires_in ?? 7 * 24 * 3600;
+  const expiresInSec = expires_in ?? 7 * 24 * 3600;
   const expiresAt = new Date(Date.now() + expiresInSec * 1000).toISOString();
   return {
-    access_token: json.access_token,
-    refresh_token: json.refresh_token ?? null,
+    access_token,
+    refresh_token,
     token_expires_at: expiresAt,
   };
 }
