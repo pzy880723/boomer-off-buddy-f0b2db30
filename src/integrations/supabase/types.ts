@@ -830,6 +830,116 @@ export type Database = {
           },
         ]
       }
+      youzan_shops: {
+        Row: {
+          access_token: string | null
+          authorized_at: string | null
+          created_at: string
+          expires_at: string | null
+          id: string
+          kdt_id: number
+          last_ping_at: string | null
+          last_ping_msg: string | null
+          last_ping_ok: boolean | null
+          notes: string | null
+          parent_kdt_id: number | null
+          refresh_token: string | null
+          role: string
+          shop_name: string
+          status: string
+          token_expires_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          access_token?: string | null
+          authorized_at?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          kdt_id: number
+          last_ping_at?: string | null
+          last_ping_msg?: string | null
+          last_ping_ok?: boolean | null
+          notes?: string | null
+          parent_kdt_id?: number | null
+          refresh_token?: string | null
+          role?: string
+          shop_name: string
+          status?: string
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string | null
+          authorized_at?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          kdt_id?: number
+          last_ping_at?: string | null
+          last_ping_msg?: string | null
+          last_ping_ok?: boolean | null
+          notes?: string | null
+          parent_kdt_id?: number | null
+          refresh_token?: string | null
+          role?: string
+          shop_name?: string
+          status?: string
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      youzan_sync_logs: {
+        Row: {
+          action: string
+          count_in: number
+          count_out: number
+          error: string | null
+          finished_at: string | null
+          id: string
+          kdt_id: number | null
+          message: string | null
+          shop_id: string | null
+          started_at: string
+          status: string
+        }
+        Insert: {
+          action: string
+          count_in?: number
+          count_out?: number
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          kdt_id?: number | null
+          message?: string | null
+          shop_id?: string | null
+          started_at?: string
+          status?: string
+        }
+        Update: {
+          action?: string
+          count_in?: number
+          count_out?: number
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          kdt_id?: number | null
+          message?: string | null
+          shop_id?: string | null
+          started_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "youzan_sync_logs_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "youzan_shops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
