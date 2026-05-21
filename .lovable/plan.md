@@ -1,80 +1,147 @@
 
-# 有赞**连锁**对接计划（总部 + 分店双后台）
+# 有赞对接：重新设计 + 数据汇总
 
-## 关键背景：连锁系统的"两层 kdt_id"
+## 目标
 
-有赞连锁的数据模型是：
-- **总部店铺（HQ）**：有自己的 `kdt_id`，**商品库**在这里统一维护，下发到分店；连锁配置、加盟商关系也在总部。
-- **分店店铺（Branch / 网点）**：每家分店各有自己的 `kdt_id`，**订单、会员、门店库存**都挂在各自的分店 kdt_id 下。
-- 自用型应用的 `client_id` + `client_secret` 是一对，但**每一个 kdt_id 都要单独授权一次**，授权后用 `grant_type=silent` + `kdt_id` 换出该店专属的 `access_token`，调谁的 API 就用谁的 token。
+把现在那个"开发者调试台"风格的页面，改成业务人员一眼能懂的「门店面板 + 总部汇总」。技术细节（kdt_id / token / sync_log）全部藏起来，授权流程从"手填 kdt_id"改成"一键从总部拉取分店列表"。
 
-你截图里授权的 `BOOMER OFF vintage / kdt_id=153242272` ——从名字像是**总部**（或者主店）。但**只授权一家不够**，需要在有赞云"自用型应用 → 测试店铺/授权信息" 里**把总部 + 5 家分店都加进来**，每家点一次授权。
+## 一、页面信息结构（先看图）
 
-> ⚠️ 待你确认：153242272 是总部 kdt 还是某家分店？决定下面 API 调用归到"总部"还是"分店"那一栏。
+```text
+┌─ 顶部 ──────────────────────────────────────────┐
+│ ← 返回           有赞门店                       │
+│ 5 家门店在线 · 最近同步 2 分钟前      [立即同步] │
+└─────────────────────────────────────────────────┘
 
-## 推荐的数据模型
+┌─ 总部业务汇总（核心 4 项卡片 · 全部门店相加） ──┐
+│ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐   │
+│ │总营业额│ │总订单数│ │总商品数│ │总库存量│   │
+│ │ ¥xxx万 │ │ x,xxx  │ │  xxx   │ │ xx,xxx │   │
+│ │ 本月   │ │ 本月   │ │ 在售   │ │ 件     │   │
+│ └────────┘ └────────┘ └────────┘ └────────┘   │
+└─────────────────────────────────────────────────┘
 
+┌─ 我的门店 ──────────────────[+ 添加分店授权] ──┐
+│  🏠 总部 · BOOMER OFF                           │
+│     ✓ 已连接  · 商品库 1,234 件                 │
+│                                                 │
+│  🏬 上海安福路店                                │
+│     ✓ 已连接  · 本月 ¥xx,xxx · 32 单 [详情▸]  │
+│  🏬 北京三里屯店                                │
+│     ✓ 已连接  · 本月 ¥xx,xxx · 18 单 [详情▸]  │
+│  🏬 成都太古里店                                │
+│     ⚠ 授权即将过期（还剩 12 天） [立即续期]   │
+└─────────────────────────────────────────────────┘
+
+▾ 高级 / 同步明细（默认折叠，给我自己排查问题用）
 ```
-youzan_shops                    -- 一行 = 一个 kdt_id（总部或分店）
-  kdt_id (unique)
-  shop_name
-  role            ── 'hq' | 'branch'
-  parent_kdt_id   ── 分店指向总部，总部为空
-  status, access_token, refresh_token, token_expires_at
-  authorized_at, expires_at
+
+页面顶部有 **← 返回** 按钮（回到 /dashboard），并且接入 AppSidebar 同样的面包屑/PageHeader，左侧栏导航本来就在「门店加盟 → 有赞对接」。
+
+## 二、授权流程（自用型应用 · 不用 OAuth 跳转）
+
+你们是自用型应用，有赞云不会给我们 OAuth 跳转链接。但我们可以做到**接近一键**的体验：
+
+1. **总部一次性配好**：你在有赞云后台「自用型应用 → 测试店铺/授权信息」把总部 kdt_id 勾上授权（这步只做一次，已完成）。
+2. **「添加分店授权」按钮 = 一键拉取**：点击后，后端用总部 token 调有赞**连锁门店 API**（`youzan.retail.shop.query` 系列）枚举出该总部下所有子店铺，弹窗里以**复选框**形式展示「门店名 / 地址 / 类型」，员工只需勾选要接入的店并点确认，就批量入库（自动调 `grant_type=silent` 拿每家的 token），全程不需要看到 kdt_id。
+3. **降级方案**：如果连锁 API 在自用型权限下不可用，弹窗顶部给一段一图流引导（截图 + 一句话："去有赞云后台勾选门店授权，回来点刷新即可"），刷新后再次走第 2 步——同样不暴露 kdt_id 输入框。
+
+未来如果要做"加盟商自己点链接授权"，需要把应用升级成"公开型/工具型"，那是另一个迭代，本次不做。
+
+## 三、总部业务汇总（核心 4 项）
+
+每张卡背后是一个 serverFn，聚合所有 `youzan_shops` 的数据：
+
+| 指标 | 数据源 API | 入库表（新建） | 刷新策略 |
+|---|---|---|---|
+| 总营业额（本月 / 今日切换） | `youzan.trades.sold.get.4.0.0` | `youzan_orders` | 同步任务每 30 分钟跑一次 |
+| 总订单数 | 同上 | `youzan_orders` | 同上 |
+| 总商品数（在售 SKU） | `youzan.items.onsale.get.3.0.0` | `youzan_items` | 每天 1 次 + 手动刷新 |
+| 总库存量 | `youzan.retail.stock.query` 或 `youzan.item.sku.get` 汇总 | `youzan_items`（含 stock_qty 列） | 同商品同步一起跑 |
+
+**实现路径**：
+- `src/lib/youzan-sync.functions.ts`：新增 `syncOrders(shopId)`、`syncItems(shopId)`、`syncAll()`。
+- 新建 1 个公开 cron 路由 `src/routes/api/public/hooks/youzan-sync.ts`，每 30 分钟由 pg_cron 触发跑 `syncAll`。
+- `src/lib/youzan-stats.functions.ts`：4 个聚合 serverFn 给页面卡片用，直接读本地 `youzan_orders` / `youzan_items`，不再实时调有赞（快、且不会触发限流）。
+- 卡片可点：点「总营业额」跳到分店明细对比表，点「总订单数」跳订单流水。
+
+## 四、和现有仪表盘的合并
+
+把这 4 张卡也加到 `/dashboard` 顶部，作为「线下零售」分组，和现有的「采购 4 渠道」并列。这样仪表盘一眼能看出**采购成本 vs 线下营收**的全貌。
+
+## 五、技术细节（给我自己看的，可跳过）
+
+### 5.1 数据库变更（新增 2 张表）
+
+```sql
+-- 订单流水（按 shop + tid 唯一）
+create table youzan_orders (
+  id uuid primary key default gen_random_uuid(),
+  shop_id uuid not null references youzan_shops(id) on delete cascade,
+  kdt_id bigint not null,
+  tid text not null,                    -- 有赞订单号
+  status text,                          -- WAIT_BUYER_PAY / WAIT_SELLER_SEND_GOODS / ...
+  pay_type int,
+  buyer_nick text,
+  total_fee numeric,                    -- 订单金额（分→元已折算）
+  payment numeric,                      -- 实付
+  num int,                              -- 商品件数
+  pay_time timestamptz,
+  created_time timestamptz,
+  raw jsonb,
+  inserted_at timestamptz default now(),
+  unique (kdt_id, tid)
+);
+create index on youzan_orders (shop_id, pay_time desc);
+
+-- 商品 + 库存（按 shop + item_id 唯一）
+create table youzan_items (
+  id uuid primary key default gen_random_uuid(),
+  shop_id uuid not null references youzan_shops(id) on delete cascade,
+  kdt_id bigint not null,
+  item_id bigint not null,
+  title text,
+  price numeric,
+  stock_qty int default 0,
+  is_listed boolean default true,
+  pic_url text,
+  raw jsonb,
+  updated_at timestamptz default now(),
+  unique (kdt_id, item_id)
+);
 ```
 
-未来加新分店：在有赞云后台授权一次 → 在本系统 `youzan_shops` 里 insert 一行（`role='branch', parent_kdt_id=总部kdt`），所有 server function 自动覆盖。
+RLS 沿用现有的 open-policy 模式（项目其它表都是这样）。
 
-## 调用归属对照（哪类数据找谁要）
+### 5.2 文件改动
 
-| 数据 | 调谁的 token | 典型 API |
-|---|---|---|
-| 商品库（spu/sku、上下架） | **总部** | `youzan.items.onsale.get` / `youzan.item.add` |
-| 商品库存（总仓） | **总部** | `youzan.item.sku.update.stock` |
-| 门店列表 / 网点信息 | **总部** | `youzan.retail.store.queryall` |
-| 订单 | **分店**（每家分别拉） | `youzan.trades.sold.get/4.0.0` |
-| 门店实际库存 | **分店** | `youzan.retail.store.stock.query` |
-| 会员 / 储值卡 | **总部**（连锁会员通常归总部） | `youzan.scrm.customer.search` |
-| Webhook 订阅 | 按事件挂到对应 kdt | 后台「消息订阅」 |
+| 文件 | 动作 |
+|---|---|
+| `src/routes/stores.youzan.tsx` | 整体重写为「汇总卡 + 门店卡片网格 + 一键拉取弹窗」，删掉同步日志 DataTable 和 kdt_id 输入框 |
+| `src/components/page-header.tsx` | 复用，加 `← 返回` |
+| `src/lib/youzan.functions.ts` | 新增 `listAuthorizedShopsFromHQ`（调连锁 API）+ `batchImportShops` |
+| `src/lib/youzan-sync.functions.ts` | **新文件**：`syncOrders` / `syncItems` / `syncAll` |
+| `src/lib/youzan-stats.functions.ts` | **新文件**：4 个聚合查询 |
+| `src/routes/api/public/hooks/youzan-sync.ts` | **新文件**：cron 入口，验 `x-cron-secret` |
+| `src/routes/dashboard.tsx` | 顶部加「线下零售」4 张卡 |
+| 旧的 `youzan_sync_logs` | 保留，但只在折叠「高级」区显示 |
 
-## 分阶段实施
+### 5.3 cron 部署
 
-### Phase 0 — 基础设施
-1. `add_secret` 让你输入 `YOUZAN_CLIENT_ID` + `YOUZAN_CLIENT_SECRET`。
-2. 迁移建表：`youzan_shops`、`youzan_sync_logs`、`youzan_webhook_events`。先插入总部一行（153242272，待你确认 role）。
-3. server fn `getYouzanAccessToken(kdtId)`：自用型 `oauth/token?grant_type=silent`，缓存到 `youzan_shops`，到期前 5 分钟自动 refresh。
-4. server fn `pingShop(kdtId)` → 调 `youzan.shop.get` 验证联通。
-5. 把 `/stores/youzan` 现有 mock 页面改成真实数据：店铺列表（总部+分店）+ 每家「测试连接」按钮 + 同步日志表。
+迁移完成、cron 路由部署后，我用 `supabase--insert` 写一条 `cron.schedule` 调 `https://project--2158bffa-7f82-4bc6-9df9-c59319d262f7.lovable.app/api/public/hooks/youzan-sync`，每 30 分钟一次。
 
-### Phase 1 — 拉门店列表 + 拉订单（最小闭环）
-6. server fn `syncStoresFromHq()`：用总部 token 调 `youzan.retail.store.queryall`，把所有分店 upsert 进 `youzan_shops`（自动建立 parent/child 关系）。**这一步可以让你免去手工录 5 家 kdt**——但前提是每家分店仍要在有赞云后台逐一点"授权"按钮。
-7. 表 `youzan_orders` + `youzan_order_items`（字段对齐 `youzan.trades.sold.get/4.0.0`）。
-8. server fn `pullYouzanOrders({ kdtId, sinceMinutes })`：增量按 update_time，upsert 入库 + 写 `youzan_sync_logs`。
-9. UI：`/stores/youzan` 加「立即同步全部分店订单」按钮 + 新页面 `/stores/youzan/orders` 列表（可按分店过滤）。
-10. **定时拉取**：`/api/public/youzan-cron-pull-orders`（带 secret token 校验），pg_cron 每 5 分钟跑一次，遍历所有 active 分店。
+## 六、分期交付
 
-### Phase 2 — 商品 / 库存 双向同步
-11. `inv_skus` 加列 `youzan_hq_item_id`（总部商品 ID）。
-12. server fn `pushSkuToYouzanHq(skuId)`：用**总部 token** 调 `youzan.item.add`，回写 ID。
-13. 本地入库（`inv_apply_inbound_stock` RPC）后写入 `youzan_stock_push_queue`，pg_cron 每 1 分钟 flush 到**总部** `youzan.item.sku.update.stock`，总部会自动下发到分店。
-14. （可选）拉分店实际库存对账：`youzan.retail.store.stock.query`。
+**Phase A（本轮）**：
+- 重设计页面 UI + 返回按钮 + 一键拉取分店弹窗（先用连锁 API，失败则降级到引导）
+- 4 张汇总卡（仅做静态/0 值兜底，没数据先显示「等待首次同步」）
+- 数据库迁移：`youzan_orders` + `youzan_items`
 
-### Phase 3 — Webhook
-15. `/api/public/youzan-webhook`，校验签名后写 `youzan_webhook_events` + 触发订单状态更新。
-16. 回调 URL 我会基于 `project--{id}-dev.lovable.app` 给你，你贴到有赞后台「消息订阅」。
-17. 推荐先订阅：`TRADE_ORDER_STATE_CHANGE`、`TRADE_REFUND_STATE_CHANGE`、`ITEM_UPDATE`。
+**Phase B（确认 A 后）**：
+- 实现 `syncOrders` / `syncItems` 并打通 cron
+- 4 张卡接真实数据
+- 汇总卡同步搬到 `/dashboard`
 
-## 落地顺序建议
+---
 
-**先 Phase 0 + Phase 1 的前半段**（基础设施 + 自动拉分店列表 + 测试连接），让你看到 5 家店都连通；
-**再 Phase 1 后半段**（拉订单）；
-Phase 2 商品/库存推送等订单稳定后再开。
-
-## 需要你确认 / 提供的事项
-
-1. **kdt_id=153242272 是总部还是分店？** 总部 → 直接当 HQ 用；如果是分店 → 你需要在有赞云后台把总部那家也加一次授权（必需，否则商品库读不到）。
-2. **5 家店现在是否都已经在有赞云"测试店铺/授权信息"里授权过？** 没有的话需要先去后台逐一点授权，自用型应用不能用代码代办这一步。
-3. 同意现在让我 `add_secret` 写入 `YOUZAN_CLIENT_ID` + `YOUZAN_CLIENT_SECRET`？
-
-回复确认这 3 点，我就可以切到 build 模式直接开 Phase 0。
+确认这个方向就开始 Phase A。如果你希望分店卡片上还要看到别的指标（比如"本月退款数"、"在线/离线状态"等），现在告诉我加进去。
