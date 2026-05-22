@@ -97,6 +97,15 @@ const groups: { label: string; items: { title: string; url: NavTo; icon: LucideI
     icon: Store,
   },
   {
+    label: "订单管理",
+    items: [
+      { title: "门店订单", url: "/orders/shops", icon: Receipt },
+      { title: "铺货订单", url: "/orders/dispatch", icon: Truck },
+      { title: "批发订单", url: "/orders/wholesale", icon: PackageCheck },
+    ],
+    icon: ClipboardList,
+  },
+  {
     label: "运营",
     items: [
       { title: "知识库", url: "/knowledge", icon: BookOpen },
