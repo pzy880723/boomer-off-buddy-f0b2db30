@@ -49,7 +49,7 @@ type NavTo =
   | "/inventory/inbound/new"
   | "/stores/list"
   | "/stores/franchisees"
-  | "/stores/youzan"
+  | "/youzan"
   | "/knowledge"
   | "/settings"
   | "/admin/users";
