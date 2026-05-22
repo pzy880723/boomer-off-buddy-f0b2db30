@@ -95,6 +95,7 @@ function YouzanPage() {
   const fetchBreakdown = useServerFn(getShopSalesBreakdown);
   const pingFn = useServerFn(pingYouzanShop);
   const removeFn = useServerFn(removeYouzanShop);
+  const syncAllFn = useServerFn(syncAllShops);
 
   const shopsQ = useQuery({
     queryKey: ["youzan-shops"],
