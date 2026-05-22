@@ -209,7 +209,27 @@ function YouzanPage() {
         )}
       </div>
 
-      {shops.length === 0 ? (
+      {shopsQ.isLoading ? (
+        <Card className="border-dashed">
+          <CardContent className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            正在加载门店列表…
+          </CardContent>
+        </Card>
+      ) : shopsQ.error ? (
+        <Card className="border-destructive/40">
+          <CardContent className="flex flex-col items-center justify-center gap-2 py-10 text-center">
+            <AlertTriangle className="h-5 w-5 text-destructive" />
+            <p className="text-sm font-medium text-destructive">门店列表读取失败</p>
+            <p className="max-w-md text-xs text-muted-foreground">
+              {shopsQ.error instanceof Error ? shopsQ.error.message : String(shopsQ.error)}
+            </p>
+            <Button size="sm" variant="outline" onClick={() => shopsQ.refetch()}>
+              重试
+            </Button>
+          </CardContent>
+        </Card>
+      ) : shops.length === 0 ? (
         <EmptyShops />
       ) : (
         <div className="mb-6 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
