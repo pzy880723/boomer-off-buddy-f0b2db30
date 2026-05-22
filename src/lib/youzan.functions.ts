@@ -659,14 +659,130 @@ export const syncYouzanItems = createServerFn({ method: "POST" })
   });
 
 // ============================================================
-// syncYouzanOrders — 按时间区间拉订单
+// 内部：单店订单同步（被 syncYouzanOrders / syncAllShops 复用）
 // ============================================================
+async function runOrdersSyncForShop(
+  shop: ShopRow,
+  startDate: Date,
+  endDate: Date,
+): Promise<{ ok: boolean; count: number; message: string }> {
+  const fmt = (d: Date) => {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  };
+
+  const { data: log } = await supabase
+    .from("youzan_sync_logs")
+    .insert({
+      shop_id: shop.id,
+      kdt_id: shop.kdt_id,
+      action: "orders",
+      status: "running",
+      message: `${fmt(startDate)} ~ ${fmt(endDate)}`,
+    } as never)
+    .select("id")
+    .single();
+
+  try {
+    const token = await ensureAccessToken(shop);
+    const pageSize = 100;
+    let page = 1;
+    let totalUpserted = 0;
+
+    for (;;) {
+      const raw = (await callYouzanApi({
+        accessToken: token,
+        method: "youzan.trades.sold.get",
+        version: "4.0.0",
+        params: {
+          start_update: fmt(startDate),
+          end_update: fmt(endDate),
+          page_no: page,
+          page_size: pageSize,
+        },
+      })) as {
+        trades?: Array<Record<string, unknown>>;
+        full_trades?: { trades?: Array<Record<string, unknown>> };
+        total_results?: number;
+      };
+      const trades = raw.trades ?? raw.full_trades?.trades ?? [];
+      if (trades.length === 0) break;
+
+      const rows = trades
+        .map((t) => {
+          const tid = String(t.tid ?? "");
+          if (!tid) return null;
+          const payTime = t.pay_time ? String(t.pay_time) : null;
+          const created = t.created ? String(t.created) : null;
+          return {
+            shop_id: shop.id,
+            kdt_id: shop.kdt_id,
+            tid,
+            status: (t.status as string) ?? null,
+            buyer_nick: (t.buyer_nick as string) ?? null,
+            payment: Number(t.payment ?? 0) || 0,
+            total_fee: Number(t.total_fee ?? 0) || 0,
+            num: Number(t.num ?? 0) || 0,
+            pay_type:
+              typeof t.pay_type === "number"
+                ? t.pay_type
+                : t.pay_type
+                  ? Number(t.pay_type)
+                  : null,
+            pay_time: payTime ? new Date(payTime).toISOString() : null,
+            created_time: created ? new Date(created).toISOString() : null,
+            raw: t,
+          };
+        })
+        .filter((r): r is NonNullable<typeof r> => r !== null);
+
+      if (rows.length > 0) {
+        const { error } = await supabase
+          .from("youzan_orders")
+          .upsert(rows as never, { onConflict: "kdt_id,tid" });
+        if (error) throw new Error(error.message);
+        totalUpserted += rows.length;
+      }
+      if (trades.length < pageSize) break;
+      page += 1;
+      if (page > 500) break;
+    }
+
+    const msg = `同步订单 ${totalUpserted} 条（${fmt(startDate)} ~ ${fmt(endDate)}）`;
+    if (log?.id) {
+      await supabase
+        .from("youzan_sync_logs")
+        .update({
+          status: "ok",
+          count_in: totalUpserted,
+          message: msg,
+          finished_at: new Date().toISOString(),
+        } as never)
+        .eq("id", log.id);
+    }
+    return { ok: true, count: totalUpserted, message: msg };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (log?.id) {
+      await supabase
+        .from("youzan_sync_logs")
+        .update({
+          status: "error",
+          error: msg,
+          finished_at: new Date().toISOString(),
+        } as never)
+        .eq("id", log.id);
+    }
+    return { ok: false, count: 0, message: msg };
+  }
+}
+
 export const syncYouzanOrders = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z
       .object({
         shop_id: z.string().uuid(),
-        start: z.string().optional(), // ISO
+        start: z.string().optional(),
         end: z.string().optional(),
       })
       .parse(input),
@@ -677,115 +793,61 @@ export const syncYouzanOrders = createServerFn({ method: "POST" })
     const startDate = data.start
       ? new Date(data.start)
       : new Date(Date.now() - 30 * 86_400_000);
+    return runOrdersSyncForShop(shop, startDate, endDate);
+  });
 
-    const fmt = (d: Date) => {
-      const pad = (n: number) => String(n).padStart(2, "0");
-      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-    };
+// ============================================================
+// syncAllShops — 一键同步全部门店（商品 + 近 N 天订单）
+// ============================================================
+export const syncAllShops = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({ days: z.number().int().min(1).max(180).default(30) })
+      .parse(input ?? {}),
+  )
+  .handler(async ({ data }) => {
+    const { data: shopsRaw, error } = await supabase
+      .from("youzan_shops")
+      .select("*")
+      .eq("status", "active");
+    if (error) throw new Error(error.message);
+    const shops = (shopsRaw ?? []) as ShopRow[];
 
-    const { data: log } = await supabase
-      .from("youzan_sync_logs")
-      .insert({
+    const endDate = new Date();
+    const startDate = new Date(Date.now() - data.days * 86_400_000);
+
+    const results: Array<{
+      shop_id: string;
+      kdt_id: number;
+      shop_name: string;
+      items: { ok: boolean; count: number; message: string };
+      orders: { ok: boolean; count: number; message: string };
+    }> = [];
+
+    for (const shop of shops) {
+      const items = await runItemsSyncForShop(shop);
+      const orders = await runOrdersSyncForShop(shop, startDate, endDate);
+      results.push({
         shop_id: shop.id,
         kdt_id: shop.kdt_id,
-        action: "orders",
-        status: "running",
-        message: `${fmt(startDate)} ~ ${fmt(endDate)}`,
-      } as never)
-      .select("id")
-      .single();
-
-    try {
-      const token = await ensureAccessToken(shop);
-      const pageSize = 100;
-      let page = 1;
-      let totalUpserted = 0;
-
-      for (;;) {
-        const raw = (await callYouzanApi({
-          accessToken: token,
-          method: "youzan.trades.sold.get",
-          version: "4.0.0",
-          params: {
-            start_update: fmt(startDate),
-            end_update: fmt(endDate),
-            page_no: page,
-            page_size: pageSize,
-          },
-        })) as {
-          trades?: Array<Record<string, unknown>>;
-          full_trades?: { trades?: Array<Record<string, unknown>> };
-          total_results?: number;
-        };
-        const trades =
-          raw.trades ?? raw.full_trades?.trades ?? [];
-        if (trades.length === 0) break;
-
-        const rows = trades
-          .map((t) => {
-            const tid = String(t.tid ?? "");
-            if (!tid) return null;
-            const payTime = t.pay_time ? String(t.pay_time) : null;
-            const created = t.created ? String(t.created) : null;
-            return {
-              shop_id: shop.id,
-              kdt_id: shop.kdt_id,
-              tid,
-              status: (t.status as string) ?? null,
-              buyer_nick: (t.buyer_nick as string) ?? null,
-              payment: Number(t.payment ?? 0) || 0,
-              total_fee: Number(t.total_fee ?? 0) || 0,
-              num: Number(t.num ?? 0) || 0,
-              pay_type:
-                typeof t.pay_type === "number"
-                  ? t.pay_type
-                  : t.pay_type
-                    ? Number(t.pay_type)
-                    : null,
-              pay_time: payTime ? new Date(payTime).toISOString() : null,
-              created_time: created ? new Date(created).toISOString() : null,
-              raw: t,
-            };
-          })
-          .filter((r): r is NonNullable<typeof r> => r !== null);
-
-        if (rows.length > 0) {
-          const { error } = await supabase
-            .from("youzan_orders")
-            .upsert(rows as never, { onConflict: "kdt_id,tid" });
-          if (error) throw new Error(error.message);
-          totalUpserted += rows.length;
-        }
-        if (trades.length < pageSize) break;
-        page += 1;
-        if (page > 500) break; // 安全阀
-      }
-
-      const msg = `同步订单 ${totalUpserted} 条（${fmt(startDate)} ~ ${fmt(endDate)}）`;
-      if (log?.id) {
-        await supabase
-          .from("youzan_sync_logs")
-          .update({
-            status: "ok",
-            count_in: totalUpserted,
-            message: msg,
-            finished_at: new Date().toISOString(),
-          } as never)
-          .eq("id", log.id);
-      }
-      return { ok: true, count: totalUpserted, message: msg };
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (log?.id) {
-        await supabase
-          .from("youzan_sync_logs")
-          .update({
-            status: "error",
-            error: msg,
-            finished_at: new Date().toISOString(),
-          } as never)
-          .eq("id", log.id);
-      }
-      return { ok: false, count: 0, message: msg };
+        shop_name: shop.shop_name,
+        items,
+        orders,
+      });
     }
+
+    const itemsTotal = results.reduce((s, r) => s + r.items.count, 0);
+    const ordersTotal = results.reduce((s, r) => s + r.orders.count, 0);
+    const okCount = results.filter((r) => r.items.ok && r.orders.ok).length;
+    const failCount = results.length - okCount;
+
+    return {
+      shopCount: results.length,
+      okCount,
+      failCount,
+      itemsTotal,
+      ordersTotal,
+      results,
+    };
   });
+
