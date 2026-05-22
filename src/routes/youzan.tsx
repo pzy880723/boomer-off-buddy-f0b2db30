@@ -134,6 +134,22 @@ function YouzanPage() {
     },
   });
 
+  const syncAllM = useMutation({
+    mutationFn: () => syncAllFn({ data: { days: 30 } }),
+    onSuccess: (r) => {
+      if (r.failCount === 0) {
+        toast.success(`同步完成：${r.shopCount} 家门店 · 商品 ${r.itemsTotal} · 订单 ${r.ordersTotal}`);
+      } else {
+        toast.warning(`部分失败：${r.okCount}/${r.shopCount} 成功，请查看下方同步明细`);
+      }
+      qc.invalidateQueries({ queryKey: ["youzan-summary"] });
+      qc.invalidateQueries({ queryKey: ["youzan-breakdown"] });
+      qc.invalidateQueries({ queryKey: ["youzan-sync-logs"] });
+      qc.invalidateQueries({ queryKey: ["shop-orders"] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+  });
+
   const shops = shopsQ.data?.shops ?? [];
   const summary = summaryQ.data;
   const breakdown = breakdownQ.data?.breakdown ?? {};
