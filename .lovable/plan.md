@@ -1,39 +1,48 @@
-## 实施计划
+我查到原因了：不是你授权没成功，而是我们代码里换取有赞 access_token 的参数用错了。
 
-### Step 1 — 把已授权分店导入本地
-在 `/youzan` 顶部加 **「从有赞拉取分店」** 按钮：
-- 调已有的 `listAuthorizedShopsFromHQ`
-- 弹窗列出未导入的 kdt_id，勾选后调 `batchImportShops` 入库
+现在本地店铺记录里总部没有 token，最近同步日志都是：
 
-### Step 2 — 商品全量同步
-新增 `syncYouzanItems({ shop_id })`：
-- 调有赞 `youzan.items.onsale.get` + `youzan.items.inventory.get`（在售 + 仓库），分页 100/页拉完
-- 按 `(shop_id, item_id)` upsert 到 `youzan_items`，写 `title / price / stock_qty / is_listed / pic_url / raw`
-- 写一条 `youzan_sync_logs(action='items')`
+```text
+有赞换 token 失败：参数错误
+```
 
-### Step 3 — 订单同步（默认 30 天，可自选范围）
-新增 `syncYouzanOrders({ shop_id, start, end })`：
-- 默认 `start = now - 30d`，`end = now`；前端可改
-- 调 `youzan.trades.sold.get / 4.0.0`，分页 100/页，按 `start_update / end_update` 拉
-- 按 `(shop_id, tid)` upsert 到 `youzan_orders`：tid / payment / total_fee / pay_time / created_time / status / buyer_nick / num / pay_type / raw
-- 写一条 `youzan_sync_logs(action='orders', count_in, message)`
+对照有赞官方文档，自用型应用换 token 应该传：
 
-### Step 4 — UI：每店一个"同步"对话框
-门店卡片上加 **「同步」** 按钮，弹出对话框：
-- 商品同步：一键全量
-- 订单同步：日期范围选择器（默认最近 30 天，可改任意区间），按钮"开始同步"
-- 显示进度 + 结果（拉了几条 / 错误）
-- 卡片显示 `last_sync_at` + 最近一次日志摘要
+```json
+{
+  "client_id": "...",
+  "client_secret": "...",
+  "authorize_type": "silent",
+  "grant_id": "店铺 kdt_id",
+  "refresh": "false"
+}
+```
 
-### Step 5 — 顶部统计卡显示商品状态
-`youzan-stats.functions.ts` 的 `getYouzanSummary` 已经在统计 `listedCount / stockTotal`，把卡片改成「在售商品 / 总库存」即可，无需新查询。
+但当前代码传的是：
 
-### 文件改动
-- 新增：`src/components/youzan/sync-dialog.tsx`（同步对话框）
-- 修改：`src/lib/youzan.functions.ts`（加 `syncYouzanItems` / `syncYouzanOrders` / `listAuthorizedShopsFromHQ` 调用入口已有）
-- 修改：`src/routes/youzan.tsx`（顶部「拉取分店」按钮、每张门店卡加「同步」按钮、4 张顶部统计卡含义微调）
+```json
+{
+  "grant_type": "silent",
+  "kdt_id": 153242272
+}
+```
 
-### 不做的事
-- ❌ 暂不接 pg_cron（手动同步跑通后再加）
-- ❌ 不写商品图片 CDN 缓存（直接用有赞的 pic_url）
-- ❌ 不做订单明细 sub-orders 展开（先只入主单）
+所以有赞一直返回“参数错误”，后面的商品/订单同步自然跑不起来。
+
+实施计划：
+
+1. 修改 `fetchSilentToken`
+   - 把 `grant_type` 改为 `authorize_type`
+   - 把 `kdt_id` 改为 `grant_id`
+   - 增加 `refresh: "false"`
+   - 兼容有赞返回的 `code: 200` 成功状态
+   - 兼容 `expires` 毫秒时间戳，正确保存过期时间
+
+2. 增强错误提示
+   - 如果仍失败，返回有赞原始错误信息，页面能直接看到是“密钥不对 / 店铺未授权 / 权限不足 / 参数问题”中的哪一种。
+
+3. 验证同步链路
+   - 修完后先用总部店铺跑一次“测试连接/同步商品”
+   - 若 token 成功，再继续商品全量同步和订单最近 30 天同步
+
+这次不用你再去填“登录回调地址”，它不是这个问题的原因。
