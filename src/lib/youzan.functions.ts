@@ -519,19 +519,28 @@ export const batchImportShops = createServerFn({ method: "POST" })
         // 试着换一次 token 验证授权
         const t = await fetchSilentToken(s.kdt_id);
 
-        const { error } = await supabase.from("youzan_shops").insert({
-          kdt_id: s.kdt_id,
-          shop_name: s.shop_name,
-          role: "branch",
-          parent_kdt_id: s.parent_kdt_id ?? null,
-          status: "active",
-          access_token: t.access_token,
-          refresh_token: t.refresh_token,
-          token_expires_at: t.token_expires_at,
-          authorized_at: new Date().toISOString(),
-        } as never);
+        const { data: inserted, error } = await supabase
+          .from("youzan_shops")
+          .insert({
+            kdt_id: s.kdt_id,
+            shop_name: s.shop_name,
+            role: "branch",
+            parent_kdt_id: s.parent_kdt_id ?? null,
+            status: "active",
+            access_token: t.access_token,
+            refresh_token: t.refresh_token,
+            token_expires_at: t.token_expires_at,
+            authorized_at: new Date().toISOString(),
+          } as never)
+          .select("*")
+          .single();
         if (error) throw new Error(error.message);
         added += 1;
+
+        // 新加店铺立即跑一次商品同步（不阻塞失败）
+        if (inserted) {
+          runItemsSyncForShop(inserted as ShopRow).catch(() => {});
+        }
       } catch (e) {
         failed += 1;
         errors.push({
