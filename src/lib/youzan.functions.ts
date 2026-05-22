@@ -145,12 +145,19 @@ async function callYouzanApi(opts: {
   const j = json as {
     error_response?: { code?: number; msg?: string; sub_msg?: string };
     response?: unknown;
+    success?: boolean;
+    code?: number;
+    message?: string;
+    data?: unknown;
   };
   if (j.error_response) {
     const e = j.error_response;
     throw new Error(`[${e.code}] ${e.msg ?? ""} ${e.sub_msg ?? ""}`.trim());
   }
-  return j.response ?? json;
+  if (j.success === false || (typeof j.code === "number" && j.code !== 0)) {
+    throw new Error(`[${j.code ?? "?"}] ${j.message ?? "调用失败"}`);
+  }
+  return j.response ?? j.data ?? json;
 }
 
 // ============================================================
