@@ -563,7 +563,7 @@ export const syncYouzanItems = createServerFn({ method: "POST" })
           if (rows.length > 0) {
             const { error } = await supabase
               .from("youzan_items")
-              .upsert(rows as never, { onConflict: "shop_id,item_id" });
+              .upsert(rows as never, { onConflict: "kdt_id,item_id" });
             if (error) throw new Error(error.message);
             totalUpserted += rows.length;
           }
