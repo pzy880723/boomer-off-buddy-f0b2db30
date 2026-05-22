@@ -111,13 +111,6 @@ function ShopOrdersPage() {
           <DataTable
             rowKey={(r) => r.id}
             data={filtered}
-            empty={
-              q.isLoading
-                ? "加载中…"
-                : orders.length === 0
-                  ? "尚无订单数据，请到 有赞对接 页同步"
-                  : "该门店本期无订单"
-            }
             columns={[
               {
                 header: "订单号",
