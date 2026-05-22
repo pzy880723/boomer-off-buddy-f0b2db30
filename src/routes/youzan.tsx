@@ -49,6 +49,7 @@ import {
   removeYouzanShop,
   listAuthorizedShopsFromHQ,
   batchImportShops,
+  syncAllShops,
 } from "@/lib/youzan.functions";
 import {
   getYouzanSummary,
@@ -94,6 +95,7 @@ function YouzanPage() {
   const fetchBreakdown = useServerFn(getShopSalesBreakdown);
   const pingFn = useServerFn(pingYouzanShop);
   const removeFn = useServerFn(removeYouzanShop);
+  const syncAllFn = useServerFn(syncAllShops);
 
   const shopsQ = useQuery({
     queryKey: ["youzan-shops"],
@@ -132,6 +134,22 @@ function YouzanPage() {
     },
   });
 
+  const syncAllM = useMutation({
+    mutationFn: () => syncAllFn({ data: { days: 30 } }),
+    onSuccess: (r) => {
+      if (r.failCount === 0) {
+        toast.success(`同步完成：${r.shopCount} 家门店 · 商品 ${r.itemsTotal} · 订单 ${r.ordersTotal}`);
+      } else {
+        toast.warning(`部分失败：${r.okCount}/${r.shopCount} 成功，请查看下方同步明细`);
+      }
+      qc.invalidateQueries({ queryKey: ["youzan-summary"] });
+      qc.invalidateQueries({ queryKey: ["youzan-breakdown"] });
+      qc.invalidateQueries({ queryKey: ["youzan-sync-logs"] });
+      qc.invalidateQueries({ queryKey: ["shop-orders"] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+  });
+
   const shops = shopsQ.data?.shops ?? [];
   const summary = summaryQ.data;
   const breakdown = breakdownQ.data?.breakdown ?? {};
@@ -145,45 +163,41 @@ function YouzanPage() {
         title="有赞门店"
         description={`${shops.length} 家门店 · ${summary?.shopOnline ?? 0} 家在线 · 最近同步 ${relativeTime(summary?.lastSyncAt ?? null)}`}
         actions={
-          <ImportShopsDialog
-            hqExists={!!hq}
-            hqKdtId={hq?.kdt_id ?? null}
-            onDone={() => {
-              qc.invalidateQueries({ queryKey: ["youzan-shops"] });
-              qc.invalidateQueries({ queryKey: ["youzan-summary"] });
-            }}
-          />
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => syncAllM.mutate()}
+              disabled={syncAllM.isPending || shops.length === 0}
+            >
+              {syncAllM.isPending ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+              )}
+              一键同步全部
+            </Button>
+            <ImportShopsDialog
+              hqExists={!!hq}
+              hqKdtId={hq?.kdt_id ?? null}
+              onDone={() => {
+                qc.invalidateQueries({ queryKey: ["youzan-shops"] });
+                qc.invalidateQueries({ queryKey: ["youzan-summary"] });
+              }}
+            />
+          </div>
         }
       />
 
-      {/* 业务汇总 4 卡 */}
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricCard
-          icon={TrendingUp}
-          label="本月营业额"
-          value={summary ? cny(summary.revenueMonthCny) : "—"}
-          hint={summary?.hasData ? "全部门店相加" : "等待首次同步"}
-          tone="primary"
-        />
-        <MetricCard
-          icon={ShoppingBag}
-          label="本月订单"
-          value={summary ? num(summary.orderCountMonth) : "—"}
-          hint={summary?.hasData ? "已完成 + 进行中" : "等待首次同步"}
-        />
-        <MetricCard
-          icon={Package}
-          label="在售商品"
-          value={summary ? num(summary.listedItemCount) : "—"}
-          hint={summary?.hasData ? "总部商品库" : "等待首次同步"}
-        />
-        <MetricCard
-          icon={Boxes}
-          label="总库存"
-          value={summary ? num(summary.stockTotal) : "—"}
-          hint={summary?.hasData ? "全部门店相加" : "等待首次同步"}
-        />
-      </div>
+      {/* 业务汇总 单行紧凑条 */}
+      <Card className="mb-4">
+        <CardContent className="grid grid-cols-2 divide-x divide-border p-0 sm:grid-cols-4">
+          <CompactStat icon={TrendingUp} label="本月营业额" value={summary ? cny(summary.revenueMonthCny) : "—"} tone="primary" empty={!summary?.hasData} />
+          <CompactStat icon={ShoppingBag} label="本月订单" value={summary ? num(summary.orderCountMonth) : "—"} empty={!summary?.hasData} />
+          <CompactStat icon={Package} label="在售商品" value={summary ? num(summary.listedItemCount) : "—"} empty={!summary?.hasData} />
+          <CompactStat icon={Boxes} label="总库存" value={summary ? num(summary.stockTotal) : "—"} empty={!summary?.hasData} />
+        </CardContent>
+      </Card>
 
       {/* 门店卡片 */}
       <div className="mb-2 flex items-center justify-between">
@@ -304,6 +318,33 @@ function YouzanPage() {
 // ============================================================
 // 汇总卡
 // ============================================================
+function CompactStat({
+  icon: Icon,
+  label,
+  value,
+  tone,
+  empty,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+  tone?: "primary";
+  empty?: boolean;
+}) {
+  return (
+    <div className={`flex items-center gap-3 px-4 py-3 ${tone === "primary" ? "bg-primary/[0.03]" : ""}`}>
+      <Icon className={`h-4 w-4 shrink-0 ${tone === "primary" ? "text-primary" : "text-muted-foreground"}`} />
+      <div className="min-w-0 flex-1">
+        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-sm font-semibold tabular-nums">{value}</span>
+          {empty && <span className="text-[10px] text-muted-foreground/60">待同步</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MetricCard({
   icon: Icon,
   label,
