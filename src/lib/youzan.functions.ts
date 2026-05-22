@@ -27,14 +27,16 @@ async function fetchSilentToken(kdtId: number) {
   if (!clientId || !clientSecret) {
     throw new Error("YOUZAN_CLIENT_ID / YOUZAN_CLIENT_SECRET 未配置");
   }
+  // 有赞自用型应用换 token 的正确参数（官方文档 doc/7515）
   const res = await fetch(YZ_OAUTH_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json;charset=UTF-8" },
     body: JSON.stringify({
       client_id: clientId,
       client_secret: clientSecret,
-      grant_type: "silent",
-      kdt_id: kdtId,
+      authorize_type: "silent",
+      grant_id: String(kdtId),
+      refresh: "false",
     }),
   });
   const text = await res.text();
@@ -50,6 +52,7 @@ async function fetchSilentToken(kdtId: number) {
       access_token?: string;
       refresh_token?: string;
       expires_in?: number;
+      expires?: number;
     } | null;
     error?: string;
     error_response?: { code?: number; msg?: string };
@@ -59,26 +62,33 @@ async function fetchSilentToken(kdtId: number) {
   } catch {
     throw new Error(`有赞响应不是 JSON（HTTP ${res.status}）：${text.slice(0, 200)}`);
   }
-  // 兼容两种返回结构：旧的直接顶层、新的 {success, code, data:{...}}
   const access_token = json.access_token ?? json.data?.access_token;
   const refresh_token = json.refresh_token ?? json.data?.refresh_token ?? null;
   const expires_in = json.expires_in ?? json.data?.expires_in;
+  // 自用型返回 expires 是毫秒时间戳
+  const expiresTs = json.expires ?? json.data?.expires;
 
+  // 自用型成功 code=200；其它接口也可能返回 code=0
+  const codeOk =
+    json.code === undefined || json.code === 0 || json.code === 200;
   const isFailed =
-    !res.ok ||
-    !access_token ||
-    json.success === false ||
-    (typeof json.code === "number" && json.code !== 0);
+    !res.ok || !access_token || json.success === false || !codeOk;
   if (isFailed) {
     const msg =
       json.message ||
       json.error_response?.msg ||
       json.error ||
-      `HTTP ${res.status}`;
+      `HTTP ${res.status} ${text.slice(0, 200)}`;
     throw new Error(`有赞换 token 失败：${msg}`);
   }
-  const expiresInSec = expires_in ?? 7 * 24 * 3600;
-  const expiresAt = new Date(Date.now() + expiresInSec * 1000).toISOString();
+  let expiresAt: string;
+  if (expiresTs && expiresTs > 1_000_000_000_000) {
+    expiresAt = new Date(expiresTs).toISOString();
+  } else if (expires_in) {
+    expiresAt = new Date(Date.now() + expires_in * 1000).toISOString();
+  } else {
+    expiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString();
+  }
   return {
     access_token,
     refresh_token,
