@@ -139,6 +139,17 @@ async function callYouzanApi(opts: {
   version: string; // e.g. 3.0.0
   params?: Record<string, unknown>;
 }): Promise<unknown> {
+  const r = await callYouzanApiVerbose(opts);
+  return r.payload;
+}
+
+/** 返回 payload + trace_id + 原始响应前 400 字，方便排查 */
+async function callYouzanApiVerbose(opts: {
+  accessToken: string;
+  method: string;
+  version: string;
+  params?: Record<string, unknown>;
+}): Promise<{ payload: unknown; trace_id: string | null; preview: string }> {
   const url = `${YZ_GW_URL}/${opts.method}/${opts.version}?access_token=${encodeURIComponent(opts.accessToken)}`;
   const res = await fetch(url, {
     method: "POST",
@@ -159,15 +170,18 @@ async function callYouzanApi(opts: {
     code?: number;
     message?: string;
     data?: unknown;
+    trace_id?: string;
   };
+  const trace = (j.trace_id as string | undefined) ?? null;
+  const preview = text.length > 400 ? text.slice(0, 400) + "..." : text;
   if (j.error_response) {
     const e = j.error_response;
-    throw new Error(`[${e.code}] ${e.msg ?? ""} ${e.sub_msg ?? ""}`.trim());
+    throw new Error(`[${e.code}] ${e.msg ?? ""} ${e.sub_msg ?? ""}${trace ? ` trace=${trace}` : ""}`.trim());
   }
-  if (j.success === false || (typeof j.code === "number" && j.code !== 0)) {
-    throw new Error(`[${j.code ?? "?"}] ${j.message ?? "调用失败"}`);
+  if (j.success === false || (typeof j.code === "number" && j.code !== 0 && j.code !== 200)) {
+    throw new Error(`[${j.code ?? "?"}] ${j.message ?? "调用失败"}${trace ? ` trace=${trace}` : ""}`);
   }
-  return j.response ?? j.data ?? json;
+  return { payload: j.response ?? j.data ?? json, trace_id: trace, preview };
 }
 
 // ============================================================
@@ -563,19 +577,38 @@ export const batchImportShops = createServerFn({ method: "POST" })
 // 都会写入 youzan_sync_logs，方便诊断「同步 0 条」到底是哪一步出问题。
 // ============================================================
 function pickItemRows(raw: unknown): Array<Record<string, unknown>> {
-  const obj = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-  const candidates: unknown[] = [
-    obj.items,
-    (obj as { data?: { items?: unknown } }).data?.items,
-    (obj as { response?: { items?: unknown } }).response?.items,
-    (obj as { item_list?: unknown }).item_list,
-    (obj as { goods_list?: unknown }).goods_list,
-    (obj as { list?: unknown }).list,
+  const visited = new Set<unknown>();
+  const arrays: Array<Array<Record<string, unknown>>> = [];
+  const keys = [
+    "items",
+    "item_list",
+    "itemList",
+    "goods_list",
+    "goodsList",
+    "list",
+    "records",
+    "rows",
   ];
-  for (const c of candidates) {
-    if (Array.isArray(c)) return c as Array<Record<string, unknown>>;
-  }
-  return [];
+  const visit = (node: unknown, depth = 0) => {
+    if (!node || depth > 4 || visited.has(node)) return;
+    if (typeof node !== "object") return;
+    visited.add(node);
+    if (Array.isArray(node)) {
+      if (node.length && typeof node[0] === "object") {
+        arrays.push(node as Array<Record<string, unknown>>);
+      }
+      return;
+    }
+    const obj = node as Record<string, unknown>;
+    for (const k of keys) if (k in obj) visit(obj[k], depth + 1);
+    for (const k of ["data", "response", "result", "paginator", "page"]) {
+      if (k in obj) visit(obj[k], depth + 1);
+    }
+  };
+  visit(raw);
+  if (arrays.length === 0) return [];
+  arrays.sort((a, b) => b.length - a.length);
+  return arrays[0];
 }
 
 function normalizeItemRow(
@@ -584,31 +617,32 @@ function normalizeItemRow(
   isListed: boolean,
 ) {
   const itemId = Number(
-    it.item_id ?? it.num_iid ?? it.channel_item_id ?? it.id ?? 0,
+    it.item_id ?? it.itemId ?? it.num_iid ?? it.numIid ?? it.channel_item_id ?? it.goods_id ?? it.goodsId ?? it.id ?? 0,
   );
   if (!itemId) return null;
   const media = (it.media as { images?: Array<{ url?: string }> } | undefined);
   const pic =
     (it.pic_url as string) ??
+    (it.picUrl as string) ??
     (it.pic_thumb_url as string) ??
+    (it.image as string) ??
     (Array.isArray(it.pic_urls) ? (it.pic_urls[0] as string) : null) ??
+    (Array.isArray(it.images) ? (it.images[0] as string) : null) ??
     (media?.images?.[0]?.url ?? null);
-  const priceRaw = it.price ?? it.origin_price ?? it.retail_price ?? 0;
+  const priceRaw =
+    it.price ?? it.origin_price ?? it.retail_price ?? it.min_price ?? it.goods_price ?? 0;
   const priceNum = Number(priceRaw);
-  const soldStatus = Number(it.sold_status ?? -1);
+  const soldStatus = Number(it.sold_status ?? it.soldStatus ?? -1);
   const listedFlag =
-    soldStatus === 1
-      ? true
-      : soldStatus === 0
-        ? false
-        : isListed;
+    soldStatus === 1 ? true : soldStatus === 0 ? false : isListed;
   return {
     shop_id: shop.id,
     kdt_id: shop.kdt_id,
     item_id: itemId,
-    title: String(it.title ?? it.name ?? ""),
+    title: String(it.title ?? it.item_title ?? it.name ?? it.goods_name ?? ""),
     price: Number.isFinite(priceNum) ? priceNum : 0,
-    stock_qty: Number(it.num ?? it.quantity ?? it.stock_num ?? 0) || 0,
+    stock_qty:
+      Number(it.num ?? it.quantity ?? it.stock_num ?? it.stockNum ?? it.stock ?? 0) || 0,
     is_listed: listedFlag,
     pic_url: pic ?? null,
     raw: it,
@@ -632,32 +666,66 @@ async function runItemsSyncForShop(
   const attemptMsgs: string[] = [];
   let totalReturned = 0;
   let totalUpserted = 0;
+  let lastPreview = "";
+  let lastTrace: string | null = null;
   const seen = new Set<number>();
 
   try {
     const token = await ensureAccessToken(shop);
     const pageSize = 100;
 
-    const attempts: Array<{ label: string; method: string; version: string; listed: boolean }> = [
-      { label: "common.search", method: "youzan.item.common.search", version: "1.0.0", listed: true },
-      { label: "onsale.get", method: "youzan.items.onsale.get", version: "3.0.0", listed: true },
-      { label: "inventory.get", method: "youzan.items.inventory.get", version: "3.0.0", listed: false },
+    // 多个接口逐个尝试。common.search 在连锁场景需要 kdt_ids + item_type；
+    // onsale.get / inventory.get 用分店 token 调用即可拿到该店商品。
+    const attempts: Array<{
+      label: string;
+      method: string;
+      version: string;
+      listed: boolean;
+      buildParams: (page: number) => Record<string, unknown>;
+    }> = [
+      {
+        label: "onsale.get",
+        method: "youzan.items.onsale.get",
+        version: "3.0.0",
+        listed: true,
+        buildParams: (p) => ({ page_no: p, page_size: pageSize }),
+      },
+      {
+        label: "inventory.get",
+        method: "youzan.items.inventory.get",
+        version: "3.0.0",
+        listed: false,
+        buildParams: (p) => ({ page_no: p, page_size: pageSize, banner: "for_shelved" }),
+      },
+      {
+        label: "common.search",
+        method: "youzan.item.common.search",
+        version: "1.0.0",
+        listed: true,
+        buildParams: (p) => ({
+          page_no: p,
+          page_size: pageSize,
+          kdt_ids: [shop.kdt_id],
+          item_type: 61,
+        }),
+      },
     ];
 
     for (const m of attempts) {
       let page = 1;
       let attemptReturned = 0;
       let attemptUpserted = 0;
-      let attemptError: string | null = null;
       try {
         for (;;) {
-          const raw = await callYouzanApi({
+          const r = await callYouzanApiVerbose({
             accessToken: token,
             method: m.method,
             version: m.version,
-            params: { page_no: page, page_size: pageSize },
+            params: m.buildParams(page),
           });
-          const items = pickItemRows(raw);
+          lastPreview = r.preview;
+          lastTrace = r.trace_id;
+          const items = pickItemRows(r.payload);
           attemptReturned += items.length;
           if (items.length === 0) break;
 
@@ -682,19 +750,24 @@ async function runItemsSyncForShop(
         }
         attemptMsgs.push(`${m.label}: 返回 ${attemptReturned} 入库 ${attemptUpserted}`);
       } catch (e) {
-        attemptError = e instanceof Error ? e.message : String(e);
-        attemptMsgs.push(`${m.label}: ${attemptError}`);
+        const msg = e instanceof Error ? e.message : String(e);
+        attemptMsgs.push(`${m.label}: ${msg}`);
       }
       totalReturned += attemptReturned;
       totalUpserted += attemptUpserted;
     }
 
-    const msg = `商品同步 入库 ${totalUpserted} 条（接口返回累计 ${totalReturned}）｜${attemptMsgs.join(" / ")}`;
+    const status = totalUpserted > 0 ? "ok" : totalReturned > 0 ? "ok" : "empty";
+    let msg = `商品同步 入库 ${totalUpserted} / 返回 ${totalReturned}｜${attemptMsgs.join(" / ")}`;
+    if (totalReturned === 0 && lastPreview) {
+      msg += `｜末次响应: ${lastPreview}`;
+      if (lastTrace) msg += ` (trace=${lastTrace})`;
+    }
     if (log?.id) {
       await supabase
         .from("youzan_sync_logs")
         .update({
-          status: totalUpserted > 0 ? "ok" : "ok",
+          status,
           count_in: totalUpserted,
           count_out: totalReturned,
           message: msg,
@@ -702,7 +775,7 @@ async function runItemsSyncForShop(
         } as never)
         .eq("id", log.id);
     }
-    return { ok: true, count: totalUpserted, message: msg };
+    return { ok: status !== "empty", count: totalUpserted, message: msg };
   } catch (err) {
     const msg = `${err instanceof Error ? err.message : String(err)}｜${attemptMsgs.join(" / ")}`;
     if (log?.id) {
@@ -757,86 +830,129 @@ async function runOrdersSyncForShop(
 
   let totalReturned = 0;
   let totalUpserted = 0;
+  const attemptMsgs: string[] = [];
+  let lastPreview = "";
+  let lastTrace: string | null = null;
 
   try {
     const token = await ensureAccessToken(shop);
     const pageSize = 100;
-    let page = 1;
 
-    for (;;) {
-      const raw = (await callYouzanApi({
-        accessToken: token,
-        method: "youzan.trades.sold.get",
-        version: "4.0.0",
-        params: {
-          start_update: fmt(startDate),
-          end_update: fmt(endDate),
-          page_no: page,
-          page_size: pageSize,
-        },
-      })) as Record<string, unknown>;
+    // 两种过滤模式都试一次：start_update / start_created
+    // 首次同步时，店铺可能根本没有 updated 数据但有 created 数据
+    const filterModes: Array<{ label: string; key: "update" | "created" }> = [
+      { label: "by_update", key: "update" },
+      { label: "by_created", key: "created" },
+    ];
 
-      const tradesAny =
-        (raw.trades as unknown) ??
-        (raw.full_trades as { trades?: unknown } | undefined)?.trades ??
-        (raw.trade_list as unknown) ??
-        (raw.data as { trades?: unknown } | undefined)?.trades ??
-        [];
-      const trades = Array.isArray(tradesAny)
-        ? (tradesAny as Array<Record<string, unknown>>)
-        : [];
-      totalReturned += trades.length;
-      if (trades.length === 0) break;
-
-      const rows = trades
-        .map((t) => {
-          const tid = String(t.tid ?? t.order_no ?? "");
-          if (!tid) return null;
-          const payTime = t.pay_time ? String(t.pay_time) : null;
-          const created = t.created ? String(t.created) : null;
-          return {
-            shop_id: shop.id,
-            kdt_id: shop.kdt_id,
-            tid,
-            status: (t.status as string) ?? null,
-            buyer_nick: (t.buyer_nick as string) ?? null,
-            payment: Number(t.payment ?? 0) || 0,
-            total_fee: Number(t.total_fee ?? 0) || 0,
-            num: Number(t.num ?? 0) || 0,
-            pay_type:
-              typeof t.pay_type === "number"
-                ? t.pay_type
-                : t.pay_type
-                  ? Number(t.pay_type)
-                  : null,
-            pay_time: payTime ? new Date(payTime).toISOString() : null,
-            created_time: created ? new Date(created).toISOString() : null,
-            raw: t,
+    for (const mode of filterModes) {
+      let attemptReturned = 0;
+      let attemptUpserted = 0;
+      let page = 1;
+      try {
+        for (;;) {
+          const params: Record<string, unknown> = {
+            page_no: page,
+            page_size: pageSize,
           };
-        })
-        .filter((r): r is NonNullable<typeof r> => r !== null);
+          if (mode.key === "update") {
+            params.start_update = fmt(startDate);
+            params.end_update = fmt(endDate);
+          } else {
+            params.start_created = fmt(startDate);
+            params.end_created = fmt(endDate);
+          }
+          const r = await callYouzanApiVerbose({
+            accessToken: token,
+            method: "youzan.trades.sold.get",
+            version: "4.0.0",
+            params,
+          });
+          lastPreview = r.preview;
+          lastTrace = r.trace_id;
+          const raw = (r.payload && typeof r.payload === "object" ? r.payload : {}) as Record<string, unknown>;
 
-      if (rows.length > 0) {
-        const { error } = await supabase
-          .from("youzan_orders")
-          .upsert(rows as never, { onConflict: "kdt_id,tid" });
-        if (error) throw new Error(error.message);
-        totalUpserted += rows.length;
+          // 兼容多种返回结构
+          const fullList = (raw.full_order_info_list as unknown) ??
+            (raw.full_trades as { trades?: unknown } | undefined)?.trades;
+          const tradesAny =
+            (raw.trades as unknown) ??
+            fullList ??
+            (raw.trade_list as unknown) ??
+            (raw.orders as unknown) ??
+            (raw.data as { trades?: unknown } | undefined)?.trades ??
+            [];
+          const trades = Array.isArray(tradesAny)
+            ? (tradesAny as Array<Record<string, unknown>>)
+            : [];
+          attemptReturned += trades.length;
+          if (trades.length === 0) break;
+
+          const rows = trades
+            .map((t) => {
+              // 兼容 full_order_info 嵌套结构
+              const root = (t.full_order_info as Record<string, unknown> | undefined) ?? t;
+              const tradeBase = (root.tradeBase ?? root.trade ?? root) as Record<string, unknown>;
+              const node = { ...tradeBase, ...t };
+              const tid = String(node.tid ?? node.order_no ?? node.orderNo ?? "");
+              if (!tid) return null;
+              const payTime = node.pay_time ? String(node.pay_time) : null;
+              const created = node.created ? String(node.created) : null;
+              return {
+                shop_id: shop.id,
+                kdt_id: shop.kdt_id,
+                tid,
+                status: (node.status as string) ?? null,
+                buyer_nick: (node.buyer_nick as string) ?? null,
+                payment: Number(node.payment ?? 0) || 0,
+                total_fee: Number(node.total_fee ?? 0) || 0,
+                num: Number(node.num ?? 0) || 0,
+                pay_type:
+                  typeof node.pay_type === "number"
+                    ? node.pay_type
+                    : node.pay_type
+                      ? Number(node.pay_type)
+                      : null,
+                pay_time: payTime ? new Date(payTime).toISOString() : null,
+                created_time: created ? new Date(created).toISOString() : null,
+                raw: node,
+              };
+            })
+            .filter((r): r is NonNullable<typeof r> => r !== null);
+
+          if (rows.length > 0) {
+            const { error } = await supabase
+              .from("youzan_orders")
+              .upsert(rows as never, { onConflict: "kdt_id,tid" });
+            if (error) throw new Error(error.message);
+            attemptUpserted += rows.length;
+          }
+          if (trades.length < pageSize) break;
+          page += 1;
+          if (page > 500) break;
+        }
+        attemptMsgs.push(`${mode.label}: 返回 ${attemptReturned} 入库 ${attemptUpserted}`);
+      } catch (e) {
+        const errMsg = e instanceof Error ? e.message : String(e);
+        attemptMsgs.push(`${mode.label}: ${errMsg}`);
       }
-      if (trades.length < pageSize) break;
-      page += 1;
-      if (page > 500) break;
+      totalReturned += attemptReturned;
+      totalUpserted += attemptUpserted;
+      // 如果第一种已经拿到订单，就不再试第二种（避免重复）
+      if (attemptReturned > 0) break;
     }
 
-    const msg =
-      totalReturned === 0
-        ? `订单同步：有赞接口返回 0 条（${fmt(startDate)} ~ ${fmt(endDate)}）`
-        : `订单同步 入库 ${totalUpserted} / 返回 ${totalReturned}（${fmt(startDate)} ~ ${fmt(endDate)}）`;
+    const status = totalReturned > 0 ? "ok" : "empty";
+    let msg = `订单同步 入库 ${totalUpserted} / 返回 ${totalReturned}（${fmt(startDate)} ~ ${fmt(endDate)}）｜${attemptMsgs.join(" / ")}`;
+    if (totalReturned === 0 && lastPreview) {
+      msg += `｜末次响应: ${lastPreview}`;
+      if (lastTrace) msg += ` (trace=${lastTrace})`;
+    }
     if (log?.id) {
       await supabase
         .from("youzan_sync_logs")
         .update({
-          status: "ok",
+          status,
           count_in: totalUpserted,
           count_out: totalReturned,
           message: msg,
@@ -844,7 +960,7 @@ async function runOrdersSyncForShop(
         } as never)
         .eq("id", log.id);
     }
-    return { ok: true, count: totalUpserted, message: msg };
+    return { ok: status !== "empty", count: totalUpserted, message: msg };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (log?.id) {
