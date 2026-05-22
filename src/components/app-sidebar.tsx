@@ -72,11 +72,12 @@ const groups: { label: string; items: { title: string; url: NavTo; icon: LucideI
     icon: Package,
   },
   {
-    label: "商品库存",
+    label: "仓库管理",
     items: [
-      { title: "商品 SKU", url: "/inventory/skus", icon: Tags },
+      { title: "仓库商品", url: "/inventory/skus", icon: Tags },
       { title: "扫枪入库", url: "/inventory/inbound/new", icon: ArrowLeftRight },
       { title: "入库记录", url: "/inventory/inbound", icon: Layers },
+      { title: "调拨单", url: "/inventory/transfers", icon: ArrowLeftRight },
     ],
     icon: Boxes,
   },
@@ -84,6 +85,7 @@ const groups: { label: string; items: { title: string; url: NavTo; icon: LucideI
     label: "门店加盟",
     items: [
       { title: "门店列表", url: "/stores/list", icon: Building2 },
+      { title: "门店商品库", url: "/stores/products", icon: Package },
       { title: "加盟商管理", url: "/stores/franchisees", icon: Users },
       { title: "有赞对接", url: "/youzan", icon: Link2 },
     ],
