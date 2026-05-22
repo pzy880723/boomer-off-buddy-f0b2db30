@@ -348,6 +348,43 @@ type ChainShop = {
   already_added: boolean;
 };
 
+function asObject(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function collectShopArrays(raw: unknown) {
+  const roots = [raw, asObject(raw)?.response, asObject(raw)?.data].filter(Boolean);
+  const keys = [
+    "shop_list",
+    "shopList",
+    "shops",
+    "list",
+    "items",
+    "records",
+    "shop_infos",
+    "shopInfoList",
+    "offline_shop_list",
+  ];
+  const found: unknown[] = [];
+  const visit = (node: unknown, depth = 0) => {
+    if (depth > 3 || !node) return;
+    if (Array.isArray(node)) {
+      found.push(...node);
+      return;
+    }
+    const obj = asObject(node);
+    if (!obj) return;
+    for (const key of keys) visit(obj[key], depth + 1);
+    for (const key of ["data", "response", "result", "paginator", "page"]) {
+      visit(obj[key], depth + 1);
+    }
+  };
+  roots.forEach((root) => visit(root));
+  return found;
+}
+
 export const listAuthorizedShopsFromHQ = createServerFn({ method: "POST" })
   .handler(async (): Promise<{ shops: ChainShop[]; error: string | null }> => {
     // 1. 找总部
@@ -416,26 +453,30 @@ export const listAuthorizedShopsFromHQ = createServerFn({ method: "POST" })
     }
 
     // 5. 解析（有赞返回结构有多种，做容错）
-    const list =
-      (raw as { shop_list?: unknown[] }).shop_list ??
-      (raw as { shops?: unknown[] }).shops ??
-      (raw as { list?: unknown[] }).list ??
-      [];
-
-    const shops: ChainShop[] = (list as Array<Record<string, unknown>>).map(
-      (s) => {
-        const kdtId = Number(
-          s.kdt_id ?? s.shop_id ?? s.id ?? 0,
-        );
+    const seen = new Set<number>();
+    const shops: ChainShop[] = collectShopArrays(raw).map((item) => {
+        const s = asObject(item) ?? {};
+        const kdtId = Number(s.kdt_id ?? s.kdtId ?? s.shop_id ?? s.shopId ?? s.id ?? 0);
         return {
           kdt_id: kdtId,
-          shop_name: String(s.shop_name ?? s.name ?? `店铺 ${kdtId}`),
-          shop_type: (s.shop_type as string) ?? null,
-          address: (s.address as string) ?? null,
+          shop_name: String(s.shop_name ?? s.shopName ?? s.store_name ?? s.storeName ?? s.name ?? `店铺 ${kdtId}`),
+          shop_type: (s.shop_type ?? s.shopType ?? s.type) as string | null,
+          address: (s.address ?? s.full_address ?? s.fullAddress) as string | null,
           already_added: existingSet.has(kdtId),
         };
-      },
-    ).filter((s) => s.kdt_id > 0);
+      })
+      .filter((s) => {
+        if (s.kdt_id <= 0 || seen.has(s.kdt_id)) return false;
+        seen.add(s.kdt_id);
+        return true;
+      });
+
+    if (shops.length === 0) {
+      return {
+        shops: [],
+        error: "总部授权可用，但有赞连锁门店列表接口没有返回分店。可以在下方手动粘贴已授权分店的 kdt_id，系统会逐个验证授权后添加。",
+      };
+    }
 
     return { shops, error: null };
   });

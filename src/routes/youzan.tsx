@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -541,6 +542,8 @@ function ImportShopsDialog({
   >([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [importing, setImporting] = useState(false);
+  const [manualText, setManualText] = useState("");
+  const [manualImporting, setManualImporting] = useState(false);
 
   const fetchChain = useServerFn(listAuthorizedShopsFromHQ);
   const importFn = useServerFn(batchImportShops);
@@ -597,6 +600,56 @@ function ImportShopsDialog({
     }
   };
 
+  const parseManualShops = () => {
+    const parsed = manualText
+      .split(/\n+/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const match = line.match(/^(\d{5,})[\s,，\t|]+(.+)$/);
+        if (!match) return null;
+        return { kdt_id: Number(match[1]), shop_name: match[2].trim() };
+      })
+      .filter((row): row is { kdt_id: number; shop_name: string } =>
+        Boolean(row && Number.isFinite(row.kdt_id) && row.shop_name),
+      );
+    const seen = new Set<number>();
+    return parsed.filter((row) => {
+      if (seen.has(row.kdt_id)) return false;
+      seen.add(row.kdt_id);
+      return true;
+    });
+  };
+
+  const handleManualImport = async () => {
+    const picked = parseManualShops();
+    if (picked.length === 0) {
+      toast.error("请按每行：kdt_id 门店名称 的格式粘贴");
+      return;
+    }
+    setManualImporting(true);
+    try {
+      const r = await importFn({
+        data: {
+          shops: picked.map((s) => ({ ...s, parent_kdt_id: hqKdtId })),
+        },
+      });
+      if (r.added > 0) toast.success(`成功添加 ${r.added} 家门店`);
+      if (r.failed > 0) {
+        toast.error(`${r.failed} 家授权验证失败，请确认 kdt_id 已在有赞云后台授权`);
+      }
+      if (r.added > 0) {
+        setManualText("");
+        onDone();
+        setOpen(false);
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      setManualImporting(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleOpen}>
       <DialogTrigger asChild>
@@ -618,7 +671,7 @@ function ImportShopsDialog({
 
         {!hqExists && (
           <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-xs text-warning">
-            尚未配置总部门店。请先在数据库添加 role=hq 的门店记录后再试。
+            尚未接入总部门店。请先完成总部有赞账号授权，再添加分店。
           </div>
         )}
 
@@ -702,7 +755,35 @@ function ImportShopsDialog({
 
         {hqExists && !loading && !error && shops.length === 0 && (
           <div className="rounded-md border border-dashed p-6 text-center text-xs text-muted-foreground">
-            未发现已授权的分店。请到有赞云后台授权后重试。
+            自动接口未返回分店。可在下方手动粘贴已授权分店的 kdt_id。
+          </div>
+        )}
+
+        {hqExists && !loading && (
+          <div className="rounded-md border bg-muted/20 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-medium">手动添加已授权分店</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  每行一个：kdt_id 门店名称。系统会先验证有赞授权，通过后再添加。
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleManualImport}
+                disabled={manualImporting || manualText.trim().length === 0}
+              >
+                {manualImporting && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
+                验证并添加
+              </Button>
+            </div>
+            <Textarea
+              value={manualText}
+              onChange={(e) => setManualText(e.target.value)}
+              placeholder={"123456789 上海安福路店\n987654321 北京三里屯店"}
+              className="mt-2 min-h-20 text-xs"
+            />
           </div>
         )}
 

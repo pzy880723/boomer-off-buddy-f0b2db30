@@ -1,52 +1,22 @@
-## 背景
+我查到现在数据库里只有 1 条总部店铺记录（kdt_id=153242272），没有任何 branch 分店；弹窗提示“未发现已授权分店”是因为当前代码只靠几个有赞“连锁门店列表”接口自动枚举分店，而这些接口在你这个账号/权限下返回空，导致即使分店已经在有赞后台授权，也无法被系统发现。
 
-当前 sidebar "门店加盟" 分组里的三个子页面（门店列表 / 门店商品库 / 加盟商管理）都挂在 `/stores/*` 路径下。手机端使用的是 `/store/*`（单数），技术上不冲突，但 URL 看起来还是 `store` 开头，容易混淆。你希望：
+计划这样修：
 
-1. 分组名 **门店加盟 → 门店管理**
-2. PC 路径完全脱离 `store`/`stores`，换成清晰可辨的前缀
-3. 这几个页面就是 PC 大屏后台的 UI（保持现有桌面卡片/表格风格，不动业务逻辑）
+1. 修复自动拉取分店的解析与诊断
+   - 在 `listAuthorizedShopsFromHQ` 里增强有赞返回结构解析，兼容更多字段：`items`、`data.items`、`data.list`、`response.items`、分页对象等。
+   - 如果接口返回空，不再只显示一句“未发现”，而显示实际含义：总部 token 可用，但连锁门店列表接口没有返回分店，需要用手动导入兜底。
 
-## 改动方案
+2. 增加“手动添加已授权分店”兜底
+   - 在“一键导入分店”弹窗里加一个手动输入区域。
+   - 支持粘贴多行：`kdt_id 门店名称` 或 `kdt_id,门店名称`。
+   - 提交时逐个用 `silent token` 验证这些 kdt_id 是否真的已授权；验证成功才写入门店库。
+   - 这样即使有赞不允许我们枚举全部分店，只要你从有赞后台复制分店 kdt_id，就能接入。
 
-### 1. 路径迁移（PC 端，全部脱离 `store`）
+3. 优化文案，避免误导
+   - 把“请先在数据库添加 role=hq”这种开发文案改成后台可理解的操作提示。
+   - 弹窗底部明确提示：自动拉取依赖有赞连锁接口；如果接口返回空，可以使用手动添加。
 
-| 现在 | 改为 |
-| --- | --- |
-| `/stores/list`        | `/shop-mgmt/shops`        |
-| `/stores/products`    | `/shop-mgmt/products`     |
-| `/stores/franchisees` | `/shop-mgmt/franchisees`  |
-| `/stores/youzan`      | 删除（早已 redirect 到 `/youzan`） |
-
-新建文件：
-- `src/routes/shop-mgmt.tsx` （父布局，仅 `<Outlet/>` + head）
-- `src/routes/shop-mgmt.shops.tsx`
-- `src/routes/shop-mgmt.products.tsx`
-- `src/routes/shop-mgmt.franchisees.tsx`
-
-旧的 `src/routes/stores.*.tsx` 全部改成 `beforeLoad` 重定向到新路径（保留一次跳转，避免老链接 404），下一轮可以彻底删。
-
-### 2. Sidebar 改造（`src/components/app-sidebar.tsx`）
-
-- 分组 label：`门店加盟` → `门店管理`
-- `NavTo` 类型：移除 `/stores/list /stores/products /stores/franchisees`，新增 `/shop-mgmt/shops /shop-mgmt/products /shop-mgmt/franchisees`
-- 菜单项指向新路径，`有赞对接` 保持 `/youzan` 不变
-- 底部 footer "在线门店 12/14" 这种 mock 文案不动
-
-### 3. 页面内容（保持 PC 大屏 UI，仅做最小修整）
-
-三个页面现有写法已经是 `PageHeader + Card/Table` 桌面风格，本轮只做：
-- 把页面 head 的 `· 门店加盟` 文案改成 `· 门店管理`
-- 复制现有 JSX 到新文件，路由声明改为新路径
-- `stores.products.tsx` 内 server fn 调用（`listShopProducts` / `syncYouzanItems` / `TransferDialog`）原样保留，不改业务
-
-> 本轮不动 `src/routes/store.*`（手机端 `/store/*` 完全独立，是 PWA 入口）。
-
-### 4. 引用排查
-
-执行 `rg "/stores/(list|products|franchisees)" src` 把所有内部 `<Link to=...>`、`router.navigate({to:...})`、`redirect({to:...})` 一并改成新路径。预计涉及面很小（sidebar 是主要入口）。
-
-## 不在本轮范围
-
-- 不重写 UI 视觉（你说"PC 大屏使用的 UI"，现状已经是桌面卡片/表格布局；如需 redesign 再单独发起）
-- 不改门店商品库 / 调拨 的业务逻辑
-- 不动手机端 `/store/*` 和 `/m/*`
+4. 保持现有业务逻辑不变
+   - 不改库存同步、订单同步、调拨逻辑。
+   - 不动 `/store` 手机端路由。
+   - 分店导入后仍走现有 `youzan_shops`、`youzan_items`、同步日志体系。
