@@ -143,19 +143,33 @@ async function callYouzanApi(opts: {
   return r.payload;
 }
 
-/** 返回 payload + trace_id + 原始响应前 400 字，方便排查 */
+/** 返回 payload + trace_id + 原始响应前 400 字，方便排查；自带 20s 超时 */
 async function callYouzanApiVerbose(opts: {
   accessToken: string;
   method: string;
   version: string;
   params?: Record<string, unknown>;
+  timeoutMs?: number;
 }): Promise<{ payload: unknown; trace_id: string | null; preview: string }> {
   const url = `${YZ_GW_URL}/${opts.method}/${opts.version}?access_token=${encodeURIComponent(opts.accessToken)}`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(opts.params ?? {}),
-  });
+  const ctl = new AbortController();
+  const tmo = setTimeout(() => ctl.abort(), opts.timeoutMs ?? 20_000);
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(opts.params ?? {}),
+      signal: ctl.signal,
+    });
+  } catch (e) {
+    clearTimeout(tmo);
+    const msg = e instanceof Error && e.name === "AbortError"
+      ? `请求超时 (${opts.method})`
+      : `网络错误：${e instanceof Error ? e.message : String(e)}`;
+    throw new Error(msg);
+  }
+  clearTimeout(tmo);
   const text = await res.text();
   let json: unknown;
   try {
@@ -171,9 +185,14 @@ async function callYouzanApiVerbose(opts: {
     message?: string;
     data?: unknown;
     trace_id?: string;
+    gw_err_resp?: { trace_id?: string; err_msg?: string; err_code?: number };
   };
-  const trace = (j.trace_id as string | undefined) ?? null;
+  const trace = j.trace_id ?? j.gw_err_resp?.trace_id ?? null;
   const preview = text.length > 400 ? text.slice(0, 400) + "..." : text;
+  if (j.gw_err_resp?.err_code) {
+    const g = j.gw_err_resp;
+    throw new Error(`[gw ${g.err_code}] ${g.err_msg ?? ""}${trace ? ` trace=${trace}` : ""}`.trim());
+  }
   if (j.error_response) {
     const e = j.error_response;
     throw new Error(`[${e.code}] ${e.msg ?? ""} ${e.sub_msg ?? ""}${trace ? ` trace=${trace}` : ""}`.trim());
@@ -182,6 +201,19 @@ async function callYouzanApiVerbose(opts: {
     throw new Error(`[${j.code ?? "?"}] ${j.message ?? "调用失败"}${trace ? ` trace=${trace}` : ""}`);
   }
   return { payload: j.response ?? j.data ?? json, trace_id: trace, preview };
+}
+
+/** 进入同步前，把超过 90 秒还在 running 的旧记录直接标成失败，避免页面假活 */
+async function reapStaleSyncLogs() {
+  await supabase
+    .from("youzan_sync_logs")
+    .update({
+      status: "error",
+      error: "上次同步进程中断或超时（自动重置）",
+      finished_at: new Date().toISOString(),
+    } as never)
+    .eq("status", "running")
+    .lt("started_at", new Date(Date.now() - 90_000).toISOString());
 }
 
 // ============================================================
