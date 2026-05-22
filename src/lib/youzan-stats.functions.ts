@@ -23,7 +23,7 @@ export const getYouzanSummary = createServerFn({ method: "GET" }).handler(
         .gte("pay_time", monthStart),
       supabase
         .from("youzan_items")
-        .select("stock_qty, is_listed"),
+        .select("stock_qty, is_listed, shop_id"),
       supabase
         .from("youzan_shops")
         .select("id, last_ping_ok, last_ping_at"),
@@ -36,6 +36,7 @@ export const getYouzanSummary = createServerFn({ method: "GET" }).handler(
     const items = (itemsRes.data ?? []) as Array<{
       stock_qty: number | null;
       is_listed: boolean | null;
+      shop_id: string;
     }>;
     const shops = (shopsRes.data ?? []) as Array<{
       id: string;
@@ -50,6 +51,11 @@ export const getYouzanSummary = createServerFn({ method: "GET" }).handler(
     const orderCount = ordersRes.count ?? orders.length;
     const listedCount = items.filter((i) => i.is_listed).length;
     const stockTotal = items.reduce((s, i) => s + Number(i.stock_qty ?? 0), 0);
+
+    const itemsByShop: Record<string, number> = {};
+    for (const it of items) {
+      itemsByShop[it.shop_id] = (itemsByShop[it.shop_id] ?? 0) + 1;
+    }
 
     const lastSyncAt = shops
       .map((s) => s.last_ping_at)
@@ -66,6 +72,7 @@ export const getYouzanSummary = createServerFn({ method: "GET" }).handler(
       shopOnline: shops.filter((s) => s.last_ping_ok).length,
       lastSyncAt,
       hasData: orders.length > 0 || items.length > 0,
+      itemsByShop,
     };
   },
 );
