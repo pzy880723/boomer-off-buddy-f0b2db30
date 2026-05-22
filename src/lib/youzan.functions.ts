@@ -952,7 +952,7 @@ async function runOrdersSyncForShop(
       await supabase
         .from("youzan_sync_logs")
         .update({
-          status: "ok",
+          status,
           count_in: totalUpserted,
           count_out: totalReturned,
           message: msg,
@@ -960,7 +960,7 @@ async function runOrdersSyncForShop(
         } as never)
         .eq("id", log.id);
     }
-    return { ok: true, count: totalUpserted, message: msg };
+    return { ok: status !== "empty", count: totalUpserted, message: msg };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (log?.id) {
