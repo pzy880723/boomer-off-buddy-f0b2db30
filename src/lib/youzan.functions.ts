@@ -880,6 +880,7 @@ export const syncYouzanItems = createServerFn({ method: "POST" })
     z.object({ shop_id: z.string().uuid() }).parse(input),
   )
   .handler(async ({ data }) => {
+    await reapStaleSyncLogs();
     const shop = await getShopOr404({ shop_id: data.shop_id });
     return runItemsSyncForShop(shop);
   });
