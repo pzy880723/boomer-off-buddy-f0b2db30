@@ -10,7 +10,9 @@ import {
   Mail,
   ShoppingBag,
   PackageCheck,
-  
+  ClipboardList,
+  Truck,
+  Receipt,
   Tags,
   Layers,
   ArrowLeftRight,
