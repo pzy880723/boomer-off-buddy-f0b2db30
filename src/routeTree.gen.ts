@@ -20,6 +20,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as StoreIndexRouteImport } from './routes/store.index'
 import { Route as MIndexRouteImport } from './routes/m.index'
 import { Route as StoresYouzanRouteImport } from './routes/stores.youzan'
+import { Route as StoresProductsRouteImport } from './routes/stores.products'
 import { Route as StoresListRouteImport } from './routes/stores.list'
 import { Route as StoresFranchiseesRouteImport } from './routes/stores.franchisees'
 import { Route as StoreScanRouteImport } from './routes/store.scan'
@@ -111,6 +112,11 @@ const MIndexRoute = MIndexRouteImport.update({
 const StoresYouzanRoute = StoresYouzanRouteImport.update({
   id: '/stores/youzan',
   path: '/stores/youzan',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StoresProductsRoute = StoresProductsRouteImport.update({
+  id: '/stores/products',
+  path: '/stores/products',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StoresListRoute = StoresListRouteImport.update({
@@ -331,6 +337,7 @@ export interface FileRoutesByFullPath {
   '/store/scan': typeof StoreScanRoute
   '/stores/franchisees': typeof StoresFranchiseesRoute
   '/stores/list': typeof StoresListRoute
+  '/stores/products': typeof StoresProductsRoute
   '/stores/youzan': typeof StoresYouzanRoute
   '/m/': typeof MIndexRoute
   '/store/': typeof StoreIndexRoute
@@ -374,6 +381,7 @@ export interface FileRoutesByTo {
   '/store/scan': typeof StoreScanRoute
   '/stores/franchisees': typeof StoresFranchiseesRoute
   '/stores/list': typeof StoresListRoute
+  '/stores/products': typeof StoresProductsRoute
   '/stores/youzan': typeof StoresYouzanRoute
   '/m': typeof MIndexRoute
   '/store': typeof StoreIndexRoute
@@ -425,6 +433,7 @@ export interface FileRoutesById {
   '/store/scan': typeof StoreScanRoute
   '/stores/franchisees': typeof StoresFranchiseesRoute
   '/stores/list': typeof StoresListRoute
+  '/stores/products': typeof StoresProductsRoute
   '/stores/youzan': typeof StoresYouzanRoute
   '/m/': typeof MIndexRoute
   '/store/': typeof StoreIndexRoute
@@ -477,6 +486,7 @@ export interface FileRouteTypes {
     | '/store/scan'
     | '/stores/franchisees'
     | '/stores/list'
+    | '/stores/products'
     | '/stores/youzan'
     | '/m/'
     | '/store/'
@@ -520,6 +530,7 @@ export interface FileRouteTypes {
     | '/store/scan'
     | '/stores/franchisees'
     | '/stores/list'
+    | '/stores/products'
     | '/stores/youzan'
     | '/m'
     | '/store'
@@ -570,6 +581,7 @@ export interface FileRouteTypes {
     | '/store/scan'
     | '/stores/franchisees'
     | '/stores/list'
+    | '/stores/products'
     | '/stores/youzan'
     | '/m/'
     | '/store/'
@@ -614,6 +626,7 @@ export interface RootRouteChildren {
   PurchaseJapanParcelRoute: typeof PurchaseJapanParcelRouteWithChildren
   StoresFranchiseesRoute: typeof StoresFranchiseesRoute
   StoresListRoute: typeof StoresListRoute
+  StoresProductsRoute: typeof StoresProductsRoute
   StoresYouzanRoute: typeof StoresYouzanRoute
   ApiPublicMerukiIngestRoute: typeof ApiPublicMerukiIngestRoute
 }
@@ -695,6 +708,13 @@ declare module '@tanstack/react-router' {
       path: '/stores/youzan'
       fullPath: '/stores/youzan'
       preLoaderRoute: typeof StoresYouzanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/stores/products': {
+      id: '/stores/products'
+      path: '/stores/products'
+      fullPath: '/stores/products'
+      preLoaderRoute: typeof StoresProductsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/stores/list': {
@@ -1094,6 +1114,7 @@ const rootRouteChildren: RootRouteChildren = {
   PurchaseJapanParcelRoute: PurchaseJapanParcelRouteWithChildren,
   StoresFranchiseesRoute: StoresFranchiseesRoute,
   StoresListRoute: StoresListRoute,
+  StoresProductsRoute: StoresProductsRoute,
   StoresYouzanRoute: StoresYouzanRoute,
   ApiPublicMerukiIngestRoute: ApiPublicMerukiIngestRoute,
 }

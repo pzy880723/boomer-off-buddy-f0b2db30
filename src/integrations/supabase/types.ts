@@ -830,6 +830,101 @@ export type Database = {
           },
         ]
       }
+      stock_transfers: {
+        Row: {
+          code: string
+          created_at: string
+          from_shop_id: string | null
+          from_sku_id: string | null
+          from_youzan_item_id: number | null
+          id: string
+          kind: string
+          notes: string | null
+          operator: string | null
+          posted_at: string | null
+          qty: number
+          reason: string | null
+          status: string
+          to_shop_id: string | null
+          to_sku_id: string | null
+          to_youzan_item_id: number | null
+          updated_at: string
+          youzan_error_msg: string | null
+          youzan_sync_status: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          from_shop_id?: string | null
+          from_sku_id?: string | null
+          from_youzan_item_id?: number | null
+          id?: string
+          kind: string
+          notes?: string | null
+          operator?: string | null
+          posted_at?: string | null
+          qty: number
+          reason?: string | null
+          status?: string
+          to_shop_id?: string | null
+          to_sku_id?: string | null
+          to_youzan_item_id?: number | null
+          updated_at?: string
+          youzan_error_msg?: string | null
+          youzan_sync_status?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          from_shop_id?: string | null
+          from_sku_id?: string | null
+          from_youzan_item_id?: number | null
+          id?: string
+          kind?: string
+          notes?: string | null
+          operator?: string | null
+          posted_at?: string | null
+          qty?: number
+          reason?: string | null
+          status?: string
+          to_shop_id?: string | null
+          to_sku_id?: string | null
+          to_youzan_item_id?: number | null
+          updated_at?: string
+          youzan_error_msg?: string | null
+          youzan_sync_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_transfers_from_shop_id_fkey"
+            columns: ["from_shop_id"]
+            isOneToOne: false
+            referencedRelation: "youzan_shops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_transfers_from_sku_id_fkey"
+            columns: ["from_sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_transfers_to_shop_id_fkey"
+            columns: ["to_shop_id"]
+            isOneToOne: false
+            referencedRelation: "youzan_shops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_transfers_to_sku_id_fkey"
+            columns: ["to_sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       youzan_items: {
         Row: {
           created_at: string
@@ -1060,7 +1155,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      gen_stock_transfer_code: { Args: never; Returns: string }
       inv_apply_inbound_stock: {
+        Args: { p_delta: number; p_sku_id: string }
+        Returns: undefined
+      }
+      inv_apply_stock_delta: {
         Args: { p_delta: number; p_sku_id: string }
         Returns: undefined
       }
