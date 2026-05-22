@@ -143,19 +143,33 @@ async function callYouzanApi(opts: {
   return r.payload;
 }
 
-/** 返回 payload + trace_id + 原始响应前 400 字，方便排查 */
+/** 返回 payload + trace_id + 原始响应前 400 字，方便排查；自带 20s 超时 */
 async function callYouzanApiVerbose(opts: {
   accessToken: string;
   method: string;
   version: string;
   params?: Record<string, unknown>;
+  timeoutMs?: number;
 }): Promise<{ payload: unknown; trace_id: string | null; preview: string }> {
   const url = `${YZ_GW_URL}/${opts.method}/${opts.version}?access_token=${encodeURIComponent(opts.accessToken)}`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(opts.params ?? {}),
-  });
+  const ctl = new AbortController();
+  const tmo = setTimeout(() => ctl.abort(), opts.timeoutMs ?? 20_000);
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(opts.params ?? {}),
+      signal: ctl.signal,
+    });
+  } catch (e) {
+    clearTimeout(tmo);
+    const msg = e instanceof Error && e.name === "AbortError"
+      ? `请求超时 (${opts.method})`
+      : `网络错误：${e instanceof Error ? e.message : String(e)}`;
+    throw new Error(msg);
+  }
+  clearTimeout(tmo);
   const text = await res.text();
   let json: unknown;
   try {
@@ -171,9 +185,14 @@ async function callYouzanApiVerbose(opts: {
     message?: string;
     data?: unknown;
     trace_id?: string;
+    gw_err_resp?: { trace_id?: string; err_msg?: string; err_code?: number };
   };
-  const trace = (j.trace_id as string | undefined) ?? null;
+  const trace = j.trace_id ?? j.gw_err_resp?.trace_id ?? null;
   const preview = text.length > 400 ? text.slice(0, 400) + "..." : text;
+  if (j.gw_err_resp?.err_code) {
+    const g = j.gw_err_resp;
+    throw new Error(`[gw ${g.err_code}] ${g.err_msg ?? ""}${trace ? ` trace=${trace}` : ""}`.trim());
+  }
   if (j.error_response) {
     const e = j.error_response;
     throw new Error(`[${e.code}] ${e.msg ?? ""} ${e.sub_msg ?? ""}${trace ? ` trace=${trace}` : ""}`.trim());
@@ -182,6 +201,19 @@ async function callYouzanApiVerbose(opts: {
     throw new Error(`[${j.code ?? "?"}] ${j.message ?? "调用失败"}${trace ? ` trace=${trace}` : ""}`);
   }
   return { payload: j.response ?? j.data ?? json, trace_id: trace, preview };
+}
+
+/** 进入同步前，把超过 90 秒还在 running 的旧记录直接标成失败，避免页面假活 */
+async function reapStaleSyncLogs() {
+  await supabase
+    .from("youzan_sync_logs")
+    .update({
+      status: "error",
+      error: "上次同步进程中断或超时（自动重置）",
+      finished_at: new Date().toISOString(),
+    } as never)
+    .eq("status", "running")
+    .lt("started_at", new Date(Date.now() - 90_000).toISOString());
 }
 
 // ============================================================
@@ -209,6 +241,7 @@ export const listYouzanSyncLogs = createServerFn({ method: "GET" })
       .parse(input ?? {}),
   )
   .handler(async ({ data }) => {
+    await reapStaleSyncLogs();
     const { data: rows, error } = await supabase
       .from("youzan_sync_logs")
       .select("*")
@@ -672,36 +705,32 @@ async function runItemsSyncForShop(
 
   try {
     const token = await ensureAccessToken(shop);
-    const pageSize = 100;
+    const pageSize = 50;
 
-    // 多个接口逐个尝试。common.search 在连锁场景需要 kdt_ids + item_type；
-    // onsale.get / inventory.get 用分店 token 调用即可拿到该店商品。
-    const attempts: Array<{
+    // 多个接口逐个尝试。文档不同店铺类型支持的接口不同；遇到 4005「非法的API」
+    // 直接跳过、试下一个，不要再让它把整次同步拖死。
+    type Attempt = {
       label: string;
       method: string;
       version: string;
       listed: boolean;
+      idOnly?: boolean; // 该接口只返回 item_id，需要 base.get 补详情
       buildParams: (page: number) => Record<string, unknown>;
-    }> = [
+    };
+    const attempts: Attempt[] = [
       {
-        label: "onsale.get",
-        method: "youzan.items.onsale.get",
+        label: "item.search.3.0.0",
+        method: "youzan.item.search",
         version: "3.0.0",
         listed: true,
         buildParams: (p) => ({ page_no: p, page_size: pageSize }),
       },
       {
-        label: "inventory.get",
-        method: "youzan.items.inventory.get",
-        version: "3.0.0",
-        listed: false,
-        buildParams: (p) => ({ page_no: p, page_size: pageSize, banner: "for_shelved" }),
-      },
-      {
-        label: "common.search",
+        label: "item.common.search.1.0.0",
         method: "youzan.item.common.search",
         version: "1.0.0",
         listed: true,
+        idOnly: true,
         buildParams: (p) => ({
           page_no: p,
           page_size: pageSize,
@@ -709,7 +738,37 @@ async function runItemsSyncForShop(
           item_type: 61,
         }),
       },
+      {
+        label: "items.onsale.get.3.0.0",
+        method: "youzan.items.onsale.get",
+        version: "3.0.0",
+        listed: true,
+        buildParams: (p) => ({ page_no: p, page_size: pageSize }),
+      },
+      {
+        label: "items.inventory.get.3.0.0",
+        method: "youzan.items.inventory.get",
+        version: "3.0.0",
+        listed: false,
+        buildParams: (p) => ({ page_no: p, page_size: pageSize, banner: "for_shelved" }),
+      },
     ];
+
+    const fetchBaseDetail = async (itemId: number) => {
+      try {
+        const r = await callYouzanApiVerbose({
+          accessToken: token,
+          method: "youzan.item.base.get",
+          version: "1.0.0",
+          params: { item_id: itemId },
+          timeoutMs: 15_000,
+        });
+        const obj = r.payload as Record<string, unknown> | null;
+        return (obj?.item as Record<string, unknown> | undefined) ?? obj ?? null;
+      } catch {
+        return null;
+      }
+    };
 
     for (const m of attempts) {
       let page = 1;
@@ -722,6 +781,7 @@ async function runItemsSyncForShop(
             method: m.method,
             version: m.version,
             params: m.buildParams(page),
+            timeoutMs: 20_000,
           });
           lastPreview = r.preview;
           lastTrace = r.trace_id;
@@ -729,7 +789,24 @@ async function runItemsSyncForShop(
           attemptReturned += items.length;
           if (items.length === 0) break;
 
-          const rows = items
+          // 如果接口只返回 ID，逐个补 base.get（限制并发到 5）
+          let detailed = items;
+          if (m.idOnly) {
+            const ids = items
+              .map((it) => Number(it.item_id ?? it.itemId ?? it.id ?? 0))
+              .filter((x) => x > 0 && !seen.has(x));
+            const results: Array<Record<string, unknown>> = [];
+            for (let i = 0; i < ids.length; i += 5) {
+              const batch = ids.slice(i, i + 5);
+              const got = await Promise.all(batch.map((id) => fetchBaseDetail(id)));
+              got.forEach((g, idx) => {
+                if (g) results.push({ ...g, item_id: g.item_id ?? batch[idx] });
+              });
+            }
+            detailed = results;
+          }
+
+          const rows = detailed
             .map((it) => normalizeItemRow(it, shop, m.listed))
             .filter((r): r is NonNullable<typeof r> => !!r && !seen.has(r.item_id))
             .map((r) => {
@@ -746,20 +823,24 @@ async function runItemsSyncForShop(
           }
           if (items.length < pageSize) break;
           page += 1;
-          if (page > 200) break;
+          if (page > 100) break;
         }
         attemptMsgs.push(`${m.label}: 返回 ${attemptReturned} 入库 ${attemptUpserted}`);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        attemptMsgs.push(`${m.label}: ${msg}`);
+        // 4005「非法的API」= 该店铺不支持此接口，标注一下就跳过
+        const friendly = /4005|非法的API/.test(msg) ? `${msg}（店铺不支持，跳过）` : msg;
+        attemptMsgs.push(`${m.label}: ${friendly}`);
       }
       totalReturned += attemptReturned;
       totalUpserted += attemptUpserted;
+      // 已经成功拉到数据就不再尝试其余接口（避免重复 / 不必要的 4005）
+      if (attemptUpserted > 0) break;
     }
 
-    const status = totalUpserted > 0 ? "ok" : totalReturned > 0 ? "ok" : "empty";
+    const status = totalUpserted > 0 ? "ok" : "empty";
     let msg = `商品同步 入库 ${totalUpserted} / 返回 ${totalReturned}｜${attemptMsgs.join(" / ")}`;
-    if (totalReturned === 0 && lastPreview) {
+    if (totalUpserted === 0 && lastPreview) {
       msg += `｜末次响应: ${lastPreview}`;
       if (lastTrace) msg += ` (trace=${lastTrace})`;
     }
@@ -799,6 +880,7 @@ export const syncYouzanItems = createServerFn({ method: "POST" })
     z.object({ shop_id: z.string().uuid() }).parse(input),
   )
   .handler(async ({ data }) => {
+    await reapStaleSyncLogs();
     const shop = await getShopOr404({ shop_id: data.shop_id });
     return runItemsSyncForShop(shop);
   });
@@ -990,6 +1072,7 @@ export const syncYouzanOrders = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data }) => {
+    await reapStaleSyncLogs();
     const shop = await getShopOr404({ shop_id: data.shop_id });
     const endDate = data.end ? new Date(data.end) : new Date();
     const startDate = data.start
@@ -1008,6 +1091,7 @@ export const syncAllShops = createServerFn({ method: "POST" })
       .parse(input ?? {}),
   )
   .handler(async ({ data }) => {
+    await reapStaleSyncLogs();
     const { data: shopsRaw, error } = await supabase
       .from("youzan_shops")
       .select("*")

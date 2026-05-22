@@ -1,35 +1,27 @@
-我确认后端和门店数据都在，真正问题不是“门店丢了”，而是同步接口请求/解析不够贴合有赞真实返回：最近同步日志显示 2 家门店都成功换到了 token，但商品接口全部返回 0，订单接口也返回 0，数据库里 `youzan_items=0`、`youzan_orders=0`。
+我看到了两个明确问题：
 
-执行方案：
+1. **最新 6 条同步日志一直停在 `running`**：这说明当前同步请求在服务端执行过程中超时/被中断，日志没有机会写回 `ok/error/empty`，所以页面看起来一直卡住。
+2. **商品接口最后报 `非法的API 4005`**：当前逻辑仍在调用旧接口 `youzan.items.onsale.get` / `inventory.get`，这些接口对你这个店铺/应用权限不可用；你贴的公开文档是 `youzan.item.base.get.1.0.0` 单品详情接口，不能当全量列表用，必须先用可用的商品列表/搜索接口拿商品 ID，再逐个补详情。
 
-1. 重写有赞商品同步请求参数
-   - `youzan.item.common.search.1.0.0` 补齐有赞公开文档里连锁/商品库场景需要的 `kdt_ids` 和 `item_type` 参数，而不是只传分页。
-   - 保留 `youzan.items.onsale.get.3.0.0`、`youzan.items.inventory.get.3.0.0` 兜底，但优化 page_size、分页和返回结构解析。
-   - 新增对 `youzan.item.search.3.0.0` 或同类列表接口的备用尝试，覆盖“销售中/售罄/仓库中”商品状态场景。
+计划如下：
 
-2. 增强商品字段解析
-   - 兼容 `items`、`goods_list`、`item_list`、`data.items`、`response.items` 等结构。
-   - 同时识别 `item_id / itemId / num_iid / alias / goods_id`、`title / item_title / name`、`price / goods_price / min_price`、库存字段等。
-   - 如果列表接口只返回基础字段，再按 `youzan.item.base.get.1.0.0` 对单个商品补详情，避免“列表有 ID 但入库被过滤”。
+1. **先解决“running 卡死”**
+   - 给商品、订单同步增加接口级超时，任何有赞请求超过限定时间就写入 `error`。
+   - 同步开始前自动把超过一定时间未完成的旧 `running` 记录标记为 `error/timeout`，避免页面永远显示进行中。
+   - 前端日志把 `running` 超时记录显示成“已超时”，不再误导为还在同步。
 
-3. 修正订单同步策略
-   - 订单同步不只查 `start_update/end_update`，增加 `start_created/end_created` 作为首次同步兜底，避免店铺近 30 天订单没有“更新时间”导致 0。
-   - 增加订单接口版本备选：优先稳定版本，再尝试可用新版。
-   - 兼容有赞订单返回里的 `full_order_info_list`、`full_order_info`、`orders`、`trades`、`trade_list` 等真实结构。
+2. **重写商品同步策略**
+   - 停止把 `youzan.items.onsale.get` / `youzan.items.inventory.get` 作为主路径，避免继续触发 `非法的API 4005`。
+   - 主路径改为公开文档可用的新版商品检索接口候选，例如 `youzan.item.common.search.1.0.0` / `youzan.item.search.3.0.0`，并记录每个接口的真实返回结构。
+   - 如果列表接口只返回商品 ID，就按你给的 `youzan.item.base.get.1.0.0` 对每个商品 ID 拉基础信息，再入库 `youzan_items`。
+   - 对总部/分店分别传正确参数：总部 token 查询分店商品时带 `kdt_ids`，分店 token 直查时不强塞总部参数。
 
-4. 修复门店商品页读取边界
-   - `stock-transfer.functions.ts` 现在仍在用普通客户端读 `youzan_items`，这会被权限策略拦住；改成服务端可信读取，和 `/youzan` 页面保持一致。
-   - 这样即使商品已经入库，`/shop-mgmt/products` 也能正常显示。
+3. **修正订单同步**
+   - 订单接口保留 `youzan.trades.sold.get.4.0.0`，但增加更清晰的分页、日期字段 fallback、空返回原始响应记录。
+   - 若 30 天返回 0，提供 90/180 天手动同步入口或默认回溯更长时间，避免新接入店铺刚好近期无订单导致误判。
 
-5. 同步日志改成“失败就失败”
-   - 当前商品同步 0 条也写 `ok`，这会误导；改成 `empty`/明确消息，展示每个接口传了什么关键参数、返回多少、解析多少、入库多少。
-   - 同步按钮 toast 直接显示每家店的失败原因，不再只显示“成功 0”。
+4. **验证路径**
+   - 改完后直接触发一次同步。
+   - 读取数据库确认：`youzan_sync_logs` 不再有新的长期 `running`；`youzan_items` / `youzan_orders` 有数据，或者日志里明确写出有赞返回的 `trace_id`、接口名、参数和错误原因。
 
-6. 验证
-   - 重新跑一次 2 家门店的商品 + 订单同步。
-   - 读取数据库确认 `youzan_items` 或 `youzan_orders` 数量变化；如果有赞接口依然真实返回 0，就把日志里 trace/message 暴露在页面上，能直接拿去对有赞后台查权限/店铺类型，而不是继续盲改。
-
-技术点：
-- 修改集中在 `src/lib/youzan.functions.ts`、`src/lib/stock-transfer.functions.ts`、必要时少量调整 `/youzan` 日志展示。
-- 不改数据库结构，不动已有门店数据，不删除任何 token。
-- 不再创建新页面或大改 UI，只修同步链路和读取链路。
+不会改 token、不会删门店、不会改数据库结构；只改同步函数和日志展示。
