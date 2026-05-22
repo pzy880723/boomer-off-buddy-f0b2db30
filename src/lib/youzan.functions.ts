@@ -755,11 +755,13 @@ async function runOrdersSyncForShop(
     .select("id")
     .single();
 
+  let totalReturned = 0;
+  let totalUpserted = 0;
+
   try {
     const token = await ensureAccessToken(shop);
     const pageSize = 100;
     let page = 1;
-    let totalUpserted = 0;
 
     for (;;) {
       const raw = (await callYouzanApi({
@@ -772,17 +774,23 @@ async function runOrdersSyncForShop(
           page_no: page,
           page_size: pageSize,
         },
-      })) as {
-        trades?: Array<Record<string, unknown>>;
-        full_trades?: { trades?: Array<Record<string, unknown>> };
-        total_results?: number;
-      };
-      const trades = raw.trades ?? raw.full_trades?.trades ?? [];
+      })) as Record<string, unknown>;
+
+      const tradesAny =
+        (raw.trades as unknown) ??
+        (raw.full_trades as { trades?: unknown } | undefined)?.trades ??
+        (raw.trade_list as unknown) ??
+        (raw.data as { trades?: unknown } | undefined)?.trades ??
+        [];
+      const trades = Array.isArray(tradesAny)
+        ? (tradesAny as Array<Record<string, unknown>>)
+        : [];
+      totalReturned += trades.length;
       if (trades.length === 0) break;
 
       const rows = trades
         .map((t) => {
-          const tid = String(t.tid ?? "");
+          const tid = String(t.tid ?? t.order_no ?? "");
           if (!tid) return null;
           const payTime = t.pay_time ? String(t.pay_time) : null;
           const created = t.created ? String(t.created) : null;
@@ -820,13 +828,17 @@ async function runOrdersSyncForShop(
       if (page > 500) break;
     }
 
-    const msg = `同步订单 ${totalUpserted} 条（${fmt(startDate)} ~ ${fmt(endDate)}）`;
+    const msg =
+      totalReturned === 0
+        ? `订单同步：有赞接口返回 0 条（${fmt(startDate)} ~ ${fmt(endDate)}）`
+        : `订单同步 入库 ${totalUpserted} / 返回 ${totalReturned}（${fmt(startDate)} ~ ${fmt(endDate)}）`;
     if (log?.id) {
       await supabase
         .from("youzan_sync_logs")
         .update({
           status: "ok",
           count_in: totalUpserted,
+          count_out: totalReturned,
           message: msg,
           finished_at: new Date().toISOString(),
         } as never)
@@ -840,12 +852,14 @@ async function runOrdersSyncForShop(
         .from("youzan_sync_logs")
         .update({
           status: "error",
+          count_in: totalUpserted,
+          count_out: totalReturned,
           error: msg,
           finished_at: new Date().toISOString(),
         } as never)
         .eq("id", log.id);
     }
-    return { ok: false, count: 0, message: msg };
+    return { ok: false, count: totalUpserted, message: msg };
   }
 }
 
