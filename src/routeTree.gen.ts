@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as YouzanRouteImport } from './routes/youzan'
 import { Route as StoreRouteImport } from './routes/store'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as MRouteImport } from './routes/m'
@@ -57,6 +58,11 @@ import { Route as InventoryInboundNewRouteImport } from './routes/inventory.inbo
 import { Route as InventoryInboundIdRouteImport } from './routes/inventory.inbound.$id'
 import { Route as ApiPublicMerukiIngestRouteImport } from './routes/api/public/meruki-ingest'
 
+const YouzanRoute = YouzanRouteImport.update({
+  id: '/youzan',
+  path: '/youzan',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StoreRoute = StoreRouteImport.update({
   id: '/store',
   path: '/store',
@@ -305,6 +311,7 @@ export interface FileRoutesByFullPath {
   '/m': typeof MRouteWithChildren
   '/settings': typeof SettingsRoute
   '/store': typeof StoreRouteWithChildren
+  '/youzan': typeof YouzanRoute
   '/admin/users': typeof AdminUsersRoute
   '/inventory/batches': typeof InventoryBatchesRoute
   '/inventory/inbound': typeof InventoryInboundRouteWithChildren
@@ -352,6 +359,7 @@ export interface FileRoutesByTo {
   '/knowledge': typeof KnowledgeRoute
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
+  '/youzan': typeof YouzanRoute
   '/admin/users': typeof AdminUsersRoute
   '/inventory/batches': typeof InventoryBatchesRoute
   '/inventory/products': typeof InventoryProductsRoute
@@ -397,6 +405,7 @@ export interface FileRoutesById {
   '/m': typeof MRouteWithChildren
   '/settings': typeof SettingsRoute
   '/store': typeof StoreRouteWithChildren
+  '/youzan': typeof YouzanRoute
   '/admin/users': typeof AdminUsersRoute
   '/inventory/batches': typeof InventoryBatchesRoute
   '/inventory/inbound': typeof InventoryInboundRouteWithChildren
@@ -448,6 +457,7 @@ export interface FileRouteTypes {
     | '/m'
     | '/settings'
     | '/store'
+    | '/youzan'
     | '/admin/users'
     | '/inventory/batches'
     | '/inventory/inbound'
@@ -495,6 +505,7 @@ export interface FileRouteTypes {
     | '/knowledge'
     | '/login'
     | '/settings'
+    | '/youzan'
     | '/admin/users'
     | '/inventory/batches'
     | '/inventory/products'
@@ -539,6 +550,7 @@ export interface FileRouteTypes {
     | '/m'
     | '/settings'
     | '/store'
+    | '/youzan'
     | '/admin/users'
     | '/inventory/batches'
     | '/inventory/inbound'
@@ -589,6 +601,7 @@ export interface RootRouteChildren {
   MRoute: typeof MRouteWithChildren
   SettingsRoute: typeof SettingsRoute
   StoreRoute: typeof StoreRouteWithChildren
+  YouzanRoute: typeof YouzanRoute
   AdminUsersRoute: typeof AdminUsersRoute
   InventoryBatchesRoute: typeof InventoryBatchesRoute
   InventoryInboundRoute: typeof InventoryInboundRouteWithChildren
@@ -607,6 +620,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/youzan': {
+      id: '/youzan'
+      path: '/youzan'
+      fullPath: '/youzan'
+      preLoaderRoute: typeof YouzanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/store': {
       id: '/store'
       path: '/store'
@@ -1061,6 +1081,7 @@ const rootRouteChildren: RootRouteChildren = {
   MRoute: MRouteWithChildren,
   SettingsRoute: SettingsRoute,
   StoreRoute: StoreRouteWithChildren,
+  YouzanRoute: YouzanRoute,
   AdminUsersRoute: AdminUsersRoute,
   InventoryBatchesRoute: InventoryBatchesRoute,
   InventoryInboundRoute: InventoryInboundRouteWithChildren,
@@ -1079,3 +1100,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
