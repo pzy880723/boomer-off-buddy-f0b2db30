@@ -48,9 +48,9 @@ type NavTo =
   | "/inventory/inbound"
   | "/inventory/inbound/new"
   | "/inventory/transfers"
-  | "/stores/list"
-  | "/stores/products"
-  | "/stores/franchisees"
+  | "/shop-mgmt/shops"
+  | "/shop-mgmt/products"
+  | "/shop-mgmt/franchisees"
   | "/youzan"
   | "/knowledge"
   | "/settings"
@@ -82,11 +82,11 @@ const groups: { label: string; items: { title: string; url: NavTo; icon: LucideI
     icon: Boxes,
   },
   {
-    label: "门店加盟",
+    label: "门店管理",
     items: [
-      { title: "门店列表", url: "/stores/list", icon: Building2 },
-      { title: "门店商品库", url: "/stores/products", icon: Package },
-      { title: "加盟商管理", url: "/stores/franchisees", icon: Users },
+      { title: "门店列表", url: "/shop-mgmt/shops", icon: Building2 },
+      { title: "门店商品库", url: "/shop-mgmt/products", icon: Package },
+      { title: "加盟商管理", url: "/shop-mgmt/franchisees", icon: Users },
       { title: "有赞对接", url: "/youzan", icon: Link2 },
     ],
     icon: Store,

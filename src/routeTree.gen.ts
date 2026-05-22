@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as YouzanRouteImport } from './routes/youzan'
 import { Route as StoreRouteImport } from './routes/store'
+import { Route as ShopMgmtRouteImport } from './routes/shop-mgmt'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as MRouteImport } from './routes/m'
 import { Route as LoginRouteImport } from './routes/login'
@@ -26,6 +27,9 @@ import { Route as StoresFranchiseesRouteImport } from './routes/stores.franchise
 import { Route as StoreScanRouteImport } from './routes/store.scan'
 import { Route as StoreInventoryRouteImport } from './routes/store.inventory'
 import { Route as StoreIncomingRouteImport } from './routes/store.incoming'
+import { Route as ShopMgmtShopsRouteImport } from './routes/shop-mgmt.shops'
+import { Route as ShopMgmtProductsRouteImport } from './routes/shop-mgmt.products'
+import { Route as ShopMgmtFranchiseesRouteImport } from './routes/shop-mgmt.franchisees'
 import { Route as PurchaseJapanParcelRouteImport } from './routes/purchase.japan-parcel'
 import { Route as PurchaseJapanBulkRouteImport } from './routes/purchase.japan-bulk'
 import { Route as PurchaseDomesticBulkRouteImport } from './routes/purchase.domestic-bulk'
@@ -67,6 +71,11 @@ const YouzanRoute = YouzanRouteImport.update({
 const StoreRoute = StoreRouteImport.update({
   id: '/store',
   path: '/store',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShopMgmtRoute = ShopMgmtRouteImport.update({
+  id: '/shop-mgmt',
+  path: '/shop-mgmt',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -143,6 +152,21 @@ const StoreIncomingRoute = StoreIncomingRouteImport.update({
   id: '/incoming',
   path: '/incoming',
   getParentRoute: () => StoreRoute,
+} as any)
+const ShopMgmtShopsRoute = ShopMgmtShopsRouteImport.update({
+  id: '/shops',
+  path: '/shops',
+  getParentRoute: () => ShopMgmtRoute,
+} as any)
+const ShopMgmtProductsRoute = ShopMgmtProductsRouteImport.update({
+  id: '/products',
+  path: '/products',
+  getParentRoute: () => ShopMgmtRoute,
+} as any)
+const ShopMgmtFranchiseesRoute = ShopMgmtFranchiseesRouteImport.update({
+  id: '/franchisees',
+  path: '/franchisees',
+  getParentRoute: () => ShopMgmtRoute,
 } as any)
 const PurchaseJapanParcelRoute = PurchaseJapanParcelRouteImport.update({
   id: '/purchase/japan-parcel',
@@ -316,6 +340,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/m': typeof MRouteWithChildren
   '/settings': typeof SettingsRoute
+  '/shop-mgmt': typeof ShopMgmtRouteWithChildren
   '/store': typeof StoreRouteWithChildren
   '/youzan': typeof YouzanRoute
   '/admin/users': typeof AdminUsersRoute
@@ -332,6 +357,9 @@ export interface FileRoutesByFullPath {
   '/purchase/domestic-bulk': typeof PurchaseDomesticBulkRouteWithChildren
   '/purchase/japan-bulk': typeof PurchaseJapanBulkRoute
   '/purchase/japan-parcel': typeof PurchaseJapanParcelRouteWithChildren
+  '/shop-mgmt/franchisees': typeof ShopMgmtFranchiseesRoute
+  '/shop-mgmt/products': typeof ShopMgmtProductsRoute
+  '/shop-mgmt/shops': typeof ShopMgmtShopsRoute
   '/store/incoming': typeof StoreIncomingRoute
   '/store/inventory': typeof StoreInventoryRoute
   '/store/scan': typeof StoreScanRoute
@@ -366,6 +394,7 @@ export interface FileRoutesByTo {
   '/knowledge': typeof KnowledgeRoute
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
+  '/shop-mgmt': typeof ShopMgmtRouteWithChildren
   '/youzan': typeof YouzanRoute
   '/admin/users': typeof AdminUsersRoute
   '/inventory/batches': typeof InventoryBatchesRoute
@@ -376,6 +405,9 @@ export interface FileRoutesByTo {
   '/m/photo-search': typeof MPhotoSearchRoute
   '/m/scan': typeof MScanRoute
   '/purchase/japan-bulk': typeof PurchaseJapanBulkRoute
+  '/shop-mgmt/franchisees': typeof ShopMgmtFranchiseesRoute
+  '/shop-mgmt/products': typeof ShopMgmtProductsRoute
+  '/shop-mgmt/shops': typeof ShopMgmtShopsRoute
   '/store/incoming': typeof StoreIncomingRoute
   '/store/inventory': typeof StoreInventoryRoute
   '/store/scan': typeof StoreScanRoute
@@ -412,6 +444,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/m': typeof MRouteWithChildren
   '/settings': typeof SettingsRoute
+  '/shop-mgmt': typeof ShopMgmtRouteWithChildren
   '/store': typeof StoreRouteWithChildren
   '/youzan': typeof YouzanRoute
   '/admin/users': typeof AdminUsersRoute
@@ -428,6 +461,9 @@ export interface FileRoutesById {
   '/purchase/domestic-bulk': typeof PurchaseDomesticBulkRouteWithChildren
   '/purchase/japan-bulk': typeof PurchaseJapanBulkRoute
   '/purchase/japan-parcel': typeof PurchaseJapanParcelRouteWithChildren
+  '/shop-mgmt/franchisees': typeof ShopMgmtFranchiseesRoute
+  '/shop-mgmt/products': typeof ShopMgmtProductsRoute
+  '/shop-mgmt/shops': typeof ShopMgmtShopsRoute
   '/store/incoming': typeof StoreIncomingRoute
   '/store/inventory': typeof StoreInventoryRoute
   '/store/scan': typeof StoreScanRoute
@@ -465,6 +501,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/m'
     | '/settings'
+    | '/shop-mgmt'
     | '/store'
     | '/youzan'
     | '/admin/users'
@@ -481,6 +518,9 @@ export interface FileRouteTypes {
     | '/purchase/domestic-bulk'
     | '/purchase/japan-bulk'
     | '/purchase/japan-parcel'
+    | '/shop-mgmt/franchisees'
+    | '/shop-mgmt/products'
+    | '/shop-mgmt/shops'
     | '/store/incoming'
     | '/store/inventory'
     | '/store/scan'
@@ -515,6 +555,7 @@ export interface FileRouteTypes {
     | '/knowledge'
     | '/login'
     | '/settings'
+    | '/shop-mgmt'
     | '/youzan'
     | '/admin/users'
     | '/inventory/batches'
@@ -525,6 +566,9 @@ export interface FileRouteTypes {
     | '/m/photo-search'
     | '/m/scan'
     | '/purchase/japan-bulk'
+    | '/shop-mgmt/franchisees'
+    | '/shop-mgmt/products'
+    | '/shop-mgmt/shops'
     | '/store/incoming'
     | '/store/inventory'
     | '/store/scan'
@@ -560,6 +604,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/m'
     | '/settings'
+    | '/shop-mgmt'
     | '/store'
     | '/youzan'
     | '/admin/users'
@@ -576,6 +621,9 @@ export interface FileRouteTypes {
     | '/purchase/domestic-bulk'
     | '/purchase/japan-bulk'
     | '/purchase/japan-parcel'
+    | '/shop-mgmt/franchisees'
+    | '/shop-mgmt/products'
+    | '/shop-mgmt/shops'
     | '/store/incoming'
     | '/store/inventory'
     | '/store/scan'
@@ -612,6 +660,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   MRoute: typeof MRouteWithChildren
   SettingsRoute: typeof SettingsRoute
+  ShopMgmtRoute: typeof ShopMgmtRouteWithChildren
   StoreRoute: typeof StoreRouteWithChildren
   YouzanRoute: typeof YouzanRoute
   AdminUsersRoute: typeof AdminUsersRoute
@@ -645,6 +694,13 @@ declare module '@tanstack/react-router' {
       path: '/store'
       fullPath: '/store'
       preLoaderRoute: typeof StoreRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/shop-mgmt': {
+      id: '/shop-mgmt'
+      path: '/shop-mgmt'
+      fullPath: '/shop-mgmt'
+      preLoaderRoute: typeof ShopMgmtRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -751,6 +807,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/store/incoming'
       preLoaderRoute: typeof StoreIncomingRouteImport
       parentRoute: typeof StoreRoute
+    }
+    '/shop-mgmt/shops': {
+      id: '/shop-mgmt/shops'
+      path: '/shops'
+      fullPath: '/shop-mgmt/shops'
+      preLoaderRoute: typeof ShopMgmtShopsRouteImport
+      parentRoute: typeof ShopMgmtRoute
+    }
+    '/shop-mgmt/products': {
+      id: '/shop-mgmt/products'
+      path: '/products'
+      fullPath: '/shop-mgmt/products'
+      preLoaderRoute: typeof ShopMgmtProductsRouteImport
+      parentRoute: typeof ShopMgmtRoute
+    }
+    '/shop-mgmt/franchisees': {
+      id: '/shop-mgmt/franchisees'
+      path: '/franchisees'
+      fullPath: '/shop-mgmt/franchisees'
+      preLoaderRoute: typeof ShopMgmtFranchiseesRouteImport
+      parentRoute: typeof ShopMgmtRoute
     }
     '/purchase/japan-parcel': {
       id: '/purchase/japan-parcel'
@@ -999,6 +1076,22 @@ const MRouteChildren: MRouteChildren = {
 
 const MRouteWithChildren = MRoute._addFileChildren(MRouteChildren)
 
+interface ShopMgmtRouteChildren {
+  ShopMgmtFranchiseesRoute: typeof ShopMgmtFranchiseesRoute
+  ShopMgmtProductsRoute: typeof ShopMgmtProductsRoute
+  ShopMgmtShopsRoute: typeof ShopMgmtShopsRoute
+}
+
+const ShopMgmtRouteChildren: ShopMgmtRouteChildren = {
+  ShopMgmtFranchiseesRoute: ShopMgmtFranchiseesRoute,
+  ShopMgmtProductsRoute: ShopMgmtProductsRoute,
+  ShopMgmtShopsRoute: ShopMgmtShopsRoute,
+}
+
+const ShopMgmtRouteWithChildren = ShopMgmtRoute._addFileChildren(
+  ShopMgmtRouteChildren,
+)
+
 interface StoreRouteChildren {
   StoreIncomingRoute: typeof StoreIncomingRoute
   StoreInventoryRoute: typeof StoreInventoryRoute
@@ -1100,6 +1193,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   MRoute: MRouteWithChildren,
   SettingsRoute: SettingsRoute,
+  ShopMgmtRoute: ShopMgmtRouteWithChildren,
   StoreRoute: StoreRouteWithChildren,
   YouzanRoute: YouzanRoute,
   AdminUsersRoute: AdminUsersRoute,
