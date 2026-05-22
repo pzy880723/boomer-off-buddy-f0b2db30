@@ -139,12 +139,10 @@ function YouzanPage() {
   const branches = shops.filter((s) => s.role === "branch");
 
   return (
-    <div>
+    <div className="container mx-auto px-4 py-6 space-y-6">
       <PageHeader
         title="有赞门店"
         description={`${shops.length} 家门店 · ${summary?.shopOnline ?? 0} 家在线 · 最近同步 ${relativeTime(summary?.lastSyncAt ?? null)}`}
-        backTo="/dashboard"
-        backLabel="返回仪表盘"
         actions={
           <ImportShopsDialog
             hqExists={!!hq}
