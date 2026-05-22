@@ -1,63 +1,30 @@
-## 1. 4 卡 → 单行紧凑条（视觉缩减）
+## 修正计划
 
-`src/routes/youzan.tsx` 第 159-186 行，把 `grid sm:grid-cols-2 lg:grid-cols-4` 的 `MetricCard` 区块换成一个 `Card` 内部 `flex divide-x` 的一行四栏小条：
+1. **侧边栏位置调整**
+   - 把「订单管理」移动到「仓库管理」下面、「门店管理」上面。
+   - 保持子菜单不变：门店订单、铺货订单、批发订单。
 
-- 一行高度从 ~140px 压到 ~56px
-- 每栏：图标 + label 一行（10px 灰）+ value 一行（base 半粗，不再 3xl）
-- 仍保留 "本月营业额 / 本月订单 / 在售商品 / 总库存"，hint "等待首次同步" 改为右侧 1 行极小灰字、只在无数据时显示
-- 移动端 `grid-cols-2`，桌面 `flex`，保持响应式
+2. **重做商品同步接口策略**
+   - 不再只依赖当前的 `youzan.items.onsale.get` / `youzan.items.inventory.get`。
+   - 按有赞公开文档补上商品列表查询接口：优先使用 `youzan.item.common.search.1.0.0` 拉商品列表。
+   - 对列表返回的商品，再按需调用你提供的 `youzan.item.base.get.1.0.0` 补全基础信息：`item_id / title / display / sold_status / media.images / channel_item_id / root_kdt_id / kdt_id`。
+   - 同步入库时继续写 `youzan_items`，并兼容有赞返回的多种字段命名：`item_id`、`channel_item_id`、`title`、`origin_price`、`price`、`media.images[0].url`、`display`、`sold_status`。
+   - 同步日志里区分：接口返回数量、解析数量、成功入库数量、失败原因。
 
-## 2. 新增"订单管理"侧栏大类
+3. **修复连锁/门店场景商品拉取**
+   - 对每个本地 active 门店分别用自己的 `kdt_id` 换 token 后同步。
+   - 总部和分店都同步，但分店商品不再假设可以用总部旧商品接口拿到。
+   - 如果某个门店接口权限不支持，会把有赞原始错误写入同步明细，而不是显示“同步 0 条”误导。
 
-`src/components/app-sidebar.tsx`，在"门店管理"和"运营"之间插入新组：
+4. **订单同步排查与增强**
+   - 保留 `youzan.trades.sold.get.4.0.0`，但检查参数和返回结构，兼容 `trades`、`full_trades.trades`、`trade_list` 等结构。
+   - 每家门店单独同步近 30 天订单，记录接口返回数量和成功入库数量。
+   - 如果订单仍为 0，日志明确显示是“有赞接口返回 0”还是“解析/入库失败”。
 
-```
-订单管理（icon: ClipboardList）
-  ├─ 门店订单    /orders/shops     (有赞 + POS 销售)
-  ├─ 铺货订单    /orders/dispatch  (总仓→门店调拨/铺货单)
-  └─ 批发订单    /orders/wholesale (B 端批发出货)
-```
+5. **修复页面数据函数结构**
+   - 把 `/orders/shops` 里内联的 `createServerFn` 挪到 `src/lib/youzan.functions.ts`，路由只负责展示，避免服务端函数和页面逻辑混写导致运行不稳定。
 
-新建 4 个路由文件（占位骨架，先把入口跑通，不做完整业务）：
-- `src/routes/orders.tsx` —— layout，仅 `<Outlet />`
-- `src/routes/orders.shops.tsx` —— 接入已有 `youzan_orders`，分门店筛选 + DataTable
-- `src/routes/orders.dispatch.tsx` —— 复用 `stock_transfers` 数据，按"铺货"视角呈现
-- `src/routes/orders.wholesale.tsx` —— 空骨架 + EmptyState「即将上线」
-
-`NavTo` 联合类型同步加上 4 条新路径。
-
-## 3. 修复有赞商品/订单不同步
-
-**诊断**（已查 DB + 日志）：
-- 总部 `153242272` token 正常，`items` 同步成功但返回 **0 条** —— 总部账户名下确实没挂商品，所有商品挂在分店 `187395218`
-- 分店 `187395218` 只跑过 `ping`，**从未触发过 items / orders 同步** —— 现有 UI 需要逐店打开 SyncDialog 手动点，用户没意识到分店要单独同步
-- `ensureAccessToken` 已支持用分店自己的 `kdt_id` 换 silent token（分店 ping 已成功验证），所以代码层只缺一个"全部同步"入口
-
-**修复方案**（不改底层同步逻辑，加入口 + 自动触发）：
-
-a) `src/lib/youzan.functions.ts` 新增 `syncAllShops` serverFn：
-   - 拉所有 `status='active'` 的店铺
-   - 对每家串行调 `syncYouzanItems`+`syncYouzanOrders`（近 30 天），失败不中断
-   - 返回 `{ shop_id, shop_name, itemsResult, ordersResult }[]` 汇总
-
-b) `src/routes/youzan.tsx` 顶部 PageHeader actions 旁新增「🔄 一键同步全部」按钮，调用 `syncAllShops`，loading 时禁用，结束 toast 显示 "X 家成功 / Y 家失败"，并 invalidate 所有 query
-
-c) `batchImportShops`（lib 已有）末尾追加：导入成功后对新加店铺自动跑一次 `syncYouzanItems`（不跑 orders 避免太慢），把"加了店铺却看不到商品"的疑惑消除在源头
-
-d) `ShopCard` 上若 `youzan_items` 中该 kdt_id 计数为 0，显示一个 amber 小提示「尚未同步商品，点击同步」直接打开 SyncDialog —— 复用现有 `getShopSalesBreakdown` 已经返回的店铺 item 数即可（如果没有，给 summary serverFn 加上 `itemsByShop`）
-
-## 文件改动清单
-
-- 编辑 `src/routes/youzan.tsx`（紧凑条 + 一键同步按钮 + 空商品提示）
-- 编辑 `src/components/app-sidebar.tsx`（订单管理 5 行 + NavTo 联合类型）
-- 编辑 `src/lib/youzan.functions.ts`（新增 `syncAllShops`；`batchImportShops` 尾部自动同步）
-- 编辑 `src/lib/youzan-stats.functions.ts`（summary 加 `itemsByShop` 计数）
-- 新建 `src/routes/orders.tsx` / `orders.shops.tsx` / `orders.dispatch.tsx` / `orders.wholesale.tsx`
-
-不动：数据库表结构、RLS、SyncDialog 内部逻辑、`ensureAccessToken`/`callYouzanApi` 底层调用、移动端 `/store`、`/shop-mgmt/*`、`/inventory/*`。
-
-## 后续不在本次范围
-
-- 门店订单全功能（退款/发货回写有赞）
-- 批发订单业务建表（先骨架占位）
-- 定时任务自动同步（暂时手动 + 一键）
+6. **验证**
+   - 修复后触发一次「一键同步全部」。
+   - 检查 `youzan_sync_logs`、`youzan_items`、`youzan_orders` 三处数据。
+   - 如果有赞返回权限/参数错误，直接在页面同步明细里展示真实错误，方便继续对照文档修正。
