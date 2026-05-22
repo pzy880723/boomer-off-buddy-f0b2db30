@@ -13,6 +13,7 @@ import { Route as YouzanRouteImport } from './routes/youzan'
 import { Route as StoreRouteImport } from './routes/store'
 import { Route as ShopMgmtRouteImport } from './routes/shop-mgmt'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as MRouteImport } from './routes/m'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as KnowledgeRouteImport } from './routes/knowledge'
@@ -34,6 +35,9 @@ import { Route as PurchaseJapanParcelRouteImport } from './routes/purchase.japan
 import { Route as PurchaseJapanBulkRouteImport } from './routes/purchase.japan-bulk'
 import { Route as PurchaseDomesticBulkRouteImport } from './routes/purchase.domestic-bulk'
 import { Route as PurchaseDomesticRouteImport } from './routes/purchase.domestic'
+import { Route as OrdersWholesaleRouteImport } from './routes/orders.wholesale'
+import { Route as OrdersShopsRouteImport } from './routes/orders.shops'
+import { Route as OrdersDispatchRouteImport } from './routes/orders.dispatch'
 import { Route as MScanRouteImport } from './routes/m.scan'
 import { Route as MPhotoSearchRouteImport } from './routes/m.photo-search'
 import { Route as MParcelsRouteImport } from './routes/m.parcels'
@@ -81,6 +85,11 @@ const ShopMgmtRoute = ShopMgmtRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrdersRoute = OrdersRouteImport.update({
+  id: '/orders',
+  path: '/orders',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MRoute = MRouteImport.update({
@@ -187,6 +196,21 @@ const PurchaseDomesticRoute = PurchaseDomesticRouteImport.update({
   id: '/purchase/domestic',
   path: '/purchase/domestic',
   getParentRoute: () => rootRouteImport,
+} as any)
+const OrdersWholesaleRoute = OrdersWholesaleRouteImport.update({
+  id: '/wholesale',
+  path: '/wholesale',
+  getParentRoute: () => OrdersRoute,
+} as any)
+const OrdersShopsRoute = OrdersShopsRouteImport.update({
+  id: '/shops',
+  path: '/shops',
+  getParentRoute: () => OrdersRoute,
+} as any)
+const OrdersDispatchRoute = OrdersDispatchRouteImport.update({
+  id: '/dispatch',
+  path: '/dispatch',
+  getParentRoute: () => OrdersRoute,
 } as any)
 const MScanRoute = MScanRouteImport.update({
   id: '/scan',
@@ -339,6 +363,7 @@ export interface FileRoutesByFullPath {
   '/knowledge': typeof KnowledgeRoute
   '/login': typeof LoginRoute
   '/m': typeof MRouteWithChildren
+  '/orders': typeof OrdersRouteWithChildren
   '/settings': typeof SettingsRoute
   '/shop-mgmt': typeof ShopMgmtRouteWithChildren
   '/store': typeof StoreRouteWithChildren
@@ -353,6 +378,9 @@ export interface FileRoutesByFullPath {
   '/m/parcels': typeof MParcelsRoute
   '/m/photo-search': typeof MPhotoSearchRoute
   '/m/scan': typeof MScanRoute
+  '/orders/dispatch': typeof OrdersDispatchRoute
+  '/orders/shops': typeof OrdersShopsRoute
+  '/orders/wholesale': typeof OrdersWholesaleRoute
   '/purchase/domestic': typeof PurchaseDomesticRouteWithChildren
   '/purchase/domestic-bulk': typeof PurchaseDomesticBulkRouteWithChildren
   '/purchase/japan-bulk': typeof PurchaseJapanBulkRoute
@@ -393,6 +421,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/knowledge': typeof KnowledgeRoute
   '/login': typeof LoginRoute
+  '/orders': typeof OrdersRouteWithChildren
   '/settings': typeof SettingsRoute
   '/shop-mgmt': typeof ShopMgmtRouteWithChildren
   '/youzan': typeof YouzanRoute
@@ -404,6 +433,9 @@ export interface FileRoutesByTo {
   '/m/parcels': typeof MParcelsRoute
   '/m/photo-search': typeof MPhotoSearchRoute
   '/m/scan': typeof MScanRoute
+  '/orders/dispatch': typeof OrdersDispatchRoute
+  '/orders/shops': typeof OrdersShopsRoute
+  '/orders/wholesale': typeof OrdersWholesaleRoute
   '/purchase/japan-bulk': typeof PurchaseJapanBulkRoute
   '/shop-mgmt/franchisees': typeof ShopMgmtFranchiseesRoute
   '/shop-mgmt/products': typeof ShopMgmtProductsRoute
@@ -443,6 +475,7 @@ export interface FileRoutesById {
   '/knowledge': typeof KnowledgeRoute
   '/login': typeof LoginRoute
   '/m': typeof MRouteWithChildren
+  '/orders': typeof OrdersRouteWithChildren
   '/settings': typeof SettingsRoute
   '/shop-mgmt': typeof ShopMgmtRouteWithChildren
   '/store': typeof StoreRouteWithChildren
@@ -457,6 +490,9 @@ export interface FileRoutesById {
   '/m/parcels': typeof MParcelsRoute
   '/m/photo-search': typeof MPhotoSearchRoute
   '/m/scan': typeof MScanRoute
+  '/orders/dispatch': typeof OrdersDispatchRoute
+  '/orders/shops': typeof OrdersShopsRoute
+  '/orders/wholesale': typeof OrdersWholesaleRoute
   '/purchase/domestic': typeof PurchaseDomesticRouteWithChildren
   '/purchase/domestic-bulk': typeof PurchaseDomesticBulkRouteWithChildren
   '/purchase/japan-bulk': typeof PurchaseJapanBulkRoute
@@ -500,6 +536,7 @@ export interface FileRouteTypes {
     | '/knowledge'
     | '/login'
     | '/m'
+    | '/orders'
     | '/settings'
     | '/shop-mgmt'
     | '/store'
@@ -514,6 +551,9 @@ export interface FileRouteTypes {
     | '/m/parcels'
     | '/m/photo-search'
     | '/m/scan'
+    | '/orders/dispatch'
+    | '/orders/shops'
+    | '/orders/wholesale'
     | '/purchase/domestic'
     | '/purchase/domestic-bulk'
     | '/purchase/japan-bulk'
@@ -554,6 +594,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/knowledge'
     | '/login'
+    | '/orders'
     | '/settings'
     | '/shop-mgmt'
     | '/youzan'
@@ -565,6 +606,9 @@ export interface FileRouteTypes {
     | '/m/parcels'
     | '/m/photo-search'
     | '/m/scan'
+    | '/orders/dispatch'
+    | '/orders/shops'
+    | '/orders/wholesale'
     | '/purchase/japan-bulk'
     | '/shop-mgmt/franchisees'
     | '/shop-mgmt/products'
@@ -603,6 +647,7 @@ export interface FileRouteTypes {
     | '/knowledge'
     | '/login'
     | '/m'
+    | '/orders'
     | '/settings'
     | '/shop-mgmt'
     | '/store'
@@ -617,6 +662,9 @@ export interface FileRouteTypes {
     | '/m/parcels'
     | '/m/photo-search'
     | '/m/scan'
+    | '/orders/dispatch'
+    | '/orders/shops'
+    | '/orders/wholesale'
     | '/purchase/domestic'
     | '/purchase/domestic-bulk'
     | '/purchase/japan-bulk'
@@ -659,6 +707,7 @@ export interface RootRouteChildren {
   KnowledgeRoute: typeof KnowledgeRoute
   LoginRoute: typeof LoginRoute
   MRoute: typeof MRouteWithChildren
+  OrdersRoute: typeof OrdersRouteWithChildren
   SettingsRoute: typeof SettingsRoute
   ShopMgmtRoute: typeof ShopMgmtRouteWithChildren
   StoreRoute: typeof StoreRouteWithChildren
@@ -708,6 +757,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/orders': {
+      id: '/orders'
+      path: '/orders'
+      fullPath: '/orders'
+      preLoaderRoute: typeof OrdersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/m': {
@@ -856,6 +912,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/purchase/domestic'
       preLoaderRoute: typeof PurchaseDomesticRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/orders/wholesale': {
+      id: '/orders/wholesale'
+      path: '/wholesale'
+      fullPath: '/orders/wholesale'
+      preLoaderRoute: typeof OrdersWholesaleRouteImport
+      parentRoute: typeof OrdersRoute
+    }
+    '/orders/shops': {
+      id: '/orders/shops'
+      path: '/shops'
+      fullPath: '/orders/shops'
+      preLoaderRoute: typeof OrdersShopsRouteImport
+      parentRoute: typeof OrdersRoute
+    }
+    '/orders/dispatch': {
+      id: '/orders/dispatch'
+      path: '/dispatch'
+      fullPath: '/orders/dispatch'
+      preLoaderRoute: typeof OrdersDispatchRouteImport
+      parentRoute: typeof OrdersRoute
     }
     '/m/scan': {
       id: '/m/scan'
@@ -1076,6 +1153,21 @@ const MRouteChildren: MRouteChildren = {
 
 const MRouteWithChildren = MRoute._addFileChildren(MRouteChildren)
 
+interface OrdersRouteChildren {
+  OrdersDispatchRoute: typeof OrdersDispatchRoute
+  OrdersShopsRoute: typeof OrdersShopsRoute
+  OrdersWholesaleRoute: typeof OrdersWholesaleRoute
+}
+
+const OrdersRouteChildren: OrdersRouteChildren = {
+  OrdersDispatchRoute: OrdersDispatchRoute,
+  OrdersShopsRoute: OrdersShopsRoute,
+  OrdersWholesaleRoute: OrdersWholesaleRoute,
+}
+
+const OrdersRouteWithChildren =
+  OrdersRoute._addFileChildren(OrdersRouteChildren)
+
 interface ShopMgmtRouteChildren {
   ShopMgmtFranchiseesRoute: typeof ShopMgmtFranchiseesRoute
   ShopMgmtProductsRoute: typeof ShopMgmtProductsRoute
@@ -1192,6 +1284,7 @@ const rootRouteChildren: RootRouteChildren = {
   KnowledgeRoute: KnowledgeRoute,
   LoginRoute: LoginRoute,
   MRoute: MRouteWithChildren,
+  OrdersRoute: OrdersRouteWithChildren,
   SettingsRoute: SettingsRoute,
   ShopMgmtRoute: ShopMgmtRouteWithChildren,
   StoreRoute: StoreRouteWithChildren,
