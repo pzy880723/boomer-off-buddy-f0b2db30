@@ -318,6 +318,33 @@ function YouzanPage() {
 // ============================================================
 // 汇总卡
 // ============================================================
+function CompactStat({
+  icon: Icon,
+  label,
+  value,
+  tone,
+  empty,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+  tone?: "primary";
+  empty?: boolean;
+}) {
+  return (
+    <div className={`flex items-center gap-3 px-4 py-3 ${tone === "primary" ? "bg-primary/[0.03]" : ""}`}>
+      <Icon className={`h-4 w-4 shrink-0 ${tone === "primary" ? "text-primary" : "text-muted-foreground"}`} />
+      <div className="min-w-0 flex-1">
+        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-sm font-semibold tabular-nums">{value}</span>
+          {empty && <span className="text-[10px] text-muted-foreground/60">待同步</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MetricCard({
   icon: Icon,
   label,
