@@ -49,7 +49,7 @@ type NavTo =
   | "/inventory/inbound/new"
   | "/stores/list"
   | "/stores/franchisees"
-  | "/stores/youzan"
+  | "/youzan"
   | "/knowledge"
   | "/settings"
   | "/admin/users";
@@ -83,7 +83,7 @@ const groups: { label: string; items: { title: string; url: NavTo; icon: LucideI
     items: [
       { title: "门店列表", url: "/stores/list", icon: Building2 },
       { title: "加盟商管理", url: "/stores/franchisees", icon: Users },
-      { title: "有赞对接", url: "/stores/youzan", icon: Link2 },
+      { title: "有赞对接", url: "/youzan", icon: Link2 },
     ],
     icon: Store,
   },
