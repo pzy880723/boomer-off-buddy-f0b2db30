@@ -548,23 +548,32 @@ function ImportShopsDialog({
   const fetchChain = useServerFn(listAuthorizedShopsFromHQ);
   const importFn = useServerFn(batchImportShops);
 
-  const handleOpen = async (next: boolean) => {
+  const [autoTried, setAutoTried] = useState(false);
+
+  const handleOpen = (next: boolean) => {
     setOpen(next);
-    if (next && hqExists) {
-      setLoading(true);
+    if (!next) {
+      setAutoTried(false);
+      setShops([]);
       setError(null);
-      try {
-        const r = await fetchChain();
-        setShops(r.shops);
-        setError(r.error);
-        setSelected(
-          new Set(r.shops.filter((s) => !s.already_added).map((s) => s.kdt_id)),
-        );
-      } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
-      } finally {
-        setLoading(false);
-      }
+    }
+  };
+
+  const handleAutoFetch = async () => {
+    setLoading(true);
+    setError(null);
+    setAutoTried(true);
+    try {
+      const r = await fetchChain();
+      setShops(r.shops);
+      setError(r.error);
+      setSelected(
+        new Set(r.shops.filter((s) => !s.already_added).map((s) => s.kdt_id)),
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -606,12 +615,16 @@ function ImportShopsDialog({
       .map((line) => line.trim())
       .filter(Boolean)
       .map((line) => {
-        const match = line.match(/^(\d{5,})[\s,，\t|]+(.+)$/);
+        // 允许只填 kdt_id，名称可空（由后端验证接口回填）
+        const match = line.match(/^(\d{5,})(?:[\s,，\t|]+(.+))?$/);
         if (!match) return null;
-        return { kdt_id: Number(match[1]), shop_name: match[2].trim() };
+        return {
+          kdt_id: Number(match[1]),
+          shop_name: (match[2] ?? "").trim() || `店铺 ${match[1]}`,
+        };
       })
       .filter((row): row is { kdt_id: number; shop_name: string } =>
-        Boolean(row && Number.isFinite(row.kdt_id) && row.shop_name),
+        Boolean(row && Number.isFinite(row.kdt_id)),
       );
     const seen = new Set<number>();
     return parsed.filter((row) => {
@@ -624,7 +637,7 @@ function ImportShopsDialog({
   const handleManualImport = async () => {
     const picked = parseManualShops();
     if (picked.length === 0) {
-      toast.error("请按每行：kdt_id 门店名称 的格式粘贴");
+      toast.error("请按每行：kdt_id 门店名称（名称可省略）的格式粘贴");
       return;
     }
     setManualImporting(true);
@@ -636,7 +649,9 @@ function ImportShopsDialog({
       });
       if (r.added > 0) toast.success(`成功添加 ${r.added} 家门店`);
       if (r.failed > 0) {
-        toast.error(`${r.failed} 家授权验证失败，请确认 kdt_id 已在有赞云后台授权`);
+        toast.error(
+          `${r.failed} 家授权验证失败：${r.errors.map((e) => `kdt_id=${e.kdt_id}`).join(", ")}`,
+        );
       }
       if (r.added > 0) {
         setManualText("");
@@ -662,136 +677,147 @@ function ImportShopsDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
-            一键导入分店
+            添加分店授权
           </DialogTitle>
           <DialogDescription>
-            从总部连锁账号自动拉取所有可用门店，勾选要接入的分店即可。
+            有赞开放平台未对普通应用提供「分店枚举」接口，请从有赞后台复制每个分店的 kdt_id 后粘贴到下方。系统会用总部 token 逐个验证授权并写入门店库。
           </DialogDescription>
         </DialogHeader>
 
         {!hqExists && (
           <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-xs text-warning">
-            尚未接入总部门店。请先完成总部有赞账号授权，再添加分店。
+            尚未接入总部门店。请先在「添加店铺授权」里完成总部（kdt_id={hqKdtId || "153242272"}）授权，再添加分店。
           </div>
         )}
 
-        {hqExists && loading && (
-          <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            正在从有赞拉取分店列表…
-          </div>
-        )}
-
-        {hqExists && !loading && error && (
-          <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs">
-            <p className="font-medium text-destructive">无法自动拉取</p>
-            <p className="mt-1 text-muted-foreground">{error}</p>
-            <div className="mt-2 rounded bg-muted/50 p-2 text-[11px] text-muted-foreground">
-              请到{" "}
-              <a
-                href="https://www.youzanyun.com/devhome"
-                target="_blank"
-                rel="noreferrer"
-                className="text-primary underline"
-              >
-                有赞云开发者中心
-              </a>{" "}
-              的「自用型应用 → 授权店铺」勾选要接入的分店，回来再点一次按钮即可。
-            </div>
-          </div>
-        )}
-
-        {hqExists && !loading && !error && shops.length > 0 && (
-          <div className="max-h-[360px] space-y-1.5 overflow-auto">
-            {shops.map((s) => (
-              <label
-                key={s.kdt_id}
-                className={
-                  "flex items-start gap-3 rounded-md border p-2.5 transition " +
-                  (s.already_added
-                    ? "border-muted bg-muted/30 opacity-60"
-                    : selected.has(s.kdt_id)
-                      ? "border-primary/40 bg-primary/[0.04]"
-                      : "border-border hover:bg-muted/40 cursor-pointer")
-                }
-              >
-                <Checkbox
-                  checked={selected.has(s.kdt_id) || s.already_added}
-                  disabled={s.already_added}
-                  onCheckedChange={(v) => {
-                    setSelected((prev) => {
-                      const next = new Set(prev);
-                      if (v) next.add(s.kdt_id);
-                      else next.delete(s.kdt_id);
-                      return next;
-                    });
-                  }}
-                  className="mt-0.5"
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="truncate text-sm font-medium">{s.shop_name}</p>
-                    {s.already_added && (
-                      <Badge variant="outline" className="h-4 px-1.5 text-[10px]">
-                        已添加
-                      </Badge>
-                    )}
-                    {s.shop_type && (
-                      <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
-                        {s.shop_type}
-                      </Badge>
-                    )}
-                  </div>
-                  {s.address && (
-                    <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                      {s.address}
-                    </p>
-                  )}
+        {hqExists && (
+          <>
+            {/* 主流程：手动添加 */}
+            <div className="rounded-md border bg-muted/20 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-medium">手动添加分店</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    每行一个，格式：<code className="rounded bg-muted px-1">kdt_id 门店名称</code>，名称可省略。
+                  </p>
                 </div>
-              </label>
-            ))}
-          </div>
-        )}
-
-        {hqExists && !loading && !error && shops.length === 0 && (
-          <div className="rounded-md border border-dashed p-6 text-center text-xs text-muted-foreground">
-            自动接口未返回分店。可在下方手动粘贴已授权分店的 kdt_id。
-          </div>
-        )}
-
-        {hqExists && !loading && (
-          <div className="rounded-md border bg-muted/20 p-3">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <p className="text-sm font-medium">手动添加已授权分店</p>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  每行一个：kdt_id 门店名称。系统会先验证有赞授权，通过后再添加。
-                </p>
+                <Button
+                  size="sm"
+                  onClick={handleManualImport}
+                  disabled={manualImporting || manualText.trim().length === 0}
+                >
+                  {manualImporting && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
+                  验证并添加
+                </Button>
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleManualImport}
-                disabled={manualImporting || manualText.trim().length === 0}
-              >
-                {manualImporting && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
-                验证并添加
-              </Button>
+              <Textarea
+                value={manualText}
+                onChange={(e) => setManualText(e.target.value)}
+                placeholder={"187395218 BOOMER OFF vintage（中信泰富店）\n187395218,中信泰富店\n187395218"}
+                className="mt-2 min-h-24 text-xs font-mono"
+              />
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                如何获取 kdt_id：登录{" "}
+                <a
+                  href="https://www.youzan.com/v4/vis/feature/shop"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary underline"
+                >
+                  有赞后台
+                </a>{" "}
+                后切换到目标分店，浏览器地址栏中的 <code className="rounded bg-muted px-1">kdt_id=</code> 参数即是。
+              </p>
             </div>
-            <Textarea
-              value={manualText}
-              onChange={(e) => setManualText(e.target.value)}
-              placeholder={"123456789 上海安福路店\n987654321 北京三里屯店"}
-              className="mt-2 min-h-20 text-xs"
-            />
-          </div>
+
+            {/* 次要入口：尝试自动获取（多数账号不可用） */}
+            <div className="rounded-md border border-dashed p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    尝试从有赞自动获取分店列表
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    仅连锁版总部账号 + 特定权限包可用，多数账号会返回空。
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleAutoFetch}
+                  disabled={loading}
+                >
+                  {loading && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
+                  尝试自动获取
+                </Button>
+              </div>
+
+              {autoTried && !loading && shops.length === 0 && (
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  {error || "有赞接口未返回分店，请使用上方手动添加。"}
+                </p>
+              )}
+
+              {shops.length > 0 && (
+                <div className="mt-3 max-h-[280px] space-y-1.5 overflow-auto">
+                  {shops.map((s) => (
+                    <label
+                      key={s.kdt_id}
+                      className={
+                        "flex items-start gap-3 rounded-md border p-2.5 transition " +
+                        (s.already_added
+                          ? "border-muted bg-muted/30 opacity-60"
+                          : selected.has(s.kdt_id)
+                            ? "border-primary/40 bg-primary/[0.04]"
+                            : "border-border hover:bg-muted/40 cursor-pointer")
+                      }
+                    >
+                      <Checkbox
+                        checked={selected.has(s.kdt_id) || s.already_added}
+                        disabled={s.already_added}
+                        onCheckedChange={(v) => {
+                          setSelected((prev) => {
+                            const next = new Set(prev);
+                            if (v) next.add(s.kdt_id);
+                            else next.delete(s.kdt_id);
+                            return next;
+                          });
+                        }}
+                        className="mt-0.5"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="truncate text-sm font-medium">{s.shop_name}</p>
+                          {s.already_added && (
+                            <Badge variant="outline" className="h-4 px-1.5 text-[10px]">
+                              已添加
+                            </Badge>
+                          )}
+                          {s.shop_type && (
+                            <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
+                              {s.shop_type}
+                            </Badge>
+                          )}
+                        </div>
+                        {s.address && (
+                          <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                            {s.address}
+                          </p>
+                        )}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)} disabled={importing}>
-            取消
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={importing || manualImporting}>
+            关闭
           </Button>
-          {hqExists && !loading && !error && shops.length > 0 && (
+          {hqExists && shops.length > 0 && (
             <Button
               onClick={handleImport}
               disabled={
@@ -800,7 +826,7 @@ function ImportShopsDialog({
               }
             >
               {importing && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
-              批量授权并添加（
+              批量添加（
               {shops.filter((s) => selected.has(s.kdt_id) && !s.already_added).length}
               ）
             </Button>
