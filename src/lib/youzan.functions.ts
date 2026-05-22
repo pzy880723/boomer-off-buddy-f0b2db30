@@ -1072,6 +1072,7 @@ export const syncYouzanOrders = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data }) => {
+    await reapStaleSyncLogs();
     const shop = await getShopOr404({ shop_id: data.shop_id });
     const endDate = data.end ? new Date(data.end) : new Date();
     const startDate = data.start
