@@ -1091,6 +1091,7 @@ export const syncAllShops = createServerFn({ method: "POST" })
       .parse(input ?? {}),
   )
   .handler(async ({ data }) => {
+    await reapStaleSyncLogs();
     const { data: shopsRaw, error } = await supabase
       .from("youzan_shops")
       .select("*")
