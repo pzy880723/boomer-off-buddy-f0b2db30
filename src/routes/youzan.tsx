@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -541,6 +542,8 @@ function ImportShopsDialog({
   >([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [importing, setImporting] = useState(false);
+  const [manualText, setManualText] = useState("");
+  const [manualImporting, setManualImporting] = useState(false);
 
   const fetchChain = useServerFn(listAuthorizedShopsFromHQ);
   const importFn = useServerFn(batchImportShops);
@@ -594,6 +597,56 @@ function ImportShopsDialog({
       toast.error(e instanceof Error ? e.message : String(e));
     } finally {
       setImporting(false);
+    }
+  };
+
+  const parseManualShops = () => {
+    const parsed = manualText
+      .split(/\n+/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const match = line.match(/^(\d{5,})[\s,，\t|]+(.+)$/);
+        if (!match) return null;
+        return { kdt_id: Number(match[1]), shop_name: match[2].trim() };
+      })
+      .filter((row): row is { kdt_id: number; shop_name: string } =>
+        Boolean(row && Number.isFinite(row.kdt_id) && row.shop_name),
+      );
+    const seen = new Set<number>();
+    return parsed.filter((row) => {
+      if (seen.has(row.kdt_id)) return false;
+      seen.add(row.kdt_id);
+      return true;
+    });
+  };
+
+  const handleManualImport = async () => {
+    const picked = parseManualShops();
+    if (picked.length === 0) {
+      toast.error("请按每行：kdt_id 门店名称 的格式粘贴");
+      return;
+    }
+    setManualImporting(true);
+    try {
+      const r = await importFn({
+        data: {
+          shops: picked.map((s) => ({ ...s, parent_kdt_id: hqKdtId })),
+        },
+      });
+      if (r.added > 0) toast.success(`成功添加 ${r.added} 家门店`);
+      if (r.failed > 0) {
+        toast.error(`${r.failed} 家授权验证失败，请确认 kdt_id 已在有赞云后台授权`);
+      }
+      if (r.added > 0) {
+        setManualText("");
+        onDone();
+        setOpen(false);
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      setManualImporting(false);
     }
   };
 
