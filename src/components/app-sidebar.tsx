@@ -54,6 +54,9 @@ type NavTo =
   | "/shop-mgmt/products"
   | "/shop-mgmt/franchisees"
   | "/youzan"
+  | "/orders/shops"
+  | "/orders/dispatch"
+  | "/orders/wholesale"
   | "/knowledge"
   | "/settings"
   | "/admin/users";
