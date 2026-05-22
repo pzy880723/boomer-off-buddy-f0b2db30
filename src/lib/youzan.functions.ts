@@ -139,6 +139,17 @@ async function callYouzanApi(opts: {
   version: string; // e.g. 3.0.0
   params?: Record<string, unknown>;
 }): Promise<unknown> {
+  const r = await callYouzanApiVerbose(opts);
+  return r.payload;
+}
+
+/** 返回 payload + trace_id + 原始响应前 400 字，方便排查 */
+async function callYouzanApiVerbose(opts: {
+  accessToken: string;
+  method: string;
+  version: string;
+  params?: Record<string, unknown>;
+}): Promise<{ payload: unknown; trace_id: string | null; preview: string }> {
   const url = `${YZ_GW_URL}/${opts.method}/${opts.version}?access_token=${encodeURIComponent(opts.accessToken)}`;
   const res = await fetch(url, {
     method: "POST",
@@ -159,15 +170,18 @@ async function callYouzanApi(opts: {
     code?: number;
     message?: string;
     data?: unknown;
+    trace_id?: string;
   };
+  const trace = (j.trace_id as string | undefined) ?? null;
+  const preview = text.length > 400 ? text.slice(0, 400) + "..." : text;
   if (j.error_response) {
     const e = j.error_response;
-    throw new Error(`[${e.code}] ${e.msg ?? ""} ${e.sub_msg ?? ""}`.trim());
+    throw new Error(`[${e.code}] ${e.msg ?? ""} ${e.sub_msg ?? ""}${trace ? ` trace=${trace}` : ""}`.trim());
   }
-  if (j.success === false || (typeof j.code === "number" && j.code !== 0)) {
-    throw new Error(`[${j.code ?? "?"}] ${j.message ?? "调用失败"}`);
+  if (j.success === false || (typeof j.code === "number" && j.code !== 0 && j.code !== 200)) {
+    throw new Error(`[${j.code ?? "?"}] ${j.message ?? "调用失败"}${trace ? ` trace=${trace}` : ""}`);
   }
-  return j.response ?? j.data ?? json;
+  return { payload: j.response ?? j.data ?? json, trace_id: trace, preview };
 }
 
 // ============================================================
