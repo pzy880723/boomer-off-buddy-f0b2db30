@@ -937,3 +937,25 @@ export const syncAllShops = createServerFn({ method: "POST" })
     };
   });
 
+// ============================================================
+// listShopOrders — 门店订单列表（订单管理页用）
+// ============================================================
+export const listShopOrders = createServerFn({ method: "GET" }).handler(
+  async () => {
+    const [ordersRes, shopsRes] = await Promise.all([
+      supabase
+        .from("youzan_orders")
+        .select(
+          "id, tid, kdt_id, shop_id, status, buyer_nick, payment, total_fee, num, pay_time, created_time",
+        )
+        .order("pay_time", { ascending: false, nullsFirst: false })
+        .limit(300),
+      supabase.from("youzan_shops").select("id, shop_name, kdt_id"),
+    ]);
+    if (ordersRes.error) throw new Error(ordersRes.error.message);
+    if (shopsRes.error) throw new Error(shopsRes.error.message);
+    return { orders: ordersRes.data ?? [], shops: shopsRes.data ?? [] };
+  },
+);
+
+
