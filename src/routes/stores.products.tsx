@@ -156,10 +156,12 @@ function ShopProductsPage() {
         </CardContent>
       </Card>
 
+      {isLoading && (
+        <p className="mb-2 text-xs text-muted-foreground">加载中…</p>
+      )}
       <DataTable
         rowKey={(r: Item) => r.id}
         data={items}
-        emptyMessage={isLoading ? "加载中…" : "暂无商品，请先在「有赞对接」同步"}
         columns={[
           {
             header: "商品",
