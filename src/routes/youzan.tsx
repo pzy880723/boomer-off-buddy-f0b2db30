@@ -16,7 +16,6 @@ import {
   ShoppingBag,
   Package,
   Boxes,
-  ChevronRight,
   Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
