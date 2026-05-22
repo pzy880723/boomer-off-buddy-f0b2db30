@@ -56,7 +56,7 @@ function DispatchPage() {
           <DataTable
             rowKey={(r) => r.id}
             data={rows}
-            empty={q.isLoading ? "加载中…" : "尚无铺货记录"}
+            
             columns={[
               {
                 header: "单号",
@@ -75,7 +75,7 @@ function DispatchPage() {
                   </span>
                 ),
               },
-              { header: "状态", cell: (r) => <StatusBadge status={r.status} /> },
+              { header: "状态", cell: (r) => <StatusBadge>{r.status}</StatusBadge> },
               {
                 header: "时间",
                 cell: (r) => (
