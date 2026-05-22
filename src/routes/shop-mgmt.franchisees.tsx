@@ -9,7 +9,7 @@ import { PageHeader } from "@/components/page-header";
 import { franchisees } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/shop-mgmt/franchisees")({
-  head: () => ({ meta: [{ title: "加盟商管理 · 门店加盟" }, { name: "description", content: "加盟商档案与开店进度" }] }),
+  head: () => ({ meta: [{ title: "加盟商管理 · 门店管理" }, { name: "description", content: "加盟商档案与开店进度" }] }),
   component: FranchiseesPage,
 });
 

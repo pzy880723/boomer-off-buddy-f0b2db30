@@ -24,7 +24,7 @@ import { TransferDialog } from "@/components/stores/transfer-dialog";
 export const Route = createFileRoute("/shop-mgmt/products")({
   head: () => ({
     meta: [
-      { title: "门店商品库 · 门店加盟" },
+      { title: "门店商品库 · 门店管理" },
       { name: "description", content: "查看各门店有赞商品并执行库存调拨" },
     ],
   }),

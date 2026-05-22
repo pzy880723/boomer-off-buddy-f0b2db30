@@ -255,11 +255,11 @@ export const recentActivities = [
 ];
 
 export const todoItems = [
-  { id: "T1", label: "加盟申请待审核", count: 3, tone: "primary" as const, href: "/stores/franchisees" },
+  { id: "T1", label: "加盟申请待审核", count: 3, tone: "primary" as const, href: "/shop-mgmt/franchisees" },
   { id: "T2", label: "包裹待清关", count: 2, tone: "warning" as const, href: "/purchase/logistics" },
   { id: "T3", label: "门店库存预警", count: 5, tone: "destructive" as const, href: "/inventory/products" },
   { id: "T4", label: "调拨待发货", count: 4, tone: "info" as const, href: "/inventory/transfers" },
-  { id: "T5", label: "加盟商待结算", count: 2, tone: "success" as const, href: "/stores/franchisees" },
+  { id: "T5", label: "加盟商待结算", count: 2, tone: "success" as const, href: "/shop-mgmt/franchisees" },
 ];
 
 export const youzanSyncLog = [
