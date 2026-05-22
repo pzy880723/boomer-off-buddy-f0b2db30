@@ -1,10 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { createServerFn } from "@tanstack/react-start";
 import { useState, useMemo } from "react";
 import { Link2, RefreshCw } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,20 +14,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DataTable } from "@/components/data-table";
+import { listShopOrders } from "@/lib/youzan.functions";
 
-const listShopOrders = createServerFn({ method: "GET" }).handler(async () => {
-  const [ordersRes, shopsRes] = await Promise.all([
-    supabase
-      .from("youzan_orders")
-      .select("id, tid, kdt_id, shop_id, status, buyer_nick, payment, total_fee, num, pay_time, created_time")
-      .order("pay_time", { ascending: false, nullsFirst: false })
-      .limit(300),
-    supabase.from("youzan_shops").select("id, shop_name, kdt_id"),
-  ]);
-  if (ordersRes.error) throw new Error(ordersRes.error.message);
-  if (shopsRes.error) throw new Error(shopsRes.error.message);
-  return { orders: ordersRes.data ?? [], shops: shopsRes.data ?? [] };
-});
+
 
 export const Route = createFileRoute("/orders/shops")({
   head: () => ({

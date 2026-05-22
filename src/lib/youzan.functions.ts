@@ -553,8 +553,68 @@ export const batchImportShops = createServerFn({ method: "POST" })
   });
 
 // ============================================================
-// 内部：单店商品同步逻辑（被 syncYouzanItems / syncAllShops 复用）
+// 内部：单店商品同步逻辑
+// ------------------------------------------------------------
+// 按公开文档使用多个接口逐个尝试：
+//   1) youzan.item.common.search.1.0.0  —— 微商城/连锁 通用列表
+//   2) youzan.items.onsale.get.3.0.0    —— 在售商品
+//   3) youzan.items.inventory.get.3.0.0 —— 仓库（已下架）商品
+// 任一返回数据就解析入库；每一步的状态、原始返回数量、解析数量、入库数量
+// 都会写入 youzan_sync_logs，方便诊断「同步 0 条」到底是哪一步出问题。
 // ============================================================
+function pickItemRows(raw: unknown): Array<Record<string, unknown>> {
+  const obj = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const candidates: unknown[] = [
+    obj.items,
+    (obj as { data?: { items?: unknown } }).data?.items,
+    (obj as { response?: { items?: unknown } }).response?.items,
+    (obj as { item_list?: unknown }).item_list,
+    (obj as { goods_list?: unknown }).goods_list,
+    (obj as { list?: unknown }).list,
+  ];
+  for (const c of candidates) {
+    if (Array.isArray(c)) return c as Array<Record<string, unknown>>;
+  }
+  return [];
+}
+
+function normalizeItemRow(
+  it: Record<string, unknown>,
+  shop: ShopRow,
+  isListed: boolean,
+) {
+  const itemId = Number(
+    it.item_id ?? it.num_iid ?? it.channel_item_id ?? it.id ?? 0,
+  );
+  if (!itemId) return null;
+  const media = (it.media as { images?: Array<{ url?: string }> } | undefined);
+  const pic =
+    (it.pic_url as string) ??
+    (it.pic_thumb_url as string) ??
+    (Array.isArray(it.pic_urls) ? (it.pic_urls[0] as string) : null) ??
+    (media?.images?.[0]?.url ?? null);
+  const priceRaw = it.price ?? it.origin_price ?? it.retail_price ?? 0;
+  const priceNum = Number(priceRaw);
+  const soldStatus = Number(it.sold_status ?? -1);
+  const listedFlag =
+    soldStatus === 1
+      ? true
+      : soldStatus === 0
+        ? false
+        : isListed;
+  return {
+    shop_id: shop.id,
+    kdt_id: shop.kdt_id,
+    item_id: itemId,
+    title: String(it.title ?? it.name ?? ""),
+    price: Number.isFinite(priceNum) ? priceNum : 0,
+    stock_qty: Number(it.num ?? it.quantity ?? it.stock_num ?? 0) || 0,
+    is_listed: listedFlag,
+    pic_url: pic ?? null,
+    raw: it,
+  };
+}
+
 async function runItemsSyncForShop(
   shop: ShopRow,
 ): Promise<{ ok: boolean; count: number; message: string }> {
@@ -569,73 +629,74 @@ async function runItemsSyncForShop(
     .select("id")
     .single();
 
+  const attemptMsgs: string[] = [];
+  let totalReturned = 0;
+  let totalUpserted = 0;
+  const seen = new Set<number>();
+
   try {
     const token = await ensureAccessToken(shop);
     const pageSize = 100;
-    const seen = new Set<number>();
-    let totalUpserted = 0;
 
-    for (const m of [
-      { method: "youzan.items.onsale.get", version: "3.0.0", listed: true },
-      { method: "youzan.items.inventory.get", version: "3.0.0", listed: false },
-    ]) {
+    const attempts: Array<{ label: string; method: string; version: string; listed: boolean }> = [
+      { label: "common.search", method: "youzan.item.common.search", version: "1.0.0", listed: true },
+      { label: "onsale.get", method: "youzan.items.onsale.get", version: "3.0.0", listed: true },
+      { label: "inventory.get", method: "youzan.items.inventory.get", version: "3.0.0", listed: false },
+    ];
+
+    for (const m of attempts) {
       let page = 1;
-      for (;;) {
-        const raw = (await callYouzanApi({
-          accessToken: token,
-          method: m.method,
-          version: m.version,
-          params: { page_no: page, page_size: pageSize },
-        })) as {
-          items?: Array<Record<string, unknown>>;
-          total_results?: number;
-        };
-        const items = raw.items ?? [];
-        if (items.length === 0) break;
+      let attemptReturned = 0;
+      let attemptUpserted = 0;
+      let attemptError: string | null = null;
+      try {
+        for (;;) {
+          const raw = await callYouzanApi({
+            accessToken: token,
+            method: m.method,
+            version: m.version,
+            params: { page_no: page, page_size: pageSize },
+          });
+          const items = pickItemRows(raw);
+          attemptReturned += items.length;
+          if (items.length === 0) break;
 
-        const rows = items
-          .map((it) => {
-            const itemId = Number(it.item_id ?? it.num_iid ?? 0);
-            if (!itemId || seen.has(itemId)) return null;
-            seen.add(itemId);
-            return {
-              shop_id: shop.id,
-              kdt_id: shop.kdt_id,
-              item_id: itemId,
-              title: String(it.title ?? ""),
-              price: Number(it.price ?? 0) || 0,
-              stock_qty: Number(it.num ?? it.quantity ?? 0) || 0,
-              is_listed: m.listed,
-              pic_url:
-                (it.pic_url as string) ??
-                (it.pic_thumb_url as string) ??
-                (Array.isArray(it.pic_urls) ? (it.pic_urls[0] as string) : null) ??
-                null,
-              raw: it,
-            };
-          })
-          .filter((r): r is NonNullable<typeof r> => r !== null);
+          const rows = items
+            .map((it) => normalizeItemRow(it, shop, m.listed))
+            .filter((r): r is NonNullable<typeof r> => !!r && !seen.has(r.item_id))
+            .map((r) => {
+              seen.add(r.item_id);
+              return r;
+            });
 
-        if (rows.length > 0) {
-          const { error } = await supabase
-            .from("youzan_items")
-            .upsert(rows as never, { onConflict: "kdt_id,item_id" });
-          if (error) throw new Error(error.message);
-          totalUpserted += rows.length;
+          if (rows.length > 0) {
+            const { error } = await supabase
+              .from("youzan_items")
+              .upsert(rows as never, { onConflict: "kdt_id,item_id" });
+            if (error) throw new Error(error.message);
+            attemptUpserted += rows.length;
+          }
+          if (items.length < pageSize) break;
+          page += 1;
+          if (page > 200) break;
         }
-        if (items.length < pageSize) break;
-        page += 1;
-        if (page > 200) break;
+        attemptMsgs.push(`${m.label}: 返回 ${attemptReturned} 入库 ${attemptUpserted}`);
+      } catch (e) {
+        attemptError = e instanceof Error ? e.message : String(e);
+        attemptMsgs.push(`${m.label}: ${attemptError}`);
       }
+      totalReturned += attemptReturned;
+      totalUpserted += attemptUpserted;
     }
 
-    const msg = `同步商品 ${totalUpserted} 条`;
+    const msg = `商品同步 入库 ${totalUpserted} 条（接口返回累计 ${totalReturned}）｜${attemptMsgs.join(" / ")}`;
     if (log?.id) {
       await supabase
         .from("youzan_sync_logs")
         .update({
-          status: "ok",
+          status: totalUpserted > 0 ? "ok" : "ok",
           count_in: totalUpserted,
+          count_out: totalReturned,
           message: msg,
           finished_at: new Date().toISOString(),
         } as never)
@@ -643,18 +704,20 @@ async function runItemsSyncForShop(
     }
     return { ok: true, count: totalUpserted, message: msg };
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = `${err instanceof Error ? err.message : String(err)}｜${attemptMsgs.join(" / ")}`;
     if (log?.id) {
       await supabase
         .from("youzan_sync_logs")
         .update({
           status: "error",
+          count_in: totalUpserted,
+          count_out: totalReturned,
           error: msg,
           finished_at: new Date().toISOString(),
         } as never)
         .eq("id", log.id);
     }
-    return { ok: false, count: 0, message: msg };
+    return { ok: false, count: totalUpserted, message: msg };
   }
 }
 
@@ -692,11 +755,13 @@ async function runOrdersSyncForShop(
     .select("id")
     .single();
 
+  let totalReturned = 0;
+  let totalUpserted = 0;
+
   try {
     const token = await ensureAccessToken(shop);
     const pageSize = 100;
     let page = 1;
-    let totalUpserted = 0;
 
     for (;;) {
       const raw = (await callYouzanApi({
@@ -709,17 +774,23 @@ async function runOrdersSyncForShop(
           page_no: page,
           page_size: pageSize,
         },
-      })) as {
-        trades?: Array<Record<string, unknown>>;
-        full_trades?: { trades?: Array<Record<string, unknown>> };
-        total_results?: number;
-      };
-      const trades = raw.trades ?? raw.full_trades?.trades ?? [];
+      })) as Record<string, unknown>;
+
+      const tradesAny =
+        (raw.trades as unknown) ??
+        (raw.full_trades as { trades?: unknown } | undefined)?.trades ??
+        (raw.trade_list as unknown) ??
+        (raw.data as { trades?: unknown } | undefined)?.trades ??
+        [];
+      const trades = Array.isArray(tradesAny)
+        ? (tradesAny as Array<Record<string, unknown>>)
+        : [];
+      totalReturned += trades.length;
       if (trades.length === 0) break;
 
       const rows = trades
         .map((t) => {
-          const tid = String(t.tid ?? "");
+          const tid = String(t.tid ?? t.order_no ?? "");
           if (!tid) return null;
           const payTime = t.pay_time ? String(t.pay_time) : null;
           const created = t.created ? String(t.created) : null;
@@ -757,13 +828,17 @@ async function runOrdersSyncForShop(
       if (page > 500) break;
     }
 
-    const msg = `同步订单 ${totalUpserted} 条（${fmt(startDate)} ~ ${fmt(endDate)}）`;
+    const msg =
+      totalReturned === 0
+        ? `订单同步：有赞接口返回 0 条（${fmt(startDate)} ~ ${fmt(endDate)}）`
+        : `订单同步 入库 ${totalUpserted} / 返回 ${totalReturned}（${fmt(startDate)} ~ ${fmt(endDate)}）`;
     if (log?.id) {
       await supabase
         .from("youzan_sync_logs")
         .update({
           status: "ok",
           count_in: totalUpserted,
+          count_out: totalReturned,
           message: msg,
           finished_at: new Date().toISOString(),
         } as never)
@@ -777,12 +852,14 @@ async function runOrdersSyncForShop(
         .from("youzan_sync_logs")
         .update({
           status: "error",
+          count_in: totalUpserted,
+          count_out: totalReturned,
           error: msg,
           finished_at: new Date().toISOString(),
         } as never)
         .eq("id", log.id);
     }
-    return { ok: false, count: 0, message: msg };
+    return { ok: false, count: totalUpserted, message: msg };
   }
 }
 
@@ -859,4 +936,26 @@ export const syncAllShops = createServerFn({ method: "POST" })
       results,
     };
   });
+
+// ============================================================
+// listShopOrders — 门店订单列表（订单管理页用）
+// ============================================================
+export const listShopOrders = createServerFn({ method: "GET" }).handler(
+  async () => {
+    const [ordersRes, shopsRes] = await Promise.all([
+      supabase
+        .from("youzan_orders")
+        .select(
+          "id, tid, kdt_id, shop_id, status, buyer_nick, payment, total_fee, num, pay_time, created_time",
+        )
+        .order("pay_time", { ascending: false, nullsFirst: false })
+        .limit(300),
+      supabase.from("youzan_shops").select("id, shop_name, kdt_id"),
+    ]);
+    if (ordersRes.error) throw new Error(ordersRes.error.message);
+    if (shopsRes.error) throw new Error(shopsRes.error.message);
+    return { orders: ordersRes.data ?? [], shops: shopsRes.data ?? [] };
+  },
+);
+
 
