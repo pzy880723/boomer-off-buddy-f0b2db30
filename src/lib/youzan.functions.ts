@@ -241,6 +241,7 @@ export const listYouzanSyncLogs = createServerFn({ method: "GET" })
       .parse(input ?? {}),
   )
   .handler(async ({ data }) => {
+    await reapStaleSyncLogs();
     const { data: rows, error } = await supabase
       .from("youzan_sync_logs")
       .select("*")
