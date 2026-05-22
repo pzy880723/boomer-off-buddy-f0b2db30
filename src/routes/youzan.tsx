@@ -163,45 +163,41 @@ function YouzanPage() {
         title="有赞门店"
         description={`${shops.length} 家门店 · ${summary?.shopOnline ?? 0} 家在线 · 最近同步 ${relativeTime(summary?.lastSyncAt ?? null)}`}
         actions={
-          <ImportShopsDialog
-            hqExists={!!hq}
-            hqKdtId={hq?.kdt_id ?? null}
-            onDone={() => {
-              qc.invalidateQueries({ queryKey: ["youzan-shops"] });
-              qc.invalidateQueries({ queryKey: ["youzan-summary"] });
-            }}
-          />
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => syncAllM.mutate()}
+              disabled={syncAllM.isPending || shops.length === 0}
+            >
+              {syncAllM.isPending ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+              )}
+              一键同步全部
+            </Button>
+            <ImportShopsDialog
+              hqExists={!!hq}
+              hqKdtId={hq?.kdt_id ?? null}
+              onDone={() => {
+                qc.invalidateQueries({ queryKey: ["youzan-shops"] });
+                qc.invalidateQueries({ queryKey: ["youzan-summary"] });
+              }}
+            />
+          </div>
         }
       />
 
-      {/* 业务汇总 4 卡 */}
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricCard
-          icon={TrendingUp}
-          label="本月营业额"
-          value={summary ? cny(summary.revenueMonthCny) : "—"}
-          hint={summary?.hasData ? "全部门店相加" : "等待首次同步"}
-          tone="primary"
-        />
-        <MetricCard
-          icon={ShoppingBag}
-          label="本月订单"
-          value={summary ? num(summary.orderCountMonth) : "—"}
-          hint={summary?.hasData ? "已完成 + 进行中" : "等待首次同步"}
-        />
-        <MetricCard
-          icon={Package}
-          label="在售商品"
-          value={summary ? num(summary.listedItemCount) : "—"}
-          hint={summary?.hasData ? "总部商品库" : "等待首次同步"}
-        />
-        <MetricCard
-          icon={Boxes}
-          label="总库存"
-          value={summary ? num(summary.stockTotal) : "—"}
-          hint={summary?.hasData ? "全部门店相加" : "等待首次同步"}
-        />
-      </div>
+      {/* 业务汇总 单行紧凑条 */}
+      <Card className="mb-4">
+        <CardContent className="grid grid-cols-2 divide-x divide-border p-0 sm:grid-cols-4">
+          <CompactStat icon={TrendingUp} label="本月营业额" value={summary ? cny(summary.revenueMonthCny) : "—"} tone="primary" empty={!summary?.hasData} />
+          <CompactStat icon={ShoppingBag} label="本月订单" value={summary ? num(summary.orderCountMonth) : "—"} empty={!summary?.hasData} />
+          <CompactStat icon={Package} label="在售商品" value={summary ? num(summary.listedItemCount) : "—"} empty={!summary?.hasData} />
+          <CompactStat icon={Boxes} label="总库存" value={summary ? num(summary.stockTotal) : "—"} empty={!summary?.hasData} />
+        </CardContent>
+      </Card>
 
       {/* 门店卡片 */}
       <div className="mb-2 flex items-center justify-between">
