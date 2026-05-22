@@ -544,113 +544,118 @@ export const batchImportShops = createServerFn({ method: "POST" })
   });
 
 // ============================================================
-// syncYouzanItems — 全量拉商品（在售 + 仓库），upsert 到 youzan_items
+// 内部：单店商品同步逻辑（被 syncYouzanItems / syncAllShops 复用）
 // ============================================================
+async function runItemsSyncForShop(
+  shop: ShopRow,
+): Promise<{ ok: boolean; count: number; message: string }> {
+  const { data: log } = await supabase
+    .from("youzan_sync_logs")
+    .insert({
+      shop_id: shop.id,
+      kdt_id: shop.kdt_id,
+      action: "items",
+      status: "running",
+    } as never)
+    .select("id")
+    .single();
+
+  try {
+    const token = await ensureAccessToken(shop);
+    const pageSize = 100;
+    const seen = new Set<number>();
+    let totalUpserted = 0;
+
+    for (const m of [
+      { method: "youzan.items.onsale.get", version: "3.0.0", listed: true },
+      { method: "youzan.items.inventory.get", version: "3.0.0", listed: false },
+    ]) {
+      let page = 1;
+      for (;;) {
+        const raw = (await callYouzanApi({
+          accessToken: token,
+          method: m.method,
+          version: m.version,
+          params: { page_no: page, page_size: pageSize },
+        })) as {
+          items?: Array<Record<string, unknown>>;
+          total_results?: number;
+        };
+        const items = raw.items ?? [];
+        if (items.length === 0) break;
+
+        const rows = items
+          .map((it) => {
+            const itemId = Number(it.item_id ?? it.num_iid ?? 0);
+            if (!itemId || seen.has(itemId)) return null;
+            seen.add(itemId);
+            return {
+              shop_id: shop.id,
+              kdt_id: shop.kdt_id,
+              item_id: itemId,
+              title: String(it.title ?? ""),
+              price: Number(it.price ?? 0) || 0,
+              stock_qty: Number(it.num ?? it.quantity ?? 0) || 0,
+              is_listed: m.listed,
+              pic_url:
+                (it.pic_url as string) ??
+                (it.pic_thumb_url as string) ??
+                (Array.isArray(it.pic_urls) ? (it.pic_urls[0] as string) : null) ??
+                null,
+              raw: it,
+            };
+          })
+          .filter((r): r is NonNullable<typeof r> => r !== null);
+
+        if (rows.length > 0) {
+          const { error } = await supabase
+            .from("youzan_items")
+            .upsert(rows as never, { onConflict: "kdt_id,item_id" });
+          if (error) throw new Error(error.message);
+          totalUpserted += rows.length;
+        }
+        if (items.length < pageSize) break;
+        page += 1;
+        if (page > 200) break;
+      }
+    }
+
+    const msg = `同步商品 ${totalUpserted} 条`;
+    if (log?.id) {
+      await supabase
+        .from("youzan_sync_logs")
+        .update({
+          status: "ok",
+          count_in: totalUpserted,
+          message: msg,
+          finished_at: new Date().toISOString(),
+        } as never)
+        .eq("id", log.id);
+    }
+    return { ok: true, count: totalUpserted, message: msg };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (log?.id) {
+      await supabase
+        .from("youzan_sync_logs")
+        .update({
+          status: "error",
+          error: msg,
+          finished_at: new Date().toISOString(),
+        } as never)
+        .eq("id", log.id);
+    }
+    return { ok: false, count: 0, message: msg };
+  }
+}
+
 export const syncYouzanItems = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z.object({ shop_id: z.string().uuid() }).parse(input),
   )
   .handler(async ({ data }) => {
     const shop = await getShopOr404({ shop_id: data.shop_id });
-    const { data: log } = await supabase
-      .from("youzan_sync_logs")
-      .insert({
-        shop_id: shop.id,
-        kdt_id: shop.kdt_id,
-        action: "items",
-        status: "running",
-      } as never)
-      .select("id")
-      .single();
-
-    try {
-      const token = await ensureAccessToken(shop);
-      const pageSize = 100;
-      const seen = new Set<number>();
-      let totalUpserted = 0;
-
-      // 两个接口分别拉，合并：onsale（在售）+ inventory（仓库/已下架）
-      for (const m of [
-        { method: "youzan.items.onsale.get", version: "3.0.0", listed: true },
-        { method: "youzan.items.inventory.get", version: "3.0.0", listed: false },
-      ]) {
-        let page = 1;
-        for (;;) {
-          const raw = (await callYouzanApi({
-            accessToken: token,
-            method: m.method,
-            version: m.version,
-            params: { page_no: page, page_size: pageSize },
-          })) as {
-            items?: Array<Record<string, unknown>>;
-            total_results?: number;
-          };
-          const items = raw.items ?? [];
-          if (items.length === 0) break;
-
-          const rows = items
-            .map((it) => {
-              const itemId = Number(it.item_id ?? it.num_iid ?? 0);
-              if (!itemId || seen.has(itemId)) return null;
-              seen.add(itemId);
-              return {
-                shop_id: shop.id,
-                kdt_id: shop.kdt_id,
-                item_id: itemId,
-                title: String(it.title ?? ""),
-                price: Number(it.price ?? 0) || 0,
-                stock_qty: Number(it.num ?? it.quantity ?? 0) || 0,
-                is_listed: m.listed,
-                pic_url:
-                  (it.pic_url as string) ??
-                  (it.pic_thumb_url as string) ??
-                  (Array.isArray(it.pic_urls) ? (it.pic_urls[0] as string) : null) ??
-                  null,
-                raw: it,
-              };
-            })
-            .filter((r): r is NonNullable<typeof r> => r !== null);
-
-          if (rows.length > 0) {
-            const { error } = await supabase
-              .from("youzan_items")
-              .upsert(rows as never, { onConflict: "kdt_id,item_id" });
-            if (error) throw new Error(error.message);
-            totalUpserted += rows.length;
-          }
-          if (items.length < pageSize) break;
-          page += 1;
-          if (page > 200) break; // 安全阀
-        }
-      }
-
-      const msg = `同步商品 ${totalUpserted} 条`;
-      if (log?.id) {
-        await supabase
-          .from("youzan_sync_logs")
-          .update({
-            status: "ok",
-            count_in: totalUpserted,
-            message: msg,
-            finished_at: new Date().toISOString(),
-          } as never)
-          .eq("id", log.id);
-      }
-      return { ok: true, count: totalUpserted, message: msg };
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (log?.id) {
-        await supabase
-          .from("youzan_sync_logs")
-          .update({
-            status: "error",
-            error: msg,
-            finished_at: new Date().toISOString(),
-          } as never)
-          .eq("id", log.id);
-      }
-      return { ok: false, count: 0, message: msg };
-    }
+    return runItemsSyncForShop(shop);
   });
 
 // ============================================================
