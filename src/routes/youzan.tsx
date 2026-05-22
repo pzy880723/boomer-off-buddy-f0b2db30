@@ -466,7 +466,7 @@ function ShopCard({
         )}
 
         {/* 操作 */}
-        <div className="mt-3 flex items-center justify-between">
+        <div className="mt-3 flex items-center justify-between gap-2">
           <Button
             size="sm"
             variant="ghost"
@@ -481,11 +481,16 @@ function ShopCard({
             )}
             测试连接
           </Button>
-          {!isHq && (
-            <span className="inline-flex items-center text-[11px] text-muted-foreground/60">
-              详情 <ChevronRight className="h-3 w-3" />
-            </span>
-          )}
+          <SyncDialog
+            shopId={shop.id}
+            shopName={shop.shop_name}
+            trigger={
+              <Button size="sm" className="h-7 px-2 text-xs">
+                <RefreshCw className="mr-1 h-3 w-3" />
+                同步
+              </Button>
+            }
+          />
         </div>
       </CardContent>
     </Card>
