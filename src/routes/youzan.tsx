@@ -41,6 +41,7 @@ import {
 import { PageHeader } from "@/components/page-header";
 import { DataTable } from "@/components/data-table";
 import { StatusBadge } from "@/components/status-badge";
+import { SyncDialog } from "@/components/youzan/sync-dialog";
 import {
   listYouzanShops,
   listYouzanSyncLogs,
