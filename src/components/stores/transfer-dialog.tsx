@@ -109,7 +109,19 @@ export function TransferDialog({
     if (qty < 1) return toast.error("数量需 ≥ 1");
     setBusy(true);
     try {
-      const payload: Parameters<typeof createTransfer>[0]["data"] = {
+      const payload: {
+        kind: typeof kind;
+        qty: number;
+        operator: string | null;
+        notes: string | null;
+        from_shop_id?: string;
+        to_shop_id?: string;
+        from_sku_id?: string;
+        to_sku_id?: string;
+        from_youzan_item_id?: number;
+        to_youzan_item_id?: number;
+        reason?: string;
+      } = {
         kind,
         qty,
         operator: operator || null,
