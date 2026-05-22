@@ -49,6 +49,7 @@ import {
   removeYouzanShop,
   listAuthorizedShopsFromHQ,
   batchImportShops,
+  syncAllShops,
 } from "@/lib/youzan.functions";
 import {
   getYouzanSummary,
