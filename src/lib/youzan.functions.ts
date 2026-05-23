@@ -485,7 +485,7 @@ export const listAuthorizedShopsFromHQ = createServerFn({ method: "POST" })
           accessToken: token,
           method: c.method,
           version: c.version,
-          params: { page_no: 1, page_size: 200 },
+          params: { page_no: 1, page_size: 20 },
         });
         lastErr = "";
         break;
@@ -732,7 +732,7 @@ async function runItemsSyncForShop(
   const attemptMsgs: string[] = [];
 
   try {
-    const pageSize = 50;
+    const pageSize = 20;
 
     type Attempt = {
       label: string;
@@ -955,7 +955,7 @@ async function runOrdersSyncForShop(
   try {
     const hq = await getHqShop();
     const token = await ensureAccessToken(hq);
-    const pageSize = 100;
+    const pageSize = 20;
 
     const attempts: Array<{ label: string; method: string; version: string }> = [
       { label: "retail.trade.order.search", method: "youzan.retail.trade.order.search", version: "1.0.0" },
