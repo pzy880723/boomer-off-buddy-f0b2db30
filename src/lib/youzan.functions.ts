@@ -940,8 +940,8 @@ function pickTradeRows(raw: unknown): Array<Record<string, unknown>> {
 // 内部：单店订单同步（零售连锁版）
 // ------------------------------------------------------------
 // HQ      → 跳过，总部没有销售
-// Branch  → youzan.retail.trade.order.search（fallback：retail.trade.search）
-//           用总部 token + 分店 kdt_id + 时间窗
+// Branch  → 优先 youzan.trades.sold.get（通用交易接口，offline_id=分店 kdt_id）
+//           兜底再试 retail.trade.order.search / retail.trade.search
 // ============================================================
 async function runOrdersSyncForShop(
   shop: ShopRow,
@@ -989,9 +989,60 @@ async function runOrdersSyncForShop(
     const token = await ensureAccessToken(hq);
     const pageSize = 20;
 
-    const attempts: Array<{ label: string; method: string; version: string }> = [
-      { label: "retail.trade.order.search", method: "youzan.retail.trade.order.search", version: "1.0.0" },
-      { label: "retail.trade.search", method: "youzan.retail.trade.search", version: "1.0.0" },
+    const attempts: Array<{
+      label: string;
+      method: string;
+      version: string;
+      buildParams: (page: number) => Record<string, unknown>;
+    }> = [
+      {
+        label: "trades.sold.get",
+        method: "youzan.trades.sold.get",
+        version: "4.0.2",
+        buildParams: (page) => ({
+          page_no: page,
+          page_size: pageSize,
+          offline_id: shop.kdt_id,
+          start_update: fmt(startDate),
+          end_update: fmt(endDate),
+        }),
+      },
+      {
+        label: "trades.sold.get@4.0.0",
+        method: "youzan.trades.sold.get",
+        version: "4.0.0",
+        buildParams: (page) => ({
+          page_no: page,
+          page_size: pageSize,
+          offline_id: shop.kdt_id,
+          start_update: fmt(startDate),
+          end_update: fmt(endDate),
+        }),
+      },
+      {
+        label: "retail.trade.order.search",
+        method: "youzan.retail.trade.order.search",
+        version: "1.0.0",
+        buildParams: (page) => ({
+          page_no: page,
+          page_size: pageSize,
+          kdt_id: shop.kdt_id,
+          start_update: fmt(startDate),
+          end_update: fmt(endDate),
+        }),
+      },
+      {
+        label: "retail.trade.search",
+        method: "youzan.retail.trade.search",
+        version: "1.0.0",
+        buildParams: (page) => ({
+          page_no: page,
+          page_size: pageSize,
+          kdt_id: shop.kdt_id,
+          start_update: fmt(startDate),
+          end_update: fmt(endDate),
+        }),
+      },
     ];
 
     for (const m of attempts) {
@@ -1000,13 +1051,7 @@ async function runOrdersSyncForShop(
       let page = 1;
       try {
         for (;;) {
-          const params: Record<string, unknown> = {
-            page_no: page,
-            page_size: pageSize,
-            kdt_id: shop.kdt_id,
-            start_update: fmt(startDate),
-            end_update: fmt(endDate),
-          };
+          const params: Record<string, unknown> = m.buildParams(page);
           const r = await callYouzanApiVerbose({
             accessToken: token,
             method: m.method,
