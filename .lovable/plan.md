@@ -1,50 +1,47 @@
-## 背景
+## 结论
 
-零售连锁版的实际业务模型（你刚确认的）：
+这次截图里的错误已经不是“微商城接口选错”那一层了，而是**网关路径仍然错了**：当前代码调用的是：
 
-- **订单**：只有**分店**有销售；总部（HQ `153242272`）只做后台管理，没有交易。所以订单同步应**跳过 HQ**，只对 `role='branch'` 的店执行。
-- **商品**：总部维护**商品库（SPU 主数据）**并分配给分店；分店只在**网店在售**里出现总部下发的商品，分店自己没有上架权。所以商品同步要分两层：
-  1. HQ 拉**商品库**（master）→ 一份完整数据
-  2. 每个 branch 拉**门店在售**（哪些主数据被分配到这家店）→ 做"店-货关联"
+```text
+https://open.youzanyun.com/api/oauthentry/youzan.retail.open.spu.query/3.0.0?access_token=...
+```
 
-当前代码全在调微商城接口（`youzan.item.common.search` / `youzan.items.onsale.get` / `youzan.trades.sold.get`），对零售连锁全部 4005，所以一直拉不出来。
+但有赞新网关文档和报错案例显示，零售开放接口应走：
 
-## 改动 `src/lib/youzan.functions.ts`
+```text
+https://open.youzanyun.com/api/youzan.retail.open.spu.query/3.0.0?access_token=...
+```
 
-### A. `syncShopItems` — 按 role 分流
+也就是要去掉 `/oauthentry`。否则即使接口名是对的，也会被网关判定为 `[gw 4005] 非法的API`。
 
-- 若 `role='headquarter'`：调 **`youzan.retail.open.spu.query` 3.0.0**（总部商品库 SPU 列表），用 HQ 自己的 token + HQ 的 kdt_id，分页拉全。字段映射：
-  - `item_id` ← `spu_id`
-  - `title` ← `title` / `name`
-  - `price` ← SKU 最低价或 SPU 标价
-  - `pic_url` ← 首图
-  - `stock_qty` ← 0（SPU 维度没库存）
-  - `is_listed` ← true
-  - `raw` ← 原始 JSON
-- 若 `role='branch'`：调 **`youzan.retail.open.online.spu.query`**（门店在售 SPU），用**总部 token** + 分店 `kdt_id`，分页拉全。字段同上，`is_listed=true`。
-- 两个接口都失败时，把 method/code/msg 完整写进 `youzan_sync_logs.error`，不再静默落空。
+## 修正计划
 
-### B. `syncShopOrders` — 只对分店执行
+1. **修正有赞 API 网关地址**
+   - 把 `YZ_GW_URL` 从 `/api/oauthentry` 改为 `/api`。
+   - 保持现有 `POST + JSON body + access_token query` 调用方式。
+   - 这样 `youzan.shop.get`、`youzan.retail.open.spu.query`、`youzan.retail.open.online.spu.query`、`youzan.retail.trade.*` 都走同一套官方新网关。
 
-- 若 `role='headquarter'`：**直接跳过**，`youzan_sync_logs` 记一条 `status='skipped'`, `message='HQ 无销售数据'`。
-- 若 `role='branch'`：调零售订单接口，主用 **`youzan.retail.trade.order.search`**，失败 fallback 到 `youzan.retail.trade.search`，两次响应都打进 `sync_logs.error`，避免又盲打。入参：HQ token + 分店 `kdt_id` + `start_update`/`end_update` 时间窗 + 分页。字段映射到 `youzan_orders`：`tid` / `status` / `pay_type` / `buyer_nick` / `total_fee` / `payment` / `num` / `pay_time` / `created_time` / `raw`。按 `(shop_id, tid)` upsert 判重。
+2. **商品同步继续按零售连锁业务分流**
+   - 总部：拉总部商品库 `youzan.retail.open.spu.query.3.0.0`。
+   - 分店：拉门店在售 `youzan.retail.open.online.spu.query.1.0.0`，用总部 token + 分店 `kdt_id`。
+   - 当前这部分业务模型保留，不退回微商城接口。
 
-### C. 删掉错的死代码
+3. **订单同步保留“总部跳过、分店拉订单”**
+   - 总部订单直接 `skipped`。
+   - 分店继续尝试 `youzan.retail.trade.order.search`，失败再试 `youzan.retail.trade.search`。
+   - 如果修正网关后仍 4005，再说明是应用没有开通对应交易能力包，而不是路径问题。
 
-删除文件里这几个 fallback：`youzan.item.search`、`youzan.item.common.search`、`youzan.items.onsale.get`、`youzan.items.inventory.get`、`youzan.item.base.get`、`youzan.trades.sold.get` —— 对零售连锁全部是错的入口，留着只会污染日志。
+4. **改善失败信息**
+   - 错误信息里追加实际调用的接口路径片段（不暴露 token），方便发给有赞核查。
+   - 同步日志里保留 method/version/trace，避免再靠猜。
 
-## 不动
+5. **清理旧 running 记录**
+   - 代码已有自动把超过 90 秒的 running 标成失败；修正后再次同步会自动清掉旧假运行状态。
 
-- 表结构：`youzan_shops` / `youzan_items` / `youzan_orders` / `youzan_sync_logs` 字段够用。
-- HQ + 分店两条 `youzan_shops` 记录、token 刷新逻辑、UI 入口（手动同步按钮）保留。
-- `youzan.shop.get` / `youzan.auth.token` 探活保留。
+## 验证方式
 
-## 验证
-
-1. 在 `/integrations/youzan`，对 HQ 点同步商品 → 拉到 SPU 商品库；点同步订单 → 看到 `skipped`。
-2. 对每个分店点同步商品 → 拉到下发的在售商品；点同步订单 → 拉到该店真实订单。
-3. 看 `youzan_sync_logs`：成功条目 `status=success` 且 `count_in>0`；失败的话错误里能看到明确 method+code+msg，直接拿这条去问有赞核对零售-商品/零售-交易权限包。
-
-## 文档同步
-
-更新 `/mnt/documents/youzan-sync-issue-report.pdf` 末尾加一节："**根因已自查**：之前调的是微商城接口，对零售连锁版必返 4005；已切换到 `youzan.retail.*` 系列。如新接口仍 4005，请贵司核对客户端是否开通 **零售-商品库 / 零售-门店在售商品 / 零售-正向交易** 三个能力包。"
+- 先点总部「同步商品」：如果不再出现 `retail.open.spu.query.3.0.0: [gw 4005] 非法的API`，说明路径修正生效。
+- 再点分店「同步订单」：
+  - 有数据：完成。
+  - 仍 4005：拿日志里的 `method + version + trace` 给有赞，让他们确认自用型应用是否开了零售商品/零售交易能力包。
+  - 返回授权关系不存在：说明该分店 `kdt_id` 没被当前自用型应用授权。
