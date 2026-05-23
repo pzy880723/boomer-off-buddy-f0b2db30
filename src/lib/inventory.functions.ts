@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { generateEpc } from "./inventory.helpers";
 
 const CATEGORY_VALUES = [
