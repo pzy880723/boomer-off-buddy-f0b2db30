@@ -940,8 +940,8 @@ function pickTradeRows(raw: unknown): Array<Record<string, unknown>> {
 // 内部：单店订单同步（零售连锁版）
 // ------------------------------------------------------------
 // HQ      → 跳过，总部没有销售
-// Branch  → youzan.retail.trade.order.search（fallback：retail.trade.search）
-//           用总部 token + 分店 kdt_id + 时间窗
+// Branch  → 优先 youzan.trades.sold.get（通用交易接口，offline_id=分店 kdt_id）
+//           兜底再试 retail.trade.order.search / retail.trade.search
 // ============================================================
 async function runOrdersSyncForShop(
   shop: ShopRow,
