@@ -50,6 +50,7 @@ import {
   listAuthorizedShopsFromHQ,
   batchImportShops,
   syncAllShops,
+  backfillShopOrders,
 } from "@/lib/youzan.functions";
 import {
   getYouzanSummary,
