@@ -981,51 +981,84 @@ export type Database = {
       youzan_orders: {
         Row: {
           buyer_nick: string | null
+          buyer_open_id: string | null
           created_time: string | null
+          first_item_image: string | null
           id: string
           inserted_at: string
+          item_count: number | null
+          item_titles: string | null
           kdt_id: number
           num: number | null
+          outer_transaction_no: string | null
           pay_time: string | null
           pay_type: number | null
           payment: number | null
+          post_fee: number | null
           raw: Json | null
+          receiver_address: string | null
+          receiver_name: string | null
+          receiver_tel: string | null
           shop_id: string
+          sku_count: number | null
           status: string | null
+          status_text: string | null
           tid: string
           total_fee: number | null
           updated_at: string
         }
         Insert: {
           buyer_nick?: string | null
+          buyer_open_id?: string | null
           created_time?: string | null
+          first_item_image?: string | null
           id?: string
           inserted_at?: string
+          item_count?: number | null
+          item_titles?: string | null
           kdt_id: number
           num?: number | null
+          outer_transaction_no?: string | null
           pay_time?: string | null
           pay_type?: number | null
           payment?: number | null
+          post_fee?: number | null
           raw?: Json | null
+          receiver_address?: string | null
+          receiver_name?: string | null
+          receiver_tel?: string | null
           shop_id: string
+          sku_count?: number | null
           status?: string | null
+          status_text?: string | null
           tid: string
           total_fee?: number | null
           updated_at?: string
         }
         Update: {
           buyer_nick?: string | null
+          buyer_open_id?: string | null
           created_time?: string | null
+          first_item_image?: string | null
           id?: string
           inserted_at?: string
+          item_count?: number | null
+          item_titles?: string | null
           kdt_id?: number
           num?: number | null
+          outer_transaction_no?: string | null
           pay_time?: string | null
           pay_type?: number | null
           payment?: number | null
+          post_fee?: number | null
           raw?: Json | null
+          receiver_address?: string | null
+          receiver_name?: string | null
+          receiver_tel?: string | null
           shop_id?: string
+          sku_count?: number | null
           status?: string | null
+          status_text?: string | null
           tid?: string
           total_fee?: number | null
           updated_at?: string

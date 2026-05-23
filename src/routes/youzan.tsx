@@ -50,6 +50,7 @@ import {
   listAuthorizedShopsFromHQ,
   batchImportShops,
   syncAllShops,
+  backfillShopOrders,
 } from "@/lib/youzan.functions";
 import {
   getYouzanSummary,
@@ -96,6 +97,15 @@ function YouzanPage() {
   const pingFn = useServerFn(pingYouzanShop);
   const removeFn = useServerFn(removeYouzanShop);
   const syncAllFn = useServerFn(syncAllShops);
+  const backfillFn = useServerFn(backfillShopOrders);
+
+  const backfillM = useMutation({
+    mutationFn: () => backfillFn(),
+    onSuccess: (r) => {
+      toast.success(`回填完成：扫描 ${r.scanned} · 更新 ${r.updated}`);
+    },
+    onError: (e: Error) => toast.error(`回填失败：${e.message}`),
+  });
 
   const shopsQ = useQuery({
     queryKey: ["youzan-shops"],
@@ -271,7 +281,22 @@ function YouzanPage() {
             高级 · 同步明细
           </Button>
         </CollapsibleTrigger>
-        <CollapsibleContent className="mt-3">
+        <CollapsibleContent className="mt-3 space-y-3">
+          <div className="flex items-center justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => backfillM.mutate()}
+              disabled={backfillM.isPending}
+            >
+              {backfillM.isPending ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+              )}
+              回填历史订单字段
+            </Button>
+          </div>
           <Card>
             <CardContent className="p-0">
               <DataTable

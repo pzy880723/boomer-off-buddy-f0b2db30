@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin as supabase } from "@/integrations/supabase/client.server";
+import { yzStatusText } from "./youzan-status";
 
 // ============================================================
 // 有赞自用型应用 OAuth：grant_type=silent + kdt_id
@@ -1022,6 +1023,122 @@ function parseYzTime(raw: string | null): string | null {
   return isNaN(d.getTime()) ? null : d.toISOString();
 }
 
+// ============================================================
+// 从原始 trade JSON 里抽取展示字段（商品摘要 / 收货 / 买家 / 件数 …）
+// ============================================================
+type EnrichedFields = {
+  buyer_nick: string | null;
+  buyer_open_id: string | null;
+  item_count: number | null;
+  sku_count: number | null;
+  item_titles: string | null;
+  first_item_image: string | null;
+  receiver_name: string | null;
+  receiver_tel: string | null;
+  receiver_address: string | null;
+  outer_transaction_no: string | null;
+  post_fee: number | null;
+  status_text: string | null;
+};
+
+function pickFirst(obj: Record<string, unknown>, keys: string[]): string | null {
+  for (const k of keys) {
+    const v = obj[k];
+    if (v !== undefined && v !== null && String(v).trim() !== "") return String(v);
+  }
+  return null;
+}
+function pickFirstNum(obj: Record<string, unknown>, keys: string[]): number | null {
+  for (const k of keys) {
+    const v = obj[k];
+    if (v !== undefined && v !== null && v !== "") {
+      const n = Number(v);
+      if (!Number.isNaN(n)) return n;
+    }
+  }
+  return null;
+}
+
+export function enrichOrderFields(
+  trade: Record<string, unknown>,
+  status: string | null,
+): EnrichedFields {
+  const fullOrder = ((trade.full_order_info ?? trade.fullOrderInfo ?? {}) as Record<string, unknown>);
+  const ordersArr = (fullOrder.orders as Array<Record<string, unknown>> | undefined) ?? [];
+  const addr = ((fullOrder.address_info ?? fullOrder.addressInfo ?? {}) as Record<string, unknown>);
+  const buyer = ((fullOrder.buyer_info ?? fullOrder.buyerInfo ?? {}) as Record<string, unknown>);
+  const payInfo = ((fullOrder.pay_info ?? fullOrder.payInfo ?? {}) as Record<string, unknown>);
+
+  // 件数：累加所有子单 num
+  let itemCount = 0;
+  for (const o of ordersArr) itemCount += Number((o?.num as unknown) ?? 0) || 0;
+
+  // 商品摘要
+  const titles = ordersArr
+    .map((o) => String((o?.title as unknown) ?? "").trim())
+    .filter(Boolean);
+  let itemTitles: string | null = null;
+  if (titles.length > 0) {
+    const head = titles.slice(0, 3).join("、");
+    itemTitles = titles.length > 3 ? `${head} 等 ${titles.length} 件` : head;
+  }
+
+  // 首张商品图：orders[0].pic_url / sku_pic_url / image
+  let firstImg: string | null = null;
+  if (ordersArr[0]) {
+    firstImg = pickFirst(ordersArr[0] as Record<string, unknown>, [
+      "pic_url",
+      "picUrl",
+      "sku_pic_url",
+      "skuPicUrl",
+      "pic_thumb_url",
+      "image",
+      "img_url",
+    ]);
+  }
+
+  // 买家
+  const buyerNick =
+    pickFirst(buyer, ["fans_nickname", "fansNickname", "buyer_nick", "buyerNick", "nickname", "nick"]) ??
+    (pickFirst(buyer, ["outer_user_id", "outerUserId"]) ?? null);
+  const buyerOpenId = pickFirst(buyer, ["yz_open_id", "yzOpenId", "openId", "open_id"]);
+
+  // 收货
+  const receiverName = pickFirst(addr, ["receiver_name", "receiverName"]);
+  const receiverTel = pickFirst(addr, ["receiver_tel", "receiverTel", "receiver_mobile", "receiverMobile"]);
+  const parts = [
+    pickFirst(addr, ["delivery_province", "deliveryProvince", "province"]),
+    pickFirst(addr, ["delivery_city", "deliveryCity", "city"]),
+    pickFirst(addr, ["delivery_district", "deliveryDistrict", "district"]),
+    pickFirst(addr, ["delivery_address", "deliveryAddress", "address"]),
+  ].filter(Boolean);
+  const receiverAddress = parts.length > 0 ? parts.join(" ") : null;
+
+  // 支付
+  let outerTxn: string | null = null;
+  const outerArr = payInfo.outer_transactions ?? payInfo.outerTransactions;
+  if (Array.isArray(outerArr) && outerArr.length > 0) outerTxn = String(outerArr[0] ?? "") || null;
+  const postFee = pickFirstNum(payInfo, ["post_fee", "postFee"]);
+
+  return {
+    buyer_nick: buyerNick,
+    buyer_open_id: buyerOpenId,
+    item_count: itemCount > 0 ? itemCount : null,
+    sku_count: ordersArr.length > 0 ? ordersArr.length : null,
+    item_titles: itemTitles,
+    first_item_image: firstImg,
+    receiver_name: receiverName,
+    receiver_tel: receiverTel,
+    receiver_address: receiverAddress,
+    outer_transaction_no: outerTxn,
+    post_fee: postFee,
+    status_text: status ? yzStatusText(status) : null,
+  };
+}
+
+
+
+
 
 
 // ============================================================
@@ -1208,19 +1325,33 @@ async function runOrdersSyncForShop(
               const payType = payTypeRaw && !Number.isNaN(Number(payTypeRaw))
                 ? Number(payTypeRaw)
                 : null;
+              const enriched = enrichOrderFields(t as Record<string, unknown>, status);
+              // 件数：优先用子单累加（更准），否则回退到 num 字段
+              const finalNum = enriched.item_count ?? (num || null);
               const row = {
                 shop_id: shop.id,
                 kdt_id: shop.kdt_id,
                 tid,
                 status,
-                buyer_nick: buyer,
+                buyer_nick: enriched.buyer_nick ?? buyer,
                 payment,
                 total_fee: totalFee,
-                num,
+                num: finalNum,
                 pay_type: payType,
                 pay_time: parseYzTime(payTimeStr),
                 created_time: parseYzTime(createdStr),
                 raw: t,
+                buyer_open_id: enriched.buyer_open_id,
+                item_count: enriched.item_count,
+                sku_count: enriched.sku_count,
+                item_titles: enriched.item_titles,
+                first_item_image: enriched.first_item_image,
+                receiver_name: enriched.receiver_name,
+                receiver_tel: enriched.receiver_tel,
+                receiver_address: enriched.receiver_address,
+                outer_transaction_no: enriched.outer_transaction_no,
+                post_fee: enriched.post_fee,
+                status_text: enriched.status_text,
               };
               if (!sampleMapped) sampleMapped = JSON.stringify(row).slice(0, 1500);
               return row;
@@ -1378,10 +1509,10 @@ export const listShopOrders = createServerFn({ method: "GET" }).handler(
       supabase
         .from("youzan_orders")
         .select(
-          "id, tid, kdt_id, shop_id, status, buyer_nick, payment, total_fee, num, pay_time, created_time",
+          "id, tid, kdt_id, shop_id, status, status_text, buyer_nick, buyer_open_id, payment, total_fee, num, item_count, sku_count, item_titles, first_item_image, receiver_name, receiver_tel, receiver_address, outer_transaction_no, post_fee, pay_time, created_time, raw",
         )
         .order("pay_time", { ascending: false, nullsFirst: false })
-        .limit(300),
+        .limit(2000),
       supabase.from("youzan_shops").select("id, shop_name, kdt_id"),
     ]);
     if (ordersRes.error) throw new Error(ordersRes.error.message);
@@ -1389,5 +1520,57 @@ export const listShopOrders = createServerFn({ method: "GET" }).handler(
     return { orders: ordersRes.data ?? [], shops: shopsRes.data ?? [] };
   },
 );
+
+// ============================================================
+// backfillShopOrders — 用 raw 重新跑 enrich，把新字段补齐
+// ============================================================
+export const backfillShopOrders = createServerFn({ method: "POST" }).handler(
+  async () => {
+    const pageSize = 500;
+    let offset = 0;
+    let scanned = 0;
+    let updated = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from("youzan_orders")
+        .select("id, status, raw")
+        .range(offset, offset + pageSize - 1);
+      if (error) throw new Error(error.message);
+      if (!data || data.length === 0) break;
+      scanned += data.length;
+      for (const row of data) {
+        const raw = (row as { raw: unknown }).raw;
+        if (!raw || typeof raw !== "object") continue;
+        const status = (row as { status: string | null }).status ?? null;
+        const enriched = enrichOrderFields(raw as Record<string, unknown>, status);
+        const patch: Record<string, unknown> = {
+          buyer_open_id: enriched.buyer_open_id,
+          item_count: enriched.item_count,
+          sku_count: enriched.sku_count,
+          item_titles: enriched.item_titles,
+          first_item_image: enriched.first_item_image,
+          receiver_name: enriched.receiver_name,
+          receiver_tel: enriched.receiver_tel,
+          receiver_address: enriched.receiver_address,
+          outer_transaction_no: enriched.outer_transaction_no,
+          post_fee: enriched.post_fee,
+          status_text: enriched.status_text,
+        };
+        if (enriched.buyer_nick) patch.buyer_nick = enriched.buyer_nick;
+        if (enriched.item_count && enriched.item_count > 0) patch.num = enriched.item_count;
+        const { error: upErr } = await supabase
+          .from("youzan_orders")
+          .update(patch as never)
+          .eq("id", (row as { id: string }).id);
+        if (!upErr) updated += 1;
+      }
+      if (data.length < pageSize) break;
+      offset += pageSize;
+      if (offset > 50000) break;
+    }
+    return { scanned, updated };
+  },
+);
+
 
 
