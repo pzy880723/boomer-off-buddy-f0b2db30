@@ -675,9 +675,16 @@ function normalizeSpuRow(it: Record<string, unknown>, shop: ShopRow) {
     it.sale_price ??
     0;
   const priceNum = Number(priceRaw);
-  // 总部 SPU 接口图片字段是 photo_url: [{ url }]
+  // 总部 SPU 接口图片字段：photo_url 可能是 [{url}]、字符串数组，也可能是 JSON 字符串
   let pic: string | null = null;
-  const photoUrl = it.photo_url ?? it.photoUrl;
+  let photoUrl: unknown = it.photo_url ?? it.photoUrl;
+  if (typeof photoUrl === "string") {
+    try {
+      photoUrl = JSON.parse(photoUrl);
+    } catch {
+      // ignore
+    }
+  }
   if (Array.isArray(photoUrl) && photoUrl.length) {
     const first = photoUrl[0];
     pic =
