@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -31,7 +31,7 @@ export const Route = createFileRoute("/shop-mgmt/products")({
   component: ShopProductsPage,
 });
 
-type Item = {
+type ShopRow = {
   id: string;
   shop_id: string;
   kdt_id: number;
@@ -43,7 +43,32 @@ type Item = {
   pic_url: string | null;
   updated_at: string;
 };
+type OnSaleShop = {
+  shop_id: string;
+  shop_name: string;
+  role: string;
+  stock_qty: number;
+  low: boolean;
+};
+type AggItem = {
+  id: string;
+  item_id: number;
+  title: string | null;
+  pic_url: string | null;
+  price: number | null;
+  total_stock: number;
+  is_listed: boolean;
+  status: "green" | "orange" | "red";
+  on_sale_shops: OnSaleShop[];
+  rows: ShopRow[];
+};
 type Shop = { id: string; shop_name: string; kdt_id: number; role: string };
+
+const STATUS_META: Record<AggItem["status"], { label: string; cls: string }> = {
+  green: { label: "在售", cls: "bg-emerald-500/15 text-emerald-700 border-emerald-500/30 dark:text-emerald-300" },
+  orange: { label: "库存预警", cls: "bg-amber-500/15 text-amber-700 border-amber-500/30 dark:text-amber-300" },
+  red: { label: "缺货/下架", cls: "bg-rose-500/15 text-rose-700 border-rose-500/30 dark:text-rose-300" },
+};
 
 function ShopProductsPage() {
   const qc = useQueryClient();
@@ -53,8 +78,8 @@ function ShopProductsPage() {
   const [listed, setListed] = useState<string>("all");
   const [syncing, setSyncing] = useState<string | null>(null);
   const [dialog, setDialog] = useState<
-    | { mode: "in"; targetItem: Item; targetShop: Shop }
-    | { mode: "out"; sourceItem: Item; sourceShop: Shop }
+    | { mode: "in"; targetItem: ShopRow; targetShop: Shop }
+    | { mode: "out"; sourceItem: ShopRow; sourceShop: Shop }
     | null
   >(null);
 
@@ -70,9 +95,8 @@ function ShopProductsPage() {
       }),
   });
 
-  const items = (data?.items ?? []) as Item[];
+  const items = (data?.items ?? []) as AggItem[];
   const shops = (data?.shops ?? []) as Shop[];
-  const shopMap = useMemo(() => new Map(shops.map((s) => [s.id, s])), [shops]);
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["shop-products"] });
 
@@ -89,11 +113,17 @@ function ShopProductsPage() {
     }
   };
 
+  // 操作按钮：当筛选了具体门店时启用（用该门店对应的 row）；否则禁用提示
+  const pickRowForShop = (it: AggItem): ShopRow | null => {
+    if (shopId === "all") return it.rows[0] ?? null;
+    return it.rows.find((r) => r.shop_id === shopId) ?? null;
+  };
+
   return (
     <div>
       <PageHeader
         title="门店商品库"
-        description="查看各门店有赞商品的库存与状态，支持调拨入库 / 出库"
+        description="商品来自总部统一同步；每行展示该 SPU 在哪些分店在售。"
         meta={
           <>
             <span>共 {items.length} 件商品</span>
@@ -160,12 +190,12 @@ function ShopProductsPage() {
         <p className="mb-2 text-xs text-muted-foreground">加载中…</p>
       )}
       <DataTable
-        rowKey={(r: Item) => r.id}
+        rowKey={(r: AggItem) => String(r.item_id)}
         data={items}
         columns={[
           {
             header: "商品",
-            cell: (r: Item) => (
+            cell: (r: AggItem) => (
               <div className="flex items-center gap-2.5 min-w-0">
                 {r.pic_url ? (
                   <img src={r.pic_url} alt="" className="h-9 w-9 rounded object-cover bg-muted" />
@@ -176,51 +206,77 @@ function ShopProductsPage() {
                 )}
                 <div className="min-w-0">
                   <p className="truncate text-sm">{r.title || "(无标题)"}</p>
-                  <p className="text-[10px] text-muted-foreground tabular-nums">item {r.item_id}</p>
+                  <p className="text-[10px] text-muted-foreground tabular-nums">spu {r.item_id}</p>
                 </div>
               </div>
             ),
           },
           {
-            header: "门店",
-            cell: (r: Item) => (
-              <span className="text-xs">{shopMap.get(r.shop_id)?.shop_name ?? r.kdt_id}</span>
-            ),
-          },
-          {
             header: "价格",
-            cell: (r: Item) => <span className="tabular-nums">¥{Number(r.price ?? 0).toFixed(2)}</span>,
+            cell: (r: AggItem) => <span className="tabular-nums">¥{Number(r.price ?? 0).toFixed(2)}</span>,
             className: "text-right",
           },
           {
-            header: "库存",
-            cell: (r: Item) => (
-              <span className={`tabular-nums font-medium ${r.stock_qty === 0 ? "text-destructive" : ""}`}>
-                {r.stock_qty}
+            header: "总库存",
+            cell: (r: AggItem) => (
+              <span className={`tabular-nums font-medium ${r.total_stock === 0 ? "text-destructive" : ""}`}>
+                {r.total_stock}
               </span>
             ),
             className: "text-right",
           },
           {
+            header: "在售门店",
+            cell: (r: AggItem) => {
+              if (r.on_sale_shops.length === 0) {
+                return <span className="text-xs text-muted-foreground">无</span>;
+              }
+              return (
+                <div className="flex flex-wrap gap-1">
+                  {r.on_sale_shops.map((s) => (
+                    <span
+                      key={s.shop_id}
+                      className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] ${
+                        s.low
+                          ? "bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-300"
+                          : "bg-muted/50 border-border text-foreground"
+                      }`}
+                      title={`库存 ${s.stock_qty}`}
+                    >
+                      {s.shop_name}
+                      <span className="tabular-nums opacity-70">{s.stock_qty}</span>
+                    </span>
+                  ))}
+                </div>
+              );
+            },
+          },
+          {
             header: "状态",
-            cell: (r: Item) => (
-              <Badge variant={r.is_listed ? "default" : "secondary"} className="text-[10px]">
-                {r.is_listed ? "在售" : "下架"}
-              </Badge>
-            ),
+            cell: (r: AggItem) => {
+              const meta = STATUS_META[r.status];
+              return (
+                <Badge variant="outline" className={`text-[10px] ${meta.cls}`}>
+                  {meta.label}
+                </Badge>
+              );
+            },
           },
           {
             header: "操作",
-            cell: (r: Item) => {
-              const shop = shopMap.get(r.shop_id);
-              if (!shop) return null;
+            cell: (r: AggItem) => {
+              const row = pickRowForShop(r);
+              const shop = row ? shops.find((s) => s.id === row.shop_id) : null;
+              if (!row || !shop) return null;
+              const disabledHint =
+                shopId === "all" ? "默认对该商品的首选门店操作" : undefined;
               return (
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1" title={disabledHint}>
                   <Button
                     size="sm"
                     variant="outline"
                     className="h-7 px-2 text-[11px]"
-                    onClick={() => setDialog({ mode: "in", targetItem: r, targetShop: shop })}
+                    onClick={() => setDialog({ mode: "in", targetItem: row, targetShop: shop })}
                   >
                     <ArrowDownToLine className="h-3 w-3 mr-1" />
                     调入
@@ -229,7 +285,7 @@ function ShopProductsPage() {
                     size="sm"
                     variant="outline"
                     className="h-7 px-2 text-[11px]"
-                    onClick={() => setDialog({ mode: "out", sourceItem: r, sourceShop: shop })}
+                    onClick={() => setDialog({ mode: "out", sourceItem: row, sourceShop: shop })}
                   >
                     <ArrowUpFromLine className="h-3 w-3 mr-1" />
                     调出
