@@ -661,8 +661,8 @@ function normalizeSpuRow(it: Record<string, unknown>, shop: ShopRow) {
     it.spu_id ?? it.spuId ?? it.item_id ?? it.itemId ?? it.id ?? 0,
   );
   if (!itemId) return null;
-  const skus = Array.isArray(it.sku_list ?? it.skuList)
-    ? ((it.sku_list ?? it.skuList) as Array<Record<string, unknown>>)
+  const skus = Array.isArray(it.sku_list ?? it.skuList ?? it.skus)
+    ? ((it.sku_list ?? it.skuList ?? it.skus) as Array<Record<string, unknown>>)
     : [];
   const skuPrices = skus
     .map((s) => Number(s.price ?? s.retail_price ?? s.sale_price ?? 0))
@@ -675,7 +675,20 @@ function normalizeSpuRow(it: Record<string, unknown>, shop: ShopRow) {
     it.sale_price ??
     0;
   const priceNum = Number(priceRaw);
-  const pic =
+  // 总部 SPU 接口图片字段是 photo_url: [{ url }]
+  let pic: string | null = null;
+  const photoUrl = it.photo_url ?? it.photoUrl;
+  if (Array.isArray(photoUrl) && photoUrl.length) {
+    const first = photoUrl[0];
+    pic =
+      typeof first === "string"
+        ? first
+        : first && typeof first === "object" && (first as Record<string, unknown>).url
+          ? String((first as Record<string, unknown>).url)
+          : null;
+  }
+  pic =
+    pic ??
     (it.pic_url as string) ??
     (it.picUrl as string) ??
     (it.main_pic as string) ??
@@ -684,20 +697,32 @@ function normalizeSpuRow(it: Record<string, unknown>, shop: ShopRow) {
     (Array.isArray(it.images) ? (it.images[0] as string) : null) ??
     null;
   const stockSum = skus.reduce(
-    (s, x) => s + (Number(x.stock_num ?? x.stockNum ?? x.quantity ?? 0) || 0),
+    (s, x) => s + (Number(x.stock_num ?? x.stockNum ?? x.quantity ?? x.stock ?? 0) || 0),
     0,
   );
+  const statusRaw = it.status ?? it.online_status ?? it.sale_status;
+  const statusNum = Number(statusRaw);
+  const isListed =
+    Number.isFinite(statusNum) && statusNum > 0 ? statusNum === 1 : true;
   return {
     shop_id: shop.id,
     kdt_id: shop.kdt_id,
     item_id: itemId,
-    title: String(it.title ?? it.name ?? it.spu_name ?? it.spuName ?? ""),
+    title: String(
+      it.product_name ??
+        it.productName ??
+        it.title ??
+        it.name ??
+        it.spu_name ??
+        it.spuName ??
+        "",
+    ),
     price: Number.isFinite(priceNum) ? priceNum : 0,
     stock_qty:
       stockSum ||
       Number(it.stock_num ?? it.stockNum ?? it.total_stock ?? it.quantity ?? 0) ||
       0,
-    is_listed: true,
+    is_listed: isListed,
     pic_url: pic,
     raw: it,
   };
