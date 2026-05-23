@@ -1107,35 +1107,15 @@ async function runOrdersSyncForShop(
           end_update: fmt(endDate),
         }),
       },
-      {
-        label: "retail.trade.order.search",
-        method: "youzan.retail.trade.order.search",
-        version: "1.0.0",
-        buildParams: (page) => ({
-          page_no: page,
-          page_size: pageSize,
-          kdt_id: shop.kdt_id,
-          start_update: fmt(startDate),
-          end_update: fmt(endDate),
-        }),
-      },
-      {
-        label: "retail.trade.search",
-        method: "youzan.retail.trade.search",
-        version: "1.0.0",
-        buildParams: (page) => ({
-          page_no: page,
-          page_size: pageSize,
-          kdt_id: shop.kdt_id,
-          start_update: fmt(startDate),
-          end_update: fmt(endDate),
-        }),
-      },
     ];
+
+    let sampleRaw = "";
+    let sampleMapped = "";
 
     for (const m of attempts) {
       let attemptReturned = 0;
       let attemptUpserted = 0;
+      let attemptDropped = 0;
       let page = 1;
       try {
         for (;;) {
@@ -1152,34 +1132,98 @@ async function runOrdersSyncForShop(
           attemptReturned += trades.length;
           if (trades.length === 0) break;
 
+          if (!sampleRaw && trades[0]) {
+            sampleRaw = JSON.stringify(trades[0]).slice(0, 3500);
+          }
+
           const rows = trades
             .map((t) => {
-              const root = (t.full_order_info as Record<string, unknown> | undefined) ?? t;
-              const tradeBase = (root.tradeBase ?? root.trade ?? root) as Record<string, unknown>;
-              const node = { ...tradeBase, ...t };
-              const tid = String(node.tid ?? node.order_no ?? node.orderNo ?? node.order_id ?? "");
-              if (!tid) return null;
-              const payTime = node.pay_time ? String(node.pay_time) : null;
-              const created = (node.created ?? node.create_time ?? node.createTime) ? String(node.created ?? node.create_time ?? node.createTime) : null;
-              return {
+              const n = flattenTrade(t);
+              const tid = pickStr(n, [
+                "tid",
+                "orderNo",
+                "order_no",
+                "bizOrderId",
+                "biz_order_id",
+                "oid",
+                "order_id",
+                "orderId",
+              ]);
+              if (!tid) {
+                attemptDropped += 1;
+                return null;
+              }
+              const payTimeStr = pickStr(n, [
+                "pay_time",
+                "payTime",
+                "paidTime",
+                "paid_time",
+              ]);
+              const createdStr = pickStr(n, [
+                "created",
+                "createTime",
+                "create_time",
+                "tradeCreateTime",
+                "trade_create_time",
+              ]);
+              const status =
+                pickStr(n, [
+                  "status",
+                  "tradeStatus",
+                  "trade_status",
+                  "orderStatus",
+                  "order_status",
+                ]) ?? null;
+              const buyer =
+                pickStr(n, [
+                  "buyer_nick",
+                  "buyerNick",
+                  "buyerName",
+                  "buyer_name",
+                  "buyerId",
+                ]) ?? null;
+              const payment = pickNum(n, [
+                "payment",
+                "payAmount",
+                "pay_amount",
+                "actualPayFee",
+                "actual_pay_fee",
+              ]);
+              const totalFee = pickNum(n, [
+                "total_fee",
+                "totalFee",
+                "orderAmount",
+                "order_amount",
+                "totalPrice",
+              ]);
+              const num = pickNum(n, [
+                "num",
+                "itemTotalNum",
+                "item_total_num",
+                "totalNum",
+                "total_num",
+                "buyNum",
+              ]);
+              const payTypeRaw = pickStr(n, ["pay_type", "payType", "paymentType"]);
+              const payType = payTypeRaw && !Number.isNaN(Number(payTypeRaw))
+                ? Number(payTypeRaw)
+                : null;
+              const row = {
                 shop_id: shop.id,
                 kdt_id: shop.kdt_id,
                 tid,
-                status: (node.status as string) ?? null,
-                buyer_nick: (node.buyer_nick as string) ?? null,
-                payment: Number(node.payment ?? 0) || 0,
-                total_fee: Number(node.total_fee ?? 0) || 0,
-                num: Number(node.num ?? 0) || 0,
-                pay_type:
-                  typeof node.pay_type === "number"
-                    ? node.pay_type
-                    : node.pay_type
-                      ? Number(node.pay_type)
-                      : null,
-                pay_time: payTime ? new Date(payTime).toISOString() : null,
-                created_time: created ? new Date(created).toISOString() : null,
-                raw: node,
+                status,
+                buyer_nick: buyer,
+                payment,
+                total_fee: totalFee,
+                num,
+                pay_type: payType,
+                pay_time: parseYzTime(payTimeStr),
+                created_time: parseYzTime(createdStr),
+                raw: t,
               };
+              if (!sampleMapped) sampleMapped = JSON.stringify(row).slice(0, 1500);
+              return row;
             })
             .filter((r): r is NonNullable<typeof r> => r !== null);
 
@@ -1194,7 +1238,8 @@ async function runOrdersSyncForShop(
           page += 1;
           if (page > 500) break;
         }
-        attemptMsgs.push(`${m.label}: 返回 ${attemptReturned} 入库 ${attemptUpserted}`);
+        const dropTxt = attemptDropped > 0 ? ` 丢弃 ${attemptDropped}` : "";
+        attemptMsgs.push(`${m.label}: 返回 ${attemptReturned} 入库 ${attemptUpserted}${dropTxt}`);
       } catch (e) {
         const errMsg = e instanceof Error ? e.message : String(e);
         attemptMsgs.push(`${m.label}: ${errMsg}`);
@@ -1204,12 +1249,18 @@ async function runOrdersSyncForShop(
       if (attemptReturned > 0) break;
     }
 
-    const status = totalReturned > 0 ? "ok" : "empty";
+    const status = totalReturned > 0 ? (totalUpserted > 0 ? "ok" : "empty") : "empty";
     let msg = `订单同步 入库 ${totalUpserted} / 返回 ${totalReturned}（${fmt(startDate)} ~ ${fmt(endDate)}）｜${attemptMsgs.join(" / ")}`;
     if (totalReturned === 0 && lastPreview) {
       msg += `｜末次响应: ${lastPreview}`;
       if (lastTrace) msg += ` (trace=${lastTrace})`;
     }
+    if (totalReturned > 0 && totalUpserted === 0 && sampleRaw) {
+      msg += `｜原始样本: ${sampleRaw}`;
+    } else if (sampleMapped) {
+      msg += `｜样本: ${sampleMapped}`;
+    }
+
     if (log?.id) {
       await supabase
         .from("youzan_sync_logs")
