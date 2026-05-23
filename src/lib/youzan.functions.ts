@@ -1325,19 +1325,33 @@ async function runOrdersSyncForShop(
               const payType = payTypeRaw && !Number.isNaN(Number(payTypeRaw))
                 ? Number(payTypeRaw)
                 : null;
+              const enriched = enrichOrderFields(t as Record<string, unknown>, status);
+              // 件数：优先用子单累加（更准），否则回退到 num 字段
+              const finalNum = enriched.item_count ?? (num || null);
               const row = {
                 shop_id: shop.id,
                 kdt_id: shop.kdt_id,
                 tid,
                 status,
-                buyer_nick: buyer,
+                buyer_nick: enriched.buyer_nick ?? buyer,
                 payment,
                 total_fee: totalFee,
-                num,
+                num: finalNum,
                 pay_type: payType,
                 pay_time: parseYzTime(payTimeStr),
                 created_time: parseYzTime(createdStr),
                 raw: t,
+                buyer_open_id: enriched.buyer_open_id,
+                item_count: enriched.item_count,
+                sku_count: enriched.sku_count,
+                item_titles: enriched.item_titles,
+                first_item_image: enriched.first_item_image,
+                receiver_name: enriched.receiver_name,
+                receiver_tel: enriched.receiver_tel,
+                receiver_address: enriched.receiver_address,
+                outer_transaction_no: enriched.outer_transaction_no,
+                post_fee: enriched.post_fee,
+                status_text: enriched.status_text,
               };
               if (!sampleMapped) sampleMapped = JSON.stringify(row).slice(0, 1500);
               return row;
