@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { generateEpc } from "./inventory.helpers";
 
 const CATEGORY_VALUES = [
@@ -202,7 +203,7 @@ export const submitInbound = createServerFn({ method: "POST" })
 
     // 累加库存（并发安全函数）
     for (const s of data.scans) {
-      const { error: rpcErr } = await supabase.rpc("inv_apply_inbound_stock", {
+      const { error: rpcErr } = await supabaseAdmin.rpc("inv_apply_inbound_stock", {
         p_sku_id: s.sku_id,
         p_delta: s.qty,
       });
