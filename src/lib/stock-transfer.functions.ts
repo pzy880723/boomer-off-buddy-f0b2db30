@@ -154,30 +154,108 @@ export const listShopProducts = createServerFn({ method: "GET" })
         shop_id: z.string().uuid().optional(),
         search: z.string().optional(),
         listed: z.boolean().optional(),
-        limit: z.number().min(1).max(500).default(200),
+        limit: z.number().min(1).max(2000).default(1000),
+        low_stock_threshold: z.number().min(0).default(3),
       })
       .parse(input ?? {}),
   )
   .handler(async ({ data }) => {
-    let q = supabase
-      .from("youzan_items")
-      .select("id, shop_id, kdt_id, item_id, title, price, stock_qty, is_listed, pic_url, updated_at")
-      .order("updated_at", { ascending: false })
-      .limit(data.limit);
-    if (data.shop_id) q = q.eq("shop_id", data.shop_id);
-    if (data.listed !== undefined) q = q.eq("is_listed", data.listed);
-    if (data.search) {
-      const s = `%${data.search}%`;
-      q = q.or(`title.ilike.${s}`);
-    }
-    const { data: items, error } = await q;
-    if (error) throw new Error(error.message);
     const { data: shops } = await supabase
       .from("youzan_shops")
       .select("id, shop_name, kdt_id, role")
       .order("role", { ascending: true });
-    return { items: items ?? [], shops: shops ?? [] };
+    const shopList = shops ?? [];
+    const shopById = new Map(shopList.map((s) => [s.id as string, s]));
+
+    let q = supabase
+      .from("youzan_items")
+      .select(
+        "id, shop_id, kdt_id, item_id, title, price, stock_qty, is_listed, pic_url, updated_at",
+      )
+      .order("updated_at", { ascending: false })
+      .limit(data.limit);
+    if (data.search) {
+      const s = `%${data.search}%`;
+      q = q.or(`title.ilike.${s}`);
+    }
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+    const allRows = (rows ?? []) as Array<{
+      id: string;
+      shop_id: string;
+      kdt_id: number;
+      item_id: number;
+      title: string | null;
+      price: number | null;
+      stock_qty: number;
+      is_listed: boolean;
+      pic_url: string | null;
+      updated_at: string;
+    }>;
+
+    // 按 item_id 聚合：同一 SPU 在不同门店各占一行，合并成一条
+    const groups = new Map<number, typeof allRows>();
+    for (const r of allRows) {
+      const arr = groups.get(r.item_id) ?? [];
+      arr.push(r);
+      groups.set(r.item_id, arr);
+    }
+
+    const items = Array.from(groups.values()).map((rows) => {
+      // 选首选展示行（HQ 优先；否则最新一条）
+      const sorted = [...rows].sort((a, b) => {
+        const ra = shopById.get(a.shop_id)?.role === "hq" ? 0 : 1;
+        const rb = shopById.get(b.shop_id)?.role === "hq" ? 0 : 1;
+        if (ra !== rb) return ra - rb;
+        return (b.updated_at ?? "").localeCompare(a.updated_at ?? "");
+      });
+      const primary = sorted[0];
+      const totalStock = rows.reduce((s, r) => s + (r.stock_qty || 0), 0);
+      const onSaleShops = rows
+        .filter((r) => r.is_listed && (r.stock_qty || 0) > 0)
+        .map((r) => {
+          const sh = shopById.get(r.shop_id);
+          return {
+            shop_id: r.shop_id,
+            shop_name: sh?.shop_name ?? String(r.kdt_id),
+            role: sh?.role ?? "branch",
+            stock_qty: r.stock_qty || 0,
+            low: (r.stock_qty || 0) <= data.low_stock_threshold,
+          };
+        });
+      const anyListed = rows.some((r) => r.is_listed);
+      // 状态：red 全部下架或库存=0；orange 在售但库存≤阈值；green 正常
+      let status: "green" | "orange" | "red";
+      if (!anyListed || totalStock === 0) status = "red";
+      else if (totalStock <= data.low_stock_threshold) status = "orange";
+      else status = "green";
+      return {
+        id: primary.id,
+        item_id: primary.item_id,
+        title: primary.title,
+        pic_url: primary.pic_url,
+        price: primary.price,
+        total_stock: totalStock,
+        is_listed: anyListed,
+        status,
+        on_sale_shops: onSaleShops,
+        rows, // 全部分店明细，调拨弹窗用
+      };
+    });
+
+    // 应用 shop_id / listed 过滤（在聚合层面）
+    const filtered = items.filter((it) => {
+      if (data.listed !== undefined && it.is_listed !== data.listed) return false;
+      if (data.shop_id) {
+        const has = it.rows.some((r) => r.shop_id === data.shop_id);
+        if (!has) return false;
+      }
+      return true;
+    });
+
+    return { items: filtered, shops: shopList };
   });
+
 
 // ============================================================
 // listStockTransfers
