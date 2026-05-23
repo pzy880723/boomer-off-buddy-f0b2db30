@@ -600,30 +600,40 @@ export const batchImportShops = createServerFn({ method: "POST" })
   });
 
 // ============================================================
-// 内部：单店商品同步逻辑
-// ------------------------------------------------------------
-// 按公开文档使用多个接口逐个尝试：
-//   1) youzan.item.common.search.1.0.0  —— 微商城/连锁 通用列表
-//   2) youzan.items.onsale.get.3.0.0    —— 在售商品
-//   3) youzan.items.inventory.get.3.0.0 —— 仓库（已下架）商品
-// 任一返回数据就解析入库；每一步的状态、原始返回数量、解析数量、入库数量
-// 都会写入 youzan_sync_logs，方便诊断「同步 0 条」到底是哪一步出问题。
+// 内部：取总部 token（零售连锁版很多 retail.open.* 接口都要用总部 token + 分店 kdt_id）
 // ============================================================
-function pickItemRows(raw: unknown): Array<Record<string, unknown>> {
+async function getHqShop(): Promise<ShopRow> {
+  const { data, error } = await supabase
+    .from("youzan_shops")
+    .select("*")
+    .eq("role", "hq")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("尚未配置总部门店（role=hq）");
+  return data as ShopRow;
+}
+
+// ============================================================
+// 内部：从有赞零售返回结构里挖出 SPU 列表
+// ============================================================
+function pickSpuRows(raw: unknown): Array<Record<string, unknown>> {
   const visited = new Set<unknown>();
   const arrays: Array<Array<Record<string, unknown>>> = [];
   const keys = [
+    "spu_list",
+    "spuList",
+    "spus",
     "items",
     "item_list",
     "itemList",
-    "goods_list",
-    "goodsList",
+    "online_spu_list",
+    "onlineSpuList",
     "list",
     "records",
     "rows",
   ];
   const visit = (node: unknown, depth = 0) => {
-    if (!node || depth > 4 || visited.has(node)) return;
+    if (!node || depth > 5 || visited.has(node)) return;
     if (typeof node !== "object") return;
     visited.add(node);
     if (Array.isArray(node)) {
@@ -644,44 +654,60 @@ function pickItemRows(raw: unknown): Array<Record<string, unknown>> {
   return arrays[0];
 }
 
-function normalizeItemRow(
-  it: Record<string, unknown>,
-  shop: ShopRow,
-  isListed: boolean,
-) {
+function normalizeSpuRow(it: Record<string, unknown>, shop: ShopRow) {
   const itemId = Number(
-    it.item_id ?? it.itemId ?? it.num_iid ?? it.numIid ?? it.channel_item_id ?? it.goods_id ?? it.goodsId ?? it.id ?? 0,
+    it.spu_id ?? it.spuId ?? it.item_id ?? it.itemId ?? it.id ?? 0,
   );
   if (!itemId) return null;
-  const media = (it.media as { images?: Array<{ url?: string }> } | undefined);
+  const skus = Array.isArray(it.sku_list ?? it.skuList)
+    ? ((it.sku_list ?? it.skuList) as Array<Record<string, unknown>>)
+    : [];
+  const skuPrices = skus
+    .map((s) => Number(s.price ?? s.retail_price ?? s.sale_price ?? 0))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  const priceRaw =
+    (skuPrices.length ? Math.min(...skuPrices) : null) ??
+    it.price ??
+    it.retail_price ??
+    it.min_price ??
+    it.sale_price ??
+    0;
+  const priceNum = Number(priceRaw);
   const pic =
     (it.pic_url as string) ??
     (it.picUrl as string) ??
-    (it.pic_thumb_url as string) ??
-    (it.image as string) ??
+    (it.main_pic as string) ??
+    (it.mainPic as string) ??
     (Array.isArray(it.pic_urls) ? (it.pic_urls[0] as string) : null) ??
     (Array.isArray(it.images) ? (it.images[0] as string) : null) ??
-    (media?.images?.[0]?.url ?? null);
-  const priceRaw =
-    it.price ?? it.origin_price ?? it.retail_price ?? it.min_price ?? it.goods_price ?? 0;
-  const priceNum = Number(priceRaw);
-  const soldStatus = Number(it.sold_status ?? it.soldStatus ?? -1);
-  const listedFlag =
-    soldStatus === 1 ? true : soldStatus === 0 ? false : isListed;
+    null;
+  const stockSum = skus.reduce(
+    (s, x) => s + (Number(x.stock_num ?? x.stockNum ?? x.quantity ?? 0) || 0),
+    0,
+  );
   return {
     shop_id: shop.id,
     kdt_id: shop.kdt_id,
     item_id: itemId,
-    title: String(it.title ?? it.item_title ?? it.name ?? it.goods_name ?? ""),
+    title: String(it.title ?? it.name ?? it.spu_name ?? it.spuName ?? ""),
     price: Number.isFinite(priceNum) ? priceNum : 0,
     stock_qty:
-      Number(it.num ?? it.quantity ?? it.stock_num ?? it.stockNum ?? it.stock ?? 0) || 0,
-    is_listed: listedFlag,
-    pic_url: pic ?? null,
+      stockSum ||
+      Number(it.stock_num ?? it.stockNum ?? it.total_stock ?? it.quantity ?? 0) ||
+      0,
+    is_listed: true,
+    pic_url: pic,
     raw: it,
   };
 }
 
+// ============================================================
+// 内部：单店商品同步（零售连锁版）
+// ------------------------------------------------------------
+// HQ      → youzan.retail.open.spu.query.3.0.0（总部商品库 SPU）
+// Branch  → youzan.retail.open.online.spu.query.1.0.0（门店在售 SPU，
+//           用总部 token + 分店 kdt_id）
+// ============================================================
 async function runItemsSyncForShop(
   shop: ShopRow,
 ): Promise<{ ok: boolean; count: number; message: string }> {
@@ -696,79 +722,49 @@ async function runItemsSyncForShop(
     .select("id")
     .single();
 
-  const attemptMsgs: string[] = [];
   let totalReturned = 0;
   let totalUpserted = 0;
   let lastPreview = "";
   let lastTrace: string | null = null;
   const seen = new Set<number>();
+  const attemptMsgs: string[] = [];
 
   try {
-    const token = await ensureAccessToken(shop);
     const pageSize = 50;
 
-    // 多个接口逐个尝试。文档不同店铺类型支持的接口不同；遇到 4005「非法的API」
-    // 直接跳过、试下一个，不要再让它把整次同步拖死。
     type Attempt = {
       label: string;
       method: string;
       version: string;
-      listed: boolean;
-      idOnly?: boolean; // 该接口只返回 item_id，需要 base.get 补详情
+      token: string;
       buildParams: (page: number) => Record<string, unknown>;
     };
-    const attempts: Attempt[] = [
-      {
-        label: "item.search.3.0.0",
-        method: "youzan.item.search",
+    const attempts: Attempt[] = [];
+
+    if (shop.role === "hq") {
+      const token = await ensureAccessToken(shop);
+      attempts.push({
+        label: "retail.open.spu.query.3.0.0",
+        method: "youzan.retail.open.spu.query",
         version: "3.0.0",
-        listed: true,
+        token,
         buildParams: (p) => ({ page_no: p, page_size: pageSize }),
-      },
-      {
-        label: "item.common.search.1.0.0",
-        method: "youzan.item.common.search",
+      });
+    } else {
+      const hq = await getHqShop();
+      const hqToken = await ensureAccessToken(hq);
+      attempts.push({
+        label: "retail.open.online.spu.query.1.0.0",
+        method: "youzan.retail.open.online.spu.query",
         version: "1.0.0",
-        listed: true,
-        idOnly: true,
+        token: hqToken,
         buildParams: (p) => ({
           page_no: p,
           page_size: pageSize,
-          kdt_ids: [shop.kdt_id],
-          item_type: 61,
+          kdt_id: shop.kdt_id,
         }),
-      },
-      {
-        label: "items.onsale.get.3.0.0",
-        method: "youzan.items.onsale.get",
-        version: "3.0.0",
-        listed: true,
-        buildParams: (p) => ({ page_no: p, page_size: pageSize }),
-      },
-      {
-        label: "items.inventory.get.3.0.0",
-        method: "youzan.items.inventory.get",
-        version: "3.0.0",
-        listed: false,
-        buildParams: (p) => ({ page_no: p, page_size: pageSize, banner: "for_shelved" }),
-      },
-    ];
-
-    const fetchBaseDetail = async (itemId: number) => {
-      try {
-        const r = await callYouzanApiVerbose({
-          accessToken: token,
-          method: "youzan.item.base.get",
-          version: "1.0.0",
-          params: { item_id: itemId },
-          timeoutMs: 15_000,
-        });
-        const obj = r.payload as Record<string, unknown> | null;
-        return (obj?.item as Record<string, unknown> | undefined) ?? obj ?? null;
-      } catch {
-        return null;
-      }
-    };
+      });
+    }
 
     for (const m of attempts) {
       let page = 1;
@@ -777,7 +773,7 @@ async function runItemsSyncForShop(
       try {
         for (;;) {
           const r = await callYouzanApiVerbose({
-            accessToken: token,
+            accessToken: m.token,
             method: m.method,
             version: m.version,
             params: m.buildParams(page),
@@ -785,29 +781,12 @@ async function runItemsSyncForShop(
           });
           lastPreview = r.preview;
           lastTrace = r.trace_id;
-          const items = pickItemRows(r.payload);
+          const items = pickSpuRows(r.payload);
           attemptReturned += items.length;
           if (items.length === 0) break;
 
-          // 如果接口只返回 ID，逐个补 base.get（限制并发到 5）
-          let detailed = items;
-          if (m.idOnly) {
-            const ids = items
-              .map((it) => Number(it.item_id ?? it.itemId ?? it.id ?? 0))
-              .filter((x) => x > 0 && !seen.has(x));
-            const results: Array<Record<string, unknown>> = [];
-            for (let i = 0; i < ids.length; i += 5) {
-              const batch = ids.slice(i, i + 5);
-              const got = await Promise.all(batch.map((id) => fetchBaseDetail(id)));
-              got.forEach((g, idx) => {
-                if (g) results.push({ ...g, item_id: g.item_id ?? batch[idx] });
-              });
-            }
-            detailed = results;
-          }
-
-          const rows = detailed
-            .map((it) => normalizeItemRow(it, shop, m.listed))
+          const rows = items
+            .map((it) => normalizeSpuRow(it, shop))
             .filter((r): r is NonNullable<typeof r> => !!r && !seen.has(r.item_id))
             .map((r) => {
               seen.add(r.item_id);
@@ -823,18 +802,15 @@ async function runItemsSyncForShop(
           }
           if (items.length < pageSize) break;
           page += 1;
-          if (page > 100) break;
+          if (page > 200) break;
         }
         attemptMsgs.push(`${m.label}: 返回 ${attemptReturned} 入库 ${attemptUpserted}`);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        // 4005「非法的API」= 该店铺不支持此接口，标注一下就跳过
-        const friendly = /4005|非法的API/.test(msg) ? `${msg}（店铺不支持，跳过）` : msg;
-        attemptMsgs.push(`${m.label}: ${friendly}`);
+        attemptMsgs.push(`${m.label}: ${msg}`);
       }
       totalReturned += attemptReturned;
       totalUpserted += attemptUpserted;
-      // 已经成功拉到数据就不再尝试其余接口（避免重复 / 不必要的 4005）
       if (attemptUpserted > 0) break;
     }
 
@@ -884,6 +860,7 @@ export const syncYouzanItems = createServerFn({ method: "POST" })
     const shop = await getShopOr404({ shop_id: data.shop_id });
     return runItemsSyncForShop(shop);
   });
+
 
 // ============================================================
 // 内部：单店订单同步（被 syncYouzanOrders / syncAllShops 复用）
