@@ -97,6 +97,15 @@ function YouzanPage() {
   const pingFn = useServerFn(pingYouzanShop);
   const removeFn = useServerFn(removeYouzanShop);
   const syncAllFn = useServerFn(syncAllShops);
+  const backfillFn = useServerFn(backfillShopOrders);
+
+  const backfillM = useMutation({
+    mutationFn: () => backfillFn(),
+    onSuccess: (r) => {
+      toast.success(`回填完成：扫描 ${r.scanned} · 更新 ${r.updated}`);
+    },
+    onError: (e: Error) => toast.error(`回填失败：${e.message}`),
+  });
 
   const shopsQ = useQuery({
     queryKey: ["youzan-shops"],
