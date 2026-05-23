@@ -863,7 +863,51 @@ export const syncYouzanItems = createServerFn({ method: "POST" })
 
 
 // ============================================================
-// 内部：单店订单同步（被 syncYouzanOrders / syncAllShops 复用）
+// 内部：从有赞零售返回结构里挖出订单/交易列表
+// ============================================================
+function pickTradeRows(raw: unknown): Array<Record<string, unknown>> {
+  const visited = new Set<unknown>();
+  const arrays: Array<Array<Record<string, unknown>>> = [];
+  const keys = [
+    "orders",
+    "order_list",
+    "orderList",
+    "trades",
+    "trade_list",
+    "tradeList",
+    "full_order_info_list",
+    "list",
+    "records",
+    "rows",
+  ];
+  const visit = (node: unknown, depth = 0) => {
+    if (!node || depth > 5 || visited.has(node)) return;
+    if (typeof node !== "object") return;
+    visited.add(node);
+    if (Array.isArray(node)) {
+      if (node.length && typeof node[0] === "object") {
+        arrays.push(node as Array<Record<string, unknown>>);
+      }
+      return;
+    }
+    const obj = node as Record<string, unknown>;
+    for (const k of keys) if (k in obj) visit(obj[k], depth + 1);
+    for (const k of ["data", "response", "result", "paginator", "page"]) {
+      if (k in obj) visit(obj[k], depth + 1);
+    }
+  };
+  visit(raw);
+  if (arrays.length === 0) return [];
+  arrays.sort((a, b) => b.length - a.length);
+  return arrays[0];
+}
+
+// ============================================================
+// 内部：单店订单同步（零售连锁版）
+// ------------------------------------------------------------
+// HQ      → 跳过，总部没有销售
+// Branch  → youzan.retail.trade.order.search（fallback：retail.trade.search）
+//           用总部 token + 分店 kdt_id + 时间窗
 // ============================================================
 async function runOrdersSyncForShop(
   shop: ShopRow,
@@ -874,6 +918,19 @@ async function runOrdersSyncForShop(
     const pad = (n: number) => String(n).padStart(2, "0");
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
   };
+
+  // HQ 不同步订单
+  if (shop.role === "hq") {
+    await supabase.from("youzan_sync_logs").insert({
+      shop_id: shop.id,
+      kdt_id: shop.kdt_id,
+      action: "orders",
+      status: "skipped",
+      message: "总部门店无销售数据（已跳过）",
+      finished_at: new Date().toISOString(),
+    } as never);
+    return { ok: true, count: 0, message: "总部门店无销售数据（已跳过）" };
+  }
 
   const { data: log } = await supabase
     .from("youzan_sync_logs")
@@ -894,17 +951,16 @@ async function runOrdersSyncForShop(
   let lastTrace: string | null = null;
 
   try {
-    const token = await ensureAccessToken(shop);
+    const hq = await getHqShop();
+    const token = await ensureAccessToken(hq);
     const pageSize = 100;
 
-    // 两种过滤模式都试一次：start_update / start_created
-    // 首次同步时，店铺可能根本没有 updated 数据但有 created 数据
-    const filterModes: Array<{ label: string; key: "update" | "created" }> = [
-      { label: "by_update", key: "update" },
-      { label: "by_created", key: "created" },
+    const attempts: Array<{ label: string; method: string; version: string }> = [
+      { label: "retail.trade.order.search", method: "youzan.retail.trade.order.search", version: "1.0.0" },
+      { label: "retail.trade.search", method: "youzan.retail.trade.search", version: "1.0.0" },
     ];
 
-    for (const mode of filterModes) {
+    for (const m of attempts) {
       let attemptReturned = 0;
       let attemptUpserted = 0;
       let page = 1;
@@ -913,50 +969,31 @@ async function runOrdersSyncForShop(
           const params: Record<string, unknown> = {
             page_no: page,
             page_size: pageSize,
+            kdt_id: shop.kdt_id,
+            start_update: fmt(startDate),
+            end_update: fmt(endDate),
           };
-          if (mode.key === "update") {
-            params.start_update = fmt(startDate);
-            params.end_update = fmt(endDate);
-          } else {
-            params.start_created = fmt(startDate);
-            params.end_created = fmt(endDate);
-          }
           const r = await callYouzanApiVerbose({
             accessToken: token,
-            method: "youzan.trades.sold.get",
-            version: "4.0.0",
+            method: m.method,
+            version: m.version,
             params,
           });
           lastPreview = r.preview;
           lastTrace = r.trace_id;
-          const raw = (r.payload && typeof r.payload === "object" ? r.payload : {}) as Record<string, unknown>;
-
-          // 兼容多种返回结构
-          const fullList = (raw.full_order_info_list as unknown) ??
-            (raw.full_trades as { trades?: unknown } | undefined)?.trades;
-          const tradesAny =
-            (raw.trades as unknown) ??
-            fullList ??
-            (raw.trade_list as unknown) ??
-            (raw.orders as unknown) ??
-            (raw.data as { trades?: unknown } | undefined)?.trades ??
-            [];
-          const trades = Array.isArray(tradesAny)
-            ? (tradesAny as Array<Record<string, unknown>>)
-            : [];
+          const trades = pickTradeRows(r.payload);
           attemptReturned += trades.length;
           if (trades.length === 0) break;
 
           const rows = trades
             .map((t) => {
-              // 兼容 full_order_info 嵌套结构
               const root = (t.full_order_info as Record<string, unknown> | undefined) ?? t;
               const tradeBase = (root.tradeBase ?? root.trade ?? root) as Record<string, unknown>;
               const node = { ...tradeBase, ...t };
-              const tid = String(node.tid ?? node.order_no ?? node.orderNo ?? "");
+              const tid = String(node.tid ?? node.order_no ?? node.orderNo ?? node.order_id ?? "");
               if (!tid) return null;
               const payTime = node.pay_time ? String(node.pay_time) : null;
-              const created = node.created ? String(node.created) : null;
+              const created = (node.created ?? node.create_time ?? node.createTime) ? String(node.created ?? node.create_time ?? node.createTime) : null;
               return {
                 shop_id: shop.id,
                 kdt_id: shop.kdt_id,
@@ -990,14 +1027,13 @@ async function runOrdersSyncForShop(
           page += 1;
           if (page > 500) break;
         }
-        attemptMsgs.push(`${mode.label}: 返回 ${attemptReturned} 入库 ${attemptUpserted}`);
+        attemptMsgs.push(`${m.label}: 返回 ${attemptReturned} 入库 ${attemptUpserted}`);
       } catch (e) {
         const errMsg = e instanceof Error ? e.message : String(e);
-        attemptMsgs.push(`${mode.label}: ${errMsg}`);
+        attemptMsgs.push(`${m.label}: ${errMsg}`);
       }
       totalReturned += attemptReturned;
       totalUpserted += attemptUpserted;
-      // 如果第一种已经拿到订单，就不再试第二种（避免重复）
       if (attemptReturned > 0) break;
     }
 
@@ -1037,6 +1073,7 @@ async function runOrdersSyncForShop(
     return { ok: false, count: totalUpserted, message: msg };
   }
 }
+
 
 export const syncYouzanOrders = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
