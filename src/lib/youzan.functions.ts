@@ -1509,10 +1509,10 @@ export const listShopOrders = createServerFn({ method: "GET" }).handler(
       supabase
         .from("youzan_orders")
         .select(
-          "id, tid, kdt_id, shop_id, status, buyer_nick, payment, total_fee, num, pay_time, created_time",
+          "id, tid, kdt_id, shop_id, status, status_text, buyer_nick, buyer_open_id, payment, total_fee, num, item_count, sku_count, item_titles, first_item_image, receiver_name, receiver_tel, receiver_address, outer_transaction_no, post_fee, pay_time, created_time, raw",
         )
         .order("pay_time", { ascending: false, nullsFirst: false })
-        .limit(300),
+        .limit(2000),
       supabase.from("youzan_shops").select("id, shop_name, kdt_id"),
     ]);
     if (ordersRes.error) throw new Error(ordersRes.error.message);
@@ -1520,5 +1520,57 @@ export const listShopOrders = createServerFn({ method: "GET" }).handler(
     return { orders: ordersRes.data ?? [], shops: shopsRes.data ?? [] };
   },
 );
+
+// ============================================================
+// backfillShopOrders — 用 raw 重新跑 enrich，把新字段补齐
+// ============================================================
+export const backfillShopOrders = createServerFn({ method: "POST" }).handler(
+  async () => {
+    const pageSize = 500;
+    let offset = 0;
+    let scanned = 0;
+    let updated = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from("youzan_orders")
+        .select("id, status, raw")
+        .range(offset, offset + pageSize - 1);
+      if (error) throw new Error(error.message);
+      if (!data || data.length === 0) break;
+      scanned += data.length;
+      for (const row of data) {
+        const raw = (row as { raw: unknown }).raw;
+        if (!raw || typeof raw !== "object") continue;
+        const status = (row as { status: string | null }).status ?? null;
+        const enriched = enrichOrderFields(raw as Record<string, unknown>, status);
+        const patch: Record<string, unknown> = {
+          buyer_open_id: enriched.buyer_open_id,
+          item_count: enriched.item_count,
+          sku_count: enriched.sku_count,
+          item_titles: enriched.item_titles,
+          first_item_image: enriched.first_item_image,
+          receiver_name: enriched.receiver_name,
+          receiver_tel: enriched.receiver_tel,
+          receiver_address: enriched.receiver_address,
+          outer_transaction_no: enriched.outer_transaction_no,
+          post_fee: enriched.post_fee,
+          status_text: enriched.status_text,
+        };
+        if (enriched.buyer_nick) patch.buyer_nick = enriched.buyer_nick;
+        if (enriched.item_count && enriched.item_count > 0) patch.num = enriched.item_count;
+        const { error: upErr } = await supabase
+          .from("youzan_orders")
+          .update(patch)
+          .eq("id", (row as { id: string }).id);
+        if (!upErr) updated += 1;
+      }
+      if (data.length < pageSize) break;
+      offset += pageSize;
+      if (offset > 50000) break;
+    }
+    return { scanned, updated };
+  },
+);
+
 
 
