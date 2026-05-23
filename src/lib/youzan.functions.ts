@@ -1023,6 +1023,122 @@ function parseYzTime(raw: string | null): string | null {
   return isNaN(d.getTime()) ? null : d.toISOString();
 }
 
+// ============================================================
+// 从原始 trade JSON 里抽取展示字段（商品摘要 / 收货 / 买家 / 件数 …）
+// ============================================================
+type EnrichedFields = {
+  buyer_nick: string | null;
+  buyer_open_id: string | null;
+  item_count: number | null;
+  sku_count: number | null;
+  item_titles: string | null;
+  first_item_image: string | null;
+  receiver_name: string | null;
+  receiver_tel: string | null;
+  receiver_address: string | null;
+  outer_transaction_no: string | null;
+  post_fee: number | null;
+  status_text: string | null;
+};
+
+function pickFirst(obj: Record<string, unknown>, keys: string[]): string | null {
+  for (const k of keys) {
+    const v = obj[k];
+    if (v !== undefined && v !== null && String(v).trim() !== "") return String(v);
+  }
+  return null;
+}
+function pickFirstNum(obj: Record<string, unknown>, keys: string[]): number | null {
+  for (const k of keys) {
+    const v = obj[k];
+    if (v !== undefined && v !== null && v !== "") {
+      const n = Number(v);
+      if (!Number.isNaN(n)) return n;
+    }
+  }
+  return null;
+}
+
+export function enrichOrderFields(
+  trade: Record<string, unknown>,
+  status: string | null,
+): EnrichedFields {
+  const fullOrder = ((trade.full_order_info ?? trade.fullOrderInfo ?? {}) as Record<string, unknown>);
+  const ordersArr = (fullOrder.orders as Array<Record<string, unknown>> | undefined) ?? [];
+  const addr = ((fullOrder.address_info ?? fullOrder.addressInfo ?? {}) as Record<string, unknown>);
+  const buyer = ((fullOrder.buyer_info ?? fullOrder.buyerInfo ?? {}) as Record<string, unknown>);
+  const payInfo = ((fullOrder.pay_info ?? fullOrder.payInfo ?? {}) as Record<string, unknown>);
+
+  // 件数：累加所有子单 num
+  let itemCount = 0;
+  for (const o of ordersArr) itemCount += Number((o?.num as unknown) ?? 0) || 0;
+
+  // 商品摘要
+  const titles = ordersArr
+    .map((o) => String((o?.title as unknown) ?? "").trim())
+    .filter(Boolean);
+  let itemTitles: string | null = null;
+  if (titles.length > 0) {
+    const head = titles.slice(0, 3).join("、");
+    itemTitles = titles.length > 3 ? `${head} 等 ${titles.length} 件` : head;
+  }
+
+  // 首张商品图：orders[0].pic_url / sku_pic_url / image
+  let firstImg: string | null = null;
+  if (ordersArr[0]) {
+    firstImg = pickFirst(ordersArr[0] as Record<string, unknown>, [
+      "pic_url",
+      "picUrl",
+      "sku_pic_url",
+      "skuPicUrl",
+      "pic_thumb_url",
+      "image",
+      "img_url",
+    ]);
+  }
+
+  // 买家
+  const buyerNick =
+    pickFirst(buyer, ["fans_nickname", "fansNickname", "buyer_nick", "buyerNick", "nickname", "nick"]) ??
+    (pickFirst(buyer, ["outer_user_id", "outerUserId"]) ?? null);
+  const buyerOpenId = pickFirst(buyer, ["yz_open_id", "yzOpenId", "openId", "open_id"]);
+
+  // 收货
+  const receiverName = pickFirst(addr, ["receiver_name", "receiverName"]);
+  const receiverTel = pickFirst(addr, ["receiver_tel", "receiverTel", "receiver_mobile", "receiverMobile"]);
+  const parts = [
+    pickFirst(addr, ["delivery_province", "deliveryProvince", "province"]),
+    pickFirst(addr, ["delivery_city", "deliveryCity", "city"]),
+    pickFirst(addr, ["delivery_district", "deliveryDistrict", "district"]),
+    pickFirst(addr, ["delivery_address", "deliveryAddress", "address"]),
+  ].filter(Boolean);
+  const receiverAddress = parts.length > 0 ? parts.join(" ") : null;
+
+  // 支付
+  let outerTxn: string | null = null;
+  const outerArr = payInfo.outer_transactions ?? payInfo.outerTransactions;
+  if (Array.isArray(outerArr) && outerArr.length > 0) outerTxn = String(outerArr[0] ?? "") || null;
+  const postFee = pickFirstNum(payInfo, ["post_fee", "postFee"]);
+
+  return {
+    buyer_nick: buyerNick,
+    buyer_open_id: buyerOpenId,
+    item_count: itemCount > 0 ? itemCount : null,
+    sku_count: ordersArr.length > 0 ? ordersArr.length : null,
+    item_titles: itemTitles,
+    first_item_image: firstImg,
+    receiver_name: receiverName,
+    receiver_tel: receiverTel,
+    receiver_address: receiverAddress,
+    outer_transaction_no: outerTxn,
+    post_fee: postFee,
+    status_text: status ? yzStatusText(status) : null,
+  };
+}
+
+
+
+
 
 
 // ============================================================
