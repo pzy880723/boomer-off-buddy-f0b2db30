@@ -937,6 +937,94 @@ function pickTradeRows(raw: unknown): Array<Record<string, unknown>> {
 }
 
 // ============================================================
+// 内部：把一条 trade（无论 trades.sold.get / retail.* 哪种结构）
+// 平展成 { k -> v } lookup，再用多 key 别名取字段。
+// ------------------------------------------------------------
+// 有赞 4.x 返回结构：
+//   full_order_info_list[i] = { full_order_info: { tradeBase, orderInfo, payInfo, ... } }
+// 字段名可能是 snake_case 也可能 camelCase，金额/时间放在 payInfo 里
+// ============================================================
+function flattenTrade(trade: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  const seen = new Set<unknown>();
+  const SUB_KEYS = [
+    "full_order_info",
+    "fullOrderInfo",
+    "tradeBase",
+    "trade_base",
+    "trade",
+    "orderInfo",
+    "order_info",
+    "payInfo",
+    "pay_info",
+    "buyerInfo",
+    "buyer_info",
+    "logisticsInfo",
+    "logistics_info",
+    "promotionDetail",
+    "extraInfo",
+  ];
+  const walk = (node: unknown, depth: number) => {
+    if (!node || typeof node !== "object" || seen.has(node) || depth > 4) return;
+    seen.add(node);
+    if (Array.isArray(node)) return;
+    const obj = node as Record<string, unknown>;
+    for (const [k, v] of Object.entries(obj)) {
+      if (v === null || typeof v !== "object") {
+        if (!(k in out)) out[k] = v;
+      } else if (SUB_KEYS.includes(k)) {
+        walk(v, depth + 1);
+      }
+    }
+  };
+  walk(trade, 0);
+  return out;
+}
+
+function pickStr(n: Record<string, unknown>, keys: string[]): string | null {
+  for (const k of keys) {
+    const v = n[k];
+    if (v !== undefined && v !== null && String(v).trim() !== "") return String(v);
+  }
+  return null;
+}
+function pickNum(n: Record<string, unknown>, keys: string[]): number {
+  for (const k of keys) {
+    const v = n[k];
+    if (v !== undefined && v !== null && v !== "") {
+      const num = Number(v);
+      if (!Number.isNaN(num)) return num;
+    }
+  }
+  return 0;
+}
+// 有赞返回的时间多为 "YYYY-MM-DD HH:mm:ss"（北京时间，无时区），
+// 直接 new Date 会按本机时区解析。这里强制按 +08:00 解析为 UTC ISO。
+function parseYzTime(raw: string | null): string | null {
+  if (!raw) return null;
+  const s = String(raw).trim();
+  if (!s || s === "0" || s.startsWith("1970") || s.startsWith("0000")) return null;
+  if (/^\d{10,13}$/.test(s)) {
+    const ms = s.length === 10 ? Number(s) * 1000 : Number(s);
+    return new Date(ms).toISOString();
+  }
+  if (/T/.test(s) || /Z$/.test(s) || /[+-]\d{2}:?\d{2}$/.test(s)) {
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? null : d.toISOString();
+  }
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
+  if (m) {
+    const iso = `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}+08:00`;
+    const d = new Date(iso);
+    return isNaN(d.getTime()) ? null : d.toISOString();
+  }
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+
+
+// ============================================================
 // 内部：单店订单同步（零售连锁版）
 // ------------------------------------------------------------
 // HQ      → 跳过，总部没有销售
