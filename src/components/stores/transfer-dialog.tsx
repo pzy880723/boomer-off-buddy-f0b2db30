@@ -103,7 +103,23 @@ export function TransferDialog({
     queryFn: () => itemListFn({ data: { shop_id: otherShopId, limit: 500 } }),
     enabled: !!otherShopId && (kind === "shop_to_shop"),
   });
-  const otherItems = (otherItemsData?.items ?? []) as Item[];
+  // 把聚合后的 items 拆成属于 otherShopId 的具体门店行
+  const aggregated = (otherItemsData?.items ?? []) as Array<{
+    item_id: number;
+    title: string | null;
+    rows: Array<{ id: string; shop_id: string; item_id: number; title: string | null; stock_qty: number }>;
+  }>;
+  const otherItems: Item[] = aggregated.flatMap((it) =>
+    it.rows
+      .filter((r) => r.shop_id === otherShopId)
+      .map((r) => ({
+        id: r.id,
+        shop_id: r.shop_id,
+        item_id: r.item_id,
+        title: r.title ?? it.title,
+        stock_qty: r.stock_qty,
+      })),
+  );
 
   const submit = async () => {
     if (qty < 1) return toast.error("数量需 ≥ 1");
