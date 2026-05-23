@@ -420,7 +420,7 @@ function OrderDetail({ row }: { row: Record<string, unknown> }) {
             {row.receiver_tel ? ` · ${row.receiver_tel}` : ""}
           </div>
           <div className="text-muted-foreground">
-            {(row.receiver_address as string) ??
+            {((row.receiver_address as string | null) ??
               [
                 addr.delivery_province,
                 addr.delivery_city,
@@ -428,7 +428,7 @@ function OrderDetail({ row }: { row: Record<string, unknown> }) {
                 addr.delivery_address,
               ]
                 .filter(Boolean)
-                .join(" ") ||
+                .join(" ")) ||
               "—"}
           </div>
         </div>
