@@ -1560,7 +1560,7 @@ export const backfillShopOrders = createServerFn({ method: "POST" }).handler(
         if (enriched.item_count && enriched.item_count > 0) patch.num = enriched.item_count;
         const { error: upErr } = await supabase
           .from("youzan_orders")
-          .update(patch)
+          .update(patch as never)
           .eq("id", (row as { id: string }).id);
         if (!upErr) updated += 1;
       }
