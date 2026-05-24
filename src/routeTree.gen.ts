@@ -64,6 +64,7 @@ import { Route as PurchaseDomesticBulkNewRouteImport } from './routes/purchase.d
 import { Route as PurchaseDomesticBulkIdRouteImport } from './routes/purchase.domestic-bulk.$id'
 import { Route as MSkusIdRouteImport } from './routes/m.skus.$id'
 import { Route as MReceiveIdRouteImport } from './routes/m.receive.$id'
+import { Route as MProductsCodeRouteImport } from './routes/m.products.$code'
 import { Route as InventorySkusIdRouteImport } from './routes/inventory.skus.$id'
 import { Route as InventoryProductsCodeRouteImport } from './routes/inventory.products.$code'
 import { Route as InventoryInboundNewRouteImport } from './routes/inventory.inbound.new'
@@ -349,6 +350,11 @@ const MReceiveIdRoute = MReceiveIdRouteImport.update({
   path: '/receive/$id',
   getParentRoute: () => MRoute,
 } as any)
+const MProductsCodeRoute = MProductsCodeRouteImport.update({
+  id: '/products/$code',
+  path: '/products/$code',
+  getParentRoute: () => MRoute,
+} as any)
 const InventorySkusIdRoute = InventorySkusIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -421,6 +427,7 @@ export interface FileRoutesByFullPath {
   '/inventory/inbound/new': typeof InventoryInboundNewRoute
   '/inventory/products/$code': typeof InventoryProductsCodeRoute
   '/inventory/skus/$id': typeof InventorySkusIdRoute
+  '/m/products/$code': typeof MProductsCodeRoute
   '/m/receive/$id': typeof MReceiveIdRoute
   '/m/skus/$id': typeof MSkusIdRoute
   '/purchase/domestic-bulk/$id': typeof PurchaseDomesticBulkIdRoute
@@ -476,6 +483,7 @@ export interface FileRoutesByTo {
   '/inventory/inbound/new': typeof InventoryInboundNewRoute
   '/inventory/products/$code': typeof InventoryProductsCodeRoute
   '/inventory/skus/$id': typeof InventorySkusIdRoute
+  '/m/products/$code': typeof MProductsCodeRoute
   '/m/receive/$id': typeof MReceiveIdRoute
   '/m/skus/$id': typeof MSkusIdRoute
   '/purchase/domestic-bulk/$id': typeof PurchaseDomesticBulkIdRoute
@@ -539,6 +547,7 @@ export interface FileRoutesById {
   '/inventory/inbound/new': typeof InventoryInboundNewRoute
   '/inventory/products/$code': typeof InventoryProductsCodeRoute
   '/inventory/skus/$id': typeof InventorySkusIdRoute
+  '/m/products/$code': typeof MProductsCodeRoute
   '/m/receive/$id': typeof MReceiveIdRoute
   '/m/skus/$id': typeof MSkusIdRoute
   '/purchase/domestic-bulk/$id': typeof PurchaseDomesticBulkIdRoute
@@ -603,6 +612,7 @@ export interface FileRouteTypes {
     | '/inventory/inbound/new'
     | '/inventory/products/$code'
     | '/inventory/skus/$id'
+    | '/m/products/$code'
     | '/m/receive/$id'
     | '/m/skus/$id'
     | '/purchase/domestic-bulk/$id'
@@ -658,6 +668,7 @@ export interface FileRouteTypes {
     | '/inventory/inbound/new'
     | '/inventory/products/$code'
     | '/inventory/skus/$id'
+    | '/m/products/$code'
     | '/m/receive/$id'
     | '/m/skus/$id'
     | '/purchase/domestic-bulk/$id'
@@ -720,6 +731,7 @@ export interface FileRouteTypes {
     | '/inventory/inbound/new'
     | '/inventory/products/$code'
     | '/inventory/skus/$id'
+    | '/m/products/$code'
     | '/m/receive/$id'
     | '/m/skus/$id'
     | '/purchase/domestic-bulk/$id'
@@ -1152,6 +1164,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MReceiveIdRouteImport
       parentRoute: typeof MRoute
     }
+    '/m/products/$code': {
+      id: '/m/products/$code'
+      path: '/products/$code'
+      fullPath: '/m/products/$code'
+      preLoaderRoute: typeof MProductsCodeRouteImport
+      parentRoute: typeof MRoute
+    }
     '/inventory/skus/$id': {
       id: '/inventory/skus/$id'
       path: '/$id'
@@ -1207,6 +1226,7 @@ interface MRouteChildren {
   MScanRoute: typeof MScanRoute
   MSkusRoute: typeof MSkusRouteWithChildren
   MIndexRoute: typeof MIndexRoute
+  MProductsCodeRoute: typeof MProductsCodeRoute
   MReceiveIdRoute: typeof MReceiveIdRoute
 }
 
@@ -1217,6 +1237,7 @@ const MRouteChildren: MRouteChildren = {
   MScanRoute: MScanRoute,
   MSkusRoute: MSkusRouteWithChildren,
   MIndexRoute: MIndexRoute,
+  MProductsCodeRoute: MProductsCodeRoute,
   MReceiveIdRoute: MReceiveIdRoute,
 }
 
