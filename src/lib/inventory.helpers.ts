@@ -25,11 +25,12 @@ export const CATEGORY_CODE: Record<string, string> = Object.fromEntries(
 
 export const PRICE_TIERS = [6.9, 9.9, 15.9, 19.9, 29.9, 39.9, 49.9] as const;
 
-export type SkuKind = "single" | "pack";
+export type SkuKind = "single" | "pack" | "bundle";
 
 export const SKU_KIND_LABEL: Record<SkuKind, string> = {
   single: "单品",
   pack: "组包",
+  bundle: "组包",
 };
 
 export const SKU_STATUS_LABEL: Record<string, string> = {
