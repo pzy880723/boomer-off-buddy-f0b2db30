@@ -279,4 +279,23 @@ export const traceByEpc = createServerFn({ method: "GET" })
     return { sku, batches: batches ?? [], lines: lines ?? [] };
   });
 
+/** 更新单个子商品的到货照片列表 */
+export const updateItemArrivalPhotos = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        item_id: z.string().uuid(),
+        photo_urls: z.array(z.string().url()).max(9),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { error } = await supabaseAdmin
+      .from("japan_parcel_items")
+      .update({ arrival_photo_urls: data.photo_urls })
+      .eq("id", data.item_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 export const MOBILE_PRICE_TIERS = PRICE_TIERS;

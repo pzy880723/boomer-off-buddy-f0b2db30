@@ -1,17 +1,17 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useRef, Fragment } from "react";
-import { Camera, Check, AlertTriangle, Loader2, ArrowRight, X, Plus, ImageIcon, ChevronRight } from "lucide-react";
+import { useState, Fragment } from "react";
+import { Check, AlertTriangle, Loader2, ArrowRight, ChevronRight } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { MobileShell } from "@/components/mobile/mobile-shell";
 import { getJapanParcel } from "@/lib/japan-parcel.functions";
 import { markParcelDelivered, markParcelProblem } from "@/lib/mobile.functions";
-import { uploadParcelImage } from "@/lib/image-upload";
 import { toThumbUrl } from "@/lib/image";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ItemDetailSheet, type ItemDetailValue } from "@/components/mobile/item-detail-sheet";
+import { PhotoUploaderGrid } from "@/components/mobile/photo-uploader-grid";
 
 export const Route = createFileRoute("/m/receive/$id")({
   component: ReceivePage,
@@ -33,57 +33,10 @@ function ReceivePage() {
   });
 
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
-  const [uploading, setUploading] = useState(0);
   const [note, setNote] = useState("");
   const [showProblem, setShowProblem] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
   const [detailItem, setDetailItem] = useState<ItemDetailValue | null>(null);
-  const captureRef = useRef<HTMLInputElement>(null);
-  const burstRef = useRef<HTMLInputElement>(null);
-  const galleryRef = useRef<HTMLInputElement>(null);
-  const continuousRef = useRef(false);
 
-  async function handleFiles(files: FileList | null, opts?: { burst?: boolean }) {
-    if (!files || files.length === 0) {
-      if (opts?.burst) continuousRef.current = false;
-      return;
-    }
-    setPhotoUrls((prev) => {
-      const remain = MAX_PHOTOS - prev.length;
-      if (remain <= 0) {
-        toast.error(`最多 ${MAX_PHOTOS} 张`);
-        return prev;
-      }
-      const list = Array.from(files).slice(0, remain);
-      setUploading((n) => n + list.length);
-      void (async () => {
-        const results = await Promise.allSettled(
-          list.map((f) => uploadParcelImage(f, "receive", id)),
-        );
-        const ok: string[] = [];
-        let failed = 0;
-        for (const r of results) {
-          if (r.status === "fulfilled") ok.push(r.value);
-          else failed++;
-        }
-        if (ok.length) setPhotoUrls((p) => [...p, ...ok].slice(0, MAX_PHOTOS));
-        setUploading((n) => Math.max(0, n - list.length));
-        if (failed) toast.error(`${failed} 张上传失败`);
-        // 连拍：上传完成后自动再次唤起相机，直到达到上限或用户取消
-        if (opts?.burst && continuousRef.current) {
-          setTimeout(() => {
-            setPhotoUrls((cur) => {
-              if (cur.length < MAX_PHOTOS && continuousRef.current) {
-                burstRef.current?.click();
-              }
-              return cur;
-            });
-          }, 150);
-        }
-      })();
-      return prev;
-    });
-  }
 
   const deliverMut = useMutation({
     mutationFn: () => doDelivered({ data: { id, photo_urls: photoUrls } }),
@@ -234,77 +187,18 @@ function ReceivePage() {
 
           <section className="space-y-2">
             <h3 className="px-1 text-xs font-medium text-muted-foreground">
-              到货照片（必填，最多 {MAX_PHOTOS} 张）
+              包裹照片（必填，最多 {MAX_PHOTOS} 张）
             </h3>
-            <div className="grid grid-cols-3 gap-2">
-              {photoUrls.map((url, i) => (
-                <div
-                  key={url + i}
-                  className="relative aspect-square overflow-hidden rounded-xl border bg-muted"
-                >
-                  <img src={url} alt="" className="h-full w-full object-cover" />
-                  <button
-                    type="button"
-                    onClick={() => setPhotoUrls((prev) => prev.filter((_, idx) => idx !== i))}
-                    className="absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white"
-                    aria-label="删除"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ))}
-              {photoUrls.length < MAX_PHOTOS ? (
-                <button
-                  type="button"
-                  onClick={() => setPickerOpen(true)}
-                  className="flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-muted-foreground/30 bg-muted/30 text-muted-foreground active:bg-muted"
-                  disabled={uploading > 0}
-                >
-                  {uploading > 0 ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : (
-                    <>
-                      <Plus className="h-5 w-5" />
-                      <span className="text-[10px]">添加</span>
-                    </>
-                  )}
-                </button>
-              ) : null}
-            </div>
-            <input
-              ref={captureRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={(e) => {
-                handleFiles(e.target.files);
-                e.currentTarget.value = "";
-              }}
+            <p className="px-1 text-[10px] text-muted-foreground">
+              请拍清楚面单、外箱多角度，如有破损一并记录。子商品的到货照片可在上方对应条目中分别拍摄。
+            </p>
+            <PhotoUploaderGrid
+              value={photoUrls}
+              onChange={setPhotoUrls}
+              folder="receive"
+              parcelId={id}
+              max={MAX_PHOTOS}
             />
-            <input
-              ref={burstRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={(e) => {
-                handleFiles(e.target.files, { burst: true });
-                e.currentTarget.value = "";
-              }}
-            />
-            <input
-              ref={galleryRef}
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={(e) => {
-                handleFiles(e.target.files);
-                e.currentTarget.value = "";
-              }}
-            />
-            
           </section>
 
           <div className="grid grid-cols-2 gap-2 pt-1">
@@ -363,58 +257,6 @@ function ReceivePage() {
         </div>
       )}
 
-      {/* 拍照 / 相册 picker */}
-      {pickerOpen ? (
-        <div
-          className="fixed inset-0 z-40 flex items-end bg-black/50"
-          onClick={() => setPickerOpen(false)}
-        >
-          <div
-            className="w-full space-y-2 rounded-t-2xl bg-card p-3 pb-[calc(env(safe-area-inset-bottom)+12px)]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border bg-primary text-sm font-medium text-primary-foreground active:opacity-80"
-              onClick={() => {
-                setPickerOpen(false);
-                continuousRef.current = true;
-                burstRef.current?.click();
-              }}
-            >
-              <Camera className="h-4 w-4" /> 连拍（自动续拍直到完成）
-            </button>
-            <button
-              type="button"
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border bg-background text-sm font-medium active:bg-muted"
-              onClick={() => {
-                setPickerOpen(false);
-                continuousRef.current = false;
-                captureRef.current?.click();
-              }}
-            >
-              <Camera className="h-4 w-4" /> 拍一张
-            </button>
-            <button
-              type="button"
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border bg-background text-sm font-medium active:bg-muted"
-              onClick={() => {
-                setPickerOpen(false);
-                galleryRef.current?.click();
-              }}
-            >
-              <ImageIcon className="h-4 w-4" /> 从相册选择（多选）
-            </button>
-            <button
-              type="button"
-              className="h-12 w-full rounded-xl text-sm text-muted-foreground"
-              onClick={() => setPickerOpen(false)}
-            >
-              取消
-            </button>
-          </div>
-        </div>
-      ) : null}
 
       <ItemDetailSheet
         open={!!detailItem}

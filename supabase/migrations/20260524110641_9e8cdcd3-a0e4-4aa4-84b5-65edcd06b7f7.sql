@@ -1,0 +1,1 @@
+ALTER TABLE public.japan_parcel_items ADD COLUMN IF NOT EXISTS arrival_photo_urls jsonb NOT NULL DEFAULT '[]'::jsonb;

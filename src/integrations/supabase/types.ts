@@ -435,6 +435,7 @@ export type Database = {
       japan_parcel_items: {
         Row: {
           addon_service: string | null
+          arrival_photo_urls: Json
           condition: string | null
           created_at: string
           domestic_freight_jpy: number | null
@@ -469,6 +470,7 @@ export type Database = {
         }
         Insert: {
           addon_service?: string | null
+          arrival_photo_urls?: Json
           condition?: string | null
           created_at?: string
           domestic_freight_jpy?: number | null
@@ -503,6 +505,7 @@ export type Database = {
         }
         Update: {
           addon_service?: string | null
+          arrival_photo_urls?: Json
           condition?: string | null
           created_at?: string
           domestic_freight_jpy?: number | null
