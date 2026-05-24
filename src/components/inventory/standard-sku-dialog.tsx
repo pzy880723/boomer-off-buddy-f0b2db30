@@ -2,7 +2,6 @@ import { useMemo, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Plus, Check, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -12,10 +11,10 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createStandardSkus } from "@/lib/inventory.functions";
-import { PRICE_TIERS, generateEpc } from "@/lib/inventory.helpers";
+import { generateEpc } from "@/lib/inventory.helpers";
+import { PriceTierEditor } from "./price-tier-editor";
 import { SkuMetaFields, emptySkuMeta, type SkuMetaState } from "./sku-meta-fields";
 
 export function StandardSkuDialog({
