@@ -1,0 +1,1 @@
+ALTER TABLE public.inv_skus ADD COLUMN IF NOT EXISTS is_custom_price boolean NOT NULL DEFAULT false;

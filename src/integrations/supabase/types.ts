@@ -361,6 +361,7 @@ export type Database = {
           epc: string
           id: string
           image_url: string | null
+          is_custom_price: boolean
           kind: string
           name: string
           notes: string | null
@@ -377,6 +378,7 @@ export type Database = {
           epc: string
           id?: string
           image_url?: string | null
+          is_custom_price?: boolean
           kind?: string
           name: string
           notes?: string | null
@@ -393,6 +395,7 @@ export type Database = {
           epc?: string
           id?: string
           image_url?: string | null
+          is_custom_price?: boolean
           kind?: string
           name?: string
           notes?: string | null
