@@ -47,7 +47,7 @@ function ScanPage() {
         const r = await doTrace({ data: { epc: v } });
         if (r.sku) {
           toast.success(`找到 SKU：${r.sku.name}`);
-          router.navigate({ to: "/inventory/skus/$id", params: { id: r.sku.id } });
+          router.navigate({ to: "/m/skus/$id", params: { id: r.sku.id } });
         } else {
           toast.error(`未匹配 EPC：${v}`);
         }
