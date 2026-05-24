@@ -51,13 +51,35 @@ export function ItemDetailSheet({
   onOpenChange: (o: boolean) => void;
   item: ItemDetailValue | null;
 }) {
+  const qc = useQueryClient();
+  const saveFn = useServerFn(updateItemArrivalPhotos);
+  const [photos, setPhotos] = useState<string[]>([]);
+
+  useEffect(() => {
+    setPhotos(Array.isArray(item?.arrival_photo_urls) ? item!.arrival_photo_urls! : []);
+  }, [item?.id, item?.arrival_photo_urls]);
+
   if (!item) return null;
   const img = item.item_image_url
     ? toThumbUrl(item.item_image_url, 600) ?? item.item_image_url
     : null;
+
+  const handleChange = (urls: string[]) => {
+    setPhotos(urls);
+    void (async () => {
+      try {
+        await saveFn({ data: { item_id: item.id, photo_urls: urls } });
+        qc.invalidateQueries({ queryKey: ["mobile-parcel"] });
+      } catch (e) {
+        toast.error((e as Error).message);
+      }
+    })();
+  };
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="max-h-[90dvh] overflow-y-auto rounded-t-2xl p-0">
+
         <SheetHeader className="px-4 pt-4">
           <SheetTitle className="text-left text-base">
             {item.item_title_cn || item.item_title || "(未命名)"}
