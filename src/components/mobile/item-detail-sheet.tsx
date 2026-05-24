@@ -157,6 +157,22 @@ export function ItemDetailSheet({
               </>
             ) : null}
           </div>
+
+          <div className="rounded-xl border bg-card p-3">
+            <div className="mb-2 flex items-baseline justify-between">
+              <h4 className="text-xs font-medium">到货照片</h4>
+              <span className="text-[10px] text-muted-foreground">
+                {photos.length}/9 · 支持连拍/多选
+              </span>
+            </div>
+            <PhotoUploaderGrid
+              value={photos}
+              onChange={handleChange}
+              folder="receive"
+              parcelId={item.parent_id ?? undefined}
+              cols={4}
+            />
+          </div>
         </div>
       </SheetContent>
     </Sheet>
