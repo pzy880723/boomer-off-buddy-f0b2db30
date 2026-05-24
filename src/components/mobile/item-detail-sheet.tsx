@@ -33,6 +33,8 @@ export interface ItemDetailValue {
   notes?: string | null;
   tariff_category?: string | null;
   tariff_rate?: number | null;
+  arrival_photo_urls?: string[] | null;
+  parent_id?: string | null;
 }
 
 const fmtJpy = (v: number | null | undefined) =>
