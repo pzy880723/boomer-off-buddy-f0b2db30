@@ -90,6 +90,25 @@ function SkuDetailPage() {
         </Card>
 
         <div className="space-y-4">
+          {sku.kind === "bundle" && bundleChildren.length > 0 && (
+            <Card className="p-4">
+              <h3 className="mb-3 text-sm font-semibold">包含子项</h3>
+              <ul className="divide-y">
+                {bundleChildren.map((c) => (
+                  <li key={c.id} className="flex items-center gap-3 py-2">
+                    <div className="h-10 w-10 shrink-0 overflow-hidden rounded bg-muted">
+                      {c.image_url ? <img src={c.image_url} alt={c.name} className="h-full w-full object-cover" /> : null}
+                    </div>
+                    <Link to="/inventory/skus/$id" params={{ id: c.id }} className="min-w-0 flex-1 hover:underline">
+                      <p className="truncate text-sm font-medium">{c.name}</p>
+                      <p className="font-mono text-[10px] text-muted-foreground">{formatPrice(c.price_tier)} · {c.epc}</p>
+                    </Link>
+                    <span className="text-sm font-bold tabular-nums">×{c.qty}</span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
           {/* 打印 RFID 标签 */}
           <Card className="p-4">
             <div className="mb-3 flex items-center justify-between">
