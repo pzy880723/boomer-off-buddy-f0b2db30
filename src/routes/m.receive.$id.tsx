@@ -257,58 +257,6 @@ function ReceivePage() {
         </div>
       )}
 
-      {/* 拍照 / 相册 picker */}
-      {pickerOpen ? (
-        <div
-          className="fixed inset-0 z-40 flex items-end bg-black/50"
-          onClick={() => setPickerOpen(false)}
-        >
-          <div
-            className="w-full space-y-2 rounded-t-2xl bg-card p-3 pb-[calc(env(safe-area-inset-bottom)+12px)]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border bg-primary text-sm font-medium text-primary-foreground active:opacity-80"
-              onClick={() => {
-                setPickerOpen(false);
-                continuousRef.current = true;
-                burstRef.current?.click();
-              }}
-            >
-              <Camera className="h-4 w-4" /> 连拍（自动续拍直到完成）
-            </button>
-            <button
-              type="button"
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border bg-background text-sm font-medium active:bg-muted"
-              onClick={() => {
-                setPickerOpen(false);
-                continuousRef.current = false;
-                captureRef.current?.click();
-              }}
-            >
-              <Camera className="h-4 w-4" /> 拍一张
-            </button>
-            <button
-              type="button"
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border bg-background text-sm font-medium active:bg-muted"
-              onClick={() => {
-                setPickerOpen(false);
-                galleryRef.current?.click();
-              }}
-            >
-              <ImageIcon className="h-4 w-4" /> 从相册选择（多选）
-            </button>
-            <button
-              type="button"
-              className="h-12 w-full rounded-xl text-sm text-muted-foreground"
-              onClick={() => setPickerOpen(false)}
-            >
-              取消
-            </button>
-          </div>
-        </div>
-      ) : null}
 
       <ItemDetailSheet
         open={!!detailItem}
