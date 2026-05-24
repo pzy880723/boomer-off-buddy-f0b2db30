@@ -109,3 +109,94 @@ export function SingleSkuCard({ row }: { row: SkuRow }) {
     </Link>
   );
 }
+
+/** 列表行 - 标准商品 */
+export function StandardProductRow({ group }: { group: StandardProductGroup }) {
+  const visibleTiers = group.tiers.slice(0, 4);
+  const remaining = group.tiers.length - visibleTiers.length;
+  return (
+    <Link
+      to="/inventory/products/$code"
+      params={{ code: group.key }}
+      className="flex items-center gap-3 border-b px-3 py-2.5 transition-colors last:border-b-0 hover:bg-muted/60"
+    >
+      <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded bg-muted">
+        {group.image_url ? (
+          <img src={group.image_url} alt={group.name} className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+            <Tags className="h-5 w-5" />
+          </div>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="truncate text-sm font-medium">{group.name}</span>
+          <Badge variant="outline" className="text-[10px]">标准</Badge>
+        </div>
+        <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+          {CATEGORY_LABEL[group.category] ?? group.category}
+          {group.code && <span className="ml-2 font-mono">{group.code}</span>}
+        </p>
+      </div>
+      <div className="hidden flex-wrap items-center justify-end gap-1 sm:flex">
+        {visibleTiers.map((t) => (
+          <Badge key={t} className="bg-primary/90 text-primary-foreground tabular-nums">
+            {formatPrice(t)}
+          </Badge>
+        ))}
+        {remaining > 0 && <Badge variant="secondary">+{remaining}</Badge>}
+      </div>
+      <div className="w-20 text-right text-xs tabular-nums">
+        库存 <span className="font-semibold">{group.totalStock}</span>
+      </div>
+      <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+    </Link>
+  );
+}
+
+/** 列表行 - 自定义/组包 SKU */
+export function SingleSkuRow({ row }: { row: SkuRow }) {
+  const isBundle = row.kind === "bundle";
+  const bundleItems = Array.isArray(row.bundle_items) ? row.bundle_items : [];
+  return (
+    <Link
+      to="/inventory/skus/$id"
+      params={{ id: row.id }}
+      className="flex items-center gap-3 border-b px-3 py-2.5 transition-colors last:border-b-0 hover:bg-muted/60"
+    >
+      <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded bg-muted">
+        {row.image_url ? (
+          <img src={row.image_url} alt={row.name} className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+            <Tags className="h-5 w-5" />
+          </div>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="truncate text-sm font-medium">{row.name}</span>
+          {isBundle ? (
+            <Badge variant="secondary" className="text-[10px]">
+              <Boxes className="mr-0.5 h-2.5 w-2.5" />组包·{bundleItems.length}
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-[10px]">自定义</Badge>
+          )}
+        </div>
+        <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-muted-foreground">
+          {CATEGORY_LABEL[row.category] ?? row.category}
+          <span className="mx-1">·</span>
+          <Printer className="h-2.5 w-2.5" />
+          <span className="font-mono">{row.epc}</span>
+        </p>
+      </div>
+      <Badge className="bg-primary/90 text-primary-foreground tabular-nums">{formatPrice(row.price_tier)}</Badge>
+      <div className="w-20 text-right text-xs tabular-nums">
+        库存 <span className="font-semibold">{row.stock_qty}</span>
+      </div>
+      <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+    </Link>
+  );
+}
