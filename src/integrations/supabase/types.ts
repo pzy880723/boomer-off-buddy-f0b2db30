@@ -356,6 +356,7 @@ export type Database = {
       }
       inv_skus: {
         Row: {
+          bundle_items: Json
           category: string
           created_at: string
           epc: string
@@ -367,12 +368,14 @@ export type Database = {
           notes: string | null
           pack_pieces: number | null
           price_tier: number
+          sku_code: string | null
           status: string
           stock_qty: number
           updated_at: string
           weight_g: number | null
         }
         Insert: {
+          bundle_items?: Json
           category: string
           created_at?: string
           epc: string
@@ -384,12 +387,14 @@ export type Database = {
           notes?: string | null
           pack_pieces?: number | null
           price_tier: number
+          sku_code?: string | null
           status?: string
           stock_qty?: number
           updated_at?: string
           weight_g?: number | null
         }
         Update: {
+          bundle_items?: Json
           category?: string
           created_at?: string
           epc?: string
@@ -401,6 +406,7 @@ export type Database = {
           notes?: string | null
           pack_pieces?: number | null
           price_tier?: number
+          sku_code?: string | null
           status?: string
           stock_qty?: number
           updated_at?: string
