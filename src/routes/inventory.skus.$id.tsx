@@ -49,11 +49,13 @@ function SkuDetailPage() {
   const sku = q.data?.sku;
   const labels = q.data?.labels ?? [];
   const lines = q.data?.lines ?? [];
+  const bundleChildren = q.data?.bundle_children ?? [];
 
   if (q.isLoading) return <div className="p-6 text-muted-foreground">加载中…</div>;
   if (!sku) return <div className="p-6 text-muted-foreground">SKU 不存在</div>;
 
   const printCount = Math.max(1, Math.min(1000, Number(qty) || 0));
+  const skuCode = (sku as { sku_code?: string | null }).sku_code;
 
   return (
     <div className="space-y-4">
@@ -63,12 +65,13 @@ function SkuDetailPage() {
 
       <PageHeader
         title={sku.name}
-        description={`${CATEGORY_LABEL[sku.category] ?? sku.category} · ${SKU_KIND_LABEL[sku.kind as "single" | "pack"]}${sku.kind === "pack" ? ` · 组包 ${sku.pack_pieces} 件` : ""}`}
+        description={`${CATEGORY_LABEL[sku.category] ?? sku.category} · ${SKU_KIND_LABEL[sku.kind as SkuKind] ?? sku.kind}${sku.kind === "pack" ? ` · 组包 ${sku.pack_pieces} 件` : ""}${sku.kind === "bundle" ? ` · 含 ${bundleChildren.length} 种子项` : ""}`}
         meta={
           <>
             <Badge className="bg-primary/90 text-primary-foreground">{formatPrice(sku.price_tier)}</Badge>
             <Badge variant="outline">库存 {sku.stock_qty} 件</Badge>
             <span className="font-mono text-[11px]">{sku.epc}</span>
+            {skuCode && <span className="font-mono text-[11px] text-muted-foreground">编码：{skuCode}</span>}
           </>
         }
       />
