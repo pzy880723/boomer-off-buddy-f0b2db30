@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { generateEpc } from "./inventory.helpers";
+import { generateEpc, PRICE_TIERS } from "./inventory.helpers";
 
 const CATEGORY_VALUES = [
   "jp_porcelain",
@@ -17,19 +17,16 @@ const CATEGORY_VALUES = [
   "antique",
 ] as const;
 
-const SkuInput = z.object({
+const MetaInput = z.object({
   category: z.enum(CATEGORY_VALUES),
-  price_tier: z.number().positive().max(99999.9),
-  is_custom_price: z.boolean().default(false),
   name: z.string().min(1).max(120),
-  kind: z.enum(["single", "pack"]).default("single"),
-  pack_pieces: z.number().int().positive().nullable().optional(),
+  sku_code: z.string().trim().max(64).nullable().optional(),
   weight_g: z.number().nullable().optional(),
   image_url: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
-  status: z.enum(["active", "archived"]).default("active"),
 });
 
+const PRICE_TIER_SET = new Set<number>(PRICE_TIERS as readonly number[]);
 
 export const listSkus = createServerFn({ method: "GET" })
   .inputValidator((input: unknown) =>
@@ -37,7 +34,8 @@ export const listSkus = createServerFn({ method: "GET" })
       .object({
         category: z.string().optional(),
         price_tier: z.number().optional(),
-        kind: z.enum(["single", "pack"]).optional(),
+        kind: z.enum(["single", "pack", "bundle"]).optional(),
+        exclude_kind: z.enum(["single", "pack", "bundle"]).optional(),
         search: z.string().optional(),
         limit: z.number().min(1).max(500).default(200),
       })
@@ -52,9 +50,10 @@ export const listSkus = createServerFn({ method: "GET" })
     if (data.category) q = q.eq("category", data.category);
     if (data.price_tier != null) q = q.eq("price_tier", data.price_tier);
     if (data.kind) q = q.eq("kind", data.kind);
+    if (data.exclude_kind) q = q.neq("kind", data.exclude_kind);
     if (data.search) {
       const s = `%${data.search}%`;
-      q = q.or(`name.ilike.${s},epc.ilike.${s},notes.ilike.${s}`);
+      q = q.or(`name.ilike.${s},epc.ilike.${s},sku_code.ilike.${s},notes.ilike.${s}`);
     }
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
@@ -70,6 +69,34 @@ export const getSku = createServerFn({ method: "GET" })
       .eq("id", data.id)
       .single();
     if (error) throw new Error(error.message);
+
+    // 解析组包子项
+    let bundleChildren: Array<{ id: string; name: string; epc: string; image_url: string | null; price_tier: number; qty: number }> = [];
+    const bi = (row as { bundle_items?: unknown }).bundle_items;
+    if (row && row.kind === "bundle" && Array.isArray(bi) && bi.length > 0) {
+      const items = bi as Array<{ sku_id: string; qty: number }>;
+      const ids = items.map((x) => x.sku_id);
+      const { data: childRows } = await supabase
+        .from("inv_skus")
+        .select("id, name, epc, image_url, price_tier")
+        .in("id", ids);
+      const map = new Map((childRows ?? []).map((r) => [r.id, r]));
+      bundleChildren = items
+        .map((it) => {
+          const c = map.get(it.sku_id);
+          if (!c) return null;
+          return {
+            id: c.id,
+            name: c.name,
+            epc: c.epc,
+            image_url: c.image_url,
+            price_tier: Number(c.price_tier),
+            qty: it.qty,
+          };
+        })
+        .filter((x): x is NonNullable<typeof x> => x != null);
+    }
+
     const { data: labels } = await supabase
       .from("inv_label_batches")
       .select("*")
@@ -82,17 +109,117 @@ export const getSku = createServerFn({ method: "GET" })
       .eq("sku_id", data.id)
       .order("created_at", { ascending: false })
       .limit(50);
-    return { sku: row, labels: labels ?? [], lines: lines ?? [] };
+    return { sku: row, labels: labels ?? [], lines: lines ?? [], bundle_children: bundleChildren };
   });
 
-export const createSku = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => SkuInput.parse(input))
+/** 标准商品：一次为多个价格档生成多条 single SKU */
+export const createStandardSkus = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    MetaInput.extend({
+      price_tiers: z.array(z.number().positive()).min(1).max(10),
+    }).parse(input),
+  )
   .handler(async ({ data }) => {
-    const epc = generateEpc(data.category, data.price_tier);
+    const tiers = Array.from(new Set(data.price_tiers));
+    for (const t of tiers) {
+      if (!PRICE_TIER_SET.has(t)) throw new Error(`非法标准价格档：${t}`);
+    }
+    const rows = tiers.map((t) => ({
+      category: data.category,
+      name: data.name.trim(),
+      sku_code: data.sku_code?.trim() || null,
+      price_tier: t,
+      is_custom_price: false,
+      kind: "single" as const,
+      pack_pieces: null,
+      bundle_items: [],
+      weight_g: data.weight_g ?? null,
+      image_url: data.image_url ?? null,
+      notes: data.notes ?? null,
+      status: "active" as const,
+      epc: generateEpc(data.category, t),
+    }));
+    const { data: inserted, error } = await supabase
+      .from("inv_skus")
+      .insert(rows as never)
+      .select("*");
+    if (error) throw new Error(error.message);
+    return { skus: inserted ?? [] };
+  });
+
+/** 自定义商品：单条 SKU，价格手填 */
+export const createCustomSku = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    MetaInput.extend({
+      price: z.number().positive().max(99999.9),
+    }).parse(input),
+  )
+  .handler(async ({ data }) => {
     const payload = {
-      ...data,
-      epc,
-      pack_pieces: data.kind === "pack" ? data.pack_pieces ?? null : null,
+      category: data.category,
+      name: data.name.trim(),
+      sku_code: data.sku_code?.trim() || null,
+      price_tier: Math.round(data.price * 100) / 100,
+      is_custom_price: true,
+      kind: "single" as const,
+      pack_pieces: null,
+      bundle_items: [],
+      weight_g: data.weight_g ?? null,
+      image_url: data.image_url ?? null,
+      notes: data.notes ?? null,
+      status: "active" as const,
+      epc: generateEpc(data.category, data.price),
+    };
+    const { data: row, error } = await supabase
+      .from("inv_skus")
+      .insert(payload as never)
+      .select("*")
+      .single();
+    if (error) throw new Error(error.message);
+    return { sku: row };
+  });
+
+/** 组包商品：引用若干已有 SKU 形成一个新的独立 SKU */
+export const createBundleSku = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    MetaInput.extend({
+      price: z.number().positive().max(99999.9),
+      items: z
+        .array(z.object({ sku_id: z.string().uuid(), qty: z.number().int().positive() }))
+        .min(1)
+        .max(50),
+    }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    // 校验子 SKU 存在且不是 bundle
+    const ids = data.items.map((x) => x.sku_id);
+    const { data: children, error: cErr } = await supabase
+      .from("inv_skus")
+      .select("id, kind")
+      .in("id", ids);
+    if (cErr) throw new Error(cErr.message);
+    if ((children?.length ?? 0) !== new Set(ids).size) {
+      throw new Error("部分子 SKU 不存在");
+    }
+    if (children?.some((c) => c.kind === "bundle")) {
+      throw new Error("组包内不能再包含另一个组包");
+    }
+
+    const totalPieces = data.items.reduce((s, x) => s + x.qty, 0);
+    const payload = {
+      category: data.category,
+      name: data.name.trim(),
+      sku_code: data.sku_code?.trim() || null,
+      price_tier: Math.round(data.price * 100) / 100,
+      is_custom_price: true,
+      kind: "bundle" as const,
+      pack_pieces: totalPieces,
+      bundle_items: data.items,
+      weight_g: data.weight_g ?? null,
+      image_url: data.image_url ?? null,
+      notes: data.notes ?? null,
+      status: "active" as const,
+      epc: generateEpc(data.category, data.price),
     };
     const { data: row, error } = await supabase
       .from("inv_skus")
@@ -105,12 +232,27 @@ export const createSku = createServerFn({ method: "POST" })
 
 export const updateSku = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
-    z.object({ id: z.string().uuid(), patch: SkuInput.partial() }).parse(input),
+    z
+      .object({
+        id: z.string().uuid(),
+        patch: z
+          .object({
+            name: z.string().min(1).max(120).optional(),
+            sku_code: z.string().trim().max(64).nullable().optional(),
+            weight_g: z.number().nullable().optional(),
+            image_url: z.string().nullable().optional(),
+            notes: z.string().nullable().optional(),
+            status: z.enum(["active", "archived"]).optional(),
+          })
+          .strict(),
+      })
+      .parse(input),
   )
   .handler(async ({ data }) => {
-    const patch = { ...data.patch } as Record<string, unknown>;
-    if (patch.kind === "single") patch.pack_pieces = null;
-    const { error } = await supabase.from("inv_skus").update(patch as never).eq("id", data.id);
+    const { error } = await supabase
+      .from("inv_skus")
+      .update(data.patch as never)
+      .eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -145,7 +287,7 @@ export const lookupSkusByEpcs = createServerFn({ method: "POST" })
     if (uniq.length === 0) return { skus: [] };
     const { data: rows, error } = await supabase
       .from("inv_skus")
-      .select("id, epc, category, price_tier, name, kind, pack_pieces, image_url")
+      .select("id, epc, category, price_tier, name, kind, pack_pieces, sku_code, image_url")
       .in("epc", uniq);
     if (error) throw new Error(error.message);
     return { skus: rows ?? [] };
@@ -240,7 +382,7 @@ export const getInboundOrder = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
     const { data: lines } = await supabase
       .from("inv_inbound_lines")
-      .select("*, inv_skus(id, name, category, price_tier, kind, epc, image_url)")
+      .select("*, inv_skus(id, name, category, price_tier, kind, epc, sku_code, image_url)")
       .eq("order_id", data.id);
     return { order, lines: lines ?? [] };
   });
