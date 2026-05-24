@@ -97,9 +97,24 @@ export function PriceTierEditor({
   const editRef = useRef<HTMLInputElement>(null);
   useEffect(() => { if (editingTier != null) editRef.current?.focus(); }, [editingTier]);
 
+  const allSelected = tiers.length > 0 && tiers.every((t) => value.includes(t));
+  const toggleAll = () => onChange(allSelected ? [] : [...tiers].sort((a, b) => a - b));
+
   return (
     <>
       <div className="flex flex-wrap items-center gap-1.5">
+        {tiers.length > 0 && (
+          <Button
+            type="button"
+            size="sm"
+            variant={allSelected ? "secondary" : "outline"}
+            onClick={toggleAll}
+            className="text-xs"
+          >
+            {allSelected ? "取消全选" : "全选"}
+          </Button>
+        )}
+
         {tiers.map((t) => {
           const active = value.includes(t);
           if (editingTier === t) {
