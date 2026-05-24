@@ -194,6 +194,7 @@ export const createCustomSku = createServerFn({ method: "POST" })
 
 /** 组包商品：引用若干已有 SKU 形成一个新的独立 SKU */
 export const createBundleSku = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     MetaInput.extend({
       price: z.number().positive().max(99999.9),
@@ -203,10 +204,11 @@ export const createBundleSku = createServerFn({ method: "POST" })
         .max(50),
     }).parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
     // 校验子 SKU 存在且不是 bundle
     const ids = data.items.map((x) => x.sku_id);
-    const { data: children, error: cErr } = await supabase
+    const { data: children, error: cErr } = await sb
       .from("inv_skus")
       .select("id, kind")
       .in("id", ids);
@@ -234,7 +236,7 @@ export const createBundleSku = createServerFn({ method: "POST" })
       status: "active" as const,
       epc: generateEpc(data.category, data.price),
     };
-    const { data: row, error } = await supabase
+    const { data: row, error } = await sb
       .from("inv_skus")
       .insert(payload as never)
       .select("*")
