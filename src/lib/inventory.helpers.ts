@@ -82,3 +82,73 @@ export function aggregateScans(epcs: string[]): Map<string, number> {
   }
   return map;
 }
+
+// ---------- 标准商品聚合 ----------
+
+export type SkuRow = {
+  id: string;
+  category: string;
+  name: string;
+  sku_code: string | null;
+  price_tier: number;
+  is_custom_price: boolean;
+  kind: string;
+  pack_pieces: number | null;
+  bundle_items: unknown;
+  weight_g: number | null;
+  image_url: string | null;
+  notes: string | null;
+  status: string;
+  epc: string;
+  stock_qty: number;
+  created_at: string;
+};
+
+export type StandardProductGroup = {
+  key: string;
+  code: string | null;
+  category: string;
+  name: string;
+  image_url: string | null;
+  weight_g: number | null;
+  notes: string | null;
+  skus: SkuRow[];
+  totalStock: number;
+  tiers: number[];
+  createdAt: string;
+};
+
+/** 按 sku_code（无则 category|name）聚合标准 SKU */
+export function groupStandardSkus(rows: SkuRow[]): StandardProductGroup[] {
+  const groups = new Map<string, StandardProductGroup>();
+  for (const r of rows) {
+    const key = (r.sku_code && r.sku_code.trim()) || `${r.category}|${r.name}`;
+    let g = groups.get(key);
+    if (!g) {
+      g = {
+        key,
+        code: r.sku_code ?? null,
+        category: r.category,
+        name: r.name,
+        image_url: r.image_url,
+        weight_g: r.weight_g,
+        notes: r.notes,
+        skus: [],
+        totalStock: 0,
+        tiers: [],
+        createdAt: r.created_at,
+      };
+      groups.set(key, g);
+    }
+    g.skus.push(r);
+    g.totalStock += r.stock_qty ?? 0;
+    if (!g.image_url && r.image_url) g.image_url = r.image_url;
+    if (r.created_at > g.createdAt) g.createdAt = r.created_at;
+  }
+  for (const g of groups.values()) {
+    g.skus.sort((a, b) => Number(a.price_tier) - Number(b.price_tier));
+    g.tiers = g.skus.map((s) => Number(s.price_tier));
+  }
+  return Array.from(groups.values()).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+}
+
