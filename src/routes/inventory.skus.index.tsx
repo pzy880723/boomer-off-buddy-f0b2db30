@@ -14,7 +14,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
-import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { StandardSkuDialog } from "@/components/inventory/standard-sku-dialog";
 import { CustomSkuDialog } from "@/components/inventory/custom-sku-dialog";
@@ -25,8 +24,11 @@ import {
   StandardProductRow,
   SingleSkuRow,
 } from "@/components/inventory/product-card";
-import { listSkus } from "@/lib/inventory.functions";
-import { groupStandardSkus, type SkuRow } from "@/lib/inventory.helpers";
+import { RowActionsMenu } from "@/components/inventory/row-actions-menu";
+import { ProductEditDialog } from "@/components/inventory/product-edit-dialog";
+import { SkuEditDialog } from "@/components/inventory/sku-edit-dialog";
+import { listSkus, deleteSku, deleteStandardProduct } from "@/lib/inventory.functions";
+import { groupStandardSkus, type SkuRow, type StandardProductGroup } from "@/lib/inventory.helpers";
 
 export const Route = createFileRoute("/inventory/skus/")({
   head: () => ({
@@ -42,11 +44,29 @@ type ViewMode = "grid" | "list";
 function SkusPage() {
   const nav = useNavigate();
   const listFn = useServerFn(listSkus);
+  const delSkuFn = useServerFn(deleteSku);
+  const delProductFn = useServerFn(deleteStandardProduct);
+
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [openDialog, setOpenDialog] = useState<DialogKind>(null);
   const [tab, setTab] = useState<TabKind>("standard");
-  const [view, setView] = useState<ViewMode>("grid");
+  const [view, setView] = useState<ViewMode>(() => {
+    if (typeof window === "undefined") return "list";
+    return (localStorage.getItem("inv-skus-view") as ViewMode) || "list";
+  });
+
+  const [editingGroup, setEditingGroup] = useState<StandardProductGroup | null>(null);
+  const [editingSku, setEditingSku] = useState<SkuRow | null>(null);
+
+  const setViewMode = (v: ViewMode) => {
+    setView(v);
+    try {
+      localStorage.setItem("inv-skus-view", v);
+    } catch {
+      /* noop */
+    }
+  };
 
   const q = useQuery({
     queryKey: ["inv-skus", search],
@@ -87,28 +107,31 @@ function SkusPage() {
     </DropdownMenu>
   );
 
-  const totalStock = rows.reduce((s, r) => s + (r.stock_qty ?? 0), 0);
+  const productActions = (g: StandardProductGroup) => (
+    <RowActionsMenu
+      onEdit={() => setEditingGroup(g)}
+      onDelete={async () => {
+        await delProductFn({ data: { key: g.key } });
+        await q.refetch();
+      }}
+      deleteTitle={`删除商品「${g.name}」？`}
+      deleteDescription={`将删除该商品下全部 ${g.skus.length} 个价格档。若任一价格档有库存或入库记录，删除会失败。`}
+    />
+  );
+  const skuActions = (r: SkuRow) => (
+    <RowActionsMenu
+      onEdit={() => setEditingSku(r)}
+      onDelete={async () => {
+        await delSkuFn({ data: { id: r.id } });
+        await q.refetch();
+      }}
+      deleteTitle={`删除「${r.name}」？`}
+      deleteDescription="若有库存或入库记录，删除会失败。"
+    />
+  );
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        title="商品 SKU"
-        description="标准商品按 类目+品名 共享多个价格档；自定义、组包独立成 SKU"
-        meta={
-          <span>
-            标准 {standardGroups.length} 个 · 自定义 {customRows.length} · 组包 {bundleRows.length} · 在库合计 {totalStock} 件
-          </span>
-        }
-        actions={
-          <>
-            <Button variant="outline" size="sm" onClick={() => nav({ to: "/inventory/inbound/new" })}>
-              <Package2 className="mr-1.5 h-3.5 w-3.5" /> 扫枪入库
-            </Button>
-            {NewMenu}
-          </>
-        }
-      />
-
       <Tabs value={tab} onValueChange={(v) => setTab(v as TabKind)}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <TabsList>
@@ -137,7 +160,7 @@ function SkusPage() {
             <ToggleGroup
               type="single"
               value={view}
-              onValueChange={(v) => v && setView(v as ViewMode)}
+              onValueChange={(v) => v && setViewMode(v as ViewMode)}
               size="sm"
             >
               <ToggleGroupItem value="grid" aria-label="大图模式" className="h-8 w-8 p-0">
@@ -147,6 +170,10 @@ function SkusPage() {
                 <List className="h-3.5 w-3.5" />
               </ToggleGroupItem>
             </ToggleGroup>
+            <Button variant="outline" size="sm" onClick={() => nav({ to: "/inventory/inbound/new" })}>
+              <Package2 className="mr-1.5 h-3.5 w-3.5" /> 扫枪入库
+            </Button>
+            {NewMenu}
           </div>
         </div>
 
@@ -161,13 +188,13 @@ function SkusPage() {
           ) : view === "grid" ? (
             <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {standardGroups.map((g) => (
-                <StandardProductCard key={g.key} group={g} />
+                <StandardProductCard key={g.key} group={g} actions={productActions(g)} />
               ))}
             </div>
           ) : (
             <Card className="overflow-hidden">
               {standardGroups.map((g) => (
-                <StandardProductRow key={g.key} group={g} />
+                <StandardProductRow key={g.key} group={g} actions={productActions(g)} />
               ))}
             </Card>
           )}
@@ -184,13 +211,13 @@ function SkusPage() {
           ) : view === "grid" ? (
             <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {customRows.map((r) => (
-                <SingleSkuCard key={r.id} row={r} />
+                <SingleSkuCard key={r.id} row={r} actions={skuActions(r)} />
               ))}
             </div>
           ) : (
             <Card className="overflow-hidden">
               {customRows.map((r) => (
-                <SingleSkuRow key={r.id} row={r} />
+                <SingleSkuRow key={r.id} row={r} actions={skuActions(r)} />
               ))}
             </Card>
           )}
@@ -207,13 +234,13 @@ function SkusPage() {
           ) : view === "grid" ? (
             <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {bundleRows.map((r) => (
-                <SingleSkuCard key={r.id} row={r} />
+                <SingleSkuCard key={r.id} row={r} actions={skuActions(r)} />
               ))}
             </div>
           ) : (
             <Card className="overflow-hidden">
               {bundleRows.map((r) => (
-                <SingleSkuRow key={r.id} row={r} />
+                <SingleSkuRow key={r.id} row={r} actions={skuActions(r)} />
               ))}
             </Card>
           )}
@@ -234,6 +261,19 @@ function SkusPage() {
         open={openDialog === "bundle"}
         onOpenChange={(v) => !v && setOpenDialog(null)}
         onCreated={() => q.refetch()}
+      />
+
+      <ProductEditDialog
+        group={editingGroup}
+        open={!!editingGroup}
+        onOpenChange={(v) => !v && setEditingGroup(null)}
+        onSaved={() => q.refetch()}
+      />
+      <SkuEditDialog
+        sku={editingSku}
+        open={!!editingSku}
+        onOpenChange={(v) => !v && setEditingSku(null)}
+        onSaved={() => q.refetch()}
       />
     </div>
   );
