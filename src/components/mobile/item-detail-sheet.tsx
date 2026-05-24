@@ -2,7 +2,12 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { toThumbUrl } from "@/lib/image";
 import { tariffCategoryLabel, rateToPercent } from "@/lib/tariff";
 import { computeItemTariffJpy } from "@/lib/japan-parcel.helpers";
-import type { ReactNode } from "react";
+import { PhotoUploaderGrid } from "@/components/mobile/photo-uploader-grid";
+import { useServerFn } from "@tanstack/react-start";
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState, type ReactNode } from "react";
+import { updateItemArrivalPhotos } from "@/lib/mobile.functions";
+import { toast } from "sonner";
 
 export interface ItemDetailValue {
   id: string;
