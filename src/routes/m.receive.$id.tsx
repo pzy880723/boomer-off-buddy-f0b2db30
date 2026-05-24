@@ -234,77 +234,18 @@ function ReceivePage() {
 
           <section className="space-y-2">
             <h3 className="px-1 text-xs font-medium text-muted-foreground">
-              到货照片（必填，最多 {MAX_PHOTOS} 张）
+              包裹照片（必填，最多 {MAX_PHOTOS} 张）
             </h3>
-            <div className="grid grid-cols-3 gap-2">
-              {photoUrls.map((url, i) => (
-                <div
-                  key={url + i}
-                  className="relative aspect-square overflow-hidden rounded-xl border bg-muted"
-                >
-                  <img src={url} alt="" className="h-full w-full object-cover" />
-                  <button
-                    type="button"
-                    onClick={() => setPhotoUrls((prev) => prev.filter((_, idx) => idx !== i))}
-                    className="absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white"
-                    aria-label="删除"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ))}
-              {photoUrls.length < MAX_PHOTOS ? (
-                <button
-                  type="button"
-                  onClick={() => setPickerOpen(true)}
-                  className="flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-muted-foreground/30 bg-muted/30 text-muted-foreground active:bg-muted"
-                  disabled={uploading > 0}
-                >
-                  {uploading > 0 ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : (
-                    <>
-                      <Plus className="h-5 w-5" />
-                      <span className="text-[10px]">添加</span>
-                    </>
-                  )}
-                </button>
-              ) : null}
-            </div>
-            <input
-              ref={captureRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={(e) => {
-                handleFiles(e.target.files);
-                e.currentTarget.value = "";
-              }}
+            <p className="px-1 text-[10px] text-muted-foreground">
+              请拍清楚面单、外箱多角度，如有破损一并记录。子商品的到货照片可在上方对应条目中分别拍摄。
+            </p>
+            <PhotoUploaderGrid
+              value={photoUrls}
+              onChange={setPhotoUrls}
+              folder="receive"
+              parcelId={id}
+              max={MAX_PHOTOS}
             />
-            <input
-              ref={burstRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={(e) => {
-                handleFiles(e.target.files, { burst: true });
-                e.currentTarget.value = "";
-              }}
-            />
-            <input
-              ref={galleryRef}
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={(e) => {
-                handleFiles(e.target.files);
-                e.currentTarget.value = "";
-              }}
-            />
-            
           </section>
 
           <div className="grid grid-cols-2 gap-2 pt-1">
