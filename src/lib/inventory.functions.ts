@@ -259,6 +259,7 @@ export const updateSku = createServerFn({ method: "POST" })
             image_url: z.string().nullable().optional(),
             notes: z.string().nullable().optional(),
             status: z.enum(["active", "archived"]).optional(),
+            price_tier: z.number().positive().max(99999.9).optional(),
           })
           .strict(),
       })
@@ -271,6 +272,98 @@ export const updateSku = createServerFn({ method: "POST" })
       .eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
+  });
+
+/** 批量更新一组标准商品的共用字段（按 sku_code 或 category|name 聚合） */
+export const updateStandardProduct = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        key: z.string().min(1),
+        patch: z
+          .object({
+            name: z.string().min(1).max(120).optional(),
+            sku_code: z.string().trim().max(64).nullable().optional(),
+            weight_g: z.number().nullable().optional(),
+            image_url: z.string().nullable().optional(),
+            notes: z.string().nullable().optional(),
+          })
+          .strict(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
+    const { data: rows, error: qErr } = await sb
+      .from("inv_skus")
+      .select("id, sku_code, category, name")
+      .eq("kind", "single")
+      .eq("is_custom_price", false);
+    if (qErr) throw new Error(qErr.message);
+    const ids = (rows ?? [])
+      .filter((r) => ((r.sku_code && r.sku_code.trim()) || `${r.category}|${r.name}`) === data.key)
+      .map((r) => r.id);
+    if (ids.length === 0) throw new Error("找不到对应的标准商品");
+    const { error } = await sb
+      .from("inv_skus")
+      .update(data.patch as never)
+      .in("id", ids);
+    if (error) throw new Error(error.message);
+    return { ok: true, updated: ids.length };
+  });
+
+async function safeDeleteSkuById(sb: typeof supabaseAdmin, id: string) {
+  const { data: row, error: rErr } = await sb
+    .from("inv_skus")
+    .select("id, stock_qty, name")
+    .eq("id", id)
+    .single();
+  if (rErr) throw new Error(rErr.message);
+  if (!row) throw new Error("SKU 不存在");
+  if ((row.stock_qty ?? 0) > 0) {
+    throw new Error(`【${row.name}】仍有 ${row.stock_qty} 件库存，无法删除`);
+  }
+  const { data: lines } = await sb
+    .from("inv_inbound_lines")
+    .select("id")
+    .eq("sku_id", id)
+    .limit(1);
+  if ((lines?.length ?? 0) > 0) {
+    throw new Error(`【${row.name}】存在入库记录，请先归档而不是删除`);
+  }
+  await sb.from("inv_label_batches").delete().eq("sku_id", id);
+  const { error: dErr } = await sb.from("inv_skus").delete().eq("id", id);
+  if (dErr) throw new Error(dErr.message);
+}
+
+export const deleteSku = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    await safeDeleteSkuById(context.supabase as never, data.id);
+    return { ok: true };
+  });
+
+export const deleteStandardProduct = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ key: z.string().min(1) }).parse(input))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
+    const { data: rows, error } = await sb
+      .from("inv_skus")
+      .select("id, sku_code, category, name")
+      .eq("kind", "single")
+      .eq("is_custom_price", false);
+    if (error) throw new Error(error.message);
+    const ids = (rows ?? [])
+      .filter((r) => ((r.sku_code && r.sku_code.trim()) || `${r.category}|${r.name}`) === data.key)
+      .map((r) => r.id);
+    if (ids.length === 0) throw new Error("找不到对应的标准商品");
+    for (const id of ids) {
+      await safeDeleteSkuById(sb as never, id);
+    }
+    return { ok: true, deleted: ids.length };
   });
 
 export const createLabelBatch = createServerFn({ method: "POST" })
