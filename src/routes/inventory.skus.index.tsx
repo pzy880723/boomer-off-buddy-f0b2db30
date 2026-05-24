@@ -162,7 +162,7 @@ function SkusPage() {
                     </p>
                     {skuCode && (
                       <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
-                        商品编码：{skuCode}
+                        商品商品编码：{skuCode}
                       </p>
                     )}
                   </div>
