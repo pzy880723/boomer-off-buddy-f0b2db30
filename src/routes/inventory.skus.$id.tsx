@@ -16,6 +16,7 @@ import {
   CATEGORY_LABEL,
   SKU_KIND_LABEL,
   formatPrice,
+  type SkuKind,
 } from "@/lib/inventory.helpers";
 
 export const Route = createFileRoute("/inventory/skus/$id")({
