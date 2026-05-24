@@ -35,6 +35,7 @@ const priceTierSchema = z
   .refine((n) => Math.round(n * 10) === n * 10, "价格档最多保留 1 位小数");
 
 export const listSkus = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -47,8 +48,9 @@ export const listSkus = createServerFn({ method: "GET" })
       })
       .parse(input ?? {}),
   )
-  .handler(async ({ data }) => {
-    let q = supabase
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
+    let q = sb
       .from("inv_skus")
       .select("*")
       .order("created_at", { ascending: false })
@@ -67,9 +69,11 @@ export const listSkus = createServerFn({ method: "GET" })
   });
 
 export const getSku = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
-  .handler(async ({ data }) => {
-    const { data: row, error } = await supabase
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
+    const { data: row, error } = await sb
       .from("inv_skus")
       .select("*")
       .eq("id", data.id)
@@ -82,7 +86,7 @@ export const getSku = createServerFn({ method: "GET" })
     if (row && row.kind === "bundle" && Array.isArray(bi) && bi.length > 0) {
       const items = bi as Array<{ sku_id: string; qty: number }>;
       const ids = items.map((x) => x.sku_id);
-      const { data: childRows } = await supabase
+      const { data: childRows } = await sb
         .from("inv_skus")
         .select("id, name, epc, image_url, price_tier")
         .in("id", ids);
@@ -103,13 +107,13 @@ export const getSku = createServerFn({ method: "GET" })
         .filter((x): x is NonNullable<typeof x> => x != null);
     }
 
-    const { data: labels } = await supabase
+    const { data: labels } = await sb
       .from("inv_label_batches")
       .select("*")
       .eq("sku_id", data.id)
       .order("printed_at", { ascending: false })
       .limit(50);
-    const { data: lines } = await supabase
+    const { data: lines } = await sb
       .from("inv_inbound_lines")
       .select("id, qty, unit_price, subtotal, created_at, order_id")
       .eq("sku_id", data.id)
