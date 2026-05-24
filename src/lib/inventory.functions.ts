@@ -146,7 +146,7 @@ export const createStandardSkus = createServerFn({ method: "POST" })
       status: "active" as const,
       epc: data.epc_map?.[String(t)] || generateEpc(data.category, t),
     }));
-    const { data: inserted, error } = await supabase
+    const { data: inserted, error } = await sb
       .from("inv_skus")
       .insert(rows as never)
       .select("*");
