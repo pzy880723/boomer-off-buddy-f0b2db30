@@ -25,6 +25,7 @@ const MetaInput = z.object({
   weight_g: z.number().nullable().optional(),
   image_url: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
+  grade: z.enum(["N", "S", "A", "B", "C", "J"]).nullable().optional(),
 });
 
 // 价格档校验：> 0、≤ 9999.9、最多 1 位小数
