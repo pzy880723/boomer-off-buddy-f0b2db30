@@ -53,6 +53,19 @@ export function generateEpc(category: string, priceTier: number): string {
   return `INV-${code}-${tier}-${rand}`;
 }
 
+/** 生成商品编码：SKU/PKG-{类目码}-{YYMMDD}-{4位随机 base36} */
+export function generateSkuCode(category: string, kind: SkuKind = "single"): string {
+  const code = CATEGORY_CODE[category] ?? "XX";
+  const prefix = kind === "bundle" ? "PKG" : "SKU";
+  const d = new Date();
+  const yy = String(d.getFullYear()).slice(-2);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  let rand = "";
+  for (let i = 0; i < 4; i++) rand += BASE36[Math.floor(Math.random() * BASE36.length)];
+  return `${prefix}-${code}-${yy}${mm}${dd}-${rand}`;
+}
+
 
 export function formatPrice(v: number | null | undefined): string {
   if (v == null) return "—";
