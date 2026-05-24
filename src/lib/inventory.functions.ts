@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { generateEpc, PRICE_TIERS } from "./inventory.helpers";
+import { generateEpc, generateSkuCode } from "./inventory.helpers";
 
 const CATEGORY_VALUES = [
   "jp_porcelain",
