@@ -41,16 +41,21 @@ export const searchParcels = createServerFn({ method: "GET" })
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
     const mapped = (rows ?? []).map((r) => {
-      const children = ((r as { japan_parcel_items?: Array<{ item_title: string | null; item_title_cn: string | null; position: number | null }> }).japan_parcel_items ?? [])
+      const children = ((r as { japan_parcel_items?: Array<{ item_title: string | null; item_title_cn: string | null; item_image_url: string | null; position: number | null }> }).japan_parcel_items ?? [])
         .slice()
         .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
       const first = children[0];
       const firstItemName = first
         ? (first.item_title_cn || first.item_title || "")
         : (r.item_title_cn || r.item_title || "");
+      const firstImage =
+        r.item_image_url ||
+        children.find((c) => c.item_image_url)?.item_image_url ||
+        null;
       return {
         ...r,
         japan_parcel_items: undefined,
+        item_image_url: firstImage,
         first_item_name: firstItemName,
         item_count: children.length,
       };
