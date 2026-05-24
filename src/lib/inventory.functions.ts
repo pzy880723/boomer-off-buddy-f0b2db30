@@ -121,18 +121,17 @@ export const getSku = createServerFn({ method: "GET" })
 export const createStandardSkus = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     MetaInput.extend({
-      price_tiers: z.array(z.number().positive()).min(1).max(10),
+      price_tiers: z.array(priceTierSchema).min(1).max(20),
+      epc_map: z.record(z.string(), z.string()).optional(),
     }).parse(input),
   )
   .handler(async ({ data }) => {
-    const tiers = Array.from(new Set(data.price_tiers));
-    for (const t of tiers) {
-      if (!PRICE_TIER_SET.has(t)) throw new Error(`非法标准价格档：${t}`);
-    }
+    const tiers = Array.from(new Set(data.price_tiers)).sort((a, b) => a - b);
+    const code = (data.sku_code?.trim() || generateSkuCode(data.category, "single"));
     const rows = tiers.map((t) => ({
       category: data.category,
       name: data.name.trim(),
-      sku_code: data.sku_code?.trim() || null,
+      sku_code: code,
       price_tier: t,
       is_custom_price: false,
       kind: "single" as const,
@@ -142,7 +141,7 @@ export const createStandardSkus = createServerFn({ method: "POST" })
       image_url: data.image_url ?? null,
       notes: data.notes ?? null,
       status: "active" as const,
-      epc: generateEpc(data.category, t),
+      epc: data.epc_map?.[String(t)] || generateEpc(data.category, t),
     }));
     const { data: inserted, error } = await supabase
       .from("inv_skus")
