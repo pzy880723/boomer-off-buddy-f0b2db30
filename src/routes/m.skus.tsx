@@ -37,7 +37,7 @@ export const Route = createFileRoute("/m/skus")({
   component: MSkusPage,
 });
 
-type TabKind = "standard" | "custom" | "bundle";
+type TabKind = "custom" | "bundle" | "standard";
 type DialogKind = "standard" | "custom" | "bundle" | null;
 
 function MSkusPage() {
@@ -45,7 +45,7 @@ function MSkusPage() {
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [openDialog, setOpenDialog] = useState<DialogKind>(null);
-  const [tab, setTab] = useState<TabKind>("standard");
+  const [tab, setTab] = useState<TabKind>("custom");
 
   const q = useQuery({
     queryKey: ["m-inv-skus", search],
@@ -101,28 +101,20 @@ function MSkusPage() {
 
         <Tabs value={tab} onValueChange={(v) => setTab(v as TabKind)}>
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="standard">
-              标准 <span className="ml-1 text-[10px] text-muted-foreground">{standardGroups.length}</span>
-            </TabsTrigger>
             <TabsTrigger value="custom">
               自定义 <span className="ml-1 text-[10px] text-muted-foreground">{customRows.length}</span>
             </TabsTrigger>
             <TabsTrigger value="bundle">
               组包 <span className="ml-1 text-[10px] text-muted-foreground">{bundleRows.length}</span>
             </TabsTrigger>
+            <TabsTrigger value="standard">
+              标准 <span className="ml-1 text-[10px] text-muted-foreground">{standardGroups.length}</span>
+            </TabsTrigger>
           </TabsList>
-
-          <TabsContent value="standard" className="mt-3 space-y-2">
-            {standardGroups.length === 0 ? (
-              <EmptyState icon={Tags} title="还没有标准商品" description="点右上「新建」开始" />
-            ) : (
-              standardGroups.map((g) => <MStandardRow key={g.key} group={g} />)
-            )}
-          </TabsContent>
 
           <TabsContent value="custom" className="mt-3 space-y-2">
             {customRows.length === 0 ? (
-              <EmptyState icon={Sparkles} title="还没有自定义商品" />
+              <EmptyState icon={Sparkles} title="还没有自定义商品" description="点右上「新建」→ 自定义商品" />
             ) : (
               customRows.map((r) => <MSingleRow key={r.id} row={r} />)
             )}
@@ -133,6 +125,14 @@ function MSkusPage() {
               <EmptyState icon={Boxes} title="还没有组包商品" />
             ) : (
               bundleRows.map((r) => <MSingleRow key={r.id} row={r} />)
+            )}
+          </TabsContent>
+
+          <TabsContent value="standard" className="mt-3 space-y-2">
+            {standardGroups.length === 0 ? (
+              <EmptyState icon={Tags} title="还没有标准商品" description="点右上「新建」开始" />
+            ) : (
+              standardGroups.map((g) => <MStandardRow key={g.key} group={g} />)
             )}
           </TabsContent>
         </Tabs>
@@ -250,7 +250,12 @@ function MNewCustomSkuSheet({
 }) {
   const [meta, setMeta] = useState<SkuMetaState>(emptySkuMeta);
   const [price, setPrice] = useState("");
-  const reset = () => { setMeta(emptySkuMeta); setPrice(""); };
+  const [smartOpen, setSmartOpen] = useState(false);
+  const reset = () => {
+    setMeta(emptySkuMeta);
+    setPrice("");
+    setSmartOpen(false);
+  };
   const mut = useCustomSkuMutation(() => {
     reset();
     onOpenChange(false);
@@ -263,7 +268,22 @@ function MNewCustomSkuSheet({
         <SheetHeader className="border-b p-4">
           <SheetTitle>新建自定义商品</SheetTitle>
         </SheetHeader>
-        <div className="p-4 pb-24">
+        <div className="space-y-3 p-4 pb-24">
+          {smartOpen ? (
+            <SmartSkuCapture
+              onApply={(patch) => setMeta({ ...meta, ...patch })}
+              onClose={() => setSmartOpen(false)}
+            />
+          ) : (
+            <Button
+              variant="outline"
+              className="w-full justify-center"
+              onClick={() => setSmartOpen(true)}
+            >
+              <Sparkles className="mr-2 h-4 w-4 text-primary" />
+              智能新建（拍照自动识别类目 / 品名 / 描述）
+            </Button>
+          )}
           <CustomSkuForm meta={meta} setMeta={setMeta} price={price} setPrice={setPrice} mobile />
         </div>
         <SheetFooter className="fixed inset-x-0 bottom-0 border-t bg-background p-3 pb-[calc(env(safe-area-inset-bottom)+12px)]">

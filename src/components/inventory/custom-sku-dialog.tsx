@@ -63,6 +63,7 @@ export function useCustomSkuMutation(onDone: () => void) {
           weight_g: meta.weight ? Number(meta.weight) : null,
           image_url: meta.imageUrl.trim() || null,
           notes: meta.notes.trim() || null,
+          grade: (meta.grade || null) as "N" | "S" | "A" | "B" | "C" | "J" | null,
           price: Math.round(p * 100) / 100,
         },
       });
