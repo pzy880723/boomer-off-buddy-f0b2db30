@@ -160,12 +160,14 @@ export const createStandardSkus = createServerFn({ method: "POST" })
 
 /** 自定义商品：单条 SKU，价格手填 */
 export const createCustomSku = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     MetaInput.extend({
       price: z.number().positive().max(99999.9),
     }).parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
     const payload = {
       category: data.category,
       name: data.name.trim(),
@@ -181,7 +183,7 @@ export const createCustomSku = createServerFn({ method: "POST" })
       status: "active" as const,
       epc: generateEpc(data.category, data.price),
     };
-    const { data: row, error } = await supabase
+    const { data: row, error } = await sb
       .from("inv_skus")
       .insert(payload as never)
       .select("*")
