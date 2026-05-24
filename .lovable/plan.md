@@ -1,86 +1,114 @@
-## 改动概览
 
-把 `/inventory/skus` 从「每个 SKU 一张卡」改为「每个商品一张卡 + 顶部三 Tab」，并新增标准商品聚合详情页。
+## 目标
+1. 列表默认列表模式 + 隐藏顶部"商品 SKU"大标题区
+2. 商品/SKU 支持「编辑」「删除」
+3. 商品详情页按电商详情排版重新设计（图小、信息右排、模块化分块）
 
-## Tab 分类
+---
 
-顶部三个 Tab（带计数），默认「标准商品」：
+## 1. 列表页 (`src/routes/inventory.skus.index.tsx`)
 
-- **标准商品**：`kind=single` 且 `is_custom_price=false`，按 `sku_code || \`${category}|${name}\`` 聚合
-- **自定义商品**：`kind=single` 且 `is_custom_price=true`，一 SKU 一卡
-- **组包商品**：`kind=bundle`，一 SKU 一卡
+- `useState<ViewMode>("list")` 默认 list
+- 删除 `<PageHeader title="商品 SKU" ... />` 整块（即截图红框区）
+- 把右上角的「扫枪入库」和「新建商品」按钮移到 Tabs 那一行的右侧（与搜索/视图切换并列），避免功能丢失
+- 列表行（`StandardProductRow` / `SingleSkuRow`）右侧追加行内"⋯"菜单：
+  - 标准商品：编辑（改品名/图片/编码/重量/备注）/ 删除（删除该商品下全部价格档 SKU）
+  - 自定义、组包：编辑 / 删除
+- 大图卡（`StandardProductCard` / `SingleSkuCard`）右上角浮一个"⋯"按钮
 
-搜索框按当前 Tab 过滤。
+---
 
-## 商品卡（`src/components/inventory/product-card.tsx`）
+## 2. 编辑 / 删除
 
-复用现有 `Card + aspect-square` 视觉。三种形态：
+### 后端 `src/lib/inventory.functions.ts`
 
-- **标准卡**：左上显示前 3 个价格档 Badge（`¥6.9 ¥9.9 ¥15.9`），>3 则追加 `+N`；右上显示「合计库存」=各档求和；底部显示「N 个价格档」而非 EPC
-- **自定义卡**：单价 Badge + 「自定义价」+ EPC + 库存
-- **组包卡**：「组包·N件」Badge + 价格 + EPC + 库存
+- 扩展 `updateSku` 的 patch 允许字段：`name / sku_code / image_url / notes / weight_g / status / price_tier`（自定义、组包可改价；标准档不允许改 price_tier）
+- 新增 `updateStandardProduct({ key, patch })`：按当前 key（sku_code 或 category|name）批量改这一组所有子 SKU 的共用字段（name/sku_code/image_url/notes/weight_g）
+- 新增 `deleteSku({ id })`：
+  - 若 `stock_qty > 0` 或存在 `inv_inbound_lines` → 报错，提示先清空库存或归档
+  - 否则一并删除 `inv_label_batches` 后删除 SKU
+- 新增 `deleteStandardProduct({ key })`：对该组内每条 SKU 执行同样的安全删除
 
-## 详情页
+### 前端组件
 
-- 标准卡点击 → `/inventory/products/$code`（用 `sku_code` 或聚合 key）
-- 自定义/组包卡点击 → 沿用 `/inventory/skus/$id`
+- 新增 `src/components/inventory/sku-edit-dialog.tsx`：单 SKU 编辑（自定义/组包：可改价；标准价格档：只读价、只改备注）
+- 新增 `src/components/inventory/product-edit-dialog.tsx`：标准商品组级编辑（品名/编码/图/重量/备注）
+- 删除走 `AlertDialog` 二次确认
+- 编辑/删除成功后 `queryClient.invalidateQueries({ queryKey: ["inv-skus"] })`
 
-### 标准商品聚合详情页 `/inventory/products/$code`
+---
 
-布局：
-```text
-┌─ 顶部 ────────────────────────────────────┐
-│ [返回] 品名               [编辑] [新增价格档] │
-│ 类目 · 商品编码 · 总库存 N 件                │
-├─ 左：商品图 (aspect-square)                │
-├─ 右：基本信息（品名/类目/重量/备注/图）       │
-├─ 下：价格档列表 (Table)                    │
-│   ¥6.9   EPC...  库存 12  [打印] [入库] [↗]│
-│   ¥9.9   EPC...  库存  3  [打印] [入库] [↗]│
-│   ...                                       │
-└────────────────────────────────────────────┘
+## 3. 商品详情页重新排版（电商详情风格）
+
+### `src/routes/inventory.products.$code.tsx`（标准商品）
+
+布局参考京东/天猫商品详情：
+
+```
+[← 返回 SKU 列表]                                [编辑] [删除] [扫枪入库]
+
+┌─────────────────────────────────────────────────────────┐
+│ ┌────────┐  品名（大）                                   │
+│ │        │  类目 · 标准商品 · N 个价格档                 │
+│ │ 240px  │                                              │
+│ │ 主图   │  ¥6.90 起   总库存 128 件                    │
+│ │        │  编码 SKU-JP-...   单重 120g                  │
+│ └────────┘  ─────────────────────────────                │
+│             [快速操作: 扫枪入库 / 打印标签 / 编辑]        │
+└─────────────────────────────────────────────────────────┘
+
+┌──── Tabs: 价格档 | 备注 ────┐
+│ 价格档子 SKU 表格 ...        │
+└──────────────────────────────┘
 ```
 
-- 「↗」跳到对应价格档子 SKU 的 `/inventory/skus/$id`
-- 「打印」复用现有标签批次逻辑（`createLabelBatch`）
-- 「入库」跳 `/inventory/inbound/new?epc=...` 预填
-- 「新增价格档」沿用 `StandardSkuDialog`，但锁定品名/类目/图（仅选未存在的价格档）—— 本期先放 TODO 占位按钮即可，不实现
+- 主图尺寸 `h-60 w-60`（小屏 `h-40 w-40`），不再撑满左列 280×280
+- 删 `<PageHeader>`，标题改为右侧 `h1` + 描述行
+- 信息列网格化：价格起、库存、编码、单重，2 列 metric 风格
+- 价格档子 SKU 列表保留并改为更"产品规格表"的样式，每行带"打印 / 入库"快捷链接
+- 备注若有，作为独立 Card 放在 Tabs 内或主图下方
+- 顶部 actions 加入编辑、删除按钮
 
-## 客户端聚合
+### `src/routes/inventory.skus.$id.tsx`（自定义/组包详情）
 
-`src/lib/inventory.helpers.ts` 新增：
+同样收紧：
 
-```ts
-export type StandardProductGroup = {
-  key: string;          // sku_code || `${category}|${name}`
-  code: string | null;  // sku_code
-  category: string;
-  name: string;
-  image_url: string | null;
-  skus: SkuRow[];       // 按 price_tier 升序
-  totalStock: number;
-  tiers: number[];      // 升序
-};
+```
+[← 返回]                                  [编辑] [删除]
+┌─────────────────────────────────────────────────┐
+│ [图 200px]  品名 (h1)                            │
+│             类目 · 自定义/组包 · 含 N 子项        │
+│             ¥XX.XX   库存 X 件                   │
+│             EPC mono · 编码 mono                 │
+└─────────────────────────────────────────────────┘
 
-export function groupStandardSkus(rows: SkuRow[]): StandardProductGroup[];
+Tabs: 子项(仅组包) | RFID 打印 | 打印记录 | 入库历史
 ```
 
-不改 `listSkus` serverFn —— 一次拉全量本地分组即可，三个 Tab 共用同一查询结果。
+- 当前已是 flex 布局，进一步拆成 Tabs，避免一屏挤 4 张 Card
+- 主图固定 `h-40 w-40`（移动）/ `h-48 w-48`（桌面）
 
-## 移动端 `/m/skus`
+---
 
-加 Tabs 头 + `ProductCard` 紧凑变体；右上 `新建` 改为下拉菜单（标准/自定义/组包）；点击行为同桌面端。
+## 技术细节
 
-## 文件改动
+- 删除前置校验都在 serverFn 内完成，前端只展示错误 toast
+- `groupStandardSkus` key 已是 `sku_code || category|name`，`updateStandardProduct` / `deleteStandardProduct` 用同样规则筛选记录
+- 视图模式可写入 `localStorage("inv-skus-view")` 让用户刷新后保留选择
+- 所有新增/修改的颜色继续走 semantic token（primary/muted/destructive 等）
 
-新建：
-- `src/components/inventory/product-card.tsx`
-- `src/routes/inventory.products.$code.tsx`（聚合详情页）
+---
 
-修改：
-- `src/lib/inventory.helpers.ts`（加 `groupStandardSkus`）
-- `src/routes/inventory.skus.index.tsx`（Tabs + ProductCard）
-- `src/routes/inventory.products.tsx`（保留 redirect 到 `/inventory/skus`）
-- `src/routes/m.skus.tsx`（Tabs + 三种新建入口）
+## 文件清单
 
-不动：`inventory.functions.ts`、RLS、schema、`inventory.skus.$id.tsx`。
+新增
+- `src/components/inventory/sku-edit-dialog.tsx`
+- `src/components/inventory/product-edit-dialog.tsx`
+- `src/components/inventory/row-actions-menu.tsx`（统一的 ⋯ 菜单 + 删除确认）
+
+修改
+- `src/lib/inventory.functions.ts` — 扩展 updateSku、新增 updateStandardProduct / deleteSku / deleteStandardProduct
+- `src/routes/inventory.skus.index.tsx` — 默认 list、删 PageHeader、按钮搬位、接入操作菜单
+- `src/components/inventory/product-card.tsx` — 卡片 / 行追加 ⋯ 按钮
+- `src/routes/inventory.products.$code.tsx` — 电商风格重排版 + 编辑/删除入口
+- `src/routes/inventory.skus.$id.tsx` — 电商风格 + Tabs 分块 + 编辑/删除入口
