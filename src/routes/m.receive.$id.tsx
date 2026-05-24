@@ -1,17 +1,17 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useRef, Fragment } from "react";
-import { Camera, Check, AlertTriangle, Loader2, ArrowRight, X, Plus, ImageIcon, ChevronRight } from "lucide-react";
+import { useState, Fragment } from "react";
+import { Check, AlertTriangle, Loader2, ArrowRight, ChevronRight } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { MobileShell } from "@/components/mobile/mobile-shell";
 import { getJapanParcel } from "@/lib/japan-parcel.functions";
 import { markParcelDelivered, markParcelProblem } from "@/lib/mobile.functions";
-import { uploadParcelImage } from "@/lib/image-upload";
 import { toThumbUrl } from "@/lib/image";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ItemDetailSheet, type ItemDetailValue } from "@/components/mobile/item-detail-sheet";
+import { PhotoUploaderGrid } from "@/components/mobile/photo-uploader-grid";
 
 export const Route = createFileRoute("/m/receive/$id")({
   component: ReceivePage,
