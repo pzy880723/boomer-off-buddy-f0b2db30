@@ -35,6 +35,7 @@ export function ProductEditDialog({
     weight: "",
     imageUrl: "",
     notes: "",
+    grade: "",
   });
   const [tiers, setTiers] = useState<number[]>([]);
 
@@ -47,6 +48,7 @@ export function ProductEditDialog({
         weight: group.weight_g != null ? String(group.weight_g) : "",
         imageUrl: group.image_url ?? "",
         notes: group.notes ?? "",
+        grade: "",
       });
       setTiers([...group.tiers].sort((a, b) => a - b));
     }

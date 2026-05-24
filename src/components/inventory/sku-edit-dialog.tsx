@@ -35,6 +35,7 @@ export function SkuEditDialog({
     weight: "",
     imageUrl: "",
     notes: "",
+    grade: "",
   });
   const [price, setPrice] = useState("");
 
@@ -50,6 +51,7 @@ export function SkuEditDialog({
         weight: sku.weight_g != null ? String(sku.weight_g) : "",
         imageUrl: sku.image_url ?? "",
         notes: sku.notes ?? "",
+        grade: (sku as { grade?: string | null }).grade ?? "",
       });
       setPrice(String(sku.price_tier ?? ""));
     }
@@ -65,6 +67,7 @@ export function SkuEditDialog({
         weight_g: meta.weight ? Number(meta.weight) : null,
         image_url: meta.imageUrl.trim() || null,
         notes: meta.notes.trim() || null,
+        grade: meta.grade || null,
       };
       if (priceEditable) {
         const p = Number(price);
