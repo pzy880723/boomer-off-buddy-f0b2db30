@@ -95,7 +95,7 @@ function SkusPage() {
         <div className="relative w-full max-w-xs">
           <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="搜品名 / EPC / 商家编码"
+            placeholder="搜品名 / EPC / 商品编码"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && setSearch(searchInput.trim())}
@@ -162,7 +162,7 @@ function SkusPage() {
                     </p>
                     {skuCode && (
                       <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
-                        编码：{skuCode}
+                        商品商品编码：{skuCode}
                       </p>
                     )}
                   </div>

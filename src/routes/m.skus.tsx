@@ -106,7 +106,7 @@ function MSkusPage() {
                       </span>
                     </p>
                     {skuCode && (
-                      <p className="font-mono text-[10px] text-muted-foreground">编码：{skuCode}</p>
+                      <p className="font-mono text-[10px] text-muted-foreground">商品商品编码：{skuCode}</p>
                     )}
                   </div>
                 </Link>

@@ -71,7 +71,7 @@ function SkuDetailPage() {
             <Badge className="bg-primary/90 text-primary-foreground">{formatPrice(sku.price_tier)}</Badge>
             <Badge variant="outline">库存 {sku.stock_qty} 件</Badge>
             <span className="font-mono text-[11px]">{sku.epc}</span>
-            {skuCode && <span className="font-mono text-[11px] text-muted-foreground">编码：{skuCode}</span>}
+            {skuCode && <span className="font-mono text-[11px] text-muted-foreground">商品编码：{skuCode}</span>}
           </>
         }
       />

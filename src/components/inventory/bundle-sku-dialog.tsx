@@ -236,7 +236,7 @@ function ChildPickerDialog({
         <div className="relative">
           <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="搜品名 / EPC / 商家编码"
+            placeholder="搜品名 / EPC / 商品编码"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && setSearch(searchInput.trim())}
