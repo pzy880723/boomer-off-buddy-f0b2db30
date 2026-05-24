@@ -143,13 +143,24 @@ const breadcrumbMap: Record<string, string> = {
   "shop-mgmt": "店铺管理",
 };
 
+// 部分父路由是 Outlet-only（没有 index 子路由），点击会 404；
+// 这里把它们映射到一个真实可达的子路由
+const breadcrumbHrefOverride: Record<string, string> = {
+  "/inventory": "/inventory/skus",
+  "/inventory/products": "/inventory/skus",
+  "/orders": "/orders/dispatch",
+  "/stores": "/stores/list",
+  "/admin": "/admin/users",
+  "/shop-mgmt": "/shop-mgmt/shops",
+};
+// 这些父段没有任何可达页面，直接渲染为纯文本
+const breadcrumbNonClickable = new Set<string>(["/purchase"]);
+
 // 看起来像 UUID / 长随机 ID 的段，显示成「详情」而不是裸编码
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function isIdLike(seg: string) {
   if (UUID_RE.test(seg)) return true;
-  // 纯数字 ID
   if (/^\d{4,}$/.test(seg)) return true;
-  // 长随机 token（同时含字母和数字、长度 >= 12）
   if (seg.length >= 12 && /[A-Za-z]/.test(seg) && /\d/.test(seg)) return true;
   return false;
 }
@@ -165,13 +176,15 @@ function Breadcrumbs() {
       </Link>
       {segments.map((seg, i) => {
         const isLast = i === segments.length - 1;
-        const href = "/" + segments.slice(0, i + 1).join("/");
+        const cumulative = "/" + segments.slice(0, i + 1).join("/");
+        const href = breadcrumbHrefOverride[cumulative] ?? cumulative;
         const label = breadcrumbMap[seg] ?? (isIdLike(seg) ? "详情" : seg);
+        const nonClickable = breadcrumbNonClickable.has(cumulative);
         return (
           <span key={i} className="flex items-center gap-1.5">
             <span className="text-border">/</span>
-            {isLast ? (
-              <span className="font-medium text-foreground">{label}</span>
+            {isLast || nonClickable ? (
+              <span className={isLast ? "font-medium text-foreground" : ""}>{label}</span>
             ) : (
               <Link
                 to={href as string}

@@ -274,7 +274,7 @@ export const updateSku = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-/** 批量更新一组标准商品的共用字段（按 sku_code 或 category|name 聚合） */
+/** 批量更新一组标准商品的共用字段（按 sku_code 或 category|name 聚合），可选同步价格档 */
 export const updateStandardProduct = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
@@ -290,6 +290,7 @@ export const updateStandardProduct = createServerFn({ method: "POST" })
             notes: z.string().nullable().optional(),
           })
           .strict(),
+        price_tiers: z.array(priceTierSchema).min(1).max(50).optional(),
       })
       .parse(input),
   )
@@ -297,20 +298,65 @@ export const updateStandardProduct = createServerFn({ method: "POST" })
     const sb = context.supabase;
     const { data: rows, error: qErr } = await sb
       .from("inv_skus")
-      .select("id, sku_code, category, name")
+      .select("id, sku_code, category, name, price_tier, stock_qty")
       .eq("kind", "single")
       .eq("is_custom_price", false);
     if (qErr) throw new Error(qErr.message);
-    const ids = (rows ?? [])
-      .filter((r) => ((r.sku_code && r.sku_code.trim()) || `${r.category}|${r.name}`) === data.key)
-      .map((r) => r.id);
-    if (ids.length === 0) throw new Error("找不到对应的标准商品");
-    const { error } = await sb
-      .from("inv_skus")
-      .update(data.patch as never)
-      .in("id", ids);
-    if (error) throw new Error(error.message);
-    return { ok: true, updated: ids.length };
+    const matched = (rows ?? []).filter(
+      (r) => ((r.sku_code && r.sku_code.trim()) || `${r.category}|${r.name}`) === data.key,
+    );
+    if (matched.length === 0) throw new Error("找不到对应的标准商品");
+    const ids = matched.map((r) => r.id);
+
+    if (Object.keys(data.patch).length > 0) {
+      const { error } = await sb.from("inv_skus").update(data.patch as never).in("id", ids);
+      if (error) throw new Error(error.message);
+    }
+
+    let added = 0;
+    let removed = 0;
+    if (data.price_tiers && data.price_tiers.length > 0) {
+      const wanted = Array.from(new Set(data.price_tiers)).sort((a, b) => a - b);
+      const current = new Map(matched.map((r) => [Number(r.price_tier), r]));
+      const ref = matched[0];
+      const category = ref.category as string;
+      const name = (data.patch.name ?? ref.name) as string;
+      const sku_code =
+        data.patch.sku_code !== undefined ? data.patch.sku_code : (ref.sku_code ?? null);
+
+      const toAdd = wanted.filter((t) => !current.has(t));
+      if (toAdd.length > 0) {
+        const inserts = toAdd.map((t) => ({
+          category,
+          name,
+          sku_code: sku_code ?? generateSkuCode(category, "single"),
+          price_tier: t,
+          is_custom_price: false,
+          kind: "single" as const,
+          pack_pieces: null,
+          bundle_items: [],
+          weight_g: (data.patch.weight_g ?? null) as number | null,
+          image_url: (data.patch.image_url ?? null) as string | null,
+          notes: (data.patch.notes ?? null) as string | null,
+          status: "active" as const,
+          epc: generateEpc(category, t),
+        }));
+        const { error } = await sb.from("inv_skus").insert(inserts as never);
+        if (error) throw new Error(error.message);
+        added = inserts.length;
+      }
+
+      const toRemove = Array.from(current.entries()).filter(([t]) => !wanted.includes(t));
+      for (const [t, row] of toRemove) {
+        if ((row.stock_qty ?? 0) > 0) {
+          throw new Error(`价格档 ¥${t} 仍有 ${row.stock_qty} 件库存，无法删除`);
+        }
+        await safeDeleteSkuById(sb as never, row.id);
+        removed += 1;
+      }
+    }
+
+    return { ok: true, updated: ids.length, added, removed };
   });
 
 async function safeDeleteSkuById(sb: typeof supabaseAdmin, id: string) {
