@@ -1,12 +1,12 @@
-把 `/m` 底部导航里的「分拣」Tab 替换为「商品」，指向手机端 SKU 模块 `/m/skus`。
+## 背景
+
+`/m/skus` 列表和 SKU 详情手机版 `/m/skus/$id` 已经做好；但 `/m/scan` 扫到 RFID/EPC 命中 SKU 时仍然 `router.navigate` 到 PC 版 `/inventory/skus/$id`，所以手机端点过去就跳到桌面详情页了。
 
 ## 改动
 
-**`src/components/mobile/mobile-shell.tsx`** — `TabBar` 中 `base="/m"` 分支：
-- 将 `{ to: "/m/sort", label: "分拣", icon: Boxes }` 改为 `{ to: "/m/skus", label: "商品", icon: Boxes }`
-- 图标继续复用 `Boxes`（语义吻合），其余 Tab（首页 / 包裹 / 扫码 / 识图）保持不变。
+**`src/routes/m.scan.tsx`**（第 50 行）
+- 将 `router.navigate({ to: "/inventory/skus/$id", params: { id: r.sku.id } })` 改为 `to: "/m/skus/$id"`，其余逻辑保持不变。
 
 ## 不在范围
-- 保留 `/m/sort` 路由文件本身，仅从底部 Tab 撤掉入口，避免老链接 404。
-- `/store` 一侧的 Tab 栏不动。
-- `/m/skus` 页面内容不动。
+- PC 侧 `product-card.tsx` / `inventory.inbound.$id.tsx` / `inventory.products.$code.tsx` 等桌面入口继续指向 `/inventory/skus/$id`，不动。
+- `/m/skus` 列表与 `/m/skus/$id` 详情已就绪，不改。
