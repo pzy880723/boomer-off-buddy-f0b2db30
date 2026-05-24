@@ -11,7 +11,7 @@ export function StandardProductCard({ group }: { group: StandardProductGroup }) 
   return (
     <Link
       to="/inventory/products/$code"
-      params={{ code: encodeURIComponent(group.key) }}
+      params={{ code: group.key }}
       className="block"
     >
       <Card className="group h-full overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-card-hover">
