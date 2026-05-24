@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Tags, Boxes, Printer } from "lucide-react";
+import { Tags, Boxes, Printer, ChevronRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CATEGORY_LABEL, formatPrice, type StandardProductGroup, type SkuRow } from "@/lib/inventory.helpers";
