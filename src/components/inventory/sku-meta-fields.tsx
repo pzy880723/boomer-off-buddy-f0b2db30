@@ -11,6 +11,17 @@ import {
 import { INV_CATEGORIES, CATEGORY_LABEL } from "@/lib/inventory.helpers";
 import { SkuImagePicker } from "./sku-image-picker";
 
+export type SkuGrade = "N" | "S" | "A" | "B" | "C" | "J";
+
+export const SKU_GRADE_OPTIONS: { value: SkuGrade; label: string; desc: string }[] = [
+  { value: "N", label: "N 级", desc: "全新 / 未拆封" },
+  { value: "S", label: "S 级", desc: "已拆封，功能完好，外观无明显瑕疵" },
+  { value: "A", label: "A 级", desc: "功能完好，外观有轻微使用痕迹" },
+  { value: "B", label: "B 级", desc: "功能完好，外观有明显痕迹或轻微缺陷" },
+  { value: "C", label: "C 级", desc: "功能完好，外观严重瑕疵，但不影响使用" },
+  { value: "J", label: "J 级", desc: "缺件 / 当垃圾处理，功能未知" },
+];
+
 export type SkuMetaState = {
   category: string;
   name: string;
@@ -18,6 +29,7 @@ export type SkuMetaState = {
   weight: string;
   imageUrl: string;
   notes: string;
+  grade: string;
 };
 
 export const emptySkuMeta: SkuMetaState = {
@@ -27,6 +39,7 @@ export const emptySkuMeta: SkuMetaState = {
   weight: "",
   imageUrl: "",
   notes: "",
+  grade: "",
 };
 
 export function SkuMetaFields({
@@ -91,6 +104,23 @@ export function SkuMetaFields({
       </div>
 
       <div className="space-y-1.5">
+        <Label>商品评级</Label>
+        <Select value={state.grade} onValueChange={(v) => patch({ grade: v })}>
+          <SelectTrigger>
+            <SelectValue placeholder="选择成色档次" />
+          </SelectTrigger>
+          <SelectContent>
+            {SKU_GRADE_OPTIONS.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                <span className="font-medium">{o.label}</span>
+                <span className="ml-2 text-xs text-muted-foreground">{o.desc}</span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-1.5">
         <Label>商品图片</Label>
         <SkuImagePicker
           value={state.imageUrl}
@@ -102,11 +132,12 @@ export function SkuMetaFields({
       </div>
 
       <div className="space-y-1.5">
-        <Label>备注</Label>
+        <Label>备注 / 描述</Label>
         <Textarea
           value={state.notes}
           onChange={(e) => patch({ notes: e.target.value })}
-          rows={2}
+          rows={3}
+          placeholder="商品简介、卖点、注意事项等"
         />
       </div>
     </div>

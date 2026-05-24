@@ -378,6 +378,7 @@ export type Database = {
           category: string
           created_at: string
           epc: string
+          grade: string | null
           id: string
           image_url: string | null
           is_custom_price: boolean
@@ -397,6 +398,7 @@ export type Database = {
           category: string
           created_at?: string
           epc: string
+          grade?: string | null
           id?: string
           image_url?: string | null
           is_custom_price?: boolean
@@ -416,6 +418,7 @@ export type Database = {
           category?: string
           created_at?: string
           epc?: string
+          grade?: string | null
           id?: string
           image_url?: string | null
           is_custom_price?: boolean

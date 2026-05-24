@@ -25,6 +25,7 @@ const MetaInput = z.object({
   weight_g: z.number().nullable().optional(),
   image_url: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
+  grade: z.enum(["N", "S", "A", "B", "C", "J"]).nullable().optional(),
 });
 
 // 价格档校验：> 0、≤ 9999.9、最多 1 位小数
@@ -147,6 +148,7 @@ export const createStandardSkus = createServerFn({ method: "POST" })
       weight_g: data.weight_g ?? null,
       image_url: data.image_url ?? null,
       notes: data.notes ?? null,
+      grade: data.grade ?? null,
       status: "active" as const,
       epc: data.epc_map?.[String(t)] || generateEpc(data.category, t),
     }));
@@ -180,6 +182,7 @@ export const createCustomSku = createServerFn({ method: "POST" })
       weight_g: data.weight_g ?? null,
       image_url: data.image_url ?? null,
       notes: data.notes ?? null,
+      grade: data.grade ?? null,
       status: "active" as const,
       epc: generateEpc(data.category, data.price),
     };
@@ -233,6 +236,7 @@ export const createBundleSku = createServerFn({ method: "POST" })
       weight_g: data.weight_g ?? null,
       image_url: data.image_url ?? null,
       notes: data.notes ?? null,
+      grade: data.grade ?? null,
       status: "active" as const,
       epc: generateEpc(data.category, data.price),
     };
@@ -258,6 +262,7 @@ export const updateSku = createServerFn({ method: "POST" })
             weight_g: z.number().nullable().optional(),
             image_url: z.string().nullable().optional(),
             notes: z.string().nullable().optional(),
+            grade: z.enum(["N", "S", "A", "B", "C", "J"]).nullable().optional(),
             status: z.enum(["active", "archived"]).optional(),
             price_tier: z.number().positive().max(99999.9).optional(),
           })
