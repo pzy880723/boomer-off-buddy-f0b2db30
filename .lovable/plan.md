@@ -1,80 +1,79 @@
 ## 目标
 
-调整"新建标准商品"弹窗的交互；并在三个新建对话框中统一把"商家编码"改名为"商品编码"，留空则后端自动生成。重量在所有场景明确为选填。
+在 SKU 商品图选择处（`SkuImagePicker`），除了"本地上传"外，再支持：
+1. **AI 生成** — 用品名 + 类目 + 可选自定义描述，让 Gemini Nano Banana 生成商品图
+2. **在线搜索** — 调用 Firecrawl 搜索网络图片，让用户从结果里挑一张
 
----
+最终都把图存进 `parcel-item-images/skus/` 桶，写回 `state.imageUrl`，与现有上传逻辑完全一致，下游零改动。
 
-## 一、价格档可自定义新增（仅标准商品弹窗）
+## 用户交互
 
-`src/components/inventory/standard-sku-dialog.tsx`
+`SkuImagePicker` 顶部 dropdown「+ 添加图片」展开 3 个选项：
+- 上传图片（保留现状）
+- AI 生成
+- 在线搜索
 
-- 在已有 chips（`PRICE_TIERS`）末尾增加一个 `+` 按钮
-- 点击后就地展开一个小输入框（数字 + 确认/取消），支持 `Enter` 确认
-- 校验：必须 > 0、≤ 9999.9、最多 1 位小数；重复值自动忽略
-- 新增的价格档存在弹窗本地 state（`extraTiers: number[]`），关闭弹窗即丢弃；不写库、不污染 `PRICE_TIERS` 常量
-- 显示顺序：`[...PRICE_TIERS, ...extraTiers, ...selectedOnlyTiers].sort((a,b)=>a-b)` 去重后渲染；选中状态用 `tiers: number[]`
-- 新增并提交时按价格升序生成 SKU
+### AI 生成弹窗
+- 默认 prompt = `${类目中文} ${品名} 商品白底图 高清` （可编辑）
+- 「生成」按钮 → 调用 serverFn `generateSkuImage`（Lovable AI / `google/gemini-2.5-flash-image`）
+- 生成结果（1 张，base64）预览 → 「使用此图」上传到桶并回填，或「重新生成」
 
-提交逻辑：后端 `createStandardSkus` 当前的 `PRICE_TIER_SET` 白名单需要放宽 —— 改为只校验 `0 < t ≤ 9999.9 且最多 1 位小数`，不再要求必须命中常量。这是为了让"自定义价格档生成的标准 SKU"也能落库（`is_custom_price` 仍保留 `false`，因为是用户认定的"标准档"）。
+### 在线搜索弹窗
+- 搜索框默认填 `品名`，可改
+- 「搜索」→ 调用 serverFn `searchSkuImages`（Firecrawl `search` + `imageLinks`，取前 12 张缩略图 URL）
+- 网格展示，点击某张 → 服务端下载 → 上传到桶 → 回填 URL（避免热链失效 + 跨域）
 
----
+## 技术实现
 
-## 二、选档后实时显示将要生成的 SKU 编码
+### 1. serverFn: `src/lib/inventory.functions.ts`（或新建 `src/lib/sku-image.functions.ts`）
 
-每勾选/取消一个价格档，在 chips 下方实时展示一个预览列表：
+```ts
+generateSkuImage({ prompt }) -> { dataUrl: string }
+// 调 https://ai.gateway.lovable.dev/v1/chat/completions
+// model: google/gemini-2.5-flash-image, modalities:["image","text"]
+// 返回 data:image/png;base64,...
 
+searchSkuImages({ query }) -> { images: { url, thumb, source }[] }
+// 调 Firecrawl v2 search，imageLinks: 8
+// 过滤掉无 https 链接的项
+
+saveImageFromUrl({ url }) -> { imageUrl: string }
+// 服务端 fetch 该 URL（或 dataUrl）→ 上传到 parcel-item-images/skus/
+// 用 supabaseAdmin，返回公共 URL
 ```
-将生成 3 个 SKU：
-  ¥6.9   INV-TY-00069-XXXXXX
-  ¥9.9   INV-TY-00099-XXXXXX
-  ¥19.9  INV-TY-00199-XXXXXX
-```
 
-实现：用 `useMemo` 在选档/类目变化时跑一次 `generateEpc(category, tier)`；为避免每次重渲染都换随机串，把"已生成的 EPC"按 `category+tier` 做 key 缓存在 `useRef<Map>`；取消勾选不清空缓存，重新勾选时复用同一个 EPC。提交时直接把缓存里的 EPC 透传给后端，后端用透传值入库（如未传则后端继续生成）。
+需要的密钥：
+- `LOVABLE_API_KEY` ✅ 已配置
+- `FIRECRAWL_API_KEY` — 需要让用户在 Connectors 里启用 Firecrawl 连接器；若用户暂不想接，"在线搜索"按钮就 disable 并提示
 
-后端兼容：`createStandardSkus` 入参增加可选 `epc_map: Record<string /*tier*/, string>`，落库时 `epc: epc_map[t] ?? generateEpc(...)`。
+### 2. 新组件 `src/components/inventory/sku-image-source-dialog.tsx`
 
-> 仅标准弹窗做这个预览；自定义/组包不变（它们都是单条 SKU，提交时由后端生成 EPC）。
+承载两种新模式，内部用 Tabs：AI / 搜索。接收 `defaultName`、`defaultCategoryLabel`，回调 `onPick(url)`.
 
----
+### 3. 改造 `src/components/inventory/sku-image-picker.tsx`
 
-## 三、商家编码 → 商品编码 + 自动生成
+- 空态按钮改为 `DropdownMenu`，3 个 item
+- 选 "上传" → 走原 `<input type=file>`
+- 选 "AI 生成" / "在线搜索" → 打开 `SkuImageSourceDialog`
+- 把当前所在表单的 `name` / `category` 透传进来（在 `SkuMetaFields` 里把这俩透传给 picker）
 
-`src/components/inventory/sku-meta-fields.tsx`
+### 4. `sku-meta-fields.tsx`
 
-- Label 改为 "商品编码"
-- placeholder 改为 "留空则自动生成"
-- 字段值（`sku_code`）保持原 schema，仍可空
+把 `state.name` / `state.category` 作为 `defaultName` / `defaultCategory` 传给 `SkuImagePicker`。仅 props 透传，无其他逻辑改动。
 
-后端三个 create 函数（`createStandardSkus` / `createCustomSku` / `createBundleSku`）：
-- 当用户传入 `sku_code` 为 null/空时，后端根据规则生成：
-  - 标准/自定义：`SKU-{类目码}-{YYMMDD}-{4位随机}` 例如 `SKU-TY-260524-A3K9`
-  - 组包：`PKG-{类目码}-{YYMMDD}-{4位随机}`
-  - 标准多档时，同一品名所有档共用同一个 `sku_code`（在 handler 里一次生成、循环复用）
-- 工具函数 `generateSkuCode(category, kind)` 放 `inventory.helpers.ts`
+## 不在范围内
 
-列表/详情现有展示 `商家编码：xxx` 的地方文案改为 `商品编码：xxx`：
-- `src/routes/inventory.skus.index.tsx` 卡片
-- `src/routes/inventory.skus.$id.tsx` 详情头部
+- 不改数据库 schema
+- 不改 SKU 创建/列表逻辑
+- 不改移动端 `sku-image-picker` 之外的代码（手机端自动继承）
+- 不做多图、不做编辑已上传图（如需后续再加）
 
----
+## 涉及文件
 
-## 四、重量明确选填
+- 新增：`src/lib/sku-image.functions.ts`、`src/components/inventory/sku-image-source-dialog.tsx`
+- 修改：`src/components/inventory/sku-image-picker.tsx`、`src/components/inventory/sku-meta-fields.tsx`
 
-`sku-meta-fields.tsx`：Label 由 `单件重量 (g)` 改为 `单件重量 (g)（选填）`，无其它变化。三个 create 函数当前 schema 已经是 `nullable().optional()`，无需改动。
+## 需确认
 
----
-
-## 变更文件清单
-
-修改：
-- `src/components/inventory/standard-sku-dialog.tsx`（+ 按钮、自定义档输入、EPC 预览缓存、提交带 epc_map）
-- `src/components/inventory/sku-meta-fields.tsx`（文案：商品编码、留空自动生成、重量选填）
-- `src/lib/inventory.functions.ts`（放宽标准档校验、添加 `epc_map` 入参、三个 create 在 sku_code 为空时调用 `generateSkuCode`）
-- `src/lib/inventory.helpers.ts`（新增 `generateSkuCode(category, kind)`）
-- `src/routes/inventory.skus.index.tsx`（"编码" 文案）
-- `src/routes/inventory.skus.$id.tsx`（"编码" 文案）
-
-不动：移动端 `m.skus.tsx` 复用 `SkuMetaFields`，会自动跟随文案变化；不需要单独改。
-
-数据库：无需迁移。
+1. **在线搜索**走 Firecrawl 可以吗？如果还没启用 Firecrawl 连接器，我会在实现里先把"在线搜索"按钮 disable+提示，AI 生成单独可用；或者你也可以现在就接 Firecrawl 后我一起接。
+2. AI 生成默认 1 张就够，还是出 4 张让你挑？（出 4 张耗时/费用 ×4）
