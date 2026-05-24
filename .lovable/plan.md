@@ -1,91 +1,59 @@
-## 目标
+# 仓库商品 SKU 升级
 
-把已经同步的 849 条有赞订单从 raw 中"榨干"，补齐展示所需字段，让 `订单管理 → 门店订单`（`/orders/shops`）一打开就能看到完整信息，不再出现 件数=0 / 买家=— / 没商品 / 没收货 的空白。
+## 1. 桌面端列表 `/inventory/skus`（`src/routes/inventory.skus.index.tsx`）
 
-## 现状
+- 删除截图中的两条筛选 Tabs：类目 Tabs（全部/日本瓷器/…）和价格档 Tabs（全档/¥6.9/…）。
+- 顶部保留：标题 + "扫枪入库" + "新建 SKU"。
+- 搜索框（品名/EPC）保留，移到列表上方左侧。
+- 卡片网格保持现在的样式，仅展示商品；类目/价格仍显示在卡片角标里，只是不再做筛选。
+- 服务端 `listSkus` 不动（参数都是 optional，前端不再传 category/price_tier 即可）。
 
-- 同步链路 OK：`youzan.trades.sold.get` 已稳定返回，849 / 849 入库。
-- 但 `youzan_orders` 表只有 11 个业务字段，丢了商品明细、收货人、买家昵称、子单数等。
-- `pickStr/pickNum` 在 `flattenTrade` 后拿不到这些字段，因为：
-  - `num` 在订单级根本没给，需要按 `orders[].num` 累加；
-  - `buyer_nick` 在新接口下叫 `buyer_info.fans_nickname`（部分订单只有 `yz_open_id`）；
-  - 商品标题/图片/收货全在嵌套对象，需要单独读，不靠泛搜。
+## 2. 新建 SKU 弹窗（`src/components/inventory/sku-form-dialog.tsx`）
 
-## 方案
+新交互：
 
-### 1. 扩展 `youzan_orders` 字段（migration）
+1. 选择 **类目**（保持现有下拉）。
+2. **定价方式**单选：`标准价格档` / `自定义价格`。
+   - 标准：弹出价格档（¥6.9 / 9.9 / 15.9 / 19.9 / 29.9 / 39.9 / 49.9）按钮组，点选即定价。
+   - 自定义：显示数字输入框，自行填写（>0，最多两位小数）。
+3. 品名、类型（单品/组包）、组包件数、单件重量、备注 —— 保持。
+4. **图片**：把原来的 URL 文本框替换为真正的上传组件（拖拽/点击 + 复用 `src/lib/image-upload.ts` 的 `compressImage` + Supabase Storage 上传，参考 `item-image-uploader`），上传后回填 `image_url`。
+5. 校验：类目 + 价格 + 品名必填；组包必填件数。
 
-新增列（都可空，老数据兼容）：
+## 3. 自定义价对 EPC / 唯一约束的影响
 
-| 字段 | 类型 | 来源 |
-|---|---|---|
-| `buyer_open_id` | text | `buyer_info.yz_open_id` |
-| `item_count` | int | `Σ orders[].num` |
-| `sku_count` | int | `orders[].length` |
-| `item_titles` | text | 前 3 个 `orders[].title` 用 `、` 连接，超出加 "等 N 件" |
-| `first_item_image` | text | `orders[0].pic_url` / `pic_thumb_url`（接口字段为 `goods_url` 中拿不到，从 `orders[0].sku_pic_url` 或 raw 里 `pic_url` 取） |
-| `receiver_name` | text | `address_info.receiver_name` |
-| `receiver_tel` | text | `address_info.receiver_tel` |
-| `receiver_address` | text | `province + city + district + delivery_address` 拼接 |
-| `outer_transaction_no` | text | `pay_info.outer_transactions[0]` |
-| `post_fee` | numeric | `pay_info.post_fee` |
-| `status_text` | text | 状态码 → 中文映射（WAIT_BUYER_PAY=待付款、TRADE_SUCCESS=已完成、TRADE_CLOSED=已关闭…） |
+- 现 EPC 形如 `INV-{类目码}-{价格×10 共3位}-{6位随机}`，自定义价（如 128 元）会突破 3 位。
+- 调整 `generateEpc`：把价格段固定为 **5 位**（最多 ¥999.99），标准档照样能编码（如 0099）；老数据不受影响（只生成新 EPC 时使用新格式）。
+- 同时新增一列 `is_custom_price boolean default false` 用于前端展示"自定义"标签和将来区分。
+- 唯一约束 `(category, price_tier, name)` 在自定义价下依然有效（不同价格视为不同 SKU）。无需改动。
 
-加索引：`(shop_id, pay_time desc)`、`(shop_id, status)`。
+迁移内容：
+- `ALTER TABLE inv_skus ADD COLUMN is_custom_price boolean NOT NULL DEFAULT false;`
 
-### 2. 改造同步 mapping（`src/lib/youzan.functions.ts`）
+## 4. 服务端 `createSku`（`src/lib/inventory.functions.ts`）
 
-把 trade 里这几块单独抽：
+- `SkuInput` 增加 `is_custom_price: z.boolean().default(false)`。
+- `price_tier` 校验从"正数"放宽到 `z.number().positive().max(99999.99)`；不再限定枚举。
+- 入库逻辑不变（仍按 `price_tier` 算单价）。
 
-```ts
-const fullOrder = (t.full_order_info ?? {}) as any;
-const ordersArr = fullOrder.orders ?? [];
-const addr = fullOrder.address_info ?? {};
-const buyer = fullOrder.buyer_info ?? {};
-const payInfo = fullOrder.pay_info ?? {};
-```
+## 5. 移动端 `/m/skus`（新增 `src/routes/m.skus.tsx` 及 detail）
 
-然后：
-- `item_count = ordersArr.reduce((s,o)=>s+Number(o.num||0),0)`，回填到现有 `num` 字段（解决件数=0）；
-- `buyer_nick` 优先 `buyer.fans_nickname`，回退 `buyer.outer_user_id`，再回退 `yz_open_id` 末 6 位；
-- `item_titles / first_item_image / receiver_* / outer_transaction_no / post_fee / status_text` 按上表填；
-- 保留 `raw: t` 全量备查。
-- 顺手把状态码→中文表也导出，供前端复用。
+- 在 `mobile-shell` 底部 Tab 增加"商品"入口（或在首页加入口卡片，二选一 — 默认加底部 Tab 第三个）。
+- 列表样式按 `m.parcels` 卡片风格：单列，图片缩略 + 品名 + 类目 + 价格 + 库存 + EPC。
+- 顶部固定"新建"按钮 → 打开 `Sheet`，复用与桌面相同的字段顺序（类目 → 标准/自定义价 → 品名 → 单品/组包 → 图片上传），调用同一个 `createSku` server fn。
+- 图片上传走相机/相册（`<input type="file" accept="image/*" capture="environment">`），同样复用 `compressImage`。
+- 搜索框（顶部，回车触发），无筛选 Tab。
 
-### 3. 一次性回填脚本
+## 技术细节
 
-写一个 `backfillShopOrders` server fn（管理员手动触发一次即可）：遍历现有 849 条 `youzan_orders`，从 `raw` 重新跑一遍 mapping，UPDATE 新字段。完成后在 `/youzan` 页加一个"回填字段"按钮（位置：高级 · 同步明细 里）。后续新同步走改造后的逻辑，无需再次回填。
+- 不动 `inventory.skus.$id.tsx`；如果用户进了详情页，自定义价格的展示沿用 `price_tier` 字段，加一个"自定义价"小徽章（基于新增的 `is_custom_price`）。
+- 桌面/移动新建表单抽公共逻辑到 `useCreateSkuForm` hook（位于 `src/components/inventory/`），减少重复。
+- 图片上传组件抽公共 `<SkuImageUploader>`，桌面/移动共用。
 
-### 4. 改造 `/orders/shops` 页面
+## 涉及文件
 
-`listShopOrders` 返回结构增加新字段；`DataTable` 列改为：
+- 迁移：新增一条 SQL（加列）。
+- 编辑：`src/routes/inventory.skus.index.tsx`、`src/components/inventory/sku-form-dialog.tsx`、`src/lib/inventory.functions.ts`、`src/lib/inventory.helpers.ts`（EPC 生成）、`src/components/mobile/mobile-shell.tsx`（底部 Tab）。
+- 新增：`src/routes/m.skus.tsx`、`src/components/inventory/sku-image-uploader.tsx`、`src/components/inventory/use-create-sku-form.ts`。
 
-```
-[缩略图] 订单号 / 门店 / 商品摘要(+件数) / 买家 / 收货人 / 金额 / 状态(中文) / 支付时间
-```
-
-- 默认按 `pay_time desc` 排序；
-- 顶部增加：
-  - 搜索框（订单号 / 买家 / 收货人 / 商品名 模糊匹配，本地过滤即可，849 条够用）；
-  - 状态筛选（待付款/已付款/已发货/已完成/已关闭/退款中）；
-  - 日期范围（最近 7/30/90 天 + 自定义）；
-- 行点击展开，显示完整商品清单（从 `raw.full_order_info.orders` 渲染）+ 收货地址 + 支付流水号；
-- 列表加分页（25/页）+ 总金额合计。
-
-## 技术说明（细节）
-
-- `youzan_orders` 唯一键已是 `(kdt_id, tid)`，UPSERT 不变。
-- 状态码映射放 `src/lib/youzan-status.ts`，前后端共用。
-- 回填脚本一次跑完即可，不放 cron。
-- `listShopOrders` 当前一次取全部，849 条 OK；超过 5000 时再加 server 端分页（本期不做）。
-- 不动同步链路本身（已稳定），只动 mapping 和展示。
-
-## 交付清单
-
-1. migration：`youzan_orders` 加 11 列 + 2 索引
-2. `src/lib/youzan-status.ts`（状态映射，新增）
-3. `src/lib/youzan.functions.ts`：mapping 重写 + `backfillShopOrders` 新增 + `listShopOrders` 返回新字段
-4. `src/routes/orders.shops.tsx`：搜索/筛选/分页/展开行/缩略图/中文状态
-5. `src/routes/youzan.tsx`：高级面板加"回填历史订单字段"按钮
-
-验收：打开 `/orders/shops`，849 条订单全部有商品名、件数、买家、收货人、中文状态；点行能看到商品清单。
+确认后我会执行迁移并实现。
