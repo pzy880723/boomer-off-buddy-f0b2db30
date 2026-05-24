@@ -174,7 +174,7 @@ function Breadcrumbs() {
               <span className="font-medium text-foreground">{label}</span>
             ) : (
               <Link
-                to={href}
+                to={href as string}
                 preload="intent"
                 className="transition-colors hover:text-foreground"
               >
