@@ -2,7 +2,6 @@ import { useMemo, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Plus, Check, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -12,10 +11,10 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createStandardSkus } from "@/lib/inventory.functions";
-import { PRICE_TIERS, generateEpc } from "@/lib/inventory.helpers";
+import { generateEpc } from "@/lib/inventory.helpers";
+import { PriceTierEditor } from "./price-tier-editor";
 import { SkuMetaFields, emptySkuMeta, type SkuMetaState } from "./sku-meta-fields";
 
 export function StandardSkuDialog({
@@ -30,9 +29,6 @@ export function StandardSkuDialog({
   const fn = useServerFn(createStandardSkus);
   const [meta, setMeta] = useState<SkuMetaState>(emptySkuMeta);
   const [tiers, setTiers] = useState<number[]>([]);
-  const [extraTiers, setExtraTiers] = useState<number[]>([]);
-  const [adding, setAdding] = useState(false);
-  const [newTierInput, setNewTierInput] = useState("");
 
   // 缓存 (category|tier) -> epc，避免重渲染时换随机串
   const epcCacheRef = useRef<Map<string, string>>(new Map());
@@ -46,43 +42,11 @@ export function StandardSkuDialog({
     return v;
   };
 
-  // 合并所有可选档：标准 + 自定义新增；按数字排序去重
-  const allTierOptions = useMemo(() => {
-    const set = new Set<number>([...PRICE_TIERS, ...extraTiers]);
-    return Array.from(set).sort((a, b) => a - b);
-  }, [extraTiers]);
-
-  const toggleTier = (t: number) =>
-    setTiers((cur) => (cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t].sort((a, b) => a - b)));
-
-  const confirmAddTier = () => {
-    const n = Number(newTierInput);
-    if (!Number.isFinite(n) || n <= 0 || n > 9999.9) {
-      toast.error("请输入 0~9999.9 之间的价格");
-      return;
-    }
-    const rounded = Math.round(n * 10) / 10;
-    if (Math.round(rounded * 10) !== rounded * 10) {
-      toast.error("价格档最多保留 1 位小数");
-      return;
-    }
-    if (!(PRICE_TIERS as readonly number[]).includes(rounded) && !extraTiers.includes(rounded)) {
-      setExtraTiers((cur) => [...cur, rounded]);
-    }
-    // 自动勾选新加的档
-    setTiers((cur) => (cur.includes(rounded) ? cur : [...cur, rounded].sort((a, b) => a - b)));
-    setNewTierInput("");
-    setAdding(false);
-  };
-
   const sortedSelected = useMemo(() => [...tiers].sort((a, b) => a - b), [tiers]);
 
   const reset = () => {
     setMeta(emptySkuMeta);
     setTiers([]);
-    setExtraTiers([]);
-    setAdding(false);
-    setNewTierInput("");
     epcCacheRef.current.clear();
   };
 
@@ -126,53 +90,8 @@ export function StandardSkuDialog({
         <div className="space-y-4 py-2">
           <SkuMetaFields state={meta} onChange={setMeta} />
           <div className="space-y-2">
-            <Label>标准价格档 *（可多选，可自定义新增）</Label>
-            <div className="flex flex-wrap items-center gap-1.5">
-              {allTierOptions.map((t) => {
-                const active = tiers.includes(t);
-                const isExtra = extraTiers.includes(t);
-                return (
-                  <Button
-                    key={t}
-                    type="button"
-                    size="sm"
-                    variant={active ? "default" : "outline"}
-                    onClick={() => toggleTier(t)}
-                  >
-                    ¥{t}{isExtra && <span className="ml-1 text-[10px] opacity-70">新</span>}
-                  </Button>
-                );
-              })}
-              {adding ? (
-                <div className="flex items-center gap-1">
-                  <Input
-                    autoFocus
-                    type="number"
-                    inputMode="decimal"
-                    step="0.1"
-                    min="0"
-                    value={newTierInput}
-                    onChange={(e) => setNewTierInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") { e.preventDefault(); confirmAddTier(); }
-                      if (e.key === "Escape") { setAdding(false); setNewTierInput(""); }
-                    }}
-                    placeholder="价格"
-                    className="h-8 w-20 text-xs"
-                  />
-                  <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={confirmAddTier}>
-                    <Check className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setAdding(false); setNewTierInput(""); }}>
-                    <X className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              ) : (
-                <Button type="button" size="sm" variant="outline" onClick={() => setAdding(true)}>
-                  <Plus className="h-3.5 w-3.5" />
-                </Button>
-              )}
-            </div>
+            <Label>标准价格档 *（全局共用，可增删改）</Label>
+            <PriceTierEditor value={tiers} onChange={setTiers} />
             <p className="text-xs text-muted-foreground">
               已选 {sortedSelected.length} 档 → 将生成 {sortedSelected.length} 个 SKU
             </p>
