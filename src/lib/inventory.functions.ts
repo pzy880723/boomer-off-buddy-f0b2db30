@@ -246,6 +246,7 @@ export const createBundleSku = createServerFn({ method: "POST" })
   });
 
 export const updateSku = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -263,8 +264,8 @@ export const updateSku = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
-    const { error } = await supabase
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase
       .from("inv_skus")
       .update(data.patch as never)
       .eq("id", data.id);
@@ -273,6 +274,7 @@ export const updateSku = createServerFn({ method: "POST" })
   });
 
 export const createLabelBatch = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -283,8 +285,8 @@ export const createLabelBatch = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
-    const { data: row, error } = await supabase
+  .handler(async ({ data, context }) => {
+    const { data: row, error } = await context.supabase
       .from("inv_label_batches")
       .insert(data as never)
       .select("*")
@@ -294,13 +296,14 @@ export const createLabelBatch = createServerFn({ method: "POST" })
   });
 
 export const lookupSkusByEpcs = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z.object({ epcs: z.array(z.string()).min(1).max(2000) }).parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const uniq = Array.from(new Set(data.epcs.map((e) => e.trim()).filter(Boolean)));
     if (uniq.length === 0) return { skus: [] };
-    const { data: rows, error } = await supabase
+    const { data: rows, error } = await context.supabase
       .from("inv_skus")
       .select("id, epc, category, price_tier, name, kind, pack_pieces, sku_code, image_url")
       .in("epc", uniq);
