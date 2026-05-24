@@ -90,53 +90,8 @@ export function StandardSkuDialog({
         <div className="space-y-4 py-2">
           <SkuMetaFields state={meta} onChange={setMeta} />
           <div className="space-y-2">
-            <Label>标准价格档 *（可多选，可自定义新增）</Label>
-            <div className="flex flex-wrap items-center gap-1.5">
-              {allTierOptions.map((t) => {
-                const active = tiers.includes(t);
-                const isExtra = extraTiers.includes(t);
-                return (
-                  <Button
-                    key={t}
-                    type="button"
-                    size="sm"
-                    variant={active ? "default" : "outline"}
-                    onClick={() => toggleTier(t)}
-                  >
-                    ¥{t}{isExtra && <span className="ml-1 text-[10px] opacity-70">新</span>}
-                  </Button>
-                );
-              })}
-              {adding ? (
-                <div className="flex items-center gap-1">
-                  <Input
-                    autoFocus
-                    type="number"
-                    inputMode="decimal"
-                    step="0.1"
-                    min="0"
-                    value={newTierInput}
-                    onChange={(e) => setNewTierInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") { e.preventDefault(); confirmAddTier(); }
-                      if (e.key === "Escape") { setAdding(false); setNewTierInput(""); }
-                    }}
-                    placeholder="价格"
-                    className="h-8 w-20 text-xs"
-                  />
-                  <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={confirmAddTier}>
-                    <Check className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setAdding(false); setNewTierInput(""); }}>
-                    <X className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              ) : (
-                <Button type="button" size="sm" variant="outline" onClick={() => setAdding(true)}>
-                  <Plus className="h-3.5 w-3.5" />
-                </Button>
-              )}
-            </div>
+            <Label>标准价格档 *（全局共用，可增删改）</Label>
+            <PriceTierEditor value={tiers} onChange={setTiers} />
             <p className="text-xs text-muted-foreground">
               已选 {sortedSelected.length} 档 → 将生成 {sortedSelected.length} 个 SKU
             </p>
