@@ -120,13 +120,15 @@ export const getSku = createServerFn({ method: "GET" })
 
 /** 标准商品：一次为多个价格档生成多条 single SKU */
 export const createStandardSkus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     MetaInput.extend({
       price_tiers: z.array(priceTierSchema).min(1).max(50),
       epc_map: z.record(z.string(), z.string()).optional(),
     }).parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
     const tiers = Array.from(new Set(data.price_tiers)).sort((a, b) => a - b);
     const code = (data.sku_code?.trim() || generateSkuCode(data.category, "single"));
     const rows = tiers.map((t) => ({
