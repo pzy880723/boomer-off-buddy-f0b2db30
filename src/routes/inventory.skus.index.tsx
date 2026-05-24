@@ -2,10 +2,12 @@ import { useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Plus, Search, Tags, Package2, ChevronDown, Boxes, Sparkles } from "lucide-react";
+import { Plus, Search, Tags, Package2, ChevronDown, Boxes, Sparkles, LayoutGrid, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Card } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -17,7 +19,12 @@ import { EmptyState } from "@/components/empty-state";
 import { StandardSkuDialog } from "@/components/inventory/standard-sku-dialog";
 import { CustomSkuDialog } from "@/components/inventory/custom-sku-dialog";
 import { BundleSkuDialog } from "@/components/inventory/bundle-sku-dialog";
-import { StandardProductCard, SingleSkuCard } from "@/components/inventory/product-card";
+import {
+  StandardProductCard,
+  SingleSkuCard,
+  StandardProductRow,
+  SingleSkuRow,
+} from "@/components/inventory/product-card";
 import { listSkus } from "@/lib/inventory.functions";
 import { groupStandardSkus, type SkuRow } from "@/lib/inventory.helpers";
 
