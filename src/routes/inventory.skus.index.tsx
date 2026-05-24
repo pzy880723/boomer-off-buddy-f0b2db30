@@ -1,12 +1,11 @@
-import { useState } from "react";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Plus, Search, Tags, Package2, Printer, ChevronDown, Boxes, Sparkles } from "lucide-react";
+import { Plus, Search, Tags, Package2, ChevronDown, Boxes, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -18,13 +17,9 @@ import { EmptyState } from "@/components/empty-state";
 import { StandardSkuDialog } from "@/components/inventory/standard-sku-dialog";
 import { CustomSkuDialog } from "@/components/inventory/custom-sku-dialog";
 import { BundleSkuDialog } from "@/components/inventory/bundle-sku-dialog";
+import { StandardProductCard, SingleSkuCard } from "@/components/inventory/product-card";
 import { listSkus } from "@/lib/inventory.functions";
-import {
-  CATEGORY_LABEL,
-  SKU_KIND_LABEL,
-  formatPrice,
-  type SkuKind,
-} from "@/lib/inventory.helpers";
+import { groupStandardSkus, type SkuRow } from "@/lib/inventory.helpers";
 
 export const Route = createFileRoute("/inventory/skus/")({
   head: () => ({
@@ -34,6 +29,7 @@ export const Route = createFileRoute("/inventory/skus/")({
 });
 
 type DialogKind = "standard" | "custom" | "bundle" | null;
+type TabKind = "standard" | "custom" | "bundle";
 
 function SkusPage() {
   const nav = useNavigate();
@@ -41,19 +37,30 @@ function SkusPage() {
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [openDialog, setOpenDialog] = useState<DialogKind>(null);
+  const [tab, setTab] = useState<TabKind>("standard");
 
   const q = useQuery({
     queryKey: ["inv-skus", search],
-    queryFn: () => listFn({ data: { search: search || undefined, limit: 300 } }),
+    queryFn: () => listFn({ data: { search: search || undefined, limit: 500 } }),
   });
 
-  const rows = q.data?.rows ?? [];
+  const rows = (q.data?.rows ?? []) as SkuRow[];
+  const { standardGroups, customRows, bundleRows } = useMemo(() => {
+    const std = rows.filter((r) => r.kind === "single" && !r.is_custom_price);
+    const cus = rows.filter((r) => r.kind === "single" && r.is_custom_price);
+    const bun = rows.filter((r) => r.kind === "bundle");
+    return {
+      standardGroups: groupStandardSkus(std),
+      customRows: cus,
+      bundleRows: bun,
+    };
+  }, [rows]);
 
   const NewMenu = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button size="sm" className="bg-gradient-brand hover:opacity-90">
-          <Plus className="mr-1.5 h-3.5 w-3.5" /> 新建 SKU
+          <Plus className="mr-1.5 h-3.5 w-3.5" /> 新建商品
           <ChevronDown className="ml-1 h-3 w-3" />
         </Button>
       </DropdownMenuTrigger>
@@ -71,14 +78,16 @@ function SkusPage() {
     </DropdownMenu>
   );
 
+  const totalStock = rows.reduce((s, r) => s + (r.stock_qty ?? 0), 0);
+
   return (
     <div className="space-y-4">
       <PageHeader
         title="商品 SKU"
-        description="按 类目 + 价格 + 品名 共用 EPC；组包商品作为独立 SKU"
+        description="标准商品按 类目+品名 共享多个价格档；自定义、组包独立成 SKU"
         meta={
           <span>
-            共 {rows.length} 个 SKU · 在库合计 {rows.reduce((s, r) => s + (r.stock_qty ?? 0), 0)} 件
+            标准 {standardGroups.length} 个 · 自定义 {customRows.length} · 组包 {bundleRows.length} · 在库合计 {totalStock} 件
           </span>
         }
         actions={
@@ -91,87 +100,83 @@ function SkusPage() {
         }
       />
 
-      <div className="flex items-center gap-2">
-        <div className="relative w-full max-w-xs">
-          <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="搜品名 / EPC / 商品编码"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && setSearch(searchInput.trim())}
-            className="h-8 pl-7 text-xs"
-          />
-        </div>
-      </div>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as TabKind)}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <TabsList>
+            <TabsTrigger value="standard">
+              标准商品 <span className="ml-1.5 text-xs text-muted-foreground">{standardGroups.length}</span>
+            </TabsTrigger>
+            <TabsTrigger value="custom">
+              自定义商品 <span className="ml-1.5 text-xs text-muted-foreground">{customRows.length}</span>
+            </TabsTrigger>
+            <TabsTrigger value="bundle">
+              组包商品 <span className="ml-1.5 text-xs text-muted-foreground">{bundleRows.length}</span>
+            </TabsTrigger>
+          </TabsList>
 
-      {rows.length === 0 ? (
-        <EmptyState
-          icon={Tags}
-          title="还没有 SKU"
-          description="点击右上「新建 SKU」创建第一个商品档案"
-          action={NewMenu}
-        />
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-          {rows.map((r) => {
-            const isBundle = r.kind === "bundle";
-            const skuCode = (r as { sku_code?: string | null }).sku_code;
-            const bundleItems = (r as { bundle_items?: unknown[] }).bundle_items;
-            return (
-              <Link key={r.id} to="/inventory/skus/$id" params={{ id: r.id }} className="block">
-                <Card className="group h-full overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-card-hover">
-                  <div className="relative aspect-square overflow-hidden bg-muted">
-                    {r.image_url ? (
-                      <img
-                        src={r.image_url}
-                        alt={r.name}
-                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                        <Tags className="h-10 w-10" />
-                      </div>
-                    )}
-                    <div className="absolute left-2 top-2 flex flex-wrap gap-1">
-                      <Badge className="bg-primary/90 text-primary-foreground">{formatPrice(r.price_tier)}</Badge>
-                      {isBundle && (
-                        <Badge variant="secondary">
-                          <Boxes className="mr-0.5 h-2.5 w-2.5" />
-                          组包·{Array.isArray(bundleItems) ? bundleItems.length : "?"}
-                        </Badge>
-                      )}
-                      {r.kind === "pack" && <Badge variant="secondary">组包·{r.pack_pieces ?? "?"}</Badge>}
-                      {(r as { is_custom_price?: boolean }).is_custom_price && !isBundle && (
-                        <Badge variant="outline" className="bg-background/80 backdrop-blur">自定义价</Badge>
-                      )}
-                    </div>
-                    <div className="absolute right-2 top-2">
-                      <Badge variant="outline" className="bg-background/80 backdrop-blur">
-                        库存 {r.stock_qty}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div className="p-3">
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                      {CATEGORY_LABEL[r.category] ?? r.category} · {SKU_KIND_LABEL[r.kind as SkuKind] ?? r.kind}
-                    </p>
-                    <p className="mt-1 line-clamp-1 text-sm font-medium">{r.name}</p>
-                    <p className="mt-1 flex items-center gap-1 font-mono text-[10px] text-muted-foreground">
-                      <Printer className="h-2.5 w-2.5" />
-                      {r.epc}
-                    </p>
-                    {skuCode && (
-                      <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
-                        商品商品编码：{skuCode}
-                      </p>
-                    )}
-                  </div>
-                </Card>
-              </Link>
-            );
-          })}
+          <div className="relative w-full max-w-xs">
+            <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="搜品名 / EPC / 商品编码"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && setSearch(searchInput.trim())}
+              className="h-8 pl-7 text-xs"
+            />
+          </div>
         </div>
-      )}
+
+        <TabsContent value="standard" className="mt-4">
+          {standardGroups.length === 0 ? (
+            <EmptyState
+              icon={Tags}
+              title="还没有标准商品"
+              description="标准商品按类目+品名共享多个价格档，95% 的商品都用这种方式"
+              action={NewMenu}
+            />
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+              {standardGroups.map((g) => (
+                <StandardProductCard key={g.key} group={g} />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="custom" className="mt-4">
+          {customRows.length === 0 ? (
+            <EmptyState
+              icon={Sparkles}
+              title="还没有自定义商品"
+              description="不能归类到标准价格档的大件商品请用「自定义商品」"
+              action={NewMenu}
+            />
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+              {customRows.map((r) => (
+                <SingleSkuCard key={r.id} row={r} />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="bundle" className="mt-4">
+          {bundleRows.length === 0 ? (
+            <EmptyState
+              icon={Boxes}
+              title="还没有组包商品"
+              description="组包商品引用若干已有 SKU，主要用于批发场景"
+              action={NewMenu}
+            />
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+              {bundleRows.map((r) => (
+                <SingleSkuCard key={r.id} row={r} />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
 
       <StandardSkuDialog
         open={openDialog === "standard"}

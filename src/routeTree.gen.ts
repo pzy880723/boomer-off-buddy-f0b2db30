@@ -64,6 +64,7 @@ import { Route as PurchaseDomesticBulkNewRouteImport } from './routes/purchase.d
 import { Route as PurchaseDomesticBulkIdRouteImport } from './routes/purchase.domestic-bulk.$id'
 import { Route as MReceiveIdRouteImport } from './routes/m.receive.$id'
 import { Route as InventorySkusIdRouteImport } from './routes/inventory.skus.$id'
+import { Route as InventoryProductsCodeRouteImport } from './routes/inventory.products.$code'
 import { Route as InventoryInboundNewRouteImport } from './routes/inventory.inbound.new'
 import { Route as InventoryInboundIdRouteImport } from './routes/inventory.inbound.$id'
 import { Route as ApiPublicMerukiIngestRouteImport } from './routes/api/public/meruki-ingest'
@@ -347,6 +348,11 @@ const InventorySkusIdRoute = InventorySkusIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => InventorySkusRoute,
 } as any)
+const InventoryProductsCodeRoute = InventoryProductsCodeRouteImport.update({
+  id: '/$code',
+  path: '/$code',
+  getParentRoute: () => InventoryProductsRoute,
+} as any)
 const InventoryInboundNewRoute = InventoryInboundNewRouteImport.update({
   id: '/new',
   path: '/new',
@@ -377,7 +383,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AdminUsersRoute
   '/inventory/batches': typeof InventoryBatchesRoute
   '/inventory/inbound': typeof InventoryInboundRouteWithChildren
-  '/inventory/products': typeof InventoryProductsRoute
+  '/inventory/products': typeof InventoryProductsRouteWithChildren
   '/inventory/skus': typeof InventorySkusRouteWithChildren
   '/inventory/transfers': typeof InventoryTransfersRoute
   '/m/inbound': typeof MInboundRoute
@@ -407,6 +413,7 @@ export interface FileRoutesByFullPath {
   '/api/public/meruki-ingest': typeof ApiPublicMerukiIngestRoute
   '/inventory/inbound/$id': typeof InventoryInboundIdRoute
   '/inventory/inbound/new': typeof InventoryInboundNewRoute
+  '/inventory/products/$code': typeof InventoryProductsCodeRoute
   '/inventory/skus/$id': typeof InventorySkusIdRoute
   '/m/receive/$id': typeof MReceiveIdRoute
   '/purchase/domestic-bulk/$id': typeof PurchaseDomesticBulkIdRoute
@@ -434,7 +441,7 @@ export interface FileRoutesByTo {
   '/youzan': typeof YouzanRoute
   '/admin/users': typeof AdminUsersRoute
   '/inventory/batches': typeof InventoryBatchesRoute
-  '/inventory/products': typeof InventoryProductsRoute
+  '/inventory/products': typeof InventoryProductsRouteWithChildren
   '/inventory/transfers': typeof InventoryTransfersRoute
   '/m/inbound': typeof MInboundRoute
   '/m/parcels': typeof MParcelsRoute
@@ -460,6 +467,7 @@ export interface FileRoutesByTo {
   '/api/public/meruki-ingest': typeof ApiPublicMerukiIngestRoute
   '/inventory/inbound/$id': typeof InventoryInboundIdRoute
   '/inventory/inbound/new': typeof InventoryInboundNewRoute
+  '/inventory/products/$code': typeof InventoryProductsCodeRoute
   '/inventory/skus/$id': typeof InventorySkusIdRoute
   '/m/receive/$id': typeof MReceiveIdRoute
   '/purchase/domestic-bulk/$id': typeof PurchaseDomesticBulkIdRoute
@@ -491,7 +499,7 @@ export interface FileRoutesById {
   '/admin/users': typeof AdminUsersRoute
   '/inventory/batches': typeof InventoryBatchesRoute
   '/inventory/inbound': typeof InventoryInboundRouteWithChildren
-  '/inventory/products': typeof InventoryProductsRoute
+  '/inventory/products': typeof InventoryProductsRouteWithChildren
   '/inventory/skus': typeof InventorySkusRouteWithChildren
   '/inventory/transfers': typeof InventoryTransfersRoute
   '/m/inbound': typeof MInboundRoute
@@ -521,6 +529,7 @@ export interface FileRoutesById {
   '/api/public/meruki-ingest': typeof ApiPublicMerukiIngestRoute
   '/inventory/inbound/$id': typeof InventoryInboundIdRoute
   '/inventory/inbound/new': typeof InventoryInboundNewRoute
+  '/inventory/products/$code': typeof InventoryProductsCodeRoute
   '/inventory/skus/$id': typeof InventorySkusIdRoute
   '/m/receive/$id': typeof MReceiveIdRoute
   '/purchase/domestic-bulk/$id': typeof PurchaseDomesticBulkIdRoute
@@ -583,6 +592,7 @@ export interface FileRouteTypes {
     | '/api/public/meruki-ingest'
     | '/inventory/inbound/$id'
     | '/inventory/inbound/new'
+    | '/inventory/products/$code'
     | '/inventory/skus/$id'
     | '/m/receive/$id'
     | '/purchase/domestic-bulk/$id'
@@ -636,6 +646,7 @@ export interface FileRouteTypes {
     | '/api/public/meruki-ingest'
     | '/inventory/inbound/$id'
     | '/inventory/inbound/new'
+    | '/inventory/products/$code'
     | '/inventory/skus/$id'
     | '/m/receive/$id'
     | '/purchase/domestic-bulk/$id'
@@ -696,6 +707,7 @@ export interface FileRouteTypes {
     | '/api/public/meruki-ingest'
     | '/inventory/inbound/$id'
     | '/inventory/inbound/new'
+    | '/inventory/products/$code'
     | '/inventory/skus/$id'
     | '/m/receive/$id'
     | '/purchase/domestic-bulk/$id'
@@ -727,7 +739,7 @@ export interface RootRouteChildren {
   AdminUsersRoute: typeof AdminUsersRoute
   InventoryBatchesRoute: typeof InventoryBatchesRoute
   InventoryInboundRoute: typeof InventoryInboundRouteWithChildren
-  InventoryProductsRoute: typeof InventoryProductsRoute
+  InventoryProductsRoute: typeof InventoryProductsRouteWithChildren
   InventorySkusRoute: typeof InventorySkusRouteWithChildren
   InventoryTransfersRoute: typeof InventoryTransfersRoute
   PurchaseDomesticRoute: typeof PurchaseDomesticRouteWithChildren
@@ -1128,6 +1140,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InventorySkusIdRouteImport
       parentRoute: typeof InventorySkusRoute
     }
+    '/inventory/products/$code': {
+      id: '/inventory/products/$code'
+      path: '/$code'
+      fullPath: '/inventory/products/$code'
+      preLoaderRoute: typeof InventoryProductsCodeRouteImport
+      parentRoute: typeof InventoryProductsRoute
+    }
     '/inventory/inbound/new': {
       id: '/inventory/inbound/new'
       path: '/new'
@@ -1236,6 +1255,17 @@ const InventoryInboundRouteChildren: InventoryInboundRouteChildren = {
 const InventoryInboundRouteWithChildren =
   InventoryInboundRoute._addFileChildren(InventoryInboundRouteChildren)
 
+interface InventoryProductsRouteChildren {
+  InventoryProductsCodeRoute: typeof InventoryProductsCodeRoute
+}
+
+const InventoryProductsRouteChildren: InventoryProductsRouteChildren = {
+  InventoryProductsCodeRoute: InventoryProductsCodeRoute,
+}
+
+const InventoryProductsRouteWithChildren =
+  InventoryProductsRoute._addFileChildren(InventoryProductsRouteChildren)
+
 interface InventorySkusRouteChildren {
   InventorySkusIdRoute: typeof InventorySkusIdRoute
   InventorySkusIndexRoute: typeof InventorySkusIndexRoute
@@ -1313,7 +1343,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminUsersRoute: AdminUsersRoute,
   InventoryBatchesRoute: InventoryBatchesRoute,
   InventoryInboundRoute: InventoryInboundRouteWithChildren,
-  InventoryProductsRoute: InventoryProductsRoute,
+  InventoryProductsRoute: InventoryProductsRouteWithChildren,
   InventorySkusRoute: InventorySkusRouteWithChildren,
   InventoryTransfersRoute: InventoryTransfersRoute,
   PurchaseDomesticRoute: PurchaseDomesticRouteWithChildren,
