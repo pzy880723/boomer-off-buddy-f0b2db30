@@ -63,32 +63,35 @@ function SkuDetailPage() {
         <ArrowLeft className="h-3 w-3" /> 返回 SKU 列表
       </Link>
 
-      <PageHeader
-        title={sku.name}
-        description={`${CATEGORY_LABEL[sku.category] ?? sku.category} · ${SKU_KIND_LABEL[sku.kind as SkuKind] ?? sku.kind}${sku.kind === "pack" ? ` · 组包 ${sku.pack_pieces} 件` : ""}${sku.kind === "bundle" ? ` · 含 ${bundleChildren.length} 种子项` : ""}`}
-        meta={
-          <>
+      <Card className="flex gap-4 p-4">
+        <div className="h-28 w-28 flex-shrink-0 overflow-hidden rounded-md bg-muted sm:h-32 sm:w-32">
+          {sku.image_url ? (
+            <img src={sku.image_url} alt={sku.name} className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+              <Tags className="h-8 w-8" />
+            </div>
+          )}
+        </div>
+        <div className="min-w-0 flex-1 space-y-2">
+          <div>
+            <h1 className="truncate text-lg font-semibold leading-tight">{sku.name}</h1>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {CATEGORY_LABEL[sku.category] ?? sku.category} · {SKU_KIND_LABEL[sku.kind as SkuKind] ?? sku.kind}
+              {sku.kind === "pack" ? ` · 组包 ${sku.pack_pieces} 件` : ""}
+              {sku.kind === "bundle" ? ` · 含 ${bundleChildren.length} 种子项` : ""}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
             <Badge className="bg-primary/90 text-primary-foreground">{formatPrice(sku.price_tier)}</Badge>
             <Badge variant="outline">库存 {sku.stock_qty} 件</Badge>
             <span className="font-mono text-[11px]">{sku.epc}</span>
-            {skuCode && <span className="font-mono text-[11px] text-muted-foreground">商品编码：{skuCode}</span>}
-          </>
-        }
-      />
-
-      <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
-        <Card className="overflow-hidden">
-          <div className="aspect-square bg-muted">
-            {sku.image_url ? (
-              <img src={sku.image_url} alt={sku.name} className="h-full w-full object-cover" />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                <Tags className="h-12 w-12" />
-              </div>
-            )}
+            {skuCode && <span className="font-mono text-[11px] text-muted-foreground">编码：{skuCode}</span>}
           </div>
-        </Card>
+        </div>
+      </Card>
 
+      <div>
         <div className="space-y-4">
           {sku.kind === "bundle" && bundleChildren.length > 0 && (
             <Card className="p-4">
