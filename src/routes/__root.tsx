@@ -120,16 +120,39 @@ const breadcrumbMap: Record<string, string> = {
   domestic: "国内小包",
   "domestic-bulk": "国内大宗",
   inventory: "商品库存",
+  skus: "商品 SKU",
   products: "商品档案",
   batches: "采购批次",
   transfers: "库存调拨",
+  inbound: "扫枪入库",
+  new: "新建",
+  import: "导入",
+  accounts: "账号管理",
   stores: "门店加盟",
   list: "门店列表",
   franchisees: "加盟商管理",
   youzan: "有赞对接",
   knowledge: "知识库",
   settings: "系统设置",
+  admin: "管理",
+  users: "用户",
+  orders: "订单",
+  dispatch: "发货",
+  shops: "店铺",
+  wholesale: "批发",
+  "shop-mgmt": "店铺管理",
 };
+
+// 看起来像 UUID / 长随机 ID 的段，显示成「详情」而不是裸编码
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isIdLike(seg: string) {
+  if (UUID_RE.test(seg)) return true;
+  // 纯数字 ID
+  if (/^\d{4,}$/.test(seg)) return true;
+  // 长随机 token（同时含字母和数字、长度 >= 12）
+  if (seg.length >= 12 && /[A-Za-z]/.test(seg) && /\d/.test(seg)) return true;
+  return false;
+}
 
 function Breadcrumbs() {
   const path = useRouterState({ select: (s) => s.location.pathname });
@@ -140,14 +163,27 @@ function Breadcrumbs() {
       <Link to="/dashboard" preload="intent" className="transition-colors hover:text-foreground">
         首页
       </Link>
-      {segments.map((seg, i) => (
-        <span key={i} className="flex items-center gap-1.5">
-          <span className="text-border">/</span>
-          <span className={i === segments.length - 1 ? "font-medium text-foreground" : ""}>
-            {breadcrumbMap[seg] ?? seg}
+      {segments.map((seg, i) => {
+        const isLast = i === segments.length - 1;
+        const href = "/" + segments.slice(0, i + 1).join("/");
+        const label = breadcrumbMap[seg] ?? (isIdLike(seg) ? "详情" : seg);
+        return (
+          <span key={i} className="flex items-center gap-1.5">
+            <span className="text-border">/</span>
+            {isLast ? (
+              <span className="font-medium text-foreground">{label}</span>
+            ) : (
+              <Link
+                to={href as string}
+                preload="intent"
+                className="transition-colors hover:text-foreground"
+              >
+                {label}
+              </Link>
+            )}
           </span>
-        </span>
-      ))}
+        );
+      })}
     </nav>
   );
 }
