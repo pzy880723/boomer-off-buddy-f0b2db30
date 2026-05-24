@@ -148,6 +148,7 @@ export const createStandardSkus = createServerFn({ method: "POST" })
       weight_g: data.weight_g ?? null,
       image_url: data.image_url ?? null,
       notes: data.notes ?? null,
+      grade: data.grade ?? null,
       status: "active" as const,
       epc: data.epc_map?.[String(t)] || generateEpc(data.category, t),
     }));
@@ -181,6 +182,7 @@ export const createCustomSku = createServerFn({ method: "POST" })
       weight_g: data.weight_g ?? null,
       image_url: data.image_url ?? null,
       notes: data.notes ?? null,
+      grade: data.grade ?? null,
       status: "active" as const,
       epc: generateEpc(data.category, data.price),
     };
