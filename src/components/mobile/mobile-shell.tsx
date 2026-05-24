@@ -50,7 +50,7 @@ function TabBar({ base }: { base: "/m" | "/store" }) {
           { to: "/m", label: "首页", icon: Home, exact: true },
           { to: "/m/parcels", label: "包裹", icon: Package },
           { to: "/m/scan", label: "扫码", icon: ScanLine, primary: true },
-          { to: "/m/sort", label: "分拣", icon: Boxes },
+          { to: "/m/skus", label: "商品", icon: Boxes },
           { to: "/m/photo-search", label: "识图", icon: Camera },
         ]
       : [
