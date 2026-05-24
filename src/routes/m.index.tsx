@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Package, ScanLine, Boxes, ArrowDownToLine, Camera, Search } from "lucide-react";
+import { Package, ScanLine, Boxes, ArrowDownToLine, Camera, Search, Tags } from "lucide-react";
 import { MobileShell } from "@/components/mobile/mobile-shell";
 import { useServerFn } from "@tanstack/react-start";
 import { getMobileCounts } from "@/lib/mobile.functions";

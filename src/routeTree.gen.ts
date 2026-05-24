@@ -38,6 +38,7 @@ import { Route as PurchaseDomesticRouteImport } from './routes/purchase.domestic
 import { Route as OrdersWholesaleRouteImport } from './routes/orders.wholesale'
 import { Route as OrdersShopsRouteImport } from './routes/orders.shops'
 import { Route as OrdersDispatchRouteImport } from './routes/orders.dispatch'
+import { Route as MSkusRouteImport } from './routes/m.skus'
 import { Route as MScanRouteImport } from './routes/m.scan'
 import { Route as MPhotoSearchRouteImport } from './routes/m.photo-search'
 import { Route as MParcelsRouteImport } from './routes/m.parcels'
@@ -212,6 +213,11 @@ const OrdersDispatchRoute = OrdersDispatchRouteImport.update({
   path: '/dispatch',
   getParentRoute: () => OrdersRoute,
 } as any)
+const MSkusRoute = MSkusRouteImport.update({
+  id: '/skus',
+  path: '/skus',
+  getParentRoute: () => MRoute,
+} as any)
 const MScanRoute = MScanRouteImport.update({
   id: '/scan',
   path: '/scan',
@@ -378,6 +384,7 @@ export interface FileRoutesByFullPath {
   '/m/parcels': typeof MParcelsRoute
   '/m/photo-search': typeof MPhotoSearchRoute
   '/m/scan': typeof MScanRoute
+  '/m/skus': typeof MSkusRoute
   '/orders/dispatch': typeof OrdersDispatchRoute
   '/orders/shops': typeof OrdersShopsRoute
   '/orders/wholesale': typeof OrdersWholesaleRoute
@@ -433,6 +440,7 @@ export interface FileRoutesByTo {
   '/m/parcels': typeof MParcelsRoute
   '/m/photo-search': typeof MPhotoSearchRoute
   '/m/scan': typeof MScanRoute
+  '/m/skus': typeof MSkusRoute
   '/orders/dispatch': typeof OrdersDispatchRoute
   '/orders/shops': typeof OrdersShopsRoute
   '/orders/wholesale': typeof OrdersWholesaleRoute
@@ -490,6 +498,7 @@ export interface FileRoutesById {
   '/m/parcels': typeof MParcelsRoute
   '/m/photo-search': typeof MPhotoSearchRoute
   '/m/scan': typeof MScanRoute
+  '/m/skus': typeof MSkusRoute
   '/orders/dispatch': typeof OrdersDispatchRoute
   '/orders/shops': typeof OrdersShopsRoute
   '/orders/wholesale': typeof OrdersWholesaleRoute
@@ -551,6 +560,7 @@ export interface FileRouteTypes {
     | '/m/parcels'
     | '/m/photo-search'
     | '/m/scan'
+    | '/m/skus'
     | '/orders/dispatch'
     | '/orders/shops'
     | '/orders/wholesale'
@@ -606,6 +616,7 @@ export interface FileRouteTypes {
     | '/m/parcels'
     | '/m/photo-search'
     | '/m/scan'
+    | '/m/skus'
     | '/orders/dispatch'
     | '/orders/shops'
     | '/orders/wholesale'
@@ -662,6 +673,7 @@ export interface FileRouteTypes {
     | '/m/parcels'
     | '/m/photo-search'
     | '/m/scan'
+    | '/m/skus'
     | '/orders/dispatch'
     | '/orders/shops'
     | '/orders/wholesale'
@@ -934,6 +946,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrdersDispatchRouteImport
       parentRoute: typeof OrdersRoute
     }
+    '/m/skus': {
+      id: '/m/skus'
+      path: '/skus'
+      fullPath: '/m/skus'
+      preLoaderRoute: typeof MSkusRouteImport
+      parentRoute: typeof MRoute
+    }
     '/m/scan': {
       id: '/m/scan'
       path: '/scan'
@@ -1138,6 +1157,7 @@ interface MRouteChildren {
   MParcelsRoute: typeof MParcelsRoute
   MPhotoSearchRoute: typeof MPhotoSearchRoute
   MScanRoute: typeof MScanRoute
+  MSkusRoute: typeof MSkusRoute
   MIndexRoute: typeof MIndexRoute
   MReceiveIdRoute: typeof MReceiveIdRoute
 }
@@ -1147,6 +1167,7 @@ const MRouteChildren: MRouteChildren = {
   MParcelsRoute: MParcelsRoute,
   MPhotoSearchRoute: MPhotoSearchRoute,
   MScanRoute: MScanRoute,
+  MSkusRoute: MSkusRoute,
   MIndexRoute: MIndexRoute,
   MReceiveIdRoute: MReceiveIdRoute,
 }
