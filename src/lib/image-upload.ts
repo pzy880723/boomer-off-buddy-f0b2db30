@@ -94,6 +94,20 @@ export async function uploadParcelImage(
   return supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
 }
 
+/** 上传商品 SKU 图片（复用 parcel-item-images 公共桶的 skus/ 子目录） */
+export async function uploadSkuImage(file: File | Blob): Promise<string> {
+  const BUCKET = "parcel-item-images";
+  const { blob, ext, mime } = await compressImage(file, (file as File).name);
+  const path = `skus/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
+  const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
+    cacheControl: "3600",
+    upsert: false,
+    contentType: mime,
+  });
+  if (error) throw new Error(error.message);
+  return supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+}
+
 /** 把 Blob 转 base64（不含 data: 前缀），AI 拍照识图用 */
 export async function blobToBase64(blob: Blob): Promise<string> {
   return await new Promise((resolve, reject) => {

@@ -5,7 +5,6 @@ import { useServerFn } from "@tanstack/react-start";
 import { Plus, Search, Tags, Package2, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/page-header";
@@ -13,8 +12,6 @@ import { EmptyState } from "@/components/empty-state";
 import { SkuFormDialog } from "@/components/inventory/sku-form-dialog";
 import { listSkus } from "@/lib/inventory.functions";
 import {
-  INV_CATEGORIES,
-  PRICE_TIERS,
   CATEGORY_LABEL,
   SKU_KIND_LABEL,
   formatPrice,
@@ -30,23 +27,13 @@ export const Route = createFileRoute("/inventory/skus/")({
 function SkusPage() {
   const nav = useNavigate();
   const listFn = useServerFn(listSkus);
-  const [category, setCategory] = useState<string>("all");
-  const [tier, setTier] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [openNew, setOpenNew] = useState(false);
 
   const q = useQuery({
-    queryKey: ["inv-skus", category, tier, search],
-    queryFn: () =>
-      listFn({
-        data: {
-          category: category === "all" ? undefined : category,
-          price_tier: tier === "all" ? undefined : Number(tier),
-          search: search || undefined,
-          limit: 300,
-        },
-      }),
+    queryKey: ["inv-skus", search],
+    queryFn: () => listFn({ data: { search: search || undefined, limit: 300 } }),
   });
 
   const rows = q.data?.rows ?? [];
@@ -55,8 +42,12 @@ function SkusPage() {
     <div className="space-y-4">
       <PageHeader
         title="商品 SKU"
-        description="按 类目 + 价格档 + 品名 共用 EPC；组包商品作为独立 SKU"
-        meta={<span>共 {rows.length} 个 SKU · 在库合计 {rows.reduce((s, r) => s + (r.stock_qty ?? 0), 0)} 件</span>}
+        description="按 类目 + 价格 + 品名 共用 EPC；组包商品作为独立 SKU"
+        meta={
+          <span>
+            共 {rows.length} 个 SKU · 在库合计 {rows.reduce((s, r) => s + (r.stock_qty ?? 0), 0)} 件
+          </span>
+        }
         actions={
           <>
             <Button variant="outline" size="sm" onClick={() => nav({ to: "/inventory/inbound/new" })}>
@@ -69,36 +60,15 @@ function SkusPage() {
         }
       />
 
-      <Tabs value={category} onValueChange={setCategory}>
-        <TabsList className="flex-wrap">
-          <TabsTrigger value="all">全部</TabsTrigger>
-          {INV_CATEGORIES.map((c) => (
-            <TabsTrigger key={c.value} value={c.value}>
-              {c.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <Tabs value={tier} onValueChange={setTier}>
-          <TabsList>
-            <TabsTrigger value="all">全档</TabsTrigger>
-            {PRICE_TIERS.map((t) => (
-              <TabsTrigger key={t} value={String(t)}>
-                ¥{t}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-        <div className="relative ml-auto">
+      <div className="flex items-center gap-2">
+        <div className="relative w-full max-w-xs">
           <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="搜品名 / EPC"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && setSearch(searchInput.trim())}
-            className="h-8 w-56 pl-7 text-xs"
+            className="h-8 pl-7 text-xs"
           />
         </div>
       </div>
@@ -117,12 +87,7 @@ function SkusPage() {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
           {rows.map((r) => (
-            <Link
-              key={r.id}
-              to="/inventory/skus/$id"
-              params={{ id: r.id }}
-              className="block"
-            >
+            <Link key={r.id} to="/inventory/skus/$id" params={{ id: r.id }} className="block">
               <Card className="group h-full overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-card-hover">
                 <div className="relative aspect-square overflow-hidden bg-muted">
                   {r.image_url ? (
@@ -138,8 +103,9 @@ function SkusPage() {
                   )}
                   <div className="absolute left-2 top-2 flex gap-1">
                     <Badge className="bg-primary/90 text-primary-foreground">{formatPrice(r.price_tier)}</Badge>
-                    {r.kind === "pack" && (
-                      <Badge variant="secondary">组包·{r.pack_pieces ?? "?"}</Badge>
+                    {r.kind === "pack" && <Badge variant="secondary">组包·{r.pack_pieces ?? "?"}</Badge>}
+                    {(r as { is_custom_price?: boolean }).is_custom_price && (
+                      <Badge variant="outline" className="bg-background/80 backdrop-blur">自定义价</Badge>
                     )}
                   </div>
                   <div className="absolute right-2 top-2">

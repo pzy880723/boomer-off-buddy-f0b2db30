@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Package, ScanLine, Boxes, ArrowDownToLine, Camera, Search } from "lucide-react";
+import { Package, ScanLine, Boxes, ArrowDownToLine, Camera, Search, Tags } from "lucide-react";
 import { MobileShell } from "@/components/mobile/mobile-shell";
 import { useServerFn } from "@tanstack/react-start";
 import { getMobileCounts } from "@/lib/mobile.functions";
@@ -18,6 +18,7 @@ function MobileHome() {
   });
   const tiles = [
     { to: "/m/parcels", icon: Package, label: "包裹搜索", desc: "按单号/订单号/商品名找包裹", color: "bg-blue-500/10 text-blue-600" },
+    { to: "/m/skus", icon: Tags, label: "商品 SKU", desc: "查看 / 新建商品档案", color: "bg-rose-500/10 text-rose-600" },
     { to: "/m/scan", icon: ScanLine, label: "通用扫码", desc: "条码 / RFID / 订单号 OCR", color: "bg-emerald-500/10 text-emerald-600" },
     { to: "/inventory/inbound/new", icon: Boxes, label: "新建入库单", desc: "分拣后扫枪入库", color: "bg-amber-500/10 text-amber-600" },
     { to: "/m/inbound", icon: ArrowDownToLine, label: "扫码入库", desc: "扫枪聚合提交", color: "bg-violet-500/10 text-violet-600" },

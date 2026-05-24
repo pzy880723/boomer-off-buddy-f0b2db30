@@ -39,16 +39,19 @@ export const SKU_STATUS_LABEL: Record<string, string> = {
 
 const BASE36 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-/** 生成 EPC：INV-{类目码}-{价格档*10}-{6位随机 base36} */
+/** 生成 EPC：INV-{类目码}-{价格*10 共5位，最高 ¥9999.9}-{6位随机 base36} */
 export function generateEpc(category: string, priceTier: number): string {
   const code = CATEGORY_CODE[category] ?? "XX";
-  const tier = Math.round(priceTier * 10).toString().padStart(3, "0");
+  const tier = Math.min(99999, Math.max(0, Math.round(priceTier * 10)))
+    .toString()
+    .padStart(5, "0");
   let rand = "";
   for (let i = 0; i < 6; i++) {
     rand += BASE36[Math.floor(Math.random() * BASE36.length)];
   }
   return `INV-${code}-${tier}-${rand}`;
 }
+
 
 export function formatPrice(v: number | null | undefined): string {
   if (v == null) return "—";
