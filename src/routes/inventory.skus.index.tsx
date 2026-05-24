@@ -37,6 +37,7 @@ export const Route = createFileRoute("/inventory/skus/")({
 
 type DialogKind = "standard" | "custom" | "bundle" | null;
 type TabKind = "standard" | "custom" | "bundle";
+type ViewMode = "grid" | "list";
 
 function SkusPage() {
   const nav = useNavigate();
@@ -45,6 +46,7 @@ function SkusPage() {
   const [searchInput, setSearchInput] = useState("");
   const [openDialog, setOpenDialog] = useState<DialogKind>(null);
   const [tab, setTab] = useState<TabKind>("standard");
+  const [view, setView] = useState<ViewMode>("grid");
 
   const q = useQuery({
     queryKey: ["inv-skus", search],
