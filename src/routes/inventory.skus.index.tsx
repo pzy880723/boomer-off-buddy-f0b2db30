@@ -2,10 +2,12 @@ import { useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Plus, Search, Tags, Package2, ChevronDown, Boxes, Sparkles } from "lucide-react";
+import { Plus, Search, Tags, Package2, ChevronDown, Boxes, Sparkles, LayoutGrid, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Card } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -17,7 +19,12 @@ import { EmptyState } from "@/components/empty-state";
 import { StandardSkuDialog } from "@/components/inventory/standard-sku-dialog";
 import { CustomSkuDialog } from "@/components/inventory/custom-sku-dialog";
 import { BundleSkuDialog } from "@/components/inventory/bundle-sku-dialog";
-import { StandardProductCard, SingleSkuCard } from "@/components/inventory/product-card";
+import {
+  StandardProductCard,
+  SingleSkuCard,
+  StandardProductRow,
+  SingleSkuRow,
+} from "@/components/inventory/product-card";
 import { listSkus } from "@/lib/inventory.functions";
 import { groupStandardSkus, type SkuRow } from "@/lib/inventory.helpers";
 
@@ -30,6 +37,7 @@ export const Route = createFileRoute("/inventory/skus/")({
 
 type DialogKind = "standard" | "custom" | "bundle" | null;
 type TabKind = "standard" | "custom" | "bundle";
+type ViewMode = "grid" | "list";
 
 function SkusPage() {
   const nav = useNavigate();
@@ -38,6 +46,7 @@ function SkusPage() {
   const [searchInput, setSearchInput] = useState("");
   const [openDialog, setOpenDialog] = useState<DialogKind>(null);
   const [tab, setTab] = useState<TabKind>("standard");
+  const [view, setView] = useState<ViewMode>("grid");
 
   const q = useQuery({
     queryKey: ["inv-skus", search],
@@ -114,15 +123,30 @@ function SkusPage() {
             </TabsTrigger>
           </TabsList>
 
-          <div className="relative w-full max-w-xs">
-            <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="搜品名 / EPC / 商品编码"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && setSearch(searchInput.trim())}
-              className="h-8 pl-7 text-xs"
-            />
+          <div className="flex items-center gap-2">
+            <div className="relative w-full max-w-xs">
+              <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="搜品名 / EPC / 商品编码"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && setSearch(searchInput.trim())}
+                className="h-8 pl-7 text-xs"
+              />
+            </div>
+            <ToggleGroup
+              type="single"
+              value={view}
+              onValueChange={(v) => v && setView(v as ViewMode)}
+              size="sm"
+            >
+              <ToggleGroupItem value="grid" aria-label="大图模式" className="h-8 w-8 p-0">
+                <LayoutGrid className="h-3.5 w-3.5" />
+              </ToggleGroupItem>
+              <ToggleGroupItem value="list" aria-label="列表模式" className="h-8 w-8 p-0">
+                <List className="h-3.5 w-3.5" />
+              </ToggleGroupItem>
+            </ToggleGroup>
           </div>
         </div>
 
@@ -131,15 +155,21 @@ function SkusPage() {
             <EmptyState
               icon={Tags}
               title="还没有标准商品"
-              description="标准商品按类目+品名共享多个价格档，95% 的商品都用这种方式"
+              description="标准商品按类目+品名共享多个价格档,95% 的商品都用这种方式"
               action={NewMenu}
             />
-          ) : (
+          ) : view === "grid" ? (
             <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {standardGroups.map((g) => (
                 <StandardProductCard key={g.key} group={g} />
               ))}
             </div>
+          ) : (
+            <Card className="overflow-hidden">
+              {standardGroups.map((g) => (
+                <StandardProductRow key={g.key} group={g} />
+              ))}
+            </Card>
           )}
         </TabsContent>
 
@@ -151,12 +181,18 @@ function SkusPage() {
               description="不能归类到标准价格档的大件商品请用「自定义商品」"
               action={NewMenu}
             />
-          ) : (
+          ) : view === "grid" ? (
             <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {customRows.map((r) => (
                 <SingleSkuCard key={r.id} row={r} />
               ))}
             </div>
+          ) : (
+            <Card className="overflow-hidden">
+              {customRows.map((r) => (
+                <SingleSkuRow key={r.id} row={r} />
+              ))}
+            </Card>
           )}
         </TabsContent>
 
@@ -168,12 +204,18 @@ function SkusPage() {
               description="组包商品引用若干已有 SKU，主要用于批发场景"
               action={NewMenu}
             />
-          ) : (
+          ) : view === "grid" ? (
             <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {bundleRows.map((r) => (
                 <SingleSkuCard key={r.id} row={r} />
               ))}
             </div>
+          ) : (
+            <Card className="overflow-hidden">
+              {bundleRows.map((r) => (
+                <SingleSkuRow key={r.id} row={r} />
+              ))}
+            </Card>
           )}
         </TabsContent>
       </Tabs>

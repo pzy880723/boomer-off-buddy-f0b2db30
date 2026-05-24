@@ -343,9 +343,9 @@ const InventorySkusIdRoute = InventorySkusIdRouteImport.update({
   getParentRoute: () => InventorySkusRoute,
 } as any)
 const InventoryProductsCodeRoute = InventoryProductsCodeRouteImport.update({
-  id: '/$code',
-  path: '/$code',
-  getParentRoute: () => InventoryProductsRoute,
+  id: '/inventory/products/$code',
+  path: '/inventory/products/$code',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const InventoryInboundNewRoute = InventoryInboundNewRouteImport.update({
   id: '/new',
@@ -738,6 +738,7 @@ export interface RootRouteChildren {
   StoresProductsRoute: typeof StoresProductsRoute
   StoresYouzanRoute: typeof StoresYouzanRoute
   ApiPublicMerukiIngestRoute: typeof ApiPublicMerukiIngestRoute
+  InventoryProductsCodeRoute: typeof InventoryProductsCodeRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1122,10 +1123,10 @@ declare module '@tanstack/react-router' {
     }
     '/inventory/products/$code': {
       id: '/inventory/products/$code'
-      path: '/$code'
+      path: '/inventory/products/$code'
       fullPath: '/inventory/products/$code'
       preLoaderRoute: typeof InventoryProductsCodeRouteImport
-      parentRoute: typeof InventoryProductsRoute
+      parentRoute: typeof rootRouteImport
     }
     '/inventory/inbound/new': {
       id: '/inventory/inbound/new'
@@ -1323,17 +1324,8 @@ const rootRouteChildren: RootRouteChildren = {
   StoresProductsRoute: StoresProductsRoute,
   StoresYouzanRoute: StoresYouzanRoute,
   ApiPublicMerukiIngestRoute: ApiPublicMerukiIngestRoute,
+  InventoryProductsCodeRoute: InventoryProductsCodeRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
