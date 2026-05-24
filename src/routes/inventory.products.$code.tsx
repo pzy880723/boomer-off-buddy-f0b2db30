@@ -22,7 +22,7 @@ export const Route = createFileRoute("/inventory/products/$code")({
 
 function ProductDetailPage() {
   const { code } = Route.useParams();
-  const decoded = decodeURIComponent(code);
+  const decoded = code;
   const nav = useNavigate();
   const listFn = useServerFn(listSkus);
 
