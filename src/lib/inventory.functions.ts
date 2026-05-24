@@ -213,7 +213,7 @@ export const createBundleSku = createServerFn({ method: "POST" })
     const payload = {
       category: data.category,
       name: data.name.trim(),
-      sku_code: data.sku_code?.trim() || null,
+      sku_code: data.sku_code?.trim() || generateSkuCode(data.category, "bundle"),
       price_tier: Math.round(data.price * 100) / 100,
       is_custom_price: true,
       kind: "bundle" as const,
