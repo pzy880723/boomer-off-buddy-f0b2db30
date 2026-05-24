@@ -15,7 +15,7 @@ import {
   type SkuRow,
 } from "@/lib/inventory.helpers";
 
-export const Route = createFileRoute("/inventory/products/$code")({
+export const Route = createFileRoute("/inventory/products/$code/")({
   head: () => ({ meta: [{ title: "标准商品详情 · 库存" }] }),
   component: ProductDetailPage,
 });
