@@ -1,20 +1,35 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Plus, Search, Tags, Printer, Boxes } from "lucide-react";
+import { Plus, Search, Tags, Printer, Boxes, Sparkles, ChevronDown } from "lucide-react";
 import { MobileShell } from "@/components/mobile/mobile-shell";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/empty-state";
 import { listSkus } from "@/lib/inventory.functions";
-import { CATEGORY_LABEL, SKU_KIND_LABEL, formatPrice, type SkuKind } from "@/lib/inventory.helpers";
+import {
+  CATEGORY_LABEL,
+  formatPrice,
+  groupStandardSkus,
+  type SkuRow,
+  type StandardProductGroup,
+} from "@/lib/inventory.helpers";
 import {
   CustomSkuForm,
   useCustomSkuMutation,
 } from "@/components/inventory/custom-sku-dialog";
+import { StandardSkuDialog } from "@/components/inventory/standard-sku-dialog";
+import { BundleSkuDialog } from "@/components/inventory/bundle-sku-dialog";
 import { emptySkuMeta, type SkuMetaState } from "@/components/inventory/sku-meta-fields";
 
 export const Route = createFileRoute("/m/skus")({
@@ -22,28 +37,56 @@ export const Route = createFileRoute("/m/skus")({
   component: MSkusPage,
 });
 
+type TabKind = "standard" | "custom" | "bundle";
+type DialogKind = "standard" | "custom" | "bundle" | null;
+
 function MSkusPage() {
   const listFn = useServerFn(listSkus);
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
-  const [openNew, setOpenNew] = useState(false);
+  const [openDialog, setOpenDialog] = useState<DialogKind>(null);
+  const [tab, setTab] = useState<TabKind>("standard");
 
   const q = useQuery({
     queryKey: ["m-inv-skus", search],
-    queryFn: () => listFn({ data: { search: search || undefined, limit: 200 } }),
+    queryFn: () => listFn({ data: { search: search || undefined, limit: 500 } }),
   });
-  const rows = q.data?.rows ?? [];
+  const rows = (q.data?.rows ?? []) as SkuRow[];
+  const { standardGroups, customRows, bundleRows } = useMemo(() => {
+    const std = rows.filter((r) => r.kind === "single" && !r.is_custom_price);
+    const cus = rows.filter((r) => r.kind === "single" && r.is_custom_price);
+    const bun = rows.filter((r) => r.kind === "bundle");
+    return {
+      standardGroups: groupStandardSkus(std),
+      customRows: cus,
+      bundleRows: bun,
+    };
+  }, [rows]);
+
+  const NewBtn = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button size="sm" className="h-8 px-2">
+          <Plus className="mr-1 h-3.5 w-3.5" /> 新建
+          <ChevronDown className="ml-0.5 h-3 w-3" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-44">
+        <DropdownMenuItem onClick={() => setOpenDialog("standard")}>
+          <Tags className="mr-2 h-3.5 w-3.5" /> 标准商品
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setOpenDialog("custom")}>
+          <Sparkles className="mr-2 h-3.5 w-3.5" /> 自定义商品
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setOpenDialog("bundle")}>
+          <Boxes className="mr-2 h-3.5 w-3.5" /> 组包商品
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
   return (
-    <MobileShell
-      title="商品 SKU"
-      back="/m"
-      rightSlot={
-        <Button size="sm" className="h-8 px-2" onClick={() => setOpenNew(true)}>
-          <Plus className="mr-1 h-3.5 w-3.5" /> 新建
-        </Button>
-      }
-    >
+    <MobileShell title="商品 SKU" back="/m" rightSlot={NewBtn}>
       <div className="space-y-3 p-3">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -56,68 +99,143 @@ function MSkusPage() {
           />
         </div>
 
-        {rows.length === 0 ? (
-          <EmptyState
-            icon={Tags}
-            title="还没有 SKU"
-            description="点击右上「新建」创建一个自定义商品"
-          />
+        <Tabs value={tab} onValueChange={(v) => setTab(v as TabKind)}>
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="standard">
+              标准 <span className="ml-1 text-[10px] text-muted-foreground">{standardGroups.length}</span>
+            </TabsTrigger>
+            <TabsTrigger value="custom">
+              自定义 <span className="ml-1 text-[10px] text-muted-foreground">{customRows.length}</span>
+            </TabsTrigger>
+            <TabsTrigger value="bundle">
+              组包 <span className="ml-1 text-[10px] text-muted-foreground">{bundleRows.length}</span>
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="standard" className="mt-3 space-y-2">
+            {standardGroups.length === 0 ? (
+              <EmptyState icon={Tags} title="还没有标准商品" description="点右上「新建」开始" />
+            ) : (
+              standardGroups.map((g) => <MStandardRow key={g.key} group={g} />)
+            )}
+          </TabsContent>
+
+          <TabsContent value="custom" className="mt-3 space-y-2">
+            {customRows.length === 0 ? (
+              <EmptyState icon={Sparkles} title="还没有自定义商品" />
+            ) : (
+              customRows.map((r) => <MSingleRow key={r.id} row={r} />)
+            )}
+          </TabsContent>
+
+          <TabsContent value="bundle" className="mt-3 space-y-2">
+            {bundleRows.length === 0 ? (
+              <EmptyState icon={Boxes} title="还没有组包商品" />
+            ) : (
+              bundleRows.map((r) => <MSingleRow key={r.id} row={r} />)
+            )}
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      {/* 自定义商品移动端用底部 Sheet */}
+      <MNewCustomSkuSheet
+        open={openDialog === "custom"}
+        onOpenChange={(v) => !v && setOpenDialog(null)}
+        onCreated={() => q.refetch()}
+      />
+      {/* 标准 / 组包暂复用桌面对话框（移动端可滚动） */}
+      <StandardSkuDialog
+        open={openDialog === "standard"}
+        onOpenChange={(v) => !v && setOpenDialog(null)}
+        onCreated={() => q.refetch()}
+      />
+      <BundleSkuDialog
+        open={openDialog === "bundle"}
+        onOpenChange={(v) => !v && setOpenDialog(null)}
+        onCreated={() => q.refetch()}
+      />
+    </MobileShell>
+  );
+}
+
+function MStandardRow({ group }: { group: StandardProductGroup }) {
+  const visibleTiers = group.tiers.slice(0, 3);
+  const remaining = group.tiers.length - visibleTiers.length;
+  return (
+    <Link
+      to="/inventory/products/$code"
+      params={{ code: encodeURIComponent(group.key) }}
+      className="flex gap-3 rounded-xl border bg-card p-2.5 active:bg-muted"
+    >
+      <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-muted">
+        {group.image_url ? (
+          <img src={group.image_url} alt={group.name} className="h-full w-full object-cover" />
         ) : (
-          <div className="space-y-2">
-            {rows.map((r) => {
-              const skuCode = (r as { sku_code?: string | null }).sku_code;
-              const isBundle = r.kind === "bundle";
-              return (
-                <Link
-                  key={r.id}
-                  to="/inventory/skus/$id"
-                  params={{ id: r.id }}
-                  className="flex gap-3 rounded-xl border bg-card p-2.5 active:bg-muted"
-                >
-                  <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-muted">
-                    {r.image_url ? (
-                      <img src={r.image_url} alt={r.name} className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                        <Tags className="h-5 w-5" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <div className="flex items-center gap-1.5">
-                      <Badge className="bg-primary/90 text-primary-foreground">{formatPrice(r.price_tier)}</Badge>
-                      {isBundle && (
-                        <Badge variant="secondary">
-                          <Boxes className="mr-0.5 h-2.5 w-2.5" />组包
-                        </Badge>
-                      )}
-                      {r.kind === "pack" && <Badge variant="secondary">组包·{r.pack_pieces ?? "?"}</Badge>}
-                      {(r as { is_custom_price?: boolean }).is_custom_price && !isBundle && (
-                        <Badge variant="outline">自定义</Badge>
-                      )}
-                      <span className="ml-auto text-[11px] text-muted-foreground">库存 {r.stock_qty}</span>
-                    </div>
-                    <p className="line-clamp-1 text-sm font-medium">{r.name}</p>
-                    <p className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                      <span>{CATEGORY_LABEL[r.category] ?? r.category} · {SKU_KIND_LABEL[r.kind as SkuKind] ?? r.kind}</span>
-                      <span className="ml-auto inline-flex items-center gap-1 font-mono">
-                        <Printer className="h-2.5 w-2.5" />
-                        {r.epc}
-                      </span>
-                    </p>
-                    {skuCode && (
-                      <p className="font-mono text-[10px] text-muted-foreground">商品商品编码：{skuCode}</p>
-                    )}
-                  </div>
-                </Link>
-              );
-            })}
+          <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+            <Tags className="h-5 w-5" />
           </div>
         )}
       </div>
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex flex-wrap items-center gap-1">
+          {visibleTiers.map((t) => (
+            <Badge key={t} className="bg-primary/90 text-primary-foreground">
+              {formatPrice(t)}
+            </Badge>
+          ))}
+          {remaining > 0 && <Badge variant="secondary">+{remaining}</Badge>}
+          <span className="ml-auto text-[11px] text-muted-foreground">库存 {group.totalStock}</span>
+        </div>
+        <p className="line-clamp-1 text-sm font-medium">{group.name}</p>
+        <p className="text-[10px] text-muted-foreground">
+          {CATEGORY_LABEL[group.category] ?? group.category} · {group.tiers.length} 个价格档
+          {group.code && <span className="ml-1 font-mono">· {group.code}</span>}
+        </p>
+      </div>
+    </Link>
+  );
+}
 
-      <MNewCustomSkuSheet open={openNew} onOpenChange={setOpenNew} onCreated={() => q.refetch()} />
-    </MobileShell>
+function MSingleRow({ row }: { row: SkuRow }) {
+  const isBundle = row.kind === "bundle";
+  return (
+    <Link
+      to="/inventory/skus/$id"
+      params={{ id: row.id }}
+      className="flex gap-3 rounded-xl border bg-card p-2.5 active:bg-muted"
+    >
+      <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-muted">
+        {row.image_url ? (
+          <img src={row.image_url} alt={row.name} className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+            <Tags className="h-5 w-5" />
+          </div>
+        )}
+      </div>
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex items-center gap-1.5">
+          <Badge className="bg-primary/90 text-primary-foreground">{formatPrice(row.price_tier)}</Badge>
+          {isBundle ? (
+            <Badge variant="secondary">
+              <Boxes className="mr-0.5 h-2.5 w-2.5" />组包
+            </Badge>
+          ) : (
+            <Badge variant="outline">自定义</Badge>
+          )}
+          <span className="ml-auto text-[11px] text-muted-foreground">库存 {row.stock_qty}</span>
+        </div>
+        <p className="line-clamp-1 text-sm font-medium">{row.name}</p>
+        <p className="flex items-center gap-1 text-[10px] text-muted-foreground">
+          <span>{CATEGORY_LABEL[row.category] ?? row.category}</span>
+          <span className="ml-auto inline-flex items-center gap-1 font-mono">
+            <Printer className="h-2.5 w-2.5" />
+            {row.epc}
+          </span>
+        </p>
+      </div>
+    </Link>
   );
 }
 
