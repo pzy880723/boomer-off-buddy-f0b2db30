@@ -312,6 +312,7 @@ export const lookupSkusByEpcs = createServerFn({ method: "POST" })
   });
 
 export const submitInbound = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -325,10 +326,11 @@ export const submitInbound = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
     // 取 SKU 价格
     const skuIds = Array.from(new Set(data.scans.map((s) => s.sku_id)));
-    const { data: skus, error: skuErr } = await supabase
+    const { data: skus, error: skuErr } = await sb
       .from("inv_skus")
       .select("id, price_tier")
       .in("id", skuIds);
@@ -345,7 +347,7 @@ export const submitInbound = createServerFn({ method: "POST" })
       return { sku_id: s.sku_id, qty: s.qty, unit_price: price, subtotal };
     });
 
-    const { data: order, error: orderErr } = await supabase
+    const { data: order, error: orderErr } = await sb
       .from("inv_inbound_orders")
       .insert({
         operator: data.operator ?? null,
@@ -358,7 +360,7 @@ export const submitInbound = createServerFn({ method: "POST" })
       .single();
     if (orderErr) throw new Error(orderErr.message);
 
-    const { error: linesErr } = await supabase
+    const { error: linesErr } = await sb
       .from("inv_inbound_lines")
       .insert(lines.map((l) => ({ ...l, order_id: order.id })) as never);
     if (linesErr) throw new Error(linesErr.message);
@@ -376,11 +378,12 @@ export const submitInbound = createServerFn({ method: "POST" })
   });
 
 export const listInboundOrders = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z.object({ limit: z.number().min(1).max(200).default(50) }).parse(input ?? {}),
   )
-  .handler(async ({ data }) => {
-    const { data: rows, error } = await supabase
+  .handler(async ({ data, context }) => {
+    const { data: rows, error } = await context.supabase
       .from("inv_inbound_orders")
       .select("*")
       .order("scanned_at", { ascending: false })
@@ -390,15 +393,17 @@ export const listInboundOrders = createServerFn({ method: "GET" })
   });
 
 export const getInboundOrder = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
-  .handler(async ({ data }) => {
-    const { data: order, error } = await supabase
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
+    const { data: order, error } = await sb
       .from("inv_inbound_orders")
       .select("*")
       .eq("id", data.id)
       .single();
     if (error) throw new Error(error.message);
-    const { data: lines } = await supabase
+    const { data: lines } = await sb
       .from("inv_inbound_lines")
       .select("*, inv_skus(id, name, category, price_tier, kind, epc, sku_code, image_url)")
       .eq("order_id", data.id);
