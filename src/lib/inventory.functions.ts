@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { supabase } from "@/integrations/supabase/client";
+
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { generateEpc, generateSkuCode } from "./inventory.helpers";
@@ -35,6 +35,7 @@ const priceTierSchema = z
   .refine((n) => Math.round(n * 10) === n * 10, "价格档最多保留 1 位小数");
 
 export const listSkus = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -47,8 +48,9 @@ export const listSkus = createServerFn({ method: "GET" })
       })
       .parse(input ?? {}),
   )
-  .handler(async ({ data }) => {
-    let q = supabase
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
+    let q = sb
       .from("inv_skus")
       .select("*")
       .order("created_at", { ascending: false })
@@ -67,9 +69,11 @@ export const listSkus = createServerFn({ method: "GET" })
   });
 
 export const getSku = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
-  .handler(async ({ data }) => {
-    const { data: row, error } = await supabase
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
+    const { data: row, error } = await sb
       .from("inv_skus")
       .select("*")
       .eq("id", data.id)
@@ -82,7 +86,7 @@ export const getSku = createServerFn({ method: "GET" })
     if (row && row.kind === "bundle" && Array.isArray(bi) && bi.length > 0) {
       const items = bi as Array<{ sku_id: string; qty: number }>;
       const ids = items.map((x) => x.sku_id);
-      const { data: childRows } = await supabase
+      const { data: childRows } = await sb
         .from("inv_skus")
         .select("id, name, epc, image_url, price_tier")
         .in("id", ids);
@@ -103,13 +107,13 @@ export const getSku = createServerFn({ method: "GET" })
         .filter((x): x is NonNullable<typeof x> => x != null);
     }
 
-    const { data: labels } = await supabase
+    const { data: labels } = await sb
       .from("inv_label_batches")
       .select("*")
       .eq("sku_id", data.id)
       .order("printed_at", { ascending: false })
       .limit(50);
-    const { data: lines } = await supabase
+    const { data: lines } = await sb
       .from("inv_inbound_lines")
       .select("id, qty, unit_price, subtotal, created_at, order_id")
       .eq("sku_id", data.id)
@@ -156,12 +160,14 @@ export const createStandardSkus = createServerFn({ method: "POST" })
 
 /** 自定义商品：单条 SKU，价格手填 */
 export const createCustomSku = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     MetaInput.extend({
       price: z.number().positive().max(99999.9),
     }).parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
     const payload = {
       category: data.category,
       name: data.name.trim(),
@@ -177,7 +183,7 @@ export const createCustomSku = createServerFn({ method: "POST" })
       status: "active" as const,
       epc: generateEpc(data.category, data.price),
     };
-    const { data: row, error } = await supabase
+    const { data: row, error } = await sb
       .from("inv_skus")
       .insert(payload as never)
       .select("*")
@@ -188,6 +194,7 @@ export const createCustomSku = createServerFn({ method: "POST" })
 
 /** 组包商品：引用若干已有 SKU 形成一个新的独立 SKU */
 export const createBundleSku = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     MetaInput.extend({
       price: z.number().positive().max(99999.9),
@@ -197,10 +204,11 @@ export const createBundleSku = createServerFn({ method: "POST" })
         .max(50),
     }).parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
     // 校验子 SKU 存在且不是 bundle
     const ids = data.items.map((x) => x.sku_id);
-    const { data: children, error: cErr } = await supabase
+    const { data: children, error: cErr } = await sb
       .from("inv_skus")
       .select("id, kind")
       .in("id", ids);
@@ -228,7 +236,7 @@ export const createBundleSku = createServerFn({ method: "POST" })
       status: "active" as const,
       epc: generateEpc(data.category, data.price),
     };
-    const { data: row, error } = await supabase
+    const { data: row, error } = await sb
       .from("inv_skus")
       .insert(payload as never)
       .select("*")
@@ -238,6 +246,7 @@ export const createBundleSku = createServerFn({ method: "POST" })
   });
 
 export const updateSku = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -255,8 +264,8 @@ export const updateSku = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
-    const { error } = await supabase
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase
       .from("inv_skus")
       .update(data.patch as never)
       .eq("id", data.id);
@@ -265,6 +274,7 @@ export const updateSku = createServerFn({ method: "POST" })
   });
 
 export const createLabelBatch = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -275,8 +285,8 @@ export const createLabelBatch = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
-    const { data: row, error } = await supabase
+  .handler(async ({ data, context }) => {
+    const { data: row, error } = await context.supabase
       .from("inv_label_batches")
       .insert(data as never)
       .select("*")
@@ -286,13 +296,14 @@ export const createLabelBatch = createServerFn({ method: "POST" })
   });
 
 export const lookupSkusByEpcs = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z.object({ epcs: z.array(z.string()).min(1).max(2000) }).parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const uniq = Array.from(new Set(data.epcs.map((e) => e.trim()).filter(Boolean)));
     if (uniq.length === 0) return { skus: [] };
-    const { data: rows, error } = await supabase
+    const { data: rows, error } = await context.supabase
       .from("inv_skus")
       .select("id, epc, category, price_tier, name, kind, pack_pieces, sku_code, image_url")
       .in("epc", uniq);
@@ -301,6 +312,7 @@ export const lookupSkusByEpcs = createServerFn({ method: "POST" })
   });
 
 export const submitInbound = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -314,10 +326,11 @@ export const submitInbound = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
     // 取 SKU 价格
     const skuIds = Array.from(new Set(data.scans.map((s) => s.sku_id)));
-    const { data: skus, error: skuErr } = await supabase
+    const { data: skus, error: skuErr } = await sb
       .from("inv_skus")
       .select("id, price_tier")
       .in("id", skuIds);
@@ -334,7 +347,7 @@ export const submitInbound = createServerFn({ method: "POST" })
       return { sku_id: s.sku_id, qty: s.qty, unit_price: price, subtotal };
     });
 
-    const { data: order, error: orderErr } = await supabase
+    const { data: order, error: orderErr } = await sb
       .from("inv_inbound_orders")
       .insert({
         operator: data.operator ?? null,
@@ -347,7 +360,7 @@ export const submitInbound = createServerFn({ method: "POST" })
       .single();
     if (orderErr) throw new Error(orderErr.message);
 
-    const { error: linesErr } = await supabase
+    const { error: linesErr } = await sb
       .from("inv_inbound_lines")
       .insert(lines.map((l) => ({ ...l, order_id: order.id })) as never);
     if (linesErr) throw new Error(linesErr.message);
@@ -365,11 +378,12 @@ export const submitInbound = createServerFn({ method: "POST" })
   });
 
 export const listInboundOrders = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z.object({ limit: z.number().min(1).max(200).default(50) }).parse(input ?? {}),
   )
-  .handler(async ({ data }) => {
-    const { data: rows, error } = await supabase
+  .handler(async ({ data, context }) => {
+    const { data: rows, error } = await context.supabase
       .from("inv_inbound_orders")
       .select("*")
       .order("scanned_at", { ascending: false })
@@ -379,15 +393,17 @@ export const listInboundOrders = createServerFn({ method: "GET" })
   });
 
 export const getInboundOrder = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
-  .handler(async ({ data }) => {
-    const { data: order, error } = await supabase
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
+    const { data: order, error } = await sb
       .from("inv_inbound_orders")
       .select("*")
       .eq("id", data.id)
       .single();
     if (error) throw new Error(error.message);
-    const { data: lines } = await supabase
+    const { data: lines } = await sb
       .from("inv_inbound_lines")
       .select("*, inv_skus(id, name, category, price_tier, kind, epc, sku_code, image_url)")
       .eq("order_id", data.id);
