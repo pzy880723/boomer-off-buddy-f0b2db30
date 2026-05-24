@@ -26,8 +26,9 @@ type SkuRow = {
   category: string;
   price_tier: number;
   name: string;
-  kind: "single" | "pack";
+  kind: "single" | "pack" | "bundle";
   pack_pieces: number | null;
+  sku_code?: string | null;
   image_url: string | null;
 };
 
