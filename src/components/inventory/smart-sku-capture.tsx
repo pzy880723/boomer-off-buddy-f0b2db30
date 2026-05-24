@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Camera, Upload, X, Loader2, Sparkles, SwitchCamera, Check } from "lucide-react";
+import { Camera, Upload, X, Loader2, Sparkles, SwitchCamera, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { uploadSkuImage, blobToBase64 } from "@/lib/image-upload";
 import { recognizeSkuFromPhotos } from "@/lib/ai.functions";
 import type { SkuMetaState } from "./sku-meta-fields";
 
 const MAX_SHOTS = 5;
+/** 智能识别可能覆盖的字段集合（重拍前会先清空） */
+const SMART_FIELDS: (keyof SkuMetaState)[] = ["imageUrl", "category", "name", "notes", "grade"];
 
 export function SmartSkuCapture({
   onApply,
@@ -22,9 +24,12 @@ export function SmartSkuCapture({
   const [shots, setShots] = useState<{ dataUrl: string; blob: Blob }[]>([]);
   const [facing, setFacing] = useState<"environment" | "user">("environment");
   const [analyzing, setAnalyzing] = useState(false);
+  const [recognized, setRecognized] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  /** 触发自动识别的 token：每次 shots 变化递增，handleAnalyze 防抖捕获最新 */
+  const analyzeTokenRef = useRef(0);
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -110,55 +115,95 @@ export function SmartSkuCapture({
   const removeShot = (i: number) =>
     setShots((prev) => prev.filter((_, idx) => idx !== i));
 
-  const handleAnalyze = async () => {
+  /** 清空照片与已填的智能字段，回到初始状态 */
+  const restart = () => {
+    setShots([]);
+    setRecognized(false);
+    const clear: Partial<SkuMetaState> = {};
+    for (const k of SMART_FIELDS) clear[k] = "";
+    onApply(clear);
+    toast.message("已清空，请重新拍摄");
+  };
+
+  const runAnalyze = useCallback(
+    async (token: number, currentShots: { dataUrl: string; blob: Blob }[]) => {
+      setAnalyzing(true);
+      try {
+        const urls = await Promise.all(currentShots.map((s) => uploadSkuImage(s.blob)));
+        const images = await Promise.all(
+          currentShots.map(async (s) => ({
+            base64: await blobToBase64(s.blob),
+            mime: s.blob.type || "image/jpeg",
+          })),
+        );
+        const res = await recognizeFn({ data: { images } });
+        // 若中途又拍了新照片，丢弃这次结果
+        if (token !== analyzeTokenRef.current) return;
+        if (!res.ok) {
+          toast.warning("AI 识别失败，已保存照片，可手动补全");
+          onApply({ imageUrl: urls[0] });
+          setRecognized(true);
+          return;
+        }
+        const f = res.fields;
+        onApply({
+          imageUrl: urls[0],
+          category: f.category || "",
+          name: f.name || "",
+          notes: f.description || "",
+          grade: f.grade || "",
+        });
+        setRecognized(true);
+        toast.success("已自动填充，可微调或重拍");
+      } catch (e) {
+        if (token === analyzeTokenRef.current) {
+          toast.error((e as Error).message || "识别失败");
+        }
+      } finally {
+        if (token === analyzeTokenRef.current) setAnalyzing(false);
+      }
+    },
+    [onApply, recognizeFn],
+  );
+
+  // 自动识别：照片变化后防抖 600ms 触发；为 0 张时跳过
+  useEffect(() => {
     if (shots.length === 0) {
-      toast.error("请至少拍 / 选 1 张照片");
+      setRecognized(false);
       return;
     }
-    setAnalyzing(true);
-    try {
-      // 1) 上传所有照片
-      const urls = await Promise.all(shots.map((s) => uploadSkuImage(s.blob)));
-      // 2) AI 识别（用 base64，避免外网回源延迟）
-      const images = await Promise.all(
-        shots.map(async (s) => ({
-          base64: await blobToBase64(s.blob),
-          mime: s.blob.type || "image/jpeg",
-        })),
-      );
-      const res = await recognizeFn({ data: { images } });
-      if (!res.ok) {
-        toast.warning("AI 识别失败，已为你保存照片，请手动补全字段");
-        onApply({ imageUrl: urls[0] });
-        onClose();
-        return;
-      }
-      const f = res.fields;
-      onApply({
-        imageUrl: urls[0],
-        category: f.category || "",
-        name: f.name || "",
-        notes: f.description || "",
-        grade: f.grade || "",
-      });
-      toast.success("已自动填充，可微调后保存");
-      onClose();
-    } catch (e) {
-      toast.error((e as Error).message || "识别失败");
-    } finally {
-      setAnalyzing(false);
-    }
-  };
+    analyzeTokenRef.current += 1;
+    const token = analyzeTokenRef.current;
+    const t = setTimeout(() => {
+      runAnalyze(token, shots);
+    }, 600);
+    return () => clearTimeout(t);
+  }, [shots, runAnalyze]);
 
   return (
     <div className="space-y-3 rounded-xl border bg-muted/30 p-3">
       <div className="flex items-center justify-between">
         <div className="inline-flex items-center gap-1.5 text-sm font-medium">
           <Sparkles className="h-4 w-4 text-primary" /> 智能新建
+          {analyzing && (
+            <span className="ml-2 inline-flex items-center gap-1 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" /> 识别中
+            </span>
+          )}
+          {!analyzing && recognized && (
+            <span className="ml-2 text-xs text-success">已识别</span>
+          )}
         </div>
-        <Button size="sm" variant="ghost" onClick={onClose}>
-          <X className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          {shots.length > 0 && (
+            <Button size="sm" variant="ghost" onClick={restart} title="清空重拍">
+              <RotateCcw className="mr-1 h-3.5 w-3.5" /> 重拍
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       <div className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-black">
@@ -172,6 +217,7 @@ export function SmartSkuCapture({
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-xs text-white/80">
             <Camera className="h-7 w-7" />
             <span>点下方「开启摄像头」开始拍摄</span>
+            <span className="text-[10px] opacity-70">拍完会自动识别</span>
           </div>
         )}
         {streaming && (
@@ -183,6 +229,11 @@ export function SmartSkuCapture({
           >
             <SwitchCamera className="h-4 w-4" />
           </button>
+        )}
+        {analyzing && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-white">
+            <Loader2 className="mr-2 h-5 w-5 animate-spin" /> 识别中…
+          </div>
         )}
       </div>
 
@@ -210,47 +261,35 @@ export function SmartSkuCapture({
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         {!streaming ? (
-          <Button size="sm" variant="outline" onClick={() => startCamera()} className="col-span-1">
-            <Camera className="mr-1 h-4 w-4" /> 开启
+          <Button size="sm" variant="outline" onClick={() => startCamera()}>
+            <Camera className="mr-1 h-4 w-4" /> 开启摄像头
           </Button>
         ) : (
           <Button
             size="sm"
             onClick={grab}
-            disabled={shots.length >= MAX_SHOTS}
-            className="col-span-1"
+            disabled={shots.length >= MAX_SHOTS || analyzing}
           >
-            <Camera className="mr-1 h-4 w-4" /> 拍 ({shots.length}/{MAX_SHOTS})
+            <Camera className="mr-1 h-4 w-4" /> 拍照 ({shots.length}/{MAX_SHOTS})
           </Button>
         )}
         <Button
           size="sm"
           variant="outline"
           onClick={() => fileRef.current?.click()}
-          disabled={shots.length >= MAX_SHOTS}
-          className="col-span-1"
+          disabled={shots.length >= MAX_SHOTS || analyzing}
         >
-          <Upload className="mr-1 h-4 w-4" /> 上传
-        </Button>
-        <Button
-          size="sm"
-          onClick={handleAnalyze}
-          disabled={analyzing || shots.length === 0}
-          className="col-span-1"
-        >
-          {analyzing ? (
-            <>
-              <Loader2 className="mr-1 h-4 w-4 animate-spin" /> 识别…
-            </>
-          ) : (
-            <>
-              <Check className="mr-1 h-4 w-4" /> 识别填充
-            </>
-          )}
+          <Upload className="mr-1 h-4 w-4" /> 上传图片
         </Button>
       </div>
+
+      {recognized && !analyzing && (
+        <Button size="sm" variant="secondary" className="w-full" onClick={onClose}>
+          完成，去填价格
+        </Button>
+      )}
 
       <input
         ref={fileRef}

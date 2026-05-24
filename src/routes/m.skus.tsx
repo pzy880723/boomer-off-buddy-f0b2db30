@@ -202,7 +202,7 @@ function MSingleRow({ row }: { row: SkuRow }) {
   const isBundle = row.kind === "bundle";
   return (
     <Link
-      to="/inventory/skus/$id"
+      to="/m/skus/$id"
       params={{ id: row.id }}
       className="flex gap-3 rounded-xl border bg-card p-2.5 active:bg-muted"
     >

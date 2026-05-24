@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { DataTable } from "@/components/data-table";
 import { SkuEditDialog } from "@/components/inventory/sku-edit-dialog";
+import { PrintLabels, PRINT_STYLE } from "@/components/inventory/sku-detail-shared";
 import { getSku, createLabelBatch, deleteSku } from "@/lib/inventory.functions";
 import {
   CATEGORY_LABEL,
@@ -263,14 +264,7 @@ function SkuDetailPage() {
         />
       </div>
 
-      <style>{`
-        @media print {
-          body * { visibility: hidden; }
-          .print-area, .print-area * { visibility: visible; }
-          .print-area { position: absolute; top: 0; left: 0; width: 100%; display: block !important; }
-          .print-area .hidden { display: block !important; }
-        }
-      `}</style>
+      <style>{PRINT_STYLE}</style>
 
       <SkuEditDialog
         sku={sku}
@@ -312,51 +306,6 @@ function Attr({ label, value }: { label: string; value: React.ReactNode }) {
     <div className="flex gap-2">
       <span className="text-muted-foreground">{label}</span>
       <span className="min-w-0 break-all">{value}</span>
-    </div>
-  );
-}
-
-function PrintLabels({
-  epc,
-  name,
-  price,
-  category,
-  count,
-}: {
-  epc: string;
-  name: string;
-  price: number;
-  category: string;
-  count: number;
-}) {
-  return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(4, 1fr)",
-        gap: "4mm",
-        padding: "5mm",
-      }}
-    >
-      {Array.from({ length: count }).map((_, i) => (
-        <div
-          key={i}
-          style={{
-            border: "1px solid #000",
-            borderRadius: "2mm",
-            padding: "3mm",
-            fontFamily: "sans-serif",
-            color: "#000",
-            background: "#fff",
-            minHeight: "30mm",
-          }}
-        >
-          <div style={{ fontSize: "9px", color: "#555" }}>{category}</div>
-          <div style={{ fontSize: "13px", fontWeight: 700, margin: "1mm 0" }}>{name}</div>
-          <div style={{ fontSize: "20px", fontWeight: 800 }}>¥{price.toFixed(2)}</div>
-          <div style={{ fontFamily: "monospace", fontSize: "8px", marginTop: "1mm" }}>{epc}</div>
-        </div>
-      ))}
     </div>
   );
 }
