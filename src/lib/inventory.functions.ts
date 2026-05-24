@@ -185,6 +185,7 @@ export const createCustomSku = createServerFn({ method: "POST" })
       grade: data.grade ?? null,
       status: "active" as const,
       epc: generateEpc(data.category, data.price),
+      stock_qty: 0,
     };
     const { data: row, error } = await sb
       .from("inv_skus")
