@@ -1,104 +1,80 @@
 ## 目标
 
-把"新建 SKU"重写为三条入口：**标准商品（多价格档 → 多 SKU）/ 自定义商品 / 组包商品**。每个 SKU 都保留系统生成的 EPC，并允许额外填一个可选的"商家自编码 sku_code"。手机端只保留"新建自定义商品"。
+调整"新建标准商品"弹窗的交互；并在三个新建对话框中统一把"商家编码"改名为"商品编码"，留空则后端自动生成。重量在所有场景明确为选填。
 
 ---
 
-## 数据模型
+## 一、价格档可自定义新增（仅标准商品弹窗）
 
-迁移 `inv_skus`：
+`src/components/inventory/standard-sku-dialog.tsx`
 
-- 新增 `sku_code text null`（用户自填编码，nullable，不强制唯一；加普通索引）
-- 新增 `kind` 取值 `bundle`（在现有 `single | pack` 之外），用于"组包商品"
-- 新增 `bundle_items jsonb default '[]'`：`[{sku_id, qty}]`，仅 `kind='bundle'` 使用
-- 保留 `is_custom_price`、`pack_pieces`、`epc` 现有字段不动
-- `price_tier` 仍存最终单价：标准档=档位金额，自定义=手填金额，组包=用户手填的整包售价
+- 在已有 chips（`PRICE_TIERS`）末尾增加一个 `+` 按钮
+- 点击后就地展开一个小输入框（数字 + 确认/取消），支持 `Enter` 确认
+- 校验：必须 > 0、≤ 9999.9、最多 1 位小数；重复值自动忽略
+- 新增的价格档存在弹窗本地 state（`extraTiers: number[]`），关闭弹窗即丢弃；不写库、不污染 `PRICE_TIERS` 常量
+- 显示顺序：`[...PRICE_TIERS, ...extraTiers, ...selectedOnlyTiers].sort((a,b)=>a-b)` 去重后渲染；选中状态用 `tiers: number[]`
+- 新增并提交时按价格升序生成 SKU
 
-> 不做"组包扣子 SKU 库存"逻辑（沿用现状：组包是独立 SKU，独立库存）。
-
----
-
-## 后端 `src/lib/inventory.functions.ts`
-
-把 `createSku` 拆成三个 serverFn，全部返回 `{ skus: [...] }` 以便标准商品一次返回多条：
-
-1. **`createStandardSkus`**：入参 `{ category, name, weight_g?, image_url?, sku_code?, notes?, price_tiers: number[] }` → 校验 `price_tiers` 取自 `PRICE_TIERS`，循环每档生成 `{ kind:'single', price_tier, is_custom_price:false, epc=generateEpc(...) }` 一次 insert。
-2. **`createCustomSku`**：入参 `{ category, name, price, weight_g?, image_url?, sku_code?, notes? }` → 一条 `{ kind:'single', price_tier:price, is_custom_price:true }`。
-3. **`createBundleSku`**：入参 `{ category, name, price, weight_g?, image_url?, sku_code?, notes?, items:[{sku_id, qty}] }` → 校验 items≥1 且子 SKU 存在；写入 `{ kind:'bundle', price_tier:price, is_custom_price:true, bundle_items:items, pack_pieces=sum(qty) }`。
-4. 旧 `createSku` 删除调用方后移除。
-
-`SkuInput`/`updateSku` 同步加 `sku_code` 字段；`lookupSkusByEpcs`、入库 select 增加 `sku_code, bundle_items`。
+提交逻辑：后端 `createStandardSkus` 当前的 `PRICE_TIER_SET` 白名单需要放宽 —— 改为只校验 `0 < t ≤ 9999.9 且最多 1 位小数`，不再要求必须命中常量。这是为了让"自定义价格档生成的标准 SKU"也能落库（`is_custom_price` 仍保留 `false`，因为是用户认定的"标准档"）。
 
 ---
 
-## 前端
+## 二、选档后实时显示将要生成的 SKU 编码
 
-### 桌面 `/inventory/skus`（`inventory.skus.index.tsx`）
+每勾选/取消一个价格档，在 chips 下方实时展示一个预览列表：
 
-- 顶部"新建 SKU"按钮改为下拉菜单（DropdownMenu）三项：标准 / 自定义 / 组包。
-- 列表卡片：在 EPC 下方多一行 `商家编码：xxx`（有才显示）；`kind==='bundle'` 显示组包 badge + 子项数量。
+```
+将生成 3 个 SKU：
+  ¥6.9   INV-TY-00069-XXXXXX
+  ¥9.9   INV-TY-00099-XXXXXX
+  ¥19.9  INV-TY-00199-XXXXXX
+```
 
-### 新建对话框（拆三个）
+实现：用 `useMemo` 在选档/类目变化时跑一次 `generateEpc(category, tier)`；为避免每次重渲染都换随机串，把"已生成的 EPC"按 `category+tier` 做 key 缓存在 `useRef<Map>`；取消勾选不清空缓存，重新勾选时复用同一个 EPC。提交时直接把缓存里的 EPC 透传给后端，后端用透传值入库（如未传则后端继续生成）。
 
-新建 `src/components/inventory/`：
+后端兼容：`createStandardSkus` 入参增加可选 `epc_map: Record<string /*tier*/, string>`，落库时 `epc: epc_map[t] ?? generateEpc(...)`。
 
-- `standard-sku-dialog.tsx`
-  - 表单：类目、品名、商家编码（可选）、单件重量、图片、备注
-  - 价格档"多选 chips"（`PRICE_TIERS`），至少选 1
-  - 提交后 toast 列出生成的 N 条 EPC
-- `custom-sku-dialog.tsx`
-  - 类目、品名、自定义价格、商家编码、重量、图片、备注
-- `bundle-sku-dialog.tsx`
-  - 类目、品名、组包售价、商家编码、重量、图片、备注
-  - "添加子 SKU" → 弹一个搜索选择器（复用 `listSkus`，限定 `kind!='bundle'`），可输入品名/EPC 检索，多选并为每项填数量
-  - 子项列表展示 缩略图/品名/EPC/单价/数量/小计 + 删除
-  - 显示"子项合计参考价 ¥X.XX"，提醒和自填售价的差额
-
-抽公共 `sku-meta-fields.tsx`（类目+品名+商家编码+重量+图片+备注），三个 dialog 共享。
-
-`sku-form-fields.tsx` / `sku-form-dialog.tsx` 现有文件删除（或仅保留 `SkuImagePicker` 提取成 `sku-image-picker.tsx` 供复用）。
-
-### 详情页 `inventory.skus.$id.tsx`
-
-- 在头部信息追加：商家编码（如有）
-- 组包商品额外渲染"包含子项"卡片：子项缩略图 + 品名 + EPC + 数量；点击跳转子 SKU 详情
-
-### 移动端 `/m/skus`（`src/routes/m.skus.tsx`）
-
-- "新建"按钮直接打开"自定义商品" Sheet（不暴露标准/组包入口）
-- 复用 `custom-sku-dialog` 的内部表单组件
-- 列表卡片同样展示商家编码（如有）和组包 badge
+> 仅标准弹窗做这个预览；自定义/组包不变（它们都是单条 SKU，提交时由后端生成 EPC）。
 
 ---
 
-## 技术细节
+## 三、商家编码 → 商品编码 + 自动生成
 
-- 类型：`SkuKind = 'single' | 'pack' | 'bundle'`；`SKU_KIND_LABEL.bundle = '组包'`。`pack` 现状字段保留兼容旧数据，新建入口不再产生 `pack`。
-- EPC：`generateEpc` 不变，组包 SKU 仍用 `INV-{类目}-{价格*10:5位}-{rand6}`。
-- `sku_code` 是用户可编辑文本（≤64 字符，可空），不做强校验。
-- 入库流程 (`inventory.inbound.new.tsx`)：组包 SKU 也是普通可扫的 EPC，**逻辑无需改**；只在卡片上加 `组包·N` badge。
-- 仪表盘、转移、入库的 select 字段补 `sku_code, bundle_items`，但展示侧仅在 SKU 详情/列表用 `bundle_items`。
+`src/components/inventory/sku-meta-fields.tsx`
+
+- Label 改为 "商品编码"
+- placeholder 改为 "留空则自动生成"
+- 字段值（`sku_code`）保持原 schema，仍可空
+
+后端三个 create 函数（`createStandardSkus` / `createCustomSku` / `createBundleSku`）：
+- 当用户传入 `sku_code` 为 null/空时，后端根据规则生成：
+  - 标准/自定义：`SKU-{类目码}-{YYMMDD}-{4位随机}` 例如 `SKU-TY-260524-A3K9`
+  - 组包：`PKG-{类目码}-{YYMMDD}-{4位随机}`
+  - 标准多档时，同一品名所有档共用同一个 `sku_code`（在 handler 里一次生成、循环复用）
+- 工具函数 `generateSkuCode(category, kind)` 放 `inventory.helpers.ts`
+
+列表/详情现有展示 `商家编码：xxx` 的地方文案改为 `商品编码：xxx`：
+- `src/routes/inventory.skus.index.tsx` 卡片
+- `src/routes/inventory.skus.$id.tsx` 详情头部
+
+---
+
+## 四、重量明确选填
+
+`sku-meta-fields.tsx`：Label 由 `单件重量 (g)` 改为 `单件重量 (g)（选填）`，无其它变化。三个 create 函数当前 schema 已经是 `nullable().optional()`，无需改动。
 
 ---
 
 ## 变更文件清单
 
-新建：
-- `src/components/inventory/sku-meta-fields.tsx`
-- `src/components/inventory/sku-image-picker.tsx`（从旧 sku-form-fields 抽出）
-- `src/components/inventory/standard-sku-dialog.tsx`
-- `src/components/inventory/custom-sku-dialog.tsx`
-- `src/components/inventory/bundle-sku-dialog.tsx`
-- `src/components/inventory/bundle-children-picker.tsx`
-- 一个 supabase 迁移：加 `sku_code`、`bundle_items` 列 + `kind` 允许 `bundle`
-
 修改：
-- `src/lib/inventory.functions.ts`（拆三个 createXxxSku、字段补充）
-- `src/lib/inventory.helpers.ts`（kind 类型 + label）
-- `src/routes/inventory.skus.index.tsx`（DropdownMenu 入口、卡片字段）
-- `src/routes/inventory.skus.$id.tsx`（商家编码、组包子项卡片）
-- `src/routes/m.skus.tsx`（接到 custom dialog）
-- `src/routes/inventory.inbound.new.tsx`（仅 select & badge 适配）
+- `src/components/inventory/standard-sku-dialog.tsx`（+ 按钮、自定义档输入、EPC 预览缓存、提交带 epc_map）
+- `src/components/inventory/sku-meta-fields.tsx`（文案：商品编码、留空自动生成、重量选填）
+- `src/lib/inventory.functions.ts`（放宽标准档校验、添加 `epc_map` 入参、三个 create 在 sku_code 为空时调用 `generateSkuCode`）
+- `src/lib/inventory.helpers.ts`（新增 `generateSkuCode(category, kind)`）
+- `src/routes/inventory.skus.index.tsx`（"编码" 文案）
+- `src/routes/inventory.skus.$id.tsx`（"编码" 文案）
 
-删除：
-- `src/components/inventory/sku-form-dialog.tsx`、`sku-form-fields.tsx`（被新组件取代）
+不动：移动端 `m.skus.tsx` 复用 `SkuMetaFields`，会自动跟随文案变化；不需要单独改。
+
+数据库：无需迁移。
