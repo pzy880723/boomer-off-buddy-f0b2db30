@@ -8,7 +8,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { INV_CATEGORIES } from "@/lib/inventory.helpers";
+import { INV_CATEGORIES, CATEGORY_LABEL } from "@/lib/inventory.helpers";
 import { SkuImagePicker } from "./sku-image-picker";
 
 export type SkuMetaState = {
@@ -96,6 +96,8 @@ export function SkuMetaFields({
           value={state.imageUrl}
           onChange={(url) => patch({ imageUrl: url })}
           mobile={mobile}
+          defaultName={state.name}
+          defaultCategoryLabel={state.category ? CATEGORY_LABEL[state.category] : undefined}
         />
       </div>
 
