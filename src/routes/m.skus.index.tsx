@@ -33,7 +33,7 @@ import { BundleSkuDialog } from "@/components/inventory/bundle-sku-dialog";
 import { emptySkuMeta, type SkuMetaState } from "@/components/inventory/sku-meta-fields";
 import { SmartSkuCapture } from "@/components/inventory/smart-sku-capture";
 
-export const Route = createFileRoute("/m/skus")({
+export const Route = createFileRoute("/m/skus/")({
   head: () => ({ meta: [{ title: "商品 SKU · 移动" }] }),
   component: MSkusPage,
 });
