@@ -165,7 +165,7 @@ function MStandardRow({ group }: { group: StandardProductGroup }) {
   const remaining = group.tiers.length - visibleTiers.length;
   return (
     <Link
-      to="/inventory/products/$code"
+      to="/m/products/$code"
       params={{ code: encodeURIComponent(group.key) }}
       className="flex gap-3 rounded-xl border bg-card p-2.5 active:bg-muted"
     >
