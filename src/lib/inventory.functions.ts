@@ -19,7 +19,8 @@ const CATEGORY_VALUES = [
 
 const SkuInput = z.object({
   category: z.enum(CATEGORY_VALUES),
-  price_tier: z.number().positive(),
+  price_tier: z.number().positive().max(99999.9),
+  is_custom_price: z.boolean().default(false),
   name: z.string().min(1).max(120),
   kind: z.enum(["single", "pack"]).default("single"),
   pack_pieces: z.number().int().positive().nullable().optional(),
@@ -28,6 +29,7 @@ const SkuInput = z.object({
   notes: z.string().nullable().optional(),
   status: z.enum(["active", "archived"]).default("active"),
 });
+
 
 export const listSkus = createServerFn({ method: "GET" })
   .inputValidator((input: unknown) =>
