@@ -29,9 +29,6 @@ export function StandardSkuDialog({
   const fn = useServerFn(createStandardSkus);
   const [meta, setMeta] = useState<SkuMetaState>(emptySkuMeta);
   const [tiers, setTiers] = useState<number[]>([]);
-  const [extraTiers, setExtraTiers] = useState<number[]>([]);
-  const [adding, setAdding] = useState(false);
-  const [newTierInput, setNewTierInput] = useState("");
 
   // 缓存 (category|tier) -> epc，避免重渲染时换随机串
   const epcCacheRef = useRef<Map<string, string>>(new Map());
@@ -45,43 +42,11 @@ export function StandardSkuDialog({
     return v;
   };
 
-  // 合并所有可选档：标准 + 自定义新增；按数字排序去重
-  const allTierOptions = useMemo(() => {
-    const set = new Set<number>([...PRICE_TIERS, ...extraTiers]);
-    return Array.from(set).sort((a, b) => a - b);
-  }, [extraTiers]);
-
-  const toggleTier = (t: number) =>
-    setTiers((cur) => (cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t].sort((a, b) => a - b)));
-
-  const confirmAddTier = () => {
-    const n = Number(newTierInput);
-    if (!Number.isFinite(n) || n <= 0 || n > 9999.9) {
-      toast.error("请输入 0~9999.9 之间的价格");
-      return;
-    }
-    const rounded = Math.round(n * 10) / 10;
-    if (Math.round(rounded * 10) !== rounded * 10) {
-      toast.error("价格档最多保留 1 位小数");
-      return;
-    }
-    if (!(PRICE_TIERS as readonly number[]).includes(rounded) && !extraTiers.includes(rounded)) {
-      setExtraTiers((cur) => [...cur, rounded]);
-    }
-    // 自动勾选新加的档
-    setTiers((cur) => (cur.includes(rounded) ? cur : [...cur, rounded].sort((a, b) => a - b)));
-    setNewTierInput("");
-    setAdding(false);
-  };
-
   const sortedSelected = useMemo(() => [...tiers].sort((a, b) => a - b), [tiers]);
 
   const reset = () => {
     setMeta(emptySkuMeta);
     setTiers([]);
-    setExtraTiers([]);
-    setAdding(false);
-    setNewTierInput("");
     epcCacheRef.current.clear();
   };
 
