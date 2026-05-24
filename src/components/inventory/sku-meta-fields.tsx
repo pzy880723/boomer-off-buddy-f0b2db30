@@ -73,15 +73,15 @@ export function SkuMetaFields({
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
-          <Label>商家编码</Label>
+          <Label>商品编码</Label>
           <Input
             value={state.sku_code}
             onChange={(e) => patch({ sku_code: e.target.value })}
-            placeholder="可选，自定义编号"
+            placeholder="留空则自动生成"
           />
         </div>
         <div className="space-y-1.5">
-          <Label>单件重量 (g)</Label>
+          <Label>单件重量 (g)（选填）</Label>
           <Input
             type="number"
             value={state.weight}
