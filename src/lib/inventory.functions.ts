@@ -26,7 +26,12 @@ const MetaInput = z.object({
   notes: z.string().nullable().optional(),
 });
 
-const PRICE_TIER_SET = new Set<number>(PRICE_TIERS as readonly number[]);
+// 价格档校验：> 0、≤ 9999.9、最多 1 位小数
+const priceTierSchema = z
+  .number()
+  .positive()
+  .max(9999.9)
+  .refine((n) => Math.round(n * 10) === n * 10, "价格档最多保留 1 位小数");
 
 export const listSkus = createServerFn({ method: "GET" })
   .inputValidator((input: unknown) =>
