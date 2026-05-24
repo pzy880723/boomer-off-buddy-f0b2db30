@@ -121,7 +121,7 @@ export const getSku = createServerFn({ method: "GET" })
 export const createStandardSkus = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     MetaInput.extend({
-      price_tiers: z.array(priceTierSchema).min(1).max(20),
+      price_tiers: z.array(priceTierSchema).min(1).max(50),
       epc_map: z.record(z.string(), z.string()).optional(),
     }).parse(input),
   )
