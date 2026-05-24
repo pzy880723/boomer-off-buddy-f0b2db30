@@ -10,7 +10,9 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { SkuMetaFields, type SkuMetaState } from "./sku-meta-fields";
+import { PriceTierEditor } from "./price-tier-editor";
 import { updateStandardProduct } from "@/lib/inventory.functions";
 import type { StandardProductGroup } from "@/lib/inventory.helpers";
 
@@ -34,6 +36,7 @@ export function ProductEditDialog({
     imageUrl: "",
     notes: "",
   });
+  const [tiers, setTiers] = useState<number[]>([]);
 
   useEffect(() => {
     if (group && open) {
@@ -45,6 +48,7 @@ export function ProductEditDialog({
         imageUrl: group.image_url ?? "",
         notes: group.notes ?? "",
       });
+      setTiers([...group.tiers].sort((a, b) => a - b));
     }
   }, [group, open]);
 
@@ -52,6 +56,7 @@ export function ProductEditDialog({
     mutationFn: async () => {
       if (!group) throw new Error("缺少商品");
       if (!meta.name.trim()) throw new Error("品名必填");
+      if (tiers.length === 0) throw new Error("至少保留一个价格档");
       return fn({
         data: {
           key: group.key,
@@ -62,11 +67,16 @@ export function ProductEditDialog({
             image_url: meta.imageUrl.trim() || null,
             notes: meta.notes.trim() || null,
           },
+          price_tiers: tiers,
         },
       });
     },
-    onSuccess: () => {
-      toast.success("已保存");
+    onSuccess: (res) => {
+      const r = res as { added?: number; removed?: number };
+      const parts: string[] = ["已保存"];
+      if (r.added) parts.push(`新增 ${r.added} 档`);
+      if (r.removed) parts.push(`删除 ${r.removed} 档`);
+      toast.success(parts.join(" · "));
       onOpenChange(false);
       onSaved?.();
     },
@@ -80,10 +90,17 @@ export function ProductEditDialog({
           <DialogTitle>编辑标准商品</DialogTitle>
         </DialogHeader>
         <p className="text-xs text-muted-foreground">
-          类目无法修改；保存后会同步到该商品下的全部价格档子 SKU。
+          类目无法修改；保存后会同步到该商品下的全部价格档子 SKU。新增的价格档会自动生成 EPC，删除的价格档若仍有库存会阻止保存。
         </p>
-        <div className="py-2">
+        <div className="py-2 space-y-4">
           <SkuMetaFields state={meta} onChange={setMeta} hideCategory />
+          <div className="space-y-1.5">
+            <Label>价格档 *</Label>
+            <PriceTierEditor value={tiers} onChange={setTiers} />
+            <p className="text-[11px] text-muted-foreground">
+              点选 = 该商品启用此档；点 + 可添加新档（全局共享）。
+            </p>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
