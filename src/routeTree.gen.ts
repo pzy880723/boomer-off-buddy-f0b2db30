@@ -38,7 +38,6 @@ import { Route as PurchaseDomesticRouteImport } from './routes/purchase.domestic
 import { Route as OrdersWholesaleRouteImport } from './routes/orders.wholesale'
 import { Route as OrdersShopsRouteImport } from './routes/orders.shops'
 import { Route as OrdersDispatchRouteImport } from './routes/orders.dispatch'
-import { Route as MSkusRouteImport } from './routes/m.skus'
 import { Route as MScanRouteImport } from './routes/m.scan'
 import { Route as MPhotoSearchRouteImport } from './routes/m.photo-search'
 import { Route as MParcelsRouteImport } from './routes/m.parcels'
@@ -52,6 +51,7 @@ import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as PurchaseJapanParcelIndexRouteImport } from './routes/purchase.japan-parcel.index'
 import { Route as PurchaseDomesticIndexRouteImport } from './routes/purchase.domestic.index'
 import { Route as PurchaseDomesticBulkIndexRouteImport } from './routes/purchase.domestic-bulk.index'
+import { Route as MSkusIndexRouteImport } from './routes/m.skus.index'
 import { Route as InventorySkusIndexRouteImport } from './routes/inventory.skus.index'
 import { Route as InventoryInboundIndexRouteImport } from './routes/inventory.inbound.index'
 import { Route as PurchaseJapanParcelNewRouteImport } from './routes/purchase.japan-parcel.new'
@@ -216,11 +216,6 @@ const OrdersDispatchRoute = OrdersDispatchRouteImport.update({
   path: '/dispatch',
   getParentRoute: () => OrdersRoute,
 } as any)
-const MSkusRoute = MSkusRouteImport.update({
-  id: '/skus',
-  path: '/skus',
-  getParentRoute: () => MRoute,
-} as any)
 const MScanRoute = MScanRouteImport.update({
   id: '/scan',
   path: '/scan',
@@ -288,6 +283,11 @@ const PurchaseDomesticBulkIndexRoute =
     path: '/',
     getParentRoute: () => PurchaseDomesticBulkRoute,
   } as any)
+const MSkusIndexRoute = MSkusIndexRouteImport.update({
+  id: '/skus/',
+  path: '/skus/',
+  getParentRoute: () => MRoute,
+} as any)
 const InventorySkusIndexRoute = InventorySkusIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -341,9 +341,9 @@ const PurchaseDomesticBulkIdRoute = PurchaseDomesticBulkIdRouteImport.update({
   getParentRoute: () => PurchaseDomesticBulkRoute,
 } as any)
 const MSkusIdRoute = MSkusIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => MSkusRoute,
+  id: '/skus/$id',
+  path: '/skus/$id',
+  getParentRoute: () => MRoute,
 } as any)
 const MReceiveIdRoute = MReceiveIdRouteImport.update({
   id: '/receive/$id',
@@ -402,7 +402,6 @@ export interface FileRoutesByFullPath {
   '/m/parcels': typeof MParcelsRoute
   '/m/photo-search': typeof MPhotoSearchRoute
   '/m/scan': typeof MScanRoute
-  '/m/skus': typeof MSkusRouteWithChildren
   '/orders/dispatch': typeof OrdersDispatchRoute
   '/orders/shops': typeof OrdersShopsRoute
   '/orders/wholesale': typeof OrdersWholesaleRoute
@@ -440,6 +439,7 @@ export interface FileRoutesByFullPath {
   '/purchase/japan-parcel/new': typeof PurchaseJapanParcelNewRoute
   '/inventory/inbound/': typeof InventoryInboundIndexRoute
   '/inventory/skus/': typeof InventorySkusIndexRoute
+  '/m/skus/': typeof MSkusIndexRoute
   '/purchase/domestic-bulk/': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic/': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
@@ -461,7 +461,6 @@ export interface FileRoutesByTo {
   '/m/parcels': typeof MParcelsRoute
   '/m/photo-search': typeof MPhotoSearchRoute
   '/m/scan': typeof MScanRoute
-  '/m/skus': typeof MSkusRouteWithChildren
   '/orders/dispatch': typeof OrdersDispatchRoute
   '/orders/shops': typeof OrdersShopsRoute
   '/orders/wholesale': typeof OrdersWholesaleRoute
@@ -496,6 +495,7 @@ export interface FileRoutesByTo {
   '/purchase/japan-parcel/new': typeof PurchaseJapanParcelNewRoute
   '/inventory/inbound': typeof InventoryInboundIndexRoute
   '/inventory/skus': typeof InventorySkusIndexRoute
+  '/m/skus': typeof MSkusIndexRoute
   '/purchase/domestic-bulk': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel': typeof PurchaseJapanParcelIndexRoute
@@ -522,7 +522,6 @@ export interface FileRoutesById {
   '/m/parcels': typeof MParcelsRoute
   '/m/photo-search': typeof MPhotoSearchRoute
   '/m/scan': typeof MScanRoute
-  '/m/skus': typeof MSkusRouteWithChildren
   '/orders/dispatch': typeof OrdersDispatchRoute
   '/orders/shops': typeof OrdersShopsRoute
   '/orders/wholesale': typeof OrdersWholesaleRoute
@@ -560,6 +559,7 @@ export interface FileRoutesById {
   '/purchase/japan-parcel/new': typeof PurchaseJapanParcelNewRoute
   '/inventory/inbound/': typeof InventoryInboundIndexRoute
   '/inventory/skus/': typeof InventorySkusIndexRoute
+  '/m/skus/': typeof MSkusIndexRoute
   '/purchase/domestic-bulk/': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic/': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
@@ -587,7 +587,6 @@ export interface FileRouteTypes {
     | '/m/parcels'
     | '/m/photo-search'
     | '/m/scan'
-    | '/m/skus'
     | '/orders/dispatch'
     | '/orders/shops'
     | '/orders/wholesale'
@@ -625,6 +624,7 @@ export interface FileRouteTypes {
     | '/purchase/japan-parcel/new'
     | '/inventory/inbound/'
     | '/inventory/skus/'
+    | '/m/skus/'
     | '/purchase/domestic-bulk/'
     | '/purchase/domestic/'
     | '/purchase/japan-parcel/'
@@ -646,7 +646,6 @@ export interface FileRouteTypes {
     | '/m/parcels'
     | '/m/photo-search'
     | '/m/scan'
-    | '/m/skus'
     | '/orders/dispatch'
     | '/orders/shops'
     | '/orders/wholesale'
@@ -681,6 +680,7 @@ export interface FileRouteTypes {
     | '/purchase/japan-parcel/new'
     | '/inventory/inbound'
     | '/inventory/skus'
+    | '/m/skus'
     | '/purchase/domestic-bulk'
     | '/purchase/domestic'
     | '/purchase/japan-parcel'
@@ -706,7 +706,6 @@ export interface FileRouteTypes {
     | '/m/parcels'
     | '/m/photo-search'
     | '/m/scan'
-    | '/m/skus'
     | '/orders/dispatch'
     | '/orders/shops'
     | '/orders/wholesale'
@@ -744,6 +743,7 @@ export interface FileRouteTypes {
     | '/purchase/japan-parcel/new'
     | '/inventory/inbound/'
     | '/inventory/skus/'
+    | '/m/skus/'
     | '/purchase/domestic-bulk/'
     | '/purchase/domestic/'
     | '/purchase/japan-parcel/'
@@ -982,13 +982,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrdersDispatchRouteImport
       parentRoute: typeof OrdersRoute
     }
-    '/m/skus': {
-      id: '/m/skus'
-      path: '/skus'
-      fullPath: '/m/skus'
-      preLoaderRoute: typeof MSkusRouteImport
-      parentRoute: typeof MRoute
-    }
     '/m/scan': {
       id: '/m/scan'
       path: '/scan'
@@ -1080,6 +1073,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PurchaseDomesticBulkIndexRouteImport
       parentRoute: typeof PurchaseDomesticBulkRoute
     }
+    '/m/skus/': {
+      id: '/m/skus/'
+      path: '/skus'
+      fullPath: '/m/skus/'
+      preLoaderRoute: typeof MSkusIndexRouteImport
+      parentRoute: typeof MRoute
+    }
     '/inventory/skus/': {
       id: '/inventory/skus/'
       path: '/'
@@ -1152,10 +1152,10 @@ declare module '@tanstack/react-router' {
     }
     '/m/skus/$id': {
       id: '/m/skus/$id'
-      path: '/$id'
+      path: '/skus/$id'
       fullPath: '/m/skus/$id'
       preLoaderRoute: typeof MSkusIdRouteImport
-      parentRoute: typeof MSkusRoute
+      parentRoute: typeof MRoute
     }
     '/m/receive/$id': {
       id: '/m/receive/$id'
@@ -1209,25 +1209,16 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface MSkusRouteChildren {
-  MSkusIdRoute: typeof MSkusIdRoute
-}
-
-const MSkusRouteChildren: MSkusRouteChildren = {
-  MSkusIdRoute: MSkusIdRoute,
-}
-
-const MSkusRouteWithChildren = MSkusRoute._addFileChildren(MSkusRouteChildren)
-
 interface MRouteChildren {
   MInboundRoute: typeof MInboundRoute
   MParcelsRoute: typeof MParcelsRoute
   MPhotoSearchRoute: typeof MPhotoSearchRoute
   MScanRoute: typeof MScanRoute
-  MSkusRoute: typeof MSkusRouteWithChildren
   MIndexRoute: typeof MIndexRoute
   MProductsCodeRoute: typeof MProductsCodeRoute
   MReceiveIdRoute: typeof MReceiveIdRoute
+  MSkusIdRoute: typeof MSkusIdRoute
+  MSkusIndexRoute: typeof MSkusIndexRoute
 }
 
 const MRouteChildren: MRouteChildren = {
@@ -1235,10 +1226,11 @@ const MRouteChildren: MRouteChildren = {
   MParcelsRoute: MParcelsRoute,
   MPhotoSearchRoute: MPhotoSearchRoute,
   MScanRoute: MScanRoute,
-  MSkusRoute: MSkusRouteWithChildren,
   MIndexRoute: MIndexRoute,
   MProductsCodeRoute: MProductsCodeRoute,
   MReceiveIdRoute: MReceiveIdRoute,
+  MSkusIdRoute: MSkusIdRoute,
+  MSkusIndexRoute: MSkusIndexRoute,
 }
 
 const MRouteWithChildren = MRoute._addFileChildren(MRouteChildren)
