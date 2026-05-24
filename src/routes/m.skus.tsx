@@ -272,7 +272,7 @@ function MNewCustomSkuSheet({
         <div className="space-y-3 p-4 pb-24">
           {smartOpen ? (
             <SmartSkuCapture
-              onApply={(patch) => setMeta({ ...meta, ...patch })}
+              onApply={(patch: Partial<SkuMetaState>) => setMeta({ ...meta, ...patch })}
               onClose={() => setSmartOpen(false)}
             />
           ) : (
