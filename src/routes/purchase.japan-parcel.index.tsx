@@ -315,14 +315,44 @@ function JapanParcelList() {
     <div>
       <Card className="mb-3">
         <CardContent className="flex flex-wrap items-center gap-3 py-3">
-          <div className="relative max-w-sm flex-1 min-w-[220px]">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="搜索订单号 / 物流号 / 商品名称（支持中文）"
-              className="h-9 pl-8"
-            />
+          <div className="flex items-center gap-2 max-w-md flex-1 min-w-[260px]">
+            <div className="relative flex-1">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    setSubmittedSearch(search.trim());
+                  }
+                }}
+                placeholder="搜索订单号 / 物流号 / 商品名称（支持中文）"
+                className="h-9 pl-8 pr-8"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearch("");
+                    setSubmittedSearch("");
+                  }}
+                  className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
+                  aria-label="清除搜索"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-9"
+              onClick={() => setSubmittedSearch(search.trim())}
+            >
+              <Search className="h-4 w-4 mr-1" />
+              搜索
+            </Button>
           </div>
 
           <div className="ml-auto flex items-center gap-3">
