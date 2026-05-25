@@ -19,6 +19,7 @@ import {
   Copy,
   Calculator,
   PackageCheck,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
