@@ -124,9 +124,27 @@ export const listJapanParcels = createServerFn({ method: "GET" })
     if (data.onlyIncomplete) q = q.lt("completeness", 80);
     if (data.search) {
       const s = `%${data.search}%`;
-      q = q.or(
-        `item_title.ilike.${s},source_order_no.ilike.${s},tracking_no.ilike.${s},seller.ilike.${s},receiver_name.ilike.${s}`,
+      // 先查子商品里匹配的 parent_id
+      const { data: itemMatches } = await supabaseAdmin
+        .from("japan_parcel_items")
+        .select("parent_id")
+        .or(`item_title.ilike.${s},item_title_cn.ilike.${s}`)
+        .limit(500);
+      const parcelIds = Array.from(
+        new Set((itemMatches ?? []).map((r) => r.parent_id).filter(Boolean) as string[]),
       );
+      const orParts = [
+        `item_title.ilike.${s}`,
+        `item_title_cn.ilike.${s}`,
+        `source_order_no.ilike.${s}`,
+        `tracking_no.ilike.${s}`,
+        `seller.ilike.${s}`,
+        `receiver_name.ilike.${s}`,
+      ];
+      if (parcelIds.length > 0) {
+        orParts.push(`id.in.(${parcelIds.join(",")})`);
+      }
+      q = q.or(orParts.join(","));
     }
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
