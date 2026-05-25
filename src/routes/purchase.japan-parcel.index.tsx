@@ -160,6 +160,7 @@ function JapanParcelList() {
   const [tab, setTab] = useState<ParcelTab>("purchased");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
+  const [submittedSearch, setSubmittedSearch] = useState("");
   const [openCardId, setOpenCardId] = useState<string | null>(null);
   const [openTab, setOpenTab] = useState<"overview" | "edit">("overview");
   const [packCalc, setPackCalc] = useState<{ item: ItemRow; landedCny: number | null } | null>(null);
@@ -169,14 +170,19 @@ function JapanParcelList() {
   const [sort, setSort] = useState<SortState>({ field: "intl_pay_at", dir: "desc" });
   const debouncedSearch = useDebounced(search, 300);
 
-  // 搜索时自动切到「商品」视图，便于直接看到匹配商品
+  // debounce 自动同步到 submittedSearch
   useEffect(() => {
-    if (debouncedSearch && viewMode !== "item") setViewMode("item");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setSubmittedSearch(debouncedSearch);
   }, [debouncedSearch]);
 
+  // 搜索时自动切到「商品」视图，便于直接看到匹配商品
+  useEffect(() => {
+    if (submittedSearch && viewMode !== "item") setViewMode("item");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [submittedSearch]);
+
   const list = useQuery({
-    ...listOptions(tab, debouncedSearch, sort),
+    ...listOptions(tab, submittedSearch, sort),
     placeholderData: (previousData) => previousData,
   });
 
