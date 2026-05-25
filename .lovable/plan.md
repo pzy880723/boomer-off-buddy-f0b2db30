@@ -1,35 +1,43 @@
-## 目标
-1. 日本小包列表的搜索框支持按"商品名称"搜索，覆盖中文（`item_title_cn`）和日文（`item_title`），既包含包裹主表的标题，也包含子商品 `japan_parcel_items` 里的标题。
-2. 一旦搜索框有内容，列表自动切到「商品」展示模式（`ViewModeToggle` 的 item 视图），方便直接看到匹配到的商品。清空搜索后保留用户原本选择的模式。
+# 日本小包搜索：加按钮 + 修复
 
-## 变更范围
+## 现状排查
 
-### 1. `src/lib/japan-parcel.functions.ts` — `listJapanParcels`
-扩展搜索逻辑，让 keyword 同时命中子商品标题：
+`src/routes/purchase.japan-parcel.index.tsx` 已实现：输入框 → 300ms debounce → 自动切到「商品」视图 → 触发 `listJapanParcels`。
 
-- 在现有 `data.search` 分支中：
-  - 包裹主表 OR 条件追加 `item_title_cn.ilike.%s%`（目前只匹配日文 `item_title`）。
-  - 先用一条额外查询查 `japan_parcel_items`：`select parcel_id` where `item_title ilike s OR item_title_cn ilike s`，去重得到 `matchedParcelIds`。
-  - 把上面这组 id 合并到主查询的 `.or(...)`：通过 `id.in.(uuid1,uuid2,...)` 子句加入，与现有 5 个字段一起 OR。
-  - 空集时跳过 `id.in.(...)`，避免 PostgREST 语法错。
-- 其他逻辑（tab、排序、limit）不变；search 仍保留对订单号、物流号、卖家、收件人的匹配。
-- 中文走 `ilike` 已能匹配（Postgres ilike 对 Unicode 大小写不敏感对中文等价于普通匹配），无需额外配置。
+`src/lib/japan-parcel.functions.ts` (L125-148) 的搜索分支存在 **两个隐性 bug**，会导致"看上去搜不到"：
 
-### 2. `src/routes/purchase.japan-parcel.index.tsx` — 搜索时自动切换商品视图
-- 引入可写版本：`const [viewMode, setViewMode] = useParcelViewMode();`
-- 增加一个 `useEffect`：当 `debouncedSearch` 非空且 `viewMode !== "item"` 时，调用 `setViewMode("item")`。
-- 不在清空搜索时自动改回，避免来回跳；用户可手动点 ViewModeToggle 切回包裹模式。
-- 搜索框 placeholder 更新为「搜索订单号 / 物流号 / 商品名称（支持中文）」，让能力可见。
+1. **当前 tab 过滤会盖住搜索结果**：搜索时仍然带上 `tab` 过滤（`purchased` / `delivered` / `problem`）。例如用户在"已采购"页搜一个已签收的包裹的商品名 → 0 结果。
+2. **PostgREST `.or()` 字符串注入风险**：搜索词若含 `,` `(` `)` `:`，会破坏 `.or()` 语法导致整个查询报 400；中文虽然安全，但英文/混合输入有概率踩坑。`item_title.ilike.%hello,world%` 这种就会被解析出错。
 
-不动：`ViewModeToggle`、`useParcelViewMode`、商品视图的渲染（已经存在的 item 行）、PC 之外的页面、计数接口、其它路由。
+## 改造方案
 
-## 技术细节
+### 1. UI：搜索框后面加按钮 + 支持回车
 
-- PostgREST `.or()` 中 `id.in.(...)` 的值用逗号分隔的 UUID，不带引号；UUID 形如 `xxxxxxxx-xxxx-...`，安全字符集，不需要再转义。
-- 额外那条 `japan_parcel_items` 查询限制 `limit(500)` 防止极端情况下结果过大；若超出，主搜索仍能通过包裹标题命中，可接受。
-- `useEffect` 依赖 `[debouncedSearch]`，避免每次渲染都 setState。
+文件：`src/routes/purchase.japan-parcel.index.tsx`
 
-## 不做
-- 不做高亮匹配项。
-- 不调整 item 视图的列结构、排序。
-- 不修改移动端 `/m/parcels`（如需后续可加）。
+- 在 `<Input>` 同行右侧加一个 `<Button>搜索</Button>`（变体 `secondary`，h-9）。
+- 输入框 `onKeyDown`：Enter 时立即提交（绕过 debounce）。
+- 新增本地 state `submittedSearch`，按钮/回车点击时 `setSubmittedSearch(search)` 并把 `debouncedSearch` 也同步；listOptions 改用 `submittedSearch` 作为 query key 与请求参数。
+- 保留输入时 debounce 自动触发（兼顾现在的体验）。
+- 输入框右侧若有内容，显示一个 X 清除按钮（一次性清空 search + submittedSearch）。
+
+### 2. 搜索逻辑修复
+
+文件：`src/lib/japan-parcel.functions.ts` `listJapanParcels`
+
+- **跨 tab 搜索**：当 `data.search` 非空时，忽略 `tab` 过滤里的 `status` / `is_problem` 限制，仅保留 `deleted_at is null`（trash 仍然单独走）。这样用户在任意 tab 搜，都能看到全部匹配。
+- **转义搜索词**：构造一个 `escapeForPostgrestOr(s)`，把 `,` `(` `)` `:` 替换/包裹。具体做法：对 ilike 模式用双引号包裹值 → `item_title.ilike."${s}"`（PostgREST 允许用双引号包裹含特殊字符的值），并把 `s` 里的 `"` `\` 转义。`id.in.(...)` 由 UUID 组成，安全。
+- 子商品匹配查询同样使用转义后的值。
+
+### 3. 验证
+
+- 改完后到 `/purchase/japan-parcel`：
+  - 输入中文商品名 → 点搜索 → 自动切「商品」视图，应能命中无论包裹在哪个 tab。
+  - 输入订单号片段 → 回车 → 同上。
+  - 输入含逗号的字符串 → 不再 400。
+  - 清除按钮 → 回到原始列表，tab 过滤恢复。
+
+## 不改动
+
+- PC / 移动端商品详情、其他路由、count 接口、ViewModeToggle、回收站逻辑。
+- Debounce 自动搜索仍保留，按钮只是显式触发入口。
