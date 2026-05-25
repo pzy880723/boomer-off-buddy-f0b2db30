@@ -110,20 +110,27 @@ export const listJapanParcels = createServerFn({ method: "GET" })
       .order("created_at", { ascending: false })
       .limit(200);
 
+    const hasSearch = !!data.search?.trim();
     if (tab === "trash") {
       q = q.not("deleted_at", "is", null);
     } else {
       q = q.is("deleted_at", null);
-      if (tab === "purchased") q = q.in("status", PURCHASED_STATUSES);
-      else if (tab === "delivered") q = q.in("status", DELIVERED_STATUSES);
-      else if (tab === "problem") q = q.eq("is_problem", true);
+      // 搜索时跨 tab 查全部（除回收站），便于直接定位
+      if (!hasSearch) {
+        if (tab === "purchased") q = q.in("status", PURCHASED_STATUSES);
+        else if (tab === "delivered") q = q.in("status", DELIVERED_STATUSES);
+        else if (tab === "problem") q = q.eq("is_problem", true);
+      }
     }
 
     if (data.status?.length) q = q.in("status", data.status);
     if (data.source?.length) q = q.in("source", data.source);
     if (data.onlyIncomplete) q = q.lt("completeness", 80);
-    if (data.search) {
-      const s = `%${data.search}%`;
+    if (hasSearch) {
+      // 转义 PostgREST .or() 里的特殊字符：用双引号包裹值，转义 \ 和 "
+      const raw = data.search!.trim();
+      const escaped = raw.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+      const s = `"%${escaped}%"`;
       // 先查子商品里匹配的 parent_id
       const { data: itemMatches } = await supabaseAdmin
         .from("japan_parcel_items")
