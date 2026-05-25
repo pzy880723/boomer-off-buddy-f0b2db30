@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useIsFetching, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -164,9 +164,15 @@ function JapanParcelList() {
   const [packCalc, setPackCalc] = useState<{ item: ItemRow; landedCny: number | null } | null>(null);
   const [itemCard, setItemCard] = useState<{ item: ItemRow; parcelId: string } | null>(null);
   const [currency] = useCurrencyDisplay();
-  const [viewMode] = useParcelViewMode();
+  const [viewMode, setViewMode] = useParcelViewMode();
   const [sort, setSort] = useState<SortState>({ field: "intl_pay_at", dir: "desc" });
   const debouncedSearch = useDebounced(search, 300);
+
+  // 搜索时自动切到「商品」视图，便于直接看到匹配商品
+  useEffect(() => {
+    if (debouncedSearch && viewMode !== "item") setViewMode("item");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch]);
 
   const list = useQuery({
     ...listOptions(tab, debouncedSearch, sort),
@@ -307,7 +313,7 @@ function JapanParcelList() {
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="搜索订单号 / 标题 / 物流单号"
+              placeholder="搜索订单号 / 物流号 / 商品名称（支持中文）"
               className="h-9 pl-8"
             />
           </div>

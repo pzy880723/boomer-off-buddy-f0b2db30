@@ -1,51 +1,35 @@
-## 现状梳理
+## 目标
+1. 日本小包列表的搜索框支持按"商品名称"搜索，覆盖中文（`item_title_cn`）和日文（`item_title`），既包含包裹主表的标题，也包含子商品 `japan_parcel_items` 里的标题。
+2. 一旦搜索框有内容，列表自动切到「商品」展示模式（`ViewModeToggle` 的 item 视图），方便直接看到匹配到的商品。清空搜索后保留用户原本选择的模式。
 
-`/m/skus` 列表三种商品当前跳转：
+## 变更范围
 
-| 类型 | 当前跳转 | 是否手机版 |
-| --- | --- | --- |
-| 自定义（single + is_custom_price） | `/m/skus/$id` | ✅ 已经是手机版 |
-| 组包（kind = bundle） | `/m/skus/$id` | ✅ 已经是手机版 |
-| 标准（single 多档聚合） | `/inventory/products/$code` | ❌ PC 版（你看到的问题） |
+### 1. `src/lib/japan-parcel.functions.ts` — `listJapanParcels`
+扩展搜索逻辑，让 keyword 同时命中子商品标题：
 
-另外，PC 标准商品详情里点"价格档子 SKU"会跳 `/inventory/skus/$id`（PC 单 SKU 详情）；在手机入口下也应该走 `/m/skus/$id`。
+- 在现有 `data.search` 分支中：
+  - 包裹主表 OR 条件追加 `item_title_cn.ilike.%s%`（目前只匹配日文 `item_title`）。
+  - 先用一条额外查询查 `japan_parcel_items`：`select parcel_id` where `item_title ilike s OR item_title_cn ilike s`，去重得到 `matchedParcelIds`。
+  - 把上面这组 id 合并到主查询的 `.or(...)`：通过 `id.in.(uuid1,uuid2,...)` 子句加入，与现有 5 个字段一起 OR。
+  - 空集时跳过 `id.in.(...)`，避免 PostgREST 语法错。
+- 其他逻辑（tab、排序、limit）不变；search 仍保留对订单号、物流号、卖家、收件人的匹配。
+- 中文走 `ilike` 已能匹配（Postgres ilike 对 Unicode 大小写不敏感对中文等价于普通匹配），无需额外配置。
 
-所以真正缺的只有「标准商品的手机版总详情页」。自定义 / 组包不需要改详情，只是列表入口已经对了。
+### 2. `src/routes/purchase.japan-parcel.index.tsx` — 搜索时自动切换商品视图
+- 引入可写版本：`const [viewMode, setViewMode] = useParcelViewMode();`
+- 增加一个 `useEffect`：当 `debouncedSearch` 非空且 `viewMode !== "item"` 时，调用 `setViewMode("item")`。
+- 不在清空搜索时自动改回，避免来回跳；用户可手动点 ViewModeToggle 切回包裹模式。
+- 搜索框 placeholder 更新为「搜索订单号 / 物流号 / 商品名称（支持中文）」，让能力可见。
 
-## 改动
+不动：`ViewModeToggle`、`useParcelViewMode`、商品视图的渲染（已经存在的 item 行）、PC 之外的页面、计数接口、其它路由。
 
-### 1. 新建 `src/routes/m.products.$code.tsx`（标准商品总详情 · 手机版）
+## 技术细节
 
-- 数据：复用 `listSkus` + `groupStandardSkus`（和 PC 版同源），按 `code` 找到对应 group。
-- 包在 `MobileShell title="商品详情" back="/m/skus"`，单列竖排：
-  1. **主图卡**：满宽 4:3 主图 + 类目/「标准」Badge + 标题；价格区间 `¥min ~ ¥max · N 档` 大字 + 总库存 `N 件`。
-  2. **属性卡**（divide-y 一行一项）：商品编码（mono + 复制按钮）、单件重量、价格档数。
-  3. **价格档子 SKU 列表卡**：每行 `Badge 价格 · EPC(mono) · 库存 N · ChevronRight`，整行 `<Link to="/m/skus/$id" params={{id: sku.id}}>`，点进去就是已有的手机版单 SKU 详情（可在那里打印 RFID / 看入库记录）。
-  4. **备注卡**（若有）。
-- 顶栏右上 `rightSlot`：编辑（铅笔图标，打开 `ProductEditDialog`，复用桌面 Dialog，手机也能滚动）/ 删除（垃圾桶图标 + `AlertDialog` + `deleteStandardProduct`，成功后 `nav({to: "/m/skus"})`）。
-- 加载中 / 找不到：返回 `/m/skus` 而不是 `/inventory/skus`。
+- PostgREST `.or()` 中 `id.in.(...)` 的值用逗号分隔的 UUID，不带引号；UUID 形如 `xxxxxxxx-xxxx-...`，安全字符集，不需要再转义。
+- 额外那条 `japan_parcel_items` 查询限制 `limit(500)` 防止极端情况下结果过大；若超出，主搜索仍能通过包裹标题命中，可接受。
+- `useEffect` 依赖 `[debouncedSearch]`，避免每次渲染都 setState。
 
-### 2. 修改 `src/routes/m.skus.tsx`
-
-`MStandardRow` 里 `<Link>` 从：
-```
-to="/inventory/products/$code"
-params={{ code: encodeURIComponent(group.key) }}
-```
-改为：
-```
-to="/m/products/$code"
-params={{ code: encodeURIComponent(group.key) }}
-```
-其它不动。
-
-## 明确不动的部分
-
-- `m.skus.$id.tsx` 已经是手机版自定义 / 组包详情，**不动**。
-- PC 端 `/inventory/products/$code`、`/inventory/skus/$id`、`product-card.tsx` 等 PC 入口，**完全不动**。
-- 数据库、serverFn、`ProductEditDialog`、`SkuEditDialog`，全部复用，**不动**。
-- 上一轮已修好的 `m.scan.tsx`（扫到 SKU 跳 `/m/skus/$id`），**不动**。
-
-## 一个小取舍
-
-手机版标准商品详情里**不放**"扫枪入库"按钮（手机不接扫枪，入库走 `/m/inbound`，已经在底部 Tab 里）。如果你希望加一个跳"扫枪入库"的快捷按钮，告诉我即可，否则就按上述实现。
+## 不做
+- 不做高亮匹配项。
+- 不调整 item 视图的列结构、排序。
+- 不修改移动端 `/m/parcels`（如需后续可加）。
