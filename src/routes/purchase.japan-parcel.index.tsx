@@ -313,7 +313,7 @@ function JapanParcelList() {
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="搜索订单号 / 标题 / 物流单号"
+              placeholder="搜索订单号 / 物流号 / 商品名称（支持中文）"
               className="h-9 pl-8"
             />
           </div>
