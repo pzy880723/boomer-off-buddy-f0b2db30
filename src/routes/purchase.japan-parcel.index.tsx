@@ -164,9 +164,15 @@ function JapanParcelList() {
   const [packCalc, setPackCalc] = useState<{ item: ItemRow; landedCny: number | null } | null>(null);
   const [itemCard, setItemCard] = useState<{ item: ItemRow; parcelId: string } | null>(null);
   const [currency] = useCurrencyDisplay();
-  const [viewMode] = useParcelViewMode();
+  const [viewMode, setViewMode] = useParcelViewMode();
   const [sort, setSort] = useState<SortState>({ field: "intl_pay_at", dir: "desc" });
   const debouncedSearch = useDebounced(search, 300);
+
+  // 搜索时自动切到「商品」视图，便于直接看到匹配商品
+  useEffect(() => {
+    if (debouncedSearch && viewMode !== "item") setViewMode("item");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch]);
 
   const list = useQuery({
     ...listOptions(tab, debouncedSearch, sort),
