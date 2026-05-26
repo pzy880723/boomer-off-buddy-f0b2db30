@@ -19,7 +19,7 @@ export function MobileShell({
 }) {
   const router = useRouter();
   return (
-    <div className="flex min-h-[100dvh] flex-col bg-background text-foreground">
+    <div className="flex min-h-[100dvh] flex-col bg-background text-foreground pt-[env(safe-area-inset-top)]">
       <header className="sticky top-0 z-20 flex h-12 items-center gap-2 border-b bg-card/95 px-3 backdrop-blur">
         {back ? (
           <button
