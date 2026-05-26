@@ -271,7 +271,7 @@ function ParcelsSearch() {
                       );
                       const u = (it as { pack_unit_note?: string | null }).pack_unit_note || "个";
                       return (
-                        <span className="mt-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-red-600 bg-red-200">
+                        <span className="mt-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-red-600 bg-red-50">
                           拆 {pp}{u} ·{" "}
                           {pieceCny != null
                             ? `¥${pieceCny.toFixed(2)}/${u}`
