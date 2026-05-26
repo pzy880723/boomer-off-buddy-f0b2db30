@@ -1,43 +1,31 @@
-# 日本小包搜索：加按钮 + 修复
+# 修复：搜索"史努比"后跳出大量无关商品
 
-## 现状排查
+## 根因
 
-`src/routes/purchase.japan-parcel.index.tsx` 已实现：输入框 → 300ms debounce → 自动切到「商品」视图 → 触发 `listJapanParcels`。
+后端 `listJapanParcels` 搜索时：通过子商品表先查到匹配的 `parent_id`，再把这些**整个包裹**（含全部子商品）返回。前端商品视图（`viewMode === "item"`）会把每个包裹的 `japan_parcel_items` **全部展平**渲染。
 
-`src/lib/japan-parcel.functions.ts` (L125-148) 的搜索分支存在 **两个隐性 bug**，会导致"看上去搜不到"：
-
-1. **当前 tab 过滤会盖住搜索结果**：搜索时仍然带上 `tab` 过滤（`purchased` / `delivered` / `problem`）。例如用户在"已采购"页搜一个已签收的包裹的商品名 → 0 结果。
-2. **PostgREST `.or()` 字符串注入风险**：搜索词若含 `,` `(` `)` `:`，会破坏 `.or()` 语法导致整个查询报 400；中文虽然安全，但英文/混合输入有概率踩坑。`item_title.ilike.%hello,world%` 这种就会被解析出错。
+举例：搜"史努比"匹配到包裹 `CN111077666JP` 里 1 个史努比相关商品 → 该包裹的全部 ~30 个商品（领带、纽扣、台钟、麦当劳…）都被显示出来，所以看上去"全是无关内容"。
 
 ## 改造方案
 
-### 1. UI：搜索框后面加按钮 + 支持回车
+只改前端 `src/routes/purchase.japan-parcel.index.tsx` 的商品视图渲染逻辑，**不动**后端、不动包裹视图：
 
-文件：`src/routes/purchase.japan-parcel.index.tsx`
-
-- 在 `<Input>` 同行右侧加一个 `<Button>搜索</Button>`（变体 `secondary`，h-9）。
-- 输入框 `onKeyDown`：Enter 时立即提交（绕过 debounce）。
-- 新增本地 state `submittedSearch`，按钮/回车点击时 `setSubmittedSearch(search)` 并把 `debouncedSearch` 也同步；listOptions 改用 `submittedSearch` 作为 query key 与请求参数。
-- 保留输入时 debounce 自动触发（兼顾现在的体验）。
-- 输入框右侧若有内容，显示一个 X 清除按钮（一次性清空 search + submittedSearch）。
-
-### 2. 搜索逻辑修复
-
-文件：`src/lib/japan-parcel.functions.ts` `listJapanParcels`
-
-- **跨 tab 搜索**：当 `data.search` 非空时，忽略 `tab` 过滤里的 `status` / `is_problem` 限制，仅保留 `deleted_at is null`（trash 仍然单独走）。这样用户在任意 tab 搜，都能看到全部匹配。
-- **转义搜索词**：构造一个 `escapeForPostgrestOr(s)`，把 `,` `(` `)` `:` 替换/包裹。具体做法：对 ilike 模式用双引号包裹值 → `item_title.ilike."${s}"`（PostgREST 允许用双引号包裹含特殊字符的值），并把 `s` 里的 `"` `\` 转义。`id.in.(...)` 由 UUID 组成，安全。
-- 子商品匹配查询同样使用转义后的值。
-
-### 3. 验证
-
-- 改完后到 `/purchase/japan-parcel`：
-  - 输入中文商品名 → 点搜索 → 自动切「商品」视图，应能命中无论包裹在哪个 tab。
-  - 输入订单号片段 → 回车 → 同上。
-  - 输入含逗号的字符串 → 不再 400。
-  - 清除按钮 → 回到原始列表，tab 过滤恢复。
+1. 把 `submittedSearch` 传进商品视图的 flatMap 分支。
+2. 当 `submittedSearch` 非空 且 `viewMode === "item"` 时，对每个包裹的 `sortedItems` 做一次本地过滤：
+   - 取关键词 `kw = submittedSearch.trim().toLowerCase()`
+   - 命中条件：`item_title` 或 `item_title_cn` 的 lowercase 包含 `kw`
+   - 过滤后非空 → 只渲染命中的子商品行
+   - 过滤后为空 → 说明这个包裹是通过订单号 / 运单号 / 卖家 / 收件人等父级字段匹配的，**回退**渲染原全部商品（保持现在能定位到包裹的体验），不让它变成空行
+3. `landedMap` 仍然基于完整 `sortedItems` 计算（因为分摊国际运费要按整包），过滤只影响展示。
 
 ## 不改动
 
-- PC / 移动端商品详情、其他路由、count 接口、ViewModeToggle、回收站逻辑。
-- Debounce 自动搜索仍保留，按钮只是显式触发入口。
+- 后端 `listJapanParcels`（仍按"匹配到子商品 → 拉整包"返回，保证统计/landed 计算正确）。
+- 包裹视图、搜索按钮、清除按钮、跨 tab 搜索、PostgREST 转义等已修复逻辑。
+- 子商品弹窗、`ItemsHoverPreview` 等。
+
+## 验证
+
+- 搜"史努比" → 商品视图只剩标题含"史努比 / Snoopy"的行。
+- 搜运单号 `CN111077666JP` → 商品视图仍显示该包裹全部商品（回退分支生效）。
+- 搜中文关键字大小写、英文关键字混合 → 都按 lowercase 包含判定。
