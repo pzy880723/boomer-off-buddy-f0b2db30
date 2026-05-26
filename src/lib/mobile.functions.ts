@@ -93,7 +93,8 @@ export const searchParcels = createServerFn({ method: "GET" })
         "id, source_order_no, tracking_no, status, item_title, item_title_cn, item_image_url, intl_pay_at, received_at, grand_total_cny, is_problem, created_at, japan_parcel_items(id, item_title, item_title_cn, item_image_url, item_total_cny, quantity, position)",
       )
       .is("deleted_at", null)
-      .order(orderCol, { ascending: false, nullsFirst: false })
+      .order("received_at", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false, nullsFirst: false })
       .range(from, to);
     if (data.bucket === "pending") {
       q = q.in("status", PENDING_STATUSES as unknown as string[]);
