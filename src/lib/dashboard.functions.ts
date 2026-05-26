@@ -1,19 +1,32 @@
 import { createServerFn } from "@tanstack/react-start";
-import { supabase } from "@/integrations/supabase/client";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export type ChannelKey = "japan_parcel" | "japan_bulk" | "domestic" | "domestic_bulk";
 
+export type ChannelStat = {
+  key: ChannelKey;
+  label: string;
+  month: number;
+  ytd: number;
+  all: number;
+  count: number;
+  placeholder?: boolean;
+};
+
+export type StatusBucket = { key: string; label: string; count: number };
+
+export type RecentItem = {
+  id: string;
+  channel: ChannelKey;
+  title: string;
+  amount: number;
+  ts: string;
+  status?: string | null;
+};
+
 export type PurchaseStats = {
-  totals: { month: number; ytd: number; all: number; count: number };
-  byChannel: {
-    key: ChannelKey;
-    label: string;
-    month: number;
-    ytd: number;
-    all: number;
-    count: number;
-    placeholder?: boolean;
-  }[];
+  totals: { month: number; ytd: number; all: number; count: number; monthCount: number };
+  byChannel: ChannelStat[];
   monthlyTrend: {
     month: string;
     japan_parcel: number;
@@ -21,6 +34,8 @@ export type PurchaseStats = {
     domestic: number;
     domestic_bulk: number;
   }[];
+  byStatus: StatusBucket[];
+  recent: RecentItem[];
 };
 
 const CHANNEL_LABEL: Record<ChannelKey, string> = {
@@ -30,124 +45,205 @@ const CHANNEL_LABEL: Record<ChannelKey, string> = {
   domestic_bulk: "国内大宗",
 };
 
+const JP_STATUS_LABEL: Record<string, string> = {
+  purchased: "已采购",
+  at_jp_warehouse: "在日仓",
+  shipping_intl: "国际运输",
+  delivered: "已签收",
+  completed: "已完成",
+};
+const JP_STATUS_ORDER = ["purchased", "at_jp_warehouse", "shipping_intl", "delivered", "completed"];
+
 function monthKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-export const getPurchaseStats = createServerFn({ method: "GET" }).handler(async (): Promise<PurchaseStats> => {
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-  const yearStart = new Date(now.getFullYear(), 0, 1).toISOString();
+export const getPurchaseStats = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<PurchaseStats> => {
+    const { supabase } = context;
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const yearStart = new Date(now.getFullYear(), 0, 1);
+    const trendStart = new Date(now.getFullYear(), now.getMonth() - 11, 1);
 
-  const trendStart = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+    const [jpItemsRes, dmRes, dbRes, dbCountRes, jpStatusRes, jpRecentRes, dmRecentRes, dbRecentRes] =
+      await Promise.all([
+        supabase
+          .from("japan_parcel_items")
+          .select("parent_id,pay_at,item_total_cny,japan_parcels!inner(deleted_at)")
+          .not("pay_at", "is", null)
+          .is("japan_parcels.deleted_at", null),
+        supabase
+          .from("domestic_orders")
+          .select("id,item_title,platform,total_cny,purchased_at,status")
+          .is("deleted_at", null),
+        supabase
+          .from("domestic_bulk_orders")
+          .select("id,supplier_name,total_cny,purchased_at,status")
+          .is("deleted_at", null),
+        supabase
+          .from("domestic_bulk_orders")
+          .select("id", { count: "exact", head: true })
+          .is("deleted_at", null),
+        supabase.from("japan_parcels").select("status").is("deleted_at", null),
+        supabase
+          .from("japan_parcels")
+          .select("id,item_title,item_title_cn,grand_total_cny,total_cny,purchased_at,status,updated_at")
+          .is("deleted_at", null)
+          .order("updated_at", { ascending: false })
+          .limit(8),
+        supabase
+          .from("domestic_orders")
+          .select("id,item_title,total_cny,purchased_at,status,updated_at")
+          .is("deleted_at", null)
+          .order("updated_at", { ascending: false })
+          .limit(8),
+        supabase
+          .from("domestic_bulk_orders")
+          .select("id,supplier_name,total_cny,purchased_at,status,updated_at")
+          .is("deleted_at", null)
+          .order("updated_at", { ascending: false })
+          .limit(8),
+      ]);
 
-  // 日本小包：按 item.pay_at + item_total_cny
-  const { data: jpItems, error: jpErr } = await supabase
-    .from("japan_parcel_items")
-    .select("parent_id,pay_at,item_total_cny,japan_parcels!inner(deleted_at)")
-    .not("pay_at", "is", null)
-    .is("japan_parcels.deleted_at", null);
-  if (jpErr) throw new Error(jpErr.message);
+    for (const r of [jpItemsRes, dmRes, dbRes, jpStatusRes, jpRecentRes, dmRecentRes, dbRecentRes]) {
+      if (r.error) throw new Error(r.error.message);
+    }
 
-  // 国内小包
-  const { data: dmRows, error: dmErr } = await supabase
-    .from("domestic_orders")
-    .select("total_cny,purchased_at,deleted_at")
-    .is("deleted_at", null)
-    .not("purchased_at", "is", null);
-  if (dmErr) throw new Error(dmErr.message);
+    // 趋势桶
+    const trendMap = new Map<
+      string,
+      { japan_parcel: number; japan_bulk: number; domestic: number; domestic_bulk: number }
+    >();
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(trendStart.getFullYear(), trendStart.getMonth() + i, 1);
+      trendMap.set(monthKey(d), { japan_parcel: 0, japan_bulk: 0, domestic: 0, domestic_bulk: 0 });
+    }
 
-  // 国内大宗
-  const { data: dbRows, error: dbErr } = await supabase
-    .from("domestic_bulk_orders")
-    .select("total_cny,purchased_at,deleted_at")
-    .is("deleted_at", null)
-    .not("purchased_at", "is", null);
-  if (dbErr) throw new Error(dbErr.message);
+    function bucket(ts: string, amt: number, ch: "japan_parcel" | "domestic" | "domestic_bulk") {
+      const d = new Date(ts);
+      const k = monthKey(d);
+      if (trendMap.has(k)) trendMap.get(k)![ch] += amt;
+      return {
+        all: amt,
+        ytd: d >= yearStart ? amt : 0,
+        month: d >= monthStart ? amt : 0,
+      };
+    }
 
-  // 国内大宗的单数（即便没有 purchased_at 也要计入 count）
-  const { count: dbAllCount } = await supabase
-    .from("domestic_bulk_orders")
-    .select("id", { count: "exact", head: true })
-    .is("deleted_at", null);
+    // 日本小包
+    const jpParents = new Set<string>();
+    const jpMonthParents = new Set<string>();
+    const jpStat = { month: 0, ytd: 0, all: 0, count: 0 };
+    for (const r of jpItemsRes.data ?? []) {
+      const amt = Number(r.item_total_cny ?? 0);
+      if (!r.pay_at) continue;
+      const b = bucket(r.pay_at as string, amt, "japan_parcel");
+      jpStat.all += b.all;
+      jpStat.ytd += b.ytd;
+      jpStat.month += b.month;
+      if (r.parent_id) {
+        jpParents.add(r.parent_id as string);
+        if (new Date(r.pay_at as string) >= monthStart) jpMonthParents.add(r.parent_id as string);
+      }
+    }
+    jpStat.count = jpParents.size;
 
-  const trendMap = new Map<
-    string,
-    { japan_parcel: number; japan_bulk: number; domestic: number; domestic_bulk: number }
-  >();
-  for (let i = 0; i < 12; i++) {
-    const d = new Date(trendStart.getFullYear(), trendStart.getMonth() + i, 1);
-    trendMap.set(monthKey(d), { japan_parcel: 0, japan_bulk: 0, domestic: 0, domestic_bulk: 0 });
-  }
+    // 国内小包
+    const dmStat = { month: 0, ytd: 0, all: 0, count: dmRes.data?.length ?? 0 };
+    let dmMonthCount = 0;
+    for (const r of dmRes.data ?? []) {
+      if (!r.purchased_at) continue;
+      const amt = Number(r.total_cny ?? 0);
+      const b = bucket(r.purchased_at as string, amt, "domestic");
+      dmStat.all += b.all;
+      dmStat.ytd += b.ytd;
+      dmStat.month += b.month;
+      if (new Date(r.purchased_at as string) >= monthStart) dmMonthCount += 1;
+    }
 
-  const monthStartD = new Date(monthStart);
-  const yearStartD = new Date(yearStart);
+    // 国内大宗
+    const dbStat = { month: 0, ytd: 0, all: 0, count: dbCountRes.count ?? dbRes.data?.length ?? 0 };
+    let dbMonthCount = 0;
+    for (const r of dbRes.data ?? []) {
+      if (!r.purchased_at) continue;
+      const amt = Number(r.total_cny ?? 0);
+      const b = bucket(r.purchased_at as string, amt, "domestic_bulk");
+      dbStat.all += b.all;
+      dbStat.ytd += b.ytd;
+      dbStat.month += b.month;
+      if (new Date(r.purchased_at as string) >= monthStart) dbMonthCount += 1;
+    }
 
-  function bucket(
-    ts: string,
-    amt: number,
-    channel: "japan_parcel" | "domestic" | "domestic_bulk",
-  ) {
-    const d = new Date(ts);
-    const k = monthKey(d);
-    if (trendMap.has(k)) trendMap.get(k)![channel] += amt;
-    const inYear = d >= yearStartD;
-    const inMonth = d >= monthStartD;
-    return { all: amt, ytd: inYear ? amt : 0, month: inMonth ? amt : 0 };
-  }
+    const bulkStat = { month: 0, ytd: 0, all: 0, count: 0 };
 
-  const jpParents = new Set<string>();
-  const jpStat = { month: 0, ytd: 0, all: 0, count: 0 };
-  for (const r of jpItems ?? []) {
-    const amt = Number(r.item_total_cny ?? 0);
-    if (!r.pay_at) continue;
-    const b = bucket(r.pay_at as string, amt, "japan_parcel");
-    jpStat.all += b.all;
-    jpStat.ytd += b.ytd;
-    jpStat.month += b.month;
-    if (r.parent_id) jpParents.add(r.parent_id as string);
-  }
-  jpStat.count = jpParents.size;
+    const byChannel: ChannelStat[] = [
+      { key: "japan_parcel", label: CHANNEL_LABEL.japan_parcel, ...jpStat },
+      { key: "domestic", label: CHANNEL_LABEL.domestic, ...dmStat },
+      { key: "domestic_bulk", label: CHANNEL_LABEL.domestic_bulk, ...dbStat },
+      { key: "japan_bulk", label: CHANNEL_LABEL.japan_bulk, ...bulkStat, placeholder: true },
+    ];
 
-  const dmStat = { month: 0, ytd: 0, all: 0, count: dmRows?.length ?? 0 };
-  for (const r of dmRows ?? []) {
-    const amt = Number(r.total_cny ?? 0);
-    if (!r.purchased_at) continue;
-    const b = bucket(r.purchased_at as string, amt, "domestic");
-    dmStat.all += b.all;
-    dmStat.ytd += b.ytd;
-    dmStat.month += b.month;
-  }
+    // 日本小包状态分布
+    const statusCount = new Map<string, number>();
+    for (const r of jpStatusRes.data ?? []) {
+      const k = (r.status as string) || "purchased";
+      statusCount.set(k, (statusCount.get(k) ?? 0) + 1);
+    }
+    const byStatus: StatusBucket[] = JP_STATUS_ORDER.map((k) => ({
+      key: k,
+      label: JP_STATUS_LABEL[k],
+      count: statusCount.get(k) ?? 0,
+    }));
 
-  const dbStat = { month: 0, ytd: 0, all: 0, count: dbAllCount ?? dbRows?.length ?? 0 };
-  for (const r of dbRows ?? []) {
-    const amt = Number(r.total_cny ?? 0);
-    if (!r.purchased_at) continue;
-    const b = bucket(r.purchased_at as string, amt, "domestic_bulk");
-    dbStat.all += b.all;
-    dbStat.ytd += b.ytd;
-    dbStat.month += b.month;
-  }
+    // 最近动态合并
+    const recent: RecentItem[] = [];
+    for (const r of jpRecentRes.data ?? []) {
+      recent.push({
+        id: String(r.id),
+        channel: "japan_parcel",
+        title: (r.item_title_cn as string) || (r.item_title as string) || "（未命名包裹）",
+        amount: Number(r.grand_total_cny ?? r.total_cny ?? 0),
+        ts: (r.updated_at as string) || (r.purchased_at as string) || new Date().toISOString(),
+        status: (r.status as string) ?? null,
+      });
+    }
+    for (const r of dmRecentRes.data ?? []) {
+      recent.push({
+        id: String(r.id),
+        channel: "domestic",
+        title: (r.item_title as string) || "（国内小包）",
+        amount: Number(r.total_cny ?? 0),
+        ts: (r.updated_at as string) || (r.purchased_at as string) || new Date().toISOString(),
+        status: (r.status as string) ?? null,
+      });
+    }
+    for (const r of dbRecentRes.data ?? []) {
+      recent.push({
+        id: String(r.id),
+        channel: "domestic_bulk",
+        title: (r.supplier_name as string) || "（大宗采购）",
+        amount: Number(r.total_cny ?? 0),
+        ts: (r.updated_at as string) || (r.purchased_at as string) || new Date().toISOString(),
+        status: (r.status as string) ?? null,
+      });
+    }
+    recent.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
 
-  const bulkStat = { month: 0, ytd: 0, all: 0, count: 0 };
+    const monthlyTrend = Array.from(trendMap.entries()).map(([month, v]) => ({ month, ...v }));
 
-  const byChannel = [
-    { key: "japan_parcel" as const, label: CHANNEL_LABEL.japan_parcel, ...jpStat },
-    { key: "japan_bulk" as const, label: CHANNEL_LABEL.japan_bulk, ...bulkStat, placeholder: true },
-    { key: "domestic_bulk" as const, label: CHANNEL_LABEL.domestic_bulk, ...dbStat },
-    { key: "domestic" as const, label: CHANNEL_LABEL.domestic, ...dmStat },
-  ];
-
-  const monthlyTrend = Array.from(trendMap.entries()).map(([month, v]) => ({ month, ...v }));
-
-  return {
-    totals: {
-      month: jpStat.month + dmStat.month + dbStat.month,
-      ytd: jpStat.ytd + dmStat.ytd + dbStat.ytd,
-      all: jpStat.all + dmStat.all + dbStat.all,
-      count: jpStat.count + dmStat.count + dbStat.count,
-    },
-    byChannel,
-    monthlyTrend,
-  };
-});
+    return {
+      totals: {
+        month: jpStat.month + dmStat.month + dbStat.month,
+        ytd: jpStat.ytd + dmStat.ytd + dbStat.ytd,
+        all: jpStat.all + dmStat.all + dbStat.all,
+        count: jpStat.count + dmStat.count + dbStat.count,
+        monthCount: jpMonthParents.size + dmMonthCount + dbMonthCount,
+      },
+      byChannel,
+      monthlyTrend,
+      byStatus,
+      recent: recent.slice(0, 10),
+    };
+  });
