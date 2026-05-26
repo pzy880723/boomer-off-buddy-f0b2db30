@@ -115,12 +115,9 @@ export const listJapanParcels = createServerFn({ method: "GET" })
       q = q.not("deleted_at", "is", null);
     } else {
       q = q.is("deleted_at", null);
-      // 搜索时跨 tab 查全部（除回收站），便于直接定位
-      if (!hasSearch) {
-        if (tab === "purchased") q = q.in("status", PURCHASED_STATUSES);
-        else if (tab === "delivered") q = q.in("status", DELIVERED_STATUSES);
-        else if (tab === "problem") q = q.eq("is_problem", true);
-      }
+      if (tab === "purchased") q = q.in("status", PURCHASED_STATUSES);
+      else if (tab === "delivered") q = q.in("status", DELIVERED_STATUSES);
+      else if (tab === "problem") q = q.eq("is_problem", true);
     }
 
     if (data.status?.length) q = q.in("status", data.status);
