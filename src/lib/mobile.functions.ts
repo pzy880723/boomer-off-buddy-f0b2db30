@@ -23,7 +23,7 @@ export const searchParcels = createServerFn({ method: "GET" })
       let q = supabaseAdmin
         .from("japan_parcel_items")
         .select(
-          "id, parent_id, item_title, item_title_cn, item_image_url, unit_price_jpy, quantity, item_total_jpy, item_total_cny, pay_at, position, japan_parcels!inner(id, source_order_no, tracking_no, status, received_at, is_problem, deleted_at, intl_pay_at, created_at)",
+          "id, parent_id, sub_order_no, merchant_order_no, source_platform, condition, addon_service, item_title, item_title_cn, item_image_url, unit_price_jpy, quantity, item_total_jpy, item_total_cny, weight_g, exchange_rate, service_fee_jpy, domestic_freight_jpy, freight_diff_jpy, pay_method, pay_at, tariff_category, tariff_rate, notes, arrival_photo_urls, position, japan_parcels!inner(id, source_order_no, tracking_no, status, received_at, is_problem, deleted_at, intl_pay_at, created_at)",
         )
         .is("japan_parcels.deleted_at", null)
         .limit(data.limit);
@@ -52,6 +52,11 @@ export const searchParcels = createServerFn({ method: "GET" })
         return {
           id: r.id,
           parcel_id: r.parent_id,
+          sub_order_no: r.sub_order_no,
+          merchant_order_no: r.merchant_order_no,
+          source_platform: r.source_platform,
+          condition: r.condition,
+          addon_service: r.addon_service,
           item_title: r.item_title,
           item_title_cn: r.item_title_cn,
           item_image_url: r.item_image_url,
@@ -59,7 +64,17 @@ export const searchParcels = createServerFn({ method: "GET" })
           quantity: r.quantity,
           item_total_jpy: r.item_total_jpy,
           item_total_cny: r.item_total_cny,
+          weight_g: r.weight_g,
+          exchange_rate: r.exchange_rate,
+          service_fee_jpy: r.service_fee_jpy,
+          domestic_freight_jpy: r.domestic_freight_jpy,
+          freight_diff_jpy: r.freight_diff_jpy,
+          pay_method: r.pay_method,
           pay_at: r.pay_at,
+          tariff_category: r.tariff_category,
+          tariff_rate: r.tariff_rate,
+          notes: r.notes,
+          arrival_photo_urls: r.arrival_photo_urls,
           source_order_no: p?.source_order_no ?? null,
           tracking_no: p?.tracking_no ?? null,
           status: p?.status ?? null,
@@ -70,6 +85,7 @@ export const searchParcels = createServerFn({ method: "GET" })
       });
       return { mode: "item" as const, items, rows: [] as never[] };
     }
+
 
     const orderCol = data.bucket === "received" ? "received_at" : "created_at";
     let q = supabaseAdmin
