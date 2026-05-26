@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Search, AlertCircle, X, Package, ShoppingBag, Loader2 } from "lucide-react";
+import { Search, AlertCircle, X, Package, ShoppingBag, Loader2, Camera } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { MobileShell } from "@/components/mobile/mobile-shell";
 import { searchParcels } from "@/lib/mobile.functions";
