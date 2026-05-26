@@ -35,6 +35,9 @@ export interface ItemDetailValue {
   tariff_rate?: number | null;
   arrival_photo_urls?: string[] | null;
   parent_id?: string | null;
+  system_code?: string | null;
+  created_by?: string | null;
+  created_at?: string | null;
 }
 
 const fmtJpy = (v: number | null | undefined) =>
