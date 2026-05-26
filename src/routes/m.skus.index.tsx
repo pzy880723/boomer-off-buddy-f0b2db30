@@ -67,7 +67,7 @@ function MSkusPage() {
   const NewBtn = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button size="sm" className="h-8 px-2">
+        <Button className="h-10 px-3 shrink-0">
           <Plus className="mr-1 h-3.5 w-3.5" /> 新建
           <ChevronDown className="ml-0.5 h-3 w-3" />
         </Button>
@@ -87,17 +87,20 @@ function MSkusPage() {
   );
 
   return (
-    <MobileShell title="商品 SKU" back="/m" rightSlot={NewBtn}>
+    <MobileShell title="商品 SKU" back="/m">
       <div className="space-y-3 p-3">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="搜品名 / EPC / 编码，回车搜索"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && setSearch(searchInput.trim())}
-            className="h-10 pl-9"
-          />
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="搜品名 / EPC / 编码，回车搜索"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && setSearch(searchInput.trim())}
+              className="h-10 pl-9"
+            />
+          </div>
+          {NewBtn}
         </div>
 
         <Tabs value={tab} onValueChange={(v) => setTab(v as TabKind)}>
