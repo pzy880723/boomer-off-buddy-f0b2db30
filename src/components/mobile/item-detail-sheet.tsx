@@ -153,6 +153,10 @@ export function ItemDetailSheet({
                 {item.addon_service ? <Row label="附加服务" v={item.addon_service} /> : null}
               </>
             ) : null}
+            <Sep />
+            <Row label="系统编码" v={item.system_code || "—"} />
+            <Row label="添加人" v={userNames.name(item.created_by)} />
+            <Row label="添加时间" v={item.created_at ? new Date(item.created_at).toLocaleString() : "—"} />
             {item.notes ? (
               <>
                 <Sep />
