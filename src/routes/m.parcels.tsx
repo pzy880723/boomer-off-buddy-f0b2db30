@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Search, AlertCircle, X, Package, ShoppingBag, Loader2 } from "lucide-react";
+import { Search, AlertCircle, X, Package, ShoppingBag, Loader2, Camera } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { MobileShell } from "@/components/mobile/mobile-shell";
 import { searchParcels } from "@/lib/mobile.functions";
@@ -114,23 +114,32 @@ function ParcelsSearch() {
   return (
     <MobileShell title="包裹">
       <div className="sticky top-0 z-10 space-y-3 border-b border-border/60 bg-background/90 px-3 py-3 backdrop-blur">
-        <div className="flex h-10 items-center gap-2 rounded-full bg-muted/70 px-4">
-          <Search className="h-4 w-4 flex-none text-muted-foreground" />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="搜索商品名 / 子单号"
-            className="h-full flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-          />
-          {q ? (
-            <button
-              type="button"
-              onClick={() => setQ("")}
-              className="rounded-full p-0.5 text-muted-foreground hover:text-foreground"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          ) : null}
+        <div className="flex items-center gap-2">
+          <div className="flex h-10 flex-1 items-center gap-2 rounded-full bg-muted/70 px-4">
+            <Search className="h-4 w-4 flex-none text-muted-foreground" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="搜索商品名 / 子单号"
+              className="h-full flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            />
+            {q ? (
+              <button
+                type="button"
+                onClick={() => setQ("")}
+                className="rounded-full p-0.5 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            ) : null}
+          </div>
+          <Link
+            to="/m/photo-search"
+            aria-label="拍照识图"
+            className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-primary/10 text-primary active:bg-primary/20"
+          >
+            <Camera className="h-4 w-4" />
+          </Link>
         </div>
 
         <div className="flex items-center justify-between gap-2">
