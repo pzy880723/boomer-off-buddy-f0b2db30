@@ -1,12 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
-import { Search, AlertTriangle } from "lucide-react";
+import { useState } from "react";
+import { Search, AlertCircle, X, Package, ShoppingBag } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { MobileShell } from "@/components/mobile/mobile-shell";
 import { searchParcels } from "@/lib/mobile.functions";
 import { toThumbUrl } from "@/lib/image";
 import { useParcelViewMode } from "@/hooks/use-parcel-view-mode";
+import { ItemDetailSheet, type ItemDetailValue } from "@/components/mobile/item-detail-sheet";
 
 export const Route = createFileRoute("/m/parcels")({
   component: ParcelsSearch,
@@ -18,9 +19,7 @@ function fmtDate(s: string | null | undefined) {
   if (!s) return null;
   const d = new Date(s);
   if (Number.isNaN(+d)) return null;
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${m}-${day}`;
+  return `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 function fmtDateTime(s: string | null | undefined) {
   if (!s) return null;
@@ -32,14 +31,11 @@ function fmtDateTime(s: string | null | undefined) {
 function ParcelsSearch() {
   const [bucket, setBucket] = useState<Bucket>("pending");
   const [q, setQ] = useState("");
-  const [mode, setMode] = useParcelViewMode();
+  const [storedMode, setStoredMode] = useParcelViewMode();
+  // 搜索时强制商品维度
+  const mode = q.trim() ? "item" : storedMode;
+  const [selected, setSelected] = useState<ItemDetailValue | null>(null);
   const fetchSearch = useServerFn(searchParcels);
-
-  // 输入搜索词时自动切到「商品」视图，和 PC 端一致
-  useEffect(() => {
-    if (q.trim() && mode !== "item") setMode("item");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q]);
 
   const { data, isLoading } = useQuery({
     queryKey: ["mobile-parcels", bucket, q, mode],
@@ -47,131 +43,163 @@ function ParcelsSearch() {
     placeholderData: (prev) => prev,
   });
 
+  const showModeSwitch = !q.trim();
+
   return (
     <MobileShell title="包裹">
-      <div className="sticky top-0 z-10 space-y-2 border-b bg-background/95 p-3 backdrop-blur">
-        <div className="flex h-10 items-center gap-2 rounded-xl border bg-muted/40 px-3">
-          <Search className="h-4 w-4 text-muted-foreground" />
+      <div className="sticky top-0 z-10 space-y-3 border-b border-border/60 bg-background/90 px-3 py-3 backdrop-blur">
+        {/* 搜索框 */}
+        <div className="flex h-10 items-center gap-2 rounded-full bg-muted/70 px-4">
+          <Search className="h-4 w-4 flex-none text-muted-foreground" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder={mode === "item" ? "搜索商品名 / 子单号" : "单号 / 订单号 / 商品名 / 卖家"}
+            placeholder="搜索商品名 / 子单号"
             className="h-full flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
-        </div>
-        <div className="grid grid-cols-2 gap-1 rounded-xl border bg-muted/30 p-1">
-          {(
-            [
-              { v: "pending" as const, l: "待签收" },
-              { v: "received" as const, l: "已签收" },
-            ]
-          ).map((t) => (
+          {q ? (
             <button
-              key={t.v}
               type="button"
-              onClick={() => setBucket(t.v)}
-              className={`rounded-lg py-2 text-xs font-medium transition-colors ${
-                bucket === t.v ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
-              }`}
+              onClick={() => setQ("")}
+              className="rounded-full p-0.5 text-muted-foreground hover:text-foreground"
             >
-              {t.l}
+              <X className="h-4 w-4" />
             </button>
-          ))}
+          ) : null}
         </div>
-        <div className="grid grid-cols-2 gap-1 rounded-xl border bg-muted/30 p-1">
-          {(
-            [
-              { v: "parcel" as const, l: "按包裹" },
-              { v: "item" as const, l: "按商品" },
-            ]
-          ).map((t) => (
-            <button
-              key={t.v}
-              type="button"
-              onClick={() => setMode(t.v)}
-              className={`rounded-lg py-2 text-xs font-medium transition-colors ${
-                mode === t.v ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
-              }`}
-            >
-              {t.l}
-            </button>
-          ))}
+
+        <div className="flex items-center justify-between gap-2">
+          {/* 状态切换 */}
+          <div className="inline-flex h-8 items-center rounded-full bg-muted/60 p-0.5 text-xs">
+            {(
+              [
+                { v: "pending" as const, l: "待签收" },
+                { v: "received" as const, l: "已签收" },
+              ]
+            ).map((t) => (
+              <button
+                key={t.v}
+                type="button"
+                onClick={() => setBucket(t.v)}
+                className={`h-7 rounded-full px-3 font-medium transition-colors ${
+                  bucket === t.v
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground"
+                }`}
+              >
+                {t.l}
+              </button>
+            ))}
+          </div>
+
+          {/* 维度切换：仅在无搜索词时展示 */}
+          {showModeSwitch ? (
+            <div className="inline-flex h-8 items-center rounded-full bg-muted/60 p-0.5 text-xs">
+              {(
+                [
+                  { v: "parcel" as const, l: "包裹", Icon: Package },
+                  { v: "item" as const, l: "商品", Icon: ShoppingBag },
+                ]
+              ).map((t) => (
+                <button
+                  key={t.v}
+                  type="button"
+                  onClick={() => setStoredMode(t.v)}
+                  className={`flex h-7 items-center gap-1 rounded-full px-2.5 font-medium transition-colors ${
+                    storedMode === t.v
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  <t.Icon className="h-3.5 w-3.5" />
+                  {t.l}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
       </div>
 
+      {/* 列表 */}
       {mode === "item" ? (
-        <ul className="divide-y">
+        <ul className="px-3 py-1">
           {(data?.items ?? []).map((it) => {
-            const thumb = toThumbUrl(it.item_image_url, 160);
+            const thumb = toThumbUrl(it.item_image_url, 200);
             const name = it.item_title_cn || it.item_title || "(未填写商品名)";
-            const orderNo = it.tracking_no || it.source_order_no || "无单号";
-            const unit = it.unit_price_jpy != null ? Number(it.unit_price_jpy) : null;
             const qty = it.quantity ?? 1;
             const subCny = it.item_total_cny != null ? Number(it.item_total_cny) : null;
+            // 单件平均成本（含分摊后到手价）
+            const avgCny = subCny != null && qty > 0 ? subCny / qty : null;
             const receivedAt = fmtDateTime(it.received_at);
+            const orderNo = it.sub_order_no || it.tracking_no || it.source_order_no;
             return (
-              <li key={it.id}>
-                <Link
-                  to="/m/receive/$id"
-                  params={{ id: it.parcel_id }}
-                  className="flex items-start gap-3 px-3 py-3 active:bg-muted"
+              <li key={it.id} className="border-b border-border/40 last:border-0">
+                <button
+                  type="button"
+                  onClick={() => setSelected(it as ItemDetailValue)}
+                  className={`relative flex w-full items-start gap-3 py-3 text-left active:bg-muted/50 ${
+                    it.is_problem ? "pl-2" : ""
+                  }`}
                 >
+                  {it.is_problem ? (
+                    <span className="absolute left-0 top-3 bottom-3 w-[3px] rounded-full bg-destructive" />
+                  ) : null}
                   {thumb ? (
                     <img
                       src={thumb}
                       alt=""
-                      className="h-20 w-20 flex-none rounded-lg border object-cover"
+                      className="h-16 w-16 flex-none rounded-xl border border-border/40 object-cover"
                       loading="lazy"
                       decoding="async"
-                      width={80}
-                      height={80}
+                      width={64}
+                      height={64}
                     />
                   ) : (
-                    <div className="h-20 w-20 flex-none rounded-lg border bg-muted" />
+                    <div className="flex h-16 w-16 flex-none items-center justify-center rounded-xl border border-border/40 bg-muted text-xl">
+                      📦
+                    </div>
                   )}
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="truncate font-mono text-[11px] text-muted-foreground">
+                    <div className="line-clamp-2 text-sm font-medium leading-snug">{name}</div>
+                    {orderNo ? (
+                      <div className="mt-1 truncate font-mono text-[10px] text-muted-foreground">
                         {orderNo}
-                      </span>
-                      {it.is_problem ? (
-                        <AlertTriangle className="h-3.5 w-3.5 flex-none text-destructive" />
-                      ) : null}
-                    </div>
-                    <div className="mt-0.5 line-clamp-2 text-sm font-medium">{name}</div>
-                    <div className="mt-1 flex items-baseline gap-2 text-[11px] text-muted-foreground">
-                      {unit != null ? (
-                        <span className="text-sm font-semibold text-foreground">
-                          ¥{unit.toLocaleString("ja-JP")}
-                          <span className="ml-1 text-[10px] font-normal text-muted-foreground">/件</span>
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">无单价</span>
-                      )}
-                      <span>× {qty}</span>
-                      {subCny != null ? <span>≈ ¥{subCny.toFixed(2)}</span> : null}
-                    </div>
-                    {bucket === "received" && receivedAt ? (
+                      </div>
+                    ) : null}
+                    {receivedAt ? (
                       <div className="mt-0.5 text-[10px] text-muted-foreground">
-                        签收于 {receivedAt}
+                        签收 {receivedAt}
                       </div>
                     ) : null}
                   </div>
-                </Link>
+                  <div className="flex flex-none flex-col items-end gap-0.5 pl-1">
+                    {avgCny != null ? (
+                      <span className="text-sm font-semibold tabular-nums">
+                        ¥{avgCny.toFixed(2)}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">无成本</span>
+                    )}
+                    <span className="text-[10px] text-muted-foreground">× {qty} 件</span>
+                    {it.is_problem ? (
+                      <AlertCircle className="mt-0.5 h-3.5 w-3.5 text-destructive" />
+                    ) : null}
+                  </div>
+                </button>
               </li>
             );
           })}
           {!isLoading && (data?.items ?? []).length === 0 ? (
-            <li className="px-6 py-12 text-center text-sm text-muted-foreground">
+            <li className="px-6 py-16 text-center text-sm text-muted-foreground">
               {q ? "没有匹配的商品" : bucket === "pending" ? "暂无待签收商品" : "暂无已签收商品"}
             </li>
           ) : null}
         </ul>
       ) : (
-        <ul className="divide-y">
+        <ul className="px-3 py-1">
           {(data?.rows ?? []).map((r) => {
-            const thumb = toThumbUrl(r.item_image_url, 160);
-            const orderNo = r.tracking_no || r.source_order_no || "无单号";
+            const thumb = toThumbUrl(r.item_image_url, 200);
+            const orderNo = r.tracking_no || r.source_order_no;
             const purchasedAt = fmtDate(r.intl_pay_at ?? r.created_at);
             const receivedAt = fmtDateTime(r.received_at);
             const count = (r as { item_count?: number }).item_count ?? 0;
@@ -184,50 +212,55 @@ function ParcelsSearch() {
             const title = !firstName
               ? "(未填写商品名)"
               : count > 1
-                ? `${head} 等 ${count} 件商品`
+                ? `${head} 等 ${count} 件`
                 : firstName;
             return (
-              <li key={r.id}>
+              <li key={r.id} className="border-b border-border/40 last:border-0">
                 <Link
                   to="/m/receive/$id"
                   params={{ id: r.id }}
-                  className="flex items-start gap-3 px-3 py-3 active:bg-muted"
+                  className={`relative flex items-start gap-3 py-3 active:bg-muted/50 ${
+                    r.is_problem ? "pl-2" : ""
+                  }`}
                 >
+                  {r.is_problem ? (
+                    <span className="absolute left-0 top-3 bottom-3 w-[3px] rounded-full bg-destructive" />
+                  ) : null}
                   {thumb ? (
                     <img
                       src={thumb}
                       alt=""
-                      className="h-20 w-20 flex-none rounded-lg border object-cover"
+                      className="h-16 w-16 flex-none rounded-xl border border-border/40 object-cover"
                       loading="lazy"
                       decoding="async"
-                      width={80}
-                      height={80}
+                      width={64}
+                      height={64}
                     />
                   ) : (
-                    <div className="h-20 w-20 flex-none rounded-lg border bg-muted" />
+                    <div className="flex h-16 w-16 flex-none items-center justify-center rounded-xl border border-border/40 bg-muted text-xl">
+                      📦
+                    </div>
                   )}
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="truncate font-mono text-[11px] text-muted-foreground">
-                        {orderNo}
-                      </span>
-                      {r.is_problem ? (
-                        <AlertTriangle className="h-3.5 w-3.5 flex-none text-destructive" />
-                      ) : null}
+                    <div className="line-clamp-2 text-sm font-medium leading-snug">{title}</div>
+                    <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
+                      {orderNo ? <span className="truncate font-mono">{orderNo}</span> : null}
+                      {purchasedAt ? <span>· 购 {purchasedAt}</span> : null}
                     </div>
-                    <div className="mt-0.5 line-clamp-2 text-sm font-medium">{title}</div>
-                    <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
-                      {r.grand_total_cny != null ? (
-                        <span className="font-medium text-foreground">
-                          ¥{Number(r.grand_total_cny).toFixed(2)}
-                        </span>
-                      ) : null}
-                      {purchasedAt ? <span>购于 {purchasedAt}</span> : null}
-                    </div>
-                    {bucket === "received" && receivedAt ? (
+                    {receivedAt ? (
                       <div className="mt-0.5 text-[10px] text-muted-foreground">
-                        签收于 {receivedAt}
+                        签收 {receivedAt}
                       </div>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-none flex-col items-end gap-0.5 pl-1">
+                    {r.grand_total_cny != null ? (
+                      <span className="text-sm font-semibold tabular-nums">
+                        ¥{Number(r.grand_total_cny).toFixed(2)}
+                      </span>
+                    ) : null}
+                    {count > 0 ? (
+                      <span className="text-[10px] text-muted-foreground">{count} 件</span>
                     ) : null}
                   </div>
                 </Link>
@@ -235,12 +268,18 @@ function ParcelsSearch() {
             );
           })}
           {!isLoading && (data?.rows ?? []).length === 0 ? (
-            <li className="px-6 py-12 text-center text-sm text-muted-foreground">
-              {q ? "没有匹配的包裹" : bucket === "pending" ? "暂无待签收包裹" : "暂无已签收包裹"}
+            <li className="px-6 py-16 text-center text-sm text-muted-foreground">
+              {bucket === "pending" ? "暂无待签收包裹" : "暂无已签收包裹"}
             </li>
           ) : null}
         </ul>
       )}
+
+      <ItemDetailSheet
+        open={!!selected}
+        onOpenChange={(o) => !o && setSelected(null)}
+        item={selected}
+      />
     </MobileShell>
   );
 }
