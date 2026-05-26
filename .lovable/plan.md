@@ -1,25 +1,15 @@
-## 调整：搜索结果按当前 tab 过滤，不再跨 tab
+## 问题
 
-### 现状
-后端 `listJapanParcels` 在有搜索词时会无视 tab，把"已采购 / 已签收 / 问题件 / 全部"的匹配结果一起返回（除了回收站），导致在「已签收」tab 搜索也会看到已采购的包裹，不好区分。
+「拆包单价计算」对话框里 `包内件数` 和 `单件单位` 两个输入框上下不对齐：
 
-### 改动
-只改 `src/lib/japan-parcel.functions.ts` 的 `listJapanParcels`：
+- 左边 label `包内件数` 用了 `flex items-center gap-1` + `<Hand>` 图标，高度被图标撑高
+- 右边 label `单件单位` 是纯文字，高度更小
+- 结果两个 Label 高度不一致 → 下方的 Input 不在同一水平线
 
-- 删除"搜索时跨 tab"的特殊逻辑。
-- 不论是否有搜索词，都按当前 tab 应用对应过滤：
-  - `all` → 仅 `deleted_at is null`
-  - `purchased` → `status in PURCHASED_STATUSES`
-  - `delivered` → `status in DELIVERED_STATUSES`
-  - `problem` → `is_problem = true`
-  - `trash` → `deleted_at is not null`
-- 搜索关键词的 `.or(...)` 拼装逻辑保持不变（子商品匹配 + 父级字段匹配）。
+## 方案
 
-### 不动
-- 前端 tab 切换、搜索框、搜索按钮、商品视图本地过滤（史努比那次的修复）都保持原样。
-- counts 接口、回收站、批量操作等不变。
+只改 `src/components/japan-parcel/pack-price-calculator-dialog.tsx` 中那一段 grid：
 
-### 验证
-- 在「已签收」tab 搜索一个只存在于"已采购"包裹的关键词 → 结果为空（符合预期）。
-- 在「全部」tab 搜同一关键词 → 能搜到。
-- 清空搜索 → 各 tab 列表恢复正常。
+给两个 Label 统一高度（`flex h-5 items-center gap-1`），并在「单件单位」label 前加一个等宽透明占位（`h-3 w-3` 不可见），让两个 label 行高完全一致，输入框自然对齐。
+
+不动其它任何样式 / 逻辑。

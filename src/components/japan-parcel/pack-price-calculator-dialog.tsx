@@ -233,7 +233,7 @@ export function PackPriceCalculatorDialog({ open, onOpenChange, item, landedCny 
           {/* 输入框 */}
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <Label className="flex items-center gap-1 text-xs">
+              <Label className="flex h-5 items-center gap-1 text-xs">
                 <Hand className="h-3 w-3" /> 包内件数
               </Label>
               <Input
@@ -248,7 +248,9 @@ export function PackPriceCalculatorDialog({ open, onOpenChange, item, landedCny 
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">单件单位</Label>
+              <Label className="flex h-5 items-center gap-1 text-xs">
+                <Hand className="h-3 w-3 opacity-0" aria-hidden /> 单件单位
+              </Label>
               <Input
                 value={unit}
                 onChange={(e) => setUnit(e.target.value)}
