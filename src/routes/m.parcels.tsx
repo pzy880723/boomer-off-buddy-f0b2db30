@@ -208,10 +208,10 @@ function ParcelsSearch() {
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
-                    <div className="line-clamp-2 text-sm font-medium leading-snug">{name}</div>
+                    <div className="line-clamp-2 text-sm font-medium leading-snug">{highlight(name, q)}</div>
                     {orderNo ? (
                       <div className="mt-1 truncate font-mono text-[10px] text-muted-foreground">
-                        {orderNo}
+                        {highlight(orderNo, q)}
                       </div>
                     ) : null}
                     {receivedAt ? (
