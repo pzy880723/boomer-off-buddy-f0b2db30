@@ -377,4 +377,30 @@ export const updateItemArrivalPhotos = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/** 根据 user_id 批量查邮箱/昵称，用于"添加人"展示 */
+export const getUsersByIds = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z.object({ ids: z.array(z.string().uuid()).min(1).max(200) }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const out: Record<string, { name: string; email: string | null }> = {};
+    // supabase-js admin API has listUsers but no batch get; iterate via getUserById
+    await Promise.all(
+      data.ids.map(async (id) => {
+        try {
+          const { data: u } = await supabaseAdmin.auth.admin.getUserById(id);
+          const user = u?.user;
+          if (!user) return;
+          const meta = (user.user_metadata ?? {}) as { name?: string; full_name?: string };
+          const name =
+            meta.name || meta.full_name || (user.email ? user.email.split("@")[0] : id.slice(0, 6));
+          out[id] = { name, email: user.email ?? null };
+        } catch {
+          // ignore missing user
+        }
+      }),
+    );
+    return { users: out };
+  });
+
 export const MOBILE_PRICE_TIERS = PRICE_TIERS;
