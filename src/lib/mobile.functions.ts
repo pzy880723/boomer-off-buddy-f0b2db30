@@ -40,15 +40,10 @@ export const searchParcels = createServerFn({ method: "GET" })
         const s = `%${data.q}%`;
         q = q.or(`item_title.ilike.${s},item_title_cn.ilike.${s},sub_order_no.ilike.${s}`);
       }
-      if (data.bucket === "received") {
-        q = q
-          .order("received_at", { referencedTable: "japan_parcels", ascending: false, nullsFirst: false })
-          .order("position", { ascending: true });
-      } else {
-        q = q
-          .order("created_at", { referencedTable: "japan_parcels", ascending: false, nullsFirst: false })
-          .order("position", { ascending: true });
-      }
+      q = q
+        .order("received_at", { referencedTable: "japan_parcels", ascending: false, nullsFirst: false })
+        .order("created_at", { referencedTable: "japan_parcels", ascending: false, nullsFirst: false })
+        .order("position", { ascending: true });
       const { data: rows, error } = await q;
       if (error) throw new Error(error.message);
       const items = (rows ?? []).map((r) => {
@@ -91,14 +86,14 @@ export const searchParcels = createServerFn({ method: "GET" })
     }
 
 
-    const orderCol = data.bucket === "received" ? "received_at" : "created_at";
     let q = supabaseAdmin
       .from("japan_parcels")
       .select(
         "id, source_order_no, tracking_no, status, item_title, item_title_cn, item_image_url, intl_pay_at, received_at, grand_total_cny, is_problem, created_at, japan_parcel_items(id, item_title, item_title_cn, item_image_url, item_total_cny, quantity, position)",
       )
       .is("deleted_at", null)
-      .order(orderCol, { ascending: false, nullsFirst: false })
+      .order("received_at", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false, nullsFirst: false })
       .range(from, to);
     if (data.bucket === "pending") {
       q = q.in("status", PENDING_STATUSES as unknown as string[]);
