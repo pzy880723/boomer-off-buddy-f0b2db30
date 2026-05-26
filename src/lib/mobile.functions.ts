@@ -13,11 +13,64 @@ export const searchParcels = createServerFn({ method: "GET" })
       .object({
         q: z.string().trim().max(200).optional(),
         bucket: z.enum(["pending", "received", "all"]).default("all"),
+        mode: z.enum(["parcel", "item"]).default("parcel"),
         limit: z.number().min(1).max(50).default(30),
       })
       .parse(input ?? {}),
   )
   .handler(async ({ data }) => {
+    if (data.mode === "item") {
+      let q = supabaseAdmin
+        .from("japan_parcel_items")
+        .select(
+          "id, parent_id, item_title, item_title_cn, item_image_url, unit_price_jpy, quantity, item_total_jpy, item_total_cny, pay_at, position, japan_parcels!inner(id, source_order_no, tracking_no, status, received_at, is_problem, deleted_at, intl_pay_at, created_at)",
+        )
+        .is("japan_parcels.deleted_at", null)
+        .limit(data.limit);
+      if (data.bucket === "pending") {
+        q = q.in("japan_parcels.status", PENDING_STATUSES as unknown as string[]);
+      } else if (data.bucket === "received") {
+        q = q.in("japan_parcels.status", RECEIVED_STATUSES as unknown as string[]);
+      }
+      if (data.q) {
+        const s = `%${data.q}%`;
+        q = q.or(`item_title.ilike.${s},item_title_cn.ilike.${s},sub_order_no.ilike.${s}`);
+      }
+      if (data.bucket === "received") {
+        q = q
+          .order("received_at", { referencedTable: "japan_parcels", ascending: false, nullsFirst: false })
+          .order("position", { ascending: true });
+      } else {
+        q = q
+          .order("created_at", { referencedTable: "japan_parcels", ascending: false, nullsFirst: false })
+          .order("position", { ascending: true });
+      }
+      const { data: rows, error } = await q;
+      if (error) throw new Error(error.message);
+      const items = (rows ?? []).map((r) => {
+        const p = (r as { japan_parcels?: { id: string; source_order_no: string | null; tracking_no: string | null; status: string; received_at: string | null; is_problem: boolean; intl_pay_at: string | null; created_at: string } }).japan_parcels;
+        return {
+          id: r.id,
+          parcel_id: r.parent_id,
+          item_title: r.item_title,
+          item_title_cn: r.item_title_cn,
+          item_image_url: r.item_image_url,
+          unit_price_jpy: r.unit_price_jpy,
+          quantity: r.quantity,
+          item_total_jpy: r.item_total_jpy,
+          item_total_cny: r.item_total_cny,
+          pay_at: r.pay_at,
+          source_order_no: p?.source_order_no ?? null,
+          tracking_no: p?.tracking_no ?? null,
+          status: p?.status ?? null,
+          received_at: p?.received_at ?? null,
+          is_problem: p?.is_problem ?? false,
+          intl_pay_at: p?.intl_pay_at ?? null,
+        };
+      });
+      return { mode: "item" as const, items, rows: [] as never[] };
+    }
+
     const orderCol = data.bucket === "received" ? "received_at" : "created_at";
     let q = supabaseAdmin
       .from("japan_parcels")
@@ -60,7 +113,7 @@ export const searchParcels = createServerFn({ method: "GET" })
         item_count: children.length,
       };
     });
-    return { rows: mapped };
+    return { mode: "parcel" as const, rows: mapped, items: [] as never[] };
   });
 
 /** 待签收计数（首页用） */

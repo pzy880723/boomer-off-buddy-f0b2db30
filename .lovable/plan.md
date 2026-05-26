@@ -1,53 +1,35 @@
-## 现状
+## 目标
 
-数据库里数据是有的（121 个日本小包、469 个子项、近 ¥172,900），但仪表盘显示 0。
+让手机端 `/m/parcels` 也支持「包裹 / 商品」两种维度切换，商品维度可以看到单件价格，并支持按商品名搜索。
 
-**根因**：`src/lib/dashboard.functions.ts` 的 `getPurchaseStats` 是 `createServerFn` 但没有挂 `requireSupabaseAuth`，handler 里用的是浏览器 `supabase` 客户端（无 session），所有表都开了 `authenticated` RLS，于是服务端查询全部被拒、返回空数据，前端拿到的全是 0。
+## 改动范围
 
-## 改造方案
+### 1. `src/lib/mobile.functions.ts`
+- 扩展 `searchParcels` 入参：新增 `mode: "parcel" | "item"`，默认 `parcel`，保持现有行为不变。
+- 当 `mode === "item"` 时改查 `japan_parcel_items`：
+  - 选择字段：`id, parent_id, item_title, item_title_cn, item_image_url, unit_price_jpy, quantity, item_total_jpy, item_total_cny, pay_at, japan_parcels!inner(id, source_order_no, tracking_no, status, received_at, is_problem, deleted_at, intl_pay_at)`
+  - `deleted_at is null`、bucket 状态筛选作用在 `japan_parcels` 上（待签收/已签收）。
+  - 搜索 `q` 走商品字段：`item_title.ilike / item_title_cn.ilike`，以及订单号 / 物流号（来自父表）。
+  - 排序按 bucket：待签收用 `created_at desc`，已签收用 `japan_parcels.received_at desc`。
+  - 返回扁平化的 `items` 数组，包含：`id, parcel_id, source_order_no, tracking_no, status, is_problem, received_at, item_title(_cn), item_image_url, unit_price_jpy, quantity, item_total_cny`。
 
-### 1. 修数据接入（核心）
+### 2. `src/routes/m.parcels.tsx`
+- 复用已有的 `useParcelViewMode` hook（和 PC 端同源），在搜索框下方加一行 segmented 控件：「包裹 / 商品」，沿用 `ViewModeToggle` 风格但适配移动端尺寸（更高更易点）。
+- `useQuery` key/参数带上 `mode`；queryFn 透传 `mode`。
+- 当 `mode === "item"` 时渲染商品列表：
+  - 卡片显示商品缩略图、商品名（中文优先）、`¥单价` 大字 + `×数量 = ¥小计` 灰字、订单号、状态/签收时间、问题标记。
+  - 点击跳到 `/m/receive/$id`（父包裹详情）。
+- 当 `mode === "parcel"` 时保持现有 UI 不变。
+- 空态文案根据 mode 区分（「没有匹配的商品」/「没有匹配的包裹」）。
+- 与 PC 端一致：用户输入搜索词时自动切到「商品」视图，便于直接看到匹配商品。
 
-`src/lib/dashboard.functions.ts`：
-- 加 `requireSupabaseAuth` middleware，handler 内用 `context.supabase` 替换原来的浏览器 client
-- 顺手补两件事：
-  - 国内大宗的 `total_cny` 累加加上 `lines` 兜底（订单本身没填总价时按 lines 汇总），避免大宗看起来永远 0
-  - 增加返回字段：日本小包按 5 档状态分布 `byStatus`、最近 5 笔记录 `recent`（包裹 / 国内 / 大宗 合并按时间倒序）
-
-### 2. 重新设计仪表盘 UI
-
-`src/routes/dashboard.tsx` 整体重写，按内部管理后台的实用主义改：
-
-```
-┌─ PageHeader  [周期切换：本月/本季度/本年/全部]
-│
-├─ KPI 4 卡： 本月采购 / 本月单数 / 本年累计 / 历史累计
-│             (主卡 brand 渐变 + 同比小标)
-│
-├─ 左 2/3：12 个月堆叠柱状趋势（4 渠道颜色统一）
-│  右 1/3：渠道占比环形图 + 列表（本月口径，可切换为累计）
-│
-├─ 左：日本小包状态分布（横向进度条 5 档：已采购→在日仓→国际运输→已签收→已完成）
-│  右：最近动态（最近 10 条采购/到货事件，可点跳转详情）
-│
-└─ 待接入提示：日本大宗（保留占位卡片，挂"待接入"badge）
-```
-
-设计要点（沿用现有 token，不引新色）：
-- 卡片用 `Card` + `hover:shadow-card-hover`，金额走 `tabular-nums`、主指标 `text-3xl`
-- 4 渠道颜色固定：日本小包=chart-1、日本大宗=chart-2、国内小包=chart-3、国内大宗=chart-4
-- 状态分布用 5 段堆叠 bar（每档一种 muted 色阶）
-- 周期切换在前端做（loader 一次性返回全部聚合，按当前 tab 计算展示口径），避免重复请求
-
-### 3. 不动的部分
-
-- `getPurchaseStats` 返回 schema 向后兼容（新增字段为可选）
-- `MetricCard` / `PageHeader` 组件保持不动
-- 路由路径、菜单、其它页面均不动
+### 3. 不改的部分
+- `m.receive.$id`、PC 端列表、`use-parcel-view-mode` 全局状态保持不变（手机端切换会和 PC 端同步到 localStorage，这是预期行为）。
+- 状态枚举、bucket 定义不变。
 
 ## 验证
 
-- 登录后打开 /dashboard，KPI 卡显示 ¥172,900 量级数字（不再是 0）
-- 月度趋势 2024-09 ~ 2026-04 各月柱子高度对得上数据库聚合
-- 切周期 tab 时图表与 KPI 同步刷新
-- 大宗渠道目前 0 单 → 显示"暂无数据"但卡片仍渲染
+- 手机端 `/m/parcels` 切到「商品」后能看到每件商品独立一行，含单价 ¥ 显示。
+- 搜索「ガンプラ」之类关键词在商品维度能命中商品；在包裹维度仍按包裹返回。
+- 待签收 / 已签收 tab 在两种维度下都正确过滤。
+- 点击商品行进入对应包裹详情。
