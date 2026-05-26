@@ -94,7 +94,7 @@ export const searchParcels = createServerFn({ method: "GET" })
     let q = supabaseAdmin
       .from("japan_parcels")
       .select(
-        "id, source_order_no, tracking_no, status, item_title, item_title_cn, item_image_url, intl_pay_at, received_at, grand_total_cny, is_problem, created_at, japan_parcel_items(id, item_title, item_title_cn, item_image_url, item_total_cny, quantity, position)",
+        "id, source_order_no, tracking_no, status, item_title, item_title_cn, item_image_url, intl_pay_at, received_at, grand_total_cny, is_problem, created_at, system_code, created_by, japan_parcel_items(id, item_title, item_title_cn, item_image_url, item_total_cny, quantity, position, system_code)",
       )
       .is("deleted_at", null)
       .order("intl_pay_at", { ascending: false, nullsFirst: false })
@@ -108,7 +108,7 @@ export const searchParcels = createServerFn({ method: "GET" })
     if (data.q) {
       const s = `%${data.q}%`;
       q = q.or(
-        `item_title.ilike.${s},item_title_cn.ilike.${s},source_order_no.ilike.${s},tracking_no.ilike.${s},seller.ilike.${s}`,
+        `item_title.ilike.${s},item_title_cn.ilike.${s},source_order_no.ilike.${s},tracking_no.ilike.${s},seller.ilike.${s},system_code.ilike.${s}`,
       );
     }
     const { data: rows, error } = await q;
