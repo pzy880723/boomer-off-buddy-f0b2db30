@@ -58,6 +58,7 @@ export function ItemDetailSheet({
   const qc = useQueryClient();
   const saveFn = useServerFn(updateItemArrivalPhotos);
   const [photos, setPhotos] = useState<string[]>([]);
+  const userNames = useUserNames([item?.created_by]);
 
   useEffect(() => {
     setPhotos(Array.isArray(item?.arrival_photo_urls) ? item!.arrival_photo_urls! : []);
