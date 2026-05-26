@@ -27,7 +27,7 @@ export const searchParcels = createServerFn({ method: "GET" })
       let q = supabaseAdmin
         .from("japan_parcel_items")
         .select(
-          "id, parent_id, sub_order_no, merchant_order_no, source_platform, condition, addon_service, item_title, item_title_cn, item_image_url, unit_price_jpy, quantity, item_total_jpy, item_total_cny, weight_g, exchange_rate, service_fee_jpy, domestic_freight_jpy, freight_diff_jpy, pay_method, pay_at, tariff_category, tariff_rate, notes, arrival_photo_urls, position, system_code, created_by, created_at, japan_parcels!inner(id, source_order_no, tracking_no, status, received_at, is_problem, deleted_at, intl_pay_at, created_at, system_code, created_by)",
+          "id, parent_id, sub_order_no, merchant_order_no, source_platform, condition, addon_service, item_title, item_title_cn, item_image_url, unit_price_jpy, quantity, item_total_jpy, item_total_cny, weight_g, exchange_rate, service_fee_jpy, domestic_freight_jpy, freight_diff_jpy, pay_method, pay_at, tariff_category, tariff_rate, notes, arrival_photo_urls, position, system_code, created_by, created_at, pack_pieces, pack_pieces_source, pack_unit_note, japan_parcels!inner(id, source_order_no, tracking_no, status, received_at, is_problem, deleted_at, intl_pay_at, created_at, system_code, created_by)",
         )
         .is("japan_parcels.deleted_at", null)
         .range(from, to);
@@ -74,6 +74,9 @@ export const searchParcels = createServerFn({ method: "GET" })
           tariff_rate: r.tariff_rate,
           notes: r.notes,
           arrival_photo_urls: r.arrival_photo_urls,
+          pack_pieces: (r as { pack_pieces: number | null }).pack_pieces,
+          pack_pieces_source: (r as { pack_pieces_source: string | null }).pack_pieces_source,
+          pack_unit_note: (r as { pack_unit_note: string | null }).pack_unit_note,
           system_code: (r as { system_code: string | null }).system_code,
           created_by: (r as { created_by: string | null }).created_by,
           created_at: (r as { created_at: string }).created_at,
