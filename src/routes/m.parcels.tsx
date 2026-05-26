@@ -8,6 +8,7 @@ import { searchParcels } from "@/lib/mobile.functions";
 import { toThumbUrl } from "@/lib/image";
 import { useParcelViewMode } from "@/hooks/use-parcel-view-mode";
 import { ItemDetailSheet, type ItemDetailValue } from "@/components/mobile/item-detail-sheet";
+import { useUserNames } from "@/hooks/use-user-names";
 
 export const Route = createFileRoute("/m/parcels")({
   component: ParcelsSearch,
