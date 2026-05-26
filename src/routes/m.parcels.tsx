@@ -261,6 +261,26 @@ function ParcelsSearch() {
                       <span className="text-xs text-muted-foreground">无成本</span>
                     )}
                     <span className="text-[10px] text-muted-foreground">× {qty} 件</span>
+                    {(() => {
+                      const pp = (it as { pack_pieces?: number | null }).pack_pieces;
+                      if (!pp || pp <= 1) return null;
+                      const { pieceCny, pieceJpy } = computePiecePrice(
+                        it.item_total_jpy as number | null,
+                        it.item_total_cny as number | null,
+                        pp,
+                      );
+                      const u = (it as { pack_unit_note?: string | null }).pack_unit_note || "个";
+                      return (
+                        <span className="mt-0.5 rounded bg-pink-50 px-1.5 py-0.5 text-[10px] font-medium text-pink-600 tabular-nums dark:bg-pink-500/10">
+                          拆 {pp}{u} ·{" "}
+                          {pieceCny != null
+                            ? `¥${pieceCny.toFixed(2)}/${u}`
+                            : pieceJpy != null
+                              ? `JPY ${pieceJpy.toFixed(0)}/${u}`
+                              : "—"}
+                        </span>
+                      );
+                    })()}
                     {it.is_problem ? (
                       <AlertCircle className="mt-0.5 h-3.5 w-3.5 text-destructive" />
                     ) : null}
