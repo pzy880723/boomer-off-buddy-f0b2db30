@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { Search, AlertCircle, X, Package, ShoppingBag } from "lucide-react";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Search, AlertCircle, X, Package, ShoppingBag, Loader2 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { MobileShell } from "@/components/mobile/mobile-shell";
 import { searchParcels } from "@/lib/mobile.functions";
@@ -14,6 +14,7 @@ export const Route = createFileRoute("/m/parcels")({
 });
 
 type Bucket = "pending" | "received";
+const PAGE_SIZE = 30;
 
 function fmtDate(s: string | null | undefined) {
   if (!s) return null;
@@ -32,23 +33,58 @@ function ParcelsSearch() {
   const [bucket, setBucket] = useState<Bucket>("pending");
   const [q, setQ] = useState("");
   const [storedMode, setStoredMode] = useParcelViewMode();
-  // 搜索时强制商品维度
   const mode = q.trim() ? "item" : storedMode;
   const [selected, setSelected] = useState<ItemDetailValue | null>(null);
   const fetchSearch = useServerFn(searchParcels);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const {
+    data,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ["mobile-parcels", bucket, q, mode],
-    queryFn: () => fetchSearch({ data: { q: q || undefined, bucket, mode, limit: 30 } }),
-    placeholderData: (prev) => prev,
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) =>
+      fetchSearch({
+        data: { q: q || undefined, bucket, mode, limit: PAGE_SIZE, offset: pageParam as number },
+      }),
+    getNextPageParam: (last, all) =>
+      last.hasMore ? all.reduce((s, p) => s + (mode === "item" ? p.items.length : p.rows.length), 0) : undefined,
   });
+
+  const items = useMemo(
+    () => (mode === "item" ? (data?.pages.flatMap((p) => p.items) ?? []) : []),
+    [data, mode],
+  );
+  const rows = useMemo(
+    () => (mode === "parcel" ? (data?.pages.flatMap((p) => p.rows) ?? []) : []),
+    [data, mode],
+  );
+
+  // 无限滚动
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const showModeSwitch = !q.trim();
 
   return (
     <MobileShell title="包裹">
       <div className="sticky top-0 z-10 space-y-3 border-b border-border/60 bg-background/90 px-3 py-3 backdrop-blur">
-        {/* 搜索框 */}
         <div className="flex h-10 items-center gap-2 rounded-full bg-muted/70 px-4">
           <Search className="h-4 w-4 flex-none text-muted-foreground" />
           <input
@@ -69,7 +105,6 @@ function ParcelsSearch() {
         </div>
 
         <div className="flex items-center justify-between gap-2">
-          {/* 状态切换 */}
           <div className="inline-flex h-8 items-center rounded-full bg-muted/60 p-0.5 text-xs">
             {(
               [
@@ -92,13 +127,12 @@ function ParcelsSearch() {
             ))}
           </div>
 
-          {/* 维度切换：仅在无搜索词时展示 */}
           {showModeSwitch ? (
             <div className="inline-flex h-8 items-center rounded-full bg-muted/60 p-0.5 text-xs">
               {(
                 [
-                  { v: "parcel" as const, l: "包裹", Icon: Package },
                   { v: "item" as const, l: "商品", Icon: ShoppingBag },
+                  { v: "parcel" as const, l: "包裹", Icon: Package },
                 ]
               ).map((t) => (
                 <button
@@ -120,15 +154,13 @@ function ParcelsSearch() {
         </div>
       </div>
 
-      {/* 列表 */}
       {mode === "item" ? (
         <ul className="px-3 py-1">
-          {(data?.items ?? []).map((it) => {
+          {items.map((it) => {
             const thumb = toThumbUrl(it.item_image_url, 200);
             const name = it.item_title_cn || it.item_title || "(未填写商品名)";
             const qty = it.quantity ?? 1;
             const subCny = it.item_total_cny != null ? Number(it.item_total_cny) : null;
-            // 单件平均成本（含分摊后到手价）
             const avgCny = subCny != null && qty > 0 ? subCny / qty : null;
             const receivedAt = fmtDateTime(it.received_at);
             const orderNo = it.sub_order_no || it.tracking_no || it.source_order_no;
@@ -189,7 +221,7 @@ function ParcelsSearch() {
               </li>
             );
           })}
-          {!isLoading && (data?.items ?? []).length === 0 ? (
+          {!isLoading && items.length === 0 ? (
             <li className="px-6 py-16 text-center text-sm text-muted-foreground">
               {q ? "没有匹配的商品" : bucket === "pending" ? "暂无待签收商品" : "暂无已签收商品"}
             </li>
@@ -197,12 +229,15 @@ function ParcelsSearch() {
         </ul>
       ) : (
         <ul className="px-3 py-1">
-          {(data?.rows ?? []).map((r) => {
+          {rows.map((r) => {
             const thumb = toThumbUrl(r.item_image_url, 200);
             const orderNo = r.tracking_no || r.source_order_no;
             const purchasedAt = fmtDate(r.intl_pay_at ?? r.created_at);
             const receivedAt = fmtDateTime(r.received_at);
             const count = (r as { item_count?: number }).item_count ?? 0;
+            const totalQty = (r as { total_qty?: number }).total_qty ?? 0;
+            const avgUnitCny = (r as { avg_unit_cny?: number | null }).avg_unit_cny;
+            const unitCount = totalQty > 0 ? totalQty : count;
             const firstName =
               (r as { first_item_name?: string }).first_item_name ||
               r.item_title_cn ||
@@ -259,21 +294,38 @@ function ParcelsSearch() {
                         ¥{Number(r.grand_total_cny).toFixed(2)}
                       </span>
                     ) : null}
-                    {count > 0 ? (
-                      <span className="text-[10px] text-muted-foreground">{count} 件</span>
+                    {avgUnitCny != null && unitCount > 0 ? (
+                      <span className="text-[10px] text-muted-foreground tabular-nums">
+                        ¥{avgUnitCny.toFixed(2)} × {unitCount} 件
+                      </span>
+                    ) : unitCount > 0 ? (
+                      <span className="text-[10px] text-muted-foreground">{unitCount} 件</span>
                     ) : null}
                   </div>
                 </Link>
               </li>
             );
           })}
-          {!isLoading && (data?.rows ?? []).length === 0 ? (
+          {!isLoading && rows.length === 0 ? (
             <li className="px-6 py-16 text-center text-sm text-muted-foreground">
               {bucket === "pending" ? "暂无待签收包裹" : "暂无已签收包裹"}
             </li>
           ) : null}
         </ul>
       )}
+
+      {/* 无限滚动哨兵 + 状态 */}
+      <div ref={sentinelRef} className="flex items-center justify-center px-3 py-6 text-xs text-muted-foreground">
+        {isLoading ? (
+          <span className="inline-flex items-center gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" />加载中…</span>
+        ) : isFetchingNextPage ? (
+          <span className="inline-flex items-center gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" />正在加载更多…</span>
+        ) : hasNextPage ? (
+          <span>下滑加载更多</span>
+        ) : (mode === "item" ? items.length : rows.length) > 0 ? (
+          <span>— 没有更多了 —</span>
+        ) : null}
+      </div>
 
       <ItemDetailSheet
         open={!!selected}

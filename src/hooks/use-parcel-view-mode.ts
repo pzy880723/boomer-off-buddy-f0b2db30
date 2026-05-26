@@ -4,7 +4,7 @@ export type ParcelViewMode = "parcel" | "item";
 
 const KEY = "jp-parcel-view-mode";
 const EVENT = "jp-parcel-view-mode-change";
-const DEFAULT: ParcelViewMode = "parcel";
+const DEFAULT: ParcelViewMode = "item";
 
 export function useParcelViewMode(): [ParcelViewMode, (v: ParcelViewMode) => void] {
   const [value, setValue] = useState<ParcelViewMode>(DEFAULT);
