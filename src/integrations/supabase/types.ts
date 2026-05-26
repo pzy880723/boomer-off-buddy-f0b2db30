@@ -441,6 +441,7 @@ export type Database = {
           arrival_photo_urls: Json
           condition: string | null
           created_at: string
+          created_by: string | null
           domestic_freight_jpy: number | null
           exchange_rate: number | null
           freight_diff_jpy: number | null
@@ -465,6 +466,7 @@ export type Database = {
           service_fee_jpy: number | null
           source_platform: string | null
           sub_order_no: string | null
+          system_code: string | null
           tariff_category: string | null
           tariff_rate: number | null
           unit_price_jpy: number | null
@@ -476,6 +478,7 @@ export type Database = {
           arrival_photo_urls?: Json
           condition?: string | null
           created_at?: string
+          created_by?: string | null
           domestic_freight_jpy?: number | null
           exchange_rate?: number | null
           freight_diff_jpy?: number | null
@@ -500,6 +503,7 @@ export type Database = {
           service_fee_jpy?: number | null
           source_platform?: string | null
           sub_order_no?: string | null
+          system_code?: string | null
           tariff_category?: string | null
           tariff_rate?: number | null
           unit_price_jpy?: number | null
@@ -511,6 +515,7 @@ export type Database = {
           arrival_photo_urls?: Json
           condition?: string | null
           created_at?: string
+          created_by?: string | null
           domestic_freight_jpy?: number | null
           exchange_rate?: number | null
           freight_diff_jpy?: number | null
@@ -535,6 +540,7 @@ export type Database = {
           service_fee_jpy?: number | null
           source_platform?: string | null
           sub_order_no?: string | null
+          system_code?: string | null
           tariff_category?: string | null
           tariff_rate?: number | null
           unit_price_jpy?: number | null
@@ -557,6 +563,7 @@ export type Database = {
           category: string | null
           completeness: number
           created_at: string
+          created_by: string | null
           deleted_at: string | null
           domestic_freight_jpy: number | null
           eta: string | null
@@ -600,6 +607,7 @@ export type Database = {
           status_text: string | null
           status_timeline: Json | null
           storage_days: number | null
+          system_code: string | null
           tariff_cny: number | null
           tariff_jpy: number | null
           total_cny: number | null
@@ -616,6 +624,7 @@ export type Database = {
           category?: string | null
           completeness?: number
           created_at?: string
+          created_by?: string | null
           deleted_at?: string | null
           domestic_freight_jpy?: number | null
           eta?: string | null
@@ -659,6 +668,7 @@ export type Database = {
           status_text?: string | null
           status_timeline?: Json | null
           storage_days?: number | null
+          system_code?: string | null
           tariff_cny?: number | null
           tariff_jpy?: number | null
           total_cny?: number | null
@@ -675,6 +685,7 @@ export type Database = {
           category?: string | null
           completeness?: number
           created_at?: string
+          created_by?: string | null
           deleted_at?: string | null
           domestic_freight_jpy?: number | null
           eta?: string | null
@@ -718,6 +729,7 @@ export type Database = {
           status_text?: string | null
           status_timeline?: Json | null
           storage_days?: number | null
+          system_code?: string | null
           tariff_cny?: number | null
           tariff_jpy?: number | null
           total_cny?: number | null

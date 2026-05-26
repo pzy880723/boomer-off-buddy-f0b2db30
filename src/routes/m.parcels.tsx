@@ -8,6 +8,7 @@ import { searchParcels } from "@/lib/mobile.functions";
 import { toThumbUrl } from "@/lib/image";
 import { useParcelViewMode } from "@/hooks/use-parcel-view-mode";
 import { ItemDetailSheet, type ItemDetailValue } from "@/components/mobile/item-detail-sheet";
+import { useUserNames } from "@/hooks/use-user-names";
 
 export const Route = createFileRoute("/m/parcels")({
   component: ParcelsSearch,
@@ -80,7 +81,19 @@ function ParcelsSearch() {
     [data, mode],
   );
 
-  // 无限滚动
+
+  // 收集所有 created_by 用户 id，统一查名
+  const userIds = useMemo(() => {
+    if (mode === "item")
+      return items.flatMap((i) => [
+        (i as { created_by?: string | null }).created_by,
+        (i as { parcel_created_by?: string | null }).parcel_created_by,
+      ]);
+    return rows.map((r) => (r as { created_by?: string | null }).created_by);
+  }, [mode, items, rows]);
+  const userNames = useUserNames(userIds);
+
+
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el) return;
@@ -219,6 +232,15 @@ function ParcelsSearch() {
                         签收 {receivedAt}
                       </div>
                     ) : null}
+                    {(it as { system_code?: string | null }).system_code ? (
+                      <div className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground/80">
+                        {highlight((it as { system_code: string }).system_code, q)}
+                        {" · "}
+                        {userNames.name((it as { created_by?: string | null }).created_by)}
+                        {" · "}
+                        {fmtDateTime((it as { created_at?: string }).created_at) ?? "—"}
+                      </div>
+                    ) : null}
                   </div>
                   <div className="flex flex-none flex-col items-end gap-0.5 pl-1">
                     {avgCny != null ? (
@@ -301,6 +323,15 @@ function ParcelsSearch() {
                     {receivedAt ? (
                       <div className="mt-0.5 text-[10px] text-muted-foreground">
                         签收 {receivedAt}
+                      </div>
+                    ) : null}
+                    {(r as { system_code?: string | null }).system_code ? (
+                      <div className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground/80">
+                        {highlight((r as { system_code: string }).system_code, q)}
+                        {" · "}
+                        {userNames.name((r as { created_by?: string | null }).created_by)}
+                        {" · "}
+                        {fmtDateTime((r as { created_at?: string }).created_at) ?? "—"}
                       </div>
                     ) : null}
                   </div>

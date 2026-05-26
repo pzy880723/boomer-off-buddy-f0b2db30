@@ -7,6 +7,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
 import { updateItemArrivalPhotos } from "@/lib/mobile.functions";
+import { useUserNames } from "@/hooks/use-user-names";
 import { toast } from "sonner";
 
 export interface ItemDetailValue {
@@ -35,6 +36,9 @@ export interface ItemDetailValue {
   tariff_rate?: number | null;
   arrival_photo_urls?: string[] | null;
   parent_id?: string | null;
+  system_code?: string | null;
+  created_by?: string | null;
+  created_at?: string | null;
 }
 
 const fmtJpy = (v: number | null | undefined) =>
@@ -54,6 +58,7 @@ export function ItemDetailSheet({
   const qc = useQueryClient();
   const saveFn = useServerFn(updateItemArrivalPhotos);
   const [photos, setPhotos] = useState<string[]>([]);
+  const userNames = useUserNames([item?.created_by]);
 
   useEffect(() => {
     setPhotos(Array.isArray(item?.arrival_photo_urls) ? item!.arrival_photo_urls! : []);
@@ -148,6 +153,10 @@ export function ItemDetailSheet({
                 {item.addon_service ? <Row label="附加服务" v={item.addon_service} /> : null}
               </>
             ) : null}
+            <Sep />
+            <Row label="系统编码" v={item.system_code || "—"} />
+            <Row label="添加人" v={userNames.name(item.created_by)} />
+            <Row label="添加时间" v={item.created_at ? new Date(item.created_at).toLocaleString() : "—"} />
             {item.notes ? (
               <>
                 <Sep />

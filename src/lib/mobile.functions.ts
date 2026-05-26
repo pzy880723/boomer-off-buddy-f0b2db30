@@ -27,7 +27,7 @@ export const searchParcels = createServerFn({ method: "GET" })
       let q = supabaseAdmin
         .from("japan_parcel_items")
         .select(
-          "id, parent_id, sub_order_no, merchant_order_no, source_platform, condition, addon_service, item_title, item_title_cn, item_image_url, unit_price_jpy, quantity, item_total_jpy, item_total_cny, weight_g, exchange_rate, service_fee_jpy, domestic_freight_jpy, freight_diff_jpy, pay_method, pay_at, tariff_category, tariff_rate, notes, arrival_photo_urls, position, japan_parcels!inner(id, source_order_no, tracking_no, status, received_at, is_problem, deleted_at, intl_pay_at, created_at)",
+          "id, parent_id, sub_order_no, merchant_order_no, source_platform, condition, addon_service, item_title, item_title_cn, item_image_url, unit_price_jpy, quantity, item_total_jpy, item_total_cny, weight_g, exchange_rate, service_fee_jpy, domestic_freight_jpy, freight_diff_jpy, pay_method, pay_at, tariff_category, tariff_rate, notes, arrival_photo_urls, position, system_code, created_by, created_at, japan_parcels!inner(id, source_order_no, tracking_no, status, received_at, is_problem, deleted_at, intl_pay_at, created_at, system_code, created_by)",
         )
         .is("japan_parcels.deleted_at", null)
         .range(from, to);
@@ -38,7 +38,7 @@ export const searchParcels = createServerFn({ method: "GET" })
       }
       if (data.q) {
         const s = `%${data.q}%`;
-        q = q.or(`item_title.ilike.${s},item_title_cn.ilike.${s},sub_order_no.ilike.${s}`);
+        q = q.or(`item_title.ilike.${s},item_title_cn.ilike.${s},sub_order_no.ilike.${s},system_code.ilike.${s}`);
       }
       q = q
         .order("pay_at", { ascending: false, nullsFirst: false })
@@ -47,7 +47,7 @@ export const searchParcels = createServerFn({ method: "GET" })
       const { data: rows, error } = await q;
       if (error) throw new Error(error.message);
       const items = (rows ?? []).map((r) => {
-        const p = (r as { japan_parcels?: { id: string; source_order_no: string | null; tracking_no: string | null; status: string; received_at: string | null; is_problem: boolean; intl_pay_at: string | null; created_at: string } }).japan_parcels;
+        const p = (r as { japan_parcels?: { id: string; source_order_no: string | null; tracking_no: string | null; status: string; received_at: string | null; is_problem: boolean; intl_pay_at: string | null; created_at: string; system_code: string | null; created_by: string | null } }).japan_parcels;
         return {
           id: r.id,
           parcel_id: r.parent_id,
@@ -74,12 +74,17 @@ export const searchParcels = createServerFn({ method: "GET" })
           tariff_rate: r.tariff_rate,
           notes: r.notes,
           arrival_photo_urls: r.arrival_photo_urls,
+          system_code: (r as { system_code: string | null }).system_code,
+          created_by: (r as { created_by: string | null }).created_by,
+          created_at: (r as { created_at: string }).created_at,
           source_order_no: p?.source_order_no ?? null,
           tracking_no: p?.tracking_no ?? null,
           status: p?.status ?? null,
           received_at: p?.received_at ?? null,
           is_problem: p?.is_problem ?? false,
           intl_pay_at: p?.intl_pay_at ?? null,
+          parcel_system_code: p?.system_code ?? null,
+          parcel_created_by: p?.created_by ?? null,
         };
       });
       return { mode: "item" as const, items, rows: [] as never[], hasMore: items.length === data.limit };
@@ -89,7 +94,7 @@ export const searchParcels = createServerFn({ method: "GET" })
     let q = supabaseAdmin
       .from("japan_parcels")
       .select(
-        "id, source_order_no, tracking_no, status, item_title, item_title_cn, item_image_url, intl_pay_at, received_at, grand_total_cny, is_problem, created_at, japan_parcel_items(id, item_title, item_title_cn, item_image_url, item_total_cny, quantity, position)",
+        "id, source_order_no, tracking_no, status, item_title, item_title_cn, item_image_url, intl_pay_at, received_at, grand_total_cny, is_problem, created_at, system_code, created_by, japan_parcel_items(id, item_title, item_title_cn, item_image_url, item_total_cny, quantity, position, system_code)",
       )
       .is("deleted_at", null)
       .order("intl_pay_at", { ascending: false, nullsFirst: false })
@@ -103,7 +108,7 @@ export const searchParcels = createServerFn({ method: "GET" })
     if (data.q) {
       const s = `%${data.q}%`;
       q = q.or(
-        `item_title.ilike.${s},item_title_cn.ilike.${s},source_order_no.ilike.${s},tracking_no.ilike.${s},seller.ilike.${s}`,
+        `item_title.ilike.${s},item_title_cn.ilike.${s},source_order_no.ilike.${s},tracking_no.ilike.${s},seller.ilike.${s},system_code.ilike.${s}`,
       );
     }
     const { data: rows, error } = await q;
@@ -370,6 +375,32 @@ export const updateItemArrivalPhotos = createServerFn({ method: "POST" })
       .eq("id", data.item_id);
     if (error) throw new Error(error.message);
     return { ok: true };
+  });
+
+/** 根据 user_id 批量查邮箱/昵称，用于"添加人"展示 */
+export const getUsersByIds = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z.object({ ids: z.array(z.string().uuid()).min(1).max(200) }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const out: Record<string, { name: string; email: string | null }> = {};
+    // supabase-js admin API has listUsers but no batch get; iterate via getUserById
+    await Promise.all(
+      data.ids.map(async (id) => {
+        try {
+          const { data: u } = await supabaseAdmin.auth.admin.getUserById(id);
+          const user = u?.user;
+          if (!user) return;
+          const meta = (user.user_metadata ?? {}) as { name?: string; full_name?: string };
+          const name =
+            meta.name || meta.full_name || (user.email ? user.email.split("@")[0] : id.slice(0, 6));
+          out[id] = { name, email: user.email ?? null };
+        } catch {
+          // ignore missing user
+        }
+      }),
+    );
+    return { users: out };
   });
 
 export const MOBILE_PRICE_TIERS = PRICE_TIERS;
