@@ -41,7 +41,7 @@ export const searchParcels = createServerFn({ method: "GET" })
         q = q.or(`item_title.ilike.${s},item_title_cn.ilike.${s},sub_order_no.ilike.${s}`);
       }
       q = q
-        .order("received_at", { referencedTable: "japan_parcels", ascending: false, nullsFirst: false })
+        .order("pay_at", { ascending: false, nullsFirst: false })
         .order("created_at", { referencedTable: "japan_parcels", ascending: false, nullsFirst: false })
         .order("position", { ascending: true });
       const { data: rows, error } = await q;
