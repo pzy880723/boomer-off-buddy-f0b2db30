@@ -40,15 +40,10 @@ export const searchParcels = createServerFn({ method: "GET" })
         const s = `%${data.q}%`;
         q = q.or(`item_title.ilike.${s},item_title_cn.ilike.${s},sub_order_no.ilike.${s}`);
       }
-      if (data.bucket === "received") {
-        q = q
-          .order("received_at", { referencedTable: "japan_parcels", ascending: false, nullsFirst: false })
-          .order("position", { ascending: true });
-      } else {
-        q = q
-          .order("created_at", { referencedTable: "japan_parcels", ascending: false, nullsFirst: false })
-          .order("position", { ascending: true });
-      }
+      q = q
+        .order("received_at", { referencedTable: "japan_parcels", ascending: false, nullsFirst: false })
+        .order("created_at", { referencedTable: "japan_parcels", ascending: false, nullsFirst: false })
+        .order("position", { ascending: true });
       const { data: rows, error } = await q;
       if (error) throw new Error(error.message);
       const items = (rows ?? []).map((r) => {
