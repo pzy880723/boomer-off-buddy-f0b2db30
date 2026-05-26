@@ -29,6 +29,22 @@ function fmtDateTime(s: string | null | undefined) {
   return `${fmtDate(s)} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
+function highlight(text: string, q: string) {
+  const needle = q.trim();
+  if (!needle) return text;
+  const re = new RegExp(`(${needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");
+  const parts = text.split(re);
+  return parts.map((p, i) =>
+    i % 2 === 1 ? (
+      <mark key={i} className="rounded bg-yellow-200/80 px-0.5 text-foreground dark:bg-yellow-500/40">
+        {p}
+      </mark>
+    ) : (
+      <span key={i}>{p}</span>
+    ),
+  );
+}
+
 function ParcelsSearch() {
   const [bucket, setBucket] = useState<Bucket>("pending");
   const [q, setQ] = useState("");
@@ -192,10 +208,10 @@ function ParcelsSearch() {
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
-                    <div className="line-clamp-2 text-sm font-medium leading-snug">{name}</div>
+                    <div className="line-clamp-2 text-sm font-medium leading-snug">{highlight(name, q)}</div>
                     {orderNo ? (
                       <div className="mt-1 truncate font-mono text-[10px] text-muted-foreground">
-                        {orderNo}
+                        {highlight(orderNo, q)}
                       </div>
                     ) : null}
                     {receivedAt ? (
@@ -277,9 +293,9 @@ function ParcelsSearch() {
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
-                    <div className="line-clamp-2 text-sm font-medium leading-snug">{title}</div>
+                    <div className="line-clamp-2 text-sm font-medium leading-snug">{highlight(title, q)}</div>
                     <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
-                      {orderNo ? <span className="truncate font-mono">{orderNo}</span> : null}
+                      {orderNo ? <span className="truncate font-mono">{highlight(orderNo, q)}</span> : null}
                       {purchasedAt ? <span>· 购 {purchasedAt}</span> : null}
                     </div>
                     {receivedAt ? (
