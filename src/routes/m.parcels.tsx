@@ -81,7 +81,19 @@ function ParcelsSearch() {
     [data, mode],
   );
 
-  // 无限滚动
+
+  // 收集所有 created_by 用户 id，统一查名
+  const userIds = useMemo(() => {
+    if (mode === "item")
+      return items.flatMap((i) => [
+        (i as { created_by?: string | null }).created_by,
+        (i as { parcel_created_by?: string | null }).parcel_created_by,
+      ]);
+    return rows.map((r) => (r as { created_by?: string | null }).created_by);
+  }, [mode, items, rows]);
+  const userNames = useUserNames(userIds);
+
+
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el) return;
