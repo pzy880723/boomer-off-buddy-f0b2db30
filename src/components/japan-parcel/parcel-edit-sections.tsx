@@ -23,11 +23,13 @@ interface FieldDef {
 }
 
 const PARCEL_INFO: FieldDef[] = [
+  { key: "system_code", label: "系统编码" },
   { key: "source_order_no", label: "订单号" },
   { key: "tracking_no", label: "国际物流单号" },
   { key: "intl_merchant_order_no", label: "平台订单号" },
   { key: "purchased_at", label: "采购时间", type: "datetime" },
   { key: "received_at", label: "签收时间", type: "datetime" },
+  { key: "created_at", label: "添加时间", type: "datetime" },
   { key: "status", label: "状态", type: "select", options: PARCEL_STATUS_OPTIONS },
   { key: "warehouse_location", label: "仓库位置" },
   { key: "receiver_name", label: "收件人" },
