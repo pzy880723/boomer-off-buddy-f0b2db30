@@ -7,6 +7,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
 import { updateItemArrivalPhotos } from "@/lib/mobile.functions";
+import { useUserNames } from "@/hooks/use-user-names";
 import { toast } from "sonner";
 
 export interface ItemDetailValue {
