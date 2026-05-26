@@ -293,9 +293,9 @@ function ParcelsSearch() {
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
-                    <div className="line-clamp-2 text-sm font-medium leading-snug">{title}</div>
+                    <div className="line-clamp-2 text-sm font-medium leading-snug">{highlight(title, q)}</div>
                     <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
-                      {orderNo ? <span className="truncate font-mono">{orderNo}</span> : null}
+                      {orderNo ? <span className="truncate font-mono">{highlight(orderNo, q)}</span> : null}
                       {purchasedAt ? <span>· 购 {purchasedAt}</span> : null}
                     </div>
                     {receivedAt ? (
