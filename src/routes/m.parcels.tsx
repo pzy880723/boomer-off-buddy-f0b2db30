@@ -325,6 +325,15 @@ function ParcelsSearch() {
                         签收 {receivedAt}
                       </div>
                     ) : null}
+                    {(r as { system_code?: string | null }).system_code ? (
+                      <div className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground/80">
+                        {highlight((r as { system_code: string }).system_code, q)}
+                        {" · "}
+                        {userNames.name((r as { created_by?: string | null }).created_by)}
+                        {" · "}
+                        {fmtDateTime((r as { created_at?: string }).created_at) ?? "—"}
+                      </div>
+                    ) : null}
                   </div>
                   <div className="flex flex-none flex-col items-end gap-0.5 pl-1">
                     {r.grand_total_cny != null ? (
