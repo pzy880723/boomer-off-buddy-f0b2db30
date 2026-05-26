@@ -578,7 +578,16 @@ function JapanParcelList() {
                       { intl_total_jpy: r.intl_total_jpy, intl_exchange_rate: r.intl_exchange_rate },
                       sortedItems,
                     );
-                    const displayItems: (ItemRow | null)[] = sortedItems.length ? sortedItems : [null];
+                    let visibleItems = sortedItems;
+                    const kw = submittedSearch.trim().toLowerCase();
+                    if (kw) {
+                      const matched = sortedItems.filter((it) =>
+                        (it.item_title ?? "").toLowerCase().includes(kw) ||
+                        (it.item_title_cn ?? "").toLowerCase().includes(kw),
+                      );
+                      if (matched.length > 0) visibleItems = matched;
+                    }
+                    const displayItems: (ItemRow | null)[] = visibleItems.length ? visibleItems : [null];
                     return displayItems.map((it, idx) => {
                       const landed = it ? landedMap.get(it.id) : null;
                       return (
