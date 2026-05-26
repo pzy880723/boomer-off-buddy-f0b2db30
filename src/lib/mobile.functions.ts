@@ -15,10 +15,14 @@ export const searchParcels = createServerFn({ method: "GET" })
         bucket: z.enum(["pending", "received", "all"]).default("all"),
         mode: z.enum(["parcel", "item"]).default("parcel"),
         limit: z.number().min(1).max(50).default(30),
+        offset: z.number().min(0).default(0),
       })
       .parse(input ?? {}),
   )
   .handler(async ({ data }) => {
+    const from = data.offset;
+    const to = data.offset + data.limit - 1;
+
     if (data.mode === "item") {
       let q = supabaseAdmin
         .from("japan_parcel_items")
@@ -26,7 +30,7 @@ export const searchParcels = createServerFn({ method: "GET" })
           "id, parent_id, sub_order_no, merchant_order_no, source_platform, condition, addon_service, item_title, item_title_cn, item_image_url, unit_price_jpy, quantity, item_total_jpy, item_total_cny, weight_g, exchange_rate, service_fee_jpy, domestic_freight_jpy, freight_diff_jpy, pay_method, pay_at, tariff_category, tariff_rate, notes, arrival_photo_urls, position, japan_parcels!inner(id, source_order_no, tracking_no, status, received_at, is_problem, deleted_at, intl_pay_at, created_at)",
         )
         .is("japan_parcels.deleted_at", null)
-        .limit(data.limit);
+        .range(from, to);
       if (data.bucket === "pending") {
         q = q.in("japan_parcels.status", PENDING_STATUSES as unknown as string[]);
       } else if (data.bucket === "received") {
@@ -83,7 +87,7 @@ export const searchParcels = createServerFn({ method: "GET" })
           intl_pay_at: p?.intl_pay_at ?? null,
         };
       });
-      return { mode: "item" as const, items, rows: [] as never[] };
+      return { mode: "item" as const, items, rows: [] as never[], hasMore: items.length === data.limit };
     }
 
 
@@ -91,11 +95,11 @@ export const searchParcels = createServerFn({ method: "GET" })
     let q = supabaseAdmin
       .from("japan_parcels")
       .select(
-        "id, source_order_no, tracking_no, status, item_title, item_title_cn, item_image_url, intl_pay_at, received_at, grand_total_cny, is_problem, created_at, japan_parcel_items(id, item_title, item_title_cn, item_image_url, position)",
+        "id, source_order_no, tracking_no, status, item_title, item_title_cn, item_image_url, intl_pay_at, received_at, grand_total_cny, is_problem, created_at, japan_parcel_items(id, item_title, item_title_cn, item_image_url, item_total_cny, quantity, position)",
       )
       .is("deleted_at", null)
       .order(orderCol, { ascending: false, nullsFirst: false })
-      .limit(data.limit);
+      .range(from, to);
     if (data.bucket === "pending") {
       q = q.in("status", PENDING_STATUSES as unknown as string[]);
     } else if (data.bucket === "received") {
@@ -110,7 +114,7 @@ export const searchParcels = createServerFn({ method: "GET" })
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
     const mapped = (rows ?? []).map((r) => {
-      const children = ((r as { japan_parcel_items?: Array<{ item_title: string | null; item_title_cn: string | null; item_image_url: string | null; position: number | null }> }).japan_parcel_items ?? [])
+      const children = ((r as { japan_parcel_items?: Array<{ item_title: string | null; item_title_cn: string | null; item_image_url: string | null; item_total_cny: number | null; quantity: number | null; position: number | null }> }).japan_parcel_items ?? [])
         .slice()
         .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
       const first = children[0];
@@ -121,15 +125,21 @@ export const searchParcels = createServerFn({ method: "GET" })
         r.item_image_url ||
         children.find((c) => c.item_image_url)?.item_image_url ||
         null;
+      const itemsTotalCny = children.reduce((s, c) => s + (Number(c.item_total_cny) || 0), 0);
+      const totalQty = children.reduce((s, c) => s + (Number(c.quantity) || 0), 0);
+      const baseTotal = r.grand_total_cny != null ? Number(r.grand_total_cny) : (itemsTotalCny > 0 ? itemsTotalCny : null);
+      const avgUnitCny = baseTotal != null && totalQty > 0 ? baseTotal / totalQty : null;
       return {
         ...r,
         japan_parcel_items: undefined,
         item_image_url: firstImage,
         first_item_name: firstItemName,
         item_count: children.length,
+        total_qty: totalQty,
+        avg_unit_cny: avgUnitCny,
       };
     });
-    return { mode: "parcel" as const, rows: mapped, items: [] as never[] };
+    return { mode: "parcel" as const, rows: mapped, items: [] as never[], hasMore: mapped.length === data.limit };
   });
 
 /** 待签收计数（首页用） */
