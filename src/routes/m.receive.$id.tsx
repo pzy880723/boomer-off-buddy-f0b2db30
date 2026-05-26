@@ -124,6 +124,8 @@ function ReceivePage() {
                 ["付款时间", parcel.intl_pay_at ? new Date(parcel.intl_pay_at).toLocaleString("zh-CN") : null],
                 ["签收时间", parcel.received_at ? new Date(parcel.received_at).toLocaleString("zh-CN") : null],
                 ["仓位", parcel.warehouse_location],
+                ["系统编码", (parcel as { system_code?: string | null }).system_code],
+                ["添加时间", (parcel as { created_at?: string | null }).created_at ? new Date((parcel as { created_at: string }).created_at).toLocaleString("zh-CN") : null],
                 ["备注", parcel.notes],
               ]
                 .filter(([, v]) => v !== null && v !== undefined && v !== "")
