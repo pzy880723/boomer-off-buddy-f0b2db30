@@ -86,7 +86,6 @@ export const searchParcels = createServerFn({ method: "GET" })
     }
 
 
-    const orderCol = data.bucket === "received" ? "received_at" : "created_at";
     let q = supabaseAdmin
       .from("japan_parcels")
       .select(
