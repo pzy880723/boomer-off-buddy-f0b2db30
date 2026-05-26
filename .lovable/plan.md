@@ -1,35 +1,48 @@
 ## 目标
 
-让手机端 `/m/parcels` 也支持「包裹 / 商品」两种维度切换，商品维度可以看到单件价格，并支持按商品名搜索。
+修复 `/m/parcels` 在「按商品」模式下的三个问题：
+1. 点击商品行应弹出**商品卡**（ItemDetailSheet），而不是跳转到包裹详情页
+2. 列表中显示**单件平均成本（CNY）** = `item_total_cny / quantity`（含分摊后的真实到手成本）
+3. 搜索框只走商品维度，不再保留「按包裹」搜索分支
+4. 整体 UI 重新设计，去掉当前略显粗糙的卡片样式
 
-## 改动范围
+## 范围
 
-### 1. `src/lib/mobile.functions.ts`
-- 扩展 `searchParcels` 入参：新增 `mode: "parcel" | "item"`，默认 `parcel`，保持现有行为不变。
-- 当 `mode === "item"` 时改查 `japan_parcel_items`：
-  - 选择字段：`id, parent_id, item_title, item_title_cn, item_image_url, unit_price_jpy, quantity, item_total_jpy, item_total_cny, pay_at, japan_parcels!inner(id, source_order_no, tracking_no, status, received_at, is_problem, deleted_at, intl_pay_at)`
-  - `deleted_at is null`、bucket 状态筛选作用在 `japan_parcels` 上（待签收/已签收）。
-  - 搜索 `q` 走商品字段：`item_title.ilike / item_title_cn.ilike`，以及订单号 / 物流号（来自父表）。
-  - 排序按 bucket：待签收用 `created_at desc`，已签收用 `japan_parcels.received_at desc`。
-  - 返回扁平化的 `items` 数组，包含：`id, parcel_id, source_order_no, tracking_no, status, is_problem, received_at, item_title(_cn), item_image_url, unit_price_jpy, quantity, item_total_cny`。
+仅改动手机端，不动 PC 端，不动数据库。
 
-### 2. `src/routes/m.parcels.tsx`
-- 复用已有的 `useParcelViewMode` hook（和 PC 端同源），在搜索框下方加一行 segmented 控件：「包裹 / 商品」，沿用 `ViewModeToggle` 风格但适配移动端尺寸（更高更易点）。
-- `useQuery` key/参数带上 `mode`；queryFn 透传 `mode`。
-- 当 `mode === "item"` 时渲染商品列表：
-  - 卡片显示商品缩略图、商品名（中文优先）、`¥单价` 大字 + `×数量 = ¥小计` 灰字、订单号、状态/签收时间、问题标记。
-  - 点击跳到 `/m/receive/$id`（父包裹详情）。
-- 当 `mode === "parcel"` 时保持现有 UI 不变。
-- 空态文案根据 mode 区分（「没有匹配的商品」/「没有匹配的包裹」）。
-- 与 PC 端一致：用户输入搜索词时自动切到「商品」视图，便于直接看到匹配商品。
+### 文件改动
 
-### 3. 不改的部分
-- `m.receive.$id`、PC 端列表、`use-parcel-view-mode` 全局状态保持不变（手机端切换会和 PC 端同步到 localStorage，这是预期行为）。
-- 状态枚举、bucket 定义不变。
+**1. `src/lib/mobile.functions.ts` — `searchParcels`**
+- 商品模式 select 增加 `service_fee_jpy, domestic_freight_jpy, freight_diff_jpy, exchange_rate, weight_g, pay_method, sub_order_no, merchant_order_no, source_platform, condition, addon_service, tariff_category, tariff_rate, notes, arrival_photo_urls`，让前端能直接喂给 `ItemDetailSheet`，无需二次请求。
+- 包裹模式有搜索词时直接返回空，或在前端层屏蔽（见下）。保留 `mode === "parcel"` 分支用于无搜索词的浏览。
+
+**2. `src/routes/m.parcels.tsx` — 重写**
+
+交互：
+- 搜索框聚焦或输入任何字符时，强制 `mode = "item"` 并禁用「按包裹/按商品」切换条（或直接隐藏切换条，仅在搜索为空时显示）。
+- 商品行 `onClick` 不再使用 `<Link>`，改为 `setSelectedItem(it)` 打开 `ItemDetailSheet`。需要把 serverFn 返回的字段映射成 `ItemDetailValue`。
+- 包裹行依旧 `<Link to="/m/receive/$id">`。
+
+UI 重新设计（移动端友好）：
+- **顶部搜索栏**：圆角输入框去掉边框，改为 `bg-muted/60` + 内嵌 Search 图标 + 清除按钮（有内容时显示 ×）。sticky 时加 `backdrop-blur` + 底部细分隔。
+- **段控件**：用单一 `Tabs`（待签收 / 已签收）替换现在的两段按钮组，靠左小尺寸；视图模式切换器（按包裹/按商品）改为右上角小型 segmented control（图标 + 文字），仅在搜索为空时出现。
+- **商品卡片行**：
+  - 左侧 64×64 圆角缩略图（无图时显示包裹 emoji 占位）
+  - 右侧两行：第一行商品名（粗体，line-clamp-2）；第二行小字 = 子单号 · 包裹单号
+  - 右上角金额块：大字 `¥{单件平均成本}`（CNY，2 位小数），下面小字 `× {qty} 件`
+  - 异常用左侧 2px 红色竖条 + 角落小红点替代当前的 AlertTriangle，更克制
+  - 已签收行底部追加灰色小字「签收 MM-DD HH:mm」
+  - 行间距 `py-3.5`，分隔用 `border-b border-border/40` 而非纯 divide
+- **空状态**：用 `EmptyState` 组件（项目已存在）+ 文案区分搜索 / 待签 / 已签
+- **加载**：用 3-5 行 skeleton 行（圆角占位）替换闪烁
+
+**3. （可选）`src/components/mobile/item-detail-sheet.tsx`**
+- 若打开时缺字段会渲染空，则补一个 fallback；预计不需要改，因为 serverFn 已经把字段补齐。
 
 ## 验证
 
-- 手机端 `/m/parcels` 切到「商品」后能看到每件商品独立一行，含单价 ¥ 显示。
-- 搜索「ガンプラ」之类关键词在商品维度能命中商品；在包裹维度仍按包裹返回。
-- 待签收 / 已签收 tab 在两种维度下都正确过滤。
-- 点击商品行进入对应包裹详情。
+- `/m/parcels` 搜索 "ガンプラ"：自动隐藏切换条、只显示商品列表
+- 点击商品行：底部弹出 `ItemDetailSheet`，金额、税率、到货照片可查可改
+- 商品行金额显示为「单件平均成本」=`item_total_cny/quantity`，与点开后明细里的 `单价` 概念区分清楚（明细里仍展示原始 `unit_price_jpy`）
+- 「按包裹」模式下点击仍跳 `/m/receive/$id`
+- 异常包裹的视觉提示更克制，不再抢眼
