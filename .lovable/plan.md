@@ -1,36 +1,51 @@
 ## 问题
+手机端 `ItemDetailSheet` 计算拆包单价时直接用 `item.item_total_cny`，没有像 PC 端那样按重量分摊国际运费、再加关税。`PackPriceCalculatorDialog` 也因此收到错误的 `landedCny`，保存的整体成本和单价都偏低。
 
-在手机端 `/m/parcels` 商品详情抽屉里点"拆包单价计算"，对话框里点保存后：
+PC 端的正确做法在 `item-card-dialog.tsx`：调用 `computeParcelItemLanded({ intl_total_jpy, intl_exchange_rate }, siblings)`，取该商品的 `landed.landedCny`，再传给 `computePiecePrice` / `PackPriceCalculatorDialog`。
 
-- `PackPriceCalculatorDialog` 调 `updateParcelItem` 写库成功，toast 显示"已保存"。
-- 但它只 invalidate `["jp-parcels"] / ["jp-parcels-counts"] / ["jp-parcel"]`（桌面端的 key），手机端用的是 `["mobile-parcels", ...]`，刷不到。
-- 抽屉里展示的 `item` 来自父组件 `selected` 这个本地 state，对象引用没变；即便后台 query 重新拉到了新数据，`selected` 也不会自动更新。
-- 结果：拆包卡片还是显示"拆包单价计算"按钮，看起来"没保存"，其实库里已经写进去了，重新打开抽屉才会看到。
+`pack_pieces / pack_pieces_source / pack_unit_note` 三个字段本来就是 `japan_parcel_items` 表里的，PC 与手机写的是同一行（通过 `updateParcelItem`），无需新建字段。
 
-## 方案
+## 改动
 
-只改前端展示，不动业务逻辑/数据库。
+### 1. `src/lib/mobile.functions.ts`
+新增 server fn `getParcelLandedContext`：
+- 入参：`{ parcel_id: string }`
+- 查 `japan_parcels` 取 `intl_total_jpy, intl_exchange_rate`
+- 查 `japan_parcel_items` 取该 parent 下所有商品的 `id, item_total_jpy, unit_price_jpy, quantity, weight_g, tariff_rate`
+- 返回 `{ parcel, items }`，给前端 `computeParcelItemLanded` 用
 
-### 1) `src/components/japan-parcel/pack-price-calculator-dialog.tsx`
+### 2. `src/components/mobile/item-detail-sheet.tsx`
+- 引入 `computeParcelItemLanded` 和新 server fn。
+- 当 `item.parent_id` 存在时，`useQuery(["mobile-parcel-landed", parent_id])` 拉 context（`enabled: open && !!parent_id`，`staleTime: 60s`）。
+- 用 `computeParcelItemLanded(parcel, items).get(item.id)` 得到 `landed`。
+- 拆包卡片：`computePiecePrice(item.item_total_jpy, landed.landedCny, pp)`。
+- 在金额块新增一行「到手价 / 运费分摊 / 关税」简版显示（与 PC 端口径一致），方便核对。
+- `<PackPriceCalculatorDialog landedCny={landed?.landedCny ?? null} />`（替换原来错误的 `item.item_total_cny`）。
+- 关闭对话框时除了 `mobile-parcel`/`mobile-parcels`，再 invalidate `["mobile-parcel-landed", parent_id]`，确保 landed 也刷新（其实 landed context 与 pack_pieces 无关，但保险）。
 
-- 新增可选 prop `onSaved?: (v: { pack_pieces: number | null; pack_pieces_source: string | null; pack_unit_note: string | null }) => void`。
-- 在 `handleSave` 成功 toast 之后、`onOpenChange(false)` 之前调用 `onSaved?.(...)`，把刚刚写库的三个字段值回传给调用方。
-- 桌面端调用方不传 `onSaved`，行为不变。
+### 3. 不变
+- `PackPriceCalculatorDialog`、`updateParcelItem`、`computeParcelItemLanded`、数据库 schema、RLS、PC 端 UI。
+- `mobile.functions.ts` 已有的 `searchParcels` 字段保持不变（按重量分摊需要 siblings，单条 item 查询里塞不下，所以单独发一次轻量查询是更干净的做法）。
 
-### 2) `src/components/mobile/item-detail-sheet.tsx`
-
-- 用本地 state 覆盖三个 pack 字段：`const [packOverride, setPackOverride] = useState<{ pieces, source, unit } | null>(null)`，并在 `useEffect([item?.id])` 里重置为 `null`。
-- 渲染拆包卡片和传给 `PackPriceCalculatorDialog` 的 `item` 时，优先使用 `packOverride` 里的值，回落到 `item.*`。
-- 把 `onSaved` 传给 `PackPriceCalculatorDialog`，回调里 `setPackOverride(...)`，这样卡片立刻显示新的 `拆 N 个 · ¥X/个` 和"重新计算"按钮。
-- 同时把 `onOpenChange(false)` 时的 invalidate key 改成（或追加）`["mobile-parcels"]`，让列表/汇总也刷新；保留对 `["mobile-parcel"]` 的兼容调用即可。
-
-### 3) 不动的部分
-
-- `PackPriceCalculatorDialog` 的识别管线、`updateParcelItem`、`pack-pieces.functions.ts`、数据库、RLS、桌面端调用处。
-- `m.parcels.tsx` 不需要改（重开抽屉时父级 query 已刷新，新 `selected` 自然带新值；本次会话内的即时显示靠 sheet 内 override 完成）。
-
-## 验收
-
-- 打开手机端 `/m/parcels` → 任一商品 → 拆包单价计算 → 填件数 → 保存。
-- 对话框关闭后，拆包卡片立刻显示 `拆 N 个 · ¥X.XX/个` 和"重新计算"按钮，不需要重开抽屉。
-- 再次打开同一商品，数据保持一致（说明真的写库了）。
+## 技术细节
+```ts
+// mobile.functions.ts
+export const getParcelLandedContext = createServerFn({ method: "GET" })
+  .inputValidator((i: unknown) => z.object({ parcel_id: z.string().uuid() }).parse(i))
+  .handler(async ({ data }) => {
+    const [p, it] = await Promise.all([
+      supabaseAdmin.from("japan_parcels")
+        .select("id, intl_total_jpy, intl_exchange_rate")
+        .eq("id", data.parcel_id).maybeSingle(),
+      supabaseAdmin.from("japan_parcel_items")
+        .select("id, item_total_jpy, unit_price_jpy, quantity, weight_g, tariff_rate")
+        .eq("parent_id", data.parcel_id),
+    ]);
+    if (p.error) throw new Error(p.error.message);
+    if (it.error) throw new Error(it.error.message);
+    return {
+      parcel: { intl_total_jpy: p.data?.intl_total_jpy ?? null, intl_exchange_rate: p.data?.intl_exchange_rate ?? null },
+      items: it.data ?? [],
+    };
+  });
+```
