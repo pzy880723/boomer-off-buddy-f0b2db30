@@ -38,6 +38,11 @@ interface Props {
   onOpenChange: (v: boolean) => void;
   item: PackCalcItem;
   landedCny: number | null;
+  onSaved?: (v: {
+    pack_pieces: number | null;
+    pack_pieces_source: string | null;
+    pack_unit_note: string | null;
+  }) => void;
 }
 
 type StepState =
