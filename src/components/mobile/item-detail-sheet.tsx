@@ -166,6 +166,21 @@ export function ItemDetailSheet({
             />
 
             <Sep />
+            <Row label="运费分摊" v={landed?.freightShareCny != null ? formatCny(landed.freightShareCny) : "—"} />
+            <Row label="关税(¥)" v={landed?.tariffCny != null ? formatCny(landed.tariffCny) : "—"} />
+            <Row
+              label="到手价"
+              v={
+                landed?.landedCny != null ? (
+                  <span className="font-semibold text-red-600">{formatCny(landed.landedCny)}</span>
+                ) : (
+                  "—"
+                )
+              }
+            />
+
+
+            <Sep />
             <Row label="支付方式" v={item.pay_method || "—"} />
             <Row
               label="支付时间"
