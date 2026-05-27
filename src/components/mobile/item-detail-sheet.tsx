@@ -65,10 +65,16 @@ export function ItemDetailSheet({
   const saveFn = useServerFn(updateItemArrivalPhotos);
   const [photos, setPhotos] = useState<string[]>([]);
   const [calcOpen, setCalcOpen] = useState(false);
+  const [packOverride, setPackOverride] = useState<{
+    pack_pieces: number | null;
+    pack_pieces_source: string | null;
+    pack_unit_note: string | null;
+  } | null>(null);
   const userNames = useUserNames([item?.created_by]);
 
   useEffect(() => {
     setPhotos(Array.isArray(item?.arrival_photo_urls) ? item!.arrival_photo_urls! : []);
+    setPackOverride(null);
   }, [item?.id, item?.arrival_photo_urls]);
 
   if (!item) return null;
