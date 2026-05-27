@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { PRICE_TIERS } from "./inventory.helpers";
+import { computeParcelItemLanded } from "./japan-parcel.helpers";
 
 const PENDING_STATUSES = ["purchased", "at_jp_warehouse", "shipping_intl"] as const;
 const RECEIVED_STATUSES = ["delivered", "completed"] as const;
@@ -91,6 +92,42 @@ export const searchParcels = createServerFn({ method: "GET" })
           parcel_created_by: p?.created_by ?? null,
         };
       });
+
+      // 为列表项补 landed_cny（按重量分摊国际运费 + 关税）
+      const parentIds = Array.from(new Set(items.map((i) => i.parent_id).filter(Boolean) as string[]));
+      if (parentIds.length > 0) {
+        const [parcelsRes, siblingsRes] = await Promise.all([
+          supabaseAdmin
+            .from("japan_parcels")
+            .select("id, intl_total_jpy, intl_exchange_rate")
+            .in("id", parentIds),
+          supabaseAdmin
+            .from("japan_parcel_items")
+            .select("id, parent_id, item_total_jpy, unit_price_jpy, quantity, weight_g, tariff_rate")
+            .in("parent_id", parentIds),
+        ]);
+        const parcelMap = new Map<string, { intl_total_jpy: number | null; intl_exchange_rate: number | null }>();
+        (parcelsRes.data ?? []).forEach((p) => parcelMap.set(p.id, { intl_total_jpy: p.intl_total_jpy ?? null, intl_exchange_rate: p.intl_exchange_rate ?? null }));
+        const siblingsByParent = new Map<string, Array<{ id: string; item_total_jpy: number | null; unit_price_jpy: number | null; quantity: number | null; weight_g: number | null; tariff_rate: number | null }>>();
+        (siblingsRes.data ?? []).forEach((s) => {
+          const k = s.parent_id as string;
+          const arr = siblingsByParent.get(k) ?? [];
+          arr.push(s);
+          siblingsByParent.set(k, arr);
+        });
+        const landedById = new Map<string, number | null>();
+        for (const pid of parentIds) {
+          const parcel = parcelMap.get(pid);
+          const sibs = siblingsByParent.get(pid) ?? [];
+          if (!parcel || sibs.length === 0) continue;
+          const m = computeParcelItemLanded(parcel, sibs);
+          m.forEach((v, k) => landedById.set(k, v.landedCny));
+        }
+        items.forEach((it) => {
+          (it as { landed_cny?: number | null }).landed_cny = landedById.get(it.id) ?? null;
+        });
+      }
+
       return { mode: "item" as const, items, rows: [] as never[], hasMore: items.length === data.limit };
     }
 

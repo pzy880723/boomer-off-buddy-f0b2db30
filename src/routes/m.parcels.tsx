@@ -264,9 +264,10 @@ function ParcelsSearch() {
                     {(() => {
                       const pp = (it as { pack_pieces?: number | null }).pack_pieces;
                       if (!pp || pp <= 1) return null;
+                      const landedCny = (it as { landed_cny?: number | null }).landed_cny ?? null;
                       const { pieceCny, pieceJpy } = computePiecePrice(
                         it.item_total_jpy as number | null,
-                        it.item_total_cny as number | null,
+                        landedCny,
                         pp,
                       );
                       const u = (it as { pack_unit_note?: string | null }).pack_unit_note || "个";
