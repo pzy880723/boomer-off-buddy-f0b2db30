@@ -51,6 +51,7 @@ export const searchParcels = createServerFn({ method: "GET" })
         return {
           id: r.id,
           parcel_id: r.parent_id,
+          parent_id: r.parent_id,
           sub_order_no: r.sub_order_no,
           merchant_order_no: r.merchant_order_no,
           source_platform: r.source_platform,
