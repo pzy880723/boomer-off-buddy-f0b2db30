@@ -174,6 +174,50 @@ export function ItemDetailSheet({
             ) : null}
           </div>
 
+          {(() => {
+            const pp = item.pack_pieces ?? null;
+            const unit = item.pack_unit_note || "个";
+            const { pieceCny, pieceJpy } = computePiecePrice(
+              item.item_total_jpy ?? null,
+              item.item_total_cny ?? null,
+              pp && pp > 0 ? pp : null,
+            );
+            return (
+              <div className="rounded-xl border bg-card p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <h4 className="text-xs font-medium flex items-center gap-1">
+                    <Sparkles className="h-3.5 w-3.5 text-primary" /> 拆包单价
+                  </h4>
+                  {pp && pp > 0 ? (
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-[11px]" onClick={() => setCalcOpen(true)}>
+                      重新计算
+                    </Button>
+                  ) : null}
+                </div>
+                {pp && pp > 0 ? (
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-[11px] text-muted-foreground">
+                      整包拆 <b className="text-foreground">{pp}</b> {unit}
+                    </span>
+                    <span className="font-mono tabular-nums text-sm font-semibold text-red-600">
+                      {pieceCny != null
+                        ? `¥${pieceCny.toFixed(2)}/${unit}`
+                        : pieceJpy != null
+                          ? `JPY ${pieceJpy.toFixed(0)}/${unit}`
+                          : "—"}
+                    </span>
+                  </div>
+                ) : (
+                  <Button size="sm" className="w-full" onClick={() => setCalcOpen(true)}>
+                    <Sparkles className="mr-1.5 h-3.5 w-3.5" /> 拆包单价计算
+                  </Button>
+                )}
+              </div>
+            );
+          })()}
+
+
+
           <div className="rounded-xl border bg-card p-3">
             <div className="mb-2 flex items-baseline justify-between">
               <h4 className="text-xs font-medium">到货照片</h4>
