@@ -3,13 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Sparkles } from "lucide-react";
 import { toThumbUrl } from "@/lib/image";
 import { tariffCategoryLabel, rateToPercent } from "@/lib/tariff";
-import { computeItemTariffJpy, computePiecePrice } from "@/lib/japan-parcel.helpers";
+import { computeItemTariffJpy, computePiecePrice, computeParcelItemLanded, formatCny } from "@/lib/japan-parcel.helpers";
 import { PhotoUploaderGrid } from "@/components/mobile/photo-uploader-grid";
 import { PackPriceCalculatorDialog } from "@/components/japan-parcel/pack-price-calculator-dialog";
 import { useServerFn } from "@tanstack/react-start";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
-import { updateItemArrivalPhotos } from "@/lib/mobile.functions";
+import { updateItemArrivalPhotos, getParcelLandedContext } from "@/lib/mobile.functions";
 import { useUserNames } from "@/hooks/use-user-names";
 import { toast } from "sonner";
 
@@ -63,6 +63,7 @@ export function ItemDetailSheet({
 }) {
   const qc = useQueryClient();
   const saveFn = useServerFn(updateItemArrivalPhotos);
+  const fetchLanded = useServerFn(getParcelLandedContext);
   const [photos, setPhotos] = useState<string[]>([]);
   const [calcOpen, setCalcOpen] = useState(false);
   const [packOverride, setPackOverride] = useState<{
@@ -71,6 +72,19 @@ export function ItemDetailSheet({
     pack_unit_note: string | null;
   } | null>(null);
   const userNames = useUserNames([item?.created_by]);
+
+  const parentId = item?.parent_id ?? null;
+  const { data: landedCtx } = useQuery({
+    queryKey: ["mobile-parcel-landed", parentId],
+    queryFn: () => fetchLanded({ data: { parcel_id: parentId! } }),
+    enabled: !!open && !!parentId,
+    staleTime: 60_000,
+  });
+  const landed = (() => {
+    if (!landedCtx || !item) return null;
+    const map = computeParcelItemLanded(landedCtx.parcel, landedCtx.items);
+    return map.get(item.id) ?? null;
+  })();
 
   useEffect(() => {
     setPhotos(Array.isArray(item?.arrival_photo_urls) ? item!.arrival_photo_urls! : []);
@@ -152,6 +166,21 @@ export function ItemDetailSheet({
             />
 
             <Sep />
+            <Row label="运费分摊" v={landed?.freightShareCny != null ? formatCny(landed.freightShareCny) : "—"} />
+            <Row label="关税(¥)" v={landed?.tariffCny != null ? formatCny(landed.tariffCny) : "—"} />
+            <Row
+              label="到手价"
+              v={
+                landed?.landedCny != null ? (
+                  <span className="font-semibold text-red-600">{formatCny(landed.landedCny)}</span>
+                ) : (
+                  "—"
+                )
+              }
+            />
+
+
+            <Sep />
             <Row label="支付方式" v={item.pay_method || "—"} />
             <Row
               label="支付时间"
@@ -187,7 +216,7 @@ export function ItemDetailSheet({
             const unit = effUnitNote || "个";
             const { pieceCny, pieceJpy } = computePiecePrice(
               item.item_total_jpy ?? null,
-              item.item_total_cny ?? null,
+              landed?.landedCny ?? null,
               pp && pp > 0 ? pp : null,
             );
             return (
@@ -263,7 +292,7 @@ export function ItemDetailSheet({
           pack_pieces_source: packOverride?.pack_pieces_source ?? item.pack_pieces_source ?? null,
           pack_unit_note: packOverride?.pack_unit_note ?? item.pack_unit_note ?? null,
         }}
-        landedCny={item.item_total_cny ?? null}
+        landedCny={landed?.landedCny ?? null}
       />
     </Sheet>
   );
