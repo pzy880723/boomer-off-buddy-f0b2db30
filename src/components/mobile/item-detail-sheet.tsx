@@ -181,8 +181,10 @@ export function ItemDetailSheet({
           </div>
 
           {(() => {
-            const pp = item.pack_pieces ?? null;
-            const unit = item.pack_unit_note || "个";
+            const effPieces = packOverride?.pack_pieces ?? item.pack_pieces ?? null;
+            const effUnitNote = packOverride?.pack_unit_note ?? item.pack_unit_note ?? null;
+            const pp = effPieces;
+            const unit = effUnitNote || "个";
             const { pieceCny, pieceJpy } = computePiecePrice(
               item.item_total_jpy ?? null,
               item.item_total_cny ?? null,
