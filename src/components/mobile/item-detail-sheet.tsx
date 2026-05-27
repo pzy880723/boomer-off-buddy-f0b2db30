@@ -216,7 +216,7 @@ export function ItemDetailSheet({
             const unit = effUnitNote || "个";
             const { pieceCny, pieceJpy } = computePiecePrice(
               item.item_total_jpy ?? null,
-              item.item_total_cny ?? null,
+              landed?.landedCny ?? null,
               pp && pp > 0 ? pp : null,
             );
             return (
