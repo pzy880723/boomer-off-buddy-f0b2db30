@@ -1,30 +1,36 @@
-## 目标
+## 问题
 
-手机端 `/m/parcels` 商品列表点开的"商品详情" Sheet（`ItemDetailSheet`）目前只展示信息，桌面端已有的"拆包单价计算"（AI 标题+图片识别 → 回填 pack_pieces / pack_unit_note）在手机端无法触达。本次给手机端补齐同款功能。
+在手机端 `/m/parcels` 商品详情抽屉里点"拆包单价计算"，对话框里点保存后：
 
-## 改动范围
+- `PackPriceCalculatorDialog` 调 `updateParcelItem` 写库成功，toast 显示"已保存"。
+- 但它只 invalidate `["jp-parcels"] / ["jp-parcels-counts"] / ["jp-parcel"]`（桌面端的 key），手机端用的是 `["mobile-parcels", ...]`，刷不到。
+- 抽屉里展示的 `item` 来自父组件 `selected` 这个本地 state，对象引用没变；即便后台 query 重新拉到了新数据，`selected` 也不会自动更新。
+- 结果：拆包卡片还是显示"拆包单价计算"按钮，看起来"没保存"，其实库里已经写进去了，重新打开抽屉才会看到。
 
-仅前端 / UI，复用现有的 `PackPriceCalculatorDialog` 与 server fn（`estimatePiecesFromTitle` / `estimatePiecesFromImage` / `updateParcelItem`），不动数据库与业务逻辑。
+## 方案
 
-### 1) `src/components/mobile/item-detail-sheet.tsx`
-- 扩展 `ItemDetailValue` 类型，补 `pack_pieces / pack_pieces_source / pack_unit_note` 三个可选字段（与后端字段一致）。
-- 顶部信息卡下新增一块「拆包单价」卡片：
-  - 若已有 `pack_pieces`：显示 `拆 N{unit} · ¥X.XX/{unit}`（用 `computePiecePrice(item_total_jpy, item_total_cny, pack_pieces)` 计算），右侧放一个「重新计算」按钮。
-  - 若未拆包：显示一行说明 + 主按钮「✨ 拆包单价计算」。
-- 点击按钮 `setCalcOpen(true)` 打开 `PackPriceCalculatorDialog`，传：
-  - `item={ id, item_title, item_title_cn, item_image_url, item_total_jpy, pack_pieces, pack_pieces_source, pack_unit_note }`
-  - `landedCny={ item.item_total_cny ?? null }`（手机端列表没有按重量摊运费的整包 landed，直接用子订单 `item_total_cny` 作为到手价基准，与列表里 `computePiecePrice` 的口径保持一致）。
-- 保存后 `PackPriceCalculatorDialog` 已自动 invalidate `jp-parcel*`；额外 invalidate `["mobile-parcel"]`（在 `onOpenChange(false)` 回调里调用 `qc.invalidateQueries`），让列表立刻刷新。
+只改前端展示，不动业务逻辑/数据库。
 
-### 2) `src/routes/m.parcels.tsx`
-- 当前 `setSelected(it as ItemDetailValue)` 已经把整条记录塞进 sheet，确认 `searchParcels` 返回的 item 行里包含 `pack_pieces / pack_pieces_source / pack_unit_note` 三字段；若缺失则在 `src/lib/mobile.functions.ts` 的 select 列表里补上（仅 select 字段，不动 schema）。
+### 1) `src/components/japan-parcel/pack-price-calculator-dialog.tsx`
+
+- 新增可选 prop `onSaved?: (v: { pack_pieces: number | null; pack_pieces_source: string | null; pack_unit_note: string | null }) => void`。
+- 在 `handleSave` 成功 toast 之后、`onOpenChange(false)` 之前调用 `onSaved?.(...)`，把刚刚写库的三个字段值回传给调用方。
+- 桌面端调用方不传 `onSaved`，行为不变。
+
+### 2) `src/components/mobile/item-detail-sheet.tsx`
+
+- 用本地 state 覆盖三个 pack 字段：`const [packOverride, setPackOverride] = useState<{ pieces, source, unit } | null>(null)`，并在 `useEffect([item?.id])` 里重置为 `null`。
+- 渲染拆包卡片和传给 `PackPriceCalculatorDialog` 的 `item` 时，优先使用 `packOverride` 里的值，回落到 `item.*`。
+- 把 `onSaved` 传给 `PackPriceCalculatorDialog`，回调里 `setPackOverride(...)`，这样卡片立刻显示新的 `拆 N 个 · ¥X/个` 和"重新计算"按钮。
+- 同时把 `onOpenChange(false)` 时的 invalidate key 改成（或追加）`["mobile-parcels"]`，让列表/汇总也刷新；保留对 `["mobile-parcel"]` 的兼容调用即可。
 
 ### 3) 不动的部分
-- `PackPriceCalculatorDialog` 自身（Dialog 在手机端弹出已经能正常使用，`max-w-md` 移动端宽度可接受，无需改写成 Sheet）。
-- `pack-pieces.functions.ts` / `japan-parcel.functions.ts` / 数据库 / RLS / 桌面端 UI。
+
+- `PackPriceCalculatorDialog` 的识别管线、`updateParcelItem`、`pack-pieces.functions.ts`、数据库、RLS、桌面端调用处。
+- `m.parcels.tsx` 不需要改（重开抽屉时父级 query 已刷新，新 `selected` 自然带新值；本次会话内的即时显示靠 sheet 内 override 完成）。
 
 ## 验收
 
-1. 手机端打开 `/m/parcels`，点任一商品 → Sheet 内能看到「拆包单价计算」入口。
-2. 已有拆包数据的商品，Sheet 内直接展示单件单价 + 「重新计算」按钮。
-3. 点击按钮 → 弹出对话框 → 自动跑标题识别 → 可手动改件数 → 保存 → Sheet/列表上的"拆 N{unit} · ¥X.XX"立即更新。
+- 打开手机端 `/m/parcels` → 任一商品 → 拆包单价计算 → 填件数 → 保存。
+- 对话框关闭后，拆包卡片立刻显示 `拆 N 个 · ¥X.XX/个` 和"重新计算"按钮，不需要重开抽屉。
+- 再次打开同一商品，数据保持一致（说明真的写库了）。

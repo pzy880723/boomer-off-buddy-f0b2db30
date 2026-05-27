@@ -38,6 +38,11 @@ interface Props {
   onOpenChange: (v: boolean) => void;
   item: PackCalcItem;
   landedCny: number | null;
+  onSaved?: (v: {
+    pack_pieces: number | null;
+    pack_pieces_source: string | null;
+    pack_unit_note: string | null;
+  }) => void;
 }
 
 type StepState =
@@ -47,7 +52,7 @@ type StepState =
   | { status: "error"; reason: string }
   | { status: "skipped"; reason: string };
 
-export function PackPriceCalculatorDialog({ open, onOpenChange, item, landedCny }: Props) {
+export function PackPriceCalculatorDialog({ open, onOpenChange, item, landedCny, onSaved }: Props) {
   const qc = useQueryClient();
   const fnTitle = useServerFn(estimatePiecesFromTitle);
   const fnImage = useServerFn(estimatePiecesFromImage);
@@ -150,18 +155,19 @@ export function PackPriceCalculatorDialog({ open, onOpenChange, item, landedCny 
   const handleSave = async () => {
     setSaving(true);
     try {
+      const saved = {
+        pack_pieces: piecesNum > 0 ? piecesNum : null,
+        pack_pieces_source: piecesNum > 0 ? source : null,
+        pack_unit_note: (unit.trim() || (piecesNum > 0 ? "个" : null)) as string | null,
+      };
       await fnUpdate({
-        data: {
-          id: item.id,
-          pack_pieces: piecesNum > 0 ? piecesNum : null,
-          pack_pieces_source: piecesNum > 0 ? source : null,
-          pack_unit_note: unit.trim() || (piecesNum > 0 ? "个" : null),
-        },
+        data: { id: item.id, ...saved },
       });
       toast.success("已保存");
       await qc.invalidateQueries({ queryKey: ["jp-parcels"] });
       await qc.invalidateQueries({ queryKey: ["jp-parcels-counts"] });
       await qc.invalidateQueries({ queryKey: ["jp-parcel"] });
+      onSaved?.(saved);
       onOpenChange(false);
     } catch (e) {
       toast.error((e as Error).message);

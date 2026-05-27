@@ -65,10 +65,16 @@ export function ItemDetailSheet({
   const saveFn = useServerFn(updateItemArrivalPhotos);
   const [photos, setPhotos] = useState<string[]>([]);
   const [calcOpen, setCalcOpen] = useState(false);
+  const [packOverride, setPackOverride] = useState<{
+    pack_pieces: number | null;
+    pack_pieces_source: string | null;
+    pack_unit_note: string | null;
+  } | null>(null);
   const userNames = useUserNames([item?.created_by]);
 
   useEffect(() => {
     setPhotos(Array.isArray(item?.arrival_photo_urls) ? item!.arrival_photo_urls! : []);
+    setPackOverride(null);
   }, [item?.id, item?.arrival_photo_urls]);
 
   if (!item) return null;
@@ -175,8 +181,10 @@ export function ItemDetailSheet({
           </div>
 
           {(() => {
-            const pp = item.pack_pieces ?? null;
-            const unit = item.pack_unit_note || "个";
+            const effPieces = packOverride?.pack_pieces ?? item.pack_pieces ?? null;
+            const effUnitNote = packOverride?.pack_unit_note ?? item.pack_unit_note ?? null;
+            const pp = effPieces;
+            const unit = effUnitNote || "个";
             const { pieceCny, pieceJpy } = computePiecePrice(
               item.item_total_jpy ?? null,
               item.item_total_cny ?? null,
@@ -239,17 +247,21 @@ export function ItemDetailSheet({
         open={calcOpen}
         onOpenChange={(v) => {
           setCalcOpen(v);
-          if (!v) qc.invalidateQueries({ queryKey: ["mobile-parcel"] });
+          if (!v) {
+            qc.invalidateQueries({ queryKey: ["mobile-parcel"] });
+            qc.invalidateQueries({ queryKey: ["mobile-parcels"] });
+          }
         }}
+        onSaved={(s) => setPackOverride(s)}
         item={{
           id: item.id,
           item_title: item.item_title ?? null,
           item_title_cn: item.item_title_cn ?? null,
           item_image_url: item.item_image_url ?? null,
           item_total_jpy: item.item_total_jpy ?? null,
-          pack_pieces: item.pack_pieces ?? null,
-          pack_pieces_source: item.pack_pieces_source ?? null,
-          pack_unit_note: item.pack_unit_note ?? null,
+          pack_pieces: packOverride?.pack_pieces ?? item.pack_pieces ?? null,
+          pack_pieces_source: packOverride?.pack_pieces_source ?? item.pack_pieces_source ?? null,
+          pack_unit_note: packOverride?.pack_unit_note ?? item.pack_unit_note ?? null,
         }}
         landedCny={item.item_total_cny ?? null}
       />
