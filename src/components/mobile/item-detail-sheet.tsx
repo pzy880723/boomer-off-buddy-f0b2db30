@@ -64,6 +64,7 @@ export function ItemDetailSheet({
   const qc = useQueryClient();
   const saveFn = useServerFn(updateItemArrivalPhotos);
   const [photos, setPhotos] = useState<string[]>([]);
+  const [calcOpen, setCalcOpen] = useState(false);
   const userNames = useUserNames([item?.created_by]);
 
   useEffect(() => {
