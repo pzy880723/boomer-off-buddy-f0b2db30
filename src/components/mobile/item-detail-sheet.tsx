@@ -63,6 +63,7 @@ export function ItemDetailSheet({
 }) {
   const qc = useQueryClient();
   const saveFn = useServerFn(updateItemArrivalPhotos);
+  const fetchLanded = useServerFn(getParcelLandedContext);
   const [photos, setPhotos] = useState<string[]>([]);
   const [calcOpen, setCalcOpen] = useState(false);
   const [packOverride, setPackOverride] = useState<{
@@ -71,6 +72,19 @@ export function ItemDetailSheet({
     pack_unit_note: string | null;
   } | null>(null);
   const userNames = useUserNames([item?.created_by]);
+
+  const parentId = item?.parent_id ?? null;
+  const { data: landedCtx } = useQuery({
+    queryKey: ["mobile-parcel-landed", parentId],
+    queryFn: () => fetchLanded({ data: { parcel_id: parentId! } }),
+    enabled: !!open && !!parentId,
+    staleTime: 60_000,
+  });
+  const landed = (() => {
+    if (!landedCtx || !item) return null;
+    const map = computeParcelItemLanded(landedCtx.parcel, landedCtx.items);
+    return map.get(item.id) ?? null;
+  })();
 
   useEffect(() => {
     setPhotos(Array.isArray(item?.arrival_photo_urls) ? item!.arrival_photo_urls! : []);
