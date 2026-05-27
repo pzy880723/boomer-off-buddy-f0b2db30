@@ -247,17 +247,21 @@ export function ItemDetailSheet({
         open={calcOpen}
         onOpenChange={(v) => {
           setCalcOpen(v);
-          if (!v) qc.invalidateQueries({ queryKey: ["mobile-parcel"] });
+          if (!v) {
+            qc.invalidateQueries({ queryKey: ["mobile-parcel"] });
+            qc.invalidateQueries({ queryKey: ["mobile-parcels"] });
+          }
         }}
+        onSaved={(s) => setPackOverride(s)}
         item={{
           id: item.id,
           item_title: item.item_title ?? null,
           item_title_cn: item.item_title_cn ?? null,
           item_image_url: item.item_image_url ?? null,
           item_total_jpy: item.item_total_jpy ?? null,
-          pack_pieces: item.pack_pieces ?? null,
-          pack_pieces_source: item.pack_pieces_source ?? null,
-          pack_unit_note: item.pack_unit_note ?? null,
+          pack_pieces: packOverride?.pack_pieces ?? item.pack_pieces ?? null,
+          pack_pieces_source: packOverride?.pack_pieces_source ?? item.pack_pieces_source ?? null,
+          pack_unit_note: packOverride?.pack_unit_note ?? item.pack_unit_note ?? null,
         }}
         landedCny={item.item_total_cny ?? null}
       />
