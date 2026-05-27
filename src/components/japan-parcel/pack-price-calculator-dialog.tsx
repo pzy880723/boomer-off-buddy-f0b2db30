@@ -52,7 +52,7 @@ type StepState =
   | { status: "error"; reason: string }
   | { status: "skipped"; reason: string };
 
-export function PackPriceCalculatorDialog({ open, onOpenChange, item, landedCny }: Props) {
+export function PackPriceCalculatorDialog({ open, onOpenChange, item, landedCny, onSaved }: Props) {
   const qc = useQueryClient();
   const fnTitle = useServerFn(estimatePiecesFromTitle);
   const fnImage = useServerFn(estimatePiecesFromImage);
