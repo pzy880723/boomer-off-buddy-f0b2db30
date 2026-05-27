@@ -155,18 +155,19 @@ export function PackPriceCalculatorDialog({ open, onOpenChange, item, landedCny,
   const handleSave = async () => {
     setSaving(true);
     try {
+      const saved = {
+        pack_pieces: piecesNum > 0 ? piecesNum : null,
+        pack_pieces_source: piecesNum > 0 ? source : null,
+        pack_unit_note: (unit.trim() || (piecesNum > 0 ? "个" : null)) as string | null,
+      };
       await fnUpdate({
-        data: {
-          id: item.id,
-          pack_pieces: piecesNum > 0 ? piecesNum : null,
-          pack_pieces_source: piecesNum > 0 ? source : null,
-          pack_unit_note: unit.trim() || (piecesNum > 0 ? "个" : null),
-        },
+        data: { id: item.id, ...saved },
       });
       toast.success("已保存");
       await qc.invalidateQueries({ queryKey: ["jp-parcels"] });
       await qc.invalidateQueries({ queryKey: ["jp-parcels-counts"] });
       await qc.invalidateQueries({ queryKey: ["jp-parcel"] });
+      onSaved?.(saved);
       onOpenChange(false);
     } catch (e) {
       toast.error((e as Error).message);
