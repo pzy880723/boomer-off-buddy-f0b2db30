@@ -157,6 +157,41 @@ export const getMobileCounts = createServerFn({ method: "GET" }).handler(async (
   };
 });
 
+/** 包裹到手价 context：用于按重量分摊运费 + 关税，得出每个商品的到手价 */
+export const getParcelLandedContext = createServerFn({ method: "GET" })
+  .inputValidator((input: unknown) =>
+    z.object({ parcel_id: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const [p, it] = await Promise.all([
+      supabaseAdmin
+        .from("japan_parcels")
+        .select("id, intl_total_jpy, intl_exchange_rate")
+        .eq("id", data.parcel_id)
+        .maybeSingle(),
+      supabaseAdmin
+        .from("japan_parcel_items")
+        .select("id, item_total_jpy, unit_price_jpy, quantity, weight_g, tariff_rate")
+        .eq("parent_id", data.parcel_id),
+    ]);
+    if (p.error) throw new Error(p.error.message);
+    if (it.error) throw new Error(it.error.message);
+    return {
+      parcel: {
+        intl_total_jpy: p.data?.intl_total_jpy ?? null,
+        intl_exchange_rate: p.data?.intl_exchange_rate ?? null,
+      },
+      items: (it.data ?? []) as Array<{
+        id: string;
+        item_total_jpy: number | null;
+        unit_price_jpy: number | null;
+        quantity: number | null;
+        weight_g: number | null;
+        tariff_rate: number | null;
+      }>,
+    };
+  });
+
 /** 一键签收 + 写时间线（仅更新包裹状态/到货照片，不创建库存条目） */
 export const markParcelDelivered = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
