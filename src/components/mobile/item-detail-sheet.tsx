@@ -42,6 +42,9 @@ export interface ItemDetailValue {
   system_code?: string | null;
   created_by?: string | null;
   created_at?: string | null;
+  pack_pieces?: number | null;
+  pack_pieces_source?: string | null;
+  pack_unit_note?: string | null;
 }
 
 const fmtJpy = (v: number | null | undefined) =>
