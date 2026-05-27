@@ -292,7 +292,7 @@ export function ItemDetailSheet({
           pack_pieces_source: packOverride?.pack_pieces_source ?? item.pack_pieces_source ?? null,
           pack_unit_note: packOverride?.pack_unit_note ?? item.pack_unit_note ?? null,
         }}
-        landedCny={item.item_total_cny ?? null}
+        landedCny={landed?.landedCny ?? null}
       />
     </Sheet>
   );
