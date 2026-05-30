@@ -187,10 +187,11 @@ function JapanParcelList() {
   });
 
   const countsQ = useQuery({
-    queryKey: ["jp-parcels-counts"],
-    queryFn: () => getJapanParcelCounts(),
+    queryKey: ["jp-parcels-counts", submittedSearch],
+    queryFn: () => getJapanParcelCounts({ data: { search: submittedSearch || undefined } }),
     staleTime: 30_000,
   });
+
   const counts = countsQ.data ?? { all: 0, purchased: 0, delivered: 0, problem: 0, trash: 0 };
 
   const rows = (list.data?.rows ?? []) as unknown as ParcelRow[];

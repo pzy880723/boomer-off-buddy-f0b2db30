@@ -156,13 +156,44 @@ export const listJapanParcels = createServerFn({ method: "GET" })
   });
 
 export const getJapanParcelCounts = createServerFn({ method: "GET" })
-  .handler(async () => {
+  .inputValidator((input: unknown) =>
+    z.object({ search: z.string().trim().max(200).optional() }).parse(input ?? {}),
+  )
+  .handler(async ({ data }) => {
+    const raw = data.search?.trim();
+    let orExpr: string | null = null;
+    if (raw) {
+      const escaped = raw.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+      const s = `"%${escaped}%"`;
+      const { data: itemMatches } = await supabaseAdmin
+        .from("japan_parcel_items")
+        .select("parent_id")
+        .or(`item_title.ilike.${s},item_title_cn.ilike.${s}`)
+        .limit(500);
+      const parcelIds = Array.from(
+        new Set((itemMatches ?? []).map((r) => r.parent_id).filter(Boolean) as string[]),
+      );
+      const parts = [
+        `item_title.ilike.${s}`,
+        `item_title_cn.ilike.${s}`,
+        `source_order_no.ilike.${s}`,
+        `tracking_no.ilike.${s}`,
+        `seller.ilike.${s}`,
+        `receiver_name.ilike.${s}`,
+      ];
+      if (parcelIds.length > 0) parts.push(`id.in.(${parcelIds.join(",")})`);
+      orExpr = parts.join(",");
+    }
+    const base = () => {
+      const q = supabaseAdmin.from("japan_parcels").select("id", { count: "exact", head: true });
+      return orExpr ? q.or(orExpr) : q;
+    };
     const [allRes, purchasedRes, deliveredRes, problemRes, trashRes] = await Promise.all([
-      supabaseAdmin.from("japan_parcels").select("id", { count: "exact", head: true }).is("deleted_at", null),
-      supabaseAdmin.from("japan_parcels").select("id", { count: "exact", head: true }).is("deleted_at", null).in("status", PURCHASED_STATUSES),
-      supabaseAdmin.from("japan_parcels").select("id", { count: "exact", head: true }).is("deleted_at", null).in("status", DELIVERED_STATUSES),
-      supabaseAdmin.from("japan_parcels").select("id", { count: "exact", head: true }).is("deleted_at", null).eq("is_problem", true),
-      supabaseAdmin.from("japan_parcels").select("id", { count: "exact", head: true }).not("deleted_at", "is", null),
+      base().is("deleted_at", null),
+      base().is("deleted_at", null).in("status", PURCHASED_STATUSES),
+      base().is("deleted_at", null).in("status", DELIVERED_STATUSES),
+      base().is("deleted_at", null).eq("is_problem", true),
+      base().not("deleted_at", "is", null),
     ]);
     return {
       all: allRes.count ?? 0,
@@ -172,6 +203,7 @@ export const getJapanParcelCounts = createServerFn({ method: "GET" })
       trash: trashRes.count ?? 0,
     };
   });
+
 
 export const setJapanParcelProblem = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
