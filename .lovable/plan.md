@@ -1,51 +1,24 @@
 ## 问题
-手机端 `ItemDetailSheet` 计算拆包单价时直接用 `item.item_total_cny`，没有像 PC 端那样按重量分摊国际运费、再加关税。`PackPriceCalculatorDialog` 也因此收到错误的 `landedCny`，保存的整体成本和单价都偏低。
-
-PC 端的正确做法在 `item-card-dialog.tsx`：调用 `computeParcelItemLanded({ intl_total_jpy, intl_exchange_rate }, siblings)`，取该商品的 `landed.landedCny`，再传给 `computePiecePrice` / `PackPriceCalculatorDialog`。
-
-`pack_pieces / pack_pieces_source / pack_unit_note` 三个字段本来就是 `japan_parcel_items` 表里的，PC 与手机写的是同一行（通过 `updateParcelItem`），无需新建字段。
+`/purchase/japan-parcel` 顶部 Tab 角标（全部 / 已采购 / 已签收 / 问题包裹 / 回收站）来自 `getJapanParcelCounts`，它对全表做 `count: exact`，**不带搜索词**。所以输入搜索后，列表行数变了，角标却还是全量数字，跟实际结果对不上。
 
 ## 改动
 
-### 1. `src/lib/mobile.functions.ts`
-新增 server fn `getParcelLandedContext`：
-- 入参：`{ parcel_id: string }`
-- 查 `japan_parcels` 取 `intl_total_jpy, intl_exchange_rate`
-- 查 `japan_parcel_items` 取该 parent 下所有商品的 `id, item_total_jpy, unit_price_jpy, quantity, weight_g, tariff_rate`
-- 返回 `{ parcel, items }`，给前端 `computeParcelItemLanded` 用
+### 1. `src/lib/japan-parcel.functions.ts` — `getJapanParcelCounts`
+- 增加 `search?: string` 入参（`inputValidator` 用 zod，trim、≤200）。
+- 当有 search 时，复用 `listJapanParcels` 里那段搜索逻辑：
+  - 先查 `japan_parcel_items` 取匹配的 `parent_id` 集合（limit 500，与 list 保持一致，避免口径不一致）；
+  - 五个 `count: exact, head: true` 查询都额外 `.or(...)` 同样的 6 条件 + `id.in.(...)`。
+- 无 search 时维持现在的实现，零额外开销。
+- 抽一个内部小函数 `applySearch(q, search, parcelIds)` 避免重复。
 
-### 2. `src/components/mobile/item-detail-sheet.tsx`
-- 引入 `computeParcelItemLanded` 和新 server fn。
-- 当 `item.parent_id` 存在时，`useQuery(["mobile-parcel-landed", parent_id])` 拉 context（`enabled: open && !!parent_id`，`staleTime: 60s`）。
-- 用 `computeParcelItemLanded(parcel, items).get(item.id)` 得到 `landed`。
-- 拆包卡片：`computePiecePrice(item.item_total_jpy, landed.landedCny, pp)`。
-- 在金额块新增一行「到手价 / 运费分摊 / 关税」简版显示（与 PC 端口径一致），方便核对。
-- `<PackPriceCalculatorDialog landedCny={landed?.landedCny ?? null} />`（替换原来错误的 `item.item_total_cny`）。
-- 关闭对话框时除了 `mobile-parcel`/`mobile-parcels`，再 invalidate `["mobile-parcel-landed", parent_id]`，确保 landed 也刷新（其实 landed context 与 pack_pieces 无关，但保险）。
+### 2. `src/routes/purchase.japan-parcel.index.tsx`
+- `countsQ` 的 queryKey 改成 `["jp-parcels-counts", submittedSearch]`，queryFn 传 `{ data: { search: submittedSearch || undefined } }`。
+- `qc.invalidateQueries({ queryKey: ["jp-parcels-counts"] })`（写操作后的失效逻辑）保持现状即可，按前缀失效会带上所有 search 变体。
+- 其它逻辑不变。
 
-### 3. 不变
-- `PackPriceCalculatorDialog`、`updateParcelItem`、`computeParcelItemLanded`、数据库 schema、RLS、PC 端 UI。
-- `mobile.functions.ts` 已有的 `searchParcels` 字段保持不变（按重量分摊需要 siblings，单条 item 查询里塞不下，所以单独发一次轻量查询是更干净的做法）。
+### 3. 不动
+`PURCHASED_STATUSES / DELIVERED_STATUSES` 字典、Badge UI、`listJapanParcels`、移动端、数据库 schema、RLS。
 
-## 技术细节
-```ts
-// mobile.functions.ts
-export const getParcelLandedContext = createServerFn({ method: "GET" })
-  .inputValidator((i: unknown) => z.object({ parcel_id: z.string().uuid() }).parse(i))
-  .handler(async ({ data }) => {
-    const [p, it] = await Promise.all([
-      supabaseAdmin.from("japan_parcels")
-        .select("id, intl_total_jpy, intl_exchange_rate")
-        .eq("id", data.parcel_id).maybeSingle(),
-      supabaseAdmin.from("japan_parcel_items")
-        .select("id, item_total_jpy, unit_price_jpy, quantity, weight_g, tariff_rate")
-        .eq("parent_id", data.parcel_id),
-    ]);
-    if (p.error) throw new Error(p.error.message);
-    if (it.error) throw new Error(it.error.message);
-    return {
-      parcel: { intl_total_jpy: p.data?.intl_total_jpy ?? null, intl_exchange_rate: p.data?.intl_exchange_rate ?? null },
-      items: it.data ?? [],
-    };
-  });
-```
+## 备注
+- 子商品匹配上限 500 与列表查询一致，所以"列表显示 N 条 / 角标 N"在常规体量下完全吻合；若极端搜索命中超过 500 个 parent，两侧会同时截断，行为一致。
+- 5 个 count 走 `Promise.all`，加搜索后单次请求只多一次 items 查询，性能开销可接受。
