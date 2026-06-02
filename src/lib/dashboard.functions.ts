@@ -67,13 +67,12 @@ export const getPurchaseStats = createServerFn({ method: "GET" })
     const yearStart = new Date(now.getFullYear(), 0, 1);
     const trendStart = new Date(now.getFullYear(), now.getMonth() - 11, 1);
 
-    const [jpItemsRes, dmRes, dbRes, dbCountRes, jpStatusRes, jpRecentRes, dmRecentRes, dbRecentRes] =
+    const [jpRes, dmRes, dbRes, dbCountRes, jpStatusRes, jpRecentRes, dmRecentRes, dbRecentRes] =
       await Promise.all([
         supabase
-          .from("japan_parcel_items")
-          .select("parent_id,pay_at,item_total_cny,japan_parcels!inner(deleted_at)")
-          .not("pay_at", "is", null)
-          .is("japan_parcels.deleted_at", null),
+          .from("japan_parcels")
+          .select("id,intl_pay_at,purchased_at,grand_total_cny,total_cny")
+          .is("deleted_at", null),
         supabase
           .from("domestic_orders")
           .select("id,item_title,platform,total_cny,purchased_at,status")
@@ -107,7 +106,7 @@ export const getPurchaseStats = createServerFn({ method: "GET" })
           .limit(8),
       ]);
 
-    for (const r of [jpItemsRes, dmRes, dbRes, jpStatusRes, jpRecentRes, dmRecentRes, dbRecentRes]) {
+    for (const r of [jpRes, dmRes, dbRes, jpStatusRes, jpRecentRes, dmRecentRes, dbRecentRes]) {
       if (r.error) throw new Error(r.error.message);
     }
 
@@ -132,23 +131,20 @@ export const getPurchaseStats = createServerFn({ method: "GET" })
       };
     }
 
-    // 日本小包
-    const jpParents = new Set<string>();
-    const jpMonthParents = new Set<string>();
+    // 日本小包：按包裹聚合，金额取 grand_total_cny（含商品 + 国际运费 + 关税）
     const jpStat = { month: 0, ytd: 0, all: 0, count: 0 };
-    for (const r of jpItemsRes.data ?? []) {
-      const amt = Number(r.item_total_cny ?? 0);
-      if (!r.pay_at) continue;
-      const b = bucket(r.pay_at as string, amt, "japan_parcel");
-      jpStat.all += b.all;
+    let jpMonthCount = 0;
+    for (const r of jpRes.data ?? []) {
+      const amt = Number(r.grand_total_cny ?? r.total_cny ?? 0);
+      jpStat.all += amt;
+      jpStat.count += 1;
+      const ts = (r.intl_pay_at as string) || (r.purchased_at as string);
+      if (!ts) continue;
+      const b = bucket(ts, amt, "japan_parcel");
       jpStat.ytd += b.ytd;
       jpStat.month += b.month;
-      if (r.parent_id) {
-        jpParents.add(r.parent_id as string);
-        if (new Date(r.pay_at as string) >= monthStart) jpMonthParents.add(r.parent_id as string);
-      }
+      if (new Date(ts) >= monthStart) jpMonthCount += 1;
     }
-    jpStat.count = jpParents.size;
 
     // 国内小包
     const dmStat = { month: 0, ytd: 0, all: 0, count: dmRes.data?.length ?? 0 };
@@ -239,7 +235,7 @@ export const getPurchaseStats = createServerFn({ method: "GET" })
         ytd: jpStat.ytd + dmStat.ytd + dbStat.ytd,
         all: jpStat.all + dmStat.all + dbStat.all,
         count: jpStat.count + dmStat.count + dbStat.count,
-        monthCount: jpMonthParents.size + dmMonthCount + dbMonthCount,
+        monthCount: jpMonthCount + dmMonthCount + dbMonthCount,
       },
       byChannel,
       monthlyTrend,

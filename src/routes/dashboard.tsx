@@ -149,13 +149,14 @@ function DashboardPage() {
               hint={`总计 ${data.totals.count} 单`}
             />
             <MetricCard
-              title="日本小包在途/在仓"
+              title="日本小包在途未签收"
               value={
+                (data.byStatus.find((s) => s.key === "purchased")?.count ?? 0) +
                 (data.byStatus.find((s) => s.key === "at_jp_warehouse")?.count ?? 0) +
                 (data.byStatus.find((s) => s.key === "shipping_intl")?.count ?? 0)
               }
               icon={PackageSearch}
-              hint="在日仓 + 国际运输"
+              hint="已采购 + 在日仓 + 国际运输"
             />
           </>
         )}
