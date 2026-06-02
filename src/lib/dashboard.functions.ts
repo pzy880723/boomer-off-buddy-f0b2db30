@@ -235,7 +235,7 @@ export const getPurchaseStats = createServerFn({ method: "GET" })
         ytd: jpStat.ytd + dmStat.ytd + dbStat.ytd,
         all: jpStat.all + dmStat.all + dbStat.all,
         count: jpStat.count + dmStat.count + dbStat.count,
-        monthCount: jpMonthParents.size + dmMonthCount + dbMonthCount,
+        monthCount: jpMonthCount + dmMonthCount + dbMonthCount,
       },
       byChannel,
       monthlyTrend,
