@@ -70,6 +70,8 @@ import { Route as InventoryProductsCodeRouteImport } from './routes/inventory.pr
 import { Route as InventoryInboundNewRouteImport } from './routes/inventory.inbound.new'
 import { Route as InventoryInboundIdRouteImport } from './routes/inventory.inbound.$id'
 import { Route as ApiPublicMerukiIngestRouteImport } from './routes/api/public/meruki-ingest'
+import { Route as ApiPublicHooksYouzanStockWorkerRouteImport } from './routes/api/public/hooks/youzan-stock-worker'
+import { Route as ApiPublicHooksYouzanReconcileRouteImport } from './routes/api/public/hooks/youzan-reconcile'
 
 const YouzanRoute = YouzanRouteImport.update({
   id: '/youzan',
@@ -380,6 +382,18 @@ const ApiPublicMerukiIngestRoute = ApiPublicMerukiIngestRouteImport.update({
   path: '/api/public/meruki-ingest',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksYouzanStockWorkerRoute =
+  ApiPublicHooksYouzanStockWorkerRouteImport.update({
+    id: '/api/public/hooks/youzan-stock-worker',
+    path: '/api/public/hooks/youzan-stock-worker',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksYouzanReconcileRoute =
+  ApiPublicHooksYouzanReconcileRouteImport.update({
+    id: '/api/public/hooks/youzan-reconcile',
+    path: '/api/public/hooks/youzan-reconcile',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -443,6 +457,8 @@ export interface FileRoutesByFullPath {
   '/purchase/domestic-bulk/': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic/': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
+  '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
+  '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -499,6 +515,8 @@ export interface FileRoutesByTo {
   '/purchase/domestic-bulk': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel': typeof PurchaseJapanParcelIndexRoute
+  '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
+  '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -563,6 +581,8 @@ export interface FileRoutesById {
   '/purchase/domestic-bulk/': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic/': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
+  '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
+  '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -628,6 +648,8 @@ export interface FileRouteTypes {
     | '/purchase/domestic-bulk/'
     | '/purchase/domestic/'
     | '/purchase/japan-parcel/'
+    | '/api/public/hooks/youzan-reconcile'
+    | '/api/public/hooks/youzan-stock-worker'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -684,6 +706,8 @@ export interface FileRouteTypes {
     | '/purchase/domestic-bulk'
     | '/purchase/domestic'
     | '/purchase/japan-parcel'
+    | '/api/public/hooks/youzan-reconcile'
+    | '/api/public/hooks/youzan-stock-worker'
   id:
     | '__root__'
     | '/'
@@ -747,6 +771,8 @@ export interface FileRouteTypes {
     | '/purchase/domestic-bulk/'
     | '/purchase/domestic/'
     | '/purchase/japan-parcel/'
+    | '/api/public/hooks/youzan-reconcile'
+    | '/api/public/hooks/youzan-stock-worker'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -775,6 +801,8 @@ export interface RootRouteChildren {
   StoresProductsRoute: typeof StoresProductsRoute
   StoresYouzanRoute: typeof StoresYouzanRoute
   ApiPublicMerukiIngestRoute: typeof ApiPublicMerukiIngestRoute
+  ApiPublicHooksYouzanReconcileRoute: typeof ApiPublicHooksYouzanReconcileRoute
+  ApiPublicHooksYouzanStockWorkerRoute: typeof ApiPublicHooksYouzanStockWorkerRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1206,6 +1234,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicMerukiIngestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/youzan-stock-worker': {
+      id: '/api/public/hooks/youzan-stock-worker'
+      path: '/api/public/hooks/youzan-stock-worker'
+      fullPath: '/api/public/hooks/youzan-stock-worker'
+      preLoaderRoute: typeof ApiPublicHooksYouzanStockWorkerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/youzan-reconcile': {
+      id: '/api/public/hooks/youzan-reconcile'
+      path: '/api/public/hooks/youzan-reconcile'
+      fullPath: '/api/public/hooks/youzan-reconcile'
+      preLoaderRoute: typeof ApiPublicHooksYouzanReconcileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -1397,6 +1439,8 @@ const rootRouteChildren: RootRouteChildren = {
   StoresProductsRoute: StoresProductsRoute,
   StoresYouzanRoute: StoresYouzanRoute,
   ApiPublicMerukiIngestRoute: ApiPublicMerukiIngestRoute,
+  ApiPublicHooksYouzanReconcileRoute: ApiPublicHooksYouzanReconcileRoute,
+  ApiPublicHooksYouzanStockWorkerRoute: ApiPublicHooksYouzanStockWorkerRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

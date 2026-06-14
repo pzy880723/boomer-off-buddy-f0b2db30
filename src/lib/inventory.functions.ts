@@ -519,8 +519,27 @@ export const submitInbound = createServerFn({ method: "POST" })
       if (rpcErr) throw new Error(rpcErr.message);
     }
 
+    // 推送到有赞（仅对已绑定的 SKU，未绑定的会被 enqueueStockPush 忽略）
+    try {
+      const { enqueueStockPush, runStockSyncWorker: _w } = await import(
+        "./youzan-sync.functions"
+      );
+      void _w; // 用 enqueueAndRun 内部封装，这里只入队，cron 兜底
+      for (const s of data.scans) {
+        await enqueueStockPush(s.sku_id, "inbound");
+      }
+      // 同请求内顺带跑一次
+      const mod = await import("./youzan-sync.functions");
+      // runStockSyncWorker 是 createServerFn，不能直接调；调内部 core
+      // 这里用 retry 触发：通过 enqueue 之后由 cron 兜底；前台体验由列表/详情刷新感知
+      void mod;
+    } catch {
+      // 不阻塞入库
+    }
+
     return { order_id: order.id, total_qty: totalQty, total_value_cny: totalValue };
   });
+
 
 export const listInboundOrders = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
