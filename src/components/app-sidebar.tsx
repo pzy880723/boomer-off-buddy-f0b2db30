@@ -82,7 +82,6 @@ const groups: { label: string; items: { title: string; url: NavTo; icon: LucideI
     label: "仓库管理",
     items: [
       { title: "仓库商品", url: "/inventory/skus", icon: Tags },
-      { title: "扫枪入库", url: "/inventory/inbound/new", icon: ArrowLeftRight },
       { title: "入库记录", url: "/inventory/inbound", icon: Layers },
       { title: "调拨单", url: "/inventory/transfers", icon: ArrowLeftRight },
     ],

@@ -244,6 +244,105 @@ export type Database = {
         }
         Relationships: []
       }
+      inv_epcs: {
+        Row: {
+          current_location_id: string | null
+          epc: string
+          first_seen_at: string
+          label_batch_id: string | null
+          last_seen_at: string
+          sku_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          current_location_id?: string | null
+          epc: string
+          first_seen_at?: string
+          label_batch_id?: string | null
+          last_seen_at?: string
+          sku_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          current_location_id?: string | null
+          epc?: string
+          first_seen_at?: string
+          label_batch_id?: string | null
+          last_seen_at?: string
+          sku_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inv_epcs_current_location_id_fkey"
+            columns: ["current_location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inv_epcs_label_batch_id_fkey"
+            columns: ["label_batch_id"]
+            isOneToOne: false
+            referencedRelation: "inv_label_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inv_epcs_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inv_handheld_devices: {
+        Row: {
+          created_at: string
+          default_location_id: string | null
+          device_code: string
+          id: string
+          is_active: boolean
+          label: string
+          last_seen_at: string | null
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          default_location_id?: string | null
+          device_code: string
+          id?: string
+          is_active?: boolean
+          label: string
+          last_seen_at?: string | null
+          token: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          default_location_id?: string | null
+          device_code?: string
+          id?: string
+          is_active?: boolean
+          label?: string
+          last_seen_at?: string | null
+          token?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inv_handheld_devices_default_location_id_fkey"
+            columns: ["default_location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inv_inbound_lines: {
         Row: {
           created_at: string
@@ -292,7 +391,9 @@ export type Database = {
       inv_inbound_orders: {
         Row: {
           created_at: string
+          device_id: string | null
           id: string
+          location_id: string | null
           notes: string | null
           operator: string | null
           scanned_at: string
@@ -303,7 +404,9 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          device_id?: string | null
           id?: string
+          location_id?: string | null
           notes?: string | null
           operator?: string | null
           scanned_at?: string
@@ -314,7 +417,9 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          device_id?: string | null
           id?: string
+          location_id?: string | null
           notes?: string | null
           operator?: string | null
           scanned_at?: string
@@ -323,7 +428,22 @@ export type Database = {
           total_value_cny?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "inv_inbound_orders_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "inv_handheld_devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inv_inbound_orders_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       inv_label_batches: {
         Row: {
@@ -368,6 +488,47 @@ export type Database = {
             columns: ["sku_id"]
             isOneToOne: false
             referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inv_locations: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          kind: string
+          name: string
+          notes: string | null
+          shop_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          kind: string
+          name: string
+          notes?: string | null
+          shop_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          kind?: string
+          name?: string
+          notes?: string | null
+          shop_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inv_locations_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: true
+            referencedRelation: "youzan_shops"
             referencedColumns: ["id"]
           },
         ]
@@ -434,6 +595,134 @@ export type Database = {
           weight_g?: number | null
         }
         Relationships: []
+      }
+      inv_stock_movements: {
+        Row: {
+          balance_after: number
+          created_at: string
+          created_by: string | null
+          delta: number
+          epc: string | null
+          id: string
+          location_id: string
+          note: string | null
+          ref_id: string | null
+          ref_type: string
+          sku_id: string
+        }
+        Insert: {
+          balance_after: number
+          created_at?: string
+          created_by?: string | null
+          delta: number
+          epc?: string | null
+          id?: string
+          location_id: string
+          note?: string | null
+          ref_id?: string | null
+          ref_type: string
+          sku_id: string
+        }
+        Update: {
+          balance_after?: number
+          created_at?: string
+          created_by?: string | null
+          delta?: number
+          epc?: string | null
+          id?: string
+          location_id?: string
+          note?: string | null
+          ref_id?: string | null
+          ref_type?: string
+          sku_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inv_stock_movements_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inv_stock_movements_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inv_stocks: {
+        Row: {
+          location_id: string
+          qty: number
+          sku_id: string
+          updated_at: string
+        }
+        Insert: {
+          location_id: string
+          qty?: number
+          sku_id: string
+          updated_at?: string
+        }
+        Update: {
+          location_id?: string
+          qty?: number
+          sku_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inv_stocks_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inv_stocks_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inv_unclaimed_epcs: {
+        Row: {
+          created_at: string
+          epc: string
+          hits: number
+          last_seen_at: string
+          last_seen_location_id: string | null
+          note: string | null
+        }
+        Insert: {
+          created_at?: string
+          epc: string
+          hits?: number
+          last_seen_at?: string
+          last_seen_location_id?: string | null
+          note?: string | null
+        }
+        Update: {
+          created_at?: string
+          epc?: string
+          hits?: number
+          last_seen_at?: string
+          last_seen_location_id?: string | null
+          note?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inv_unclaimed_epcs_last_seen_location_id_fkey"
+            columns: ["last_seen_location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       japan_parcel_items: {
         Row: {
@@ -938,10 +1227,95 @@ export type Database = {
           },
         ]
       }
+      stock_transfer_epcs: {
+        Row: {
+          epc: string
+          receive_scanned_at: string | null
+          ship_scanned_at: string | null
+          sku_id: string | null
+          transfer_id: string
+        }
+        Insert: {
+          epc: string
+          receive_scanned_at?: string | null
+          ship_scanned_at?: string | null
+          sku_id?: string | null
+          transfer_id: string
+        }
+        Update: {
+          epc?: string
+          receive_scanned_at?: string | null
+          ship_scanned_at?: string | null
+          sku_id?: string | null
+          transfer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_transfer_epcs_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_transfer_epcs_transfer_id_fkey"
+            columns: ["transfer_id"]
+            isOneToOne: false
+            referencedRelation: "stock_transfers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_transfer_lines: {
+        Row: {
+          created_at: string
+          expected_qty: number
+          id: string
+          received_qty: number
+          shipped_qty: number
+          sku_id: string
+          transfer_id: string
+        }
+        Insert: {
+          created_at?: string
+          expected_qty?: number
+          id?: string
+          received_qty?: number
+          shipped_qty?: number
+          sku_id: string
+          transfer_id: string
+        }
+        Update: {
+          created_at?: string
+          expected_qty?: number
+          id?: string
+          received_qty?: number
+          shipped_qty?: number
+          sku_id?: string
+          transfer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_transfer_lines_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_transfer_lines_transfer_id_fkey"
+            columns: ["transfer_id"]
+            isOneToOne: false
+            referencedRelation: "stock_transfers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock_transfers: {
         Row: {
           code: string
           created_at: string
+          from_location_id: string | null
           from_shop_id: string | null
           from_sku_id: string | null
           from_youzan_item_id: number | null
@@ -952,7 +1326,12 @@ export type Database = {
           posted_at: string | null
           qty: number
           reason: string | null
+          received_at: string | null
+          received_by: string | null
+          shipped_at: string | null
+          shipped_by: string | null
           status: string
+          to_location_id: string | null
           to_shop_id: string | null
           to_sku_id: string | null
           to_youzan_item_id: number | null
@@ -961,8 +1340,9 @@ export type Database = {
           youzan_sync_status: string
         }
         Insert: {
-          code: string
+          code?: string
           created_at?: string
+          from_location_id?: string | null
           from_shop_id?: string | null
           from_sku_id?: string | null
           from_youzan_item_id?: number | null
@@ -973,7 +1353,12 @@ export type Database = {
           posted_at?: string | null
           qty: number
           reason?: string | null
+          received_at?: string | null
+          received_by?: string | null
+          shipped_at?: string | null
+          shipped_by?: string | null
           status?: string
+          to_location_id?: string | null
           to_shop_id?: string | null
           to_sku_id?: string | null
           to_youzan_item_id?: number | null
@@ -984,6 +1369,7 @@ export type Database = {
         Update: {
           code?: string
           created_at?: string
+          from_location_id?: string | null
           from_shop_id?: string | null
           from_sku_id?: string | null
           from_youzan_item_id?: number | null
@@ -994,7 +1380,12 @@ export type Database = {
           posted_at?: string | null
           qty?: number
           reason?: string | null
+          received_at?: string | null
+          received_by?: string | null
+          shipped_at?: string | null
+          shipped_by?: string | null
           status?: string
+          to_location_id?: string | null
           to_shop_id?: string | null
           to_sku_id?: string | null
           to_youzan_item_id?: number | null
@@ -1003,6 +1394,13 @@ export type Database = {
           youzan_sync_status?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "stock_transfers_from_location_id_fkey"
+            columns: ["from_location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "stock_transfers_from_shop_id_fkey"
             columns: ["from_shop_id"]
@@ -1018,6 +1416,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "stock_transfers_to_location_id_fkey"
+            columns: ["to_location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "stock_transfers_to_shop_id_fkey"
             columns: ["to_shop_id"]
             isOneToOne: false
@@ -1029,6 +1434,149 @@ export type Database = {
             columns: ["to_sku_id"]
             isOneToOne: false
             referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stocktake_lines: {
+        Row: {
+          counted_qty: number
+          diff: number
+          id: string
+          reason: string | null
+          sku_id: string
+          stocktake_id: string
+          system_qty: number
+        }
+        Insert: {
+          counted_qty?: number
+          diff?: number
+          id?: string
+          reason?: string | null
+          sku_id: string
+          stocktake_id: string
+          system_qty?: number
+        }
+        Update: {
+          counted_qty?: number
+          diff?: number
+          id?: string
+          reason?: string | null
+          sku_id?: string
+          stocktake_id?: string
+          system_qty?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stocktake_lines_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stocktake_lines_stocktake_id_fkey"
+            columns: ["stocktake_id"]
+            isOneToOne: false
+            referencedRelation: "stocktakes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stocktake_scans: {
+        Row: {
+          epc: string
+          id: string
+          scanned_at: string
+          sku_id: string | null
+          stocktake_id: string
+        }
+        Insert: {
+          epc: string
+          id?: string
+          scanned_at?: string
+          sku_id?: string | null
+          stocktake_id: string
+        }
+        Update: {
+          epc?: string
+          id?: string
+          scanned_at?: string
+          sku_id?: string | null
+          stocktake_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stocktake_scans_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stocktake_scans_stocktake_id_fkey"
+            columns: ["stocktake_id"]
+            isOneToOne: false
+            referencedRelation: "stocktakes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stocktakes: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          location_id: string
+          notes: string | null
+          opened_at: string
+          opened_by: string | null
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          submitted_at: string | null
+          submitted_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          location_id: string
+          notes?: string | null
+          opened_at?: string
+          opened_by?: string | null
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          submitted_at?: string | null
+          submitted_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          location_id?: string
+          notes?: string | null
+          opened_at?: string
+          opened_by?: string | null
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          submitted_at?: string | null
+          submitted_by?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stocktakes_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
             referencedColumns: ["id"]
           },
         ]
@@ -1347,6 +1895,18 @@ export type Database = {
       inv_apply_inbound_stock: {
         Args: { p_delta: number; p_sku_id: string }
         Returns: undefined
+      }
+      inv_apply_movement: {
+        Args: {
+          p_delta: number
+          p_epc?: string
+          p_location_id: string
+          p_note?: string
+          p_ref_id: string
+          p_ref_type: string
+          p_sku_id: string
+        }
+        Returns: number
       }
       inv_apply_stock_delta: {
         Args: { p_delta: number; p_sku_id: string }
