@@ -50,7 +50,7 @@ function UnclaimedPage() {
   const [sel, setSel] = useState({ sku_id: "", location_id: "", q: "" });
   const skusQ = useQuery({
     queryKey: ["skus-search", sel.q],
-    queryFn: () => skusFn({ data: { q: sel.q || undefined, limit: 30 } as any }),
+    queryFn: () => skusFn({ data: { search: sel.q || undefined, limit: 30 } }),
     enabled: !!target,
   });
 
