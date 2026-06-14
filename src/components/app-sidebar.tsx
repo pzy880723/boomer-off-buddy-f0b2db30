@@ -50,6 +50,10 @@ type NavTo =
   | "/inventory/inbound"
   | "/inventory/inbound/new"
   | "/inventory/transfers"
+  | "/inventory/locations"
+  | "/inventory/devices"
+  | "/inventory/unclaimed"
+  | "/inventory/stocktakes"
   | "/shop-mgmt/shops"
   | "/shop-mgmt/products"
   | "/shop-mgmt/franchisees"
@@ -57,6 +61,11 @@ type NavTo =
   | "/youzan/sync"
 
   | "/orders/shops"
+  | "/orders/dispatch"
+  | "/orders/wholesale"
+  | "/knowledge"
+  | "/settings"
+  | "/admin/users";
   | "/orders/dispatch"
   | "/orders/wholesale"
   | "/knowledge"
