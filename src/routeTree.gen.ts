@@ -21,6 +21,7 @@ import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as StoreIndexRouteImport } from './routes/store.index'
 import { Route as MIndexRouteImport } from './routes/m.index'
+import { Route as YouzanSyncRouteImport } from './routes/youzan.sync'
 import { Route as StoresYouzanRouteImport } from './routes/stores.youzan'
 import { Route as StoresProductsRouteImport } from './routes/stores.products'
 import { Route as StoresListRouteImport } from './routes/stores.list'
@@ -70,6 +71,8 @@ import { Route as InventoryProductsCodeRouteImport } from './routes/inventory.pr
 import { Route as InventoryInboundNewRouteImport } from './routes/inventory.inbound.new'
 import { Route as InventoryInboundIdRouteImport } from './routes/inventory.inbound.$id'
 import { Route as ApiPublicMerukiIngestRouteImport } from './routes/api/public/meruki-ingest'
+import { Route as ApiPublicHooksYouzanStockWorkerRouteImport } from './routes/api/public/hooks/youzan-stock-worker'
+import { Route as ApiPublicHooksYouzanReconcileRouteImport } from './routes/api/public/hooks/youzan-reconcile'
 
 const YouzanRoute = YouzanRouteImport.update({
   id: '/youzan',
@@ -130,6 +133,11 @@ const MIndexRoute = MIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => MRoute,
+} as any)
+const YouzanSyncRoute = YouzanSyncRouteImport.update({
+  id: '/sync',
+  path: '/sync',
+  getParentRoute: () => YouzanRoute,
 } as any)
 const StoresYouzanRoute = StoresYouzanRouteImport.update({
   id: '/stores/youzan',
@@ -380,6 +388,18 @@ const ApiPublicMerukiIngestRoute = ApiPublicMerukiIngestRouteImport.update({
   path: '/api/public/meruki-ingest',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksYouzanStockWorkerRoute =
+  ApiPublicHooksYouzanStockWorkerRouteImport.update({
+    id: '/api/public/hooks/youzan-stock-worker',
+    path: '/api/public/hooks/youzan-stock-worker',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksYouzanReconcileRoute =
+  ApiPublicHooksYouzanReconcileRouteImport.update({
+    id: '/api/public/hooks/youzan-reconcile',
+    path: '/api/public/hooks/youzan-reconcile',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -391,7 +411,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/shop-mgmt': typeof ShopMgmtRouteWithChildren
   '/store': typeof StoreRouteWithChildren
-  '/youzan': typeof YouzanRoute
+  '/youzan': typeof YouzanRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
   '/inventory/batches': typeof InventoryBatchesRoute
   '/inventory/inbound': typeof InventoryInboundRouteWithChildren
@@ -419,6 +439,7 @@ export interface FileRoutesByFullPath {
   '/stores/list': typeof StoresListRoute
   '/stores/products': typeof StoresProductsRoute
   '/stores/youzan': typeof StoresYouzanRoute
+  '/youzan/sync': typeof YouzanSyncRoute
   '/m/': typeof MIndexRoute
   '/store/': typeof StoreIndexRoute
   '/api/public/meruki-ingest': typeof ApiPublicMerukiIngestRoute
@@ -443,6 +464,8 @@ export interface FileRoutesByFullPath {
   '/purchase/domestic-bulk/': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic/': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
+  '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
+  '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -452,7 +475,7 @@ export interface FileRoutesByTo {
   '/orders': typeof OrdersRouteWithChildren
   '/settings': typeof SettingsRoute
   '/shop-mgmt': typeof ShopMgmtRouteWithChildren
-  '/youzan': typeof YouzanRoute
+  '/youzan': typeof YouzanRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
   '/inventory/batches': typeof InventoryBatchesRoute
   '/inventory/products': typeof InventoryProductsRouteWithChildren
@@ -475,6 +498,7 @@ export interface FileRoutesByTo {
   '/stores/list': typeof StoresListRoute
   '/stores/products': typeof StoresProductsRoute
   '/stores/youzan': typeof StoresYouzanRoute
+  '/youzan/sync': typeof YouzanSyncRoute
   '/m': typeof MIndexRoute
   '/store': typeof StoreIndexRoute
   '/api/public/meruki-ingest': typeof ApiPublicMerukiIngestRoute
@@ -499,6 +523,8 @@ export interface FileRoutesByTo {
   '/purchase/domestic-bulk': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel': typeof PurchaseJapanParcelIndexRoute
+  '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
+  '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -511,7 +537,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/shop-mgmt': typeof ShopMgmtRouteWithChildren
   '/store': typeof StoreRouteWithChildren
-  '/youzan': typeof YouzanRoute
+  '/youzan': typeof YouzanRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
   '/inventory/batches': typeof InventoryBatchesRoute
   '/inventory/inbound': typeof InventoryInboundRouteWithChildren
@@ -539,6 +565,7 @@ export interface FileRoutesById {
   '/stores/list': typeof StoresListRoute
   '/stores/products': typeof StoresProductsRoute
   '/stores/youzan': typeof StoresYouzanRoute
+  '/youzan/sync': typeof YouzanSyncRoute
   '/m/': typeof MIndexRoute
   '/store/': typeof StoreIndexRoute
   '/api/public/meruki-ingest': typeof ApiPublicMerukiIngestRoute
@@ -563,6 +590,8 @@ export interface FileRoutesById {
   '/purchase/domestic-bulk/': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic/': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
+  '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
+  '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -604,6 +633,7 @@ export interface FileRouteTypes {
     | '/stores/list'
     | '/stores/products'
     | '/stores/youzan'
+    | '/youzan/sync'
     | '/m/'
     | '/store/'
     | '/api/public/meruki-ingest'
@@ -628,6 +658,8 @@ export interface FileRouteTypes {
     | '/purchase/domestic-bulk/'
     | '/purchase/domestic/'
     | '/purchase/japan-parcel/'
+    | '/api/public/hooks/youzan-reconcile'
+    | '/api/public/hooks/youzan-stock-worker'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -660,6 +692,7 @@ export interface FileRouteTypes {
     | '/stores/list'
     | '/stores/products'
     | '/stores/youzan'
+    | '/youzan/sync'
     | '/m'
     | '/store'
     | '/api/public/meruki-ingest'
@@ -684,6 +717,8 @@ export interface FileRouteTypes {
     | '/purchase/domestic-bulk'
     | '/purchase/domestic'
     | '/purchase/japan-parcel'
+    | '/api/public/hooks/youzan-reconcile'
+    | '/api/public/hooks/youzan-stock-worker'
   id:
     | '__root__'
     | '/'
@@ -723,6 +758,7 @@ export interface FileRouteTypes {
     | '/stores/list'
     | '/stores/products'
     | '/stores/youzan'
+    | '/youzan/sync'
     | '/m/'
     | '/store/'
     | '/api/public/meruki-ingest'
@@ -747,6 +783,8 @@ export interface FileRouteTypes {
     | '/purchase/domestic-bulk/'
     | '/purchase/domestic/'
     | '/purchase/japan-parcel/'
+    | '/api/public/hooks/youzan-reconcile'
+    | '/api/public/hooks/youzan-stock-worker'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -759,7 +797,7 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   ShopMgmtRoute: typeof ShopMgmtRouteWithChildren
   StoreRoute: typeof StoreRouteWithChildren
-  YouzanRoute: typeof YouzanRoute
+  YouzanRoute: typeof YouzanRouteWithChildren
   AdminUsersRoute: typeof AdminUsersRoute
   InventoryBatchesRoute: typeof InventoryBatchesRoute
   InventoryInboundRoute: typeof InventoryInboundRouteWithChildren
@@ -775,6 +813,8 @@ export interface RootRouteChildren {
   StoresProductsRoute: typeof StoresProductsRoute
   StoresYouzanRoute: typeof StoresYouzanRoute
   ApiPublicMerukiIngestRoute: typeof ApiPublicMerukiIngestRoute
+  ApiPublicHooksYouzanReconcileRoute: typeof ApiPublicHooksYouzanReconcileRoute
+  ApiPublicHooksYouzanStockWorkerRoute: typeof ApiPublicHooksYouzanStockWorkerRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -862,6 +902,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/m/'
       preLoaderRoute: typeof MIndexRouteImport
       parentRoute: typeof MRoute
+    }
+    '/youzan/sync': {
+      id: '/youzan/sync'
+      path: '/sync'
+      fullPath: '/youzan/sync'
+      preLoaderRoute: typeof YouzanSyncRouteImport
+      parentRoute: typeof YouzanRoute
     }
     '/stores/youzan': {
       id: '/stores/youzan'
@@ -1206,6 +1253,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicMerukiIngestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/youzan-stock-worker': {
+      id: '/api/public/hooks/youzan-stock-worker'
+      path: '/api/public/hooks/youzan-stock-worker'
+      fullPath: '/api/public/hooks/youzan-stock-worker'
+      preLoaderRoute: typeof ApiPublicHooksYouzanStockWorkerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/youzan-reconcile': {
+      id: '/api/public/hooks/youzan-reconcile'
+      path: '/api/public/hooks/youzan-reconcile'
+      fullPath: '/api/public/hooks/youzan-reconcile'
+      preLoaderRoute: typeof ApiPublicHooksYouzanReconcileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -1281,6 +1342,17 @@ const StoreRouteChildren: StoreRouteChildren = {
 }
 
 const StoreRouteWithChildren = StoreRoute._addFileChildren(StoreRouteChildren)
+
+interface YouzanRouteChildren {
+  YouzanSyncRoute: typeof YouzanSyncRoute
+}
+
+const YouzanRouteChildren: YouzanRouteChildren = {
+  YouzanSyncRoute: YouzanSyncRoute,
+}
+
+const YouzanRouteWithChildren =
+  YouzanRoute._addFileChildren(YouzanRouteChildren)
 
 interface InventoryInboundRouteChildren {
   InventoryInboundIdRoute: typeof InventoryInboundIdRoute
@@ -1381,7 +1453,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   ShopMgmtRoute: ShopMgmtRouteWithChildren,
   StoreRoute: StoreRouteWithChildren,
-  YouzanRoute: YouzanRoute,
+  YouzanRoute: YouzanRouteWithChildren,
   AdminUsersRoute: AdminUsersRoute,
   InventoryBatchesRoute: InventoryBatchesRoute,
   InventoryInboundRoute: InventoryInboundRouteWithChildren,
@@ -1397,17 +1469,9 @@ const rootRouteChildren: RootRouteChildren = {
   StoresProductsRoute: StoresProductsRoute,
   StoresYouzanRoute: StoresYouzanRoute,
   ApiPublicMerukiIngestRoute: ApiPublicMerukiIngestRoute,
+  ApiPublicHooksYouzanReconcileRoute: ApiPublicHooksYouzanReconcileRoute,
+  ApiPublicHooksYouzanStockWorkerRoute: ApiPublicHooksYouzanStockWorkerRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

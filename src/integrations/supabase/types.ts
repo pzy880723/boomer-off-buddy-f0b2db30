@@ -875,6 +875,69 @@ export type Database = {
           },
         ]
       }
+      sku_youzan_links: {
+        Row: {
+          created_at: string
+          id: string
+          last_error: string | null
+          last_pull_at: string | null
+          last_pull_stock: number | null
+          last_pushed_at: string | null
+          last_pushed_stock: number | null
+          shop_id: string
+          sku_id: string
+          status: string
+          updated_at: string
+          yz_item_id: number
+          yz_sku_id: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          last_pull_at?: string | null
+          last_pull_stock?: number | null
+          last_pushed_at?: string | null
+          last_pushed_stock?: number | null
+          shop_id: string
+          sku_id: string
+          status?: string
+          updated_at?: string
+          yz_item_id: number
+          yz_sku_id?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          last_pull_at?: string | null
+          last_pull_stock?: number | null
+          last_pushed_at?: string | null
+          last_pushed_stock?: number | null
+          shop_id?: string
+          sku_id?: string
+          status?: string
+          updated_at?: string
+          yz_item_id?: number
+          yz_sku_id?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sku_youzan_links_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "youzan_shops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sku_youzan_links_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: true
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock_transfers: {
         Row: {
           code: string
@@ -1177,6 +1240,53 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      youzan_stock_sync_queue: {
+        Row: {
+          attempts: number
+          created_at: string
+          id: string
+          last_error: string | null
+          next_run_at: string
+          reason: string
+          sku_id: string
+          status: string
+          target_stock: number
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          next_run_at?: string
+          reason?: string
+          sku_id: string
+          status?: string
+          target_stock: number
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          next_run_at?: string
+          reason?: string
+          sku_id?: string
+          status?: string
+          target_stock?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "youzan_stock_sync_queue_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       youzan_sync_logs: {
         Row: {

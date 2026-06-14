@@ -102,8 +102,9 @@ async function fetchSilentToken(kdtId: number) {
 /**
  * 拿一家店的 access_token：有缓存且未过期则直接用，
  * 否则向有赞重新换并写回 youzan_shops。
+ * （exported 给 youzan-sync.functions.ts 复用）
  */
-async function ensureAccessToken(shop: ShopRow): Promise<string> {
+export async function ensureAccessToken(shop: ShopRow): Promise<string> {
   const now = Date.now();
   const expAt = shop.token_expires_at
     ? new Date(shop.token_expires_at).getTime()
@@ -123,6 +124,7 @@ async function ensureAccessToken(shop: ShopRow): Promise<string> {
     .eq("id", shop.id);
   return t.access_token;
 }
+
 
 async function getShopOr404(idOrKdt: { shop_id?: string; kdt_id?: number }) {
   let q = supabase.from("youzan_shops").select("*").limit(1);
@@ -147,7 +149,7 @@ async function callYouzanApi(opts: {
 }
 
 /** 返回 payload + trace_id + 原始响应前 400 字，方便排查；自带 20s 超时 */
-async function callYouzanApiVerbose(opts: {
+export async function callYouzanApiVerbose(opts: {
   accessToken: string;
   method: string;
   version: string;
@@ -605,7 +607,7 @@ export const batchImportShops = createServerFn({ method: "POST" })
 // ============================================================
 // 内部：取总部 token（零售连锁版很多 retail.open.* 接口都要用总部 token + 分店 kdt_id）
 // ============================================================
-async function getHqShop(): Promise<ShopRow> {
+export async function getHqShop(): Promise<ShopRow> {
   const { data, error } = await supabase
     .from("youzan_shops")
     .select("*")
@@ -615,6 +617,7 @@ async function getHqShop(): Promise<ShopRow> {
   if (!data) throw new Error("尚未配置总部门店（role=hq）");
   return data as ShopRow;
 }
+
 
 // ============================================================
 // 内部：从有赞零售返回结构里挖出 SPU 列表

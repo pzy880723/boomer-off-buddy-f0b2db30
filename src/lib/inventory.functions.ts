@@ -519,8 +519,20 @@ export const submitInbound = createServerFn({ method: "POST" })
       if (rpcErr) throw new Error(rpcErr.message);
     }
 
+    // 推送到有赞（仅对已绑定的 SKU；未绑定的会被自动忽略）
+    try {
+      const { enqueueStockPush } = await import("./youzan-sync.functions");
+      for (const s of data.scans) {
+        await enqueueStockPush(s.sku_id, "inbound");
+      }
+    } catch {
+      // 不阻塞入库
+    }
+
     return { order_id: order.id, total_qty: totalQty, total_value_cny: totalValue };
   });
+
+
 
 export const listInboundOrders = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
