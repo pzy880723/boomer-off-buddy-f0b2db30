@@ -149,7 +149,7 @@ async function callYouzanApi(opts: {
 }
 
 /** 返回 payload + trace_id + 原始响应前 400 字，方便排查；自带 20s 超时 */
-async function callYouzanApiVerbose(opts: {
+export async function callYouzanApiVerbose(opts: {
   accessToken: string;
   method: string;
   version: string;
