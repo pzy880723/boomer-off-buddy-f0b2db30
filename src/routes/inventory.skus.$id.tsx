@@ -23,6 +23,7 @@ import {
 import { DataTable } from "@/components/data-table";
 import { SkuEditDialog } from "@/components/inventory/sku-edit-dialog";
 import { PrintLabels, PRINT_STYLE } from "@/components/inventory/sku-detail-shared";
+import { SkuYouzanCard } from "@/components/youzan/sku-youzan-card";
 import { getSku, createLabelBatch, deleteSku } from "@/lib/inventory.functions";
 import {
   CATEGORY_LABEL,
