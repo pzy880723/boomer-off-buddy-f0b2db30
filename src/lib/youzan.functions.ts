@@ -607,7 +607,7 @@ export const batchImportShops = createServerFn({ method: "POST" })
 // ============================================================
 // 内部：取总部 token（零售连锁版很多 retail.open.* 接口都要用总部 token + 分店 kdt_id）
 // ============================================================
-async function getHqShop(): Promise<ShopRow> {
+export async function getHqShop(): Promise<ShopRow> {
   const { data, error } = await supabase
     .from("youzan_shops")
     .select("*")
@@ -617,6 +617,7 @@ async function getHqShop(): Promise<ShopRow> {
   if (!data) throw new Error("尚未配置总部门店（role=hq）");
   return data as ShopRow;
 }
+
 
 // ============================================================
 // 内部：从有赞零售返回结构里挖出 SPU 列表
