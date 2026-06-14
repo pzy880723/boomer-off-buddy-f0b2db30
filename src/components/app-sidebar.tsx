@@ -66,11 +66,6 @@ type NavTo =
   | "/knowledge"
   | "/settings"
   | "/admin/users";
-  | "/orders/dispatch"
-  | "/orders/wholesale"
-  | "/knowledge"
-  | "/settings"
-  | "/admin/users";
 
 const groups: { label: string; items: { title: string; url: NavTo; icon: LucideIcon }[]; icon?: LucideIcon }[] = [
   {
