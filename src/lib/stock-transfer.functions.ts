@@ -424,6 +424,15 @@ export const createTransfer = createServerFn({ method: "POST" })
       if (data.to_sku_id) {
         await supabase.rpc("inv_apply_stock_delta", { p_sku_id: data.to_sku_id, p_delta: +qty });
       }
+      // 推送到有赞（已绑定才推；未绑定自动忽略）
+      try {
+        const { enqueueStockPush } = await import("./youzan-sync.functions");
+        if (data.from_sku_id) await enqueueStockPush(data.from_sku_id, "transfer");
+        if (data.to_sku_id) await enqueueStockPush(data.to_sku_id, "transfer");
+      } catch {
+        // 不阻塞调拨
+      }
+
       // 有赞 items 本地缓存
       const updates: Array<{ shop_id: string; item_id: number; delta: number }> = [];
       if (kind === "wh_to_shop")
