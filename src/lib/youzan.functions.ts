@@ -102,8 +102,9 @@ async function fetchSilentToken(kdtId: number) {
 /**
  * 拿一家店的 access_token：有缓存且未过期则直接用，
  * 否则向有赞重新换并写回 youzan_shops。
+ * （exported 给 youzan-sync.functions.ts 复用）
  */
-async function ensureAccessToken(shop: ShopRow): Promise<string> {
+export async function ensureAccessToken(shop: ShopRow): Promise<string> {
   const now = Date.now();
   const expAt = shop.token_expires_at
     ? new Date(shop.token_expires_at).getTime()
@@ -123,6 +124,7 @@ async function ensureAccessToken(shop: ShopRow): Promise<string> {
     .eq("id", shop.id);
   return t.access_token;
 }
+
 
 async function getShopOr404(idOrKdt: { shop_id?: string; kdt_id?: number }) {
   let q = supabase.from("youzan_shops").select("*").limit(1);
