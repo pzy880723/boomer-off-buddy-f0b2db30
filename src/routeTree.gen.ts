@@ -43,9 +43,11 @@ import { Route as MScanRouteImport } from './routes/m.scan'
 import { Route as MPhotoSearchRouteImport } from './routes/m.photo-search'
 import { Route as MParcelsRouteImport } from './routes/m.parcels'
 import { Route as MInboundRouteImport } from './routes/m.inbound'
+import { Route as InventoryUnclaimedRouteImport } from './routes/inventory.unclaimed'
 import { Route as InventoryTransfersRouteImport } from './routes/inventory.transfers'
 import { Route as InventorySkusRouteImport } from './routes/inventory.skus'
 import { Route as InventoryProductsRouteImport } from './routes/inventory.products'
+import { Route as InventoryLocationsRouteImport } from './routes/inventory.locations'
 import { Route as InventoryInboundRouteImport } from './routes/inventory.inbound'
 import { Route as InventoryDevicesRouteImport } from './routes/inventory.devices'
 import { Route as InventoryBatchesRouteImport } from './routes/inventory.batches'
@@ -54,6 +56,7 @@ import { Route as PurchaseJapanParcelIndexRouteImport } from './routes/purchase.
 import { Route as PurchaseDomesticIndexRouteImport } from './routes/purchase.domestic.index'
 import { Route as PurchaseDomesticBulkIndexRouteImport } from './routes/purchase.domestic-bulk.index'
 import { Route as MSkusIndexRouteImport } from './routes/m.skus.index'
+import { Route as InventoryStocktakesIndexRouteImport } from './routes/inventory.stocktakes.index'
 import { Route as InventorySkusIndexRouteImport } from './routes/inventory.skus.index'
 import { Route as InventoryInboundIndexRouteImport } from './routes/inventory.inbound.index'
 import { Route as PurchaseJapanParcelNewRouteImport } from './routes/purchase.japan-parcel.new'
@@ -67,6 +70,7 @@ import { Route as PurchaseDomesticBulkIdRouteImport } from './routes/purchase.do
 import { Route as MSkusIdRouteImport } from './routes/m.skus.$id'
 import { Route as MReceiveIdRouteImport } from './routes/m.receive.$id'
 import { Route as MProductsCodeRouteImport } from './routes/m.products.$code'
+import { Route as InventoryStocktakesIdRouteImport } from './routes/inventory.stocktakes.$id'
 import { Route as InventorySkusIdRouteImport } from './routes/inventory.skus.$id'
 import { Route as InventoryProductsCodeRouteImport } from './routes/inventory.products.$code'
 import { Route as InventoryInboundNewRouteImport } from './routes/inventory.inbound.new'
@@ -256,6 +260,11 @@ const MInboundRoute = MInboundRouteImport.update({
   path: '/inbound',
   getParentRoute: () => MRoute,
 } as any)
+const InventoryUnclaimedRoute = InventoryUnclaimedRouteImport.update({
+  id: '/inventory/unclaimed',
+  path: '/inventory/unclaimed',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const InventoryTransfersRoute = InventoryTransfersRouteImport.update({
   id: '/inventory/transfers',
   path: '/inventory/transfers',
@@ -269,6 +278,11 @@ const InventorySkusRoute = InventorySkusRouteImport.update({
 const InventoryProductsRoute = InventoryProductsRouteImport.update({
   id: '/inventory/products',
   path: '/inventory/products',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InventoryLocationsRoute = InventoryLocationsRouteImport.update({
+  id: '/inventory/locations',
+  path: '/inventory/locations',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InventoryInboundRoute = InventoryInboundRouteImport.update({
@@ -313,6 +327,12 @@ const MSkusIndexRoute = MSkusIndexRouteImport.update({
   path: '/skus/',
   getParentRoute: () => MRoute,
 } as any)
+const InventoryStocktakesIndexRoute =
+  InventoryStocktakesIndexRouteImport.update({
+    id: '/inventory/stocktakes/',
+    path: '/inventory/stocktakes/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const InventorySkusIndexRoute = InventorySkusIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -379,6 +399,11 @@ const MProductsCodeRoute = MProductsCodeRouteImport.update({
   id: '/products/$code',
   path: '/products/$code',
   getParentRoute: () => MRoute,
+} as any)
+const InventoryStocktakesIdRoute = InventoryStocktakesIdRouteImport.update({
+  id: '/inventory/stocktakes/$id',
+  path: '/inventory/stocktakes/$id',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const InventorySkusIdRoute = InventorySkusIdRouteImport.update({
   id: '/$id',
@@ -499,9 +524,11 @@ export interface FileRoutesByFullPath {
   '/inventory/batches': typeof InventoryBatchesRoute
   '/inventory/devices': typeof InventoryDevicesRoute
   '/inventory/inbound': typeof InventoryInboundRouteWithChildren
+  '/inventory/locations': typeof InventoryLocationsRoute
   '/inventory/products': typeof InventoryProductsRouteWithChildren
   '/inventory/skus': typeof InventorySkusRouteWithChildren
   '/inventory/transfers': typeof InventoryTransfersRoute
+  '/inventory/unclaimed': typeof InventoryUnclaimedRoute
   '/m/inbound': typeof MInboundRoute
   '/m/parcels': typeof MParcelsRoute
   '/m/photo-search': typeof MPhotoSearchRoute
@@ -531,6 +558,7 @@ export interface FileRoutesByFullPath {
   '/inventory/inbound/new': typeof InventoryInboundNewRoute
   '/inventory/products/$code': typeof InventoryProductsCodeRoute
   '/inventory/skus/$id': typeof InventorySkusIdRoute
+  '/inventory/stocktakes/$id': typeof InventoryStocktakesIdRoute
   '/m/products/$code': typeof MProductsCodeRoute
   '/m/receive/$id': typeof MReceiveIdRoute
   '/m/skus/$id': typeof MSkusIdRoute
@@ -544,6 +572,7 @@ export interface FileRoutesByFullPath {
   '/purchase/japan-parcel/new': typeof PurchaseJapanParcelNewRoute
   '/inventory/inbound/': typeof InventoryInboundIndexRoute
   '/inventory/skus/': typeof InventorySkusIndexRoute
+  '/inventory/stocktakes/': typeof InventoryStocktakesIndexRoute
   '/m/skus/': typeof MSkusIndexRoute
   '/purchase/domestic-bulk/': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic/': typeof PurchaseDomesticIndexRoute
@@ -574,8 +603,10 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AdminUsersRoute
   '/inventory/batches': typeof InventoryBatchesRoute
   '/inventory/devices': typeof InventoryDevicesRoute
+  '/inventory/locations': typeof InventoryLocationsRoute
   '/inventory/products': typeof InventoryProductsRouteWithChildren
   '/inventory/transfers': typeof InventoryTransfersRoute
+  '/inventory/unclaimed': typeof InventoryUnclaimedRoute
   '/m/inbound': typeof MInboundRoute
   '/m/parcels': typeof MParcelsRoute
   '/m/photo-search': typeof MPhotoSearchRoute
@@ -602,6 +633,7 @@ export interface FileRoutesByTo {
   '/inventory/inbound/new': typeof InventoryInboundNewRoute
   '/inventory/products/$code': typeof InventoryProductsCodeRoute
   '/inventory/skus/$id': typeof InventorySkusIdRoute
+  '/inventory/stocktakes/$id': typeof InventoryStocktakesIdRoute
   '/m/products/$code': typeof MProductsCodeRoute
   '/m/receive/$id': typeof MReceiveIdRoute
   '/m/skus/$id': typeof MSkusIdRoute
@@ -615,6 +647,7 @@ export interface FileRoutesByTo {
   '/purchase/japan-parcel/new': typeof PurchaseJapanParcelNewRoute
   '/inventory/inbound': typeof InventoryInboundIndexRoute
   '/inventory/skus': typeof InventorySkusIndexRoute
+  '/inventory/stocktakes': typeof InventoryStocktakesIndexRoute
   '/m/skus': typeof MSkusIndexRoute
   '/purchase/domestic-bulk': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic': typeof PurchaseDomesticIndexRoute
@@ -649,9 +682,11 @@ export interface FileRoutesById {
   '/inventory/batches': typeof InventoryBatchesRoute
   '/inventory/devices': typeof InventoryDevicesRoute
   '/inventory/inbound': typeof InventoryInboundRouteWithChildren
+  '/inventory/locations': typeof InventoryLocationsRoute
   '/inventory/products': typeof InventoryProductsRouteWithChildren
   '/inventory/skus': typeof InventorySkusRouteWithChildren
   '/inventory/transfers': typeof InventoryTransfersRoute
+  '/inventory/unclaimed': typeof InventoryUnclaimedRoute
   '/m/inbound': typeof MInboundRoute
   '/m/parcels': typeof MParcelsRoute
   '/m/photo-search': typeof MPhotoSearchRoute
@@ -681,6 +716,7 @@ export interface FileRoutesById {
   '/inventory/inbound/new': typeof InventoryInboundNewRoute
   '/inventory/products/$code': typeof InventoryProductsCodeRoute
   '/inventory/skus/$id': typeof InventorySkusIdRoute
+  '/inventory/stocktakes/$id': typeof InventoryStocktakesIdRoute
   '/m/products/$code': typeof MProductsCodeRoute
   '/m/receive/$id': typeof MReceiveIdRoute
   '/m/skus/$id': typeof MSkusIdRoute
@@ -694,6 +730,7 @@ export interface FileRoutesById {
   '/purchase/japan-parcel/new': typeof PurchaseJapanParcelNewRoute
   '/inventory/inbound/': typeof InventoryInboundIndexRoute
   '/inventory/skus/': typeof InventorySkusIndexRoute
+  '/inventory/stocktakes/': typeof InventoryStocktakesIndexRoute
   '/m/skus/': typeof MSkusIndexRoute
   '/purchase/domestic-bulk/': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic/': typeof PurchaseDomesticIndexRoute
@@ -729,9 +766,11 @@ export interface FileRouteTypes {
     | '/inventory/batches'
     | '/inventory/devices'
     | '/inventory/inbound'
+    | '/inventory/locations'
     | '/inventory/products'
     | '/inventory/skus'
     | '/inventory/transfers'
+    | '/inventory/unclaimed'
     | '/m/inbound'
     | '/m/parcels'
     | '/m/photo-search'
@@ -761,6 +800,7 @@ export interface FileRouteTypes {
     | '/inventory/inbound/new'
     | '/inventory/products/$code'
     | '/inventory/skus/$id'
+    | '/inventory/stocktakes/$id'
     | '/m/products/$code'
     | '/m/receive/$id'
     | '/m/skus/$id'
@@ -774,6 +814,7 @@ export interface FileRouteTypes {
     | '/purchase/japan-parcel/new'
     | '/inventory/inbound/'
     | '/inventory/skus/'
+    | '/inventory/stocktakes/'
     | '/m/skus/'
     | '/purchase/domestic-bulk/'
     | '/purchase/domestic/'
@@ -804,8 +845,10 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/inventory/batches'
     | '/inventory/devices'
+    | '/inventory/locations'
     | '/inventory/products'
     | '/inventory/transfers'
+    | '/inventory/unclaimed'
     | '/m/inbound'
     | '/m/parcels'
     | '/m/photo-search'
@@ -832,6 +875,7 @@ export interface FileRouteTypes {
     | '/inventory/inbound/new'
     | '/inventory/products/$code'
     | '/inventory/skus/$id'
+    | '/inventory/stocktakes/$id'
     | '/m/products/$code'
     | '/m/receive/$id'
     | '/m/skus/$id'
@@ -845,6 +889,7 @@ export interface FileRouteTypes {
     | '/purchase/japan-parcel/new'
     | '/inventory/inbound'
     | '/inventory/skus'
+    | '/inventory/stocktakes'
     | '/m/skus'
     | '/purchase/domestic-bulk'
     | '/purchase/domestic'
@@ -878,9 +923,11 @@ export interface FileRouteTypes {
     | '/inventory/batches'
     | '/inventory/devices'
     | '/inventory/inbound'
+    | '/inventory/locations'
     | '/inventory/products'
     | '/inventory/skus'
     | '/inventory/transfers'
+    | '/inventory/unclaimed'
     | '/m/inbound'
     | '/m/parcels'
     | '/m/photo-search'
@@ -910,6 +957,7 @@ export interface FileRouteTypes {
     | '/inventory/inbound/new'
     | '/inventory/products/$code'
     | '/inventory/skus/$id'
+    | '/inventory/stocktakes/$id'
     | '/m/products/$code'
     | '/m/receive/$id'
     | '/m/skus/$id'
@@ -923,6 +971,7 @@ export interface FileRouteTypes {
     | '/purchase/japan-parcel/new'
     | '/inventory/inbound/'
     | '/inventory/skus/'
+    | '/inventory/stocktakes/'
     | '/m/skus/'
     | '/purchase/domestic-bulk/'
     | '/purchase/domestic/'
@@ -957,9 +1006,11 @@ export interface RootRouteChildren {
   InventoryBatchesRoute: typeof InventoryBatchesRoute
   InventoryDevicesRoute: typeof InventoryDevicesRoute
   InventoryInboundRoute: typeof InventoryInboundRouteWithChildren
+  InventoryLocationsRoute: typeof InventoryLocationsRoute
   InventoryProductsRoute: typeof InventoryProductsRouteWithChildren
   InventorySkusRoute: typeof InventorySkusRouteWithChildren
   InventoryTransfersRoute: typeof InventoryTransfersRoute
+  InventoryUnclaimedRoute: typeof InventoryUnclaimedRoute
   PurchaseDomesticRoute: typeof PurchaseDomesticRouteWithChildren
   PurchaseDomesticBulkRoute: typeof PurchaseDomesticBulkRouteWithChildren
   PurchaseJapanBulkRoute: typeof PurchaseJapanBulkRoute
@@ -969,6 +1020,8 @@ export interface RootRouteChildren {
   StoresProductsRoute: typeof StoresProductsRoute
   StoresYouzanRoute: typeof StoresYouzanRoute
   ApiPublicMerukiIngestRoute: typeof ApiPublicMerukiIngestRoute
+  InventoryStocktakesIdRoute: typeof InventoryStocktakesIdRoute
+  InventoryStocktakesIndexRoute: typeof InventoryStocktakesIndexRoute
   ApiPublicHooksYouzanReconcileRoute: typeof ApiPublicHooksYouzanReconcileRoute
   ApiPublicHooksYouzanStockWorkerRoute: typeof ApiPublicHooksYouzanStockWorkerRoute
   ApiPublicHandheldAuthPingRoute: typeof ApiPublicHandheldAuthPingRoute
@@ -1224,6 +1277,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MInboundRouteImport
       parentRoute: typeof MRoute
     }
+    '/inventory/unclaimed': {
+      id: '/inventory/unclaimed'
+      path: '/inventory/unclaimed'
+      fullPath: '/inventory/unclaimed'
+      preLoaderRoute: typeof InventoryUnclaimedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/inventory/transfers': {
       id: '/inventory/transfers'
       path: '/inventory/transfers'
@@ -1243,6 +1303,13 @@ declare module '@tanstack/react-router' {
       path: '/inventory/products'
       fullPath: '/inventory/products'
       preLoaderRoute: typeof InventoryProductsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inventory/locations': {
+      id: '/inventory/locations'
+      path: '/inventory/locations'
+      fullPath: '/inventory/locations'
+      preLoaderRoute: typeof InventoryLocationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/inventory/inbound': {
@@ -1300,6 +1367,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/m/skus/'
       preLoaderRoute: typeof MSkusIndexRouteImport
       parentRoute: typeof MRoute
+    }
+    '/inventory/stocktakes/': {
+      id: '/inventory/stocktakes/'
+      path: '/inventory/stocktakes'
+      fullPath: '/inventory/stocktakes/'
+      preLoaderRoute: typeof InventoryStocktakesIndexRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/inventory/skus/': {
       id: '/inventory/skus/'
@@ -1391,6 +1465,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/m/products/$code'
       preLoaderRoute: typeof MProductsCodeRouteImport
       parentRoute: typeof MRoute
+    }
+    '/inventory/stocktakes/$id': {
+      id: '/inventory/stocktakes/$id'
+      path: '/inventory/stocktakes/$id'
+      fullPath: '/inventory/stocktakes/$id'
+      preLoaderRoute: typeof InventoryStocktakesIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/inventory/skus/$id': {
       id: '/inventory/skus/$id'
@@ -1709,9 +1790,11 @@ const rootRouteChildren: RootRouteChildren = {
   InventoryBatchesRoute: InventoryBatchesRoute,
   InventoryDevicesRoute: InventoryDevicesRoute,
   InventoryInboundRoute: InventoryInboundRouteWithChildren,
+  InventoryLocationsRoute: InventoryLocationsRoute,
   InventoryProductsRoute: InventoryProductsRouteWithChildren,
   InventorySkusRoute: InventorySkusRouteWithChildren,
   InventoryTransfersRoute: InventoryTransfersRoute,
+  InventoryUnclaimedRoute: InventoryUnclaimedRoute,
   PurchaseDomesticRoute: PurchaseDomesticRouteWithChildren,
   PurchaseDomesticBulkRoute: PurchaseDomesticBulkRouteWithChildren,
   PurchaseJapanBulkRoute: PurchaseJapanBulkRoute,
@@ -1721,6 +1804,8 @@ const rootRouteChildren: RootRouteChildren = {
   StoresProductsRoute: StoresProductsRoute,
   StoresYouzanRoute: StoresYouzanRoute,
   ApiPublicMerukiIngestRoute: ApiPublicMerukiIngestRoute,
+  InventoryStocktakesIdRoute: InventoryStocktakesIdRoute,
+  InventoryStocktakesIndexRoute: InventoryStocktakesIndexRoute,
   ApiPublicHooksYouzanReconcileRoute: ApiPublicHooksYouzanReconcileRoute,
   ApiPublicHooksYouzanStockWorkerRoute: ApiPublicHooksYouzanStockWorkerRoute,
   ApiPublicHandheldAuthPingRoute: ApiPublicHandheldAuthPingRoute,
