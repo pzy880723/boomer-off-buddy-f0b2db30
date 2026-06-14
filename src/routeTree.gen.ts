@@ -73,6 +73,13 @@ import { Route as InventoryInboundIdRouteImport } from './routes/inventory.inbou
 import { Route as ApiPublicMerukiIngestRouteImport } from './routes/api/public/meruki-ingest'
 import { Route as ApiPublicHooksYouzanStockWorkerRouteImport } from './routes/api/public/hooks/youzan-stock-worker'
 import { Route as ApiPublicHooksYouzanReconcileRouteImport } from './routes/api/public/hooks/youzan-reconcile'
+import { Route as ApiPublicHandheldTransferShipScanRouteImport } from './routes/api/public/handheld/transfer.ship-scan'
+import { Route as ApiPublicHandheldTransferShipConfirmRouteImport } from './routes/api/public/handheld/transfer.ship-confirm'
+import { Route as ApiPublicHandheldTransferReceiveScanRouteImport } from './routes/api/public/handheld/transfer.receive-scan'
+import { Route as ApiPublicHandheldTransferReceiveConfirmRouteImport } from './routes/api/public/handheld/transfer.receive-confirm'
+import { Route as ApiPublicHandheldStocktakeSubmitRouteImport } from './routes/api/public/handheld/stocktake.submit'
+import { Route as ApiPublicHandheldStocktakeScanRouteImport } from './routes/api/public/handheld/stocktake.scan'
+import { Route as ApiPublicHandheldStocktakeOpenRouteImport } from './routes/api/public/handheld/stocktake.open'
 import { Route as ApiPublicHandheldSkuSearchRouteImport } from './routes/api/public/handheld/sku.search'
 import { Route as ApiPublicHandheldSkuByEpcRouteImport } from './routes/api/public/handheld/sku.by-epc'
 import { Route as ApiPublicHandheldInboundScanRouteImport } from './routes/api/public/handheld/inbound.scan'
@@ -404,6 +411,48 @@ const ApiPublicHooksYouzanReconcileRoute =
     path: '/api/public/hooks/youzan-reconcile',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHandheldTransferShipScanRoute =
+  ApiPublicHandheldTransferShipScanRouteImport.update({
+    id: '/api/public/handheld/transfer/ship-scan',
+    path: '/api/public/handheld/transfer/ship-scan',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldTransferShipConfirmRoute =
+  ApiPublicHandheldTransferShipConfirmRouteImport.update({
+    id: '/api/public/handheld/transfer/ship-confirm',
+    path: '/api/public/handheld/transfer/ship-confirm',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldTransferReceiveScanRoute =
+  ApiPublicHandheldTransferReceiveScanRouteImport.update({
+    id: '/api/public/handheld/transfer/receive-scan',
+    path: '/api/public/handheld/transfer/receive-scan',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldTransferReceiveConfirmRoute =
+  ApiPublicHandheldTransferReceiveConfirmRouteImport.update({
+    id: '/api/public/handheld/transfer/receive-confirm',
+    path: '/api/public/handheld/transfer/receive-confirm',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldStocktakeSubmitRoute =
+  ApiPublicHandheldStocktakeSubmitRouteImport.update({
+    id: '/api/public/handheld/stocktake/submit',
+    path: '/api/public/handheld/stocktake/submit',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldStocktakeScanRoute =
+  ApiPublicHandheldStocktakeScanRouteImport.update({
+    id: '/api/public/handheld/stocktake/scan',
+    path: '/api/public/handheld/stocktake/scan',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldStocktakeOpenRoute =
+  ApiPublicHandheldStocktakeOpenRouteImport.update({
+    id: '/api/public/handheld/stocktake/open',
+    path: '/api/public/handheld/stocktake/open',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHandheldSkuSearchRoute =
   ApiPublicHandheldSkuSearchRouteImport.update({
     id: '/api/public/handheld/sku/search',
@@ -498,6 +547,13 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/inbound/scan': typeof ApiPublicHandheldInboundScanRoute
   '/api/public/handheld/sku/by-epc': typeof ApiPublicHandheldSkuByEpcRoute
   '/api/public/handheld/sku/search': typeof ApiPublicHandheldSkuSearchRoute
+  '/api/public/handheld/stocktake/open': typeof ApiPublicHandheldStocktakeOpenRoute
+  '/api/public/handheld/stocktake/scan': typeof ApiPublicHandheldStocktakeScanRoute
+  '/api/public/handheld/stocktake/submit': typeof ApiPublicHandheldStocktakeSubmitRoute
+  '/api/public/handheld/transfer/receive-confirm': typeof ApiPublicHandheldTransferReceiveConfirmRoute
+  '/api/public/handheld/transfer/receive-scan': typeof ApiPublicHandheldTransferReceiveScanRoute
+  '/api/public/handheld/transfer/ship-confirm': typeof ApiPublicHandheldTransferShipConfirmRoute
+  '/api/public/handheld/transfer/ship-scan': typeof ApiPublicHandheldTransferShipScanRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -561,6 +617,13 @@ export interface FileRoutesByTo {
   '/api/public/handheld/inbound/scan': typeof ApiPublicHandheldInboundScanRoute
   '/api/public/handheld/sku/by-epc': typeof ApiPublicHandheldSkuByEpcRoute
   '/api/public/handheld/sku/search': typeof ApiPublicHandheldSkuSearchRoute
+  '/api/public/handheld/stocktake/open': typeof ApiPublicHandheldStocktakeOpenRoute
+  '/api/public/handheld/stocktake/scan': typeof ApiPublicHandheldStocktakeScanRoute
+  '/api/public/handheld/stocktake/submit': typeof ApiPublicHandheldStocktakeSubmitRoute
+  '/api/public/handheld/transfer/receive-confirm': typeof ApiPublicHandheldTransferReceiveConfirmRoute
+  '/api/public/handheld/transfer/receive-scan': typeof ApiPublicHandheldTransferReceiveScanRoute
+  '/api/public/handheld/transfer/ship-confirm': typeof ApiPublicHandheldTransferShipConfirmRoute
+  '/api/public/handheld/transfer/ship-scan': typeof ApiPublicHandheldTransferShipScanRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -632,6 +695,13 @@ export interface FileRoutesById {
   '/api/public/handheld/inbound/scan': typeof ApiPublicHandheldInboundScanRoute
   '/api/public/handheld/sku/by-epc': typeof ApiPublicHandheldSkuByEpcRoute
   '/api/public/handheld/sku/search': typeof ApiPublicHandheldSkuSearchRoute
+  '/api/public/handheld/stocktake/open': typeof ApiPublicHandheldStocktakeOpenRoute
+  '/api/public/handheld/stocktake/scan': typeof ApiPublicHandheldStocktakeScanRoute
+  '/api/public/handheld/stocktake/submit': typeof ApiPublicHandheldStocktakeSubmitRoute
+  '/api/public/handheld/transfer/receive-confirm': typeof ApiPublicHandheldTransferReceiveConfirmRoute
+  '/api/public/handheld/transfer/receive-scan': typeof ApiPublicHandheldTransferReceiveScanRoute
+  '/api/public/handheld/transfer/ship-confirm': typeof ApiPublicHandheldTransferShipConfirmRoute
+  '/api/public/handheld/transfer/ship-scan': typeof ApiPublicHandheldTransferShipScanRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -704,6 +774,13 @@ export interface FileRouteTypes {
     | '/api/public/handheld/inbound/scan'
     | '/api/public/handheld/sku/by-epc'
     | '/api/public/handheld/sku/search'
+    | '/api/public/handheld/stocktake/open'
+    | '/api/public/handheld/stocktake/scan'
+    | '/api/public/handheld/stocktake/submit'
+    | '/api/public/handheld/transfer/receive-confirm'
+    | '/api/public/handheld/transfer/receive-scan'
+    | '/api/public/handheld/transfer/ship-confirm'
+    | '/api/public/handheld/transfer/ship-scan'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -767,6 +844,13 @@ export interface FileRouteTypes {
     | '/api/public/handheld/inbound/scan'
     | '/api/public/handheld/sku/by-epc'
     | '/api/public/handheld/sku/search'
+    | '/api/public/handheld/stocktake/open'
+    | '/api/public/handheld/stocktake/scan'
+    | '/api/public/handheld/stocktake/submit'
+    | '/api/public/handheld/transfer/receive-confirm'
+    | '/api/public/handheld/transfer/receive-scan'
+    | '/api/public/handheld/transfer/ship-confirm'
+    | '/api/public/handheld/transfer/ship-scan'
   id:
     | '__root__'
     | '/'
@@ -837,6 +921,13 @@ export interface FileRouteTypes {
     | '/api/public/handheld/inbound/scan'
     | '/api/public/handheld/sku/by-epc'
     | '/api/public/handheld/sku/search'
+    | '/api/public/handheld/stocktake/open'
+    | '/api/public/handheld/stocktake/scan'
+    | '/api/public/handheld/stocktake/submit'
+    | '/api/public/handheld/transfer/receive-confirm'
+    | '/api/public/handheld/transfer/receive-scan'
+    | '/api/public/handheld/transfer/ship-confirm'
+    | '/api/public/handheld/transfer/ship-scan'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -871,6 +962,13 @@ export interface RootRouteChildren {
   ApiPublicHandheldInboundScanRoute: typeof ApiPublicHandheldInboundScanRoute
   ApiPublicHandheldSkuByEpcRoute: typeof ApiPublicHandheldSkuByEpcRoute
   ApiPublicHandheldSkuSearchRoute: typeof ApiPublicHandheldSkuSearchRoute
+  ApiPublicHandheldStocktakeOpenRoute: typeof ApiPublicHandheldStocktakeOpenRoute
+  ApiPublicHandheldStocktakeScanRoute: typeof ApiPublicHandheldStocktakeScanRoute
+  ApiPublicHandheldStocktakeSubmitRoute: typeof ApiPublicHandheldStocktakeSubmitRoute
+  ApiPublicHandheldTransferReceiveConfirmRoute: typeof ApiPublicHandheldTransferReceiveConfirmRoute
+  ApiPublicHandheldTransferReceiveScanRoute: typeof ApiPublicHandheldTransferReceiveScanRoute
+  ApiPublicHandheldTransferShipConfirmRoute: typeof ApiPublicHandheldTransferShipConfirmRoute
+  ApiPublicHandheldTransferShipScanRoute: typeof ApiPublicHandheldTransferShipScanRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1323,6 +1421,55 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksYouzanReconcileRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/handheld/transfer/ship-scan': {
+      id: '/api/public/handheld/transfer/ship-scan'
+      path: '/api/public/handheld/transfer/ship-scan'
+      fullPath: '/api/public/handheld/transfer/ship-scan'
+      preLoaderRoute: typeof ApiPublicHandheldTransferShipScanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/transfer/ship-confirm': {
+      id: '/api/public/handheld/transfer/ship-confirm'
+      path: '/api/public/handheld/transfer/ship-confirm'
+      fullPath: '/api/public/handheld/transfer/ship-confirm'
+      preLoaderRoute: typeof ApiPublicHandheldTransferShipConfirmRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/transfer/receive-scan': {
+      id: '/api/public/handheld/transfer/receive-scan'
+      path: '/api/public/handheld/transfer/receive-scan'
+      fullPath: '/api/public/handheld/transfer/receive-scan'
+      preLoaderRoute: typeof ApiPublicHandheldTransferReceiveScanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/transfer/receive-confirm': {
+      id: '/api/public/handheld/transfer/receive-confirm'
+      path: '/api/public/handheld/transfer/receive-confirm'
+      fullPath: '/api/public/handheld/transfer/receive-confirm'
+      preLoaderRoute: typeof ApiPublicHandheldTransferReceiveConfirmRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/stocktake/submit': {
+      id: '/api/public/handheld/stocktake/submit'
+      path: '/api/public/handheld/stocktake/submit'
+      fullPath: '/api/public/handheld/stocktake/submit'
+      preLoaderRoute: typeof ApiPublicHandheldStocktakeSubmitRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/stocktake/scan': {
+      id: '/api/public/handheld/stocktake/scan'
+      path: '/api/public/handheld/stocktake/scan'
+      fullPath: '/api/public/handheld/stocktake/scan'
+      preLoaderRoute: typeof ApiPublicHandheldStocktakeScanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/stocktake/open': {
+      id: '/api/public/handheld/stocktake/open'
+      path: '/api/public/handheld/stocktake/open'
+      fullPath: '/api/public/handheld/stocktake/open'
+      preLoaderRoute: typeof ApiPublicHandheldStocktakeOpenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/handheld/sku/search': {
       id: '/api/public/handheld/sku/search'
       path: '/api/public/handheld/sku/search'
@@ -1559,6 +1706,17 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHandheldInboundScanRoute: ApiPublicHandheldInboundScanRoute,
   ApiPublicHandheldSkuByEpcRoute: ApiPublicHandheldSkuByEpcRoute,
   ApiPublicHandheldSkuSearchRoute: ApiPublicHandheldSkuSearchRoute,
+  ApiPublicHandheldStocktakeOpenRoute: ApiPublicHandheldStocktakeOpenRoute,
+  ApiPublicHandheldStocktakeScanRoute: ApiPublicHandheldStocktakeScanRoute,
+  ApiPublicHandheldStocktakeSubmitRoute: ApiPublicHandheldStocktakeSubmitRoute,
+  ApiPublicHandheldTransferReceiveConfirmRoute:
+    ApiPublicHandheldTransferReceiveConfirmRoute,
+  ApiPublicHandheldTransferReceiveScanRoute:
+    ApiPublicHandheldTransferReceiveScanRoute,
+  ApiPublicHandheldTransferShipConfirmRoute:
+    ApiPublicHandheldTransferShipConfirmRoute,
+  ApiPublicHandheldTransferShipScanRoute:
+    ApiPublicHandheldTransferShipScanRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
