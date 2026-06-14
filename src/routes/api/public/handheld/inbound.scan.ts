@@ -67,10 +67,9 @@ export const Route = createFileRoute("/api/public/handheld/inbound/scan")({
             p_location_id: locationId,
             p_delta: 1,
             p_ref_type: "handheld_inbound",
-            p_ref_id: null,
             p_epc: epc,
             p_note: `device:${auth.device.device_code}`,
-          });
+          } as never);
           if (mvErr) {
             duplicated.push({ epc, reason: `movement_failed:${mvErr.message}` });
             continue;
@@ -86,31 +85,19 @@ export const Route = createFileRoute("/api/public/handheld/inbound/scan")({
           accepted.push({ epc, sku_id: e.sku_id });
         }
 
-        // Unclaimed queue
-        if (unclaimed.length) {
-          for (const epc of unclaimed) {
-            await supabaseAdmin
-              .from("inv_unclaimed_epcs")
-              .upsert(
-                {
-                  epc,
-                  last_seen_location_id: locationId,
-                  last_seen_at: new Date().toISOString(),
-                  hits: 1,
-                },
-                { onConflict: "epc" }
-              );
-            // bump hits
-            await supabaseAdmin.rpc("inv_apply_movement", {
-              p_sku_id: "00000000-0000-0000-0000-000000000000",
-              p_location_id: locationId,
-              p_delta: 0,
-              p_ref_type: "_noop",
-              p_ref_id: null,
-              p_epc: epc,
-              p_note: null,
-            }).catch(() => {});
-          }
+        // Unclaimed queue (upsert and bump hits)
+        for (const epc of unclaimed) {
+          await supabaseAdmin
+            .from("inv_unclaimed_epcs")
+            .upsert(
+              {
+                epc,
+                last_seen_location_id: locationId,
+                last_seen_at: new Date().toISOString(),
+                hits: 1,
+              },
+              { onConflict: "epc" }
+            );
         }
 
         return ok({

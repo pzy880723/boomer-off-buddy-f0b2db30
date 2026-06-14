@@ -73,6 +73,10 @@ import { Route as InventoryInboundIdRouteImport } from './routes/inventory.inbou
 import { Route as ApiPublicMerukiIngestRouteImport } from './routes/api/public/meruki-ingest'
 import { Route as ApiPublicHooksYouzanStockWorkerRouteImport } from './routes/api/public/hooks/youzan-stock-worker'
 import { Route as ApiPublicHooksYouzanReconcileRouteImport } from './routes/api/public/hooks/youzan-reconcile'
+import { Route as ApiPublicHandheldSkuSearchRouteImport } from './routes/api/public/handheld/sku.search'
+import { Route as ApiPublicHandheldSkuByEpcRouteImport } from './routes/api/public/handheld/sku.by-epc'
+import { Route as ApiPublicHandheldInboundScanRouteImport } from './routes/api/public/handheld/inbound.scan'
+import { Route as ApiPublicHandheldAuthPingRouteImport } from './routes/api/public/handheld/auth.ping'
 
 const YouzanRoute = YouzanRouteImport.update({
   id: '/youzan',
@@ -400,6 +404,30 @@ const ApiPublicHooksYouzanReconcileRoute =
     path: '/api/public/hooks/youzan-reconcile',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHandheldSkuSearchRoute =
+  ApiPublicHandheldSkuSearchRouteImport.update({
+    id: '/api/public/handheld/sku/search',
+    path: '/api/public/handheld/sku/search',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldSkuByEpcRoute =
+  ApiPublicHandheldSkuByEpcRouteImport.update({
+    id: '/api/public/handheld/sku/by-epc',
+    path: '/api/public/handheld/sku/by-epc',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldInboundScanRoute =
+  ApiPublicHandheldInboundScanRouteImport.update({
+    id: '/api/public/handheld/inbound/scan',
+    path: '/api/public/handheld/inbound/scan',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldAuthPingRoute =
+  ApiPublicHandheldAuthPingRouteImport.update({
+    id: '/api/public/handheld/auth/ping',
+    path: '/api/public/handheld/auth/ping',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -466,6 +494,10 @@ export interface FileRoutesByFullPath {
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
+  '/api/public/handheld/auth/ping': typeof ApiPublicHandheldAuthPingRoute
+  '/api/public/handheld/inbound/scan': typeof ApiPublicHandheldInboundScanRoute
+  '/api/public/handheld/sku/by-epc': typeof ApiPublicHandheldSkuByEpcRoute
+  '/api/public/handheld/sku/search': typeof ApiPublicHandheldSkuSearchRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -525,6 +557,10 @@ export interface FileRoutesByTo {
   '/purchase/japan-parcel': typeof PurchaseJapanParcelIndexRoute
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
+  '/api/public/handheld/auth/ping': typeof ApiPublicHandheldAuthPingRoute
+  '/api/public/handheld/inbound/scan': typeof ApiPublicHandheldInboundScanRoute
+  '/api/public/handheld/sku/by-epc': typeof ApiPublicHandheldSkuByEpcRoute
+  '/api/public/handheld/sku/search': typeof ApiPublicHandheldSkuSearchRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -592,6 +628,10 @@ export interface FileRoutesById {
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
+  '/api/public/handheld/auth/ping': typeof ApiPublicHandheldAuthPingRoute
+  '/api/public/handheld/inbound/scan': typeof ApiPublicHandheldInboundScanRoute
+  '/api/public/handheld/sku/by-epc': typeof ApiPublicHandheldSkuByEpcRoute
+  '/api/public/handheld/sku/search': typeof ApiPublicHandheldSkuSearchRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -660,6 +700,10 @@ export interface FileRouteTypes {
     | '/purchase/japan-parcel/'
     | '/api/public/hooks/youzan-reconcile'
     | '/api/public/hooks/youzan-stock-worker'
+    | '/api/public/handheld/auth/ping'
+    | '/api/public/handheld/inbound/scan'
+    | '/api/public/handheld/sku/by-epc'
+    | '/api/public/handheld/sku/search'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -719,6 +763,10 @@ export interface FileRouteTypes {
     | '/purchase/japan-parcel'
     | '/api/public/hooks/youzan-reconcile'
     | '/api/public/hooks/youzan-stock-worker'
+    | '/api/public/handheld/auth/ping'
+    | '/api/public/handheld/inbound/scan'
+    | '/api/public/handheld/sku/by-epc'
+    | '/api/public/handheld/sku/search'
   id:
     | '__root__'
     | '/'
@@ -785,6 +833,10 @@ export interface FileRouteTypes {
     | '/purchase/japan-parcel/'
     | '/api/public/hooks/youzan-reconcile'
     | '/api/public/hooks/youzan-stock-worker'
+    | '/api/public/handheld/auth/ping'
+    | '/api/public/handheld/inbound/scan'
+    | '/api/public/handheld/sku/by-epc'
+    | '/api/public/handheld/sku/search'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -815,6 +867,10 @@ export interface RootRouteChildren {
   ApiPublicMerukiIngestRoute: typeof ApiPublicMerukiIngestRoute
   ApiPublicHooksYouzanReconcileRoute: typeof ApiPublicHooksYouzanReconcileRoute
   ApiPublicHooksYouzanStockWorkerRoute: typeof ApiPublicHooksYouzanStockWorkerRoute
+  ApiPublicHandheldAuthPingRoute: typeof ApiPublicHandheldAuthPingRoute
+  ApiPublicHandheldInboundScanRoute: typeof ApiPublicHandheldInboundScanRoute
+  ApiPublicHandheldSkuByEpcRoute: typeof ApiPublicHandheldSkuByEpcRoute
+  ApiPublicHandheldSkuSearchRoute: typeof ApiPublicHandheldSkuSearchRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1267,6 +1323,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksYouzanReconcileRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/handheld/sku/search': {
+      id: '/api/public/handheld/sku/search'
+      path: '/api/public/handheld/sku/search'
+      fullPath: '/api/public/handheld/sku/search'
+      preLoaderRoute: typeof ApiPublicHandheldSkuSearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/sku/by-epc': {
+      id: '/api/public/handheld/sku/by-epc'
+      path: '/api/public/handheld/sku/by-epc'
+      fullPath: '/api/public/handheld/sku/by-epc'
+      preLoaderRoute: typeof ApiPublicHandheldSkuByEpcRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/inbound/scan': {
+      id: '/api/public/handheld/inbound/scan'
+      path: '/api/public/handheld/inbound/scan'
+      fullPath: '/api/public/handheld/inbound/scan'
+      preLoaderRoute: typeof ApiPublicHandheldInboundScanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/auth/ping': {
+      id: '/api/public/handheld/auth/ping'
+      path: '/api/public/handheld/auth/ping'
+      fullPath: '/api/public/handheld/auth/ping'
+      preLoaderRoute: typeof ApiPublicHandheldAuthPingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -1471,6 +1555,10 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicMerukiIngestRoute: ApiPublicMerukiIngestRoute,
   ApiPublicHooksYouzanReconcileRoute: ApiPublicHooksYouzanReconcileRoute,
   ApiPublicHooksYouzanStockWorkerRoute: ApiPublicHooksYouzanStockWorkerRoute,
+  ApiPublicHandheldAuthPingRoute: ApiPublicHandheldAuthPingRoute,
+  ApiPublicHandheldInboundScanRoute: ApiPublicHandheldInboundScanRoute,
+  ApiPublicHandheldSkuByEpcRoute: ApiPublicHandheldSkuByEpcRoute,
+  ApiPublicHandheldSkuSearchRoute: ApiPublicHandheldSkuSearchRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
