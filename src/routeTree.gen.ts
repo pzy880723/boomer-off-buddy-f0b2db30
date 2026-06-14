@@ -43,16 +43,20 @@ import { Route as MScanRouteImport } from './routes/m.scan'
 import { Route as MPhotoSearchRouteImport } from './routes/m.photo-search'
 import { Route as MParcelsRouteImport } from './routes/m.parcels'
 import { Route as MInboundRouteImport } from './routes/m.inbound'
+import { Route as InventoryUnclaimedRouteImport } from './routes/inventory.unclaimed'
 import { Route as InventoryTransfersRouteImport } from './routes/inventory.transfers'
 import { Route as InventorySkusRouteImport } from './routes/inventory.skus'
 import { Route as InventoryProductsRouteImport } from './routes/inventory.products'
+import { Route as InventoryLocationsRouteImport } from './routes/inventory.locations'
 import { Route as InventoryInboundRouteImport } from './routes/inventory.inbound'
+import { Route as InventoryDevicesRouteImport } from './routes/inventory.devices'
 import { Route as InventoryBatchesRouteImport } from './routes/inventory.batches'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as PurchaseJapanParcelIndexRouteImport } from './routes/purchase.japan-parcel.index'
 import { Route as PurchaseDomesticIndexRouteImport } from './routes/purchase.domestic.index'
 import { Route as PurchaseDomesticBulkIndexRouteImport } from './routes/purchase.domestic-bulk.index'
 import { Route as MSkusIndexRouteImport } from './routes/m.skus.index'
+import { Route as InventoryStocktakesIndexRouteImport } from './routes/inventory.stocktakes.index'
 import { Route as InventorySkusIndexRouteImport } from './routes/inventory.skus.index'
 import { Route as InventoryInboundIndexRouteImport } from './routes/inventory.inbound.index'
 import { Route as PurchaseJapanParcelNewRouteImport } from './routes/purchase.japan-parcel.new'
@@ -66,6 +70,7 @@ import { Route as PurchaseDomesticBulkIdRouteImport } from './routes/purchase.do
 import { Route as MSkusIdRouteImport } from './routes/m.skus.$id'
 import { Route as MReceiveIdRouteImport } from './routes/m.receive.$id'
 import { Route as MProductsCodeRouteImport } from './routes/m.products.$code'
+import { Route as InventoryStocktakesIdRouteImport } from './routes/inventory.stocktakes.$id'
 import { Route as InventorySkusIdRouteImport } from './routes/inventory.skus.$id'
 import { Route as InventoryProductsCodeRouteImport } from './routes/inventory.products.$code'
 import { Route as InventoryInboundNewRouteImport } from './routes/inventory.inbound.new'
@@ -73,6 +78,17 @@ import { Route as InventoryInboundIdRouteImport } from './routes/inventory.inbou
 import { Route as ApiPublicMerukiIngestRouteImport } from './routes/api/public/meruki-ingest'
 import { Route as ApiPublicHooksYouzanStockWorkerRouteImport } from './routes/api/public/hooks/youzan-stock-worker'
 import { Route as ApiPublicHooksYouzanReconcileRouteImport } from './routes/api/public/hooks/youzan-reconcile'
+import { Route as ApiPublicHandheldTransferShipScanRouteImport } from './routes/api/public/handheld/transfer.ship-scan'
+import { Route as ApiPublicHandheldTransferShipConfirmRouteImport } from './routes/api/public/handheld/transfer.ship-confirm'
+import { Route as ApiPublicHandheldTransferReceiveScanRouteImport } from './routes/api/public/handheld/transfer.receive-scan'
+import { Route as ApiPublicHandheldTransferReceiveConfirmRouteImport } from './routes/api/public/handheld/transfer.receive-confirm'
+import { Route as ApiPublicHandheldStocktakeSubmitRouteImport } from './routes/api/public/handheld/stocktake.submit'
+import { Route as ApiPublicHandheldStocktakeScanRouteImport } from './routes/api/public/handheld/stocktake.scan'
+import { Route as ApiPublicHandheldStocktakeOpenRouteImport } from './routes/api/public/handheld/stocktake.open'
+import { Route as ApiPublicHandheldSkuSearchRouteImport } from './routes/api/public/handheld/sku.search'
+import { Route as ApiPublicHandheldSkuByEpcRouteImport } from './routes/api/public/handheld/sku.by-epc'
+import { Route as ApiPublicHandheldInboundScanRouteImport } from './routes/api/public/handheld/inbound.scan'
+import { Route as ApiPublicHandheldAuthPingRouteImport } from './routes/api/public/handheld/auth.ping'
 
 const YouzanRoute = YouzanRouteImport.update({
   id: '/youzan',
@@ -244,6 +260,11 @@ const MInboundRoute = MInboundRouteImport.update({
   path: '/inbound',
   getParentRoute: () => MRoute,
 } as any)
+const InventoryUnclaimedRoute = InventoryUnclaimedRouteImport.update({
+  id: '/inventory/unclaimed',
+  path: '/inventory/unclaimed',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const InventoryTransfersRoute = InventoryTransfersRouteImport.update({
   id: '/inventory/transfers',
   path: '/inventory/transfers',
@@ -259,9 +280,19 @@ const InventoryProductsRoute = InventoryProductsRouteImport.update({
   path: '/inventory/products',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InventoryLocationsRoute = InventoryLocationsRouteImport.update({
+  id: '/inventory/locations',
+  path: '/inventory/locations',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const InventoryInboundRoute = InventoryInboundRouteImport.update({
   id: '/inventory/inbound',
   path: '/inventory/inbound',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InventoryDevicesRoute = InventoryDevicesRouteImport.update({
+  id: '/inventory/devices',
+  path: '/inventory/devices',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InventoryBatchesRoute = InventoryBatchesRouteImport.update({
@@ -296,6 +327,12 @@ const MSkusIndexRoute = MSkusIndexRouteImport.update({
   path: '/skus/',
   getParentRoute: () => MRoute,
 } as any)
+const InventoryStocktakesIndexRoute =
+  InventoryStocktakesIndexRouteImport.update({
+    id: '/inventory/stocktakes/',
+    path: '/inventory/stocktakes/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const InventorySkusIndexRoute = InventorySkusIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -363,6 +400,11 @@ const MProductsCodeRoute = MProductsCodeRouteImport.update({
   path: '/products/$code',
   getParentRoute: () => MRoute,
 } as any)
+const InventoryStocktakesIdRoute = InventoryStocktakesIdRouteImport.update({
+  id: '/inventory/stocktakes/$id',
+  path: '/inventory/stocktakes/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const InventorySkusIdRoute = InventorySkusIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -400,6 +442,72 @@ const ApiPublicHooksYouzanReconcileRoute =
     path: '/api/public/hooks/youzan-reconcile',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHandheldTransferShipScanRoute =
+  ApiPublicHandheldTransferShipScanRouteImport.update({
+    id: '/api/public/handheld/transfer/ship-scan',
+    path: '/api/public/handheld/transfer/ship-scan',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldTransferShipConfirmRoute =
+  ApiPublicHandheldTransferShipConfirmRouteImport.update({
+    id: '/api/public/handheld/transfer/ship-confirm',
+    path: '/api/public/handheld/transfer/ship-confirm',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldTransferReceiveScanRoute =
+  ApiPublicHandheldTransferReceiveScanRouteImport.update({
+    id: '/api/public/handheld/transfer/receive-scan',
+    path: '/api/public/handheld/transfer/receive-scan',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldTransferReceiveConfirmRoute =
+  ApiPublicHandheldTransferReceiveConfirmRouteImport.update({
+    id: '/api/public/handheld/transfer/receive-confirm',
+    path: '/api/public/handheld/transfer/receive-confirm',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldStocktakeSubmitRoute =
+  ApiPublicHandheldStocktakeSubmitRouteImport.update({
+    id: '/api/public/handheld/stocktake/submit',
+    path: '/api/public/handheld/stocktake/submit',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldStocktakeScanRoute =
+  ApiPublicHandheldStocktakeScanRouteImport.update({
+    id: '/api/public/handheld/stocktake/scan',
+    path: '/api/public/handheld/stocktake/scan',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldStocktakeOpenRoute =
+  ApiPublicHandheldStocktakeOpenRouteImport.update({
+    id: '/api/public/handheld/stocktake/open',
+    path: '/api/public/handheld/stocktake/open',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldSkuSearchRoute =
+  ApiPublicHandheldSkuSearchRouteImport.update({
+    id: '/api/public/handheld/sku/search',
+    path: '/api/public/handheld/sku/search',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldSkuByEpcRoute =
+  ApiPublicHandheldSkuByEpcRouteImport.update({
+    id: '/api/public/handheld/sku/by-epc',
+    path: '/api/public/handheld/sku/by-epc',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldInboundScanRoute =
+  ApiPublicHandheldInboundScanRouteImport.update({
+    id: '/api/public/handheld/inbound/scan',
+    path: '/api/public/handheld/inbound/scan',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldAuthPingRoute =
+  ApiPublicHandheldAuthPingRouteImport.update({
+    id: '/api/public/handheld/auth/ping',
+    path: '/api/public/handheld/auth/ping',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -414,10 +522,13 @@ export interface FileRoutesByFullPath {
   '/youzan': typeof YouzanRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
   '/inventory/batches': typeof InventoryBatchesRoute
+  '/inventory/devices': typeof InventoryDevicesRoute
   '/inventory/inbound': typeof InventoryInboundRouteWithChildren
+  '/inventory/locations': typeof InventoryLocationsRoute
   '/inventory/products': typeof InventoryProductsRouteWithChildren
   '/inventory/skus': typeof InventorySkusRouteWithChildren
   '/inventory/transfers': typeof InventoryTransfersRoute
+  '/inventory/unclaimed': typeof InventoryUnclaimedRoute
   '/m/inbound': typeof MInboundRoute
   '/m/parcels': typeof MParcelsRoute
   '/m/photo-search': typeof MPhotoSearchRoute
@@ -447,6 +558,7 @@ export interface FileRoutesByFullPath {
   '/inventory/inbound/new': typeof InventoryInboundNewRoute
   '/inventory/products/$code': typeof InventoryProductsCodeRoute
   '/inventory/skus/$id': typeof InventorySkusIdRoute
+  '/inventory/stocktakes/$id': typeof InventoryStocktakesIdRoute
   '/m/products/$code': typeof MProductsCodeRoute
   '/m/receive/$id': typeof MReceiveIdRoute
   '/m/skus/$id': typeof MSkusIdRoute
@@ -460,12 +572,24 @@ export interface FileRoutesByFullPath {
   '/purchase/japan-parcel/new': typeof PurchaseJapanParcelNewRoute
   '/inventory/inbound/': typeof InventoryInboundIndexRoute
   '/inventory/skus/': typeof InventorySkusIndexRoute
+  '/inventory/stocktakes/': typeof InventoryStocktakesIndexRoute
   '/m/skus/': typeof MSkusIndexRoute
   '/purchase/domestic-bulk/': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic/': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
+  '/api/public/handheld/auth/ping': typeof ApiPublicHandheldAuthPingRoute
+  '/api/public/handheld/inbound/scan': typeof ApiPublicHandheldInboundScanRoute
+  '/api/public/handheld/sku/by-epc': typeof ApiPublicHandheldSkuByEpcRoute
+  '/api/public/handheld/sku/search': typeof ApiPublicHandheldSkuSearchRoute
+  '/api/public/handheld/stocktake/open': typeof ApiPublicHandheldStocktakeOpenRoute
+  '/api/public/handheld/stocktake/scan': typeof ApiPublicHandheldStocktakeScanRoute
+  '/api/public/handheld/stocktake/submit': typeof ApiPublicHandheldStocktakeSubmitRoute
+  '/api/public/handheld/transfer/receive-confirm': typeof ApiPublicHandheldTransferReceiveConfirmRoute
+  '/api/public/handheld/transfer/receive-scan': typeof ApiPublicHandheldTransferReceiveScanRoute
+  '/api/public/handheld/transfer/ship-confirm': typeof ApiPublicHandheldTransferShipConfirmRoute
+  '/api/public/handheld/transfer/ship-scan': typeof ApiPublicHandheldTransferShipScanRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -478,8 +602,11 @@ export interface FileRoutesByTo {
   '/youzan': typeof YouzanRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
   '/inventory/batches': typeof InventoryBatchesRoute
+  '/inventory/devices': typeof InventoryDevicesRoute
+  '/inventory/locations': typeof InventoryLocationsRoute
   '/inventory/products': typeof InventoryProductsRouteWithChildren
   '/inventory/transfers': typeof InventoryTransfersRoute
+  '/inventory/unclaimed': typeof InventoryUnclaimedRoute
   '/m/inbound': typeof MInboundRoute
   '/m/parcels': typeof MParcelsRoute
   '/m/photo-search': typeof MPhotoSearchRoute
@@ -506,6 +633,7 @@ export interface FileRoutesByTo {
   '/inventory/inbound/new': typeof InventoryInboundNewRoute
   '/inventory/products/$code': typeof InventoryProductsCodeRoute
   '/inventory/skus/$id': typeof InventorySkusIdRoute
+  '/inventory/stocktakes/$id': typeof InventoryStocktakesIdRoute
   '/m/products/$code': typeof MProductsCodeRoute
   '/m/receive/$id': typeof MReceiveIdRoute
   '/m/skus/$id': typeof MSkusIdRoute
@@ -519,12 +647,24 @@ export interface FileRoutesByTo {
   '/purchase/japan-parcel/new': typeof PurchaseJapanParcelNewRoute
   '/inventory/inbound': typeof InventoryInboundIndexRoute
   '/inventory/skus': typeof InventorySkusIndexRoute
+  '/inventory/stocktakes': typeof InventoryStocktakesIndexRoute
   '/m/skus': typeof MSkusIndexRoute
   '/purchase/domestic-bulk': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel': typeof PurchaseJapanParcelIndexRoute
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
+  '/api/public/handheld/auth/ping': typeof ApiPublicHandheldAuthPingRoute
+  '/api/public/handheld/inbound/scan': typeof ApiPublicHandheldInboundScanRoute
+  '/api/public/handheld/sku/by-epc': typeof ApiPublicHandheldSkuByEpcRoute
+  '/api/public/handheld/sku/search': typeof ApiPublicHandheldSkuSearchRoute
+  '/api/public/handheld/stocktake/open': typeof ApiPublicHandheldStocktakeOpenRoute
+  '/api/public/handheld/stocktake/scan': typeof ApiPublicHandheldStocktakeScanRoute
+  '/api/public/handheld/stocktake/submit': typeof ApiPublicHandheldStocktakeSubmitRoute
+  '/api/public/handheld/transfer/receive-confirm': typeof ApiPublicHandheldTransferReceiveConfirmRoute
+  '/api/public/handheld/transfer/receive-scan': typeof ApiPublicHandheldTransferReceiveScanRoute
+  '/api/public/handheld/transfer/ship-confirm': typeof ApiPublicHandheldTransferShipConfirmRoute
+  '/api/public/handheld/transfer/ship-scan': typeof ApiPublicHandheldTransferShipScanRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -540,10 +680,13 @@ export interface FileRoutesById {
   '/youzan': typeof YouzanRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
   '/inventory/batches': typeof InventoryBatchesRoute
+  '/inventory/devices': typeof InventoryDevicesRoute
   '/inventory/inbound': typeof InventoryInboundRouteWithChildren
+  '/inventory/locations': typeof InventoryLocationsRoute
   '/inventory/products': typeof InventoryProductsRouteWithChildren
   '/inventory/skus': typeof InventorySkusRouteWithChildren
   '/inventory/transfers': typeof InventoryTransfersRoute
+  '/inventory/unclaimed': typeof InventoryUnclaimedRoute
   '/m/inbound': typeof MInboundRoute
   '/m/parcels': typeof MParcelsRoute
   '/m/photo-search': typeof MPhotoSearchRoute
@@ -573,6 +716,7 @@ export interface FileRoutesById {
   '/inventory/inbound/new': typeof InventoryInboundNewRoute
   '/inventory/products/$code': typeof InventoryProductsCodeRoute
   '/inventory/skus/$id': typeof InventorySkusIdRoute
+  '/inventory/stocktakes/$id': typeof InventoryStocktakesIdRoute
   '/m/products/$code': typeof MProductsCodeRoute
   '/m/receive/$id': typeof MReceiveIdRoute
   '/m/skus/$id': typeof MSkusIdRoute
@@ -586,12 +730,24 @@ export interface FileRoutesById {
   '/purchase/japan-parcel/new': typeof PurchaseJapanParcelNewRoute
   '/inventory/inbound/': typeof InventoryInboundIndexRoute
   '/inventory/skus/': typeof InventorySkusIndexRoute
+  '/inventory/stocktakes/': typeof InventoryStocktakesIndexRoute
   '/m/skus/': typeof MSkusIndexRoute
   '/purchase/domestic-bulk/': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic/': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
+  '/api/public/handheld/auth/ping': typeof ApiPublicHandheldAuthPingRoute
+  '/api/public/handheld/inbound/scan': typeof ApiPublicHandheldInboundScanRoute
+  '/api/public/handheld/sku/by-epc': typeof ApiPublicHandheldSkuByEpcRoute
+  '/api/public/handheld/sku/search': typeof ApiPublicHandheldSkuSearchRoute
+  '/api/public/handheld/stocktake/open': typeof ApiPublicHandheldStocktakeOpenRoute
+  '/api/public/handheld/stocktake/scan': typeof ApiPublicHandheldStocktakeScanRoute
+  '/api/public/handheld/stocktake/submit': typeof ApiPublicHandheldStocktakeSubmitRoute
+  '/api/public/handheld/transfer/receive-confirm': typeof ApiPublicHandheldTransferReceiveConfirmRoute
+  '/api/public/handheld/transfer/receive-scan': typeof ApiPublicHandheldTransferReceiveScanRoute
+  '/api/public/handheld/transfer/ship-confirm': typeof ApiPublicHandheldTransferShipConfirmRoute
+  '/api/public/handheld/transfer/ship-scan': typeof ApiPublicHandheldTransferShipScanRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -608,10 +764,13 @@ export interface FileRouteTypes {
     | '/youzan'
     | '/admin/users'
     | '/inventory/batches'
+    | '/inventory/devices'
     | '/inventory/inbound'
+    | '/inventory/locations'
     | '/inventory/products'
     | '/inventory/skus'
     | '/inventory/transfers'
+    | '/inventory/unclaimed'
     | '/m/inbound'
     | '/m/parcels'
     | '/m/photo-search'
@@ -641,6 +800,7 @@ export interface FileRouteTypes {
     | '/inventory/inbound/new'
     | '/inventory/products/$code'
     | '/inventory/skus/$id'
+    | '/inventory/stocktakes/$id'
     | '/m/products/$code'
     | '/m/receive/$id'
     | '/m/skus/$id'
@@ -654,12 +814,24 @@ export interface FileRouteTypes {
     | '/purchase/japan-parcel/new'
     | '/inventory/inbound/'
     | '/inventory/skus/'
+    | '/inventory/stocktakes/'
     | '/m/skus/'
     | '/purchase/domestic-bulk/'
     | '/purchase/domestic/'
     | '/purchase/japan-parcel/'
     | '/api/public/hooks/youzan-reconcile'
     | '/api/public/hooks/youzan-stock-worker'
+    | '/api/public/handheld/auth/ping'
+    | '/api/public/handheld/inbound/scan'
+    | '/api/public/handheld/sku/by-epc'
+    | '/api/public/handheld/sku/search'
+    | '/api/public/handheld/stocktake/open'
+    | '/api/public/handheld/stocktake/scan'
+    | '/api/public/handheld/stocktake/submit'
+    | '/api/public/handheld/transfer/receive-confirm'
+    | '/api/public/handheld/transfer/receive-scan'
+    | '/api/public/handheld/transfer/ship-confirm'
+    | '/api/public/handheld/transfer/ship-scan'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -672,8 +844,11 @@ export interface FileRouteTypes {
     | '/youzan'
     | '/admin/users'
     | '/inventory/batches'
+    | '/inventory/devices'
+    | '/inventory/locations'
     | '/inventory/products'
     | '/inventory/transfers'
+    | '/inventory/unclaimed'
     | '/m/inbound'
     | '/m/parcels'
     | '/m/photo-search'
@@ -700,6 +875,7 @@ export interface FileRouteTypes {
     | '/inventory/inbound/new'
     | '/inventory/products/$code'
     | '/inventory/skus/$id'
+    | '/inventory/stocktakes/$id'
     | '/m/products/$code'
     | '/m/receive/$id'
     | '/m/skus/$id'
@@ -713,12 +889,24 @@ export interface FileRouteTypes {
     | '/purchase/japan-parcel/new'
     | '/inventory/inbound'
     | '/inventory/skus'
+    | '/inventory/stocktakes'
     | '/m/skus'
     | '/purchase/domestic-bulk'
     | '/purchase/domestic'
     | '/purchase/japan-parcel'
     | '/api/public/hooks/youzan-reconcile'
     | '/api/public/hooks/youzan-stock-worker'
+    | '/api/public/handheld/auth/ping'
+    | '/api/public/handheld/inbound/scan'
+    | '/api/public/handheld/sku/by-epc'
+    | '/api/public/handheld/sku/search'
+    | '/api/public/handheld/stocktake/open'
+    | '/api/public/handheld/stocktake/scan'
+    | '/api/public/handheld/stocktake/submit'
+    | '/api/public/handheld/transfer/receive-confirm'
+    | '/api/public/handheld/transfer/receive-scan'
+    | '/api/public/handheld/transfer/ship-confirm'
+    | '/api/public/handheld/transfer/ship-scan'
   id:
     | '__root__'
     | '/'
@@ -733,10 +921,13 @@ export interface FileRouteTypes {
     | '/youzan'
     | '/admin/users'
     | '/inventory/batches'
+    | '/inventory/devices'
     | '/inventory/inbound'
+    | '/inventory/locations'
     | '/inventory/products'
     | '/inventory/skus'
     | '/inventory/transfers'
+    | '/inventory/unclaimed'
     | '/m/inbound'
     | '/m/parcels'
     | '/m/photo-search'
@@ -766,6 +957,7 @@ export interface FileRouteTypes {
     | '/inventory/inbound/new'
     | '/inventory/products/$code'
     | '/inventory/skus/$id'
+    | '/inventory/stocktakes/$id'
     | '/m/products/$code'
     | '/m/receive/$id'
     | '/m/skus/$id'
@@ -779,12 +971,24 @@ export interface FileRouteTypes {
     | '/purchase/japan-parcel/new'
     | '/inventory/inbound/'
     | '/inventory/skus/'
+    | '/inventory/stocktakes/'
     | '/m/skus/'
     | '/purchase/domestic-bulk/'
     | '/purchase/domestic/'
     | '/purchase/japan-parcel/'
     | '/api/public/hooks/youzan-reconcile'
     | '/api/public/hooks/youzan-stock-worker'
+    | '/api/public/handheld/auth/ping'
+    | '/api/public/handheld/inbound/scan'
+    | '/api/public/handheld/sku/by-epc'
+    | '/api/public/handheld/sku/search'
+    | '/api/public/handheld/stocktake/open'
+    | '/api/public/handheld/stocktake/scan'
+    | '/api/public/handheld/stocktake/submit'
+    | '/api/public/handheld/transfer/receive-confirm'
+    | '/api/public/handheld/transfer/receive-scan'
+    | '/api/public/handheld/transfer/ship-confirm'
+    | '/api/public/handheld/transfer/ship-scan'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -800,10 +1004,13 @@ export interface RootRouteChildren {
   YouzanRoute: typeof YouzanRouteWithChildren
   AdminUsersRoute: typeof AdminUsersRoute
   InventoryBatchesRoute: typeof InventoryBatchesRoute
+  InventoryDevicesRoute: typeof InventoryDevicesRoute
   InventoryInboundRoute: typeof InventoryInboundRouteWithChildren
+  InventoryLocationsRoute: typeof InventoryLocationsRoute
   InventoryProductsRoute: typeof InventoryProductsRouteWithChildren
   InventorySkusRoute: typeof InventorySkusRouteWithChildren
   InventoryTransfersRoute: typeof InventoryTransfersRoute
+  InventoryUnclaimedRoute: typeof InventoryUnclaimedRoute
   PurchaseDomesticRoute: typeof PurchaseDomesticRouteWithChildren
   PurchaseDomesticBulkRoute: typeof PurchaseDomesticBulkRouteWithChildren
   PurchaseJapanBulkRoute: typeof PurchaseJapanBulkRoute
@@ -813,8 +1020,21 @@ export interface RootRouteChildren {
   StoresProductsRoute: typeof StoresProductsRoute
   StoresYouzanRoute: typeof StoresYouzanRoute
   ApiPublicMerukiIngestRoute: typeof ApiPublicMerukiIngestRoute
+  InventoryStocktakesIdRoute: typeof InventoryStocktakesIdRoute
+  InventoryStocktakesIndexRoute: typeof InventoryStocktakesIndexRoute
   ApiPublicHooksYouzanReconcileRoute: typeof ApiPublicHooksYouzanReconcileRoute
   ApiPublicHooksYouzanStockWorkerRoute: typeof ApiPublicHooksYouzanStockWorkerRoute
+  ApiPublicHandheldAuthPingRoute: typeof ApiPublicHandheldAuthPingRoute
+  ApiPublicHandheldInboundScanRoute: typeof ApiPublicHandheldInboundScanRoute
+  ApiPublicHandheldSkuByEpcRoute: typeof ApiPublicHandheldSkuByEpcRoute
+  ApiPublicHandheldSkuSearchRoute: typeof ApiPublicHandheldSkuSearchRoute
+  ApiPublicHandheldStocktakeOpenRoute: typeof ApiPublicHandheldStocktakeOpenRoute
+  ApiPublicHandheldStocktakeScanRoute: typeof ApiPublicHandheldStocktakeScanRoute
+  ApiPublicHandheldStocktakeSubmitRoute: typeof ApiPublicHandheldStocktakeSubmitRoute
+  ApiPublicHandheldTransferReceiveConfirmRoute: typeof ApiPublicHandheldTransferReceiveConfirmRoute
+  ApiPublicHandheldTransferReceiveScanRoute: typeof ApiPublicHandheldTransferReceiveScanRoute
+  ApiPublicHandheldTransferShipConfirmRoute: typeof ApiPublicHandheldTransferShipConfirmRoute
+  ApiPublicHandheldTransferShipScanRoute: typeof ApiPublicHandheldTransferShipScanRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1057,6 +1277,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MInboundRouteImport
       parentRoute: typeof MRoute
     }
+    '/inventory/unclaimed': {
+      id: '/inventory/unclaimed'
+      path: '/inventory/unclaimed'
+      fullPath: '/inventory/unclaimed'
+      preLoaderRoute: typeof InventoryUnclaimedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/inventory/transfers': {
       id: '/inventory/transfers'
       path: '/inventory/transfers'
@@ -1078,11 +1305,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InventoryProductsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/inventory/locations': {
+      id: '/inventory/locations'
+      path: '/inventory/locations'
+      fullPath: '/inventory/locations'
+      preLoaderRoute: typeof InventoryLocationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/inventory/inbound': {
       id: '/inventory/inbound'
       path: '/inventory/inbound'
       fullPath: '/inventory/inbound'
       preLoaderRoute: typeof InventoryInboundRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inventory/devices': {
+      id: '/inventory/devices'
+      path: '/inventory/devices'
+      fullPath: '/inventory/devices'
+      preLoaderRoute: typeof InventoryDevicesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/inventory/batches': {
@@ -1126,6 +1367,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/m/skus/'
       preLoaderRoute: typeof MSkusIndexRouteImport
       parentRoute: typeof MRoute
+    }
+    '/inventory/stocktakes/': {
+      id: '/inventory/stocktakes/'
+      path: '/inventory/stocktakes'
+      fullPath: '/inventory/stocktakes/'
+      preLoaderRoute: typeof InventoryStocktakesIndexRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/inventory/skus/': {
       id: '/inventory/skus/'
@@ -1218,6 +1466,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MProductsCodeRouteImport
       parentRoute: typeof MRoute
     }
+    '/inventory/stocktakes/$id': {
+      id: '/inventory/stocktakes/$id'
+      path: '/inventory/stocktakes/$id'
+      fullPath: '/inventory/stocktakes/$id'
+      preLoaderRoute: typeof InventoryStocktakesIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/inventory/skus/$id': {
       id: '/inventory/skus/$id'
       path: '/$id'
@@ -1265,6 +1520,83 @@ declare module '@tanstack/react-router' {
       path: '/api/public/hooks/youzan-reconcile'
       fullPath: '/api/public/hooks/youzan-reconcile'
       preLoaderRoute: typeof ApiPublicHooksYouzanReconcileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/transfer/ship-scan': {
+      id: '/api/public/handheld/transfer/ship-scan'
+      path: '/api/public/handheld/transfer/ship-scan'
+      fullPath: '/api/public/handheld/transfer/ship-scan'
+      preLoaderRoute: typeof ApiPublicHandheldTransferShipScanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/transfer/ship-confirm': {
+      id: '/api/public/handheld/transfer/ship-confirm'
+      path: '/api/public/handheld/transfer/ship-confirm'
+      fullPath: '/api/public/handheld/transfer/ship-confirm'
+      preLoaderRoute: typeof ApiPublicHandheldTransferShipConfirmRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/transfer/receive-scan': {
+      id: '/api/public/handheld/transfer/receive-scan'
+      path: '/api/public/handheld/transfer/receive-scan'
+      fullPath: '/api/public/handheld/transfer/receive-scan'
+      preLoaderRoute: typeof ApiPublicHandheldTransferReceiveScanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/transfer/receive-confirm': {
+      id: '/api/public/handheld/transfer/receive-confirm'
+      path: '/api/public/handheld/transfer/receive-confirm'
+      fullPath: '/api/public/handheld/transfer/receive-confirm'
+      preLoaderRoute: typeof ApiPublicHandheldTransferReceiveConfirmRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/stocktake/submit': {
+      id: '/api/public/handheld/stocktake/submit'
+      path: '/api/public/handheld/stocktake/submit'
+      fullPath: '/api/public/handheld/stocktake/submit'
+      preLoaderRoute: typeof ApiPublicHandheldStocktakeSubmitRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/stocktake/scan': {
+      id: '/api/public/handheld/stocktake/scan'
+      path: '/api/public/handheld/stocktake/scan'
+      fullPath: '/api/public/handheld/stocktake/scan'
+      preLoaderRoute: typeof ApiPublicHandheldStocktakeScanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/stocktake/open': {
+      id: '/api/public/handheld/stocktake/open'
+      path: '/api/public/handheld/stocktake/open'
+      fullPath: '/api/public/handheld/stocktake/open'
+      preLoaderRoute: typeof ApiPublicHandheldStocktakeOpenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/sku/search': {
+      id: '/api/public/handheld/sku/search'
+      path: '/api/public/handheld/sku/search'
+      fullPath: '/api/public/handheld/sku/search'
+      preLoaderRoute: typeof ApiPublicHandheldSkuSearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/sku/by-epc': {
+      id: '/api/public/handheld/sku/by-epc'
+      path: '/api/public/handheld/sku/by-epc'
+      fullPath: '/api/public/handheld/sku/by-epc'
+      preLoaderRoute: typeof ApiPublicHandheldSkuByEpcRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/inbound/scan': {
+      id: '/api/public/handheld/inbound/scan'
+      path: '/api/public/handheld/inbound/scan'
+      fullPath: '/api/public/handheld/inbound/scan'
+      preLoaderRoute: typeof ApiPublicHandheldInboundScanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/auth/ping': {
+      id: '/api/public/handheld/auth/ping'
+      path: '/api/public/handheld/auth/ping'
+      fullPath: '/api/public/handheld/auth/ping'
+      preLoaderRoute: typeof ApiPublicHandheldAuthPingRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -1456,10 +1788,13 @@ const rootRouteChildren: RootRouteChildren = {
   YouzanRoute: YouzanRouteWithChildren,
   AdminUsersRoute: AdminUsersRoute,
   InventoryBatchesRoute: InventoryBatchesRoute,
+  InventoryDevicesRoute: InventoryDevicesRoute,
   InventoryInboundRoute: InventoryInboundRouteWithChildren,
+  InventoryLocationsRoute: InventoryLocationsRoute,
   InventoryProductsRoute: InventoryProductsRouteWithChildren,
   InventorySkusRoute: InventorySkusRouteWithChildren,
   InventoryTransfersRoute: InventoryTransfersRoute,
+  InventoryUnclaimedRoute: InventoryUnclaimedRoute,
   PurchaseDomesticRoute: PurchaseDomesticRouteWithChildren,
   PurchaseDomesticBulkRoute: PurchaseDomesticBulkRouteWithChildren,
   PurchaseJapanBulkRoute: PurchaseJapanBulkRoute,
@@ -1469,8 +1804,25 @@ const rootRouteChildren: RootRouteChildren = {
   StoresProductsRoute: StoresProductsRoute,
   StoresYouzanRoute: StoresYouzanRoute,
   ApiPublicMerukiIngestRoute: ApiPublicMerukiIngestRoute,
+  InventoryStocktakesIdRoute: InventoryStocktakesIdRoute,
+  InventoryStocktakesIndexRoute: InventoryStocktakesIndexRoute,
   ApiPublicHooksYouzanReconcileRoute: ApiPublicHooksYouzanReconcileRoute,
   ApiPublicHooksYouzanStockWorkerRoute: ApiPublicHooksYouzanStockWorkerRoute,
+  ApiPublicHandheldAuthPingRoute: ApiPublicHandheldAuthPingRoute,
+  ApiPublicHandheldInboundScanRoute: ApiPublicHandheldInboundScanRoute,
+  ApiPublicHandheldSkuByEpcRoute: ApiPublicHandheldSkuByEpcRoute,
+  ApiPublicHandheldSkuSearchRoute: ApiPublicHandheldSkuSearchRoute,
+  ApiPublicHandheldStocktakeOpenRoute: ApiPublicHandheldStocktakeOpenRoute,
+  ApiPublicHandheldStocktakeScanRoute: ApiPublicHandheldStocktakeScanRoute,
+  ApiPublicHandheldStocktakeSubmitRoute: ApiPublicHandheldStocktakeSubmitRoute,
+  ApiPublicHandheldTransferReceiveConfirmRoute:
+    ApiPublicHandheldTransferReceiveConfirmRoute,
+  ApiPublicHandheldTransferReceiveScanRoute:
+    ApiPublicHandheldTransferReceiveScanRoute,
+  ApiPublicHandheldTransferShipConfirmRoute:
+    ApiPublicHandheldTransferShipConfirmRoute,
+  ApiPublicHandheldTransferShipScanRoute:
+    ApiPublicHandheldTransferShipScanRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

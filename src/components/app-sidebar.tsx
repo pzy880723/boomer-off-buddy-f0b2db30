@@ -21,6 +21,8 @@ import {
   Link2,
   Activity,
   ShieldCheck,
+  AlertCircle,
+  Smartphone,
   type LucideIcon,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks/use-auth-session";
@@ -50,6 +52,10 @@ type NavTo =
   | "/inventory/inbound"
   | "/inventory/inbound/new"
   | "/inventory/transfers"
+  | "/inventory/locations"
+  | "/inventory/devices"
+  | "/inventory/unclaimed"
+  | "/inventory/stocktakes"
   | "/shop-mgmt/shops"
   | "/shop-mgmt/products"
   | "/shop-mgmt/franchisees"
@@ -84,6 +90,10 @@ const groups: { label: string; items: { title: string; url: NavTo; icon: LucideI
       { title: "仓库商品", url: "/inventory/skus", icon: Tags },
       { title: "入库记录", url: "/inventory/inbound", icon: Layers },
       { title: "调拨单", url: "/inventory/transfers", icon: ArrowLeftRight },
+      { title: "盘点单", url: "/inventory/stocktakes", icon: ClipboardList },
+      { title: "待认领 EPC", url: "/inventory/unclaimed", icon: AlertCircle },
+      { title: "库位管理", url: "/inventory/locations", icon: Building2 },
+      { title: "手持终端", url: "/inventory/devices", icon: Smartphone },
     ],
     icon: Boxes,
   },
