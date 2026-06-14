@@ -139,7 +139,11 @@ function SkuDetailPage() {
         </div>
       </Card>
 
+      {/* 有赞同步卡 */}
+      <SkuYouzanCard skuId={sku.id} skuName={sku.name} />
+
       {/* 分块 Tabs */}
+
       <Tabs defaultValue={isBundle ? "children" : "print"}>
         <TabsList>
           {isBundle && <TabsTrigger value="children">子项 {bundleChildren.length}</TabsTrigger>}
