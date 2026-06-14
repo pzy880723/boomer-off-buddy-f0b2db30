@@ -23,6 +23,7 @@ import {
 import { DataTable } from "@/components/data-table";
 import { SkuEditDialog } from "@/components/inventory/sku-edit-dialog";
 import { PrintLabels, PRINT_STYLE } from "@/components/inventory/sku-detail-shared";
+import { SkuYouzanCard } from "@/components/youzan/sku-youzan-card";
 import { getSku, createLabelBatch, deleteSku } from "@/lib/inventory.functions";
 import {
   CATEGORY_LABEL,
@@ -138,7 +139,11 @@ function SkuDetailPage() {
         </div>
       </Card>
 
+      {/* 有赞同步卡 */}
+      <SkuYouzanCard skuId={sku.id} skuName={sku.name} />
+
       {/* 分块 Tabs */}
+
       <Tabs defaultValue={isBundle ? "children" : "print"}>
         <TabsList>
           {isBundle && <TabsTrigger value="children">子项 {bundleChildren.length}</TabsTrigger>}
