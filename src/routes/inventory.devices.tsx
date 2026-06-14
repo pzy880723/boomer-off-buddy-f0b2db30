@@ -39,7 +39,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Copy, RefreshCw } from "lucide-react";
 
-export const Route = createFileRoute("/_authenticated/inventory/devices")({
+export const Route = createFileRoute("/inventory/devices")({
   component: DevicesPage,
 });
 
