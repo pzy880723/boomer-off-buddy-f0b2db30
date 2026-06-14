@@ -19,7 +19,7 @@ import {
   retryQueueItem,
 } from "@/lib/youzan-sync.functions";
 
-export const Route = createFileRoute("/_authenticated/youzan/sync")({
+export const Route = createFileRoute("/youzan/sync")({
   head: () => ({ meta: [{ title: "有赞同步中心" }] }),
   component: SyncCenter,
 });
