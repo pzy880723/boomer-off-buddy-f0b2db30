@@ -47,6 +47,7 @@ import { Route as InventoryTransfersRouteImport } from './routes/inventory.trans
 import { Route as InventorySkusRouteImport } from './routes/inventory.skus'
 import { Route as InventoryProductsRouteImport } from './routes/inventory.products'
 import { Route as InventoryInboundRouteImport } from './routes/inventory.inbound'
+import { Route as InventoryDevicesRouteImport } from './routes/inventory.devices'
 import { Route as InventoryBatchesRouteImport } from './routes/inventory.batches'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as PurchaseJapanParcelIndexRouteImport } from './routes/purchase.japan-parcel.index'
@@ -71,7 +72,6 @@ import { Route as InventoryProductsCodeRouteImport } from './routes/inventory.pr
 import { Route as InventoryInboundNewRouteImport } from './routes/inventory.inbound.new'
 import { Route as InventoryInboundIdRouteImport } from './routes/inventory.inbound.$id'
 import { Route as ApiPublicMerukiIngestRouteImport } from './routes/api/public/meruki-ingest'
-import { Route as AuthenticatedInventoryDevicesRouteImport } from './routes/_authenticated/inventory/devices'
 import { Route as ApiPublicHooksYouzanStockWorkerRouteImport } from './routes/api/public/hooks/youzan-stock-worker'
 import { Route as ApiPublicHooksYouzanReconcileRouteImport } from './routes/api/public/hooks/youzan-reconcile'
 import { Route as ApiPublicHandheldTransferShipScanRouteImport } from './routes/api/public/handheld/transfer.ship-scan'
@@ -276,6 +276,11 @@ const InventoryInboundRoute = InventoryInboundRouteImport.update({
   path: '/inventory/inbound',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InventoryDevicesRoute = InventoryDevicesRouteImport.update({
+  id: '/inventory/devices',
+  path: '/inventory/devices',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const InventoryBatchesRoute = InventoryBatchesRouteImport.update({
   id: '/inventory/batches',
   path: '/inventory/batches',
@@ -400,12 +405,6 @@ const ApiPublicMerukiIngestRoute = ApiPublicMerukiIngestRouteImport.update({
   path: '/api/public/meruki-ingest',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedInventoryDevicesRoute =
-  AuthenticatedInventoryDevicesRouteImport.update({
-    id: '/_authenticated/inventory/devices',
-    path: '/inventory/devices',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 const ApiPublicHooksYouzanStockWorkerRoute =
   ApiPublicHooksYouzanStockWorkerRouteImport.update({
     id: '/api/public/hooks/youzan-stock-worker',
@@ -498,6 +497,7 @@ export interface FileRoutesByFullPath {
   '/youzan': typeof YouzanRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
   '/inventory/batches': typeof InventoryBatchesRoute
+  '/inventory/devices': typeof InventoryDevicesRoute
   '/inventory/inbound': typeof InventoryInboundRouteWithChildren
   '/inventory/products': typeof InventoryProductsRouteWithChildren
   '/inventory/skus': typeof InventorySkusRouteWithChildren
@@ -526,7 +526,6 @@ export interface FileRoutesByFullPath {
   '/youzan/sync': typeof YouzanSyncRoute
   '/m/': typeof MIndexRoute
   '/store/': typeof StoreIndexRoute
-  '/inventory/devices': typeof AuthenticatedInventoryDevicesRoute
   '/api/public/meruki-ingest': typeof ApiPublicMerukiIngestRoute
   '/inventory/inbound/$id': typeof InventoryInboundIdRoute
   '/inventory/inbound/new': typeof InventoryInboundNewRoute
@@ -574,6 +573,7 @@ export interface FileRoutesByTo {
   '/youzan': typeof YouzanRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
   '/inventory/batches': typeof InventoryBatchesRoute
+  '/inventory/devices': typeof InventoryDevicesRoute
   '/inventory/products': typeof InventoryProductsRouteWithChildren
   '/inventory/transfers': typeof InventoryTransfersRoute
   '/m/inbound': typeof MInboundRoute
@@ -597,7 +597,6 @@ export interface FileRoutesByTo {
   '/youzan/sync': typeof YouzanSyncRoute
   '/m': typeof MIndexRoute
   '/store': typeof StoreIndexRoute
-  '/inventory/devices': typeof AuthenticatedInventoryDevicesRoute
   '/api/public/meruki-ingest': typeof ApiPublicMerukiIngestRoute
   '/inventory/inbound/$id': typeof InventoryInboundIdRoute
   '/inventory/inbound/new': typeof InventoryInboundNewRoute
@@ -648,6 +647,7 @@ export interface FileRoutesById {
   '/youzan': typeof YouzanRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
   '/inventory/batches': typeof InventoryBatchesRoute
+  '/inventory/devices': typeof InventoryDevicesRoute
   '/inventory/inbound': typeof InventoryInboundRouteWithChildren
   '/inventory/products': typeof InventoryProductsRouteWithChildren
   '/inventory/skus': typeof InventorySkusRouteWithChildren
@@ -676,7 +676,6 @@ export interface FileRoutesById {
   '/youzan/sync': typeof YouzanSyncRoute
   '/m/': typeof MIndexRoute
   '/store/': typeof StoreIndexRoute
-  '/_authenticated/inventory/devices': typeof AuthenticatedInventoryDevicesRoute
   '/api/public/meruki-ingest': typeof ApiPublicMerukiIngestRoute
   '/inventory/inbound/$id': typeof InventoryInboundIdRoute
   '/inventory/inbound/new': typeof InventoryInboundNewRoute
@@ -728,6 +727,7 @@ export interface FileRouteTypes {
     | '/youzan'
     | '/admin/users'
     | '/inventory/batches'
+    | '/inventory/devices'
     | '/inventory/inbound'
     | '/inventory/products'
     | '/inventory/skus'
@@ -756,7 +756,6 @@ export interface FileRouteTypes {
     | '/youzan/sync'
     | '/m/'
     | '/store/'
-    | '/inventory/devices'
     | '/api/public/meruki-ingest'
     | '/inventory/inbound/$id'
     | '/inventory/inbound/new'
@@ -804,6 +803,7 @@ export interface FileRouteTypes {
     | '/youzan'
     | '/admin/users'
     | '/inventory/batches'
+    | '/inventory/devices'
     | '/inventory/products'
     | '/inventory/transfers'
     | '/m/inbound'
@@ -827,7 +827,6 @@ export interface FileRouteTypes {
     | '/youzan/sync'
     | '/m'
     | '/store'
-    | '/inventory/devices'
     | '/api/public/meruki-ingest'
     | '/inventory/inbound/$id'
     | '/inventory/inbound/new'
@@ -877,6 +876,7 @@ export interface FileRouteTypes {
     | '/youzan'
     | '/admin/users'
     | '/inventory/batches'
+    | '/inventory/devices'
     | '/inventory/inbound'
     | '/inventory/products'
     | '/inventory/skus'
@@ -905,7 +905,6 @@ export interface FileRouteTypes {
     | '/youzan/sync'
     | '/m/'
     | '/store/'
-    | '/_authenticated/inventory/devices'
     | '/api/public/meruki-ingest'
     | '/inventory/inbound/$id'
     | '/inventory/inbound/new'
@@ -956,6 +955,7 @@ export interface RootRouteChildren {
   YouzanRoute: typeof YouzanRouteWithChildren
   AdminUsersRoute: typeof AdminUsersRoute
   InventoryBatchesRoute: typeof InventoryBatchesRoute
+  InventoryDevicesRoute: typeof InventoryDevicesRoute
   InventoryInboundRoute: typeof InventoryInboundRouteWithChildren
   InventoryProductsRoute: typeof InventoryProductsRouteWithChildren
   InventorySkusRoute: typeof InventorySkusRouteWithChildren
@@ -968,7 +968,6 @@ export interface RootRouteChildren {
   StoresListRoute: typeof StoresListRoute
   StoresProductsRoute: typeof StoresProductsRoute
   StoresYouzanRoute: typeof StoresYouzanRoute
-  AuthenticatedInventoryDevicesRoute: typeof AuthenticatedInventoryDevicesRoute
   ApiPublicMerukiIngestRoute: typeof ApiPublicMerukiIngestRoute
   ApiPublicHooksYouzanReconcileRoute: typeof ApiPublicHooksYouzanReconcileRoute
   ApiPublicHooksYouzanStockWorkerRoute: typeof ApiPublicHooksYouzanStockWorkerRoute
@@ -1253,6 +1252,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InventoryInboundRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/inventory/devices': {
+      id: '/inventory/devices'
+      path: '/inventory/devices'
+      fullPath: '/inventory/devices'
+      preLoaderRoute: typeof InventoryDevicesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/inventory/batches': {
       id: '/inventory/batches'
       path: '/inventory/batches'
@@ -1419,13 +1425,6 @@ declare module '@tanstack/react-router' {
       path: '/api/public/meruki-ingest'
       fullPath: '/api/public/meruki-ingest'
       preLoaderRoute: typeof ApiPublicMerukiIngestRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/inventory/devices': {
-      id: '/_authenticated/inventory/devices'
-      path: '/inventory/devices'
-      fullPath: '/inventory/devices'
-      preLoaderRoute: typeof AuthenticatedInventoryDevicesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/youzan-stock-worker': {
@@ -1708,6 +1707,7 @@ const rootRouteChildren: RootRouteChildren = {
   YouzanRoute: YouzanRouteWithChildren,
   AdminUsersRoute: AdminUsersRoute,
   InventoryBatchesRoute: InventoryBatchesRoute,
+  InventoryDevicesRoute: InventoryDevicesRoute,
   InventoryInboundRoute: InventoryInboundRouteWithChildren,
   InventoryProductsRoute: InventoryProductsRouteWithChildren,
   InventorySkusRoute: InventorySkusRouteWithChildren,
@@ -1720,7 +1720,6 @@ const rootRouteChildren: RootRouteChildren = {
   StoresListRoute: StoresListRoute,
   StoresProductsRoute: StoresProductsRoute,
   StoresYouzanRoute: StoresYouzanRoute,
-  AuthenticatedInventoryDevicesRoute: AuthenticatedInventoryDevicesRoute,
   ApiPublicMerukiIngestRoute: ApiPublicMerukiIngestRoute,
   ApiPublicHooksYouzanReconcileRoute: ApiPublicHooksYouzanReconcileRoute,
   ApiPublicHooksYouzanStockWorkerRoute: ApiPublicHooksYouzanStockWorkerRoute,
