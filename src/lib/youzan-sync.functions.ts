@@ -70,22 +70,27 @@ export const searchYouzanItems = createServerFn({ method: "POST" })
         q: z.string().trim().max(200).optional(),
         limit: z.number().min(1).max(100).default(30),
         only_unbound: z.boolean().default(false),
+        shop_id: z.string().uuid().optional(),
       })
       .parse(input ?? {}),
   )
   .handler(async ({ data }) => {
-    // 只取总部账号的商品（role=hq）
-    const { data: hq } = await supabase
-      .from("youzan_shops")
-      .select("id")
-      .eq("role", "hq")
-      .maybeSingle();
-    if (!hq) return { rows: [] };
+    // shop_id 缺省时落到总部，兼容旧调用
+    let shopId = data.shop_id ?? null;
+    if (!shopId) {
+      const { data: hq } = await supabase
+        .from("youzan_shops")
+        .select("id")
+        .eq("role", "hq")
+        .maybeSingle();
+      if (!hq) return { rows: [] };
+      shopId = hq.id;
+    }
 
     let q = supabase
       .from("youzan_items")
       .select("id, item_id, title, price, stock_qty, is_listed, pic_url, updated_at")
-      .eq("shop_id", hq.id)
+      .eq("shop_id", shopId)
       .order("updated_at", { ascending: false })
       .limit(data.limit);
 
@@ -102,13 +107,14 @@ export const searchYouzanItems = createServerFn({ method: "POST" })
     const { data: items, error } = await q;
     if (error) throw new Error(error.message);
 
-    // 标记已被占用
+    // 标记已被占用（同店内同一 item 只能绑一个本地 SKU）
     const ids = (items ?? []).map((r) => r.item_id);
     let bound = new Map<number, string>();
     if (ids.length > 0) {
       const { data: links } = await supabase
         .from("sku_youzan_links")
         .select("yz_item_id, sku_id")
+        .eq("shop_id", shopId)
         .in("yz_item_id", ids);
       bound = new Map((links ?? []).map((l) => [l.yz_item_id, l.sku_id]));
     }
@@ -119,6 +125,70 @@ export const searchYouzanItems = createServerFn({ method: "POST" })
     }));
     if (data.only_unbound) rows = rows.filter((r) => !r.bound_sku_id);
     return { rows };
+  });
+
+// ============================================================
+// listYouzanItemsByShop —— 「门店商品库」分页浏览
+// ============================================================
+export const listYouzanItemsByShop = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        shop_id: z.string().uuid(),
+        q: z.string().trim().max(200).optional(),
+        limit: z.number().min(1).max(200).default(60),
+      })
+      .parse(input ?? {}),
+  )
+  .handler(async ({ data }) => {
+    let q = supabase
+      .from("youzan_items")
+      .select(
+        "id, item_id, title, price, stock_qty, sold_num, is_listed, pic_url, updated_at",
+      )
+      .eq("shop_id", data.shop_id)
+      .order("updated_at", { ascending: false })
+      .limit(data.limit);
+    if (data.q) {
+      const kw = data.q.trim();
+      const asNum = Number(kw);
+      if (Number.isInteger(asNum) && asNum > 0) {
+        q = q.or(`title.ilike.%${kw}%,item_id.eq.${asNum}`);
+      } else {
+        q = q.ilike("title", `%${kw}%`);
+      }
+    }
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+
+    const ids = (rows ?? []).map((r) => r.item_id);
+    let linkMap = new Map<number, { sku_id: string; sku_name: string }>();
+    if (ids.length > 0) {
+      const { data: links } = await supabase
+        .from("sku_youzan_links")
+        .select("yz_item_id, sku_id, inv_skus(name)")
+        .eq("shop_id", data.shop_id)
+        .in("yz_item_id", ids);
+      linkMap = new Map(
+        (links ?? []).map((l) => [
+          l.yz_item_id,
+          {
+            sku_id: l.sku_id,
+            sku_name:
+              (l as unknown as { inv_skus?: { name?: string } }).inv_skus
+                ?.name ?? "",
+          },
+        ]),
+      );
+    }
+
+    return {
+      rows: (rows ?? []).map((r) => ({
+        ...r,
+        link: linkMap.get(r.item_id) ?? null,
+      })),
+    };
   });
 
 // ============================================================
