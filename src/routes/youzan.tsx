@@ -147,15 +147,14 @@ function YouzanPage() {
   const syncAllM = useMutation({
     mutationFn: () => syncAllFn({ data: { days: 30 } }),
     onSuccess: (r) => {
-      if (r.failCount === 0) {
-        toast.success(`同步完成：${r.shopCount} 家门店 · 商品 ${r.itemsTotal} · 订单 ${r.ordersTotal}`);
-      } else {
-        toast.warning(`部分失败：${r.okCount}/${r.shopCount} 成功，请查看下方同步明细`);
-      }
-      qc.invalidateQueries({ queryKey: ["youzan-summary"] });
-      qc.invalidateQueries({ queryKey: ["youzan-breakdown"] });
-      qc.invalidateQueries({ queryKey: ["youzan-sync-logs"] });
-      qc.invalidateQueries({ queryKey: ["shop-orders"] });
+      toast.success(r.message);
+      // 后台异步任务，1 秒后再刷一次给用户看到第一波结果
+      setTimeout(() => {
+        qc.invalidateQueries({ queryKey: ["youzan-summary"] });
+        qc.invalidateQueries({ queryKey: ["youzan-breakdown"] });
+        qc.invalidateQueries({ queryKey: ["youzan-sync-logs"] });
+        qc.invalidateQueries({ queryKey: ["shop-orders"] });
+      }, 1000);
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
   });
