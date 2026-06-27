@@ -872,7 +872,9 @@ async function runItemsSyncForShop(
     }
     return { ok: status !== "empty", count: totalUpserted, message: msg };
   } catch (err) {
-    const msg = `${err instanceof Error ? err.message : String(err)}｜${attemptMsgs.join(" / ")}`;
+    let msg = `${err instanceof Error ? err.message : String(err)}｜${attemptMsgs.join(" / ")}`;
+    if (lastPreview) msg += `｜末次响应: ${lastPreview}`;
+    if (lastTrace) msg += ` (trace=${lastTrace})`;
     if (log?.id) {
       await supabase
         .from("youzan_sync_logs")
@@ -880,7 +882,7 @@ async function runItemsSyncForShop(
           status: "error",
           count_in: totalUpserted,
           count_out: totalReturned,
-          error: msg,
+          error: msg.slice(0, 4000),
           finished_at: new Date().toISOString(),
         } as never)
         .eq("id", log.id);
