@@ -202,13 +202,18 @@ export const linkSkuToYouzanItem = createServerFn({ method: "POST" })
         sku_id: z.string().uuid(),
         yz_item_id: z.number().int().positive(),
         yz_sku_id: z.number().int().positive().optional(),
+        shop_id: z.string().uuid().optional(),
       })
       .parse(input),
   )
   .handler(async ({ data }) => {
-    const hq = await getHqShop();
+    // shop_id 缺省回落总部
+    let shopId = data.shop_id ?? null;
+    if (!shopId) {
+      const hq = await getHqShop();
+      shopId = hq.id;
+    }
 
-    // 校验：sku 与 item 都存在
     const { data: sku } = await supabase
       .from("inv_skus")
       .select("id, name, stock_qty")
@@ -219,45 +224,57 @@ export const linkSkuToYouzanItem = createServerFn({ method: "POST" })
     const { data: yzItem } = await supabase
       .from("youzan_items")
       .select("item_id, title")
-      .eq("shop_id", hq.id)
+      .eq("shop_id", shopId)
       .eq("item_id", data.yz_item_id)
       .maybeSingle();
     if (!yzItem) {
-      throw new Error("有赞商品不存在，请先在「同步」里把总部商品拉到本地再试");
+      throw new Error("该门店中找不到这个有赞商品，请先把该门店的商品同步到本地");
     }
 
-    // 写入（upsert by sku_id）
     const { error: upErr } = await supabase
       .from("sku_youzan_links")
       .upsert(
         {
           sku_id: data.sku_id,
-          shop_id: hq.id,
+          shop_id: shopId,
           yz_item_id: data.yz_item_id,
           yz_sku_id: data.yz_sku_id ?? null,
           status: "linked",
           last_error: null,
         } as never,
-        { onConflict: "sku_id" },
+        { onConflict: "sku_id,shop_id" },
       );
     if (upErr) throw new Error(upErr.message);
 
-    // 立即触发一次以本地库存为准的推送
+    // 立即触发一次以本地库存为准的推送（按 sku 维度即可）
     await enqueueAndRun(data.sku_id, "link_init");
 
-    return { ok: true, message: `已绑定「${yzItem.title}」，并按本地库存 ${sku.stock_qty} 同步` };
+    return {
+      ok: true,
+      message: `已绑定「${yzItem.title}」，并按本地库存 ${sku.stock_qty} 同步`,
+    };
   });
 
 // ============================================================
-// unlinkSku
+// unlinkSku —— 解绑（可指定门店；不传则全解）
 // ============================================================
 export const unlinkSku = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ sku_id: z.string().uuid() }).parse(input),
+    z
+      .object({
+        sku_id: z.string().uuid(),
+        shop_id: z.string().uuid().optional(),
+      })
+      .parse(input),
   )
   .handler(async ({ data }) => {
-    const { error } = await supabase
+    let q = supabase
+      .from("sku_youzan_links")
+      .delete()
+      .eq("sku_id", data.sku_id);
+    if (data.shop_id) q = q.eq("shop_id", data.shop_id);
+    const { error } = await q;
       .from("sku_youzan_links")
       .delete()
       .eq("sku_id", data.sku_id);
