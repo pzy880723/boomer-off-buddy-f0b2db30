@@ -1411,7 +1411,9 @@ async function runOrdersSyncForShop(
     }
     return { ok: status !== "empty", count: totalUpserted, message: msg };
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+    let msg = `${err instanceof Error ? err.message : String(err)}｜${attemptMsgs.join(" / ")}`;
+    if (lastPreview) msg += `｜末次响应: ${lastPreview}`;
+    if (lastTrace) msg += ` (trace=${lastTrace})`;
     if (log?.id) {
       await supabase
         .from("youzan_sync_logs")
@@ -1419,13 +1421,30 @@ async function runOrdersSyncForShop(
           status: "error",
           count_in: totalUpserted,
           count_out: totalReturned,
-          error: msg,
+          error: msg.slice(0, 4000),
           finished_at: new Date().toISOString(),
         } as never)
         .eq("id", log.id);
     }
     return { ok: false, count: totalUpserted, message: msg };
   }
+}
+
+// ============================================================
+// runShopSyncCore —— 给后台 worker 调（不走 createServerFn 中间件）
+// ============================================================
+export async function runShopSyncCore(opts: {
+  shop_id: string;
+  action: "items" | "orders";
+  days?: number;
+}): Promise<{ ok: boolean; count: number; message: string }> {
+  await reapStaleSyncLogs();
+  const shop = await getShopOr404({ shop_id: opts.shop_id });
+  if (opts.action === "items") return runItemsSyncForShop(shop);
+  const days = opts.days ?? 30;
+  const end = new Date();
+  const start = new Date(Date.now() - days * 86_400_000);
+  return runOrdersSyncForShop(shop, start, end);
 }
 
 
