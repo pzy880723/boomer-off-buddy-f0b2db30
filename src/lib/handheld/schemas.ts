@@ -10,7 +10,8 @@
  * 改字段：只动这一个文件。CI 的 sdk:check 会检测漂移。
  */
 import * as z from "zod";
-import "zod-openapi/extend"; // 引入后 .meta() 支持 OpenAPI 字段类型
+/// <reference types="zod-openapi" />
+// Zod v4 的 .meta() 原生支持任意元数据；zod-openapi 通过类型补全 OpenAPI 字段。
 
 // ============================================================
 // 通用
