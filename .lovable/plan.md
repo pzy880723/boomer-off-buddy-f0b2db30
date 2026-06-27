@@ -1,93 +1,61 @@
-# Phase 2 实施计划
+## 1. 排查有赞同步问题（先定位，再修）
 
-## 一、手持终端 API（核心新增）
+查 `youzan_sync_logs` 最新 30 条发现：
+- 最近一次 items 同步从 `13:36` 一直是 `running` 没结束；之前多条都是 `上次同步进程中断或超时（自动重置）`。
+- 5/23 之后只在今天有几次尝试，全部失败/卡死，没有一次 items / orders 真正完成。
+- HQ items 历史上能跑通（5/23 入库 12 条），但分店 items 从未真正回数据。
 
-所有接口放在 `src/routes/api/public/handheld/*`（公开前缀，绕过站点登录），**每个 handler 内部用 `X-Device-Token` 鉴权**（查 `inv_handheld_devices`，校验 token + active + 记录 `last_seen_at`）。返回统一 JSON：`{ ok, data?, error? }`。
+定位方向：
+- `syncAllShops` 在一次请求里串行调所有店铺的 items + orders，超过 Worker 单请求超时 → 进程被掐 → 下次跑触发"自动重置"。
+- 分店走的是 `youzan.retail.open.online.spu.query`（用总部 token + 分店 kdt_id），需要确认有赞返回是不是权限错误而不是空数据（目前日志里 message 都被 `自动重置` 覆盖看不到）。
 
-### 1. 鉴权 & 设备
-- `POST /api/public/handheld/auth/ping`
-  入参：`X-Device-Token`
-  返回：设备绑定的 `location_id / location_name / kind(warehouse|shop)`，用于 APP 启动时显示"当前登录到 XX 仓 / XX 门店"。
+修复方案：
+- **"一键同步全部"改为后台模式**：UI 立即触发 `/api/public/hooks/youzan-sync-worker`（新增的 server route），handler 按 shop+action 拆成小任务循环 fire-and-forget（每个 shop 单独一次 server fn 调用），前端用 `youzan_sync_logs` 轮询展示进度，避免单请求超时。
+- **超时阈值收紧 + 真错误落库**：当前自动重置逻辑把"running 超过 N 分钟"覆盖成模糊错误，把 N 调小到 2 分钟，并在 `callYouzanApiVerbose` 失败时把 `lastPreview` + `trace_id` 写进 `error` 字段，便于排查分店是否权限不足。
+- **手动单店同步按钮**：每张门店卡片上加"同步本店商品/订单"按钮，方便分别排查。
 
-### 2. SKU 查询（APP 端 EPC→SKU 显示用）
-- `GET /api/public/handheld/sku/by-epc?epc=xxx`
-  返回 SKU 基本信息 + 状态（in_stock / unclaimed / sold / lost）+ 所属 location。
-- `GET /api/public/handheld/sku/search?q=xxx`
-  名称/编码模糊搜索，分页 20 条。
+## 2. 合并"有赞对接"与"有赞同步中心"
 
-### 3. 入库扫描（仅 warehouse 设备可调用）
-- `POST /api/public/handheld/inbound/scan`
-  入参：`{ epcs: string[] }`（一次上报一批，去重幂等）
-  逻辑：
-  1. 校验设备 kind=warehouse
-  2. 对每个 EPC 查 `inv_epcs`：
-     - 已知 → 调 `inv_apply_movement(sku_id, device.location_id, +1, 'inbound', null, epc)`，更新 `inv_epcs.status='in_stock' / current_location_id`
-     - 未知 → 写入 `inv_unclaimed_epcs`（status=pending, location_id=设备所在仓）
-  3. 返回 `{ accepted: [...], unclaimed: [...], duplicated: [...] }`
+现状：左侧导航有两个入口：
+- `/youzan`：门店列表、业务汇总、一键同步、折叠的"高级 · 同步明细"。
+- `/youzan/sync`：未绑定 SKU / 库存不一致 / 推送失败 / 推送队列。
 
-### 4. 盘点扫描（warehouse + shop 都可用）
-- `POST /api/public/handheld/stocktake/open`
-  入参：`{ name?: string }`
-  逻辑：在设备所在 location 创建 `stocktakes` 行，status=`scanning`，返回 `stocktake_id`。
-  （同一 location 同一时间只允许一个 scanning 单，已有则直接返回该单）
-- `POST /api/public/handheld/stocktake/scan`
-  入参：`{ stocktake_id, epcs: string[] }`
-  逻辑：批量写 `stocktake_scans`（unique on stocktake+epc 去重），未知 EPC 单独标记返回。
-- `POST /api/public/handheld/stocktake/submit`
-  入参：`{ stocktake_id }`
-  逻辑：聚合 `stocktake_scans` → 写 `stocktake_lines`（按 sku 算 scanned_qty / expected_qty / diff），status 变 `submitted`，等待总部审核。
+合并方案：
+- 保留单一入口 `/youzan`，重命名导航为 **"有赞门店"**。
+- 页面顶部保留：门店卡片 + 业务汇总 + 一键同步。
+- 下方改为常驻 Tab 区（**不再折叠**），含 4 个 tab：
+  - 同步明细（原折叠区，默认展开）
+  - 未绑定 SKU
+  - 库存不一致
+  - 推送队列
+- `/youzan/sync` 路由保留但 `redirect` 到 `/youzan?tab=mismatch`，避免外链 404。
+- 侧边栏只留一个"有赞门店"菜单项，删除"有赞同步中心"。
 
-### 5. 调拨扫描（必须扫具体 EPC）
-- `POST /api/public/handheld/transfer/ship-scan`
-  入参：`{ transfer_id, epcs: string[] }`
-  逻辑：校验设备 location = transfer.from_location_id 且 status=draft；写 `stock_transfer_epcs(side='ship')`。
-- `POST /api/public/handheld/transfer/ship-confirm`
-  入参：`{ transfer_id }`
-  逻辑：核对每行 SKU 已扫数量 = 计划数量 → 对所有 epc 调 `inv_apply_movement(from, -1, 'transfer_ship', id, epc)`；status 变 `in_transit`。
-- `POST /api/public/handheld/transfer/receive-scan`、`/receive-confirm`
-  收货方设备扫描，写 `side='receive'`，确认时核对 ship/receive EPC 一致 → `inv_apply_movement(to, +1, 'transfer_receive', id, epc)`，更新 `inv_epcs.current_location_id`，status 变 `received`。
+## 3. 商品同步：把分店商品也拉过来
 
-> 所有写操作走 service-role（在 handler 内 `await import('@/integrations/supabase/client.server')`），先做设备鉴权再调用。
+当前 `syncShopItems` 已支持分店分支（`youzan.retail.open.online.spu.query`），但因第 1 节的超时问题没真正跑成功。本次工作：
+- 修好同步链路后，确保分店写入 `youzan_items`（`kdt_id` + `item_id` 唯一）。
+- 在"有赞门店"页面新增 Tab **"门店商品库"**：按 shop 分组展示 `youzan_items`，可筛选 HQ / 分店、上下架、库存。
+- 单条商品支持"绑定本地 SKU"操作，复用现有 `BindYouzanDialog`（反向：从有赞侧发起绑定）。
 
-## 二、后台 UI
+## 4. 双向同步基础（本期只做"准备"，不做完整推送链路）
 
-### 新增页面
-1. `/inventory/locations` — 库位列表（仓库 + 门店映射），只读 + 启停。
-2. `/inventory/unclaimed` — 待认领 EPC 队列：列表 + 搜索 SKU 指派 + 一键认领（写入 `inv_epcs`，补一次 `inv_apply_movement` 入对应仓库）。
-3. `/inventory/devices` — 手持终端管理：新建设备（生成随机 token，复制按钮）、绑定 location、停用。
-4. `/inventory/stocktakes` 列表 + `/inventory/stocktakes/$id` 详情：
-   - 显示差异行（多/少/未知 EPC）
-   - 总部"审核通过"按钮 → 调 server fn `approveStocktake`：对每行差异调 `inv_apply_movement(location, diff, 'stocktake', id)`，status → `approved`；"驳回"→ `rejected`
-5. `/inventory/transfers` 改造：
-   - 列表带 4 状态筛选（draft/in_transit/received/cancelled）
-   - 新建：选 from/to location + 行（SKU + 计划数量）→ 保存 draft
-   - 详情：发出/收货扫描进度（实时显示已扫 EPC 数量 vs 计划），允许网页端"手动取消"
-
-### 修改
-- 侧边栏：移除"扫枪入库"入口；新增"库位 / 设备 / 待认领 / 盘点"。
-- SKU 详情页：增加"分库位库存"小表（按 `inv_stocks` 列出每个 location 的数量）。
-- 移除 `/inventory/inbound/new` 手动入库页面。
-
-## 三、Server Functions（后台用）
-
-新增：
-- `src/lib/handheld-devices.functions.ts` — list/create/regenerate-token/deactivate
-- `src/lib/stocktake.functions.ts` — listStocktakes / getStocktake / approveStocktake / rejectStocktake
-- `src/lib/transfer-v2.functions.ts` — createTransfer / cancelTransfer / getTransfer（发出/收货由手持端 API 完成）
-- `src/lib/unclaimed-epc.functions.ts` — list / claim(epc, sku_id) / discard
-- `src/lib/locations.functions.ts` — list / toggleActive
-
-全部用 `requireSupabaseAuth`，敏感操作（approveStocktake、claim）内部检查 `has_role(admin)`。
-
-删除 `inventory.functions.ts` 中的 `submitInbound` / `createInboundOrder`。
-
-## 四、不在本期内
-- 手持端 APP 本身不动（用户已确认）
-- 已售出/退货流转、Youzan 库存推送同步（后续单独迭代）
-- 旧 mobile 扫枪 web 页面：保留代码但路由入口隐藏，提示"请使用手持终端"
+- `sku_youzan_links` 已是 1:1 映射结构，目前只支持 HQ。本次扩展 `BindYouzanDialog`：可选择"绑定到哪个店铺"，多店铺时一个本地 SKU 可绑多条 `yz_item_id`（每店一条），数据库唯一键改为 `(sku_id, kdt_id)`。
+- 推送时按 `sku_youzan_links` 中的每条绑定逐店推库存（队列已支持，循环展开即可）。
+- 反向同步（有赞 → 本地）先只做"对账提示"：拉取 `youzan_items.stock` 写回 `last_pull_stock`，差异在"库存不一致" tab 展示；真正双向写回（有赞改库存自动减本地）放在后续迭代，先打好绑定与对账基础。
 
 ---
 
-**Phase 3 预告**：盘点审核通过后自动推 Youzan 库存差异；EPC 标签批次回填 `inv_epcs(status='unclaimed')` 以便手持端识别打印未入库的标签。
+### 技术细节
 
-完成后会给你一份「手持端 APP 对接文档」（端点、请求/响应示例、错误码），交给 APP 开发者即可。
+- 新增 server route：`src/routes/api/public/hooks/youzan-sync-worker.ts`（按 `?shop_id=...&action=items|orders` 触发单店任务，handler 内 `await syncShopItems(...)`）。
+- `syncAllShops` 改为只负责写 `pending` 队列并 fire `fetch(workerUrl)`，不等待返回。
+- 迁移：`ALTER TABLE sku_youzan_links DROP CONSTRAINT ... ; ADD UNIQUE (sku_id, kdt_id);`
+- 新文件：`src/components/youzan/shop-items-tab.tsx`、`src/components/youzan/reverse-bind-dialog.tsx`。
+- 修改：`src/routes/youzan.tsx`（合并 tab）、`src/routes/youzan.sync.tsx`（改为 redirect）、`src/components/app-sidebar.tsx`（删一项）。
+- 修改：`src/lib/youzan.functions.ts`（错误落库 + 自动重置阈值、按店推送循环）。
+
+### 不在本期范围
+- 有赞→本地的实时库存回写（webhook 监听）。
+- 分店间商品差异化（同 spu 不同店不同价/不同库存）的 UI 编辑。
+- 旧 `/youzan/sync` 路由文件删除（保留 redirect 一个迭代后再清理）。
