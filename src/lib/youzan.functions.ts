@@ -1491,27 +1491,31 @@ export const syncAllShops = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     const shops = (shopsRaw ?? []) as ShopRow[];
 
-    // 推断 worker URL：优先用 PUBLIC_SITE_URL，其次 SUPABASE 推断不行就用相对路径
-    const base =
-      process.env.PUBLIC_SITE_URL ??
-      process.env.LOVABLE_PUBLISHED_URL ??
-      "";
-    const workerUrl = `${base.replace(/\/$/, "")}/api/public/hooks/youzan-sync-worker`;
-
+    // 改为"进程内 fire-and-forget"：每个任务用独立 Promise 异步跑，
+    // 主请求立刻返回，避免单次请求 CPU/wall 超限。
+    // 进度通过 youzan_sync_logs 轮询观察。
     let dispatched = 0;
     for (const shop of shops) {
+      // HQ：拉 HQ 商品 + 拉全连锁订单（订单接口只在 HQ 跑一次）
+      // 分店：只拉自己门店的商品
       const jobs: Array<"items" | "orders"> =
-        shop.role === "hq" ? ["items"] : ["items", "orders"];
+        shop.role === "hq" ? ["items", "orders"] : ["items"];
       for (const action of jobs) {
-        // fire-and-forget；catch 防 unhandled rejection
-        void fetch(workerUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ shop_id: shop.id, action, days: data.days }),
-        }).catch(() => {});
+        void (async () => {
+          try {
+            await runShopSyncCore({
+              shop_id: shop.id,
+              action,
+              days: data.days,
+            });
+          } catch (e) {
+            console.error("[syncAllShops bg]", shop.id, action, e);
+          }
+        })();
         dispatched += 1;
       }
     }
+
 
     return {
       shopCount: shops.length,
