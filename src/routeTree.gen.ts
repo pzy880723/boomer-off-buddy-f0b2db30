@@ -76,6 +76,7 @@ import { Route as InventoryProductsCodeRouteImport } from './routes/inventory.pr
 import { Route as InventoryInboundNewRouteImport } from './routes/inventory.inbound.new'
 import { Route as InventoryInboundIdRouteImport } from './routes/inventory.inbound.$id'
 import { Route as ApiPublicMerukiIngestRouteImport } from './routes/api/public/meruki-ingest'
+import { Route as ApiPublicHooksYouzanSyncWorkerRouteImport } from './routes/api/public/hooks/youzan-sync-worker'
 import { Route as ApiPublicHooksYouzanStockWorkerRouteImport } from './routes/api/public/hooks/youzan-stock-worker'
 import { Route as ApiPublicHooksYouzanReconcileRouteImport } from './routes/api/public/hooks/youzan-reconcile'
 import { Route as ApiPublicHandheldTransferShipScanRouteImport } from './routes/api/public/handheld/transfer.ship-scan'
@@ -430,6 +431,12 @@ const ApiPublicMerukiIngestRoute = ApiPublicMerukiIngestRouteImport.update({
   path: '/api/public/meruki-ingest',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksYouzanSyncWorkerRoute =
+  ApiPublicHooksYouzanSyncWorkerRouteImport.update({
+    id: '/api/public/hooks/youzan-sync-worker',
+    path: '/api/public/hooks/youzan-sync-worker',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksYouzanStockWorkerRoute =
   ApiPublicHooksYouzanStockWorkerRouteImport.update({
     id: '/api/public/hooks/youzan-stock-worker',
@@ -579,6 +586,7 @@ export interface FileRoutesByFullPath {
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
+  '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
   '/api/public/handheld/auth/ping': typeof ApiPublicHandheldAuthPingRoute
   '/api/public/handheld/inbound/scan': typeof ApiPublicHandheldInboundScanRoute
   '/api/public/handheld/sku/by-epc': typeof ApiPublicHandheldSkuByEpcRoute
@@ -654,6 +662,7 @@ export interface FileRoutesByTo {
   '/purchase/japan-parcel': typeof PurchaseJapanParcelIndexRoute
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
+  '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
   '/api/public/handheld/auth/ping': typeof ApiPublicHandheldAuthPingRoute
   '/api/public/handheld/inbound/scan': typeof ApiPublicHandheldInboundScanRoute
   '/api/public/handheld/sku/by-epc': typeof ApiPublicHandheldSkuByEpcRoute
@@ -737,6 +746,7 @@ export interface FileRoutesById {
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
+  '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
   '/api/public/handheld/auth/ping': typeof ApiPublicHandheldAuthPingRoute
   '/api/public/handheld/inbound/scan': typeof ApiPublicHandheldInboundScanRoute
   '/api/public/handheld/sku/by-epc': typeof ApiPublicHandheldSkuByEpcRoute
@@ -821,6 +831,7 @@ export interface FileRouteTypes {
     | '/purchase/japan-parcel/'
     | '/api/public/hooks/youzan-reconcile'
     | '/api/public/hooks/youzan-stock-worker'
+    | '/api/public/hooks/youzan-sync-worker'
     | '/api/public/handheld/auth/ping'
     | '/api/public/handheld/inbound/scan'
     | '/api/public/handheld/sku/by-epc'
@@ -896,6 +907,7 @@ export interface FileRouteTypes {
     | '/purchase/japan-parcel'
     | '/api/public/hooks/youzan-reconcile'
     | '/api/public/hooks/youzan-stock-worker'
+    | '/api/public/hooks/youzan-sync-worker'
     | '/api/public/handheld/auth/ping'
     | '/api/public/handheld/inbound/scan'
     | '/api/public/handheld/sku/by-epc'
@@ -978,6 +990,7 @@ export interface FileRouteTypes {
     | '/purchase/japan-parcel/'
     | '/api/public/hooks/youzan-reconcile'
     | '/api/public/hooks/youzan-stock-worker'
+    | '/api/public/hooks/youzan-sync-worker'
     | '/api/public/handheld/auth/ping'
     | '/api/public/handheld/inbound/scan'
     | '/api/public/handheld/sku/by-epc'
@@ -1024,6 +1037,7 @@ export interface RootRouteChildren {
   InventoryStocktakesIndexRoute: typeof InventoryStocktakesIndexRoute
   ApiPublicHooksYouzanReconcileRoute: typeof ApiPublicHooksYouzanReconcileRoute
   ApiPublicHooksYouzanStockWorkerRoute: typeof ApiPublicHooksYouzanStockWorkerRoute
+  ApiPublicHooksYouzanSyncWorkerRoute: typeof ApiPublicHooksYouzanSyncWorkerRoute
   ApiPublicHandheldAuthPingRoute: typeof ApiPublicHandheldAuthPingRoute
   ApiPublicHandheldInboundScanRoute: typeof ApiPublicHandheldInboundScanRoute
   ApiPublicHandheldSkuByEpcRoute: typeof ApiPublicHandheldSkuByEpcRoute
@@ -1508,6 +1522,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicMerukiIngestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/youzan-sync-worker': {
+      id: '/api/public/hooks/youzan-sync-worker'
+      path: '/api/public/hooks/youzan-sync-worker'
+      fullPath: '/api/public/hooks/youzan-sync-worker'
+      preLoaderRoute: typeof ApiPublicHooksYouzanSyncWorkerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/youzan-stock-worker': {
       id: '/api/public/hooks/youzan-stock-worker'
       path: '/api/public/hooks/youzan-stock-worker'
@@ -1808,6 +1829,7 @@ const rootRouteChildren: RootRouteChildren = {
   InventoryStocktakesIndexRoute: InventoryStocktakesIndexRoute,
   ApiPublicHooksYouzanReconcileRoute: ApiPublicHooksYouzanReconcileRoute,
   ApiPublicHooksYouzanStockWorkerRoute: ApiPublicHooksYouzanStockWorkerRoute,
+  ApiPublicHooksYouzanSyncWorkerRoute: ApiPublicHooksYouzanSyncWorkerRoute,
   ApiPublicHandheldAuthPingRoute: ApiPublicHandheldAuthPingRoute,
   ApiPublicHandheldInboundScanRoute: ApiPublicHandheldInboundScanRoute,
   ApiPublicHandheldSkuByEpcRoute: ApiPublicHandheldSkuByEpcRoute,
