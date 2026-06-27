@@ -33,11 +33,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ShopItemsPanel } from "@/components/youzan/shop-items-panel";
+import { SyncCenterPanel } from "@/components/youzan/sync-center-panel";
 import { PageHeader } from "@/components/page-header";
 import { DataTable } from "@/components/data-table";
 import { StatusBadge } from "@/components/status-badge";
