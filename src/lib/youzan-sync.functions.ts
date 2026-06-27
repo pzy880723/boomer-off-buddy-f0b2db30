@@ -275,9 +275,6 @@ export const unlinkSku = createServerFn({ method: "POST" })
       .eq("sku_id", data.sku_id);
     if (data.shop_id) q = q.eq("shop_id", data.shop_id);
     const { error } = await q;
-      .from("sku_youzan_links")
-      .delete()
-      .eq("sku_id", data.sku_id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
