@@ -23,6 +23,7 @@ import {
   ShieldCheck,
   AlertCircle,
   Smartphone,
+  FileCode2,
   type LucideIcon,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks/use-auth-session";
@@ -66,6 +67,7 @@ type NavTo =
   | "/orders/dispatch"
   | "/orders/wholesale"
   | "/knowledge"
+  | "/api-docs"
   | "/settings"
   | "/admin/users";
 
@@ -121,6 +123,7 @@ const groups: { label: string; items: { title: string; url: NavTo; icon: LucideI
     label: "运营",
     items: [
       { title: "知识库", url: "/knowledge", icon: BookOpen },
+      { title: "API 文档", url: "/api-docs", icon: FileCode2 },
       { title: "系统设置", url: "/settings", icon: Settings },
     ],
   },

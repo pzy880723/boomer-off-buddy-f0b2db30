@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { z } from "zod";
+import type { z } from "zod";
 import {
   HANDHELD_CORS,
   authenticateDevice,
@@ -8,8 +8,7 @@ import {
   err,
 } from "@/server/handheld-auth.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-
-const Body = z.object({ name: z.string().optional() });
+import { StocktakeOpenReq as Body } from "@/lib/handheld/schemas";
 
 function code() {
   const d = new Date();
