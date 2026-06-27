@@ -98,7 +98,7 @@ export function ShopItemsPanel() {
                 ) : null}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="line-clamp-1 text-sm font-medium" title={r.title}>
+                <p className="line-clamp-1 text-sm font-medium" title={r.title ?? undefined}>
                   {r.title}
                 </p>
                 <p className="text-[11px] text-muted-foreground">
