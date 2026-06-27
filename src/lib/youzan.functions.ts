@@ -1469,7 +1469,12 @@ export const syncYouzanOrders = createServerFn({ method: "POST" })
   });
 
 // ============================================================
-// syncAllShops — 一键同步全部门店（商品 + 近 N 天订单）
+// syncAllShops — 一键同步全部门店（后台模式）
+// ------------------------------------------------------------
+// 把每店 items / orders 拆成单独的 HTTP 任务，立刻投递到
+// /api/public/hooks/youzan-sync-worker（fire-and-forget），
+// 避免在一次请求里串行跑光 Worker 单请求 CPU/wall 时间预算。
+// 前端通过轮询 youzan_sync_logs 拿到进度。
 // ============================================================
 export const syncAllShops = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
@@ -1486,41 +1491,32 @@ export const syncAllShops = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     const shops = (shopsRaw ?? []) as ShopRow[];
 
-    const endDate = new Date();
-    const startDate = new Date(Date.now() - data.days * 86_400_000);
+    // 推断 worker URL：优先用 PUBLIC_SITE_URL，其次 SUPABASE 推断不行就用相对路径
+    const base =
+      process.env.PUBLIC_SITE_URL ??
+      process.env.LOVABLE_PUBLISHED_URL ??
+      "";
+    const workerUrl = `${base.replace(/\/$/, "")}/api/public/hooks/youzan-sync-worker`;
 
-    const results: Array<{
-      shop_id: string;
-      kdt_id: number;
-      shop_name: string;
-      items: { ok: boolean; count: number; message: string };
-      orders: { ok: boolean; count: number; message: string };
-    }> = [];
-
+    let dispatched = 0;
     for (const shop of shops) {
-      const items = await runItemsSyncForShop(shop);
-      const orders = await runOrdersSyncForShop(shop, startDate, endDate);
-      results.push({
-        shop_id: shop.id,
-        kdt_id: shop.kdt_id,
-        shop_name: shop.shop_name,
-        items,
-        orders,
-      });
+      const jobs: Array<"items" | "orders"> =
+        shop.role === "hq" ? ["items"] : ["items", "orders"];
+      for (const action of jobs) {
+        // fire-and-forget；catch 防 unhandled rejection
+        void fetch(workerUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ shop_id: shop.id, action, days: data.days }),
+        }).catch(() => {});
+        dispatched += 1;
+      }
     }
 
-    const itemsTotal = results.reduce((s, r) => s + r.items.count, 0);
-    const ordersTotal = results.reduce((s, r) => s + r.orders.count, 0);
-    const okCount = results.filter((r) => r.items.ok && r.orders.ok).length;
-    const failCount = results.length - okCount;
-
     return {
-      shopCount: results.length,
-      okCount,
-      failCount,
-      itemsTotal,
-      ordersTotal,
-      results,
+      shopCount: shops.length,
+      dispatched,
+      message: `已派发 ${dispatched} 个同步任务到后台，进度请看下方「同步明细」`,
     };
   });
 
