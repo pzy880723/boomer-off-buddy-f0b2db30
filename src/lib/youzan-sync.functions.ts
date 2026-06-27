@@ -145,7 +145,7 @@ export const listYouzanItemsByShop = createServerFn({ method: "GET" })
     let q = supabase
       .from("youzan_items")
       .select(
-        "id, item_id, title, price, stock_qty, sold_num, is_listed, pic_url, updated_at",
+        "id, item_id, title, price, stock_qty, is_listed, pic_url, updated_at",
       )
       .eq("shop_id", data.shop_id)
       .order("updated_at", { ascending: false })
