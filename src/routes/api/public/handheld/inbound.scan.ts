@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { z } from "zod";
+import type { z } from "zod";
 import {
   HANDHELD_CORS,
   authenticateDevice,
@@ -8,8 +8,7 @@ import {
   err,
 } from "@/server/handheld-auth.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-
-const Body = z.object({ epcs: z.array(z.string().min(1)).min(1).max(500) });
+import { InboundScanReq as Body } from "@/lib/handheld/schemas";
 
 export const Route = createFileRoute("/api/public/handheld/inbound/scan")({
   server: {

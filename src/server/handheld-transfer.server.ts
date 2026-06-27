@@ -1,13 +1,11 @@
 // Shared transfer scan helpers
-import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { type DeviceContext, ok, err } from "@/server/handheld-auth.server";
+import { TransferScanReq, TransferConfirmReq } from "@/lib/handheld/schemas";
 
-export const ScanBody = z.object({
-  transfer_id: z.string().uuid(),
-  epcs: z.array(z.string().min(1)).min(1).max(1000),
-});
-export const ConfirmBody = z.object({ transfer_id: z.string().uuid() });
+// 兼容现有路由 import 名
+export const ScanBody = TransferScanReq;
+export const ConfirmBody = TransferConfirmReq;
 
 export async function getTransfer(id: string) {
   const { data } = await supabaseAdmin

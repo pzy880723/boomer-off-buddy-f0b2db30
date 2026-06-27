@@ -1,9 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { z } from "zod";
+import type { z } from "zod";
 import { HANDHELD_CORS, authenticateDevice, ok, err } from "@/server/handheld-auth.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-
-const Body = z.object({ stocktake_id: z.string().uuid() });
+import { StocktakeSubmitReq as Body } from "@/lib/handheld/schemas";
 
 export const Route = createFileRoute("/api/public/handheld/stocktake/submit")({
   server: {
