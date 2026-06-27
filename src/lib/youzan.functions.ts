@@ -208,17 +208,17 @@ export async function callYouzanApiVerbose(opts: {
   return { payload: j.response ?? j.data ?? json, trace_id: trace, preview };
 }
 
-/** 进入同步前，把超过 90 秒还在 running 的旧记录直接标成失败，避免页面假活 */
+/** 进入同步前，把超过 30 秒还在 running 的旧记录直接标成失败，避免页面假活 */
 async function reapStaleSyncLogs() {
   await supabase
     .from("youzan_sync_logs")
     .update({
       status: "error",
-      error: "上次同步进程中断或超时（自动重置）",
+      error: "上次同步进程中断或超时（自动重置）—— 可能是 Worker 单次请求超时，请改用后台同步",
       finished_at: new Date().toISOString(),
     } as never)
     .eq("status", "running")
-    .lt("started_at", new Date(Date.now() - 90_000).toISOString());
+    .lt("started_at", new Date(Date.now() - 30_000).toISOString());
 }
 
 // ============================================================
