@@ -112,8 +112,7 @@ const groups: { label: string; items: { title: string; url: NavTo; icon: LucideI
       { title: "门店列表", url: "/shop-mgmt/shops", icon: Building2 },
       { title: "门店商品库", url: "/shop-mgmt/products", icon: Package },
       { title: "加盟商管理", url: "/shop-mgmt/franchisees", icon: Users },
-      { title: "有赞对接", url: "/youzan", icon: Link2 },
-      { title: "有赞同步中心", url: "/youzan/sync", icon: Link2 },
+      { title: "有赞门店", url: "/youzan", icon: Link2 },
 
     ],
     icon: Store,

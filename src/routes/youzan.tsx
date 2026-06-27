@@ -33,11 +33,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ShopItemsPanel } from "@/components/youzan/shop-items-panel";
+import { SyncCenterPanel } from "@/components/youzan/sync-center-panel";
 import { PageHeader } from "@/components/page-header";
 import { DataTable } from "@/components/data-table";
 import { StatusBadge } from "@/components/status-badge";
@@ -147,15 +145,14 @@ function YouzanPage() {
   const syncAllM = useMutation({
     mutationFn: () => syncAllFn({ data: { days: 30 } }),
     onSuccess: (r) => {
-      if (r.failCount === 0) {
-        toast.success(`同步完成：${r.shopCount} 家门店 · 商品 ${r.itemsTotal} · 订单 ${r.ordersTotal}`);
-      } else {
-        toast.warning(`部分失败：${r.okCount}/${r.shopCount} 成功，请查看下方同步明细`);
-      }
-      qc.invalidateQueries({ queryKey: ["youzan-summary"] });
-      qc.invalidateQueries({ queryKey: ["youzan-breakdown"] });
-      qc.invalidateQueries({ queryKey: ["youzan-sync-logs"] });
-      qc.invalidateQueries({ queryKey: ["shop-orders"] });
+      toast.success(r.message);
+      // 后台异步任务，1 秒后再刷一次给用户看到第一波结果
+      setTimeout(() => {
+        qc.invalidateQueries({ queryKey: ["youzan-summary"] });
+        qc.invalidateQueries({ queryKey: ["youzan-breakdown"] });
+        qc.invalidateQueries({ queryKey: ["youzan-sync-logs"] });
+        qc.invalidateQueries({ queryKey: ["shop-orders"] });
+      }, 1000);
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
   });
@@ -273,89 +270,108 @@ function YouzanPage() {
         </div>
       )}
 
-      {/* 高级 / 同步明细 折叠 */}
-      <Collapsible className="mt-8">
-        <CollapsibleTrigger asChild>
-          <Button variant="ghost" size="sm" className="text-muted-foreground">
-            <Activity className="mr-1.5 h-3.5 w-3.5" />
-            高级 · 同步明细
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="mt-3 space-y-3">
-          <div className="flex items-center justify-end">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => backfillM.mutate()}
-              disabled={backfillM.isPending}
-            >
-              {backfillM.isPending ? (
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-              )}
-              回填历史订单字段
-            </Button>
-          </div>
-          <Card>
-            <CardContent className="p-0">
-              <DataTable
-                rowKey={(r) => r.id}
-                data={logs}
-                columns={[
-                  {
-                    header: "时间",
-                    cell: (r) => (
-                      <span className="font-mono text-xs tabular-nums">
-                        {new Date(r.started_at).toLocaleString("zh-CN")}
-                      </span>
-                    ),
-                  },
-                  {
-                    header: "kdt_id",
-                    cell: (r) => (
-                      <span className="font-mono text-xs tabular-nums">
-                        {r.kdt_id ?? "—"}
-                      </span>
-                    ),
-                  },
-                  {
-                    header: "动作",
-                    cell: (r) => <span className="text-xs">{r.action}</span>,
-                  },
-                  {
-                    header: "结果",
-                    cell: (r) => (
-                      <StatusBadge
-                        tone={
-                          r.status === "ok"
-                            ? "success"
-                            : r.status === "error"
-                              ? "danger"
-                              : "neutral"
-                        }
-                      >
-                        {r.status}
-                      </StatusBadge>
-                    ),
-                  },
-                  {
-                    header: "信息",
-                    cell: (r) => (
-                      <span
-                        className="block max-w-[420px] truncate text-xs text-muted-foreground"
-                        title={r.error ?? r.message ?? ""}
-                      >
-                        {r.error ?? r.message ?? "—"}
-                      </span>
-                    ),
-                  },
-                ]}
-              />
-            </CardContent>
-          </Card>
-        </CollapsibleContent>
-      </Collapsible>
+      {/* 数据 / 同步 / 商品库 —— 永久可见的 Tabs */}
+      <div className="mt-8">
+        <Tabs defaultValue="logs">
+          <TabsList>
+            <TabsTrigger value="logs">
+              <Activity className="mr-1.5 h-3.5 w-3.5" />
+              同步明细
+            </TabsTrigger>
+            <TabsTrigger value="items">
+              <Package className="mr-1.5 h-3.5 w-3.5" />
+              门店商品库
+            </TabsTrigger>
+            <TabsTrigger value="sync">
+              <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+              数据同步
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="logs" className="mt-3 space-y-3">
+            <div className="flex items-center justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => backfillM.mutate()}
+                disabled={backfillM.isPending}
+              >
+                {backfillM.isPending ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                )}
+                回填历史订单字段
+              </Button>
+            </div>
+            <Card>
+              <CardContent className="p-0">
+                <DataTable
+                  rowKey={(r) => r.id}
+                  data={logs}
+                  columns={[
+                    {
+                      header: "时间",
+                      cell: (r) => (
+                        <span className="font-mono text-xs tabular-nums">
+                          {new Date(r.started_at).toLocaleString("zh-CN")}
+                        </span>
+                      ),
+                    },
+                    {
+                      header: "kdt_id",
+                      cell: (r) => (
+                        <span className="font-mono text-xs tabular-nums">
+                          {r.kdt_id ?? "—"}
+                        </span>
+                      ),
+                    },
+                    {
+                      header: "动作",
+                      cell: (r) => <span className="text-xs">{r.action}</span>,
+                    },
+                    {
+                      header: "结果",
+                      cell: (r) => (
+                        <StatusBadge
+                          tone={
+                            r.status === "ok"
+                              ? "success"
+                              : r.status === "error"
+                                ? "danger"
+                                : "neutral"
+                          }
+                        >
+                          {r.status}
+                        </StatusBadge>
+                      ),
+                    },
+                    {
+                      header: "信息",
+                      cell: (r) => (
+                        <span
+                          className="block max-w-[420px] truncate text-xs text-muted-foreground"
+                          title={r.error ?? r.message ?? ""}
+                        >
+                          {r.error ?? r.message ?? "—"}
+                        </span>
+                      ),
+                    },
+                  ]}
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="items" className="mt-3">
+            <ShopItemsPanel />
+          </TabsContent>
+
+          <TabsContent value="sync" className="mt-3">
+            <SyncCenterPanel />
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 }

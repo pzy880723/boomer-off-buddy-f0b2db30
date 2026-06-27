@@ -208,17 +208,17 @@ export async function callYouzanApiVerbose(opts: {
   return { payload: j.response ?? j.data ?? json, trace_id: trace, preview };
 }
 
-/** 进入同步前，把超过 90 秒还在 running 的旧记录直接标成失败，避免页面假活 */
+/** 进入同步前，把超过 30 秒还在 running 的旧记录直接标成失败，避免页面假活 */
 async function reapStaleSyncLogs() {
   await supabase
     .from("youzan_sync_logs")
     .update({
       status: "error",
-      error: "上次同步进程中断或超时（自动重置）",
+      error: "上次同步进程中断或超时（自动重置）—— 可能是 Worker 单次请求超时，请改用后台同步",
       finished_at: new Date().toISOString(),
     } as never)
     .eq("status", "running")
-    .lt("started_at", new Date(Date.now() - 90_000).toISOString());
+    .lt("started_at", new Date(Date.now() - 30_000).toISOString());
 }
 
 // ============================================================
@@ -872,7 +872,9 @@ async function runItemsSyncForShop(
     }
     return { ok: status !== "empty", count: totalUpserted, message: msg };
   } catch (err) {
-    const msg = `${err instanceof Error ? err.message : String(err)}｜${attemptMsgs.join(" / ")}`;
+    let msg = `${err instanceof Error ? err.message : String(err)}｜${attemptMsgs.join(" / ")}`;
+    if (lastPreview) msg += `｜末次响应: ${lastPreview}`;
+    if (lastTrace) msg += ` (trace=${lastTrace})`;
     if (log?.id) {
       await supabase
         .from("youzan_sync_logs")
@@ -880,7 +882,7 @@ async function runItemsSyncForShop(
           status: "error",
           count_in: totalUpserted,
           count_out: totalReturned,
-          error: msg,
+          error: msg.slice(0, 4000),
           finished_at: new Date().toISOString(),
         } as never)
         .eq("id", log.id);
@@ -1409,7 +1411,9 @@ async function runOrdersSyncForShop(
     }
     return { ok: status !== "empty", count: totalUpserted, message: msg };
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+    let msg = `${err instanceof Error ? err.message : String(err)}｜${attemptMsgs.join(" / ")}`;
+    if (lastPreview) msg += `｜末次响应: ${lastPreview}`;
+    if (lastTrace) msg += ` (trace=${lastTrace})`;
     if (log?.id) {
       await supabase
         .from("youzan_sync_logs")
@@ -1417,13 +1421,30 @@ async function runOrdersSyncForShop(
           status: "error",
           count_in: totalUpserted,
           count_out: totalReturned,
-          error: msg,
+          error: msg.slice(0, 4000),
           finished_at: new Date().toISOString(),
         } as never)
         .eq("id", log.id);
     }
     return { ok: false, count: totalUpserted, message: msg };
   }
+}
+
+// ============================================================
+// runShopSyncCore —— 给后台 worker 调（不走 createServerFn 中间件）
+// ============================================================
+export async function runShopSyncCore(opts: {
+  shop_id: string;
+  action: "items" | "orders";
+  days?: number;
+}): Promise<{ ok: boolean; count: number; message: string }> {
+  await reapStaleSyncLogs();
+  const shop = await getShopOr404({ shop_id: opts.shop_id });
+  if (opts.action === "items") return runItemsSyncForShop(shop);
+  const days = opts.days ?? 30;
+  const end = new Date();
+  const start = new Date(Date.now() - days * 86_400_000);
+  return runOrdersSyncForShop(shop, start, end);
 }
 
 
@@ -1448,7 +1469,12 @@ export const syncYouzanOrders = createServerFn({ method: "POST" })
   });
 
 // ============================================================
-// syncAllShops — 一键同步全部门店（商品 + 近 N 天订单）
+// syncAllShops — 一键同步全部门店（后台模式）
+// ------------------------------------------------------------
+// 把每店 items / orders 拆成单独的 HTTP 任务，立刻投递到
+// /api/public/hooks/youzan-sync-worker（fire-and-forget），
+// 避免在一次请求里串行跑光 Worker 单请求 CPU/wall 时间预算。
+// 前端通过轮询 youzan_sync_logs 拿到进度。
 // ============================================================
 export const syncAllShops = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
@@ -1465,41 +1491,36 @@ export const syncAllShops = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     const shops = (shopsRaw ?? []) as ShopRow[];
 
-    const endDate = new Date();
-    const startDate = new Date(Date.now() - data.days * 86_400_000);
-
-    const results: Array<{
-      shop_id: string;
-      kdt_id: number;
-      shop_name: string;
-      items: { ok: boolean; count: number; message: string };
-      orders: { ok: boolean; count: number; message: string };
-    }> = [];
-
+    // 改为"进程内 fire-and-forget"：每个任务用独立 Promise 异步跑，
+    // 主请求立刻返回，避免单次请求 CPU/wall 超限。
+    // 进度通过 youzan_sync_logs 轮询观察。
+    let dispatched = 0;
     for (const shop of shops) {
-      const items = await runItemsSyncForShop(shop);
-      const orders = await runOrdersSyncForShop(shop, startDate, endDate);
-      results.push({
-        shop_id: shop.id,
-        kdt_id: shop.kdt_id,
-        shop_name: shop.shop_name,
-        items,
-        orders,
-      });
+      // HQ：拉 HQ 商品 + 拉全连锁订单（订单接口只在 HQ 跑一次）
+      // 分店：只拉自己门店的商品
+      const jobs: Array<"items" | "orders"> =
+        shop.role === "hq" ? ["items", "orders"] : ["items"];
+      for (const action of jobs) {
+        void (async () => {
+          try {
+            await runShopSyncCore({
+              shop_id: shop.id,
+              action,
+              days: data.days,
+            });
+          } catch (e) {
+            console.error("[syncAllShops bg]", shop.id, action, e);
+          }
+        })();
+        dispatched += 1;
+      }
     }
 
-    const itemsTotal = results.reduce((s, r) => s + r.items.count, 0);
-    const ordersTotal = results.reduce((s, r) => s + r.orders.count, 0);
-    const okCount = results.filter((r) => r.items.ok && r.orders.ok).length;
-    const failCount = results.length - okCount;
 
     return {
-      shopCount: results.length,
-      okCount,
-      failCount,
-      itemsTotal,
-      ordersTotal,
-      results,
+      shopCount: shops.length,
+      dispatched,
+      message: `已派发 ${dispatched} 个同步任务到后台，进度请看下方「同步明细」`,
     };
   });
 

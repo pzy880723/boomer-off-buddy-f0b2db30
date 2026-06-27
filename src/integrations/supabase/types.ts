@@ -1221,7 +1221,7 @@ export type Database = {
           {
             foreignKeyName: "sku_youzan_links_sku_id_fkey"
             columns: ["sku_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "inv_skus"
             referencedColumns: ["id"]
           },
