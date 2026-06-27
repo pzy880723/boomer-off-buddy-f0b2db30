@@ -10,6 +10,13 @@ export const Route = createFileRoute("/api/public/hooks/youzan-sync-worker")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const apikey = request.headers.get("apikey");
+        if (
+          process.env.SUPABASE_PUBLISHABLE_KEY &&
+          apikey !== process.env.SUPABASE_PUBLISHABLE_KEY
+        ) {
+          return new Response("unauthorized", { status: 401 });
+        }
         let body: { shop_id?: string; action?: string; days?: number };
         try {
           body = (await request.json()) as typeof body;
