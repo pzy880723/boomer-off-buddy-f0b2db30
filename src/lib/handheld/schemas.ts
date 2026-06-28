@@ -374,15 +374,23 @@ export const UploadImageReq = z
     bucket: z.enum(["sku-raw", "sku-listing"]).default("sku-raw"),
     filename: z.string().min(1).meta({ description: "原始文件名，仅用于扩展名识别" }),
     content_type: z.string().min(1).meta({ example: "image/jpeg" }),
+    mode: z
+      .enum(["signed", "multipart"])
+      .default("signed")
+      .meta({
+        description:
+          "signed=返回 signed PUT URL，APP 直传 Storage（推荐）；multipart=同时返回一个 ERP 中转 POST 端点，APP 走 multipart/form-data 上传（兼容受限网络）。",
+      }),
   })
   .meta({ id: "UploadImageReq" });
 
 export const UploadImageRes = okEnvelope(
   z.object({
     storage_path: z.string(),
-    upload_url: z.string().url().meta({ description: "30 分钟有效，PUT 直传" }),
+    upload_url: z.string().url().meta({ description: "30 分钟有效；signed 模式为 Storage PUT URL，multipart 模式为 ERP 中转 POST URL" }),
     read_url: z.string().url().meta({ description: "7 天 signed GET URL" }),
-    method: z.literal("PUT"),
+    method: z.enum(["PUT", "POST"]),
+    mode: z.enum(["signed", "multipart"]),
     headers: z.record(z.string(), z.string()).meta({ description: "上传时必须带这些 header" }),
   }),
 );
