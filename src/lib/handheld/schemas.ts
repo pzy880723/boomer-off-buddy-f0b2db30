@@ -306,6 +306,9 @@ export const LoginReq = z
   .object({
     email: z.string().email(),
     password: z.string().min(1),
+    capabilities: DeviceCapabilities.optional(),
+    app_version: z.string().max(40).optional(),
+    os_version: z.string().max(40).optional(),
   })
   .meta({ id: "LoginReq" });
 
