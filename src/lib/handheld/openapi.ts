@@ -117,11 +117,17 @@ Token 由后台 **仓库管理 → 手持终端** 页面创建/复制。设备�
   security: SECURITY,
   tags: [
     { name: "鉴权", description: "设备心跳与登录信息" },
+    { name: "账号", description: "操作员登录、可见库位、当前库位切换（v1.1+）" },
     { name: "SKU", description: "SKU 查询" },
+    { name: "AI", description: "拍照识别商品 + 出上架主图（v1.1+）" },
+    { name: "图片", description: "签名上传图片到 Storage（v1.1+）" },
+    { name: "商品", description: "智能上架 + 有赞同步状态（v1.1+）" },
     { name: "入库", description: "扫码自动入库（仅 warehouse 设备）" },
     { name: "盘点", description: "门店 / 仓库盘点流程" },
     { name: "调拨", description: "库位间调拨：发出方扫描 → 发出方确认 → 收货方扫描 → 收货方确认" },
+    { name: "RFID", description: "EPC 单点操作（v1.1+）" },
   ],
+
   paths: {
     "/api/public/handheld/auth/ping": {
       post: {
