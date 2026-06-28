@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Boomer Off — 手持终端 API",
-    "version": "1.0.0",
+    "version": "1.4.0",
     "description": "所有接口都在 `/api/public/handheld/*` 前缀下（**绕过站点登录**）。\n\n## 鉴权\n每个请求必须带 HTTP Header：\n\n```\nX-Device-Token: <设备 token>\n```\n\nToken 由后台 **仓库管理 → 手持终端** 页面创建/复制。设备绑定的库位决定上报的目标位置。\n\n## 统一响应\n\n```json\n{ \"ok\": true, \"data\": { ... } }\n{ \"ok\": false, \"error\": \"...\", \"...\": \"...\" }\n```\n\n## 字段同步约定\n\n服务端的 Zod schema 是唯一真源（`src/lib/handheld/schemas.ts`）。\n本文档 + APP 端 SDK 都从它生成。改字段流程：\n\n1. 改 `schemas.ts`\n2. 运行 `bun run sdk:gen` 生成新的 `openapi.snapshot.json` 和 TS 类型\n3. APP 端拉取 `/api/public/handheld/openapi.json` 重新生成本地 SDK"
   },
   "servers": [
@@ -5547,6 +5547,300 @@
           }
         }
       }
+    },
+    "/api/public/auth/otp/send": {
+      "post": {
+        "tags": [
+          "账号"
+        ],
+        "summary": "发送手机验证码（v1.4）",
+        "description": "**公开接口**，不需要任何 token。同手机号 60 秒内最多 1 次、10 分钟内最多 5 次；单 IP 每小时最多 20 次。短信通道：腾讯云 SMS。",
+        "security": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OtpSendReq"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "ttl": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "验证码有效期（秒）"
+                        }
+                      },
+                      "required": [
+                        "ttl"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/auth/otp/verify": {
+      "post": {
+        "tags": [
+          "账号"
+        ],
+        "summary": "验证验证码并登录（v1.4）",
+        "description": "**公开接口**，不需要任何 token。\n\n- **Web 模式**：只传 `phone` + `code`，返回 `{ session, user }`，前端用 `supabase.auth.setSession()` 落地。\n- **APP 模式**：额外带 `install_id` / `device_label` / `capabilities`，服务端 upsert 设备并返回 **完整 BootstrapRes**（device_token + access_token + session_token + refresh_token + device + user + locations），一步登录到位。\n\n用户必须已经被管理员添加到 ERP；本接口不会自动注册新账号。",
+        "security": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OtpVerifyReq"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Web 模式 OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "session": {
+                          "type": "object",
+                          "properties": {
+                            "access_token": {
+                              "type": "string"
+                            },
+                            "refresh_token": {
+                              "type": "string"
+                            },
+                            "expires_at": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "required": [
+                            "access_token",
+                            "refresh_token",
+                            "expires_at"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "user": {
+                          "$ref": "#/components/schemas/SessionUser"
+                        }
+                      },
+                      "required": [
+                        "session",
+                        "user"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -6170,6 +6464,63 @@
         "required": [
           "kind",
           "message"
+        ]
+      },
+      "OtpSendReq": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "pattern": "^1[3-9]\\d{9}$",
+            "description": "11 位中国大陆手机号"
+          },
+          "purpose": {
+            "default": "login",
+            "type": "string",
+            "enum": [
+              "login"
+            ]
+          }
+        },
+        "required": [
+          "phone"
+        ]
+      },
+      "OtpVerifyReq": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "pattern": "^1[3-9]\\d{9}$"
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^\\d{6}$"
+          },
+          "install_id": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 64
+          },
+          "device_label": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/DeviceCapabilities"
+          },
+          "app_version": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "os_version": {
+            "type": "string",
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "phone",
+          "code"
         ]
       },
       "DeviceContext": {
