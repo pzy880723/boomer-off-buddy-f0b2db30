@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Package, ScanLine, Boxes, ArrowDownToLine, Camera, Search, Tags } from "lucide-react";
+import { Package, ScanLine, Boxes, ArrowDownToLine, Camera, Search, Tags, ShoppingBag } from "lucide-react";
 import { MobileShell } from "@/components/mobile/mobile-shell";
 import { useServerFn } from "@tanstack/react-start";
 import { getMobileCounts } from "@/lib/mobile.functions";
@@ -23,6 +23,7 @@ function MobileHome() {
     { to: "/inventory/inbound/new", icon: Boxes, label: "新建入库单", desc: "分拣后扫枪入库", color: "bg-amber-500/10 text-amber-600" },
     { to: "/m/inbound", icon: ArrowDownToLine, label: "扫码入库", desc: "扫枪聚合提交", color: "bg-violet-500/10 text-violet-600" },
     { to: "/m/photo-search", icon: Camera, label: "拍照识图", desc: "找包裹·查均价", color: "bg-pink-500/10 text-pink-600" },
+    { to: "/m/domestic/quick-add", icon: ShoppingBag, label: "快速录入小包", desc: "截图/拍照 → AI 识别入库", color: "bg-orange-500/10 text-orange-600" },
   ];
   return (
     <MobileShell title="BOOMER OFF · 仓库" noTabBar={false}>
