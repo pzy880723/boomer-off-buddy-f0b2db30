@@ -67,9 +67,29 @@ const epcSchema = z
 
 const uuidSchema = z.string().uuid().meta({ example: "550e8400-e29b-41d4-a716-446655440000" });
 
+/** v1.2：离线幂等键。APP 端为每个写请求生成一个 UUID/ULID，重试时回放上一次响应。 */
+export const ClientOpId = z
+  .string()
+  .min(8)
+  .max(64)
+  .meta({ description: "客户端幂等键；同一 device + client_op_id 服务端只执行一次" });
+
 // ============================================================
 // 1. auth/ping
 // ============================================================
+
+/** v1.2：设备能力上报，APP 启动后用于自适应 UI。 */
+export const DeviceCapabilities = z
+  .object({
+    reader_model: z
+      .enum(["SUNMI_V3", "RFID_PDA", "UNKNOWN"])
+      .default("UNKNOWN"),
+    has_printer: z.boolean().default(false),
+    has_rfid_reader: z.boolean().default(false),
+    has_barcode_scanner: z.boolean().default(false),
+    has_camera: z.boolean().default(true),
+  })
+  .meta({ id: "DeviceCapabilities" });
 
 export const DeviceContextSchema = z
   .object({
@@ -82,6 +102,11 @@ export const DeviceContextSchema = z
       .nullable()
       .meta({ description: "warehouse=仓库 / shop=门店" }),
     location_name: z.string().nullable().meta({ example: "总仓" }),
+    device_capabilities: DeviceCapabilities.meta({
+      description: "v1.2：设备能力。后台未设置时全字段走默认值",
+    }),
+    app_version: z.string().nullable(),
+    os_version: z.string().nullable(),
   })
   .meta({ id: "DeviceContext" });
 
