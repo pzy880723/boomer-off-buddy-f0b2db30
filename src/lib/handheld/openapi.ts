@@ -5,26 +5,45 @@
 import { createDocument, type ZodOpenApiObject } from "zod-openapi";
 import * as z from "zod";
 import {
+  AiListingImageReq,
+  AiListingImageRes,
+  AiRecognizeReq,
+  AiRecognizeRes,
   AuthPingRes,
   ErrorResponse,
   InboundScanReq,
   InboundScanRes,
+  LocationsRes,
+  LocationSwitchReq,
+  LocationSwitchRes,
+  LoginReq,
+  LoginRes,
+  RfidBindReq,
+  RfidBindRes,
+  RfidTransferReq,
+  RfidTransferRes,
   SkuByEpcQuery,
   SkuByEpcRes,
   SkuSearchQuery,
   SkuSearchRes,
+  SmartCreateReq,
+  SmartCreateRes,
   StocktakeOpenReq,
   StocktakeOpenRes,
   StocktakeScanReq,
   StocktakeScanRes,
   StocktakeSubmitReq,
   StocktakeSubmitRes,
+  SyncStatusRes,
   TransferConfirmReq,
   TransferReceiveConfirmRes,
   TransferScanReq,
   TransferScanRes,
   TransferShipConfirmRes,
+  UploadImageReq,
+  UploadImageRes,
 } from "./schemas";
+
 
 const SECURITY = [{ DeviceToken: [] }];
 
