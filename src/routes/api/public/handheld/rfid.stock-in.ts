@@ -41,7 +41,7 @@ export const Route = createFileRoute("/api/public/handheld/rfid/stock-in")({
               .upsert(
                 {
                   epc,
-                  location_id: auth.device.location_id,
+                  last_seen_location_id: auth.device.location_id,
                   last_seen_at: nowIso,
                   hits: 1,
                 },
