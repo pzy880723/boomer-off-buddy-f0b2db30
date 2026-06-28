@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { HANDHELD_CORS, authenticateDevice, ok } from "@/server/handheld-auth.server";
+import { HANDHELD_CORS, authenticateDevice, ok, json } from "@/server/handheld-auth.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 export const Route = createFileRoute("/api/public/handheld/rfid/$epc")({
@@ -14,12 +14,12 @@ export const Route = createFileRoute("/api/public/handheld/rfid/$epc")({
         const { data: row } = await supabaseAdmin
           .from("inv_epcs")
           .select(
-            "epc, status, sku_id, current_location_id, sku:inv_skus!sku_id(id, sku_code, name, category, price_tier, stock_qty), location:inv_locations!current_location_id(id, name, kind)",
+            "epc, status, sku_id, current_location_id, sku:inv_skus!sku_id(id, sku_code, name, category, price_tier, stock_qty, barcode, grade), location:inv_locations!current_location_id(id, name, kind)",
           )
           .eq("epc", epc)
           .maybeSingle();
 
-        if (row) {
+        if (row && row.sku_id) {
           return ok({
             known: true as const,
             epc: row.epc,
@@ -35,16 +35,14 @@ export const Route = createFileRoute("/api/public/handheld/rfid/$epc")({
           .select("epc, hits, last_seen_at")
           .eq("epc", epc)
           .maybeSingle();
-        // Return ok envelope with code marker for APP to switch on
-        return new Response(
-          JSON.stringify({
-            ok: true,
-            code: "unlinked",
-            data: { known: false as const, unclaimed: un ?? null },
-          }),
-          { headers: { "Content-Type": "application/json" }, status: 200 },
-        );
+        // APP switches on code='unlinked'
+        return json({
+          ok: true,
+          code: "unlinked",
+          data: { known: false as const, unclaimed: un ?? null },
+        });
       },
     },
   },
 });
+
