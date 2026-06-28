@@ -721,5 +721,42 @@ export const DiagReportReq = z
 
 export const DiagReportRes = okEnvelope(z.object({ id: uuidSchema }));
 
+// ============================================================
+// 15. v1.3：APP 自助引导（一次登录 = 拿 device_token + access_token）
+// ============================================================
+
+export const BootstrapReq = z
+  .object({
+    email: z.string().email().optional().meta({ description: "ERP 邮箱；与 phone 二选一" }),
+    phone: z.string().min(6).optional().meta({ description: "ERP 手机号；与 email 二选一" }),
+    password: z.string().min(1),
+    install_id: z
+      .string()
+      .min(8)
+      .max(64)
+      .meta({ description: "APP 首装时生成的稳定 UUID/ULID，持久化在 keystore" }),
+    device_label: z.string().max(80).optional().meta({ example: "商米 V3 - 仓库1" }),
+    capabilities: DeviceCapabilities.optional(),
+    app_version: z.string().max(40).optional(),
+    os_version: z.string().max(40).optional(),
+  })
+  .refine((v) => !!(v.email || v.phone), { message: "email 或 phone 至少传一项" })
+  .meta({ id: "BootstrapReq" });
+
+export const BootstrapRes = okEnvelope(
+  z.object({
+    device_token: z.string().meta({
+      description: "之后所有请求带的 X-Device-Token；APP 应安全持久化",
+    }),
+    device: DeviceContextSchema,
+    access_token: z.string(),
+    refresh_token: z.string(),
+    expires_at: z.number().int(),
+    user: SessionUserSchema,
+    locations: z.array(LocationSchema),
+  }),
+);
+
+
 
 
