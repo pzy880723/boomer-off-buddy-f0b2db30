@@ -1,62 +1,65 @@
 ## 目标
 
-1. **简化国内大宗订单录入** — 默认大多数情况是「微信付款 → 物流到货」，不需要每次填收件人/电话/地址。
-2. **在系统设置里加一个「地址库」** — 收件人/地址/电话集中管理，默认地址在大宗单据中自动带入，无需重复填写。
-3. **给国内小包（闲鱼/抖音/小红书/微信/拼多多）一个更顺手的同步入口** — 当前只能截图导入，需要更省力的方案建议。
+在手机端 `/m` 下加一个「快速录入小包订单」入口，覆盖闲鱼/抖音/小红书/微信/拼多多等渠道的零散下单场景。员工在手机上直接：拍照/相册选图/粘贴文字 → AI 解析 → 确认 → 入库。复用 PC 端现有的截图识别管线（`recognizeDomesticScreenshots`），无需新写 AI 逻辑。
 
 ---
 
-## 一、地址库（系统设置）
+## 一、入口
 
-在 `/settings` 里新增「地址库」Tab：
-- 新表 `org_addresses`：label（备注名，如"公司前台"）、receiver_name、receiver_phone、address、is_default。
-- CRUD UI（增/删/编辑/设为默认）。
-- 服务端 fn：`listAddresses` / `upsertAddress` / `deleteAddress` / `setDefaultAddress`。
-- 没填地址前给个空状态 + "添加常用地址"按钮。
+在 `/m`（手机首页）新增一个一级卡片「快速录入小包」，图标 + 副标题「截图/拍照/粘贴 → AI 识别入库」。点击进入 `/m/domestic/quick-add`。
 
-## 二、简化国内大宗订单表单（`/purchase/domestic-bulk/new` 和编辑页）
+底部导航（若有）也加一个 tab；没有就只放首页卡片。
 
-将「物流信息」整块**默认收起**，并按下面调整：
+## 二、`/m/domestic/quick-add` 页面流程
 
-**默认显示（必填/常用）：**
-- 供应商、订单号、采购时间、状态、总金额、运费、付款方式（默认「微信」）
+单页三段式，从上到下：
 
-**「物流信息」折叠面板（默认收起）：**
-- 仅保留：物流公司、运单号、签收时间
-- 收件人/电话/地址**改为右上角一个小下拉**：「使用地址：默认地址 ▾」从地址库选；选中后不再展示这三个字段（数据仍写入订单，保持历史可查）；点「自定义」才展开三行输入。
-- 没有任何地址库记录时，提示 "去设置 → 地址库添加" 并隐藏下拉。
+1. **平台选择（可选）**
+   - 横向 chip：闲鱼 / 抖音 / 小红书 / 微信 / 拼多多 / 自动识别（默认）
+   - 选了就作为 `hint_platform` 传给 AI，提升准确率
+2. **图片区**
+   - 大按钮「拍照」（调起 `<input type="file" accept="image/*" capture="environment">`）
+   - 次按钮「从相册选」（`accept="image/*" multiple`）
+   - 第三按钮「粘贴截图」（监听 `navigator.clipboard.read()`，iOS Safari 不支持时隐藏）
+   - 缩略图网格，最多 15 张，可单张删除
+   - 微信场景：还可以「粘贴聊天文字」展开一个 textarea（识别时把文字打包成一张文本图发给 AI，或直接走纯文本 prompt——见技术细节）
+3. **识别按钮 + 结果卡片**
+   - 「AI 识别」按钮，调用现有 `recognizeDomesticScreenshots`
+   - 返回的 `orders[]` 每条渲染成可编辑卡片：平台、卖家、商品、数量、单价、运费、合计、下单时间、物流、状态
+   - 每条卡片右上角有「忽略」按钮（不入库）
+   - 底部「全部入库」按钮，循环调用现有 `createDomesticOrder`（或新增批量 `createDomesticOrders`）
 
-**保留不变：** 商品明细、票据/合同（也默认收起）、附件、备注。
+## 三、复用 vs 新增
 
-数据字段不删，只改 UI 可见性与默认折叠状态，保证旧数据兼容。
+复用：
+- `src/lib/domestic-recognize.functions.ts` 的 `recognizeDomesticScreenshots`（已支持 1~15 张图 + `hint_platform`）
+- `src/lib/domestic-orders.functions.ts` 的创建 fn
+- `MobileShell`、`PhotoUploaderGrid`（`src/components/mobile/photo-uploader-grid.tsx` 已有）
 
-## 三、国内小包同步建议（讨论 + 落地方向）
+新增：
+- `src/routes/m.domestic.quick-add.tsx` — 主页面
+- `src/components/mobile/domestic-quick-add/`
+  - `recognized-order-card.tsx` — 单条可编辑卡片（复用 PC 端 import 页的 UI 思路，缩成手机版）
+- `src/routes/m.index.tsx` — 加一个入口卡片
+- （可选）`src/lib/domestic-orders.functions.ts` 增加 `createDomesticOrdersBatch`，单事务批量插入，减少手机端网络往返
 
-当前只能截图 → AI 解析。下面是按"省力度"排序的可行方案，供选择：
+## 四、技术细节（非用户向）
 
-| 方案 | 平台覆盖 | 自动化程度 | 落地难度 | 备注 |
-|---|---|---|---|---|
-| A. **微信 / 短信通知 webhook** | 微信支付、短信物流通知 | 高 | 中 | 用「微信 - 服务通知 → 转发到企业微信 webhook → 我们接 `/api/public/hooks/wx-notify`」；只能拿到付款金额+店铺名，需要再补商品。 |
-| B. **Chrome 扩展抓页面**（复用现有 `extension/`） | 闲鱼网页版、小红书网页版、抖音电商网页版 | 高 | 中 | 在「我的订单」页注入按钮，一键把可见订单 POST 到 `/api/public/domestic-orders/ingest`；不需要登录态共享，靠用户自己登录。**推荐主打**。 |
-| C. **手机分享菜单 → 小程序/H5**（PWA `/m/domestic/quick-add`） | 全平台 | 中 | 低 | 在手机端做一个极简「粘贴订单详情文本/截图 → AI 解析 → 一键入库」页面，配合 iOS 快捷指令/安卓分享菜单。当下最现实。 |
-| D. **闲鱼开放平台 / 抖音开放平台官方 API** | 仅企业号 | 极高 | 极高 | 闲鱼无开放 API；抖店要企业资质 + 审核。**不推荐**。 |
-| E. **邮箱解析**（支付宝/微信账单邮件） | 仅有邮件账单的部分 | 中 | 中 | 国内电商基本不发邮件，价值低。 |
+- 图片压缩：上传前用 canvas 压到长边 ≤ 1600px、JPEG 0.8，避免手机大图把 base64 撑爆（`browser-image-compression` 或手写）
+- 微信聊天文字模式：用一段附加 prompt 走 `generateText`（不走图片），需要在 `domestic-recognize.functions.ts` 加一个姐妹 fn `recognizeDomesticText(text, hint_platform?)`，返回同样的 `orders[]` 结构
+- 状态管理：本地 React state 即可，不入 Query 缓存；入库成功后跳到 `/m`（或停留显示「已入库 N 条」）
+- PWA：现有 `public/m-manifest.webmanifest` 已注册手机端 PWA，安装到桌面后可直接打开此页
+- 不做：iOS 分享菜单（Share Target API iOS 不支持）、安卓快捷指令——下一轮再考虑
 
-**推荐组合：B（Chrome 扩展）+ C（手机 PWA 快速录入）**：
-- B 覆盖电脑端批量场景（闲鱼/小红书/抖音）
-- C 覆盖手机端零散下单（微信群、朋友介绍）
-- 两边都 POST 到同一个 ingest 接口，复用现有的 AI 识别管线（`src/lib/domestic-recognize.functions.ts`）
+## 五、落地顺序
 
-本轮先不写 B/C 的代码，先确认方向，下一轮再拆任务。
+1. 加 `m.domestic.quick-add.tsx` 路由 + `m.index.tsx` 入口卡片，先打通「选图 → 识别 → 显示卡片」
+2. 接入入库（先单条循环，够用就不做批量 fn）
+3. 加微信文字粘贴模式 + `recognizeDomesticText`
+4. 加图片压缩
 
 ---
-
-## 落地顺序
-
-1. 加 `org_addresses` 表 + Settings 里的地址库 Tab。
-2. 改 `bulk-order-form.tsx`：折叠物流/票据、付款方式默认"微信"、引入地址库下拉。
-3. （第二轮）按你选定的方案做小包同步入口。
 
 请确认：
-- 地址库放在 `设置 → 地址库` OK 吗？
-- 国内小包同步，先做 **B 扩展** 还是 **C 手机 PWA 快速录入**？还是两个都要？
+- 入口放 `/m` 首页一级卡片 OK 吗？还是想放底部 tab？
+- 第一版要不要包含「微信聊天文字粘贴」模式？（不要的话只做截图识别，更快上线）
