@@ -114,12 +114,22 @@ Token 由后台 **仓库管理 → 手持终端** 页面创建/复制。设备�
     },
   ],
   components: {
+    schemas: {
+      HandheldErrorCode,
+    },
     securitySchemes: {
       DeviceToken: {
         type: "apiKey",
         in: "header",
         name: "X-Device-Token",
-        description: "设备 token，由后台「手持终端」页面颁发。",
+        description: "设备 token，由后台「手持终端」页面颁发。所有写请求必须带。",
+      },
+      SessionToken: {
+        type: "apiKey",
+        in: "header",
+        name: "X-Session-Token",
+        description:
+          "操作员 Supabase access_token（来自 /auth/login）。所有写请求 + AI 请求都必须带；ERP 会按此关联操作员审计。",
       },
     },
   },
