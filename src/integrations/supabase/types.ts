@@ -32,6 +32,45 @@ export type Database = {
         }
         Relationships: []
       }
+      auth_phone_otp: {
+        Row: {
+          attempts: number
+          code_hash: string
+          consumed_at: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          ip: string | null
+          phone: string
+          purpose: string
+          user_agent: string | null
+        }
+        Insert: {
+          attempts?: number
+          code_hash: string
+          consumed_at?: string | null
+          created_at?: string
+          expires_at: string
+          id?: string
+          ip?: string | null
+          phone: string
+          purpose?: string
+          user_agent?: string | null
+        }
+        Update: {
+          attempts?: number
+          code_hash?: string
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          ip?: string | null
+          phone?: string
+          purpose?: string
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       domestic_bulk_order_lines: {
         Row: {
           created_at: string
