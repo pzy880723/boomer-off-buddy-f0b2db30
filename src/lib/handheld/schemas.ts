@@ -367,13 +367,27 @@ const INV_CATEGORY = z.enum([
   "antique",
 ]);
 
-export const AiRecognizeReq = z
+export const AiRecognizeImage = z
   .object({
     image_url: z.string().url().optional(),
     image_base64: z.string().optional(),
+  })
+  .refine((v) => v.image_url || v.image_base64, {
+    message: "image_url 或 image_base64 必传其一",
+  });
+
+export const AiRecognizeReq = z
+  .object({
+    // 单图字段（向后兼容旧 APP）
+    image_url: z.string().url().optional(),
+    image_base64: z.string().optional(),
+    // v1.2 多图：最多 4 张。images[0] 为主图。
+    images: z.array(AiRecognizeImage).min(1).max(4).optional(),
     hint: z.string().optional().meta({ description: "店员补充提示，可选" }),
   })
-  .refine((v) => v.image_url || v.image_base64, { message: "image_url 或 image_base64 必传其一" })
+  .refine((v) => v.image_url || v.image_base64 || (v.images && v.images.length > 0), {
+    message: "image_url / image_base64 / images 至少传一项",
+  })
   .meta({ id: "AiRecognizeReq" });
 
 export const AiRecognizeRes = okEnvelope(
