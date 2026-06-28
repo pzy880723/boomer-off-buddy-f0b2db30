@@ -486,3 +486,80 @@ export const RfidTransferRes = okEnvelope(
   z.object({ epc: epcSchema, from_location_id: uuidSchema.nullable(), to_location_id: uuidSchema }),
 );
 
+// ============================================================
+// 11. RFID 裸 EPC 入库（扫到未绑定的标签先放入待认领队列）
+// ============================================================
+
+export const RfidStockInReq = z
+  .object({
+    epcs: z.array(epcSchema).min(1).max(500),
+  })
+  .meta({ id: "RfidStockInReq" });
+
+export const RfidStockInRes = okEnvelope(
+  z.object({
+    queued: z.number().int().meta({ description: "进入待认领队列的 EPC 数（去重后）" }),
+    already_bound: z.array(z.object({ epc: epcSchema, sku_id: uuidSchema })).meta({
+      description: "已绑定 SKU 的 EPC，APP 端应该改走 inbound/scan 或 transfer-location",
+    }),
+  }),
+);
+
+// ============================================================
+// 12. Auth 扩展：refresh / me / logout（Supabase token 直通）
+// ============================================================
+
+export const AuthRefreshReq = z
+  .object({ refresh_token: z.string().min(1) })
+  .meta({ id: "AuthRefreshReq" });
+
+export const AuthRefreshRes = okEnvelope(
+  z.object({
+    access_token: z.string(),
+    refresh_token: z.string(),
+    expires_at: z.number().int().meta({ description: "unix 秒；access_token 默认 2 小时" }),
+  }),
+);
+
+export const AuthMeRes = okEnvelope(
+  z.object({
+    device: DeviceContextSchema,
+    user: SessionUserSchema.nullable().meta({ description: "未带 X-Session-Token 时为 null" }),
+  }),
+);
+
+// ============================================================
+// 13. SKU 详情（APP 查 barcode / condition_grade / 当前库存）
+// ============================================================
+
+export const SkuDetailRes = okEnvelope(
+  z.object({
+    id: uuidSchema,
+    sku_code: z.string().nullable(),
+    barcode: z.string().nullable(),
+    epc: z.string(),
+    name: z.string(),
+    category: z.string(),
+    price_tier: z.number(),
+    is_custom_price: z.boolean(),
+    condition_grade: z.enum(["N", "S", "A", "B", "C", "J"]).nullable(),
+    grade: z.string().nullable().meta({ description: "兼容旧字段，等同 condition_grade" }),
+    image_url: z.string().nullable(),
+    notes: z.string().nullable(),
+    weight_g: z.number().nullable(),
+    stock_qty: z.number().int(),
+    status: z.string(),
+    created_at: z.string(),
+    updated_at: z.string(),
+    stocks: z.array(
+      z.object({
+        location_id: uuidSchema,
+        location_name: z.string(),
+        location_kind: z.enum(["warehouse", "shop"]),
+        qty: z.number().int(),
+      }),
+    ),
+  }),
+);
+
+
