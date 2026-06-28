@@ -1,8 +1,11 @@
 # Handheld APP Onboarding — v1.2
 
+> 👉 一次性接力交接见 [`./handheld-handoff-to-codex.md`](./handheld-handoff-to-codex.md)（含 APP 开发顺序 + 待确认问题清单）。
+>
 > 所有接口都在 `/api/public/handheld/*` 前缀下（绕过站点登录）。
 > OpenAPI: https://boomer-off-buddy.lovable.app/api/public/handheld/openapi.json
 > Scalar UI: https://boomer-off-buddy.lovable.app/api-docs
+
 
 ## 1. 鉴权头
 
