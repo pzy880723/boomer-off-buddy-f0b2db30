@@ -348,6 +348,3 @@ export function buildHandheldOpenApi() {
   return cached;
 }
 
-  if (!cached) cached = createDocument(document);
-  return cached;
-}
