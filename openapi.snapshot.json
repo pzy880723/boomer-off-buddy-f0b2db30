@@ -1941,13 +1941,182 @@
         }
       }
     },
+    "/api/public/handheld/auth/bootstrap": {
+      "post": {
+        "tags": [
+          "账号"
+        ],
+        "summary": "APP 自助引导：登录即拿 device_token + access_token（v1.3）",
+        "description": "**不需要 X-Device-Token**。APP 首装时生成稳定 `install_id` 持久化，然后用 ERP 邮箱/手机号 + 密码调本接口。服务端按 (owner_user_id, install_id) upsert 设备，自动颁发 device_token；首登设备的 `default_location_id` 为 null，APP 再调 `/location/switch` 让用户选库位。",
+        "security": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BootstrapReq"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "device_token": {
+                          "type": "string",
+                          "description": "之后所有请求带的 X-Device-Token；APP 应安全持久化"
+                        },
+                        "device": {
+                          "$ref": "#/components/schemas/DeviceContext"
+                        },
+                        "access_token": {
+                          "type": "string"
+                        },
+                        "session_token": {
+                          "type": "string",
+                          "description": "等同 access_token；供 APP 统一写入 X-Session-Token"
+                        },
+                        "refresh_token": {
+                          "type": "string"
+                        },
+                        "expires_at": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "user": {
+                          "$ref": "#/components/schemas/SessionUser"
+                        },
+                        "locations": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Location"
+                          }
+                        }
+                      },
+                      "required": [
+                        "device_token",
+                        "device",
+                        "access_token",
+                        "session_token",
+                        "refresh_token",
+                        "expires_at",
+                        "user",
+                        "locations"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/public/handheld/auth/login": {
       "post": {
         "tags": [
           "账号"
         ],
-        "summary": "操作员登录（邮箱 + 密码）",
-        "description": "复用 ERP 后台 Supabase 账号体系。返回 access_token，APP 后续可放到 `X-Session-Token` Header 让 ERP 关联操作员；同时返回所有 active 库位列表，APP 让店员选当前操作库位。",
+        "summary": "操作员登录（旧：需要后台预创建设备 + X-Device-Token）",
+        "description": "保留兼容。新接入请用 `/auth/bootstrap`，一次登录即可同时拿 device_token + access_token，无需后台手动建设备。",
         "requestBody": {
           "content": {
             "application/json": {
@@ -5497,17 +5666,34 @@
           "transfer_id"
         ]
       },
-      "LoginReq": {
+      "BootstrapReq": {
         "type": "object",
         "properties": {
           "email": {
+            "description": "ERP 邮箱；与 phone 二选一",
             "type": "string",
             "format": "email",
             "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
           },
+          "phone": {
+            "description": "ERP 手机号；与 email 二选一",
+            "type": "string",
+            "minLength": 6
+          },
           "password": {
             "type": "string",
             "minLength": 1
+          },
+          "install_id": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 64,
+            "description": "APP 首装时生成的稳定 UUID/ULID，持久化在 keystore"
+          },
+          "device_label": {
+            "example": "商米 V3 - 仓库1",
+            "type": "string",
+            "maxLength": 80
           },
           "capabilities": {
             "$ref": "#/components/schemas/DeviceCapabilities"
@@ -5522,8 +5708,8 @@
           }
         },
         "required": [
-          "email",
-          "password"
+          "password",
+          "install_id"
         ]
       },
       "DeviceCapabilities": {
@@ -5555,6 +5741,35 @@
             "type": "boolean"
           }
         }
+      },
+      "LoginReq": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/DeviceCapabilities"
+          },
+          "app_version": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "os_version": {
+            "type": "string",
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
       },
       "LocationSwitchReq": {
         "type": "object",
