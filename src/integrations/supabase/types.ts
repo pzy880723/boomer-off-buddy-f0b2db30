@@ -301,6 +301,8 @@ export type Database = {
       }
       inv_handheld_devices: {
         Row: {
+          app_version: string | null
+          capabilities: Json
           created_at: string
           default_location_id: string | null
           device_code: string
@@ -308,10 +310,13 @@ export type Database = {
           is_active: boolean
           label: string
           last_seen_at: string | null
+          os_version: string | null
           token: string
           updated_at: string
         }
         Insert: {
+          app_version?: string | null
+          capabilities?: Json
           created_at?: string
           default_location_id?: string | null
           device_code: string
@@ -319,10 +324,13 @@ export type Database = {
           is_active?: boolean
           label: string
           last_seen_at?: string | null
+          os_version?: string | null
           token: string
           updated_at?: string
         }
         Update: {
+          app_version?: string | null
+          capabilities?: Json
           created_at?: string
           default_location_id?: string | null
           device_code?: string
@@ -330,6 +338,7 @@ export type Database = {
           is_active?: boolean
           label?: string
           last_seen_at?: string | null
+          os_version?: string | null
           token?: string
           updated_at?: string
         }
@@ -339,6 +348,136 @@ export type Database = {
             columns: ["default_location_id"]
             isOneToOne: false
             referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inv_handheld_diag: {
+        Row: {
+          app_version: string | null
+          created_at: string
+          device_id: string | null
+          id: string
+          kind: string
+          message: string
+          os_version: string | null
+          payload: Json
+          user_id: string | null
+        }
+        Insert: {
+          app_version?: string | null
+          created_at?: string
+          device_id?: string | null
+          id?: string
+          kind: string
+          message: string
+          os_version?: string | null
+          payload?: Json
+          user_id?: string | null
+        }
+        Update: {
+          app_version?: string | null
+          created_at?: string
+          device_id?: string | null
+          id?: string
+          kind?: string
+          message?: string
+          os_version?: string | null
+          payload?: Json
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inv_handheld_diag_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "inv_handheld_devices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inv_handheld_notifications: {
+        Row: {
+          device_id: string | null
+          id: string
+          kind: string
+          location_id: string | null
+          payload: Json
+          title: string | null
+          ts: string
+        }
+        Insert: {
+          device_id?: string | null
+          id?: string
+          kind: string
+          location_id?: string | null
+          payload?: Json
+          title?: string | null
+          ts?: string
+        }
+        Update: {
+          device_id?: string | null
+          id?: string
+          kind?: string
+          location_id?: string | null
+          payload?: Json
+          title?: string | null
+          ts?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inv_handheld_notifications_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "inv_handheld_devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inv_handheld_notifications_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inv_handheld_op_log: {
+        Row: {
+          client_op_id: string
+          created_at: string
+          device_id: string
+          id: string
+          op_type: string
+          request_hash: string | null
+          response_json: Json | null
+          response_status: number
+        }
+        Insert: {
+          client_op_id: string
+          created_at?: string
+          device_id: string
+          id?: string
+          op_type: string
+          request_hash?: string | null
+          response_json?: Json | null
+          response_status?: number
+        }
+        Update: {
+          client_op_id?: string
+          created_at?: string
+          device_id?: string
+          id?: string
+          op_type?: string
+          request_hash?: string | null
+          response_json?: Json | null
+          response_status?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inv_handheld_op_log_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "inv_handheld_devices"
             referencedColumns: ["id"]
           },
         ]
@@ -1488,6 +1627,7 @@ export type Database = {
       }
       stocktake_scans: {
         Row: {
+          device_id: string | null
           epc: string
           id: string
           scanned_at: string
@@ -1495,6 +1635,7 @@ export type Database = {
           stocktake_id: string
         }
         Insert: {
+          device_id?: string | null
           epc: string
           id?: string
           scanned_at?: string
@@ -1502,6 +1643,7 @@ export type Database = {
           stocktake_id: string
         }
         Update: {
+          device_id?: string | null
           epc?: string
           id?: string
           scanned_at?: string
@@ -1509,6 +1651,13 @@ export type Database = {
           stocktake_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "stocktake_scans_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "inv_handheld_devices"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "stocktake_scans_sku_id_fkey"
             columns: ["sku_id"]

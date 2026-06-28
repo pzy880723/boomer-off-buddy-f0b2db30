@@ -72,3 +72,40 @@ X-Session-Token: <access_token> # 来自 /auth/login
 ## 7. 字段同步约定
 
 ERP `src/lib/handheld/schemas.ts` 是唯一真源。任何改动都会反映到 `/openapi.json`，APP 端通过 `bun run sdk:gen`（或 APP 自己的代码生成）拉取并重生成。
+
+## 8. v1.2 新增（codex 已确认全部按推荐）
+
+### 8.1 设备能力上报
+- `auth/ping` 和 `auth/me` 返回 `device_capabilities`（`reader_model` / `has_printer` / `has_rfid_reader` / `has_barcode_scanner` / `has_camera`），以及 `app_version` / `os_version`。
+- 上报方式：`POST /auth/login` body 里可带 `capabilities` / `app_version` / `os_version`，服务端写回 `inv_handheld_devices`。
+
+### 8.2 离线批量入库（幂等）
+- `POST /rfid/batch-stock-in`：一次最多 50 个 op，每个 op 1-500 个 EPC。
+- 每个 op 必须带 `client_op_id`（建议 UUIDv4），ERP 按 `(device_id, client_op_id)` 持久化响应；重复提交直接回放，`replayed: true`。
+- 单点接口 `rfid/stock-in` / `rfid/bind-item` / `rfid/transfer-location` / `items/smart-create` 也支持可选 `client_op_id` 字段，同样幂等。
+
+### 8.3 扁平打印 payload
+- `items/smart-create` 与 `GET /items/{id}` 都返回 `print_payload`：
+  ```json
+  { "sku_code": "VG...", "barcode": "690...", "title_short": "≤24 字符", "price_tag": "¥699", "grade": "A" }
+  ```
+- APP 自渲染 ZPL / ESC-POS；ERP 不维护模板。
+
+### 8.4 通知轮询
+- `GET /notifications/since?ts=<iso>&limit=50`：
+  - 不传 `ts`：返回最近的 50 条；之后用响应里的 `server_ts` 作为下一次 `ts`。
+  - `kind` 枚举：`stocktake_assigned` / `transfer_incoming` / `youzan_sync_failed` / `unclaimed_epc_pending` / `system`。
+  - 服务端按 `device_id` / `location_id` 过滤，只下发给本设备 / 本库位 / 全局事件。
+- 推荐前台 30s 一次，后台 5min 一次。
+
+### 8.5 AI 多图识别
+- `POST /ai/recognize-item` 兼容旧的 `image_url` / `image_base64` 单图字段；
+- v1.2 推荐用 `images: [{ image_url | image_base64 }]`，**最多 4 张**，`images[0]` 视为主图，其余为细节/不同角度。
+
+### 8.6 协作盘点
+- `stocktake/scan` 接受 `device_id`（服务端自动填当前设备）；
+- 多台 PDA 可同时往同一个盘点会话上传，按 `(stocktake_id, epc)` 去重。
+
+### 8.7 错误上报
+- `POST /diag/report`：`kind` ∈ `crash | network | api_error | device`；可选 `payload` / `app_version` / `os_version`。
+- 安全提醒：**不要在 payload 里上传 token、密码、原始 RFID 报文**，只上报 hash / 摘要。

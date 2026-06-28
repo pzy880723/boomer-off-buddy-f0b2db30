@@ -41,16 +41,39 @@ era 用 1970s / 昭和后期 这种粒度，不知就 null。
 suggested_price_cny 给整数 RMB 估值，没把握就 null。
 不知道的字段一律 null，不要瞎编。`;
 
+function toDataUrl(input: { image_url?: string; image_base64?: string }): string {
+  if (input.image_url) return input.image_url;
+  const b64 = input.image_base64 || "";
+  return b64.startsWith("data:") ? b64 : `data:image/jpeg;base64,${b64}`;
+}
+
 export async function aiRecognizeItem(input: {
   image_url?: string;
   image_base64?: string;
+  images?: Array<{ image_url?: string; image_base64?: string }>;
   hint?: string;
 }) {
-  const dataUrl = input.image_url
-    ? input.image_url
-    : input.image_base64?.startsWith("data:")
-    ? input.image_base64
-    : `data:image/jpeg;base64,${input.image_base64}`;
+  // v1.2：最多 4 张图，images[0] 视为主图
+  const sources: Array<{ image_url?: string; image_base64?: string }> = [];
+  if (input.images && input.images.length > 0) {
+    sources.push(...input.images.slice(0, 4));
+  } else if (input.image_url || input.image_base64) {
+    sources.push({ image_url: input.image_url, image_base64: input.image_base64 });
+  }
+  if (sources.length === 0) throw new Error("no image provided");
+
+  const imageParts = sources.map((s) => ({
+    type: "image_url" as const,
+    image_url: { url: toDataUrl(s) },
+  }));
+
+  const hintLine = input.hint
+    ? `店员补充：${input.hint}\n`
+    : "";
+  const multiNote =
+    sources.length > 1
+      ? `共 ${sources.length} 张图，第 1 张是主图，其余为细节/不同角度，请综合判断。\n`
+      : "";
 
   const body = {
     model: "google/gemini-2.5-pro",
@@ -59,13 +82,8 @@ export async function aiRecognizeItem(input: {
       {
         role: "user",
         content: [
-          {
-            type: "text",
-            text: input.hint
-              ? `店员补充：${input.hint}\n请按要求输出 JSON。`
-              : "请按要求输出 JSON。",
-          },
-          { type: "image_url", image_url: { url: dataUrl } },
+          { type: "text", text: `${hintLine}${multiNote}请按要求输出 JSON。` },
+          ...imageParts,
         ],
       },
     ],

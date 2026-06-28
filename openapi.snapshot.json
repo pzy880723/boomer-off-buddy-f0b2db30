@@ -17,7 +17,8 @@
   ],
   "security": [
     {
-      "DeviceToken": []
+      "DeviceToken": [],
+      "SessionToken": []
     }
   ],
   "tags": [
@@ -60,6 +61,14 @@
     {
       "name": "RFID",
       "description": "EPC 单点操作（v1.1+）"
+    },
+    {
+      "name": "通知",
+      "description": "APP 主动轮询的事件（v1.2+）"
+    },
+    {
+      "name": "诊断",
+      "description": "APP 上报 crash / 网络错误 / 设备状态（v1.2+）"
     }
   ],
   "paths": {
@@ -96,7 +105,7 @@
             }
           },
           "400": {
-            "description": "入参不合法",
+            "description": "入参不合法（code: invalid_body / validation_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -106,7 +115,7 @@
             }
           },
           "401": {
-            "description": "缺少 / 无效 token",
+            "description": "缺少 / 无效 token（code: unauthorized）",
             "content": {
               "application/json": {
                 "schema": {
@@ -116,7 +125,7 @@
             }
           },
           "403": {
-            "description": "设备被停用 / 库位/角色不匹配",
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
             "content": {
               "application/json": {
                 "schema": {
@@ -126,7 +135,7 @@
             }
           },
           "404": {
-            "description": "资源不存在",
+            "description": "资源不存在（code: not_found / unlinked）",
             "content": {
               "application/json": {
                 "schema": {
@@ -136,7 +145,7 @@
             }
           },
           "409": {
-            "description": "状态冲突",
+            "description": "状态冲突（code: already_exists / transfer_required）",
             "content": {
               "application/json": {
                 "schema": {
@@ -146,7 +155,17 @@
             }
           },
           "422": {
-            "description": "校验失败（数量不一致等）",
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
             "content": {
               "application/json": {
                 "schema": {
@@ -156,7 +175,7 @@
             }
           },
           "500": {
-            "description": "服务端错误",
+            "description": "服务端错误（code: internal_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -198,7 +217,7 @@
             }
           },
           "400": {
-            "description": "入参不合法",
+            "description": "入参不合法（code: invalid_body / validation_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -208,7 +227,7 @@
             }
           },
           "401": {
-            "description": "缺少 / 无效 token",
+            "description": "缺少 / 无效 token（code: unauthorized）",
             "content": {
               "application/json": {
                 "schema": {
@@ -218,7 +237,7 @@
             }
           },
           "403": {
-            "description": "设备被停用 / 库位/角色不匹配",
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
             "content": {
               "application/json": {
                 "schema": {
@@ -228,7 +247,7 @@
             }
           },
           "404": {
-            "description": "资源不存在",
+            "description": "资源不存在（code: not_found / unlinked）",
             "content": {
               "application/json": {
                 "schema": {
@@ -238,7 +257,7 @@
             }
           },
           "409": {
-            "description": "状态冲突",
+            "description": "状态冲突（code: already_exists / transfer_required）",
             "content": {
               "application/json": {
                 "schema": {
@@ -248,7 +267,17 @@
             }
           },
           "422": {
-            "description": "校验失败（数量不一致等）",
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
             "content": {
               "application/json": {
                 "schema": {
@@ -258,7 +287,7 @@
             }
           },
           "500": {
-            "description": "服务端错误",
+            "description": "服务端错误（code: internal_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -465,7 +494,7 @@
             }
           },
           "400": {
-            "description": "入参不合法",
+            "description": "入参不合法（code: invalid_body / validation_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -475,7 +504,7 @@
             }
           },
           "401": {
-            "description": "缺少 / 无效 token",
+            "description": "缺少 / 无效 token（code: unauthorized）",
             "content": {
               "application/json": {
                 "schema": {
@@ -485,7 +514,7 @@
             }
           },
           "403": {
-            "description": "设备被停用 / 库位/角色不匹配",
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
             "content": {
               "application/json": {
                 "schema": {
@@ -495,7 +524,7 @@
             }
           },
           "404": {
-            "description": "资源不存在",
+            "description": "资源不存在（code: not_found / unlinked）",
             "content": {
               "application/json": {
                 "schema": {
@@ -505,7 +534,7 @@
             }
           },
           "409": {
-            "description": "状态冲突",
+            "description": "状态冲突（code: already_exists / transfer_required）",
             "content": {
               "application/json": {
                 "schema": {
@@ -515,7 +544,17 @@
             }
           },
           "422": {
-            "description": "校验失败（数量不一致等）",
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
             "content": {
               "application/json": {
                 "schema": {
@@ -525,7 +564,7 @@
             }
           },
           "500": {
-            "description": "服务端错误",
+            "description": "服务端错误（code: internal_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -593,7 +632,7 @@
             }
           },
           "400": {
-            "description": "入参不合法",
+            "description": "入参不合法（code: invalid_body / validation_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -603,7 +642,7 @@
             }
           },
           "401": {
-            "description": "缺少 / 无效 token",
+            "description": "缺少 / 无效 token（code: unauthorized）",
             "content": {
               "application/json": {
                 "schema": {
@@ -613,7 +652,7 @@
             }
           },
           "403": {
-            "description": "设备被停用 / 库位/角色不匹配",
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
             "content": {
               "application/json": {
                 "schema": {
@@ -623,7 +662,7 @@
             }
           },
           "404": {
-            "description": "资源不存在",
+            "description": "资源不存在（code: not_found / unlinked）",
             "content": {
               "application/json": {
                 "schema": {
@@ -633,7 +672,7 @@
             }
           },
           "409": {
-            "description": "状态冲突",
+            "description": "状态冲突（code: already_exists / transfer_required）",
             "content": {
               "application/json": {
                 "schema": {
@@ -643,7 +682,17 @@
             }
           },
           "422": {
-            "description": "校验失败（数量不一致等）",
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
             "content": {
               "application/json": {
                 "schema": {
@@ -653,7 +702,7 @@
             }
           },
           "500": {
-            "description": "服务端错误",
+            "description": "服务端错误（code: internal_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -791,7 +840,7 @@
             }
           },
           "400": {
-            "description": "入参不合法",
+            "description": "入参不合法（code: invalid_body / validation_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -801,7 +850,7 @@
             }
           },
           "401": {
-            "description": "缺少 / 无效 token",
+            "description": "缺少 / 无效 token（code: unauthorized）",
             "content": {
               "application/json": {
                 "schema": {
@@ -811,7 +860,7 @@
             }
           },
           "403": {
-            "description": "设备被停用 / 库位/角色不匹配",
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
             "content": {
               "application/json": {
                 "schema": {
@@ -821,7 +870,7 @@
             }
           },
           "404": {
-            "description": "资源不存在",
+            "description": "资源不存在（code: not_found / unlinked）",
             "content": {
               "application/json": {
                 "schema": {
@@ -831,7 +880,7 @@
             }
           },
           "409": {
-            "description": "状态冲突",
+            "description": "状态冲突（code: already_exists / transfer_required）",
             "content": {
               "application/json": {
                 "schema": {
@@ -841,7 +890,17 @@
             }
           },
           "422": {
-            "description": "校验失败（数量不一致等）",
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
             "content": {
               "application/json": {
                 "schema": {
@@ -851,7 +910,7 @@
             }
           },
           "500": {
-            "description": "服务端错误",
+            "description": "服务端错误（code: internal_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -905,7 +964,7 @@
             }
           },
           "400": {
-            "description": "入参不合法",
+            "description": "入参不合法（code: invalid_body / validation_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -915,7 +974,7 @@
             }
           },
           "401": {
-            "description": "缺少 / 无效 token",
+            "description": "缺少 / 无效 token（code: unauthorized）",
             "content": {
               "application/json": {
                 "schema": {
@@ -925,7 +984,7 @@
             }
           },
           "403": {
-            "description": "设备被停用 / 库位/角色不匹配",
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
             "content": {
               "application/json": {
                 "schema": {
@@ -935,7 +994,7 @@
             }
           },
           "404": {
-            "description": "资源不存在",
+            "description": "资源不存在（code: not_found / unlinked）",
             "content": {
               "application/json": {
                 "schema": {
@@ -945,7 +1004,7 @@
             }
           },
           "409": {
-            "description": "状态冲突",
+            "description": "状态冲突（code: already_exists / transfer_required）",
             "content": {
               "application/json": {
                 "schema": {
@@ -955,7 +1014,17 @@
             }
           },
           "422": {
-            "description": "校验失败（数量不一致等）",
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
             "content": {
               "application/json": {
                 "schema": {
@@ -965,7 +1034,7 @@
             }
           },
           "500": {
-            "description": "服务端错误",
+            "description": "服务端错误（code: internal_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1026,12 +1095,20 @@
                             "description": "RFID EPC 编码",
                             "example": "E2000017220C00000000A1B2"
                           }
+                        },
+                        "participants": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/StocktakeParticipant"
+                          }
                         }
                       },
                       "required": [
                         "received",
                         "unknown_count",
-                        "unknown"
+                        "unknown",
+                        "participants"
                       ],
                       "additionalProperties": false
                     }
@@ -1046,7 +1123,7 @@
             }
           },
           "400": {
-            "description": "入参不合法",
+            "description": "入参不合法（code: invalid_body / validation_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1056,7 +1133,7 @@
             }
           },
           "401": {
-            "description": "缺少 / 无效 token",
+            "description": "缺少 / 无效 token（code: unauthorized）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1066,7 +1143,7 @@
             }
           },
           "403": {
-            "description": "设备被停用 / 库位/角色不匹配",
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1076,7 +1153,7 @@
             }
           },
           "404": {
-            "description": "资源不存在",
+            "description": "资源不存在（code: not_found / unlinked）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1086,7 +1163,7 @@
             }
           },
           "409": {
-            "description": "状态冲突",
+            "description": "状态冲突（code: already_exists / transfer_required）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1096,7 +1173,17 @@
             }
           },
           "422": {
-            "description": "校验失败（数量不一致等）",
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1106,7 +1193,7 @@
             }
           },
           "500": {
-            "description": "服务端错误",
+            "description": "服务端错误（code: internal_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1186,7 +1273,7 @@
             }
           },
           "400": {
-            "description": "入参不合法",
+            "description": "入参不合法（code: invalid_body / validation_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1196,7 +1283,7 @@
             }
           },
           "401": {
-            "description": "缺少 / 无效 token",
+            "description": "缺少 / 无效 token（code: unauthorized）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1206,7 +1293,7 @@
             }
           },
           "403": {
-            "description": "设备被停用 / 库位/角色不匹配",
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1216,7 +1303,7 @@
             }
           },
           "404": {
-            "description": "资源不存在",
+            "description": "资源不存在（code: not_found / unlinked）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1226,7 +1313,7 @@
             }
           },
           "409": {
-            "description": "状态冲突",
+            "description": "状态冲突（code: already_exists / transfer_required）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1236,7 +1323,17 @@
             }
           },
           "422": {
-            "description": "校验失败（数量不一致等）",
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1246,7 +1343,7 @@
             }
           },
           "500": {
-            "description": "服务端错误",
+            "description": "服务端错误（code: internal_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1327,7 +1424,7 @@
             }
           },
           "400": {
-            "description": "入参不合法",
+            "description": "入参不合法（code: invalid_body / validation_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1337,7 +1434,7 @@
             }
           },
           "401": {
-            "description": "缺少 / 无效 token",
+            "description": "缺少 / 无效 token（code: unauthorized）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1347,7 +1444,7 @@
             }
           },
           "403": {
-            "description": "设备被停用 / 库位/角色不匹配",
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1357,7 +1454,7 @@
             }
           },
           "404": {
-            "description": "资源不存在",
+            "description": "资源不存在（code: not_found / unlinked）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1367,7 +1464,7 @@
             }
           },
           "409": {
-            "description": "状态冲突",
+            "description": "状态冲突（code: already_exists / transfer_required）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1377,7 +1474,17 @@
             }
           },
           "422": {
-            "description": "校验失败（数量不一致等）",
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1387,7 +1494,7 @@
             }
           },
           "500": {
-            "description": "服务端错误",
+            "description": "服务端错误（code: internal_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1459,7 +1566,7 @@
             }
           },
           "400": {
-            "description": "入参不合法",
+            "description": "入参不合法（code: invalid_body / validation_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1469,7 +1576,7 @@
             }
           },
           "401": {
-            "description": "缺少 / 无效 token",
+            "description": "缺少 / 无效 token（code: unauthorized）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1479,7 +1586,7 @@
             }
           },
           "403": {
-            "description": "设备被停用 / 库位/角色不匹配",
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1489,7 +1596,7 @@
             }
           },
           "404": {
-            "description": "资源不存在",
+            "description": "资源不存在（code: not_found / unlinked）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1499,7 +1606,7 @@
             }
           },
           "409": {
-            "description": "状态冲突",
+            "description": "状态冲突（code: already_exists / transfer_required）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1509,7 +1616,17 @@
             }
           },
           "422": {
-            "description": "校验失败（数量不一致等）",
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1519,7 +1636,7 @@
             }
           },
           "500": {
-            "description": "服务端错误",
+            "description": "服务端错误（code: internal_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1600,7 +1717,7 @@
             }
           },
           "400": {
-            "description": "入参不合法",
+            "description": "入参不合法（code: invalid_body / validation_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1610,7 +1727,7 @@
             }
           },
           "401": {
-            "description": "缺少 / 无效 token",
+            "description": "缺少 / 无效 token（code: unauthorized）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1620,7 +1737,7 @@
             }
           },
           "403": {
-            "description": "设备被停用 / 库位/角色不匹配",
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1630,7 +1747,7 @@
             }
           },
           "404": {
-            "description": "资源不存在",
+            "description": "资源不存在（code: not_found / unlinked）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1640,7 +1757,7 @@
             }
           },
           "409": {
-            "description": "状态冲突",
+            "description": "状态冲突（code: already_exists / transfer_required）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1650,7 +1767,17 @@
             }
           },
           "422": {
-            "description": "校验失败（数量不一致等）",
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1660,7 +1787,7 @@
             }
           },
           "500": {
-            "description": "服务端错误",
+            "description": "服务端错误（code: internal_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1732,7 +1859,7 @@
             }
           },
           "400": {
-            "description": "入参不合法",
+            "description": "入参不合法（code: invalid_body / validation_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1742,7 +1869,7 @@
             }
           },
           "401": {
-            "description": "缺少 / 无效 token",
+            "description": "缺少 / 无效 token（code: unauthorized）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1752,7 +1879,7 @@
             }
           },
           "403": {
-            "description": "设备被停用 / 库位/角色不匹配",
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1762,7 +1889,7 @@
             }
           },
           "404": {
-            "description": "资源不存在",
+            "description": "资源不存在（code: not_found / unlinked）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1772,7 +1899,7 @@
             }
           },
           "409": {
-            "description": "状态冲突",
+            "description": "状态冲突（code: already_exists / transfer_required）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1782,7 +1909,17 @@
             }
           },
           "422": {
-            "description": "校验失败（数量不一致等）",
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1792,7 +1929,7 @@
             }
           },
           "500": {
-            "description": "服务端错误",
+            "description": "服务端错误（code: internal_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1878,7 +2015,7 @@
             }
           },
           "400": {
-            "description": "入参不合法",
+            "description": "入参不合法（code: invalid_body / validation_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1888,7 +2025,7 @@
             }
           },
           "401": {
-            "description": "缺少 / 无效 token",
+            "description": "缺少 / 无效 token（code: unauthorized）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1898,7 +2035,7 @@
             }
           },
           "403": {
-            "description": "设备被停用 / 库位/角色不匹配",
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1908,7 +2045,7 @@
             }
           },
           "404": {
-            "description": "资源不存在",
+            "description": "资源不存在（code: not_found / unlinked）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1918,7 +2055,7 @@
             }
           },
           "409": {
-            "description": "状态冲突",
+            "description": "状态冲突（code: already_exists / transfer_required）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1928,7 +2065,17 @@
             }
           },
           "422": {
-            "description": "校验失败（数量不一致等）",
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1938,7 +2085,7 @@
             }
           },
           "500": {
-            "description": "服务端错误",
+            "description": "服务端错误（code: internal_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1994,7 +2141,7 @@
             }
           },
           "400": {
-            "description": "入参不合法",
+            "description": "入参不合法（code: invalid_body / validation_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2004,7 +2151,7 @@
             }
           },
           "401": {
-            "description": "缺少 / 无效 token",
+            "description": "缺少 / 无效 token（code: unauthorized）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2014,7 +2161,7 @@
             }
           },
           "403": {
-            "description": "设备被停用 / 库位/角色不匹配",
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2024,7 +2171,7 @@
             }
           },
           "404": {
-            "description": "资源不存在",
+            "description": "资源不存在（code: not_found / unlinked）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2034,7 +2181,7 @@
             }
           },
           "409": {
-            "description": "状态冲突",
+            "description": "状态冲突（code: already_exists / transfer_required）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2044,7 +2191,17 @@
             }
           },
           "422": {
-            "description": "校验失败（数量不一致等）",
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2054,7 +2211,7 @@
             }
           },
           "500": {
-            "description": "服务端错误",
+            "description": "服务端错误（code: internal_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2124,7 +2281,7 @@
             }
           },
           "400": {
-            "description": "入参不合法",
+            "description": "入参不合法（code: invalid_body / validation_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2134,7 +2291,7 @@
             }
           },
           "401": {
-            "description": "缺少 / 无效 token",
+            "description": "缺少 / 无效 token（code: unauthorized）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2144,7 +2301,7 @@
             }
           },
           "403": {
-            "description": "设备被停用 / 库位/角色不匹配",
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2154,7 +2311,7 @@
             }
           },
           "404": {
-            "description": "资源不存在",
+            "description": "资源不存在（code: not_found / unlinked）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2164,7 +2321,7 @@
             }
           },
           "409": {
-            "description": "状态冲突",
+            "description": "状态冲突（code: already_exists / transfer_required）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2174,7 +2331,17 @@
             }
           },
           "422": {
-            "description": "校验失败（数量不一致等）",
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2184,7 +2351,7 @@
             }
           },
           "500": {
-            "description": "服务端错误",
+            "description": "服务端错误（code: internal_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2335,7 +2502,7 @@
             }
           },
           "400": {
-            "description": "入参不合法",
+            "description": "入参不合法（code: invalid_body / validation_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2345,7 +2512,7 @@
             }
           },
           "401": {
-            "description": "缺少 / 无效 token",
+            "description": "缺少 / 无效 token（code: unauthorized）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2355,7 +2522,7 @@
             }
           },
           "403": {
-            "description": "设备被停用 / 库位/角色不匹配",
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2365,7 +2532,7 @@
             }
           },
           "404": {
-            "description": "资源不存在",
+            "description": "资源不存在（code: not_found / unlinked）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2375,7 +2542,7 @@
             }
           },
           "409": {
-            "description": "状态冲突",
+            "description": "状态冲突（code: already_exists / transfer_required）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2385,7 +2552,17 @@
             }
           },
           "422": {
-            "description": "校验失败（数量不一致等）",
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2395,7 +2572,7 @@
             }
           },
           "500": {
-            "description": "服务端错误",
+            "description": "服务端错误（code: internal_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2469,7 +2646,7 @@
             }
           },
           "400": {
-            "description": "入参不合法",
+            "description": "入参不合法（code: invalid_body / validation_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2479,7 +2656,7 @@
             }
           },
           "401": {
-            "description": "缺少 / 无效 token",
+            "description": "缺少 / 无效 token（code: unauthorized）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2489,7 +2666,7 @@
             }
           },
           "403": {
-            "description": "设备被停用 / 库位/角色不匹配",
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2499,7 +2676,7 @@
             }
           },
           "404": {
-            "description": "资源不存在",
+            "description": "资源不存在（code: not_found / unlinked）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2509,7 +2686,7 @@
             }
           },
           "409": {
-            "description": "状态冲突",
+            "description": "状态冲突（code: already_exists / transfer_required）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2519,7 +2696,17 @@
             }
           },
           "422": {
-            "description": "校验失败（数量不一致等）",
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2529,7 +2716,7 @@
             }
           },
           "500": {
-            "description": "服务端错误",
+            "description": "服务端错误（code: internal_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2578,7 +2765,7 @@
                         "upload_url": {
                           "type": "string",
                           "format": "uri",
-                          "description": "30 分钟有效，PUT 直传"
+                          "description": "30 分钟有效；signed 模式为 Storage PUT URL，multipart 模式为 ERP 中转 POST URL"
                         },
                         "read_url": {
                           "type": "string",
@@ -2587,7 +2774,17 @@
                         },
                         "method": {
                           "type": "string",
-                          "const": "PUT"
+                          "enum": [
+                            "PUT",
+                            "POST"
+                          ]
+                        },
+                        "mode": {
+                          "type": "string",
+                          "enum": [
+                            "signed",
+                            "multipart"
+                          ]
                         },
                         "headers": {
                           "type": "object",
@@ -2605,6 +2802,7 @@
                         "upload_url",
                         "read_url",
                         "method",
+                        "mode",
                         "headers"
                       ],
                       "additionalProperties": false
@@ -2620,7 +2818,7 @@
             }
           },
           "400": {
-            "description": "入参不合法",
+            "description": "入参不合法（code: invalid_body / validation_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2630,7 +2828,7 @@
             }
           },
           "401": {
-            "description": "缺少 / 无效 token",
+            "description": "缺少 / 无效 token（code: unauthorized）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2640,7 +2838,7 @@
             }
           },
           "403": {
-            "description": "设备被停用 / 库位/角色不匹配",
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2650,7 +2848,7 @@
             }
           },
           "404": {
-            "description": "资源不存在",
+            "description": "资源不存在（code: not_found / unlinked）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2660,7 +2858,7 @@
             }
           },
           "409": {
-            "description": "状态冲突",
+            "description": "状态冲突（code: already_exists / transfer_required）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2670,7 +2868,17 @@
             }
           },
           "422": {
-            "description": "校验失败（数量不一致等）",
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2680,7 +2888,7 @@
             }
           },
           "500": {
-            "description": "服务端错误",
+            "description": "服务端错误（code: internal_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2732,9 +2940,38 @@
                         "sku_code": {
                           "type": "string"
                         },
+                        "barcode": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "EAN-13 全局唯一条码，自动生成"
+                        },
                         "epc": {
                           "type": "string",
                           "description": "本 SKU 的共享 EPC（类目+价格档+品名 唯一）"
+                        },
+                        "condition_grade": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "N",
+                                "S",
+                                "A",
+                                "B",
+                                "C",
+                                "J"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         },
                         "stock_qty": {
                           "type": "integer",
@@ -2752,6 +2989,16 @@
                             "sku_code": {
                               "type": "string"
                             },
+                            "barcode": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
                             "epc": {
                               "type": "string"
                             },
@@ -2765,6 +3012,24 @@
                               "anyOf": [
                                 {
                                   "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "condition_grade": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "N",
+                                    "S",
+                                    "A",
+                                    "B",
+                                    "C",
+                                    "J"
+                                  ]
                                 },
                                 {
                                   "type": "null"
@@ -2787,14 +3052,20 @@
                           },
                           "required": [
                             "sku_code",
+                            "barcode",
                             "epc",
                             "name",
                             "price_cny",
                             "grade",
+                            "condition_grade",
                             "location_name",
                             "qrcode_payload"
                           ],
                           "additionalProperties": false
+                        },
+                        "print_payload": {
+                          "description": "v1.2：扁平结构，直接灌打印模板",
+                          "$ref": "#/components/schemas/PrintPayload"
                         },
                         "youzan_sync_status": {
                           "type": "string",
@@ -2809,10 +3080,13 @@
                       "required": [
                         "sku_id",
                         "sku_code",
+                        "barcode",
                         "epc",
+                        "condition_grade",
                         "stock_qty",
                         "bound_epcs",
                         "label",
+                        "print_payload",
                         "youzan_sync_status"
                       ],
                       "additionalProperties": false
@@ -2828,7 +3102,7 @@
             }
           },
           "400": {
-            "description": "入参不合法",
+            "description": "入参不合法（code: invalid_body / validation_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2838,7 +3112,7 @@
             }
           },
           "401": {
-            "description": "缺少 / 无效 token",
+            "description": "缺少 / 无效 token（code: unauthorized）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2848,7 +3122,7 @@
             }
           },
           "403": {
-            "description": "设备被停用 / 库位/角色不匹配",
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2858,7 +3132,7 @@
             }
           },
           "404": {
-            "description": "资源不存在",
+            "description": "资源不存在（code: not_found / unlinked）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2868,7 +3142,7 @@
             }
           },
           "409": {
-            "description": "状态冲突",
+            "description": "状态冲突（code: already_exists / transfer_required）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2878,7 +3152,17 @@
             }
           },
           "422": {
-            "description": "校验失败（数量不一致等）",
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2888,7 +3172,7 @@
             }
           },
           "500": {
-            "description": "服务端错误",
+            "description": "服务端错误（code: internal_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -3090,7 +3374,7 @@
             }
           },
           "400": {
-            "description": "入参不合法",
+            "description": "入参不合法（code: invalid_body / validation_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -3100,7 +3384,7 @@
             }
           },
           "401": {
-            "description": "缺少 / 无效 token",
+            "description": "缺少 / 无效 token（code: unauthorized）",
             "content": {
               "application/json": {
                 "schema": {
@@ -3110,7 +3394,7 @@
             }
           },
           "403": {
-            "description": "设备被停用 / 库位/角色不匹配",
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
             "content": {
               "application/json": {
                 "schema": {
@@ -3120,7 +3404,7 @@
             }
           },
           "404": {
-            "description": "资源不存在",
+            "description": "资源不存在（code: not_found / unlinked）",
             "content": {
               "application/json": {
                 "schema": {
@@ -3130,7 +3414,7 @@
             }
           },
           "409": {
-            "description": "状态冲突",
+            "description": "状态冲突（code: already_exists / transfer_required）",
             "content": {
               "application/json": {
                 "schema": {
@@ -3140,7 +3424,17 @@
             }
           },
           "422": {
-            "description": "校验失败（数量不一致等）",
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
             "content": {
               "application/json": {
                 "schema": {
@@ -3150,7 +3444,7 @@
             }
           },
           "500": {
-            "description": "服务端错误",
+            "description": "服务端错误（code: internal_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -3352,7 +3646,7 @@
             }
           },
           "400": {
-            "description": "入参不合法",
+            "description": "入参不合法（code: invalid_body / validation_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -3362,7 +3656,7 @@
             }
           },
           "401": {
-            "description": "缺少 / 无效 token",
+            "description": "缺少 / 无效 token（code: unauthorized）",
             "content": {
               "application/json": {
                 "schema": {
@@ -3372,7 +3666,7 @@
             }
           },
           "403": {
-            "description": "设备被停用 / 库位/角色不匹配",
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
             "content": {
               "application/json": {
                 "schema": {
@@ -3382,7 +3676,7 @@
             }
           },
           "404": {
-            "description": "资源不存在",
+            "description": "资源不存在（code: not_found / unlinked）",
             "content": {
               "application/json": {
                 "schema": {
@@ -3392,7 +3686,7 @@
             }
           },
           "409": {
-            "description": "状态冲突",
+            "description": "状态冲突（code: already_exists / transfer_required）",
             "content": {
               "application/json": {
                 "schema": {
@@ -3402,7 +3696,17 @@
             }
           },
           "422": {
-            "description": "校验失败（数量不一致等）",
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
             "content": {
               "application/json": {
                 "schema": {
@@ -3412,7 +3716,7 @@
             }
           },
           "500": {
-            "description": "服务端错误",
+            "description": "服务端错误（code: internal_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -3498,7 +3802,7 @@
             }
           },
           "400": {
-            "description": "入参不合法",
+            "description": "入参不合法（code: invalid_body / validation_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -3508,7 +3812,7 @@
             }
           },
           "401": {
-            "description": "缺少 / 无效 token",
+            "description": "缺少 / 无效 token（code: unauthorized）",
             "content": {
               "application/json": {
                 "schema": {
@@ -3518,7 +3822,7 @@
             }
           },
           "403": {
-            "description": "设备被停用 / 库位/角色不匹配",
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
             "content": {
               "application/json": {
                 "schema": {
@@ -3528,7 +3832,7 @@
             }
           },
           "404": {
-            "description": "资源不存在",
+            "description": "资源不存在（code: not_found / unlinked）",
             "content": {
               "application/json": {
                 "schema": {
@@ -3538,7 +3842,7 @@
             }
           },
           "409": {
-            "description": "状态冲突",
+            "description": "状态冲突（code: already_exists / transfer_required）",
             "content": {
               "application/json": {
                 "schema": {
@@ -3548,7 +3852,17 @@
             }
           },
           "422": {
-            "description": "校验失败（数量不一致等）",
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
             "content": {
               "application/json": {
                 "schema": {
@@ -3558,7 +3872,7 @@
             }
           },
           "500": {
-            "description": "服务端错误",
+            "description": "服务端错误（code: internal_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -3645,7 +3959,7 @@
             }
           },
           "400": {
-            "description": "入参不合法",
+            "description": "入参不合法（code: invalid_body / validation_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -3655,7 +3969,7 @@
             }
           },
           "401": {
-            "description": "缺少 / 无效 token",
+            "description": "缺少 / 无效 token（code: unauthorized）",
             "content": {
               "application/json": {
                 "schema": {
@@ -3665,7 +3979,7 @@
             }
           },
           "403": {
-            "description": "设备被停用 / 库位/角色不匹配",
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
             "content": {
               "application/json": {
                 "schema": {
@@ -3675,7 +3989,7 @@
             }
           },
           "404": {
-            "description": "资源不存在",
+            "description": "资源不存在（code: not_found / unlinked）",
             "content": {
               "application/json": {
                 "schema": {
@@ -3685,7 +3999,7 @@
             }
           },
           "409": {
-            "description": "状态冲突",
+            "description": "状态冲突（code: already_exists / transfer_required）",
             "content": {
               "application/json": {
                 "schema": {
@@ -3695,7 +4009,17 @@
             }
           },
           "422": {
-            "description": "校验失败（数量不一致等）",
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
             "content": {
               "application/json": {
                 "schema": {
@@ -3705,7 +4029,1345 @@
             }
           },
           "500": {
-            "description": "服务端错误",
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/handheld/rfid/stock-in": {
+      "post": {
+        "tags": [
+          "RFID"
+        ],
+        "summary": "裸 EPC 入库到待认领队列",
+        "description": "扫到一批未绑定 SKU 的标签时调用。已绑定的 EPC 会在 `already_bound` 里返回，APP 应改走 inbound/scan 或 transfer-location。",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RfidStockInReq"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "queued": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "进入待认领队列的 EPC 数（去重后）"
+                        },
+                        "already_bound": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "epc": {
+                                "type": "string",
+                                "minLength": 1,
+                                "description": "RFID EPC 编码",
+                                "example": "E2000017220C00000000A1B2"
+                              },
+                              "sku_id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                                "example": "550e8400-e29b-41d4-a716-446655440000"
+                              }
+                            },
+                            "required": [
+                              "epc",
+                              "sku_id"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "description": "已绑定 SKU 的 EPC，APP 端应该改走 inbound/scan 或 transfer-location"
+                        }
+                      },
+                      "required": [
+                        "queued",
+                        "already_bound"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/handheld/auth/refresh": {
+      "post": {
+        "tags": [
+          "账号"
+        ],
+        "summary": "用 refresh_token 换新的 access_token",
+        "description": "access_token 有效期 2 小时；refresh_token 由 Supabase 维护。",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthRefreshReq"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "access_token": {
+                          "type": "string"
+                        },
+                        "refresh_token": {
+                          "type": "string"
+                        },
+                        "expires_at": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "unix 秒；access_token 默认 2 小时"
+                        }
+                      },
+                      "required": [
+                        "access_token",
+                        "refresh_token",
+                        "expires_at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/handheld/auth/me": {
+      "get": {
+        "tags": [
+          "账号"
+        ],
+        "summary": "当前设备 + 操作员上下文",
+        "description": "未带 X-Session-Token 时 user=null，APP 可以提示重新登录。",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "device": {
+                          "$ref": "#/components/schemas/DeviceContext"
+                        },
+                        "user": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/SessionUser"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "未带 X-Session-Token 时为 null"
+                        }
+                      },
+                      "required": [
+                        "device",
+                        "user"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/handheld/auth/logout": {
+      "post": {
+        "tags": [
+          "账号"
+        ],
+        "summary": "登出当前操作员（吊销 session）",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/DeviceContext"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/handheld/items/{id}": {
+      "get": {
+        "tags": [
+          "商品"
+        ],
+        "summary": "SKU 详情（含 barcode / condition_grade / 多库位库存）",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                          "example": "550e8400-e29b-41d4-a716-446655440000"
+                        },
+                        "sku_code": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "barcode": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "epc": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "category": {
+                          "type": "string"
+                        },
+                        "price_tier": {
+                          "type": "number"
+                        },
+                        "is_custom_price": {
+                          "type": "boolean"
+                        },
+                        "condition_grade": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "N",
+                                "S",
+                                "A",
+                                "B",
+                                "C",
+                                "J"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "grade": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "兼容旧字段，等同 condition_grade"
+                        },
+                        "image_url": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "notes": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "weight_g": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "stock_qty": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "created_at": {
+                          "type": "string"
+                        },
+                        "updated_at": {
+                          "type": "string"
+                        },
+                        "stocks": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "location_id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                                "example": "550e8400-e29b-41d4-a716-446655440000"
+                              },
+                              "location_name": {
+                                "type": "string"
+                              },
+                              "location_kind": {
+                                "type": "string",
+                                "enum": [
+                                  "warehouse",
+                                  "shop"
+                                ]
+                              },
+                              "qty": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": [
+                              "location_id",
+                              "location_name",
+                              "location_kind",
+                              "qty"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "print_payload": {
+                          "description": "v1.2：扁平打印 payload",
+                          "$ref": "#/components/schemas/PrintPayload"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "sku_code",
+                        "barcode",
+                        "epc",
+                        "name",
+                        "category",
+                        "price_tier",
+                        "is_custom_price",
+                        "condition_grade",
+                        "grade",
+                        "image_url",
+                        "notes",
+                        "weight_g",
+                        "stock_qty",
+                        "status",
+                        "created_at",
+                        "updated_at",
+                        "stocks",
+                        "print_payload"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/handheld/rfid/batch-stock-in": {
+      "post": {
+        "tags": [
+          "RFID"
+        ],
+        "summary": "批量裸 EPC 入库（v1.2 离线幂等）",
+        "description": "APP 离线时把多次扫描攒成一批补交；每条 op 必须带 `client_op_id`，服务端按 (device, client_op_id) 回放，永远幂等。每条结果都会带 `replayed: bool`。",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RfidBatchStockInReq"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "results": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "client_op_id": {
+                                "type": "string",
+                                "minLength": 8,
+                                "maxLength": 64,
+                                "description": "客户端幂等键；同一 device + client_op_id 服务端只执行一次"
+                              },
+                              "replayed": {
+                                "type": "boolean"
+                              },
+                              "queued": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "already_bound": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "epc": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "description": "RFID EPC 编码",
+                                      "example": "E2000017220C00000000A1B2"
+                                    },
+                                    "sku_id": {
+                                      "type": "string",
+                                      "format": "uuid",
+                                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                                      "example": "550e8400-e29b-41d4-a716-446655440000"
+                                    }
+                                  },
+                                  "required": [
+                                    "epc",
+                                    "sku_id"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": [
+                              "client_op_id",
+                              "replayed",
+                              "queued",
+                              "already_bound"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "results"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/handheld/notifications/since": {
+      "get": {
+        "tags": [
+          "通知"
+        ],
+        "summary": "拉取自 `ts` 之后的通知（v1.2 轮询模式）",
+        "description": "推荐 APP 每 30s 轮询一次；首次不传 `ts`，之后用上次响应的 `server_ts`。只下发给本设备 / 本库位 / 全局的事件。",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "ts",
+            "schema": {
+              "description": "上次拉取的 server_ts；空=最近 50 条",
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+            },
+            "description": "上次拉取的 server_ts；空=最近 50 条"
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/NotificationItem"
+                          }
+                        },
+                        "server_ts": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                          "description": "下次请求把它当成 ts"
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "server_ts"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/handheld/diag/report": {
+      "post": {
+        "tags": [
+          "诊断"
+        ],
+        "summary": "上报 APP 端 crash / 网络错误 / 设备状态（v1.2）",
+        "description": "请勿在 payload 里上传 token 原文；ERP 会按 device + user 关联审计。",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiagReportReq"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                          "example": "550e8400-e29b-41d4-a716-446655440000"
+                        }
+                      },
+                      "required": [
+                        "id"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
             "content": {
               "application/json": {
                 "schema": {
@@ -3768,6 +5430,12 @@
               "description": "RFID EPC 编码",
               "example": "E2000017220C00000000A1B2"
             }
+          },
+          "client_op_id": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 64,
+            "description": "客户端幂等键；同一 device + client_op_id 服务端只执行一次"
           }
         },
         "required": [
@@ -3840,12 +5508,53 @@
           "password": {
             "type": "string",
             "minLength": 1
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/DeviceCapabilities"
+          },
+          "app_version": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "os_version": {
+            "type": "string",
+            "maxLength": 40
           }
         },
         "required": [
           "email",
           "password"
         ]
+      },
+      "DeviceCapabilities": {
+        "type": "object",
+        "properties": {
+          "reader_model": {
+            "default": "UNKNOWN",
+            "type": "string",
+            "enum": [
+              "SUNMI_V3",
+              "RFID_PDA",
+              "UNKNOWN"
+            ]
+          },
+          "has_printer": {
+            "default": false,
+            "type": "boolean"
+          },
+          "has_rfid_reader": {
+            "default": false,
+            "type": "boolean"
+          },
+          "has_barcode_scanner": {
+            "default": false,
+            "type": "boolean"
+          },
+          "has_camera": {
+            "default": true,
+            "type": "boolean"
+          }
+        }
       },
       "LocationSwitchReq": {
         "type": "object",
@@ -3870,6 +5579,23 @@
           },
           "image_base64": {
             "type": "string"
+          },
+          "images": {
+            "minItems": 1,
+            "maxItems": 4,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "image_url": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "image_base64": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "hint": {
             "description": "店员补充提示，可选",
@@ -3913,6 +5639,15 @@
             "type": "string",
             "minLength": 1,
             "example": "image/jpeg"
+          },
+          "mode": {
+            "default": "signed",
+            "description": "signed=返回 signed PUT URL，APP 直传 Storage（推荐）；multipart=同时返回一个 ERP 中转 POST 端点，APP 走 multipart/form-data 上传（兼容受限网络）。",
+            "type": "string",
+            "enum": [
+              "signed",
+              "multipart"
+            ]
           }
         },
         "required": [
@@ -4024,6 +5759,12 @@
             "default": false,
             "description": "默认 false，APP 给开关；true 时入库存同步队列",
             "type": "boolean"
+          },
+          "client_op_id": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 64,
+            "description": "客户端幂等键；同一 device + client_op_id 服务端只执行一次"
           }
         },
         "required": [
@@ -4053,6 +5794,12 @@
             "format": "uuid",
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
             "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
+          "client_op_id": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 64,
+            "description": "客户端幂等键；同一 device + client_op_id 服务端只执行一次"
           }
         },
         "required": [
@@ -4078,11 +5825,136 @@
           "reason": {
             "type": "string",
             "maxLength": 120
+          },
+          "client_op_id": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 64,
+            "description": "客户端幂等键；同一 device + client_op_id 服务端只执行一次"
           }
         },
         "required": [
           "epc",
           "to_location_id"
+        ]
+      },
+      "RfidStockInReq": {
+        "type": "object",
+        "properties": {
+          "epcs": {
+            "minItems": 1,
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "RFID EPC 编码",
+              "example": "E2000017220C00000000A1B2"
+            }
+          },
+          "client_op_id": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 64,
+            "description": "客户端幂等键；同一 device + client_op_id 服务端只执行一次"
+          }
+        },
+        "required": [
+          "epcs"
+        ]
+      },
+      "AuthRefreshReq": {
+        "type": "object",
+        "properties": {
+          "refresh_token": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "refresh_token"
+        ]
+      },
+      "RfidBatchStockInReq": {
+        "type": "object",
+        "properties": {
+          "ops": {
+            "minItems": 1,
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "client_op_id": {
+                  "type": "string",
+                  "minLength": 8,
+                  "maxLength": 64,
+                  "description": "客户端幂等键；同一 device + client_op_id 服务端只执行一次"
+                },
+                "epcs": {
+                  "minItems": 1,
+                  "maxItems": 500,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "RFID EPC 编码",
+                    "example": "E2000017220C00000000A1B2"
+                  }
+                },
+                "scanned_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                }
+              },
+              "required": [
+                "client_op_id",
+                "epcs"
+              ]
+            }
+          }
+        },
+        "required": [
+          "ops"
+        ]
+      },
+      "DiagReportReq": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "crash",
+              "network",
+              "api_error",
+              "device"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "payload": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "app_version": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "os_version": {
+            "type": "string",
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "kind",
+          "message"
         ]
       },
       "DeviceContext": {
@@ -4140,6 +6012,30 @@
               }
             ],
             "example": "总仓"
+          },
+          "device_capabilities": {
+            "description": "v1.2：设备能力。后台未设置时全字段走默认值",
+            "$ref": "#/components/schemas/DeviceCapabilitiesOutput"
+          },
+          "app_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "os_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -4148,7 +6044,10 @@
           "label",
           "location_id",
           "location_kind",
-          "location_name"
+          "location_name",
+          "device_capabilities",
+          "app_version",
+          "os_version"
         ],
         "additionalProperties": false
       },
@@ -4159,14 +6058,14 @@
             "type": "boolean",
             "const": false
           },
+          "code": {
+            "description": "业务错误码；APP 按此分支",
+            "$ref": "#/components/schemas/HandheldErrorCode"
+          },
           "error": {
             "type": "string",
             "description": "人类可读错误信息",
             "example": "Invalid body"
-          },
-          "code": {
-            "description": "可选机器可读错误码",
-            "type": "string"
           },
           "detail": {
             "type": "string"
@@ -4276,6 +6175,14 @@
           "reused": {
             "type": "boolean",
             "description": "true=复用了同库位的已开盘点单；false=新建"
+          },
+          "participants": {
+            "default": [],
+            "description": "v1.2：当前正在协作的 PDA 列表（按最近扫描时间）",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StocktakeParticipant"
+            }
           }
         },
         "required": [
@@ -4283,7 +6190,64 @@
           "code",
           "status",
           "opened_at",
-          "reused"
+          "reused",
+          "participants"
+        ],
+        "additionalProperties": false
+      },
+      "StocktakeParticipant": {
+        "type": "object",
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
+          "device_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "scan_count": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "last_scan_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "device_id",
+          "device_code",
+          "label",
+          "scan_count",
+          "last_scan_at"
         ],
         "additionalProperties": false
       },
@@ -4361,6 +6325,162 @@
           "is_active"
         ],
         "additionalProperties": false
+      },
+      "PrintPayload": {
+        "type": "object",
+        "properties": {
+          "sku_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "barcode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title_short": {
+            "type": "string",
+            "description": "<=24 字符截断"
+          },
+          "price_tag": {
+            "type": "string",
+            "example": "¥699"
+          },
+          "grade": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "sku_code",
+          "barcode",
+          "title_short",
+          "price_tag",
+          "grade"
+        ],
+        "additionalProperties": false
+      },
+      "NotificationItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "stocktake_assigned",
+              "transfer_incoming",
+              "youzan_sync_failed",
+              "unclaimed_epc_pending",
+              "system"
+            ]
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "payload": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "ts": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "payload",
+          "ts"
+        ],
+        "additionalProperties": false
+      },
+      "HandheldErrorCode": {
+        "type": "string",
+        "enum": [
+          "unauthorized",
+          "unauthorized_location",
+          "invalid_body",
+          "validation_error",
+          "not_found",
+          "unlinked",
+          "already_exists",
+          "transfer_required",
+          "rate_limited",
+          "ai_credits_exhausted",
+          "internal_error"
+        ]
+      },
+      "DeviceCapabilitiesOutput": {
+        "type": "object",
+        "properties": {
+          "reader_model": {
+            "default": "UNKNOWN",
+            "type": "string",
+            "enum": [
+              "SUNMI_V3",
+              "RFID_PDA",
+              "UNKNOWN"
+            ]
+          },
+          "has_printer": {
+            "default": false,
+            "type": "boolean"
+          },
+          "has_rfid_reader": {
+            "default": false,
+            "type": "boolean"
+          },
+          "has_barcode_scanner": {
+            "default": false,
+            "type": "boolean"
+          },
+          "has_camera": {
+            "default": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "reader_model",
+          "has_printer",
+          "has_rfid_reader",
+          "has_barcode_scanner",
+          "has_camera"
+        ],
+        "additionalProperties": false
       }
     },
     "securitySchemes": {
@@ -4368,7 +6488,13 @@
         "type": "apiKey",
         "in": "header",
         "name": "X-Device-Token",
-        "description": "设备 token，由后台「手持终端」页面颁发。"
+        "description": "设备 token，由后台「手持终端」页面颁发。所有写请求必须带。"
+      },
+      "SessionToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Session-Token",
+        "description": "操作员 Supabase access_token（来自 /auth/login）。所有写请求 + AI 请求都必须带；ERP 会按此关联操作员审计。"
       }
     }
   }

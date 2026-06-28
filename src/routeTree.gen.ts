@@ -94,12 +94,15 @@ import { Route as ApiPublicHandheldSkuByEpcRouteImport } from './routes/api/publ
 import { Route as ApiPublicHandheldRfidTransferLocationRouteImport } from './routes/api/public/handheld/rfid.transfer-location'
 import { Route as ApiPublicHandheldRfidStockInRouteImport } from './routes/api/public/handheld/rfid.stock-in'
 import { Route as ApiPublicHandheldRfidBindItemRouteImport } from './routes/api/public/handheld/rfid.bind-item'
+import { Route as ApiPublicHandheldRfidBatchStockInRouteImport } from './routes/api/public/handheld/rfid.batch-stock-in'
 import { Route as ApiPublicHandheldRfidEpcRouteImport } from './routes/api/public/handheld/rfid.$epc'
+import { Route as ApiPublicHandheldNotificationsSinceRouteImport } from './routes/api/public/handheld/notifications.since'
 import { Route as ApiPublicHandheldLocationSwitchRouteImport } from './routes/api/public/handheld/location.switch'
 import { Route as ApiPublicHandheldItemsUploadImageRouteImport } from './routes/api/public/handheld/items.upload-image'
 import { Route as ApiPublicHandheldItemsSmartCreateRouteImport } from './routes/api/public/handheld/items.smart-create'
 import { Route as ApiPublicHandheldItemsIdRouteImport } from './routes/api/public/handheld/items.$id'
 import { Route as ApiPublicHandheldInboundScanRouteImport } from './routes/api/public/handheld/inbound.scan'
+import { Route as ApiPublicHandheldDiagReportRouteImport } from './routes/api/public/handheld/diag.report'
 import { Route as ApiPublicHandheldAuthRefreshRouteImport } from './routes/api/public/handheld/auth.refresh'
 import { Route as ApiPublicHandheldAuthPingRouteImport } from './routes/api/public/handheld/auth.ping'
 import { Route as ApiPublicHandheldAuthMeRouteImport } from './routes/api/public/handheld/auth.me'
@@ -557,10 +560,22 @@ const ApiPublicHandheldRfidBindItemRoute =
     path: '/api/public/handheld/rfid/bind-item',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHandheldRfidBatchStockInRoute =
+  ApiPublicHandheldRfidBatchStockInRouteImport.update({
+    id: '/api/public/handheld/rfid/batch-stock-in',
+    path: '/api/public/handheld/rfid/batch-stock-in',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHandheldRfidEpcRoute =
   ApiPublicHandheldRfidEpcRouteImport.update({
     id: '/api/public/handheld/rfid/$epc',
     path: '/api/public/handheld/rfid/$epc',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldNotificationsSinceRoute =
+  ApiPublicHandheldNotificationsSinceRouteImport.update({
+    id: '/api/public/handheld/notifications/since',
+    path: '/api/public/handheld/notifications/since',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicHandheldLocationSwitchRoute =
@@ -591,6 +606,12 @@ const ApiPublicHandheldInboundScanRoute =
   ApiPublicHandheldInboundScanRouteImport.update({
     id: '/api/public/handheld/inbound/scan',
     path: '/api/public/handheld/inbound/scan',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldDiagReportRoute =
+  ApiPublicHandheldDiagReportRouteImport.update({
+    id: '/api/public/handheld/diag/report',
+    path: '/api/public/handheld/diag/report',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicHandheldAuthRefreshRoute =
@@ -728,12 +749,15 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/auth/me': typeof ApiPublicHandheldAuthMeRoute
   '/api/public/handheld/auth/ping': typeof ApiPublicHandheldAuthPingRoute
   '/api/public/handheld/auth/refresh': typeof ApiPublicHandheldAuthRefreshRoute
+  '/api/public/handheld/diag/report': typeof ApiPublicHandheldDiagReportRoute
   '/api/public/handheld/inbound/scan': typeof ApiPublicHandheldInboundScanRoute
   '/api/public/handheld/items/$id': typeof ApiPublicHandheldItemsIdRouteWithChildren
   '/api/public/handheld/items/smart-create': typeof ApiPublicHandheldItemsSmartCreateRoute
   '/api/public/handheld/items/upload-image': typeof ApiPublicHandheldItemsUploadImageRouteWithChildren
   '/api/public/handheld/location/switch': typeof ApiPublicHandheldLocationSwitchRoute
+  '/api/public/handheld/notifications/since': typeof ApiPublicHandheldNotificationsSinceRoute
   '/api/public/handheld/rfid/$epc': typeof ApiPublicHandheldRfidEpcRoute
+  '/api/public/handheld/rfid/batch-stock-in': typeof ApiPublicHandheldRfidBatchStockInRoute
   '/api/public/handheld/rfid/bind-item': typeof ApiPublicHandheldRfidBindItemRoute
   '/api/public/handheld/rfid/stock-in': typeof ApiPublicHandheldRfidStockInRoute
   '/api/public/handheld/rfid/transfer-location': typeof ApiPublicHandheldRfidTransferLocationRoute
@@ -823,12 +847,15 @@ export interface FileRoutesByTo {
   '/api/public/handheld/auth/me': typeof ApiPublicHandheldAuthMeRoute
   '/api/public/handheld/auth/ping': typeof ApiPublicHandheldAuthPingRoute
   '/api/public/handheld/auth/refresh': typeof ApiPublicHandheldAuthRefreshRoute
+  '/api/public/handheld/diag/report': typeof ApiPublicHandheldDiagReportRoute
   '/api/public/handheld/inbound/scan': typeof ApiPublicHandheldInboundScanRoute
   '/api/public/handheld/items/$id': typeof ApiPublicHandheldItemsIdRouteWithChildren
   '/api/public/handheld/items/smart-create': typeof ApiPublicHandheldItemsSmartCreateRoute
   '/api/public/handheld/items/upload-image': typeof ApiPublicHandheldItemsUploadImageRouteWithChildren
   '/api/public/handheld/location/switch': typeof ApiPublicHandheldLocationSwitchRoute
+  '/api/public/handheld/notifications/since': typeof ApiPublicHandheldNotificationsSinceRoute
   '/api/public/handheld/rfid/$epc': typeof ApiPublicHandheldRfidEpcRoute
+  '/api/public/handheld/rfid/batch-stock-in': typeof ApiPublicHandheldRfidBatchStockInRoute
   '/api/public/handheld/rfid/bind-item': typeof ApiPublicHandheldRfidBindItemRoute
   '/api/public/handheld/rfid/stock-in': typeof ApiPublicHandheldRfidStockInRoute
   '/api/public/handheld/rfid/transfer-location': typeof ApiPublicHandheldRfidTransferLocationRoute
@@ -926,12 +953,15 @@ export interface FileRoutesById {
   '/api/public/handheld/auth/me': typeof ApiPublicHandheldAuthMeRoute
   '/api/public/handheld/auth/ping': typeof ApiPublicHandheldAuthPingRoute
   '/api/public/handheld/auth/refresh': typeof ApiPublicHandheldAuthRefreshRoute
+  '/api/public/handheld/diag/report': typeof ApiPublicHandheldDiagReportRoute
   '/api/public/handheld/inbound/scan': typeof ApiPublicHandheldInboundScanRoute
   '/api/public/handheld/items/$id': typeof ApiPublicHandheldItemsIdRouteWithChildren
   '/api/public/handheld/items/smart-create': typeof ApiPublicHandheldItemsSmartCreateRoute
   '/api/public/handheld/items/upload-image': typeof ApiPublicHandheldItemsUploadImageRouteWithChildren
   '/api/public/handheld/location/switch': typeof ApiPublicHandheldLocationSwitchRoute
+  '/api/public/handheld/notifications/since': typeof ApiPublicHandheldNotificationsSinceRoute
   '/api/public/handheld/rfid/$epc': typeof ApiPublicHandheldRfidEpcRoute
+  '/api/public/handheld/rfid/batch-stock-in': typeof ApiPublicHandheldRfidBatchStockInRoute
   '/api/public/handheld/rfid/bind-item': typeof ApiPublicHandheldRfidBindItemRoute
   '/api/public/handheld/rfid/stock-in': typeof ApiPublicHandheldRfidStockInRoute
   '/api/public/handheld/rfid/transfer-location': typeof ApiPublicHandheldRfidTransferLocationRoute
@@ -1030,12 +1060,15 @@ export interface FileRouteTypes {
     | '/api/public/handheld/auth/me'
     | '/api/public/handheld/auth/ping'
     | '/api/public/handheld/auth/refresh'
+    | '/api/public/handheld/diag/report'
     | '/api/public/handheld/inbound/scan'
     | '/api/public/handheld/items/$id'
     | '/api/public/handheld/items/smart-create'
     | '/api/public/handheld/items/upload-image'
     | '/api/public/handheld/location/switch'
+    | '/api/public/handheld/notifications/since'
     | '/api/public/handheld/rfid/$epc'
+    | '/api/public/handheld/rfid/batch-stock-in'
     | '/api/public/handheld/rfid/bind-item'
     | '/api/public/handheld/rfid/stock-in'
     | '/api/public/handheld/rfid/transfer-location'
@@ -1125,12 +1158,15 @@ export interface FileRouteTypes {
     | '/api/public/handheld/auth/me'
     | '/api/public/handheld/auth/ping'
     | '/api/public/handheld/auth/refresh'
+    | '/api/public/handheld/diag/report'
     | '/api/public/handheld/inbound/scan'
     | '/api/public/handheld/items/$id'
     | '/api/public/handheld/items/smart-create'
     | '/api/public/handheld/items/upload-image'
     | '/api/public/handheld/location/switch'
+    | '/api/public/handheld/notifications/since'
     | '/api/public/handheld/rfid/$epc'
+    | '/api/public/handheld/rfid/batch-stock-in'
     | '/api/public/handheld/rfid/bind-item'
     | '/api/public/handheld/rfid/stock-in'
     | '/api/public/handheld/rfid/transfer-location'
@@ -1227,12 +1263,15 @@ export interface FileRouteTypes {
     | '/api/public/handheld/auth/me'
     | '/api/public/handheld/auth/ping'
     | '/api/public/handheld/auth/refresh'
+    | '/api/public/handheld/diag/report'
     | '/api/public/handheld/inbound/scan'
     | '/api/public/handheld/items/$id'
     | '/api/public/handheld/items/smart-create'
     | '/api/public/handheld/items/upload-image'
     | '/api/public/handheld/location/switch'
+    | '/api/public/handheld/notifications/since'
     | '/api/public/handheld/rfid/$epc'
+    | '/api/public/handheld/rfid/batch-stock-in'
     | '/api/public/handheld/rfid/bind-item'
     | '/api/public/handheld/rfid/stock-in'
     | '/api/public/handheld/rfid/transfer-location'
@@ -1293,12 +1332,15 @@ export interface RootRouteChildren {
   ApiPublicHandheldAuthMeRoute: typeof ApiPublicHandheldAuthMeRoute
   ApiPublicHandheldAuthPingRoute: typeof ApiPublicHandheldAuthPingRoute
   ApiPublicHandheldAuthRefreshRoute: typeof ApiPublicHandheldAuthRefreshRoute
+  ApiPublicHandheldDiagReportRoute: typeof ApiPublicHandheldDiagReportRoute
   ApiPublicHandheldInboundScanRoute: typeof ApiPublicHandheldInboundScanRoute
   ApiPublicHandheldItemsIdRoute: typeof ApiPublicHandheldItemsIdRouteWithChildren
   ApiPublicHandheldItemsSmartCreateRoute: typeof ApiPublicHandheldItemsSmartCreateRoute
   ApiPublicHandheldItemsUploadImageRoute: typeof ApiPublicHandheldItemsUploadImageRouteWithChildren
   ApiPublicHandheldLocationSwitchRoute: typeof ApiPublicHandheldLocationSwitchRoute
+  ApiPublicHandheldNotificationsSinceRoute: typeof ApiPublicHandheldNotificationsSinceRoute
   ApiPublicHandheldRfidEpcRoute: typeof ApiPublicHandheldRfidEpcRoute
+  ApiPublicHandheldRfidBatchStockInRoute: typeof ApiPublicHandheldRfidBatchStockInRoute
   ApiPublicHandheldRfidBindItemRoute: typeof ApiPublicHandheldRfidBindItemRoute
   ApiPublicHandheldRfidStockInRoute: typeof ApiPublicHandheldRfidStockInRoute
   ApiPublicHandheldRfidTransferLocationRoute: typeof ApiPublicHandheldRfidTransferLocationRoute
@@ -1910,11 +1952,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldRfidBindItemRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/handheld/rfid/batch-stock-in': {
+      id: '/api/public/handheld/rfid/batch-stock-in'
+      path: '/api/public/handheld/rfid/batch-stock-in'
+      fullPath: '/api/public/handheld/rfid/batch-stock-in'
+      preLoaderRoute: typeof ApiPublicHandheldRfidBatchStockInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/handheld/rfid/$epc': {
       id: '/api/public/handheld/rfid/$epc'
       path: '/api/public/handheld/rfid/$epc'
       fullPath: '/api/public/handheld/rfid/$epc'
       preLoaderRoute: typeof ApiPublicHandheldRfidEpcRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/notifications/since': {
+      id: '/api/public/handheld/notifications/since'
+      path: '/api/public/handheld/notifications/since'
+      fullPath: '/api/public/handheld/notifications/since'
+      preLoaderRoute: typeof ApiPublicHandheldNotificationsSinceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/handheld/location/switch': {
@@ -1950,6 +2006,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/handheld/inbound/scan'
       fullPath: '/api/public/handheld/inbound/scan'
       preLoaderRoute: typeof ApiPublicHandheldInboundScanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/diag/report': {
+      id: '/api/public/handheld/diag/report'
+      path: '/api/public/handheld/diag/report'
+      fullPath: '/api/public/handheld/diag/report'
+      preLoaderRoute: typeof ApiPublicHandheldDiagReportRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/handheld/auth/refresh': {
@@ -2266,6 +2329,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHandheldAuthMeRoute: ApiPublicHandheldAuthMeRoute,
   ApiPublicHandheldAuthPingRoute: ApiPublicHandheldAuthPingRoute,
   ApiPublicHandheldAuthRefreshRoute: ApiPublicHandheldAuthRefreshRoute,
+  ApiPublicHandheldDiagReportRoute: ApiPublicHandheldDiagReportRoute,
   ApiPublicHandheldInboundScanRoute: ApiPublicHandheldInboundScanRoute,
   ApiPublicHandheldItemsIdRoute: ApiPublicHandheldItemsIdRouteWithChildren,
   ApiPublicHandheldItemsSmartCreateRoute:
@@ -2273,7 +2337,11 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHandheldItemsUploadImageRoute:
     ApiPublicHandheldItemsUploadImageRouteWithChildren,
   ApiPublicHandheldLocationSwitchRoute: ApiPublicHandheldLocationSwitchRoute,
+  ApiPublicHandheldNotificationsSinceRoute:
+    ApiPublicHandheldNotificationsSinceRoute,
   ApiPublicHandheldRfidEpcRoute: ApiPublicHandheldRfidEpcRoute,
+  ApiPublicHandheldRfidBatchStockInRoute:
+    ApiPublicHandheldRfidBatchStockInRoute,
   ApiPublicHandheldRfidBindItemRoute: ApiPublicHandheldRfidBindItemRoute,
   ApiPublicHandheldRfidStockInRoute: ApiPublicHandheldRfidStockInRoute,
   ApiPublicHandheldRfidTransferLocationRoute:

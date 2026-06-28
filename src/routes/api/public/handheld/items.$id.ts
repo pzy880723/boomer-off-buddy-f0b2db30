@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { HANDHELD_CORS, authenticateDevice, ok } from "@/server/handheld-auth.server";
 import { errCode } from "@/lib/handheld/errors";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { buildPrintPayload } from "@/server/handheld-print.server";
 
 export const Route = createFileRoute("/api/public/handheld/items/$id")({
   server: {
@@ -60,6 +61,14 @@ export const Route = createFileRoute("/api/public/handheld/items/$id")({
           created_at: sku.created_at,
           updated_at: sku.updated_at,
           stocks: stockList,
+          print_payload: buildPrintPayload({
+            sku_code: sku.sku_code,
+            barcode: (sku as any).barcode ?? null,
+            name: sku.name,
+            price_tier: sku.price_tier,
+            grade: sku.grade,
+            condition_grade: (sku.grade as any) ?? null,
+          }),
         });
       },
     },

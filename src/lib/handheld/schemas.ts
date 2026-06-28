@@ -67,9 +67,29 @@ const epcSchema = z
 
 const uuidSchema = z.string().uuid().meta({ example: "550e8400-e29b-41d4-a716-446655440000" });
 
+/** v1.2：离线幂等键。APP 端为每个写请求生成一个 UUID/ULID，重试时回放上一次响应。 */
+export const ClientOpId = z
+  .string()
+  .min(8)
+  .max(64)
+  .meta({ description: "客户端幂等键；同一 device + client_op_id 服务端只执行一次" });
+
 // ============================================================
 // 1. auth/ping
 // ============================================================
+
+/** v1.2：设备能力上报，APP 启动后用于自适应 UI。 */
+export const DeviceCapabilities = z
+  .object({
+    reader_model: z
+      .enum(["SUNMI_V3", "RFID_PDA", "UNKNOWN"])
+      .default("UNKNOWN"),
+    has_printer: z.boolean().default(false),
+    has_rfid_reader: z.boolean().default(false),
+    has_barcode_scanner: z.boolean().default(false),
+    has_camera: z.boolean().default(true),
+  })
+  .meta({ id: "DeviceCapabilities" });
 
 export const DeviceContextSchema = z
   .object({
@@ -82,6 +102,11 @@ export const DeviceContextSchema = z
       .nullable()
       .meta({ description: "warehouse=仓库 / shop=门店" }),
     location_name: z.string().nullable().meta({ example: "总仓" }),
+    device_capabilities: DeviceCapabilities.meta({
+      description: "v1.2：设备能力。后台未设置时全字段走默认值",
+    }),
+    app_version: z.string().nullable(),
+    os_version: z.string().nullable(),
   })
   .meta({ id: "DeviceContext" });
 
@@ -178,6 +203,16 @@ export const StocktakeOpenReq = z
   .object({ name: z.string().optional().meta({ description: "可选备注" }) })
   .meta({ id: "StocktakeOpenReq" });
 
+export const StocktakeParticipant = z
+  .object({
+    device_id: uuidSchema,
+    device_code: z.string().nullable(),
+    label: z.string().nullable(),
+    scan_count: z.number().int(),
+    last_scan_at: z.string().datetime().nullable(),
+  })
+  .meta({ id: "StocktakeParticipant" });
+
 export const StocktakeSummarySchema = z
   .object({
     id: uuidSchema,
@@ -187,6 +222,10 @@ export const StocktakeSummarySchema = z
     reused: z
       .boolean()
       .meta({ description: "true=复用了同库位的已开盘点单；false=新建" }),
+    participants: z
+      .array(StocktakeParticipant)
+      .default([])
+      .meta({ description: "v1.2：当前正在协作的 PDA 列表（按最近扫描时间）" }),
   })
   .meta({ id: "StocktakeSummary" });
 
@@ -196,6 +235,7 @@ export const StocktakeScanReq = z
   .object({
     stocktake_id: uuidSchema,
     epcs: z.array(epcSchema).min(1).max(1000),
+    client_op_id: ClientOpId.optional(),
   })
   .meta({ id: "StocktakeScanReq" });
 
@@ -204,6 +244,7 @@ export const StocktakeScanRes = okEnvelope(
     received: z.number().int(),
     unknown_count: z.number().int(),
     unknown: z.array(epcSchema),
+    participants: z.array(StocktakeParticipant).default([]),
   }),
 );
 
@@ -265,6 +306,9 @@ export const LoginReq = z
   .object({
     email: z.string().email(),
     password: z.string().min(1),
+    capabilities: DeviceCapabilities.optional(),
+    app_version: z.string().max(40).optional(),
+    os_version: z.string().max(40).optional(),
   })
   .meta({ id: "LoginReq" });
 
@@ -326,13 +370,27 @@ const INV_CATEGORY = z.enum([
   "antique",
 ]);
 
-export const AiRecognizeReq = z
+export const AiRecognizeImage = z
   .object({
     image_url: z.string().url().optional(),
     image_base64: z.string().optional(),
+  })
+  .refine((v) => v.image_url || v.image_base64, {
+    message: "image_url 或 image_base64 必传其一",
+  });
+
+export const AiRecognizeReq = z
+  .object({
+    // 单图字段（向后兼容旧 APP）
+    image_url: z.string().url().optional(),
+    image_base64: z.string().optional(),
+    // v1.2 多图：最多 4 张。images[0] 为主图。
+    images: z.array(AiRecognizeImage).min(1).max(4).optional(),
     hint: z.string().optional().meta({ description: "店员补充提示，可选" }),
   })
-  .refine((v) => v.image_url || v.image_base64, { message: "image_url 或 image_base64 必传其一" })
+  .refine((v) => v.image_url || v.image_base64 || (v.images && v.images.length > 0), {
+    message: "image_url / image_base64 / images 至少传一项",
+  })
   .meta({ id: "AiRecognizeReq" });
 
 export const AiRecognizeRes = okEnvelope(
@@ -412,8 +470,20 @@ export const SmartCreateReq = z
     weight_g: z.number().nullable().optional(),
     epcs: z.array(epcSchema).max(50).optional().meta({ description: "已打好标签则一并绑定" }),
     auto_push_youzan: z.boolean().default(false).meta({ description: "默认 false，APP 给开关；true 时入库存同步队列" }),
+    client_op_id: ClientOpId.optional(),
   })
   .meta({ id: "SmartCreateReq" });
+
+/** v1.2：扁平打印 payload，APP 自渲染 ZPL/ESC-POS。 */
+export const PrintPayloadSchema = z
+  .object({
+    sku_code: z.string().nullable(),
+    barcode: z.string().nullable(),
+    title_short: z.string().meta({ description: "<=24 字符截断" }),
+    price_tag: z.string().meta({ example: "¥699" }),
+    grade: z.string().nullable(),
+  })
+  .meta({ id: "PrintPayload" });
 
 export const SmartCreateRes = okEnvelope(
   z.object({
@@ -435,6 +505,7 @@ export const SmartCreateRes = okEnvelope(
       location_name: z.string().nullable(),
       qrcode_payload: z.string(),
     }),
+    print_payload: PrintPayloadSchema.meta({ description: "v1.2：扁平结构，直接灌打印模板" }),
     youzan_sync_status: z.enum(["disabled", "queued", "linked", "unlinked"]),
   }),
 );
@@ -475,6 +546,7 @@ export const RfidBindReq = z
     epc: epcSchema,
     sku_id: uuidSchema,
     location_id: uuidSchema.optional().meta({ description: "默认设备所在库位" }),
+    client_op_id: ClientOpId.optional(),
   })
   .meta({ id: "RfidBindReq" });
 
@@ -487,6 +559,7 @@ export const RfidTransferReq = z
     epc: epcSchema,
     to_location_id: uuidSchema,
     reason: z.string().max(120).optional(),
+    client_op_id: ClientOpId.optional(),
   })
   .meta({ id: "RfidTransferReq" });
 
@@ -501,6 +574,7 @@ export const RfidTransferRes = okEnvelope(
 export const RfidStockInReq = z
   .object({
     epcs: z.array(epcSchema).min(1).max(500),
+    client_op_id: ClientOpId.optional(),
   })
   .meta({ id: "RfidStockInReq" });
 
@@ -567,7 +641,85 @@ export const SkuDetailRes = okEnvelope(
         qty: z.number().int(),
       }),
     ),
+    print_payload: PrintPayloadSchema.meta({ description: "v1.2：扁平打印 payload" }),
   }),
 );
+
+// ============================================================
+// 14. v1.2：离线批量入库 / 通知轮询 / 诊断上报
+// ============================================================
+
+export const RfidBatchStockInReq = z
+  .object({
+    ops: z
+      .array(
+        z.object({
+          client_op_id: ClientOpId,
+          epcs: z.array(epcSchema).min(1).max(500),
+          scanned_at: z.string().datetime().optional(),
+        }),
+      )
+      .min(1)
+      .max(50),
+  })
+  .meta({ id: "RfidBatchStockInReq" });
+
+export const RfidBatchStockInRes = okEnvelope(
+  z.object({
+    results: z.array(
+      z.object({
+        client_op_id: ClientOpId,
+        replayed: z.boolean(),
+        queued: z.number().int(),
+        already_bound: z.array(z.object({ epc: epcSchema, sku_id: uuidSchema })),
+      }),
+    ),
+  }),
+);
+
+export const NotificationKind = z.enum([
+  "stocktake_assigned",
+  "transfer_incoming",
+  "youzan_sync_failed",
+  "unclaimed_epc_pending",
+  "system",
+]);
+
+export const NotificationsSinceQuery = z
+  .object({
+    ts: z.string().datetime().optional().meta({ description: "上次拉取的 server_ts；空=最近 50 条" }),
+    limit: z.coerce.number().int().min(1).max(200).default(50),
+  })
+  .meta({ id: "NotificationsSinceQuery" });
+
+export const NotificationItem = z
+  .object({
+    id: uuidSchema,
+    kind: NotificationKind,
+    title: z.string().nullable(),
+    payload: z.record(z.string(), z.unknown()),
+    ts: z.string().datetime(),
+  })
+  .meta({ id: "NotificationItem" });
+
+export const NotificationsSinceRes = okEnvelope(
+  z.object({
+    items: z.array(NotificationItem),
+    server_ts: z.string().datetime().meta({ description: "下次请求把它当成 ts" }),
+  }),
+);
+
+export const DiagReportReq = z
+  .object({
+    kind: z.enum(["crash", "network", "api_error", "device"]),
+    message: z.string().min(1).max(4000),
+    payload: z.record(z.string(), z.unknown()).optional(),
+    app_version: z.string().max(40).optional(),
+    os_version: z.string().max(40).optional(),
+  })
+  .meta({ id: "DiagReportReq" });
+
+export const DiagReportRes = okEnvelope(z.object({ id: uuidSchema }));
+
 
 

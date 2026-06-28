@@ -12,11 +12,23 @@ export const Route = createFileRoute("/api/public/handheld/auth/login")({
         const auth = await authenticateDevice(request);
         if (!auth.ok) return auth.response;
 
-        let body: { email: string; password: string };
+        let body: ReturnType<typeof LoginReq.parse>;
         try {
           body = LoginReq.parse(await request.json());
         } catch (e) {
           return err("Invalid body", 400, { detail: String(e) });
+        }
+
+        // 同步设备硬件能力/版本（如果带了的话）
+        if (body.capabilities || body.app_version || body.os_version) {
+          const patch: Record<string, unknown> = {};
+          if (body.capabilities) patch.capabilities = body.capabilities;
+          if (body.app_version) patch.app_version = body.app_version;
+          if (body.os_version) patch.os_version = body.os_version;
+          await supabaseAdmin
+            .from("inv_handheld_devices" as never)
+            .update(patch as never)
+            .eq("id", auth.device.id);
         }
 
         const sb = createClient(
