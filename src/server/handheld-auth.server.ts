@@ -4,10 +4,11 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 export const HANDHELD_CORS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, X-Device-Token",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, X-Device-Token, X-Session-Token, Authorization",
   "Access-Control-Max-Age": "86400",
 };
+
 
 export function json(body: unknown, init: ResponseInit = {}) {
   return new Response(JSON.stringify(body), {
