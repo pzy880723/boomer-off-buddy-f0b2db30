@@ -9,6 +9,8 @@ import {
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { SmartCreateReq } from "@/lib/handheld/schemas";
 import { generateEpc, generateSkuCode } from "@/lib/inventory.helpers";
+import { buildPrintPayload } from "@/server/handheld-print.server";
+import { replayIfPresent, recordOp, jsonReplay } from "@/server/handheld-idempotency.server";
 
 export const Route = createFileRoute("/api/public/handheld/items/smart-create")({
   server: {
