@@ -238,9 +238,118 @@ Token 由后台 **仓库管理 → 手持终端** 页面创建/复制。设备�
   },
 };
 
+    "/api/public/handheld/auth/login": {
+      post: {
+        tags: ["账号"],
+        summary: "操作员登录（邮箱 + 密码）",
+        description:
+          "复用 ERP 后台 Supabase 账号体系。返回 access_token，APP 后续可放到 `X-Session-Token` Header 让 ERP 关联操作员；同时返回所有 active 库位列表，APP 让店员选当前操作库位。",
+        requestBody: jsonBody(LoginReq),
+        responses: { "200": jsonRes("OK", LoginRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/locations": {
+      get: {
+        tags: ["账号"],
+        summary: "列出所有 active 库位",
+        responses: { "200": jsonRes("OK", LocationsRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/location/switch": {
+      post: {
+        tags: ["账号"],
+        summary: "切换当前设备绑定的库位",
+        description: "更新 `inv_handheld_devices.default_location_id`。",
+        requestBody: jsonBody(LocationSwitchReq),
+        responses: { "200": jsonRes("OK", LocationSwitchRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/ai/recognize-item": {
+      post: {
+        tags: ["AI"],
+        summary: "拍照识别商品 → 结构化字段",
+        description:
+          "多模态识别。默认模型 `google/gemini-2.5-pro`，走 Lovable AI Gateway。返回 name / category / brand / era / condition_grade / description / suggested_price_cny。不确定的字段为 null。",
+        requestBody: jsonBody(AiRecognizeReq),
+        responses: { "200": jsonRes("OK", AiRecognizeRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/ai/prepare-listing-image": {
+      post: {
+        tags: ["AI"],
+        summary: "原图 → 上架主图",
+        description:
+          "默认模型 `google/gemini-3.1-flash-image`（Nano Banana 2）。只做角度/裁切/底色/光线修正，不改商品本体。生成后写入 `sku-listing` 私桶并返回 7 天 signed URL。",
+        requestBody: jsonBody(AiListingImageReq),
+        responses: { "200": jsonRes("OK", AiListingImageRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/items/upload-image": {
+      post: {
+        tags: ["图片"],
+        summary: "申请图片直传 signed URL",
+        description:
+          "APP 先调本接口拿到 `upload_url` + `headers`，再用 `PUT` 直接把图片传到 Storage，避免大图穿过 ERP。返回的 `read_url` 是 7 天 signed GET URL，可直接用于 smart-create。",
+        requestBody: jsonBody(UploadImageReq),
+        responses: { "200": jsonRes("OK", UploadImageRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/items/smart-create": {
+      post: {
+        tags: ["商品"],
+        summary: "智能上架（建 SKU + 入库存 + 绑 EPC + 入有赞队列）",
+        description:
+          "如果已经存在 (category, price_tier, name) 完全相同的 SKU，会复用并 +1；否则新建。`epcs` 可选，传了就一并绑定到这个 SKU。`auto_push_youzan` 默认 false，对齐 ERP 现行「手动推送 + 人工绑定」策略；true 时若 SKU 已有有赞绑定则入 `youzan_stock_sync_queue`，否则返回 `unlinked`。返回的 `label` 字段供 APP 自渲染打印。",
+        requestBody: jsonBody(SmartCreateReq),
+        responses: { "200": jsonRes("OK", SmartCreateRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/items/{id}/sync-status": {
+      get: {
+        tags: ["商品"],
+        summary: "查 SKU 在各有赞店铺的同步状态",
+        requestParams: { path: z.object({ id: z.string().uuid() }) },
+        responses: { "200": jsonRes("OK", SyncStatusRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/rfid/{epc}": {
+      get: {
+        tags: ["RFID"],
+        summary: "按 EPC 查 SKU + 当前库位（等价 sku/by-epc，URL 风格不同）",
+        requestParams: { path: z.object({ epc: z.string() }) },
+        responses: { "200": jsonRes("OK", SkuByEpcRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/rfid/bind-item": {
+      post: {
+        tags: ["RFID"],
+        summary: "把单个 EPC 绑到指定 SKU 并入库 +1",
+        description:
+          "用于「待认领 EPC」现场认领，或新打的标签直接绑到已有 SKU。会同时从 `inv_unclaimed_epcs` 移除。",
+        requestBody: jsonBody(RfidBindReq),
+        responses: { "200": jsonRes("OK", RfidBindRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/rfid/transfer-location": {
+      post: {
+        tags: ["RFID"],
+        summary: "把单个 EPC 直接换库位（现场纠错）",
+        description:
+          "对应「这件东西被人挪到别的库位但没走调拨单」的情况。生成成对的 -1 / +1 movement。批量调拨请用 `transfer/*` 系列。",
+        requestBody: jsonBody(RfidTransferReq),
+        responses: { "200": jsonRes("OK", RfidTransferRes), ...ERROR_RESPONSES },
+      },
+    },
+  },
+};
+
 let cached: ReturnType<typeof createDocument> | null = null;
 
 export function buildHandheldOpenApi() {
+  if (!cached) cached = createDocument(document);
+  return cached;
+}
+
   if (!cached) cached = createDocument(document);
   return cached;
 }
