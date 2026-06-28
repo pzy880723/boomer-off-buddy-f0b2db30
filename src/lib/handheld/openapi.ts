@@ -53,16 +53,17 @@ import {
 
 
 
-const SECURITY = [{ DeviceToken: [] }];
+const SECURITY = [{ DeviceToken: [], SessionToken: [] }];
 
 const ERROR_RESPONSES = {
-  "400": { description: "入参不合法", content: { "application/json": { schema: ErrorResponse } } },
-  "401": { description: "缺少 / 无效 token", content: { "application/json": { schema: ErrorResponse } } },
-  "403": { description: "设备被停用 / 库位/角色不匹配", content: { "application/json": { schema: ErrorResponse } } },
-  "404": { description: "资源不存在", content: { "application/json": { schema: ErrorResponse } } },
-  "409": { description: "状态冲突", content: { "application/json": { schema: ErrorResponse } } },
-  "422": { description: "校验失败（数量不一致等）", content: { "application/json": { schema: ErrorResponse } } },
-  "500": { description: "服务端错误", content: { "application/json": { schema: ErrorResponse } } },
+  "400": { description: "入参不合法（code: invalid_body / validation_error）", content: { "application/json": { schema: ErrorResponse } } },
+  "401": { description: "缺少 / 无效 token（code: unauthorized）", content: { "application/json": { schema: ErrorResponse } } },
+  "403": { description: "设备被停用 / 库位/角色不匹配（code: unauthorized_location）", content: { "application/json": { schema: ErrorResponse } } },
+  "404": { description: "资源不存在（code: not_found / unlinked）", content: { "application/json": { schema: ErrorResponse } } },
+  "409": { description: "状态冲突（code: already_exists / transfer_required）", content: { "application/json": { schema: ErrorResponse } } },
+  "422": { description: "校验失败（数量不一致等，code: validation_error）", content: { "application/json": { schema: ErrorResponse } } },
+  "429": { description: "限流（code: rate_limited / ai_credits_exhausted）", content: { "application/json": { schema: ErrorResponse } } },
+  "500": { description: "服务端错误（code: internal_error）", content: { "application/json": { schema: ErrorResponse } } },
 };
 
 const jsonBody = (schema: z.ZodType) => ({ content: { "application/json": { schema } } });
