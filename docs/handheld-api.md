@@ -45,7 +45,10 @@
 
 > 鉴权说明：所有接口默认 `X-Device-Token`；走 `/auth/login` 后，APP 可附带 `X-Session-Token: <access_token>` 让 ERP 关联操作员审计。
 >
-> AI / 图片接口约定：图片永远以「签名 URL」形式在 APP 和 ERP 之间传递，不在 JSON body 里塞 base64。
+> **AI / 图片接口图片传递**：`/ai/recognize-item` 和 `/ai/prepare-listing-image` 入参同时支持 `image_url`、`image_base64`，`recognize-item` 还支持 `images[]`（最多 4 张，每张二选一）。
+> - **MVP / 真机调试**：直接传 `image_base64`（建议先在 APP 端把图压到 ≤ 4MB / 长边 ≤ 1600px 再 base64）。
+> - **生产推荐**：APP 先调 `/items/upload-image` 拿 signed PUT URL，把原图直传到 `sku-raw` 桶，再把返回的 signed GET URL 作为 `image_url` 传给 AI 接口，避免大图塞在 JSON body 里。
+> - `/ai/prepare-listing-image` 永远返回 `{ storage_path, signed_url, mime_type }`（signed URL 7 天有效，桶 `sku-listing` 私有）。APP 用 `signed_url` 下载/展示/打印上架主图。
 
 详细 schema、示例、错误码请见在线文档。
 
