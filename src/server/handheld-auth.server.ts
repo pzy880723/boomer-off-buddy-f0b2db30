@@ -29,6 +29,38 @@ export function err(message: string, status = 400, extra?: Record<string, unknow
   return json({ ok: false, error: message, ...(extra || {}) }, { status });
 }
 
+export type DeviceCapabilities = {
+  reader_model: "SUNMI_V3" | "RFID_PDA" | "UNKNOWN";
+  has_printer: boolean;
+  has_rfid_reader: boolean;
+  has_barcode_scanner: boolean;
+  has_camera: boolean;
+};
+
+const DEFAULT_DEVICE_CAPABILITIES: DeviceCapabilities = {
+  reader_model: "UNKNOWN",
+  has_printer: false,
+  has_rfid_reader: false,
+  has_barcode_scanner: false,
+  has_camera: true,
+};
+
+function normalizeCapabilities(raw: unknown): DeviceCapabilities {
+  if (!raw || typeof raw !== "object") return { ...DEFAULT_DEVICE_CAPABILITIES };
+  const r = raw as Record<string, unknown>;
+  const reader = r.reader_model;
+  return {
+    reader_model:
+      reader === "SUNMI_V3" || reader === "RFID_PDA" || reader === "UNKNOWN"
+        ? reader
+        : "UNKNOWN",
+    has_printer: r.has_printer === true,
+    has_rfid_reader: r.has_rfid_reader === true,
+    has_barcode_scanner: r.has_barcode_scanner === true,
+    has_camera: r.has_camera !== false,
+  };
+}
+
 export type DeviceContext = {
   id: string;
   device_code: string;
@@ -36,6 +68,9 @@ export type DeviceContext = {
   location_id: string | null;
   location_kind: "warehouse" | "shop" | null;
   location_name: string | null;
+  device_capabilities: DeviceCapabilities;
+  app_version: string | null;
+  os_version: string | null;
 };
 
 export async function authenticateDevice(request: Request): Promise<
@@ -49,7 +84,7 @@ export async function authenticateDevice(request: Request): Promise<
   const { data, error } = await supabaseAdmin
     .from("inv_handheld_devices")
     .select(
-      "id, device_code, label, default_location_id, is_active, location:inv_locations!default_location_id(id, kind, name)"
+      "id, device_code, label, default_location_id, is_active, capabilities, app_version, os_version, location:inv_locations!default_location_id(id, kind, name)" as never,
     )
     .eq("token", token)
     .maybeSingle();
@@ -57,14 +92,14 @@ export async function authenticateDevice(request: Request): Promise<
   if (error || !data) {
     return { ok: false, response: err("Invalid token", 401) };
   }
-  if (!data.is_active) {
+  if (!(data as any).is_active) {
     return { ok: false, response: err("Device disabled", 403) };
   }
   // Best-effort heartbeat
   void supabaseAdmin
     .from("inv_handheld_devices")
     .update({ last_seen_at: new Date().toISOString() })
-    .eq("id", data.id);
+    .eq("id", (data as any).id);
 
   const loc = (data as any).location as
     | { id: string; kind: "warehouse" | "shop"; name: string }
@@ -73,12 +108,15 @@ export async function authenticateDevice(request: Request): Promise<
   return {
     ok: true,
     device: {
-      id: data.id as string,
-      device_code: data.device_code as string,
-      label: data.label as string,
+      id: (data as any).id as string,
+      device_code: (data as any).device_code as string,
+      label: (data as any).label as string,
       location_id: loc?.id ?? null,
       location_kind: loc?.kind ?? null,
       location_name: loc?.name ?? null,
+      device_capabilities: normalizeCapabilities((data as any).capabilities),
+      app_version: ((data as any).app_version as string | null) ?? null,
+      os_version: ((data as any).os_version as string | null) ?? null,
     },
   };
 }
