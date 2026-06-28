@@ -357,6 +357,48 @@ Token 由后台 **仓库管理 → 手持终端** 页面创建/复制。设备�
         responses: { "200": jsonRes("OK", RfidTransferRes), ...ERROR_RESPONSES },
       },
     },
+    "/api/public/handheld/rfid/stock-in": {
+      post: {
+        tags: ["RFID"],
+        summary: "裸 EPC 入库到待认领队列",
+        description:
+          "扫到一批未绑定 SKU 的标签时调用。已绑定的 EPC 会在 `already_bound` 里返回，APP 应改走 inbound/scan 或 transfer-location。",
+        requestBody: jsonBody(RfidStockInReq),
+        responses: { "200": jsonRes("OK", RfidStockInRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/auth/refresh": {
+      post: {
+        tags: ["账号"],
+        summary: "用 refresh_token 换新的 access_token",
+        description: "access_token 有效期 2 小时；refresh_token 由 Supabase 维护。",
+        requestBody: jsonBody(AuthRefreshReq),
+        responses: { "200": jsonRes("OK", AuthRefreshRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/auth/me": {
+      get: {
+        tags: ["账号"],
+        summary: "当前设备 + 操作员上下文",
+        description: "未带 X-Session-Token 时 user=null，APP 可以提示重新登录。",
+        responses: { "200": jsonRes("OK", AuthMeRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/auth/logout": {
+      post: {
+        tags: ["账号"],
+        summary: "登出当前操作员（吊销 session）",
+        responses: { "200": jsonRes("OK", AuthPingRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/items/{id}": {
+      get: {
+        tags: ["商品"],
+        summary: "SKU 详情（含 barcode / condition_grade / 多库位库存）",
+        requestParams: { path: z.object({ id: z.string().uuid() }) },
+        responses: { "200": jsonRes("OK", SkuDetailRes), ...ERROR_RESPONSES },
+      },
+    },
   },
 };
 
