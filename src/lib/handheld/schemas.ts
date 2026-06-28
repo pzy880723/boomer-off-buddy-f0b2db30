@@ -638,7 +638,85 @@ export const SkuDetailRes = okEnvelope(
         qty: z.number().int(),
       }),
     ),
+    print_payload: PrintPayloadSchema.meta({ description: "v1.2：扁平打印 payload" }),
   }),
 );
+
+// ============================================================
+// 14. v1.2：离线批量入库 / 通知轮询 / 诊断上报
+// ============================================================
+
+export const RfidBatchStockInReq = z
+  .object({
+    ops: z
+      .array(
+        z.object({
+          client_op_id: ClientOpId,
+          epcs: z.array(epcSchema).min(1).max(500),
+          scanned_at: z.string().datetime().optional(),
+        }),
+      )
+      .min(1)
+      .max(50),
+  })
+  .meta({ id: "RfidBatchStockInReq" });
+
+export const RfidBatchStockInRes = okEnvelope(
+  z.object({
+    results: z.array(
+      z.object({
+        client_op_id: ClientOpId,
+        replayed: z.boolean(),
+        queued: z.number().int(),
+        already_bound: z.array(z.object({ epc: epcSchema, sku_id: uuidSchema })),
+      }),
+    ),
+  }),
+);
+
+export const NotificationKind = z.enum([
+  "stocktake_assigned",
+  "transfer_incoming",
+  "youzan_sync_failed",
+  "unclaimed_epc_pending",
+  "system",
+]);
+
+export const NotificationsSinceQuery = z
+  .object({
+    ts: z.string().datetime().optional().meta({ description: "上次拉取的 server_ts；空=最近 50 条" }),
+    limit: z.coerce.number().int().min(1).max(200).default(50),
+  })
+  .meta({ id: "NotificationsSinceQuery" });
+
+export const NotificationItem = z
+  .object({
+    id: uuidSchema,
+    kind: NotificationKind,
+    title: z.string().nullable(),
+    payload: z.record(z.string(), z.unknown()),
+    ts: z.string().datetime(),
+  })
+  .meta({ id: "NotificationItem" });
+
+export const NotificationsSinceRes = okEnvelope(
+  z.object({
+    items: z.array(NotificationItem),
+    server_ts: z.string().datetime().meta({ description: "下次请求把它当成 ts" }),
+  }),
+);
+
+export const DiagReportReq = z
+  .object({
+    kind: z.enum(["crash", "network", "api_error", "device"]),
+    message: z.string().min(1).max(4000),
+    payload: z.record(z.string(), z.unknown()).optional(),
+    app_version: z.string().max(40).optional(),
+    os_version: z.string().max(40).optional(),
+  })
+  .meta({ id: "DiagReportReq" });
+
+export const DiagReportRes = okEnvelope(z.object({ id: uuidSchema }));
+
 
 
