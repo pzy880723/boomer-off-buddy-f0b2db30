@@ -24,8 +24,15 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
         try {
           body = SmartCreateReq.parse(await request.json());
         } catch (e) {
-          return err("Invalid body", 400, { detail: String(e) });
+          return err("Invalid body", 400, { code: "validation_error", detail: String(e) });
         }
+        // 幂等回放
+        const replay = await replayIfPresent({
+          deviceId: auth.device.id,
+          clientOpId: body.client_op_id,
+          opType: "items.smart-create",
+        });
+        if (replay) return jsonReplay(replay);
         const session = await resolveSessionUser(request);
         const locationId = body.location_id ?? auth.device.location_id;
         if (!locationId) return err("No target location (device unbound and no location_id given)", 400);
