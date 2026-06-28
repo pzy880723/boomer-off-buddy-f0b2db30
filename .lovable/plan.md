@@ -1,105 +1,156 @@
-## 目标
 
-把现有 `/api/public/handheld/*` 11 条接口收敛成 **OpenAPI 单一真源**：服务端 Zod schema 是唯一定义，文档站和 APP 端 SDK 都从它自动生成。改字段时只动一个地方，CI 防止漂移。
+# 给 codex 的 ERP 对接交付方案
 
-## 架构
+按 codex 给的链路（APP → ERP → 有赞）落地。ERP 这边补齐 APP 需要的所有接口，AI 与有赞同步都封在 ERP 内部，APP 不直接触达。
 
-```text
-   [ src/lib/handheld/schemas.ts ]   ← 唯一真源（Zod）
-            │
-   ┌────────┼─────────────────────┐
-   │        │                     │
-   ▼        ▼                     ▼
-路由 handler   生成 openapi.json    生成 APP SDK
-(运行时校验)   (构建产物)          (TS/Dart/Kotlin)
-   │              │
-   │              ▼
-   │     /api-docs (Scalar UI)
-   │              ▲
-   └─── 同源部署，APP 直接读 ────┘
+---
+
+## 一、现状与差距
+
+ERP 已有（`/api/public/handheld/*`，详见 `/api-docs`）：
+- `auth/ping`、`sku/by-epc`、`sku/search`
+- `inbound/scan`（仓库自动入库）
+- `stocktake/open|scan|submit`
+- `transfer/ship-scan|ship-confirm|receive-scan|receive-confirm`
+
+鉴权：`X-Device-Token`，token 已绑定库位（warehouse / shop）。
+
+差距（codex 要的）：
+1. 账号登录（人 + 设备，目前只有设备 token）
+2. 当前操作库位切换（一台设备绑多个门店时）
+3. 智能上架：拍照 → AI 识别 → 生成上架图 → 人工确认 → 建 SKU → 入库 → 绑 EPC → 同步有赞
+4. 图片上传通道（直传到 Lovable Cloud Storage）
+5. 标签数据返回（条码/编码/价格）
+6. 有赞同步状态查询
+
+---
+
+## 二、新增接口（全部走 `/api/public/handheld/*`，Zod schema 写在 `src/lib/handheld/schemas.ts`，自动进 `/api-docs` 和 SDK）
+
+### 1. 账号 / 库位
+
+- `POST auth/login` — 入参 `{ username, password, device_code }`，返回用户 + 该用户可操作的库位列表 + 新的 `session_token`（短期）。设备 token 继续负责设备身份，session token 叠加人的身份。
+- `GET locations` — 当前账号可见的所有 warehouse / shop。
+- `POST location/switch` — 入参 `{ location_id }`；之后所有写操作默认落到这个库位。
+
+### 2. 智能上架（核心新链路）
+
+```
+POST ai/recognize-item        # 多模态识别 → 结构化字段
+POST ai/prepare-listing-image # 出上架主图（裁切/正光/净底，不改商品本体）
+POST items/upload-image       # 直传图片到 Storage，返回 URL
+POST items/smart-create       # 建 SKU + 落库存 + 绑 EPC + 推有赞队列
+GET  items/{id}/sync-status   # 查有赞同步状态
 ```
 
-## 实施步骤
+`items/smart-create` 入参 / 出参按 codex 给的版本对齐，额外补 `epcs?: string[]`（已打标签就直接绑），`auto_push_youzan: boolean`（默认 false，对齐既有「手动推送」策略）。出参回 `item_code` / `barcode` / `youzan_sync_status`，APP 拿到立即打印标签。
 
-### 1. 抽取 Zod schema 到 `src/lib/handheld/schemas.ts`
+### 3. RFID / EPC 单点操作（补现有缺口）
 
-把现在散落在 11 个路由文件里的 `inputValidator` 全部收回这一个文件，按接口命名导出，例如：
+- `GET rfid/{epc}` — 已有 `sku/by-epc` 的同语义薄包装，方便 APP 路由
+- `POST rfid/bind-item` — `{ epc, sku_id, location_id }`，把待认领 EPC 绑到 SKU
+- `POST rfid/transfer-location` — 单 EPC 直接改 current_location（仅 admin 设备允许，用于现场纠错）
 
-- `InboundScanReq` / `InboundScanRes`
-- `SkuByEpcReq` / `SkuByEpcRes`
-- `StocktakeOpenReq` / `StocktakeOpenRes`
-- `TransferShipScanReq` / `TransferShipScanRes`
-- … 共 11 组
+注：批量入库、调拨、盘点已经存在，不重复造。
 
-每个 schema 用 `.describe()` 标注字段含义、用 `.openapi({ example })` 标注示例（通过 `zod-openapi` 扩展）。路由文件改成 `import { InboundScanReq } from "@/lib/handheld/schemas"`，不再写本地 schema。
+---
 
-### 2. 用 `zod-openapi` 生成 OpenAPI 3.1 文档
+## 三、AI 选型
 
-新增 `src/lib/handheld/openapi.ts`：注册所有 schema + 路径，输出 `OpenAPIObject`。包含：
+封装统一 `aiRecognizeItem` / `aiPrepareListingImage` server fn，模型从 env 配置切换，APP 只看到 ERP 接口。
 
-- 全局 `securitySchemes`：`X-Device-Token`（apiKey in header）
-- 公共错误模型：`ErrorResponse { error: string, code?: string }`
-- 每条路由的 method / path / 请求 / 响应 / 401·403·422 错误
-- `servers`：production = `https://boomer-off-buddy.lovable.app`，preview = `https://project--2158bffa-7f82-4bc6-9df9-c59319d262f7-dev.lovable.app`
+- 识别（结构化字段）：默认 `google/gemini-2.5-pro`（已是项目里的多模态主力，走 Lovable AI Gateway，不需要单独配置 key）。
+- 上架图修整：默认 `google/gemini-3.1-flash-image`（Nano Banana 2，编辑能力强、速度快）；备选 `openai/gpt-image-2`。
+- 国内链路（Qwen / Wan）暂不接，留 adapter 接口，后面要切换只改 provider 文件。
 
-### 3. 在线文档站
-
-- 新增路由 `src/routes/api/public/handheld/openapi.json.ts` —— 返回上一步生成的 JSON（公开、可缓存）。
-- 新增路由 `src/routes/api-docs.tsx` —— 用 [Scalar API Reference](https://github.com/scalar/scalar)（比 Swagger UI 更现代、支持暗色主题，单个 React 组件挂载）渲染 `/api/public/handheld/openapi.json`。提供"复制 curl"、在线调试、按 Tag 分组（鉴权/入库/SKU/盘点/调拨）。
-- 在登录后台的侧边栏加一个"API 文档"入口指向 `/api-docs`。
-
-### 4. 自动生成 APP SDK
-
-加 npm script `bun run sdk:gen`：
-
-```text
-openapi.json ──┐
-               ├─► openapi-typescript    → sdk/ts/api.d.ts  (TS APP)
-               ├─► openapi-generator-cli → sdk/dart/        (Flutter APP)
-               └─► openapi-generator-cli → sdk/kotlin/      (Android 原生)
+输出 schema（识别）：
+```
+{ name, category, brand, era, condition_grade, description, suggested_price_cny? }
 ```
 
-产物落在 `sdk/` 目录（gitignored 或单独仓库）。你 APP 工程里 `bun add` / `pub add` 引用即可，业务字段全部带类型。
+修图约束写进 system prompt：只做角度/裁切/底色/光线，禁止改 logo、文字、瑕疵、配件数量。
 
-### 5. CI 防漂移
+---
 
-加 `bun run sdk:check`：重新生成 openapi.json，跟仓库里上次提交的 `openapi.snapshot.json` diff。如果不一致就 fail，提示"接口契约变更，请同步运行 `bun run sdk:gen` 并通知 APP 端"。这是关键的"两端字段同步"保险。
+## 四、数据/落库
 
-### 6. 版本与兼容策略（给未来改字段用）
+复用现有表，不新增主表：
 
-- URL 不带版本号；用 `info.version`（semver）+ 响应 header `X-API-Version` 标记。
-- **加字段**：直接加，可选字段，老 APP 忽略 → 不算破坏。
-- **改/删字段**：先在 schema 加 `.deprecated()`，文档站自动标红；过渡期同时返回新旧字段；APP 升级后下个版本删除。
-- 破坏性变更（极少）：新增并行路由 `/v2/...`，老路由保留 ≥1 个 APP 版本周期。
+- `inv_skus` — 智能上架直接写这里（kind=single 默认）
+- `inv_epcs` — `rfid/bind-item` 写入
+- `inv_stocks` — `smart-create` 同时 +1
+- `sku_youzan_links` + `youzan_stock_sync_queue` — 已有，`auto_push_youzan=true` 时入队
 
-### 7. 鉴权强化（顺便）
+新增轻量表：
+- `handheld_sessions(id, user_id, device_id, current_location_id, expires_at)` — 支持人 + 设备 + 当前库位三元组
+- `handheld_users(id, username, password_hash, role, allowed_location_ids[])`（也可复用现有 auth.users + user_roles，按当前 user-roles 规范走，**优先复用，不另起一套**）
 
-现在 `X-Device-Token` 是明文 UUID。建议同期：
-- token 改 hash 存表（设备首次拿到后服务端只存 hash）。
-- 加 `inv_handheld_devices.last_seen_at` 自动写入。
-- 文档站的"试一试"用一个只读的演示 token，避免泄漏生产 token。
+倾向：**复用 Supabase auth + user_roles**，`auth/login` 内部走 supabase 邮箱/手机号登录，session token = supabase access_token。这样后台用户和手持用户是同一套人。
 
-## 交付清单
+---
 
-新增文件：
-- `src/lib/handheld/schemas.ts` —— 所有 Zod 真源
-- `src/lib/handheld/openapi.ts` —— OpenAPI 文档生成器
-- `src/routes/api/public/handheld/openapi.json.ts` —— 对外 JSON
-- `src/routes/api-docs.tsx` —— Scalar 在线文档
-- `scripts/gen-sdk.ts` —— 生成 TS/Dart/Kotlin SDK
-- `scripts/check-openapi-drift.ts` —— CI 漂移检查
-- `openapi.snapshot.json` —— 当前契约快照（提交到 git）
+## 五、图片存储
 
-修改文件：
-- `src/routes/api/public/handheld/*.ts` × 11 —— 改用 `@/lib/handheld/schemas` 共享 schema
-- `docs/handheld-api.md` —— 改成一行：跳转 `/api-docs`
-- `src/components/app-sidebar.tsx` —— 加一个"API 文档"入口
-- `package.json` —— 加 `sdk:gen` / `sdk:check` script
-- `bun add zod-openapi @scalar/api-reference-react openapi-typescript`
+用 Lovable Cloud Storage（Supabase Storage），bucket：
+- `sku-raw/` — 店员原图（private）
+- `sku-listing/` — AI 生成的上架图（public，给有赞用）
 
-## 给你的建议
+`items/upload-image` 后端签发 signed URL，APP 直传，不走 ERP 中转，避免大图打爆。
 
-1. **OpenAPI 比手写 Markdown 强 10 倍**，但前提是 schema 真的成为唯一真源——路由文件不能再单独定义 Zod。第 1 步必须做彻底。
-2. **不建议搞独立中转网关**：你的后端已经在 Cloudflare Workers 边缘上，再套一层只增加延迟、运维和鉴权同步成本。同源直出 + 在线文档 + 生成 SDK 已经完全覆盖你说的需求。
-3. **APP 端配合**：建议 APP 仓库加一条 CI，定期拉 `https://你的域名/api/public/handheld/openapi.json` 跟本地 SDK 比 hash，不一致就阻塞发版——这样字段漂移在 APP 这一侧也兜得住。
-4. 后续若要加"日本小包查询"或"商品列表只读 API"，只需要往 `schemas.ts` + `openapi.ts` 各加一段，文档站和 SDK 自动跟进。
+---
+
+## 六、标签返回格式
+
+`smart-create` 返回里追加 `label`：
+```
+{
+  item_code: "VG202606280001",
+  barcode: "690000000001",
+  qrcode_payload: "vg://item/<id>",
+  name, price_cny, condition_grade, location_name
+}
+```
+
+APP 自由选打什么，ERP 不限制模板。
+
+---
+
+## 七、有赞同步规则（明确给 codex）
+
+- ERP 是商品主数据中心
+- `smart-create` 默认**不自动推**，APP 给个开关；后台 `/youzan` 也能手动推
+- 库存方向：**ERP → 有赞 单向推**（已有 `youzan_stock_sync_queue`）
+- 有赞销售回写：暂不做，下一期接 webhook
+- 商品分类映射：在 `/youzan` 后台维护映射表（下一期）
+- 图片：用 `sku-listing` 的 public URL，有赞侧再缓存
+
+---
+
+## 八、给 codex 的回复包
+
+我会在仓库里产出：
+1. `docs/handheld-api.md` 更新到包含全部新接口示例 + 字段说明
+2. `/api-docs` 在线 OpenAPI（已有，新接口自动进去）
+3. `openapi.snapshot.json` 更新，APP 端跑 `openapi-typescript` 直接生成 TS SDK
+4. 一份 `docs/handheld-onboarding.md`：登录流程、token 生命周期、smart-create 端到端时序图、有赞同步状态机
+5. 测试设备 token + 测试账号通过私下渠道发，不在仓库
+
+---
+
+## 九、需要 codex / 你确认的 4 件事
+
+1. **登录体系**：直接复用 ERP 现有 Supabase 邮箱密码 + 手持用户角色？还是单独搞一套 username/password？（推荐前者）
+2. **AI 模型默认**：识别用 Gemini 2.5 Pro、修图用 Nano Banana 2 — 同意？还是优先国内 Qwen+Wan？
+3. **智能上架默认是否自动推有赞**：当前历史决策是「手动推 + 人工绑」，APP 这边要不要保留默认手动？
+4. **标签打印**：APP 那边自己渲染 PDF/位图，ERP 只回数据；还是 ERP 也提供一个 `items/{id}/label.png`？
+
+---
+
+## 技术实现位置（给我自己看的）
+
+- 路由：`src/routes/api/public/handheld/{auth.login,locations,location.switch,ai.recognize-item,ai.prepare-listing-image,items.upload-image,items.smart-create,items.$id.sync-status,rfid.$epc,rfid.bind-item,rfid.transfer-location}.ts`
+- Schema：追加到 `src/lib/handheld/schemas.ts`
+- OpenAPI：在 `src/lib/handheld/openapi.ts` 注册新 path
+- AI 封装：`src/lib/handheld-ai.functions.ts`（多模态走 Lovable AI Gateway，schema 走 zod + `Output.object`）
+- Storage：新增 migration 建 `sku-raw` / `sku-listing` bucket + RLS
+- 鉴权中间件：`src/server/handheld-auth.server.ts` 扩展支持 session token
