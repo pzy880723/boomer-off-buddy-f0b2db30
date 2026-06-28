@@ -151,6 +151,8 @@ Token 由后台 **仓库管理 → 手持终端** 页面创建/复制。设备�
     { name: "盘点", description: "门店 / 仓库盘点流程" },
     { name: "调拨", description: "库位间调拨：发出方扫描 → 发出方确认 → 收货方扫描 → 收货方确认" },
     { name: "RFID", description: "EPC 单点操作（v1.1+）" },
+    { name: "通知", description: "APP 主动轮询的事件（v1.2+）" },
+    { name: "诊断", description: "APP 上报 crash / 网络错误 / 设备状态（v1.2+）" },
   ],
 
   paths: {
