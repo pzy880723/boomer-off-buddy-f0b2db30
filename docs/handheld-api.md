@@ -29,7 +29,9 @@
 | 分组 | 方法 + 路径 | 说明 |
 | ---- | ---------- | ---- |
 | 鉴权 | `POST /auth/ping` | 设备心跳 / 当前库位信息 |
-| 账号 | `POST /auth/login` | 操作员邮箱密码登录，返回 access_token + 可见库位 |
+| 账号 | `POST /auth/bootstrap` | **推荐**：APP 自助引导，登录即拿 device_token + access_token（无需后台预创建设备） |
+| 账号 | `POST /auth/login` | 兼容：要求已存在 X-Device-Token，旧 APP 用 |
+
 | 账号 | `GET /locations` `POST /location/switch` | 库位列表 / 切换当前库位 |
 | SKU  | `GET /sku/by-epc?epc=` | 按 EPC 查询 |
 | SKU  | `GET /sku/search?q=`  | 关键字搜索 |

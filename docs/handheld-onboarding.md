@@ -1,4 +1,4 @@
-# Handheld APP Onboarding — v1.2
+# Handheld APP Onboarding — v1.3
 
 > 👉 一次性接力交接见 [`./handheld-handoff-to-codex.md`](./handheld-handoff-to-codex.md)（含 APP 开发顺序 + 待确认问题清单）。
 >
@@ -7,24 +7,45 @@
 > Scalar UI: https://boomer-off-buddy.lovable.app/api-docs
 
 
-## 1. 鉴权头
+## 1. 启动流程（v1.3 推荐：APP 自助引导）
 
-每个**写请求**必须同时带两个 header：
+**APP 账号 = ERP 账号**（同一套 Supabase Auth）。无需后台预创建设备。
 
 ```
-X-Device-Token: <设备 token>   # 后台「仓库管理 → 手持终端」颁发
-X-Session-Token: <access_token> # 来自 /auth/login
+1. APP 首装：生成稳定 install_id（UUID/ULID），写入 keystore（卸载重装才会变）。
+2. 登录页：用户输 ERP 邮箱（或手机号）+ 密码。
+3. POST /api/public/handheld/auth/bootstrap     ← 不带 X-Device-Token
+     { email | phone, password, install_id, device_label?, capabilities?, app_version?, os_version? }
+4. 服务端校验 ERP 账号 → 按 (owner_user_id, install_id) upsert 设备 → 返回：
+     { device_token, device, access_token, refresh_token, expires_at, user, locations }
+5. APP 把 device_token + access_token + refresh_token 全部存 keystore。
+6. 若 device.location_id 为 null：让用户从 locations 选一个，调 POST /location/switch。
+7. 之后每个请求都带：
+     X-Device-Token:  <device_token>
+     X-Session-Token: <access_token>
+```
+
+> 同一 ERP 账号在多台 PDA 上各自登录会得到各自的 device_token（按 install_id 区分）。
+
+## 1b. 鉴权头
+
+```
+X-Device-Token: <device_token>    # 由 /auth/bootstrap 颁发并长期有效
+X-Session-Token: <access_token>   # Supabase access token，2h 过期 → /auth/refresh
 ```
 
 - `X-Device-Token` 决定设备绑定的库位（warehouse / shop）。
-- `X-Session-Token` 决定操作员审计（user_id 写入 movement note）。
+- `X-Session-Token` 决定操作员审计（user_id 写入 movement / op_log）。
 - 只读接口（`auth/ping`, `sku/by-epc`, `sku/search`, `items/{id}`）允许只带 Device token。
+- 旧的 `/auth/login` 保留兼容，但要求 X-Device-Token 已存在；新接入一律走 `/auth/bootstrap`。
 
 ## 2. Token 生命周期
 
-- `auth/login` 返回 `access_token`（2 小时）+ `refresh_token`。
-- access_token 过期前 5 分钟 APP 调 `auth/refresh` 换新。
-- `auth/me` 用于启动期回填当前操作员；`auth/logout` 吊销 session。
+- `/auth/bootstrap` 返回 `access_token`（2 小时）+ `refresh_token`。
+- access_token 过期前 5 分钟 APP 调 `/auth/refresh` 换新。
+- `/auth/me` 用于启动期回填当前操作员；`/auth/logout` 吊销 session（device_token 不变，下次还能 bootstrap）。
+- `device_token` 不主动过期；如果后台在「仓库管理 → 手持终端」停用设备，所有接口会返回 `403 / unauthorized_location`。
+
 
 ## 3. 业务错误码（`code` 字段）
 
