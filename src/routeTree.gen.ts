@@ -102,6 +102,7 @@ import { Route as ApiPublicHandheldItemsUploadImageRouteImport } from './routes/
 import { Route as ApiPublicHandheldItemsSmartCreateRouteImport } from './routes/api/public/handheld/items.smart-create'
 import { Route as ApiPublicHandheldItemsIdRouteImport } from './routes/api/public/handheld/items.$id'
 import { Route as ApiPublicHandheldInboundScanRouteImport } from './routes/api/public/handheld/inbound.scan'
+import { Route as ApiPublicHandheldDiagReportRouteImport } from './routes/api/public/handheld/diag.report'
 import { Route as ApiPublicHandheldAuthRefreshRouteImport } from './routes/api/public/handheld/auth.refresh'
 import { Route as ApiPublicHandheldAuthPingRouteImport } from './routes/api/public/handheld/auth.ping'
 import { Route as ApiPublicHandheldAuthMeRouteImport } from './routes/api/public/handheld/auth.me'
@@ -607,6 +608,12 @@ const ApiPublicHandheldInboundScanRoute =
     path: '/api/public/handheld/inbound/scan',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHandheldDiagReportRoute =
+  ApiPublicHandheldDiagReportRouteImport.update({
+    id: '/api/public/handheld/diag/report',
+    path: '/api/public/handheld/diag/report',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHandheldAuthRefreshRoute =
   ApiPublicHandheldAuthRefreshRouteImport.update({
     id: '/api/public/handheld/auth/refresh',
@@ -742,6 +749,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/auth/me': typeof ApiPublicHandheldAuthMeRoute
   '/api/public/handheld/auth/ping': typeof ApiPublicHandheldAuthPingRoute
   '/api/public/handheld/auth/refresh': typeof ApiPublicHandheldAuthRefreshRoute
+  '/api/public/handheld/diag/report': typeof ApiPublicHandheldDiagReportRoute
   '/api/public/handheld/inbound/scan': typeof ApiPublicHandheldInboundScanRoute
   '/api/public/handheld/items/$id': typeof ApiPublicHandheldItemsIdRouteWithChildren
   '/api/public/handheld/items/smart-create': typeof ApiPublicHandheldItemsSmartCreateRoute
@@ -839,6 +847,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/auth/me': typeof ApiPublicHandheldAuthMeRoute
   '/api/public/handheld/auth/ping': typeof ApiPublicHandheldAuthPingRoute
   '/api/public/handheld/auth/refresh': typeof ApiPublicHandheldAuthRefreshRoute
+  '/api/public/handheld/diag/report': typeof ApiPublicHandheldDiagReportRoute
   '/api/public/handheld/inbound/scan': typeof ApiPublicHandheldInboundScanRoute
   '/api/public/handheld/items/$id': typeof ApiPublicHandheldItemsIdRouteWithChildren
   '/api/public/handheld/items/smart-create': typeof ApiPublicHandheldItemsSmartCreateRoute
@@ -944,6 +953,7 @@ export interface FileRoutesById {
   '/api/public/handheld/auth/me': typeof ApiPublicHandheldAuthMeRoute
   '/api/public/handheld/auth/ping': typeof ApiPublicHandheldAuthPingRoute
   '/api/public/handheld/auth/refresh': typeof ApiPublicHandheldAuthRefreshRoute
+  '/api/public/handheld/diag/report': typeof ApiPublicHandheldDiagReportRoute
   '/api/public/handheld/inbound/scan': typeof ApiPublicHandheldInboundScanRoute
   '/api/public/handheld/items/$id': typeof ApiPublicHandheldItemsIdRouteWithChildren
   '/api/public/handheld/items/smart-create': typeof ApiPublicHandheldItemsSmartCreateRoute
@@ -1050,6 +1060,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/auth/me'
     | '/api/public/handheld/auth/ping'
     | '/api/public/handheld/auth/refresh'
+    | '/api/public/handheld/diag/report'
     | '/api/public/handheld/inbound/scan'
     | '/api/public/handheld/items/$id'
     | '/api/public/handheld/items/smart-create'
@@ -1147,6 +1158,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/auth/me'
     | '/api/public/handheld/auth/ping'
     | '/api/public/handheld/auth/refresh'
+    | '/api/public/handheld/diag/report'
     | '/api/public/handheld/inbound/scan'
     | '/api/public/handheld/items/$id'
     | '/api/public/handheld/items/smart-create'
@@ -1251,6 +1263,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/auth/me'
     | '/api/public/handheld/auth/ping'
     | '/api/public/handheld/auth/refresh'
+    | '/api/public/handheld/diag/report'
     | '/api/public/handheld/inbound/scan'
     | '/api/public/handheld/items/$id'
     | '/api/public/handheld/items/smart-create'
@@ -1319,6 +1332,7 @@ export interface RootRouteChildren {
   ApiPublicHandheldAuthMeRoute: typeof ApiPublicHandheldAuthMeRoute
   ApiPublicHandheldAuthPingRoute: typeof ApiPublicHandheldAuthPingRoute
   ApiPublicHandheldAuthRefreshRoute: typeof ApiPublicHandheldAuthRefreshRoute
+  ApiPublicHandheldDiagReportRoute: typeof ApiPublicHandheldDiagReportRoute
   ApiPublicHandheldInboundScanRoute: typeof ApiPublicHandheldInboundScanRoute
   ApiPublicHandheldItemsIdRoute: typeof ApiPublicHandheldItemsIdRouteWithChildren
   ApiPublicHandheldItemsSmartCreateRoute: typeof ApiPublicHandheldItemsSmartCreateRoute
@@ -1994,6 +2008,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldInboundScanRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/handheld/diag/report': {
+      id: '/api/public/handheld/diag/report'
+      path: '/api/public/handheld/diag/report'
+      fullPath: '/api/public/handheld/diag/report'
+      preLoaderRoute: typeof ApiPublicHandheldDiagReportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/handheld/auth/refresh': {
       id: '/api/public/handheld/auth/refresh'
       path: '/api/public/handheld/auth/refresh'
@@ -2308,6 +2329,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHandheldAuthMeRoute: ApiPublicHandheldAuthMeRoute,
   ApiPublicHandheldAuthPingRoute: ApiPublicHandheldAuthPingRoute,
   ApiPublicHandheldAuthRefreshRoute: ApiPublicHandheldAuthRefreshRoute,
+  ApiPublicHandheldDiagReportRoute: ApiPublicHandheldDiagReportRoute,
   ApiPublicHandheldInboundScanRoute: ApiPublicHandheldInboundScanRoute,
   ApiPublicHandheldItemsIdRoute: ApiPublicHandheldItemsIdRouteWithChildren,
   ApiPublicHandheldItemsSmartCreateRoute:
