@@ -467,8 +467,20 @@ export const SmartCreateReq = z
     weight_g: z.number().nullable().optional(),
     epcs: z.array(epcSchema).max(50).optional().meta({ description: "已打好标签则一并绑定" }),
     auto_push_youzan: z.boolean().default(false).meta({ description: "默认 false，APP 给开关；true 时入库存同步队列" }),
+    client_op_id: ClientOpId.optional(),
   })
   .meta({ id: "SmartCreateReq" });
+
+/** v1.2：扁平打印 payload，APP 自渲染 ZPL/ESC-POS。 */
+export const PrintPayloadSchema = z
+  .object({
+    sku_code: z.string().nullable(),
+    barcode: z.string().nullable(),
+    title_short: z.string().meta({ description: "<=24 字符截断" }),
+    price_tag: z.string().meta({ example: "¥699" }),
+    grade: z.string().nullable(),
+  })
+  .meta({ id: "PrintPayload" });
 
 export const SmartCreateRes = okEnvelope(
   z.object({
@@ -490,6 +502,7 @@ export const SmartCreateRes = okEnvelope(
       location_name: z.string().nullable(),
       qrcode_payload: z.string(),
     }),
+    print_payload: PrintPayloadSchema.meta({ description: "v1.2：扁平结构，直接灌打印模板" }),
     youzan_sync_status: z.enum(["disabled", "queued", "linked", "unlinked"]),
   }),
 );
