@@ -13,7 +13,7 @@
 ## 基本信息
 
 - 所有接口都在 `/api/public/handheld/*` 前缀下（**绕过站点登录**）。
-- 鉴权：每个请求带 Header `X-Device-Token: <token>`。Token 由后台 **仓库管理 → 手持终端** 颁发。
+- 鉴权：首登走 `POST /auth/bootstrap`（不带 `X-Device-Token`），返回 `device_token` + `access_token` + `session_token` + `refresh_token`；之后每个请求带 `X-Device-Token`，写入/AI 请求同时带 `X-Session-Token: <session_token>`。
 - 统一响应：
   ```json
   { "ok": true,  "data": { ... } }
@@ -45,7 +45,7 @@
 | 调拨 | `POST /transfer/ship-scan` `/ship-confirm` `/receive-scan` `/receive-confirm` | 调拨四步 |
 | RFID | `GET /rfid/{epc}` `POST /rfid/bind-item` `POST /rfid/transfer-location` | EPC 单点操作 |
 
-> 鉴权说明：所有接口默认 `X-Device-Token`；走 `/auth/login` 后，APP 可附带 `X-Session-Token: <access_token>` 让 ERP 关联操作员审计。
+> 鉴权说明：新 APP 首登必须走 `/auth/bootstrap`；`/auth/login` 是旧兼容接口，要求已经有 `X-Device-Token`。`session_token` 当前等同 `access_token`，APP 直接放到 `X-Session-Token`。
 >
 > **AI / 图片接口图片传递**：`/ai/recognize-item` 和 `/ai/prepare-listing-image` 入参同时支持 `image_url`、`image_base64`，`recognize-item` 还支持 `images[]`（最多 4 张，每张二选一）。
 > - **MVP / 真机调试**：直接传 `image_base64`（建议先在 APP 端把图压到 ≤ 4MB / 长边 ≤ 1600px 再 base64）。

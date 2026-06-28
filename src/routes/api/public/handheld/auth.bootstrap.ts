@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
 import { HANDHELD_CORS, ok, err } from "@/server/handheld-auth.server";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { BootstrapReq } from "@/lib/handheld/schemas";
 
 function genDeviceCode() {
@@ -44,6 +43,7 @@ export const Route = createFileRoute("/api/public/handheld/auth/bootstrap")({
           return err(signInErr?.message || "Invalid credentials", 401, { code: "unauthorized" });
         }
         const user = signIn.user;
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
         // 2. Upsert device by (owner_user_id, install_id)
         const { data: existing } = await supabaseAdmin
@@ -162,6 +162,7 @@ export const Route = createFileRoute("/api/public/handheld/auth/bootstrap")({
             os_version: ((deviceRow as any)?.os_version as string | null) ?? null,
           },
           access_token: signIn.session.access_token,
+          session_token: signIn.session.access_token,
           refresh_token: signIn.session.refresh_token,
           expires_at: signIn.session.expires_at ?? 0,
           user: {

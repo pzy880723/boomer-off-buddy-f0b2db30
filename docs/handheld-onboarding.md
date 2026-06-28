@@ -17,8 +17,8 @@
 3. POST /api/public/handheld/auth/bootstrap     ← 不带 X-Device-Token
      { email | phone, password, install_id, device_label?, capabilities?, app_version?, os_version? }
 4. 服务端校验 ERP 账号 → 按 (owner_user_id, install_id) upsert 设备 → 返回：
-     { device_token, device, access_token, refresh_token, expires_at, user, locations }
-5. APP 把 device_token + access_token + refresh_token 全部存 keystore。
+     { device_token, device, access_token, session_token, refresh_token, expires_at, user, locations }
+5. APP 把 device_token + access_token/session_token + refresh_token 全部存 keystore。
 6. 若 device.location_id 为 null：让用户从 locations 选一个，调 POST /location/switch。
 7. 之后每个请求都带：
      X-Device-Token:  <device_token>
@@ -41,7 +41,7 @@ X-Session-Token: <access_token>   # Supabase access token，2h 过期 → /auth/
 
 ## 2. Token 生命周期
 
-- `/auth/bootstrap` 返回 `access_token`（2 小时）+ `refresh_token`。
+- `/auth/bootstrap` 返回 `access_token`（2 小时）+ `session_token`（等同 access_token，用于 `X-Session-Token`）+ `refresh_token`。
 - access_token 过期前 5 分钟 APP 调 `/auth/refresh` 换新。
 - `/auth/me` 用于启动期回填当前操作员；`/auth/logout` 吊销 session（device_token 不变，下次还能 bootstrap）。
 - `device_token` 不主动过期；如果后台在「仓库管理 → 手持终端」停用设备，所有接口会返回 `403 / unauthorized_location`。

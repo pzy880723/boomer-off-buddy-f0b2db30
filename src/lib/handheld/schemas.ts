@@ -750,6 +750,7 @@ export const BootstrapRes = okEnvelope(
     }),
     device: DeviceContextSchema,
     access_token: z.string(),
+    session_token: z.string().meta({ description: "等同 access_token；供 APP 统一写入 X-Session-Token" }),
     refresh_token: z.string(),
     expires_at: z.number().int(),
     user: SessionUserSchema,
