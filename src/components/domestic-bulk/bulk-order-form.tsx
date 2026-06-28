@@ -1,5 +1,8 @@
 import { useEffect, useState, useRef } from "react";
-import { Plus, Trash2, Upload, X, Loader2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { Plus, Trash2, Upload, X, Loader2, ChevronDown, ChevronUp, MapPin } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,6 +24,7 @@ import {
   type DomesticBulkOrderInput,
   type DomesticBulkLineInput,
 } from "@/lib/domestic-bulk.functions";
+import { listAddresses, type OrgAddress } from "@/lib/addresses.functions";
 
 export type BulkOrderFormValue = DomesticBulkOrderInput & {
   attachment_urls: string[];
@@ -44,7 +48,7 @@ const EMPTY_ORDER: BulkOrderFormValue = {
   delivered_at: null,
   invoice_no: null,
   contract_no: null,
-  pay_method: null,
+  pay_method: "微信",
   attachment_urls: [],
   notes: null,
 };
@@ -75,7 +79,34 @@ export function BulkOrderForm({
   });
   const [lines, setLines] = useState<BulkLineFormValue[]>(initialLines ?? []);
   const [uploading, setUploading] = useState(false);
+  const [showLogistics, setShowLogistics] = useState(
+    !!(initialOrder?.carrier || initialOrder?.tracking_no || initialOrder?.delivered_at || initialOrder?.receiver_address),
+  );
+  const [showInvoice, setShowInvoice] = useState(!!(initialOrder?.invoice_no || initialOrder?.contract_no));
+  const [customAddress, setCustomAddress] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const listAddrFn = useServerFn(listAddresses);
+  const { data: addresses = [] } = useQuery({
+    queryKey: ["org-addresses"],
+    queryFn: () => listAddrFn(),
+  });
+
+  // 自动带入默认地址（仅当订单尚未填写地址时）
+  useEffect(() => {
+    if (addresses.length === 0) return;
+    if (order.receiver_address) return;
+    const def = (addresses as OrgAddress[]).find((a) => a.is_default) ?? addresses[0];
+    if (def) {
+      setOrder((prev) => ({
+        ...prev,
+        receiver_name: prev.receiver_name ?? def.receiver_name,
+        receiver_phone: prev.receiver_phone ?? def.receiver_phone,
+        receiver_address: prev.receiver_address ?? def.address,
+      }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addresses.length]);
 
   useEffect(() => {
     onChange(order, lines);
@@ -258,43 +289,149 @@ export function BulkOrderForm({
           </CardContent>
         </Card>
 
-        {/* 物流 */}
+        {/* 物流（默认收起） */}
         <Card>
           <CardContent className="space-y-3 py-4">
-            <h3 className="text-sm font-semibold">物流信息</h3>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-              <Field label="物流公司" value={order.carrier} onChange={(v) => set("carrier", v)} />
-              <Field label="运单号" value={order.tracking_no} onChange={(v) => set("tracking_no", v)} />
-              <Field label="签收时间" type="datetime-local" value={toLocalDt(order.delivered_at)} onChange={(v) => set("delivered_at", fromLocalDt(v))} />
-              <Field label="收件人" value={order.receiver_name} onChange={(v) => set("receiver_name", v)} />
-              <Field label="收件电话" value={order.receiver_phone} onChange={(v) => set("receiver_phone", v)} />
-              <Field
-                label="收件地址"
-                value={order.receiver_address}
-                onChange={(v) => set("receiver_address", v)}
-                className="md:col-span-3"
-              />
-            </div>
+            <button
+              type="button"
+              onClick={() => setShowLogistics((v) => !v)}
+              className="flex w-full items-center justify-between text-left"
+            >
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold">物流信息</h3>
+                {(order.carrier || order.tracking_no) && (
+                  <span className="text-xs text-muted-foreground">
+                    {order.carrier} {order.tracking_no}
+                  </span>
+                )}
+              </div>
+              {showLogistics ? (
+                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              )}
+            </button>
+
+            {showLogistics && (
+              <>
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                  <Field label="物流公司" value={order.carrier} onChange={(v) => set("carrier", v)} />
+                  <Field label="运单号" value={order.tracking_no} onChange={(v) => set("tracking_no", v)} />
+                  <Field label="签收时间" type="datetime-local" value={toLocalDt(order.delivered_at)} onChange={(v) => set("delivered_at", fromLocalDt(v))} />
+                </div>
+
+                {/* 地址：从地址库选 */}
+                <div className="rounded-md border bg-muted/20 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 text-xs font-medium">
+                      <MapPin className="h-3.5 w-3.5" /> 收件地址
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {addresses.length > 0 && (
+                        <select
+                          className="h-7 rounded border bg-background px-2 text-xs"
+                          value={
+                            (addresses as OrgAddress[]).find((a) => a.address === order.receiver_address)?.id ?? ""
+                          }
+                          onChange={(e) => {
+                            const a = (addresses as OrgAddress[]).find((x) => x.id === e.target.value);
+                            if (a) {
+                              setOrder((prev) => ({
+                                ...prev,
+                                receiver_name: a.receiver_name,
+                                receiver_phone: a.receiver_phone,
+                                receiver_address: a.address,
+                              }));
+                              setCustomAddress(false);
+                            }
+                          }}
+                        >
+                          <option value="">— 选择地址 —</option>
+                          {(addresses as OrgAddress[]).map((a) => (
+                            <option key={a.id} value={a.id}>
+                              {a.label}
+                              {a.is_default ? "（默认）" : ""}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-xs"
+                        onClick={() => setCustomAddress((v) => !v)}
+                      >
+                        {customAddress ? "收起" : "自定义"}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {addresses.length === 0 && !customAddress ? (
+                    <p className="mt-2 text-[11px] text-muted-foreground">
+                      还没有常用地址，
+                      <Link to="/settings" className="underline">
+                        去「设置 → 地址库」
+                      </Link>
+                      添加，下次自动带入。
+                    </p>
+                  ) : (
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      {order.receiver_name || "—"} · {order.receiver_phone || "—"}
+                      <div>{order.receiver_address || "（未选择）"}</div>
+                    </div>
+                  )}
+
+                  {customAddress && (
+                    <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3">
+                      <Field label="收件人" value={order.receiver_name} onChange={(v) => set("receiver_name", v)} />
+                      <Field label="收件电话" value={order.receiver_phone} onChange={(v) => set("receiver_phone", v)} />
+                      <Field
+                        label="收件地址"
+                        value={order.receiver_address}
+                        onChange={(v) => set("receiver_address", v)}
+                        className="md:col-span-3"
+                      />
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
-        {/* 票据 */}
+        {/* 票据 / 备注（默认收起） */}
         <Card>
           <CardContent className="space-y-3 py-4">
-            <h3 className="text-sm font-semibold">票据 / 合同</h3>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-              <Field label="发票号" value={order.invoice_no} onChange={(v) => set("invoice_no", v)} />
-              <Field label="合同号" value={order.contract_no} onChange={(v) => set("contract_no", v)} />
-            </div>
-            <div>
-              <Label className="text-xs">备注</Label>
-              <Textarea
-                rows={3}
-                value={order.notes ?? ""}
-                onChange={(e) => set("notes", e.target.value || null)}
-                className="text-xs"
-              />
-            </div>
+            <button
+              type="button"
+              onClick={() => setShowInvoice((v) => !v)}
+              className="flex w-full items-center justify-between text-left"
+            >
+              <h3 className="text-sm font-semibold">票据 / 合同 / 备注</h3>
+              {showInvoice ? (
+                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              )}
+            </button>
+            {showInvoice && (
+              <>
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                  <Field label="发票号" value={order.invoice_no} onChange={(v) => set("invoice_no", v)} />
+                  <Field label="合同号" value={order.contract_no} onChange={(v) => set("contract_no", v)} />
+                </div>
+                <div>
+                  <Label className="text-xs">备注</Label>
+                  <Textarea
+                    rows={3}
+                    value={order.notes ?? ""}
+                    onChange={(e) => set("notes", e.target.value || null)}
+                    className="text-xs"
+                  />
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

@@ -1,30 +1,62 @@
-## 现状结论（先回 Codex 的 4 点）
+## 目标
 
-经核对 ERP 代码与线上：
+1. **简化国内大宗订单录入** — 默认大多数情况是「微信付款 → 物流到货」，不需要每次填收件人/电话/地址。
+2. **在系统设置里加一个「地址库」** — 收件人/地址/电话集中管理，默认地址在大宗单据中自动带入，无需重复填写。
+3. **给国内小包（闲鱼/抖音/小红书/微信/拼多多）一个更顺手的同步入口** — 当前只能截图导入，需要更省力的方案建议。
 
-1. **OpenAPI 404 = 没发布**。路由 `src/routes/api/public/handheld/openapi[.]json.ts` 已经存在，**预览站** `…-dev.lovable.app/api/public/handheld/openapi.json` 正常返回 OpenAPI 3.1 JSON；生产站 404 是因为 ERP 自上次改动后**没有点 Publish**。需要你在 Lovable 顶部点一次"Publish / Update"把当前 dev 版本推到 `boomer-off-buddy.lovable.app`。
-2. **`image_base64` 是支持的，不止 signed URL**。`AiRecognizeReq` / `AiListingImageReq` 都接受 `image_url` 或 `image_base64`，`recognize-item` 还支持 `images[]`（最多 4 张，每张 url 或 base64 任选）。所以 APP MVP 直接用 base64 是 OK 的，没有"必须先走直传"的限制。文档（`docs/handheld-api.md`）写错了，需要改成"两种都可，base64 适合 MVP，生产推荐 signed URL"。
-3. **`/ai/prepare-listing-image` 已经返回 `storage_path` / `signed_url` / `mime_type`**（schema + 路由实现一致，signed URL 7 天有效，桶 `sku-listing` 私有）。无需改动。
-4. **`items.smart-create` 已经按你列的清单做了**：生成 `sku_code` + EAN-13 `barcode`、写 `inv_skus`、走 `inv_apply_movement` 入库 + 绑定额外 EPCs、记 `condition_grade`(grade)、按 `auto_push_youzan` 入有赞队列（已绑定才入队，未绑定返回 `youzan_sync_status: "unlinked"`）、返回 `label` 和扁平 `print_payload`。无需改动。
+---
 
-所以**不需要改任何业务代码**，只有两件小事：
+## 一、地址库（系统设置）
 
-## 改动 1：文档 `docs/handheld-api.md` 去掉 base64/URL 不一致
+在 `/settings` 里新增「地址库」Tab：
+- 新表 `org_addresses`：label（备注名，如"公司前台"）、receiver_name、receiver_phone、address、is_default。
+- CRUD UI（增/删/编辑/设为默认）。
+- 服务端 fn：`listAddresses` / `upsertAddress` / `deleteAddress` / `setDefaultAddress`。
+- 没填地址前给个空状态 + "添加常用地址"按钮。
 
-当前那句"图片永远以签名 URL 形式在 APP 和 ERP 之间传递，不在 JSON body 里塞 base64"和实际接口冲突。改成：
+## 二、简化国内大宗订单表单（`/purchase/domestic-bulk/new` 和编辑页）
 
-- AI 接口（`/ai/recognize-item`、`/ai/prepare-listing-image`）入参支持 `image_url`、`image_base64`、`images[]`（最多 4 张，每张二选一）；
-- MVP 可直接传 base64（小于 ~4MB 压缩后图）；
-- 生产建议：APP 先调 `/items/upload-image` 拿 signed PUT URL 直传到 `sku-raw` 桶，再把返回的 signed GET URL 当 `image_url` 传给 AI，避免把大图塞 JSON 里。
-- `/ai/prepare-listing-image` 永远返回 `storage_path` + 7 天 `signed_url` + `mime_type`，APP 用 `signed_url` 下载/打印。
+将「物流信息」整块**默认收起**，并按下面调整：
 
-同时在文档顶部"基本信息"加一句：**生产 base URL 改动后必须重新 Publish，否则 `boomer-off-buddy.lovable.app/api/public/handheld/*` 仍走旧版本**。
+**默认显示（必填/常用）：**
+- 供应商、订单号、采购时间、状态、总金额、运费、付款方式（默认「微信」）
 
-## 改动 2：你点一下 Publish
+**「物流信息」折叠面板（默认收起）：**
+- 仅保留：物流公司、运单号、签收时间
+- 收件人/电话/地址**改为右上角一个小下拉**：「使用地址：默认地址 ▾」从地址库选；选中后不再展示这三个字段（数据仍写入订单，保持历史可查）；点「自定义」才展开三行输入。
+- 没有任何地址库记录时，提示 "去设置 → 地址库添加" 并隐藏下拉。
 
-ERP 现在 dev 版（含 v1.2 全部接口）正常，生产站还是旧版没有 openapi.json。等你点完 Publish 我会再 `curl` 一次 `https://boomer-off-buddy.lovable.app/api/public/handheld/openapi.json` 确认 200 + JSON。
+**保留不变：** 商品明细、票据/合同（也默认收起）、附件、备注。
 
-## 不动的部分
+数据字段不删，只改 UI 可见性与默认折叠状态，保证旧数据兼容。
 
-- `schemas.ts`、`ai.recognize-item.ts`、`ai.prepare-listing-image.ts`、`items.smart-create.ts`、`handheld-ai.server.ts`、`openapi.ts`：全部保持现状，已满足 Codex 列出的所有要求。
-- Android APP 当前以 `image_base64` 调 AI 是合法用法，可以继续；后续做大图/多图时再迁到 signed URL，不影响兼容。
+## 三、国内小包同步建议（讨论 + 落地方向）
+
+当前只能截图 → AI 解析。下面是按"省力度"排序的可行方案，供选择：
+
+| 方案 | 平台覆盖 | 自动化程度 | 落地难度 | 备注 |
+|---|---|---|---|---|
+| A. **微信 / 短信通知 webhook** | 微信支付、短信物流通知 | 高 | 中 | 用「微信 - 服务通知 → 转发到企业微信 webhook → 我们接 `/api/public/hooks/wx-notify`」；只能拿到付款金额+店铺名，需要再补商品。 |
+| B. **Chrome 扩展抓页面**（复用现有 `extension/`） | 闲鱼网页版、小红书网页版、抖音电商网页版 | 高 | 中 | 在「我的订单」页注入按钮，一键把可见订单 POST 到 `/api/public/domestic-orders/ingest`；不需要登录态共享，靠用户自己登录。**推荐主打**。 |
+| C. **手机分享菜单 → 小程序/H5**（PWA `/m/domestic/quick-add`） | 全平台 | 中 | 低 | 在手机端做一个极简「粘贴订单详情文本/截图 → AI 解析 → 一键入库」页面，配合 iOS 快捷指令/安卓分享菜单。当下最现实。 |
+| D. **闲鱼开放平台 / 抖音开放平台官方 API** | 仅企业号 | 极高 | 极高 | 闲鱼无开放 API；抖店要企业资质 + 审核。**不推荐**。 |
+| E. **邮箱解析**（支付宝/微信账单邮件） | 仅有邮件账单的部分 | 中 | 中 | 国内电商基本不发邮件，价值低。 |
+
+**推荐组合：B（Chrome 扩展）+ C（手机 PWA 快速录入）**：
+- B 覆盖电脑端批量场景（闲鱼/小红书/抖音）
+- C 覆盖手机端零散下单（微信群、朋友介绍）
+- 两边都 POST 到同一个 ingest 接口，复用现有的 AI 识别管线（`src/lib/domestic-recognize.functions.ts`）
+
+本轮先不写 B/C 的代码，先确认方向，下一轮再拆任务。
+
+---
+
+## 落地顺序
+
+1. 加 `org_addresses` 表 + Settings 里的地址库 Tab。
+2. 改 `bulk-order-form.tsx`：折叠物流/票据、付款方式默认"微信"、引入地址库下拉。
+3. （第二轮）按你选定的方案做小包同步入口。
+
+请确认：
+- 地址库放在 `设置 → 地址库` OK 吗？
+- 国内小包同步，先做 **B 扩展** 还是 **C 手机 PWA 快速录入**？还是两个都要？

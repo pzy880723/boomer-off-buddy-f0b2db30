@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Building2, Users, Bell, Plug, Webhook, Key, History } from "lucide-react";
+import { Building2, Users, Bell, Plug, Webhook, Key, History, MapPin } from "lucide-react";
+import { AddressBookPanel } from "@/components/settings/address-book-panel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,10 @@ function SettingsPage() {
           <TabsTrigger value="members" className="gap-1.5">
             <Users className="h-3.5 w-3.5" />
             成员权限
+          </TabsTrigger>
+          <TabsTrigger value="addresses" className="gap-1.5">
+            <MapPin className="h-3.5 w-3.5" />
+            地址库
           </TabsTrigger>
           <TabsTrigger value="notify" className="gap-1.5">
             <Bell className="h-3.5 w-3.5" />
@@ -103,6 +108,10 @@ function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="addresses">
+          <AddressBookPanel />
         </TabsContent>
 
         <TabsContent value="notify">

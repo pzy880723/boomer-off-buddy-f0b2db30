@@ -1306,6 +1306,42 @@ export type Database = {
           },
         ]
       }
+      org_addresses: {
+        Row: {
+          address: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_default: boolean
+          label: string
+          receiver_name: string | null
+          receiver_phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          address: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_default?: boolean
+          label: string
+          receiver_name?: string | null
+          receiver_phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_default?: boolean
+          label?: string
+          receiver_name?: string | null
+          receiver_phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       sku_youzan_links: {
         Row: {
           created_at: string
