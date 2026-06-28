@@ -407,7 +407,37 @@ Token 由后台 **仓库管理 → 手持终端** 页面创建/复制。设备�
         responses: { "200": jsonRes("OK", SkuDetailRes), ...ERROR_RESPONSES },
       },
     },
+    "/api/public/handheld/rfid/batch-stock-in": {
+      post: {
+        tags: ["RFID"],
+        summary: "批量裸 EPC 入库（v1.2 离线幂等）",
+        description:
+          "APP 离线时把多次扫描攒成一批补交；每条 op 必须带 `client_op_id`，服务端按 (device, client_op_id) 回放，永远幂等。每条结果都会带 `replayed: bool`。",
+        requestBody: jsonBody(RfidBatchStockInReq),
+        responses: { "200": jsonRes("OK", RfidBatchStockInRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/notifications/since": {
+      get: {
+        tags: ["通知"],
+        summary: "拉取自 `ts` 之后的通知（v1.2 轮询模式）",
+        description:
+          "推荐 APP 每 30s 轮询一次；首次不传 `ts`，之后用上次响应的 `server_ts`。只下发给本设备 / 本库位 / 全局的事件。",
+        requestParams: { query: NotificationsSinceQuery },
+        responses: { "200": jsonRes("OK", NotificationsSinceRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/diag/report": {
+      post: {
+        tags: ["诊断"],
+        summary: "上报 APP 端 crash / 网络错误 / 设备状态（v1.2）",
+        description: "请勿在 payload 里上传 token 原文；ERP 会按 device + user 关联审计。",
+        requestBody: jsonBody(DiagReportReq),
+        responses: { "200": jsonRes("OK", DiagReportRes), ...ERROR_RESPONSES },
+      },
+    },
   },
+
 };
 
 let cached: ReturnType<typeof createDocument> | null = null;
