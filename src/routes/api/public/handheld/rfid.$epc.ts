@@ -35,7 +35,15 @@ export const Route = createFileRoute("/api/public/handheld/rfid/$epc")({
           .select("epc, hits, last_seen_at")
           .eq("epc", epc)
           .maybeSingle();
-        return ok({ known: false as const, unclaimed: un ?? null });
+        // Return ok envelope with code marker for APP to switch on
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            code: "unlinked",
+            data: { known: false as const, unclaimed: un ?? null },
+          }),
+          { headers: { "Content-Type": "application/json" }, status: 200 },
+        );
       },
     },
   },
