@@ -543,6 +543,7 @@ export const RfidBindReq = z
     epc: epcSchema,
     sku_id: uuidSchema,
     location_id: uuidSchema.optional().meta({ description: "默认设备所在库位" }),
+    client_op_id: ClientOpId.optional(),
   })
   .meta({ id: "RfidBindReq" });
 
@@ -555,6 +556,7 @@ export const RfidTransferReq = z
     epc: epcSchema,
     to_location_id: uuidSchema,
     reason: z.string().max(120).optional(),
+    client_op_id: ClientOpId.optional(),
   })
   .meta({ id: "RfidTransferReq" });
 
