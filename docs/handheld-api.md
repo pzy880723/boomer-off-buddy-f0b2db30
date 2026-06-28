@@ -27,13 +27,26 @@
 | 分组 | 方法 + 路径 | 说明 |
 | ---- | ---------- | ---- |
 | 鉴权 | `POST /auth/ping` | 设备心跳 / 当前库位信息 |
+| 账号 | `POST /auth/login` | 操作员邮箱密码登录，返回 access_token + 可见库位 |
+| 账号 | `GET /locations` `POST /location/switch` | 库位列表 / 切换当前库位 |
 | SKU  | `GET /sku/by-epc?epc=` | 按 EPC 查询 |
 | SKU  | `GET /sku/search?q=`  | 关键字搜索 |
+| AI   | `POST /ai/recognize-item` | 拍照识别 → 商品结构化字段（Gemini 2.5 Pro）|
+| AI   | `POST /ai/prepare-listing-image` | 原图 → 上架主图（Nano Banana 2）|
+| 图片 | `POST /items/upload-image` | 申请直传 signed URL |
+| 商品 | `POST /items/smart-create` | 智能上架（建 SKU + 入库存 + 可选入有赞队列）|
+| 商品 | `GET /items/{id}/sync-status` | 查 SKU 在各有赞店铺的同步状态 |
 | 入库 | `POST /inbound/scan`  | 扫码自动入库（仓库设备）|
 | 盘点 | `POST /stocktake/open` `/stocktake/scan` `/stocktake/submit` | 盘点三步 |
 | 调拨 | `POST /transfer/ship-scan` `/ship-confirm` `/receive-scan` `/receive-confirm` | 调拨四步 |
+| RFID | `GET /rfid/{epc}` `POST /rfid/bind-item` `POST /rfid/transfer-location` | EPC 单点操作 |
+
+> 鉴权说明：所有接口默认 `X-Device-Token`；走 `/auth/login` 后，APP 可附带 `X-Session-Token: <access_token>` 让 ERP 关联操作员审计。
+>
+> AI / 图片接口约定：图片永远以「签名 URL」形式在 APP 和 ERP 之间传递，不在 JSON body 里塞 base64。
 
 详细 schema、示例、错误码请见在线文档。
+
 
 ## 给 APP 端：生成本地 SDK
 
