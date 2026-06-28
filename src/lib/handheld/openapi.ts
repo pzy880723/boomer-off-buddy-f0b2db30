@@ -235,12 +235,10 @@ Token 由后台 **仓库管理 → 手持终端** 页面创建/复制。设备�
         responses: { "200": jsonRes("OK", TransferReceiveConfirmRes), ...ERROR_RESPONSES },
       },
     },
-  },
-};
-
     "/api/public/handheld/auth/login": {
       post: {
         tags: ["账号"],
+
         summary: "操作员登录（邮箱 + 密码）",
         description:
           "复用 ERP 后台 Supabase 账号体系。返回 access_token，APP 后续可放到 `X-Session-Token` Header 让 ERP 关联操作员；同时返回所有 active 库位列表，APP 让店员选当前操作库位。",
