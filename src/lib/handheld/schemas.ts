@@ -17,11 +17,39 @@ import * as z from "zod";
 // 通用
 // ============================================================
 
+/**
+ * 业务错误码（APP 直接按 code 做页面提示）。
+ *  - unauthorized：401，缺失/失效 token
+ *  - unauthorized_location：401，session 当前 location 与请求不符
+ *  - invalid_body：400，请求体不是合法 JSON / 缺字段
+ *  - validation_error：422，Zod 校验失败（detail 含字段路径）
+ *  - not_found：404，资源不存在
+ *  - unlinked：404，EPC 未绑定任何 SKU（GET /rfid/{epc}）
+ *  - already_exists：409，barcode / EPC 已绑到其它 SKU
+ *  - transfer_required：409，EPC 当前不在本 location，需要走调拨流程
+ *  - rate_limited：429，AI 网关限流
+ *  - ai_credits_exhausted：402，AI 网关额度耗尽
+ *  - internal_error：500
+ */
+export const HandheldErrorCode = z.enum([
+  "unauthorized",
+  "unauthorized_location",
+  "invalid_body",
+  "validation_error",
+  "not_found",
+  "unlinked",
+  "already_exists",
+  "transfer_required",
+  "rate_limited",
+  "ai_credits_exhausted",
+  "internal_error",
+]);
+
 export const ErrorResponse = z
   .object({
     ok: z.literal(false),
+    code: HandheldErrorCode.optional().meta({ description: "业务错误码；APP 按此分支" }),
     error: z.string().meta({ description: "人类可读错误信息", example: "Invalid body" }),
-    code: z.string().optional().meta({ description: "可选机器可读错误码" }),
     detail: z.string().optional(),
     issues: z.array(z.string()).optional(),
     missingReceive: z.array(z.string()).optional(),
@@ -346,15 +374,23 @@ export const UploadImageReq = z
     bucket: z.enum(["sku-raw", "sku-listing"]).default("sku-raw"),
     filename: z.string().min(1).meta({ description: "原始文件名，仅用于扩展名识别" }),
     content_type: z.string().min(1).meta({ example: "image/jpeg" }),
+    mode: z
+      .enum(["signed", "multipart"])
+      .default("signed")
+      .meta({
+        description:
+          "signed=返回 signed PUT URL，APP 直传 Storage（推荐）；multipart=同时返回一个 ERP 中转 POST 端点，APP 走 multipart/form-data 上传（兼容受限网络）。",
+      }),
   })
   .meta({ id: "UploadImageReq" });
 
 export const UploadImageRes = okEnvelope(
   z.object({
     storage_path: z.string(),
-    upload_url: z.string().url().meta({ description: "30 分钟有效，PUT 直传" }),
+    upload_url: z.string().url().meta({ description: "30 分钟有效；signed 模式为 Storage PUT URL，multipart 模式为 ERP 中转 POST URL" }),
     read_url: z.string().url().meta({ description: "7 天 signed GET URL" }),
-    method: z.literal("PUT"),
+    method: z.enum(["PUT", "POST"]),
+    mode: z.enum(["signed", "multipart"]),
     headers: z.record(z.string(), z.string()).meta({ description: "上传时必须带这些 header" }),
   }),
 );
@@ -383,15 +419,19 @@ export const SmartCreateRes = okEnvelope(
   z.object({
     sku_id: uuidSchema,
     sku_code: z.string(),
+    barcode: z.string().nullable().meta({ description: "EAN-13 全局唯一条码，自动生成" }),
     epc: z.string().meta({ description: "本 SKU 的共享 EPC（类目+价格档+品名 唯一）" }),
+    condition_grade: z.enum(["N", "S", "A", "B", "C", "J"]).nullable(),
     stock_qty: z.number().int(),
     bound_epcs: z.number().int(),
     label: z.object({
       sku_code: z.string(),
+      barcode: z.string().nullable(),
       epc: z.string(),
       name: z.string(),
       price_cny: z.number(),
       grade: z.string().nullable(),
+      condition_grade: z.enum(["N", "S", "A", "B", "C", "J"]).nullable(),
       location_name: z.string().nullable(),
       qrcode_payload: z.string(),
     }),
@@ -453,4 +493,81 @@ export const RfidTransferReq = z
 export const RfidTransferRes = okEnvelope(
   z.object({ epc: epcSchema, from_location_id: uuidSchema.nullable(), to_location_id: uuidSchema }),
 );
+
+// ============================================================
+// 11. RFID 裸 EPC 入库（扫到未绑定的标签先放入待认领队列）
+// ============================================================
+
+export const RfidStockInReq = z
+  .object({
+    epcs: z.array(epcSchema).min(1).max(500),
+  })
+  .meta({ id: "RfidStockInReq" });
+
+export const RfidStockInRes = okEnvelope(
+  z.object({
+    queued: z.number().int().meta({ description: "进入待认领队列的 EPC 数（去重后）" }),
+    already_bound: z.array(z.object({ epc: epcSchema, sku_id: uuidSchema })).meta({
+      description: "已绑定 SKU 的 EPC，APP 端应该改走 inbound/scan 或 transfer-location",
+    }),
+  }),
+);
+
+// ============================================================
+// 12. Auth 扩展：refresh / me / logout（Supabase token 直通）
+// ============================================================
+
+export const AuthRefreshReq = z
+  .object({ refresh_token: z.string().min(1) })
+  .meta({ id: "AuthRefreshReq" });
+
+export const AuthRefreshRes = okEnvelope(
+  z.object({
+    access_token: z.string(),
+    refresh_token: z.string(),
+    expires_at: z.number().int().meta({ description: "unix 秒；access_token 默认 2 小时" }),
+  }),
+);
+
+export const AuthMeRes = okEnvelope(
+  z.object({
+    device: DeviceContextSchema,
+    user: SessionUserSchema.nullable().meta({ description: "未带 X-Session-Token 时为 null" }),
+  }),
+);
+
+// ============================================================
+// 13. SKU 详情（APP 查 barcode / condition_grade / 当前库存）
+// ============================================================
+
+export const SkuDetailRes = okEnvelope(
+  z.object({
+    id: uuidSchema,
+    sku_code: z.string().nullable(),
+    barcode: z.string().nullable(),
+    epc: z.string(),
+    name: z.string(),
+    category: z.string(),
+    price_tier: z.number(),
+    is_custom_price: z.boolean(),
+    condition_grade: z.enum(["N", "S", "A", "B", "C", "J"]).nullable(),
+    grade: z.string().nullable().meta({ description: "兼容旧字段，等同 condition_grade" }),
+    image_url: z.string().nullable(),
+    notes: z.string().nullable(),
+    weight_g: z.number().nullable(),
+    stock_qty: z.number().int(),
+    status: z.string(),
+    created_at: z.string(),
+    updated_at: z.string(),
+    stocks: z.array(
+      z.object({
+        location_id: uuidSchema,
+        location_name: z.string(),
+        location_kind: z.enum(["warehouse", "shop"]),
+        qty: z.number().int(),
+      }),
+    ),
+  }),
+);
+
 

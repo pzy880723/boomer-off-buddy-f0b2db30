@@ -535,6 +535,7 @@ export type Database = {
       }
       inv_skus: {
         Row: {
+          barcode: string | null
           bundle_items: Json
           category: string
           created_at: string
@@ -555,6 +556,7 @@ export type Database = {
           weight_g: number | null
         }
         Insert: {
+          barcode?: string | null
           bundle_items?: Json
           category: string
           created_at?: string
@@ -575,6 +577,7 @@ export type Database = {
           weight_g?: number | null
         }
         Update: {
+          barcode?: string | null
           bundle_items?: Json
           category?: string
           created_at?: string
@@ -1891,6 +1894,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      gen_ean13: { Args: never; Returns: string }
       gen_stock_transfer_code: { Args: never; Returns: string }
       inv_apply_inbound_stock: {
         Args: { p_delta: number; p_sku_id: string }

@@ -71,7 +71,7 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
               stock_qty: 0,
               status: "active",
             })
-            .select("id, sku_code, epc")
+            .select("id, sku_code, epc, barcode, grade")
             .single();
           if (ins.error || !ins.data) return err(`Create SKU failed: ${ins.error?.message}`, 500);
           skuId = ins.data.id;
@@ -136,22 +136,30 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
 
         const { data: finalSku } = await supabaseAdmin
           .from("inv_skus")
-          .select("stock_qty")
+          .select("stock_qty, barcode, grade")
           .eq("id", skuId)
           .maybeSingle();
+
+        const barcode = (finalSku as any)?.barcode ?? null;
+        const conditionGrade = ((finalSku as any)?.grade ?? body.grade ?? null) as
+          | "N" | "S" | "A" | "B" | "C" | "J" | null;
 
         return ok({
           sku_id: skuId,
           sku_code: skuCode,
+          barcode,
           epc,
+          condition_grade: conditionGrade,
           stock_qty: finalSku?.stock_qty ?? 0,
           bound_epcs: boundCount,
           label: {
             sku_code: skuCode,
+            barcode,
             epc,
             name: body.name,
             price_cny: body.price_tier,
             grade: body.grade ?? null,
+            condition_grade: conditionGrade,
             location_name: loc.name,
             qrcode_payload: `vg://sku/${skuId}`,
           },

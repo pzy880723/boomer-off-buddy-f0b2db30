@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { HANDHELD_CORS, authenticateDevice, ok, err } from "@/server/handheld-auth.server";
+import { HANDHELD_CORS, authenticateDevice, ok } from "@/server/handheld-auth.server";
+import { errCode } from "@/lib/handheld/errors";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { RfidTransferReq } from "@/lib/handheld/schemas";
 
@@ -14,7 +15,7 @@ export const Route = createFileRoute("/api/public/handheld/rfid/transfer-locatio
         try {
           body = RfidTransferReq.parse(await request.json());
         } catch (e) {
-          return err("Invalid body", 400, { detail: String(e) });
+          return errCode("invalid_body", undefined, { detail: String(e) });
         }
 
         const { data: e } = await supabaseAdmin
@@ -22,11 +23,26 @@ export const Route = createFileRoute("/api/public/handheld/rfid/transfer-locatio
           .select("epc, sku_id, current_location_id")
           .eq("epc", body.epc)
           .maybeSingle();
-        if (!e || !e.sku_id) return err("EPC not bound", 404);
+        if (!e || !e.sku_id) return errCode("not_found", "EPC not bound");
 
         const from = e.current_location_id;
         const to = body.to_location_id;
         if (from === to) return ok({ epc: body.epc, from_location_id: from, to_location_id: to });
+
+        // Devices may only relocate items at their own location, unless device is a warehouse
+        if (auth.device.location_kind !== "warehouse" && from && from !== auth.device.location_id) {
+          return errCode(
+            "transfer_required",
+            "EPC currently belongs to another location; create a stock transfer instead",
+            { from_location_id: from, to_location_id: to },
+          );
+        }
+        if (auth.device.location_kind !== "warehouse" && to !== auth.device.location_id) {
+          return errCode("unauthorized_location", "Cannot relocate to a location other than current device", {
+            device_location_id: auth.device.location_id,
+            to_location_id: to,
+          });
+        }
 
         if (from) {
           const mv1 = await supabaseAdmin.rpc("inv_apply_movement", {
@@ -37,7 +53,7 @@ export const Route = createFileRoute("/api/public/handheld/rfid/transfer-locatio
             p_epc: body.epc,
             p_note: body.reason ?? null,
           } as never);
-          if (mv1.error) return err(mv1.error.message, 500);
+          if (mv1.error) return errCode("internal_error", mv1.error.message);
         }
         const mv2 = await supabaseAdmin.rpc("inv_apply_movement", {
           p_sku_id: e.sku_id,
@@ -47,7 +63,7 @@ export const Route = createFileRoute("/api/public/handheld/rfid/transfer-locatio
           p_epc: body.epc,
           p_note: body.reason ?? null,
         } as never);
-        if (mv2.error) return err(mv2.error.message, 500);
+        if (mv2.error) return errCode("internal_error", mv2.error.message);
 
         await supabaseAdmin
           .from("inv_epcs")
@@ -59,3 +75,4 @@ export const Route = createFileRoute("/api/public/handheld/rfid/transfer-locatio
     },
   },
 });
+

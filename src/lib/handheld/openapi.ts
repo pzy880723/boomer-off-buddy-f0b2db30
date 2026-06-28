@@ -9,8 +9,12 @@ import {
   AiListingImageRes,
   AiRecognizeReq,
   AiRecognizeRes,
+  AuthMeRes,
   AuthPingRes,
+  AuthRefreshReq,
+  AuthRefreshRes,
   ErrorResponse,
+  HandheldErrorCode,
   InboundScanReq,
   InboundScanRes,
   LocationsRes,
@@ -20,10 +24,13 @@ import {
   LoginRes,
   RfidBindReq,
   RfidBindRes,
+  RfidStockInReq,
+  RfidStockInRes,
   RfidTransferReq,
   RfidTransferRes,
   SkuByEpcQuery,
   SkuByEpcRes,
+  SkuDetailRes,
   SkuSearchQuery,
   SkuSearchRes,
   SmartCreateReq,
@@ -45,16 +52,18 @@ import {
 } from "./schemas";
 
 
-const SECURITY = [{ DeviceToken: [] }];
+
+const SECURITY = [{ DeviceToken: [], SessionToken: [] }];
 
 const ERROR_RESPONSES = {
-  "400": { description: "入参不合法", content: { "application/json": { schema: ErrorResponse } } },
-  "401": { description: "缺少 / 无效 token", content: { "application/json": { schema: ErrorResponse } } },
-  "403": { description: "设备被停用 / 库位/角色不匹配", content: { "application/json": { schema: ErrorResponse } } },
-  "404": { description: "资源不存在", content: { "application/json": { schema: ErrorResponse } } },
-  "409": { description: "状态冲突", content: { "application/json": { schema: ErrorResponse } } },
-  "422": { description: "校验失败（数量不一致等）", content: { "application/json": { schema: ErrorResponse } } },
-  "500": { description: "服务端错误", content: { "application/json": { schema: ErrorResponse } } },
+  "400": { description: "入参不合法（code: invalid_body / validation_error）", content: { "application/json": { schema: ErrorResponse } } },
+  "401": { description: "缺少 / 无效 token（code: unauthorized）", content: { "application/json": { schema: ErrorResponse } } },
+  "403": { description: "设备被停用 / 库位/角色不匹配（code: unauthorized_location）", content: { "application/json": { schema: ErrorResponse } } },
+  "404": { description: "资源不存在（code: not_found / unlinked）", content: { "application/json": { schema: ErrorResponse } } },
+  "409": { description: "状态冲突（code: already_exists / transfer_required）", content: { "application/json": { schema: ErrorResponse } } },
+  "422": { description: "校验失败（数量不一致等，code: validation_error）", content: { "application/json": { schema: ErrorResponse } } },
+  "429": { description: "限流（code: rate_limited / ai_credits_exhausted）", content: { "application/json": { schema: ErrorResponse } } },
+  "500": { description: "服务端错误（code: internal_error）", content: { "application/json": { schema: ErrorResponse } } },
 };
 
 const jsonBody = (schema: z.ZodType) => ({ content: { "application/json": { schema } } });
@@ -105,12 +114,22 @@ Token 由后台 **仓库管理 → 手持终端** 页面创建/复制。设备�
     },
   ],
   components: {
+    schemas: {
+      HandheldErrorCode,
+    },
     securitySchemes: {
       DeviceToken: {
         type: "apiKey",
         in: "header",
         name: "X-Device-Token",
-        description: "设备 token，由后台「手持终端」页面颁发。",
+        description: "设备 token，由后台「手持终端」页面颁发。所有写请求必须带。",
+      },
+      SessionToken: {
+        type: "apiKey",
+        in: "header",
+        name: "X-Session-Token",
+        description:
+          "操作员 Supabase access_token（来自 /auth/login）。所有写请求 + AI 请求都必须带；ERP 会按此关联操作员审计。",
       },
     },
   },
@@ -336,6 +355,48 @@ Token 由后台 **仓库管理 → 手持终端** 页面创建/复制。设备�
           "对应「这件东西被人挪到别的库位但没走调拨单」的情况。生成成对的 -1 / +1 movement。批量调拨请用 `transfer/*` 系列。",
         requestBody: jsonBody(RfidTransferReq),
         responses: { "200": jsonRes("OK", RfidTransferRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/rfid/stock-in": {
+      post: {
+        tags: ["RFID"],
+        summary: "裸 EPC 入库到待认领队列",
+        description:
+          "扫到一批未绑定 SKU 的标签时调用。已绑定的 EPC 会在 `already_bound` 里返回，APP 应改走 inbound/scan 或 transfer-location。",
+        requestBody: jsonBody(RfidStockInReq),
+        responses: { "200": jsonRes("OK", RfidStockInRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/auth/refresh": {
+      post: {
+        tags: ["账号"],
+        summary: "用 refresh_token 换新的 access_token",
+        description: "access_token 有效期 2 小时；refresh_token 由 Supabase 维护。",
+        requestBody: jsonBody(AuthRefreshReq),
+        responses: { "200": jsonRes("OK", AuthRefreshRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/auth/me": {
+      get: {
+        tags: ["账号"],
+        summary: "当前设备 + 操作员上下文",
+        description: "未带 X-Session-Token 时 user=null，APP 可以提示重新登录。",
+        responses: { "200": jsonRes("OK", AuthMeRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/auth/logout": {
+      post: {
+        tags: ["账号"],
+        summary: "登出当前操作员（吊销 session）",
+        responses: { "200": jsonRes("OK", AuthPingRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/items/{id}": {
+      get: {
+        tags: ["商品"],
+        summary: "SKU 详情（含 barcode / condition_grade / 多库位库存）",
+        requestParams: { path: z.object({ id: z.string().uuid() }) },
+        responses: { "200": jsonRes("OK", SkuDetailRes), ...ERROR_RESPONSES },
       },
     },
   },
