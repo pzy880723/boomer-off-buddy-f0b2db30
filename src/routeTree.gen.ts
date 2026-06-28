@@ -92,6 +92,7 @@ import { Route as ApiPublicHandheldStocktakeOpenRouteImport } from './routes/api
 import { Route as ApiPublicHandheldSkuSearchRouteImport } from './routes/api/public/handheld/sku.search'
 import { Route as ApiPublicHandheldSkuByEpcRouteImport } from './routes/api/public/handheld/sku.by-epc'
 import { Route as ApiPublicHandheldRfidTransferLocationRouteImport } from './routes/api/public/handheld/rfid.transfer-location'
+import { Route as ApiPublicHandheldRfidStockInRouteImport } from './routes/api/public/handheld/rfid.stock-in'
 import { Route as ApiPublicHandheldRfidBindItemRouteImport } from './routes/api/public/handheld/rfid.bind-item'
 import { Route as ApiPublicHandheldRfidEpcRouteImport } from './routes/api/public/handheld/rfid.$epc'
 import { Route as ApiPublicHandheldLocationSwitchRouteImport } from './routes/api/public/handheld/location.switch'
@@ -543,6 +544,12 @@ const ApiPublicHandheldRfidTransferLocationRoute =
     path: '/api/public/handheld/rfid/transfer-location',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHandheldRfidStockInRoute =
+  ApiPublicHandheldRfidStockInRouteImport.update({
+    id: '/api/public/handheld/rfid/stock-in',
+    path: '/api/public/handheld/rfid/stock-in',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHandheldRfidBindItemRoute =
   ApiPublicHandheldRfidBindItemRouteImport.update({
     id: '/api/public/handheld/rfid/bind-item',
@@ -721,6 +728,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/location/switch': typeof ApiPublicHandheldLocationSwitchRoute
   '/api/public/handheld/rfid/$epc': typeof ApiPublicHandheldRfidEpcRoute
   '/api/public/handheld/rfid/bind-item': typeof ApiPublicHandheldRfidBindItemRoute
+  '/api/public/handheld/rfid/stock-in': typeof ApiPublicHandheldRfidStockInRoute
   '/api/public/handheld/rfid/transfer-location': typeof ApiPublicHandheldRfidTransferLocationRoute
   '/api/public/handheld/sku/by-epc': typeof ApiPublicHandheldSkuByEpcRoute
   '/api/public/handheld/sku/search': typeof ApiPublicHandheldSkuSearchRoute
@@ -814,6 +822,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/location/switch': typeof ApiPublicHandheldLocationSwitchRoute
   '/api/public/handheld/rfid/$epc': typeof ApiPublicHandheldRfidEpcRoute
   '/api/public/handheld/rfid/bind-item': typeof ApiPublicHandheldRfidBindItemRoute
+  '/api/public/handheld/rfid/stock-in': typeof ApiPublicHandheldRfidStockInRoute
   '/api/public/handheld/rfid/transfer-location': typeof ApiPublicHandheldRfidTransferLocationRoute
   '/api/public/handheld/sku/by-epc': typeof ApiPublicHandheldSkuByEpcRoute
   '/api/public/handheld/sku/search': typeof ApiPublicHandheldSkuSearchRoute
@@ -915,6 +924,7 @@ export interface FileRoutesById {
   '/api/public/handheld/location/switch': typeof ApiPublicHandheldLocationSwitchRoute
   '/api/public/handheld/rfid/$epc': typeof ApiPublicHandheldRfidEpcRoute
   '/api/public/handheld/rfid/bind-item': typeof ApiPublicHandheldRfidBindItemRoute
+  '/api/public/handheld/rfid/stock-in': typeof ApiPublicHandheldRfidStockInRoute
   '/api/public/handheld/rfid/transfer-location': typeof ApiPublicHandheldRfidTransferLocationRoute
   '/api/public/handheld/sku/by-epc': typeof ApiPublicHandheldSkuByEpcRoute
   '/api/public/handheld/sku/search': typeof ApiPublicHandheldSkuSearchRoute
@@ -1017,6 +1027,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/location/switch'
     | '/api/public/handheld/rfid/$epc'
     | '/api/public/handheld/rfid/bind-item'
+    | '/api/public/handheld/rfid/stock-in'
     | '/api/public/handheld/rfid/transfer-location'
     | '/api/public/handheld/sku/by-epc'
     | '/api/public/handheld/sku/search'
@@ -1110,6 +1121,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/location/switch'
     | '/api/public/handheld/rfid/$epc'
     | '/api/public/handheld/rfid/bind-item'
+    | '/api/public/handheld/rfid/stock-in'
     | '/api/public/handheld/rfid/transfer-location'
     | '/api/public/handheld/sku/by-epc'
     | '/api/public/handheld/sku/search'
@@ -1210,6 +1222,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/location/switch'
     | '/api/public/handheld/rfid/$epc'
     | '/api/public/handheld/rfid/bind-item'
+    | '/api/public/handheld/rfid/stock-in'
     | '/api/public/handheld/rfid/transfer-location'
     | '/api/public/handheld/sku/by-epc'
     | '/api/public/handheld/sku/search'
@@ -1274,6 +1287,7 @@ export interface RootRouteChildren {
   ApiPublicHandheldLocationSwitchRoute: typeof ApiPublicHandheldLocationSwitchRoute
   ApiPublicHandheldRfidEpcRoute: typeof ApiPublicHandheldRfidEpcRoute
   ApiPublicHandheldRfidBindItemRoute: typeof ApiPublicHandheldRfidBindItemRoute
+  ApiPublicHandheldRfidStockInRoute: typeof ApiPublicHandheldRfidStockInRoute
   ApiPublicHandheldRfidTransferLocationRoute: typeof ApiPublicHandheldRfidTransferLocationRoute
   ApiPublicHandheldSkuByEpcRoute: typeof ApiPublicHandheldSkuByEpcRoute
   ApiPublicHandheldSkuSearchRoute: typeof ApiPublicHandheldSkuSearchRoute
@@ -1869,6 +1883,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldRfidTransferLocationRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/handheld/rfid/stock-in': {
+      id: '/api/public/handheld/rfid/stock-in'
+      path: '/api/public/handheld/rfid/stock-in'
+      fullPath: '/api/public/handheld/rfid/stock-in'
+      preLoaderRoute: typeof ApiPublicHandheldRfidStockInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/handheld/rfid/bind-item': {
       id: '/api/public/handheld/rfid/bind-item'
       path: '/api/public/handheld/rfid/bind-item'
@@ -2219,6 +2240,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHandheldLocationSwitchRoute: ApiPublicHandheldLocationSwitchRoute,
   ApiPublicHandheldRfidEpcRoute: ApiPublicHandheldRfidEpcRoute,
   ApiPublicHandheldRfidBindItemRoute: ApiPublicHandheldRfidBindItemRoute,
+  ApiPublicHandheldRfidStockInRoute: ApiPublicHandheldRfidStockInRoute,
   ApiPublicHandheldRfidTransferLocationRoute:
     ApiPublicHandheldRfidTransferLocationRoute,
   ApiPublicHandheldSkuByEpcRoute: ApiPublicHandheldSkuByEpcRoute,
