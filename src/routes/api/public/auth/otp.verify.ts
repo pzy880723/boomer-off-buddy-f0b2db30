@@ -20,8 +20,8 @@ function json(body: unknown, init: ResponseInit = {}) {
     },
   });
 }
-function ok<T extends object>(data: T) {
-  return json({ ok: true, ...data });
+function ok<T>(data: T) {
+  return json({ ok: true, data });
 }
 function err(message: string, status = 400, extra?: Record<string, unknown>) {
   return json({ ok: false, error: message, ...(extra || {}) }, { status });

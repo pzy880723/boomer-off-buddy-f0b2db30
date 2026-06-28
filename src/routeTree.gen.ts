@@ -112,6 +112,8 @@ import { Route as ApiPublicHandheldAuthLoginRouteImport } from './routes/api/pub
 import { Route as ApiPublicHandheldAuthBootstrapRouteImport } from './routes/api/public/handheld/auth.bootstrap'
 import { Route as ApiPublicHandheldAiRecognizeItemRouteImport } from './routes/api/public/handheld/ai.recognize-item'
 import { Route as ApiPublicHandheldAiPrepareListingImageRouteImport } from './routes/api/public/handheld/ai.prepare-listing-image'
+import { Route as ApiPublicAuthOtpVerifyRouteImport } from './routes/api/public/auth/otp.verify'
+import { Route as ApiPublicAuthOtpSendRouteImport } from './routes/api/public/auth/otp.send'
 import { Route as ApiPublicHandheldItemsUploadImageMultipartRouteImport } from './routes/api/public/handheld/items.upload-image.multipart'
 import { Route as ApiPublicHandheldItemsIdSyncStatusRouteImport } from './routes/api/public/handheld/items.$id.sync-status'
 
@@ -668,6 +670,16 @@ const ApiPublicHandheldAiPrepareListingImageRoute =
     path: '/api/public/handheld/ai/prepare-listing-image',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicAuthOtpVerifyRoute = ApiPublicAuthOtpVerifyRouteImport.update({
+  id: '/api/public/auth/otp/verify',
+  path: '/api/public/auth/otp/verify',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicAuthOtpSendRoute = ApiPublicAuthOtpSendRouteImport.update({
+  id: '/api/public/auth/otp/send',
+  path: '/api/public/auth/otp/send',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicHandheldItemsUploadImageMultipartRoute =
   ApiPublicHandheldItemsUploadImageMultipartRouteImport.update({
     id: '/multipart',
@@ -756,6 +768,8 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
   '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
+  '/api/public/auth/otp/send': typeof ApiPublicAuthOtpSendRoute
+  '/api/public/auth/otp/verify': typeof ApiPublicAuthOtpVerifyRoute
   '/api/public/handheld/ai/prepare-listing-image': typeof ApiPublicHandheldAiPrepareListingImageRoute
   '/api/public/handheld/ai/recognize-item': typeof ApiPublicHandheldAiRecognizeItemRoute
   '/api/public/handheld/auth/bootstrap': typeof ApiPublicHandheldAuthBootstrapRoute
@@ -856,6 +870,8 @@ export interface FileRoutesByTo {
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
   '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
+  '/api/public/auth/otp/send': typeof ApiPublicAuthOtpSendRoute
+  '/api/public/auth/otp/verify': typeof ApiPublicAuthOtpVerifyRoute
   '/api/public/handheld/ai/prepare-listing-image': typeof ApiPublicHandheldAiPrepareListingImageRoute
   '/api/public/handheld/ai/recognize-item': typeof ApiPublicHandheldAiRecognizeItemRoute
   '/api/public/handheld/auth/bootstrap': typeof ApiPublicHandheldAuthBootstrapRoute
@@ -964,6 +980,8 @@ export interface FileRoutesById {
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
   '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
+  '/api/public/auth/otp/send': typeof ApiPublicAuthOtpSendRoute
+  '/api/public/auth/otp/verify': typeof ApiPublicAuthOtpVerifyRoute
   '/api/public/handheld/ai/prepare-listing-image': typeof ApiPublicHandheldAiPrepareListingImageRoute
   '/api/public/handheld/ai/recognize-item': typeof ApiPublicHandheldAiRecognizeItemRoute
   '/api/public/handheld/auth/bootstrap': typeof ApiPublicHandheldAuthBootstrapRoute
@@ -1073,6 +1091,8 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-reconcile'
     | '/api/public/hooks/youzan-stock-worker'
     | '/api/public/hooks/youzan-sync-worker'
+    | '/api/public/auth/otp/send'
+    | '/api/public/auth/otp/verify'
     | '/api/public/handheld/ai/prepare-listing-image'
     | '/api/public/handheld/ai/recognize-item'
     | '/api/public/handheld/auth/bootstrap'
@@ -1173,6 +1193,8 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-reconcile'
     | '/api/public/hooks/youzan-stock-worker'
     | '/api/public/hooks/youzan-sync-worker'
+    | '/api/public/auth/otp/send'
+    | '/api/public/auth/otp/verify'
     | '/api/public/handheld/ai/prepare-listing-image'
     | '/api/public/handheld/ai/recognize-item'
     | '/api/public/handheld/auth/bootstrap'
@@ -1280,6 +1302,8 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-reconcile'
     | '/api/public/hooks/youzan-stock-worker'
     | '/api/public/hooks/youzan-sync-worker'
+    | '/api/public/auth/otp/send'
+    | '/api/public/auth/otp/verify'
     | '/api/public/handheld/ai/prepare-listing-image'
     | '/api/public/handheld/ai/recognize-item'
     | '/api/public/handheld/auth/bootstrap'
@@ -1350,6 +1374,8 @@ export interface RootRouteChildren {
   ApiPublicHooksYouzanReconcileRoute: typeof ApiPublicHooksYouzanReconcileRoute
   ApiPublicHooksYouzanStockWorkerRoute: typeof ApiPublicHooksYouzanStockWorkerRoute
   ApiPublicHooksYouzanSyncWorkerRoute: typeof ApiPublicHooksYouzanSyncWorkerRoute
+  ApiPublicAuthOtpSendRoute: typeof ApiPublicAuthOtpSendRoute
+  ApiPublicAuthOtpVerifyRoute: typeof ApiPublicAuthOtpVerifyRoute
   ApiPublicHandheldAiPrepareListingImageRoute: typeof ApiPublicHandheldAiPrepareListingImageRoute
   ApiPublicHandheldAiRecognizeItemRoute: typeof ApiPublicHandheldAiRecognizeItemRoute
   ApiPublicHandheldAuthBootstrapRoute: typeof ApiPublicHandheldAuthBootstrapRoute
@@ -2104,6 +2130,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldAiPrepareListingImageRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/auth/otp/verify': {
+      id: '/api/public/auth/otp/verify'
+      path: '/api/public/auth/otp/verify'
+      fullPath: '/api/public/auth/otp/verify'
+      preLoaderRoute: typeof ApiPublicAuthOtpVerifyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/auth/otp/send': {
+      id: '/api/public/auth/otp/send'
+      path: '/api/public/auth/otp/send'
+      fullPath: '/api/public/auth/otp/send'
+      preLoaderRoute: typeof ApiPublicAuthOtpSendRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/handheld/items/upload-image/multipart': {
       id: '/api/public/handheld/items/upload-image/multipart'
       path: '/multipart'
@@ -2363,6 +2403,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksYouzanReconcileRoute: ApiPublicHooksYouzanReconcileRoute,
   ApiPublicHooksYouzanStockWorkerRoute: ApiPublicHooksYouzanStockWorkerRoute,
   ApiPublicHooksYouzanSyncWorkerRoute: ApiPublicHooksYouzanSyncWorkerRoute,
+  ApiPublicAuthOtpSendRoute: ApiPublicAuthOtpSendRoute,
+  ApiPublicAuthOtpVerifyRoute: ApiPublicAuthOtpVerifyRoute,
   ApiPublicHandheldAiPrepareListingImageRoute:
     ApiPublicHandheldAiPrepareListingImageRoute,
   ApiPublicHandheldAiRecognizeItemRoute: ApiPublicHandheldAiRecognizeItemRoute,
