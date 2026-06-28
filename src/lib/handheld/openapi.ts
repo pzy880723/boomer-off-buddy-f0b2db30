@@ -9,8 +9,12 @@ import {
   AiListingImageRes,
   AiRecognizeReq,
   AiRecognizeRes,
+  AuthMeRes,
   AuthPingRes,
+  AuthRefreshReq,
+  AuthRefreshRes,
   ErrorResponse,
+  HandheldErrorCode,
   InboundScanReq,
   InboundScanRes,
   LocationsRes,
@@ -20,10 +24,13 @@ import {
   LoginRes,
   RfidBindReq,
   RfidBindRes,
+  RfidStockInReq,
+  RfidStockInRes,
   RfidTransferReq,
   RfidTransferRes,
   SkuByEpcQuery,
   SkuByEpcRes,
+  SkuDetailRes,
   SkuSearchQuery,
   SkuSearchRes,
   SmartCreateReq,
@@ -43,6 +50,7 @@ import {
   UploadImageReq,
   UploadImageRes,
 } from "./schemas";
+
 
 
 const SECURITY = [{ DeviceToken: [] }];
