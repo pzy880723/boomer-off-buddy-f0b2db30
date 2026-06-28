@@ -1627,6 +1627,7 @@ export type Database = {
       }
       stocktake_scans: {
         Row: {
+          device_id: string | null
           epc: string
           id: string
           scanned_at: string
@@ -1634,6 +1635,7 @@ export type Database = {
           stocktake_id: string
         }
         Insert: {
+          device_id?: string | null
           epc: string
           id?: string
           scanned_at?: string
@@ -1641,6 +1643,7 @@ export type Database = {
           stocktake_id: string
         }
         Update: {
+          device_id?: string | null
           epc?: string
           id?: string
           scanned_at?: string
@@ -1648,6 +1651,13 @@ export type Database = {
           stocktake_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "stocktake_scans_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "inv_handheld_devices"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "stocktake_scans_sku_id_fkey"
             columns: ["sku_id"]
