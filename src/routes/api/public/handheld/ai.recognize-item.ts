@@ -10,11 +10,11 @@ export const Route = createFileRoute("/api/public/handheld/ai/recognize-item")({
       POST: async ({ request }) => {
         const auth = await authenticateDevice(request);
         if (!auth.ok) return auth.response;
-        let body: { image_url?: string; image_base64?: string; hint?: string };
+        let body: ReturnType<typeof AiRecognizeReq.parse>;
         try {
           body = AiRecognizeReq.parse(await request.json());
         } catch (e) {
-          return err("Invalid body", 400, { detail: String(e) });
+          return err("Invalid body", 400, { code: "validation_error", detail: String(e) });
         }
         try {
           const out = await aiRecognizeItem(body);
