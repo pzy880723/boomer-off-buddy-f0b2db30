@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { HANDHELD_CORS, authenticateDevice, ok, err } from "@/server/handheld-auth.server";
+import { HANDHELD_CORS, authenticateDevice, ok } from "@/server/handheld-auth.server";
+import { errCode } from "@/lib/handheld/errors";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { RfidBindReq } from "@/lib/handheld/schemas";
 
@@ -14,17 +15,29 @@ export const Route = createFileRoute("/api/public/handheld/rfid/bind-item")({
         try {
           body = RfidBindReq.parse(await request.json());
         } catch (e) {
-          return err("Invalid body", 400, { detail: String(e) });
+          return errCode("invalid_body", undefined, { detail: String(e) });
         }
         const locationId = body.location_id ?? auth.device.location_id;
-        if (!locationId) return err("No target location", 400);
+        if (!locationId) return errCode("validation_error", "No target location");
 
         const { data: sku } = await supabaseAdmin
           .from("inv_skus")
           .select("id")
           .eq("id", body.sku_id)
           .maybeSingle();
-        if (!sku) return err("SKU not found", 404);
+        if (!sku) return errCode("not_found", "SKU not found");
+
+        // If EPC already exists and is bound to a different SKU, return already_exists
+        const { data: existing } = await supabaseAdmin
+          .from("inv_epcs")
+          .select("epc, sku_id")
+          .eq("epc", body.epc)
+          .maybeSingle();
+        if (existing?.sku_id && existing.sku_id !== body.sku_id) {
+          return errCode("already_exists", "EPC already bound to another SKU", {
+            bound_sku_id: existing.sku_id,
+          });
+        }
 
         const up = await supabaseAdmin
           .from("inv_epcs")
@@ -38,7 +51,7 @@ export const Route = createFileRoute("/api/public/handheld/rfid/bind-item")({
             },
             { onConflict: "epc" },
           );
-        if (up.error) return err(up.error.message, 500);
+        if (up.error) return errCode("internal_error", up.error.message);
 
         await supabaseAdmin.from("inv_unclaimed_epcs").delete().eq("epc", body.epc);
 
@@ -50,7 +63,7 @@ export const Route = createFileRoute("/api/public/handheld/rfid/bind-item")({
           p_epc: body.epc,
           p_note: `device:${auth.device.device_code}`,
         } as never);
-        if (mv.error) return err(mv.error.message, 500);
+        if (mv.error) return errCode("internal_error", mv.error.message);
 
         return ok({
           epc: body.epc,
@@ -62,3 +75,4 @@ export const Route = createFileRoute("/api/public/handheld/rfid/bind-item")({
     },
   },
 });
+
