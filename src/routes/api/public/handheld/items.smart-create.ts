@@ -153,7 +153,7 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
         const conditionGrade = ((finalSku as any)?.grade ?? body.grade ?? null) as
           | "N" | "S" | "A" | "B" | "C" | "J" | null;
 
-        return ok({
+        const responseBody = {
           sku_id: skuId,
           sku_code: skuCode,
           barcode,
@@ -172,8 +172,24 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
             location_name: loc.name,
             qrcode_payload: `vg://sku/${skuId}`,
           },
+          print_payload: buildPrintPayload({
+            sku_code: skuCode,
+            barcode,
+            name: body.name,
+            price_tier: body.price_tier,
+            grade: body.grade ?? null,
+            condition_grade: conditionGrade,
+          }),
           youzan_sync_status: syncStatus,
+        };
+        await recordOp({
+          deviceId: auth.device.id,
+          clientOpId: body.client_op_id,
+          opType: "items.smart-create",
+          status: 200,
+          body: { ok: true, data: responseBody },
         });
+        return ok(responseBody);
       },
     },
   },
