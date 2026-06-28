@@ -48,7 +48,7 @@ const EMPTY_ORDER: BulkOrderFormValue = {
   delivered_at: null,
   invoice_no: null,
   contract_no: null,
-  pay_method: null,
+  pay_method: "微信",
   attachment_urls: [],
   notes: null,
 };
@@ -79,7 +79,34 @@ export function BulkOrderForm({
   });
   const [lines, setLines] = useState<BulkLineFormValue[]>(initialLines ?? []);
   const [uploading, setUploading] = useState(false);
+  const [showLogistics, setShowLogistics] = useState(
+    !!(initialOrder?.carrier || initialOrder?.tracking_no || initialOrder?.delivered_at || initialOrder?.receiver_address),
+  );
+  const [showInvoice, setShowInvoice] = useState(!!(initialOrder?.invoice_no || initialOrder?.contract_no));
+  const [customAddress, setCustomAddress] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const listAddrFn = useServerFn(listAddresses);
+  const { data: addresses = [] } = useQuery({
+    queryKey: ["org-addresses"],
+    queryFn: () => listAddrFn(),
+  });
+
+  // 自动带入默认地址（仅当订单尚未填写地址时）
+  useEffect(() => {
+    if (addresses.length === 0) return;
+    if (order.receiver_address) return;
+    const def = (addresses as OrgAddress[]).find((a) => a.is_default) ?? addresses[0];
+    if (def) {
+      setOrder((prev) => ({
+        ...prev,
+        receiver_name: prev.receiver_name ?? def.receiver_name,
+        receiver_phone: prev.receiver_phone ?? def.receiver_phone,
+        receiver_address: prev.receiver_address ?? def.address,
+      }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addresses.length]);
 
   useEffect(() => {
     onChange(order, lines);
