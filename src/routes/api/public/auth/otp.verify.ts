@@ -172,14 +172,12 @@ export const Route = createFileRoute("/api/public/auth/otp/verify")({
         // 不带 install_id → Web 模式
         if (!body.install_id) {
           return ok({
-            data: {
-              session: {
-                access_token: session.access_token,
-                refresh_token: session.refresh_token,
-                expires_at: session.expires_at ?? 0,
-              },
-              user: userPayload,
+            session: {
+              access_token: session.access_token,
+              refresh_token: session.refresh_token,
+              expires_at: session.expires_at ?? 0,
             },
+            user: userPayload,
           });
         }
 
