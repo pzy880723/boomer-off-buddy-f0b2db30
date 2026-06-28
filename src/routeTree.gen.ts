@@ -98,6 +98,7 @@ import { Route as ApiPublicHandheldLocationSwitchRouteImport } from './routes/ap
 import { Route as ApiPublicHandheldItemsUploadImageRouteImport } from './routes/api/public/handheld/items.upload-image'
 import { Route as ApiPublicHandheldItemsSmartCreateRouteImport } from './routes/api/public/handheld/items.smart-create'
 import { Route as ApiPublicHandheldInboundScanRouteImport } from './routes/api/public/handheld/inbound.scan'
+import { Route as ApiPublicHandheldAuthRefreshRouteImport } from './routes/api/public/handheld/auth.refresh'
 import { Route as ApiPublicHandheldAuthPingRouteImport } from './routes/api/public/handheld/auth.ping'
 import { Route as ApiPublicHandheldAuthLoginRouteImport } from './routes/api/public/handheld/auth.login'
 import { Route as ApiPublicHandheldAiRecognizeItemRouteImport } from './routes/api/public/handheld/ai.recognize-item'
@@ -575,6 +576,12 @@ const ApiPublicHandheldInboundScanRoute =
     path: '/api/public/handheld/inbound/scan',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHandheldAuthRefreshRoute =
+  ApiPublicHandheldAuthRefreshRouteImport.update({
+    id: '/api/public/handheld/auth/refresh',
+    path: '/api/public/handheld/auth/refresh',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHandheldAuthPingRoute =
   ApiPublicHandheldAuthPingRouteImport.update({
     id: '/api/public/handheld/auth/ping',
@@ -684,6 +691,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/ai/recognize-item': typeof ApiPublicHandheldAiRecognizeItemRoute
   '/api/public/handheld/auth/login': typeof ApiPublicHandheldAuthLoginRoute
   '/api/public/handheld/auth/ping': typeof ApiPublicHandheldAuthPingRoute
+  '/api/public/handheld/auth/refresh': typeof ApiPublicHandheldAuthRefreshRoute
   '/api/public/handheld/inbound/scan': typeof ApiPublicHandheldInboundScanRoute
   '/api/public/handheld/items/smart-create': typeof ApiPublicHandheldItemsSmartCreateRoute
   '/api/public/handheld/items/upload-image': typeof ApiPublicHandheldItemsUploadImageRoute
@@ -773,6 +781,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/ai/recognize-item': typeof ApiPublicHandheldAiRecognizeItemRoute
   '/api/public/handheld/auth/login': typeof ApiPublicHandheldAuthLoginRoute
   '/api/public/handheld/auth/ping': typeof ApiPublicHandheldAuthPingRoute
+  '/api/public/handheld/auth/refresh': typeof ApiPublicHandheldAuthRefreshRoute
   '/api/public/handheld/inbound/scan': typeof ApiPublicHandheldInboundScanRoute
   '/api/public/handheld/items/smart-create': typeof ApiPublicHandheldItemsSmartCreateRoute
   '/api/public/handheld/items/upload-image': typeof ApiPublicHandheldItemsUploadImageRoute
@@ -870,6 +879,7 @@ export interface FileRoutesById {
   '/api/public/handheld/ai/recognize-item': typeof ApiPublicHandheldAiRecognizeItemRoute
   '/api/public/handheld/auth/login': typeof ApiPublicHandheldAuthLoginRoute
   '/api/public/handheld/auth/ping': typeof ApiPublicHandheldAuthPingRoute
+  '/api/public/handheld/auth/refresh': typeof ApiPublicHandheldAuthRefreshRoute
   '/api/public/handheld/inbound/scan': typeof ApiPublicHandheldInboundScanRoute
   '/api/public/handheld/items/smart-create': typeof ApiPublicHandheldItemsSmartCreateRoute
   '/api/public/handheld/items/upload-image': typeof ApiPublicHandheldItemsUploadImageRoute
@@ -968,6 +978,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/ai/recognize-item'
     | '/api/public/handheld/auth/login'
     | '/api/public/handheld/auth/ping'
+    | '/api/public/handheld/auth/refresh'
     | '/api/public/handheld/inbound/scan'
     | '/api/public/handheld/items/smart-create'
     | '/api/public/handheld/items/upload-image'
@@ -1057,6 +1068,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/ai/recognize-item'
     | '/api/public/handheld/auth/login'
     | '/api/public/handheld/auth/ping'
+    | '/api/public/handheld/auth/refresh'
     | '/api/public/handheld/inbound/scan'
     | '/api/public/handheld/items/smart-create'
     | '/api/public/handheld/items/upload-image'
@@ -1153,6 +1165,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/ai/recognize-item'
     | '/api/public/handheld/auth/login'
     | '/api/public/handheld/auth/ping'
+    | '/api/public/handheld/auth/refresh'
     | '/api/public/handheld/inbound/scan'
     | '/api/public/handheld/items/smart-create'
     | '/api/public/handheld/items/upload-image'
@@ -1213,6 +1226,7 @@ export interface RootRouteChildren {
   ApiPublicHandheldAiRecognizeItemRoute: typeof ApiPublicHandheldAiRecognizeItemRoute
   ApiPublicHandheldAuthLoginRoute: typeof ApiPublicHandheldAuthLoginRoute
   ApiPublicHandheldAuthPingRoute: typeof ApiPublicHandheldAuthPingRoute
+  ApiPublicHandheldAuthRefreshRoute: typeof ApiPublicHandheldAuthRefreshRoute
   ApiPublicHandheldInboundScanRoute: typeof ApiPublicHandheldInboundScanRoute
   ApiPublicHandheldItemsSmartCreateRoute: typeof ApiPublicHandheldItemsSmartCreateRoute
   ApiPublicHandheldItemsUploadImageRoute: typeof ApiPublicHandheldItemsUploadImageRoute
@@ -1857,6 +1871,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldInboundScanRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/handheld/auth/refresh': {
+      id: '/api/public/handheld/auth/refresh'
+      path: '/api/public/handheld/auth/refresh'
+      fullPath: '/api/public/handheld/auth/refresh'
+      preLoaderRoute: typeof ApiPublicHandheldAuthRefreshRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/handheld/auth/ping': {
       id: '/api/public/handheld/auth/ping'
       path: '/api/public/handheld/auth/ping'
@@ -2110,6 +2131,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHandheldAiRecognizeItemRoute: ApiPublicHandheldAiRecognizeItemRoute,
   ApiPublicHandheldAuthLoginRoute: ApiPublicHandheldAuthLoginRoute,
   ApiPublicHandheldAuthPingRoute: ApiPublicHandheldAuthPingRoute,
+  ApiPublicHandheldAuthRefreshRoute: ApiPublicHandheldAuthRefreshRoute,
   ApiPublicHandheldInboundScanRoute: ApiPublicHandheldInboundScanRoute,
   ApiPublicHandheldItemsSmartCreateRoute:
     ApiPublicHandheldItemsSmartCreateRoute,
