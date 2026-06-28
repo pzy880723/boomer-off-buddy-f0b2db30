@@ -71,7 +71,7 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
               stock_qty: 0,
               status: "active",
             })
-            .select("id, sku_code, epc")
+            .select("id, sku_code, epc, barcode, grade")
             .single();
           if (ins.error || !ins.data) return err(`Create SKU failed: ${ins.error?.message}`, 500);
           skuId = ins.data.id;
