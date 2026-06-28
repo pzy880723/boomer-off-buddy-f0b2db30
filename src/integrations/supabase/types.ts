@@ -307,10 +307,12 @@ export type Database = {
           default_location_id: string | null
           device_code: string
           id: string
+          install_id: string | null
           is_active: boolean
           label: string
           last_seen_at: string | null
           os_version: string | null
+          owner_user_id: string | null
           token: string
           updated_at: string
         }
@@ -321,10 +323,12 @@ export type Database = {
           default_location_id?: string | null
           device_code: string
           id?: string
+          install_id?: string | null
           is_active?: boolean
           label: string
           last_seen_at?: string | null
           os_version?: string | null
+          owner_user_id?: string | null
           token: string
           updated_at?: string
         }
@@ -335,10 +339,12 @@ export type Database = {
           default_location_id?: string | null
           device_code?: string
           id?: string
+          install_id?: string | null
           is_active?: boolean
           label?: string
           last_seen_at?: string | null
           os_version?: string | null
+          owner_user_id?: string | null
           token?: string
           updated_at?: string
         }
