@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
 import { HANDHELD_CORS, ok, err } from "@/server/handheld-auth.server";
 import { BootstrapReq } from "@/lib/handheld/schemas";
+import { phoneToEmail, PHONE_REGEX } from "@/lib/auth-config";
 
 function genDeviceCode() {
   // HH-XXXXXXXX
@@ -36,9 +37,21 @@ export const Route = createFileRoute("/api/public/handheld/auth/bootstrap")({
           process.env.SUPABASE_PUBLISHABLE_KEY!,
           { auth: { persistSession: false, autoRefreshToken: false } },
         );
-        const { data: signIn, error: signInErr } = body.email
-          ? await sb.auth.signInWithPassword({ email: body.email, password: body.password })
-          : await sb.auth.signInWithPassword({ phone: body.phone!, password: body.password });
+        // 统一走 phoneToEmail 伪邮箱方案，避免依赖 Supabase 原生 phone provider。
+        let email: string;
+        if (body.email) {
+          email = body.email;
+        } else {
+          const phone = (body.phone ?? "").trim();
+          if (!PHONE_REGEX.test(phone)) {
+            return err("手机号格式不正确", 400, { code: "invalid_body" });
+          }
+          email = phoneToEmail(phone);
+        }
+        const { data: signIn, error: signInErr } = await sb.auth.signInWithPassword({
+          email,
+          password: body.password,
+        });
         if (signInErr || !signIn.session || !signIn.user) {
           return err(signInErr?.message || "Invalid credentials", 401, { code: "unauthorized" });
         }
