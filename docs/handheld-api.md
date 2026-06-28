@@ -22,6 +22,8 @@
 - 生产 Base URL：`https://boomer-off-buddy.lovable.app`
 - 预览 Base URL：`https://project--2158bffa-7f82-4bc6-9df9-c59319d262f7-dev.lovable.app`
 
+> ⚠️ ERP 改动后必须在 Lovable 顶部点 **Publish / Update**，否则生产站 `boomer-off-buddy.lovable.app/api/public/handheld/*` 仍是旧版本（症状：`openapi.json` 或新接口 404）。预览站会跟随每次保存自动更新。
+
 ## 接口清单
 
 | 分组 | 方法 + 路径 | 说明 |
