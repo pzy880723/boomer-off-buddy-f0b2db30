@@ -571,6 +571,7 @@ export const RfidTransferRes = okEnvelope(
 export const RfidStockInReq = z
   .object({
     epcs: z.array(epcSchema).min(1).max(500),
+    client_op_id: ClientOpId.optional(),
   })
   .meta({ id: "RfidStockInReq" });
 
