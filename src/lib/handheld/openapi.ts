@@ -265,17 +265,29 @@ Token 由后台 **仓库管理 → 手持终端** 页面创建/复制。设备�
         responses: { "200": jsonRes("OK", TransferReceiveConfirmRes), ...ERROR_RESPONSES },
       },
     },
+    "/api/public/handheld/auth/bootstrap": {
+      post: {
+        tags: ["账号"],
+        summary: "APP 自助引导：登录即拿 device_token + access_token（v1.3）",
+        description:
+          "**不需要 X-Device-Token**。APP 首装时生成稳定 `install_id` 持久化，然后用 ERP 邮箱/手机号 + 密码调本接口。服务端按 (owner_user_id, install_id) upsert 设备，自动颁发 device_token；首登设备的 `default_location_id` 为 null，APP 再调 `/location/switch` 让用户选库位。",
+        security: [],
+        requestBody: jsonBody(BootstrapReq),
+        responses: { "200": jsonRes("OK", BootstrapRes), ...ERROR_RESPONSES },
+      },
+    },
     "/api/public/handheld/auth/login": {
       post: {
         tags: ["账号"],
 
-        summary: "操作员登录（邮箱 + 密码）",
+        summary: "操作员登录（旧：需要后台预创建设备 + X-Device-Token）",
         description:
-          "复用 ERP 后台 Supabase 账号体系。返回 access_token，APP 后续可放到 `X-Session-Token` Header 让 ERP 关联操作员；同时返回所有 active 库位列表，APP 让店员选当前操作库位。",
+          "保留兼容。新接入请用 `/auth/bootstrap`，一次登录即可同时拿 device_token + access_token，无需后台手动建设备。",
         requestBody: jsonBody(LoginReq),
         responses: { "200": jsonRes("OK", LoginRes), ...ERROR_RESPONSES },
       },
     },
+
     "/api/public/handheld/locations": {
       get: {
         tags: ["账号"],
