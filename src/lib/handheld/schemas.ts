@@ -203,6 +203,16 @@ export const StocktakeOpenReq = z
   .object({ name: z.string().optional().meta({ description: "可选备注" }) })
   .meta({ id: "StocktakeOpenReq" });
 
+export const StocktakeParticipant = z
+  .object({
+    device_id: uuidSchema,
+    device_code: z.string().nullable(),
+    label: z.string().nullable(),
+    scan_count: z.number().int(),
+    last_scan_at: z.string().datetime().nullable(),
+  })
+  .meta({ id: "StocktakeParticipant" });
+
 export const StocktakeSummarySchema = z
   .object({
     id: uuidSchema,
@@ -212,6 +222,10 @@ export const StocktakeSummarySchema = z
     reused: z
       .boolean()
       .meta({ description: "true=复用了同库位的已开盘点单；false=新建" }),
+    participants: z
+      .array(StocktakeParticipant)
+      .default([])
+      .meta({ description: "v1.2：当前正在协作的 PDA 列表（按最近扫描时间）" }),
   })
   .meta({ id: "StocktakeSummary" });
 
@@ -221,6 +235,7 @@ export const StocktakeScanReq = z
   .object({
     stocktake_id: uuidSchema,
     epcs: z.array(epcSchema).min(1).max(1000),
+    client_op_id: ClientOpId.optional(),
   })
   .meta({ id: "StocktakeScanReq" });
 
@@ -229,6 +244,7 @@ export const StocktakeScanRes = okEnvelope(
     received: z.number().int(),
     unknown_count: z.number().int(),
     unknown: z.array(epcSchema),
+    participants: z.array(StocktakeParticipant).default([]),
   }),
 );
 
