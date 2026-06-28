@@ -17,11 +17,39 @@ import * as z from "zod";
 // 通用
 // ============================================================
 
+/**
+ * 业务错误码（APP 直接按 code 做页面提示）。
+ *  - unauthorized：401，缺失/失效 token
+ *  - unauthorized_location：401，session 当前 location 与请求不符
+ *  - invalid_body：400，请求体不是合法 JSON / 缺字段
+ *  - validation_error：422，Zod 校验失败（detail 含字段路径）
+ *  - not_found：404，资源不存在
+ *  - unlinked：404，EPC 未绑定任何 SKU（GET /rfid/{epc}）
+ *  - already_exists：409，barcode / EPC 已绑到其它 SKU
+ *  - transfer_required：409，EPC 当前不在本 location，需要走调拨流程
+ *  - rate_limited：429，AI 网关限流
+ *  - ai_credits_exhausted：402，AI 网关额度耗尽
+ *  - internal_error：500
+ */
+export const HandheldErrorCode = z.enum([
+  "unauthorized",
+  "unauthorized_location",
+  "invalid_body",
+  "validation_error",
+  "not_found",
+  "unlinked",
+  "already_exists",
+  "transfer_required",
+  "rate_limited",
+  "ai_credits_exhausted",
+  "internal_error",
+]);
+
 export const ErrorResponse = z
   .object({
     ok: z.literal(false),
+    code: HandheldErrorCode.optional().meta({ description: "业务错误码；APP 按此分支" }),
     error: z.string().meta({ description: "人类可读错误信息", example: "Invalid body" }),
-    code: z.string().optional().meta({ description: "可选机器可读错误码" }),
     detail: z.string().optional(),
     issues: z.array(z.string()).optional(),
     missingReceive: z.array(z.string()).optional(),
