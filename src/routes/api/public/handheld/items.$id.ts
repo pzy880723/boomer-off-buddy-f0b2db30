@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { HANDHELD_CORS, authenticateDevice, ok } from "@/server/handheld-auth.server";
 import { errCode } from "@/lib/handheld/errors";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { buildPrintPayload } from "@/server/handheld-print.server";
 
 export const Route = createFileRoute("/api/public/handheld/items/$id")({
   server: {
