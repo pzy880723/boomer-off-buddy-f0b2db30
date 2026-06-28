@@ -1,128 +1,96 @@
+# 给 Codex 的协作清单（APP 端升级 + AI 对接）
 
-## 背景
-
-当前 Web 登录其实是「手机号 → `phoneToEmail()` 转伪邮箱 → Supabase 邮箱密码登录」，所以能成功。
-而 APP bootstrap 里 `body.phone` 直接走了 `signInWithPassword({ phone })`，命中 Supabase 原生 phone provider —— 后台没开 → 422 `phone_provider_disabled`。
-
-目标：
-1. 立刻修好 APP 手机号密码登录（不开 Supabase phone provider，复用 `phoneToEmail`）。
-2. 新增「手机验证码登录」，Web、APP 双端可用；原密码登录保留。
-3. 短信通道：腾讯云 SMS。
+下面分成三段：① 可以直接发给 Codex 的话术；② APP 登录入口要做的事；③ AI 部分要对接的事。Lovable 这边不需要再改后端，全部接口已经上线在 `https://boomer-off-buddy.lovable.app`。
 
 ---
 
-## Phase A · 修 bootstrap 的手机号密码登录（5 分钟）
+## 一、直接发给 Codex 的话术（可复制粘贴）
 
-`src/routes/api/public/handheld/auth.bootstrap.ts` 里把：
-
-```
-body.email ? signInWithPassword({email}) : signInWithPassword({phone: body.phone!})
-```
-
-改成统一走邮箱：
-
-```
-const email = body.email ?? phoneToEmail(body.phone!)
-signInWithPassword({ email, password: body.password })
-```
-
-这样 APP 用「ERP 手机号 + 密码」就能直接登录，和 Web 完全一致。
-
----
-
-## Phase B · 手机验证码登录
-
-### B1. 短信通道：腾讯云 SMS
-
-需要新增 4 个 secret（用 `add_secret` 让用户填）：
-
-- `TENCENTCLOUD_SECRET_ID`
-- `TENCENTCLOUD_SECRET_KEY`
-- `TENCENT_SMS_SDK_APP_ID`（SmsSdkAppId，1400xxxxxx）
-- `TENCENT_SMS_SIGN_NAME`（已审核通过的签名，例如「博墨严选」）
-- `TENCENT_SMS_TEMPLATE_ID`（验证码模板 ID，模板内容形如「您的验证码是 {1}，5 分钟内有效。」）
-
-实现一个服务端 helper `src/server/sms.tencent.server.ts`，按腾讯云 TC3-HMAC-SHA256 签名直接 fetch `https://sms.tencentcloudapi.com`（不引入 SDK，避免 Worker 兼容性问题）。
-
-### B2. 数据表：`auth_phone_otp`
-
-```text
-auth_phone_otp
-- id uuid pk
-- phone text       (11 位)
-- code_hash text   (sha256(code + phone))
-- purpose text     ('login')
-- expires_at timestamptz   (now() + 5 min)
-- consumed_at timestamptz
-- attempts int default 0
-- ip text, user_agent text
-- created_at timestamptz
-索引：(phone, created_at desc)
-```
-
-RLS：仅 `service_role`，匿名/认证均无权限（接口走 service role）。
-另加 `cleanup_expired_otp()` 定时清理（可选，先不接 cron）。
-
-### B3. 公共 API（两个路由，都在 `/api/public/auth/otp/*`，不需要鉴权）
-
-`POST /api/public/auth/otp/send`
-- body: `{ phone: string, purpose?: 'login' }`
-- 校验：手机号格式；同 phone 60 秒内只能发 1 次，10 分钟内最多 5 次，单 IP 1 小时最多 20 次。
-- 生成 6 位数字 → 写 `auth_phone_otp`（存 hash，不存明文）→ 调腾讯云 SMS 发送。
-- 返回 `{ ok: true, ttl: 300 }`。失败返回标准 `{ ok:false, error, code }`。
-
-`POST /api/public/auth/otp/verify`
-- body: `{ phone, code }`（Web 用）或附加 `install_id, device_label, capabilities…`（APP 用，复用 BootstrapReq 字段）。
-- 取该 phone 最新未消费、未过期记录；`attempts >= 5` 锁定；hash 比对成功后标记 `consumed_at`。
-- 解析对应 ERP 用户：`email = phoneToEmail(phone)`。
-  - 若 `auth.users` 不存在 → **不自动注册**，返回 `code: 'user_not_found'`（避免任何人发条短信就能注册）。注册仍由管理员在后台完成。
-  - 若存在 → 用 `supabaseAdmin.auth.admin.generateLink({ type: 'magiclink', email })` 拿到 `properties.hashed_token`，再用一个 server 侧 `verifyOtp({ token_hash, type: 'magiclink' })` 换出 `session`（access_token + refresh_token）。
-- Web 模式：直接返回 `{ session: { access_token, refresh_token, expires_at }, user }`，前端用 `supabase.auth.setSession()` 落地。
-- APP 模式：当带 `install_id` 时，复用 bootstrap 后半段（upsert `inv_handheld_devices`、读 roles/locations），返回 **完整 BootstrapRes**（`device_token / access_token / session_token / refresh_token / device / user / locations`）—— 让 APP 一步登录到位。
-
-### B4. Web 登录页改造（`src/routes/login.tsx`）
-
-- 顶部新增 Tabs：「密码登录 / 验证码登录」，默认密码登录。
-- 验证码登录表单：手机号 + 6 位验证码 + 「获取验证码」按钮（60s 倒计时）。
-- 提交：调 `/api/public/auth/otp/verify` → `supabase.auth.setSession(res.session)` → 跳 `/dashboard`。
-- 错误码 → 中文提示：`user_not_found`「该手机号未注册，请联系管理员」、`otp_expired`、`otp_invalid`、`otp_locked`、`rate_limited` 等。
-
-### B5. OpenAPI / APP
-
-`src/lib/handheld/schemas.ts` 新增：
-- `OtpSendReq` / `OtpSendRes`
-- `OtpVerifyReq`（含可选 install_id 等）→ 返回 `BootstrapRes`
-在 `src/lib/handheld/openapi.ts` 注册两条路径，bump 版本到 **v1.4**。
-`docs/handheld-api.md` & `docs/handheld-onboarding.md` 增加「OTP 登录」段，给出 curl 示例 & 错误码表。
-跑 `bun run sdk:gen` 更新 `openapi.snapshot.json`。
-
-### B6. 旧 bootstrap 兼容
-
-- 保留 `/auth/bootstrap`（已修好的 Phase A 版本）= 手机号 + 密码。
-- 新 `/api/public/auth/otp/send` + `/verify` = 手机号 + 验证码。
-- 两者最终返回相同结构，APP 端按用户选择走任意一条。
+> **背景**：ERP 后端已经上线手机验证码登录，APP 之前的"手机号 + 密码"流程要全部替换成"手机号 + 6 位短信验证码"。后端、短信、限流都已完成，APP 只改 UI 和调用方式即可。
+>
+> **新登录主流程（推荐，单次完成登录 + 设备绑定）**
+> 1. 用户输入 11 位手机号 → APP 调用 `POST /api/public/auth/otp/send`
+>    - body: `{ "phone": "13800001111", "purpose": "login" }`
+>    - 不需要任何 header，不需要 `X-Device-Token`
+>    - 成功返回 `{ ok: true, data: { ttl: 300 } }`，UI 启动 60 秒倒计时
+>    - 失败时 `ok=false`，要展示 `error` 文案；常见 `code`：`rate_limited`、`invalid_phone`、`sms_send_failed`
+> 2. 用户输入 6 位验证码 → APP 调用 `POST /api/public/auth/otp/verify`
+>    - body 同时携带 bootstrap 字段，让一次请求完成验证 + 设备登记：
+>      ```json
+>      {
+>        "phone": "13800001111",
+>        "code": "123456",
+>        "install_id": "<APP 持久化的 UUID>",
+>        "device_label": "张三的 PDA",
+>        "app_version": "1.4.0",
+>        "os_version": "Android 14",
+>        "capabilities": {
+>          "reader_model": "SUNMI_V3",
+>          "has_printer": true,
+>          "has_rfid_reader": true,
+>          "has_barcode_scanner": true,
+>          "has_camera": true
+>        }
+>      }
+>      ```
+>    - 成功返回结构与 `/auth/bootstrap` 完全一致：`device_token`、`access_token`、`session_token`、`refresh_token`、`device`、`user`、`locations`
+>    - APP 把 `device_token` 和 `session_token` 持久化，之后所有业务请求继续按现状带 `X-Device-Token` + `X-Session-Token`
+>    - 常见错误 `code`：`otp_not_found` / `otp_expired` / `otp_invalid` / `otp_locked` / `user_not_found`，全部转中文提示
+>
+> **兼容场景**：已经登录过的设备如果 `device_token` 仍有效，不需要重新走验证码；token 过期或被踢出时再回到验证码登录页。
+>
+> **要删除/隐藏的旧逻辑**
+> - 删除"邮箱 + 密码"登录入口，保留"手机号 + 密码"作为兜底（同一个 `/auth/bootstrap`，已支持手机号→伪邮箱映射）
+> - 不再要求用户记忆密码作为日常登录方式
+>
+> **联调地址**：`https://boomer-off-buddy.lovable.app`，OpenAPI: `/api/public/handheld/openapi.json`（已包含 `/auth/otp/send`、`/auth/otp/verify`，版本 1.4.0）。
+>
+> **测试账号**：请 Mark 提供一个真实可收短信的手机号（必须先在 ERP 里建好账号），第一次发送有 60 秒/条、10 分钟/5 条、单 IP 1 小时/20 条限流。
 
 ---
 
-## 技术备注
+## 二、APP 登录入口需要 Codex 做的事
 
-- 不开启 Supabase 原生 phone provider；继续 `phoneToEmail()` 单一身份源。
-- 不用 `supabaseAdmin.auth.admin.createUser` 自动建号，避免短信轰炸即可拿账号。
-- 所有 OTP 路由在 `/api/public/*` 下，handler 内部用 service role 直读 `auth_phone_otp`、调腾讯云 API；不暴露任何敏感字段。
-- 腾讯云签名实现：纯 Web Crypto / Node `crypto` `Hmac`，无第三方 SDK，Worker 友好。
-- 速率限制：表内基于时间窗 + `attempts` 字段计数，无需 Redis。
+1. **登录页 UI 改造**
+   - 默认 Tab：「验证码登录」（手机号 + 6 位码 + 倒计时按钮）
+   - 次 Tab：「密码登录」（手机号 + 密码，保留给应急/弱网）
+   - 移除现有的"邮箱"字样和切换
+2. **`install_id` 生命周期**
+   - 首次启动生成 UUID 写入安全存储（Android Keystore / iOS Keychain），卸载重装才换新
+   - `verify` / `bootstrap` 都用同一个 `install_id`，后端按 `(user_id, install_id)` 复用设备记录
+3. **Token 存储与续期**
+   - `device_token`：长期有效，加密存储
+   - `session_token` / `access_token`：到期前用 `refresh_token` 调 `/auth/refresh` 续期（现有逻辑保留）
+   - 收到 `401 unauthorized` 时清掉 session，跳回登录页（保留 `install_id`）
+4. **错误码映射文案**：把 `rate_limited` → "发送过于频繁，请稍后再试"、`otp_expired` → "验证码已过期" 等统一沉到 i18n
+5. **能力字段对齐**：`capabilities` 必须按 OpenAPI 字段名传（`has_camera` / `has_printer` / `reader_model`），之前出现过的 `camera` / `printer` 旧字段要清理
 
 ---
 
-## 交付清单
+## 三、AI 部分要 Codex 配合对接的事
 
-1. 修 `auth.bootstrap.ts`（Phase A，立即修复 APP 登录）。
-2. 新表 `auth_phone_otp` migration。
-3. `src/server/sms.tencent.server.ts`（腾讯云 SendSms 签名 + 调用）。
-4. `src/routes/api/public/auth/otp.send.ts` & `otp.verify.ts`。
-5. `src/lib/handheld/schemas.ts` & `openapi.ts` v1.4；`sdk:gen` 快照。
-6. `src/routes/login.tsx` 增加「验证码登录」Tab。
-7. `add_secret`：`TENCENTCLOUD_SECRET_ID` / `TENCENTCLOUD_SECRET_KEY` / `TENCENT_SMS_SDK_APP_ID` / `TENCENT_SMS_SIGN_NAME` / `TENCENT_SMS_TEMPLATE_ID`。
-8. 文档：`docs/handheld-api.md` + `docs/handheld-onboarding.md` 更新 OTP 段落。
+后端 AI 已经在 ERP 这边跑通了，全部走 Lovable AI Gateway，APP 不需要自己接任何模型。Codex 那边只需要把 APP 的"拍照建商品 / 拍照生成上架图"两条链路指向我们的接口：
 
-确认后我按 Phase A → Phase B 顺序实施，并在结尾给你需要在腾讯云控制台准备的「签名 / 模板内容」清单。
+| APP 场景 | 调用接口 | 关键说明 |
+| --- | --- | --- |
+| 拍照识别（建 SKU 时识别商品名/品牌/类目） | `POST /api/public/handheld/ai/recognize-item` | 支持 `image_url`（已上传到 `sku-raw` 桶时）或 `image_base64`；多角度可用 `images[]`（最多 4 张，每张二选一） |
+| 生成上架主图（白底/统一构图） | `POST /api/public/handheld/ai/prepare-listing-image` | 入参同上，返回 `{ storage_path, signed_url, mime_type }`，`signed_url` 7 天有效，APP 直接用它展示/下载/打印 |
+| 智能建档（识别结果 → 落库 SKU） | `POST /api/public/handheld/items/smart-create` | 接收识别结果 + 用户改动后的字段，后端写入 `inv_skus`、生成条码 |
+| 上传原图（先拿到 storage_path 再调 AI） | `POST /api/public/handheld/items/upload-image`（JSON base64）或 `items/upload-image.multipart`（表单） | 上传后拿到 `storage_path`，再传给 AI 接口可省一次大图传输 |
+
+**Codex 需要确认的点**：
+1. **图片传递路径优先级**：弱网 → 先 upload-image 拿 `storage_path` → AI 接口只传路径；强网/小图 → 直接走 `image_base64`。建议默认先 upload，再调 AI（节省单次 payload）。
+2. **鉴权**：AI 接口属于"写入/AI"类，必须同时带 `X-Device-Token` 和 `X-Session-Token`，否则会被 `unauthorized` 拒掉。
+3. **幂等**：`smart-create` 支持 `ClientOpId` header，APP 端建档要生成一次性 UUID，重试用同一个 ID，后端会去重。
+4. **错误处理**：模型调用偶尔会拿到 `429`（限流）或 `402`（额度耗尽），APP 端需要展示"AI 暂时繁忙，请稍后重试"并允许重发；不要静默吞错。
+5. **同步 OpenAPI**：所有字段名以 `https://boomer-off-buddy.lovable.app/api/public/handheld/openapi.json` 为准，建议用 `openapi-generator` 或 `orval` 重新生成 APP 端 SDK，避免手写字段漂移。
+
+---
+
+## 后续 Lovable 这边的备选动作（看 Codex 反馈再决定）
+
+- 如果 Codex 希望 OTP 校验和 bootstrap 在一次请求里更紧凑，可以在 `otp.verify` 加快捷返回字段（目前已经是合并的）。
+- 如果 APP 想要"扫码登录"或"PC 端授权 APP"，可以再加一个 `/auth/qr-bind` 接口。
+- 如果短信成本/触达需要监控，可以加一张 `auth_phone_otp_stats` 视图给运营看。
+
+这些都不在本次必做范围，按需求触发即可。
