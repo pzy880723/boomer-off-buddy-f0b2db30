@@ -274,26 +274,24 @@ export const Route = createFileRoute("/api/public/auth/otp/verify")({
           .order("name");
 
         return ok({
-          data: {
-            device_token: deviceToken,
-            device: {
-              id: deviceId,
-              device_code: (deviceRow as any)?.device_code as string,
-              label: (deviceRow as any)?.label as string,
-              location_id: loc?.id ?? null,
-              location_kind: loc?.kind ?? null,
-              location_name: loc?.name ?? null,
-              device_capabilities,
-              app_version: ((deviceRow as any)?.app_version as string | null) ?? null,
-              os_version: ((deviceRow as any)?.os_version as string | null) ?? null,
-            },
-            access_token: session.access_token,
-            session_token: session.access_token,
-            refresh_token: session.refresh_token,
-            expires_at: session.expires_at ?? 0,
-            user: userPayload,
-            locations: locs ?? [],
+          device_token: deviceToken,
+          device: {
+            id: deviceId,
+            device_code: (deviceRow as any)?.device_code as string,
+            label: (deviceRow as any)?.label as string,
+            location_id: loc?.id ?? null,
+            location_kind: loc?.kind ?? null,
+            location_name: loc?.name ?? null,
+            device_capabilities,
+            app_version: ((deviceRow as any)?.app_version as string | null) ?? null,
+            os_version: ((deviceRow as any)?.os_version as string | null) ?? null,
           },
+          access_token: session.access_token,
+          session_token: session.access_token,
+          refresh_token: session.refresh_token,
+          expires_at: session.expires_at ?? 0,
+          user: userPayload,
+          locations: locs ?? [],
         });
       },
     },
