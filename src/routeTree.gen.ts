@@ -101,6 +101,7 @@ import { Route as ApiPublicHandheldInboundScanRouteImport } from './routes/api/p
 import { Route as ApiPublicHandheldAuthRefreshRouteImport } from './routes/api/public/handheld/auth.refresh'
 import { Route as ApiPublicHandheldAuthPingRouteImport } from './routes/api/public/handheld/auth.ping'
 import { Route as ApiPublicHandheldAuthMeRouteImport } from './routes/api/public/handheld/auth.me'
+import { Route as ApiPublicHandheldAuthLogoutRouteImport } from './routes/api/public/handheld/auth.logout'
 import { Route as ApiPublicHandheldAuthLoginRouteImport } from './routes/api/public/handheld/auth.login'
 import { Route as ApiPublicHandheldAiRecognizeItemRouteImport } from './routes/api/public/handheld/ai.recognize-item'
 import { Route as ApiPublicHandheldAiPrepareListingImageRouteImport } from './routes/api/public/handheld/ai.prepare-listing-image'
@@ -594,6 +595,12 @@ const ApiPublicHandheldAuthMeRoute = ApiPublicHandheldAuthMeRouteImport.update({
   path: '/api/public/handheld/auth/me',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHandheldAuthLogoutRoute =
+  ApiPublicHandheldAuthLogoutRouteImport.update({
+    id: '/api/public/handheld/auth/logout',
+    path: '/api/public/handheld/auth/logout',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHandheldAuthLoginRoute =
   ApiPublicHandheldAuthLoginRouteImport.update({
     id: '/api/public/handheld/auth/login',
@@ -696,6 +703,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/ai/prepare-listing-image': typeof ApiPublicHandheldAiPrepareListingImageRoute
   '/api/public/handheld/ai/recognize-item': typeof ApiPublicHandheldAiRecognizeItemRoute
   '/api/public/handheld/auth/login': typeof ApiPublicHandheldAuthLoginRoute
+  '/api/public/handheld/auth/logout': typeof ApiPublicHandheldAuthLogoutRoute
   '/api/public/handheld/auth/me': typeof ApiPublicHandheldAuthMeRoute
   '/api/public/handheld/auth/ping': typeof ApiPublicHandheldAuthPingRoute
   '/api/public/handheld/auth/refresh': typeof ApiPublicHandheldAuthRefreshRoute
@@ -787,6 +795,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/ai/prepare-listing-image': typeof ApiPublicHandheldAiPrepareListingImageRoute
   '/api/public/handheld/ai/recognize-item': typeof ApiPublicHandheldAiRecognizeItemRoute
   '/api/public/handheld/auth/login': typeof ApiPublicHandheldAuthLoginRoute
+  '/api/public/handheld/auth/logout': typeof ApiPublicHandheldAuthLogoutRoute
   '/api/public/handheld/auth/me': typeof ApiPublicHandheldAuthMeRoute
   '/api/public/handheld/auth/ping': typeof ApiPublicHandheldAuthPingRoute
   '/api/public/handheld/auth/refresh': typeof ApiPublicHandheldAuthRefreshRoute
@@ -886,6 +895,7 @@ export interface FileRoutesById {
   '/api/public/handheld/ai/prepare-listing-image': typeof ApiPublicHandheldAiPrepareListingImageRoute
   '/api/public/handheld/ai/recognize-item': typeof ApiPublicHandheldAiRecognizeItemRoute
   '/api/public/handheld/auth/login': typeof ApiPublicHandheldAuthLoginRoute
+  '/api/public/handheld/auth/logout': typeof ApiPublicHandheldAuthLogoutRoute
   '/api/public/handheld/auth/me': typeof ApiPublicHandheldAuthMeRoute
   '/api/public/handheld/auth/ping': typeof ApiPublicHandheldAuthPingRoute
   '/api/public/handheld/auth/refresh': typeof ApiPublicHandheldAuthRefreshRoute
@@ -986,6 +996,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/ai/prepare-listing-image'
     | '/api/public/handheld/ai/recognize-item'
     | '/api/public/handheld/auth/login'
+    | '/api/public/handheld/auth/logout'
     | '/api/public/handheld/auth/me'
     | '/api/public/handheld/auth/ping'
     | '/api/public/handheld/auth/refresh'
@@ -1077,6 +1088,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/ai/prepare-listing-image'
     | '/api/public/handheld/ai/recognize-item'
     | '/api/public/handheld/auth/login'
+    | '/api/public/handheld/auth/logout'
     | '/api/public/handheld/auth/me'
     | '/api/public/handheld/auth/ping'
     | '/api/public/handheld/auth/refresh'
@@ -1175,6 +1187,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/ai/prepare-listing-image'
     | '/api/public/handheld/ai/recognize-item'
     | '/api/public/handheld/auth/login'
+    | '/api/public/handheld/auth/logout'
     | '/api/public/handheld/auth/me'
     | '/api/public/handheld/auth/ping'
     | '/api/public/handheld/auth/refresh'
@@ -1237,6 +1250,7 @@ export interface RootRouteChildren {
   ApiPublicHandheldAiPrepareListingImageRoute: typeof ApiPublicHandheldAiPrepareListingImageRoute
   ApiPublicHandheldAiRecognizeItemRoute: typeof ApiPublicHandheldAiRecognizeItemRoute
   ApiPublicHandheldAuthLoginRoute: typeof ApiPublicHandheldAuthLoginRoute
+  ApiPublicHandheldAuthLogoutRoute: typeof ApiPublicHandheldAuthLogoutRoute
   ApiPublicHandheldAuthMeRoute: typeof ApiPublicHandheldAuthMeRoute
   ApiPublicHandheldAuthPingRoute: typeof ApiPublicHandheldAuthPingRoute
   ApiPublicHandheldAuthRefreshRoute: typeof ApiPublicHandheldAuthRefreshRoute
@@ -1905,6 +1919,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldAuthMeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/handheld/auth/logout': {
+      id: '/api/public/handheld/auth/logout'
+      path: '/api/public/handheld/auth/logout'
+      fullPath: '/api/public/handheld/auth/logout'
+      preLoaderRoute: typeof ApiPublicHandheldAuthLogoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/handheld/auth/login': {
       id: '/api/public/handheld/auth/login'
       path: '/api/public/handheld/auth/login'
@@ -2150,6 +2171,7 @@ const rootRouteChildren: RootRouteChildren = {
     ApiPublicHandheldAiPrepareListingImageRoute,
   ApiPublicHandheldAiRecognizeItemRoute: ApiPublicHandheldAiRecognizeItemRoute,
   ApiPublicHandheldAuthLoginRoute: ApiPublicHandheldAuthLoginRoute,
+  ApiPublicHandheldAuthLogoutRoute: ApiPublicHandheldAuthLogoutRoute,
   ApiPublicHandheldAuthMeRoute: ApiPublicHandheldAuthMeRoute,
   ApiPublicHandheldAuthPingRoute: ApiPublicHandheldAuthPingRoute,
   ApiPublicHandheldAuthRefreshRoute: ApiPublicHandheldAuthRefreshRoute,
