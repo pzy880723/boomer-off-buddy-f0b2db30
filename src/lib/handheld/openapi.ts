@@ -13,10 +13,13 @@ import {
   AuthPingRes,
   AuthRefreshReq,
   AuthRefreshRes,
+  BootstrapReq,
+  BootstrapRes,
   DiagReportReq,
   DiagReportRes,
   ErrorResponse,
   HandheldErrorCode,
+
   InboundScanReq,
   InboundScanRes,
   LocationsRes,

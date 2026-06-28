@@ -109,6 +109,7 @@ import { Route as ApiPublicHandheldAuthPingRouteImport } from './routes/api/publ
 import { Route as ApiPublicHandheldAuthMeRouteImport } from './routes/api/public/handheld/auth.me'
 import { Route as ApiPublicHandheldAuthLogoutRouteImport } from './routes/api/public/handheld/auth.logout'
 import { Route as ApiPublicHandheldAuthLoginRouteImport } from './routes/api/public/handheld/auth.login'
+import { Route as ApiPublicHandheldAuthBootstrapRouteImport } from './routes/api/public/handheld/auth.bootstrap'
 import { Route as ApiPublicHandheldAiRecognizeItemRouteImport } from './routes/api/public/handheld/ai.recognize-item'
 import { Route as ApiPublicHandheldAiPrepareListingImageRouteImport } from './routes/api/public/handheld/ai.prepare-listing-image'
 import { Route as ApiPublicHandheldItemsUploadImageMultipartRouteImport } from './routes/api/public/handheld/items.upload-image.multipart'
@@ -649,6 +650,12 @@ const ApiPublicHandheldAuthLoginRoute =
     path: '/api/public/handheld/auth/login',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHandheldAuthBootstrapRoute =
+  ApiPublicHandheldAuthBootstrapRouteImport.update({
+    id: '/api/public/handheld/auth/bootstrap',
+    path: '/api/public/handheld/auth/bootstrap',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHandheldAiRecognizeItemRoute =
   ApiPublicHandheldAiRecognizeItemRouteImport.update({
     id: '/api/public/handheld/ai/recognize-item',
@@ -751,6 +758,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
   '/api/public/handheld/ai/prepare-listing-image': typeof ApiPublicHandheldAiPrepareListingImageRoute
   '/api/public/handheld/ai/recognize-item': typeof ApiPublicHandheldAiRecognizeItemRoute
+  '/api/public/handheld/auth/bootstrap': typeof ApiPublicHandheldAuthBootstrapRoute
   '/api/public/handheld/auth/login': typeof ApiPublicHandheldAuthLoginRoute
   '/api/public/handheld/auth/logout': typeof ApiPublicHandheldAuthLogoutRoute
   '/api/public/handheld/auth/me': typeof ApiPublicHandheldAuthMeRoute
@@ -850,6 +858,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
   '/api/public/handheld/ai/prepare-listing-image': typeof ApiPublicHandheldAiPrepareListingImageRoute
   '/api/public/handheld/ai/recognize-item': typeof ApiPublicHandheldAiRecognizeItemRoute
+  '/api/public/handheld/auth/bootstrap': typeof ApiPublicHandheldAuthBootstrapRoute
   '/api/public/handheld/auth/login': typeof ApiPublicHandheldAuthLoginRoute
   '/api/public/handheld/auth/logout': typeof ApiPublicHandheldAuthLogoutRoute
   '/api/public/handheld/auth/me': typeof ApiPublicHandheldAuthMeRoute
@@ -957,6 +966,7 @@ export interface FileRoutesById {
   '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
   '/api/public/handheld/ai/prepare-listing-image': typeof ApiPublicHandheldAiPrepareListingImageRoute
   '/api/public/handheld/ai/recognize-item': typeof ApiPublicHandheldAiRecognizeItemRoute
+  '/api/public/handheld/auth/bootstrap': typeof ApiPublicHandheldAuthBootstrapRoute
   '/api/public/handheld/auth/login': typeof ApiPublicHandheldAuthLoginRoute
   '/api/public/handheld/auth/logout': typeof ApiPublicHandheldAuthLogoutRoute
   '/api/public/handheld/auth/me': typeof ApiPublicHandheldAuthMeRoute
@@ -1065,6 +1075,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-sync-worker'
     | '/api/public/handheld/ai/prepare-listing-image'
     | '/api/public/handheld/ai/recognize-item'
+    | '/api/public/handheld/auth/bootstrap'
     | '/api/public/handheld/auth/login'
     | '/api/public/handheld/auth/logout'
     | '/api/public/handheld/auth/me'
@@ -1164,6 +1175,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-sync-worker'
     | '/api/public/handheld/ai/prepare-listing-image'
     | '/api/public/handheld/ai/recognize-item'
+    | '/api/public/handheld/auth/bootstrap'
     | '/api/public/handheld/auth/login'
     | '/api/public/handheld/auth/logout'
     | '/api/public/handheld/auth/me'
@@ -1270,6 +1282,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-sync-worker'
     | '/api/public/handheld/ai/prepare-listing-image'
     | '/api/public/handheld/ai/recognize-item'
+    | '/api/public/handheld/auth/bootstrap'
     | '/api/public/handheld/auth/login'
     | '/api/public/handheld/auth/logout'
     | '/api/public/handheld/auth/me'
@@ -1339,6 +1352,7 @@ export interface RootRouteChildren {
   ApiPublicHooksYouzanSyncWorkerRoute: typeof ApiPublicHooksYouzanSyncWorkerRoute
   ApiPublicHandheldAiPrepareListingImageRoute: typeof ApiPublicHandheldAiPrepareListingImageRoute
   ApiPublicHandheldAiRecognizeItemRoute: typeof ApiPublicHandheldAiRecognizeItemRoute
+  ApiPublicHandheldAuthBootstrapRoute: typeof ApiPublicHandheldAuthBootstrapRoute
   ApiPublicHandheldAuthLoginRoute: typeof ApiPublicHandheldAuthLoginRoute
   ApiPublicHandheldAuthLogoutRoute: typeof ApiPublicHandheldAuthLogoutRoute
   ApiPublicHandheldAuthMeRoute: typeof ApiPublicHandheldAuthMeRoute
@@ -2069,6 +2083,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldAuthLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/handheld/auth/bootstrap': {
+      id: '/api/public/handheld/auth/bootstrap'
+      path: '/api/public/handheld/auth/bootstrap'
+      fullPath: '/api/public/handheld/auth/bootstrap'
+      preLoaderRoute: typeof ApiPublicHandheldAuthBootstrapRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/handheld/ai/recognize-item': {
       id: '/api/public/handheld/ai/recognize-item'
       path: '/api/public/handheld/ai/recognize-item'
@@ -2345,6 +2366,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHandheldAiPrepareListingImageRoute:
     ApiPublicHandheldAiPrepareListingImageRoute,
   ApiPublicHandheldAiRecognizeItemRoute: ApiPublicHandheldAiRecognizeItemRoute,
+  ApiPublicHandheldAuthBootstrapRoute: ApiPublicHandheldAuthBootstrapRoute,
   ApiPublicHandheldAuthLoginRoute: ApiPublicHandheldAuthLoginRoute,
   ApiPublicHandheldAuthLogoutRoute: ApiPublicHandheldAuthLogoutRoute,
   ApiPublicHandheldAuthMeRoute: ApiPublicHandheldAuthMeRoute,
