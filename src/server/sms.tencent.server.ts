@@ -42,7 +42,8 @@ export async function sendOtpSms(
     SmsSdkAppId: sdkAppId,
     SignName: signName,
     TemplateId: templateId,
-    TemplateParamSet: [code, String(ttlMinutes)],
+    // 当前模板只有 1 个变量 {1} = 验证码；如果模板新增"有效分钟数"参数，再加 String(ttlMinutes)
+    TemplateParamSet: [code],
   };
   const body = JSON.stringify(payload);
 
