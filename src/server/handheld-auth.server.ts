@@ -95,3 +95,20 @@ export function requireWarehouse(d: DeviceContext): { ok: true } | { ok: false; 
     return { ok: false, response: err("This operation requires a warehouse device", 403) };
   return { ok: true };
 }
+
+/** Optional: 解析 X-Session-Token / Authorization，拿到操作员 user_id。失败返回 null（不强制）。 */
+export async function resolveSessionUser(request: Request): Promise<{
+  user_id: string;
+  email: string | null;
+} | null> {
+  const raw =
+    request.headers.get("x-session-token") ||
+    request.headers.get("X-Session-Token") ||
+    (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "") ||
+    null;
+  if (!raw) return null;
+  const { data, error } = await supabaseAdmin.auth.getUser(raw);
+  if (error || !data?.user) return null;
+  return { user_id: data.user.id, email: data.user.email ?? null };
+}
+
