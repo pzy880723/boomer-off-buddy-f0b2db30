@@ -47,9 +47,9 @@ export async function recordOp(args: {
         client_op_id: args.clientOpId,
         op_type: args.opType,
         response_status: args.status,
-        response_json: args.body as never,
-      },
-      { onConflict: "device_id,client_op_id", ignoreDuplicates: true },
+        response_json: args.body,
+      } as never,
+      { onConflict: "device_id,client_op_id", ignoreDuplicates: true } as never,
     );
 }
 
