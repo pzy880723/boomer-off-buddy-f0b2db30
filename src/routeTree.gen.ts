@@ -71,6 +71,7 @@ import { Route as PurchaseDomesticBulkIdRouteImport } from './routes/purchase.do
 import { Route as MSkusIdRouteImport } from './routes/m.skus.$id'
 import { Route as MReceiveIdRouteImport } from './routes/m.receive.$id'
 import { Route as MProductsCodeRouteImport } from './routes/m.products.$code'
+import { Route as MDomesticQuickAddRouteImport } from './routes/m.domestic.quick-add'
 import { Route as InventoryStocktakesIdRouteImport } from './routes/inventory.stocktakes.$id'
 import { Route as InventorySkusIdRouteImport } from './routes/inventory.skus.$id'
 import { Route as InventoryProductsCodeRouteImport } from './routes/inventory.products.$code'
@@ -428,6 +429,11 @@ const MProductsCodeRoute = MProductsCodeRouteImport.update({
   path: '/products/$code',
   getParentRoute: () => MRoute,
 } as any)
+const MDomesticQuickAddRoute = MDomesticQuickAddRouteImport.update({
+  id: '/domestic/quick-add',
+  path: '/domestic/quick-add',
+  getParentRoute: () => MRoute,
+} as any)
 const InventoryStocktakesIdRoute = InventoryStocktakesIdRouteImport.update({
   id: '/inventory/stocktakes/$id',
   path: '/inventory/stocktakes/$id',
@@ -719,6 +725,7 @@ export interface FileRoutesByFullPath {
   '/inventory/products/$code': typeof InventoryProductsCodeRoute
   '/inventory/skus/$id': typeof InventorySkusIdRoute
   '/inventory/stocktakes/$id': typeof InventoryStocktakesIdRoute
+  '/m/domestic/quick-add': typeof MDomesticQuickAddRoute
   '/m/products/$code': typeof MProductsCodeRoute
   '/m/receive/$id': typeof MReceiveIdRoute
   '/m/skus/$id': typeof MSkusIdRoute
@@ -817,6 +824,7 @@ export interface FileRoutesByTo {
   '/inventory/products/$code': typeof InventoryProductsCodeRoute
   '/inventory/skus/$id': typeof InventorySkusIdRoute
   '/inventory/stocktakes/$id': typeof InventoryStocktakesIdRoute
+  '/m/domestic/quick-add': typeof MDomesticQuickAddRoute
   '/m/products/$code': typeof MProductsCodeRoute
   '/m/receive/$id': typeof MReceiveIdRoute
   '/m/skus/$id': typeof MSkusIdRoute
@@ -923,6 +931,7 @@ export interface FileRoutesById {
   '/inventory/products/$code': typeof InventoryProductsCodeRoute
   '/inventory/skus/$id': typeof InventorySkusIdRoute
   '/inventory/stocktakes/$id': typeof InventoryStocktakesIdRoute
+  '/m/domestic/quick-add': typeof MDomesticQuickAddRoute
   '/m/products/$code': typeof MProductsCodeRoute
   '/m/receive/$id': typeof MReceiveIdRoute
   '/m/skus/$id': typeof MSkusIdRoute
@@ -1030,6 +1039,7 @@ export interface FileRouteTypes {
     | '/inventory/products/$code'
     | '/inventory/skus/$id'
     | '/inventory/stocktakes/$id'
+    | '/m/domestic/quick-add'
     | '/m/products/$code'
     | '/m/receive/$id'
     | '/m/skus/$id'
@@ -1128,6 +1138,7 @@ export interface FileRouteTypes {
     | '/inventory/products/$code'
     | '/inventory/skus/$id'
     | '/inventory/stocktakes/$id'
+    | '/m/domestic/quick-add'
     | '/m/products/$code'
     | '/m/receive/$id'
     | '/m/skus/$id'
@@ -1233,6 +1244,7 @@ export interface FileRouteTypes {
     | '/inventory/products/$code'
     | '/inventory/skus/$id'
     | '/inventory/stocktakes/$id'
+    | '/m/domestic/quick-add'
     | '/m/products/$code'
     | '/m/receive/$id'
     | '/m/skus/$id'
@@ -1791,6 +1803,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MProductsCodeRouteImport
       parentRoute: typeof MRoute
     }
+    '/m/domestic/quick-add': {
+      id: '/m/domestic/quick-add'
+      path: '/domestic/quick-add'
+      fullPath: '/m/domestic/quick-add'
+      preLoaderRoute: typeof MDomesticQuickAddRouteImport
+      parentRoute: typeof MRoute
+    }
     '/inventory/stocktakes/$id': {
       id: '/inventory/stocktakes/$id'
       path: '/inventory/stocktakes/$id'
@@ -2087,6 +2106,7 @@ interface MRouteChildren {
   MPhotoSearchRoute: typeof MPhotoSearchRoute
   MScanRoute: typeof MScanRoute
   MIndexRoute: typeof MIndexRoute
+  MDomesticQuickAddRoute: typeof MDomesticQuickAddRoute
   MProductsCodeRoute: typeof MProductsCodeRoute
   MReceiveIdRoute: typeof MReceiveIdRoute
   MSkusIdRoute: typeof MSkusIdRoute
@@ -2099,6 +2119,7 @@ const MRouteChildren: MRouteChildren = {
   MPhotoSearchRoute: MPhotoSearchRoute,
   MScanRoute: MScanRoute,
   MIndexRoute: MIndexRoute,
+  MDomesticQuickAddRoute: MDomesticQuickAddRoute,
   MProductsCodeRoute: MProductsCodeRoute,
   MReceiveIdRoute: MReceiveIdRoute,
   MSkusIdRoute: MSkusIdRoute,
@@ -2363,13 +2384,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
