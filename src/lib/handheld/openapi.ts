@@ -15,6 +15,10 @@ import {
   AuthRefreshRes,
   BootstrapReq,
   BootstrapRes,
+  OtpSendReq,
+  OtpSendRes,
+  OtpVerifyReq,
+  OtpVerifyWebRes,
   DiagReportReq,
   DiagReportRes,
   ErrorResponse,
@@ -85,7 +89,7 @@ const document: ZodOpenApiObject = {
   openapi: "3.1.0",
   info: {
     title: "Boomer Off — 手持终端 API",
-    version: "1.0.0",
+    version: "1.4.0",
     description: `
 所有接口都在 \`/api/public/handheld/*\` 前缀下（**绕过站点登录**）。
 
@@ -449,6 +453,31 @@ Token 由后台 **仓库管理 → 手持终端** 页面创建/复制。设备�
         description: "请勿在 payload 里上传 token 原文；ERP 会按 device + user 关联审计。",
         requestBody: jsonBody(DiagReportReq),
         responses: { "200": jsonRes("OK", DiagReportRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/auth/otp/send": {
+      post: {
+        tags: ["账号"],
+        summary: "发送手机验证码（v1.4）",
+        description:
+          "**公开接口**，不需要任何 token。同手机号 60 秒内最多 1 次、10 分钟内最多 5 次；单 IP 每小时最多 20 次。短信通道：腾讯云 SMS。",
+        security: [],
+        requestBody: jsonBody(OtpSendReq),
+        responses: { "200": jsonRes("OK", OtpSendRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/auth/otp/verify": {
+      post: {
+        tags: ["账号"],
+        summary: "验证验证码并登录（v1.4）",
+        description:
+          "**公开接口**，不需要任何 token。\n\n- **Web 模式**：只传 `phone` + `code`，返回 `{ session, user }`，前端用 `supabase.auth.setSession()` 落地。\n- **APP 模式**：额外带 `install_id` / `device_label` / `capabilities`，服务端 upsert 设备并返回 **完整 BootstrapRes**（device_token + access_token + session_token + refresh_token + device + user + locations），一步登录到位。\n\n用户必须已经被管理员添加到 ERP；本接口不会自动注册新账号。",
+        security: [],
+        requestBody: jsonBody(OtpVerifyReq),
+        responses: {
+          "200": jsonRes("Web 模式 OK", OtpVerifyWebRes),
+          ...ERROR_RESPONSES,
+        },
       },
     },
   },

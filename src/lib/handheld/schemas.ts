@@ -758,6 +758,49 @@ export const BootstrapRes = okEnvelope(
   }),
 );
 
+// ============================================================
+// 16. v1.4：手机验证码登录（OTP）
+// ============================================================
+
+export const OtpSendReq = z
+  .object({
+    phone: z.string().regex(/^1[3-9]\d{9}$/).meta({ description: "11 位中国大陆手机号" }),
+    purpose: z.enum(["login"]).default("login"),
+  })
+  .meta({ id: "OtpSendReq" });
+
+export const OtpSendRes = okEnvelope(
+  z.object({
+    ttl: z.number().int().meta({ description: "验证码有效期（秒）" }),
+  }),
+);
+
+export const OtpVerifyReq = z
+  .object({
+    phone: z.string().regex(/^1[3-9]\d{9}$/),
+    code: z.string().regex(/^\d{6}$/),
+    // 不带 install_id → Web 模式，返回 session+user
+    // 带 install_id → APP 模式，返回完整 BootstrapRes
+    install_id: z.string().min(8).max(64).optional(),
+    device_label: z.string().max(80).optional(),
+    capabilities: DeviceCapabilities.optional(),
+    app_version: z.string().max(40).optional(),
+    os_version: z.string().max(40).optional(),
+  })
+  .meta({ id: "OtpVerifyReq" });
+
+export const OtpVerifyWebRes = okEnvelope(
+  z.object({
+    session: z.object({
+      access_token: z.string(),
+      refresh_token: z.string(),
+      expires_at: z.number().int(),
+    }),
+    user: SessionUserSchema,
+  }),
+);
+
+
 
 
 

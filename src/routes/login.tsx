@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   Phone,
   Lock,
@@ -10,6 +10,7 @@ import {
   Eye,
   EyeOff,
   AlertCircle,
+  KeyRound,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuthSession } from "@/hooks/use-auth-session";
@@ -17,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { PHONE_REGEX, phoneToEmail } from "@/lib/auth-config";
 import logo from "@/assets/logo-boomeroff.png";
 import logoWhite from "@/assets/logo-boomeroff-white.png";
@@ -29,9 +31,20 @@ function LoginPage() {
   const navigate = useNavigate();
   const router = useRouter();
   const { session, loading: sessionLoading } = useAuthSession();
+  const [tab, setTab] = useState<"password" | "otp">("password");
+
+  // 密码登录
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
+  // 验证码登录
+  const [otpPhone, setOtpPhone] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [otpSending, setOtpSending] = useState(false);
+  const [otpCooldown, setOtpCooldown] = useState(0);
+  const cooldownTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const [submitting, setSubmitting] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,6 +52,9 @@ function LoginPage() {
 
   useEffect(() => {
     setMounted(true);
+    return () => {
+      if (cooldownTimer.current) clearInterval(cooldownTimer.current);
+    };
   }, []);
 
   useEffect(() => {
@@ -51,10 +67,26 @@ function LoginPage() {
 
   const inputsDisabled = submitting || redirecting;
 
-  async function doSubmit() {
-    if (submitting || redirecting) return;
-    setError(null);
+  function startCooldown(seconds = 60) {
+    setOtpCooldown(seconds);
+    if (cooldownTimer.current) clearInterval(cooldownTimer.current);
+    cooldownTimer.current = setInterval(() => {
+      setOtpCooldown((s) => {
+        if (s <= 1) {
+          if (cooldownTimer.current) {
+            clearInterval(cooldownTimer.current);
+            cooldownTimer.current = null;
+          }
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+  }
 
+  async function doPasswordLogin() {
+    if (inputsDisabled) return;
+    setError(null);
     const cleanPhone = phone.trim();
     if (!PHONE_REGEX.test(cleanPhone)) {
       setError("手机号格式不正确，请输入 11 位中国大陆手机号");
@@ -64,20 +96,17 @@ function LoginPage() {
       setError("请输入密码");
       return;
     }
-
     setSubmitting(true);
     try {
       const { error: err } = await supabase.auth.signInWithPassword({
         email: phoneToEmail(cleanPhone),
         password,
       });
-
       if (err) {
         setSubmitting(false);
         setError("手机号或密码错误，请重新输入或联系管理员");
         return;
       }
-      // 登录成功后由 useEffect 监听 session 跳转
       setRedirecting(true);
     } catch (err) {
       setSubmitting(false);
@@ -86,9 +115,96 @@ function LoginPage() {
     }
   }
 
+  async function doSendOtp() {
+    if (otpSending || otpCooldown > 0) return;
+    setError(null);
+    const cleanPhone = otpPhone.trim();
+    if (!PHONE_REGEX.test(cleanPhone)) {
+      setError("手机号格式不正确，请输入 11 位中国大陆手机号");
+      return;
+    }
+    setOtpSending(true);
+    try {
+      const res = await fetch("/api/public/auth/otp/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: cleanPhone }),
+      });
+      const json = (await res.json()) as { ok: boolean; error?: string; code?: string };
+      if (!res.ok || !json.ok) {
+        setError(json.error || "验证码发送失败");
+        setOtpSending(false);
+        return;
+      }
+      startCooldown(60);
+      setOtpSending(false);
+    } catch (err) {
+      setOtpSending(false);
+      setError("网络错误，请稍后重试");
+      console.error("[login] send otp threw", err);
+    }
+  }
+
+  async function doOtpLogin() {
+    if (inputsDisabled) return;
+    setError(null);
+    const cleanPhone = otpPhone.trim();
+    if (!PHONE_REGEX.test(cleanPhone)) {
+      setError("手机号格式不正确");
+      return;
+    }
+    if (!/^\d{6}$/.test(otpCode)) {
+      setError("请输入 6 位数字验证码");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/public/auth/otp/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: cleanPhone, code: otpCode }),
+      });
+      const json = (await res.json()) as {
+        ok: boolean;
+        error?: string;
+        code?: string;
+        data?: {
+          session: { access_token: string; refresh_token: string; expires_at: number };
+        };
+      };
+      if (!res.ok || !json.ok || !json.data?.session) {
+        setSubmitting(false);
+        const codeMap: Record<string, string> = {
+          user_not_found: "该手机号未注册，请联系管理员",
+          otp_expired: "验证码已过期，请重新获取",
+          otp_invalid: "验证码错误",
+          otp_locked: "尝试次数过多，请重新获取验证码",
+          otp_not_found: "请先获取验证码",
+        };
+        setError(codeMap[json.code ?? ""] || json.error || "登录失败");
+        return;
+      }
+      const { error: setErr } = await supabase.auth.setSession({
+        access_token: json.data.session.access_token,
+        refresh_token: json.data.session.refresh_token,
+      });
+      if (setErr) {
+        setSubmitting(false);
+        setError("会话写入失败，请重试");
+        return;
+      }
+      setRedirecting(true);
+    } catch (err) {
+      setSubmitting(false);
+      setError("网络错误，请稍后重试");
+      console.error("[login] otp verify threw", err);
+    }
+  }
+
   function onSubmit(e: FormEvent) {
     e.preventDefault();
-    void doSubmit();
+    if (tab === "password") void doPasswordLogin();
+    else void doOtpLogin();
   }
 
   return (
@@ -146,82 +262,149 @@ function LoginPage() {
             <p className="text-sm text-muted-foreground">使用管理员分配的手机号登录后台</p>
           </div>
 
-          <form onSubmit={onSubmit} noValidate className="mt-8 space-y-4" suppressHydrationWarning>
-            <div className="space-y-1.5">
-              <Label htmlFor="phone">手机号</Label>
-              <div className="relative">
-                <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="phone"
-                  type="tel"
-                  inputMode="numeric"
-                  autoComplete="tel"
-                  required
-                  maxLength={11}
-                  disabled={inputsDisabled}
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
-                  placeholder="13800138000"
-                  className="h-11 pl-9"
-                />
-              </div>
-            </div>
+          <Tabs value={tab} onValueChange={(v) => { setTab(v as "password" | "otp"); setError(null); }} className="mt-6">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="password">密码登录</TabsTrigger>
+              <TabsTrigger value="otp">验证码登录</TabsTrigger>
+            </TabsList>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="password">密码</Label>
-              <div className="relative">
-                <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  autoComplete="current-password"
-                  required
-                  disabled={inputsDisabled}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="h-11 pl-9 pr-10"
-                />
-                <button
-                  type="button"
-                  tabIndex={-1}
-                  disabled={inputsDisabled}
-                  onClick={() => setShowPassword((v) => !v)}
-                  aria-label={showPassword ? "隐藏密码" : "显示密码"}
-                  className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-            </div>
+            <form onSubmit={onSubmit} noValidate className="mt-6 space-y-4" suppressHydrationWarning>
+              <TabsContent value="password" className="mt-0 space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="phone">手机号</Label>
+                  <div className="relative">
+                    <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="phone"
+                      type="tel"
+                      inputMode="numeric"
+                      autoComplete="tel"
+                      required
+                      maxLength={11}
+                      disabled={inputsDisabled}
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+                      placeholder="13800138000"
+                      className="h-11 pl-9"
+                    />
+                  </div>
+                </div>
 
-            {error && (
-              <Alert className="border-destructive/30 bg-destructive/5 text-destructive [&>svg]:text-destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>登录失败</AlertTitle>
-                <AlertDescription className="mt-1 text-xs opacity-90">{error}</AlertDescription>
-              </Alert>
-            )}
+                <div className="space-y-1.5">
+                  <Label htmlFor="password">密码</Label>
+                  <div className="relative">
+                    <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete="current-password"
+                      required
+                      disabled={inputsDisabled}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="h-11 pl-9 pr-10"
+                    />
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      disabled={inputsDisabled}
+                      onClick={() => setShowPassword((v) => !v)}
+                      aria-label={showPassword ? "隐藏密码" : "显示密码"}
+                      className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+              </TabsContent>
 
-            <Button
-              type="button"
-              disabled={inputsDisabled || !mounted}
-              onClick={() => void doSubmit()}
-              className="h-11 w-full bg-gradient-brand shadow-elegant transition-transform hover:scale-[1.01]"
-            >
-              {submitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" /> 登录中…
-                </>
-              ) : (
-                "登录后台"
+              <TabsContent value="otp" className="mt-0 space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="otp-phone">手机号</Label>
+                  <div className="relative">
+                    <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="otp-phone"
+                      type="tel"
+                      inputMode="numeric"
+                      autoComplete="tel"
+                      maxLength={11}
+                      disabled={inputsDisabled}
+                      value={otpPhone}
+                      onChange={(e) => setOtpPhone(e.target.value.replace(/\D/g, ""))}
+                      placeholder="13800138000"
+                      className="h-11 pl-9"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="otp-code">短信验证码</Label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        id="otp-code"
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        disabled={inputsDisabled}
+                        value={otpCode}
+                        onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                        placeholder="6 位数字"
+                        className="h-11 pl-9 tracking-widest"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={otpSending || otpCooldown > 0 || inputsDisabled}
+                      onClick={() => void doSendOtp()}
+                      className="h-11 shrink-0"
+                    >
+                      {otpSending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : otpCooldown > 0 ? (
+                        `${otpCooldown}s`
+                      ) : (
+                        "获取验证码"
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    仅向已在 ERP 注册的手机号发送，未注册请联系管理员
+                  </p>
+                </div>
+              </TabsContent>
+
+              {error && (
+                <Alert className="border-destructive/30 bg-destructive/5 text-destructive [&>svg]:text-destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>登录失败</AlertTitle>
+                  <AlertDescription className="mt-1 text-xs opacity-90">{error}</AlertDescription>
+                </Alert>
               )}
-            </Button>
 
-            <p className="pt-2 text-center text-xs text-muted-foreground">
-              账号由管理员统一添加，本系统不开放注册
-            </p>
-          </form>
+              <Button
+                type="submit"
+                disabled={inputsDisabled || !mounted}
+                className="h-11 w-full bg-gradient-brand shadow-elegant transition-transform hover:scale-[1.01]"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> 登录中…
+                  </>
+                ) : (
+                  "登录后台"
+                )}
+              </Button>
+
+              <p className="pt-2 text-center text-xs text-muted-foreground">
+                账号由管理员统一添加，本系统不开放注册
+              </p>
+            </form>
+          </Tabs>
         </div>
 
         {redirecting && (
