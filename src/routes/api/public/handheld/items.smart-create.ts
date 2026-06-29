@@ -44,10 +44,23 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
           .maybeSingle();
         if (!loc || !loc.is_active) return err("Location not found or disabled", 404);
 
+        // 规范化新图：先 image_storage_paths（持久私桶路径），再 image_url（外链）
+        const incomingPaths: string[] = [];
+        for (const p of body.image_storage_paths ?? []) {
+          incomingPaths.push(`${p.bucket}/${p.storage_path}`);
+        }
+        if (
+          body.image_url &&
+          /^https?:\/\//i.test(body.image_url) &&
+          !body.image_url.includes("token=") // 不写 signed URL，否则过期
+        ) {
+          incomingPaths.push(body.image_url);
+        }
+
         // Reuse existing SKU if (category, price_tier, name) already exists; else create.
         const { data: existSku } = await supabaseAdmin
           .from("inv_skus")
-          .select("id, sku_code, epc, stock_qty")
+          .select("id, sku_code, epc, stock_qty, image_paths, image_url")
           .eq("category", body.category)
           .eq("price_tier", body.price_tier)
           .eq("name", body.name)
@@ -60,9 +73,31 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
           skuId = existSku.id;
           skuCode = existSku.sku_code ?? generateSkuCode(body.category, "single");
           epc = existSku.epc;
+          // 把新图 append 到已有数组，去重保序
+          const existing = ((existSku as { image_paths?: string[] | null }).image_paths ?? []) as string[];
+          const merged: string[] = [];
+          const seen = new Set<string>();
+          for (const x of [...existing, ...incomingPaths]) {
+            if (!x || seen.has(x)) continue;
+            seen.add(x);
+            merged.push(x);
+          }
+          if (incomingPaths.length > 0) {
+            await supabaseAdmin
+              .from("inv_skus")
+              .update({
+                image_paths: merged,
+                // 兼容：旧 image_url 仍指向第 0 张外链（无外链则保持原值）
+                image_url:
+                  merged.find((p) => /^https?:\/\//i.test(p)) ?? existSku.image_url ?? null,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", skuId);
+          }
         } else {
           skuCode = generateSkuCode(body.category, "single");
           epc = generateEpc(body.category, body.price_tier);
+          const firstHttp = incomingPaths.find((p) => /^https?:\/\//i.test(p)) ?? null;
           const ins = await supabaseAdmin
             .from("inv_skus")
             .insert({
@@ -73,7 +108,8 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
               kind: "single",
               epc,
               sku_code: skuCode,
-              image_url: body.image_url ?? null,
+              image_paths: incomingPaths,
+              image_url: firstHttp, // 仅在有外链时填，避免存过期 signed URL
               weight_g: body.weight_g ?? null,
               notes: body.notes ?? null,
               grade: body.grade ?? null,
