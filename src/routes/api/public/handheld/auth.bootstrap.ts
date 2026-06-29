@@ -122,10 +122,11 @@ export const Route = createFileRoute("/api/public/handheld/auth/bootstrap")({
           deviceId = inserted.id;
         }
 
-        // 3. Load active locations + optional auto-bind single-location
+        // 3. Load active locations scoped by user roles + auto-bind single
         const { locations, defaultLocationId } = await loadVisibleLocationsForDevice(
           deviceId,
           ((existing as any)?.default_location_id as string | null) ?? null,
+          user.id,
         );
 
         // 4. Reload device with (possibly newly-bound) location join
@@ -160,6 +161,12 @@ export const Route = createFileRoute("/api/public/handheld/auth/bootstrap")({
           .eq("user_id", user.id);
         const roles = ((roleRows as { role: string }[] | null) ?? []).map((r) => r.role);
 
+        const displayName =
+          (user.user_metadata?.display_name as string | undefined) ??
+          (user.user_metadata?.name as string | undefined) ??
+          (user.user_metadata?.full_name as string | undefined) ??
+          null;
+
         return ok({
           device_token: deviceToken,
           device: {
@@ -178,17 +185,19 @@ export const Route = createFileRoute("/api/public/handheld/auth/bootstrap")({
           refresh_token: signIn.session.refresh_token,
           expires_at: signIn.session.expires_at ?? 0,
           user: {
+            id: user.id,
             user_id: user.id,
             email: user.email ?? null,
-            display_name:
-              (user.user_metadata?.display_name as string | undefined) ??
-              (user.user_metadata?.name as string | undefined) ??
-              (user.user_metadata?.full_name as string | undefined) ??
-              null,
+            phone: (user.user_metadata?.phone as string | undefined) ?? user.phone ?? null,
+            display_name: displayName,
             roles,
           },
           locations,
         });
+      },
+    },
+  },
+});
       },
     },
   },
