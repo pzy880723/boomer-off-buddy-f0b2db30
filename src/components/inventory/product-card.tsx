@@ -70,17 +70,26 @@ export function StandardProductCard({
 }
 
 /** 自定义 / 组包 SKU 卡：保留原"一 SKU 一卡"展示 */
-export function SingleSkuCard({ row, actions }: { row: SkuRow; actions?: ReactNode }) {
+export function SingleSkuCard({
+  row,
+  actions,
+  coverOverride,
+}: {
+  row: SkuRow;
+  actions?: ReactNode;
+  coverOverride?: string | null;
+}) {
   const isBundle = row.kind === "bundle";
   const bundleItems = Array.isArray(row.bundle_items) ? row.bundle_items : [];
+  const cover = coverOverride ?? row.image_url;
   return (
     <div className="relative">
       <Link to="/inventory/skus/$id" params={{ id: row.id }} className="block">
         <Card className="group h-full overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-card-hover">
           <div className="relative aspect-square overflow-hidden bg-muted">
-            {row.image_url ? (
+            {cover ? (
               <img
-                src={row.image_url}
+                src={cover}
                 alt={row.name}
                 className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
