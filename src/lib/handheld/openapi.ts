@@ -60,6 +60,8 @@ import {
   TransferScanReq,
   TransferScanRes,
   TransferShipConfirmRes,
+  SignReadUrlReq,
+  SignReadUrlRes,
   UploadImageReq,
   UploadImageRes,
 } from "./schemas";
