@@ -29,6 +29,7 @@ import { ProductEditDialog } from "@/components/inventory/product-edit-dialog";
 import { SkuEditDialog } from "@/components/inventory/sku-edit-dialog";
 import { listSkus, deleteSku, deleteStandardProduct } from "@/lib/inventory.functions";
 import { groupStandardSkus, type SkuRow, type StandardProductGroup } from "@/lib/inventory.helpers";
+import { useSkuCovers, pickCover } from "@/hooks/use-sku-covers";
 
 export const Route = createFileRoute("/inventory/skus/")({
   head: () => ({
