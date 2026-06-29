@@ -24,6 +24,7 @@ import {
   type SkuRow,
   type StandardProductGroup,
 } from "@/lib/inventory.helpers";
+import { useSkuCovers, pickCover } from "@/hooks/use-sku-covers";
 import {
   CustomSkuForm,
   useCustomSkuMutation,
