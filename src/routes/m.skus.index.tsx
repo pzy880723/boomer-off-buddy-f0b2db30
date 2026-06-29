@@ -131,7 +131,7 @@ function MSkusPage() {
             {customRows.length === 0 ? (
               <EmptyState icon={Sparkles} title="还没有自定义商品" description="点右上「新建」→ 自定义商品" />
             ) : (
-              customRows.map((r) => <MSingleRow key={r.id} row={r} />)
+              customRows.map((r) => <MSingleRow key={r.id} row={r} cover={pickCover(covers[r.id], r.image_url)} />)
             )}
           </TabsContent>
 
@@ -139,7 +139,7 @@ function MSkusPage() {
             {bundleRows.length === 0 ? (
               <EmptyState icon={Boxes} title="还没有组包商品" />
             ) : (
-              bundleRows.map((r) => <MSingleRow key={r.id} row={r} />)
+              bundleRows.map((r) => <MSingleRow key={r.id} row={r} cover={pickCover(covers[r.id], r.image_url)} />)
             )}
           </TabsContent>
 
@@ -147,7 +147,7 @@ function MSkusPage() {
             {standardGroups.length === 0 ? (
               <EmptyState icon={Tags} title="还没有标准商品" description="点右上「新建」开始" />
             ) : (
-              standardGroups.map((g) => <MStandardRow key={g.key} group={g} />)
+              standardGroups.map((g) => <MStandardRow key={g.key} group={g} cover={groupCover(g)} />)
             )}
           </TabsContent>
         </Tabs>
