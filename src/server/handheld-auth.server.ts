@@ -159,14 +159,43 @@ export async function resolveSessionUser(request: Request): Promise<{
 export async function loadVisibleLocationsForDevice(
   deviceId: string | null,
   currentDefaultLocationId: string | null,
+  userId?: string | null,
 ): Promise<{
   locations: { id: string; name: string; kind: "warehouse" | "shop"; is_active: boolean }[];
   defaultLocationId: string | null;
 }> {
-  const { data } = await supabaseAdmin
+  let isHq = false;
+  if (userId) {
+    const roles = await loadUserRoles(userId);
+    isHq = roles.includes("super_admin") || roles.includes("hq_operator");
+  }
+
+  let allowedIds: string[] | null = null;
+  if (userId && !isHq) {
+    const { data: perms } = await supabaseAdmin
+      .from("user_location_perms" as never)
+      .select("location_id")
+      .eq("user_id", userId);
+    allowedIds = ((perms as { location_id: string }[] | null) ?? []).map((p) => p.location_id);
+    if (allowedIds.length === 0) {
+      // 非 HQ 用户尚未授权任何库位 → 空列表，清掉历史默认库位
+      if (deviceId && currentDefaultLocationId) {
+        await supabaseAdmin
+          .from("inv_handheld_devices")
+          .update({ default_location_id: null })
+          .eq("id", deviceId);
+      }
+      return { locations: [], defaultLocationId: null };
+    }
+  }
+
+  let query = supabaseAdmin
     .from("inv_locations")
     .select("id, name, kind, is_active")
     .eq("is_active", true);
+  if (allowedIds) query = query.in("id", allowedIds);
+
+  const { data } = await query;
   const rows = (data ?? []) as {
     id: string;
     name: string;
@@ -178,7 +207,17 @@ export async function loadVisibleLocationsForDevice(
     return a.name.localeCompare(b.name, "zh-Hans-CN");
   });
 
+  // 如果当前默认库位已不在可见范围（停用 / 撤权）→ 清空
   let defaultLocationId = currentDefaultLocationId;
+  if (defaultLocationId && !rows.some((r) => r.id === defaultLocationId)) {
+    defaultLocationId = null;
+    if (deviceId) {
+      await supabaseAdmin
+        .from("inv_handheld_devices")
+        .update({ default_location_id: null })
+        .eq("id", deviceId);
+    }
+  }
   if (deviceId && !defaultLocationId && rows.length === 1) {
     defaultLocationId = rows[0].id;
     await supabaseAdmin
@@ -188,4 +227,30 @@ export async function loadVisibleLocationsForDevice(
   }
   return { locations: rows, defaultLocationId };
 }
+
+/** 读取用户角色列表（字符串数组） */
+export async function loadUserRoles(userId: string): Promise<string[]> {
+  const { data } = await supabaseAdmin
+    .from("user_roles" as never)
+    .select("role")
+    .eq("user_id", userId);
+  return ((data as { role: string }[] | null) ?? []).map((r) => r.role);
+}
+
+/** 当前用户是否有权操作指定 location（HQ 角色全通） */
+export async function userCanAccessLocation(
+  userId: string,
+  locationId: string,
+): Promise<boolean> {
+  const roles = await loadUserRoles(userId);
+  if (roles.includes("super_admin") || roles.includes("hq_operator")) return true;
+  const { data } = await supabaseAdmin
+    .from("user_location_perms" as never)
+    .select("location_id")
+    .eq("user_id", userId)
+    .eq("location_id", locationId)
+    .maybeSingle();
+  return !!data;
+}
+
 
