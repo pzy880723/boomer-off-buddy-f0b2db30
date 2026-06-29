@@ -200,13 +200,13 @@ function SkusPage() {
           ) : view === "grid" ? (
             <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {standardGroups.map((g) => (
-                <StandardProductCard key={g.key} group={g} actions={productActions(g)} />
+                <StandardProductCard key={g.key} group={g} actions={productActions(g)} coverOverride={groupCover(g)} />
               ))}
             </div>
           ) : (
             <Card className="overflow-hidden">
               {standardGroups.map((g) => (
-                <StandardProductRow key={g.key} group={g} actions={productActions(g)} />
+                <StandardProductRow key={g.key} group={g} actions={productActions(g)} coverOverride={groupCover(g)} />
               ))}
             </Card>
           )}
@@ -223,13 +223,13 @@ function SkusPage() {
           ) : view === "grid" ? (
             <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {customRows.map((r) => (
-                <SingleSkuCard key={r.id} row={r} actions={skuActions(r)} />
+                <SingleSkuCard key={r.id} row={r} actions={skuActions(r)} coverOverride={pickCover(covers[r.id], r.image_url)} />
               ))}
             </div>
           ) : (
             <Card className="overflow-hidden">
               {customRows.map((r) => (
-                <SingleSkuRow key={r.id} row={r} actions={skuActions(r)} />
+                <SingleSkuRow key={r.id} row={r} actions={skuActions(r)} coverOverride={pickCover(covers[r.id], r.image_url)} />
               ))}
             </Card>
           )}
@@ -246,13 +246,13 @@ function SkusPage() {
           ) : view === "grid" ? (
             <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {bundleRows.map((r) => (
-                <SingleSkuCard key={r.id} row={r} actions={skuActions(r)} />
+                <SingleSkuCard key={r.id} row={r} actions={skuActions(r)} coverOverride={pickCover(covers[r.id], r.image_url)} />
               ))}
             </div>
           ) : (
             <Card className="overflow-hidden">
               {bundleRows.map((r) => (
-                <SingleSkuRow key={r.id} row={r} actions={skuActions(r)} />
+                <SingleSkuRow key={r.id} row={r} actions={skuActions(r)} coverOverride={pickCover(covers[r.id], r.image_url)} />
               ))}
             </Card>
           )}
