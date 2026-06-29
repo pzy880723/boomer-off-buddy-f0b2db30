@@ -174,9 +174,10 @@ function MSkusPage() {
   );
 }
 
-function MStandardRow({ group }: { group: StandardProductGroup }) {
+function MStandardRow({ group, cover }: { group: StandardProductGroup; cover?: string | null }) {
   const visibleTiers = group.tiers.slice(0, 3);
   const remaining = group.tiers.length - visibleTiers.length;
+  const src = cover ?? group.image_url;
   return (
     <Link
       to="/m/products/$code"
@@ -184,8 +185,8 @@ function MStandardRow({ group }: { group: StandardProductGroup }) {
       className="flex gap-3 rounded-xl border bg-card p-2.5 active:bg-muted"
     >
       <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-muted">
-        {group.image_url ? (
-          <img src={group.image_url} alt={group.name} className="h-full w-full object-cover" />
+        {src ? (
+          <img src={src} alt={group.name} className="h-full w-full object-cover" />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-muted-foreground">
             <Tags className="h-5 w-5" />
