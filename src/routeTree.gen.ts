@@ -83,6 +83,7 @@ import { Route as ApiPublicHooksYouzanStockWorkerRouteImport } from './routes/ap
 import { Route as ApiPublicHooksYouzanReconcileRouteImport } from './routes/api/public/hooks/youzan-reconcile'
 import { Route as ApiPublicHandheldOpenapiDotjsonRouteImport } from './routes/api/public/handheld/openapi[.]json'
 import { Route as ApiPublicHandheldLocationsRouteImport } from './routes/api/public/handheld/locations'
+import { Route as ApiPublicHandheldDashboardRouteImport } from './routes/api/public/handheld/dashboard'
 import { Route as ApiPublicHandheldTransferShipScanRouteImport } from './routes/api/public/handheld/transfer.ship-scan'
 import { Route as ApiPublicHandheldTransferShipConfirmRouteImport } from './routes/api/public/handheld/transfer.ship-confirm'
 import { Route as ApiPublicHandheldTransferReceiveScanRouteImport } from './routes/api/public/handheld/transfer.receive-scan'
@@ -497,6 +498,12 @@ const ApiPublicHandheldLocationsRoute =
     path: '/api/public/handheld/locations',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHandheldDashboardRoute =
+  ApiPublicHandheldDashboardRouteImport.update({
+    id: '/api/public/handheld/dashboard',
+    path: '/api/public/handheld/dashboard',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHandheldTransferShipScanRoute =
   ApiPublicHandheldTransferShipScanRouteImport.update({
     id: '/api/public/handheld/transfer/ship-scan',
@@ -763,6 +770,7 @@ export interface FileRoutesByFullPath {
   '/purchase/domestic-bulk/': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic/': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
+  '/api/public/handheld/dashboard': typeof ApiPublicHandheldDashboardRoute
   '/api/public/handheld/locations': typeof ApiPublicHandheldLocationsRoute
   '/api/public/handheld/openapi.json': typeof ApiPublicHandheldOpenapiDotjsonRoute
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
@@ -865,6 +873,7 @@ export interface FileRoutesByTo {
   '/purchase/domestic-bulk': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel': typeof PurchaseJapanParcelIndexRoute
+  '/api/public/handheld/dashboard': typeof ApiPublicHandheldDashboardRoute
   '/api/public/handheld/locations': typeof ApiPublicHandheldLocationsRoute
   '/api/public/handheld/openapi.json': typeof ApiPublicHandheldOpenapiDotjsonRoute
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
@@ -975,6 +984,7 @@ export interface FileRoutesById {
   '/purchase/domestic-bulk/': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic/': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
+  '/api/public/handheld/dashboard': typeof ApiPublicHandheldDashboardRoute
   '/api/public/handheld/locations': typeof ApiPublicHandheldLocationsRoute
   '/api/public/handheld/openapi.json': typeof ApiPublicHandheldOpenapiDotjsonRoute
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
@@ -1086,6 +1096,7 @@ export interface FileRouteTypes {
     | '/purchase/domestic-bulk/'
     | '/purchase/domestic/'
     | '/purchase/japan-parcel/'
+    | '/api/public/handheld/dashboard'
     | '/api/public/handheld/locations'
     | '/api/public/handheld/openapi.json'
     | '/api/public/hooks/youzan-reconcile'
@@ -1188,6 +1199,7 @@ export interface FileRouteTypes {
     | '/purchase/domestic-bulk'
     | '/purchase/domestic'
     | '/purchase/japan-parcel'
+    | '/api/public/handheld/dashboard'
     | '/api/public/handheld/locations'
     | '/api/public/handheld/openapi.json'
     | '/api/public/hooks/youzan-reconcile'
@@ -1297,6 +1309,7 @@ export interface FileRouteTypes {
     | '/purchase/domestic-bulk/'
     | '/purchase/domestic/'
     | '/purchase/japan-parcel/'
+    | '/api/public/handheld/dashboard'
     | '/api/public/handheld/locations'
     | '/api/public/handheld/openapi.json'
     | '/api/public/hooks/youzan-reconcile'
@@ -1369,6 +1382,7 @@ export interface RootRouteChildren {
   ApiPublicMerukiIngestRoute: typeof ApiPublicMerukiIngestRoute
   InventoryStocktakesIdRoute: typeof InventoryStocktakesIdRoute
   InventoryStocktakesIndexRoute: typeof InventoryStocktakesIndexRoute
+  ApiPublicHandheldDashboardRoute: typeof ApiPublicHandheldDashboardRoute
   ApiPublicHandheldLocationsRoute: typeof ApiPublicHandheldLocationsRoute
   ApiPublicHandheldOpenapiDotjsonRoute: typeof ApiPublicHandheldOpenapiDotjsonRoute
   ApiPublicHooksYouzanReconcileRoute: typeof ApiPublicHooksYouzanReconcileRoute
@@ -1927,6 +1941,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldLocationsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/handheld/dashboard': {
+      id: '/api/public/handheld/dashboard'
+      path: '/api/public/handheld/dashboard'
+      fullPath: '/api/public/handheld/dashboard'
+      preLoaderRoute: typeof ApiPublicHandheldDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/handheld/transfer/ship-scan': {
       id: '/api/public/handheld/transfer/ship-scan'
       path: '/api/public/handheld/transfer/ship-scan'
@@ -2398,6 +2419,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicMerukiIngestRoute: ApiPublicMerukiIngestRoute,
   InventoryStocktakesIdRoute: InventoryStocktakesIdRoute,
   InventoryStocktakesIndexRoute: InventoryStocktakesIndexRoute,
+  ApiPublicHandheldDashboardRoute: ApiPublicHandheldDashboardRoute,
   ApiPublicHandheldLocationsRoute: ApiPublicHandheldLocationsRoute,
   ApiPublicHandheldOpenapiDotjsonRoute: ApiPublicHandheldOpenapiDotjsonRoute,
   ApiPublicHooksYouzanReconcileRoute: ApiPublicHooksYouzanReconcileRoute,
