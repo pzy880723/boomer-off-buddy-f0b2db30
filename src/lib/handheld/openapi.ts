@@ -60,6 +60,8 @@ import {
   TransferScanReq,
   TransferScanRes,
   TransferShipConfirmRes,
+  SignReadUrlReq,
+  SignReadUrlRes,
   UploadImageReq,
   UploadImageRes,
 } from "./schemas";
@@ -333,9 +335,18 @@ Token 由后台 **仓库管理 → 手持终端** 页面创建/复制。设备�
         tags: ["图片"],
         summary: "申请图片直传 signed URL",
         description:
-          "APP 先调本接口拿到 `upload_url` + `headers`，再用 `PUT` 直接把图片传到 Storage，避免大图穿过 ERP。返回的 `read_url` 是 7 天 signed GET URL，可直接用于 smart-create。",
+          "APP 先调本接口拿到 `upload_url` + `headers`，再用 `PUT` 直接把图片传到 Storage，避免大图穿过 ERP。`read_url` 上传前永远是 null（Storage 的 createSignedUrl 要求对象已存在），上传完成后调 POST /items/sign-read-url 拿 7 天 signed GET URL。",
         requestBody: jsonBody(UploadImageReq),
         responses: { "200": jsonRes("OK", UploadImageRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/items/sign-read-url": {
+      post: {
+        tags: ["图片"],
+        summary: "为已上传对象签发 read URL",
+        description: "在 /items/upload-image 直传成功后调用，返回 signed GET URL（默认 7 天）。",
+        requestBody: jsonBody(SignReadUrlReq),
+        responses: { "200": jsonRes("OK", SignReadUrlRes), ...ERROR_RESPONSES },
       },
     },
     "/api/public/handheld/items/smart-create": {

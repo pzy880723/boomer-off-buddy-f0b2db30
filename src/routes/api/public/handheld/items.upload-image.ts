@@ -24,18 +24,17 @@ export const Route = createFileRoute("/api/public/handheld/items/upload-image")(
         const extMatch = body.filename.match(/\.([a-zA-Z0-9]{1,6})$/);
         const ext = (extMatch?.[1] || "jpg").toLowerCase();
         const path = `${new Date().toISOString().slice(0, 10)}/${auth.device.id}/${crypto.randomUUID()}.${ext}`;
-        const signedRead = await supabaseAdmin.storage
-          .from(body.bucket)
-          .createSignedUrl(path, 60 * 60 * 24 * 7);
-        if (signedRead.error) return err(signedRead.error.message, 500);
 
+        // NOTE: Supabase Storage 的 createSignedUrl 要求对象已存在。上传前没法签 read URL，
+        // 否则会返回 500 {"error":"Object not found"}。APP 上传完成后调
+        // POST /items/sign-read-url 拿 read URL。
         if (body.mode === "multipart") {
           const origin = new URL(request.url).origin;
           const upload_url = `${origin}/api/public/handheld/items/upload-image/multipart?path=${encodeURIComponent(path)}&bucket=${encodeURIComponent(body.bucket)}`;
           return ok({
             storage_path: path,
             upload_url,
-            read_url: signedRead.data.signedUrl,
+            read_url: null,
             method: "POST" as const,
             mode: "multipart" as const,
             headers: {
@@ -52,7 +51,7 @@ export const Route = createFileRoute("/api/public/handheld/items/upload-image")(
         return ok({
           storage_path: path,
           upload_url: signedUpload.data.signedUrl,
-          read_url: signedRead.data.signedUrl,
+          read_url: null,
           method: "PUT" as const,
           mode: "signed" as const,
           headers: { "Content-Type": body.content_type, "x-upsert": "false" },

@@ -446,10 +446,33 @@ export const UploadImageRes = okEnvelope(
   z.object({
     storage_path: z.string(),
     upload_url: z.string().url().meta({ description: "30 分钟有效；signed 模式为 Storage PUT URL，multipart 模式为 ERP 中转 POST URL" }),
-    read_url: z.string().url().meta({ description: "7 天 signed GET URL" }),
+    read_url: z
+      .string()
+      .url()
+      .nullable()
+      .meta({
+        description:
+          "上传前对象还不存在，无法签发 read URL；总是返回 null。上传完成后调 POST /items/sign-read-url 拿 7 天 signed GET URL。",
+      }),
     method: z.enum(["PUT", "POST"]),
     mode: z.enum(["signed", "multipart"]),
     headers: z.record(z.string(), z.string()).meta({ description: "上传时必须带这些 header" }),
+  }),
+);
+
+export const SignReadUrlReq = z
+  .object({
+    bucket: z.enum(["sku-raw", "sku-listing"]),
+    storage_path: z.string().min(1),
+    expires_in: z.number().int().min(60).max(60 * 60 * 24 * 30).default(60 * 60 * 24 * 7),
+  })
+  .meta({ id: "SignReadUrlReq" });
+
+export const SignReadUrlRes = okEnvelope(
+  z.object({
+    storage_path: z.string(),
+    read_url: z.string().url(),
+    expires_in: z.number().int(),
   }),
 );
 
