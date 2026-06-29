@@ -1,45 +1,44 @@
+# 让 APP 拍的图在 ERP 商品里永久显示
+
+## 现状
+- APP 调 `items/smart-create` 时没有传任何图片字段，导致 `inv_skus.image_url = null`。
+- 现有 schema 只支持 1 张图，且字段名是 `image_url`（外链/signed URL）。signed URL 7 天过期，写进库也会失效。
+- `sku-listing` / `sku-raw` 是私有桶。
+
 ## 目标
+APP 上传 → 服务端把 storage_path 永久保存到 SKU → ERP（PC + 移动端）按需签 URL 显示，主图大图 + 缩略图横排 + Lightbox。
 
-今后凡是涉及 APP（Codex 端）需要配合的改动，每轮结束都额外附一段「**给 Codex 的指令**」，让你一键复制粘贴即可派活。
+## 后端改动
 
-## 触发条件（满足任一即附）
+### 1. 数据库迁移
+- `inv_skus` 新增 `image_paths text[] not null default '{}'`，存形如 `sku-listing/2026-06-29/<device>/<uuid>.jpg` 的相对路径（含 bucket 前缀），第 0 个为主图。
+- 一次性回填：把现有非空 `image_url`（外链 http 直接放进去，signed URL 跳过）转成长度 1 的数组备用，方便统一前端。
 
-- 本轮改动了 `/api/public/**` 接口、字段、返回结构、错误码
-- 本轮改动了 OpenAPI（`openapi.snapshot.json` / `src/lib/handheld/**`）
-- 本轮改动了 APP 端会用到的认证 / OTP / bootstrap / 设备绑定 / 库位 / RFID / AI 流程
-- 本轮发布了新版本（v1.x）需要 APP 跟随升级
-- 本轮调整了业务数据口径，APP 展示需要跟着改
+### 2. Handheld API
+- `SmartCreateReq` 新增 `image_storage_paths: { bucket: 'sku-raw'|'sku-listing', storage_path: string }[]`（最多 6 张）；保留 `image_url` 字段做向后兼容。
+- `items/smart-create` 写入逻辑：把 `image_storage_paths` 规范成 `${bucket}/${storage_path}` 存到 `image_paths`；若同时有 `image_url` 外链且数组为空，则把外链放数组第 0 位。复用已存在 SKU 时，新图追加到尾部去重。
+- `items/$id` 返回新字段 `images: { storage_path, read_url }[]`（read_url 7 天 signed URL，外链直接返回原 URL）。`image_url` 字段保留指向主图 read_url，方便老 APP。
+- OpenAPI 与 `docs/handheld-api.md` 同步更新。
 
-纯 ERP 前端 / PC 端 / 数据库内部清理 → 不附。
+### 3. ERP 端取图
+- 新增 server fn `getSkuSignedImages(skuId)` → 解析 `image_paths`，对私有 bucket 路径用 `supabaseAdmin.storage.createSignedUrls`（24 小时），http 外链原样返回。
+- 新增 server fn `listSignedCoverUrls(skuIds[])` 给列表批量签封面图。
 
-## 指令块格式（固定模板）
+## 前端改动
 
-每段以独立代码块输出，方便整段复制：
+### PC 端
+- `src/routes/inventory.skus.$id.tsx`：把现在的方块封面换成"主图（点开 Lightbox）+ 下方缩略图横排"。复用 `ImageLightbox`（已存在于 japan-parcel 模块）。
+- SKU 详情新增"添加/重排图片"按钮：复用 `sku-image-picker` 流程，但写入 `image_paths`（保持向后兼容，可同时仍写 `image_url`）。
+- 列表 `inventory.skus.index.tsx`、`inventory.products.tsx`：封面取 `image_paths[0]` 的 signed URL，没有则回落 `image_url`。
 
-```text
-【给 Codex 的指令 · YYYY-MM-DD · 第N条】
+### 移动端
+- `src/routes/m.skus.$id.tsx` / `m.products.$code.tsx` / `m.skus.index.tsx` / `m.parcels.tsx`：同样取签名后的主图，并在详情页加横向缩略图条 + 全屏预览。
 
-背景：<这轮 Lovable 这边做了什么、为什么 APP 要改>
+## 给 Codex 的指令（同步会附在实施完成后的回复里）
+APP 端需要调整：
+1. 拍照后走 `items/upload-image`（拿 storage_path）→ 直接 PUT 上传 → **不再调 `sign-read-url`**，直接把 `{ bucket, storage_path }` 攒到本地数组。
+2. `items/smart-create` 请求体改为传 `image_storage_paths: [{bucket, storage_path}, ...]`，最多 6 张，第 0 张是主图。
+3. SKU 详情页解析 `images: [{storage_path, read_url}]`，用 `read_url` 渲染图集；不再消费 `image_url`。
 
-请在 APP 端执行：
-1. <具体动作，含接口路径 / 字段名 / 错误码>
-2. <…>
-
-接口契约：
-- POST <path>
-  Request: { … }
-  Response: { ok, data: { … } }
-  错误码：<code> → <UI 文案>
-
-验收：
-- <可观察的成功标准，例如"输入手机号点获取验证码 → 看到 toast 'ttl 300'"></>
-```
-
-## 落地方式
-
-- 写入项目记忆 `mem://preferences/codex-handoff`，列入 Core，让后续每轮自动遵守。
-- 历史 `.lovable/plan.md` 里的 Codex 协作清单保留，但今后以"每轮即时指令"为主，不再让你回去翻长文档。
-
-## 本轮（已完成的库位清洗 + 自动绑定）对应的 Codex 指令草稿
-
-进入 build 模式后我会先把上面那条记忆写好，并补发一条对应本轮库位改动的 Codex 指令给你，确认这个交付格式 OK 后正式沿用。
+## 验证
+- 用 APP 拍 3 张图新建 → 查 `inv_skus.image_paths` 长度为 3 → ERP `/inventory/skus/{id}` 主图 + 2 张缩略图都能显示 → Lightbox 可切换 → 24h 后刷新仍然能签出新 URL。
