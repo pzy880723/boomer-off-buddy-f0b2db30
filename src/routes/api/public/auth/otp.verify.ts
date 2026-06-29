@@ -159,8 +159,13 @@ export const Route = createFileRoute("/api/public/auth/otp/verify")({
         const roles = ((roleRows as { role: string }[] | null) ?? []).map((x) => x.role);
 
         const userPayload = {
+          id: authedUser.id,
           user_id: authedUser.id,
           email: authedUser.email ?? null,
+          phone:
+            (authedUser.user_metadata?.phone as string | undefined) ??
+            authedUser.phone ??
+            phone,
           display_name:
             (authedUser.user_metadata?.display_name as string | undefined) ??
             (authedUser.user_metadata?.name as string | undefined) ??
