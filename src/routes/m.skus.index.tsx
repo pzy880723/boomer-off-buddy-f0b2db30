@@ -65,6 +65,16 @@ function MSkusPage() {
     };
   }, [rows]);
 
+  const allSkuIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  const { covers } = useSkuCovers(allSkuIds);
+  const groupCover = (g: StandardProductGroup): string | null => {
+    for (const s of g.skus) {
+      const c = covers[s.id];
+      if (c) return c;
+    }
+    return pickCover(null, g.image_url);
+  };
+
   const NewBtn = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
