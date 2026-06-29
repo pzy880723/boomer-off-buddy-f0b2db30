@@ -1814,6 +1814,53 @@ export type Database = {
           },
         ]
       }
+      user_location_perms: {
+        Row: {
+          created_at: string
+          location_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          location_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          location_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_location_perms_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       youzan_items: {
         Row: {
           created_at: string
@@ -2126,6 +2173,13 @@ export type Database = {
     Functions: {
       gen_ean13: { Args: never; Returns: string }
       gen_stock_transfer_code: { Args: never; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       inv_apply_inbound_stock: {
         Args: { p_delta: number; p_sku_id: string }
         Returns: undefined
@@ -2148,7 +2202,12 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      app_role:
+        | "super_admin"
+        | "hq_operator"
+        | "store_manager"
+        | "store_staff"
+        | "warehouse_staff"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2275,6 +2334,14 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: [
+        "super_admin",
+        "hq_operator",
+        "store_manager",
+        "store_staff",
+        "warehouse_staff",
+      ],
+    },
   },
 } as const
