@@ -140,9 +140,18 @@ export function SingleSkuCard({
 }
 
 /** 列表行 - 标准商品 */
-export function StandardProductRow({ group, actions }: { group: StandardProductGroup; actions?: ReactNode }) {
+export function StandardProductRow({
+  group,
+  actions,
+  coverOverride,
+}: {
+  group: StandardProductGroup;
+  actions?: ReactNode;
+  coverOverride?: string | null;
+}) {
   const visibleTiers = group.tiers.slice(0, 4);
   const remaining = group.tiers.length - visibleTiers.length;
+  const cover = coverOverride ?? group.image_url;
   return (
     <div className="flex items-center gap-3 border-b px-3 py-2.5 transition-colors last:border-b-0 hover:bg-muted/60">
       <Link
@@ -151,8 +160,8 @@ export function StandardProductRow({ group, actions }: { group: StandardProductG
         className="flex flex-1 items-center gap-3"
       >
         <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded bg-muted">
-          {group.image_url ? (
-            <img src={group.image_url} alt={group.name} className="h-full w-full object-cover" />
+          {cover ? (
+            <img src={cover} alt={group.name} className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-muted-foreground">
               <Tags className="h-5 w-5" />
