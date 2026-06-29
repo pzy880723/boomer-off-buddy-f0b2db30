@@ -150,3 +150,42 @@ export async function resolveSessionUser(request: Request): Promise<{
   return { user_id: data.user.id, email: data.user.email ?? null };
 }
 
+/**
+ * 加载 APP 可见的库位：is_active=true，按 kind（warehouse 在前）+ name 排序。
+ * 如果 device 当前没有绑定默认库位，且可见库位刚好只有一个，则自动绑定，
+ * 让 APP 登录后跳过"选择库位"这一步。
+ * 返回 { locations, defaultLocationId }，调用方据此填充返回包里的 device.location_*。
+ */
+export async function loadVisibleLocationsForDevice(
+  deviceId: string | null,
+  currentDefaultLocationId: string | null,
+): Promise<{
+  locations: { id: string; name: string; kind: "warehouse" | "shop"; is_active: boolean }[];
+  defaultLocationId: string | null;
+}> {
+  const { data } = await supabaseAdmin
+    .from("inv_locations")
+    .select("id, name, kind, is_active")
+    .eq("is_active", true);
+  const rows = (data ?? []) as {
+    id: string;
+    name: string;
+    kind: "warehouse" | "shop";
+    is_active: boolean;
+  }[];
+  rows.sort((a, b) => {
+    if (a.kind !== b.kind) return a.kind === "warehouse" ? -1 : 1;
+    return a.name.localeCompare(b.name, "zh-Hans-CN");
+  });
+
+  let defaultLocationId = currentDefaultLocationId;
+  if (deviceId && !defaultLocationId && rows.length === 1) {
+    defaultLocationId = rows[0].id;
+    await supabaseAdmin
+      .from("inv_handheld_devices")
+      .update({ default_location_id: defaultLocationId })
+      .eq("id", deviceId);
+  }
+  return { locations: rows, defaultLocationId };
+}
+
