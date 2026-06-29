@@ -30,6 +30,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { SkuEditDialog } from "@/components/inventory/sku-edit-dialog";
+import { SkuImageGallery } from "@/components/inventory/sku-image-gallery";
 import { PrintLabels, PRINT_STYLE } from "@/components/inventory/sku-detail-shared";
 import { SKU_GRADE_OPTIONS } from "@/components/inventory/sku-meta-fields";
 import { getSku, createLabelBatch, deleteSku } from "@/lib/inventory.functions";
@@ -82,6 +83,7 @@ function MSkuDetail() {
   });
 
   const sku = q.data?.sku as SkuRow | undefined;
+  const signedImages = (q.data?.signed_images ?? []) as string[];
   const labels = (q.data?.labels ?? []) as {
     id: string;
     qty: number;
@@ -161,14 +163,12 @@ function MSkuDetail() {
       <div className="space-y-3 p-3">
         {/* 主信息 */}
         <Card className="overflow-hidden p-0">
-          <div className="aspect-[4/3] w-full bg-muted">
-            {sku.image_url ? (
-              <img src={sku.image_url} alt={sku.name} className="h-full w-full object-cover" />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                <Tags className="h-10 w-10" />
-              </div>
-            )}
+          <div className="p-3 pb-0">
+            <SkuImageGallery
+              images={signedImages}
+              fallbackUrl={sku.image_url}
+              alt={sku.name}
+            />
           </div>
           <div className="space-y-2 p-3">
             <div className="flex flex-wrap items-center gap-1.5">

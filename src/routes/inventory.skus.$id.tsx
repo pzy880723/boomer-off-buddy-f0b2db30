@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { DataTable } from "@/components/data-table";
 import { SkuEditDialog } from "@/components/inventory/sku-edit-dialog";
+import { SkuImageGallery } from "@/components/inventory/sku-image-gallery";
 import { PrintLabels, PRINT_STYLE } from "@/components/inventory/sku-detail-shared";
 import { SkuYouzanCard } from "@/components/youzan/sku-youzan-card";
 import { getSku, createLabelBatch, deleteSku } from "@/lib/inventory.functions";
@@ -76,6 +77,7 @@ function SkuDetailPage() {
   const labels = q.data?.labels ?? [];
   const lines = q.data?.lines ?? [];
   const bundleChildren = q.data?.bundle_children ?? [];
+  const signedImages = (q.data?.signed_images ?? []) as string[];
 
   if (q.isLoading) return <div className="p-6 text-muted-foreground">加载中…</div>;
   if (!sku) return <div className="p-6 text-muted-foreground">SKU 不存在</div>;
@@ -104,14 +106,12 @@ function SkuDetailPage() {
       {/* 主信息 */}
       <Card className="p-5">
         <div className="flex flex-col gap-5 sm:flex-row">
-          <div className="h-40 w-40 flex-shrink-0 overflow-hidden rounded-lg border bg-muted sm:h-48 sm:w-48">
-            {sku.image_url ? (
-              <img src={sku.image_url} alt={sku.name} className="h-full w-full object-cover" />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                <Tags className="h-10 w-10" />
-              </div>
-            )}
+          <div className="w-full flex-shrink-0 sm:w-56">
+            <SkuImageGallery
+              images={signedImages}
+              fallbackUrl={sku.image_url}
+              alt={sku.name}
+            />
           </div>
           <div className="min-w-0 flex-1 space-y-3">
             <div>
