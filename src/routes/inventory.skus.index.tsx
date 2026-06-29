@@ -86,6 +86,17 @@ function SkusPage() {
     };
   }, [rows]);
 
+  // 批量给所有 SKU 签封面（私桶图）
+  const allSkuIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  const { covers } = useSkuCovers(allSkuIds);
+  const groupCover = (g: StandardProductGroup): string | null => {
+    for (const s of g.skus) {
+      const c = covers[s.id];
+      if (c) return c;
+    }
+    return pickCover(null, g.image_url);
+  };
+
   const NewMenu = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
