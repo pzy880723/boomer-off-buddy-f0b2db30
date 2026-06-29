@@ -260,6 +260,7 @@ export const Route = createFileRoute("/api/public/auth/otp/verify")({
         const { locations: locs, defaultLocationId } = await loadVisibleLocationsForDevice(
           deviceId,
           ((deviceRow as any)?.default_location_id as string | null) ?? null,
+          authedUser.id,
         );
 
         // 若刚刚自动绑定了默认库位，重新读 location 关联
