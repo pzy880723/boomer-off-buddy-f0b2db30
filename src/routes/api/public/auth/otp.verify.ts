@@ -250,9 +250,25 @@ export const Route = createFileRoute("/api/public/auth/otp/verify")({
           )
           .eq("id", deviceId)
           .maybeSingle();
-        const loc = (deviceRow as any)?.location as
+
+        const { loadVisibleLocationsForDevice } = await import("@/server/handheld-auth.server");
+        const { locations: locs, defaultLocationId } = await loadVisibleLocationsForDevice(
+          deviceId,
+          ((deviceRow as any)?.default_location_id as string | null) ?? null,
+        );
+
+        // 若刚刚自动绑定了默认库位，重新读 location 关联
+        let loc = (deviceRow as any)?.location as
           | { id: string; kind: "warehouse" | "shop"; name: string }
           | null;
+        if (!loc && defaultLocationId) {
+          const { data: locRow } = await supabaseAdmin
+            .from("inv_locations")
+            .select("id, kind, name")
+            .eq("id", defaultLocationId)
+            .maybeSingle();
+          loc = (locRow as any) ?? null;
+        }
         const cap =
           ((deviceRow as any)?.capabilities as Record<string, unknown> | undefined) ?? {};
         const device_capabilities = {
@@ -266,20 +282,13 @@ export const Route = createFileRoute("/api/public/auth/otp/verify")({
           has_camera: cap.has_camera !== false,
         };
 
-        const { data: locs } = await supabaseAdmin
-          .from("inv_locations")
-          .select("id, name, kind, is_active")
-          .eq("is_active", true)
-          .order("kind")
-          .order("name");
-
         return ok({
           device_token: deviceToken,
           device: {
             id: deviceId,
             device_code: (deviceRow as any)?.device_code as string,
             label: (deviceRow as any)?.label as string,
-            location_id: loc?.id ?? null,
+            location_id: loc?.id ?? defaultLocationId,
             location_kind: loc?.kind ?? null,
             location_name: loc?.name ?? null,
             device_capabilities,
@@ -291,7 +300,7 @@ export const Route = createFileRoute("/api/public/auth/otp/verify")({
           refresh_token: session.refresh_token,
           expires_at: session.expires_at ?? 0,
           user: userPayload,
-          locations: locs ?? [],
+          locations: locs,
         });
       },
     },
