@@ -97,6 +97,7 @@ export type SkuRow = {
   bundle_items: unknown;
   weight_g: number | null;
   image_url: string | null;
+  image_paths?: string[] | null;
   notes: string | null;
   status: string;
   epc: string;
