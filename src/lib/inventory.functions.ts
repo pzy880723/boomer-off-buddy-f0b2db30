@@ -120,7 +120,27 @@ export const getSku = createServerFn({ method: "GET" })
       .eq("sku_id", data.id)
       .order("created_at", { ascending: false })
       .limit(50);
-    return { sku: row, labels: labels ?? [], lines: lines ?? [], bundle_children: bundleChildren };
+
+    // 签封面图集（image_paths 可能含私桶相对路径）
+    const imagePaths = ((row as { image_paths?: string[] | null })?.image_paths ?? []) as string[];
+    let signedImages: string[] = [];
+    if (imagePaths.length > 0) {
+      const { signSkuImagePaths } = await import("./sku-image-resolver.server");
+      const signed = await signSkuImagePaths(imagePaths);
+      signedImages = signed.filter((x): x is string => !!x);
+    }
+    // 兜底外链 image_url
+    if (signedImages.length === 0 && row?.image_url && /^https?:\/\//i.test(row.image_url) && !row.image_url.includes("token=")) {
+      signedImages = [row.image_url];
+    }
+
+    return {
+      sku: row,
+      labels: labels ?? [],
+      lines: lines ?? [],
+      bundle_children: bundleChildren,
+      signed_images: signedImages,
+    };
   });
 
 /** 标准商品：一次为多个价格档生成多条 single SKU */
