@@ -108,6 +108,7 @@ import { Route as ApiPublicHandheldNotificationsReadAllRouteImport } from './rou
 import { Route as ApiPublicHandheldLocationSwitchRouteImport } from './routes/api/public/handheld/location.switch'
 import { Route as ApiPublicHandheldItemsUploadImageRouteImport } from './routes/api/public/handheld/items.upload-image'
 import { Route as ApiPublicHandheldItemsSmartCreateRouteImport } from './routes/api/public/handheld/items.smart-create'
+import { Route as ApiPublicHandheldItemsSignReadUrlRouteImport } from './routes/api/public/handheld/items.sign-read-url'
 import { Route as ApiPublicHandheldItemsBindRfidRouteImport } from './routes/api/public/handheld/items.bind-rfid'
 import { Route as ApiPublicHandheldItemsIdRouteImport } from './routes/api/public/handheld/items.$id'
 import { Route as ApiPublicHandheldInboundScanRouteImport } from './routes/api/public/handheld/inbound.scan'
@@ -657,6 +658,12 @@ const ApiPublicHandheldItemsSmartCreateRoute =
     path: '/api/public/handheld/items/smart-create',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHandheldItemsSignReadUrlRoute =
+  ApiPublicHandheldItemsSignReadUrlRouteImport.update({
+    id: '/api/public/handheld/items/sign-read-url',
+    path: '/api/public/handheld/items/sign-read-url',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHandheldItemsBindRfidRoute =
   ApiPublicHandheldItemsBindRfidRouteImport.update({
     id: '/api/public/handheld/items/bind-rfid',
@@ -857,6 +864,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/inbound/scan': typeof ApiPublicHandheldInboundScanRoute
   '/api/public/handheld/items/$id': typeof ApiPublicHandheldItemsIdRouteWithChildren
   '/api/public/handheld/items/bind-rfid': typeof ApiPublicHandheldItemsBindRfidRoute
+  '/api/public/handheld/items/sign-read-url': typeof ApiPublicHandheldItemsSignReadUrlRoute
   '/api/public/handheld/items/smart-create': typeof ApiPublicHandheldItemsSmartCreateRoute
   '/api/public/handheld/items/upload-image': typeof ApiPublicHandheldItemsUploadImageRouteWithChildren
   '/api/public/handheld/location/switch': typeof ApiPublicHandheldLocationSwitchRoute
@@ -969,6 +977,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/inbound/scan': typeof ApiPublicHandheldInboundScanRoute
   '/api/public/handheld/items/$id': typeof ApiPublicHandheldItemsIdRouteWithChildren
   '/api/public/handheld/items/bind-rfid': typeof ApiPublicHandheldItemsBindRfidRoute
+  '/api/public/handheld/items/sign-read-url': typeof ApiPublicHandheldItemsSignReadUrlRoute
   '/api/public/handheld/items/smart-create': typeof ApiPublicHandheldItemsSmartCreateRoute
   '/api/public/handheld/items/upload-image': typeof ApiPublicHandheldItemsUploadImageRouteWithChildren
   '/api/public/handheld/location/switch': typeof ApiPublicHandheldLocationSwitchRoute
@@ -1089,6 +1098,7 @@ export interface FileRoutesById {
   '/api/public/handheld/inbound/scan': typeof ApiPublicHandheldInboundScanRoute
   '/api/public/handheld/items/$id': typeof ApiPublicHandheldItemsIdRouteWithChildren
   '/api/public/handheld/items/bind-rfid': typeof ApiPublicHandheldItemsBindRfidRoute
+  '/api/public/handheld/items/sign-read-url': typeof ApiPublicHandheldItemsSignReadUrlRoute
   '/api/public/handheld/items/smart-create': typeof ApiPublicHandheldItemsSmartCreateRoute
   '/api/public/handheld/items/upload-image': typeof ApiPublicHandheldItemsUploadImageRouteWithChildren
   '/api/public/handheld/location/switch': typeof ApiPublicHandheldLocationSwitchRoute
@@ -1210,6 +1220,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/inbound/scan'
     | '/api/public/handheld/items/$id'
     | '/api/public/handheld/items/bind-rfid'
+    | '/api/public/handheld/items/sign-read-url'
     | '/api/public/handheld/items/smart-create'
     | '/api/public/handheld/items/upload-image'
     | '/api/public/handheld/location/switch'
@@ -1322,6 +1333,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/inbound/scan'
     | '/api/public/handheld/items/$id'
     | '/api/public/handheld/items/bind-rfid'
+    | '/api/public/handheld/items/sign-read-url'
     | '/api/public/handheld/items/smart-create'
     | '/api/public/handheld/items/upload-image'
     | '/api/public/handheld/location/switch'
@@ -1441,6 +1453,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/inbound/scan'
     | '/api/public/handheld/items/$id'
     | '/api/public/handheld/items/bind-rfid'
+    | '/api/public/handheld/items/sign-read-url'
     | '/api/public/handheld/items/smart-create'
     | '/api/public/handheld/items/upload-image'
     | '/api/public/handheld/location/switch'
@@ -1523,6 +1536,7 @@ export interface RootRouteChildren {
   ApiPublicHandheldInboundScanRoute: typeof ApiPublicHandheldInboundScanRoute
   ApiPublicHandheldItemsIdRoute: typeof ApiPublicHandheldItemsIdRouteWithChildren
   ApiPublicHandheldItemsBindRfidRoute: typeof ApiPublicHandheldItemsBindRfidRoute
+  ApiPublicHandheldItemsSignReadUrlRoute: typeof ApiPublicHandheldItemsSignReadUrlRoute
   ApiPublicHandheldItemsSmartCreateRoute: typeof ApiPublicHandheldItemsSmartCreateRoute
   ApiPublicHandheldItemsUploadImageRoute: typeof ApiPublicHandheldItemsUploadImageRouteWithChildren
   ApiPublicHandheldLocationSwitchRoute: typeof ApiPublicHandheldLocationSwitchRoute
@@ -2237,6 +2251,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldItemsSmartCreateRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/handheld/items/sign-read-url': {
+      id: '/api/public/handheld/items/sign-read-url'
+      path: '/api/public/handheld/items/sign-read-url'
+      fullPath: '/api/public/handheld/items/sign-read-url'
+      preLoaderRoute: typeof ApiPublicHandheldItemsSignReadUrlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/handheld/items/bind-rfid': {
       id: '/api/public/handheld/items/bind-rfid'
       path: '/api/public/handheld/items/bind-rfid'
@@ -2680,6 +2701,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHandheldInboundScanRoute: ApiPublicHandheldInboundScanRoute,
   ApiPublicHandheldItemsIdRoute: ApiPublicHandheldItemsIdRouteWithChildren,
   ApiPublicHandheldItemsBindRfidRoute: ApiPublicHandheldItemsBindRfidRoute,
+  ApiPublicHandheldItemsSignReadUrlRoute:
+    ApiPublicHandheldItemsSignReadUrlRoute,
   ApiPublicHandheldItemsSmartCreateRoute:
     ApiPublicHandheldItemsSmartCreateRoute,
   ApiPublicHandheldItemsUploadImageRoute:
