@@ -288,7 +288,7 @@ export const Route = createFileRoute("/api/public/auth/otp/verify")({
             id: deviceId,
             device_code: (deviceRow as any)?.device_code as string,
             label: (deviceRow as any)?.label as string,
-            location_id: loc?.id ?? null,
+            location_id: loc?.id ?? defaultLocationId,
             location_kind: loc?.kind ?? null,
             location_name: loc?.name ?? null,
             device_capabilities,
@@ -300,7 +300,7 @@ export const Route = createFileRoute("/api/public/auth/otp/verify")({
           refresh_token: session.refresh_token,
           expires_at: session.expires_at ?? 0,
           user: userPayload,
-          locations: locs ?? [],
+          locations: locs,
         });
       },
     },
