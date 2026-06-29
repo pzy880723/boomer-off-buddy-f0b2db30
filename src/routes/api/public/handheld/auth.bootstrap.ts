@@ -198,7 +198,4 @@ export const Route = createFileRoute("/api/public/handheld/auth/bootstrap")({
     },
   },
 });
-      },
-    },
-  },
-});
+
