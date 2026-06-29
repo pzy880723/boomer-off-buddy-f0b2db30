@@ -29,6 +29,7 @@ import { ProductEditDialog } from "@/components/inventory/product-edit-dialog";
 import { SkuEditDialog } from "@/components/inventory/sku-edit-dialog";
 import { listSkus, deleteSku, deleteStandardProduct } from "@/lib/inventory.functions";
 import { groupStandardSkus, type SkuRow, type StandardProductGroup } from "@/lib/inventory.helpers";
+import { useSkuCovers, pickCover } from "@/hooks/use-sku-covers";
 
 export const Route = createFileRoute("/inventory/skus/")({
   head: () => ({
@@ -84,6 +85,17 @@ function SkusPage() {
       bundleRows: bun,
     };
   }, [rows]);
+
+  // 批量给所有 SKU 签封面（私桶图）
+  const allSkuIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  const { covers } = useSkuCovers(allSkuIds);
+  const groupCover = (g: StandardProductGroup): string | null => {
+    for (const s of g.skus) {
+      const c = covers[s.id];
+      if (c) return c;
+    }
+    return pickCover(null, g.image_url);
+  };
 
   const NewMenu = (
     <DropdownMenu>
@@ -188,13 +200,13 @@ function SkusPage() {
           ) : view === "grid" ? (
             <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {standardGroups.map((g) => (
-                <StandardProductCard key={g.key} group={g} actions={productActions(g)} />
+                <StandardProductCard key={g.key} group={g} actions={productActions(g)} coverOverride={groupCover(g)} />
               ))}
             </div>
           ) : (
             <Card className="overflow-hidden">
               {standardGroups.map((g) => (
-                <StandardProductRow key={g.key} group={g} actions={productActions(g)} />
+                <StandardProductRow key={g.key} group={g} actions={productActions(g)} coverOverride={groupCover(g)} />
               ))}
             </Card>
           )}
@@ -211,13 +223,13 @@ function SkusPage() {
           ) : view === "grid" ? (
             <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {customRows.map((r) => (
-                <SingleSkuCard key={r.id} row={r} actions={skuActions(r)} />
+                <SingleSkuCard key={r.id} row={r} actions={skuActions(r)} coverOverride={pickCover(covers[r.id], r.image_url)} />
               ))}
             </div>
           ) : (
             <Card className="overflow-hidden">
               {customRows.map((r) => (
-                <SingleSkuRow key={r.id} row={r} actions={skuActions(r)} />
+                <SingleSkuRow key={r.id} row={r} actions={skuActions(r)} coverOverride={pickCover(covers[r.id], r.image_url)} />
               ))}
             </Card>
           )}
@@ -234,13 +246,13 @@ function SkusPage() {
           ) : view === "grid" ? (
             <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {bundleRows.map((r) => (
-                <SingleSkuCard key={r.id} row={r} actions={skuActions(r)} />
+                <SingleSkuCard key={r.id} row={r} actions={skuActions(r)} coverOverride={pickCover(covers[r.id], r.image_url)} />
               ))}
             </div>
           ) : (
             <Card className="overflow-hidden">
               {bundleRows.map((r) => (
-                <SingleSkuRow key={r.id} row={r} actions={skuActions(r)} />
+                <SingleSkuRow key={r.id} row={r} actions={skuActions(r)} coverOverride={pickCover(covers[r.id], r.image_url)} />
               ))}
             </Card>
           )}

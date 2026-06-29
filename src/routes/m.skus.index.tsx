@@ -24,6 +24,7 @@ import {
   type SkuRow,
   type StandardProductGroup,
 } from "@/lib/inventory.helpers";
+import { useSkuCovers, pickCover } from "@/hooks/use-sku-covers";
 import {
   CustomSkuForm,
   useCustomSkuMutation,
@@ -63,6 +64,16 @@ function MSkusPage() {
       bundleRows: bun,
     };
   }, [rows]);
+
+  const allSkuIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  const { covers } = useSkuCovers(allSkuIds);
+  const groupCover = (g: StandardProductGroup): string | null => {
+    for (const s of g.skus) {
+      const c = covers[s.id];
+      if (c) return c;
+    }
+    return pickCover(null, g.image_url);
+  };
 
   const NewBtn = (
     <DropdownMenu>
@@ -120,7 +131,7 @@ function MSkusPage() {
             {customRows.length === 0 ? (
               <EmptyState icon={Sparkles} title="还没有自定义商品" description="点右上「新建」→ 自定义商品" />
             ) : (
-              customRows.map((r) => <MSingleRow key={r.id} row={r} />)
+              customRows.map((r) => <MSingleRow key={r.id} row={r} cover={pickCover(covers[r.id], r.image_url)} />)
             )}
           </TabsContent>
 
@@ -128,7 +139,7 @@ function MSkusPage() {
             {bundleRows.length === 0 ? (
               <EmptyState icon={Boxes} title="还没有组包商品" />
             ) : (
-              bundleRows.map((r) => <MSingleRow key={r.id} row={r} />)
+              bundleRows.map((r) => <MSingleRow key={r.id} row={r} cover={pickCover(covers[r.id], r.image_url)} />)
             )}
           </TabsContent>
 
@@ -136,7 +147,7 @@ function MSkusPage() {
             {standardGroups.length === 0 ? (
               <EmptyState icon={Tags} title="还没有标准商品" description="点右上「新建」开始" />
             ) : (
-              standardGroups.map((g) => <MStandardRow key={g.key} group={g} />)
+              standardGroups.map((g) => <MStandardRow key={g.key} group={g} cover={groupCover(g)} />)
             )}
           </TabsContent>
         </Tabs>
@@ -163,9 +174,10 @@ function MSkusPage() {
   );
 }
 
-function MStandardRow({ group }: { group: StandardProductGroup }) {
+function MStandardRow({ group, cover }: { group: StandardProductGroup; cover?: string | null }) {
   const visibleTiers = group.tiers.slice(0, 3);
   const remaining = group.tiers.length - visibleTiers.length;
+  const src = cover ?? group.image_url;
   return (
     <Link
       to="/m/products/$code"
@@ -173,8 +185,8 @@ function MStandardRow({ group }: { group: StandardProductGroup }) {
       className="flex gap-3 rounded-xl border bg-card p-2.5 active:bg-muted"
     >
       <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-muted">
-        {group.image_url ? (
-          <img src={group.image_url} alt={group.name} className="h-full w-full object-cover" />
+        {src ? (
+          <img src={src} alt={group.name} className="h-full w-full object-cover" />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-muted-foreground">
             <Tags className="h-5 w-5" />
@@ -201,8 +213,9 @@ function MStandardRow({ group }: { group: StandardProductGroup }) {
   );
 }
 
-function MSingleRow({ row }: { row: SkuRow }) {
+function MSingleRow({ row, cover }: { row: SkuRow; cover?: string | null }) {
   const isBundle = row.kind === "bundle";
+  const src = cover ?? row.image_url;
   return (
     <Link
       to="/m/skus/$id"
@@ -210,8 +223,8 @@ function MSingleRow({ row }: { row: SkuRow }) {
       className="flex gap-3 rounded-xl border bg-card p-2.5 active:bg-muted"
     >
       <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-muted">
-        {row.image_url ? (
-          <img src={row.image_url} alt={row.name} className="h-full w-full object-cover" />
+        {src ? (
+          <img src={src} alt={row.name} className="h-full w-full object-cover" />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-muted-foreground">
             <Tags className="h-5 w-5" />

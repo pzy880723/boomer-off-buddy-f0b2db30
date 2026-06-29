@@ -489,7 +489,25 @@ export const SmartCreateReq = z
     is_custom_price: z.boolean().default(false),
     grade: z.enum(["N", "S", "A", "B", "C", "J"]).nullable().optional(),
     notes: z.string().nullable().optional(),
-    image_url: z.string().url().nullable().optional().meta({ description: "上架图 signed URL 或外链" }),
+    image_url: z
+      .string()
+      .url()
+      .nullable()
+      .optional()
+      .meta({ description: "（兼容旧版）单张外链/signed URL。推荐改用 image_storage_paths。" }),
+    image_storage_paths: z
+      .array(
+        z.object({
+          bucket: z.enum(["sku-raw", "sku-listing"]),
+          storage_path: z.string().min(1),
+        }),
+      )
+      .max(6)
+      .optional()
+      .meta({
+        description:
+          "APP 通过 /items/upload-image 上传得到的 storage_path 列表。第 0 张是主图。永久保存到 inv_skus.image_paths，ERP 端按需签 URL。",
+      }),
     weight_g: z.number().nullable().optional(),
     epcs: z.array(epcSchema).max(50).optional().meta({ description: "已打好标签则一并绑定" }),
     auto_push_youzan: z.boolean().default(false).meta({ description: "默认 false，APP 给开关；true 时入库存同步队列" }),
@@ -649,7 +667,18 @@ export const SkuDetailRes = okEnvelope(
     is_custom_price: z.boolean(),
     condition_grade: z.enum(["N", "S", "A", "B", "C", "J"]).nullable(),
     grade: z.string().nullable().meta({ description: "兼容旧字段，等同 condition_grade" }),
-    image_url: z.string().nullable(),
+    image_url: z.string().nullable().meta({ description: "主图 read URL（兼容旧 APP）；优先用 images" }),
+    image_paths: z.array(z.string()).meta({
+      description: "持久化的图片来源列表：可能是 'sku-listing/2026-06-29/xxx.jpg' 形式的私桶路径或 https:// 外链",
+    }),
+    images: z
+      .array(
+        z.object({
+          storage_path: z.string().meta({ description: "对应 image_paths 里的原值" }),
+          read_url: z.string().meta({ description: "可直接渲染的 URL；私桶为 24h signed，外链原样" }),
+        }),
+      )
+      .meta({ description: "image_paths 顺序签名后的结果；第 0 张是主图" }),
     notes: z.string().nullable(),
     weight_g: z.number().nullable(),
     stock_qty: z.number().int(),

@@ -15,7 +15,7 @@ export const Route = createFileRoute("/api/public/handheld/items/$id")({
         const { data: sku, error } = await supabaseAdmin
           .from("inv_skus")
           .select(
-            "id, sku_code, barcode, epc, name, category, price_tier, is_custom_price, grade, image_url, notes, weight_g, stock_qty, status, created_at, updated_at",
+            "id, sku_code, barcode, epc, name, category, price_tier, is_custom_price, grade, image_url, image_paths, notes, weight_g, stock_qty, status, created_at, updated_at",
           )
           .eq("id", params.id)
           .maybeSingle();
@@ -42,6 +42,14 @@ export const Route = createFileRoute("/api/public/handheld/items/$id")({
           })
           .filter(Boolean);
 
+        const imagePaths = ((sku as { image_paths?: string[] | null }).image_paths ?? []) as string[];
+        const { signSkuImagePaths } = await import("@/lib/sku-image-resolver.server");
+        const signedList = await signSkuImagePaths(imagePaths);
+        const images = imagePaths
+          .map((p, i) => (signedList[i] ? { storage_path: p, read_url: signedList[i]! } : null))
+          .filter((x): x is { storage_path: string; read_url: string } => x !== null);
+        const coverUrl = images[0]?.read_url ?? sku.image_url ?? null;
+
         return ok({
           id: sku.id,
           sku_code: sku.sku_code,
@@ -53,7 +61,9 @@ export const Route = createFileRoute("/api/public/handheld/items/$id")({
           is_custom_price: sku.is_custom_price,
           condition_grade: (sku.grade as any) ?? null,
           grade: sku.grade,
-          image_url: sku.image_url,
+          image_url: coverUrl,
+          image_paths: imagePaths,
+          images,
           notes: sku.notes,
           weight_g: sku.weight_g,
           stock_qty: sku.stock_qty,

@@ -6,17 +6,26 @@ import { Badge } from "@/components/ui/badge";
 import { CATEGORY_LABEL, formatPrice, type StandardProductGroup, type SkuRow } from "@/lib/inventory.helpers";
 
 /** 标准商品卡：聚合多价格档 */
-export function StandardProductCard({ group, actions }: { group: StandardProductGroup; actions?: ReactNode }) {
+export function StandardProductCard({
+  group,
+  actions,
+  coverOverride,
+}: {
+  group: StandardProductGroup;
+  actions?: ReactNode;
+  coverOverride?: string | null;
+}) {
   const visibleTiers = group.tiers.slice(0, 3);
   const remaining = group.tiers.length - visibleTiers.length;
+  const cover = coverOverride ?? group.image_url;
   return (
     <div className="relative">
       <Link to="/inventory/products/$code" params={{ code: group.key }} className="block">
         <Card className="group h-full overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-card-hover">
           <div className="relative aspect-square overflow-hidden bg-muted">
-            {group.image_url ? (
+            {cover ? (
               <img
-                src={group.image_url}
+                src={cover}
                 alt={group.name}
                 className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
@@ -61,17 +70,26 @@ export function StandardProductCard({ group, actions }: { group: StandardProduct
 }
 
 /** 自定义 / 组包 SKU 卡：保留原"一 SKU 一卡"展示 */
-export function SingleSkuCard({ row, actions }: { row: SkuRow; actions?: ReactNode }) {
+export function SingleSkuCard({
+  row,
+  actions,
+  coverOverride,
+}: {
+  row: SkuRow;
+  actions?: ReactNode;
+  coverOverride?: string | null;
+}) {
   const isBundle = row.kind === "bundle";
   const bundleItems = Array.isArray(row.bundle_items) ? row.bundle_items : [];
+  const cover = coverOverride ?? row.image_url;
   return (
     <div className="relative">
       <Link to="/inventory/skus/$id" params={{ id: row.id }} className="block">
         <Card className="group h-full overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-card-hover">
           <div className="relative aspect-square overflow-hidden bg-muted">
-            {row.image_url ? (
+            {cover ? (
               <img
-                src={row.image_url}
+                src={cover}
                 alt={row.name}
                 className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
@@ -122,9 +140,18 @@ export function SingleSkuCard({ row, actions }: { row: SkuRow; actions?: ReactNo
 }
 
 /** 列表行 - 标准商品 */
-export function StandardProductRow({ group, actions }: { group: StandardProductGroup; actions?: ReactNode }) {
+export function StandardProductRow({
+  group,
+  actions,
+  coverOverride,
+}: {
+  group: StandardProductGroup;
+  actions?: ReactNode;
+  coverOverride?: string | null;
+}) {
   const visibleTiers = group.tiers.slice(0, 4);
   const remaining = group.tiers.length - visibleTiers.length;
+  const cover = coverOverride ?? group.image_url;
   return (
     <div className="flex items-center gap-3 border-b px-3 py-2.5 transition-colors last:border-b-0 hover:bg-muted/60">
       <Link
@@ -133,8 +160,8 @@ export function StandardProductRow({ group, actions }: { group: StandardProductG
         className="flex flex-1 items-center gap-3"
       >
         <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded bg-muted">
-          {group.image_url ? (
-            <img src={group.image_url} alt={group.name} className="h-full w-full object-cover" />
+          {cover ? (
+            <img src={cover} alt={group.name} className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-muted-foreground">
               <Tags className="h-5 w-5" />
@@ -170,9 +197,18 @@ export function StandardProductRow({ group, actions }: { group: StandardProductG
 }
 
 /** 列表行 - 自定义/组包 SKU */
-export function SingleSkuRow({ row, actions }: { row: SkuRow; actions?: ReactNode }) {
+export function SingleSkuRow({
+  row,
+  actions,
+  coverOverride,
+}: {
+  row: SkuRow;
+  actions?: ReactNode;
+  coverOverride?: string | null;
+}) {
   const isBundle = row.kind === "bundle";
   const bundleItems = Array.isArray(row.bundle_items) ? row.bundle_items : [];
+  const cover = coverOverride ?? row.image_url;
   return (
     <div className="flex items-center gap-3 border-b px-3 py-2.5 transition-colors last:border-b-0 hover:bg-muted/60">
       <Link
@@ -181,8 +217,8 @@ export function SingleSkuRow({ row, actions }: { row: SkuRow; actions?: ReactNod
         className="flex flex-1 items-center gap-3"
       >
         <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded bg-muted">
-          {row.image_url ? (
-            <img src={row.image_url} alt={row.name} className="h-full w-full object-cover" />
+          {cover ? (
+            <img src={cover} alt={row.name} className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-muted-foreground">
               <Tags className="h-5 w-5" />

@@ -726,6 +726,7 @@ export type Database = {
           epc: string
           grade: string | null
           id: string
+          image_paths: string[]
           image_url: string | null
           is_custom_price: boolean
           kind: string
@@ -747,6 +748,7 @@ export type Database = {
           epc: string
           grade?: string | null
           id?: string
+          image_paths?: string[]
           image_url?: string | null
           is_custom_price?: boolean
           kind?: string
@@ -768,6 +770,7 @@ export type Database = {
           epc?: string
           grade?: string | null
           id?: string
+          image_paths?: string[]
           image_url?: string | null
           is_custom_price?: boolean
           kind?: string
