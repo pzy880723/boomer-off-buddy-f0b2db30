@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
-import { HANDHELD_CORS, ok, err } from "@/server/handheld-auth.server";
+import { HANDHELD_CORS, ok, err, loadVisibleLocationsForDevice } from "@/server/handheld-auth.server";
 import { BootstrapReq } from "@/lib/handheld/schemas";
 import { phoneToEmail, PHONE_REGEX } from "@/lib/auth-config";
 
