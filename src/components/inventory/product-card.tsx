@@ -6,17 +6,26 @@ import { Badge } from "@/components/ui/badge";
 import { CATEGORY_LABEL, formatPrice, type StandardProductGroup, type SkuRow } from "@/lib/inventory.helpers";
 
 /** 标准商品卡：聚合多价格档 */
-export function StandardProductCard({ group, actions }: { group: StandardProductGroup; actions?: ReactNode }) {
+export function StandardProductCard({
+  group,
+  actions,
+  coverOverride,
+}: {
+  group: StandardProductGroup;
+  actions?: ReactNode;
+  coverOverride?: string | null;
+}) {
   const visibleTiers = group.tiers.slice(0, 3);
   const remaining = group.tiers.length - visibleTiers.length;
+  const cover = coverOverride ?? group.image_url;
   return (
     <div className="relative">
       <Link to="/inventory/products/$code" params={{ code: group.key }} className="block">
         <Card className="group h-full overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-card-hover">
           <div className="relative aspect-square overflow-hidden bg-muted">
-            {group.image_url ? (
+            {cover ? (
               <img
-                src={group.image_url}
+                src={cover}
                 alt={group.name}
                 className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
