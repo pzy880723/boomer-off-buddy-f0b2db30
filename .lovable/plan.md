@@ -1,32 +1,45 @@
-## 诊断
+## 目标
 
-代码侧检查结果（仓库 = 最新预览构建）：
+今后凡是涉及 APP（Codex 端）需要配合的改动，每轮结束都额外附一段「**给 Codex 的指令**」，让你一键复制粘贴即可派活。
 
-- `src/routes/api/public/auth/otp.send.ts` 和 `otp.verify.ts` 都存在，且已经在 `src/routeTree.gen.ts` 里注册为 server route（POST + OPTIONS）。
-- `src/lib/handheld/openapi.ts` 和 `openapi.snapshot.json` 都已经升到 `version: 1.4.0`，并且包含 `/api/public/auth/otp/send` 与 `/api/public/auth/otp/verify` 两个路径。
+## 触发条件（满足任一即附）
 
-线上现象：
+- 本轮改动了 `/api/public/**` 接口、字段、返回结构、错误码
+- 本轮改动了 OpenAPI（`openapi.snapshot.json` / `src/lib/handheld/**`）
+- 本轮改动了 APP 端会用到的认证 / OTP / bootstrap / 设备绑定 / 库位 / RFID / AI 流程
+- 本轮发布了新版本（v1.x）需要 APP 跟随升级
+- 本轮调整了业务数据口径，APP 展示需要跟着改
 
-- `https://boomer-off-buddy.lovable.app/api/public/handheld/openapi.json` 仍是 `1.0.0`，没有 otp 路径。
-- `POST /api/public/auth/otp/send` 返回 500 + `"Only HTML requests are supported here"`。这是 TanStack Start 在「该 URL 没有匹配的 server handler」时的 SSR 兜底响应——也就是说生产构建里根本还没有这两个 server route 文件。
+纯 ERP 前端 / PC 端 / 数据库内部清理 → 不附。
 
-结论：**OTP 接口的代码已经写好，但还没有发布到 `boomer-off-buddy.lovable.app`**。`Codex` 看到的就是上一版生产构建（v1.0.0 时期）。Codex 那侧不需要再改 APP，等这次发布完，APP 现有的请求路径就能直接生效。
+## 指令块格式（固定模板）
 
-另外说明：APP 端记录的 `/api/public/handheld/auth/otp/send` 是**错的**，OTP 接口不在 handheld 子路径下，正确路径就是：
+每段以独立代码块输出，方便整段复制：
 
-- `POST /api/public/auth/otp/send`
-- `POST /api/public/auth/otp/verify`
+```text
+【给 Codex 的指令 · YYYY-MM-DD · 第N条】
 
-## 执行步骤
+背景：<这轮 Lovable 这边做了什么、为什么 APP 要改>
 
-1. 切到 build 模式后，调用发布工具把当前预览构建推到生产 (`boomer-off-buddy.lovable.app`)，不需要任何代码改动。
-2. 发布完成后，自行回归校验：
-   - `GET /api/public/handheld/openapi.json` → `version` 应为 `1.4.0`，`paths` 里能搜到 `/api/public/auth/otp/send` 与 `/auth/otp/verify`。
-   - `POST /api/public/auth/otp/send`，body `{"phone":"13800001111","purpose":"login"}` → 返回 `{"ok":true,"data":{"ttl":300}}`（或 `429 rate_limited`，说明已经走到限流逻辑，也算正常）。
-   - `POST /api/public/auth/otp/verify`，body `{"phone":"13800001111","code":"000000"}` → 返回 `{"ok":false,"error":"...","code":"otp_not_found"|"otp_invalid"}`，证明 JSON 通道工作正常。
-3. 把校验结果反馈给 Codex，并提醒：APP 端要把 `/api/public/handheld/auth/otp/send` 改成 `/api/public/auth/otp/send`（去掉 `/handheld`）。
+请在 APP 端执行：
+1. <具体动作，含接口路径 / 字段名 / 错误码>
+2. <…>
 
-## 不做的事
+接口契约：
+- POST <path>
+  Request: { … }
+  Response: { ok, data: { … } }
+  错误码：<code> → <UI 文案>
 
-- 不修改 `otp.send.ts` / `otp.verify.ts`：代码已经返回符合契约的 JSON（`ok: true, data: { ttl: 300 }`），问题是发布而非实现。
-- 不动 OpenAPI 快照：本地已是 1.4.0，发布后线上会同步。
+验收：
+- <可观察的成功标准，例如"输入手机号点获取验证码 → 看到 toast 'ttl 300'"></>
+```
+
+## 落地方式
+
+- 写入项目记忆 `mem://preferences/codex-handoff`，列入 Core，让后续每轮自动遵守。
+- 历史 `.lovable/plan.md` 里的 Codex 协作清单保留，但今后以"每轮即时指令"为主，不再让你回去翻长文档。
+
+## 本轮（已完成的库位清洗 + 自动绑定）对应的 Codex 指令草稿
+
+进入 build 模式后我会先把上面那条记忆写好，并补发一条对应本轮库位改动的 Codex 指令给你，确认这个交付格式 OK 后正式沿用。
