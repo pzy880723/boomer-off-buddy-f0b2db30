@@ -122,7 +122,13 @@ export const Route = createFileRoute("/api/public/handheld/auth/bootstrap")({
           deviceId = inserted.id;
         }
 
-        // 3. Reload device with location join
+        // 3. Load active locations + optional auto-bind single-location
+        const { locations, defaultLocationId } = await loadVisibleLocationsForDevice(
+          deviceId,
+          ((existing as any)?.default_location_id as string | null) ?? null,
+        );
+
+        // 4. Reload device with (possibly newly-bound) location join
         const { data: deviceRow } = await supabaseAdmin
           .from("inv_handheld_devices")
           .select(
@@ -147,19 +153,12 @@ export const Route = createFileRoute("/api/public/handheld/auth/bootstrap")({
           has_camera: cap.has_camera !== false,
         };
 
-        // 4. Roles + locations
+        // 5. Roles
         const { data: roleRows } = await supabaseAdmin
           .from("user_roles" as never)
           .select("role")
           .eq("user_id", user.id);
         const roles = ((roleRows as { role: string }[] | null) ?? []).map((r) => r.role);
-
-        const { data: locs } = await supabaseAdmin
-          .from("inv_locations")
-          .select("id, name, kind, is_active")
-          .eq("is_active", true)
-          .order("kind")
-          .order("name");
 
         return ok({
           device_token: deviceToken,
@@ -167,7 +166,7 @@ export const Route = createFileRoute("/api/public/handheld/auth/bootstrap")({
             id: deviceId,
             device_code: (deviceRow as any)?.device_code as string,
             label: (deviceRow as any)?.label as string,
-            location_id: loc?.id ?? null,
+            location_id: loc?.id ?? defaultLocationId,
             location_kind: loc?.kind ?? null,
             location_name: loc?.name ?? null,
             device_capabilities,
@@ -188,7 +187,7 @@ export const Route = createFileRoute("/api/public/handheld/auth/bootstrap")({
               null,
             roles,
           },
-          locations: locs ?? [],
+          locations,
         });
       },
     },
