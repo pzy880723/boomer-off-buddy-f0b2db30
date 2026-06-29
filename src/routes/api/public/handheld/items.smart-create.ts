@@ -12,6 +12,49 @@ import { generateEpc, generateSkuCode } from "@/lib/inventory.helpers";
 import { buildPrintPayload } from "@/server/handheld-print.server";
 import { replayIfPresent, recordOp, jsonReplay } from "@/server/handheld-idempotency.server";
 
+const SKU_IMAGE_BUCKETS = new Set(["sku-raw", "sku-listing"]);
+
+function normalizeBucketPath(bucket: "sku-raw" | "sku-listing", storagePath: string): string | null {
+  const clean = storagePath.trim().replace(/^\/+/, "");
+  if (!clean) return null;
+  if (clean.startsWith(`${bucket}/`)) return clean;
+  return `${bucket}/${clean}`;
+}
+
+function parseStorageObjectUrl(rawUrl: string): string | null {
+  try {
+    const url = new URL(rawUrl);
+    const markers = [
+      "/storage/v1/object/sign/",
+      "/storage/v1/object/public/",
+      "/storage/v1/object/authenticated/",
+      "/storage/v1/object/upload/sign/",
+    ];
+    for (const marker of markers) {
+      const idx = url.pathname.indexOf(marker);
+      if (idx < 0) continue;
+      const rest = url.pathname.slice(idx + marker.length).replace(/^\/+/, "");
+      const parts = rest.split("/").map((part) => decodeURIComponent(part));
+      const bucket = parts.shift();
+      const path = parts.join("/");
+      if (bucket && SKU_IMAGE_BUCKETS.has(bucket) && path) return `${bucket}/${path}`;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function normalizeIncomingImageUrl(imageUrl?: string | null): string | null {
+  const raw = imageUrl?.trim();
+  if (!raw) return null;
+  const storagePath = parseStorageObjectUrl(raw);
+  if (storagePath) return storagePath;
+  // 只有稳定外链才直接存 image_url；signed URL 会过期，不能落库。
+  if (/^https?:\/\//i.test(raw) && !raw.includes("token=")) return raw;
+  return null;
+}
+
 export const Route = createFileRoute("/api/public/handheld/items/smart-create")({
   server: {
     handlers: {
@@ -44,18 +87,15 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
           .maybeSingle();
         if (!loc || !loc.is_active) return err("Location not found or disabled", 404);
 
-        // 规范化新图：先 image_storage_paths（持久私桶路径），再 image_url（外链）
+        // 规范化新图：先 image_storage_paths（持久私桶路径），再兼容 image_url。
+        // 如果 APP 传的是 /storage/v1/object/sign/... signed URL，这里反解为 bucket/path 持久保存。
         const incomingPaths: string[] = [];
         for (const p of body.image_storage_paths ?? []) {
-          incomingPaths.push(`${p.bucket}/${p.storage_path}`);
+          const normalized = normalizeBucketPath(p.bucket, p.storage_path);
+          if (normalized) incomingPaths.push(normalized);
         }
-        if (
-          body.image_url &&
-          /^https?:\/\//i.test(body.image_url) &&
-          !body.image_url.includes("token=") // 不写 signed URL，否则过期
-        ) {
-          incomingPaths.push(body.image_url);
-        }
+        const normalizedImageUrl = normalizeIncomingImageUrl(body.image_url);
+        if (normalizedImageUrl) incomingPaths.push(normalizedImageUrl);
 
         // Reuse existing SKU if (category, price_tier, name) already exists; else create.
         const { data: existSku } = await supabaseAdmin
