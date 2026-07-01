@@ -125,28 +125,36 @@ async function fetchYouzanHqCategories(): Promise<{
   api: string;
   shop_id: string;
   rows: YzCategory[];
+  notes: string[];
 }> {
   const { getHqShop, ensureAccessToken, callYouzanApiVerbose } = await import(
     "@/lib/youzan.functions"
   );
   const hq = await getHqShop();
   const token = await ensureAccessToken(hq);
+  const notes: string[] = [];
 
-  // 试多个已知接口
-  const attempts: { method: string; version: string; extract: (p: unknown) => YzCategory[] }[] = [
+  // 一级列表接口候选
+  const rootAttempts: {
+    method: string;
+    version: string;
+    extract: (p: unknown) => YzCategory[];
+  }[] = [
     {
       method: "youzan.retail.product.standardcategory.get",
       version: "3.0.0",
-      extract: (p) => normalizeCats((p as { categories?: unknown; data?: unknown })),
+      extract: (p) => normalizeCats(p),
     },
     {
       method: "youzan.itemcategories.get",
       version: "3.0.0",
-      extract: (p) => normalizeCats(p as { categories?: unknown }),
+      extract: (p) => normalizeCats(p),
     },
   ];
   const errs: string[] = [];
-  for (const a of attempts) {
+  let usedApi = "";
+  let allRows: YzCategory[] = [];
+  for (const a of rootAttempts) {
     try {
       const { payload } = await callYouzanApiVerbose({
         accessToken: token,
@@ -154,22 +162,75 @@ async function fetchYouzanHqCategories(): Promise<{
         version: a.version,
       });
       const rows = a.extract(payload);
-      if (rows.length > 0) return { api: a.method, shop_id: hq.id, rows };
+      if (rows.length > 0) {
+        usedApi = a.method;
+        allRows = rows;
+        break;
+      }
       errs.push(`${a.method}: 返回空`);
     } catch (e) {
       errs.push(`${a.method}: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
-  throw new Error(`拉取有赞分类失败：\n${errs.join("\n")}`);
+  if (allRows.length === 0) throw new Error(`拉取有赞分类失败：\n${errs.join("\n")}`);
+
+  // 若接口本身没返回子分类（parent_id 全为 null），逐个一级 by-parent 补拉
+  const hasChildren = allRows.some((r) => r.parent_id != null);
+  if (!hasChildren) {
+    const roots = allRows.filter((r) => r.parent_id == null);
+    const childAttempts = [
+      { method: "youzan.itemcategories.get.byparentcid", version: "3.0.0" },
+      { method: "youzan.retail.product.category.get", version: "3.0.0" },
+    ];
+    let childApi = "";
+    let ok = 0;
+    for (const root of roots) {
+      let picked: YzCategory[] | null = null;
+      for (const a of childAttempts) {
+        try {
+          const { payload } = await callYouzanApiVerbose({
+            accessToken: token,
+            method: a.method,
+            version: a.version,
+            params: { parent_cid: root.id, parent_id: root.id },
+          });
+          const kids = normalizeCats(payload, root.id);
+          if (kids.length > 0) {
+            picked = kids;
+            childApi = a.method;
+            break;
+          }
+        } catch {
+          /* try next */
+        }
+      }
+      if (picked) {
+        // 去重（child API 有时把父自己也带回来）
+        const rootSet = new Set(allRows.map((r) => r.id));
+        for (const k of picked) {
+          if (k.id === root.id) continue;
+          if (rootSet.has(k.id)) continue;
+          allRows.push({ ...k, parent_id: root.id });
+        }
+        ok++;
+      }
+    }
+    if (ok > 0) notes.push(`已通过 ${childApi} 补拉 ${ok} 个一级的子类目`);
+    else notes.push("未能获取二级分类（可能授权无权限或店铺无子分类）");
+  }
+  return { api: usedApi, shop_id: hq.id, rows: allRows, notes };
 }
 
-function normalizeCats(payload: unknown): YzCategory[] {
+function normalizeCats(payload: unknown, defaultParent: number | null = null): YzCategory[] {
   if (!payload || typeof payload !== "object") return [];
   const p = payload as Record<string, unknown>;
   const raw =
     (p.categories as unknown[]) ??
     (p.category_list as unknown[]) ??
-    ((p.data as { categories?: unknown[] } | undefined)?.categories as unknown[]) ??
+    (p.sub_categories as unknown[]) ??
+    (p.children as unknown[]) ??
+    ((p.data as { categories?: unknown[]; category_list?: unknown[] } | undefined)?.categories as unknown[]) ??
+    ((p.data as { category_list?: unknown[] } | undefined)?.category_list as unknown[]) ??
     [];
   const out: YzCategory[] = [];
   const walk = (arr: unknown[], pid: number | null) => {
@@ -178,12 +239,24 @@ function normalizeCats(payload: unknown): YzCategory[] {
       const id = Number(o.category_id ?? o.id ?? o.cid);
       const name = String(o.name ?? o.category_name ?? "").trim();
       if (!id || !name) continue;
-      out.push({ id, name, parent_id: pid, sort_order: Number(o.sort_order ?? 0) });
+      // 有些接口用 parent_cid/parent_id 字段表明层级
+      const nodeParent =
+        o.parent_cid != null
+          ? Number(o.parent_cid)
+          : o.parent_id != null
+            ? Number(o.parent_id)
+            : pid;
+      out.push({
+        id,
+        name,
+        parent_id: nodeParent && nodeParent !== 0 ? nodeParent : null,
+        sort_order: Number(o.sort_order ?? 0),
+      });
       const children = (o.children as unknown[]) ?? (o.sub_categories as unknown[]);
       if (Array.isArray(children) && children.length > 0) walk(children, id);
     }
   };
-  walk(raw as unknown[], null);
+  walk(raw as unknown[], defaultParent);
   return out;
 }
 
