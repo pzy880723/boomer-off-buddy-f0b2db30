@@ -8,7 +8,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { INV_CATEGORIES, CATEGORY_LABEL } from "@/lib/inventory.helpers";
+import { useCategories } from "@/hooks/use-categories";
 import { SkuImagePicker } from "./sku-image-picker";
 
 export type SkuGrade = "N" | "S" | "A" | "B" | "C" | "J";
@@ -60,6 +60,7 @@ export function SkuMetaFields({
   hideGrade?: boolean;
   hideWeight?: boolean;
 }) {
+  const { active: categories, labelOf } = useCategories();
   const patch = (p: Partial<SkuMetaState>) => onChange({ ...state, ...p });
   return (
     <div className="grid gap-3">
@@ -71,9 +72,9 @@ export function SkuMetaFields({
               <SelectValue placeholder="选择类目" />
             </SelectTrigger>
             <SelectContent>
-              {INV_CATEGORIES.map((c) => (
-                <SelectItem key={c.value} value={c.value}>
-                  {c.label}
+              {categories.map((c) => (
+                <SelectItem key={c.code} value={c.code}>
+                  {c.name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -138,7 +139,7 @@ export function SkuMetaFields({
           onChange={(url) => patch({ imageUrl: url })}
           mobile={mobile}
           defaultName={state.name}
-          defaultCategoryLabel={state.category ? CATEGORY_LABEL[state.category] : undefined}
+          defaultCategoryLabel={state.category ? labelOf(state.category) : undefined}
         />
       </div>
 
