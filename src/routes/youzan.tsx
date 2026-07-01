@@ -375,7 +375,12 @@ function YouzanPage() {
           <TabsContent value="sync" className="mt-3">
             <SyncCenterPanel />
           </TabsContent>
+
+          <TabsContent value="health" className="mt-3">
+            <ShopHealthPanel />
+          </TabsContent>
         </Tabs>
+
       </div>
     </div>
   );
