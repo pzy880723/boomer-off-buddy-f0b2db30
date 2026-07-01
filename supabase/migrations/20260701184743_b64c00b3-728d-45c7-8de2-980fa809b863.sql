@@ -1,0 +1,1 @@
+ALTER TABLE public.inv_categories ADD COLUMN IF NOT EXISTS youzan_hq_parent_id bigint;
