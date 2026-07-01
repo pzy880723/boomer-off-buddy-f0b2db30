@@ -917,7 +917,7 @@ export const listShopHealth = createServerFn({ method: "GET" })
   .handler(async () => {
     const { data: shops } = await supabase
       .from("youzan_shops")
-      .select("id, shop_name, kdt_id, parent_kdt_id, role, is_active")
+      .select("id, shop_name, kdt_id, parent_kdt_id, role, status")
       .order("role", { ascending: true })
       .order("shop_name", { ascending: true });
 
@@ -952,7 +952,7 @@ export const listShopHealth = createServerFn({ method: "GET" })
         kdt_id: s.kdt_id,
         parent_kdt_id: s.parent_kdt_id ?? null,
         role: s.role,
-        is_active: s.is_active,
+        status: s.status,
         bound_location: boundLoc
           ? { id: boundLoc.id, name: boundLoc.name, kind: boundLoc.kind }
           : null,
