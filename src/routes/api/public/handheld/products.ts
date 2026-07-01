@@ -125,6 +125,24 @@ async function buildItems(skus: SkuRow[], locations: LocRow[]): Promise<ProductI
     shopStocks = (st ?? []) as typeof shopStocks;
   }
 
+  // Batch-sign cover images: first path from each SKU that has any.
+  const { signSkuImagePaths } = await import("@/lib/sku-image-resolver.server");
+  const coverPaths: string[] = [];
+  const coverIdx: number[] = []; // index into skus for each entry
+  skus.forEach((s, i) => {
+    const p = (s.image_paths ?? [])[0];
+    if (p) {
+      coverPaths.push(p);
+      coverIdx.push(i);
+    }
+  });
+  const signed = await signSkuImagePaths(coverPaths);
+  const coverBySkuId = new Map<string, string>();
+  coverIdx.forEach((i, k) => {
+    const url = signed[k];
+    if (url) coverBySkuId.set(skus[i].id, url);
+  });
+
   return skus.map((s) => {
     const stocks: StockRow[] = [];
     if (primaryWarehouseId) {
@@ -148,6 +166,11 @@ async function buildItems(skus: SkuRow[], locations: LocRow[]): Promise<ProductI
       });
     }
     const total = stocks.reduce((sum, r) => sum + r.stock_qty, 0);
+    const cover =
+      coverBySkuId.get(s.id) ??
+      (s.image_url && /^https?:\/\//i.test(s.image_url) && !s.image_url.includes("token=")
+        ? s.image_url
+        : null);
     return {
       id: s.id,
       product_type: classifyType(s),
@@ -158,7 +181,7 @@ async function buildItems(skus: SkuRow[], locations: LocRow[]): Promise<ProductI
       category: s.category,
       price: Number(s.price_tier) || 0,
       condition_grade: (s.grade as ProductItem["condition_grade"]) ?? null,
-      image_url: s.image_url,
+      image_url: cover,
       notes: s.notes,
       total_stock_qty: total,
       stocks,
