@@ -48,7 +48,11 @@ export const Route = createFileRoute("/api/public/handheld/items/$id")({
         const images = imagePaths
           .map((p, i) => (signedList[i] ? { storage_path: p, read_url: signedList[i]! } : null))
           .filter((x): x is { storage_path: string; read_url: string } => x !== null);
-        const coverUrl = images[0]?.read_url ?? sku.image_url ?? null;
+        const coverUrl =
+          images[0]?.read_url ??
+          (sku.image_url && /^https?:\/\//i.test(sku.image_url) && !sku.image_url.includes("token=")
+            ? sku.image_url
+            : null);
 
         return ok({
           id: sku.id,
