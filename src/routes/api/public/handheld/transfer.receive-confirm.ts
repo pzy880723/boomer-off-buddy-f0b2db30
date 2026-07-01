@@ -79,6 +79,16 @@ export const Route = createFileRoute("/api/public/handheld/transfer/receive-conf
           .update({ status: "received", received_at: new Date().toISOString() })
           .eq("id", body.transfer_id);
 
+        // 收货成功：目标库位 +N（推分店），源库位在发货时已推过（推 HQ）；
+        // 为保证收货后 HQ / 分店都是"账实一致"，两边都再推一次。
+        for (const sku_id of receiveBySku.keys()) {
+          try {
+            await enqueueStockPushForLocation(sku_id, t.to_location_id!, "transfer_receive");
+            await enqueueStockPushForLocation(sku_id, t.from_location_id!, "transfer_receive_src");
+          } catch {}
+        }
+
+
         return ok({ transfer_id: body.transfer_id, received: scanned?.length ?? 0 });
       },
     },
