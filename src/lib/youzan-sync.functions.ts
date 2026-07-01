@@ -592,20 +592,29 @@ async function runStockSyncWorkerCore(opts: {
       .eq("id", t.id);
 
     try {
-      const { data: link } = await supabase
+      // 按 (sku, shop) 精确取 link；老队列可能没有 shop_id，退回 sku 唯一 link
+      let linkQuery = supabase
         .from("sku_youzan_links")
         .select("*")
-        .eq("sku_id", t.sku_id)
-        .maybeSingle();
-      if (!link) throw new Error("SKU 未绑定有赞商品（可能已解绑）");
+        .eq("sku_id", t.sku_id);
+      if (t.shop_id) linkQuery = linkQuery.eq("shop_id", t.shop_id);
+      const { data: link } = await linkQuery.maybeSingle();
+      if (!link) throw new Error("SKU 未绑定该门店的有赞商品（可能已解绑）");
 
-      await pushStockToYouzan(link as LinkRow, t.target_stock, t.id);
+      // 自愈：如果 location_id 存在，用当前 inv_stocks 覆盖 target，防止队列过时
+      let target = Number(t.target_stock ?? 0);
+      if (t.location_id) {
+        target = await resolveShopStockTarget(t.sku_id, t.location_id, t.shop_id);
+      }
+
+      await pushStockToYouzan(link as LinkRow, target, t.id);
 
       await supabase
         .from("youzan_stock_sync_queue")
         .update({
           status: "done",
           last_error: null,
+          target_stock: target,
           attempts: (t.attempts ?? 0) + 1,
         } as never)
         .eq("id", t.id);
@@ -613,7 +622,7 @@ async function runStockSyncWorkerCore(opts: {
       await supabase
         .from("sku_youzan_links")
         .update({
-          last_pushed_stock: t.target_stock,
+          last_pushed_stock: target,
           last_pushed_at: new Date().toISOString(),
           status: "linked",
           last_error: null,
