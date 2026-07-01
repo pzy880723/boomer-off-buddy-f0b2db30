@@ -451,22 +451,18 @@ export async function enqueueStockPush(
   sku_id: string,
   reason: string,
 ): Promise<{ enqueued: number }> {
-  const { data: links } = await supabase
-    .from("sku_youzan_links")
-    .select("shop_id");
-  const shopIds = (links ?? []).filter((l) => l).map((l) => l.shop_id as string);
-  // 只挑当前 sku 对应的 links
+  // 只挑当前 sku 且允许推库存的 links（HQ 主 SPU sync_stock=false 自动排除）
   const { data: mine } = await supabase
     .from("sku_youzan_links")
-    .select("shop_id")
+    .select("shop_id, sync_stock")
     .eq("sku_id", sku_id);
-  const targetShopIds = (mine ?? []).map((l) => l.shop_id as string);
+  const targetShopIds = (mine ?? [])
+    .filter((l) => (l as { sync_stock?: boolean }).sync_stock !== false)
+    .map((l) => l.shop_id as string);
   if (targetShopIds.length === 0) return { enqueued: 0 };
-  void shopIds; // 保留计算占位（未来做全量对账用）
 
   let enqueued = 0;
   for (const shopId of targetShopIds) {
-    // 找该 shop 对应的 location
     const { data: loc } = await supabase
       .from("inv_locations")
       .select("id")
@@ -479,7 +475,7 @@ export async function enqueueStockPush(
       shop_id: shopId,
       location_id: locationId,
       target_stock: target,
-      action: "update_stock",
+      action: "push_stock",
       reason,
       status: "pending",
       next_run_at: new Date().toISOString(),
@@ -490,6 +486,10 @@ export async function enqueueStockPush(
 }
 
 // 按 (sku, location) 直接入队（handheld 入库 / 出库 / 收货 场景推荐调用）
+// 规则：
+//  - 库位没有 shop_id（= 仓库）→ 直接跳过，永远不推
+//  - 该 shop 没有 sku_youzan_links → 跳过（未来 v2.1 会自动 create_branch_item）
+//  - link.sync_stock=false（HQ 主 SPU）→ 跳过
 export async function enqueueStockPushForLocation(
   sku_id: string,
   location_id: string,
@@ -497,19 +497,23 @@ export async function enqueueStockPushForLocation(
 ): Promise<{ enqueued: boolean }> {
   const { data: loc } = await supabase
     .from("inv_locations")
-    .select("id, shop_id")
+    .select("id, shop_id, kind")
     .eq("id", location_id)
     .maybeSingle();
-  if (!loc?.shop_id) return { enqueued: false }; // 仓库无对应有赞店，无需推
+  if (!loc?.shop_id) return { enqueued: false }; // 仓库或未绑分店的库位
+  if ((loc as { kind?: string }).kind !== "shop") return { enqueued: false };
   const shopId = loc.shop_id as string;
 
   const { data: link } = await supabase
     .from("sku_youzan_links")
-    .select("id")
+    .select("id, sync_stock")
     .eq("sku_id", sku_id)
     .eq("shop_id", shopId)
     .maybeSingle();
-  if (!link) return { enqueued: false }; // 未绑定就跳过（未来可入队 create_branch_listing）
+  if (!link) return { enqueued: false }; // TODO(v2.1): 入队 create_branch_item
+  if ((link as { sync_stock?: boolean }).sync_stock === false) {
+    return { enqueued: false };
+  }
 
   const target = await resolveShopStockTarget(sku_id, location_id, shopId);
   await supabase.from("youzan_stock_sync_queue").insert({
@@ -517,13 +521,14 @@ export async function enqueueStockPushForLocation(
     shop_id: shopId,
     location_id,
     target_stock: target,
-    action: "update_stock",
+    action: "push_stock",
     reason,
     status: "pending",
     next_run_at: new Date().toISOString(),
   } as never);
   return { enqueued: true };
 }
+
 
 async function resolveShopStockTarget(
   sku_id: string,
@@ -601,11 +606,26 @@ async function runStockSyncWorkerCore(opts: {
       const { data: link } = await linkQuery.maybeSingle();
       if (!link) throw new Error("SKU 未绑定该门店的有赞商品（可能已解绑）");
 
+      // v2：HQ 主 SPU 不推库存，直接标 done 跳过
+      if ((link as { sync_stock?: boolean }).sync_stock === false) {
+        await supabase
+          .from("youzan_stock_sync_queue")
+          .update({
+            status: "done",
+            last_error: null,
+            attempts: (t.attempts ?? 0) + 1,
+          } as never)
+          .eq("id", t.id);
+        ok += 1;
+        continue;
+      }
+
       // 自愈：如果 location_id 存在，用当前 inv_stocks 覆盖 target，防止队列过时
       let target = Number(t.target_stock ?? 0);
       if (t.location_id) {
         target = await resolveShopStockTarget(t.sku_id, t.location_id, t.shop_id ?? "");
       }
+
 
       await pushStockToYouzan(link as LinkRow, target, t.id);
 

@@ -1,120 +1,72 @@
-## 方案 A · 继续用有赞，把同步打到"能扛业务"
+# 有赞同步逻辑重构（v2 · 分店直连模型）
 
-### 核心契约：本地是单一真源（Source of Truth）
+## 目标模型
 
-```text
-本地 inv_stocks(sku, location)  ──绝对值推送──▶  有赞 (kdt, item)
-```
+- **有赞 HQ kdt** = SPU 主数据中心。ERP 新建 SKU 时在 HQ 建一次商品（拿到 HQ item_id / 图片 / 类目），**永远不推库存**。
+- **ERP 总仓库位** = 实物源头。库存变化只落本地账，**不推任何有赞店**。
+- **ERP 分店库位** ↔ **有赞分店 kdt**：1:1 对齐库存。SKU 第一次要在某分店上架时，ERP 自动在该分店 kdt 建 item（复用 HQ 的图 / 标题 / 类目 / 价格），拿回 branch_item_id 后立刻推库存。
+- **调拨** = 总仓 −N、分店 +N，只推分店那家 kdt（HQ 无动作）。
+- **销售** = 分店库位 −1，只推该分店 kdt。
 
-- ERP 这边的 `inv_stocks.qty` 是**唯一权威**；有赞的库存数永远跟着这边走。
-- 推送只推**绝对值**（`item_sku.update` set quantity = N），**不推增量** —— 增量会因为重试/丢包/手工调整产生漂移。
-- 每次推送之后回拉一次远端 `quantity`，写到 `sku_youzan_links.last_pull_stock`；对账任务定期扫差异自动修复。
+## 与现状差异
 
-### 三大业务场景的落地
+| 场景 | 现状（v1） | 新版（v2） |
+|---|---|---|
+| 仓库入库 | 推 HQ | 不推任何店 |
+| 调拨发货 | 推 HQ（源） | 不推 |
+| 调拨收货 | 推 HQ + 分店 | 只推目的分店 |
+| 分店首次上架 | 需人工在有赞后台建品 + 手动绑定 | ERP 自动在分店 kdt 建 item |
+| HQ 库存 | 会被反复覆盖 | 永远不动 |
 
-#### 1) 入库（仓库 → HQ）
+## 技术方案
 
-```text
-PDA 扫 RFID → /m/inbound 聚合 → inv_apply_movement(+N, location=总仓)
-                                         │
-              ┌──────────────────────────┴──────────────────────────┐
-              ▼                                                     ▼
-   SKU 已绑定 HQ item？                                       未绑定？
-   入队 sync_queue(target=HQ.kdt,                  入队 sync_queue(action=create_then_bind,
-                   item=link.yz_item, qty=新绝对值)             target=HQ.kdt, sku_id)
-              │                                                     │
-              ▼                                                     ▼
-     worker 调 item_sku.update                           worker 先调 item.add 创建商品
-     成功后回拉远端 qty 校验                              成功拿到 yz_item_id → 写 link → 再推库存
-```
+### 1. 数据模型微调
+- `sku_youzan_links`：保留每条记录代表「SKU × 某个 kdt」的绑定。新增列 `role`（`hq_spu` | `branch_stock`），HQ 那条永久 `role='hq_spu'` 且 `sync_stock=false`。
+- `youzan_stock_sync_queue`：`action` 支持 `create_branch_item` / `push_stock`；不再产生任何 HQ 的 push_stock 任务。
 
-要补的：
-- `youzan_stock_sync_queue` 增加 `action` 字段：`update_stock | create_and_bind | create_branch_listing`。
-- 入库 hook（`inv_apply_movement` 之后）按"该 SKU 在 HQ 仓库的最新库存"入队，**不再传 delta**。
-- 现有"未绑定"逻辑改成自动入队 `create_and_bind`，跑完自动绑 HQ，不用人在 /youzan 页面手工点。
+### 2. 库位 → 分店映射
+- `inv_locations.kind='shop'` 必须绑定 `youzan_shops.id`（无绑定 = 不推）。
+- `kind='warehouse'` 的库位库存变化**直接跳过入队**。
 
-#### 2) 调拨（HQ → 门店）
+### 3. 触发点改造
+- `enqueueStockPushForLocation()`：只在 shop 库位入队；warehouse 库位早退返回。
+- `inbound.scan.ts`（总仓入库）：移除 enqueue 调用。
+- `transfer.ship-confirm.ts`：源如果是分店才推源，源是总仓则不推。
+- `transfer.receive-confirm.ts`：只推目的分店（目的一般是分店；若是总仓则不推）。
+- POS 销售扣减（未来）：推该分店。
 
-```text
-单据创建 stock_transfers(kind=wh_to_shop, from=总仓, to=分店location)
-   │
-   ├─ 第 1 步：HQ 出库扫枪
-   │     stock_transfer_epcs.ship_scanned_at = now()
-   │     status = shipped → 本地暂不动 inv_stocks（先冻结）
-   │
-   ├─ 第 2 步：门店收货扫枪
-   │     stock_transfer_epcs.receive_scanned_at = now()
-   │     status = posted →
-   │         inv_apply_movement(-N, 总仓)
-   │         inv_apply_movement(+N, 分店location)
-   │
-   └─ posted 时入队 2 条 sync_queue：
-         ① target=HQ.kdt,    item=HQ_item,    qty=HQ仓库最新值
-         ② target=分店.kdt,  item=分店_item,   qty=分店最新值
-            └─ 分店 item 不存在？先 create_branch_listing
-               （从 HQ_item 拷标题/价/图，建在分店 kdt 下，写 sku_youzan_links.branch_links[shop_id]）
-```
+### 4. SKU 建品
+- **HQ 建 SPU**：`items.smart-create` 完成本地 SKU 后异步入队一次 `create_hq_item`（仅第一次），拿到 item_id 写回 `sku_youzan_links(role='hq_spu', sync_stock=false)`。
+- **分店建 item**：当某个 sku 在分店库位首次出现 +N 时，worker 检测到该 (sku, shop) 没有 `branch_stock` 链接，先执行 `create_branch_item`（复制 HQ item 的标题/图/类目/价格 → 调用分店 kdt 的商品新增 API），成功后写入 link，再执行同一任务的 `push_stock`。
 
-要补的：
-- `sku_youzan_links` 由 1:1 改为 1:N（一个本地 SKU ↔ HQ + N 个分店 item），用子表 `sku_youzan_branch_links(sku_id, shop_id, yz_item_id, last_pushed_stock)`。
-- 调拨 posted 触发器 / 服务端逻辑同时入队 from 端 + to 端的库存推送。
-- 出库扫枪 → 收货扫枪之间的"在途"显示在调拨单详情里；超时自动报警。
+### 5. Worker 变化
+- `runStockSyncWorkerCore`：
+  - 跳过 `role='hq_spu'` 的任何 push_stock 任务；
+  - 处理 `push_stock` 时按 (sku, shop) 找 link，缺失 → 触发 `create_branch_item` 子任务；
+  - 推送数字始终 = `inv_stocks.qty` where location.shop_id = 该 shop。
 
-#### 3) 销售（门店卖出 → 库存扣减）
+### 6. 历史数据清理
+- 对存量 `sku_youzan_links.role IS NULL` 的记录：如果 kdt 是 HQ，标 `hq_spu` 并停用 sync_stock；如果是分店，标 `branch_stock`。
+- 清空 `youzan_stock_sync_queue` 里所有 target=HQ 且 action=push_stock 的 pending 任务。
 
-```text
-有赞门店收银卖单 → 有赞订单 webhook / 轮询 → ERP 收到 trade.created
-                                                  │
-                                                  ▼
-        按 (shop_id, yz_item_id) 反查 sku_youzan_branch_links → 本地 sku_id + location
-                                                  │
-                                                  ▼
-                          inv_apply_movement(-qty, 分店location, ref=youzan_order_xxx)
-                                                  │
-                                                  ▼
-                        把"分店最新绝对值"入队推回有赞分店 item（防漂移自愈）
-```
+### 7. UI
+- `SkuYouzanCard` 拆两块显示：**HQ 商品**（只显示 item_id / 打开有赞后台链接 / 没有库存数字）+ **分店库存**（列出每家已开通分店的 item_id + 上次推送 / 上次对账 / 错误）。
+- `/youzan` 同步中心：任务列表增加 shop 列，过滤器加「只看分店」。
 
-要补的：
-- 现有 `youzan_orders` 同步只拉单不联动库存。新增订单写入 hook：识别为"已支付/已完成"状态时落 `inv_apply_movement` 一次（用 `ref_type='youzan_order'` 防重）。
-- 退款单同步触发反向 +qty。
-- 没绑定 SKU 的有赞 item 卖出 → 落 `inv_unclaimed_epcs` 风格的"待认领销售"列表，让运营手动绑回。
+### 8. 分店建品 API（需要在编码时踩坑确认）
+- 有赞分店 kdt 建商品需要 `youzan.item.add` 类接口 + 图片上传接口。这一步包成 `createBranchItem(shopId, hqItem)`，字段有缺失（运费模板、类目 id 分店端不同）会在 worker 里记 `last_error` 让人工介入。
 
-### 可靠性兜底（三层防漂移）
+## 开发顺序
 
-1. **入队 + 重试 worker**：`youzan_stock_sync_queue` 已有 `attempts/last_error`，cron 每 30s 跑一次，指数退避，最多 8 次。
-2. **写后即对账**：每次成功推送后立即 `item.get` 一次回拉，对比 `last_pushed_stock` vs `last_pull_stock`，不一致直接标 `mismatch` 进异常面板。
-3. **每日全量对账**：现有 `reconcileAllForCron` 扩展为按 (sku × kdt) 维度全扫，差异自动以本地为准回推。
+1. Schema 迁移：新增 `role` 列 + 数据回填 + 清 pending HQ 任务。
+2. `enqueueStockPushForLocation` + 三个 handheld 触发点改造（跳过总仓）。
+3. Worker 升级：识别 `role`，只处理分店任务。
+4. `create_branch_item` 流程（含 HQ item 复制、字段兜底、失败保留 last_error 人工重试）。
+5. `items.smart-create` 增加「HQ 建 SPU」入队（一次性）。
+6. UI 拆分展示 HQ / 分店。
+7. 给 Codex 的手持机指令：说明库位不再需要绑 HQ，只需要绑分店 shop_id；调拨发货/收货成功后不用再期待 HQ 更新。
 
-### UI 上要加的入口（都是已有 /youzan 页面的小扩展）
+## 需要你在实施前确认（非阻塞，可留到实施时）
 
-- "未绑定" Tab 增加按钮：**自动创建到 HQ**（一键 create_and_bind，不用手填 item_id）。
-- 绑定卡片展示：HQ item + N 个分店 item 的库存阵列（一行一店）。
-- "异常" Tab：HQ/分店任一端 mismatch、create 失败、订单未认领 → 都汇总到这里。
-- 调拨单详情：右侧时间线显示「ERP 出库 → ERP 入库 → 有赞 HQ 减库存 → 有赞分店加库存」四步状态。
-
----
-
-### 技术实施清单（按上线顺序）
-
-| # | 改动 | 文件 / 表 |
-| - | --- | --- |
-| 1 | `sku_youzan_branch_links` 新表 (sku_id, shop_id, yz_item_id, last_pushed_stock, last_pull_stock, last_error) | migration |
-| 2 | `youzan_stock_sync_queue` 增加 `shop_id` + `action` 列 | migration |
-| 3 | 推送 worker 重写：以 (sku × shop) 为单位，永远推绝对值 + 回拉校验 | `src/lib/youzan-sync.functions.ts` |
-| 4 | 入库 hook：`inv_apply_movement` 完成后按 location → 关联 shop_id 入队 | `inventory.functions.ts` / 新增 `enqueueShopStock(sku_id, shop_id)` |
-| 5 | 调拨 posted hook：from + to 两端入队 | `stock-transfer.functions.ts` |
-| 6 | 分店 item 自动创建：`createBranchListing(sku_id, shop_id)` 从 HQ 拷字段调 item.add | `youzan-sync.functions.ts` |
-| 7 | 订单回写库存：`youzan_orders` 同步增加 `applyOrderToStock(order)`，识别 paid/refund | `youzan.functions.ts` |
-| 8 | "未认领销售"列表 + 手动绑回 | `/youzan` 新 Tab |
-| 9 | 调拨单详情时间线展示有赞推送进度 | `inventory.transfers.tsx` |
-| 10 | 全量对账 cron 扩展到 (sku × shop) 粒度 | `youzan-reconcile.ts` |
-
-完整跑通后业务方就能闭环：**进货扫枪即入库即同步、调拨双扫即划账即同步、门店卖出即扣减即同步**，全程不用人去有赞后台点。
-
----
-
-### 落地前需要你确认 2 件事
-
-1. **分店在有赞那边是不是"独立 kdt + 自己的 item_id"？** 我现在按这个假设设计（看代码里 `youzan_shops.kdt_id` 也是这么存的）。如果你那边其实是"总部统一 kdt + 多网点"模式（多网点 API），分店 item 就不用建，只需要推"网点库存"，要换一套接口。这个差别决定步骤 6。
-2. **门店收银是有赞门店收银还是 ERP 自研？** 现在按"门店还在用有赞门店收银，订单从有赞订单流回 ERP 扣本地库存"设计。如果近期就要换成 ERP 自研收银（手机端），步骤 7 改成"本地收银直接 movement，再推有赞"。
+- **分店 SPU 复制策略**：分店建 item 时的价格默认取本地 SKU 的哪个字段（零售价 / 建议售价 / HQ item 原价）？
+- **首次建品失败**：如果分店建品失败（类目不匹配等），是保留任务 `failed` 等人工修字段重试，还是自动回退到「只绑不建，等人手在有赞后台建好后手动绑定」？我建议前者。
