@@ -72,9 +72,9 @@ export function SkuMetaFields({
               <SelectValue placeholder="选择类目" />
             </SelectTrigger>
             <SelectContent>
-              {INV_CATEGORIES.map((c) => (
-                <SelectItem key={c.value} value={c.value}>
-                  {c.label}
+              {categories.map((c) => (
+                <SelectItem key={c.code} value={c.code}>
+                  {c.name}
                 </SelectItem>
               ))}
             </SelectContent>
