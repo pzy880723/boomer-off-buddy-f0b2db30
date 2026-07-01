@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { HANDHELD_CORS, authenticateDevice } from "@/server/handheld-auth.server";
 import { ConfirmBody, getTransfer, ok, err } from "@/server/handheld-transfer.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { enqueueStockPushForLocation } from "@/lib/youzan-sync.functions";
 
 export const Route = createFileRoute("/api/public/handheld/transfer/receive-confirm")({
   server: {
