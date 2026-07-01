@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ShopItemsPanel } from "@/components/youzan/shop-items-panel";
+import { ShopHealthPanel } from "@/components/youzan/shop-health-panel";
 import { SyncCenterPanel } from "@/components/youzan/sync-center-panel";
 import { PageHeader } from "@/components/page-header";
 import { DataTable } from "@/components/data-table";
@@ -286,7 +287,12 @@ function YouzanPage() {
               <Sparkles className="mr-1.5 h-3.5 w-3.5" />
               数据同步
             </TabsTrigger>
+            <TabsTrigger value="health">
+              <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+              系统检查
+            </TabsTrigger>
           </TabsList>
+
 
           <TabsContent value="logs" className="mt-3 space-y-3">
             <div className="flex items-center justify-end">
@@ -370,7 +376,12 @@ function YouzanPage() {
           <TabsContent value="sync" className="mt-3">
             <SyncCenterPanel />
           </TabsContent>
+
+          <TabsContent value="health" className="mt-3">
+            <ShopHealthPanel />
+          </TabsContent>
         </Tabs>
+
       </div>
     </div>
   );
