@@ -119,10 +119,10 @@ export const AuthPingRes = okEnvelope(DeviceContextSchema);
 export const SkuSummarySchema = z
   .object({
     id: uuidSchema,
-    sku_code: z.string().meta({ example: "TOY-PIKA-001" }),
+    sku_code: z.string().nullable().meta({ example: "TOY-PIKA-001" }),
     name: z.string().meta({ example: "皮卡丘公仔" }),
     category: z.string().nullable(),
-    price_tier: z.string().nullable().meta({ description: "价格档枚举" }),
+    price_tier: z.number().nullable().meta({ description: "价格档 / 售价" }),
     stock_qty: z.number().int().meta({ example: 12 }),
     image_url: z.string().nullable().meta({ description: "主图 read URL；没有图片时为 null" }),
     image_paths: z.array(z.string()).default([]).meta({ description: "持久图片路径列表" }),
