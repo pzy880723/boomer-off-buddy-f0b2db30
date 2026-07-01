@@ -1,44 +1,120 @@
-# 让 APP 拍的图在 ERP 商品里永久显示
+## 方案 A · 继续用有赞，把同步打到"能扛业务"
 
-## 现状
-- APP 调 `items/smart-create` 时没有传任何图片字段，导致 `inv_skus.image_url = null`。
-- 现有 schema 只支持 1 张图，且字段名是 `image_url`（外链/signed URL）。signed URL 7 天过期，写进库也会失效。
-- `sku-listing` / `sku-raw` 是私有桶。
+### 核心契约：本地是单一真源（Source of Truth）
 
-## 目标
-APP 上传 → 服务端把 storage_path 永久保存到 SKU → ERP（PC + 移动端）按需签 URL 显示，主图大图 + 缩略图横排 + Lightbox。
+```text
+本地 inv_stocks(sku, location)  ──绝对值推送──▶  有赞 (kdt, item)
+```
 
-## 后端改动
+- ERP 这边的 `inv_stocks.qty` 是**唯一权威**；有赞的库存数永远跟着这边走。
+- 推送只推**绝对值**（`item_sku.update` set quantity = N），**不推增量** —— 增量会因为重试/丢包/手工调整产生漂移。
+- 每次推送之后回拉一次远端 `quantity`，写到 `sku_youzan_links.last_pull_stock`；对账任务定期扫差异自动修复。
 
-### 1. 数据库迁移
-- `inv_skus` 新增 `image_paths text[] not null default '{}'`，存形如 `sku-listing/2026-06-29/<device>/<uuid>.jpg` 的相对路径（含 bucket 前缀），第 0 个为主图。
-- 一次性回填：把现有非空 `image_url`（外链 http 直接放进去，signed URL 跳过）转成长度 1 的数组备用，方便统一前端。
+### 三大业务场景的落地
 
-### 2. Handheld API
-- `SmartCreateReq` 新增 `image_storage_paths: { bucket: 'sku-raw'|'sku-listing', storage_path: string }[]`（最多 6 张）；保留 `image_url` 字段做向后兼容。
-- `items/smart-create` 写入逻辑：把 `image_storage_paths` 规范成 `${bucket}/${storage_path}` 存到 `image_paths`；若同时有 `image_url` 外链且数组为空，则把外链放数组第 0 位。复用已存在 SKU 时，新图追加到尾部去重。
-- `items/$id` 返回新字段 `images: { storage_path, read_url }[]`（read_url 7 天 signed URL，外链直接返回原 URL）。`image_url` 字段保留指向主图 read_url，方便老 APP。
-- OpenAPI 与 `docs/handheld-api.md` 同步更新。
+#### 1) 入库（仓库 → HQ）
 
-### 3. ERP 端取图
-- 新增 server fn `getSkuSignedImages(skuId)` → 解析 `image_paths`，对私有 bucket 路径用 `supabaseAdmin.storage.createSignedUrls`（24 小时），http 外链原样返回。
-- 新增 server fn `listSignedCoverUrls(skuIds[])` 给列表批量签封面图。
+```text
+PDA 扫 RFID → /m/inbound 聚合 → inv_apply_movement(+N, location=总仓)
+                                         │
+              ┌──────────────────────────┴──────────────────────────┐
+              ▼                                                     ▼
+   SKU 已绑定 HQ item？                                       未绑定？
+   入队 sync_queue(target=HQ.kdt,                  入队 sync_queue(action=create_then_bind,
+                   item=link.yz_item, qty=新绝对值)             target=HQ.kdt, sku_id)
+              │                                                     │
+              ▼                                                     ▼
+     worker 调 item_sku.update                           worker 先调 item.add 创建商品
+     成功后回拉远端 qty 校验                              成功拿到 yz_item_id → 写 link → 再推库存
+```
 
-## 前端改动
+要补的：
+- `youzan_stock_sync_queue` 增加 `action` 字段：`update_stock | create_and_bind | create_branch_listing`。
+- 入库 hook（`inv_apply_movement` 之后）按"该 SKU 在 HQ 仓库的最新库存"入队，**不再传 delta**。
+- 现有"未绑定"逻辑改成自动入队 `create_and_bind`，跑完自动绑 HQ，不用人在 /youzan 页面手工点。
 
-### PC 端
-- `src/routes/inventory.skus.$id.tsx`：把现在的方块封面换成"主图（点开 Lightbox）+ 下方缩略图横排"。复用 `ImageLightbox`（已存在于 japan-parcel 模块）。
-- SKU 详情新增"添加/重排图片"按钮：复用 `sku-image-picker` 流程，但写入 `image_paths`（保持向后兼容，可同时仍写 `image_url`）。
-- 列表 `inventory.skus.index.tsx`、`inventory.products.tsx`：封面取 `image_paths[0]` 的 signed URL，没有则回落 `image_url`。
+#### 2) 调拨（HQ → 门店）
 
-### 移动端
-- `src/routes/m.skus.$id.tsx` / `m.products.$code.tsx` / `m.skus.index.tsx` / `m.parcels.tsx`：同样取签名后的主图，并在详情页加横向缩略图条 + 全屏预览。
+```text
+单据创建 stock_transfers(kind=wh_to_shop, from=总仓, to=分店location)
+   │
+   ├─ 第 1 步：HQ 出库扫枪
+   │     stock_transfer_epcs.ship_scanned_at = now()
+   │     status = shipped → 本地暂不动 inv_stocks（先冻结）
+   │
+   ├─ 第 2 步：门店收货扫枪
+   │     stock_transfer_epcs.receive_scanned_at = now()
+   │     status = posted →
+   │         inv_apply_movement(-N, 总仓)
+   │         inv_apply_movement(+N, 分店location)
+   │
+   └─ posted 时入队 2 条 sync_queue：
+         ① target=HQ.kdt,    item=HQ_item,    qty=HQ仓库最新值
+         ② target=分店.kdt,  item=分店_item,   qty=分店最新值
+            └─ 分店 item 不存在？先 create_branch_listing
+               （从 HQ_item 拷标题/价/图，建在分店 kdt 下，写 sku_youzan_links.branch_links[shop_id]）
+```
 
-## 给 Codex 的指令（同步会附在实施完成后的回复里）
-APP 端需要调整：
-1. 拍照后走 `items/upload-image`（拿 storage_path）→ 直接 PUT 上传 → **不再调 `sign-read-url`**，直接把 `{ bucket, storage_path }` 攒到本地数组。
-2. `items/smart-create` 请求体改为传 `image_storage_paths: [{bucket, storage_path}, ...]`，最多 6 张，第 0 张是主图。
-3. SKU 详情页解析 `images: [{storage_path, read_url}]`，用 `read_url` 渲染图集；不再消费 `image_url`。
+要补的：
+- `sku_youzan_links` 由 1:1 改为 1:N（一个本地 SKU ↔ HQ + N 个分店 item），用子表 `sku_youzan_branch_links(sku_id, shop_id, yz_item_id, last_pushed_stock)`。
+- 调拨 posted 触发器 / 服务端逻辑同时入队 from 端 + to 端的库存推送。
+- 出库扫枪 → 收货扫枪之间的"在途"显示在调拨单详情里；超时自动报警。
 
-## 验证
-- 用 APP 拍 3 张图新建 → 查 `inv_skus.image_paths` 长度为 3 → ERP `/inventory/skus/{id}` 主图 + 2 张缩略图都能显示 → Lightbox 可切换 → 24h 后刷新仍然能签出新 URL。
+#### 3) 销售（门店卖出 → 库存扣减）
+
+```text
+有赞门店收银卖单 → 有赞订单 webhook / 轮询 → ERP 收到 trade.created
+                                                  │
+                                                  ▼
+        按 (shop_id, yz_item_id) 反查 sku_youzan_branch_links → 本地 sku_id + location
+                                                  │
+                                                  ▼
+                          inv_apply_movement(-qty, 分店location, ref=youzan_order_xxx)
+                                                  │
+                                                  ▼
+                        把"分店最新绝对值"入队推回有赞分店 item（防漂移自愈）
+```
+
+要补的：
+- 现有 `youzan_orders` 同步只拉单不联动库存。新增订单写入 hook：识别为"已支付/已完成"状态时落 `inv_apply_movement` 一次（用 `ref_type='youzan_order'` 防重）。
+- 退款单同步触发反向 +qty。
+- 没绑定 SKU 的有赞 item 卖出 → 落 `inv_unclaimed_epcs` 风格的"待认领销售"列表，让运营手动绑回。
+
+### 可靠性兜底（三层防漂移）
+
+1. **入队 + 重试 worker**：`youzan_stock_sync_queue` 已有 `attempts/last_error`，cron 每 30s 跑一次，指数退避，最多 8 次。
+2. **写后即对账**：每次成功推送后立即 `item.get` 一次回拉，对比 `last_pushed_stock` vs `last_pull_stock`，不一致直接标 `mismatch` 进异常面板。
+3. **每日全量对账**：现有 `reconcileAllForCron` 扩展为按 (sku × kdt) 维度全扫，差异自动以本地为准回推。
+
+### UI 上要加的入口（都是已有 /youzan 页面的小扩展）
+
+- "未绑定" Tab 增加按钮：**自动创建到 HQ**（一键 create_and_bind，不用手填 item_id）。
+- 绑定卡片展示：HQ item + N 个分店 item 的库存阵列（一行一店）。
+- "异常" Tab：HQ/分店任一端 mismatch、create 失败、订单未认领 → 都汇总到这里。
+- 调拨单详情：右侧时间线显示「ERP 出库 → ERP 入库 → 有赞 HQ 减库存 → 有赞分店加库存」四步状态。
+
+---
+
+### 技术实施清单（按上线顺序）
+
+| # | 改动 | 文件 / 表 |
+| - | --- | --- |
+| 1 | `sku_youzan_branch_links` 新表 (sku_id, shop_id, yz_item_id, last_pushed_stock, last_pull_stock, last_error) | migration |
+| 2 | `youzan_stock_sync_queue` 增加 `shop_id` + `action` 列 | migration |
+| 3 | 推送 worker 重写：以 (sku × shop) 为单位，永远推绝对值 + 回拉校验 | `src/lib/youzan-sync.functions.ts` |
+| 4 | 入库 hook：`inv_apply_movement` 完成后按 location → 关联 shop_id 入队 | `inventory.functions.ts` / 新增 `enqueueShopStock(sku_id, shop_id)` |
+| 5 | 调拨 posted hook：from + to 两端入队 | `stock-transfer.functions.ts` |
+| 6 | 分店 item 自动创建：`createBranchListing(sku_id, shop_id)` 从 HQ 拷字段调 item.add | `youzan-sync.functions.ts` |
+| 7 | 订单回写库存：`youzan_orders` 同步增加 `applyOrderToStock(order)`，识别 paid/refund | `youzan.functions.ts` |
+| 8 | "未认领销售"列表 + 手动绑回 | `/youzan` 新 Tab |
+| 9 | 调拨单详情时间线展示有赞推送进度 | `inventory.transfers.tsx` |
+| 10 | 全量对账 cron 扩展到 (sku × shop) 粒度 | `youzan-reconcile.ts` |
+
+完整跑通后业务方就能闭环：**进货扫枪即入库即同步、调拨双扫即划账即同步、门店卖出即扣减即同步**，全程不用人去有赞后台点。
+
+---
+
+### 落地前需要你确认 2 件事
+
+1. **分店在有赞那边是不是"独立 kdt + 自己的 item_id"？** 我现在按这个假设设计（看代码里 `youzan_shops.kdt_id` 也是这么存的）。如果你那边其实是"总部统一 kdt + 多网点"模式（多网点 API），分店 item 就不用建，只需要推"网点库存"，要换一套接口。这个差别决定步骤 6。
+2. **门店收银是有赞门店收银还是 ERP 自研？** 现在按"门店还在用有赞门店收银，订单从有赞订单流回 ERP 扣本地库存"设计。如果近期就要换成 ERP 自研收银（手机端），步骤 7 改成"本地收银直接 movement，再推有赞"。
