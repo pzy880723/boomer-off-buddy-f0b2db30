@@ -191,6 +191,9 @@ export const ProductItemSchema = z
   .object({
     id: uuidSchema,
     product_type: ProductTypeSchema,
+    editable: z.boolean().default(true).meta({
+      description: "APP 是否允许编辑；standard 恒为 false",
+    }),
     sku_code: z.string().nullable(),
     barcode: z.string().nullable(),
     item_code: z.string().nullable(),
@@ -217,12 +220,19 @@ export const ProductItemSchema = z
   })
   .meta({ id: "ProductItem" });
 
+export const ProductSortSchema = z
+  .enum(["created_desc", "created_asc", "price_desc", "price_asc", "stock_desc", "updated_desc"])
+  .default("updated_desc");
+
 export const ProductsQuery = z
   .object({
     q: z.string().optional(),
     type: z.enum(["standard", "custom", "bundle", "all"]).default("all"),
     scope: z.enum(["authorized", "current_location"]).default("authorized"),
     location_id: uuidSchema.optional(),
+    category: z.string().optional().meta({ description: "分类精确匹配" }),
+    has_image: z.enum(["0", "1"]).optional().meta({ description: "仅 custom 生效" }),
+    sort: ProductSortSchema.optional(),
     page: z.coerce.number().int().min(1).default(1),
     page_size: z.coerce.number().int().min(1).max(200).default(50),
   })
@@ -234,6 +244,14 @@ export const ProductsRes = okEnvelope(
     total: z.number().int(),
     page: z.number().int(),
     page_size: z.number().int(),
+    counts: z
+      .object({
+        custom: z.number().int(),
+        bundle: z.number().int(),
+        standard: z.number().int(),
+        all: z.number().int(),
+      })
+      .meta({ description: "各 type 的角标计数（受 q/category 过滤影响，不受 type 影响）" }),
   }),
 );
 
@@ -245,6 +263,63 @@ export const ProductLookupQuery = z
   .meta({ id: "ProductLookupQuery" });
 
 export const ProductLookupRes = okEnvelope(ProductItemSchema);
+
+// ============================================================
+// 2.5 全局库存视图 global-stock（总仓账号专用）
+// ============================================================
+
+export const GlobalStockLocationSchema = z
+  .object({
+    id: uuidSchema,
+    name: z.string(),
+    kind: z.enum(["warehouse", "shop"]),
+  })
+  .meta({ id: "GlobalStockLocation" });
+
+export const GlobalStockItemSchema = z
+  .object({
+    sku_id: uuidSchema,
+    name: z.string(),
+    sku_code: z.string().nullable(),
+    barcode: z.string().nullable(),
+    category: z.string().nullable(),
+    product_type: ProductTypeSchema,
+    image_url: z.string().nullable(),
+    price: z.number(),
+    total_qty: z.number().int(),
+    stocks: z.record(z.string(), z.number().int()).meta({
+      description: "key = location_id, value = qty；没有的库位不会出现，前端按 0 处理",
+    }),
+  })
+  .meta({ id: "GlobalStockItem" });
+
+export const GlobalStockQuery = z
+  .object({
+    type: z.enum(["standard", "custom", "bundle"]).meta({ description: "必传，按 Tab 过滤" }),
+    q: z.string().optional(),
+    category: z.string().optional(),
+    stock_state: z.enum(["all", "out", "low"]).default("all"),
+    low_threshold: z.coerce.number().int().min(1).default(5),
+    page: z.coerce.number().int().min(1).default(1),
+    page_size: z.coerce.number().int().min(1).max(200).default(50),
+  })
+  .meta({ id: "GlobalStockQuery" });
+
+export const GlobalStockRes = okEnvelope(
+  z.object({
+    locations: z.array(GlobalStockLocationSchema),
+    items: z.array(GlobalStockItemSchema),
+    summary: z.object({
+      sku_count: z.number().int(),
+      total_qty: z.number().int(),
+      out_of_stock: z.number().int(),
+      low_stock: z.number().int(),
+    }),
+    page: z.number().int(),
+    page_size: z.number().int(),
+    total: z.number().int(),
+  }),
+);
 
 // ============================================================
 // 3. 入库 inbound/scan

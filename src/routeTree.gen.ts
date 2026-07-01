@@ -89,6 +89,7 @@ import { Route as ApiPublicHandheldOpenapiDotjsonRouteImport } from './routes/ap
 import { Route as ApiPublicHandheldNotificationsRouteImport } from './routes/api/public/handheld/notifications'
 import { Route as ApiPublicHandheldLocationsRouteImport } from './routes/api/public/handheld/locations'
 import { Route as ApiPublicHandheldLabelTemplatesRouteImport } from './routes/api/public/handheld/label-templates'
+import { Route as ApiPublicHandheldGlobalStockRouteImport } from './routes/api/public/handheld/global-stock'
 import { Route as ApiPublicHandheldDashboardRouteImport } from './routes/api/public/handheld/dashboard'
 import { Route as ApiPublicHandheldTransfersIdRouteImport } from './routes/api/public/handheld/transfers.$id'
 import { Route as ApiPublicHandheldTransferShipScanRouteImport } from './routes/api/public/handheld/transfer.ship-scan'
@@ -550,6 +551,12 @@ const ApiPublicHandheldLabelTemplatesRoute =
     path: '/api/public/handheld/label-templates',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHandheldGlobalStockRoute =
+  ApiPublicHandheldGlobalStockRouteImport.update({
+    id: '/api/public/handheld/global-stock',
+    path: '/api/public/handheld/global-stock',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHandheldDashboardRoute =
   ApiPublicHandheldDashboardRouteImport.update({
     id: '/api/public/handheld/dashboard',
@@ -883,6 +890,7 @@ export interface FileRoutesByFullPath {
   '/purchase/domestic/': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
   '/api/public/handheld/dashboard': typeof ApiPublicHandheldDashboardRoute
+  '/api/public/handheld/global-stock': typeof ApiPublicHandheldGlobalStockRoute
   '/api/public/handheld/label-templates': typeof ApiPublicHandheldLabelTemplatesRouteWithChildren
   '/api/public/handheld/locations': typeof ApiPublicHandheldLocationsRoute
   '/api/public/handheld/notifications': typeof ApiPublicHandheldNotificationsRouteWithChildren
@@ -1002,6 +1010,7 @@ export interface FileRoutesByTo {
   '/purchase/domestic': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel': typeof PurchaseJapanParcelIndexRoute
   '/api/public/handheld/dashboard': typeof ApiPublicHandheldDashboardRoute
+  '/api/public/handheld/global-stock': typeof ApiPublicHandheldGlobalStockRoute
   '/api/public/handheld/label-templates': typeof ApiPublicHandheldLabelTemplatesRouteWithChildren
   '/api/public/handheld/locations': typeof ApiPublicHandheldLocationsRoute
   '/api/public/handheld/notifications': typeof ApiPublicHandheldNotificationsRouteWithChildren
@@ -1129,6 +1138,7 @@ export interface FileRoutesById {
   '/purchase/domestic/': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
   '/api/public/handheld/dashboard': typeof ApiPublicHandheldDashboardRoute
+  '/api/public/handheld/global-stock': typeof ApiPublicHandheldGlobalStockRoute
   '/api/public/handheld/label-templates': typeof ApiPublicHandheldLabelTemplatesRouteWithChildren
   '/api/public/handheld/locations': typeof ApiPublicHandheldLocationsRoute
   '/api/public/handheld/notifications': typeof ApiPublicHandheldNotificationsRouteWithChildren
@@ -1257,6 +1267,7 @@ export interface FileRouteTypes {
     | '/purchase/domestic/'
     | '/purchase/japan-parcel/'
     | '/api/public/handheld/dashboard'
+    | '/api/public/handheld/global-stock'
     | '/api/public/handheld/label-templates'
     | '/api/public/handheld/locations'
     | '/api/public/handheld/notifications'
@@ -1376,6 +1387,7 @@ export interface FileRouteTypes {
     | '/purchase/domestic'
     | '/purchase/japan-parcel'
     | '/api/public/handheld/dashboard'
+    | '/api/public/handheld/global-stock'
     | '/api/public/handheld/label-templates'
     | '/api/public/handheld/locations'
     | '/api/public/handheld/notifications'
@@ -1502,6 +1514,7 @@ export interface FileRouteTypes {
     | '/purchase/domestic/'
     | '/purchase/japan-parcel/'
     | '/api/public/handheld/dashboard'
+    | '/api/public/handheld/global-stock'
     | '/api/public/handheld/label-templates'
     | '/api/public/handheld/locations'
     | '/api/public/handheld/notifications'
@@ -1591,6 +1604,7 @@ export interface RootRouteChildren {
   InventoryStocktakesIdRoute: typeof InventoryStocktakesIdRoute
   InventoryStocktakesIndexRoute: typeof InventoryStocktakesIndexRoute
   ApiPublicHandheldDashboardRoute: typeof ApiPublicHandheldDashboardRoute
+  ApiPublicHandheldGlobalStockRoute: typeof ApiPublicHandheldGlobalStockRoute
   ApiPublicHandheldLabelTemplatesRoute: typeof ApiPublicHandheldLabelTemplatesRouteWithChildren
   ApiPublicHandheldLocationsRoute: typeof ApiPublicHandheldLocationsRoute
   ApiPublicHandheldNotificationsRoute: typeof ApiPublicHandheldNotificationsRouteWithChildren
@@ -2196,6 +2210,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/handheld/label-templates'
       fullPath: '/api/public/handheld/label-templates'
       preLoaderRoute: typeof ApiPublicHandheldLabelTemplatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/global-stock': {
+      id: '/api/public/handheld/global-stock'
+      path: '/api/public/handheld/global-stock'
+      fullPath: '/api/public/handheld/global-stock'
+      preLoaderRoute: typeof ApiPublicHandheldGlobalStockRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/handheld/dashboard': {
@@ -2845,6 +2866,7 @@ const rootRouteChildren: RootRouteChildren = {
   InventoryStocktakesIdRoute: InventoryStocktakesIdRoute,
   InventoryStocktakesIndexRoute: InventoryStocktakesIndexRoute,
   ApiPublicHandheldDashboardRoute: ApiPublicHandheldDashboardRoute,
+  ApiPublicHandheldGlobalStockRoute: ApiPublicHandheldGlobalStockRoute,
   ApiPublicHandheldLabelTemplatesRoute:
     ApiPublicHandheldLabelTemplatesRouteWithChildren,
   ApiPublicHandheldLocationsRoute: ApiPublicHandheldLocationsRoute,
