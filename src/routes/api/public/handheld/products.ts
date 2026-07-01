@@ -181,6 +181,7 @@ async function buildItems(skus: SkuRow[], locations: LocRow[]): Promise<ProductI
     return {
       id: s.id,
       product_type: classifyType(s),
+      editable: classifyType(s) !== "standard",
       sku_code: s.sku_code,
       barcode: s.barcode,
       item_code: s.sku_code,
