@@ -1,8 +1,18 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { RefreshCw, Plus, Trash2, PowerOff, Power, Link2, Loader2 } from "lucide-react";
+import {
+  RefreshCw,
+  Plus,
+  Trash2,
+  PowerOff,
+  Power,
+  Link2,
+  Loader2,
+  ChevronRight,
+  ChevronDown,
+} from "lucide-react";
 import {
   listCategories,
   upsertCategory,
@@ -44,6 +54,7 @@ export function CategoriesPanel() {
 
   const [editing, setEditing] = useState<CategoryRow | null>(null);
   const [creating, setCreating] = useState(false);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["inv-categories"] });
 
@@ -99,6 +110,7 @@ export function CategoriesPanel() {
         .filter((x) => pickAdd[x.yz.id])
         .map((x) => ({
           youzan_hq_category_id: x.yz.id,
+          youzan_hq_parent_id: x.yz.parent_id ?? null,
           name: x.yz.name,
           code: (codeOverride[x.yz.id] ?? x.suggest_code).trim() || x.suggest_code,
         }));
@@ -121,10 +133,47 @@ export function CategoriesPanel() {
     }
   };
 
-  const sorted = useMemo(
-    () => [...rows].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)),
-    [rows],
-  );
+  // 构建树：一级 → 子级
+  const tree = useMemo(() => {
+    const byParent = new Map<string | null, CategoryRow[]>();
+    for (const r of rows) {
+      const pid = r.parent_id ?? null;
+      const arr = byParent.get(pid) ?? [];
+      arr.push(r);
+      byParent.set(pid, arr);
+    }
+    const sortFn = (a: CategoryRow, b: CategoryRow) =>
+      a.sort_order - b.sort_order || a.name.localeCompare(b.name);
+    for (const [, arr] of byParent) arr.sort(sortFn);
+    const roots = byParent.get(null) ?? [];
+    return { roots, byParent };
+  }, [rows]);
+
+  // 预览：按父分组
+  const previewAddGroups = useMemo(() => {
+    if (!previewData) return [] as {
+      key: string;
+      title: string;
+      items: PreviewRes["to_add"];
+    }[];
+    const map = new Map<string, PreviewRes["to_add"]>();
+    for (const x of previewData.to_add) {
+      const key = x.yz.parent_id ? String(x.yz.parent_id) : "__root__";
+      const title = x.yz.parent_id
+        ? `子分类 · ${x.parent_name ?? `#${x.yz.parent_id}`}`
+        : "一级分类";
+      const arr = map.get(key) ?? [];
+      arr.push(x);
+      map.set(key, arr);
+      // 记录 title
+      (arr as unknown as { __title?: string }).__title = title;
+    }
+    return Array.from(map.entries()).map(([key, items]) => ({
+      key,
+      title: (items as unknown as { __title?: string }).__title ?? "分类",
+      items,
+    }));
+  }, [previewData]);
 
   return (
     <Card>
@@ -132,12 +181,16 @@ export function CategoriesPanel() {
         <div>
           <CardTitle className="text-base">商品分类</CardTitle>
           <p className="text-xs text-muted-foreground mt-1">
-            ERP 是分类的唯一真源。可从有赞总部拉取分类后手动采纳；停用后新建商品不再显示。
+            ERP 是分类的唯一真源。可从有赞总部拉取一级 + 二级分类后手动采纳；停用后新建商品不再显示。
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={runPreview} disabled={syncing}>
-            {syncing ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1 h-3.5 w-3.5" />}
+            {syncing ? (
+              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="mr-1 h-3.5 w-3.5" />
+            )}
             从有赞同步
           </Button>
           <Button size="sm" onClick={() => setCreating(true)}>
@@ -147,54 +200,49 @@ export function CategoriesPanel() {
       </CardHeader>
       <CardContent>
         <div className="rounded-md border divide-y">
-          {q.isLoading && <div className="p-6 text-center text-sm text-muted-foreground">加载中…</div>}
-          {!q.isLoading && sorted.length === 0 && (
+          {q.isLoading && (
+            <div className="p-6 text-center text-sm text-muted-foreground">加载中…</div>
+          )}
+          {!q.isLoading && tree.roots.length === 0 && (
             <div className="p-6 text-center text-sm text-muted-foreground">暂无分类</div>
           )}
-          {sorted.map((c) => (
-            <div key={c.id} className="flex items-center gap-3 px-3 py-2 text-sm">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className={c.is_active ? "font-medium" : "font-medium text-muted-foreground line-through"}>
-                    {c.name}
-                  </span>
-                  <Badge variant="outline" className="font-mono text-[10px]">{c.code}</Badge>
-                  {c.is_system && <Badge variant="secondary" className="text-[10px]">系统</Badge>}
-                  {c.youzan_hq_category_id && (
-                    <Badge variant="outline" className="text-[10px] gap-1">
-                      <Link2 className="h-3 w-3" /> 有赞 #{c.youzan_hq_category_id}
-                    </Badge>
-                  )}
-                </div>
-                <div className="text-[11px] text-muted-foreground mt-0.5">
-                  排序 {c.sort_order}
-                  {c.synced_at ? ` · 同步于 ${new Date(c.synced_at).toLocaleString("zh-CN")}` : ""}
-                </div>
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => toggleActive.mutate(c)}>
-                {c.is_active ? (
-                  <><PowerOff className="mr-1 h-3.5 w-3.5" />停用</>
-                ) : (
-                  <><Power className="mr-1 h-3.5 w-3.5" />启用</>
-                )}
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setEditing(c)}>
-                编辑
-              </Button>
-              {!c.is_system && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-destructive"
-                  onClick={() => {
-                    if (confirm(`确定删除分类「${c.name}」？`)) removeCat.mutate(c.id);
+          {tree.roots.map((r) => {
+            const kids = tree.byParent.get(r.id) ?? [];
+            const isOpen = !collapsed[r.id];
+            return (
+              <div key={r.id}>
+                <CategoryRowView
+                  row={r}
+                  depth={0}
+                  hasChildren={kids.length > 0}
+                  isOpen={isOpen}
+                  onToggleOpen={() =>
+                    setCollapsed((s) => ({ ...s, [r.id]: !collapsed[r.id] }))
+                  }
+                  childCount={kids.length}
+                  onToggleActive={() => toggleActive.mutate(r)}
+                  onEdit={() => setEditing(r)}
+                  onDelete={() => {
+                    if (confirm(`确定删除分类「${r.name}」？`)) removeCat.mutate(r.id);
                   }}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              )}
-            </div>
-          ))}
+                />
+                {isOpen &&
+                  kids.map((k) => (
+                    <CategoryRowView
+                      key={k.id}
+                      row={k}
+                      depth={1}
+                      hasChildren={false}
+                      onToggleActive={() => toggleActive.mutate(k)}
+                      onEdit={() => setEditing(k)}
+                      onDelete={() => {
+                        if (confirm(`确定删除分类「${k.name}」？`)) removeCat.mutate(k.id);
+                      }}
+                    />
+                  ))}
+              </div>
+            );
+          })}
         </div>
       </CardContent>
 
@@ -208,7 +256,9 @@ export function CategoriesPanel() {
           }
         }}
         initial={editing}
-        parents={rows.filter((r) => r.is_active && (!editing || r.id !== editing.id))}
+        parents={rows.filter(
+          (r) => r.is_active && r.parent_id === null && (!editing || r.id !== editing.id),
+        )}
         onSave={async (payload) => {
           try {
             await upsert({ data: payload });
@@ -235,40 +285,74 @@ export function CategoriesPanel() {
           </DialogHeader>
           {previewData && (
             <div className="max-h-[60vh] space-y-4 overflow-y-auto">
+              {previewData.notes && previewData.notes.length > 0 && (
+                <div className="rounded-md border border-muted bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground space-y-0.5">
+                  {previewData.notes.map((n, i) => (
+                    <div key={i}>· {n}</div>
+                  ))}
+                </div>
+              )}
               <Section title={`新增（${previewData.to_add.length}）`}>
-                {previewData.to_add.map((x) => (
-                  <div key={x.yz.id} className="flex items-center gap-3 py-1 text-sm">
-                    <Checkbox
-                      checked={!!pickAdd[x.yz.id]}
-                      onCheckedChange={(v) => setPickAdd((s) => ({ ...s, [x.yz.id]: !!v }))}
-                    />
-                    <span className="flex-1 truncate">{x.yz.name}</span>
-                    <span className="text-[11px] text-muted-foreground">有赞 #{x.yz.id}</span>
-                    <Input
-                      className="h-7 w-28 font-mono text-xs"
-                      value={codeOverride[x.yz.id] ?? x.suggest_code}
-                      onChange={(e) =>
-                        setCodeOverride((s) => ({ ...s, [x.yz.id]: e.target.value }))
-                      }
-                    />
-                  </div>
-                ))}
-                {previewData.to_add.length === 0 && (
+                {previewAddGroups.length === 0 && (
                   <p className="text-xs text-muted-foreground">无</p>
                 )}
+                {previewAddGroups.map((g) => (
+                  <div key={g.key} className="mb-2 last:mb-0">
+                    <div className="text-[11px] font-medium text-muted-foreground mb-1">
+                      {g.title}
+                    </div>
+                    {g.items.map((x) => (
+                      <div
+                        key={x.yz.id}
+                        className={`flex items-center gap-3 py-1 text-sm ${
+                          x.yz.parent_id ? "pl-4" : ""
+                        }`}
+                      >
+                        <Checkbox
+                          checked={!!pickAdd[x.yz.id]}
+                          onCheckedChange={(v) =>
+                            setPickAdd((s) => ({ ...s, [x.yz.id]: !!v }))
+                          }
+                        />
+                        <span className="flex-1 truncate">
+                          {x.yz.parent_id && (
+                            <span className="text-muted-foreground mr-1">└</span>
+                          )}
+                          {x.yz.name}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground">
+                          有赞 #{x.yz.id}
+                        </span>
+                        <Input
+                          className="h-7 w-28 font-mono text-xs"
+                          value={codeOverride[x.yz.id] ?? x.suggest_code}
+                          onChange={(e) =>
+                            setCodeOverride((s) => ({ ...s, [x.yz.id]: e.target.value }))
+                          }
+                        />
+                      </div>
+                    ))}
+                  </div>
+                ))}
               </Section>
               <Section title={`更新名称（${previewData.to_update.length}）`}>
                 {previewData.to_update.map((x) => (
                   <div key={x.local.id} className="flex items-center gap-3 py-1 text-sm">
                     <Checkbox
                       checked={!!pickUpd[x.local.id]}
-                      onCheckedChange={(v) => setPickUpd((s) => ({ ...s, [x.local.id]: !!v }))}
+                      onCheckedChange={(v) =>
+                        setPickUpd((s) => ({ ...s, [x.local.id]: !!v }))
+                      }
                     />
                     <span className="flex-1 truncate">
-                      <span className="text-muted-foreground line-through mr-2">{x.local.name}</span>
+                      <span className="text-muted-foreground line-through mr-2">
+                        {x.local.name}
+                      </span>
                       → <span className="font-medium">{x.yz.name}</span>
                     </span>
-                    <Badge variant="outline" className="font-mono text-[10px]">{x.local.code}</Badge>
+                    <Badge variant="outline" className="font-mono text-[10px]">
+                      {x.local.code}
+                    </Badge>
                   </div>
                 ))}
                 {previewData.to_update.length === 0 && (
@@ -280,10 +364,14 @@ export function CategoriesPanel() {
                   <div key={x.id} className="flex items-center gap-3 py-1 text-sm">
                     <Checkbox
                       checked={!!pickDeact[x.id]}
-                      onCheckedChange={(v) => setPickDeact((s) => ({ ...s, [x.id]: !!v }))}
+                      onCheckedChange={(v) =>
+                        setPickDeact((s) => ({ ...s, [x.id]: !!v }))
+                      }
                     />
                     <span className="flex-1 truncate">{x.name}</span>
-                    <Badge variant="outline" className="font-mono text-[10px]">{x.code}</Badge>
+                    <Badge variant="outline" className="font-mono text-[10px]">
+                      {x.code}
+                    </Badge>
                   </div>
                 ))}
                 {previewData.to_deactivate.length === 0 && (
@@ -293,7 +381,9 @@ export function CategoriesPanel() {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSyncOpen(false)}>取消</Button>
+            <Button variant="outline" onClick={() => setSyncOpen(false)}>
+              取消
+            </Button>
             <Button onClick={runApply} disabled={syncing || !previewData}>
               {syncing && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
               采纳勾选项
@@ -302,6 +392,114 @@ export function CategoriesPanel() {
         </DialogContent>
       </Dialog>
     </Card>
+  );
+}
+
+function CategoryRowView({
+  row,
+  depth,
+  hasChildren,
+  isOpen,
+  onToggleOpen,
+  childCount,
+  onToggleActive,
+  onEdit,
+  onDelete,
+}: {
+  row: CategoryRow;
+  depth: 0 | 1;
+  hasChildren: boolean;
+  isOpen?: boolean;
+  onToggleOpen?: () => void;
+  childCount?: number;
+  onToggleActive: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div
+      className={`flex items-center gap-2 px-3 py-2 text-sm ${
+        depth === 1 ? "bg-muted/20 pl-10" : ""
+      }`}
+    >
+      {depth === 0 ? (
+        hasChildren ? (
+          <button
+            type="button"
+            onClick={onToggleOpen}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            {isOpen ? (
+              <ChevronDown className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronRight className="h-3.5 w-3.5" />
+            )}
+          </button>
+        ) : (
+          <span className="inline-block w-3.5" />
+        )
+      ) : (
+        <span className="text-muted-foreground">└</span>
+      )}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span
+            className={
+              row.is_active
+                ? "font-medium"
+                : "font-medium text-muted-foreground line-through"
+            }
+          >
+            {row.name}
+          </span>
+          <Badge variant="outline" className="font-mono text-[10px]">
+            {row.code}
+          </Badge>
+          {row.is_system && (
+            <Badge variant="secondary" className="text-[10px]">
+              系统
+            </Badge>
+          )}
+          {row.youzan_hq_category_id && (
+            <Badge variant="outline" className="text-[10px] gap-1">
+              <Link2 className="h-3 w-3" /> 有赞 #{row.youzan_hq_category_id}
+            </Badge>
+          )}
+          {depth === 0 && childCount ? (
+            <Badge variant="secondary" className="text-[10px]">
+              含 {childCount} 个子类
+            </Badge>
+          ) : null}
+        </div>
+        <div className="text-[11px] text-muted-foreground mt-0.5">
+          排序 {row.sort_order}
+          {row.synced_at
+            ? ` · 同步于 ${new Date(row.synced_at).toLocaleString("zh-CN")}`
+            : ""}
+        </div>
+      </div>
+      <Button variant="ghost" size="sm" onClick={onToggleActive}>
+        {row.is_active ? (
+          <>
+            <PowerOff className="mr-1 h-3.5 w-3.5" />
+            停用
+          </>
+        ) : (
+          <>
+            <Power className="mr-1 h-3.5 w-3.5" />
+            启用
+          </>
+        )}
+      </Button>
+      <Button variant="ghost" size="sm" onClick={onEdit}>
+        编辑
+      </Button>
+      {!row.is_system && (
+        <Button variant="ghost" size="sm" className="text-destructive" onClick={onDelete}>
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      )}
+    </div>
   );
 }
 
@@ -340,29 +538,18 @@ function EditDialog({
   const [sort, setSort] = useState<string>(String(initial?.sort_order ?? 100));
   const [active, setActive] = useState<boolean>(initial?.is_active ?? true);
 
-  // reset when initial changes
-  useState(() => {
+  // 弹窗打开或 initial 变化时重置字段
+  useEffect(() => {
+    if (!open) return;
     setCode(initial?.code ?? "");
     setName(initial?.name ?? "");
     setParent(initial?.parent_id ?? "");
     setSort(String(initial?.sort_order ?? 100));
     setActive(initial?.is_active ?? true);
-  });
+  }, [open, initial]);
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(v) => {
-        onOpenChange(v);
-        if (v) {
-          setCode(initial?.code ?? "");
-          setName(initial?.name ?? "");
-          setParent(initial?.parent_id ?? "");
-          setSort(String(initial?.sort_order ?? 100));
-          setActive(initial?.is_active ?? true);
-        }
-      }}
-    >
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{initial ? "编辑分类" : "新建分类"}</DialogTitle>
@@ -410,7 +597,9 @@ function EditDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>取消</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            取消
+          </Button>
           <Button
             onClick={() =>
               onSave({
