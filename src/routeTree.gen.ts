@@ -88,6 +88,7 @@ import { Route as ApiPublicHandheldProductsRouteImport } from './routes/api/publ
 import { Route as ApiPublicHandheldOpenapiDotjsonRouteImport } from './routes/api/public/handheld/openapi[.]json'
 import { Route as ApiPublicHandheldNotificationsRouteImport } from './routes/api/public/handheld/notifications'
 import { Route as ApiPublicHandheldLocationsRouteImport } from './routes/api/public/handheld/locations'
+import { Route as ApiPublicHandheldLabelTemplatesRouteImport } from './routes/api/public/handheld/label-templates'
 import { Route as ApiPublicHandheldDashboardRouteImport } from './routes/api/public/handheld/dashboard'
 import { Route as ApiPublicHandheldTransfersIdRouteImport } from './routes/api/public/handheld/transfers.$id'
 import { Route as ApiPublicHandheldTransferShipScanRouteImport } from './routes/api/public/handheld/transfer.ship-scan'
@@ -108,6 +109,7 @@ import { Route as ApiPublicHandheldProductsLookupRouteImport } from './routes/ap
 import { Route as ApiPublicHandheldNotificationsSinceRouteImport } from './routes/api/public/handheld/notifications.since'
 import { Route as ApiPublicHandheldNotificationsReadAllRouteImport } from './routes/api/public/handheld/notifications.read-all'
 import { Route as ApiPublicHandheldLocationSwitchRouteImport } from './routes/api/public/handheld/location.switch'
+import { Route as ApiPublicHandheldLabelTemplatesIdRouteImport } from './routes/api/public/handheld/label-templates.$id'
 import { Route as ApiPublicHandheldItemsUploadImageRouteImport } from './routes/api/public/handheld/items.upload-image'
 import { Route as ApiPublicHandheldItemsSmartCreateRouteImport } from './routes/api/public/handheld/items.smart-create'
 import { Route as ApiPublicHandheldItemsSignReadUrlRouteImport } from './routes/api/public/handheld/items.sign-read-url'
@@ -127,6 +129,7 @@ import { Route as ApiPublicAuthOtpVerifyRouteImport } from './routes/api/public/
 import { Route as ApiPublicAuthOtpSendRouteImport } from './routes/api/public/auth/otp.send'
 import { Route as ApiPublicHandheldTransfersIdScanRouteImport } from './routes/api/public/handheld/transfers.$id.scan'
 import { Route as ApiPublicHandheldTransfersIdConfirmRouteImport } from './routes/api/public/handheld/transfers.$id.confirm'
+import { Route as ApiPublicHandheldLabelTemplatesIdSetDefaultRouteImport } from './routes/api/public/handheld/label-templates.$id.set-default'
 import { Route as ApiPublicHandheldItemsUploadImageMultipartRouteImport } from './routes/api/public/handheld/items.upload-image.multipart'
 import { Route as ApiPublicHandheldItemsIdSyncStatusRouteImport } from './routes/api/public/handheld/items.$id.sync-status'
 
@@ -540,6 +543,12 @@ const ApiPublicHandheldLocationsRoute =
     path: '/api/public/handheld/locations',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHandheldLabelTemplatesRoute =
+  ApiPublicHandheldLabelTemplatesRouteImport.update({
+    id: '/api/public/handheld/label-templates',
+    path: '/api/public/handheld/label-templates',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHandheldDashboardRoute =
   ApiPublicHandheldDashboardRouteImport.update({
     id: '/api/public/handheld/dashboard',
@@ -660,6 +669,12 @@ const ApiPublicHandheldLocationSwitchRoute =
     path: '/api/public/handheld/location/switch',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHandheldLabelTemplatesIdRoute =
+  ApiPublicHandheldLabelTemplatesIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => ApiPublicHandheldLabelTemplatesRoute,
+  } as any)
 const ApiPublicHandheldItemsUploadImageRoute =
   ApiPublicHandheldItemsUploadImageRouteImport.update({
     id: '/api/public/handheld/items/upload-image',
@@ -771,6 +786,12 @@ const ApiPublicHandheldTransfersIdConfirmRoute =
     path: '/confirm',
     getParentRoute: () => ApiPublicHandheldTransfersIdRoute,
   } as any)
+const ApiPublicHandheldLabelTemplatesIdSetDefaultRoute =
+  ApiPublicHandheldLabelTemplatesIdSetDefaultRouteImport.update({
+    id: '/set-default',
+    path: '/set-default',
+    getParentRoute: () => ApiPublicHandheldLabelTemplatesIdRoute,
+  } as any)
 const ApiPublicHandheldItemsUploadImageMultipartRoute =
   ApiPublicHandheldItemsUploadImageMultipartRouteImport.update({
     id: '/multipart',
@@ -855,6 +876,7 @@ export interface FileRoutesByFullPath {
   '/purchase/domestic/': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
   '/api/public/handheld/dashboard': typeof ApiPublicHandheldDashboardRoute
+  '/api/public/handheld/label-templates': typeof ApiPublicHandheldLabelTemplatesRouteWithChildren
   '/api/public/handheld/locations': typeof ApiPublicHandheldLocationsRoute
   '/api/public/handheld/notifications': typeof ApiPublicHandheldNotificationsRouteWithChildren
   '/api/public/handheld/openapi.json': typeof ApiPublicHandheldOpenapiDotjsonRoute
@@ -882,6 +904,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/items/sign-read-url': typeof ApiPublicHandheldItemsSignReadUrlRoute
   '/api/public/handheld/items/smart-create': typeof ApiPublicHandheldItemsSmartCreateRoute
   '/api/public/handheld/items/upload-image': typeof ApiPublicHandheldItemsUploadImageRouteWithChildren
+  '/api/public/handheld/label-templates/$id': typeof ApiPublicHandheldLabelTemplatesIdRouteWithChildren
   '/api/public/handheld/location/switch': typeof ApiPublicHandheldLocationSwitchRoute
   '/api/public/handheld/notifications/read-all': typeof ApiPublicHandheldNotificationsReadAllRoute
   '/api/public/handheld/notifications/since': typeof ApiPublicHandheldNotificationsSinceRoute
@@ -903,6 +926,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/transfers/$id': typeof ApiPublicHandheldTransfersIdRouteWithChildren
   '/api/public/handheld/items/$id/sync-status': typeof ApiPublicHandheldItemsIdSyncStatusRoute
   '/api/public/handheld/items/upload-image/multipart': typeof ApiPublicHandheldItemsUploadImageMultipartRoute
+  '/api/public/handheld/label-templates/$id/set-default': typeof ApiPublicHandheldLabelTemplatesIdSetDefaultRoute
   '/api/public/handheld/transfers/$id/confirm': typeof ApiPublicHandheldTransfersIdConfirmRoute
   '/api/public/handheld/transfers/$id/scan': typeof ApiPublicHandheldTransfersIdScanRoute
 }
@@ -970,6 +994,7 @@ export interface FileRoutesByTo {
   '/purchase/domestic': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel': typeof PurchaseJapanParcelIndexRoute
   '/api/public/handheld/dashboard': typeof ApiPublicHandheldDashboardRoute
+  '/api/public/handheld/label-templates': typeof ApiPublicHandheldLabelTemplatesRouteWithChildren
   '/api/public/handheld/locations': typeof ApiPublicHandheldLocationsRoute
   '/api/public/handheld/notifications': typeof ApiPublicHandheldNotificationsRouteWithChildren
   '/api/public/handheld/openapi.json': typeof ApiPublicHandheldOpenapiDotjsonRoute
@@ -997,6 +1022,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/items/sign-read-url': typeof ApiPublicHandheldItemsSignReadUrlRoute
   '/api/public/handheld/items/smart-create': typeof ApiPublicHandheldItemsSmartCreateRoute
   '/api/public/handheld/items/upload-image': typeof ApiPublicHandheldItemsUploadImageRouteWithChildren
+  '/api/public/handheld/label-templates/$id': typeof ApiPublicHandheldLabelTemplatesIdRouteWithChildren
   '/api/public/handheld/location/switch': typeof ApiPublicHandheldLocationSwitchRoute
   '/api/public/handheld/notifications/read-all': typeof ApiPublicHandheldNotificationsReadAllRoute
   '/api/public/handheld/notifications/since': typeof ApiPublicHandheldNotificationsSinceRoute
@@ -1018,6 +1044,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/transfers/$id': typeof ApiPublicHandheldTransfersIdRouteWithChildren
   '/api/public/handheld/items/$id/sync-status': typeof ApiPublicHandheldItemsIdSyncStatusRoute
   '/api/public/handheld/items/upload-image/multipart': typeof ApiPublicHandheldItemsUploadImageMultipartRoute
+  '/api/public/handheld/label-templates/$id/set-default': typeof ApiPublicHandheldLabelTemplatesIdSetDefaultRoute
   '/api/public/handheld/transfers/$id/confirm': typeof ApiPublicHandheldTransfersIdConfirmRoute
   '/api/public/handheld/transfers/$id/scan': typeof ApiPublicHandheldTransfersIdScanRoute
 }
@@ -1093,6 +1120,7 @@ export interface FileRoutesById {
   '/purchase/domestic/': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
   '/api/public/handheld/dashboard': typeof ApiPublicHandheldDashboardRoute
+  '/api/public/handheld/label-templates': typeof ApiPublicHandheldLabelTemplatesRouteWithChildren
   '/api/public/handheld/locations': typeof ApiPublicHandheldLocationsRoute
   '/api/public/handheld/notifications': typeof ApiPublicHandheldNotificationsRouteWithChildren
   '/api/public/handheld/openapi.json': typeof ApiPublicHandheldOpenapiDotjsonRoute
@@ -1120,6 +1148,7 @@ export interface FileRoutesById {
   '/api/public/handheld/items/sign-read-url': typeof ApiPublicHandheldItemsSignReadUrlRoute
   '/api/public/handheld/items/smart-create': typeof ApiPublicHandheldItemsSmartCreateRoute
   '/api/public/handheld/items/upload-image': typeof ApiPublicHandheldItemsUploadImageRouteWithChildren
+  '/api/public/handheld/label-templates/$id': typeof ApiPublicHandheldLabelTemplatesIdRouteWithChildren
   '/api/public/handheld/location/switch': typeof ApiPublicHandheldLocationSwitchRoute
   '/api/public/handheld/notifications/read-all': typeof ApiPublicHandheldNotificationsReadAllRoute
   '/api/public/handheld/notifications/since': typeof ApiPublicHandheldNotificationsSinceRoute
@@ -1141,6 +1170,7 @@ export interface FileRoutesById {
   '/api/public/handheld/transfers/$id': typeof ApiPublicHandheldTransfersIdRouteWithChildren
   '/api/public/handheld/items/$id/sync-status': typeof ApiPublicHandheldItemsIdSyncStatusRoute
   '/api/public/handheld/items/upload-image/multipart': typeof ApiPublicHandheldItemsUploadImageMultipartRoute
+  '/api/public/handheld/label-templates/$id/set-default': typeof ApiPublicHandheldLabelTemplatesIdSetDefaultRoute
   '/api/public/handheld/transfers/$id/confirm': typeof ApiPublicHandheldTransfersIdConfirmRoute
   '/api/public/handheld/transfers/$id/scan': typeof ApiPublicHandheldTransfersIdScanRoute
 }
@@ -1217,6 +1247,7 @@ export interface FileRouteTypes {
     | '/purchase/domestic/'
     | '/purchase/japan-parcel/'
     | '/api/public/handheld/dashboard'
+    | '/api/public/handheld/label-templates'
     | '/api/public/handheld/locations'
     | '/api/public/handheld/notifications'
     | '/api/public/handheld/openapi.json'
@@ -1244,6 +1275,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/items/sign-read-url'
     | '/api/public/handheld/items/smart-create'
     | '/api/public/handheld/items/upload-image'
+    | '/api/public/handheld/label-templates/$id'
     | '/api/public/handheld/location/switch'
     | '/api/public/handheld/notifications/read-all'
     | '/api/public/handheld/notifications/since'
@@ -1265,6 +1297,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/transfers/$id'
     | '/api/public/handheld/items/$id/sync-status'
     | '/api/public/handheld/items/upload-image/multipart'
+    | '/api/public/handheld/label-templates/$id/set-default'
     | '/api/public/handheld/transfers/$id/confirm'
     | '/api/public/handheld/transfers/$id/scan'
   fileRoutesByTo: FileRoutesByTo
@@ -1332,6 +1365,7 @@ export interface FileRouteTypes {
     | '/purchase/domestic'
     | '/purchase/japan-parcel'
     | '/api/public/handheld/dashboard'
+    | '/api/public/handheld/label-templates'
     | '/api/public/handheld/locations'
     | '/api/public/handheld/notifications'
     | '/api/public/handheld/openapi.json'
@@ -1359,6 +1393,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/items/sign-read-url'
     | '/api/public/handheld/items/smart-create'
     | '/api/public/handheld/items/upload-image'
+    | '/api/public/handheld/label-templates/$id'
     | '/api/public/handheld/location/switch'
     | '/api/public/handheld/notifications/read-all'
     | '/api/public/handheld/notifications/since'
@@ -1380,6 +1415,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/transfers/$id'
     | '/api/public/handheld/items/$id/sync-status'
     | '/api/public/handheld/items/upload-image/multipart'
+    | '/api/public/handheld/label-templates/$id/set-default'
     | '/api/public/handheld/transfers/$id/confirm'
     | '/api/public/handheld/transfers/$id/scan'
   id:
@@ -1454,6 +1490,7 @@ export interface FileRouteTypes {
     | '/purchase/domestic/'
     | '/purchase/japan-parcel/'
     | '/api/public/handheld/dashboard'
+    | '/api/public/handheld/label-templates'
     | '/api/public/handheld/locations'
     | '/api/public/handheld/notifications'
     | '/api/public/handheld/openapi.json'
@@ -1481,6 +1518,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/items/sign-read-url'
     | '/api/public/handheld/items/smart-create'
     | '/api/public/handheld/items/upload-image'
+    | '/api/public/handheld/label-templates/$id'
     | '/api/public/handheld/location/switch'
     | '/api/public/handheld/notifications/read-all'
     | '/api/public/handheld/notifications/since'
@@ -1502,6 +1540,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/transfers/$id'
     | '/api/public/handheld/items/$id/sync-status'
     | '/api/public/handheld/items/upload-image/multipart'
+    | '/api/public/handheld/label-templates/$id/set-default'
     | '/api/public/handheld/transfers/$id/confirm'
     | '/api/public/handheld/transfers/$id/scan'
   fileRoutesById: FileRoutesById
@@ -1539,6 +1578,7 @@ export interface RootRouteChildren {
   InventoryStocktakesIdRoute: typeof InventoryStocktakesIdRoute
   InventoryStocktakesIndexRoute: typeof InventoryStocktakesIndexRoute
   ApiPublicHandheldDashboardRoute: typeof ApiPublicHandheldDashboardRoute
+  ApiPublicHandheldLabelTemplatesRoute: typeof ApiPublicHandheldLabelTemplatesRouteWithChildren
   ApiPublicHandheldLocationsRoute: typeof ApiPublicHandheldLocationsRoute
   ApiPublicHandheldNotificationsRoute: typeof ApiPublicHandheldNotificationsRouteWithChildren
   ApiPublicHandheldOpenapiDotjsonRoute: typeof ApiPublicHandheldOpenapiDotjsonRoute
@@ -2138,6 +2178,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldLocationsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/handheld/label-templates': {
+      id: '/api/public/handheld/label-templates'
+      path: '/api/public/handheld/label-templates'
+      fullPath: '/api/public/handheld/label-templates'
+      preLoaderRoute: typeof ApiPublicHandheldLabelTemplatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/handheld/dashboard': {
       id: '/api/public/handheld/dashboard'
       path: '/api/public/handheld/dashboard'
@@ -2278,6 +2325,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldLocationSwitchRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/handheld/label-templates/$id': {
+      id: '/api/public/handheld/label-templates/$id'
+      path: '/$id'
+      fullPath: '/api/public/handheld/label-templates/$id'
+      preLoaderRoute: typeof ApiPublicHandheldLabelTemplatesIdRouteImport
+      parentRoute: typeof ApiPublicHandheldLabelTemplatesRoute
+    }
     '/api/public/handheld/items/upload-image': {
       id: '/api/public/handheld/items/upload-image'
       path: '/api/public/handheld/items/upload-image'
@@ -2410,6 +2464,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/public/handheld/transfers/$id/confirm'
       preLoaderRoute: typeof ApiPublicHandheldTransfersIdConfirmRouteImport
       parentRoute: typeof ApiPublicHandheldTransfersIdRoute
+    }
+    '/api/public/handheld/label-templates/$id/set-default': {
+      id: '/api/public/handheld/label-templates/$id/set-default'
+      path: '/set-default'
+      fullPath: '/api/public/handheld/label-templates/$id/set-default'
+      preLoaderRoute: typeof ApiPublicHandheldLabelTemplatesIdSetDefaultRouteImport
+      parentRoute: typeof ApiPublicHandheldLabelTemplatesIdRoute
     }
     '/api/public/handheld/items/upload-image/multipart': {
       id: '/api/public/handheld/items/upload-image/multipart'
@@ -2603,6 +2664,36 @@ const PurchaseJapanParcelRouteChildren: PurchaseJapanParcelRouteChildren = {
 const PurchaseJapanParcelRouteWithChildren =
   PurchaseJapanParcelRoute._addFileChildren(PurchaseJapanParcelRouteChildren)
 
+interface ApiPublicHandheldLabelTemplatesIdRouteChildren {
+  ApiPublicHandheldLabelTemplatesIdSetDefaultRoute: typeof ApiPublicHandheldLabelTemplatesIdSetDefaultRoute
+}
+
+const ApiPublicHandheldLabelTemplatesIdRouteChildren: ApiPublicHandheldLabelTemplatesIdRouteChildren =
+  {
+    ApiPublicHandheldLabelTemplatesIdSetDefaultRoute:
+      ApiPublicHandheldLabelTemplatesIdSetDefaultRoute,
+  }
+
+const ApiPublicHandheldLabelTemplatesIdRouteWithChildren =
+  ApiPublicHandheldLabelTemplatesIdRoute._addFileChildren(
+    ApiPublicHandheldLabelTemplatesIdRouteChildren,
+  )
+
+interface ApiPublicHandheldLabelTemplatesRouteChildren {
+  ApiPublicHandheldLabelTemplatesIdRoute: typeof ApiPublicHandheldLabelTemplatesIdRouteWithChildren
+}
+
+const ApiPublicHandheldLabelTemplatesRouteChildren: ApiPublicHandheldLabelTemplatesRouteChildren =
+  {
+    ApiPublicHandheldLabelTemplatesIdRoute:
+      ApiPublicHandheldLabelTemplatesIdRouteWithChildren,
+  }
+
+const ApiPublicHandheldLabelTemplatesRouteWithChildren =
+  ApiPublicHandheldLabelTemplatesRoute._addFileChildren(
+    ApiPublicHandheldLabelTemplatesRouteChildren,
+  )
+
 interface ApiPublicHandheldNotificationsRouteChildren {
   ApiPublicHandheldNotificationsReadAllRoute: typeof ApiPublicHandheldNotificationsReadAllRoute
   ApiPublicHandheldNotificationsSinceRoute: typeof ApiPublicHandheldNotificationsSinceRoute
@@ -2731,6 +2822,8 @@ const rootRouteChildren: RootRouteChildren = {
   InventoryStocktakesIdRoute: InventoryStocktakesIdRoute,
   InventoryStocktakesIndexRoute: InventoryStocktakesIndexRoute,
   ApiPublicHandheldDashboardRoute: ApiPublicHandheldDashboardRoute,
+  ApiPublicHandheldLabelTemplatesRoute:
+    ApiPublicHandheldLabelTemplatesRouteWithChildren,
   ApiPublicHandheldLocationsRoute: ApiPublicHandheldLocationsRoute,
   ApiPublicHandheldNotificationsRoute:
     ApiPublicHandheldNotificationsRouteWithChildren,
