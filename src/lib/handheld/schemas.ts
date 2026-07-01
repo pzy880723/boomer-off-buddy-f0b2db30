@@ -557,6 +557,43 @@ export const SignReadUrlRes = okEnvelope(
   }),
 );
 
+export const AttachImagesReq = z
+  .object({
+    image_storage_paths: z
+      .array(
+        z.object({
+          bucket: z.enum(["sku-raw", "sku-listing"]),
+          storage_path: z.string().min(1),
+        }),
+      )
+      .max(12)
+      .default([]),
+    image_url: z
+      .string()
+      .url()
+      .nullable()
+      .optional()
+      .meta({ description: "兼容旧 APP；signed URL 会被反解为 storage path，不直接落库" }),
+  })
+  .refine((v) => v.image_storage_paths.length > 0 || !!v.image_url, {
+    message: "image_storage_paths 或 image_url 至少传一项",
+  })
+  .meta({ id: "AttachImagesReq" });
+
+export const AttachImagesRes = okEnvelope(
+  z.object({
+    sku_id: uuidSchema,
+    image_url: z.string().nullable(),
+    image_paths: z.array(z.string()),
+    images: z.array(
+      z.object({
+        storage_path: z.string(),
+        read_url: z.string(),
+      }),
+    ),
+  }),
+);
+
 // ============================================================
 // 9. 智能上架 items/smart-create + 同步状态
 // ============================================================
@@ -628,7 +665,7 @@ export const SmartCreateRes = okEnvelope(
       qrcode_payload: z.string(),
     }),
     print_payload: PrintPayloadSchema.meta({ description: "v1.2：扁平结构，直接灌打印模板" }),
-    youzan_sync_status: z.enum(["disabled", "queued", "linked", "unlinked"]),
+    youzan_sync_status: z.enum(["disabled", "queued", "linked", "unlinked", "hq_created", "hq_failed"]),
   }),
 );
 
