@@ -86,6 +86,14 @@ export const Route = createFileRoute("/api/public/handheld/transfer/ship-confirm
           })
           .eq("id", body.transfer_id);
 
+        // 发货完成 → 源库位库存减少，需要推有赞
+        for (const sku_id of shippedBySku.keys()) {
+          try {
+            await enqueueStockPushForLocation(sku_id, t.from_location_id!, "transfer_ship");
+          } catch {}
+        }
+
+
         return ok({ transfer_id: body.transfer_id, shipped: scanned?.length ?? 0 });
       },
     },
