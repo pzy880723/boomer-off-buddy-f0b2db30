@@ -25,6 +25,7 @@ import {
   type StandardProductGroup,
 } from "@/lib/inventory.helpers";
 import { useSkuCovers, pickCover } from "@/hooks/use-sku-covers";
+import { toThumbUrl } from "@/lib/image";
 import {
   CustomSkuForm,
   useCustomSkuMutation,
@@ -186,7 +187,7 @@ function MStandardRow({ group, cover }: { group: StandardProductGroup; cover?: s
     >
       <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-muted">
         {src ? (
-          <img src={src} alt={group.name} className="h-full w-full object-cover" />
+          <img src={toThumbUrl(src, 128) ?? src} alt={group.name} loading="lazy" decoding="async" className="h-full w-full object-cover" />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-muted-foreground">
             <Tags className="h-5 w-5" />
@@ -224,7 +225,7 @@ function MSingleRow({ row, cover }: { row: SkuRow; cover?: string | null }) {
     >
       <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-muted">
         {src ? (
-          <img src={src} alt={row.name} className="h-full w-full object-cover" />
+          <img src={toThumbUrl(src, 128) ?? src} alt={row.name} loading="lazy" decoding="async" className="h-full w-full object-cover" />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-muted-foreground">
             <Tags className="h-5 w-5" />

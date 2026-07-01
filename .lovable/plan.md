@@ -1,208 +1,70 @@
-## 目标
+## 现象定位
 
-给 APP 商品页做两件事，并把需求整理成一份可以直接转给 Codex 的规格说明：
+自定义商品的封面图存在私桶 `sku-listing`（AI 修图输出 1024×1024 PNG，动辄 800KB+）。当前流程：
 
-1. **按商品类型分 Tab**：自定义 / 组包 / 标准（顺序固定，自定义默认）
-2. **总仓账号新增「全局库存视图」**：一个入口看到总仓 + 所有分店在所有商品类型上的库存分布
+1. `signSkuCovers` 用 service role 生成 24h **原图** 签名 URL（`/storage/v1/object/sign/...`）。
+2. 前端 `toThumbUrl` 只替换 `/object/public/` → `/render/image/public/`，**遇到签名 URL 直接原样返回**，走的还是原图。
+3. 于是 PC/移动端商品卡、列表行、详情弹窗都在拉整张 1024 PNG，慢是必然的。
 
----
+标准商品能秒开是因为它们大多用外链或公共桶，正好命中 `toThumbUrl` 的替换分支。
 
-## 一、业务背景（先同步给 Codex）
+## 优化方案（只动展示层，不改数据）
 
-ERP 里商品有 3 种 `kind`：
+### 1. `src/lib/image.ts` — 扩展 `toThumbUrl`
 
-| kind | 中文 | APP 端优先级 | 是否允许编辑 |
-|---|---|---|---|
-| `custom` | 自定义商品 | ① 默认落地 | ✅ 门店/仓库可维护 |
-| `pack` | 组包商品 | ② | ✅ 可维护 |
-| `standard` | 标准商品 | ③ | ❌ 只查/入库，不改 |
+新增对签名 URL 的处理：
 
-`GET /api/public/handheld/products` 已返回 `kind`，但 APP 端把三种混在同一个「商品总账」，用户很难找东西。
+- `/storage/v1/object/sign/<bucket>/<path>?token=...` → `/storage/v1/render/image/sign/<bucket>/<path>?token=...&width=<w>&quality=70&resize=contain&format=origin`
+- 保留原有 public URL 分支。
+- 未识别时才原样返回。
 
----
+Supabase 签名 transform 端点复用同一 token，无需重签，一行 URL 改写即可拿到 webp 缩略图。
 
-## 二、需求 A：商品页按 kind 分 Tab
+### 2. `src/lib/sku-image-resolver.server.ts` — 保持源图签 URL，不动。
 
-### 页面结构
+前端统一通过 `toThumbUrl` 按用途选宽度（列表 96 / 卡片 480 / 详情主图 720），Supabase render 会自动出 webp，大图秒变几十 KB。
 
-```text
-┌─────────────────────────────┐
-│  🔍 搜索商品名/编码/条码      │
-├─────────────────────────────┤
-│ [自定义 78] [组包 12] [标准 30] │  ← 新增 Tab，角标 = counts
-├─────────────────────────────┤
-│ 分类▾  排序▾  库位▾           │
-├─────────────────────────────┤
-│  商品卡片列表 ...             │
-└─────────────────────────────┘
-```
+### 3. AI 出图存储优化 `src/server/handheld-ai.server.ts` + `ai.prepare-listing-image.ts`
 
-- Tab 顺序：**自定义 → 组包 → 标准**（固定，不可拖动）
-- 默认落地：`自定义`
-- Tab 切换保留当前搜索词和排序
-- 角标数量随搜索/筛选联动
+- 上传时把 AI 返回的 PNG 走 `.webp` 后缀 + `content-type: image/webp`（Gemini 已返回 1024 方图，无需再压）。若 mime 是 png 就存成 `.png`，但显式加 `cacheControl: '31536000, immutable'`，缩略图端点带上强缓存。
+- 目的：让 render/image 转换命中缓存后二次加载几乎零延迟。
 
-### 排序选项
-最新创建（默认）/ 最早创建 / 价格 ↓ / 价格 ↑ / 库存 ↓
+### 4. 覆盖到所有使用点
 
-### 筛选
-分类多选、库位（受 RBAC 限制）、是否有图（仅 custom）
+确认以下位置都走 `toThumbUrl` 后自动受益（无需再改）：
 
-### 卡片差异
+- `src/components/inventory/product-card.tsx`（4 处，已在用）
+- `src/components/inventory/sku-image-gallery.tsx`（主图 720 / 缩略 128）
+- `src/components/mobile/item-detail-sheet.tsx`、`src/routes/m.skus.index.tsx`、`src/routes/m.products.$code.tsx` — 逐个复核并替换裸 `<img src={cover}>` 为 `toThumbUrl(cover, N)`。
 
-| Tab | 展示重点 | 操作 |
-|---|---|---|
-| 自定义 | 主图 / 名 / 价 / 库存 / "缺图" 标记 | 建、改、补图、贴标、入库 |
-| 组包 | 名 / 明细数 / 总价 / 库存 | 看明细、贴标、入库 |
-| 标准 | 名 / 价格档 / 总库存 | **只看 + 入库**，编辑按钮隐藏 |
+### 5. 首屏 LCP 小优化
 
----
+商品网格首行的 `SingleSkuCard` / `StandardProductCard` 传入 `priority` 时改用 `loading="eager"` + `fetchpriority="high"`；其余保持 lazy。范围仅 `inventory/skus` 首屏前 6 张、移动端 `m/skus` 前 4 张。
 
-## 三、需求 B：总仓账号的「全局库存视图」
+## 预期效果
 
-### 权限
+- 自定义商品列表/卡片单图从 ~800KB PNG 降到 ~20-40KB webp（宽度按需 96/480/720），首屏总下载量下降 90%+。
+- 二次访问命中 Supabase render CDN 缓存，几乎瞬开。
+- 无需迁移历史数据，也不影响 APP / 有赞同步。
 
-- 仅 `role in ('hq_admin','hq_ops')` 或拥有 `all_locations` 权限的用户可见入口
-- 分店账号不显示此入口
+## 技术细节
 
-### 入口位置
-
-APP 商品页顶部工具栏新增按钮 **「🏢 全局库存」**（仅总仓账号显示），点进独立页面。
-
-### 页面结构
-
-```text
-┌───────────────────────────────────────────┐
-│ 全局库存                                    │
-│ [自定义] [组包] [标准]   [切换视图 ▾]        │
-├───────────────────────────────────────────┤
-│ 🔍 搜索 + 分类/库存高低/缺货筛选              │
-├───────────────────────────────────────────┤
-│  商品名        总库存   总仓  上海店 广州店…  │
-│  皮卡丘公仔      120     80    20    20      │
-│  盲盒-A         55      0     30    25   ⚠  │
-│  ...                                        │
-└───────────────────────────────────────────┘
-```
-
-两种视图（右上角切换）：
-
-1. **矩阵视图**（默认）：行=SKU，列=所有 location，格子=库存。总库存列固定；库存为 0 的格子灰色；缺货整行角标 ⚠。横向可滚。
-2. **明细视图**：按 SKU 折叠，展开后列出 `location + qty + 最近变动时间`；适合 SKU 多、门店多时用。
-
-### 汇总卡片（页面顶部）
-
-- 商品总数（按当前 Tab 的 kind）
-- 库存总件数
-- 缺货 SKU 数（total_qty=0）
-- 低库存 SKU 数（可配置阈值，默认 <5）
-
-### 交互
-- 点击某个 SKU 行 → 进入 SKU 详情，展示每个库位的移库/入库明细
-- 点击某个 location 列头 → 快速跳转到该库位视图
-- 支持导出 CSV（可选，先不做）
-
----
-
-## 四、ERP 端接口契约（转达给 Codex）
-
-### 1. 扩展 `GET /api/public/handheld/products`
-
-新增/明确 query：
-
-| 参数 | 类型 | 说明 |
-|---|---|---|
-| `kind` | `custom`\|`pack`\|`standard` | Tab 过滤（不传=全部）|
-| `sort` | `created_desc/asc`、`price_desc/asc`、`stock_desc` | 排序 |
-| `category_id` | string | 分类 |
-| `location_id` | string | 库位（受 RBAC）|
-| `has_image` | `0`\|`1` | 仅 custom 生效 |
-| `q` / `page` / `page_size` | | 搜索分页 |
-
-响应新增：
-
-```json
-{
-  "ok": true,
-  "data": { "items": [...], "page": 1, "total": 120 },
-  "counts": { "custom": 78, "pack": 12, "standard": 30 },
-  "items": [{ "id":"...", "kind":"custom", "editable":true, ... }]
+```ts
+// src/lib/image.ts
+export function toThumbUrl(url: string | null | undefined, width = 256): string | null {
+  if (!url) return url ?? null;
+  const swap = (from: string, to: string) => {
+    if (!url.includes(from)) return null;
+    const t = url.replace(from, to);
+    const sep = t.includes("?") ? "&" : "?";
+    return `${t}${sep}width=${width}&quality=70&resize=contain`;
+  };
+  return (
+    swap("/storage/v1/object/public/", "/storage/v1/render/image/public/") ??
+    swap("/storage/v1/object/sign/",   "/storage/v1/render/image/sign/") ??
+    url
+  );
 }
 ```
 
-`counts` 不受 `kind` 影响，但受 `q`/`category_id` 影响，与实际结果一致。
-
-### 2. 新增 `GET /api/public/handheld/global-stock`
-
-**权限**：只有 `hq_admin`/`hq_ops`（或有 `all_locations` 权限）可用；其他角色返回 403。
-
-**Query**：
-
-| 参数 | 说明 |
-|---|---|
-| `kind` | `custom`\|`pack`\|`standard`，必传 |
-| `q` | 搜索 |
-| `category_id` | 分类 |
-| `stock_state` | `all`\|`out`\|`low`（默认 all）|
-| `low_threshold` | 数字，默认 5 |
-| `page` / `page_size` | 分页（默认 50）|
-
-**响应**：
-
-```json
-{
-  "ok": true,
-  "data": {
-    "locations": [
-      { "id":"loc_hq", "name":"总仓", "kind":"warehouse" },
-      { "id":"loc_sh", "name":"上海门店", "kind":"shop" }
-    ],
-    "items": [
-      {
-        "sku_id":"...",
-        "name":"皮卡丘公仔",
-        "kind":"custom",
-        "image_url":"...",
-        "price": 39,
-        "total_qty": 120,
-        "stocks": { "loc_hq": 80, "loc_sh": 20, "loc_gz": 20 }
-      }
-    ],
-    "summary": {
-      "sku_count": 78,
-      "total_qty": 3450,
-      "out_of_stock": 4,
-      "low_stock": 9
-    },
-    "page": 1,
-    "total": 78
-  }
-}
-```
-
-**实现要点**（ERP 端）：
-- 数据来自 `inv_stocks (sku_id, location_id, qty)` join `inv_skus` join `inv_locations`
-- `stocks` 是 map，前端方便渲染矩阵
-- `locations` 按 `warehouse` 优先、然后 `shop` 按名称排序
-- 分页只对 `items` 生效，`locations` 全量返回（门店数量有限）
-- `standard` Tab 走同一接口，只是 `kind=standard`
-
-### 3. 新增 `GET /api/public/handheld/global-stock/sku/{sku_id}`
-
-进入 SKU 明细页时用，返回每个 location 的：`qty` + 最近 10 条 `inv_stock_movements`。
-
----
-
-## 五、实施拆分
-
-**ERP 端（Lovable 做）**
-1. 扩展 `/handheld/products`（kind/sort/counts/editable）
-2. 新增 `/handheld/global-stock` + `/global-stock/sku/{id}`（含 RBAC）
-3. 更新 `src/lib/handheld/openapi.ts` + `docs/handheld-api.md`
-4. 回复末尾追加「【给 Codex 的指令】」代码块
-
-**APP 端（Codex 做）**
-1. 商品页顶部加 3-Tab + 排序 + 筛选
-2. 卡片按 `kind` 分样式，`standard` 禁用编辑
-3. 总仓账号顶部增加「🏢 全局库存」入口，实现矩阵/明细两种视图
-4. 分店账号隐藏该入口
+不改数据库、不改 API、不改路由，属于纯展示层优化。

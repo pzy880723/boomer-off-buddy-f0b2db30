@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ProductEditDialog } from "@/components/inventory/product-edit-dialog";
 import { listSkus, deleteStandardProduct } from "@/lib/inventory.functions";
+import { toThumbUrl } from "@/lib/image";
 import {
   CATEGORY_LABEL,
   formatPrice,
@@ -126,7 +127,7 @@ function MProductDetail() {
         <Card className="overflow-hidden p-0">
           <div className="aspect-[4/3] w-full bg-muted">
             {group.image_url ? (
-              <img src={group.image_url} alt={group.name} className="h-full w-full object-cover" />
+              <img src={toThumbUrl(group.image_url, 720) ?? group.image_url} alt={group.name} loading="eager" decoding="async" className="h-full w-full object-cover" />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                 <Tags className="h-10 w-10" />
