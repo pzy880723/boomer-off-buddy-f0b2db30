@@ -676,6 +676,48 @@ export type Database = {
           },
         ]
       }
+      inv_label_templates: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          elements: Json
+          height_mm: number
+          id: string
+          is_default: boolean
+          name: string
+          updated_at: string
+          updated_by: string | null
+          version: number
+          width_mm: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          elements?: Json
+          height_mm?: number
+          id?: string
+          is_default?: boolean
+          name: string
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+          width_mm?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          elements?: Json
+          height_mm?: number
+          id?: string
+          is_default?: boolean
+          name?: string
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+          width_mm?: number
+        }
+        Relationships: []
+      }
       inv_locations: {
         Row: {
           created_at: string
