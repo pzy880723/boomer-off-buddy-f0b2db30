@@ -13,6 +13,8 @@ import {
   AuthPingRes,
   AuthRefreshReq,
   AuthRefreshRes,
+  AttachImagesReq,
+  AttachImagesRes,
   BootstrapReq,
   BootstrapRes,
   OtpSendReq,
@@ -46,6 +48,10 @@ import {
   SkuDetailRes,
   SkuSearchQuery,
   SkuSearchRes,
+  ProductLookupQuery,
+  ProductLookupRes,
+  ProductsQuery,
+  ProductsRes,
   SmartCreateReq,
   SmartCreateRes,
   StocktakeOpenReq,
@@ -191,9 +197,29 @@ Token 由后台 **仓库管理 → 手持终端** 页面创建/复制。设备�
       get: {
         tags: ["SKU"],
         summary: "搜索 SKU",
-        description: "按 sku_code / name 模糊匹配，最多返回 20 条。",
+        description: "按 sku_code / name 模糊匹配，最多返回 20 条；返回 image_url / image_paths / images，APP 可直接展示主图。",
         requestParams: { query: SkuSearchQuery },
         responses: { "200": jsonRes("OK", SkuSearchRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/products": {
+      get: {
+        tags: ["商品"],
+        summary: "商品总账列表（含多库位库存与图片）",
+        description:
+          "APP 商品页用。支持 q/type/scope/location_id/page/page_size；排序为 custom → bundle → standard，再按 updated_at 倒序。返回 image_url / image_paths / images。",
+        requestParams: { query: ProductsQuery },
+        responses: { "200": jsonRes("OK", ProductsRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/products/lookup": {
+      get: {
+        tags: ["商品"],
+        summary: "扫码或关键词查商品详情",
+        description:
+          "优先用 code 匹配 barcode / sku_code / EPC / QR JSON；兼容 q 关键词，返回第一条命中商品。返回结构与 /products.items[] 同构。",
+        requestParams: { query: ProductLookupQuery },
+        responses: { "200": jsonRes("OK", ProductLookupRes), ...ERROR_RESPONSES },
       },
     },
     "/api/public/handheld/inbound/scan": {
@@ -435,6 +461,17 @@ Token 由后台 **仓库管理 → 手持终端** 页面创建/复制。设备�
         summary: "SKU 详情（含 barcode / condition_grade / 多库位库存）",
         requestParams: { path: z.object({ id: z.string().uuid() }) },
         responses: { "200": jsonRes("OK", SkuDetailRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/items/{id}/attach-images": {
+      post: {
+        tags: ["图片"],
+        summary: "给已有 SKU 追加图片（不改库存）",
+        description:
+          "历史无图商品补图用。APP 上传图片后把 image_storage_paths 传进来；服务端追加到 inv_skus.image_paths、去重并返回签好的 read URL。不会 +1 库存。",
+        requestParams: { path: z.object({ id: z.string().uuid() }) },
+        requestBody: jsonBody(AttachImagesReq),
+        responses: { "200": jsonRes("OK", AttachImagesRes), ...ERROR_RESPONSES },
       },
     },
     "/api/public/handheld/rfid/batch-stock-in": {

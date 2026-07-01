@@ -582,7 +582,7 @@
           "SKU"
         ],
         "summary": "搜索 SKU",
-        "description": "按 sku_code / name 模糊匹配，最多返回 20 条。",
+        "description": "按 sku_code / name 模糊匹配，最多返回 20 条；返回 image_url / image_paths / images，APP 可直接展示主图。",
         "parameters": [
           {
             "in": "query",
@@ -620,6 +620,351 @@
                         "items"
                       ],
                       "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/handheld/products": {
+      "get": {
+        "tags": [
+          "商品"
+        ],
+        "summary": "商品总账列表（含多库位库存与图片）",
+        "description": "APP 商品页用。支持 q/type/scope/location_id/page/page_size；排序为 custom → bundle → standard，再按 updated_at 倒序。返回 image_url / image_paths / images。",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "type",
+            "schema": {
+              "default": "all",
+              "type": "string",
+              "enum": [
+                "standard",
+                "custom",
+                "bundle",
+                "all"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "scope",
+            "schema": {
+              "default": "authorized",
+              "type": "string",
+              "enum": [
+                "authorized",
+                "current_location"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "location_id",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "example": "550e8400-e29b-41d4-a716-446655440000"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/ProductItem"
+                          }
+                        },
+                        "total": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "page": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "page_size": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "total",
+                        "page",
+                        "page_size"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/handheld/products/lookup": {
+      "get": {
+        "tags": [
+          "商品"
+        ],
+        "summary": "扫码或关键词查商品详情",
+        "description": "优先用 code 匹配 barcode / sku_code / EPC / QR JSON；兼容 q 关键词，返回第一条命中商品。返回结构与 /products.items[] 同构。",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "code",
+            "schema": {
+              "description": "barcode / sku_code / EPC / QR JSON",
+              "type": "string"
+            },
+            "description": "barcode / sku_code / EPC / QR JSON"
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "description": "兼容 APP 测试；无 code 时按关键字返回第一条",
+              "type": "string"
+            },
+            "description": "兼容 APP 测试；无 code 时按关键字返回第一条"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ProductItem"
                     }
                   },
                   "required": [
@@ -2903,7 +3248,7 @@
           "图片"
         ],
         "summary": "申请图片直传 signed URL",
-        "description": "APP 先调本接口拿到 `upload_url` + `headers`，再用 `PUT` 直接把图片传到 Storage，避免大图穿过 ERP。返回的 `read_url` 是 7 天 signed GET URL，可直接用于 smart-create。",
+        "description": "APP 先调本接口拿到 `upload_url` + `headers`，再用 `PUT` 直接把图片传到 Storage，避免大图穿过 ERP。`read_url` 上传前永远是 null（Storage 的 createSignedUrl 要求对象已存在），上传完成后调 POST /items/sign-read-url 拿 7 天 signed GET URL。",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2937,9 +3282,16 @@
                           "description": "30 分钟有效；signed 模式为 Storage PUT URL，multipart 模式为 ERP 中转 POST URL"
                         },
                         "read_url": {
-                          "type": "string",
-                          "format": "uri",
-                          "description": "7 天 signed GET URL"
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "uri"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "上传前对象还不存在，无法签发 read URL；总是返回 null。上传完成后调 POST /items/sign-read-url 拿 7 天 signed GET URL。"
                         },
                         "method": {
                           "type": "string",
@@ -2973,6 +3325,150 @@
                         "method",
                         "mode",
                         "headers"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/handheld/items/sign-read-url": {
+      "post": {
+        "tags": [
+          "图片"
+        ],
+        "summary": "为已上传对象签发 read URL",
+        "description": "在 /items/upload-image 直传成功后调用，返回 signed GET URL（默认 7 天）。",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignReadUrlReq"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "storage_path": {
+                          "type": "string"
+                        },
+                        "read_url": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "expires_in": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": [
+                        "storage_path",
+                        "read_url",
+                        "expires_in"
                       ],
                       "additionalProperties": false
                     }
@@ -3242,7 +3738,9 @@
                             "disabled",
                             "queued",
                             "linked",
-                            "unlinked"
+                            "unlinked",
+                            "hq_created",
+                            "hq_failed"
                           ]
                         }
                       },
@@ -4878,7 +5376,37 @@
                             {
                               "type": "null"
                             }
-                          ]
+                          ],
+                          "description": "主图 read URL（兼容旧 APP）；优先用 images"
+                        },
+                        "image_paths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "持久化的图片来源列表：可能是 'sku-listing/2026-06-29/xxx.jpg' 形式的私桶路径或 https:// 外链"
+                        },
+                        "images": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "storage_path": {
+                                "type": "string",
+                                "description": "对应 image_paths 里的原值"
+                              },
+                              "read_url": {
+                                "type": "string",
+                                "description": "可直接渲染的 URL；私桶为 24h signed，外链原样"
+                              }
+                            },
+                            "required": [
+                              "storage_path",
+                              "read_url"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "description": "image_paths 顺序签名后的结果；第 0 张是主图"
                         },
                         "notes": {
                           "anyOf": [
@@ -4967,6 +5495,8 @@
                         "condition_grade",
                         "grade",
                         "image_url",
+                        "image_paths",
+                        "images",
                         "notes",
                         "weight_g",
                         "stock_qty",
@@ -4975,6 +5505,192 @@
                         "updated_at",
                         "stocks",
                         "print_payload"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/handheld/items/{id}/attach-images": {
+      "post": {
+        "tags": [
+          "图片"
+        ],
+        "summary": "给已有 SKU 追加图片（不改库存）",
+        "description": "历史无图商品补图用。APP 上传图片后把 image_storage_paths 传进来；服务端追加到 inv_skus.image_paths、去重并返回签好的 read URL。不会 +1 库存。",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttachImagesReq"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "sku_id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                          "example": "550e8400-e29b-41d4-a716-446655440000"
+                        },
+                        "image_url": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "image_paths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "images": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "storage_path": {
+                                "type": "string"
+                              },
+                              "read_url": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "storage_path",
+                              "read_url"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "sku_id",
+                        "image_url",
+                        "image_paths",
+                        "images"
                       ],
                       "additionalProperties": false
                     }
@@ -6164,6 +6880,32 @@
           "content_type"
         ]
       },
+      "SignReadUrlReq": {
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "string",
+            "enum": [
+              "sku-raw",
+              "sku-listing"
+            ]
+          },
+          "storage_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expires_in": {
+            "default": 604800,
+            "type": "integer",
+            "minimum": 60,
+            "maximum": 2592000
+          }
+        },
+        "required": [
+          "bucket",
+          "storage_path"
+        ]
+      },
       "SmartCreateReq": {
         "type": "object",
         "properties": {
@@ -6232,7 +6974,7 @@
             ]
           },
           "image_url": {
-            "description": "上架图 signed URL 或外链",
+            "description": "（兼容旧版）单张外链/signed URL。推荐改用 image_storage_paths。",
             "anyOf": [
               {
                 "type": "string",
@@ -6242,6 +6984,31 @@
                 "type": "null"
               }
             ]
+          },
+          "image_storage_paths": {
+            "description": "APP 通过 /items/upload-image 上传得到的 storage_path 列表。第 0 张是主图。永久保存到 inv_skus.image_paths，ERP 端按需签 URL。",
+            "maxItems": 6,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "bucket": {
+                  "type": "string",
+                  "enum": [
+                    "sku-raw",
+                    "sku-listing"
+                  ]
+                },
+                "storage_path": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "bucket",
+                "storage_path"
+              ]
+            }
           },
           "weight_g": {
             "anyOf": [
@@ -6383,6 +7150,48 @@
         "required": [
           "refresh_token"
         ]
+      },
+      "AttachImagesReq": {
+        "type": "object",
+        "properties": {
+          "image_storage_paths": {
+            "default": [],
+            "maxItems": 12,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "bucket": {
+                  "type": "string",
+                  "enum": [
+                    "sku-raw",
+                    "sku-listing"
+                  ]
+                },
+                "storage_path": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "bucket",
+                "storage_path"
+              ]
+            }
+          },
+          "image_url": {
+            "description": "兼容旧 APP；signed URL 会被反解为 storage path，不直接落库",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
       },
       "RfidBatchStockInReq": {
         "type": "object",
@@ -6665,7 +7474,14 @@
             "example": "550e8400-e29b-41d4-a716-446655440000"
           },
           "sku_code": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "example": "TOY-PIKA-001"
           },
           "name": {
@@ -6685,19 +7501,59 @@
           "price_tier": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "number"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "价格档枚举"
+            "description": "价格档 / 售价"
           },
           "stock_qty": {
             "type": "integer",
             "minimum": -9007199254740991,
             "maximum": 9007199254740991,
             "example": 12
+          },
+          "image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "主图 read URL；没有图片时为 null"
+          },
+          "image_paths": {
+            "default": [],
+            "description": "持久图片路径列表",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "images": {
+            "default": [],
+            "description": "可直接展示的图片 URL 列表",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "storage_path": {
+                  "type": "string"
+                },
+                "read_url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "storage_path",
+                "read_url"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
@@ -6706,6 +7562,214 @@
           "name",
           "category",
           "price_tier",
+          "stock_qty",
+          "image_url",
+          "image_paths",
+          "images"
+        ],
+        "additionalProperties": false
+      },
+      "ProductItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
+          "product_type": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "custom",
+              "bundle"
+            ]
+          },
+          "sku_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "barcode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "item_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "price": {
+            "type": "number"
+          },
+          "condition_grade": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "N",
+                  "S",
+                  "A",
+                  "B",
+                  "C",
+                  "J"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "主图 read URL；没有图片时为 null"
+          },
+          "image_paths": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "images": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "storage_path": {
+                  "type": "string"
+                },
+                "read_url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "storage_path",
+                "read_url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "total_stock_qty": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "stocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductStock"
+            }
+          },
+          "status": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "product_type",
+          "sku_code",
+          "barcode",
+          "item_code",
+          "name",
+          "category",
+          "price",
+          "condition_grade",
+          "image_url",
+          "image_paths",
+          "images",
+          "notes",
+          "total_stock_qty",
+          "stocks",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "additionalProperties": false
+      },
+      "ProductStock": {
+        "type": "object",
+        "properties": {
+          "location_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
+          "location_name": {
+            "type": "string"
+          },
+          "location_kind": {
+            "type": "string",
+            "enum": [
+              "warehouse",
+              "shop"
+            ]
+          },
+          "stock_qty": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "location_id",
+          "location_name",
+          "location_kind",
           "stock_qty"
         ],
         "additionalProperties": false

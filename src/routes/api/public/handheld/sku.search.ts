@@ -32,34 +32,43 @@ export const Route = createFileRoute("/api/public/handheld/sku/search")({
         }>;
 
         const { signSkuImagePaths } = await import("@/lib/sku-image-resolver.server");
-        const covers: string[] = [];
-        const idxs: number[] = [];
+        const paths: string[] = [];
+        const idxs: { rowIndex: number; path: string }[] = [];
         rows.forEach((r, i) => {
-          const p = (r.image_paths ?? [])[0];
-          if (p) {
-            covers.push(p);
-            idxs.push(i);
+          for (const p of r.image_paths ?? []) {
+            if (!p) continue;
+            paths.push(p);
+            idxs.push({ rowIndex: i, path: p });
           }
         });
-        const signed = await signSkuImagePaths(covers);
-        const urlByIdx = new Map<number, string>();
-        idxs.forEach((i, k) => {
-          if (signed[k]) urlByIdx.set(i, signed[k]!);
+        const signed = await signSkuImagePaths(paths);
+        const imagesByIdx = new Map<number, { storage_path: string; read_url: string }[]>();
+        idxs.forEach((entry, k) => {
+          const readUrl = signed[k];
+          if (!readUrl) return;
+          const list = imagesByIdx.get(entry.rowIndex) ?? [];
+          list.push({ storage_path: entry.path, read_url: readUrl });
+          imagesByIdx.set(entry.rowIndex, list);
         });
 
-        const items = rows.map((r, i) => ({
-          id: r.id,
-          sku_code: r.sku_code,
-          name: r.name,
-          category: r.category,
-          price_tier: r.price_tier,
-          stock_qty: r.stock_qty,
-          image_url:
-            urlByIdx.get(i) ??
-            (r.image_url && /^https?:\/\//i.test(r.image_url) && !r.image_url.includes("token=")
-              ? r.image_url
-              : null),
-        }));
+        const items = rows.map((r, i) => {
+          const images = imagesByIdx.get(i) ?? [];
+          return {
+            id: r.id,
+            sku_code: r.sku_code,
+            name: r.name,
+            category: r.category,
+            price_tier: r.price_tier,
+            stock_qty: r.stock_qty,
+            image_url:
+              images[0]?.read_url ??
+              (r.image_url && /^https?:\/\//i.test(r.image_url) && !r.image_url.includes("token=")
+                ? r.image_url
+                : null),
+            image_paths: r.image_paths ?? [],
+            images,
+          };
+        });
         return ok({ items });
       },
     },

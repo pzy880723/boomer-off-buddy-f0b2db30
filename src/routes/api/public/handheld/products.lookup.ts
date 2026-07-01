@@ -1,4 +1,5 @@
 // GET /api/public/handheld/products/lookup?code=<barcode|sku_code|epc|qr_payload>
+// 兼容 GET /products/lookup?q=<keyword>：无 code 时按关键词返回第一条。
 // 扫码/条码/EPC 查商品，返回单项与 /products.items[] 同构。
 import { createFileRoute } from "@tanstack/react-router";
 import {
@@ -47,21 +48,34 @@ export const Route = createFileRoute("/api/public/handheld/products/lookup")({
 
         const url = new URL(request.url);
         const raw = url.searchParams.get("code") || "";
+        const keyword = (url.searchParams.get("q") || "").trim();
         const code = normalizeCode(raw);
-        if (!code) return err("Missing code", 400, { code: "missing_code" });
+        if (!code && !keyword) return err("Missing code", 400, { code: "missing_code" });
 
         // Try in order: barcode → sku_code → epc
         let sku: any = null;
-        for (const col of ["barcode", "sku_code", "epc"]) {
+        if (code) {
+          for (const col of ["barcode", "sku_code", "epc"]) {
+            const { data } = await supabaseAdmin
+              .from("inv_skus")
+              .select(SKU_COLS)
+              .eq(col as never, code)
+              .maybeSingle();
+            if (data) {
+              sku = data;
+              break;
+            }
+          }
+        } else if (keyword) {
+          const like = `%${keyword.replace(/[%_]/g, (m) => `\\${m}`)}%`;
           const { data } = await supabaseAdmin
             .from("inv_skus")
             .select(SKU_COLS)
-            .eq(col as never, code)
+            .or(`sku_code.ilike.${like},name.ilike.${like},barcode.ilike.${like},category.ilike.${like}`)
+            .order("updated_at", { ascending: false })
+            .limit(1)
             .maybeSingle();
-          if (data) {
-            sku = data;
-            break;
-          }
+          sku = data;
         }
         if (!sku) return err("Product not found", 404, { code: "not_found" });
 
@@ -174,6 +188,11 @@ export const Route = createFileRoute("/api/public/handheld/products/lookup")({
 });
 
 function buildEmptyItem(sku: any) {
+  const imagePaths = (sku.image_paths ?? []) as string[];
+  const imageUrl =
+    sku.image_url && /^https?:\/\//i.test(sku.image_url) && !sku.image_url.includes("token=")
+      ? sku.image_url
+      : null;
   return {
     id: sku.id,
     product_type: classifyType(sku),
@@ -184,7 +203,9 @@ function buildEmptyItem(sku: any) {
     category: sku.category,
     price: Number(sku.price_tier) || 0,
     condition_grade: sku.grade ?? null,
-    image_url: sku.image_url,
+    image_url: imageUrl,
+    image_paths: imagePaths,
+    images: [],
     notes: sku.notes,
     total_stock_qty: 0,
     stocks: [],
