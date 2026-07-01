@@ -100,6 +100,17 @@ export const Route = createFileRoute("/api/public/handheld/inbound/scan")({
             );
         }
 
+        // 触发有赞库存推送（HQ / 该库位对应门店）
+        const skuIds = Array.from(new Set(accepted.map((a) => a.sku_id)));
+        for (const sid of skuIds) {
+          try {
+            await enqueueStockPushForLocation(sid, locationId, "handheld_inbound");
+          } catch {
+            // 静默：cron worker 会兜底
+          }
+        }
+
+
         return ok({
           accepted_count: accepted.length,
           duplicated_count: duplicated.length,
