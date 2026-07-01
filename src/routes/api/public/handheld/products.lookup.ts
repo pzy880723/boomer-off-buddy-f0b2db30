@@ -136,6 +136,18 @@ export const Route = createFileRoute("/api/public/handheld/products/lookup")({
           });
         }
 
+        const { signSkuImagePaths } = await import("@/lib/sku-image-resolver.server");
+        const imagePaths = (sku.image_paths ?? []) as string[];
+        const signedList = await signSkuImagePaths(imagePaths);
+        const images = imagePaths
+          .map((p, i) => (signedList[i] ? { storage_path: p, read_url: signedList[i]! } : null))
+          .filter((x): x is { storage_path: string; read_url: string } => x !== null);
+        const coverUrl =
+          images[0]?.read_url ??
+          (sku.image_url && /^https?:\/\//i.test(sku.image_url) && !sku.image_url.includes("token=")
+            ? sku.image_url
+            : null);
+
         return ok({
           id: sku.id,
           product_type: classifyType(sku),
@@ -146,7 +158,9 @@ export const Route = createFileRoute("/api/public/handheld/products/lookup")({
           category: sku.category,
           price: Number(sku.price_tier) || 0,
           condition_grade: sku.grade ?? null,
-          image_url: sku.image_url,
+          image_url: coverUrl,
+          image_paths: imagePaths,
+          images,
           notes: sku.notes,
           total_stock_qty: stocks.reduce((s, r) => s + r.stock_qty, 0),
           stocks,
