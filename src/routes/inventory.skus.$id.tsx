@@ -44,7 +44,7 @@ function SkuDetailPage() {
   const getFn = useServerFn(getSku);
   const printFn = useServerFn(createLabelBatch);
   const delFn = useServerFn(deleteSku);
-  const [qty, setQty] = useState("10");
+  const [qty, setQty] = useState("1");
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
@@ -196,7 +196,7 @@ function SkuDetailPage() {
               </Button>
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
-              打印完成后请贴到商品上，然后到「扫枪入库」页扫码完成盘点入库。
+              打印完成后请贴到商品上，然后到「RFID 入库」页完成盘点入库（支持手持机 / 台面读写器 / 扫描门）。
             </p>
           </Card>
         </TabsContent>

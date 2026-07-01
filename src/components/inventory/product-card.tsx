@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CATEGORY_LABEL, formatPrice, type StandardProductGroup, type SkuRow } from "@/lib/inventory.helpers";
+import { toThumbUrl } from "@/lib/image";
 
 /** 标准商品卡：聚合多价格档 */
 export function StandardProductCard({
@@ -25,8 +26,12 @@ export function StandardProductCard({
           <div className="relative aspect-square overflow-hidden bg-muted">
             {cover ? (
               <img
-                src={cover}
+                src={toThumbUrl(cover, 480) ?? cover}
                 alt={group.name}
+                loading="lazy"
+                decoding="async"
+                width={480}
+                height={480}
                 className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
             ) : (
@@ -89,8 +94,12 @@ export function SingleSkuCard({
           <div className="relative aspect-square overflow-hidden bg-muted">
             {cover ? (
               <img
-                src={cover}
+                src={toThumbUrl(cover, 480) ?? cover}
                 alt={row.name}
+                loading="lazy"
+                decoding="async"
+                width={480}
+                height={480}
                 className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
             ) : (
@@ -161,7 +170,7 @@ export function StandardProductRow({
       >
         <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded bg-muted">
           {cover ? (
-            <img src={cover} alt={group.name} className="h-full w-full object-cover" />
+            <img src={toThumbUrl(cover, 96) ?? cover} alt={group.name} loading="lazy" decoding="async" width={48} height={48} className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-muted-foreground">
               <Tags className="h-5 w-5" />
@@ -218,7 +227,7 @@ export function SingleSkuRow({
       >
         <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded bg-muted">
           {cover ? (
-            <img src={cover} alt={row.name} className="h-full w-full object-cover" />
+            <img src={toThumbUrl(cover, 96) ?? cover} alt={row.name} loading="lazy" decoding="async" width={48} height={48} className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-muted-foreground">
               <Tags className="h-5 w-5" />

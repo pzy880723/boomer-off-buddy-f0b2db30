@@ -20,8 +20,8 @@ function MobileHome() {
     { to: "/m/parcels", icon: Package, label: "包裹搜索", desc: "按单号/订单号/商品名找包裹", color: "bg-blue-500/10 text-blue-600" },
     { to: "/m/skus", icon: Tags, label: "商品 SKU", desc: "查看 / 新建商品档案", color: "bg-rose-500/10 text-rose-600" },
     { to: "/m/scan", icon: ScanLine, label: "通用扫码", desc: "条码 / RFID / 订单号 OCR", color: "bg-emerald-500/10 text-emerald-600" },
-    { to: "/inventory/inbound/new", icon: Boxes, label: "新建入库单", desc: "分拣后扫枪入库", color: "bg-amber-500/10 text-amber-600" },
-    { to: "/m/inbound", icon: ArrowDownToLine, label: "扫码入库", desc: "扫枪聚合提交", color: "bg-violet-500/10 text-violet-600" },
+    { to: "/inventory/inbound/new", icon: Boxes, label: "新建入库单", desc: "分拣后 RFID 入库", color: "bg-amber-500/10 text-amber-600" },
+    { to: "/m/inbound", icon: ArrowDownToLine, label: "RFID 入库", desc: "手持机 / 读写器聚合提交", color: "bg-violet-500/10 text-violet-600" },
     { to: "/m/photo-search", icon: Camera, label: "拍照识图", desc: "找包裹·查均价", color: "bg-pink-500/10 text-pink-600" },
     { to: "/m/domestic/quick-add", icon: ShoppingBag, label: "快速录入小包", desc: "截图/拍照 → AI 识别入库", color: "bg-orange-500/10 text-orange-600" },
   ];

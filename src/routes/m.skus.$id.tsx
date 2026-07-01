@@ -54,7 +54,7 @@ function MSkuDetail() {
   const printFn = useServerFn(createLabelBatch);
   const delFn = useServerFn(deleteSku);
   const printRef = useRef<HTMLDivElement>(null);
-  const [qty, setQty] = useState("10");
+  const [qty, setQty] = useState("1");
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
 
@@ -297,7 +297,7 @@ function MSkuDetail() {
                 {printMut.isPending ? "提交中…" : "打印并记录"}
               </Button>
               <p className="text-[11px] text-muted-foreground">
-                打印完成后请贴到商品上，然后到「扫枪入库」页扫码完成入库。
+                打印完成后请贴到商品上，然后到「RFID 入库」页完成入库。
               </p>
             </Card>
           </TabsContent>

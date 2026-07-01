@@ -21,7 +21,12 @@ export const generateSkuImage = createServerFn({ method: "POST" })
       },
       body: JSON.stringify({
         model: "google/gemini-2.5-flash-image",
-        messages: [{ role: "user", content: data.prompt }],
+        messages: [
+          {
+            role: "user",
+            content: `${data.prompt}\n\n【硬性要求】输出必须是 1:1 正方形（1024x1024）、主体居中、四周留白均匀，纯净白底商品图，禁止添加文字/水印。`,
+          },
+        ],
         modalities: ["image", "text"],
       }),
     });

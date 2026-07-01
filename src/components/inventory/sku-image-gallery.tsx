@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Tags } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { toThumbUrl } from "@/lib/image";
 
 /**
  * SKU 多图画廊：主图 + 缩略图横排，点击主图弹 Lightbox。
@@ -46,7 +47,7 @@ export function SkuImageGallery({
         aria-label="放大查看"
       >
         <img
-          src={cur}
+          src={toThumbUrl(cur, 720) ?? cur}
           alt={alt}
           loading="eager"
           decoding="async"
@@ -66,7 +67,7 @@ export function SkuImageGallery({
               )}
               aria-label={`第 ${i + 1} 张`}
             >
-              <img src={src} alt="" loading="lazy" className="h-full w-full object-cover" />
+              <img src={toThumbUrl(src, 128) ?? src} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
             </button>
           ))}
         </div>

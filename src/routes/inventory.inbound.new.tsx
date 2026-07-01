@@ -15,7 +15,7 @@ import { CATEGORY_LABEL, formatPrice } from "@/lib/inventory.helpers";
 
 export const Route = createFileRoute("/inventory/inbound/new")({
   head: () => ({
-    meta: [{ title: "扫枪入库 · 库存" }],
+    meta: [{ title: "RFID 入库 · 库存" }],
   }),
   component: ScanInboundPage,
 });
@@ -165,8 +165,8 @@ function ScanInboundPage() {
       </Link>
 
       <PageHeader
-        title="扫枪入库"
-        description="把扫码枪当成键盘：每扫一下，EPC 以回车结尾自动入队"
+        title="RFID 入库"
+        description="支持 RFID 手持机 / 台面读写器 / 扫描门：每读到一个 EPC 以回车结尾自动入队"
       />
 
       {/* 扫码输入 */}

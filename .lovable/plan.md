@@ -1,42 +1,54 @@
 ## 目标
 
-把「标准商品」精简到最贴近实际业务的形态：**标准商品 = 品名 + 图片 + 一组价格档（每档即一个 SKU）**，其余属性（评级 / 单件重量）在标准商品这一侧不再出现。RFID 入库和有赞同步语义保持一致：一个价格档 = 一个 SKU = 一个价格 = 一段规格编码。
+1. 图片改成正方形 + 加载提速
+2. RFID 标签默认打印 1 张
+3. PC/手机所有「扫枪入库」文案改为「RFID 入库」
 
-## 一、UI 精简（本次改动主体）
+## 1. AI 图片强制正方形
 
-### 1. 新建 / 编辑「标准商品」对话框（`SkuMetaFields` 在标准商品场景下的表现）
+修改点：
+- `src/server/handheld-ai.server.ts` `SYSTEM_LISTING_IMAGE`：在 prompt 里明确要求 **1:1 正方形，居中裁切，白底/浅灰底**；调用 `google/gemini-3.1-flash-image` 时传 `size: "1024x1024"`（gateway 支持透传）。
+- `src/lib/sku-image.functions.ts` `generateSkuImage`（`google/gemini-2.5-flash-image`）：prompt 追加「正方形 1:1」硬约束，保存前用轻量校验（服务端不再二次裁），主要靠 prompt。
+- APP 传上来经 `ai.prepare-listing-image` 处理的图，输出即为 1024×1024。
 
-- 移除**商品评级**字段（`SkuGrade` 下拉）。
-- 移除**单件重量 (g)** 字段。
-- 保留：类目 / 品名 / 商品编码 / 商品图片 / 备注。
-- 实现方式：给 `SkuMetaFields` 加两个可选开关 `hideGrade` / `hideWeight`（沿用现有 `hideCategory` 模式），在 `StandardSkuDialog` 和 `ProductEditDialog` 里传 `hideGrade hideWeight`；**自定义 SKU、拆包子件等非标准场景保持原样**，不受影响。
+## 2. 加载提速
 
-### 2. 标准商品详情页 `/inventory/products/$code`
+问题：自定义商品卡片直接用 Supabase 原图（几 MB），首屏一次性拉取几十张。
 
-- 顶部信息区去掉「单件重量」`Attr` 行。
-- 副标题保留「XX类目 · 标准商品」；不显示评级相关文案。
-- 价格档子 SKU 列表旁边新增一句更明确的说明文案：
-  > 每个价格档 = 一个独立 SKU = 一个价格 = 一段规格编码；用 RFID 扫描枪扫到该编码即库存 +1。
+修改：
+- 复用现有 `src/lib/image.ts` 的 `toThumbUrl(url, w)`（走 `/storage/v1/render/image/public/` 缩略）。
+- `src/components/inventory/product-card.tsx`：
+  - `StandardProductCard` / `SingleSkuCard` 卡片主图：`toThumbUrl(cover, 480)` + `loading="lazy"` + `decoding="async"` + `width/height` 属性防抖。
+  - `StandardProductRow` / `SingleSkuRow` 列表行 48×48 缩略：`toThumbUrl(cover, 96)`。
+- `src/components/inventory/sku-image-gallery.tsx`：
+  - 主图 `toThumbUrl(cur, 720)`，`loading="lazy"`（非首屏时）。
+  - 缩略图 `toThumbUrl(src, 128)`。
+  - Lightbox 用原图。
+- `src/routes/api/public/handheld/items.sign-read-url.ts` + `products` / `products.lookup` / `sku.search` 里 batch sign：给返回的 `read_url` 追加一个 `thumb_url`（宽 480，签名 URL 直接把 `/object/sign/` 换成 `/render/image/sign/` 并追加 `width=480&quality=75`），APP 也能受益。若签名桶 render 不受支持则仅在 UI 端处理，不改 API。（先只改前端，API 层加 `thumb_url` 属可选增量。）
 
-### 3. 价格档卡片（`ProductCard` / SKU 列表标准商品行）
+先做前端 4 处 + 画廊，即可显著提速；不改数据结构。
 
-- 若当前有展示重量的地方一并隐藏（快速审查后同步删掉展示，不动数据库字段）。
+## 3. 打印张数默认 1
 
-## 二、语义 / 文案层对齐（不改数据库）
+- `src/routes/inventory.skus.$id.tsx` L47：`useState("10")` → `useState("1")`
+- `src/routes/m.skus.$id.tsx` L57：同上
 
-- 在新建、编辑对话框顶部加一行说明：
-  > 标准商品按「价格档」分类；每个价格档就是一个独立 SKU，价格 = SKU 名。RFID 标签在打印时已绑定 商品编码 + 规格编码（价格档），扫描枪扫一下即入库 +1。
-- 「规格编码」在 UI 里明确等价于「价格档」，避免继续出现"weight / grade"这类会引发歧义的字段。
+## 4. 文案：「扫枪入库」→「RFID 入库」
 
-## 三、明确不动的东西
+替换以下文件的字符串（仅 UI 文案，不改路由/接口）：
+- `src/routes/inventory.inbound.new.tsx`（页面标题 + meta title）
+- `src/routes/inventory.inbound.index.tsx`（描述 + 新建按钮 + 空态）
+- `src/routes/inventory.skus.index.tsx`（顶部入口按钮）
+- `src/routes/inventory.products.$code.tsx`（入口按钮）
+- `src/routes/inventory.skus.$id.tsx`（提示文字）
+- `src/routes/m.skus.$id.tsx`（提示文字）
+- `src/routes/m.index.tsx`（快捷入口描述）
+- `src/routes/__root.tsx` 面包屑映射 `inbound: "扫枪入库"` → `"RFID 入库"`
+- 说明新增副标题：「支持 RFID 手持机 / RFID 台面读写器 / RFID 扫描门」
 
-- 数据库 schema **不变**：`inv_skus.weight_g`、`inv_skus.condition_grade` 保留（自定义 SKU、拆包子件、日本小包裹侧仍会用；标准商品行只是新建时不再录入，历史数据不清洗）。
-- 入库主流程 `/inventory/inbound/new` + `inv_apply_inbound_stock` **不变**：扫一次编码 = 对应价格档 SKU 库存 +1，本身已经是这个语义。
-- 有赞同步逻辑不动：现有 `sku_youzan_links` 已是每个价格档一条 SKU 映射，天然对应"价格 = SKU"。
+`src/routes/m.scan.tsx`「蓝牙扫枪」这类字面表达仍是设备名，保留不动。
 
-## 四、验证
+## 技术说明
 
-- 新建 / 编辑标准商品对话框不再出现「商品评级」「单件重量」。
-- 详情页头部信息不再出现「单件重量」。
-- 自定义 SKU 对话框仍能录入评级 / 重量。
-- Typecheck 通过。
+- Supabase render endpoint 仅对 public 桶有效；本仓库 SKU 主图桶 `parcel-item-images` 是 public，`toThumbUrl` 直接可用。sku-listing 是私桶，APP 侧走签名 URL，本轮不改。
+- gemini image 模型对 `size`/`aspect_ratio` 参数支持不稳定，主要靠 prompt「正方形 1:1、居中裁切」强约束；若模型仍返非正方，前端 `object-cover` 已能兜住视觉。
