@@ -2074,42 +2074,65 @@ export type Database = {
       }
       youzan_stock_sync_queue: {
         Row: {
+          action: string
           attempts: number
           created_at: string
           id: string
           last_error: string | null
+          location_id: string | null
           next_run_at: string
           reason: string
+          shop_id: string | null
           sku_id: string
           status: string
           target_stock: number
           updated_at: string
         }
         Insert: {
+          action?: string
           attempts?: number
           created_at?: string
           id?: string
           last_error?: string | null
+          location_id?: string | null
           next_run_at?: string
           reason?: string
+          shop_id?: string | null
           sku_id: string
           status?: string
           target_stock: number
           updated_at?: string
         }
         Update: {
+          action?: string
           attempts?: number
           created_at?: string
           id?: string
           last_error?: string | null
+          location_id?: string | null
           next_run_at?: string
           reason?: string
+          shop_id?: string | null
           sku_id?: string
           status?: string
           target_stock?: number
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "youzan_stock_sync_queue_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "youzan_stock_sync_queue_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "youzan_shops"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "youzan_stock_sync_queue_sku_id_fkey"
             columns: ["sku_id"]
