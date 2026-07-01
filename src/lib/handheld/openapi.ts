@@ -58,6 +58,8 @@ import {
   ProductLookupRes,
   ProductsQuery,
   ProductsRes,
+  GlobalStockQuery,
+  GlobalStockRes,
   SmartCreateReq,
   SmartCreateRes,
   StocktakeOpenReq,
