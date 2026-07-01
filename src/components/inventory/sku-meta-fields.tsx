@@ -8,7 +8,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { INV_CATEGORIES, CATEGORY_LABEL } from "@/lib/inventory.helpers";
+import { useCategories } from "@/hooks/use-categories";
 import { SkuImagePicker } from "./sku-image-picker";
 
 export type SkuGrade = "N" | "S" | "A" | "B" | "C" | "J";
