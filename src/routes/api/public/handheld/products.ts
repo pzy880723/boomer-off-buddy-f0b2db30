@@ -246,15 +246,16 @@ export const Route = createFileRoute("/api/public/handheld/products")({
         }
 
         // Base query — does NOT include type filter; used for counts too.
-        const applyCommonFilters = <T extends { or: Function; eq: Function; not: Function; in: Function }>(qb: T): T => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const applyCommonFilters = (qb: any): any => {
           let out = qb;
           if (q) {
             const like = `%${q.replace(/[%_]/g, (m) => `\\${m}`)}%`;
-            out = (out as any).or(
+            out = out.or(
               `sku_code.ilike.${like},name.ilike.${like},barcode.ilike.${like},category.ilike.${like}`,
             );
           }
-          if (categoryFilter) out = (out as any).eq("category", categoryFilter);
+          if (categoryFilter) out = out.eq("category", categoryFilter);
           return out;
         };
 
