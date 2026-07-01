@@ -28,14 +28,14 @@ function InboundListPage() {
     <div className="space-y-4">
       <PageHeader
         title="入库记录"
-        description="每一次扫枪盘点入库都会生成一张记录"
+        description="每一次 RFID 盘点入库都会生成一张记录（手持机 / 台面读写器 / 扫描门）"
         actions={
           <Button
             size="sm"
             className="bg-gradient-brand hover:opacity-90"
             onClick={() => nav({ to: "/inventory/inbound/new" })}
           >
-            <Plus className="mr-1.5 h-3.5 w-3.5" /> 新建扫枪入库
+            <Plus className="mr-1.5 h-3.5 w-3.5" /> 新建 RFID 入库
           </Button>
         }
       />
@@ -44,10 +44,10 @@ function InboundListPage() {
         <EmptyState
           icon={Package2}
           title="还没有入库记录"
-          description="到「新建扫枪入库」开始第一单"
+          description="到「新建 RFID 入库」开始第一单"
           action={
             <Button size="sm" onClick={() => nav({ to: "/inventory/inbound/new" })}>
-              新建扫枪入库
+              新建 RFID 入库
             </Button>
           }
         />

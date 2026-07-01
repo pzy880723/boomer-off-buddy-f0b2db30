@@ -105,7 +105,7 @@ function ProductDetailPage() {
             <Trash2 className="mr-1.5 h-3.5 w-3.5" /> 删除
           </Button>
           <Button size="sm" onClick={() => nav({ to: "/inventory/inbound/new" })}>
-            <Package2 className="mr-1.5 h-3.5 w-3.5" /> 扫枪入库
+            <Package2 className="mr-1.5 h-3.5 w-3.5" /> RFID 入库
           </Button>
         </div>
       </div>
