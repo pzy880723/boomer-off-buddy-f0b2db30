@@ -119,6 +119,11 @@ function SettingsPage() {
           <AddressBookPanel />
         </TabsContent>
 
+        <TabsContent value="categories">
+          <CategoriesPanel />
+        </TabsContent>
+
+
         <TabsContent value="notify">
           <Card>
             <CardHeader>
