@@ -227,7 +227,7 @@ export function SingleSkuRow({
       >
         <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded bg-muted">
           {cover ? (
-            <img src={cover} alt={row.name} className="h-full w-full object-cover" />
+            <img src={toThumbUrl(cover, 96) ?? cover} alt={row.name} loading="lazy" decoding="async" width={48} height={48} className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-muted-foreground">
               <Tags className="h-5 w-5" />
