@@ -296,6 +296,7 @@ export type Database = {
           synced_at: string | null
           updated_at: string
           youzan_hq_category_id: number | null
+          youzan_hq_parent_id: number | null
           youzan_shop_id: string | null
         }
         Insert: {
@@ -310,6 +311,7 @@ export type Database = {
           synced_at?: string | null
           updated_at?: string
           youzan_hq_category_id?: number | null
+          youzan_hq_parent_id?: number | null
           youzan_shop_id?: string | null
         }
         Update: {
@@ -324,6 +326,7 @@ export type Database = {
           synced_at?: string | null
           updated_at?: string
           youzan_hq_category_id?: number | null
+          youzan_hq_parent_id?: number | null
           youzan_shop_id?: string | null
         }
         Relationships: [
