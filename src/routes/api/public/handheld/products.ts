@@ -32,6 +32,8 @@ export type ProductItem = {
   price: number;
   condition_grade: "N" | "S" | "A" | "B" | "C" | "J" | null;
   image_url: string | null;
+  image_paths: string[];
+  images: { storage_path: string; read_url: string }[];
   notes: string | null;
   total_stock_qty: number;
   stocks: StockRow[];
@@ -125,22 +127,25 @@ async function buildItems(skus: SkuRow[], locations: LocRow[]): Promise<ProductI
     shopStocks = (st ?? []) as typeof shopStocks;
   }
 
-  // Batch-sign cover images: first path from each SKU that has any.
+  // Batch-sign all visible image paths so list/detail/lookup stay consistent.
   const { signSkuImagePaths } = await import("@/lib/sku-image-resolver.server");
-  const coverPaths: string[] = [];
-  const coverIdx: number[] = []; // index into skus for each entry
+  const allPaths: string[] = [];
+  const allIdx: { skuId: string; path: string }[] = [];
   skus.forEach((s, i) => {
-    const p = (s.image_paths ?? [])[0];
-    if (p) {
-      coverPaths.push(p);
-      coverIdx.push(i);
+    for (const p of s.image_paths ?? []) {
+      if (!p) continue;
+      allPaths.push(p);
+      allIdx.push({ skuId: s.id, path: p });
     }
   });
-  const signed = await signSkuImagePaths(coverPaths);
-  const coverBySkuId = new Map<string, string>();
-  coverIdx.forEach((i, k) => {
+  const signed = await signSkuImagePaths(allPaths);
+  const imagesBySkuId = new Map<string, { storage_path: string; read_url: string }[]>();
+  allIdx.forEach((entry, k) => {
     const url = signed[k];
-    if (url) coverBySkuId.set(skus[i].id, url);
+    if (!url) return;
+    const list = imagesBySkuId.get(entry.skuId) ?? [];
+    list.push({ storage_path: entry.path, read_url: url });
+    imagesBySkuId.set(entry.skuId, list);
   });
 
   return skus.map((s) => {
@@ -166,8 +171,10 @@ async function buildItems(skus: SkuRow[], locations: LocRow[]): Promise<ProductI
       });
     }
     const total = stocks.reduce((sum, r) => sum + r.stock_qty, 0);
+    const imagePaths = (s.image_paths ?? []) as string[];
+    const images = imagesBySkuId.get(s.id) ?? [];
     const cover =
-      coverBySkuId.get(s.id) ??
+      images[0]?.read_url ??
       (s.image_url && /^https?:\/\//i.test(s.image_url) && !s.image_url.includes("token=")
         ? s.image_url
         : null);
@@ -182,6 +189,8 @@ async function buildItems(skus: SkuRow[], locations: LocRow[]): Promise<ProductI
       price: Number(s.price_tier) || 0,
       condition_grade: (s.grade as ProductItem["condition_grade"]) ?? null,
       image_url: cover,
+      image_paths: imagePaths,
+      images,
       notes: s.notes,
       total_stock_qty: total,
       stocks,
