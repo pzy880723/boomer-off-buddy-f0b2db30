@@ -286,7 +286,12 @@ function YouzanPage() {
               <Sparkles className="mr-1.5 h-3.5 w-3.5" />
               数据同步
             </TabsTrigger>
+            <TabsTrigger value="health">
+              <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+              系统检查
+            </TabsTrigger>
           </TabsList>
+
 
           <TabsContent value="logs" className="mt-3 space-y-3">
             <div className="flex items-center justify-end">
