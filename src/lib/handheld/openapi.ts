@@ -215,9 +215,19 @@ Token 由后台 **仓库管理 → 手持终端** 页面创建/复制。设备�
         tags: ["商品"],
         summary: "商品总账列表（含多库位库存与图片）",
         description:
-          "APP 商品页用。支持 q/type/scope/location_id/page/page_size；排序为 custom → bundle → standard，再按 updated_at 倒序。返回 image_url / image_paths / images。",
+          "APP 商品页用。支持 q/type/scope/location_id/category/has_image/sort/page/page_size。默认排序 custom → bundle → standard 再按 updated_at 倒序；也支持 sort=created_desc/created_asc/price_desc/price_asc/stock_desc。响应包含 counts（各 type 角标，受 q/category 影响但不受 type 影响）和 items[].editable（standard 恒为 false）。",
         requestParams: { query: ProductsQuery },
         responses: { "200": jsonRes("OK", ProductsRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/global-stock": {
+      get: {
+        tags: ["商品"],
+        summary: "全局库存矩阵（总仓账号专用）",
+        description:
+          "仅 super_admin / hq_operator 可用；其他角色返回 403。按 type Tab 返回：locations 全量、items[].stocks 是 {location_id: qty} 字典、summary 汇总（sku_count/total_qty/out_of_stock/low_stock）。支持 q/category/stock_state(all|out|low)/low_threshold/page/page_size。",
+        requestParams: { query: GlobalStockQuery },
+        responses: { "200": jsonRes("OK", GlobalStockRes), ...ERROR_RESPONSES },
       },
     },
     "/api/public/handheld/products/lookup": {
