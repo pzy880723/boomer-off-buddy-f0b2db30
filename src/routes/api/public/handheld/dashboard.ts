@@ -72,14 +72,27 @@ export const Route = createFileRoute("/api/public/handheld/dashboard")({
         }
 
         // ---- 1. stats ----
-        const { data: stockRows } = await supabaseAdmin
-          .from("inv_stocks")
-          .select("qty")
-          .eq("location_id", locationId);
-        const stock_count = ((stockRows as { qty: number }[] | null) ?? []).reduce(
-          (s, r) => s + (Number(r.qty) || 0),
-          0,
-        );
+        // 仓库库存 = SUM(inv_skus.stock_qty)（入库 RPC 只更新 inv_skus.stock_qty）
+        // 门店库存 = SUM(inv_stocks.qty where location_id = 门店)
+        let stock_count = 0;
+        if (auth.device.location_kind === "warehouse") {
+          const { data: sumRows } = await supabaseAdmin
+            .from("inv_skus")
+            .select("stock_qty");
+          stock_count = ((sumRows as { stock_qty: number }[] | null) ?? []).reduce(
+            (s, r) => s + (Number(r.stock_qty) || 0),
+            0,
+          );
+        } else {
+          const { data: stockRows } = await supabaseAdmin
+            .from("inv_stocks")
+            .select("qty")
+            .eq("location_id", locationId);
+          stock_count = ((stockRows as { qty: number }[] | null) ?? []).reduce(
+            (s, r) => s + (Number(r.qty) || 0),
+            0,
+          );
+        }
 
         const { count: inTransitToHere } = await supabaseAdmin
           .from("stock_transfers" as never)
