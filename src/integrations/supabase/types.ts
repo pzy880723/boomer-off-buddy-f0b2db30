@@ -283,6 +283,66 @@ export type Database = {
         }
         Relationships: []
       }
+      inv_categories: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          is_active: boolean
+          is_system: boolean
+          name: string
+          parent_id: string | null
+          sort_order: number
+          synced_at: string | null
+          updated_at: string
+          youzan_hq_category_id: number | null
+          youzan_shop_id: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_system?: boolean
+          name: string
+          parent_id?: string | null
+          sort_order?: number
+          synced_at?: string | null
+          updated_at?: string
+          youzan_hq_category_id?: number | null
+          youzan_shop_id?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_system?: boolean
+          name?: string
+          parent_id?: string | null
+          sort_order?: number
+          synced_at?: string | null
+          updated_at?: string
+          youzan_hq_category_id?: number | null
+          youzan_shop_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inv_categories_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "inv_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inv_categories_youzan_shop_id_fkey"
+            columns: ["youzan_shop_id"]
+            isOneToOne: false
+            referencedRelation: "youzan_shops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inv_epcs: {
         Row: {
           current_location_id: string | null
