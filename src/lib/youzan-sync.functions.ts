@@ -903,3 +903,70 @@ export const getSkuLink = createServerFn({ method: "POST" })
       .limit(5);
     return { link, recent: recent ?? [] };
   });
+
+// ============================================================
+// listShopHealth —— /youzan 页 "系统检查" 面板数据源
+// ------------------------------------------------------------
+// 对齐 10 条设计原则中的 #4 / #10：
+//  - youzan_shops：role / kdt_id / parent_kdt_id / 是否已绑 location
+//  - 分店库存模式（sync_stock 判定）
+//  - inv_locations kind=shop 但 shop_id=null → 警告
+// ============================================================
+export const listShopHealth = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    const { data: shops } = await supabase
+      .from("youzan_shops")
+      .select("id, shop_name, kdt_id, parent_kdt_id, role, is_active")
+      .order("role", { ascending: true })
+      .order("shop_name", { ascending: true });
+
+    const { data: locs } = await supabase
+      .from("inv_locations")
+      .select("id, name, kind, shop_id, is_active");
+
+    const { data: links } = await supabase
+      .from("sku_youzan_links")
+      .select("shop_id, sync_stock");
+
+    const shopRows = (shops ?? []).map((s) => {
+      const boundLoc = (locs ?? []).find((l) => l.shop_id === s.id) ?? null;
+      const shopLinks = (links ?? []).filter((l) => l.shop_id === s.id);
+      const totalLinks = shopLinks.length;
+      const stockLinks = shopLinks.filter(
+        (l) => (l as { sync_stock?: boolean }).sync_stock !== false,
+      ).length;
+      const issues: string[] = [];
+      if (s.role === "branch" && !s.parent_kdt_id) {
+        issues.push("分店未填写 parent_kdt_id");
+      }
+      if (s.role === "branch" && !boundLoc) {
+        issues.push("尚未绑定 inv_locations（无法按库位推库存）");
+      }
+      if (s.role === "hq" && stockLinks > 0) {
+        issues.push(`总部有 ${stockLinks} 条 sync_stock=true 的绑定（应为 0）`);
+      }
+      return {
+        id: s.id,
+        shop_name: s.shop_name,
+        kdt_id: s.kdt_id,
+        parent_kdt_id: s.parent_kdt_id ?? null,
+        role: s.role,
+        is_active: s.is_active,
+        bound_location: boundLoc
+          ? { id: boundLoc.id, name: boundLoc.name, kind: boundLoc.kind }
+          : null,
+        stock_mode:
+          s.role === "hq" ? "master_spu" : "independent_stock",
+        link_count: totalLinks,
+        stock_sync_count: stockLinks,
+        issues,
+      };
+    });
+
+    const orphanShopLocations = (locs ?? [])
+      .filter((l) => l.kind === "shop" && !l.shop_id)
+      .map((l) => ({ id: l.id, name: l.name, is_active: l.is_active }));
+
+    return { shops: shopRows, orphan_shop_locations: orphanShopLocations };
+  });
