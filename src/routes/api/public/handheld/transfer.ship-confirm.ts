@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { HANDHELD_CORS, authenticateDevice } from "@/server/handheld-auth.server";
 import { ConfirmBody, getTransfer, ok, err } from "@/server/handheld-transfer.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { enqueueStockPushForLocation } from "@/lib/youzan-sync.functions";
 
 export const Route = createFileRoute("/api/public/handheld/transfer/ship-confirm")({
   server: {
@@ -84,6 +85,14 @@ export const Route = createFileRoute("/api/public/handheld/transfer/ship-confirm
             shipped_at: new Date().toISOString(),
           })
           .eq("id", body.transfer_id);
+
+        // 发货完成 → 源库位库存减少，需要推有赞
+        for (const sku_id of shippedBySku.keys()) {
+          try {
+            await enqueueStockPushForLocation(sku_id, t.from_location_id!, "transfer_ship");
+          } catch {}
+        }
+
 
         return ok({ transfer_id: body.transfer_id, shipped: scanned?.length ?? 0 });
       },

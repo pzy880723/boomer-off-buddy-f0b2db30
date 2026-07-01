@@ -8,6 +8,23 @@ import {
   getHqShop,
 } from "./youzan.functions";
 
+// 内部：按 shop_id 加载店铺（HQ 或分店都可）
+async function getShopById(shopId: string) {
+  const { data, error } = await supabase
+    .from("youzan_shops")
+    .select("*")
+    .eq("id", shopId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error(`youzan_shop ${shopId} 不存在`);
+  return data as unknown as Parameters<typeof ensureAccessToken>[0] & {
+    id: string;
+    kdt_id: number;
+    role: "hq" | "branch";
+    shop_name: string;
+  };
+}
+
 // ============================================================
 // 类型
 // ============================================================
@@ -34,29 +51,44 @@ export type LinkRow = {
 // 参数：kdt_id（总部）、item_id 或 sku_id、num（目标值）、type=set
 // 接口若返回 [40005] / [-1] 等错误，向上抛出，由 worker 入失败队列
 // ============================================================
+// 覆盖式推送到指定店铺。
+// - 总部（role=hq）：走 retail.open.stock.update（chain 场景可后续替换回 retail 接口）
+// - 分店（role=branch，独立 kdt + 独立 item）：走 youzan.item.quantity.update type=3 (set)
 async function pushStockToYouzan(
   link: LinkRow,
   targetStock: number,
   clientSeq: string,
 ): Promise<void> {
-  const hq = await getHqShop();
-  const token = await ensureAccessToken(hq);
-  const params: Record<string, unknown> = {
-    kdt_id: hq.kdt_id,
-    item_id: link.yz_item_id,
-    num: Math.max(0, targetStock),
-    type: "set",
-    client_seq: clientSeq,
-  };
-  if (link.yz_sku_id) params.sku_id = link.yz_sku_id;
+  const shop = await getShopById(link.shop_id);
+  const token = await ensureAccessToken(shop);
+  const num = Math.max(0, targetStock);
 
-  await callYouzanApiVerbose({
-    accessToken: token,
-    method: "youzan.retail.open.stock.update",
-    version: "1.0.0",
-    params,
-    timeoutMs: 20_000,
-  });
+  if (shop.role === "hq") {
+    const params: Record<string, unknown> = {
+      kdt_id: shop.kdt_id,
+      item_id: link.yz_item_id,
+      num,
+      type: "set",
+      client_seq: clientSeq,
+    };
+    if (link.yz_sku_id) params.sku_id = link.yz_sku_id;
+    await callYouzanApiVerbose({
+      accessToken: token,
+      method: "youzan.retail.open.stock.update",
+      version: "1.0.0",
+      params,
+      timeoutMs: 20_000,
+    });
+  } else {
+    // 独立 kdt 分店：单店商品库存 API（type=3 = 覆盖设置）
+    await callYouzanApiVerbose({
+      accessToken: token,
+      method: "youzan.item.quantity.update",
+      version: "3.0.0",
+      params: { item_id: link.yz_item_id, type: 3, quantity: num },
+      timeoutMs: 20_000,
+    });
+  }
 }
 
 // ============================================================
@@ -410,34 +442,109 @@ export const pullYouzanItemAsSku = createServerFn({ method: "POST" })
   });
 
 // ============================================================
-// enqueueStockPush —— 写入推送队列（供库存事件源调用）
+// enqueueStockPush —— 按 SKU 入队（HQ + 全部已绑分店都推一次）
+// ------------------------------------------------------------
+// 语义：目标绝对值 = 该 (sku, shop 对应 location) 上的最新 inv_stocks.qty；
+// 找不到对应 location 时回退到 inv_skus.stock_qty（一般是 HQ 仓库）。
 // ============================================================
 export async function enqueueStockPush(
   sku_id: string,
   reason: string,
+): Promise<{ enqueued: number }> {
+  const { data: links } = await supabase
+    .from("sku_youzan_links")
+    .select("shop_id");
+  const shopIds = (links ?? []).filter((l) => l).map((l) => l.shop_id as string);
+  // 只挑当前 sku 对应的 links
+  const { data: mine } = await supabase
+    .from("sku_youzan_links")
+    .select("shop_id")
+    .eq("sku_id", sku_id);
+  const targetShopIds = (mine ?? []).map((l) => l.shop_id as string);
+  if (targetShopIds.length === 0) return { enqueued: 0 };
+  void shopIds; // 保留计算占位（未来做全量对账用）
+
+  let enqueued = 0;
+  for (const shopId of targetShopIds) {
+    // 找该 shop 对应的 location
+    const { data: loc } = await supabase
+      .from("inv_locations")
+      .select("id")
+      .eq("shop_id", shopId)
+      .maybeSingle();
+    const locationId = (loc?.id as string | undefined) ?? null;
+    const target = await resolveShopStockTarget(sku_id, locationId, shopId);
+    await supabase.from("youzan_stock_sync_queue").insert({
+      sku_id,
+      shop_id: shopId,
+      location_id: locationId,
+      target_stock: target,
+      action: "update_stock",
+      reason,
+      status: "pending",
+      next_run_at: new Date().toISOString(),
+    } as never);
+    enqueued += 1;
+  }
+  return { enqueued };
+}
+
+// 按 (sku, location) 直接入队（handheld 入库 / 出库 / 收货 场景推荐调用）
+export async function enqueueStockPushForLocation(
+  sku_id: string,
+  location_id: string,
+  reason: string,
 ): Promise<{ enqueued: boolean }> {
+  const { data: loc } = await supabase
+    .from("inv_locations")
+    .select("id, shop_id")
+    .eq("id", location_id)
+    .maybeSingle();
+  if (!loc?.shop_id) return { enqueued: false }; // 仓库无对应有赞店，无需推
+  const shopId = loc.shop_id as string;
+
   const { data: link } = await supabase
     .from("sku_youzan_links")
-    .select("sku_id")
+    .select("id")
     .eq("sku_id", sku_id)
+    .eq("shop_id", shopId)
     .maybeSingle();
-  if (!link) return { enqueued: false }; // 未绑定，跳过
+  if (!link) return { enqueued: false }; // 未绑定就跳过（未来可入队 create_branch_listing）
 
-  const { data: sku } = await supabase
-    .from("inv_skus")
-    .select("stock_qty")
-    .eq("id", sku_id)
-    .maybeSingle();
-  if (!sku) return { enqueued: false };
-
+  const target = await resolveShopStockTarget(sku_id, location_id, shopId);
   await supabase.from("youzan_stock_sync_queue").insert({
     sku_id,
-    target_stock: Number(sku.stock_qty ?? 0),
+    shop_id: shopId,
+    location_id,
+    target_stock: target,
+    action: "update_stock",
     reason,
     status: "pending",
     next_run_at: new Date().toISOString(),
   } as never);
   return { enqueued: true };
+}
+
+async function resolveShopStockTarget(
+  sku_id: string,
+  location_id: string | null,
+  _shop_id: string,
+): Promise<number> {
+  if (location_id) {
+    const { data: st } = await supabase
+      .from("inv_stocks")
+      .select("qty")
+      .eq("sku_id", sku_id)
+      .eq("location_id", location_id)
+      .maybeSingle();
+    if (st) return Math.max(0, Number(st.qty ?? 0));
+  }
+  const { data: sku } = await supabase
+    .from("inv_skus")
+    .select("stock_qty")
+    .eq("id", sku_id)
+    .maybeSingle();
+  return Math.max(0, Number(sku?.stock_qty ?? 0));
 }
 
 // ============================================================
@@ -485,20 +592,29 @@ async function runStockSyncWorkerCore(opts: {
       .eq("id", t.id);
 
     try {
-      const { data: link } = await supabase
+      // 按 (sku, shop) 精确取 link；老队列可能没有 shop_id，退回 sku 唯一 link
+      let linkQuery = supabase
         .from("sku_youzan_links")
         .select("*")
-        .eq("sku_id", t.sku_id)
-        .maybeSingle();
-      if (!link) throw new Error("SKU 未绑定有赞商品（可能已解绑）");
+        .eq("sku_id", t.sku_id);
+      if (t.shop_id) linkQuery = linkQuery.eq("shop_id", t.shop_id);
+      const { data: link } = await linkQuery.maybeSingle();
+      if (!link) throw new Error("SKU 未绑定该门店的有赞商品（可能已解绑）");
 
-      await pushStockToYouzan(link as LinkRow, t.target_stock, t.id);
+      // 自愈：如果 location_id 存在，用当前 inv_stocks 覆盖 target，防止队列过时
+      let target = Number(t.target_stock ?? 0);
+      if (t.location_id) {
+        target = await resolveShopStockTarget(t.sku_id, t.location_id, t.shop_id ?? "");
+      }
+
+      await pushStockToYouzan(link as LinkRow, target, t.id);
 
       await supabase
         .from("youzan_stock_sync_queue")
         .update({
           status: "done",
           last_error: null,
+          target_stock: target,
           attempts: (t.attempts ?? 0) + 1,
         } as never)
         .eq("id", t.id);
@@ -506,7 +622,7 @@ async function runStockSyncWorkerCore(opts: {
       await supabase
         .from("sku_youzan_links")
         .update({
-          last_pushed_stock: t.target_stock,
+          last_pushed_stock: target,
           last_pushed_at: new Date().toISOString(),
           status: "linked",
           last_error: null,
