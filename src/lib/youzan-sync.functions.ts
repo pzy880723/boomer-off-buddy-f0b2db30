@@ -442,34 +442,109 @@ export const pullYouzanItemAsSku = createServerFn({ method: "POST" })
   });
 
 // ============================================================
-// enqueueStockPush —— 写入推送队列（供库存事件源调用）
+// enqueueStockPush —— 按 SKU 入队（HQ + 全部已绑分店都推一次）
+// ------------------------------------------------------------
+// 语义：目标绝对值 = 该 (sku, shop 对应 location) 上的最新 inv_stocks.qty；
+// 找不到对应 location 时回退到 inv_skus.stock_qty（一般是 HQ 仓库）。
 // ============================================================
 export async function enqueueStockPush(
   sku_id: string,
   reason: string,
+): Promise<{ enqueued: number }> {
+  const { data: links } = await supabase
+    .from("sku_youzan_links")
+    .select("shop_id");
+  const shopIds = (links ?? []).filter((l) => l).map((l) => l.shop_id as string);
+  // 只挑当前 sku 对应的 links
+  const { data: mine } = await supabase
+    .from("sku_youzan_links")
+    .select("shop_id")
+    .eq("sku_id", sku_id);
+  const targetShopIds = (mine ?? []).map((l) => l.shop_id as string);
+  if (targetShopIds.length === 0) return { enqueued: 0 };
+  void shopIds; // 保留计算占位（未来做全量对账用）
+
+  let enqueued = 0;
+  for (const shopId of targetShopIds) {
+    // 找该 shop 对应的 location
+    const { data: loc } = await supabase
+      .from("inv_locations")
+      .select("id")
+      .eq("shop_id", shopId)
+      .maybeSingle();
+    const locationId = (loc?.id as string | undefined) ?? null;
+    const target = await resolveShopStockTarget(sku_id, locationId, shopId);
+    await supabase.from("youzan_stock_sync_queue").insert({
+      sku_id,
+      shop_id: shopId,
+      location_id: locationId,
+      target_stock: target,
+      action: "update_stock",
+      reason,
+      status: "pending",
+      next_run_at: new Date().toISOString(),
+    } as never);
+    enqueued += 1;
+  }
+  return { enqueued };
+}
+
+// 按 (sku, location) 直接入队（handheld 入库 / 出库 / 收货 场景推荐调用）
+export async function enqueueStockPushForLocation(
+  sku_id: string,
+  location_id: string,
+  reason: string,
 ): Promise<{ enqueued: boolean }> {
+  const { data: loc } = await supabase
+    .from("inv_locations")
+    .select("id, shop_id")
+    .eq("id", location_id)
+    .maybeSingle();
+  if (!loc?.shop_id) return { enqueued: false }; // 仓库无对应有赞店，无需推
+  const shopId = loc.shop_id as string;
+
   const { data: link } = await supabase
     .from("sku_youzan_links")
-    .select("sku_id")
+    .select("id")
     .eq("sku_id", sku_id)
+    .eq("shop_id", shopId)
     .maybeSingle();
-  if (!link) return { enqueued: false }; // 未绑定，跳过
+  if (!link) return { enqueued: false }; // 未绑定就跳过（未来可入队 create_branch_listing）
 
-  const { data: sku } = await supabase
-    .from("inv_skus")
-    .select("stock_qty")
-    .eq("id", sku_id)
-    .maybeSingle();
-  if (!sku) return { enqueued: false };
-
+  const target = await resolveShopStockTarget(sku_id, location_id, shopId);
   await supabase.from("youzan_stock_sync_queue").insert({
     sku_id,
-    target_stock: Number(sku.stock_qty ?? 0),
+    shop_id: shopId,
+    location_id,
+    target_stock: target,
+    action: "update_stock",
     reason,
     status: "pending",
     next_run_at: new Date().toISOString(),
   } as never);
   return { enqueued: true };
+}
+
+async function resolveShopStockTarget(
+  sku_id: string,
+  location_id: string | null,
+  _shop_id: string,
+): Promise<number> {
+  if (location_id) {
+    const { data: st } = await supabase
+      .from("inv_stocks")
+      .select("qty")
+      .eq("sku_id", sku_id)
+      .eq("location_id", location_id)
+      .maybeSingle();
+    if (st) return Math.max(0, Number(st.qty ?? 0));
+  }
+  const { data: sku } = await supabase
+    .from("inv_skus")
+    .select("stock_qty")
+    .eq("id", sku_id)
+    .maybeSingle();
+  return Math.max(0, Number(sku?.stock_qty ?? 0));
 }
 
 // ============================================================
