@@ -11,12 +11,13 @@ export type CategoryRow = {
   is_active: boolean;
   is_system: boolean;
   youzan_hq_category_id: number | null;
+  youzan_hq_parent_id: number | null;
   youzan_shop_id: string | null;
   synced_at: string | null;
 };
 
 const SELECT_COLS =
-  "id, code, name, parent_id, sort_order, is_active, is_system, youzan_hq_category_id, youzan_shop_id, synced_at";
+  "id, code, name, parent_id, sort_order, is_active, is_system, youzan_hq_category_id, youzan_hq_parent_id, youzan_shop_id, synced_at";
 
 /* ---------- 列表（所有登录用户）---------- */
 export const listCategories = createServerFn({ method: "GET" })
