@@ -48,11 +48,17 @@ export function SkuMetaFields({
   mobile,
   /** 隐藏类目（用于已固定类目场景） */
   hideCategory,
+  /** 隐藏商品评级（标准商品场景不用） */
+  hideGrade,
+  /** 隐藏单件重量（标准商品场景不用） */
+  hideWeight,
 }: {
   state: SkuMetaState;
   onChange: (next: SkuMetaState) => void;
   mobile?: boolean;
   hideCategory?: boolean;
+  hideGrade?: boolean;
+  hideWeight?: boolean;
 }) {
   const patch = (p: Partial<SkuMetaState>) => onChange({ ...state, ...p });
   return (
@@ -84,7 +90,7 @@ export function SkuMetaFields({
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className={hideWeight ? "" : "grid grid-cols-2 gap-3"}>
         <div className="space-y-1.5">
           <Label>商品编码</Label>
           <Input
@@ -93,32 +99,37 @@ export function SkuMetaFields({
             placeholder="留空则自动生成"
           />
         </div>
-        <div className="space-y-1.5">
-          <Label>单件重量 (g)（选填）</Label>
-          <Input
-            type="number"
-            value={state.weight}
-            onChange={(e) => patch({ weight: e.target.value })}
-          />
-        </div>
+        {!hideWeight && (
+          <div className="space-y-1.5">
+            <Label>单件重量 (g)（选填）</Label>
+            <Input
+              type="number"
+              value={state.weight}
+              onChange={(e) => patch({ weight: e.target.value })}
+            />
+          </div>
+        )}
       </div>
 
-      <div className="space-y-1.5">
-        <Label>商品评级</Label>
-        <Select value={state.grade} onValueChange={(v) => patch({ grade: v })}>
-          <SelectTrigger>
-            <SelectValue placeholder="选择成色档次" />
-          </SelectTrigger>
-          <SelectContent>
-            {SKU_GRADE_OPTIONS.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                <span className="font-medium">{o.label}</span>
-                <span className="ml-2 text-xs text-muted-foreground">{o.desc}</span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      {!hideGrade && (
+        <div className="space-y-1.5">
+          <Label>商品评级</Label>
+          <Select value={state.grade} onValueChange={(v) => patch({ grade: v })}>
+            <SelectTrigger>
+              <SelectValue placeholder="选择成色档次" />
+            </SelectTrigger>
+            <SelectContent>
+              {SKU_GRADE_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  <span className="font-medium">{o.label}</span>
+                  <span className="ml-2 text-xs text-muted-foreground">{o.desc}</span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
 
       <div className="space-y-1.5">
         <Label>商品图片</Label>
