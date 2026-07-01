@@ -60,6 +60,7 @@ export function SkuMetaFields({
   hideGrade?: boolean;
   hideWeight?: boolean;
 }) {
+  const { active: categories, labelOf } = useCategories();
   const patch = (p: Partial<SkuMetaState>) => onChange({ ...state, ...p });
   return (
     <div className="grid gap-3">
