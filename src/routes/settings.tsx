@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Building2, Users, Bell, Plug, Webhook, Key, History, MapPin } from "lucide-react";
+import { Building2, Users, Bell, Plug, Webhook, Key, History, MapPin, Tags } from "lucide-react";
 import { AddressBookPanel } from "@/components/settings/address-book-panel";
+import { CategoriesPanel } from "@/components/settings/categories-panel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
