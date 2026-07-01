@@ -216,21 +216,24 @@ export const Route = createFileRoute("/api/public/handheld/products")({
         const type = (url.searchParams.get("type") || "all").toLowerCase();
         const scope = (url.searchParams.get("scope") || "authorized").toLowerCase();
         const locationFilter = url.searchParams.get("location_id") || null;
+        const categoryFilter = (url.searchParams.get("category") || "").trim() || null;
+        const hasImage = url.searchParams.get("has_image"); // "0" | "1" | null
+        const sort = (url.searchParams.get("sort") || "").toLowerCase();
         const page = Math.max(1, Number(url.searchParams.get("page") || "1") | 0);
         const pageSize = Math.min(
           200,
           Math.max(1, Number(url.searchParams.get("page_size") || "50") | 0),
         );
 
+        const EMPTY_COUNTS = { custom: 0, bundle: 0, standard: 0, all: 0 };
+
         const scoped = await loadScopedLocations(request);
         if (!("locations" in scoped)) return scoped.response;
         let locations = scoped.locations;
 
-        // scope: current_location → restrict to device.location_id (if allowed)
         if (scope === "current_location" && auth.device.location_id) {
           locations = locations.filter((l) => l.id === auth.device.location_id);
         }
-        // explicit location_id filter (must be inside accessible scope)
         if (locationFilter) {
           if (!locations.some((l) => l.id === locationFilter)) {
             return err("Location not accessible", 403, { code: "location_forbidden" });
@@ -238,12 +241,23 @@ export const Route = createFileRoute("/api/public/handheld/products")({
           locations = locations.filter((l) => l.id === locationFilter);
         }
 
-        // Non-HQ with zero locations → empty
         if (locations.length === 0 && scoped.allowedIds !== null) {
-          return ok({ items: [], total: 0, page, page_size: pageSize });
+          return ok({ items: [], total: 0, page, page_size: pageSize, counts: EMPTY_COUNTS });
         }
 
-        // ---- query skus (cap 2000 for in-memory type-rank sort) ----
+        // Base query — does NOT include type filter; used for counts too.
+        const applyCommonFilters = <T extends { or: Function; eq: Function; not: Function; in: Function }>(qb: T): T => {
+          let out = qb;
+          if (q) {
+            const like = `%${q.replace(/[%_]/g, (m) => `\\${m}`)}%`;
+            out = (out as any).or(
+              `sku_code.ilike.${like},name.ilike.${like},barcode.ilike.${like},category.ilike.${like}`,
+            );
+          }
+          if (categoryFilter) out = (out as any).eq("category", categoryFilter);
+          return out;
+        };
+
         let skuQ = supabaseAdmin
           .from("inv_skus")
           .select(SKU_COLS)
@@ -254,15 +268,15 @@ export const Route = createFileRoute("/api/public/handheld/products")({
         else if (type === "custom") skuQ = skuQ.eq("kind", "single").eq("is_custom_price", true);
         else if (type === "bundle") skuQ = skuQ.eq("kind", "bundle");
 
-        if (q) {
-          const like = `%${q.replace(/[%_]/g, (m) => `\\${m}`)}%`;
-          skuQ = skuQ.or(
-            `sku_code.ilike.${like},name.ilike.${like},barcode.ilike.${like},category.ilike.${like}`,
-          );
+        skuQ = applyCommonFilters(skuQ);
+
+        // has_image only meaningful for custom
+        if (hasImage === "1" && type === "custom") {
+          skuQ = skuQ.not("image_paths", "is", null);
+        } else if (hasImage === "0" && type === "custom") {
+          skuQ = skuQ.is("image_paths", null);
         }
 
-        // Shop-only scope for non-HQ (no warehouse in scope): restrict to skus
-        // that actually have inv_stocks rows in those shops.
         const shopIds = locations.filter((l) => l.kind === "shop").map((l) => l.id);
         const hasWarehouse = locations.some((l) => l.kind === "warehouse");
         if (!scoped.isHq && !hasWarehouse && shopIds.length > 0) {
@@ -274,7 +288,8 @@ export const Route = createFileRoute("/api/public/handheld/products")({
           const ids = Array.from(
             new Set(((sids as { sku_id: string }[] | null) ?? []).map((r) => r.sku_id)),
           );
-          if (ids.length === 0) return ok({ items: [], total: 0, page, page_size: pageSize });
+          if (ids.length === 0)
+            return ok({ items: [], total: 0, page, page_size: pageSize, counts: EMPTY_COUNTS });
           skuQ = skuQ.in("id", ids);
         }
 
@@ -284,18 +299,60 @@ export const Route = createFileRoute("/api/public/handheld/products")({
 
         const items = await buildItems(skus, locations);
 
-        // custom → bundle → standard, then updated_at desc
-        items.sort((a, b) => {
-          const r = typeRank(a.product_type) - typeRank(b.product_type);
-          if (r !== 0) return r;
-          return (b.updated_at || "").localeCompare(a.updated_at || "");
-        });
+        // ---- counts (q/category-affected, type-independent) ----
+        // Query in parallel with items, per-type head-counts.
+        const countKindPairs: [ProductType, { kind: string; is_custom_price?: boolean }][] = [
+          ["custom", { kind: "single", is_custom_price: true }],
+          ["bundle", { kind: "bundle" }],
+          ["standard", { kind: "single", is_custom_price: false }],
+        ];
+        const countResults = await Promise.all(
+          countKindPairs.map(async ([, cond]) => {
+            let cq = supabaseAdmin.from("inv_skus").select("id", { count: "exact", head: true });
+            cq = cq.eq("kind", cond.kind);
+            if (typeof cond.is_custom_price === "boolean")
+              cq = cq.eq("is_custom_price", cond.is_custom_price);
+            cq = applyCommonFilters(cq);
+            const { count } = await cq;
+            return count ?? 0;
+          }),
+        );
+        const counts = {
+          custom: countResults[0],
+          bundle: countResults[1],
+          standard: countResults[2],
+          all: countResults[0] + countResults[1] + countResults[2],
+        };
+
+        // ---- sort ----
+        const cmpUpdated = (a: ProductItem, b: ProductItem) =>
+          (b.updated_at || "").localeCompare(a.updated_at || "");
+        const cmpCreated = (a: ProductItem, b: ProductItem, dir: 1 | -1) =>
+          dir * (a.created_at || "").localeCompare(b.created_at || "");
+        const cmpPrice = (a: ProductItem, b: ProductItem, dir: 1 | -1) =>
+          dir * (a.price - b.price);
+        const cmpStock = (a: ProductItem, b: ProductItem) =>
+          b.total_stock_qty - a.total_stock_qty;
+
+        if (sort === "created_desc") items.sort((a, b) => cmpCreated(a, b, -1));
+        else if (sort === "created_asc") items.sort((a, b) => cmpCreated(a, b, 1));
+        else if (sort === "price_desc") items.sort((a, b) => cmpPrice(a, b, -1));
+        else if (sort === "price_asc") items.sort((a, b) => cmpPrice(a, b, 1));
+        else if (sort === "stock_desc") items.sort(cmpStock);
+        else {
+          // default: type rank then updated desc (backward-compat)
+          items.sort((a, b) => {
+            const r = typeRank(a.product_type) - typeRank(b.product_type);
+            if (r !== 0) return r;
+            return cmpUpdated(a, b);
+          });
+        }
 
         const total = items.length;
         const from = (page - 1) * pageSize;
         const paged = items.slice(from, from + pageSize);
 
-        return ok({ items: paged, total, page, page_size: pageSize });
+        return ok({ items: paged, total, page, page_size: pageSize, counts });
       },
     },
   },
