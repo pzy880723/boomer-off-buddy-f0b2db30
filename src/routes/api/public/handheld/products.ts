@@ -24,6 +24,7 @@ type StockRow = {
 export type ProductItem = {
   id: string;
   product_type: ProductType;
+  editable: boolean;
   sku_code: string | null;
   barcode: string | null;
   item_code: string | null;
