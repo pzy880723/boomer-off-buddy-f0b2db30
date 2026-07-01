@@ -191,6 +191,9 @@ export const ProductItemSchema = z
   .object({
     id: uuidSchema,
     product_type: ProductTypeSchema,
+    editable: z.boolean().default(true).meta({
+      description: "APP 是否允许编辑；standard 恒为 false",
+    }),
     sku_code: z.string().nullable(),
     barcode: z.string().nullable(),
     item_code: z.string().nullable(),
