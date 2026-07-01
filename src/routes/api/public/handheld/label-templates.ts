@@ -14,8 +14,7 @@ function isHq(roles: string[]) {
 }
 
 async function listTemplates() {
-  const { data, error } = await supabaseAdmin
-    .from("inv_label_templates" as never)
+  const { data, error } = await (supabaseAdmin.from("inv_label_templates" as never) as any)
     .select("id, name, width_mm, height_mm, elements, is_default, version, updated_at")
     .order("is_default", { ascending: false })
     .order("updated_at", { ascending: false });
@@ -77,14 +76,12 @@ export const Route = createFileRoute("/api/public/handheld/label-templates")({
         const setDefault = body?.is_default === true;
 
         if (setDefault) {
-          await supabaseAdmin
-            .from("inv_label_templates" as never)
+          await (supabaseAdmin.from("inv_label_templates" as never) as any)
             .update({ is_default: false })
             .eq("is_default", true);
         }
 
-        const { data, error } = await supabaseAdmin
-          .from("inv_label_templates" as never)
+        const { data, error } = await (supabaseAdmin.from("inv_label_templates" as never) as any)
           .insert({
             name,
             width_mm,

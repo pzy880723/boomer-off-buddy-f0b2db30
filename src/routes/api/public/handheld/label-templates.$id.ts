@@ -52,8 +52,7 @@ export const Route = createFileRoute("/api/public/handheld/label-templates/$id")
         if (body?.height_mm != null) patch.height_mm = Number(body.height_mm);
         if (Array.isArray(body?.elements)) patch.elements = body.elements;
         // version bump
-        const { data: cur } = await supabaseAdmin
-          .from("inv_label_templates" as never)
+        const { data: cur } = await (supabaseAdmin.from("inv_label_templates" as never) as any)
           .select("version, is_default")
           .eq("id", params.id)
           .maybeSingle();
@@ -61,15 +60,13 @@ export const Route = createFileRoute("/api/public/handheld/label-templates/$id")
         patch.version = ((cur as any).version ?? 1) + 1;
 
         if (body?.is_default === true && !(cur as any).is_default) {
-          await supabaseAdmin
-            .from("inv_label_templates" as never)
+          await (supabaseAdmin.from("inv_label_templates" as never) as any)
             .update({ is_default: false })
             .eq("is_default", true);
           patch.is_default = true;
         }
 
-        const { data, error } = await supabaseAdmin
-          .from("inv_label_templates" as never)
+        const { data, error } = await (supabaseAdmin.from("inv_label_templates" as never) as any)
           .update(patch)
           .eq("id", params.id)
           .select("id, name, width_mm, height_mm, elements, is_default, version, updated_at")
@@ -82,30 +79,26 @@ export const Route = createFileRoute("/api/public/handheld/label-templates/$id")
         const g = await requireHq(request);
         if (!g.ok) return g.response;
 
-        const { data: cur } = await supabaseAdmin
-          .from("inv_label_templates" as never)
+        const { data: cur } = await (supabaseAdmin.from("inv_label_templates" as never) as any)
           .select("id, is_default")
           .eq("id", params.id)
           .maybeSingle();
         if (!cur) return err("Not found", 404, { code: "not_found" });
 
-        const { error } = await supabaseAdmin
-          .from("inv_label_templates" as never)
+        const { error } = await (supabaseAdmin.from("inv_label_templates" as never) as any)
           .delete()
           .eq("id", params.id);
         if (error) return err(error.message, 500);
 
         // If deleted default, promote the most-recently-updated remaining template.
         if ((cur as any).is_default) {
-          const { data: next } = await supabaseAdmin
-            .from("inv_label_templates" as never)
+          const { data: next } = await (supabaseAdmin.from("inv_label_templates" as never) as any)
             .select("id")
             .order("updated_at", { ascending: false })
             .limit(1)
             .maybeSingle();
           if (next) {
-            await supabaseAdmin
-              .from("inv_label_templates" as never)
+            await (supabaseAdmin.from("inv_label_templates" as never) as any)
               .update({ is_default: true })
               .eq("id", (next as any).id);
           }
