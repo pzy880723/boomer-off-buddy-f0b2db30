@@ -1399,9 +1399,11 @@ export type Database = {
           last_pull_stock: number | null
           last_pushed_at: string | null
           last_pushed_stock: number | null
+          role: string
           shop_id: string
           sku_id: string
           status: string
+          sync_stock: boolean
           updated_at: string
           yz_item_id: number
           yz_sku_id: number | null
@@ -1414,9 +1416,11 @@ export type Database = {
           last_pull_stock?: number | null
           last_pushed_at?: string | null
           last_pushed_stock?: number | null
+          role?: string
           shop_id: string
           sku_id: string
           status?: string
+          sync_stock?: boolean
           updated_at?: string
           yz_item_id: number
           yz_sku_id?: number | null
@@ -1429,9 +1433,11 @@ export type Database = {
           last_pull_stock?: number | null
           last_pushed_at?: string | null
           last_pushed_stock?: number | null
+          role?: string
           shop_id?: string
           sku_id?: string
           status?: string
+          sync_stock?: boolean
           updated_at?: string
           yz_item_id?: number
           yz_sku_id?: number | null
