@@ -139,7 +139,7 @@ export function SkuMetaFields({
           onChange={(url) => patch({ imageUrl: url })}
           mobile={mobile}
           defaultName={state.name}
-          defaultCategoryLabel={state.category ? CATEGORY_LABEL[state.category] : undefined}
+          defaultCategoryLabel={state.category ? labelOf(state.category) : undefined}
         />
       </div>
 
