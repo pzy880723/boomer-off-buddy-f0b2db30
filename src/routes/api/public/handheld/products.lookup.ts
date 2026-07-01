@@ -12,7 +12,7 @@ import {
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const SKU_COLS =
-  "id, sku_code, barcode, epc, name, category, price_tier, grade, image_url, notes, status, kind, is_custom_price, stock_qty, created_at, updated_at";
+  "id, sku_code, barcode, epc, name, category, price_tier, grade, image_url, image_paths, notes, status, kind, is_custom_price, stock_qty, created_at, updated_at";
 
 type LocRow = { id: string; name: string; kind: "warehouse" | "shop" };
 
