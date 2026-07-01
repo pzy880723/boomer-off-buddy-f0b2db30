@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CATEGORY_LABEL, formatPrice, type StandardProductGroup, type SkuRow } from "@/lib/inventory.helpers";
+import { toThumbUrl } from "@/lib/image";
 
 /** 标准商品卡：聚合多价格档 */
 export function StandardProductCard({
