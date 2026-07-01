@@ -25,6 +25,7 @@ export const Route = createFileRoute("/api/public/handheld/ai/prepare-listing-im
           const path = `${new Date().toISOString().slice(0, 10)}/${auth.device.id}/${crypto.randomUUID()}.${ext}`;
           const up = await supabaseAdmin.storage.from("sku-listing").upload(path, buf, {
             contentType: mime,
+            cacheControl: "31536000",
             upsert: false,
           });
           if (up.error) return err(`Storage upload failed: ${up.error.message}`, 500);
