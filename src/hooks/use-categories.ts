@@ -11,6 +11,7 @@ const FALLBACK: CategoryRow[] = INV_CATEGORIES.map((c, i) => ({
   is_active: true,
   is_system: true,
   youzan_hq_category_id: null,
+  youzan_hq_parent_id: null,
   youzan_shop_id: null,
   synced_at: null,
 }));
