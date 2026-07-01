@@ -26,8 +26,12 @@ export function StandardProductCard({
           <div className="relative aspect-square overflow-hidden bg-muted">
             {cover ? (
               <img
-                src={cover}
+                src={toThumbUrl(cover, 480) ?? cover}
                 alt={group.name}
+                loading="lazy"
+                decoding="async"
+                width={480}
+                height={480}
                 className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
             ) : (
