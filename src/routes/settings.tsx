@@ -16,49 +16,80 @@ export const Route = createFileRoute("/settings")({
   component: SettingsPage,
 });
 
+type NavItem = { value: string; label: string; icon: typeof Building2 };
+type NavGroup = { label: string; items: NavItem[] };
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    label: "账户",
+    items: [
+      { value: "profile", label: "基本信息", icon: Building2 },
+      { value: "members", label: "成员权限", icon: Users },
+      { value: "addresses", label: "地址库", icon: MapPin },
+    ],
+  },
+  {
+    label: "商品",
+    items: [{ value: "categories", label: "商品分类", icon: Tags }],
+  },
+  {
+    label: "通知与集成",
+    items: [
+      { value: "notify", label: "通知", icon: Bell },
+      { value: "integration", label: "集成", icon: Plug },
+      { value: "webhook", label: "Webhook", icon: Webhook },
+      { value: "api", label: "API 密钥", icon: Key },
+    ],
+  },
+  {
+    label: "安全",
+    items: [{ value: "audit", label: "审计日志", icon: History }],
+  },
+];
+
 function SettingsPage() {
   return (
     <div>
       <PageHeader title="系统设置" description="账户、通知、集成与安全策略管理" />
       <Tabs defaultValue="profile" className="gap-4">
-        <TabsList className="flex-wrap">
-          <TabsTrigger value="profile" className="gap-1.5">
-            <Building2 className="h-3.5 w-3.5" />
-            基本信息
-          </TabsTrigger>
-          <TabsTrigger value="members" className="gap-1.5">
-            <Users className="h-3.5 w-3.5" />
-            成员权限
-          </TabsTrigger>
-          <TabsTrigger value="addresses" className="gap-1.5">
-            <MapPin className="h-3.5 w-3.5" />
-            地址库
-          </TabsTrigger>
-          <TabsTrigger value="categories" className="gap-1.5">
-            <Tags className="h-3.5 w-3.5" />
-            商品分类
-          </TabsTrigger>
-          <TabsTrigger value="notify" className="gap-1.5">
-            <Bell className="h-3.5 w-3.5" />
-            通知
-          </TabsTrigger>
-          <TabsTrigger value="integration" className="gap-1.5">
-            <Plug className="h-3.5 w-3.5" />
-            集成
-          </TabsTrigger>
-          <TabsTrigger value="webhook" className="gap-1.5">
-            <Webhook className="h-3.5 w-3.5" />
-            Webhook
-          </TabsTrigger>
-          <TabsTrigger value="api" className="gap-1.5">
-            <Key className="h-3.5 w-3.5" />
-            API 密钥
-          </TabsTrigger>
-          <TabsTrigger value="audit" className="gap-1.5">
-            <History className="h-3.5 w-3.5" />
-            审计日志
-          </TabsTrigger>
+        {/* 移动端：顶部横向滚动 chip */}
+        <TabsList className="md:hidden -mx-1 flex w-[calc(100%+0.5rem)] gap-1 overflow-x-auto px-1 no-scrollbar">
+          {NAV_GROUPS.flatMap((g) => g.items).map((it) => (
+            <TabsTrigger key={it.value} value={it.value} className="shrink-0 gap-1.5">
+              <it.icon className="h-3.5 w-3.5" />
+              {it.label}
+            </TabsTrigger>
+          ))}
         </TabsList>
+
+        <div className="md:grid md:grid-cols-[13rem_1fr] md:gap-6">
+          {/* 桌面端：左侧分组导航 */}
+          <aside className="hidden md:block">
+            <nav className="sticky top-4 space-y-5 pr-2">
+              {NAV_GROUPS.map((g) => (
+                <div key={g.label}>
+                  <div className="px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                    {g.label}
+                  </div>
+                  <TabsList className="flex h-auto w-full flex-col gap-0.5 bg-transparent p-0">
+                    {g.items.map((it) => (
+                      <TabsTrigger
+                        key={it.value}
+                        value={it.value}
+                        className="group w-full justify-start gap-2 rounded-md border-l-2 border-transparent px-2.5 py-1.5 text-sm font-normal text-muted-foreground data-[state=active]:border-primary data-[state=active]:bg-muted data-[state=active]:text-foreground data-[state=active]:shadow-none hover:bg-muted/60"
+                      >
+                        <it.icon className="h-4 w-4 shrink-0" />
+                        <span className="truncate">{it.label}</span>
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </div>
+              ))}
+            </nav>
+          </aside>
+
+          <div className="min-w-0">
+
 
         <TabsContent value="profile">
           <Card>
