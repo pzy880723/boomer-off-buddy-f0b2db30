@@ -9,6 +9,7 @@ import {
 } from "@/server/handheld-auth.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { InboundScanReq as Body } from "@/lib/handheld/schemas";
+import { enqueueStockPushForLocation } from "@/lib/youzan-sync.functions";
 
 export const Route = createFileRoute("/api/public/handheld/inbound/scan")({
   server: {
