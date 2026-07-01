@@ -194,14 +194,30 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
         if (mv.error) return err(`Stock movement failed: ${mv.error.message}`, 500);
 
         // Youzan sync queue
-        let syncStatus: "disabled" | "queued" | "linked" | "unlinked" = "disabled";
+        let syncStatus: "disabled" | "queued" | "linked" | "unlinked" | "hq_created" | "hq_failed" = "disabled";
+        let hqYzItemId: number | null = null;
+        let hqError: string | null = null;
         if (body.auto_push_youzan) {
+          // 新建 SKU 时：先在有赞总部注册 SPU 主数据（幂等），失败不阻塞入库
+          if (!existSku) {
+            try {
+              const { ensureHqSpuLink } = await import("@/lib/youzan-sync.functions");
+              const r = await ensureHqSpuLink(skuId);
+              hqYzItemId = r.yz_item_id;
+              syncStatus = "hq_created";
+            } catch (e) {
+              hqError = e instanceof Error ? e.message : String(e);
+              syncStatus = "hq_failed";
+            }
+          }
           const { data: links } = await supabaseAdmin
             .from("sku_youzan_links")
-            .select("id")
-            .eq("sku_id", skuId)
-            .limit(1);
-          if (links && links.length > 0) {
+            .select("id, sync_stock")
+            .eq("sku_id", skuId);
+          const stockLinks = (links ?? []).filter(
+            (l) => (l as { sync_stock?: boolean }).sync_stock !== false,
+          );
+          if (stockLinks.length > 0) {
             const { data: skuRow } = await supabaseAdmin
               .from("inv_skus")
               .select("stock_qty")
@@ -214,10 +230,11 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
               status: "pending",
             });
             syncStatus = "queued";
-          } else {
+          } else if (syncStatus === "disabled") {
             syncStatus = "unlinked";
           }
         }
+
 
         const { data: finalSku } = await supabaseAdmin
           .from("inv_skus")
