@@ -51,29 +51,44 @@ export type LinkRow = {
 // 参数：kdt_id（总部）、item_id 或 sku_id、num（目标值）、type=set
 // 接口若返回 [40005] / [-1] 等错误，向上抛出，由 worker 入失败队列
 // ============================================================
+// 覆盖式推送到指定店铺。
+// - 总部（role=hq）：走 retail.open.stock.update（chain 场景可后续替换回 retail 接口）
+// - 分店（role=branch，独立 kdt + 独立 item）：走 youzan.item.quantity.update type=3 (set)
 async function pushStockToYouzan(
   link: LinkRow,
   targetStock: number,
   clientSeq: string,
 ): Promise<void> {
-  const hq = await getHqShop();
-  const token = await ensureAccessToken(hq);
-  const params: Record<string, unknown> = {
-    kdt_id: hq.kdt_id,
-    item_id: link.yz_item_id,
-    num: Math.max(0, targetStock),
-    type: "set",
-    client_seq: clientSeq,
-  };
-  if (link.yz_sku_id) params.sku_id = link.yz_sku_id;
+  const shop = await getShopById(link.shop_id);
+  const token = await ensureAccessToken(shop);
+  const num = Math.max(0, targetStock);
 
-  await callYouzanApiVerbose({
-    accessToken: token,
-    method: "youzan.retail.open.stock.update",
-    version: "1.0.0",
-    params,
-    timeoutMs: 20_000,
-  });
+  if (shop.role === "hq") {
+    const params: Record<string, unknown> = {
+      kdt_id: shop.kdt_id,
+      item_id: link.yz_item_id,
+      num,
+      type: "set",
+      client_seq: clientSeq,
+    };
+    if (link.yz_sku_id) params.sku_id = link.yz_sku_id;
+    await callYouzanApiVerbose({
+      accessToken: token,
+      method: "youzan.retail.open.stock.update",
+      version: "1.0.0",
+      params,
+      timeoutMs: 20_000,
+    });
+  } else {
+    // 独立 kdt 分店：单店商品库存 API（type=3 = 覆盖设置）
+    await callYouzanApiVerbose({
+      accessToken: token,
+      method: "youzan.item.quantity.update",
+      version: "3.0.0",
+      params: { item_id: link.yz_item_id, type: 3, quantity: num },
+      timeoutMs: 20_000,
+    });
+  }
 }
 
 // ============================================================
