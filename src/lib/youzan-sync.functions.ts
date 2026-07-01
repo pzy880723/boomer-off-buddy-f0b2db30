@@ -317,64 +317,75 @@ export const unlinkSku = createServerFn({ method: "POST" })
 // 仅提供一个最小可用的封装；零售连锁版 spu.add 实际所需的类目 / 规格
 // 字段较多，建议用户后续按需扩展。
 // ============================================================
+export async function ensureHqSpuLink(
+  sku_id: string,
+): Promise<{ created: boolean; yz_item_id: number; shop_id: string }> {
+  const hq = await getHqShop();
+  // 已有 HQ 绑定则直接返回
+  const { data: existed } = await supabase
+    .from("sku_youzan_links")
+    .select("yz_item_id")
+    .eq("sku_id", sku_id)
+    .eq("shop_id", hq.id)
+    .maybeSingle();
+  if (existed?.yz_item_id) {
+    return { created: false, yz_item_id: Number(existed.yz_item_id), shop_id: hq.id };
+  }
+
+  const { data: sku } = await supabase
+    .from("inv_skus")
+    .select("*")
+    .eq("id", sku_id)
+    .maybeSingle();
+  if (!sku) throw new Error("SKU 不存在");
+
+  const token = await ensureAccessToken(hq);
+  const params = {
+    kdt_id: hq.kdt_id,
+    product_name: sku.name,
+    price: Number(sku.price_tier),
+    stock_num: Number(sku.stock_qty ?? 0),
+    photo_url: sku.image_url ? [sku.image_url] : [],
+    desc: sku.notes ?? "",
+    out_product_id: sku.id,
+  };
+  const res = await callYouzanApiVerbose({
+    accessToken: token,
+    method: "youzan.retail.open.spu.add",
+    version: "3.0.0",
+    params,
+    timeoutMs: 30_000,
+  });
+  const payload = res.payload as Record<string, unknown>;
+  const newItemId = Number(
+    payload.item_id ?? payload.spu_id ?? payload.id ?? 0,
+  );
+  if (!newItemId) {
+    throw new Error(`有赞返回未识别 item_id：${res.preview.slice(0, 200)}`);
+  }
+
+  await supabase.from("sku_youzan_links").upsert(
+    {
+      sku_id,
+      shop_id: hq.id,
+      yz_item_id: newItemId,
+      status: "linked",
+    } as never,
+    { onConflict: "sku_id,shop_id" },
+  );
+  return { created: true, yz_item_id: newItemId, shop_id: hq.id };
+}
+
 export const pushSkuAsNewYouzanItem = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z.object({ sku_id: z.string().uuid() }).parse(input),
   )
   .handler(async ({ data }) => {
-    const { data: sku } = await supabase
-      .from("inv_skus")
-      .select("*")
-      .eq("id", data.sku_id)
-      .maybeSingle();
-    if (!sku) throw new Error("SKU 不存在");
-
-    const hq = await getHqShop();
-    const token = await ensureAccessToken(hq);
-
-    // ⚠️ retail.open.spu.add 的真实必填字段需按你们有赞类目情况调整
-    // 这里给出最小可用骨架，调通后请补全 category_id / barcode 等
-    const params = {
-      kdt_id: hq.kdt_id,
-      product_name: sku.name,
-      price: Number(sku.price_tier),
-      stock_num: Number(sku.stock_qty ?? 0),
-      photo_url: sku.image_url ? [sku.image_url] : [],
-      desc: sku.notes ?? "",
-      out_product_id: sku.id, // 我方编码，便于回查
-    };
-
-    const res = await callYouzanApiVerbose({
-      accessToken: token,
-      method: "youzan.retail.open.spu.add",
-      version: "3.0.0",
-      params,
-      timeoutMs: 30_000,
-    });
-
-    const payload = res.payload as Record<string, unknown>;
-    const newItemId = Number(
-      payload.item_id ?? payload.spu_id ?? payload.id ?? 0,
-    );
-    if (!newItemId) {
-      throw new Error(
-        `有赞返回未识别 item_id：${res.preview.slice(0, 200)}`,
-      );
-    }
-
-    // 建链
-    await supabase.from("sku_youzan_links").upsert(
-      {
-        sku_id: sku.id,
-        shop_id: hq.id,
-        yz_item_id: newItemId,
-        status: "linked",
-      } as never,
-      { onConflict: "sku_id" },
-    );
-    return { ok: true, yz_item_id: newItemId };
+    const r = await ensureHqSpuLink(data.sku_id);
+    return { ok: true, yz_item_id: r.yz_item_id, created: r.created };
   });
+
 
 // ============================================================
 // pullYouzanItemAsSku —— 从有赞商品拉到本地建 SKU 占位并绑定
