@@ -124,6 +124,17 @@ export const SkuSummarySchema = z
     category: z.string().nullable(),
     price_tier: z.string().nullable().meta({ description: "价格档枚举" }),
     stock_qty: z.number().int().meta({ example: 12 }),
+    image_url: z.string().nullable().meta({ description: "主图 read URL；没有图片时为 null" }),
+    image_paths: z.array(z.string()).default([]).meta({ description: "持久图片路径列表" }),
+    images: z
+      .array(
+        z.object({
+          storage_path: z.string(),
+          read_url: z.string(),
+        }),
+      )
+      .default([])
+      .meta({ description: "可直接展示的图片 URL 列表" }),
   })
   .meta({ id: "SkuSummary" });
 
@@ -164,6 +175,76 @@ export const SkuSearchQuery = z.object({
 });
 
 export const SkuSearchRes = okEnvelope(z.object({ items: z.array(SkuSummarySchema) }));
+
+export const ProductTypeSchema = z.enum(["standard", "custom", "bundle"]);
+
+export const ProductStockSchema = z
+  .object({
+    location_id: uuidSchema,
+    location_name: z.string(),
+    location_kind: z.enum(["warehouse", "shop"]),
+    stock_qty: z.number().int(),
+  })
+  .meta({ id: "ProductStock" });
+
+export const ProductItemSchema = z
+  .object({
+    id: uuidSchema,
+    product_type: ProductTypeSchema,
+    sku_code: z.string().nullable(),
+    barcode: z.string().nullable(),
+    item_code: z.string().nullable(),
+    name: z.string(),
+    category: z.string().nullable(),
+    price: z.number(),
+    condition_grade: z.enum(["N", "S", "A", "B", "C", "J"]).nullable(),
+    image_url: z.string().nullable().meta({ description: "主图 read URL；没有图片时为 null" }),
+    image_paths: z.array(z.string()).default([]),
+    images: z
+      .array(
+        z.object({
+          storage_path: z.string(),
+          read_url: z.string(),
+        }),
+      )
+      .default([]),
+    notes: z.string().nullable(),
+    total_stock_qty: z.number().int(),
+    stocks: z.array(ProductStockSchema),
+    status: z.string(),
+    created_at: z.string(),
+    updated_at: z.string(),
+  })
+  .meta({ id: "ProductItem" });
+
+export const ProductsQuery = z
+  .object({
+    q: z.string().optional(),
+    type: z.enum(["standard", "custom", "bundle", "all"]).default("all"),
+    scope: z.enum(["authorized", "current_location"]).default("authorized"),
+    location_id: uuidSchema.optional(),
+    page: z.coerce.number().int().min(1).default(1),
+    page_size: z.coerce.number().int().min(1).max(200).default(50),
+  })
+  .meta({ id: "ProductsQuery" });
+
+export const ProductsRes = okEnvelope(
+  z.object({
+    items: z.array(ProductItemSchema),
+    total: z.number().int(),
+    page: z.number().int(),
+    page_size: z.number().int(),
+  }),
+);
+
+export const ProductLookupQuery = z
+  .object({
+    code: z.string().optional().meta({ description: "barcode / sku_code / EPC / QR JSON" }),
+    q: z.string().optional().meta({ description: "兼容 APP 测试；无 code 时按关键字返回第一条" }),
+  })
+  .meta({ id: "ProductLookupQuery" });
+
+export const ProductLookupRes = okEnvelope(ProductItemSchema);
 
 // ============================================================
 // 3. 入库 inbound/scan
