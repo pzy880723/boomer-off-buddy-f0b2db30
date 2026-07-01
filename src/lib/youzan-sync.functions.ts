@@ -8,6 +8,23 @@ import {
   getHqShop,
 } from "./youzan.functions";
 
+// 内部：按 shop_id 加载店铺（HQ 或分店都可）
+async function getShopById(shopId: string) {
+  const { data, error } = await supabase
+    .from("youzan_shops")
+    .select("*")
+    .eq("id", shopId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error(`youzan_shop ${shopId} 不存在`);
+  return data as unknown as Parameters<typeof ensureAccessToken>[0] & {
+    id: string;
+    kdt_id: number;
+    role: "hq" | "branch";
+    shop_name: string;
+  };
+}
+
 // ============================================================
 // 类型
 // ============================================================
