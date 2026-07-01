@@ -604,7 +604,7 @@ async function runStockSyncWorkerCore(opts: {
       // 自愈：如果 location_id 存在，用当前 inv_stocks 覆盖 target，防止队列过时
       let target = Number(t.target_stock ?? 0);
       if (t.location_id) {
-        target = await resolveShopStockTarget(t.sku_id, t.location_id, t.shop_id);
+        target = await resolveShopStockTarget(t.sku_id, t.location_id, t.shop_id ?? "");
       }
 
       await pushStockToYouzan(link as LinkRow, target, t.id);
