@@ -270,20 +270,31 @@ function pinyinCode(name: string, yzId: number): string {
 export const previewYouzanCategorySync = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { rows: yz, api, shop_id } = await fetchYouzanHqCategories();
+    const { rows: yz, api, shop_id, notes } = await fetchYouzanHqCategories();
     const { data: existing, error } = await context.supabase
       .from("inv_categories" as never)
       .select(SELECT_COLS);
     if (error) throw new Error(error.message);
     const local = (existing ?? []) as unknown as CategoryRow[];
-    const byYz = new Map(local.filter((r) => r.youzan_hq_category_id).map((r) => [r.youzan_hq_category_id!, r]));
+    const byYz = new Map(
+      local.filter((r) => r.youzan_hq_category_id).map((r) => [r.youzan_hq_category_id!, r]),
+    );
+    const yzById = new Map(yz.map((y) => [y.id, y]));
 
-    const toAdd: { yz: YzCategory; suggest_code: string }[] = [];
+    const toAdd: {
+      yz: YzCategory;
+      suggest_code: string;
+      parent_name: string | null;
+    }[] = [];
     const toUpdate: { local: CategoryRow; yz: YzCategory }[] = [];
     for (const y of yz) {
       const cur = byYz.get(y.id);
       if (!cur) {
-        toAdd.push({ yz: y, suggest_code: pinyinCode(y.name, y.id) });
+        toAdd.push({
+          yz: y,
+          suggest_code: pinyinCode(y.name, y.id),
+          parent_name: y.parent_id ? (yzById.get(y.parent_id)?.name ?? null) : null,
+        });
       } else if (cur.name !== y.name) {
         toUpdate.push({ local: cur, yz: y });
       }
@@ -293,7 +304,21 @@ export const previewYouzanCategorySync = createServerFn({ method: "POST" })
     const toDeactivate = local.filter(
       (r) => r.youzan_hq_category_id != null && !yzIds.has(r.youzan_hq_category_id) && r.is_active,
     );
-    return { api, shop_id, to_add: toAdd, to_update: toUpdate, to_deactivate: toDeactivate };
+    // 按父→子稳定排序，UI 显示更直观
+    toAdd.sort((a, b) => {
+      const ap = a.yz.parent_id ?? 0;
+      const bp = b.yz.parent_id ?? 0;
+      if (ap !== bp) return ap - bp;
+      return a.yz.name.localeCompare(b.yz.name);
+    });
+    return {
+      api,
+      shop_id,
+      notes,
+      to_add: toAdd,
+      to_update: toUpdate,
+      to_deactivate: toDeactivate,
+    };
   });
 
 const ApplyInput = z.object({
@@ -302,6 +327,7 @@ const ApplyInput = z.object({
     .array(
       z.object({
         youzan_hq_category_id: z.number().int(),
+        youzan_hq_parent_id: z.number().int().nullable().optional(),
         name: z.string(),
         code: z.string().min(1),
       }),
@@ -320,8 +346,27 @@ export const applyYouzanCategorySync = createServerFn({ method: "POST" })
     let updatedN = 0;
     let deactivatedN = 0;
 
+    // 先按父→子排序（父在前）
+    const addSorted = [...data.add].sort((a, b) => {
+      const ap = a.youzan_hq_parent_id ?? 0;
+      const bp = b.youzan_hq_parent_id ?? 0;
+      // parent (=0) 先，子后
+      return ap - bp;
+    });
+
+    // 用本次已建 + 现有映射查父 local id
+    const yzToLocal = new Map<number, string>();
+    {
+      const { data: existing } = await supabase
+        .from("inv_categories" as never)
+        .select("id, youzan_hq_category_id");
+      for (const r of (existing ?? []) as { id: string; youzan_hq_category_id: number | null }[]) {
+        if (r.youzan_hq_category_id) yzToLocal.set(r.youzan_hq_category_id, r.id);
+      }
+    }
+
     // ---- add
-    for (const a of data.add) {
+    for (const a of addSorted) {
       // code 冲突自动加后缀
       let code = a.code;
       for (let n = 2; n < 20; n++) {
@@ -333,15 +378,25 @@ export const applyYouzanCategorySync = createServerFn({ method: "POST" })
         if (!dup) break;
         code = `${a.code}${n}`;
       }
-      const { error } = await supabase.from("inv_categories" as never).insert({
-        code,
-        name: a.name,
-        youzan_hq_category_id: a.youzan_hq_category_id,
-        youzan_shop_id: data.shop_id,
-        synced_at: now,
-        sort_order: 500,
-      } as never);
+      const parentLocalId = a.youzan_hq_parent_id
+        ? (yzToLocal.get(a.youzan_hq_parent_id) ?? null)
+        : null;
+      const { data: ins, error } = await supabase
+        .from("inv_categories" as never)
+        .insert({
+          code,
+          name: a.name,
+          parent_id: parentLocalId,
+          youzan_hq_category_id: a.youzan_hq_category_id,
+          youzan_hq_parent_id: a.youzan_hq_parent_id ?? null,
+          youzan_shop_id: data.shop_id,
+          synced_at: now,
+          sort_order: parentLocalId ? 600 : 500,
+        } as never)
+        .select("id")
+        .single();
       if (error) throw new Error(error.message);
+      yzToLocal.set(a.youzan_hq_category_id, (ins as { id: string }).id);
       addedN++;
     }
     // ---- update
@@ -364,3 +419,4 @@ export const applyYouzanCategorySync = createServerFn({ method: "POST" })
     }
     return { added: addedN, updated: updatedN, deactivated: deactivatedN };
   });
+
