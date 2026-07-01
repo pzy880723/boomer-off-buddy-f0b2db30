@@ -268,8 +268,10 @@ function SettingsPage() {
               </ul>
             </CardContent>
           </Card>
-        </TabsContent>
+          </div>
+        </div>
       </Tabs>
     </div>
   );
 }
+
