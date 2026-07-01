@@ -970,6 +970,60 @@ export const OtpVerifyWebRes = okEnvelope(
   }),
 );
 
+// ============================================================
+// 标签模板（总部统一管理，v1.5）
+// ============================================================
+
+export const LabelTemplateItem = z
+  .object({
+    id: uuidSchema,
+    name: z.string(),
+    width_mm: z.number(),
+    height_mm: z.number(),
+    is_default: z.boolean(),
+    elements: z.array(z.any()).default([]),
+    version: z.number().int().default(1),
+    updated_at: z.string(),
+  })
+  .meta({ id: "LabelTemplateItem" });
+
+export const LabelTemplatesRes = okEnvelope(
+  z.object({
+    default_template_id: z.string().uuid().nullable(),
+    items: z.array(LabelTemplateItem),
+    can_manage: z.boolean(),
+  }),
+);
+
+export const LabelTemplateCreateReq = z
+  .object({
+    name: z.string().min(1).max(120),
+    width_mm: z.number().positive().default(53),
+    height_mm: z.number().positive().default(35),
+    elements: z.array(z.any()).default([]),
+    is_default: z.boolean().optional(),
+  })
+  .meta({ id: "LabelTemplateCreateReq" });
+
+export const LabelTemplateUpdateReq = z
+  .object({
+    name: z.string().min(1).max(120).optional(),
+    width_mm: z.number().positive().optional(),
+    height_mm: z.number().positive().optional(),
+    elements: z.array(z.any()).optional(),
+    is_default: z.boolean().optional(),
+  })
+  .meta({ id: "LabelTemplateUpdateReq" });
+
+export const LabelTemplateRes = okEnvelope(LabelTemplateItem);
+
+export const LabelTemplateDeleteRes = okEnvelope(z.object({ deleted: z.boolean() }));
+
+export const LabelTemplateSetDefaultRes = okEnvelope(
+  z.object({ default_template_id: uuidSchema }),
+);
+
+
 
 
 
