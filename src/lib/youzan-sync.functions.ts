@@ -606,11 +606,26 @@ async function runStockSyncWorkerCore(opts: {
       const { data: link } = await linkQuery.maybeSingle();
       if (!link) throw new Error("SKU 未绑定该门店的有赞商品（可能已解绑）");
 
+      // v2：HQ 主 SPU 不推库存，直接标 done 跳过
+      if ((link as { sync_stock?: boolean }).sync_stock === false) {
+        await supabase
+          .from("youzan_stock_sync_queue")
+          .update({
+            status: "done",
+            last_error: null,
+            attempts: (t.attempts ?? 0) + 1,
+          } as never)
+          .eq("id", t.id);
+        ok += 1;
+        continue;
+      }
+
       // 自愈：如果 location_id 存在，用当前 inv_stocks 覆盖 target，防止队列过时
       let target = Number(t.target_stock ?? 0);
       if (t.location_id) {
         target = await resolveShopStockTarget(t.sku_id, t.location_id, t.shop_id ?? "");
       }
+
 
       await pushStockToYouzan(link as LinkRow, target, t.id);
 
