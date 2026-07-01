@@ -534,9 +534,51 @@ Token 由后台 **仓库管理 → 手持终端** 页面创建/复制。设备�
         },
       },
     },
+    "/api/public/handheld/label-templates": {
+      get: {
+        tags: ["标签模板"],
+        summary: "列出所有标签模板（v1.5）",
+        description:
+          "返回全部模板 + 默认模板 id；`can_manage=true` 表示当前登录账号为总部权限，可增删改。任何登录设备都可读取，用于本地缓存。",
+        responses: { "200": jsonRes("OK", LabelTemplatesRes), ...ERROR_RESPONSES },
+      },
+      post: {
+        tags: ["标签模板"],
+        summary: "新建标签模板（HQ）",
+        description: "仅总部权限（super_admin / hq_operator）可用。传 `is_default:true` 会自动把其它模板取消默认。",
+        requestBody: jsonBody(LabelTemplateCreateReq),
+        responses: { "200": jsonRes("OK", LabelTemplateRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/label-templates/{id}": {
+      put: {
+        tags: ["标签模板"],
+        summary: "编辑标签模板（HQ）",
+        description: "仅传要改的字段；每次保存 version+1。",
+        requestParams: { path: z.object({ id: z.string().uuid() }) },
+        requestBody: jsonBody(LabelTemplateUpdateReq),
+        responses: { "200": jsonRes("OK", LabelTemplateRes), ...ERROR_RESPONSES },
+      },
+      delete: {
+        tags: ["标签模板"],
+        summary: "删除标签模板（HQ）",
+        description: "如果删除的是默认模板，会自动把最近更新的一条晋升为默认。",
+        requestParams: { path: z.object({ id: z.string().uuid() }) },
+        responses: { "200": jsonRes("OK", LabelTemplateDeleteRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/label-templates/{id}/set-default": {
+      post: {
+        tags: ["标签模板"],
+        summary: "把某个模板设为默认（HQ）",
+        requestParams: { path: z.object({ id: z.string().uuid() }) },
+        responses: { "200": jsonRes("OK", LabelTemplateSetDefaultRes), ...ERROR_RESPONSES },
+      },
+    },
   },
 
 };
+
 
 let cached: ReturnType<typeof createDocument> | null = null;
 
