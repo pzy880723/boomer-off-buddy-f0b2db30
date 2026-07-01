@@ -146,9 +146,9 @@ function ProductDetailPage() {
             <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs sm:grid-cols-3">
               <Attr label="总库存" value={<span className="font-semibold tabular-nums">{group.totalStock} 件</span>} />
               {group.code && <Attr label="商品编码" value={<span className="font-mono">{group.code}</span>} />}
-              {group.weight_g != null && <Attr label="单件重量" value={`${group.weight_g} g`} />}
               <Attr label="价格档数" value={`${group.tiers.length}`} />
             </div>
+
           </div>
         </div>
       </Card>
@@ -159,10 +159,11 @@ function ProductDetailPage() {
           <div>
             <h3 className="text-sm font-semibold">价格档子 SKU</h3>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              每个价格档独立 EPC、独立库存。点击进入打印 / 入库 / 编辑。
+              每个价格档 = 一个独立 SKU = 一个价格 = 一段规格编码；RFID 扫描枪扫到对应编码即库存 +1。
             </p>
           </div>
         </div>
+
         <div className="divide-y rounded-md border">
           {group.skus.map((sku) => (
             <Link

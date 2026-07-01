@@ -84,18 +84,19 @@ export function StandardSkuDialog({
         <DialogHeader>
           <DialogTitle>新建标准商品</DialogTitle>
           <DialogDescription>
-            选中多个标准价格档将一次生成多条 SKU，共用品名、图片和商品编码
+            标准商品按「价格档」分类：每个价格档 = 一个独立 SKU = 一个价格 = 一段规格编码。RFID 标签在打印时已绑定商品编码 + 规格编码，扫描枪扫一下即库存 +1。
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
-          <SkuMetaFields state={meta} onChange={setMeta} />
+          <SkuMetaFields state={meta} onChange={setMeta} hideGrade hideWeight />
           <div className="space-y-2">
-            <Label>标准价格档 *（全局共用，可增删改）</Label>
+            <Label>价格档 *（每档即一个 SKU）</Label>
             <PriceTierEditor value={tiers} onChange={setTiers} />
             <p className="text-xs text-muted-foreground">
               已选 {sortedSelected.length} 档 → 将生成 {sortedSelected.length} 个 SKU
             </p>
           </div>
+
 
           {sortedSelected.length > 0 && meta.category && (
             <div className="rounded-md border bg-muted/30 p-3">

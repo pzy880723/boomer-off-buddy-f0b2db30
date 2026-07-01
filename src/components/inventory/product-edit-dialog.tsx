@@ -92,10 +92,11 @@ export function ProductEditDialog({
           <DialogTitle>编辑标准商品</DialogTitle>
         </DialogHeader>
         <p className="text-xs text-muted-foreground">
-          类目无法修改；保存后会同步到该商品下的全部价格档子 SKU。新增的价格档会自动生成 EPC，删除的价格档若仍有库存会阻止保存。
+          类目无法修改；保存后会同步到该商品下的全部价格档子 SKU。每个价格档 = 一个独立 SKU = 一个价格 = 一段规格编码。新增的价格档会自动生成 EPC，删除的价格档若仍有库存会阻止保存。
         </p>
         <div className="py-2 space-y-4">
-          <SkuMetaFields state={meta} onChange={setMeta} hideCategory />
+          <SkuMetaFields state={meta} onChange={setMeta} hideCategory hideGrade hideWeight />
+
           <div className="space-y-1.5">
             <Label>价格档 *</Label>
             <PriceTierEditor value={tiers} onChange={setTiers} />
