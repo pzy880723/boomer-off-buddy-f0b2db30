@@ -34,6 +34,10 @@ function SettingsPage() {
             <MapPin className="h-3.5 w-3.5" />
             地址库
           </TabsTrigger>
+          <TabsTrigger value="categories" className="gap-1.5">
+            <Tags className="h-3.5 w-3.5" />
+            商品分类
+          </TabsTrigger>
           <TabsTrigger value="notify" className="gap-1.5">
             <Bell className="h-3.5 w-3.5" />
             通知
