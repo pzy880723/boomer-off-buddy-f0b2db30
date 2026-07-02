@@ -1,7 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { Building2, Users, Bell, Plug, Webhook, Key, History, MapPin, Tags } from "lucide-react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { z } from "zod";
+import { Building2, Users, Bell, Plug, Webhook, Key, History, MapPin, Tags, FolderTree, Layers } from "lucide-react";
 import { AddressBookPanel } from "@/components/settings/address-book-panel";
 import { CategoriesPanel } from "@/components/settings/categories-panel";
+import { EmptyState } from "@/components/empty-state";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -11,12 +13,31 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/page-header";
 
+const SETTINGS_TABS = [
+  "profile",
+  "members",
+  "addresses",
+  "categories",
+  "groups",
+  "notify",
+  "integration",
+  "webhook",
+  "api",
+  "audit",
+] as const;
+type SettingsTab = (typeof SETTINGS_TABS)[number];
+
+const SearchSchema = z.object({
+  tab: z.enum(SETTINGS_TABS).optional(),
+});
+
 export const Route = createFileRoute("/settings")({
   head: () => ({ meta: [{ title: "系统设置 · BOOMER OFF" }, { name: "description", content: "权限角色、数据字典与操作日志" }] }),
+  validateSearch: (s) => SearchSchema.parse(s),
   component: SettingsPage,
 });
 
-type NavItem = { value: string; label: string; icon: typeof Building2 };
+type NavItem = { value: SettingsTab; label: string; icon: typeof Building2 };
 type NavGroup = { label: string; items: NavItem[] };
 
 const NAV_GROUPS: NavGroup[] = [
@@ -30,7 +51,10 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: "商品",
-    items: [{ value: "categories", label: "商品分组", icon: Tags }],
+    items: [
+      { value: "categories", label: "商品分类", icon: FolderTree },
+      { value: "groups", label: "商品分组", icon: Layers },
+    ],
   },
   {
     label: "通知与集成",
@@ -48,10 +72,17 @@ const NAV_GROUPS: NavGroup[] = [
 ];
 
 function SettingsPage() {
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
+  const activeTab: SettingsTab = search.tab ?? "profile";
+  const setTab = (v: string) => {
+    navigate({ search: { tab: v === "profile" ? undefined : (v as SettingsTab) }, replace: true });
+  };
   return (
     <div>
       <PageHeader title="系统设置" description="账户、通知、集成与安全策略管理" />
-      <Tabs defaultValue="profile" className="gap-4">
+      <Tabs value={activeTab} onValueChange={setTab} className="gap-4">
+
         {/* 移动端：顶部横向滚动 chip */}
         <TabsList className="md:hidden -mx-1 flex w-[calc(100%+0.5rem)] gap-1 overflow-x-auto px-1 no-scrollbar">
           {NAV_GROUPS.flatMap((g) => g.items).map((it) => (
