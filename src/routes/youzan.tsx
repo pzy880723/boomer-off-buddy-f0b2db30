@@ -417,9 +417,6 @@ function YouzanPage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="items" className="mt-3">
-            <ShopItemsPanel />
-          </TabsContent>
 
           <TabsContent value="sync" className="mt-3">
             <SyncCenterPanel />
