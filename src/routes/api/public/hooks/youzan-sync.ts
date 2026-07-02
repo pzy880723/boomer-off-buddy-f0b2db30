@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { runShopSyncCore } from "@/lib/youzan.functions";
 
 // 定时同步有赞订单 / 商品。每 30 分钟由 pg_cron 触发，days 默认 3 天做增量。
 // 支持 POST { days?: number }（1~180）。返回派发数量。
@@ -29,18 +28,23 @@ export const Route = createFileRoute("/api/public/hooks/youzan-sync")({
           );
         }
 
+        const origin = new URL(request.url).origin;
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        const apikey = process.env.SUPABASE_PUBLISHABLE_KEY;
+        if (apikey) headers.apikey = apikey;
+
         let dispatched = 0;
         for (const shop of shops ?? []) {
           const jobs: Array<"items" | "orders"> =
-            shop.role === "hq" ? ["items", "orders"] : ["items"];
+            shop.role === "hq" ? ["items"] : ["items", "orders"];
           for (const action of jobs) {
-            void (async () => {
-              try {
-                await runShopSyncCore({ shop_id: shop.id, action, days });
-              } catch (e) {
-                console.error("[cron youzan-sync]", shop.id, action, e);
-              }
-            })();
+            void fetch(`${origin}/api/public/hooks/youzan-sync-worker`, {
+              method: "POST",
+              headers,
+              body: JSON.stringify({ shop_id: shop.id, action, days }),
+            }).catch((e) => {
+              console.error("[cron youzan-sync dispatch]", shop.id, action, e);
+            });
             dispatched += 1;
           }
         }

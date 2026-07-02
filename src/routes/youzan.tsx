@@ -218,10 +218,13 @@ function YouzanPage() {
   useEffect(() => {
     if (!syncSession || !syncProgress) return;
     if (syncProgress.finished >= syncProgress.total && syncProgress.total > 0) {
+      qc.invalidateQueries({ queryKey: ["youzan-summary"] });
+      qc.invalidateQueries({ queryKey: ["youzan-breakdown"] });
+      qc.invalidateQueries({ queryKey: ["youzan-sync-logs"] });
       const t = setTimeout(() => setSyncSession(null), 30_000);
       return () => clearTimeout(t);
     }
-  }, [syncSession, syncProgress]);
+  }, [qc, syncSession, syncProgress]);
 
 
   return (
