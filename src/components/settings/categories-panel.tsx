@@ -96,6 +96,13 @@ export function CategoriesPanel() {
       setPickUpd(u);
       setPickDeact(d);
       setSyncOpen(true);
+      if (res.blocking) {
+        if (res.blocking.kind === "ip_whitelist") {
+          toast.error("有赞侧未加白名单，见弹窗说明");
+        } else if (res.blocking.kind === "no_api") {
+          toast.error("当前授权无分类接口权限");
+        }
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "预览失败");
     } finally {
@@ -285,10 +292,15 @@ export function CategoriesPanel() {
           </DialogHeader>
           {previewData && (
             <div className="max-h-[60vh] space-y-4 overflow-y-auto">
+              {previewData.blocking && <BlockingErrorAlert blocking={previewData.blocking} onRetry={runPreview} retrying={syncing} />}
               {previewData.notes && previewData.notes.length > 0 && (
-                <div className="rounded-md border border-muted bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground space-y-0.5">
+                <div className="rounded-md border border-muted bg-muted/30 px-3 py-2 text-[11px] space-y-1">
                   {previewData.notes.map((n, i) => (
-                    <div key={i}>· {n}</div>
+                    <div key={i} className="flex items-start gap-1.5">
+                      <span>{n.status === "ok" ? "✅" : n.status === "no_api" ? "⚠️" : n.status === "ip_blocked" ? "🚫" : n.status === "empty" ? "◌" : "❌"}</span>
+                      <span className="font-mono text-[10px] shrink-0 text-muted-foreground">{n.api}</span>
+                      <span className="text-muted-foreground break-all">— {n.message}{n.count != null ? `（${n.count} 条）` : ""}</span>
+                    </div>
                   ))}
                 </div>
               )}
@@ -617,5 +629,74 @@ function EditDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+type BlockingErrorLike =
+  | { kind: "ip_whitelist"; ip: string; apis: string[]; raw: string }
+  | { kind: "no_api"; apis: string[] }
+  | { kind: "other"; message: string };
+
+function BlockingErrorAlert({
+  blocking,
+  onRetry,
+  retrying,
+}: {
+  blocking: BlockingErrorLike;
+  onRetry: () => void;
+  retrying: boolean;
+}) {
+  const copy = (t: string) => {
+    navigator.clipboard.writeText(t).then(() => toast.success("已复制"));
+  };
+  if (blocking.kind === "ip_whitelist") {
+    return (
+      <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 space-y-3 text-sm">
+        <div>
+          <div className="font-medium text-destructive">有赞侧未加 IP 白名单</div>
+          <div className="text-xs text-muted-foreground mt-0.5">
+            请前往 <b>有赞云 · 应用中心 · 应用详情 · IP 白名单</b> 添加下方出口 IP，保存后回到本页点「重试」。
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <code className="flex-1 rounded bg-muted px-2 py-1.5 font-mono text-sm">{blocking.ip || "(未识别到 IP)"}</code>
+          <Button size="sm" variant="outline" onClick={() => copy(blocking.ip)} disabled={!blocking.ip}>
+            复制
+          </Button>
+        </div>
+        {blocking.apis.length > 0 && (
+          <div className="text-[11px] text-muted-foreground">
+            被拒接口：{blocking.apis.join(" / ")}
+          </div>
+        )}
+        <div className="flex gap-2 pt-1">
+          <Button size="sm" onClick={onRetry} disabled={retrying}>
+            {retrying && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
+            已完成，重试
+          </Button>
+        </div>
+      </div>
+    );
+  }
+  if (blocking.kind === "no_api") {
+    return (
+      <div className="rounded-md border border-amber-500/40 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm space-y-2">
+        <div className="font-medium">当前授权无以下接口权限</div>
+        <ul className="text-xs text-muted-foreground list-disc pl-5">
+          {blocking.apis.map((a) => (
+            <li key={a} className="font-mono">{a}</li>
+          ))}
+        </ul>
+        <div className="text-[11px] text-muted-foreground">
+          若店铺不是零售版，`retail.*` 接口本身无法授权；请在有赞应用中心确认已勾选「商品类目」相关接口。
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
+      <div className="font-medium text-destructive mb-1">拉取失败</div>
+      <pre className="text-[11px] text-muted-foreground whitespace-pre-wrap break-all">{blocking.message}</pre>
+    </div>
   );
 }
