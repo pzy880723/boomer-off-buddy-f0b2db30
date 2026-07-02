@@ -263,7 +263,7 @@ async function reapStaleSyncLogs() {
       finished_at: new Date().toISOString(),
     } as never)
     .eq("status", "running")
-    .lt("started_at", new Date(Date.now() - 30_000).toISOString());
+    .lt("started_at", new Date(Date.now() - 10 * 60_000).toISOString());
 }
 
 // ============================================================
@@ -911,6 +911,7 @@ async function runItemsSyncForShop(
           count_in: totalUpserted,
           count_out: totalReturned,
           message: msg,
+          error: null,
           finished_at: new Date().toISOString(),
         } as never)
         .eq("id", log.id);
@@ -1450,6 +1451,7 @@ async function runOrdersSyncForShop(
           count_in: totalUpserted,
           count_out: totalReturned,
           message: msg,
+          error: null,
           finished_at: new Date().toISOString(),
         } as never)
         .eq("id", log.id);
