@@ -1,22 +1,17 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { youzanFetch, getYouzanOutboundStatus } from "./youzan-http";
+import { getYouzanOutboundStatus } from "./youzan-http";
 
 const SETTINGS_KEY = "youzan_proxy_outbound_ip";
-const IPV4 = /(?<![\d.])((?:\d{1,3}\.){3}\d{1,3})(?![\d.])/;
 
-function extractIp(text: string): string | null {
-  const m = IPV4.exec(text);
-  if (!m) return null;
-  const parts = m[1].split(".").map(Number);
-  if (parts.some((p) => !Number.isFinite(p) || p < 0 || p > 255)) return null;
-  return m[1];
+function getProxyUrl() {
+  const raw = process.env.YOUZAN_PROXY_URL?.trim();
+  return raw && /^https?:\/\//i.test(raw) ? raw : null;
 }
 
 /**
- * 探测有赞代理的固定出口 IP：故意用无效 client_id 请求 oauth/token，
- * 有赞在 IP 未加白时会返回 "IP x.x.x.x is not in whitelist"，从中解析。
- * 若已加白但凭据错误，则回包不含 IP，会尝试 ip-api 备选。
+ * 通过代理的 whoami 探针获取固定出口 IP。
+ * 代理端 (server.mjs) 收到 { probe: "whoami" } 会请求 ipify 拿到自身公网 IP 并返回。
  */
 export const detectYouzanOutboundIp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -26,32 +21,37 @@ export const detectYouzanOutboundIp = createServerFn({ method: "POST" })
       throw new Error("未配置固定出口代理（YOUZAN_PROXY_URL），无法自动探测");
     }
 
-    let ip: string | null = null;
-    let source: "youzan_whitelist_msg" | "ipify_via_proxy" = "youzan_whitelist_msg";
-    let raw = "";
+    const proxyUrl = getProxyUrl();
+    if (!proxyUrl) throw new Error("YOUZAN_PROXY_URL 未配置");
 
-    // 1) 主路径：oauth/token 的 4007 错误里就带 IP
+    const token = process.env.YOUZAN_PROXY_TOKEN?.trim();
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    let raw = "";
+    let ip: string | null = null;
+    let source = "ipify";
+
     try {
-      const res = await youzanFetch("https://open.youzanyun.com/oauth/token", {
+      const res = await fetch(proxyUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: "grant_type=silent&client_id=__probe__&client_secret=__probe__",
+        headers,
+        body: JSON.stringify({ probe: "whoami" }),
       });
       raw = await res.text();
-      ip = extractIp(raw);
+      if (!res.ok) {
+        throw new Error(`代理返回 HTTP ${res.status}：${raw.slice(0, 240)}`);
+      }
+      const json = JSON.parse(raw) as { ok?: boolean; ip?: string; source?: string; error?: string };
+      if (json.error) throw new Error(`代理返回错误：${json.error}`);
+      if (!json.ip) throw new Error(`代理未返回 IP：${raw.slice(0, 240)}`);
+      ip = json.ip;
+      source = json.source ?? "ipify";
     } catch (e) {
-      raw = e instanceof Error ? e.message : String(e);
-      ip = extractIp(raw);
-    }
-
-    // 2) 备选：如果凭据侥幸通过或错误里无 IP，再问一次 ipify（同样走代理即可）
-    //    但 youzanFetch 只允许 open.youzanyun.com，退回读取代理 /healthz 的 x-forwarded-for？
-    //    简单起见：如果解析不到，直接报错让用户手动检查。
-    if (!ip) {
       throw new Error(
-        `未能从有赞返回中解析到出口 IP。可能情况：\n` +
-          `1. 你的 IP 已经在白名单里 → 报错里就没有 IP 了；\n` +
-          `2. 代理返回异常。\n\n原始返回片段：${raw.slice(0, 400)}`,
+        e instanceof Error
+          ? `whoami 探针失败：${e.message}`
+          : `whoami 探针失败：${String(e)}`,
       );
     }
 
@@ -63,6 +63,10 @@ export const detectYouzanOutboundIp = createServerFn({ method: "POST" })
     });
     if (upErr) throw new Error(upErr.message);
 
-    return { ip, source, saved: true };
+    return {
+      ip,
+      source,
+      saved: true,
+      message: `已检测到出口 IP ${ip}，请把该 IP 加入有赞后台 → 应用管理 → IP 白名单。`,
+    };
   });
-
