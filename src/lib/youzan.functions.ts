@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequestUrl } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { supabaseAdmin as supabase } from "@/integrations/supabase/client.server";
 import { yzStatusText } from "./youzan-status";
@@ -135,6 +136,34 @@ export async function ensureAccessToken(shop: ShopRow): Promise<string> {
     } as never)
     .eq("id", shop.id);
   return t.access_token;
+}
+
+function getYouzanSyncActions(shop: Pick<ShopRow, "role">): Array<"items" | "orders"> {
+  // 总部只同步商品总账；真实销售订单属于分店。
+  return shop.role === "hq" ? ["items"] : ["items", "orders"];
+}
+
+function dispatchYouzanSyncWorker(opts: {
+  origin: string;
+  shop_id: string;
+  action: "items" | "orders";
+  days?: number;
+}) {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const apikey = process.env.SUPABASE_PUBLISHABLE_KEY;
+  if (apikey) headers.apikey = apikey;
+
+  void fetch(`${opts.origin}/api/public/hooks/youzan-sync-worker`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      shop_id: opts.shop_id,
+      action: opts.action,
+      days: opts.days,
+    }),
+  }).catch((e) => {
+    console.error("[youzan sync dispatch]", opts.shop_id, opts.action, e);
+  });
 }
 
 
@@ -1507,27 +1536,18 @@ export const syncAllShops = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     const shops = (shopsRaw ?? []) as ShopRow[];
 
-    // 改为"进程内 fire-and-forget"：每个任务用独立 Promise 异步跑，
-    // 主请求立刻返回，避免单次请求 CPU/wall 超限。
-    // 进度通过 youzan_sync_logs 轮询观察。
+    // 改为派发到独立 worker route：主请求快速返回，实际进度通过
+    // youzan_sync_logs 轮询观察；订单只同步分店，总部不再派发 orders。
+    const origin = new URL(getRequestUrl()).origin;
     let dispatched = 0;
     for (const shop of shops) {
-      // HQ：拉 HQ 商品 + 拉全连锁订单（订单接口只在 HQ 跑一次）
-      // 分店：只拉自己门店的商品
-      const jobs: Array<"items" | "orders"> =
-        shop.role === "hq" ? ["items", "orders"] : ["items"];
-      for (const action of jobs) {
-        void (async () => {
-          try {
-            await runShopSyncCore({
-              shop_id: shop.id,
-              action,
-              days: data.days,
-            });
-          } catch (e) {
-            console.error("[syncAllShops bg]", shop.id, action, e);
-          }
-        })();
+      for (const action of getYouzanSyncActions(shop)) {
+        dispatchYouzanSyncWorker({
+          origin,
+          shop_id: shop.id,
+          action,
+          days: data.days,
+        });
         dispatched += 1;
       }
     }
