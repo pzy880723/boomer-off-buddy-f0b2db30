@@ -96,6 +96,13 @@ export function CategoriesPanel() {
       setPickUpd(u);
       setPickDeact(d);
       setSyncOpen(true);
+      if (res.blocking) {
+        if (res.blocking.kind === "ip_whitelist") {
+          toast.error("有赞侧未加白名单，见弹窗说明");
+        } else if (res.blocking.kind === "no_api") {
+          toast.error("当前授权无分类接口权限");
+        }
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "预览失败");
     } finally {
