@@ -161,14 +161,33 @@ export function ApiHealthPanel() {
               </p>
             )}
           </div>
-          <Button size="sm" variant="outline" onClick={() => m.mutate()} disabled={m.isPending}>
-            {m.isPending ? (
-              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+          <div className="flex flex-wrap items-center gap-2">
+            {report.outbound.mode === "fixed_proxy" && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => detect.mutate()}
+                disabled={detect.isPending}
+                title="通过有赞返回中的白名单错误自动解析出口 IP，并保存到系统设置"
+              >
+                {detect.isPending ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Wifi className="mr-1.5 h-3.5 w-3.5" />
+                )}
+                自动检测出口 IP
+              </Button>
             )}
-            重新体检
-          </Button>
+            <Button size="sm" variant="outline" onClick={() => m.mutate()} disabled={m.isPending}>
+              {m.isPending ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+              )}
+              重新体检
+            </Button>
+          </div>
+
         </CardContent>
       </Card>
 
