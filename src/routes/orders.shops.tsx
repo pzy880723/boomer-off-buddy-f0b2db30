@@ -372,45 +372,13 @@ function OrderRow({
         </div>
       </button>
 
-      {/* 商品区：白底 */}
-      <div className="px-4 py-3 space-y-1.5 bg-card">
-        {visibleLines.map((line, i) => (
-          <div key={i} className="flex items-center gap-2.5">
-            {line.img ? (
-              <img
-                src={line.img}
-                alt=""
-                className="h-9 w-9 rounded object-cover border shrink-0"
-                loading="lazy"
-              />
-            ) : (
-              <div className="h-9 w-9 rounded border bg-muted flex items-center justify-center shrink-0">
-                <Package className="h-3.5 w-3.5 text-muted-foreground" />
-              </div>
-            )}
-            <div className="min-w-0 flex-1 text-xs line-clamp-1">
-              {line.title}
-            </div>
-            {line.qty > 0 && (
-              <div className="text-xs text-muted-foreground tabular-nums shrink-0">
-                ×{line.qty}
-              </div>
-            )}
-          </div>
-        ))}
-        {restCount > 0 && (
-          <div className="text-[11px] text-muted-foreground pl-11">
-            还有 {restCount} 件商品…
-          </div>
-        )}
-      </div>
-
       {/* 展开：明细 + 支付 */}
       {expanded && (
         <div className="border-t bg-muted/20 px-4 py-3">
           <OrderDetail row={row} />
         </div>
       )}
+
     </div>
   );
 }
