@@ -1,9 +1,7 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
-import { Building2, Users, Bell, Plug, Webhook, Key, History, MapPin, Tags, FolderTree, Layers } from "lucide-react";
+import { Building2, Users, Bell, Plug, Webhook, Key, History, MapPin } from "lucide-react";
 import { AddressBookPanel } from "@/components/settings/address-book-panel";
-import { CategoriesPanel } from "@/components/settings/categories-panel";
-import { EmptyState } from "@/components/empty-state";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -17,8 +15,6 @@ const SETTINGS_TABS = [
   "profile",
   "members",
   "addresses",
-  "categories",
-  "groups",
   "notify",
   "integration",
   "webhook",
@@ -28,12 +24,17 @@ const SETTINGS_TABS = [
 type SettingsTab = (typeof SETTINGS_TABS)[number];
 
 const SearchSchema = z.object({
-  tab: z.enum(SETTINGS_TABS).optional(),
+  tab: z.string().optional(),
 });
 
 export const Route = createFileRoute("/settings")({
   head: () => ({ meta: [{ title: "系统设置 · BOOMER OFF" }, { name: "description", content: "权限角色、数据字典与操作日志" }] }),
   validateSearch: (s) => SearchSchema.parse(s),
+  beforeLoad: ({ search }) => {
+    if (search.tab === "categories" || search.tab === "groups") {
+      throw redirect({ to: "/product-categories" });
+    }
+  },
   component: SettingsPage,
 });
 
@@ -47,13 +48,6 @@ const NAV_GROUPS: NavGroup[] = [
       { value: "profile", label: "基本信息", icon: Building2 },
       { value: "members", label: "成员权限", icon: Users },
       { value: "addresses", label: "地址库", icon: MapPin },
-    ],
-  },
-  {
-    label: "商品",
-    items: [
-      { value: "categories", label: "商品分类", icon: FolderTree },
-      { value: "groups", label: "商品分组", icon: Layers },
     ],
   },
   {
@@ -74,9 +68,11 @@ const NAV_GROUPS: NavGroup[] = [
 function SettingsPage() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
-  const activeTab: SettingsTab = search.tab ?? "profile";
+  const activeTab: SettingsTab = (SETTINGS_TABS as readonly string[]).includes(search.tab ?? "")
+    ? (search.tab as SettingsTab)
+    : "profile";
   const setTab = (v: string) => {
-    navigate({ search: { tab: v === "profile" ? undefined : (v as SettingsTab) }, replace: true });
+    navigate({ search: { tab: v === "profile" ? undefined : v }, replace: true });
   };
   return (
     <div>
@@ -181,24 +177,8 @@ function SettingsPage() {
           <AddressBookPanel />
         </TabsContent>
 
-        <TabsContent value="categories">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">商品分类（ERP 自建）</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <EmptyState
-                icon={FolderTree}
-                title="一二级分类维护 · 建设中"
-                description="将支持独立于有赞的 ERP 商品一二级分类维护，SKU 可挂载。上线前请继续使用「商品分组」。"
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
 
-        <TabsContent value="groups">
-          <CategoriesPanel />
-        </TabsContent>
+
 
 
         <TabsContent value="notify">

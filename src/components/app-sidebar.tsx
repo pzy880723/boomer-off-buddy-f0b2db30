@@ -63,6 +63,7 @@ type NavTo =
   | "/shop-mgmt/products"
   | "/shop-mgmt/online"
   | "/shop-mgmt/franchisees"
+  | "/product-categories"
   | "/youzan"
   | "/youzan/sync"
   | "/orders/shops"
@@ -87,8 +88,7 @@ const groups: NavGroup[] = [
       { title: "仓库商品", url: "/inventory/skus", icon: Tags },
       { title: "门店商品", url: "/shop-mgmt/products", icon: Package },
       { title: "网店商品", url: "/shop-mgmt/online", icon: Globe },
-      { title: "商品分类", url: "/settings", icon: FolderTree, search: { tab: "categories" } },
-      { title: "商品分组", url: "/settings", icon: Layers, search: { tab: "groups" } },
+      { title: "商品分类", url: "/product-categories", icon: FolderTree },
     ],
     icon: Package,
   },

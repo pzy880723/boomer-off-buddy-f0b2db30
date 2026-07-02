@@ -54,7 +54,7 @@ const toRow = (r: RawRow): CategoryRow => ({
   synced_at: r.synced_at,
 });
 
-/* ---------- 列表（只显示 kind='group'）---------- */
+/* ---------- 列表（商品分类，已合并原分组）---------- */
 export const listCategories = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -62,7 +62,7 @@ export const listCategories = createServerFn({ method: "GET" })
     const { data, error } = await supabase
       .from("inv_categories" as never)
       .select(SELECT_COLS)
-      .eq("kind", "group")
+      .eq("kind", "category")
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
@@ -94,7 +94,7 @@ export const upsertCategory = createServerFn({ method: "POST" })
       parent_id: data.parent_id ?? null,
       sort_order: data.sort_order ?? 0,
       is_active: data.is_active,
-      kind: "group",
+      kind: "category",
     };
     if (data.id) {
       const { error } = await supabase
@@ -319,7 +319,7 @@ export const previewYouzanCategorySync = createServerFn({ method: "POST" })
     const { data: existing, error } = await context.supabase
       .from("inv_categories" as never)
       .select(SELECT_COLS)
-      .eq("kind", "group");
+      .eq("kind", "category");
     if (error) throw new Error(error.message);
     const local = ((existing ?? []) as unknown as RawRow[]).map(toRow);
     const byYz = new Map(
@@ -427,7 +427,7 @@ export const applyYouzanCategorySync = createServerFn({ method: "POST" })
           code,
           name: a.name,
           parent_id: parentLocalId,
-          kind: "group",
+          kind: "category",
           youzan_hq_group_id: a.youzan_hq_category_id,
           youzan_hq_group_parent_id: a.youzan_hq_parent_id ?? null,
           youzan_shop_id: data.shop_id,
@@ -458,3 +458,63 @@ export const applyYouzanCategorySync = createServerFn({ method: "POST" })
     }
     return { added: addedN, updated: updatedN, deactivated: deactivatedN };
   });
+
+/* ==========================================================================
+ * 商品分类 · 与有赞分组的一一对应绑定
+ * ========================================================================== */
+
+export type YouzanGroupNode = {
+  id: number;
+  name: string;
+  parent_id: number | null;
+  sort_order: number;
+};
+
+export const fetchYouzanGroupsLive = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    const { rows, api, shop_id, notes, blocking } = await fetchYouzanHqGroups();
+    return {
+      api,
+      shop_id,
+      notes,
+      blocking: blocking ?? null,
+      rows: rows as YouzanGroupNode[],
+    };
+  });
+
+const BindInput = z.object({
+  erp_id: z.string().uuid(),
+  youzan_group_id: z.number().int().nullable(),
+  youzan_parent_id: z.number().int().nullable().optional(),
+  youzan_shop_id: z.string().uuid().nullable().optional(),
+});
+export const bindErpToYouzan = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => BindInput.parse(i))
+  .handler(async ({ data, context }) => {
+    // 一一对应：若目标 group_id 已被其他 ERP 分类占用，先解绑对方
+    if (data.youzan_group_id != null) {
+      await context.supabase
+        .from("inv_categories" as never)
+        .update({
+          youzan_hq_group_id: null,
+          youzan_hq_group_parent_id: null,
+          youzan_shop_id: null,
+        } as never)
+        .eq("youzan_hq_group_id", data.youzan_group_id)
+        .neq("id", data.erp_id);
+    }
+    const { error } = await context.supabase
+      .from("inv_categories" as never)
+      .update({
+        youzan_hq_group_id: data.youzan_group_id,
+        youzan_hq_group_parent_id: data.youzan_parent_id ?? null,
+        youzan_shop_id: data.youzan_shop_id ?? null,
+        synced_at: new Date().toISOString(),
+      } as never)
+      .eq("id", data.erp_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+

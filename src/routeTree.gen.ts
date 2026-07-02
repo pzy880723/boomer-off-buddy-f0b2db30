@@ -13,6 +13,7 @@ import { Route as YouzanRouteImport } from './routes/youzan'
 import { Route as StoreRouteImport } from './routes/store'
 import { Route as ShopMgmtRouteImport } from './routes/shop-mgmt'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ProductCategoriesRouteImport } from './routes/product-categories'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as MRouteImport } from './routes/m'
 import { Route as LoginRouteImport } from './routes/login'
@@ -154,6 +155,11 @@ const ShopMgmtRoute = ShopMgmtRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProductCategoriesRoute = ProductCategoriesRouteImport.update({
+  id: '/product-categories',
+  path: '/product-categories',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OrdersRoute = OrdersRouteImport.update({
@@ -833,6 +839,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/m': typeof MRouteWithChildren
   '/orders': typeof OrdersRouteWithChildren
+  '/product-categories': typeof ProductCategoriesRoute
   '/settings': typeof SettingsRoute
   '/shop-mgmt': typeof ShopMgmtRouteWithChildren
   '/store': typeof StoreRouteWithChildren
@@ -960,6 +967,7 @@ export interface FileRoutesByTo {
   '/knowledge': typeof KnowledgeRoute
   '/login': typeof LoginRoute
   '/orders': typeof OrdersRouteWithChildren
+  '/product-categories': typeof ProductCategoriesRoute
   '/settings': typeof SettingsRoute
   '/shop-mgmt': typeof ShopMgmtRouteWithChildren
   '/youzan': typeof YouzanRouteWithChildren
@@ -1083,6 +1091,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/m': typeof MRouteWithChildren
   '/orders': typeof OrdersRouteWithChildren
+  '/product-categories': typeof ProductCategoriesRoute
   '/settings': typeof SettingsRoute
   '/shop-mgmt': typeof ShopMgmtRouteWithChildren
   '/store': typeof StoreRouteWithChildren
@@ -1213,6 +1222,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/m'
     | '/orders'
+    | '/product-categories'
     | '/settings'
     | '/shop-mgmt'
     | '/store'
@@ -1340,6 +1350,7 @@ export interface FileRouteTypes {
     | '/knowledge'
     | '/login'
     | '/orders'
+    | '/product-categories'
     | '/settings'
     | '/shop-mgmt'
     | '/youzan'
@@ -1462,6 +1473,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/m'
     | '/orders'
+    | '/product-categories'
     | '/settings'
     | '/shop-mgmt'
     | '/store'
@@ -1591,6 +1603,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   MRoute: typeof MRouteWithChildren
   OrdersRoute: typeof OrdersRouteWithChildren
+  ProductCategoriesRoute: typeof ProductCategoriesRoute
   SettingsRoute: typeof SettingsRoute
   ShopMgmtRoute: typeof ShopMgmtRouteWithChildren
   StoreRoute: typeof StoreRouteWithChildren
@@ -1690,6 +1703,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/product-categories': {
+      id: '/product-categories'
+      path: '/product-categories'
+      fullPath: '/product-categories'
+      preLoaderRoute: typeof ProductCategoriesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/orders': {
@@ -2862,6 +2882,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   MRoute: MRouteWithChildren,
   OrdersRoute: OrdersRouteWithChildren,
+  ProductCategoriesRoute: ProductCategoriesRoute,
   SettingsRoute: SettingsRoute,
   ShopMgmtRoute: ShopMgmtRouteWithChildren,
   StoreRoute: StoreRouteWithChildren,
@@ -2947,13 +2968,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
