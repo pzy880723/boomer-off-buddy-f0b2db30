@@ -48,7 +48,7 @@ export type YzApiSpec = {
   in_use: boolean;
   required: boolean;
   /** 只读探测参数；null = 写入类接口，体检时跳过实调，只显示"最近推送成功时间" */
-  probe: { params: Record<string, unknown> } | null;
+  probe: { params: Record<string, string | number | boolean> } | null;
   /** 用于 UI 展示的中文说明 */
   description: string;
 };
