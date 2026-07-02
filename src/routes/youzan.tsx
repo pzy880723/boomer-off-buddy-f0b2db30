@@ -256,6 +256,15 @@ function YouzanPage() {
         }
       />
 
+      {syncProgress && (
+        <SyncProgressCard
+          progress={syncProgress}
+          onDismiss={() => setSyncSession(null)}
+        />
+      )}
+
+
+
       {/* 业务汇总 单行紧凑条 */}
       <Card className="mb-4">
         <CardContent className="grid grid-cols-2 divide-x divide-border p-0 sm:grid-cols-4">
