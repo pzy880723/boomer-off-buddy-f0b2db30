@@ -283,7 +283,7 @@ export function CategoriesPanel() {
       <Dialog open={syncOpen} onOpenChange={setSyncOpen}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>有赞分类同步预览</DialogTitle>
+            <DialogTitle>有赞店铺分组同步预览</DialogTitle>
             <DialogDescription>
               {previewData
                 ? `使用接口 ${previewData.api} · 待新增 ${previewData.to_add.length} · 待更新 ${previewData.to_update.length} · 待停用 ${previewData.to_deactivate.length}`
