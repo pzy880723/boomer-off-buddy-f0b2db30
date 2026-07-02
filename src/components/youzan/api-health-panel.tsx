@@ -51,6 +51,7 @@ const STATUS_CLASS: Record<YzProbeStatus, string> = {
 
 export function ApiHealthPanel() {
   const runFn = useServerFn(runYouzanApiHealthCheck);
+  const detectFn = useServerFn(detectYouzanOutboundIp);
 
   const q = useQuery({
     queryKey: ["youzan-api-health"],
@@ -68,7 +69,17 @@ export function ApiHealthPanel() {
     onError: (e: Error) => toast.error(`体检失败：${e.message}`),
   });
 
+  const detect = useMutation({
+    mutationFn: () => detectFn(),
+    onSuccess: (r) => {
+      toast.success(`检测到出口 IP：${r.ip}，已自动保存`);
+      q.refetch();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const running = q.isLoading || m.isPending;
+
 
   if (running && !q.data) {
     return (
