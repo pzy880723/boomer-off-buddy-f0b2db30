@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { getYouzanOutboundStatus } from "./youzan-http";
 
 /**
  * 本模块管理「商品分组」——ERP 侧唯一真源，来源是有赞【商品 → 分组管理】里
@@ -477,6 +478,7 @@ export const fetchYouzanGroupsLive = createServerFn({ method: "GET" })
     return {
       api,
       shop_id,
+      outbound: getYouzanOutboundStatus(),
       notes,
       blocking: blocking ?? null,
       rows: rows as YouzanGroupNode[],
