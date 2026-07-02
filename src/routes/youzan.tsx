@@ -562,15 +562,14 @@ function ShopCard({
   shop,
   breakdown,
   onPing,
-  onRemove,
   pinging,
 }: {
   shop: Shop;
   breakdown?: { revenue: number; count: number };
   onPing: () => void;
-  onRemove: () => void;
   pinging: boolean;
 }) {
+
   const isHq = shop.role === "hq";
   const Icon = isHq ? Building2 : StoreIcon;
 
