@@ -36,6 +36,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ShopItemsPanel } from "@/components/youzan/shop-items-panel";
 import { ShopHealthPanel } from "@/components/youzan/shop-health-panel";
+import { ApiHealthPanel } from "@/components/youzan/api-health-panel";
 import { SyncCenterPanel } from "@/components/youzan/sync-center-panel";
 import { PageHeader } from "@/components/page-header";
 import { DataTable } from "@/components/data-table";
@@ -300,6 +301,10 @@ function YouzanPage() {
               <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
               系统检查
             </TabsTrigger>
+            <TabsTrigger value="api-health">
+              <Activity className="mr-1.5 h-3.5 w-3.5" />
+              API 体检
+            </TabsTrigger>
           </TabsList>
 
 
@@ -388,6 +393,10 @@ function YouzanPage() {
 
           <TabsContent value="health" className="mt-3">
             <ShopHealthPanel />
+          </TabsContent>
+
+          <TabsContent value="api-health" className="mt-3">
+            <ApiHealthPanel />
           </TabsContent>
         </Tabs>
 
