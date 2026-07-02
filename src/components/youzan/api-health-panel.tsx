@@ -72,7 +72,10 @@ export function ApiHealthPanel() {
   const detect = useMutation({
     mutationFn: () => detectFn(),
     onSuccess: (r) => {
-      toast.success(`检测到出口 IP：${r.ip}，已自动保存`);
+      toast.success(r.message ?? `检测到出口 IP：${r.ip}`, {
+        description: `请把 ${r.ip} 加入有赞后台 IP 白名单`,
+        duration: 8000,
+      });
       q.refetch();
     },
     onError: (e: Error) => toast.error(e.message),
