@@ -92,11 +92,10 @@ function YouzanPage() {
   const fetchLogs = useServerFn(listYouzanSyncLogs);
   const fetchSummary = useServerFn(getYouzanSummary);
   const fetchBreakdown = useServerFn(getShopSalesBreakdown);
-  const fetchOutbound = useServerFn(getYouzanOutboundInfo);
   const pingFn = useServerFn(pingYouzanShop);
-  const removeFn = useServerFn(removeYouzanShop);
   const syncAllFn = useServerFn(syncAllShops);
   const backfillFn = useServerFn(backfillShopOrders);
+
 
   const backfillM = useMutation({
     mutationFn: () => backfillFn(),
