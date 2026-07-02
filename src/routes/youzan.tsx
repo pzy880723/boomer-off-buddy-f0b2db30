@@ -301,6 +301,10 @@ function YouzanPage() {
               <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
               系统检查
             </TabsTrigger>
+            <TabsTrigger value="api-health">
+              <Activity className="mr-1.5 h-3.5 w-3.5" />
+              API 体检
+            </TabsTrigger>
           </TabsList>
 
 
