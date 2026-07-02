@@ -16,6 +16,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { runYouzanApiHealthCheck } from "@/lib/youzan-health.functions";
+import { detectYouzanOutboundIp } from "@/lib/youzan-outbound.functions";
+
 import {
   YZ_FEATURE_LABELS,
   YZ_STATUS_LABELS,
@@ -49,6 +51,7 @@ const STATUS_CLASS: Record<YzProbeStatus, string> = {
 
 export function ApiHealthPanel() {
   const runFn = useServerFn(runYouzanApiHealthCheck);
+  const detectFn = useServerFn(detectYouzanOutboundIp);
 
   const q = useQuery({
     queryKey: ["youzan-api-health"],
@@ -66,7 +69,17 @@ export function ApiHealthPanel() {
     onError: (e: Error) => toast.error(`体检失败：${e.message}`),
   });
 
+  const detect = useMutation({
+    mutationFn: () => detectFn(),
+    onSuccess: (r) => {
+      toast.success(`检测到出口 IP：${r.ip}，已自动保存`);
+      q.refetch();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const running = q.isLoading || m.isPending;
+
 
   if (running && !q.data) {
     return (
@@ -148,14 +161,33 @@ export function ApiHealthPanel() {
               </p>
             )}
           </div>
-          <Button size="sm" variant="outline" onClick={() => m.mutate()} disabled={m.isPending}>
-            {m.isPending ? (
-              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+          <div className="flex flex-wrap items-center gap-2">
+            {report.outbound.mode === "fixed_proxy" && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => detect.mutate()}
+                disabled={detect.isPending}
+                title="通过有赞返回中的白名单错误自动解析出口 IP，并保存到系统设置"
+              >
+                {detect.isPending ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Wifi className="mr-1.5 h-3.5 w-3.5" />
+                )}
+                自动检测出口 IP
+              </Button>
             )}
-            重新体检
-          </Button>
+            <Button size="sm" variant="outline" onClick={() => m.mutate()} disabled={m.isPending}>
+              {m.isPending ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+              )}
+              重新体检
+            </Button>
+          </div>
+
         </CardContent>
       </Card>
 
