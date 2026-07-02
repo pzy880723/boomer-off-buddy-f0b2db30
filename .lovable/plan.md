@@ -1,38 +1,33 @@
 ## 目标
-从有赞连锁各门店拉取「本月订单 + 本月营业额」，展示在系统里，让你随时能看到实时销售数据。
+让 `/youzan` 页面的一键同步后，能真正拉取门店订单，并让「本月营业额 / 本月订单」马上显示本月数据。
 
-## 方案
+## 当前定位到的问题
+- 页面顶部的统计已经在读 `youzan_orders`，不是前端没做展示。
+- 数据库里目前有 849 条有赞订单，但最新支付时间停在 2026-05-23；本月订单数为 0，所以本月营业额显示 0。
+- 「一键同步全部」现在只给总部派发订单任务，但订单同步函数里又明确跳过总部；分店只同步商品，不同步订单。
+- 所以点击同步后，销售额/订单数不会更新。
+- 另外当前所谓“后台异步”是在同一个请求里 `void async` 跑，容易在请求结束后被中断；已有 worker 路由但没有真正用起来。
 
-### 1. 数据来源（有赞 API）
-使用连锁门店订单接口（走已有的 `youzanFetch` 固定 IP 代理）：
-- `youzan.trades.sold.get`（3.0.0）— 按 `start_created`/`end_created` 拉本月订单，分页
-- 字段取 `tid / status / payment / pay_time / buyer_nick / num`
-- HQ 用主 token 拉全量；分店用各自 token 拉本店；避免重复计费按 `shop_id` 归属
+## 实施计划
+1. **修正同步任务派发规则**
+   - 总部：同步商品。
+   - 分店：同步商品 + 同步订单。
+   - 不再把订单任务派给总部，避免“跳过总部订单”导致假完成。
 
-### 2. 新增表 `youzan_orders`（如已存在则复用）
-```
-id uuid, shop_id uuid → youzan_shops, tid text unique,
-status text, pay_time timestamptz, payment numeric,
-buyer_nick text, num int, raw jsonb, synced_at timestamptz
-```
-+ RLS + GRANT + 索引 `(shop_id, pay_time)`。
+2. **改成真正调用后台 worker**
+   - `syncAllShops` 不再在当前请求里 `void async` 直接跑。
+   - 改为向已有 `/api/public/hooks/youzan-sync-worker` 派发每个单独任务。
+   - 这样一键同步返回后，worker 继续执行，页面进度条轮询 `youzan_sync_logs` 就能看到真实进度。
 
-### 3. 同步 serverFn
-`syncYouzanOrders({ shop_id?, since?, until? })`：
-- 默认拉「本月 1 号 00:00 → 现在」
-- 分页 upsert 到 `youzan_orders`
-- 记录到 `youzan_sync_logs`
-- HQ 权限触发；支持"全部门店"批量
+3. **同步完成后刷新统计**
+   - 保留并加强 `/youzan` 页面对 `youzan-summary`、`youzan-breakdown`、`youzan-sync-logs` 的刷新。
+   - 进度条完成后再自动刷新一次顶部销售额/订单数，避免用户需要手动刷新。
 
-### 4. 定时任务
-`/api/public/cron/youzan-orders`（Bearer 校验），每 15 分钟增量拉取最近 2 小时窗口，由用户在服务器上挂 cron 或 pg_cron 调用。
+4. **修正定时同步逻辑**
+   - `/api/public/hooks/youzan-sync` 的定时同步也按同样规则：总部商品、分店商品 + 分店订单。
+   - 后续自动同步才会持续更新营业额和订单数。
 
-### 5. 展示
-- **仪表盘新卡片「有赞本月」**：本月营业额（已付款 payment 求和） / 本月订单数 / 环比上月 / 按门店拆分小柱状
-- **`/youzan` 新 Tab「营业数据」**：门店维度表格（本月 GMV / 订单数 / 客单价 / 最近同步时间）+「立即同步」按钮
-- 只统计 `status in (WAIT_SELLER_SEND_GOODS, WAIT_BUYER_CONFIRM_GOODS, TRADE_FINISHED, TRADE_SUCCESS)` 即已付款订单，排除已关闭/退款
-
-## 确认点
-1. 「营业额」= 已付款订单 `payment` 总和（含运费），退款不扣减；如果你要扣退款需要再接 `refund` 接口。要不要现在就一起接？
-2. 定时同步频率 15 分钟够吗？还是你希望手动点按钮就好，不挂 cron？
-3. 仪表盘卡片放在最上面一行「日本小包 / 国内小包 / 国内大宗」旁边，作为第 4 类「有赞门店销售」，可以吗？
+5. **验证**
+   - 检查同步日志应出现分店 `orders` 任务，而不是总部 `orders skipped`。
+   - 查询本月 `youzan_orders` 是否新增。
+   - 确认 `/youzan` 顶部「本月营业额 / 本月订单」展示与数据库一致。
