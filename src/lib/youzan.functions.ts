@@ -1495,7 +1495,7 @@ export const syncYouzanOrders = createServerFn({ method: "POST" })
 export const syncAllShops = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z
-      .object({ days: z.number().int().min(1).max(180).default(30) })
+      .object({ days: z.number().int().min(1).max(180).default(60) })
       .parse(input ?? {}),
   )
   .handler(async ({ data }) => {
