@@ -8,7 +8,6 @@ import {
   AlertTriangle,
   Loader2,
   Plus,
-  Trash2,
   RefreshCw,
   Activity,
   Store as StoreIcon,
@@ -35,29 +34,26 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ShopItemsPanel } from "@/components/youzan/shop-items-panel";
 import { ShopHealthPanel } from "@/components/youzan/shop-health-panel";
 import { ApiHealthPanel } from "@/components/youzan/api-health-panel";
 import { SyncCenterPanel } from "@/components/youzan/sync-center-panel";
 import { PageHeader } from "@/components/page-header";
 import { DataTable } from "@/components/data-table";
 import { StatusBadge } from "@/components/status-badge";
-import { SyncDialog } from "@/components/youzan/sync-dialog";
 import {
   listYouzanShops,
   listYouzanSyncLogs,
   pingYouzanShop,
-  removeYouzanShop,
   listAuthorizedShopsFromHQ,
   batchImportShops,
   syncAllShops,
   backfillShopOrders,
-  getYouzanOutboundInfo,
 } from "@/lib/youzan.functions";
 import {
   getYouzanSummary,
   getShopSalesBreakdown,
 } from "@/lib/youzan-stats.functions";
+
 
 export const Route = createFileRoute("/youzan")({
   head: () => ({
