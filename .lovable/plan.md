@@ -1,38 +1,38 @@
-# 给 Codex 的指令（复制粘贴给他即可）
+## 目标
+从有赞连锁各门店拉取「本月订单 + 本月营业额」，展示在系统里，让你随时能看到实时销售数据。
 
-Lovable 端已经把「自动检测出口 IP」切到了 `POST /youzan-proxy/forward` + `{ "probe": "whoami" }`，不再打 `open.youzanyun.com/oauth/token`。请你在服务器侧做以下确认和收尾。
+## 方案
 
-## 1. 确认 whoami 分支落地
+### 1. 数据来源（有赞 API）
+使用连锁门店订单接口（走已有的 `youzanFetch` 固定 IP 代理）：
+- `youzan.trades.sold.get`（3.0.0）— 按 `start_created`/`end_created` 拉本月订单，分页
+- 字段取 `tid / status / payment / pay_time / buyer_nick / num`
+- HQ 用主 token 拉全量；分店用各自 token 拉本店；避免重复计费按 `shop_id` 归属
 
-- `server.mjs` 里 `req.body.probe === "whoami"` 分支必须：
-  - 校验 `Authorization: Bearer <YOUZAN_PROXY_TOKEN>`，失败返回 401。
-  - 请求 `https://api.ipify.org?format=json`，返回 `{ ok: true, ip, source: "ipify" }`。
-  - 不要把 whoami 请求当成 Youzan forward 走出去。
-
-## 2. 加一个健康检查端点
-
-- `GET https://erp.boomeroff.com/youzan-proxy/healthz` 返回 `{ ok: true, ts: <iso> }`，无需 token，便于 Lovable 后续做心跳。
-
-## 3. 有赞白名单收敛
-
-- 把有赞后台 → 应用管理 → IP 白名单里所有历史 IP 删除，只保留 `150.158.94.248`。
-- 确认后回我一句「白名单已收敛到 150.158.94.248」。
-
-## 4. 冒烟验证
-
-在服务器上跑一遍，把输出贴回来：
-
-```bash
-curl -s -X POST https://erp.boomeroff.com/youzan-proxy/forward \
-  -H "Authorization: Bearer $YOUZAN_PROXY_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"probe":"whoami"}'
-
-curl -s https://erp.boomeroff.com/youzan-proxy/healthz
+### 2. 新增表 `youzan_orders`（如已存在则复用）
 ```
+id uuid, shop_id uuid → youzan_shops, tid text unique,
+status text, pay_time timestamptz, payment numeric,
+buyer_nick text, num int, raw jsonb, synced_at timestamptz
+```
++ RLS + GRANT + 索引 `(shop_id, pay_time)`。
 
-预期第一条返回 `{"ok":true,"ip":"150.158.94.248","source":"ipify"}`。
+### 3. 同步 serverFn
+`syncYouzanOrders({ shop_id?, since?, until? })`：
+- 默认拉「本月 1 号 00:00 → 现在」
+- 分页 upsert 到 `youzan_orders`
+- 记录到 `youzan_sync_logs`
+- HQ 权限触发；支持"全部门店"批量
 
-## 5. 完成后
+### 4. 定时任务
+`/api/public/cron/youzan-orders`（Bearer 校验），每 15 分钟增量拉取最近 2 小时窗口，由用户在服务器上挂 cron 或 pg_cron 调用。
 
-回我「whoami OK + 白名单已收敛」，我会在 `/youzan → API 体检` 点「重新体检」，把矩阵截图发你确认。
+### 5. 展示
+- **仪表盘新卡片「有赞本月」**：本月营业额（已付款 payment 求和） / 本月订单数 / 环比上月 / 按门店拆分小柱状
+- **`/youzan` 新 Tab「营业数据」**：门店维度表格（本月 GMV / 订单数 / 客单价 / 最近同步时间）+「立即同步」按钮
+- 只统计 `status in (WAIT_SELLER_SEND_GOODS, WAIT_BUYER_CONFIRM_GOODS, TRADE_FINISHED, TRADE_SUCCESS)` 即已付款订单，排除已关闭/退款
+
+## 确认点
+1. 「营业额」= 已付款订单 `payment` 总和（含运费），退款不扣减；如果你要扣退款需要再接 `refund` 接口。要不要现在就一起接？
+2. 定时同步频率 15 分钟够吗？还是你希望手动点按钮就好，不挂 cron？
+3. 仪表盘卡片放在最上面一行「日本小包 / 国内小包 / 国内大宗」旁边，作为第 4 类「有赞门店销售」，可以吗？
