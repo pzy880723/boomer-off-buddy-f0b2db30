@@ -427,7 +427,7 @@ export const applyYouzanCategorySync = createServerFn({ method: "POST" })
           code,
           name: a.name,
           parent_id: parentLocalId,
-          kind: "group",
+          kind: "category",
           youzan_hq_group_id: a.youzan_hq_category_id,
           youzan_hq_group_parent_id: a.youzan_hq_parent_id ?? null,
           youzan_shop_id: data.shop_id,
