@@ -285,10 +285,15 @@ export function CategoriesPanel() {
           </DialogHeader>
           {previewData && (
             <div className="max-h-[60vh] space-y-4 overflow-y-auto">
+              {previewData.blocking && <BlockingErrorAlert blocking={previewData.blocking} onRetry={runPreview} retrying={syncing} />}
               {previewData.notes && previewData.notes.length > 0 && (
-                <div className="rounded-md border border-muted bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground space-y-0.5">
+                <div className="rounded-md border border-muted bg-muted/30 px-3 py-2 text-[11px] space-y-1">
                   {previewData.notes.map((n, i) => (
-                    <div key={i}>· {n}</div>
+                    <div key={i} className="flex items-start gap-1.5">
+                      <span>{n.status === "ok" ? "✅" : n.status === "no_api" ? "⚠️" : n.status === "ip_blocked" ? "🚫" : n.status === "empty" ? "◌" : "❌"}</span>
+                      <span className="font-mono text-[10px] shrink-0 text-muted-foreground">{n.api}</span>
+                      <span className="text-muted-foreground break-all">— {n.message}{n.count != null ? `（${n.count} 条）` : ""}</span>
+                    </div>
                   ))}
                 </div>
               )}
