@@ -564,7 +564,7 @@ function EditDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{initial ? "编辑分类" : "新建分类"}</DialogTitle>
+          <DialogTitle>{initial ? "编辑分组" : "新建分组"}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-3">
           <div className="grid grid-cols-2 gap-3">
