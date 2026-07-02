@@ -124,15 +124,16 @@ function YouzanPage() {
     queryFn: () => fetchBreakdown(),
     refetchInterval: 60_000,
   });
+  const [syncSession, setSyncSession] = useState<{
+    startedAt: number;
+    dispatched: number;
+  } | null>(null);
+
   const logsQ = useQuery({
     queryKey: ["youzan-sync-logs"],
     queryFn: () => fetchLogs({ data: { limit: 60 } }),
-    refetchInterval: syncSessionActive() ? 2_000 : 10_000,
+    refetchInterval: syncSession ? 2_000 : 10_000,
   });
-  function syncSessionActive() {
-    // hoisted so useQuery reads the latest state; defined below via closure fallback
-    return false;
-  }
   const outboundQ = useQuery({
     queryKey: ["youzan-outbound"],
     queryFn: () => fetchOutbound(),
@@ -155,11 +156,6 @@ function YouzanPage() {
       qc.invalidateQueries({ queryKey: ["youzan-shops"] });
     },
   });
-
-  const [syncSession, setSyncSession] = useState<{
-    startedAt: number;
-    dispatched: number;
-  } | null>(null);
 
   const syncAllM = useMutation({
     mutationFn: () => syncAllFn({ data: { days: 60 } }),
