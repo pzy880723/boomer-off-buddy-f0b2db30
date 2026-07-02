@@ -8,7 +8,6 @@ import {
   AlertTriangle,
   Loader2,
   Plus,
-  Trash2,
   RefreshCw,
   Activity,
   Store as StoreIcon,
@@ -35,29 +34,26 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ShopItemsPanel } from "@/components/youzan/shop-items-panel";
 import { ShopHealthPanel } from "@/components/youzan/shop-health-panel";
 import { ApiHealthPanel } from "@/components/youzan/api-health-panel";
 import { SyncCenterPanel } from "@/components/youzan/sync-center-panel";
 import { PageHeader } from "@/components/page-header";
 import { DataTable } from "@/components/data-table";
 import { StatusBadge } from "@/components/status-badge";
-import { SyncDialog } from "@/components/youzan/sync-dialog";
 import {
   listYouzanShops,
   listYouzanSyncLogs,
   pingYouzanShop,
-  removeYouzanShop,
   listAuthorizedShopsFromHQ,
   batchImportShops,
   syncAllShops,
   backfillShopOrders,
-  getYouzanOutboundInfo,
 } from "@/lib/youzan.functions";
 import {
   getYouzanSummary,
   getShopSalesBreakdown,
 } from "@/lib/youzan-stats.functions";
+
 
 export const Route = createFileRoute("/youzan")({
   head: () => ({
@@ -96,11 +92,10 @@ function YouzanPage() {
   const fetchLogs = useServerFn(listYouzanSyncLogs);
   const fetchSummary = useServerFn(getYouzanSummary);
   const fetchBreakdown = useServerFn(getShopSalesBreakdown);
-  const fetchOutbound = useServerFn(getYouzanOutboundInfo);
   const pingFn = useServerFn(pingYouzanShop);
-  const removeFn = useServerFn(removeYouzanShop);
   const syncAllFn = useServerFn(syncAllShops);
   const backfillFn = useServerFn(backfillShopOrders);
+
 
   const backfillM = useMutation({
     mutationFn: () => backfillFn(),
@@ -134,11 +129,6 @@ function YouzanPage() {
     queryFn: () => fetchLogs({ data: { limit: 60 } }),
     refetchInterval: syncSession ? 2_000 : 10_000,
   });
-  const outboundQ = useQuery({
-    queryKey: ["youzan-outbound"],
-    queryFn: () => fetchOutbound(),
-    staleTime: 60_000,
-  });
 
   const pingM = useMutation({
     mutationFn: (id: string) => pingFn({ data: { shop_id: id } }),
@@ -149,13 +139,7 @@ function YouzanPage() {
     },
   });
 
-  const removeM = useMutation({
-    mutationFn: (id: string) => removeFn({ data: { id } }),
-    onSuccess: () => {
-      toast.success("已移除门店");
-      qc.invalidateQueries({ queryKey: ["youzan-shops"] });
-    },
-  });
+
 
   const syncAllM = useMutation({
     mutationFn: () => syncAllFn({ data: { days: 60 } }),
@@ -278,7 +262,7 @@ function YouzanPage() {
         </CardContent>
       </Card>
 
-      {outboundQ.data && <YouzanOutboundCard status={outboundQ.data} />}
+      
 
       {/* 门店卡片 */}
       <div className="mb-2 flex items-center justify-between">
@@ -319,11 +303,6 @@ function YouzanPage() {
               shop={hq}
               breakdown={breakdown[hq.id]}
               onPing={() => pingM.mutate(hq.id)}
-              onRemove={() => {
-                if (confirm(`移除总部「${hq.shop_name}」？分店将无法同步。`)) {
-                  removeM.mutate(hq.id);
-                }
-              }}
               pinging={pingM.isPending && pingM.variables === hq.id}
             />
           )}
@@ -333,15 +312,11 @@ function YouzanPage() {
               shop={s}
               breakdown={breakdown[s.id]}
               onPing={() => pingM.mutate(s.id)}
-              onRemove={() => {
-                if (confirm(`移除门店「${s.shop_name}」？`)) {
-                  removeM.mutate(s.id);
-                }
-              }}
               pinging={pingM.isPending && pingM.variables === s.id}
             />
           ))}
         </div>
+
       )}
 
       {/* 数据 / 同步 / 商品库 —— 永久可见的 Tabs */}
@@ -351,10 +326,6 @@ function YouzanPage() {
             <TabsTrigger value="logs">
               <Activity className="mr-1.5 h-3.5 w-3.5" />
               同步明细
-            </TabsTrigger>
-            <TabsTrigger value="items">
-              <Package className="mr-1.5 h-3.5 w-3.5" />
-              门店商品库
             </TabsTrigger>
             <TabsTrigger value="sync">
               <Sparkles className="mr-1.5 h-3.5 w-3.5" />
@@ -446,9 +417,6 @@ function YouzanPage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="items" className="mt-3">
-            <ShopItemsPanel />
-          </TabsContent>
 
           <TabsContent value="sync" className="mt-3">
             <SyncCenterPanel />
@@ -465,50 +433,6 @@ function YouzanPage() {
 
       </div>
     </div>
-  );
-}
-
-type YouzanOutboundStatus = {
-  mode: "fixed_proxy" | "direct_dynamic";
-  configured: boolean;
-  proxy_host: string | null;
-  outbound_ip: string | null;
-  message: string;
-};
-
-function YouzanOutboundCard({ status }: { status: YouzanOutboundStatus }) {
-  const fixed = status.mode === "fixed_proxy";
-  const copy = (value: string | null) => {
-    if (!value) return;
-    navigator.clipboard.writeText(value).then(() => toast.success("已复制"));
-  };
-  return (
-    <Card className={fixed ? "border-success/30 bg-success/5" : "border-warning/40 bg-warning/5"}>
-      <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge className={fixed ? "bg-success/10 text-success hover:bg-success/10" : "bg-warning/15 text-warning-foreground hover:bg-warning/15"}>
-              {fixed ? "固定出口代理已启用" : "当前为动态直连出口"}
-            </Badge>
-            {status.proxy_host && <span className="text-xs font-mono text-muted-foreground">{status.proxy_host}</span>}
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">{status.message}</p>
-          {!fixed && (
-            <p className="mt-1 text-xs text-muted-foreground">
-              这不是发布问题；云端后端出网 IP 会随调度变化。要对接有赞白名单，请配置固定出口代理后只白名单代理 IP。
-            </p>
-          )}
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <code className="rounded bg-background px-2 py-1.5 text-xs font-mono">
-            {status.outbound_ip ?? (fixed ? "固定 IP 未填写" : "动态 IP 不展示")}
-          </code>
-          <Button size="sm" variant="outline" onClick={() => copy(status.outbound_ip)} disabled={!status.outbound_ip}>
-            复制白名单 IP
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 
@@ -542,38 +466,6 @@ function CompactStat({
   );
 }
 
-function MetricCard({
-  icon: Icon,
-  label,
-  value,
-  hint,
-  tone,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-  hint?: string;
-  tone?: "primary";
-}) {
-  return (
-    <Card className={tone === "primary" ? "border-primary/30 bg-primary/[0.03]" : ""}>
-      <CardContent className="p-4">
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">{label}</span>
-          <Icon
-            className={
-              tone === "primary"
-                ? "h-4 w-4 text-primary"
-                : "h-4 w-4 text-muted-foreground"
-            }
-          />
-        </div>
-        <p className="mt-2 text-2xl font-semibold tabular-nums">{value}</p>
-        {hint && <p className="mt-1 text-[11px] text-muted-foreground">{hint}</p>}
-      </CardContent>
-    </Card>
-  );
-}
 
 // ============================================================
 // 门店卡
@@ -594,15 +486,14 @@ function ShopCard({
   shop,
   breakdown,
   onPing,
-  onRemove,
   pinging,
 }: {
   shop: Shop;
   breakdown?: { revenue: number; count: number };
   onPing: () => void;
-  onRemove: () => void;
   pinging: boolean;
 }) {
+
   const isHq = shop.role === "hq";
   const Icon = isHq ? Building2 : StoreIcon;
 
@@ -652,16 +543,8 @@ function ShopCard({
             </div>
           </div>
 
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-7 w-7 opacity-0 transition group-hover:opacity-100"
-            onClick={onRemove}
-            title="移除门店"
-          >
-            <Trash2 className="h-3.5 w-3.5 text-destructive" />
-          </Button>
         </div>
+
 
         {/* 本月业绩 */}
         {!isHq && breakdown && (
@@ -704,7 +587,7 @@ function ShopCard({
         )}
 
         {/* 操作 */}
-        <div className="mt-3 flex items-center justify-between gap-2">
+        <div className="mt-3 flex items-center justify-end">
           <Button
             size="sm"
             variant="ghost"
@@ -719,17 +602,8 @@ function ShopCard({
             )}
             测试连接
           </Button>
-          <SyncDialog
-            shopId={shop.id}
-            shopName={shop.shop_name}
-            trigger={
-              <Button size="sm" className="h-7 px-2 text-xs">
-                <RefreshCw className="mr-1 h-3 w-3" />
-                同步
-              </Button>
-            }
-          />
         </div>
+
       </CardContent>
     </Card>
   );
