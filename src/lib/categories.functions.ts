@@ -54,7 +54,7 @@ const toRow = (r: RawRow): CategoryRow => ({
   synced_at: r.synced_at,
 });
 
-/* ---------- 列表（只显示 kind='group'）---------- */
+/* ---------- 列表（商品分类，已合并原分组）---------- */
 export const listCategories = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -62,7 +62,7 @@ export const listCategories = createServerFn({ method: "GET" })
     const { data, error } = await supabase
       .from("inv_categories" as never)
       .select(SELECT_COLS)
-      .eq("kind", "group")
+      .eq("kind", "category")
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
