@@ -262,7 +262,7 @@ function YouzanPage() {
         </CardContent>
       </Card>
 
-      {outboundQ.data && <YouzanOutboundCard status={outboundQ.data} />}
+      
 
       {/* 门店卡片 */}
       <div className="mb-2 flex items-center justify-between">
