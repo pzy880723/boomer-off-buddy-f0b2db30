@@ -8,7 +8,7 @@ import {
   Search,
   ChevronDown,
   ChevronRight,
-  Package,
+  
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -304,30 +304,11 @@ function OrderRow({
     : "—";
   const txn = (row.outer_transaction_no as string) ?? "";
 
-  const raw = row.raw as Record<string, unknown> | null;
-  const fullOrder =
-    (raw?.full_order_info as Record<string, unknown> | undefined) ?? {};
-  const subOrders =
-    (fullOrder.orders as Array<Record<string, unknown>> | undefined) ?? [];
+  const itemCount = Number(
+    (row.item_count as number) ?? (row.num as number) ?? 0,
+  );
 
-  // 商品行：优先用 sub-orders 拼图 + 标题，否则退化为 first_item_image + item_titles
-  const productLines: { img: string | null; title: string; qty: number }[] =
-    subOrders.length > 0
-      ? subOrders.map((so) => ({
-          img: (so.pic_path as string) ?? (so.pic as string) ?? null,
-          title: String(so.title ?? "—"),
-          qty: Number(so.num ?? 0),
-        }))
-      : [
-          {
-            img: (row.first_item_image as string) ?? null,
-            title: (row.item_titles as string) ?? "—",
-            qty: Number((row.item_count as number) ?? (row.num as number) ?? 0),
-          },
-        ];
 
-  const visibleLines = productLines.slice(0, 3);
-  const restCount = productLines.length - visibleLines.length;
 
   return (
     <div className="rounded-lg border bg-card shadow-sm overflow-hidden hover:shadow transition-shadow">
@@ -335,7 +316,7 @@ function OrderRow({
       <button
         type="button"
         onClick={onToggle}
-        className="w-full flex items-start justify-between gap-3 px-4 py-2.5 text-left bg-muted/40 border-b hover:bg-muted/60 transition-colors"
+        className={`w-full flex items-start justify-between gap-3 px-4 py-2.5 text-left bg-muted/40 hover:bg-muted/60 transition-colors ${expanded ? "border-b" : ""}`}
       >
         <div className="min-w-0 flex-1 space-y-0.5">
           <div className="flex items-center gap-2 flex-wrap">
@@ -352,8 +333,9 @@ function OrderRow({
             )}
           </div>
           <div className="text-xs text-muted-foreground truncate">
-            {shopName}
+            {shopName}{itemCount > 0 ? ` · ${itemCount} 件` : ""}
           </div>
+
         </div>
         <div className="text-right shrink-0 flex items-start gap-2">
           <div>
@@ -372,45 +354,13 @@ function OrderRow({
         </div>
       </button>
 
-      {/* 商品区：白底 */}
-      <div className="px-4 py-3 space-y-1.5 bg-card">
-        {visibleLines.map((line, i) => (
-          <div key={i} className="flex items-center gap-2.5">
-            {line.img ? (
-              <img
-                src={line.img}
-                alt=""
-                className="h-9 w-9 rounded object-cover border shrink-0"
-                loading="lazy"
-              />
-            ) : (
-              <div className="h-9 w-9 rounded border bg-muted flex items-center justify-center shrink-0">
-                <Package className="h-3.5 w-3.5 text-muted-foreground" />
-              </div>
-            )}
-            <div className="min-w-0 flex-1 text-xs line-clamp-1">
-              {line.title}
-            </div>
-            {line.qty > 0 && (
-              <div className="text-xs text-muted-foreground tabular-nums shrink-0">
-                ×{line.qty}
-              </div>
-            )}
-          </div>
-        ))}
-        {restCount > 0 && (
-          <div className="text-[11px] text-muted-foreground pl-11">
-            还有 {restCount} 件商品…
-          </div>
-        )}
-      </div>
-
       {/* 展开：明细 + 支付 */}
       {expanded && (
         <div className="border-t bg-muted/20 px-4 py-3">
           <OrderDetail row={row} />
         </div>
       )}
+
     </div>
   );
 }
