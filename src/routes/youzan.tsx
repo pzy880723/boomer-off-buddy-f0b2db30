@@ -1071,3 +1071,66 @@ function ImportShopsDialog({
     </Dialog>
   );
 }
+
+// ============================================================
+// 一键同步进度条
+// ============================================================
+function formatDuration(ms: number) {
+  if (!isFinite(ms) || ms < 0) return "--";
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s} 秒`;
+  const m = Math.floor(s / 60);
+  const rs = s % 60;
+  if (m < 60) return rs ? `${m} 分 ${rs} 秒` : `${m} 分`;
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  return rm ? `${h} 小时 ${rm} 分` : `${h} 小时`;
+}
+
+function SyncProgressCard({
+  progress,
+  onDismiss,
+}: {
+  progress: {
+    total: number;
+    finished: number;
+    errored: number;
+    running: number;
+    pct: number;
+    elapsedMs: number;
+    etaText: string;
+  };
+  onDismiss: () => void;
+}) {
+  const done = progress.total > 0 && progress.finished >= progress.total;
+  return (
+    <Card className={done ? "border-success/40 bg-success/5" : "border-primary/40 bg-primary/[0.03]"}>
+      <CardContent className="space-y-2 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            {done ? (
+              <CheckCircle2 className="h-4 w-4 text-success" />
+            ) : (
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            )}
+            {done ? "一键同步已完成" : "一键同步进行中"}
+            <span className="text-xs font-normal tabular-nums text-muted-foreground">
+              {progress.finished}/{progress.total} 任务
+              {progress.errored > 0 && (
+                <span className="ml-1 text-destructive">· {progress.errored} 失败</span>
+              )}
+            </span>
+          </div>
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <span>已用 {formatDuration(progress.elapsedMs)}</span>
+            <span className={done ? "text-success" : "text-primary"}>{progress.etaText}</span>
+            <Button size="sm" variant="ghost" className="h-6 px-2" onClick={onDismiss}>
+              收起
+            </Button>
+          </div>
+        </div>
+        <Progress value={progress.pct} className="h-1.5" />
+      </CardContent>
+    </Card>
+  );
+}
