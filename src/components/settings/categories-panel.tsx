@@ -230,7 +230,7 @@ export function CategoriesPanel() {
                   onToggleActive={() => toggleActive.mutate(r)}
                   onEdit={() => setEditing(r)}
                   onDelete={() => {
-                    if (confirm(`确定删除分类「${r.name}」？`)) removeCat.mutate(r.id);
+                    if (confirm(`确定删除分组「${r.name}」？`)) removeCat.mutate(r.id);
                   }}
                 />
                 {isOpen &&
@@ -243,7 +243,7 @@ export function CategoriesPanel() {
                       onToggleActive={() => toggleActive.mutate(k)}
                       onEdit={() => setEditing(k)}
                       onDelete={() => {
-                        if (confirm(`确定删除分类「${k.name}」？`)) removeCat.mutate(k.id);
+                        if (confirm(`确定删除分组「${k.name}」？`)) removeCat.mutate(k.id);
                       }}
                     />
                   ))}
