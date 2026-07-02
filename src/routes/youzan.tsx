@@ -619,16 +619,8 @@ function ShopCard({
             </div>
           </div>
 
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-7 w-7 opacity-0 transition group-hover:opacity-100"
-            onClick={onRemove}
-            title="移除门店"
-          >
-            <Trash2 className="h-3.5 w-3.5 text-destructive" />
-          </Button>
         </div>
+
 
         {/* 本月业绩 */}
         {!isHq && breakdown && (
