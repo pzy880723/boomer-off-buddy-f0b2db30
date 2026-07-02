@@ -261,30 +261,36 @@ async function fetchYouzanHqGroups(): Promise<{
 function normalizeGroups(payload: unknown, defaultParent: number | null = null): YzGroup[] {
   if (!payload || typeof payload !== "object") return [];
   const p = payload as Record<string, unknown>;
+  const dataObj = (p.data ?? {}) as Record<string, unknown>;
   const raw =
+    (p.tags as unknown[]) ??
+    (dataObj.tags as unknown[]) ??
     (p.categories as unknown[]) ??
     (p.category_list as unknown[]) ??
     (p.shop_categories as unknown[]) ??
     (p.groups as unknown[]) ??
     (p.children as unknown[]) ??
-    ((p.data as { categories?: unknown[]; category_list?: unknown[]; shop_categories?: unknown[] } | undefined)
-      ?.categories as unknown[]) ??
-    ((p.data as { category_list?: unknown[] } | undefined)?.category_list as unknown[]) ??
-    ((p.data as { shop_categories?: unknown[] } | undefined)?.shop_categories as unknown[]) ??
+    (dataObj.categories as unknown[]) ??
+    (dataObj.category_list as unknown[]) ??
+    (dataObj.shop_categories as unknown[]) ??
     [];
   const out: YzGroup[] = [];
   const walk = (arr: unknown[], pid: number | null) => {
     for (const it of arr) {
       const o = it as Record<string, unknown>;
-      const id = Number(o.category_id ?? o.id ?? o.cid ?? o.group_id);
-      const name = String(o.name ?? o.category_name ?? o.group_name ?? "").trim();
+      const id = Number(o.category_id ?? o.id ?? o.cid ?? o.group_id ?? o.tag_id);
+      const name = String(o.name ?? o.category_name ?? o.group_name ?? o.tag_name ?? "").trim();
       if (!id || !name) continue;
+      // 只保留商家自定义分组 (type=0)；若字段缺失（旧接口）则一律保留
+      if (o.type != null && Number(o.type) !== 0) continue;
       const nodeParent =
-        o.parent_cid != null
-          ? Number(o.parent_cid)
-          : o.parent_id != null
-            ? Number(o.parent_id)
-            : pid;
+        o.upper_id != null
+          ? Number(o.upper_id)
+          : o.parent_cid != null
+            ? Number(o.parent_cid)
+            : o.parent_id != null
+              ? Number(o.parent_id)
+              : pid;
       out.push({
         id,
         name,
@@ -298,6 +304,7 @@ function normalizeGroups(payload: unknown, defaultParent: number | null = null):
   walk(raw as unknown[], defaultParent);
   return out;
 }
+
 
 function pinyinCode(name: string, yzId: number): string {
   const ascii = name.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
