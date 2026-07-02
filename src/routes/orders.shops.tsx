@@ -333,8 +333,9 @@ function OrderRow({
             )}
           </div>
           <div className="text-xs text-muted-foreground truncate">
-            {shopName}
+            {shopName}{itemCount > 0 ? ` · ${itemCount} 件` : ""}
           </div>
+
         </div>
         <div className="text-right shrink-0 flex items-start gap-2">
           <div>
