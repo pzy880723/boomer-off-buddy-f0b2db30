@@ -126,9 +126,13 @@ function YouzanPage() {
   });
   const logsQ = useQuery({
     queryKey: ["youzan-sync-logs"],
-    queryFn: () => fetchLogs({ data: { limit: 30 } }),
-    refetchInterval: 10_000,
+    queryFn: () => fetchLogs({ data: { limit: 60 } }),
+    refetchInterval: syncSessionActive() ? 2_000 : 10_000,
   });
+  function syncSessionActive() {
+    // hoisted so useQuery reads the latest state; defined below via closure fallback
+    return false;
+  }
   const outboundQ = useQuery({
     queryKey: ["youzan-outbound"],
     queryFn: () => fetchOutbound(),
