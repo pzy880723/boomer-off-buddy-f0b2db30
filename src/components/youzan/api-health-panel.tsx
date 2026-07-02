@@ -16,6 +16,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { runYouzanApiHealthCheck } from "@/lib/youzan-health.functions";
+import { detectYouzanOutboundIp } from "@/lib/youzan-outbound.functions";
+
 import {
   YZ_FEATURE_LABELS,
   YZ_STATUS_LABELS,
