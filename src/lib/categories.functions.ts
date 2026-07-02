@@ -198,12 +198,13 @@ async function fetchYouzanHqGroups(): Promise<{
   const token = await ensureAccessToken(hq);
   const notes: SyncNote[] = [];
 
-  // 店铺分组接口，按优先级尝试
+  // 商品分组（自定义 tag 树，一级/二级）——有赞云团队官方答复：
+  //   查询分组本身 → youzan.itemcategories.tags.get
+  //   字段：id / name / upper_id(0=一级) / type(0=商家自定义分组)
   const attempts: { method: string; version: string }[] = [
-    { method: "youzan.itemcategories.shop.get", version: "3.0.0" },
-    { method: "youzan.shop.categories.get", version: "3.0.0" },
-    { method: "youzan.retail.product.shopcategory.get", version: "3.0.0" },
+    { method: "youzan.itemcategories.tags.get", version: "3.0.0" },
   ];
+
 
   let usedApi = "";
   let allRows: YzGroup[] = [];
