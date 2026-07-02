@@ -63,6 +63,7 @@ type NavTo =
   | "/shop-mgmt/products"
   | "/shop-mgmt/online"
   | "/shop-mgmt/franchisees"
+  | "/product-categories"
   | "/youzan"
   | "/youzan/sync"
   | "/orders/shops"
