@@ -152,7 +152,7 @@ function YouzanPage() {
   });
 
   const syncAllM = useMutation({
-    mutationFn: () => syncAllFn({ data: { days: 30 } }),
+    mutationFn: () => syncAllFn({ data: { days: 60 } }),
     onSuccess: (r) => {
       toast.success(r.message);
       // 后台异步任务，1 秒后再刷一次给用户看到第一波结果

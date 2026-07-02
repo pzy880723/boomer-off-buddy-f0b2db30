@@ -81,6 +81,7 @@ import { Route as InventoryInboundNewRouteImport } from './routes/inventory.inbo
 import { Route as InventoryInboundIdRouteImport } from './routes/inventory.inbound.$id'
 import { Route as ApiPublicMerukiIngestRouteImport } from './routes/api/public/meruki-ingest'
 import { Route as ApiPublicHooksYouzanSyncWorkerRouteImport } from './routes/api/public/hooks/youzan-sync-worker'
+import { Route as ApiPublicHooksYouzanSyncRouteImport } from './routes/api/public/hooks/youzan-sync'
 import { Route as ApiPublicHooksYouzanStockWorkerRouteImport } from './routes/api/public/hooks/youzan-stock-worker'
 import { Route as ApiPublicHooksYouzanReconcileRouteImport } from './routes/api/public/hooks/youzan-reconcile'
 import { Route as ApiPublicHandheldTransfersRouteImport } from './routes/api/public/handheld/transfers'
@@ -503,6 +504,12 @@ const ApiPublicHooksYouzanSyncWorkerRoute =
     path: '/api/public/hooks/youzan-sync-worker',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksYouzanSyncRoute =
+  ApiPublicHooksYouzanSyncRouteImport.update({
+    id: '/api/public/hooks/youzan-sync',
+    path: '/api/public/hooks/youzan-sync',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksYouzanStockWorkerRoute =
   ApiPublicHooksYouzanStockWorkerRouteImport.update({
     id: '/api/public/hooks/youzan-stock-worker',
@@ -915,6 +922,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/transfers': typeof ApiPublicHandheldTransfersRouteWithChildren
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
+  '/api/public/hooks/youzan-sync': typeof ApiPublicHooksYouzanSyncRoute
   '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
   '/api/public/auth/otp/send': typeof ApiPublicAuthOtpSendRoute
   '/api/public/auth/otp/verify': typeof ApiPublicAuthOtpVerifyRoute
@@ -1037,6 +1045,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/transfers': typeof ApiPublicHandheldTransfersRouteWithChildren
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
+  '/api/public/hooks/youzan-sync': typeof ApiPublicHooksYouzanSyncRoute
   '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
   '/api/public/auth/otp/send': typeof ApiPublicAuthOtpSendRoute
   '/api/public/auth/otp/verify': typeof ApiPublicAuthOtpVerifyRoute
@@ -1167,6 +1176,7 @@ export interface FileRoutesById {
   '/api/public/handheld/transfers': typeof ApiPublicHandheldTransfersRouteWithChildren
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
+  '/api/public/hooks/youzan-sync': typeof ApiPublicHooksYouzanSyncRoute
   '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
   '/api/public/auth/otp/send': typeof ApiPublicAuthOtpSendRoute
   '/api/public/auth/otp/verify': typeof ApiPublicAuthOtpVerifyRoute
@@ -1298,6 +1308,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/transfers'
     | '/api/public/hooks/youzan-reconcile'
     | '/api/public/hooks/youzan-stock-worker'
+    | '/api/public/hooks/youzan-sync'
     | '/api/public/hooks/youzan-sync-worker'
     | '/api/public/auth/otp/send'
     | '/api/public/auth/otp/verify'
@@ -1420,6 +1431,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/transfers'
     | '/api/public/hooks/youzan-reconcile'
     | '/api/public/hooks/youzan-stock-worker'
+    | '/api/public/hooks/youzan-sync'
     | '/api/public/hooks/youzan-sync-worker'
     | '/api/public/auth/otp/send'
     | '/api/public/auth/otp/verify'
@@ -1549,6 +1561,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/transfers'
     | '/api/public/hooks/youzan-reconcile'
     | '/api/public/hooks/youzan-stock-worker'
+    | '/api/public/hooks/youzan-sync'
     | '/api/public/hooks/youzan-sync-worker'
     | '/api/public/auth/otp/send'
     | '/api/public/auth/otp/verify'
@@ -1640,6 +1653,7 @@ export interface RootRouteChildren {
   ApiPublicHandheldTransfersRoute: typeof ApiPublicHandheldTransfersRouteWithChildren
   ApiPublicHooksYouzanReconcileRoute: typeof ApiPublicHooksYouzanReconcileRoute
   ApiPublicHooksYouzanStockWorkerRoute: typeof ApiPublicHooksYouzanStockWorkerRoute
+  ApiPublicHooksYouzanSyncRoute: typeof ApiPublicHooksYouzanSyncRoute
   ApiPublicHooksYouzanSyncWorkerRoute: typeof ApiPublicHooksYouzanSyncWorkerRoute
   ApiPublicAuthOtpSendRoute: typeof ApiPublicAuthOtpSendRoute
   ApiPublicAuthOtpVerifyRoute: typeof ApiPublicAuthOtpVerifyRoute
@@ -2179,6 +2193,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/hooks/youzan-sync-worker'
       fullPath: '/api/public/hooks/youzan-sync-worker'
       preLoaderRoute: typeof ApiPublicHooksYouzanSyncWorkerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/youzan-sync': {
+      id: '/api/public/hooks/youzan-sync'
+      path: '/api/public/hooks/youzan-sync'
+      fullPath: '/api/public/hooks/youzan-sync'
+      preLoaderRoute: typeof ApiPublicHooksYouzanSyncRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/youzan-stock-worker': {
@@ -2921,6 +2942,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHandheldTransfersRoute: ApiPublicHandheldTransfersRouteWithChildren,
   ApiPublicHooksYouzanReconcileRoute: ApiPublicHooksYouzanReconcileRoute,
   ApiPublicHooksYouzanStockWorkerRoute: ApiPublicHooksYouzanStockWorkerRoute,
+  ApiPublicHooksYouzanSyncRoute: ApiPublicHooksYouzanSyncRoute,
   ApiPublicHooksYouzanSyncWorkerRoute: ApiPublicHooksYouzanSyncWorkerRoute,
   ApiPublicAuthOtpSendRoute: ApiPublicAuthOtpSendRoute,
   ApiPublicAuthOtpVerifyRoute: ApiPublicAuthOtpVerifyRoute,
