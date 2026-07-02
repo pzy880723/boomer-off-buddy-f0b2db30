@@ -152,10 +152,16 @@ function YouzanPage() {
     },
   });
 
+  const [syncSession, setSyncSession] = useState<{
+    startedAt: number;
+    dispatched: number;
+  } | null>(null);
+
   const syncAllM = useMutation({
     mutationFn: () => syncAllFn({ data: { days: 60 } }),
     onSuccess: (r) => {
       toast.success(r.message);
+      setSyncSession({ startedAt: Date.now(), dispatched: r.dispatched });
       // 后台异步任务，1 秒后再刷一次给用户看到第一波结果
       setTimeout(() => {
         qc.invalidateQueries({ queryKey: ["youzan-summary"] });
