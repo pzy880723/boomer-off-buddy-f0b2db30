@@ -177,7 +177,7 @@ export function CategoriesPanel() {
     }
     return Array.from(map.entries()).map(([key, items]) => ({
       key,
-      title: (items as unknown as { __title?: string }).__title ?? "分类",
+      title: (items as unknown as { __title?: string }).__title ?? "分组",
       items,
     }));
   }, [previewData]);
