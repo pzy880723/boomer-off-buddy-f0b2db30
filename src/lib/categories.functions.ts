@@ -343,7 +343,7 @@ function pinyinCode(name: string, yzId: number): string {
 export const previewYouzanCategorySync = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { rows: yz, api, shop_id, notes } = await fetchYouzanHqCategories();
+    const { rows: yz, api, shop_id, notes, blocking } = await fetchYouzanHqCategories();
     const { data: existing, error } = await context.supabase
       .from("inv_categories" as never)
       .select(SELECT_COLS);
