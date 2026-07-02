@@ -121,39 +121,61 @@ export const deleteCategory = createServerFn({ method: "POST" })
 /* ---------- 有赞同步（预览 / 采纳）---------- */
 type YzCategory = { id: number; name: string; parent_id: number | null; sort_order?: number };
 
+export type SyncNote = {
+  api: string;
+  status: "ok" | "no_api" | "ip_blocked" | "empty" | "error";
+  message: string;
+  count?: number;
+};
+export type BlockingError =
+  | { kind: "ip_whitelist"; ip: string; apis: string[]; raw: string }
+  | { kind: "no_api"; apis: string[] }
+  | { kind: "other"; message: string };
+
+class IpBlockedError extends Error {
+  ip: string;
+  constructor(ip: string, msg: string) {
+    super(msg);
+    this.ip = ip;
+  }
+}
+
+function classifyYouzanError(err: unknown): {
+  kind: "ip_blocked" | "no_api" | "other";
+  message: string;
+  ip?: string;
+} {
+  const msg = err instanceof Error ? err.message : String(err);
+  const ipMatch = msg.match(/(?:gw\s*4007|源\s*IP\s*地址)[^0-9]*((?:\d{1,3}\.){3}\d{1,3})/i);
+  if (ipMatch) return { kind: "ip_blocked", message: msg, ip: ipMatch[1] };
+  if (/gw\s*4005|非法的\s*API|invalid\s*api/i.test(msg)) return { kind: "no_api", message: msg };
+  return { kind: "other", message: msg };
+}
+
 async function fetchYouzanHqCategories(): Promise<{
   api: string;
   shop_id: string;
   rows: YzCategory[];
-  notes: string[];
+  notes: SyncNote[];
+  blocking?: BlockingError;
 }> {
   const { getHqShop, ensureAccessToken, callYouzanApiVerbose } = await import(
     "@/lib/youzan.functions"
   );
   const hq = await getHqShop();
   const token = await ensureAccessToken(hq);
-  const notes: string[] = [];
+  const notes: SyncNote[] = [];
 
-  // 一级列表接口候选
-  const rootAttempts: {
-    method: string;
-    version: string;
-    extract: (p: unknown) => YzCategory[];
-  }[] = [
-    {
-      method: "youzan.retail.product.standardcategory.get",
-      version: "3.0.0",
-      extract: (p) => normalizeCats(p),
-    },
-    {
-      method: "youzan.itemcategories.get",
-      version: "3.0.0",
-      extract: (p) => normalizeCats(p),
-    },
+  const rootAttempts: { method: string; version: string }[] = [
+    { method: "youzan.itemcategories.get", version: "3.0.0" },
+    { method: "youzan.retail.product.category.get", version: "3.0.0" },
+    { method: "youzan.retail.product.standardcategory.get", version: "3.0.0" },
   ];
-  const errs: string[] = [];
+
   let usedApi = "";
   let allRows: YzCategory[] = [];
+  let ipBlock: { ip: string; raw: string; apis: string[] } | null = null;
+
   for (const a of rootAttempts) {
     try {
       const { payload } = await callYouzanApiVerbose({
@@ -161,20 +183,46 @@ async function fetchYouzanHqCategories(): Promise<{
         method: a.method,
         version: a.version,
       });
-      const rows = a.extract(payload);
+      const rows = normalizeCats(payload);
       if (rows.length > 0) {
         usedApi = a.method;
         allRows = rows;
+        notes.push({ api: a.method, status: "ok", message: "拉取成功", count: rows.length });
         break;
       }
-      errs.push(`${a.method}: 返回空`);
+      notes.push({ api: a.method, status: "empty", message: "返回空" });
     } catch (e) {
-      errs.push(`${a.method}: ${e instanceof Error ? e.message : String(e)}`);
+      const c = classifyYouzanError(e);
+      if (c.kind === "ip_blocked") {
+        notes.push({ api: a.method, status: "ip_blocked", message: c.message });
+        ipBlock = ipBlock ?? { ip: c.ip ?? "", raw: c.message, apis: [] };
+        ipBlock.apis.push(a.method);
+        // 遇 IP 拦截立即中断——同一出口 IP 对所有接口都会被拒
+        break;
+      }
+      notes.push({
+        api: a.method,
+        status: c.kind === "no_api" ? "no_api" : "error",
+        message: c.message,
+      });
     }
   }
-  if (allRows.length === 0) throw new Error(`拉取有赞分类失败：\n${errs.join("\n")}`);
 
-  // 若接口本身没返回子分类（parent_id 全为 null），逐个一级 by-parent 补拉
+  if (allRows.length === 0) {
+    let blocking: BlockingError;
+    if (ipBlock) {
+      blocking = { kind: "ip_whitelist", ip: ipBlock.ip, apis: ipBlock.apis, raw: ipBlock.raw };
+    } else {
+      const noApis = notes.filter((n) => n.status === "no_api").map((n) => n.api);
+      blocking =
+        noApis.length > 0 && noApis.length === notes.length
+          ? { kind: "no_api", apis: noApis }
+          : { kind: "other", message: notes.map((n) => `${n.api}: ${n.message}`).join("\n") };
+    }
+    return { api: "", shop_id: hq.id, rows: [], notes, blocking };
+  }
+
+  // 若一级都是 parent_id=null，补拉二级
   const hasChildren = allRows.some((r) => r.parent_id != null);
   if (!hasChildren) {
     const roots = allRows.filter((r) => r.parent_id == null);
@@ -184,6 +232,8 @@ async function fetchYouzanHqCategories(): Promise<{
     ];
     let childApi = "";
     let ok = 0;
+    let noApiCount = 0;
+    let lastErr = "";
     for (const root of roots) {
       let picked: YzCategory[] | null = null;
       for (const a of childAttempts) {
@@ -200,12 +250,17 @@ async function fetchYouzanHqCategories(): Promise<{
             childApi = a.method;
             break;
           }
-        } catch {
-          /* try next */
+        } catch (e) {
+          const c = classifyYouzanError(e);
+          if (c.kind === "ip_blocked") {
+            // 二级也被 IP 拦截，直接抛出（一级已经拿到，但用户还是需要看到 IP 提示）
+            throw new IpBlockedError(c.ip ?? "", c.message);
+          }
+          if (c.kind === "no_api") noApiCount++;
+          lastErr = c.message;
         }
       }
       if (picked) {
-        // 去重（child API 有时把父自己也带回来）
         const rootSet = new Set(allRows.map((r) => r.id));
         for (const k of picked) {
           if (k.id === root.id) continue;
@@ -215,8 +270,26 @@ async function fetchYouzanHqCategories(): Promise<{
         ok++;
       }
     }
-    if (ok > 0) notes.push(`已通过 ${childApi} 补拉 ${ok} 个一级的子类目`);
-    else notes.push("未能获取二级分类（可能授权无权限或店铺无子分类）");
+    if (ok > 0) {
+      notes.push({
+        api: childApi,
+        status: "ok",
+        message: `补拉了 ${ok} 个一级的子类目`,
+        count: ok,
+      });
+    } else if (noApiCount > 0) {
+      notes.push({
+        api: "youzan.itemcategories.get.byparentcid",
+        status: "no_api",
+        message: "当前授权无二级类目接口权限",
+      });
+    } else if (lastErr) {
+      notes.push({
+        api: "youzan.itemcategories.get.byparentcid",
+        status: "error",
+        message: lastErr,
+      });
+    }
   }
   return { api: usedApi, shop_id: hq.id, rows: allRows, notes };
 }
