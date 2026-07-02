@@ -66,32 +66,3 @@ export const detectYouzanOutboundIp = createServerFn({ method: "POST" })
     return { ip, source, saved: true };
   });
 
-/**
- * 读取已保存的出口 IP（供健康检查合并到 outbound 状态里展示）。
- */
-export async function readSavedOutboundIp(
-  supabase: {
-    from: (t: string) => {
-      select: (c: string) => {
-        eq: (k: string, v: string) => {
-          maybeSingle: () => Promise<{
-            data: { value: unknown } | null;
-            error: unknown;
-          }>;
-        };
-      };
-    };
-  },
-): Promise<string | null> {
-  try {
-    const { data } = await supabase
-      .from("app_settings")
-      .select("value")
-      .eq("key", SETTINGS_KEY)
-      .maybeSingle();
-    const v = data?.value as { ip?: string } | null;
-    return v?.ip ?? null;
-  } catch {
-    return null;
-  }
-}
