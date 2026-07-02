@@ -100,7 +100,7 @@ export function CategoriesPanel() {
         if (res.blocking.kind === "ip_whitelist") {
           toast.error("有赞侧未加白名单，见弹窗说明");
         } else if (res.blocking.kind === "no_api") {
-          toast.error("当前授权无分类接口权限");
+          toast.error("当前授权无店铺分组接口权限");
         }
       }
     } catch (e) {
