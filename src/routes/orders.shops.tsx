@@ -222,123 +222,33 @@ function ShopOrdersPage() {
 
       {/* 订单列表 */}
       <Card>
-        <CardContent className="p-0 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/40 text-xs text-muted-foreground">
-              <tr>
-                <th className="w-8"></th>
-                <th className="px-3 py-2 text-left font-medium">商品</th>
-                <th className="px-3 py-2 text-left font-medium">订单号</th>
-                <th className="px-3 py-2 text-left font-medium">门店</th>
-                <th className="px-3 py-2 text-left font-medium">买家</th>
-                <th className="px-3 py-2 text-left font-medium">收货人</th>
-                <th className="px-3 py-2 text-right font-medium">件数</th>
-                <th className="px-3 py-2 text-right font-medium">金额</th>
-                <th className="px-3 py-2 text-left font-medium">状态</th>
-                <th className="px-3 py-2 text-left font-medium">支付时间</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pageRows.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={10}
-                    className="py-10 text-center text-sm text-muted-foreground"
-                  >
-                    没有匹配的订单
-                  </td>
-                </tr>
-              )}
-              {pageRows.map((o) => {
-                const id = o.id as string;
-                const expanded = expandedId === id;
-                const amount = Number(
-                  (o.payment as number) ?? (o.total_fee as number) ?? 0,
-                );
-                const itemQty = Number(
-                  (o.item_count as number) ?? (o.num as number) ?? 0,
-                );
-                const img = o.first_item_image as string | null;
-                const titles = (o.item_titles as string | null) ?? "—";
-                return (
-                  <Fragment key={id}>
-                    <tr
-                      className="border-t hover:bg-muted/30 cursor-pointer"
-                      onClick={() => setExpandedId(expanded ? null : id)}
-                    >
-                      <td className="pl-3 align-middle">
-                        {expanded ? (
-                          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                        ) : (
-                          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                        )}
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="flex items-center gap-2">
-                          {img ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={img}
-                              alt=""
-                              className="h-10 w-10 rounded object-cover border"
-                              loading="lazy"
-                            />
-                          ) : (
-                            <div className="h-10 w-10 rounded border bg-muted flex items-center justify-center">
-                              <Package className="h-4 w-4 text-muted-foreground" />
-                            </div>
-                          )}
-                          <span className="line-clamp-2 max-w-[280px] text-xs">
-                            {titles}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2 font-mono text-xs">
-                        {o.tid as string}
-                      </td>
-                      <td className="px-3 py-2 text-xs">
-                        {shopNameMap.get(o.shop_id as string) ??
-                          `kdt_id ${o.kdt_id}`}
-                      </td>
-                      <td className="px-3 py-2 text-xs text-muted-foreground">
-                        {(o.buyer_nick as string) ?? "—"}
-                      </td>
-                      <td className="px-3 py-2 text-xs text-muted-foreground">
-                        {(o.receiver_name as string) ?? "—"}
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums">
-                        {itemQty || "—"}
-                      </td>
-                      <td className="px-3 py-2 text-right font-medium tabular-nums">
-                        {cny(amount)}
-                      </td>
-                      <td className="px-3 py-2">
-                        <Badge variant="outline" className="text-xs">
-                          {(o.status_text as string) ??
-                            yzStatusText(o.status as string | null)}
-                        </Badge>
-                      </td>
-                      <td className="px-3 py-2 font-mono text-xs tabular-nums text-muted-foreground">
-                        {o.pay_time
-                          ? new Date(o.pay_time as string).toLocaleString("zh-CN")
-                          : "—"}
-                      </td>
-                    </tr>
-                    {expanded && (
-                      <tr className="bg-muted/20 border-t">
-                        <td></td>
-                        <td colSpan={9} className="px-3 py-3">
-                          <OrderDetail row={o} />
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
-                );
-              })}
-            </tbody>
-          </table>
+        <CardContent className="p-0">
+          <div className="divide-y">
+            {pageRows.length === 0 && (
+              <div className="py-10 text-center text-sm text-muted-foreground">
+                没有匹配的订单
+              </div>
+            )}
+            {pageRows.map((o) => {
+              const id = o.id as string;
+              const expanded = expandedId === id;
+              return (
+                <OrderRow
+                  key={id}
+                  row={o}
+                  expanded={expanded}
+                  onToggle={() => setExpandedId(expanded ? null : id)}
+                  shopName={
+                    shopNameMap.get(o.shop_id as string) ??
+                    `kdt_id ${o.kdt_id}`
+                  }
+                />
+              );
+            })}
+          </div>
         </CardContent>
       </Card>
+
 
       {/* 分页 */}
       {pageCount > 1 && (
