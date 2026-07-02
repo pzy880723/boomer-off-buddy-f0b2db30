@@ -182,6 +182,21 @@ function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="categories">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">商品分类（ERP 自建）</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <EmptyState
+                icon={FolderTree}
+                title="一二级分类维护 · 建设中"
+                description="将支持独立于有赞的 ERP 商品一二级分类维护，SKU 可挂载。上线前请继续使用「商品分组」。"
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="groups">
           <CategoriesPanel />
         </TabsContent>
 
