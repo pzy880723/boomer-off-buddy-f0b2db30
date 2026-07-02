@@ -278,14 +278,132 @@ function ShopOrdersPage() {
   );
 }
 
+function OrderRow({
+  row,
+  expanded,
+  onToggle,
+  shopName,
+}: {
+  row: Record<string, unknown>;
+  expanded: boolean;
+  onToggle: () => void;
+  shopName: string;
+}) {
+  const amount = Number(
+    (row.payment as number) ?? (row.total_fee as number) ?? 0,
+  );
+  const status = (row.status_text as string) ?? yzStatusText(row.status as string | null);
+  const payTime = row.pay_time
+    ? new Date(row.pay_time as string).toLocaleString("zh-CN")
+    : "—";
+
+  const raw = row.raw as Record<string, unknown> | null;
+  const fullOrder =
+    (raw?.full_order_info as Record<string, unknown> | undefined) ?? {};
+  const subOrders =
+    (fullOrder.orders as Array<Record<string, unknown>> | undefined) ?? [];
+
+  // 商品行：优先用 sub-orders 拼图 + 标题，否则退化为 first_item_image + item_titles
+  const productLines: { img: string | null; title: string; qty: number }[] =
+    subOrders.length > 0
+      ? subOrders.map((so) => ({
+          img: (so.pic_path as string) ?? (so.pic as string) ?? null,
+          title: String(so.title ?? "—"),
+          qty: Number(so.num ?? 0),
+        }))
+      : [
+          {
+            img: (row.first_item_image as string) ?? null,
+            title: (row.item_titles as string) ?? "—",
+            qty: Number((row.item_count as number) ?? (row.num as number) ?? 0),
+          },
+        ];
+
+  const visibleLines = productLines.slice(0, 3);
+  const restCount = productLines.length - visibleLines.length;
+
+  return (
+    <div className="hover:bg-muted/20 transition-colors">
+      {/* 顶部条 */}
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full flex items-start justify-between gap-3 px-4 pt-3 pb-2 text-left"
+      >
+        <div className="flex items-center gap-2 min-w-0 flex-wrap">
+          {expanded ? (
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          ) : (
+            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          )}
+          <span className="font-mono text-sm font-semibold tracking-tight">
+            {row.tid as string}
+          </span>
+          <Badge variant="outline" className="text-[10px] h-5">
+            {status}
+          </Badge>
+          <span className="text-xs text-muted-foreground">· {shopName}</span>
+        </div>
+        <div className="text-right shrink-0">
+          <div className="text-base font-semibold tabular-nums">
+            {cny(amount)}
+          </div>
+          <div className="text-[11px] font-mono text-muted-foreground tabular-nums">
+            {payTime}
+          </div>
+        </div>
+      </button>
+
+      {/* 商品区 */}
+      <div className="px-4 pb-3 pl-9 space-y-1.5">
+        {visibleLines.map((line, i) => (
+          <div key={i} className="flex items-center gap-2.5">
+            {line.img ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={line.img}
+                alt=""
+                className="h-9 w-9 rounded object-cover border shrink-0"
+                loading="lazy"
+              />
+            ) : (
+              <div className="h-9 w-9 rounded border bg-muted flex items-center justify-center shrink-0">
+                <Package className="h-3.5 w-3.5 text-muted-foreground" />
+              </div>
+            )}
+            <div className="min-w-0 flex-1 text-xs line-clamp-1">
+              {line.title}
+            </div>
+            {line.qty > 0 && (
+              <div className="text-xs text-muted-foreground tabular-nums shrink-0">
+                ×{line.qty}
+              </div>
+            )}
+          </div>
+        ))}
+        {restCount > 0 && (
+          <div className="text-[11px] text-muted-foreground pl-11">
+            还有 {restCount} 件商品…
+          </div>
+        )}
+      </div>
+
+      {/* 展开：明细 + 支付 */}
+      {expanded && (
+        <div className="border-t bg-muted/10 px-4 py-3 pl-9">
+          <OrderDetail row={row} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function OrderDetail({ row }: { row: Record<string, unknown> }) {
   const raw = row.raw as Record<string, unknown> | null;
   const fullOrder =
     (raw?.full_order_info as Record<string, unknown> | undefined) ?? {};
   const orders =
     (fullOrder.orders as Array<Record<string, unknown>> | undefined) ?? [];
-  const addr =
-    (fullOrder.address_info as Record<string, unknown> | undefined) ?? {};
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
@@ -324,25 +442,6 @@ function OrderDetail({ row }: { row: Record<string, unknown> }) {
       </div>
       <div className="space-y-2">
         <div>
-          <div className="font-medium text-foreground mb-1">收货</div>
-          <div className="text-muted-foreground">
-            {(row.receiver_name as string) ?? "—"}
-            {row.receiver_tel ? ` · ${row.receiver_tel}` : ""}
-          </div>
-          <div className="text-muted-foreground">
-            {((row.receiver_address as string | null) ??
-              [
-                addr.delivery_province,
-                addr.delivery_city,
-                addr.delivery_district,
-                addr.delivery_address,
-              ]
-                .filter(Boolean)
-                .join(" ")) ||
-              "—"}
-          </div>
-        </div>
-        <div>
           <div className="font-medium text-foreground mb-1">支付</div>
           <div className="text-muted-foreground">
             交易号 {(row.outer_transaction_no as string) ?? "—"}
@@ -357,3 +456,4 @@ function OrderDetail({ row }: { row: Record<string, unknown> }) {
     </div>
   );
 }
+
