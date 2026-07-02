@@ -129,11 +129,6 @@ function YouzanPage() {
     queryFn: () => fetchLogs({ data: { limit: 60 } }),
     refetchInterval: syncSession ? 2_000 : 10_000,
   });
-  const outboundQ = useQuery({
-    queryKey: ["youzan-outbound"],
-    queryFn: () => fetchOutbound(),
-    staleTime: 60_000,
-  });
 
   const pingM = useMutation({
     mutationFn: (id: string) => pingFn({ data: { shop_id: id } }),
@@ -144,13 +139,7 @@ function YouzanPage() {
     },
   });
 
-  const removeM = useMutation({
-    mutationFn: (id: string) => removeFn({ data: { id } }),
-    onSuccess: () => {
-      toast.success("已移除门店");
-      qc.invalidateQueries({ queryKey: ["youzan-shops"] });
-    },
-  });
+
 
   const syncAllM = useMutation({
     mutationFn: () => syncAllFn({ data: { days: 60 } }),
