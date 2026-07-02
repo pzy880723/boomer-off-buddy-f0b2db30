@@ -303,11 +303,6 @@ function YouzanPage() {
               shop={hq}
               breakdown={breakdown[hq.id]}
               onPing={() => pingM.mutate(hq.id)}
-              onRemove={() => {
-                if (confirm(`移除总部「${hq.shop_name}」？分店将无法同步。`)) {
-                  removeM.mutate(hq.id);
-                }
-              }}
               pinging={pingM.isPending && pingM.variables === hq.id}
             />
           )}
@@ -317,15 +312,11 @@ function YouzanPage() {
               shop={s}
               breakdown={breakdown[s.id]}
               onPing={() => pingM.mutate(s.id)}
-              onRemove={() => {
-                if (confirm(`移除门店「${s.shop_name}」？`)) {
-                  removeM.mutate(s.id);
-                }
-              }}
               pinging={pingM.isPending && pingM.variables === s.id}
             />
           ))}
         </div>
+
       )}
 
       {/* 数据 / 同步 / 商品库 —— 永久可见的 Tabs */}
