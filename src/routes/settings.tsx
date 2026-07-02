@@ -30,7 +30,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: "商品",
-    items: [{ value: "categories", label: "商品分类", icon: Tags }],
+    items: [{ value: "categories", label: "商品分组", icon: Tags }],
   },
   {
     label: "通知与集成",
