@@ -479,7 +479,7 @@ function CategoryRowView({
           )}
           {depth === 0 && childCount ? (
             <Badge variant="secondary" className="text-[10px]">
-              含 {childCount} 个子类
+              含 {childCount} 个子分组
             </Badge>
           ) : null}
         </div>
