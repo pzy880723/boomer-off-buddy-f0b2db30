@@ -24,6 +24,8 @@ import {
   AlertCircle,
   Smartphone,
   FileCode2,
+  Globe,
+  FolderTree,
   type LucideIcon,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks/use-auth-session";
