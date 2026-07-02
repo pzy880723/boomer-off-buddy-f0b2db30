@@ -588,7 +588,7 @@ function EditDialog({
               <Input type="number" value={sort} onChange={(e) => setSort(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label>上级分类</Label>
+              <Label>上级分组</Label>
               <select
                 className="h-9 w-full rounded-md border bg-background px-2 text-sm"
                 value={parent}
