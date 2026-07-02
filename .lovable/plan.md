@@ -1,72 +1,46 @@
 ## 背景
-上一版 `/settings` 同步过来的是有赞后台的**官方标准类目**（`youzan.itemcategories.get` / `retail.product.category.get`），但你实际想要的是**店铺自建分组**——就是有赞后台「商品 → 分组管理」里维护、给前台导航/橱窗用的那套。两者概念不同：类目是平台属性，分组才是店铺自己的货架分类。
 
-## 目标
-- 同步入口从「官方类目」切成「店铺分组」（HQ 总部店铺）。
-- 完全替换：清理旧的类目映射数据，之后 `inv_categories` 只承载「分组」。
-- UI 文案 / 字段命名跟着改，避免以后再混淆。
+上一版把「店铺分组」同步接口试了三个：
+`itemcategories.shop.get` / `shop.categories.get` / `retail.product.shopcategory.get`，全部 gw 4005「非法的 API」。你已确认权限申请通过，所以问题就是**接口名选错了**。
+
+有赞云团队在官方论坛的答复（thread-699886）明确：
+- 商品所属分组 → `youzan.items.custom.get` 返回体里的 `tag_ids`
+- 查询分组本身（一级 + 二级）→ **`youzan.itemcategories.tags.get`**
+  - 字段：`id / name / upper_id / type`
+  - `upper_id = 0` → 一级分组；否则 → 父分组 id
+  - `type = 0` → 商家自定义分组（就是我们要的「商品分组」）
+
+我们只用第二个接口就够（同步分组树），商品和分组的绑定后面再做。
 
 ## 实施步骤
 
-### 1. 数据模型微调（migration）
-- `inv_categories` 新增字段：
-  - `youzan_hq_group_id bigint`
-  - `youzan_hq_group_parent_id bigint`
-  - `kind text check (kind in ('group','category')) default 'group'`
-- 一次性数据迁移：把现有 `youzan_hq_category_id != null` 的行标记 `kind='category'` 并 `is_active=false`（不物理删除，避免误伤已经绑 SKU 的），后续 UI 默认只显示 `kind='group'`。
-- 保留旧列以便回滚，但代码不再写入。
+### 1. `src/lib/categories.functions.ts` — `fetchYouzanHqGroups()`
+- attempts 列表清空，只保留：
+  ```
+  { method: "youzan.itemcategories.tags.get", version: "3.0.0" }
+  ```
+  （保留 try/catch + `classifyYouzanError` 的 IP / 4005 / 4007 处理不动。）
+- `normalizeGroups()` 增加对 tags 结构的解析：
+  - 从 payload 中读 `tags` / `data.tags` / `categories` 兜底
+  - 每个节点映射：
+    - `id ← id`
+    - `name ← name`
+    - `parent_id ← upper_id === 0 ? null : upper_id`
+    - `sort_order ← order ?? 0`
+  - 过滤 `type != null && type !== 0`（只留自定义分组，排除系统分类）
+  - 一次拉平返回，一级/二级都在同一数组里（前端按 `parent_id` 组树）。
 
-### 2. 有赞 API 接入（`src/lib/categories.functions.ts`）
-用「店铺分组」相关接口，按优先级尝试并 fallback：
-- `youzan.itemcategories.shop.get`（电商店铺分组，主用）
-- `youzan.shop.categories.get` / `youzan.shop.category.list`（旧名兼容）
-- `youzan.retail.product.shopcategory.get`（零售版店铺分组，兜底）
+### 2. UI 文案
+- `CategoriesPanel` / 同步预览：把 note 里显示的 API 名换成新接口，其余不动。
 
-复用已有的 `callYouzanApiVerbose` + `classifyYouzanError`，保留 IP 白名单 / gw4005 的报错提示逻辑（用户上一轮修的部分不动）。
-`normalizeCats` 复用：分组接口返回结构大同小异（`id/name/parent_id/sort`），补上 `sort_order` 归一。
-
-### 3. `previewYouzanCategorySync` / `applyYouzanCategorySync` 调整
-- 匹配键从 `youzan_hq_category_id` 换成 `youzan_hq_group_id`。
-- 新增行统一写 `kind='group'`。
-- `to_deactivate` 只针对 `kind='group'` 且已从有赞侧删除的分组。
-- 返回体字段名保留（前端少动），内部注释统一改成「分组」。
-
-### 4. 前端 (`src/components/settings/categories-panel.tsx` + `/settings` 标签)
-- 侧栏 / Tab 标题：`商品分类` → `商品分组`。
-- 同步按钮文案：`从有赞同步` → `从有赞拉取店铺分组`。
-- 预览弹窗表头、说明文案、note 提示语全部改「分组」。
-- 树形展示逻辑不变（分组本身也有一/二级）。
-
-### 5. SKU 侧引用
-`useCategories()` 消费方式不变（依然吐出 `code + name`），只是数据源换成分组。`sku-meta-fields.tsx` 等无需改动。
-
-## 技术细节
-
-```text
-有赞后台            ERP 里的对应体
-──────────         ──────────────
-商品 → 分组管理  →  inv_categories (kind='group')  ← 本次同步目标
-商品 → 类目 (平台) →  inv_categories (kind='category', 已停用)  ← 旧数据封存
-```
-
-同步流程：
-```text
-[HQ 店铺 token]
-      │
-      ▼
-callYouzanApi(itemcategories.shop.get) ─fallback→ retail.shopcategory.get
-      │
-      ▼
-normalizeCats → {id,name,parent_id}[]
-      │
-      ▼
-diff vs inv_categories WHERE youzan_hq_group_id IS NOT NULL
-      │
-      ▼
-preview UI (add / update / deactivate) → 用户确认 → apply
-```
+### 3. 兜底文案
+- 如果分页字段存在（`total_results / has_next`），补分页循环；没有就单次调用。先按有赞返回观察，如果只有一页就不做分页（tags 数量一般 < 200）。
 
 ## 不做的事
-- 不删旧 `youzan_hq_category_id` 列（保留历史 & 回滚空间）。
-- 不动 SKU 上的 `category` 字段（依旧存 `code`）。
-- 不引入「商品标签 itemtags」——你选了只要分组。
+- 不改 `inv_categories` 表结构（v2 迁移已经把 `youzan_hq_group_id / kind` 建好了）。
+- 不同步商品与分组的绑定关系（后续需求，另开）。
+- 不动 IP 白名单 / 错误分类逻辑。
+
+## 验收
+- `/settings → 商品分组 → 从有赞拉取店铺分组`：note 里出现
+  `youzan.itemcategories.tags.get ✅ 拉取成功 · N`，预览弹窗按父/子结构列出所有一/二级分组，确认后写入 `inv_categories(kind='group')`。
