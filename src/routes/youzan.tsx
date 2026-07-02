@@ -396,7 +396,13 @@ function YouzanPage() {
   );
 }
 
-type YouzanOutboundStatus = Awaited<ReturnType<typeof getYouzanOutboundInfo>>;
+type YouzanOutboundStatus = {
+  mode: "fixed_proxy" | "direct_dynamic";
+  configured: boolean;
+  proxy_host: string | null;
+  outbound_ip: string | null;
+  message: string;
+};
 
 function YouzanOutboundCard({ status }: { status: YouzanOutboundStatus }) {
   const fixed = status.mode === "fixed_proxy";
