@@ -319,7 +319,7 @@ export const previewYouzanCategorySync = createServerFn({ method: "POST" })
     const { data: existing, error } = await context.supabase
       .from("inv_categories" as never)
       .select(SELECT_COLS)
-      .eq("kind", "group");
+      .eq("kind", "category");
     if (error) throw new Error(error.message);
     const local = ((existing ?? []) as unknown as RawRow[]).map(toRow);
     const byYz = new Map(
