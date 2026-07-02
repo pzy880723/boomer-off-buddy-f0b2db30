@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { Progress } from "@/components/ui/progress";
 import {
   CheckCircle2,
   AlertTriangle,
@@ -123,10 +124,15 @@ function YouzanPage() {
     queryFn: () => fetchBreakdown(),
     refetchInterval: 60_000,
   });
+  const [syncSession, setSyncSession] = useState<{
+    startedAt: number;
+    dispatched: number;
+  } | null>(null);
+
   const logsQ = useQuery({
     queryKey: ["youzan-sync-logs"],
-    queryFn: () => fetchLogs({ data: { limit: 30 } }),
-    refetchInterval: 10_000,
+    queryFn: () => fetchLogs({ data: { limit: 60 } }),
+    refetchInterval: syncSession ? 2_000 : 10_000,
   });
   const outboundQ = useQuery({
     queryKey: ["youzan-outbound"],
@@ -155,6 +161,7 @@ function YouzanPage() {
     mutationFn: () => syncAllFn({ data: { days: 60 } }),
     onSuccess: (r) => {
       toast.success(r.message);
+      setSyncSession({ startedAt: Date.now(), dispatched: r.dispatched });
       // 后台异步任务，1 秒后再刷一次给用户看到第一波结果
       setTimeout(() => {
         qc.invalidateQueries({ queryKey: ["youzan-summary"] });
@@ -172,6 +179,50 @@ function YouzanPage() {
   const logs = logsQ.data?.logs ?? [];
   const hq = shops.find((s) => s.role === "hq");
   const branches = shops.filter((s) => s.role === "branch");
+
+  // 一键同步进度：轮询 sync 日志计算完成度 + 预计剩余时间
+  const [nowTs, setNowTs] = useState(() => Date.now());
+  useEffect(() => {
+    if (!syncSession) return;
+    const t = setInterval(() => setNowTs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [syncSession]);
+
+  const syncProgress = useMemo(() => {
+    if (!syncSession) return null;
+    const sessionLogs = logs.filter(
+      (l) =>
+        (l.action === "items" || l.action === "orders") &&
+        new Date(l.started_at).getTime() >= syncSession.startedAt - 2000,
+    );
+    const finished = sessionLogs.filter((l) => l.status !== "running").length;
+    const errored = sessionLogs.filter((l) => l.status === "error").length;
+    const running = sessionLogs.filter((l) => l.status === "running").length;
+    const total = syncSession.dispatched;
+    const pct = total > 0 ? Math.min(100, (finished / total) * 100) : 0;
+    const elapsedMs = nowTs - syncSession.startedAt;
+    let etaText = "预计中…";
+    if (finished > 0 && finished < total) {
+      const perTask = elapsedMs / finished;
+      const remainMs = perTask * (total - finished);
+      etaText = `预计剩余 ${formatDuration(remainMs)}`;
+    } else if (finished >= total && total > 0) {
+      etaText = "已完成";
+    } else if (elapsedMs < 5000) {
+      etaText = "任务派发中…";
+    }
+    return { total, finished, errored, running, pct, elapsedMs, etaText };
+  }, [syncSession, logs, nowTs]);
+
+  // 全部完成 30 秒后自动收起
+  useEffect(() => {
+    if (!syncSession || !syncProgress) return;
+    if (syncProgress.finished >= syncProgress.total && syncProgress.total > 0) {
+      const t = setTimeout(() => setSyncSession(null), 30_000);
+      return () => clearTimeout(t);
+    }
+  }, [syncSession, syncProgress]);
+
 
   return (
     <div className="container mx-auto px-4 py-6 space-y-6">
@@ -204,6 +255,15 @@ function YouzanPage() {
           </div>
         }
       />
+
+      {syncProgress && (
+        <SyncProgressCard
+          progress={syncProgress}
+          onDismiss={() => setSyncSession(null)}
+        />
+      )}
+
+
 
       {/* 业务汇总 单行紧凑条 */}
       <Card className="mb-4">
@@ -1009,5 +1069,68 @@ function ImportShopsDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ============================================================
+// 一键同步进度条
+// ============================================================
+function formatDuration(ms: number) {
+  if (!isFinite(ms) || ms < 0) return "--";
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s} 秒`;
+  const m = Math.floor(s / 60);
+  const rs = s % 60;
+  if (m < 60) return rs ? `${m} 分 ${rs} 秒` : `${m} 分`;
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  return rm ? `${h} 小时 ${rm} 分` : `${h} 小时`;
+}
+
+function SyncProgressCard({
+  progress,
+  onDismiss,
+}: {
+  progress: {
+    total: number;
+    finished: number;
+    errored: number;
+    running: number;
+    pct: number;
+    elapsedMs: number;
+    etaText: string;
+  };
+  onDismiss: () => void;
+}) {
+  const done = progress.total > 0 && progress.finished >= progress.total;
+  return (
+    <Card className={done ? "border-success/40 bg-success/5" : "border-primary/40 bg-primary/[0.03]"}>
+      <CardContent className="space-y-2 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            {done ? (
+              <CheckCircle2 className="h-4 w-4 text-success" />
+            ) : (
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            )}
+            {done ? "一键同步已完成" : "一键同步进行中"}
+            <span className="text-xs font-normal tabular-nums text-muted-foreground">
+              {progress.finished}/{progress.total} 任务
+              {progress.errored > 0 && (
+                <span className="ml-1 text-destructive">· {progress.errored} 失败</span>
+              )}
+            </span>
+          </div>
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <span>已用 {formatDuration(progress.elapsedMs)}</span>
+            <span className={done ? "text-success" : "text-primary"}>{progress.etaText}</span>
+            <Button size="sm" variant="ghost" className="h-6 px-2" onClick={onDismiss}>
+              收起
+            </Button>
+          </div>
+        </div>
+        <Progress value={progress.pct} className="h-1.5" />
+      </CardContent>
+    </Card>
   );
 }
