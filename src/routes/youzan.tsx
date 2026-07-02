@@ -394,6 +394,10 @@ function YouzanPage() {
           <TabsContent value="health" className="mt-3">
             <ShopHealthPanel />
           </TabsContent>
+
+          <TabsContent value="api-health" className="mt-3">
+            <ApiHealthPanel />
+          </TabsContent>
         </Tabs>
 
       </div>
