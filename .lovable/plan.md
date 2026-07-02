@@ -1,46 +1,69 @@
-## 背景
+## 侧边栏新结构（`src/components/app-sidebar.tsx`）
 
-上一版把「店铺分组」同步接口试了三个：
-`itemcategories.shop.get` / `shop.categories.get` / `retail.product.shopcategory.get`，全部 gw 4005「非法的 API」。你已确认权限申请通过，所以问题就是**接口名选错了**。
+```text
+总览
+  └ 仪表盘
 
-有赞云团队在官方论坛的答复（thread-699886）明确：
-- 商品所属分组 → `youzan.items.custom.get` 返回体里的 `tag_ids`
-- 查询分组本身（一级 + 二级）→ **`youzan.itemcategories.tags.get`**
-  - 字段：`id / name / upper_id / type`
-  - `upper_id = 0` → 一级分组；否则 → 父分组 id
-  - `type = 0` → 商家自定义分组（就是我们要的「商品分组」）
+商品管理                    ← 新分组
+  └ 仓库商品   /inventory/skus       （从"仓库管理"迁入）
+  └ 门店商品   /shop-mgmt/products   （从"门店管理"迁入，改名）
+  └ 网店商品   /shop-mgmt/online     （新占位路由，暂放 placeholder 页）
+  └ 商品分类   /settings/categories  （新增，指向系统设置→商品分类 Tab）
+  └ 商品分组   /settings/groups      （新增，指向系统设置→商品分组 Tab；有赞店铺分组）
 
-我们只用第二个接口就够（同步分组树），商品和分组的绑定后面再做。
+库存管理                    ← 由"仓库管理"改名，移除"仓库商品"
+  └ 入库记录
+  └ 调拨单
+  └ 盘点单
+  └ 待认领 EPC
+  └ 库位管理
+  └ 手持终端
 
-## 实施步骤
+门店管理
+  └ 门店列表
+  └ 加盟商管理
+  └ 有赞门店
 
-### 1. `src/lib/categories.functions.ts` — `fetchYouzanHqGroups()`
-- attempts 列表清空，只保留：
-  ```
-  { method: "youzan.itemcategories.tags.get", version: "3.0.0" }
-  ```
-  （保留 try/catch + `classifyYouzanError` 的 IP / 4005 / 4007 处理不动。）
-- `normalizeGroups()` 增加对 tags 结构的解析：
-  - 从 payload 中读 `tags` / `data.tags` / `categories` 兜底
-  - 每个节点映射：
-    - `id ← id`
-    - `name ← name`
-    - `parent_id ← upper_id === 0 ? null : upper_id`
-    - `sort_order ← order ?? 0`
-  - 过滤 `type != null && type !== 0`（只留自定义分组，排除系统分类）
-  - 一次拉平返回，一级/二级都在同一数组里（前端按 `parent_id` 组树）。
+订单管理
+  └ 门店订单
+  └ 铺货订单
+  └ 批发订单
 
-### 2. UI 文案
-- `CategoriesPanel` / 同步预览：把 note 里显示的 API 名换成新接口，其余不动。
+采购物流
+  └ 日本大宗 / 日本小包 / 国内大宗 / 国内小包
 
-### 3. 兜底文案
-- 如果分页字段存在（`total_results / has_next`），补分页循环；没有就单次调用。先按有赞返回观察，如果只有一页就不做分页（tags 数量一般 < 200）。
+运营
+  └ 知识库 / API 文档 / 系统设置
 
-## 不做的事
-- 不改 `inv_categories` 表结构（v2 迁移已经把 `youzan_hq_group_id / kind` 建好了）。
-- 不同步商品与分组的绑定关系（后续需求，另开）。
-- 不动 IP 白名单 / 错误分类逻辑。
+系统（仅超管）
+  └ 账号管理
+```
+
+分组顺序：总览 → 商品管理 → 库存管理 → 门店管理 → 订单管理 → 采购物流 → 运营 → 系统。
+
+## 需要新增的路由
+
+- `src/routes/shop-mgmt.online.tsx`：网店商品占位页（`PageHeader` + `EmptyState` "网店模块规划中"），沿用现有 `shop-mgmt` 布局。
+- **不新建** `/settings/categories`、`/settings/groups` 独立路由；直接让侧边栏 `Link` 用 `/settings` + `search: { tab: 'categories' | 'groups' }`，同时把 `settings.tsx` 的 `Tabs` 改成读 search param 作 `defaultValue`。这样侧边栏点"商品分类"能直达对应 Tab。
+
+## `settings.tsx` 微调
+
+- 沿用上一版分组结构，保留 `商品分类`（ERP 一二级，`kind='category'`）和 `商品分组`（有赞，`kind='group'`）两个 Tab（前一 plan 的产物）。
+- 用 `Route.useSearch()` 读 `tab`，作为 `Tabs value`，切换时 `navigate({ search: { tab } })`。
+
+## 类型 / 图标
+
+`NavTo` 增加 `/shop-mgmt/online`。图标：网店商品用 `Globe`，商品分类用 `Tags`，商品分组用 `Layers` 或 `FolderTree`（保留一个，避免与"入库记录"重复）。
+
+## 不改的东西
+
+- 门店商品页 `/shop-mgmt/products` 内部逻辑不动，只是从"门店管理"移到"商品管理"。
+- 门店管理原有 `门店商品库` 条目删掉（避免重复入口）。
+- 采购物流各子项与订单管理子项不变，仅整体位置调整。
 
 ## 验收
-- `/settings → 商品分组 → 从有赞拉取店铺分组`：note 里出现
-  `youzan.itemcategories.tags.get ✅ 拉取成功 · N`，预览弹窗按父/子结构列出所有一/二级分组，确认后写入 `inv_categories(kind='group')`。
+
+- 侧边栏顺序与命名符合上述结构。
+- 点击"商品管理 → 商品分类" / "商品分组" 分别落到 `/settings?tab=categories` / `?tab=groups`，进入即对应 Tab。
+- `/shop-mgmt/online` 打开有占位页，不 404。
+- 原"仓库管理"分组中的"仓库商品"消失（只在"商品管理"里出现一次）。
