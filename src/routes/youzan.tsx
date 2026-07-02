@@ -663,7 +663,7 @@ function ShopCard({
         )}
 
         {/* 操作 */}
-        <div className="mt-3 flex items-center justify-between gap-2">
+        <div className="mt-3 flex items-center justify-end">
           <Button
             size="sm"
             variant="ghost"
@@ -678,17 +678,8 @@ function ShopCard({
             )}
             测试连接
           </Button>
-          <SyncDialog
-            shopId={shop.id}
-            shopName={shop.shop_name}
-            trigger={
-              <Button size="sm" className="h-7 px-2 text-xs">
-                <RefreshCw className="mr-1 h-3 w-3" />
-                同步
-              </Button>
-            }
-          />
         </div>
+
       </CardContent>
     </Card>
   );
