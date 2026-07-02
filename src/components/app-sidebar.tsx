@@ -24,6 +24,8 @@ import {
   AlertCircle,
   Smartphone,
   FileCode2,
+  Globe,
+  FolderTree,
   type LucideIcon,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks/use-auth-session";
@@ -59,10 +61,10 @@ type NavTo =
   | "/inventory/stocktakes"
   | "/shop-mgmt/shops"
   | "/shop-mgmt/products"
+  | "/shop-mgmt/online"
   | "/shop-mgmt/franchisees"
   | "/youzan"
   | "/youzan/sync"
-
   | "/orders/shops"
   | "/orders/dispatch"
   | "/orders/wholesale"
@@ -71,25 +73,28 @@ type NavTo =
   | "/settings"
   | "/admin/users";
 
-const groups: { label: string; items: { title: string; url: NavTo; icon: LucideIcon }[]; icon?: LucideIcon }[] = [
+type NavItem = { title: string; url: NavTo; icon: LucideIcon; search?: Record<string, string> };
+type NavGroup = { label: string; items: NavItem[]; icon?: LucideIcon };
+
+const groups: NavGroup[] = [
   {
     label: "总览",
     items: [{ title: "仪表盘", url: "/dashboard", icon: LayoutDashboard }],
   },
   {
-    label: "采购物流",
+    label: "商品管理",
     items: [
-      { title: "日本大宗", url: "/purchase/japan-bulk", icon: Plane },
-      { title: "日本小包", url: "/purchase/japan-parcel", icon: Mail },
-      { title: "国内大宗", url: "/purchase/domestic-bulk", icon: PackageCheck },
-      { title: "国内小包", url: "/purchase/domestic", icon: ShoppingBag },
+      { title: "仓库商品", url: "/inventory/skus", icon: Tags },
+      { title: "门店商品", url: "/shop-mgmt/products", icon: Package },
+      { title: "网店商品", url: "/shop-mgmt/online", icon: Globe },
+      { title: "商品分类", url: "/settings", icon: FolderTree, search: { tab: "categories" } },
+      { title: "商品分组", url: "/settings", icon: Layers, search: { tab: "groups" } },
     ],
     icon: Package,
   },
   {
-    label: "仓库管理",
+    label: "库存管理",
     items: [
-      { title: "仓库商品", url: "/inventory/skus", icon: Tags },
       { title: "入库记录", url: "/inventory/inbound", icon: Layers },
       { title: "调拨单", url: "/inventory/transfers", icon: ArrowLeftRight },
       { title: "盘点单", url: "/inventory/stocktakes", icon: ClipboardList },
@@ -98,6 +103,15 @@ const groups: { label: string; items: { title: string; url: NavTo; icon: LucideI
       { title: "手持终端", url: "/inventory/devices", icon: Smartphone },
     ],
     icon: Boxes,
+  },
+  {
+    label: "门店管理",
+    items: [
+      { title: "门店列表", url: "/shop-mgmt/shops", icon: Building2 },
+      { title: "加盟商管理", url: "/shop-mgmt/franchisees", icon: Users },
+      { title: "有赞门店", url: "/youzan", icon: Link2 },
+    ],
+    icon: Store,
   },
   {
     label: "订单管理",
@@ -109,15 +123,14 @@ const groups: { label: string; items: { title: string; url: NavTo; icon: LucideI
     icon: ClipboardList,
   },
   {
-    label: "门店管理",
+    label: "采购物流",
     items: [
-      { title: "门店列表", url: "/shop-mgmt/shops", icon: Building2 },
-      { title: "门店商品库", url: "/shop-mgmt/products", icon: Package },
-      { title: "加盟商管理", url: "/shop-mgmt/franchisees", icon: Users },
-      { title: "有赞门店", url: "/youzan", icon: Link2 },
-
+      { title: "日本大宗", url: "/purchase/japan-bulk", icon: Plane },
+      { title: "日本小包", url: "/purchase/japan-parcel", icon: Mail },
+      { title: "国内大宗", url: "/purchase/domestic-bulk", icon: PackageCheck },
+      { title: "国内小包", url: "/purchase/domestic", icon: ShoppingBag },
     ],
-    icon: Store,
+    icon: Package,
   },
   {
     label: "运营",
@@ -132,19 +145,32 @@ const groups: { label: string; items: { title: string; url: NavTo; icon: LucideI
 export function AppSidebar() {
   const router = useRouter();
   const currentPath = useRouterState({ select: (s) => s.location.pathname });
+  const currentSearch = useRouterState({ select: (s) => s.location.search as Record<string, unknown> });
   const { state } = useSidebar();
   const { session } = useAuthSession();
   const isSuperAdmin = isSuperAdminPhone(resolveUserPhone(session?.user));
   const collapsed = state === "collapsed";
-  const isActive = (path: string) => currentPath === path || currentPath.startsWith(path + "/");
+  const isActive = (item: NavItem) => {
+    if (item.search) {
+      // Tab-scoped entry: require exact path AND matching search key
+      if (currentPath !== item.url) return false;
+      for (const [k, v] of Object.entries(item.search)) {
+        if (String(currentSearch?.[k] ?? "") !== v) return false;
+      }
+      return true;
+    }
+    // Plain path: exact or descendant, but exclude tab-scoped duplicates by requiring no `tab` on /settings root
+    if (item.url === "/settings" && currentSearch?.tab) return false;
+    return currentPath === item.url || currentPath.startsWith(item.url + "/");
+  };
   const preload = (to: NavTo) => void router.preloadRoute({ to });
 
-  const allGroups = isSuperAdmin
+  const allGroups: NavGroup[] = isSuperAdmin
     ? [
         ...groups,
         {
           label: "系统",
-          items: [{ title: "账号管理", url: "/admin/users" as NavTo, icon: ShieldCheck }],
+          items: [{ title: "账号管理", url: "/admin/users", icon: ShieldCheck }],
         },
       ]
     : groups;
@@ -181,9 +207,10 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu>
                 {group.items.map((item) => {
-                  const active = isActive(item.url);
+                  const active = isActive(item);
+                  const key = item.url + (item.search ? `?${new URLSearchParams(item.search).toString()}` : "");
                   return (
-                    <SidebarMenuItem key={item.url}>
+                    <SidebarMenuItem key={key}>
                       <SidebarMenuButton
                         asChild
                         isActive={active}
@@ -192,6 +219,7 @@ export function AppSidebar() {
                       >
                         <Link
                           to={item.url}
+                          search={item.search as never}
                           preload="intent"
                           onMouseEnter={() => preload(item.url)}
                           onPointerDown={() => preload(item.url)}

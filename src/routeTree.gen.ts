@@ -32,6 +32,7 @@ import { Route as StoreInventoryRouteImport } from './routes/store.inventory'
 import { Route as StoreIncomingRouteImport } from './routes/store.incoming'
 import { Route as ShopMgmtShopsRouteImport } from './routes/shop-mgmt.shops'
 import { Route as ShopMgmtProductsRouteImport } from './routes/shop-mgmt.products'
+import { Route as ShopMgmtOnlineRouteImport } from './routes/shop-mgmt.online'
 import { Route as ShopMgmtFranchiseesRouteImport } from './routes/shop-mgmt.franchisees'
 import { Route as PurchaseJapanParcelRouteImport } from './routes/purchase.japan-parcel'
 import { Route as PurchaseJapanBulkRouteImport } from './routes/purchase.japan-bulk'
@@ -248,6 +249,11 @@ const ShopMgmtShopsRoute = ShopMgmtShopsRouteImport.update({
 const ShopMgmtProductsRoute = ShopMgmtProductsRouteImport.update({
   id: '/products',
   path: '/products',
+  getParentRoute: () => ShopMgmtRoute,
+} as any)
+const ShopMgmtOnlineRoute = ShopMgmtOnlineRouteImport.update({
+  id: '/online',
+  path: '/online',
   getParentRoute: () => ShopMgmtRoute,
 } as any)
 const ShopMgmtFranchiseesRoute = ShopMgmtFranchiseesRouteImport.update({
@@ -852,6 +858,7 @@ export interface FileRoutesByFullPath {
   '/purchase/japan-bulk': typeof PurchaseJapanBulkRoute
   '/purchase/japan-parcel': typeof PurchaseJapanParcelRouteWithChildren
   '/shop-mgmt/franchisees': typeof ShopMgmtFranchiseesRoute
+  '/shop-mgmt/online': typeof ShopMgmtOnlineRoute
   '/shop-mgmt/products': typeof ShopMgmtProductsRoute
   '/shop-mgmt/shops': typeof ShopMgmtShopsRoute
   '/store/incoming': typeof StoreIncomingRoute
@@ -972,6 +979,7 @@ export interface FileRoutesByTo {
   '/orders/wholesale': typeof OrdersWholesaleRoute
   '/purchase/japan-bulk': typeof PurchaseJapanBulkRoute
   '/shop-mgmt/franchisees': typeof ShopMgmtFranchiseesRoute
+  '/shop-mgmt/online': typeof ShopMgmtOnlineRoute
   '/shop-mgmt/products': typeof ShopMgmtProductsRoute
   '/shop-mgmt/shops': typeof ShopMgmtShopsRoute
   '/store/incoming': typeof StoreIncomingRoute
@@ -1100,6 +1108,7 @@ export interface FileRoutesById {
   '/purchase/japan-bulk': typeof PurchaseJapanBulkRoute
   '/purchase/japan-parcel': typeof PurchaseJapanParcelRouteWithChildren
   '/shop-mgmt/franchisees': typeof ShopMgmtFranchiseesRoute
+  '/shop-mgmt/online': typeof ShopMgmtOnlineRoute
   '/shop-mgmt/products': typeof ShopMgmtProductsRoute
   '/shop-mgmt/shops': typeof ShopMgmtShopsRoute
   '/store/incoming': typeof StoreIncomingRoute
@@ -1229,6 +1238,7 @@ export interface FileRouteTypes {
     | '/purchase/japan-bulk'
     | '/purchase/japan-parcel'
     | '/shop-mgmt/franchisees'
+    | '/shop-mgmt/online'
     | '/shop-mgmt/products'
     | '/shop-mgmt/shops'
     | '/store/incoming'
@@ -1349,6 +1359,7 @@ export interface FileRouteTypes {
     | '/orders/wholesale'
     | '/purchase/japan-bulk'
     | '/shop-mgmt/franchisees'
+    | '/shop-mgmt/online'
     | '/shop-mgmt/products'
     | '/shop-mgmt/shops'
     | '/store/incoming'
@@ -1476,6 +1487,7 @@ export interface FileRouteTypes {
     | '/purchase/japan-bulk'
     | '/purchase/japan-parcel'
     | '/shop-mgmt/franchisees'
+    | '/shop-mgmt/online'
     | '/shop-mgmt/products'
     | '/shop-mgmt/shops'
     | '/store/incoming'
@@ -1811,6 +1823,13 @@ declare module '@tanstack/react-router' {
       path: '/products'
       fullPath: '/shop-mgmt/products'
       preLoaderRoute: typeof ShopMgmtProductsRouteImport
+      parentRoute: typeof ShopMgmtRoute
+    }
+    '/shop-mgmt/online': {
+      id: '/shop-mgmt/online'
+      path: '/online'
+      fullPath: '/shop-mgmt/online'
+      preLoaderRoute: typeof ShopMgmtOnlineRouteImport
       parentRoute: typeof ShopMgmtRoute
     }
     '/shop-mgmt/franchisees': {
@@ -2575,12 +2594,14 @@ const OrdersRouteWithChildren =
 
 interface ShopMgmtRouteChildren {
   ShopMgmtFranchiseesRoute: typeof ShopMgmtFranchiseesRoute
+  ShopMgmtOnlineRoute: typeof ShopMgmtOnlineRoute
   ShopMgmtProductsRoute: typeof ShopMgmtProductsRoute
   ShopMgmtShopsRoute: typeof ShopMgmtShopsRoute
 }
 
 const ShopMgmtRouteChildren: ShopMgmtRouteChildren = {
   ShopMgmtFranchiseesRoute: ShopMgmtFranchiseesRoute,
+  ShopMgmtOnlineRoute: ShopMgmtOnlineRoute,
   ShopMgmtProductsRoute: ShopMgmtProductsRoute,
   ShopMgmtShopsRoute: ShopMgmtShopsRoute,
 }
