@@ -2,6 +2,11 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+/**
+ * 本模块管理「商品分组」——ERP 侧唯一真源，来源是有赞【商品 → 分组管理】里
+ * 店铺自建的分组（不是平台标准类目）。字段名沿用 CategoryRow 以减少改动。
+ */
+
 export type CategoryRow = {
   id: string;
   code: string;
@@ -10,6 +15,7 @@ export type CategoryRow = {
   sort_order: number;
   is_active: boolean;
   is_system: boolean;
+  /** 有赞店铺分组 id（HQ 店铺侧） */
   youzan_hq_category_id: number | null;
   youzan_hq_parent_id: number | null;
   youzan_shop_id: string | null;
@@ -17,9 +23,38 @@ export type CategoryRow = {
 };
 
 const SELECT_COLS =
-  "id, code, name, parent_id, sort_order, is_active, is_system, youzan_hq_category_id, youzan_hq_parent_id, youzan_shop_id, synced_at";
+  "id, code, name, parent_id, sort_order, is_active, is_system, " +
+  "youzan_hq_group_id, youzan_hq_group_parent_id, youzan_shop_id, synced_at";
 
-/* ---------- 列表（所有登录用户）---------- */
+type RawRow = {
+  id: string;
+  code: string;
+  name: string;
+  parent_id: string | null;
+  sort_order: number;
+  is_active: boolean;
+  is_system: boolean;
+  youzan_hq_group_id: number | null;
+  youzan_hq_group_parent_id: number | null;
+  youzan_shop_id: string | null;
+  synced_at: string | null;
+};
+
+const toRow = (r: RawRow): CategoryRow => ({
+  id: r.id,
+  code: r.code,
+  name: r.name,
+  parent_id: r.parent_id,
+  sort_order: r.sort_order,
+  is_active: r.is_active,
+  is_system: r.is_system,
+  youzan_hq_category_id: r.youzan_hq_group_id,
+  youzan_hq_parent_id: r.youzan_hq_group_parent_id,
+  youzan_shop_id: r.youzan_shop_id,
+  synced_at: r.synced_at,
+});
+
+/* ---------- 列表（只显示 kind='group'）---------- */
 export const listCategories = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -27,10 +62,11 @@ export const listCategories = createServerFn({ method: "GET" })
     const { data, error } = await supabase
       .from("inv_categories" as never)
       .select(SELECT_COLS)
+      .eq("kind", "group")
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
-    return { rows: (data ?? []) as unknown as CategoryRow[] };
+    return { rows: ((data ?? []) as unknown as RawRow[]).map(toRow) };
   });
 
 /* ---------- 新增 / 更新 ---------- */
@@ -58,6 +94,7 @@ export const upsertCategory = createServerFn({ method: "POST" })
       parent_id: data.parent_id ?? null,
       sort_order: data.sort_order ?? 0,
       is_active: data.is_active,
+      kind: "group",
     };
     if (data.id) {
       const { error } = await supabase
@@ -102,14 +139,14 @@ export const deleteCategory = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .maybeSingle();
     if (cErr) throw new Error(cErr.message);
-    if (!cat) throw new Error("分类不存在");
+    if (!cat) throw new Error("分组不存在");
     const row = cat as { code: string; is_system: boolean };
-    if (row.is_system) throw new Error("系统种子分类不可删除，可停用");
+    if (row.is_system) throw new Error("系统种子分组不可删除，可停用");
     const { count } = await supabase
       .from("inv_skus")
       .select("id", { count: "exact", head: true })
       .eq("category", row.code);
-    if ((count ?? 0) > 0) throw new Error(`该分类下还有 ${count} 个商品，不能删除，请先停用`);
+    if ((count ?? 0) > 0) throw new Error(`该分组下还有 ${count} 个商品，不能删除，请先停用`);
     const { error } = await supabase
       .from("inv_categories" as never)
       .delete()
@@ -118,8 +155,11 @@ export const deleteCategory = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-/* ---------- 有赞同步（预览 / 采纳）---------- */
-type YzCategory = { id: number; name: string; parent_id: number | null; sort_order?: number };
+/* ==========================================================================
+ * 有赞店铺分组同步
+ * ========================================================================== */
+
+type YzGroup = { id: number; name: string; parent_id: number | null; sort_order?: number };
 
 export type SyncNote = {
   api: string;
@@ -131,14 +171,6 @@ export type BlockingError =
   | { kind: "ip_whitelist"; ip: string; apis: string[]; raw: string }
   | { kind: "no_api"; apis: string[] }
   | { kind: "other"; message: string };
-
-class IpBlockedError extends Error {
-  ip: string;
-  constructor(ip: string, msg: string) {
-    super(msg);
-    this.ip = ip;
-  }
-}
 
 function classifyYouzanError(err: unknown): {
   kind: "ip_blocked" | "no_api" | "other";
@@ -152,10 +184,10 @@ function classifyYouzanError(err: unknown): {
   return { kind: "other", message: msg };
 }
 
-async function fetchYouzanHqCategories(): Promise<{
+async function fetchYouzanHqGroups(): Promise<{
   api: string;
   shop_id: string;
-  rows: YzCategory[];
+  rows: YzGroup[];
   notes: SyncNote[];
   blocking?: BlockingError;
 }> {
@@ -166,24 +198,25 @@ async function fetchYouzanHqCategories(): Promise<{
   const token = await ensureAccessToken(hq);
   const notes: SyncNote[] = [];
 
-  const rootAttempts: { method: string; version: string }[] = [
-    { method: "youzan.itemcategories.get", version: "3.0.0" },
-    { method: "youzan.retail.product.category.get", version: "3.0.0" },
-    { method: "youzan.retail.product.standardcategory.get", version: "3.0.0" },
+  // 店铺分组接口，按优先级尝试
+  const attempts: { method: string; version: string }[] = [
+    { method: "youzan.itemcategories.shop.get", version: "3.0.0" },
+    { method: "youzan.shop.categories.get", version: "3.0.0" },
+    { method: "youzan.retail.product.shopcategory.get", version: "3.0.0" },
   ];
 
   let usedApi = "";
-  let allRows: YzCategory[] = [];
+  let allRows: YzGroup[] = [];
   let ipBlock: { ip: string; raw: string; apis: string[] } | null = null;
 
-  for (const a of rootAttempts) {
+  for (const a of attempts) {
     try {
       const { payload } = await callYouzanApiVerbose({
         accessToken: token,
         method: a.method,
         version: a.version,
       });
-      const rows = normalizeCats(payload);
+      const rows = normalizeGroups(payload);
       if (rows.length > 0) {
         usedApi = a.method;
         allRows = rows;
@@ -197,7 +230,6 @@ async function fetchYouzanHqCategories(): Promise<{
         notes.push({ api: a.method, status: "ip_blocked", message: c.message });
         ipBlock = ipBlock ?? { ip: c.ip ?? "", raw: c.message, apis: [] };
         ipBlock.apis.push(a.method);
-        // 遇 IP 拦截立即中断——同一出口 IP 对所有接口都会被拒
         break;
       }
       notes.push({
@@ -222,97 +254,30 @@ async function fetchYouzanHqCategories(): Promise<{
     return { api: "", shop_id: hq.id, rows: [], notes, blocking };
   }
 
-  // 若一级都是 parent_id=null，补拉二级
-  const hasChildren = allRows.some((r) => r.parent_id != null);
-  if (!hasChildren) {
-    const roots = allRows.filter((r) => r.parent_id == null);
-    const childAttempts = [
-      { method: "youzan.itemcategories.get.byparentcid", version: "3.0.0" },
-      { method: "youzan.retail.product.category.get", version: "3.0.0" },
-    ];
-    let childApi = "";
-    let ok = 0;
-    let noApiCount = 0;
-    let lastErr = "";
-    for (const root of roots) {
-      let picked: YzCategory[] | null = null;
-      for (const a of childAttempts) {
-        try {
-          const { payload } = await callYouzanApiVerbose({
-            accessToken: token,
-            method: a.method,
-            version: a.version,
-            params: { parent_cid: root.id, parent_id: root.id },
-          });
-          const kids = normalizeCats(payload, root.id);
-          if (kids.length > 0) {
-            picked = kids;
-            childApi = a.method;
-            break;
-          }
-        } catch (e) {
-          const c = classifyYouzanError(e);
-          if (c.kind === "ip_blocked") {
-            // 二级也被 IP 拦截，直接抛出（一级已经拿到，但用户还是需要看到 IP 提示）
-            throw new IpBlockedError(c.ip ?? "", c.message);
-          }
-          if (c.kind === "no_api") noApiCount++;
-          lastErr = c.message;
-        }
-      }
-      if (picked) {
-        const rootSet = new Set(allRows.map((r) => r.id));
-        for (const k of picked) {
-          if (k.id === root.id) continue;
-          if (rootSet.has(k.id)) continue;
-          allRows.push({ ...k, parent_id: root.id });
-        }
-        ok++;
-      }
-    }
-    if (ok > 0) {
-      notes.push({
-        api: childApi,
-        status: "ok",
-        message: `补拉了 ${ok} 个一级的子类目`,
-        count: ok,
-      });
-    } else if (noApiCount > 0) {
-      notes.push({
-        api: "youzan.itemcategories.get.byparentcid",
-        status: "no_api",
-        message: "当前授权无二级类目接口权限",
-      });
-    } else if (lastErr) {
-      notes.push({
-        api: "youzan.itemcategories.get.byparentcid",
-        status: "error",
-        message: lastErr,
-      });
-    }
-  }
   return { api: usedApi, shop_id: hq.id, rows: allRows, notes };
 }
 
-function normalizeCats(payload: unknown, defaultParent: number | null = null): YzCategory[] {
+function normalizeGroups(payload: unknown, defaultParent: number | null = null): YzGroup[] {
   if (!payload || typeof payload !== "object") return [];
   const p = payload as Record<string, unknown>;
   const raw =
     (p.categories as unknown[]) ??
     (p.category_list as unknown[]) ??
-    (p.sub_categories as unknown[]) ??
+    (p.shop_categories as unknown[]) ??
+    (p.groups as unknown[]) ??
     (p.children as unknown[]) ??
-    ((p.data as { categories?: unknown[]; category_list?: unknown[] } | undefined)?.categories as unknown[]) ??
+    ((p.data as { categories?: unknown[]; category_list?: unknown[]; shop_categories?: unknown[] } | undefined)
+      ?.categories as unknown[]) ??
     ((p.data as { category_list?: unknown[] } | undefined)?.category_list as unknown[]) ??
+    ((p.data as { shop_categories?: unknown[] } | undefined)?.shop_categories as unknown[]) ??
     [];
-  const out: YzCategory[] = [];
+  const out: YzGroup[] = [];
   const walk = (arr: unknown[], pid: number | null) => {
     for (const it of arr) {
       const o = it as Record<string, unknown>;
-      const id = Number(o.category_id ?? o.id ?? o.cid);
-      const name = String(o.name ?? o.category_name ?? "").trim();
+      const id = Number(o.category_id ?? o.id ?? o.cid ?? o.group_id);
+      const name = String(o.name ?? o.category_name ?? o.group_name ?? "").trim();
       if (!id || !name) continue;
-      // 有些接口用 parent_cid/parent_id 字段表明层级
       const nodeParent =
         o.parent_cid != null
           ? Number(o.parent_cid)
@@ -323,7 +288,7 @@ function normalizeCats(payload: unknown, defaultParent: number | null = null): Y
         id,
         name,
         parent_id: nodeParent && nodeParent !== 0 ? nodeParent : null,
-        sort_order: Number(o.sort_order ?? 0),
+        sort_order: Number(o.sort_order ?? o.order ?? 0),
       });
       const children = (o.children as unknown[]) ?? (o.sub_categories as unknown[]);
       if (Array.isArray(children) && children.length > 0) walk(children, id);
@@ -334,7 +299,6 @@ function normalizeCats(payload: unknown, defaultParent: number | null = null): Y
 }
 
 function pinyinCode(name: string, yzId: number): string {
-  // 简易兜底：取字母数字保留原样，其它用有赞 id 尾数
   const ascii = name.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
   if (ascii.length >= 2) return ascii.slice(0, 8);
   return `YZ${String(yzId).slice(-4)}`;
@@ -343,23 +307,24 @@ function pinyinCode(name: string, yzId: number): string {
 export const previewYouzanCategorySync = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { rows: yz, api, shop_id, notes, blocking } = await fetchYouzanHqCategories();
+    const { rows: yz, api, shop_id, notes, blocking } = await fetchYouzanHqGroups();
     const { data: existing, error } = await context.supabase
       .from("inv_categories" as never)
-      .select(SELECT_COLS);
+      .select(SELECT_COLS)
+      .eq("kind", "group");
     if (error) throw new Error(error.message);
-    const local = (existing ?? []) as unknown as CategoryRow[];
+    const local = ((existing ?? []) as unknown as RawRow[]).map(toRow);
     const byYz = new Map(
       local.filter((r) => r.youzan_hq_category_id).map((r) => [r.youzan_hq_category_id!, r]),
     );
     const yzById = new Map(yz.map((y) => [y.id, y]));
 
     const toAdd: {
-      yz: YzCategory;
+      yz: YzGroup;
       suggest_code: string;
       parent_name: string | null;
     }[] = [];
-    const toUpdate: { local: CategoryRow; yz: YzCategory }[] = [];
+    const toUpdate: { local: CategoryRow; yz: YzGroup }[] = [];
     for (const y of yz) {
       const cur = byYz.get(y.id);
       if (!cur) {
@@ -372,12 +337,10 @@ export const previewYouzanCategorySync = createServerFn({ method: "POST" })
         toUpdate.push({ local: cur, yz: y });
       }
     }
-    // 已经映射但有赞已删除的
     const yzIds = new Set(yz.map((y) => y.id));
     const toDeactivate = local.filter(
       (r) => r.youzan_hq_category_id != null && !yzIds.has(r.youzan_hq_category_id) && r.is_active,
     );
-    // 按父→子稳定排序，UI 显示更直观
     toAdd.sort((a, b) => {
       const ap = a.yz.parent_id ?? 0;
       const bp = b.yz.parent_id ?? 0;
@@ -420,28 +383,23 @@ export const applyYouzanCategorySync = createServerFn({ method: "POST" })
     let updatedN = 0;
     let deactivatedN = 0;
 
-    // 先按父→子排序（父在前）
     const addSorted = [...data.add].sort((a, b) => {
       const ap = a.youzan_hq_parent_id ?? 0;
       const bp = b.youzan_hq_parent_id ?? 0;
-      // parent (=0) 先，子后
       return ap - bp;
     });
 
-    // 用本次已建 + 现有映射查父 local id
     const yzToLocal = new Map<number, string>();
     {
       const { data: existing } = await supabase
         .from("inv_categories" as never)
-        .select("id, youzan_hq_category_id");
-      for (const r of (existing ?? []) as { id: string; youzan_hq_category_id: number | null }[]) {
-        if (r.youzan_hq_category_id) yzToLocal.set(r.youzan_hq_category_id, r.id);
+        .select("id, youzan_hq_group_id");
+      for (const r of (existing ?? []) as { id: string; youzan_hq_group_id: number | null }[]) {
+        if (r.youzan_hq_group_id) yzToLocal.set(r.youzan_hq_group_id, r.id);
       }
     }
 
-    // ---- add
     for (const a of addSorted) {
-      // code 冲突自动加后缀
       let code = a.code;
       for (let n = 2; n < 20; n++) {
         const { data: dup } = await supabase
@@ -461,8 +419,9 @@ export const applyYouzanCategorySync = createServerFn({ method: "POST" })
           code,
           name: a.name,
           parent_id: parentLocalId,
-          youzan_hq_category_id: a.youzan_hq_category_id,
-          youzan_hq_parent_id: a.youzan_hq_parent_id ?? null,
+          kind: "group",
+          youzan_hq_group_id: a.youzan_hq_category_id,
+          youzan_hq_group_parent_id: a.youzan_hq_parent_id ?? null,
           youzan_shop_id: data.shop_id,
           synced_at: now,
           sort_order: parentLocalId ? 600 : 500,
@@ -473,7 +432,6 @@ export const applyYouzanCategorySync = createServerFn({ method: "POST" })
       yzToLocal.set(a.youzan_hq_category_id, (ins as { id: string }).id);
       addedN++;
     }
-    // ---- update
     for (const u of data.update) {
       const { error } = await supabase
         .from("inv_categories" as never)
@@ -482,7 +440,6 @@ export const applyYouzanCategorySync = createServerFn({ method: "POST" })
       if (error) throw new Error(error.message);
       updatedN++;
     }
-    // ---- deactivate
     if (data.deactivate.length > 0) {
       const { error } = await supabase
         .from("inv_categories" as never)
@@ -493,4 +450,3 @@ export const applyYouzanCategorySync = createServerFn({ method: "POST" })
     }
     return { added: addedN, updated: updatedN, deactivated: deactivatedN };
   });
-

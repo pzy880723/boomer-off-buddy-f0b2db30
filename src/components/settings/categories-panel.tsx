@@ -100,7 +100,7 @@ export function CategoriesPanel() {
         if (res.blocking.kind === "ip_whitelist") {
           toast.error("有赞侧未加白名单，见弹窗说明");
         } else if (res.blocking.kind === "no_api") {
-          toast.error("当前授权无分类接口权限");
+          toast.error("当前授权无店铺分组接口权限");
         }
       }
     } catch (e) {
@@ -167,8 +167,8 @@ export function CategoriesPanel() {
     for (const x of previewData.to_add) {
       const key = x.yz.parent_id ? String(x.yz.parent_id) : "__root__";
       const title = x.yz.parent_id
-        ? `子分类 · ${x.parent_name ?? `#${x.yz.parent_id}`}`
-        : "一级分类";
+        ? `子分组 · ${x.parent_name ?? `#${x.yz.parent_id}`}`
+        : "一级分组";
       const arr = map.get(key) ?? [];
       arr.push(x);
       map.set(key, arr);
@@ -177,7 +177,7 @@ export function CategoriesPanel() {
     }
     return Array.from(map.entries()).map(([key, items]) => ({
       key,
-      title: (items as unknown as { __title?: string }).__title ?? "分类",
+      title: (items as unknown as { __title?: string }).__title ?? "分组",
       items,
     }));
   }, [previewData]);
@@ -186,9 +186,9 @@ export function CategoriesPanel() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2">
         <div>
-          <CardTitle className="text-base">商品分类</CardTitle>
+          <CardTitle className="text-base">商品分组</CardTitle>
           <p className="text-xs text-muted-foreground mt-1">
-            ERP 是分类的唯一真源。可从有赞总部拉取一级 + 二级分类后手动采纳；停用后新建商品不再显示。
+            对应有赞后台【商品 → 分组管理】里店铺自建的分组，不是平台标准类目。ERP 是唯一真源，可从有赞总部一键拉取后手动采纳；停用后新建商品不再显示。
           </p>
         </div>
         <div className="flex gap-2">
@@ -198,10 +198,10 @@ export function CategoriesPanel() {
             ) : (
               <RefreshCw className="mr-1 h-3.5 w-3.5" />
             )}
-            从有赞同步
+            从有赞拉取店铺分组
           </Button>
           <Button size="sm" onClick={() => setCreating(true)}>
-            <Plus className="mr-1 h-3.5 w-3.5" /> 新建分类
+            <Plus className="mr-1 h-3.5 w-3.5" /> 新建分组
           </Button>
         </div>
       </CardHeader>
@@ -211,7 +211,7 @@ export function CategoriesPanel() {
             <div className="p-6 text-center text-sm text-muted-foreground">加载中…</div>
           )}
           {!q.isLoading && tree.roots.length === 0 && (
-            <div className="p-6 text-center text-sm text-muted-foreground">暂无分类</div>
+            <div className="p-6 text-center text-sm text-muted-foreground">暂无分组</div>
           )}
           {tree.roots.map((r) => {
             const kids = tree.byParent.get(r.id) ?? [];
@@ -230,7 +230,7 @@ export function CategoriesPanel() {
                   onToggleActive={() => toggleActive.mutate(r)}
                   onEdit={() => setEditing(r)}
                   onDelete={() => {
-                    if (confirm(`确定删除分类「${r.name}」？`)) removeCat.mutate(r.id);
+                    if (confirm(`确定删除分组「${r.name}」？`)) removeCat.mutate(r.id);
                   }}
                 />
                 {isOpen &&
@@ -243,7 +243,7 @@ export function CategoriesPanel() {
                       onToggleActive={() => toggleActive.mutate(k)}
                       onEdit={() => setEditing(k)}
                       onDelete={() => {
-                        if (confirm(`确定删除分类「${k.name}」？`)) removeCat.mutate(k.id);
+                        if (confirm(`确定删除分组「${k.name}」？`)) removeCat.mutate(k.id);
                       }}
                     />
                   ))}
@@ -283,7 +283,7 @@ export function CategoriesPanel() {
       <Dialog open={syncOpen} onOpenChange={setSyncOpen}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>有赞分类同步预览</DialogTitle>
+            <DialogTitle>有赞店铺分组同步预览</DialogTitle>
             <DialogDescription>
               {previewData
                 ? `使用接口 ${previewData.api} · 待新增 ${previewData.to_add.length} · 待更新 ${previewData.to_update.length} · 待停用 ${previewData.to_deactivate.length}`
@@ -479,7 +479,7 @@ function CategoryRowView({
           )}
           {depth === 0 && childCount ? (
             <Badge variant="secondary" className="text-[10px]">
-              含 {childCount} 个子类
+              含 {childCount} 个子分组
             </Badge>
           ) : null}
         </div>
@@ -564,7 +564,7 @@ function EditDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{initial ? "编辑分类" : "新建分类"}</DialogTitle>
+          <DialogTitle>{initial ? "编辑分组" : "新建分组"}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-3">
           <div className="grid grid-cols-2 gap-3">
@@ -588,7 +588,7 @@ function EditDialog({
               <Input type="number" value={sort} onChange={(e) => setSort(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label>上级分类</Label>
+              <Label>上级分组</Label>
               <select
                 className="h-9 w-full rounded-md border bg-background px-2 text-sm"
                 value={parent}

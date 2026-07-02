@@ -290,12 +290,15 @@ export type Database = {
           id: string
           is_active: boolean
           is_system: boolean
+          kind: string
           name: string
           parent_id: string | null
           sort_order: number
           synced_at: string | null
           updated_at: string
           youzan_hq_category_id: number | null
+          youzan_hq_group_id: number | null
+          youzan_hq_group_parent_id: number | null
           youzan_hq_parent_id: number | null
           youzan_shop_id: string | null
         }
@@ -305,12 +308,15 @@ export type Database = {
           id?: string
           is_active?: boolean
           is_system?: boolean
+          kind?: string
           name: string
           parent_id?: string | null
           sort_order?: number
           synced_at?: string | null
           updated_at?: string
           youzan_hq_category_id?: number | null
+          youzan_hq_group_id?: number | null
+          youzan_hq_group_parent_id?: number | null
           youzan_hq_parent_id?: number | null
           youzan_shop_id?: string | null
         }
@@ -320,12 +326,15 @@ export type Database = {
           id?: string
           is_active?: boolean
           is_system?: boolean
+          kind?: string
           name?: string
           parent_id?: string | null
           sort_order?: number
           synced_at?: string | null
           updated_at?: string
           youzan_hq_category_id?: number | null
+          youzan_hq_group_id?: number | null
+          youzan_hq_group_parent_id?: number | null
           youzan_hq_parent_id?: number | null
           youzan_shop_id?: string | null
         }
