@@ -167,8 +167,8 @@ export function CategoriesPanel() {
     for (const x of previewData.to_add) {
       const key = x.yz.parent_id ? String(x.yz.parent_id) : "__root__";
       const title = x.yz.parent_id
-        ? `子分类 · ${x.parent_name ?? `#${x.yz.parent_id}`}`
-        : "一级分类";
+        ? `子分组 · ${x.parent_name ?? `#${x.yz.parent_id}`}`
+        : "一级分组";
       const arr = map.get(key) ?? [];
       arr.push(x);
       map.set(key, arr);
