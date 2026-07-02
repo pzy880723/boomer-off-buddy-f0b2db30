@@ -94,7 +94,7 @@ export const upsertCategory = createServerFn({ method: "POST" })
       parent_id: data.parent_id ?? null,
       sort_order: data.sort_order ?? 0,
       is_active: data.is_active,
-      kind: "group",
+      kind: "category",
     };
     if (data.id) {
       const { error } = await supabase
