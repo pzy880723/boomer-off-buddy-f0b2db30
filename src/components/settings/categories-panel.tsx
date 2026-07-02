@@ -186,9 +186,9 @@ export function CategoriesPanel() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2">
         <div>
-          <CardTitle className="text-base">商品分类</CardTitle>
+          <CardTitle className="text-base">商品分组</CardTitle>
           <p className="text-xs text-muted-foreground mt-1">
-            ERP 是分类的唯一真源。可从有赞总部拉取一级 + 二级分类后手动采纳；停用后新建商品不再显示。
+            对应有赞后台【商品 → 分组管理】里店铺自建的分组，不是平台标准类目。ERP 是唯一真源，可从有赞总部一键拉取后手动采纳；停用后新建商品不再显示。
           </p>
         </div>
         <div className="flex gap-2">
@@ -198,10 +198,10 @@ export function CategoriesPanel() {
             ) : (
               <RefreshCw className="mr-1 h-3.5 w-3.5" />
             )}
-            从有赞同步
+            从有赞拉取店铺分组
           </Button>
           <Button size="sm" onClick={() => setCreating(true)}>
-            <Plus className="mr-1 h-3.5 w-3.5" /> 新建分类
+            <Plus className="mr-1 h-3.5 w-3.5" /> 新建分组
           </Button>
         </div>
       </CardHeader>
