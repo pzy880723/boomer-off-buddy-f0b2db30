@@ -180,6 +180,50 @@ function YouzanPage() {
   const hq = shops.find((s) => s.role === "hq");
   const branches = shops.filter((s) => s.role === "branch");
 
+  // 一键同步进度：轮询 sync 日志计算完成度 + 预计剩余时间
+  const [nowTs, setNowTs] = useState(() => Date.now());
+  useEffect(() => {
+    if (!syncSession) return;
+    const t = setInterval(() => setNowTs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [syncSession]);
+
+  const syncProgress = useMemo(() => {
+    if (!syncSession) return null;
+    const sessionLogs = logs.filter(
+      (l) =>
+        (l.action === "items" || l.action === "orders") &&
+        new Date(l.started_at).getTime() >= syncSession.startedAt - 2000,
+    );
+    const finished = sessionLogs.filter((l) => l.status !== "running").length;
+    const errored = sessionLogs.filter((l) => l.status === "error").length;
+    const running = sessionLogs.filter((l) => l.status === "running").length;
+    const total = syncSession.dispatched;
+    const pct = total > 0 ? Math.min(100, (finished / total) * 100) : 0;
+    const elapsedMs = nowTs - syncSession.startedAt;
+    let etaText = "预计中…";
+    if (finished > 0 && finished < total) {
+      const perTask = elapsedMs / finished;
+      const remainMs = perTask * (total - finished);
+      etaText = `预计剩余 ${formatDuration(remainMs)}`;
+    } else if (finished >= total && total > 0) {
+      etaText = "已完成";
+    } else if (elapsedMs < 5000) {
+      etaText = "任务派发中…";
+    }
+    return { total, finished, errored, running, pct, elapsedMs, etaText };
+  }, [syncSession, logs, nowTs]);
+
+  // 全部完成 30 秒后自动收起
+  useEffect(() => {
+    if (!syncSession || !syncProgress) return;
+    if (syncProgress.finished >= syncProgress.total && syncProgress.total > 0) {
+      const t = setTimeout(() => setSyncSession(null), 30_000);
+      return () => clearTimeout(t);
+    }
+  }, [syncSession, syncProgress]);
+
+
   return (
     <div className="container mx-auto px-4 py-6 space-y-6">
       <PageHeader
