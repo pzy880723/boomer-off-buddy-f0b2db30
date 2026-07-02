@@ -304,30 +304,11 @@ function OrderRow({
     : "—";
   const txn = (row.outer_transaction_no as string) ?? "";
 
-  const raw = row.raw as Record<string, unknown> | null;
-  const fullOrder =
-    (raw?.full_order_info as Record<string, unknown> | undefined) ?? {};
-  const subOrders =
-    (fullOrder.orders as Array<Record<string, unknown>> | undefined) ?? [];
+  const itemCount = Number(
+    (row.item_count as number) ?? (row.num as number) ?? 0,
+  );
 
-  // 商品行：优先用 sub-orders 拼图 + 标题，否则退化为 first_item_image + item_titles
-  const productLines: { img: string | null; title: string; qty: number }[] =
-    subOrders.length > 0
-      ? subOrders.map((so) => ({
-          img: (so.pic_path as string) ?? (so.pic as string) ?? null,
-          title: String(so.title ?? "—"),
-          qty: Number(so.num ?? 0),
-        }))
-      : [
-          {
-            img: (row.first_item_image as string) ?? null,
-            title: (row.item_titles as string) ?? "—",
-            qty: Number((row.item_count as number) ?? (row.num as number) ?? 0),
-          },
-        ];
 
-  const visibleLines = productLines.slice(0, 3);
-  const restCount = productLines.length - visibleLines.length;
 
   return (
     <div className="rounded-lg border bg-card shadow-sm overflow-hidden hover:shadow transition-shadow">
