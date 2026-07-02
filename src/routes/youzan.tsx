@@ -436,50 +436,6 @@ function YouzanPage() {
   );
 }
 
-type YouzanOutboundStatus = {
-  mode: "fixed_proxy" | "direct_dynamic";
-  configured: boolean;
-  proxy_host: string | null;
-  outbound_ip: string | null;
-  message: string;
-};
-
-function YouzanOutboundCard({ status }: { status: YouzanOutboundStatus }) {
-  const fixed = status.mode === "fixed_proxy";
-  const copy = (value: string | null) => {
-    if (!value) return;
-    navigator.clipboard.writeText(value).then(() => toast.success("已复制"));
-  };
-  return (
-    <Card className={fixed ? "border-success/30 bg-success/5" : "border-warning/40 bg-warning/5"}>
-      <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge className={fixed ? "bg-success/10 text-success hover:bg-success/10" : "bg-warning/15 text-warning-foreground hover:bg-warning/15"}>
-              {fixed ? "固定出口代理已启用" : "当前为动态直连出口"}
-            </Badge>
-            {status.proxy_host && <span className="text-xs font-mono text-muted-foreground">{status.proxy_host}</span>}
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">{status.message}</p>
-          {!fixed && (
-            <p className="mt-1 text-xs text-muted-foreground">
-              这不是发布问题；云端后端出网 IP 会随调度变化。要对接有赞白名单，请配置固定出口代理后只白名单代理 IP。
-            </p>
-          )}
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <code className="rounded bg-background px-2 py-1.5 text-xs font-mono">
-            {status.outbound_ip ?? (fixed ? "固定 IP 未填写" : "动态 IP 不展示")}
-          </code>
-          <Button size="sm" variant="outline" onClick={() => copy(status.outbound_ip)} disabled={!status.outbound_ip}>
-            复制白名单 IP
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 // ============================================================
 // 汇总卡
 // ============================================================
@@ -510,38 +466,6 @@ function CompactStat({
   );
 }
 
-function MetricCard({
-  icon: Icon,
-  label,
-  value,
-  hint,
-  tone,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-  hint?: string;
-  tone?: "primary";
-}) {
-  return (
-    <Card className={tone === "primary" ? "border-primary/30 bg-primary/[0.03]" : ""}>
-      <CardContent className="p-4">
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">{label}</span>
-          <Icon
-            className={
-              tone === "primary"
-                ? "h-4 w-4 text-primary"
-                : "h-4 w-4 text-muted-foreground"
-            }
-          />
-        </div>
-        <p className="mt-2 text-2xl font-semibold tabular-nums">{value}</p>
-        {hint && <p className="mt-1 text-[11px] text-muted-foreground">{hint}</p>}
-      </CardContent>
-    </Card>
-  );
-}
 
 // ============================================================
 // 门店卡
