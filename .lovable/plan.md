@@ -1,61 +1,72 @@
-## 问题定位
+## 背景
+上一版 `/settings` 同步过来的是有赞后台的**官方标准类目**（`youzan.itemcategories.get` / `retail.product.category.get`），但你实际想要的是**店铺自建分组**——就是有赞后台「商品 → 分组管理」里维护、给前台导航/橱窗用的那套。两者概念不同：类目是平台属性，分组才是店铺自己的货架分类。
 
-截图里两条错误说明这次「从有赞同步」两个候选接口都被有赞网关拒了：
+## 目标
+- 同步入口从「官方类目」切成「店铺分组」（HQ 总部店铺）。
+- 完全替换：清理旧的类目映射数据，之后 `inv_categories` 只承载「分组」。
+- UI 文案 / 字段命名跟着改，避免以后再混淆。
 
-1. `youzan.retail.product.standardcategory.get` → **gw 4005 非法的 API**
-   意思：**当前授权的这个店铺 / 应用类型根本没有这个接口的权限**。这是零售版专用接口，普通电商版或未开通零售的账号调不到。
-2. `youzan.itemcategories.get` → **gw 4007 源 IP 104.23.209.12 非法调用**
-   意思：接口本身是能调的，但 **有赞侧强制 IP 白名单**，我们后端出口 IP 没加进有赞应用中心的白名单。
+## 实施步骤
 
-所以之前把「二级类目」加进来其实不是主要问题——**一级都没成功拉回来**，二级更无从谈起。
+### 1. 数据模型微调（migration）
+- `inv_categories` 新增字段：
+  - `youzan_hq_group_id bigint`
+  - `youzan_hq_group_parent_id bigint`
+  - `kind text check (kind in ('group','category')) default 'group'`
+- 一次性数据迁移：把现有 `youzan_hq_category_id != null` 的行标记 `kind='category'` 并 `is_active=false`（不物理删除，避免误伤已经绑 SKU 的），后续 UI 默认只显示 `kind='group'`。
+- 保留旧列以便回滚，但代码不再写入。
 
----
+### 2. 有赞 API 接入（`src/lib/categories.functions.ts`）
+用「店铺分组」相关接口，按优先级尝试并 fallback：
+- `youzan.itemcategories.shop.get`（电商店铺分组，主用）
+- `youzan.shop.categories.get` / `youzan.shop.category.list`（旧名兼容）
+- `youzan.retail.product.shopcategory.get`（零售版店铺分组，兜底）
 
-## 修复方案
+复用已有的 `callYouzanApiVerbose` + `classifyYouzanError`，保留 IP 白名单 / gw4005 的报错提示逻辑（用户上一轮修的部分不动）。
+`normalizeCats` 复用：分组接口返回结构大同小异（`id/name/parent_id/sort`），补上 `sort_order` 归一。
 
-### 1. 后端：更聪明的接口 fallback + 更清楚的错误呈现
+### 3. `previewYouzanCategorySync` / `applyYouzanCategorySync` 调整
+- 匹配键从 `youzan_hq_category_id` 换成 `youzan_hq_group_id`。
+- 新增行统一写 `kind='group'`。
+- `to_deactivate` 只针对 `kind='group'` 且已从有赞侧删除的分组。
+- 返回体字段名保留（前端少动），内部注释统一改成「分组」。
 
-`src/lib/categories.functions.ts → fetchYouzanHqCategories`：
+### 4. 前端 (`src/components/settings/categories-panel.tsx` + `/settings` 标签)
+- 侧栏 / Tab 标题：`商品分类` → `商品分组`。
+- 同步按钮文案：`从有赞同步` → `从有赞拉取店铺分组`。
+- 预览弹窗表头、说明文案、note 提示语全部改「分组」。
+- 树形展示逻辑不变（分组本身也有一/二级）。
 
-- 按顺序尝试一组接口，能拿到就用，任何一个成功就中断：
-  1. `youzan.itemcategories.get`（电商版一级 + children）
-  2. `youzan.itemcategories.get.byparentcid`（补二级，parent 逐个拉）
-  3. `youzan.retail.product.category.get`（零售版通用类目）
-  4. `youzan.retail.product.standardcategory.get`（零售标准类目，仅零售版）
-- **区分错误类型**：
-  - `gw 4005 / 非法的 API` → 归为「未授权此接口，已跳过」，**不算致命错**，继续尝试下一个。
-  - `gw 4007 / 源 IP … 非法调用` → 归为「IP 白名单未配置」，**立即中断**并把出口 IP 直接展示给用户（截图里就是 `104.23.209.12`）。
-  - 其它错误 → 常规失败信息。
-- 收集所有尝试过的接口结果作为 `notes: Array<{ api, ok, message, count }>`，Preview 弹窗顶部照旧展示。
+### 5. SKU 侧引用
+`useCategories()` 消费方式不变（依然吐出 `code + name`），只是数据源换成分组。`sku-meta-fields.tsx` 等无需改动。
 
-### 2. UI：把「IP 白名单」这一步做成可操作提示
+## 技术细节
 
-`src/components/settings/categories-panel.tsx`：
+```text
+有赞后台            ERP 里的对应体
+──────────         ──────────────
+商品 → 分组管理  →  inv_categories (kind='group')  ← 本次同步目标
+商品 → 类目 (平台) →  inv_categories (kind='category', 已停用)  ← 旧数据封存
+```
 
-- 顶部原来的失败 toast 太长看不清。改成：
-  - 弹窗 / 内嵌 Alert，标题「有赞侧配置未完成」。
-  - 正文分两块：
-    - **需要在有赞应用中心加白名单的 IP** → 灰底代码框显示，附「复制」按钮。
-    - **需要开通/授权的接口** → 列出被 4005 拒绝的接口名，附一行提示「若店铺不是零售版可忽略」。
-  - 底部两个按钮：「已完成，重试同步」 / 「稍后」。
-- Preview 弹窗顶部 notes 区把每个尝试接口按 ✅ / ⚠️ / ❌ 状态列出来，避免只看到一句聚合失败信息。
+同步流程：
+```text
+[HQ 店铺 token]
+      │
+      ▼
+callYouzanApi(itemcategories.shop.get) ─fallback→ retail.shopcategory.get
+      │
+      ▼
+normalizeCats → {id,name,parent_id}[]
+      │
+      ▼
+diff vs inv_categories WHERE youzan_hq_group_id IS NOT NULL
+      │
+      ▼
+preview UI (add / update / deactivate) → 用户确认 → apply
+```
 
-### 3. （可选，本轮不做）后端出口 IP 稳定化说明
-
-Lovable Cloud / Cloudflare Worker 的出口 IP 段是浮动的，单个 IP 加白名单可能明天又变。计划里先把当前 IP 完整回显给用户去加白名单让流程跑通；后续如果频繁变，再单独一轮讨论「用固定出口的代理网关」方案，本轮不铺开。
-
----
-
-## 改动文件
-
-- `src/lib/categories.functions.ts` — 重写 `fetchYouzanHqCategories` 的 fallback 顺序与错误分类；`previewYouzanCategorySync` 返回结构里带 `blockingError: { kind: 'ip_whitelist' | 'no_api' | 'other', ip?, apis? }`。
-- `src/components/settings/categories-panel.tsx` — 新增 `<IpWhitelistAlert />` 内嵌卡片；Preview 弹窗 notes 分状态展示。
-- 不动数据库、不动其它 tab、不动 `useCategories`。
-
----
-
-## 验收
-
-1. 再点「从有赞同步」，如果 IP 还没加白名单：页面出现明确 Alert，能一键复制 `104.23.209.12`，并列出被拒的接口。
-2. 加完白名单再点「重试同步」：至少一个接口成功，Preview 弹窗顶部 notes 显示每个候选接口的状态（哪个 ✅、哪个因未授权 ⚠️ 跳过）。
-3. 若店铺是零售版，能顺利拉到一级 + 二级；若是电商版，走 `itemcategories.get` + `byparentcid` 也能拿到一级 + 二级。
+## 不做的事
+- 不删旧 `youzan_hq_category_id` 列（保留历史 & 回滚空间）。
+- 不动 SKU 上的 `category` 字段（依旧存 `code`）。
+- 不引入「商品标签 itemtags」——你选了只要分组。
