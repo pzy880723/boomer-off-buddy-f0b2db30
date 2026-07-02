@@ -207,9 +207,10 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu>
                 {group.items.map((item) => {
-                  const active = isActive(item.url);
+                  const active = isActive(item);
+                  const key = item.url + (item.search ? `?${new URLSearchParams(item.search).toString()}` : "");
                   return (
-                    <SidebarMenuItem key={item.url}>
+                    <SidebarMenuItem key={key}>
                       <SidebarMenuButton
                         asChild
                         isActive={active}
@@ -218,6 +219,7 @@ export function AppSidebar() {
                       >
                         <Link
                           to={item.url}
+                          search={item.search as never}
                           preload="intent"
                           onMouseEnter={() => preload(item.url)}
                           onPointerDown={() => preload(item.url)}
