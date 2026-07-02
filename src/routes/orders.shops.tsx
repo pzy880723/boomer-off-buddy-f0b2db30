@@ -221,33 +221,34 @@ function ShopOrdersPage() {
       </div>
 
       {/* 订单列表 */}
-      <Card>
-        <CardContent className="p-0">
-          <div className="divide-y">
-            {pageRows.length === 0 && (
-              <div className="py-10 text-center text-sm text-muted-foreground">
-                没有匹配的订单
-              </div>
-            )}
-            {pageRows.map((o) => {
-              const id = o.id as string;
-              const expanded = expandedId === id;
-              return (
-                <OrderRow
-                  key={id}
-                  row={o}
-                  expanded={expanded}
-                  onToggle={() => setExpandedId(expanded ? null : id)}
-                  shopName={
-                    shopNameMap.get(o.shop_id as string) ??
-                    `kdt_id ${o.kdt_id}`
-                  }
-                />
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+      {pageRows.length === 0 ? (
+        <Card>
+          <CardContent className="py-10 text-center text-sm text-muted-foreground">
+            没有匹配的订单
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {pageRows.map((o) => {
+            const id = o.id as string;
+            const expanded = expandedId === id;
+            return (
+              <OrderRow
+                key={id}
+                row={o}
+                expanded={expanded}
+                onToggle={() => setExpandedId(expanded ? null : id)}
+                shopName={
+                  shopNameMap.get(o.shop_id as string) ??
+                  `kdt_id ${o.kdt_id}`
+                }
+              />
+            );
+          })}
+        </div>
+      )}
+
+
 
 
       {/* 分页 */}
