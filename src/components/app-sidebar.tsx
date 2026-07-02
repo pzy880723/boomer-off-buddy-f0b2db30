@@ -61,10 +61,10 @@ type NavTo =
   | "/inventory/stocktakes"
   | "/shop-mgmt/shops"
   | "/shop-mgmt/products"
+  | "/shop-mgmt/online"
   | "/shop-mgmt/franchisees"
   | "/youzan"
   | "/youzan/sync"
-
   | "/orders/shops"
   | "/orders/dispatch"
   | "/orders/wholesale"
@@ -73,25 +73,28 @@ type NavTo =
   | "/settings"
   | "/admin/users";
 
-const groups: { label: string; items: { title: string; url: NavTo; icon: LucideIcon }[]; icon?: LucideIcon }[] = [
+type NavItem = { title: string; url: NavTo; icon: LucideIcon; search?: Record<string, string> };
+type NavGroup = { label: string; items: NavItem[]; icon?: LucideIcon };
+
+const groups: NavGroup[] = [
   {
     label: "总览",
     items: [{ title: "仪表盘", url: "/dashboard", icon: LayoutDashboard }],
   },
   {
-    label: "采购物流",
+    label: "商品管理",
     items: [
-      { title: "日本大宗", url: "/purchase/japan-bulk", icon: Plane },
-      { title: "日本小包", url: "/purchase/japan-parcel", icon: Mail },
-      { title: "国内大宗", url: "/purchase/domestic-bulk", icon: PackageCheck },
-      { title: "国内小包", url: "/purchase/domestic", icon: ShoppingBag },
+      { title: "仓库商品", url: "/inventory/skus", icon: Tags },
+      { title: "门店商品", url: "/shop-mgmt/products", icon: Package },
+      { title: "网店商品", url: "/shop-mgmt/online", icon: Globe },
+      { title: "商品分类", url: "/settings", icon: FolderTree, search: { tab: "categories" } },
+      { title: "商品分组", url: "/settings", icon: Layers, search: { tab: "groups" } },
     ],
     icon: Package,
   },
   {
-    label: "仓库管理",
+    label: "库存管理",
     items: [
-      { title: "仓库商品", url: "/inventory/skus", icon: Tags },
       { title: "入库记录", url: "/inventory/inbound", icon: Layers },
       { title: "调拨单", url: "/inventory/transfers", icon: ArrowLeftRight },
       { title: "盘点单", url: "/inventory/stocktakes", icon: ClipboardList },
@@ -100,6 +103,15 @@ const groups: { label: string; items: { title: string; url: NavTo; icon: LucideI
       { title: "手持终端", url: "/inventory/devices", icon: Smartphone },
     ],
     icon: Boxes,
+  },
+  {
+    label: "门店管理",
+    items: [
+      { title: "门店列表", url: "/shop-mgmt/shops", icon: Building2 },
+      { title: "加盟商管理", url: "/shop-mgmt/franchisees", icon: Users },
+      { title: "有赞门店", url: "/youzan", icon: Link2 },
+    ],
+    icon: Store,
   },
   {
     label: "订单管理",
@@ -111,15 +123,14 @@ const groups: { label: string; items: { title: string; url: NavTo; icon: LucideI
     icon: ClipboardList,
   },
   {
-    label: "门店管理",
+    label: "采购物流",
     items: [
-      { title: "门店列表", url: "/shop-mgmt/shops", icon: Building2 },
-      { title: "门店商品库", url: "/shop-mgmt/products", icon: Package },
-      { title: "加盟商管理", url: "/shop-mgmt/franchisees", icon: Users },
-      { title: "有赞门店", url: "/youzan", icon: Link2 },
-
+      { title: "日本大宗", url: "/purchase/japan-bulk", icon: Plane },
+      { title: "日本小包", url: "/purchase/japan-parcel", icon: Mail },
+      { title: "国内大宗", url: "/purchase/domestic-bulk", icon: PackageCheck },
+      { title: "国内小包", url: "/purchase/domestic", icon: ShoppingBag },
     ],
-    icon: Store,
+    icon: Package,
   },
   {
     label: "运营",
