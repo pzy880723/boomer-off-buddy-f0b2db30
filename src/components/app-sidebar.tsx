@@ -145,19 +145,32 @@ const groups: NavGroup[] = [
 export function AppSidebar() {
   const router = useRouter();
   const currentPath = useRouterState({ select: (s) => s.location.pathname });
+  const currentSearch = useRouterState({ select: (s) => s.location.search as Record<string, unknown> });
   const { state } = useSidebar();
   const { session } = useAuthSession();
   const isSuperAdmin = isSuperAdminPhone(resolveUserPhone(session?.user));
   const collapsed = state === "collapsed";
-  const isActive = (path: string) => currentPath === path || currentPath.startsWith(path + "/");
+  const isActive = (item: NavItem) => {
+    if (item.search) {
+      // Tab-scoped entry: require exact path AND matching search key
+      if (currentPath !== item.url) return false;
+      for (const [k, v] of Object.entries(item.search)) {
+        if (String(currentSearch?.[k] ?? "") !== v) return false;
+      }
+      return true;
+    }
+    // Plain path: exact or descendant, but exclude tab-scoped duplicates by requiring no `tab` on /settings root
+    if (item.url === "/settings" && currentSearch?.tab) return false;
+    return currentPath === item.url || currentPath.startsWith(item.url + "/");
+  };
   const preload = (to: NavTo) => void router.preloadRoute({ to });
 
-  const allGroups = isSuperAdmin
+  const allGroups: NavGroup[] = isSuperAdmin
     ? [
         ...groups,
         {
           label: "系统",
-          items: [{ title: "账号管理", url: "/admin/users" as NavTo, icon: ShieldCheck }],
+          items: [{ title: "账号管理", url: "/admin/users", icon: ShieldCheck }],
         },
       ]
     : groups;
