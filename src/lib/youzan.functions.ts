@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin as supabase } from "@/integrations/supabase/client.server";
 import { yzStatusText } from "./youzan-status";
+import { getYouzanOutboundStatus, youzanFetch } from "./youzan-http";
 
 // ============================================================
 // 有赞自用型应用 OAuth：grant_type=silent + kdt_id
@@ -31,7 +32,7 @@ async function fetchSilentToken(kdtId: number) {
     throw new Error("YOUZAN_CLIENT_ID / YOUZAN_CLIENT_SECRET 未配置");
   }
   // 有赞自用型应用换 token 的正确参数（官方文档 doc/7515）
-  const res = await fetch(YZ_OAUTH_URL, {
+  const res = await youzanFetch(YZ_OAUTH_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json;charset=UTF-8" },
     body: JSON.stringify({
@@ -82,7 +83,7 @@ async function fetchSilentToken(kdtId: number) {
       json.error_response?.msg ||
       json.error ||
       `HTTP ${res.status} ${text.slice(0, 200)}`;
-    throw new Error(`有赞换 token 失败：${msg}`);
+    throw new Error(formatYouzanIpError(`有赞换 token 失败：${msg}`));
   }
   let expiresAt: string;
   if (expiresTs && expiresTs > 1_000_000_000_000) {
@@ -97,6 +98,17 @@ async function fetchSilentToken(kdtId: number) {
     refresh_token,
     token_expires_at: expiresAt,
   };
+}
+
+function formatYouzanIpError(message: string) {
+  if (/gw\s*4007|IP\s*.*white|whitelist|白名单|源\s*IP\s*地址/i.test(message)) {
+    const outbound = getYouzanOutboundStatus();
+    if (outbound.mode === "fixed_proxy") {
+      return `${message}。当前已启用固定出口代理，请确认有赞白名单配置的是固定代理出口 IP${outbound.outbound_ip ? `：${outbound.outbound_ip}` : ""}，不是历史动态 IP。`;
+    }
+    return `${message}。当前仍是直连动态出口，发布后也不保证 IP 固定；请配置 YOUZAN_PROXY_URL 固定出口代理后，只把代理 IP 加入有赞白名单。`;
+  }
+  return message;
 }
 
 /**
@@ -161,7 +173,7 @@ export async function callYouzanApiVerbose(opts: {
   const tmo = setTimeout(() => ctl.abort(), opts.timeoutMs ?? 20_000);
   let res: Response;
   try {
-    res = await fetch(url, {
+    res = await youzanFetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(opts.params ?? {}),
@@ -196,17 +208,21 @@ export async function callYouzanApiVerbose(opts: {
   const preview = text.length > 400 ? text.slice(0, 400) + "..." : text;
   if (j.gw_err_resp?.err_code) {
     const g = j.gw_err_resp;
-    throw new Error(`[gw ${g.err_code}] ${g.err_msg ?? ""}${trace ? ` trace=${trace}` : ""}`.trim());
+    throw new Error(formatYouzanIpError(`[gw ${g.err_code}] ${g.err_msg ?? ""}${trace ? ` trace=${trace}` : ""}`.trim()));
   }
   if (j.error_response) {
     const e = j.error_response;
-    throw new Error(`[${e.code}] ${e.msg ?? ""} ${e.sub_msg ?? ""}${trace ? ` trace=${trace}` : ""}`.trim());
+    throw new Error(formatYouzanIpError(`[${e.code}] ${e.msg ?? ""} ${e.sub_msg ?? ""}${trace ? ` trace=${trace}` : ""}`.trim()));
   }
   if (j.success === false || (typeof j.code === "number" && j.code !== 0 && j.code !== 200)) {
-    throw new Error(`[${j.code ?? "?"}] ${j.message ?? "调用失败"}${trace ? ` trace=${trace}` : ""}`);
+    throw new Error(formatYouzanIpError(`[${j.code ?? "?"}] ${j.message ?? "调用失败"}${trace ? ` trace=${trace}` : ""}`));
   }
   return { payload: j.response ?? j.data ?? json, trace_id: trace, preview };
 }
+
+export const getYouzanOutboundInfo = createServerFn({ method: "GET" }).handler(async () => {
+  return getYouzanOutboundStatus();
+});
 
 /** 进入同步前，把超过 30 秒还在 running 的旧记录直接标成失败，避免页面假活 */
 async function reapStaleSyncLogs() {

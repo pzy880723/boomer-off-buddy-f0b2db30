@@ -1,84 +1,46 @@
+结论：这个 IP 一直变，不是因为你没有发布；发布后也不保证固定。现在后端运行在云端弹性环境，出网会经过动态出口池，预览/发布/扩缩容/冷启动/平台调度都可能让有赞看到不同 IP。前端访问域名稳定，不等于后端调用有赞时的出口 IP 稳定。
 
-## 目标
-
-1. 侧边栏「商品分类」「商品分组」合并为一项 **商品分类**，跳转到独立页面 `/product-categories`（不再进系统设置）。
-2. 一个页面同时承担：ERP 自建一二级分类的 CRUD + 与有赞店铺分组的一一对应绑定。
-3. 商品同步到有赞时，按绑定关系落到对应有赞类目；有赞独有的类目忽略（以 ERP 为准）。
-
-## 页面布局 `/product-categories`
+要满足有赞 IP 白名单，正确方案是：ERP 不再直接访问有赞，而是所有有赞请求统一走一个“固定出口 IP 代理”。有赞白名单只填这个代理的固定 IP。
 
 ```text
-┌───────────────────────────── 商品分类 ──────────────────────────────┐
-│ [新建一级]  [从有赞拉取最新]     状态: 未绑定 3 / 已绑定 12 / 有赞独有 5│
-├──────────────────────────┬─────────────────────────────────────────┤
-│  ERP 分类 (可编辑)        │  有赞店铺分组 (只读, 来自 HQ)             │
-│  ─────────────────────   │  ─────────────────────────────────────   │
-│  ▸ 服饰                  │  ▸ 服饰类目                              │
-│     · T恤    [已绑 →t恤] │     · T恤        [已绑 ← 服饰/T恤]        │
-│     · 卫衣    ○ 未绑     │     · 卫衣        ○ 未绑                 │
-│  ▸ 配饰      ○ 未绑     │  ▸ 家居 (有赞独有, 灰显)                  │
-│  ▸ 家居                 │                                         │
-│     · 摆件   ⚠ 有赞无    │                                         │
-│                          │                                         │
-│  [+ 新建二级]            │                                         │
-└──────────────────────────┴─────────────────────────────────────────┘
+ERP 后端  ->  固定出口代理(固定公网 IP)  ->  有赞开放平台
+                         ↑
+                 有赞白名单只配置这个 IP
 ```
 
-### 交互
-- 左侧点选一个 ERP 叶子分类 → 右侧同类项高亮可点 → 点击右侧对应分组即完成绑定；已绑定行显示反向指示与「解绑」。
-- 左侧支持新建/重命名/排序/删除一级与二级（禁止删除已有 SKU 引用的分类，给出提示）。
-- 顶部「从有赞拉取最新」触发一次同步，右侧刷新；沿用现有 `fetchYouzanHqGroups` 逻辑，不再写入 `inv_categories`，改写入独立缓存表（见下）。
-- 顶部统计三种状态：未绑定 ERP / 已绑定 / 有赞独有（灰显，仅提示，不建对应关系）。
-- 「ERP 有 + 有赞无」的叶子在保存 SKU 或点「推送到有赞」时，自动在有赞创建对应分组，然后回填绑定（新增按钮：单个「推到有赞」）。
+实施计划：
 
-## 数据模型
+1. 统一有赞请求出口
+   - 把系统里所有有赞 OAuth/token、商品、库存、分类/分组、同步相关请求统一收口到一个 `youzanFetch` 封装。
+   - 目前已有主要封装在 `youzan.functions.ts`，但 `stock-transfer.functions.ts` 里还有一套重复直连逻辑，也要一起改掉，避免有的接口还走动态 IP。
 
-**保留** `inv_categories`，语义收敛为「ERP 自建分类」：
-- `kind` 字段：值统一为 `'category'`；把当前 `kind='group'` 的历史行标记 `is_active=false` 或迁移（见下）。
-- 新增/复用字段：`parent_id`（二级挂一级）、`sort_order`、`code`、`name`、`is_active`。
-- 保留 `youzan_hq_group_id` / `youzan_hq_group_parent_id` 作为**绑定关系**字段（一一对应），不再当缓存。
+2. 支持固定出口代理配置
+   - 新增后端密钥配置：
+     - `YOUZAN_PROXY_URL`：固定出口代理地址。
+     - 可选 `YOUZAN_PROXY_TOKEN`：ERP 调代理时的鉴权 token。
+   - 配置后，所有有赞请求都发到代理，由代理转发到有赞。
+   - 未配置时仍可直连，但页面要明确提示“当前不是固定出口”。
 
-**新增缓存表** `youzan_hq_groups_cache`（只读快照，用于右侧渲染，避免污染 ERP 分类）：
-```
-id (uuid pk), youzan_group_id (text uniq), parent_youzan_group_id (text null),
-name (text), level (int), fetched_at (timestamptz), raw (jsonb)
-```
-GRANT + RLS：authenticated select，service_role all。
+3. 代理协议设计
+   - ERP 向代理 POST：目标 URL、method、headers、body、timeout。
+   - 代理只允许转发到有赞域名，拒绝其它域名，防止被滥用。
+   - 代理返回原始 status、headers、body，ERP 保持现有解析逻辑不变。
 
-**迁移策略**：把 `inv_categories` 中 `kind='group'` 且 `youzan_hq_group_id` 非空的行，`name/parent` 复制到 `youzan_hq_groups_cache`，然后原行 `is_active=false`；`kind='category'` 保留为 ERP 分类种子。
+4. 页面提示改造
+   - `/youzan` 或商品分类页增加“有赞出口检查”。
+   - 显示：
+     - 当前出口模式：直连动态 / 固定代理。
+     - 代理是否配置。
+     - 固定出口 IP（由你部署代理后填入或由代理健康检查返回）。
+     - 有赞白名单配置建议。
+   - 现有“请把当前动态 IP 加白名单”的提示改掉，避免你一直重复加白名单。
 
-## 侧边栏与路由改动
+5. 错误处理
+   - 如果仍收到 `gw 4007 IP 不在白名单`，优先提示“请确认有赞白名单填的是固定代理 IP，不是动态 IP”。
+   - 如果代理不可用，提示“固定出口代理不可用”，而不是误判为有赞接口问题。
 
-- `src/components/app-sidebar.tsx`：删除「商品分组」项；「商品分类」`url` 改为 `/product-categories`（去掉 `search: { tab }`）。
-- 新建路由 `src/routes/product-categories.tsx`，组件承载上述双栏页面。
-- `src/routes/settings.tsx`：移除 `categories`、`groups` 两个 Tab 与相关 NAV_GROUP「商品」组；不再接受 `?tab=categories|groups`。
-- `CategoriesPanel` 组件不再挂在 settings；其查询/mutation 逻辑拆分复用到新页面的「ERP 侧」组件。
+6. 不做的事
+   - 不尝试在 ERP 后台自动修改有赞 IP 白名单：这类应用安全配置通常没有稳定公开 API，而且即使能改，动态 IP 被拦截时也无法可靠自救。
+   - 不承诺 Lovable Cloud 本身提供固定出口 IP：需要外接固定出口代理。
 
-## Server functions（`src/lib/categories.functions.ts` 扩展）
-
-- `listErpCategories()` – 返回 ERP 树（kind=category, is_active=true）+ 每项当前绑定的有赞 group_id。
-- `upsertErpCategory({ id?, parent_id, name, code, sort_order })` / `deleteErpCategory({ id })`（删除前校验 SKU 引用）。
-- `bindErpToYouzan({ erp_id, youzan_group_id | null })` – null 即解绑。
-- `syncYouzanGroupsCache()` – 拉取有赞 HQ 分组写入 `youzan_hq_groups_cache`（复用 `fetchYouzanHqGroups`）。
-- `listYouzanGroupsCache()` – 返回右侧树 + 每项反向绑定的 ERP id。
-- `pushErpCategoryToYouzan({ erp_id })` – 单个「推到有赞」，成功后自动 `bindErpToYouzan`（后续可做，先在 UI 留按钮/占位）。
-
-## SKU 侧影响
-
-- SKU 表的分类外键仍指向 `inv_categories`（kind=category）。
-- 之前挂在 `kind=group` 行的 SKU 需要一次性映射到新 ERP 分类（迁移里按 `youzan_hq_group_id` 或名字对齐）。
-- `useCategories()`：`FALLBACK` 与 `active` 已过滤 `is_active`，天然兼容；只需确认查询过滤 `kind='category'`。
-
-## 交付步骤
-
-1. 迁移：`youzan_hq_groups_cache` 建表 + GRANT + RLS；把 `inv_categories.kind='group'` 行归档并复制到 cache；把 `inv_categories.kind='category'` 作为初始 ERP 分类。
-2. 后端：新增/改造上述 server functions。
-3. 前端：新建 `/product-categories` 页面（左右双栏 + 绑定交互 + 拉取按钮）。
-4. 侧边栏 & settings：删掉「商品分组」，「商品分类」改路由，settings 去掉两个 Tab。
-5. 保留旧 URL 兼容：`/settings?tab=categories|groups` 在 settings 组件里 redirect 到 `/product-categories`。
-
-## 不做
-
-- 不改动 SKU 编辑弹窗的分类选择器（继续用 `useCategories`）。
-- 不改动有赞同步 worker（后续接入绑定关系时再单独调整）。
-- 「推到有赞新建分组」本轮先留按钮+ toast「待接入」，等你确认有赞创建分组的 API 权限后再实现。
+你需要额外准备的一项：一个带固定公网出口 IP 的轻量代理服务。可以放在你们自己的云服务器、云函数 + NAT、或任何能保证固定出网 IP 的服务上。拿到固定 IP 后，只在有赞后台加这一个 IP，以后不用跟着动态 IP 改。

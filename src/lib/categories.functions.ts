@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { getYouzanOutboundStatus } from "./youzan-http";
 
 /**
  * 本模块管理「商品分组」——ERP 侧唯一真源，来源是有赞【商品 → 分组管理】里
@@ -178,7 +179,7 @@ function classifyYouzanError(err: unknown): {
   ip?: string;
 } {
   const msg = err instanceof Error ? err.message : String(err);
-  const ipMatch = msg.match(/(?:gw\s*4007|源\s*IP\s*地址)[^0-9]*((?:\d{1,3}\.){3}\d{1,3})/i);
+  const ipMatch = msg.match(/(?:gw\s*4007|源\s*IP\s*地址|IP\s+|whitelist)[^0-9]*((?:\d{1,3}\.){3}\d{1,3})/i);
   if (ipMatch) return { kind: "ip_blocked", message: msg, ip: ipMatch[1] };
   if (/gw\s*4005|非法的\s*API|invalid\s*api/i.test(msg)) return { kind: "no_api", message: msg };
   return { kind: "other", message: msg };
@@ -477,6 +478,7 @@ export const fetchYouzanGroupsLive = createServerFn({ method: "GET" })
     return {
       api,
       shop_id,
+      outbound: getYouzanOutboundStatus(),
       notes,
       blocking: blocking ?? null,
       rows: rows as YouzanGroupNode[],

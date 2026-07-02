@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin as supabase } from "@/integrations/supabase/client.server";
+import { getYouzanOutboundStatus, youzanFetch } from "./youzan-http";
 
 // ============================================================
 // 库存调拨 ServerFn
@@ -13,7 +14,18 @@ import { supabaseAdmin as supabase } from "@/integrations/supabase/client.server
 // ============================================================
 
 const YZ_OAUTH_URL = "https://open.youzanyun.com/auth/token";
-const YZ_GW_URL = "https://open.youzanyun.com/api/oauthentry";
+const YZ_GW_URL = "https://open.youzanyun.com/api";
+
+function formatYouzanIpError(message: string) {
+  if (/gw\s*4007|IP\s*.*white|whitelist|白名单|源\s*IP\s*地址/i.test(message)) {
+    const outbound = getYouzanOutboundStatus();
+    if (outbound.mode === "fixed_proxy") {
+      return `${message}。当前已启用固定出口代理，请确认有赞白名单配置的是固定代理出口 IP${outbound.outbound_ip ? `：${outbound.outbound_ip}` : ""}。`;
+    }
+    return `${message}。当前仍是直连动态出口，发布后也不保证 IP 固定；请配置 YOUZAN_PROXY_URL 固定出口代理。`;
+  }
+  return message;
+}
 
 type ShopRow = {
   id: string;
@@ -28,7 +40,7 @@ async function fetchSilentToken(kdtId: number) {
   const clientId = process.env.YOUZAN_CLIENT_ID;
   const clientSecret = process.env.YOUZAN_CLIENT_SECRET;
   if (!clientId || !clientSecret) throw new Error("YOUZAN_CLIENT_ID / SECRET 未配置");
-  const res = await fetch(YZ_OAUTH_URL, {
+  const res = await youzanFetch(YZ_OAUTH_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json;charset=UTF-8" },
     body: JSON.stringify({
@@ -55,7 +67,7 @@ async function fetchSilentToken(kdtId: number) {
     throw new Error(`有赞响应非 JSON：${text.slice(0, 200)}`);
   }
   const access_token = json.access_token ?? json.data?.access_token;
-  if (!access_token) throw new Error(`有赞换 token 失败：${json.message ?? text.slice(0, 200)}`);
+  if (!access_token) throw new Error(formatYouzanIpError(`有赞换 token 失败：${json.message ?? text.slice(0, 200)}`));
   const expiresTs = json.expires ?? json.data?.expires;
   const expiresIn = json.expires_in ?? json.data?.expires_in;
   const expiresAt =
@@ -89,7 +101,7 @@ async function callYouzanApi(opts: {
   params?: Record<string, unknown>;
 }): Promise<unknown> {
   const url = `${YZ_GW_URL}/${opts.method}/${opts.version}?access_token=${encodeURIComponent(opts.accessToken)}`;
-  const res = await fetch(url, {
+  const res = await youzanFetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(opts.params ?? {}),
@@ -110,10 +122,10 @@ async function callYouzanApi(opts: {
     data?: unknown;
   };
   if (j.error_response) {
-    throw new Error(`[${j.error_response.code}] ${j.error_response.msg ?? ""} ${j.error_response.sub_msg ?? ""}`.trim());
+    throw new Error(formatYouzanIpError(`[${j.error_response.code}] ${j.error_response.msg ?? ""} ${j.error_response.sub_msg ?? ""}`.trim()));
   }
   if (j.success === false || (typeof j.code === "number" && j.code !== 0)) {
-    throw new Error(`[${j.code ?? "?"}] ${j.message ?? "调用失败"}`);
+    throw new Error(formatYouzanIpError(`[${j.code ?? "?"}] ${j.message ?? "调用失败"}`));
   }
   return j.response ?? j.data ?? json;
 }

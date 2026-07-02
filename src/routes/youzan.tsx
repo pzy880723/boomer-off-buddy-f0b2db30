@@ -50,6 +50,7 @@ import {
   batchImportShops,
   syncAllShops,
   backfillShopOrders,
+  getYouzanOutboundInfo,
 } from "@/lib/youzan.functions";
 import {
   getYouzanSummary,
@@ -93,6 +94,7 @@ function YouzanPage() {
   const fetchLogs = useServerFn(listYouzanSyncLogs);
   const fetchSummary = useServerFn(getYouzanSummary);
   const fetchBreakdown = useServerFn(getShopSalesBreakdown);
+  const fetchOutbound = useServerFn(getYouzanOutboundInfo);
   const pingFn = useServerFn(pingYouzanShop);
   const removeFn = useServerFn(removeYouzanShop);
   const syncAllFn = useServerFn(syncAllShops);
@@ -124,6 +126,11 @@ function YouzanPage() {
     queryKey: ["youzan-sync-logs"],
     queryFn: () => fetchLogs({ data: { limit: 30 } }),
     refetchInterval: 10_000,
+  });
+  const outboundQ = useQuery({
+    queryKey: ["youzan-outbound"],
+    queryFn: () => fetchOutbound(),
+    staleTime: 60_000,
   });
 
   const pingM = useMutation({
@@ -206,6 +213,8 @@ function YouzanPage() {
           <CompactStat icon={Boxes} label="总库存" value={summary ? num(summary.stockTotal) : "—"} empty={!summary?.hasData} />
         </CardContent>
       </Card>
+
+      {outboundQ.data && <YouzanOutboundCard status={outboundQ.data} />}
 
       {/* 门店卡片 */}
       <div className="mb-2 flex items-center justify-between">
@@ -384,6 +393,50 @@ function YouzanPage() {
 
       </div>
     </div>
+  );
+}
+
+type YouzanOutboundStatus = {
+  mode: "fixed_proxy" | "direct_dynamic";
+  configured: boolean;
+  proxy_host: string | null;
+  outbound_ip: string | null;
+  message: string;
+};
+
+function YouzanOutboundCard({ status }: { status: YouzanOutboundStatus }) {
+  const fixed = status.mode === "fixed_proxy";
+  const copy = (value: string | null) => {
+    if (!value) return;
+    navigator.clipboard.writeText(value).then(() => toast.success("已复制"));
+  };
+  return (
+    <Card className={fixed ? "border-success/30 bg-success/5" : "border-warning/40 bg-warning/5"}>
+      <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className={fixed ? "bg-success/10 text-success hover:bg-success/10" : "bg-warning/15 text-warning-foreground hover:bg-warning/15"}>
+              {fixed ? "固定出口代理已启用" : "当前为动态直连出口"}
+            </Badge>
+            {status.proxy_host && <span className="text-xs font-mono text-muted-foreground">{status.proxy_host}</span>}
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">{status.message}</p>
+          {!fixed && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              这不是发布问题；云端后端出网 IP 会随调度变化。要对接有赞白名单，请配置固定出口代理后只白名单代理 IP。
+            </p>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <code className="rounded bg-background px-2 py-1.5 text-xs font-mono">
+            {status.outbound_ip ?? (fixed ? "固定 IP 未填写" : "动态 IP 不展示")}
+          </code>
+          <Button size="sm" variant="outline" onClick={() => copy(status.outbound_ip)} disabled={!status.outbound_ip}>
+            复制白名单 IP
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

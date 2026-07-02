@@ -655,7 +655,7 @@ function BlockingErrorAlert({
         <div>
           <div className="font-medium text-destructive">有赞侧未加 IP 白名单</div>
           <div className="text-xs text-muted-foreground mt-0.5">
-            请前往 <b>有赞云 · 应用中心 · 应用详情 · IP 白名单</b> 添加下方出口 IP，保存后回到本页点「重试」。
+            下方是云端动态出口 IP，发布后也不保证固定，不建议反复加入白名单。请配置固定出口代理后，只把代理固定 IP 加到有赞白名单。
           </div>
         </div>
         <div className="flex items-center gap-2">

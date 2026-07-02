@@ -179,6 +179,7 @@ function ProductCategoriesPage() {
   const boundCount = rows.filter((r) => r.youzan_hq_category_id).length;
   const unboundCount = rows.filter((r) => !r.youzan_hq_category_id && r.is_active).length;
   const yzOnlyCount = yzRows.filter((y) => !yzIdToErp.has(y.id)).length;
+  const outbound = yzQ.data?.outbound ?? null;
 
   return (
     <div>
@@ -194,6 +195,11 @@ function ProductCategoriesPage() {
         <Badge variant="outline" className="text-emerald-600">已绑定 {boundCount}</Badge>
         <Badge variant="outline" className="text-amber-600">未绑定 {unboundCount}</Badge>
         <Badge variant="outline" className="text-muted-foreground">有赞独有 {yzOnlyCount}（忽略）</Badge>
+        {outbound && (
+          <Badge variant="outline" className={outbound.mode === "fixed_proxy" ? "text-success" : "text-warning"}>
+            有赞出口：{outbound.mode === "fixed_proxy" ? "固定代理" : "动态直连"}
+          </Badge>
+        )}
         <div className="ml-auto flex gap-2">
           <Button variant="outline" size="sm" onClick={() => qc.invalidateQueries({ queryKey: ["yz-groups-live"] })} disabled={yzQ.isFetching}>
             {yzQ.isFetching ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1 h-3.5 w-3.5" />}
@@ -281,7 +287,10 @@ function ProductCategoriesPage() {
               <div className="mb-3 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs">
                 <div className="font-medium text-destructive mb-1">拉取失败</div>
                 {yzQ.data.blocking.kind === "ip_whitelist" && (
-                  <div>请前往有赞云应用把 IP <code className="mx-1 rounded bg-muted px-1 font-mono">{yzQ.data.blocking.ip}</code> 加入白名单后重试。</div>
+                  <div className="space-y-1">
+                    <div>有赞拒绝了当前出口 IP。这个 IP 是云端动态出口，发布后也不保证固定，不建议继续反复加入白名单。</div>
+                    <div>请配置固定出口代理后，在有赞白名单只加入代理固定 IP{outbound?.outbound_ip ? <>：<code className="mx-1 rounded bg-muted px-1 font-mono">{outbound.outbound_ip}</code></> : "。"}</div>
+                  </div>
                 )}
                 {yzQ.data.blocking.kind === "no_api" && (
                   <div>当前授权无以下接口：{yzQ.data.blocking.apis.join(", ")}</div>
