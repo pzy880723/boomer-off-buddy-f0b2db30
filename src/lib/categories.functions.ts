@@ -388,6 +388,7 @@ export const previewYouzanCategorySync = createServerFn({ method: "POST" })
       api,
       shop_id,
       notes,
+      blocking: blocking ?? null,
       to_add: toAdd,
       to_update: toUpdate,
       to_deactivate: toDeactivate,
