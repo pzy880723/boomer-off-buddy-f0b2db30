@@ -142,13 +142,18 @@ export const runYouzanApiHealthCheck = createServerFn({ method: "POST" }).handle
   async (): Promise<YzHealthReport> => {
     const outbound = getYouzanOutboundStatus();
     if (outbound.mode === "fixed_proxy" && !outbound.outbound_ip) {
-      const { readSavedOutboundIp } = await import("./youzan-outbound.functions");
-      const saved = await readSavedOutboundIp(supabase);
+      const { data: row } = await supabase
+        .from("app_settings")
+        .select("value")
+        .eq("key", "youzan_proxy_outbound_ip")
+        .maybeSingle();
+      const saved = (row?.value as { ip?: string } | null)?.ip ?? null;
       if (saved) {
         outbound.outbound_ip = saved;
         outbound.message = `固定出口代理已启用；自动探测到出口 IP ${saved}，请把该 IP 加入有赞白名单。`;
       }
     }
+
 
     const { data: shopsRaw, error } = await supabase
       .from("youzan_shops")
