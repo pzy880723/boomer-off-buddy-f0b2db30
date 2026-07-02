@@ -211,7 +211,7 @@ export function CategoriesPanel() {
             <div className="p-6 text-center text-sm text-muted-foreground">加载中…</div>
           )}
           {!q.isLoading && tree.roots.length === 0 && (
-            <div className="p-6 text-center text-sm text-muted-foreground">暂无分类</div>
+            <div className="p-6 text-center text-sm text-muted-foreground">暂无分组</div>
           )}
           {tree.roots.map((r) => {
             const kids = tree.byParent.get(r.id) ?? [];
