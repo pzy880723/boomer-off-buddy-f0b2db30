@@ -424,54 +424,47 @@ function OrderDetail({ row }: { row: Record<string, unknown> }) {
     (fullOrder.orders as Array<Record<string, unknown>> | undefined) ?? [];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-      <div className="md:col-span-2">
-        <div className="font-medium text-foreground mb-1.5">商品明细</div>
-        <div className="space-y-1">
-          {orders.length === 0 && (
-            <div className="text-muted-foreground">无明细</div>
-          )}
-          {orders.map((o, i) => {
-            const title = String(o.title ?? "");
-            const num = Number(o.num ?? 0);
-            const total = Number(o.total_fee ?? o.payment ?? 0);
-            const sku = String(o.item_no ?? o.outer_item_id ?? "");
-            return (
-              <div
-                key={i}
-                className="flex items-center justify-between gap-3 py-1 border-b last:border-0"
-              >
-                <div className="min-w-0">
-                  <div className="truncate">{title || "—"}</div>
-                  {sku && (
-                    <div className="font-mono text-[10px] text-muted-foreground">
-                      {sku}
-                    </div>
-                  )}
-                </div>
-                <div className="text-right tabular-nums">
-                  <div>×{num}</div>
-                  <div className="text-muted-foreground">{cny(total)}</div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-      <div className="space-y-2">
-        <div>
-          <div className="font-medium text-foreground mb-1">支付</div>
+    <div className="text-xs space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="font-medium text-foreground">商品明细</div>
+        {row.post_fee != null && Number(row.post_fee) > 0 && (
           <div className="text-muted-foreground">
-            交易号 {(row.outer_transaction_no as string) ?? "—"}
+            运费 {cny(Number(row.post_fee))}
           </div>
-          {row.post_fee != null && Number(row.post_fee) > 0 && (
-            <div className="text-muted-foreground">
-              运费 {cny(Number(row.post_fee))}
+        )}
+      </div>
+      <div className="space-y-1">
+        {orders.length === 0 && (
+          <div className="text-muted-foreground">无明细</div>
+        )}
+        {orders.map((o, i) => {
+          const title = String(o.title ?? "");
+          const num = Number(o.num ?? 0);
+          const total = Number(o.total_fee ?? o.payment ?? 0);
+          const sku = String(o.item_no ?? o.outer_item_id ?? "");
+          return (
+            <div
+              key={i}
+              className="flex items-center justify-between gap-3 py-1 border-b last:border-0"
+            >
+              <div className="min-w-0">
+                <div className="truncate">{title || "—"}</div>
+                {sku && (
+                  <div className="font-mono text-[10px] text-muted-foreground">
+                    {sku}
+                  </div>
+                )}
+              </div>
+              <div className="text-right tabular-nums">
+                <div>×{num}</div>
+                <div className="text-muted-foreground">{cny(total)}</div>
+              </div>
             </div>
-          )}
-        </div>
+          );
+        })}
       </div>
     </div>
+
   );
 }
 
