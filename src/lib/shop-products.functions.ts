@@ -6,7 +6,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin as supabase } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import type { SkuRow } from "./inventory.helpers";
+// SkuRow is used only on the client side; server return is a plain object array
 import {
   callYouzanApiVerbose,
   ensureAccessToken,
@@ -189,7 +189,7 @@ export const listShopSkus = createServerFn({ method: "GET" })
       .select("id, name")
       .eq("shop_id", data.shop_id)
       .maybeSingle();
-    if (!loc) return { rows: [] as SkuRow[], location_id: null };
+    if (!loc) return { rows: [] as Record<string, unknown>[], location_id: null as string | null };
 
     // 取该门店所有 inv_stocks > 0 的 sku
     const { data: stocks, error: stErr } = await sb
@@ -208,7 +208,7 @@ export const listShopSkus = createServerFn({ method: "GET" })
     const skuIds = new Set<string>();
     (stocks ?? []).forEach((s) => skuIds.add(s.sku_id));
     (links ?? []).forEach((l) => skuIds.add(l.sku_id));
-    if (skuIds.size === 0) return { rows: [] as SkuRow[], location_id: loc.id };
+    if (skuIds.size === 0) return { rows: [] as Record<string, unknown>[], location_id: loc.id as string | null };
 
     let q = sb
       .from("inv_skus")
@@ -225,10 +225,13 @@ export const listShopSkus = createServerFn({ method: "GET" })
     // 用门店库存覆盖 stock_qty 字段
     const stockMap = new Map((stocks ?? []).map((s) => [s.sku_id, Number(s.qty)]));
     const patched = (rows ?? []).map((r) => ({
-      ...r,
+      ...(r as Record<string, unknown>),
+      bundle_items: Array.isArray((r as { bundle_items?: unknown }).bundle_items)
+        ? ((r as { bundle_items?: unknown }).bundle_items as unknown[])
+        : [],
       stock_qty: stockMap.get(r.id) ?? 0,
     }));
-    return { rows: patched as SkuRow[], location_id: loc.id };
+    return { rows: patched as Record<string, unknown>[], location_id: loc.id as string | null };
   });
 
 // ---------- addShopStock：入库 / 出库 / 调整 ----------
