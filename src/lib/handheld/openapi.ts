@@ -112,7 +112,7 @@ const document: ZodOpenApiObject = {
   openapi: "3.1.0",
   info: {
     title: "Boomer Off — 手持终端 API",
-    version: "1.6.0",
+    version: "1.7.0",
     description: `
 所有接口都在 \`/api/public/handheld/*\` 前缀下（**绕过站点登录**）。
 
