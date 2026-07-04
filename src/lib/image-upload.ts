@@ -1,9 +1,31 @@
 // 客户端图片压缩 + 上传工具（提取自 item-image-uploader，供 /m 和 /store 复用）
 import { supabase } from "@/integrations/supabase/client";
 
-const MAX_DIM = 1600;
-const QUALITY = 0.82;
-const SKIP_COMPRESS_BELOW = 200 * 1024;
+const MAX_DIM = 1280;
+const QUALITY = 0.78;
+const SKIP_COMPRESS_BELOW = 80 * 1024;
+
+// ==== 全局 pending 上传计数（供表单页禁用保存按钮） ====
+let pendingCount = 0;
+const listeners = new Set<() => void>();
+export function subscribePendingUploads(fn: () => void): () => void {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+export function getPendingUploadCount(): number {
+  return pendingCount;
+}
+export function beginPendingUpload(): () => void {
+  pendingCount += 1;
+  listeners.forEach((l) => l());
+  let ended = false;
+  return () => {
+    if (ended) return;
+    ended = true;
+    pendingCount = Math.max(0, pendingCount - 1);
+    listeners.forEach((l) => l());
+  };
+}
 
 export async function compressImage(
   file: File | Blob,
