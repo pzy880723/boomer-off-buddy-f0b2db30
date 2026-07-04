@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { getPendingUploadCount, subscribePendingUploads } from "@/lib/image-upload";
 import { createFileRoute, Link, useBlocker, useNavigate } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -214,6 +215,11 @@ function NewParcelPage() {
   const [items, setItems] = useState<SubItem[]>([emptyItem()]);
   const [usedAi, setUsedAi] = useState(false);
   const [smartOpen, setSmartOpen] = useState(false);
+  const pendingUploads = useSyncExternalStore(
+    subscribePendingUploads,
+    getPendingUploadCount,
+    () => 0,
+  );
 
   const handleRecognized = (r: RecognizedResult) => {
     if (Object.keys(r.parcel).length) setParcel((p) => mergeNonNull(p, r.parcel));
@@ -348,19 +354,29 @@ function NewParcelPage() {
               size="sm"
               variant="outline"
               onClick={() => saveMut.mutate({ continueAdding: true })}
-              disabled={saveMut.isPending}
+              disabled={saveMut.isPending || pendingUploads > 0}
+              title={pendingUploads > 0 ? `还有 ${pendingUploads} 张图上传中` : undefined}
             >
               <Plus className="mr-1.5 h-3.5 w-3.5" />
-              {saveMut.isPending ? "保存中…" : "保存并继续添加"}
+              {saveMut.isPending
+                ? "保存中…"
+                : pendingUploads > 0
+                ? `图片上传中 (${pendingUploads})`
+                : "保存并继续添加"}
             </Button>
             <Button
               size="sm"
               className="bg-gradient-brand hover:opacity-90"
               onClick={() => saveMut.mutate({ continueAdding: false })}
-              disabled={saveMut.isPending}
+              disabled={saveMut.isPending || pendingUploads > 0}
+              title={pendingUploads > 0 ? `还有 ${pendingUploads} 张图上传中` : undefined}
             >
               <Save className="mr-1.5 h-3.5 w-3.5" />
-              {saveMut.isPending ? "保存中…" : "保存"}
+              {saveMut.isPending
+                ? "保存中…"
+                : pendingUploads > 0
+                ? `图片上传中 (${pendingUploads})`
+                : "保存"}
             </Button>
           </>
         }

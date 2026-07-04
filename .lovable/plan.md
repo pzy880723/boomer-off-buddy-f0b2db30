@@ -1,122 +1,73 @@
-## 目标（重写版）
 
-APP 里 1:1 复刻 `/m/parcels` 手机网页版**全部功能**，作为首页「日本小包」磁贴入口。**只对 `super_admin` 可见**。改动只在 handheld 侧新增接口 + 补充 mem，不动 web 页面。
+## 现状与瓶颈
 
----
+新建小包裹页面（`/purchase/japan-parcel/new`）里每张商品图走的是 `src/components/japan-parcel/item-image-uploader.tsx` → `uploadFile()`：
 
-## 功能对齐清单（严格照抄 /m/parcels）
+1. 选/拖/粘图 → `createImageBitmap` → OffscreenCanvas 编 webp（长边 1600、quality 0.82）
+2. 直接 `supabase.storage.from('parcel-item-images').upload(...)` 上传到 Supabase（Storage 在海外机房）
+3. 全流程串行，且要**等上传完成**后才把 URL 塞进表单，UI 上只能干等一个 loading 圈
 
-### 1. 列表页 `/parcels`
-- 顶栏搜索框（`搜索商品名 / 子单号`），300ms 防抖，输入后关键词命中位置**高亮**（`highlight`）
-- 顶栏右侧「拍照识图」入口（对应 `/m/photo-search`；见下方 Q1）
-- **两个 Tab**：`待签收 / 已签收` — 服务端字段：
-  - pending = `purchased / at_jp_warehouse / shipping_intl`
-  - received = `delivered / completed`
-- **两个维度切换**：`商品 / 包裹`（`ShoppingBag / Package` 图标），切换值本地持久化（对应 web `useParcelViewMode`；APP 端可用 SharedPreferences）
-- **搜索时强制进入商品维度**（web 行为：`q.trim() ? "item" : storedMode`），维度切换按钮此时隐藏
-- 无限滚动（下滑到底自动加载下一页）+ 底部状态文案（加载中 / 加载更多 / 没有更多）
-- 异常包裹（`is_problem=true`）左侧红色竖条 + 右下 `AlertCircle` 图标
-- **商品维度卡片**（items 模式）：
-  - 64×64 首图（`toThumbUrl(200)`），无图 fallback `📦`
-  - 品名 2 行 + `sub_order_no` + `signed_at`（若已签收）+ `system_code · 添加人 · 添加时间` 一行
-  - 右侧：**avg CNY**（`item_total_cny / quantity`）+ `× N 件` + **拆包徽标**（红字：`拆 {pieces}{unit} · ¥{piece_cny}/{unit}`；条件：`pack_pieces > 1`）
-- **包裹维度卡片**（parcel 模式）：
-  - 64×64 首图 + 标题（`首件名 等 N 件`）+ `tracking_no / source_order_no` + `购 MM-DD` + 签收时间
-  - 右侧：`grand_total_cny`（大字） + `avg_unit_cny × 件数`
-  - 点击进入包裹详情页
+主要慢的原因：
 
-### 2. 包裹详情 `/parcels/{id}`（对应 web `/m/receive/{id}`）
-- 顶部包裹摘要卡片：首图 + 首件名等 N 件 + `tracking_no` 徽标（异常时红标）
-- 详情 dl 列表：`状态 / 国际单号 / 来源订单号 / 卖家 / 商品合计 / 国际运费 / 关税 / 合计 / 重量 / 件数 / 购买时间 / 付款时间 / 签收时间 / 仓位 / 系统编码 / 添加时间 / 备注`（值为空的隐藏）
-- 「子商品 N」列表：每项 40×40 图 + 品名 + `×qty · ¥{item_total_cny}` + ChevronRight → 点击弹出**商品详情底部抽屉**（同商品维度点击）
-- 签收 / 异常 / 到货照片区块 → 见 Q1
+- **上传距离最贵**：手机截图/相册原图常常 2–5 MB，压完还剩 300–800 KB，从国内直连 Supabase Storage 一张 3–8 秒很正常，是耗时大头。
+- **压缩阈值太宽松**：`SKIP_COMPRESS_BELOW = 200 KB` + `MAX_DIM = 1600` + `quality 0.82`，商品缩略图其实用不到 1600 边，白白多传字节。
+- **UI 阻塞感强**：预览要等「压缩 + 上传」都结束才出图；用户不知道卡在哪一步，感觉「很慢」。
+- **多张图串行**：一次导入 N 个子订单时，用户逐张点上传，没有并行也没有队列提示。
 
-### 3. 商品详情底部抽屉（`ItemDetailSheet`）
-- 90dvh 可滚动，标题 = 中文名或原文
-- 大图 + 详情卡：`sub_order_no / JPY 小计 (≈CNY 小计) / 单价 / 数量 / 重量 / 汇率 / 手续费 / 国内运费 / 运费补差 / 关税类目 / 税率 / 关税 / 运费分摊 / 关税(¥) / 到手价（红色加粗）/ 支付方式 / 支付时间 / 商户单号 / 平台 / 成色 / 附加服务 / 系统编码 / 添加人 / 添加时间 / 备注`
-- **「拆包单价」卡片**（核心 write 功能）：
-  - 已算过（`pack_pieces > 0`）→ 展示「整包拆 N 个 · ¥X/个」+ `重新计算` 按钮
-  - 未算过 → 大按钮「拆包单价计算」
-- 到货照片网格（4 列，最多 9 张，支持连拍多选 / 补拍） → 见 Q1
+## 目标
 
-### 4. 拆包单价计算 Dialog（`PackPriceCalculatorDialog`）
-1. 顶部商品概览 + 当前到手价（CNY）
-2. **自动跑「标题分析」** → 命中就回填 pieces / unit（source=`title`）
-3. 标题给不出且有图 → **自动跑「图片分析」**（送缩略图，1024px）→ 回填（source=`image`）
-4. 手动输入 `pieces / unit`，UI 实时算 `¥{piece_cny}/{unit}`
-5. 保存 → 写入 `japan_parcel_items.pack_pieces / pack_pieces_source / pack_unit_note`
+在不改后端/桶策略的前提下，把「点击选图 → 看到预览 → 表单可继续填」的等待感压到 1 秒内，实际上传在后台跑完，出错再回滚。
 
----
+## 改动方案（仅前端 & 展示层）
 
-## 一、ERP 侧交付（我实现）
+改动集中在 `src/components/japan-parcel/item-image-uploader.tsx` 以及可复用工具 `src/lib/image-upload.ts`。
 
-### 端点清单（都在 `/api/public/handheld/parcels/*`，`X-Device-Token + X-Session-Token`，`super_admin` 独占；否则 403 `unauthorized_role`）
+### 1. 更激进的压缩参数
 
-| 方法 | 路径 | 复用现有 server fn |
-|---|---|---|
-| GET | `/parcels/counts` | `{ pending, received }` 数字 |
-| GET | `/parcels?bucket&mode=item\|parcel&q&limit&offset` | 抄 `searchParcels` 全部字段；item 模式包含 `landed_cny`、`pack_pieces` 等；parcel 模式包含 `grand_total_cny / avg_unit_cny / item_count / total_qty` |
-| GET | `/parcels/{id}` | `getJapanParcel` 全字段 + items 全字段 + `totals`（items_cny / intl_total_cny / tariff_cny / grand_total_cny / weight / etc.） |
-| POST | `/parcels/items/{item_id}/pack-pieces` | `updateParcelItem`：`{ pack_pieces, pack_pieces_source, pack_unit_note }`；`X-Client-Op-Id` 幂等 |
-| POST | `/parcels/items/{item_id}/pack-pieces/estimate-title` | 转发 `estimatePiecesFromTitle`（服务端读 item 的 title / title_cn） |
-| POST | `/parcels/items/{item_id}/pack-pieces/estimate-image` | 转发 `estimatePiecesFromImage`（服务端选缩略图 URL 送 AI） |
+- `MAX_DIM`: 1600 → **1280**（列表缩略只用到 256，1280 已足够放大查看）
+- `QUALITY`: 0.82 → **0.78**（webp 感官几乎无差别）
+- `SKIP_COMPRESS_BELOW`: 200 KB → **80 KB**（超过就走压缩，避免 300 KB 的截图原样上传）
+- 预期同一张 3 MB 手机图从 ~700 KB 降到 ~250–350 KB，上传时间 ≈ 1/2。
 
-统一响应：`{ ok, code, ... }` 或 `{ ok:true, data }`；错误码遵循 `HANDHELD_ERROR_CODES`（含新加的 `unauthorized_role`、以及 `estimate` 命中的 `rate_limited / ai_credits_exhausted`）。
+### 2. 乐观预览 + 后台上传
 
-### 拆包成本响应结构（供 items 列表与详情）
+- 选图后立刻用 `URL.createObjectURL(compressedBlob)` 生成本地预览塞进 `onChange`（同时把 blob 挂在组件 state 里）。表单立刻看到图、可以继续填其他字段。
+- 真正的 `storage.upload` 在后台跑；成功后把 `objectURL` 替换成 Supabase 公网 URL，`revokeObjectURL` 释放内存。
+- 失败：`toast.error`，把预览撤回 `null`，让用户重试。
+- 保存表单时若某张图还在上传，禁用「保存」按钮 + 显示「N 张图上传中…」；避免把本地 blob URL 写进 DB。
 
-- 每个 item 附带 `landed`：`{ item_jpy, freight_share_jpy, item_cny, freight_share_cny, tariff_cny, landed_cny, unit_price_cny, piece_price_jpy, piece_price_cny }`
-- parcel 详情附带 `totals`：`{ items_jpy, items_cny, intl_total_jpy, intl_total_cny, tariff_jpy, tariff_cny, fx_rate, grand_total_cny, weight_g, quantity_total }`
-- 全部服务端算好（复用 `computeParcelItemLanded + computePiecePrice + sumTariffJpy`），APP 直接展示，保证与 web 完全一致。
+### 3. 上传进度 & 并行
 
-### schemas / openapi / errors
-- `errors.ts` 已加 `unauthorized_role`
-- `schemas.ts` 新增：`ParcelListQuery / ParcelListRes(item|parcel)/ ParcelDetailRes / ParcelCountsRes / ParcelPackPiecesReq / ParcelPackPiecesRes / ParcelEstimateTitleRes / ParcelEstimateImageRes`
-- `openapi.ts` 新 tag `日本小包`，`sdk:check` 通过
+- 复用 `supabase.storage.upload`，但在覆盖层里换掉「转圈」为一个细进度条（Supabase JS v2 支持 `onUploadProgress` via fetch；没有就至少显示 0→90% 假进度 + 完成置 100%，视觉不再"卡住"）。
+- 多张图同时选/粘时（未来批量），允许最多 3 个并行 upload，用一个简单的 semaphore，串行时间大概减半。当前只处理单图入口，semaphore 先落在 `image-upload.ts` 里，为后续批量做准备。
 
-### 权限 helper
-`requireSuperAdmin(request)`（在 `parcels.ts` 内 re-export）：`authenticateDevice + resolveSessionUser + loadUserRoles`，`roles.includes("super_admin")` 才放行。
+### 4. 首次交互零阻塞
 
----
+- 组件已经用 `React.lazy` 引入，保留。
+- 在真正拿到 `createImageBitmap` 之前，先立刻在 UI 上显示"压缩中..."骨架图（避免用户以为点击没反应）。
 
-## 二、给 codex 的实现指引（回复末尾追加代码块）
+### 5. 观测
 
-### 磁贴
-`authMe.roles.includes("super_admin")` 才渲染，图标 `Package`，标题「日本小包」，副标题「查看包裹与拆包单价」。点击进入 `/parcels`。
+- 在压缩与上传前后 `performance.now()` 打点，`console.debug("[img] compress=%dms upload=%dms size=%dKB→%dKB", ...)`，方便后续回放确认是网络问题还是压缩问题。
+- 不加任何埋点上报。
 
-### 3 屏 + 1 弹窗
-- **列表屏**：粘性顶栏（搜索 + Tab + 维度切换）+ 商品/包裹卡片（视觉见上方清单）+ 无限滚动
-- **包裹详情屏**：摘要 + dl 详情 + 子商品列表 → 点击弹出「商品详情底部抽屉」
-- **商品详情底部抽屉**：全字段展示 + 到手价加粗红字 + 「拆包单价」入口
-- **拆包单价弹窗**：三步（标题 → 图片 → 手动）实时算 `¥/个`，保存回写
+## 不改的东西
 
-### 关键行为
-- 搜索时强制商品维度，维度按钮隐藏
-- 维度选择本地持久化
-- 卡片右下拆包徽标：`pack_pieces > 1` 才显示，红字
-- 关键词高亮抄 web `highlight`
-- `toThumbUrl(size)`：列表 200、详情 600、AI 送图 1024
-- 时间：MM-DD（列表） / MM-DD HH:mm（副行）/ 完整（详情）
+- Supabase 桶、RLS、路径规则不动。
+- 服务端 / 后端逻辑不动，纯前端优化。
+- `image-upload.ts` 里其他调用点（`/m`、`/store`）保持行为兼容——只把新的默认参数下沉，签名不变。
 
-### 测试脚本
-```
-1. 普通员工 → 首页无磁贴
-2. super_admin → 磁贴出现，点入
-3. 待签收/已签收 Tab 切换 + 徽标数字正确
-4. 商品/包裹维度切换（默认商品；切了下次记住）
-5. 搜关键词 → 强制商品维度 + 结果高亮
-6. 商品维度：拆包徽标（pack_pieces>1）正确显示 ¥/个
-7. 点商品 → 底部抽屉字段与 web 一致（到手价红色）
-8. 抽屉「拆包单价计算」→ 自动跑标题；跑失败/无结果 → 自动跑图片；手输覆盖
-9. 保存拆包 → 列表卡片徽标 & 抽屉数字同步更新
-10. 包裹维度 → 点卡片进详情 → 子商品列表点击也弹同一个抽屉
-```
+## 预期效果
 
----
+- **感官延迟**：点图后 <500 ms 出预览、表单立刻可用；「上传中」变后台任务，不再是模态阻塞。
+- **实际上传耗时**：单图从当前 ~5s 降到 ~2s 左右（取决于网络，压缩体积减半 + 并行）。
+- **失败可回滚**：网络掉线只掉那张图，不影响正在填写的表单。
 
-## 需要你点头确认（1 个问题）
+## 需要你确认的 1 件事
 
-**「一键签收 / 异常 / 到货照片上传 / 拍照识图」这 4 个是否也要做进 APP？**
-- 现在这个 plan 是「查询 + 拆包单价计算（含 AI）」全套，签收/异常/照片/拍照识图**没纳入**（这些都是写操作或独立场景）。
-- 如果要一起做，我把 `POST /parcels/{id}/deliver`、`POST /parcels/{id}/problem`、`POST /parcels/items/{id}/photos`、`POST /parcels/photo-search` 也塞到同一个 plan 里，接口和 UI 都补齐。
-- 如果不做，就照现在的 plan 收尾。
+保存表单时，如果某张图还在后台上传，我的默认策略是「禁用保存按钮 + 顶部提示"还有 N 张图上传中"」。你也可以选：
+
+- (A) 等所有上传完再允许点保存（当前默认，最安全）
+- (B) 直接允许保存，未完成的图先不写入，后台上传成功后再补一次 `update`（体验最顺，但会多一次写库）
+
+若不特别说，我按 (A) 实现。
