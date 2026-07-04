@@ -82,6 +82,9 @@ import {
   ParcelListRes,
   ParcelCountsRes,
   ParcelDetailRes,
+  ParcelPackPiecesReq,
+  ParcelPackPiecesRes,
+  ParcelEstimateRes,
 } from "./schemas";
 
 
@@ -109,7 +112,7 @@ const document: ZodOpenApiObject = {
   openapi: "3.1.0",
   info: {
     title: "Boomer Off — 手持终端 API",
-    version: "1.6.0",
+    version: "1.7.0",
     description: `
 所有接口都在 \`/api/public/handheld/*\` 前缀下（**绕过站点登录**）。
 
@@ -595,9 +598,9 @@ Token 由后台 **仓库管理 → 手持终端** 页面创建/复制。设备�
     "/api/public/handheld/parcels": {
       get: {
         tags: ["日本小包"],
-        summary: "日本小包列表（super_admin 独占，v1.6）",
+        summary: "日本小包列表 · 支持商品/包裹两种维度（super_admin 独占，v1.7）",
         description:
-          "只读。bucket=pending 返回三档进行中，bucket=received 返回两档已签收。按 intl_pay_at desc, created_at desc 排序。非 super_admin 返回 403 `unauthorized_role`。",
+          "只读。`bucket=pending` 返回三档进行中，`bucket=received` 返回两档已签收。`mode=item` 返回子商品扁平列表（含 landed_cny + piece_price），`mode=parcel` 返回聚合包裹卡片。前端搜索时应强制传 `mode=item`。非 super_admin 返回 403 `unauthorized_role`。",
         requestParams: { query: ParcelListQuery },
         responses: { "200": jsonRes("OK", ParcelListRes), ...ERROR_RESPONSES },
       },
@@ -605,7 +608,7 @@ Token 由后台 **仓库管理 → 手持终端** 页面创建/复制。设备�
     "/api/public/handheld/parcels/counts": {
       get: {
         tags: ["日本小包"],
-        summary: "包裹 Tab 徽标数字（v1.6）",
+        summary: "包裹 Tab 徽标数字（v1.7）",
         description: "同一 super_admin 门槛。返回 pending / received 两个整数。",
         responses: { "200": jsonRes("OK", ParcelCountsRes), ...ERROR_RESPONSES },
       },
@@ -613,11 +616,42 @@ Token 由后台 **仓库管理 → 手持终端** 页面创建/复制。设备�
     "/api/public/handheld/parcels/{id}": {
       get: {
         tags: ["日本小包"],
-        summary: "包裹详情 + 拆包成本（v1.6）",
+        summary: "包裹详情 + 拆包成本（v1.7）",
         description:
           "服务端已按重量分摊国际运费 + 关税，返回 items[].landed 里的到岸单价 / 拆包单件价 / 小计。APP 直接展示。",
         requestParams: { path: z.object({ id: z.string().uuid() }) },
         responses: { "200": jsonRes("OK", ParcelDetailRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/parcels/items/{itemId}/pack-pieces": {
+      post: {
+        tags: ["日本小包"],
+        summary: "保存拆包件数 & 单位（super_admin 独占，v1.7）",
+        description:
+          "写入 `japan_parcel_items.pack_pieces / pack_pieces_source / pack_unit_note`。传 `pack_pieces=0` 或 null 表示清空。返回该 item 最新的每小件价（CNY/JPY）。",
+        requestParams: { path: z.object({ itemId: z.string().uuid() }) },
+        requestBody: jsonBody(ParcelPackPiecesReq),
+        responses: { "200": jsonRes("OK", ParcelPackPiecesRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/parcels/items/{itemId}/pack-pieces/estimate-title": {
+      post: {
+        tags: ["日本小包"],
+        summary: "AI 标题分析整包件数（super_admin 独占，v1.7）",
+        description:
+          "服务端从 DB 读该 item 的中/日文标题，调 Lovable AI Gateway（gemini-3-flash-preview）返回件数、置信度、推理、单位。命中 `rate_limited / ai_credits_exhausted` 时按 429/402 返回。",
+        requestParams: { path: z.object({ itemId: z.string().uuid() }) },
+        responses: { "200": jsonRes("OK", ParcelEstimateRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/parcels/items/{itemId}/pack-pieces/estimate-image": {
+      post: {
+        tags: ["日本小包"],
+        summary: "AI 图片视觉识别整包件数（super_admin 独占，v1.7）",
+        description:
+          "服务端读 item 的 image_url，转为 1024px 缩略图后调 Lovable AI Gateway（gemini-2.5-flash）。无图片返回 422。",
+        requestParams: { path: z.object({ itemId: z.string().uuid() }) },
+        responses: { "200": jsonRes("OK", ParcelEstimateRes), ...ERROR_RESPONSES },
       },
     },
   },

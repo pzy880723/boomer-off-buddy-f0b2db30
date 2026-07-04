@@ -1122,15 +1122,69 @@ export const ParcelBucketQuery = z
   .enum(["pending", "received"])
   .meta({ description: "pending=待收货三档；received=已签收两档" });
 
+export const ParcelModeQuery = z
+  .enum(["item", "parcel"])
+  .meta({ description: "item=商品维度；parcel=包裹维度。搜索时前端强制传 item" });
+
 export const ParcelListQuery = z
   .object({
     bucket: ParcelBucketQuery.default("pending"),
-    q: z.string().trim().max(200).optional().meta({ description: "关键词（单号 / 品名 / 追踪号）" }),
+    mode: ParcelModeQuery.default("item"),
+    q: z.string().trim().max(200).optional().meta({ description: "关键词（品名 / 子单号 / 追踪号 / 系统编码）" }),
     limit: z.coerce.number().int().min(1).max(50).default(30),
     offset: z.coerce.number().int().min(0).default(0),
   })
   .meta({ id: "ParcelListQuery" });
 
+/** 商品维度列表项 */
+export const ParcelItemListItem = z
+  .object({
+    id: uuidSchema,
+    parent_id: uuidSchema.nullable(),
+    sub_order_no: z.string().nullable(),
+    merchant_order_no: z.string().nullable(),
+    source_platform: z.string().nullable(),
+    condition: z.string().nullable(),
+    addon_service: z.string().nullable(),
+    item_title: z.string().nullable(),
+    item_title_cn: z.string().nullable(),
+    item_image_url: z.string().nullable(),
+    unit_price_jpy: z.number().nullable(),
+    quantity: z.number().int().nullable(),
+    item_total_jpy: z.number().nullable(),
+    item_total_cny: z.number().nullable(),
+    weight_g: z.number().nullable(),
+    exchange_rate: z.number().nullable(),
+    service_fee_jpy: z.number().nullable(),
+    domestic_freight_jpy: z.number().nullable(),
+    freight_diff_jpy: z.number().nullable(),
+    pay_method: z.string().nullable(),
+    pay_at: z.string().nullable(),
+    tariff_category: z.string().nullable(),
+    tariff_rate: z.number().nullable(),
+    notes: z.string().nullable(),
+    arrival_photo_urls: z.array(z.string()).default([]),
+    pack_pieces: z.number().int().nullable(),
+    pack_pieces_source: z.string().nullable(),
+    pack_unit_note: z.string().nullable(),
+    system_code: z.string().nullable(),
+    created_by: z.string().nullable(),
+    created_at: z.string(),
+    source_order_no: z.string().nullable(),
+    tracking_no: z.string().nullable(),
+    status: ParcelStatusEnum.nullable(),
+    received_at: z.string().nullable(),
+    is_problem: z.boolean(),
+    intl_pay_at: z.string().nullable(),
+    parcel_system_code: z.string().nullable(),
+    parcel_created_by: z.string().nullable(),
+    landed_cny: z.number().nullable().meta({ description: "到岸总额（拆包前）" }),
+    piece_price_cny: z.number().nullable().meta({ description: "组包每小件 CNY；非组包为 null" }),
+    piece_price_jpy: z.number().nullable().meta({ description: "组包每小件 JPY；非组包为 null" }),
+  })
+  .meta({ id: "ParcelItemListItem" });
+
+/** 包裹维度列表项 */
 export const ParcelListItem = z
   .object({
     id: uuidSchema,
@@ -1139,21 +1193,27 @@ export const ParcelListItem = z
     tracking_no: z.string().nullable(),
     status: ParcelStatusEnum,
     is_problem: z.boolean(),
-    intl_pay_at: z.string().nullable().meta({ description: "国际付款时间；列表排序依据" }),
+    seller: z.string().nullable(),
+    warehouse_location: z.string().nullable(),
+    purchased_at: z.string().nullable(),
+    intl_pay_at: z.string().nullable(),
     received_at: z.string().nullable(),
     created_at: z.string(),
+    created_by: z.string().nullable(),
     first_item_name: z.string().nullable(),
-    item_image_url: z.string().nullable().meta({ description: "首图；缩略图请在 APP 端加参数" }),
+    item_image_url: z.string().nullable(),
     item_count: z.number().int(),
     total_qty: z.number().int(),
-    total_cny: z.number().nullable().meta({ description: "包裹合计人民币（含运费+关税）" }),
+    grand_total_cny: z.number().nullable().meta({ description: "包裹合计人民币（含运费+关税）" }),
     avg_unit_cny: z.number().nullable(),
   })
   .meta({ id: "ParcelListItem" });
 
 export const ParcelListRes = okEnvelope(
   z.object({
-    rows: z.array(ParcelListItem),
+    mode: ParcelModeQuery,
+    items: z.array(ParcelItemListItem).meta({ description: "mode=item 时有值；mode=parcel 时为空数组" }),
+    rows: z.array(ParcelListItem).meta({ description: "mode=parcel 时有值；mode=item 时为空数组" }),
     has_more: z.boolean(),
     next_offset: z.number().int(),
   }),
@@ -1172,18 +1232,30 @@ const ParcelDetailItem = z
     position: z.number().int().nullable(),
     system_code: z.string().nullable(),
     sub_order_no: z.string().nullable(),
+    merchant_order_no: z.string().nullable(),
+    source_platform: z.string().nullable(),
+    condition: z.string().nullable(),
+    addon_service: z.string().nullable(),
     item_title: z.string().nullable(),
     item_title_cn: z.string().nullable(),
     item_image_url: z.string().nullable(),
     quantity: z.number().int().nullable(),
     unit_price_jpy: z.number().nullable(),
     item_total_jpy: z.number().nullable(),
+    item_total_cny: z.number().nullable(),
     weight_g: z.number().nullable(),
+    exchange_rate: z.number().nullable(),
+    service_fee_jpy: z.number().nullable(),
+    domestic_freight_jpy: z.number().nullable(),
+    freight_diff_jpy: z.number().nullable(),
     tariff_rate: z.number().nullable(),
     tariff_category: z.string().nullable(),
     pay_at: z.string().nullable(),
     pay_method: z.string().nullable(),
     notes: z.string().nullable(),
+    arrival_photo_urls: z.array(z.string()).default([]),
+    created_by: z.string().nullable(),
+    created_at: z.string().nullable(),
     pack_pieces: z.number().int().nullable().meta({ description: ">0 表示组包，APP 才显示「单件价」" }),
     pack_pieces_source: z.string().nullable(),
     pack_unit_note: z.string().nullable(),
@@ -1212,13 +1284,20 @@ export const ParcelDetailRes = okEnvelope(
       tracking_no: z.string().nullable(),
       status: ParcelStatusEnum,
       is_problem: z.boolean(),
+      seller: z.string().nullable(),
+      warehouse_location: z.string().nullable(),
       receiver_name: z.string().nullable(),
       receiver_address: z.string().nullable(),
       total_weight_g: z.number().nullable(),
+      weight_g: z.number().nullable(),
+      purchased_at: z.string().nullable(),
       intl_pay_at: z.string().nullable(),
       received_at: z.string().nullable(),
       notes: z.string().nullable(),
       created_at: z.string(),
+      created_by: z.string().nullable(),
+      item_image_url: z.string().nullable().meta({ description: "首图（包裹自身或首件的图）" }),
+      first_item_name: z.string().nullable(),
       status_timeline: z.array(z.any()).default([]),
     }),
     totals: z.object({
@@ -1232,5 +1311,34 @@ export const ParcelDetailRes = okEnvelope(
       total_cny: z.number().nullable().meta({ description: "拆包前包裹合计人民币（大字展示）" }),
     }),
     items: z.array(ParcelDetailItem),
+  }),
+);
+
+/** 保存拆包件数 */
+export const ParcelPackPiecesReq = z
+  .object({
+    pack_pieces: z.number().int().min(0).max(100000).nullable(),
+    pack_pieces_source: z.enum(["title", "image", "manual"]).nullable().default("manual"),
+    pack_unit_note: z.string().max(16).nullable().default("个"),
+  })
+  .meta({ id: "ParcelPackPiecesReq" });
+
+export const ParcelPackPiecesRes = okEnvelope(
+  z.object({
+    id: uuidSchema,
+    pack_pieces: z.number().int().nullable(),
+    pack_pieces_source: z.string().nullable(),
+    pack_unit_note: z.string().nullable(),
+    piece_price_cny: z.number().nullable(),
+    piece_price_jpy: z.number().nullable(),
+  }),
+);
+
+export const ParcelEstimateRes = okEnvelope(
+  z.object({
+    pieces: z.number().int().nullable(),
+    confidence: z.enum(["high", "medium", "low"]).nullable(),
+    reasoning: z.string().nullable(),
+    unit: z.string().nullable(),
   }),
 );

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Boomer Off — 手持终端 API",
-    "version": "1.6.0",
+    "version": "1.7.0",
     "description": "所有接口都在 `/api/public/handheld/*` 前缀下（**绕过站点登录**）。\n\n## 鉴权\n每个请求必须带 HTTP Header：\n\n```\nX-Device-Token: <设备 token>\n```\n\nToken 由后台 **仓库管理 → 手持终端** 页面创建/复制。设备绑定的库位决定上报的目标位置。\n\n## 统一响应\n\n```json\n{ \"ok\": true, \"data\": { ... } }\n{ \"ok\": false, \"error\": \"...\", \"...\": \"...\" }\n```\n\n## 字段同步约定\n\n服务端的 Zod schema 是唯一真源（`src/lib/handheld/schemas.ts`）。\n本文档 + APP 端 SDK 都从它生成。改字段流程：\n\n1. 改 `schemas.ts`\n2. 运行 `bun run sdk:gen` 生成新的 `openapi.snapshot.json` 和 TS 类型\n3. APP 端拉取 `/api/public/handheld/openapi.json` 重新生成本地 SDK"
   },
   "servers": [
@@ -7572,8 +7572,8 @@
         "tags": [
           "日本小包"
         ],
-        "summary": "日本小包列表（super_admin 独占，v1.6）",
-        "description": "只读。bucket=pending 返回三档进行中，bucket=received 返回两档已签收。按 intl_pay_at desc, created_at desc 排序。非 super_admin 返回 403 `unauthorized_role`。",
+        "summary": "日本小包列表 · 支持商品/包裹两种维度（super_admin 独占，v1.7）",
+        "description": "只读。`bucket=pending` 返回三档进行中，`bucket=received` 返回两档已签收。`mode=item` 返回子商品扁平列表（含 landed_cny + piece_price），`mode=parcel` 返回聚合包裹卡片。前端搜索时应强制传 `mode=item`。非 super_admin 返回 403 `unauthorized_role`。",
         "parameters": [
           {
             "in": "query",
@@ -7590,13 +7590,26 @@
           },
           {
             "in": "query",
+            "name": "mode",
+            "schema": {
+              "default": "item",
+              "type": "string",
+              "enum": [
+                "item",
+                "parcel"
+              ],
+              "description": "item=商品维度；parcel=包裹维度。搜索时前端强制传 item"
+            }
+          },
+          {
+            "in": "query",
             "name": "q",
             "schema": {
-              "description": "关键词（单号 / 品名 / 追踪号）",
+              "description": "关键词（品名 / 子单号 / 追踪号 / 系统编码）",
               "type": "string",
               "maxLength": 200
             },
-            "description": "关键词（单号 / 品名 / 追踪号）"
+            "description": "关键词（品名 / 子单号 / 追踪号 / 系统编码）"
           },
           {
             "in": "query",
@@ -7634,11 +7647,27 @@
                     "data": {
                       "type": "object",
                       "properties": {
+                        "mode": {
+                          "type": "string",
+                          "enum": [
+                            "item",
+                            "parcel"
+                          ],
+                          "description": "item=商品维度；parcel=包裹维度。搜索时前端强制传 item"
+                        },
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/ParcelItemListItem"
+                          },
+                          "description": "mode=item 时有值；mode=parcel 时为空数组"
+                        },
                         "rows": {
                           "type": "array",
                           "items": {
                             "$ref": "#/components/schemas/ParcelListItem"
-                          }
+                          },
+                          "description": "mode=parcel 时有值；mode=item 时为空数组"
                         },
                         "has_more": {
                           "type": "boolean"
@@ -7650,6 +7679,8 @@
                         }
                       },
                       "required": [
+                        "mode",
+                        "items",
                         "rows",
                         "has_more",
                         "next_offset"
@@ -7754,7 +7785,7 @@
         "tags": [
           "日本小包"
         ],
-        "summary": "包裹 Tab 徽标数字（v1.6）",
+        "summary": "包裹 Tab 徽标数字（v1.7）",
         "description": "同一 super_admin 门槛。返回 pending / received 两个整数。",
         "responses": {
           "200": {
@@ -7888,7 +7919,7 @@
         "tags": [
           "日本小包"
         ],
-        "summary": "包裹详情 + 拆包成本（v1.6）",
+        "summary": "包裹详情 + 拆包成本（v1.7）",
         "description": "服务端已按重量分摊国际运费 + 关税，返回 items[].landed 里的到岸单价 / 拆包单件价 / 小计。APP 直接展示。",
         "parameters": [
           {
@@ -7970,6 +8001,26 @@
                             "is_problem": {
                               "type": "boolean"
                             },
+                            "seller": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "warehouse_location": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
                             "receiver_name": {
                               "anyOf": [
                                 {
@@ -7994,6 +8045,26 @@
                               "anyOf": [
                                 {
                                   "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "weight_g": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "purchased_at": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
                                 },
                                 {
                                   "type": "null"
@@ -8033,6 +8104,37 @@
                             "created_at": {
                               "type": "string"
                             },
+                            "created_by": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "item_image_url": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "首图（包裹自身或首件的图）"
+                            },
+                            "first_item_name": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
                             "status_timeline": {
                               "default": [],
                               "type": "array",
@@ -8046,13 +8148,20 @@
                             "tracking_no",
                             "status",
                             "is_problem",
+                            "seller",
+                            "warehouse_location",
                             "receiver_name",
                             "receiver_address",
                             "total_weight_g",
+                            "weight_g",
+                            "purchased_at",
                             "intl_pay_at",
                             "received_at",
                             "notes",
                             "created_at",
+                            "created_by",
+                            "item_image_url",
+                            "first_item_name",
                             "status_timeline"
                           ],
                           "additionalProperties": false
@@ -8152,6 +8261,577 @@
                         "parcel",
                         "totals",
                         "items"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/handheld/parcels/items/{itemId}/pack-pieces": {
+      "post": {
+        "tags": [
+          "日本小包"
+        ],
+        "summary": "保存拆包件数 & 单位（super_admin 独占，v1.7）",
+        "description": "写入 `japan_parcel_items.pack_pieces / pack_pieces_source / pack_unit_note`。传 `pack_pieces=0` 或 null 表示清空。返回该 item 最新的每小件价（CNY/JPY）。",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "itemId",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParcelPackPiecesReq"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                          "example": "550e8400-e29b-41d4-a716-446655440000"
+                        },
+                        "pack_pieces": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "pack_pieces_source": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "pack_unit_note": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "piece_price_cny": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "piece_price_jpy": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "pack_pieces",
+                        "pack_pieces_source",
+                        "pack_unit_note",
+                        "piece_price_cny",
+                        "piece_price_jpy"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/handheld/parcels/items/{itemId}/pack-pieces/estimate-title": {
+      "post": {
+        "tags": [
+          "日本小包"
+        ],
+        "summary": "AI 标题分析整包件数（super_admin 独占，v1.7）",
+        "description": "服务端从 DB 读该 item 的中/日文标题，调 Lovable AI Gateway（gemini-3-flash-preview）返回件数、置信度、推理、单位。命中 `rate_limited / ai_credits_exhausted` 时按 429/402 返回。",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "itemId",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "pieces": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "confidence": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "high",
+                                "medium",
+                                "low"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "reasoning": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "unit": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "pieces",
+                        "confidence",
+                        "reasoning",
+                        "unit"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/handheld/parcels/items/{itemId}/pack-pieces/estimate-image": {
+      "post": {
+        "tags": [
+          "日本小包"
+        ],
+        "summary": "AI 图片视觉识别整包件数（super_admin 独占，v1.7）",
+        "description": "服务端读 item 的 image_url，转为 1024px 缩略图后调 Lovable AI Gateway（gemini-2.5-flash）。无图片返回 422。",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "itemId",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "pieces": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "confidence": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "high",
+                                "medium",
+                                "low"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "reasoning": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "unit": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "pieces",
+                        "confidence",
+                        "reasoning",
+                        "unit"
                       ],
                       "additionalProperties": false
                     }
@@ -9078,6 +9758,54 @@
           }
         }
       },
+      "ParcelPackPiecesReq": {
+        "type": "object",
+        "properties": {
+          "pack_pieces": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pack_pieces_source": {
+            "default": "manual",
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "title",
+                  "image",
+                  "manual"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pack_unit_note": {
+            "default": "个",
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "pack_pieces"
+        ]
+      },
       "DeviceContext": {
         "type": "object",
         "properties": {
@@ -9980,6 +10708,473 @@
         ],
         "additionalProperties": false
       },
+      "ParcelItemListItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                "example": "550e8400-e29b-41d4-a716-446655440000"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sub_order_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "merchant_order_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source_platform": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "condition": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "addon_service": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "item_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "item_title_cn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "item_image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unit_price_jpy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "item_total_jpy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "item_total_cny": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "weight_g": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "exchange_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "service_fee_jpy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "domestic_freight_jpy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "freight_diff_jpy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pay_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pay_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tariff_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tariff_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "arrival_photo_urls": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "pack_pieces": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pack_pieces_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pack_unit_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "system_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "source_order_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tracking_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "purchased",
+                  "at_jp_warehouse",
+                  "shipping_intl",
+                  "delivered",
+                  "completed"
+                ],
+                "description": "五档状态；APP 用同一顺序渲染状态条"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "received_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "is_problem": {
+            "type": "boolean"
+          },
+          "intl_pay_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "parcel_system_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "parcel_created_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "landed_cny": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "到岸总额（拆包前）"
+          },
+          "piece_price_cny": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "组包每小件 CNY；非组包为 null"
+          },
+          "piece_price_jpy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "组包每小件 JPY；非组包为 null"
+          }
+        },
+        "required": [
+          "id",
+          "parent_id",
+          "sub_order_no",
+          "merchant_order_no",
+          "source_platform",
+          "condition",
+          "addon_service",
+          "item_title",
+          "item_title_cn",
+          "item_image_url",
+          "unit_price_jpy",
+          "quantity",
+          "item_total_jpy",
+          "item_total_cny",
+          "weight_g",
+          "exchange_rate",
+          "service_fee_jpy",
+          "domestic_freight_jpy",
+          "freight_diff_jpy",
+          "pay_method",
+          "pay_at",
+          "tariff_category",
+          "tariff_rate",
+          "notes",
+          "arrival_photo_urls",
+          "pack_pieces",
+          "pack_pieces_source",
+          "pack_unit_note",
+          "system_code",
+          "created_by",
+          "created_at",
+          "source_order_no",
+          "tracking_no",
+          "status",
+          "received_at",
+          "is_problem",
+          "intl_pay_at",
+          "parcel_system_code",
+          "parcel_created_by",
+          "landed_cny",
+          "piece_price_cny",
+          "piece_price_jpy"
+        ],
+        "additionalProperties": false
+      },
       "ParcelListItem": {
         "type": "object",
         "properties": {
@@ -10033,6 +11228,36 @@
           "is_problem": {
             "type": "boolean"
           },
+          "seller": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warehouse_location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "purchased_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "intl_pay_at": {
             "anyOf": [
               {
@@ -10041,8 +11266,7 @@
               {
                 "type": "null"
               }
-            ],
-            "description": "国际付款时间；列表排序依据"
+            ]
           },
           "received_at": {
             "anyOf": [
@@ -10056,6 +11280,16 @@
           },
           "created_at": {
             "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "first_item_name": {
             "anyOf": [
@@ -10075,8 +11309,7 @@
               {
                 "type": "null"
               }
-            ],
-            "description": "首图；缩略图请在 APP 端加参数"
+            ]
           },
           "item_count": {
             "type": "integer",
@@ -10088,7 +11321,7 @@
             "minimum": -9007199254740991,
             "maximum": 9007199254740991
           },
-          "total_cny": {
+          "grand_total_cny": {
             "anyOf": [
               {
                 "type": "number"
@@ -10117,14 +11350,18 @@
           "tracking_no",
           "status",
           "is_problem",
+          "seller",
+          "warehouse_location",
+          "purchased_at",
           "intl_pay_at",
           "received_at",
           "created_at",
+          "created_by",
           "first_item_name",
           "item_image_url",
           "item_count",
           "total_qty",
-          "total_cny",
+          "grand_total_cny",
           "avg_unit_cny"
         ],
         "additionalProperties": false
@@ -10161,6 +11398,46 @@
             ]
           },
           "sub_order_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "merchant_order_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source_platform": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "condition": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "addon_service": {
             "anyOf": [
               {
                 "type": "string"
@@ -10232,7 +11509,57 @@
               }
             ]
           },
+          "item_total_cny": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "weight_g": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "exchange_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "service_fee_jpy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "domestic_freight_jpy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "freight_diff_jpy": {
             "anyOf": [
               {
                 "type": "number"
@@ -10283,6 +11610,33 @@
             ]
           },
           "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "arrival_photo_urls": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
             "anyOf": [
               {
                 "type": "string"
@@ -10429,18 +11783,30 @@
           "position",
           "system_code",
           "sub_order_no",
+          "merchant_order_no",
+          "source_platform",
+          "condition",
+          "addon_service",
           "item_title",
           "item_title_cn",
           "item_image_url",
           "quantity",
           "unit_price_jpy",
           "item_total_jpy",
+          "item_total_cny",
           "weight_g",
+          "exchange_rate",
+          "service_fee_jpy",
+          "domestic_freight_jpy",
+          "freight_diff_jpy",
           "tariff_rate",
           "tariff_category",
           "pay_at",
           "pay_method",
           "notes",
+          "arrival_photo_urls",
+          "created_by",
+          "created_at",
           "pack_pieces",
           "pack_pieces_source",
           "pack_unit_note",
