@@ -65,6 +65,14 @@ export const Route = createFileRoute("/api/public/handheld/rfid/bind-item")({
         } as never);
         if (mv.error) return errCode("internal_error", mv.error.message);
 
+        // 若目标库位是门店，DB 触发器已入队 push_stock，此处 fire-and-forget 触发一次 worker
+        if (auth.device.location_kind === "shop") {
+          try {
+            const { triggerStockWorker } = await import("@/lib/youzan-sync.functions");
+            triggerStockWorker({ sku_ids: [body.sku_id] });
+          } catch { /* noop */ }
+        }
+
         return ok({
           epc: body.epc,
           sku_id: body.sku_id,
