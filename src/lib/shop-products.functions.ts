@@ -285,13 +285,31 @@ export const retryBranchListing = createServerFn({ method: "POST" })
       .eq("status", "error");
     const r = await ensureBranchListing(data.sku_id, data.shop_id);
     if (r.yz_item_id) {
+      // 触发一次库存推送（retry 场景本地未产生 movement，主动入队一次）
       const { location_id } = await getShopWithLocation(data.shop_id);
-      triggerStockWorker({
-        sku_id: data.sku_id,
-        shop_id: data.shop_id,
-        location_id,
-        reason: "retry_listing",
-      });
+      const { data: st } = await supabase
+        .from("inv_stocks")
+        .select("qty")
+        .eq("sku_id", data.sku_id)
+        .eq("location_id", location_id)
+        .maybeSingle();
+      await supabase
+        .from("youzan_stock_sync_queue")
+        .upsert(
+          {
+            sku_id: data.sku_id,
+            shop_id: data.shop_id,
+            location_id,
+            target_stock: Math.max(0, Number(st?.qty ?? 0)),
+            action: "push_stock",
+            reason: "retry_listing",
+            status: "pending",
+            next_run_at: new Date().toISOString(),
+            last_error: null,
+          } as never,
+          { onConflict: "sku_id,shop_id", ignoreDuplicates: false } as never,
+        );
+      triggerStockWorker({ sku_ids: [data.sku_id] });
     }
     return {
       ok: !!r.yz_item_id,
