@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Upload, X, Loader2, ImageIcon, Plus, Sparkles, Search } from "lucide-react";
 import { toast } from "sonner";
 import { compressImage, uploadSkuImage } from "@/lib/image-upload";
-import { supabase } from "@/integrations/supabase/client";
+
 import {
   DropdownMenu,
   DropdownMenuTrigger,
