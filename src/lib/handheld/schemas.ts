@@ -536,18 +536,48 @@ export const AiRecognizeImage = z
     message: "image_url 或 image_base64 必传其一",
   });
 
+export const AiRecognizeStoragePath = z.object({
+  bucket: z.enum(["sku-raw", "sku-listing"]),
+  storage_path: z.string().min(1),
+});
+
 export const AiRecognizeReq = z
   .object({
     // 单图字段（向后兼容旧 APP）
     image_url: z.string().url().optional(),
     image_base64: z.string().optional(),
-    // v1.2 多图：最多 4 张。images[0] 为主图。
-    images: z.array(AiRecognizeImage).min(1).max(4).optional(),
+    // v1.3 多图：最多 6 张。默认第 0 张为主图，可通过 primary_index 指定其他索引。
+    images: z.array(AiRecognizeImage).min(1).max(6).optional(),
+    image_urls: z
+      .array(z.string().url())
+      .min(1)
+      .max(6)
+      .optional()
+      .meta({ description: "外链/signed URL 数组，最多 6 张" }),
+    image_storage_paths: z
+      .array(AiRecognizeStoragePath)
+      .min(1)
+      .max(6)
+      .optional()
+      .meta({ description: "APP 上传后的持久 storage 路径数组，最多 6 张，服务端自动签 signed URL" }),
+    primary_index: z
+      .number()
+      .int()
+      .min(0)
+      .max(5)
+      .optional()
+      .meta({ description: "主图在数组中的下标，缺省 0" }),
     hint: z.string().optional().meta({ description: "店员补充提示，可选" }),
   })
-  .refine((v) => v.image_url || v.image_base64 || (v.images && v.images.length > 0), {
-    message: "image_url / image_base64 / images 至少传一项",
-  })
+  .refine(
+    (v) =>
+      !!v.image_url ||
+      !!v.image_base64 ||
+      (v.images && v.images.length > 0) ||
+      (v.image_urls && v.image_urls.length > 0) ||
+      (v.image_storage_paths && v.image_storage_paths.length > 0),
+    { message: "image_url / image_base64 / images / image_urls / image_storage_paths 至少传一项" },
+  )
   .meta({ id: "AiRecognizeReq" });
 
 export const AiRecognizeRes = okEnvelope(
@@ -559,6 +589,27 @@ export const AiRecognizeRes = okEnvelope(
     condition_grade: z.enum(["N", "S", "A", "B", "C", "J"]).nullable(),
     description: z.string().nullable(),
     suggested_price_cny: z.number().nullable(),
+    confidence: z
+      .number()
+      .min(0)
+      .max(1)
+      .nullable()
+      .meta({ description: "0~1，模型对 name/category 的整体置信度" }),
+    warning: z
+      .string()
+      .nullable()
+      .optional()
+      .meta({ description: "低置信度或多角度矛盾时的提示，APP 用于弹人工确认" }),
+    alternatives: z
+      .array(
+        z.object({
+          name: z.string(),
+          category: INV_CATEGORY.nullable().optional(),
+          confidence: z.number().min(0).max(1).nullable().optional(),
+        }),
+      )
+      .optional()
+      .meta({ description: "备选识别结果，最多 3 条" }),
     raw: z.unknown().optional(),
   }),
 );
