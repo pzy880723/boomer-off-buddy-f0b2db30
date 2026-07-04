@@ -235,7 +235,7 @@ export const listShopSkus = createServerFn({ method: "GET" })
         is_custom_price: Boolean(raw.is_custom_price),
         kind: String(raw.kind ?? "single"),
         pack_pieces: (raw.pack_pieces as number | null) ?? null,
-        bundle_items: Array.isArray(bi) ? (bi as unknown[]) : [],
+        bundle_items: Array.isArray(bi) ? (bi as Array<{ sku_id: string; qty: number }>) : [],
         weight_g: (raw.weight_g as number | null) ?? null,
         image_url: (raw.image_url as string | null) ?? null,
         image_paths: (raw.image_paths as string[] | null) ?? null,
@@ -259,7 +259,7 @@ export type ShopSkuRow = {
   is_custom_price: boolean;
   kind: string;
   pack_pieces: number | null;
-  bundle_items: unknown[];
+  bundle_items: Array<{ sku_id: string; qty: number }>;
   weight_g: number | null;
   image_url: string | null;
   image_paths: string[] | null;
