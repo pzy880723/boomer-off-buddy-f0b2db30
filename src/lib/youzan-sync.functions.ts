@@ -614,8 +614,26 @@ async function runStockSyncWorkerCore(opts: {
         .select("*")
         .eq("sku_id", t.sku_id);
       if (t.shop_id) linkQuery = linkQuery.eq("shop_id", t.shop_id);
-      const { data: link } = await linkQuery.maybeSingle();
-      if (!link) throw new Error("SKU 未绑定该门店的有赞商品（可能已解绑）");
+      let { data: link } = await linkQuery.maybeSingle();
+
+      // 自愈：没有 link 或 link 处于 error/未拿到 item_id → 尝试上架
+      const needsListing =
+        !link ||
+        !(link as { yz_item_id?: number }).yz_item_id ||
+        Number((link as { yz_item_id?: number }).yz_item_id ?? 0) <= 0;
+      if (needsListing) {
+        if (!t.shop_id) throw new Error("队列缺少 shop_id，无法自动上架");
+        const r = await ensureBranchListing(t.sku_id, t.shop_id);
+        if (!r.yz_item_id) throw new Error(r.error ?? "自动上架失败");
+        const refetch = await supabase
+          .from("sku_youzan_links")
+          .select("*")
+          .eq("sku_id", t.sku_id)
+          .eq("shop_id", t.shop_id)
+          .maybeSingle();
+        link = refetch.data;
+        if (!link) throw new Error("自动上架成功但 link 记录丢失");
+      }
 
       // v2：HQ 主 SPU 不推库存，直接标 done 跳过
       if ((link as { sync_stock?: boolean }).sync_stock === false) {
