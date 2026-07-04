@@ -172,12 +172,7 @@ export const addShopStock = createServerFn({ method: "POST" })
       listing = await ensureBranchListing(data.sku_id, data.shop_id);
     }
     if (listing.yz_item_id) {
-      triggerStockWorker({
-        sku_id: data.sku_id,
-        shop_id: data.shop_id,
-        location_id,
-        reason: `shop_adjust ${data.delta > 0 ? "+" : ""}${data.delta}`,
-      });
+      triggerStockWorker({ sku_ids: [data.sku_id] });
     }
 
     return {
