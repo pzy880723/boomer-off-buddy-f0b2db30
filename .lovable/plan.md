@@ -1,96 +1,122 @@
-## 目标
+## 目标（重写版）
 
-把**手机网页版**的日本小包功能（`/m/parcels`）搬到 codex 的 Android APP 里，作为首页一个磁贴。**只对 `super_admin` 可见**。核心用途：**查包裹 + 看拆包后的到岸成本**（只读，不做收货/改状态/补拍等写操作）。
-
----
-
-## 一、ERP 侧交付（我这轮做）
-
-### 1. 新增 3 个 handheld REST 端点，全部 `/api/public/handheld/parcels/*`，只读
-
-| 方法 | 路径 | 作用 | 复用现有 server fn |
-|---|---|---|---|
-| GET | `/parcels?bucket=pending\|received&q=&limit=&cursor=` | 列表（游标分页，同 `/m/parcels`） | `searchParcels` |
-| GET | `/parcels/counts` | 顶部 Tab 徽标数字 | `getMobileCounts` |
-| GET | `/parcels/{id}` | 详情 + items + **已算好的拆包成本**（到岸单价 / 单件价 / 合计 CNY） | `getJapanParcel` + `getParcelLandedContext` |
-
-**拆包成本响应字段**（这是本次的核心，详情接口必须返回）：
-- `parcel_totals`: `items_jpy` / `intl_fee_cny` / `domestic_fee_cny` / `fx_rate` / `total_cny`
-- `items[].landed`: `unit_price_cny`（到岸单价）/ `piece_price_cny`（组包时的单件价，走 `computePiecePrice`）/ `qty` / `subtotal_cny`
-- 所有金额服务端算好，APP 直接展示，不再前端算，保证与 web 完全一致。
-
-**鉴权**：抽 helper `requireSuperAdmin(request)` → 检查 `user_roles` 含 `super_admin`；否则 403 `code=unauthorized_role`。三个端点全走这个 helper。
-
-### 2. schemas.ts / openapi.ts / errors.ts 同步更新
-
-- 新增 zod：`ParcelListQuery` / `ParcelListRes` / `ParcelDetailRes` / `ParcelCountsRes`。
-- OpenAPI 新 tag `parcels`，`bun run sdk:check` 通过。
-- 新错误码 `unauthorized_role`。
-
-### 3. `/auth/me` 已经返回 `roles: string[]`，codex 直接用它决定是否渲染磁贴，不用改。
+APP 里 1:1 复刻 `/m/parcels` 手机网页版**全部功能**，作为首页「日本小包」磁贴入口。**只对 `super_admin` 可见**。改动只在 handheld 侧新增接口 + 补充 mem，不动 web 页面。
 
 ---
 
-## 二、给 codex 的实现指引（这轮结束后追加到「给 codex 的指令」代码块）
+## 功能对齐清单（严格照抄 /m/parcels）
 
-### 磁贴入口
+### 1. 列表页 `/parcels`
+- 顶栏搜索框（`搜索商品名 / 子单号`），300ms 防抖，输入后关键词命中位置**高亮**（`highlight`）
+- 顶栏右侧「拍照识图」入口（对应 `/m/photo-search`；见下方 Q1）
+- **两个 Tab**：`待签收 / 已签收` — 服务端字段：
+  - pending = `purchased / at_jp_warehouse / shipping_intl`
+  - received = `delivered / completed`
+- **两个维度切换**：`商品 / 包裹`（`ShoppingBag / Package` 图标），切换值本地持久化（对应 web `useParcelViewMode`；APP 端可用 SharedPreferences）
+- **搜索时强制进入商品维度**（web 行为：`q.trim() ? "item" : storedMode`），维度切换按钮此时隐藏
+- 无限滚动（下滑到底自动加载下一页）+ 底部状态文案（加载中 / 加载更多 / 没有更多）
+- 异常包裹（`is_problem=true`）左侧红色竖条 + 右下 `AlertCircle` 图标
+- **商品维度卡片**（items 模式）：
+  - 64×64 首图（`toThumbUrl(200)`），无图 fallback `📦`
+  - 品名 2 行 + `sub_order_no` + `signed_at`（若已签收）+ `system_code · 添加人 · 添加时间` 一行
+  - 右侧：**avg CNY**（`item_total_cny / quantity`）+ `× N 件` + **拆包徽标**（红字：`拆 {pieces}{unit} · ¥{piece_cny}/{unit}`；条件：`pack_pieces > 1`）
+- **包裹维度卡片**（parcel 模式）：
+  - 64×64 首图 + 标题（`首件名 等 N 件`）+ `tracking_no / source_order_no` + `购 MM-DD` + 签收时间
+  - 右侧：`grand_total_cny`（大字） + `avg_unit_cny × 件数`
+  - 点击进入包裹详情页
 
-- 首页多一个磁贴 `japan-parcel`，图标 `Package`，标题「日本小包」，副标题「查看包裹与拆包成本」。
-- **可见性**：`authMe.roles.includes("super_admin") === true` 才渲染，否则整块隐藏。
-- 点击进入内部路由 `/parcels`。
+### 2. 包裹详情 `/parcels/{id}`（对应 web `/m/receive/{id}`）
+- 顶部包裹摘要卡片：首图 + 首件名等 N 件 + `tracking_no` 徽标（异常时红标）
+- 详情 dl 列表：`状态 / 国际单号 / 来源订单号 / 卖家 / 商品合计 / 国际运费 / 关税 / 合计 / 重量 / 件数 / 购买时间 / 付款时间 / 签收时间 / 仓位 / 系统编码 / 添加时间 / 备注`（值为空的隐藏）
+- 「子商品 N」列表：每项 40×40 图 + 品名 + `×qty · ¥{item_total_cny}` + ChevronRight → 点击弹出**商品详情底部抽屉**（同商品维度点击）
+- 签收 / 异常 / 到货照片区块 → 见 Q1
 
-### 两个屏幕（1:1 对齐 web `/m/parcels` 视觉，只做只读）
+### 3. 商品详情底部抽屉（`ItemDetailSheet`）
+- 90dvh 可滚动，标题 = 中文名或原文
+- 大图 + 详情卡：`sub_order_no / JPY 小计 (≈CNY 小计) / 单价 / 数量 / 重量 / 汇率 / 手续费 / 国内运费 / 运费补差 / 关税类目 / 税率 / 关税 / 运费分摊 / 关税(¥) / 到手价（红色加粗）/ 支付方式 / 支付时间 / 商户单号 / 平台 / 成色 / 附加服务 / 系统编码 / 添加人 / 添加时间 / 备注`
+- **「拆包单价」卡片**（核心 write 功能）：
+  - 已算过（`pack_pieces > 0`）→ 展示「整包拆 N 个 · ¥X/个」+ `重新计算` 按钮
+  - 未算过 → 大按钮「拆包单价计算」
+- 到货照片网格（4 列，最多 9 张，支持连拍多选 / 补拍） → 见 Q1
 
-**Screen A — 列表**（对齐 `src/routes/m.parcels.tsx`）
-- 顶部 Tab：`待收货 / 已收货`，右边徽标来自 `/parcels/counts`。
-- 粘性搜索框，300ms 防抖，输入后关键词高亮（同 web `highlight` 效果）。
-- 卡片：88×88 首图 `toThumbUrl(80)` + 系统单号 + 状态 pill + 下单人 + 支付日期 `MM-DD` + items 数 + **合计 CNY**（直接用响应体 `parcel_totals.total_cny`）。
-- 无限滚动，`cursor` 翻页。
-- 空状态：`没有匹配的包裹`。
+### 4. 拆包单价计算 Dialog（`PackPriceCalculatorDialog`）
+1. 顶部商品概览 + 当前到手价（CNY）
+2. **自动跑「标题分析」** → 命中就回填 pieces / unit（source=`title`）
+3. 标题给不出且有图 → **自动跑「图片分析」**（送缩略图，1024px）→ 回填（source=`image`）
+4. 手动输入 `pieces / unit`，UI 实时算 `¥{piece_cny}/{unit}`
+5. 保存 → 写入 `japan_parcel_items.pack_pieces / pack_pieces_source / pack_unit_note`
 
-**Screen B — 详情**（对齐 web 详情但去掉所有写按钮）
-- 顶栏：返回 + 系统单号，无三点菜单，无「整单收货 / 标问题」按钮。
-- 状态条：5 段 pill `purchased → at_jp_warehouse → shipping_intl → delivered → completed`，当前段高亮，只展示不可点。
-- **拆包成本卡片**（核心）：
-  - 商品合计（JPY） / 国内运费（CNY） / 国际运费（CNY） / 汇率 / **合计 CNY**（加粗大字）
-  - 一行说明：`拆包后单件成本已算好`。
-- **items 列表**：图 + 品名 + 数量 + **到岸单价 CNY** + **单件价 CNY**（组包时才显示） + 小计 CNY。
-  - 每个 item 卡片可点击展开，看原始 JPY 单价、抓取 URL、备注。
-  - 右侧无「补拍」按钮。
-- CNY / JPY 切换沿用现有 `CurrencyToggle` 观感（纯前端切换显示，数据两套都在响应里）。
+---
 
-### 复用与约束
+## 一、ERP 侧交付（我实现）
 
-- 图缩略图：已有的 `toThumbUrl(px)`。
-- 状态枚举严格 5 档，颜色映射抄 web `simplifyStatus`（我会把常量贴在 openapi description）。
-- 金额：CNY 保留 2 位小数前置 `¥`；JPY 整数前置 `¥` 并加 `(JPY)` 后缀区分。
-- **写操作全部不做**：不实现收货、不实现标问题、不实现补拍照片、不实现编辑。以后要再加另开一轮。
+### 端点清单（都在 `/api/public/handheld/parcels/*`，`X-Device-Token + X-Session-Token`，`super_admin` 独占；否则 403 `unauthorized_role`）
+
+| 方法 | 路径 | 复用现有 server fn |
+|---|---|---|
+| GET | `/parcels/counts` | `{ pending, received }` 数字 |
+| GET | `/parcels?bucket&mode=item\|parcel&q&limit&offset` | 抄 `searchParcels` 全部字段；item 模式包含 `landed_cny`、`pack_pieces` 等；parcel 模式包含 `grand_total_cny / avg_unit_cny / item_count / total_qty` |
+| GET | `/parcels/{id}` | `getJapanParcel` 全字段 + items 全字段 + `totals`（items_cny / intl_total_cny / tariff_cny / grand_total_cny / weight / etc.） |
+| POST | `/parcels/items/{item_id}/pack-pieces` | `updateParcelItem`：`{ pack_pieces, pack_pieces_source, pack_unit_note }`；`X-Client-Op-Id` 幂等 |
+| POST | `/parcels/items/{item_id}/pack-pieces/estimate-title` | 转发 `estimatePiecesFromTitle`（服务端读 item 的 title / title_cn） |
+| POST | `/parcels/items/{item_id}/pack-pieces/estimate-image` | 转发 `estimatePiecesFromImage`（服务端选缩略图 URL 送 AI） |
+
+统一响应：`{ ok, code, ... }` 或 `{ ok:true, data }`；错误码遵循 `HANDHELD_ERROR_CODES`（含新加的 `unauthorized_role`、以及 `estimate` 命中的 `rate_limited / ai_credits_exhausted`）。
+
+### 拆包成本响应结构（供 items 列表与详情）
+
+- 每个 item 附带 `landed`：`{ item_jpy, freight_share_jpy, item_cny, freight_share_cny, tariff_cny, landed_cny, unit_price_cny, piece_price_jpy, piece_price_cny }`
+- parcel 详情附带 `totals`：`{ items_jpy, items_cny, intl_total_jpy, intl_total_cny, tariff_jpy, tariff_cny, fx_rate, grand_total_cny, weight_g, quantity_total }`
+- 全部服务端算好（复用 `computeParcelItemLanded + computePiecePrice + sumTariffJpy`），APP 直接展示，保证与 web 完全一致。
+
+### schemas / openapi / errors
+- `errors.ts` 已加 `unauthorized_role`
+- `schemas.ts` 新增：`ParcelListQuery / ParcelListRes(item|parcel)/ ParcelDetailRes / ParcelCountsRes / ParcelPackPiecesReq / ParcelPackPiecesRes / ParcelEstimateTitleRes / ParcelEstimateImageRes`
+- `openapi.ts` 新 tag `日本小包`，`sdk:check` 通过
+
+### 权限 helper
+`requireSuperAdmin(request)`（在 `parcels.ts` 内 re-export）：`authenticateDevice + resolveSessionUser + loadUserRoles`，`roles.includes("super_admin")` 才放行。
+
+---
+
+## 二、给 codex 的实现指引（回复末尾追加代码块）
+
+### 磁贴
+`authMe.roles.includes("super_admin")` 才渲染，图标 `Package`，标题「日本小包」，副标题「查看包裹与拆包单价」。点击进入 `/parcels`。
+
+### 3 屏 + 1 弹窗
+- **列表屏**：粘性顶栏（搜索 + Tab + 维度切换）+ 商品/包裹卡片（视觉见上方清单）+ 无限滚动
+- **包裹详情屏**：摘要 + dl 详情 + 子商品列表 → 点击弹出「商品详情底部抽屉」
+- **商品详情底部抽屉**：全字段展示 + 到手价加粗红字 + 「拆包单价」入口
+- **拆包单价弹窗**：三步（标题 → 图片 → 手动）实时算 `¥/个`，保存回写
+
+### 关键行为
+- 搜索时强制商品维度，维度按钮隐藏
+- 维度选择本地持久化
+- 卡片右下拆包徽标：`pack_pieces > 1` 才显示，红字
+- 关键词高亮抄 web `highlight`
+- `toThumbUrl(size)`：列表 200、详情 600、AI 送图 1024
+- 时间：MM-DD（列表） / MM-DD HH:mm（副行）/ 完整（详情）
 
 ### 测试脚本
-
 ```
-1. 普通员工登录 → 首页看不到磁贴
-2. super_admin 登录 → 磁贴出现，点入
-3. pending / received Tab 切换 + 徽标数字正确
-4. 关键词搜（单号后 4 位 / 品名） → 高亮 + 过滤
-5. 打开 1 个 parcel → 拆包成本卡片的合计 CNY 与后台 web 详情完全一致
-6. 组包型 item 显示「单件价」，非组包不显示
-7. CNY / JPY 切换正常
-8. 无任何写按钮
+1. 普通员工 → 首页无磁贴
+2. super_admin → 磁贴出现，点入
+3. 待签收/已签收 Tab 切换 + 徽标数字正确
+4. 商品/包裹维度切换（默认商品；切了下次记住）
+5. 搜关键词 → 强制商品维度 + 结果高亮
+6. 商品维度：拆包徽标（pack_pieces>1）正确显示 ¥/个
+7. 点商品 → 底部抽屉字段与 web 一致（到手价红色）
+8. 抽屉「拆包单价计算」→ 自动跑标题；跑失败/无结果 → 自动跑图片；手输覆盖
+9. 保存拆包 → 列表卡片徽标 & 抽屉数字同步更新
+10. 包裹维度 → 点卡片进详情 → 子商品列表点击也弹同一个抽屉
 ```
 
 ---
 
-## 三、我本轮产出清单
+## 需要你点头确认（1 个问题）
 
-1. `requireSuperAdmin` helper + 3 个新只读端点
-2. `schemas.ts` / `openapi.ts` / `errors.ts` 更新，`sdk:check` 通过
-3. `mem://features/handheld-parcels` 新记忆：只读接口清单 + super_admin 门槛 + 拆包成本响应结构
-4. 回复末尾一个「给 codex 的指令 · YYYY-MM-DD · 第N条」代码块，含 baseURL、磁贴门槛、2 屏 UI 规格、测试脚本
-
----
-
-## 需要你点头确认
-
-1. **只读方向对不对？** 只查包裹 + 拆包成本，不做任何写操作（收货 / 标问题 / 补拍以后再说）。
-2. **详情要不要保留状态条？** 我默认保留（不可点，纯展示）；不想要就删。
+**「一键签收 / 异常 / 到货照片上传 / 拍照识图」这 4 个是否也要做进 APP？**
+- 现在这个 plan 是「查询 + 拆包单价计算（含 AI）」全套，签收/异常/照片/拍照识图**没纳入**（这些都是写操作或独立场景）。
+- 如果要一起做，我把 `POST /parcels/{id}/deliver`、`POST /parcels/{id}/problem`、`POST /parcels/items/{id}/photos`、`POST /parcels/photo-search` 也塞到同一个 plan 里，接口和 UI 都补齐。
+- 如果不做，就照现在的 plan 收尾。
