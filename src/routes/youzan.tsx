@@ -37,6 +37,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ShopHealthPanel } from "@/components/youzan/shop-health-panel";
 import { ApiHealthPanel } from "@/components/youzan/api-health-panel";
 import { SyncCenterPanel } from "@/components/youzan/sync-center-panel";
+import { MessagePushPanel } from "@/components/youzan/message-push-panel";
 import { PageHeader } from "@/components/page-header";
 import { DataTable } from "@/components/data-table";
 import { StatusBadge } from "@/components/status-badge";
