@@ -180,6 +180,7 @@ Token 由后台 **仓库管理 → 手持终端** 页面创建/复制。设备�
     { name: "RFID", description: "EPC 单点操作（v1.1+）" },
     { name: "通知", description: "APP 主动轮询的事件（v1.2+）" },
     { name: "诊断", description: "APP 上报 crash / 网络错误 / 设备状态（v1.2+）" },
+    { name: "日本小包", description: "只读；仅 super_admin 可用（v1.6+）" },
   ],
 
   paths: {
