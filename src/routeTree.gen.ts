@@ -141,6 +141,7 @@ import { Route as ApiPublicHandheldLabelTemplatesIdSetDefaultRouteImport } from 
 import { Route as ApiPublicHandheldItemsUploadImageMultipartRouteImport } from './routes/api/public/handheld/items.upload-image.multipart'
 import { Route as ApiPublicHandheldItemsIdSyncStatusRouteImport } from './routes/api/public/handheld/items.$id.sync-status'
 import { Route as ApiPublicHandheldItemsIdAttachImagesRouteImport } from './routes/api/public/handheld/items.$id.attach-images'
+import { Route as ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteImport } from './routes/api/public/handheld/parcels.items.$itemId.pack-pieces'
 
 const YouzanRoute = YouzanRouteImport.update({
   id: '/youzan',
@@ -865,6 +866,12 @@ const ApiPublicHandheldItemsIdAttachImagesRoute =
     path: '/attach-images',
     getParentRoute: () => ApiPublicHandheldItemsIdRoute,
   } as any)
+const ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute =
+  ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteImport.update({
+    id: '/items/$itemId/pack-pieces',
+    path: '/items/$itemId/pack-pieces',
+    getParentRoute: () => ApiPublicHandheldParcelsRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -999,6 +1006,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/label-templates/$id/set-default': typeof ApiPublicHandheldLabelTemplatesIdSetDefaultRoute
   '/api/public/handheld/transfers/$id/confirm': typeof ApiPublicHandheldTransfersIdConfirmRoute
   '/api/public/handheld/transfers/$id/scan': typeof ApiPublicHandheldTransfersIdScanRoute
+  '/api/public/handheld/parcels/items/$itemId/pack-pieces': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -1126,6 +1134,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/label-templates/$id/set-default': typeof ApiPublicHandheldLabelTemplatesIdSetDefaultRoute
   '/api/public/handheld/transfers/$id/confirm': typeof ApiPublicHandheldTransfersIdConfirmRoute
   '/api/public/handheld/transfers/$id/scan': typeof ApiPublicHandheldTransfersIdScanRoute
+  '/api/public/handheld/parcels/items/$itemId/pack-pieces': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -1261,6 +1270,7 @@ export interface FileRoutesById {
   '/api/public/handheld/label-templates/$id/set-default': typeof ApiPublicHandheldLabelTemplatesIdSetDefaultRoute
   '/api/public/handheld/transfers/$id/confirm': typeof ApiPublicHandheldTransfersIdConfirmRoute
   '/api/public/handheld/transfers/$id/scan': typeof ApiPublicHandheldTransfersIdScanRoute
+  '/api/public/handheld/parcels/items/$itemId/pack-pieces': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -1397,6 +1407,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/label-templates/$id/set-default'
     | '/api/public/handheld/transfers/$id/confirm'
     | '/api/public/handheld/transfers/$id/scan'
+    | '/api/public/handheld/parcels/items/$itemId/pack-pieces'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -1524,6 +1535,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/label-templates/$id/set-default'
     | '/api/public/handheld/transfers/$id/confirm'
     | '/api/public/handheld/transfers/$id/scan'
+    | '/api/public/handheld/parcels/items/$itemId/pack-pieces'
   id:
     | '__root__'
     | '/'
@@ -1658,6 +1670,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/label-templates/$id/set-default'
     | '/api/public/handheld/transfers/$id/confirm'
     | '/api/public/handheld/transfers/$id/scan'
+    | '/api/public/handheld/parcels/items/$itemId/pack-pieces'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -2669,6 +2682,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldItemsIdAttachImagesRouteImport
       parentRoute: typeof ApiPublicHandheldItemsIdRoute
     }
+    '/api/public/handheld/parcels/items/$itemId/pack-pieces': {
+      id: '/api/public/handheld/parcels/items/$itemId/pack-pieces'
+      path: '/items/$itemId/pack-pieces'
+      fullPath: '/api/public/handheld/parcels/items/$itemId/pack-pieces'
+      preLoaderRoute: typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteImport
+      parentRoute: typeof ApiPublicHandheldParcelsRoute
+    }
   }
 }
 
@@ -2900,12 +2920,15 @@ const ApiPublicHandheldNotificationsRouteWithChildren =
 interface ApiPublicHandheldParcelsRouteChildren {
   ApiPublicHandheldParcelsIdRoute: typeof ApiPublicHandheldParcelsIdRoute
   ApiPublicHandheldParcelsCountsRoute: typeof ApiPublicHandheldParcelsCountsRoute
+  ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute: typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute
 }
 
 const ApiPublicHandheldParcelsRouteChildren: ApiPublicHandheldParcelsRouteChildren =
   {
     ApiPublicHandheldParcelsIdRoute: ApiPublicHandheldParcelsIdRoute,
     ApiPublicHandheldParcelsCountsRoute: ApiPublicHandheldParcelsCountsRoute,
+    ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute:
+      ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute,
   }
 
 const ApiPublicHandheldParcelsRouteWithChildren =

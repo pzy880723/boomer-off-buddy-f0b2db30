@@ -8,7 +8,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { HANDHELD_CORS, ok } from "@/server/handheld-auth.server";
 import { errCode } from "@/lib/handheld/errors";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { requireSuperAdmin } from "../parcels";
+import { requireSuperAdmin } from "./parcels";
 import { ParcelPackPiecesReq } from "@/lib/handheld/schemas";
 import { computeParcelItemLanded, computePiecePrice } from "@/lib/japan-parcel.helpers";
 import { z } from "zod";
