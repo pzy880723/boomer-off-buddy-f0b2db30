@@ -78,6 +78,10 @@ import {
   SignReadUrlRes,
   UploadImageReq,
   UploadImageRes,
+  ParcelListQuery,
+  ParcelListRes,
+  ParcelCountsRes,
+  ParcelDetailRes,
 } from "./schemas";
 
 

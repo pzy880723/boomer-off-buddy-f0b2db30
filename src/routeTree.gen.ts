@@ -113,6 +113,7 @@ import { Route as ApiPublicHandheldRfidBatchStockInRouteImport } from './routes/
 import { Route as ApiPublicHandheldRfidEpcRouteImport } from './routes/api/public/handheld/rfid.$epc'
 import { Route as ApiPublicHandheldProductsLookupRouteImport } from './routes/api/public/handheld/products.lookup'
 import { Route as ApiPublicHandheldParcelsCountsRouteImport } from './routes/api/public/handheld/parcels.counts'
+import { Route as ApiPublicHandheldParcelsIdRouteImport } from './routes/api/public/handheld/parcels.$id'
 import { Route as ApiPublicHandheldNotificationsSinceRouteImport } from './routes/api/public/handheld/notifications.since'
 import { Route as ApiPublicHandheldNotificationsReadAllRouteImport } from './routes/api/public/handheld/notifications.read-all'
 import { Route as ApiPublicHandheldLocationSwitchRouteImport } from './routes/api/public/handheld/location.switch'
@@ -699,6 +700,12 @@ const ApiPublicHandheldParcelsCountsRoute =
     path: '/counts',
     getParentRoute: () => ApiPublicHandheldParcelsRoute,
   } as any)
+const ApiPublicHandheldParcelsIdRoute =
+  ApiPublicHandheldParcelsIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => ApiPublicHandheldParcelsRoute,
+  } as any)
 const ApiPublicHandheldNotificationsSinceRoute =
   ApiPublicHandheldNotificationsSinceRouteImport.update({
     id: '/since',
@@ -968,6 +975,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/location/switch': typeof ApiPublicHandheldLocationSwitchRoute
   '/api/public/handheld/notifications/read-all': typeof ApiPublicHandheldNotificationsReadAllRoute
   '/api/public/handheld/notifications/since': typeof ApiPublicHandheldNotificationsSinceRoute
+  '/api/public/handheld/parcels/$id': typeof ApiPublicHandheldParcelsIdRoute
   '/api/public/handheld/parcels/counts': typeof ApiPublicHandheldParcelsCountsRoute
   '/api/public/handheld/products/lookup': typeof ApiPublicHandheldProductsLookupRoute
   '/api/public/handheld/rfid/$epc': typeof ApiPublicHandheldRfidEpcRoute
@@ -1094,6 +1102,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/location/switch': typeof ApiPublicHandheldLocationSwitchRoute
   '/api/public/handheld/notifications/read-all': typeof ApiPublicHandheldNotificationsReadAllRoute
   '/api/public/handheld/notifications/since': typeof ApiPublicHandheldNotificationsSinceRoute
+  '/api/public/handheld/parcels/$id': typeof ApiPublicHandheldParcelsIdRoute
   '/api/public/handheld/parcels/counts': typeof ApiPublicHandheldParcelsCountsRoute
   '/api/public/handheld/products/lookup': typeof ApiPublicHandheldProductsLookupRoute
   '/api/public/handheld/rfid/$epc': typeof ApiPublicHandheldRfidEpcRoute
@@ -1228,6 +1237,7 @@ export interface FileRoutesById {
   '/api/public/handheld/location/switch': typeof ApiPublicHandheldLocationSwitchRoute
   '/api/public/handheld/notifications/read-all': typeof ApiPublicHandheldNotificationsReadAllRoute
   '/api/public/handheld/notifications/since': typeof ApiPublicHandheldNotificationsSinceRoute
+  '/api/public/handheld/parcels/$id': typeof ApiPublicHandheldParcelsIdRoute
   '/api/public/handheld/parcels/counts': typeof ApiPublicHandheldParcelsCountsRoute
   '/api/public/handheld/products/lookup': typeof ApiPublicHandheldProductsLookupRoute
   '/api/public/handheld/rfid/$epc': typeof ApiPublicHandheldRfidEpcRoute
@@ -1363,6 +1373,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/location/switch'
     | '/api/public/handheld/notifications/read-all'
     | '/api/public/handheld/notifications/since'
+    | '/api/public/handheld/parcels/$id'
     | '/api/public/handheld/parcels/counts'
     | '/api/public/handheld/products/lookup'
     | '/api/public/handheld/rfid/$epc'
@@ -1489,6 +1500,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/location/switch'
     | '/api/public/handheld/notifications/read-all'
     | '/api/public/handheld/notifications/since'
+    | '/api/public/handheld/parcels/$id'
     | '/api/public/handheld/parcels/counts'
     | '/api/public/handheld/products/lookup'
     | '/api/public/handheld/rfid/$epc'
@@ -1622,6 +1634,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/location/switch'
     | '/api/public/handheld/notifications/read-all'
     | '/api/public/handheld/notifications/since'
+    | '/api/public/handheld/parcels/$id'
     | '/api/public/handheld/parcels/counts'
     | '/api/public/handheld/products/lookup'
     | '/api/public/handheld/rfid/$epc'
@@ -2460,6 +2473,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldParcelsCountsRouteImport
       parentRoute: typeof ApiPublicHandheldParcelsRoute
     }
+    '/api/public/handheld/parcels/$id': {
+      id: '/api/public/handheld/parcels/$id'
+      path: '/$id'
+      fullPath: '/api/public/handheld/parcels/$id'
+      preLoaderRoute: typeof ApiPublicHandheldParcelsIdRouteImport
+      parentRoute: typeof ApiPublicHandheldParcelsRoute
+    }
     '/api/public/handheld/notifications/since': {
       id: '/api/public/handheld/notifications/since'
       path: '/since'
@@ -2878,11 +2898,13 @@ const ApiPublicHandheldNotificationsRouteWithChildren =
   )
 
 interface ApiPublicHandheldParcelsRouteChildren {
+  ApiPublicHandheldParcelsIdRoute: typeof ApiPublicHandheldParcelsIdRoute
   ApiPublicHandheldParcelsCountsRoute: typeof ApiPublicHandheldParcelsCountsRoute
 }
 
 const ApiPublicHandheldParcelsRouteChildren: ApiPublicHandheldParcelsRouteChildren =
   {
+    ApiPublicHandheldParcelsIdRoute: ApiPublicHandheldParcelsIdRoute,
     ApiPublicHandheldParcelsCountsRoute: ApiPublicHandheldParcelsCountsRoute,
   }
 
