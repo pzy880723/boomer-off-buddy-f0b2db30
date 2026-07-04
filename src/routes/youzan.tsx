@@ -17,6 +17,7 @@ import {
   Package,
   Boxes,
   Sparkles,
+  Radio,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ShopHealthPanel } from "@/components/youzan/shop-health-panel";
 import { ApiHealthPanel } from "@/components/youzan/api-health-panel";
 import { SyncCenterPanel } from "@/components/youzan/sync-center-panel";
+import { MessagePushPanel } from "@/components/youzan/message-push-panel";
 import { PageHeader } from "@/components/page-header";
 import { DataTable } from "@/components/data-table";
 import { StatusBadge } from "@/components/status-badge";
@@ -327,6 +329,10 @@ function YouzanPage() {
               <Activity className="mr-1.5 h-3.5 w-3.5" />
               同步明细
             </TabsTrigger>
+            <TabsTrigger value="realtime">
+              <Radio className="mr-1.5 h-3.5 w-3.5" />
+              实时同步
+            </TabsTrigger>
             <TabsTrigger value="sync">
               <Sparkles className="mr-1.5 h-3.5 w-3.5" />
               数据同步
@@ -417,6 +423,10 @@ function YouzanPage() {
             </Card>
           </TabsContent>
 
+
+          <TabsContent value="realtime" className="mt-3">
+            <MessagePushPanel />
+          </TabsContent>
 
           <TabsContent value="sync" className="mt-3">
             <SyncCenterPanel />
