@@ -634,6 +634,7 @@ async function runStockSyncWorkerCore(opts: {
         link = refetch.data;
         if (!link) throw new Error("自动上架成功但 link 记录丢失");
       }
+      if (!link) throw new Error("SKU 未绑定该门店的有赞商品");
 
       // v2：HQ 主 SPU 不推库存，直接标 done 跳过
       if ((link as { sync_stock?: boolean }).sync_stock === false) {
