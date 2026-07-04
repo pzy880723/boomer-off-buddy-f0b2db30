@@ -34,6 +34,7 @@ import * as z from "zod";
 export const HandheldErrorCode = z.enum([
   "unauthorized",
   "unauthorized_location",
+  "unauthorized_role",
   "invalid_body",
   "validation_error",
   "not_found",
@@ -1103,3 +1104,133 @@ export const LabelTemplateSetDefaultRes = okEnvelope(
 
 
 
+
+// ============================================================
+// 日本小包（v1.6，仅 super_admin 可用；只读）
+// ============================================================
+
+/**
+ * APP 端「日本小包」磁贴专用只读接口。
+ * 门槛：X-Session-Token 对应用户具有 `super_admin` 角色；否则 403 `unauthorized_role`。
+ * 五档状态：purchased / at_jp_warehouse / shipping_intl / delivered / completed
+ */
+export const ParcelStatusEnum = z
+  .enum(["purchased", "at_jp_warehouse", "shipping_intl", "delivered", "completed"])
+  .meta({ description: "五档状态；APP 用同一顺序渲染状态条" });
+
+export const ParcelBucketQuery = z
+  .enum(["pending", "received"])
+  .meta({ description: "pending=待收货三档；received=已签收两档" });
+
+export const ParcelListQuery = z
+  .object({
+    bucket: ParcelBucketQuery.default("pending"),
+    q: z.string().trim().max(200).optional().meta({ description: "关键词（单号 / 品名 / 追踪号）" }),
+    limit: z.coerce.number().int().min(1).max(50).default(30),
+    offset: z.coerce.number().int().min(0).default(0),
+  })
+  .meta({ id: "ParcelListQuery" });
+
+export const ParcelListItem = z
+  .object({
+    id: uuidSchema,
+    system_code: z.string().nullable(),
+    source_order_no: z.string().nullable(),
+    tracking_no: z.string().nullable(),
+    status: ParcelStatusEnum,
+    is_problem: z.boolean(),
+    intl_pay_at: z.string().nullable().meta({ description: "国际付款时间；列表排序依据" }),
+    received_at: z.string().nullable(),
+    created_at: z.string(),
+    first_item_name: z.string().nullable(),
+    item_image_url: z.string().nullable().meta({ description: "首图；缩略图请在 APP 端加参数" }),
+    item_count: z.number().int(),
+    total_qty: z.number().int(),
+    total_cny: z.number().nullable().meta({ description: "包裹合计人民币（含运费+关税）" }),
+    avg_unit_cny: z.number().nullable(),
+  })
+  .meta({ id: "ParcelListItem" });
+
+export const ParcelListRes = okEnvelope(
+  z.object({
+    rows: z.array(ParcelListItem),
+    has_more: z.boolean(),
+    next_offset: z.number().int(),
+  }),
+);
+
+export const ParcelCountsRes = okEnvelope(
+  z.object({
+    pending: z.number().int().meta({ description: "待收货包裹数（purchased/at_jp_warehouse/shipping_intl）" }),
+    received: z.number().int().meta({ description: "已签收包裹数（delivered/completed）" }),
+  }),
+);
+
+const ParcelDetailItem = z
+  .object({
+    id: uuidSchema,
+    position: z.number().int().nullable(),
+    system_code: z.string().nullable(),
+    sub_order_no: z.string().nullable(),
+    item_title: z.string().nullable(),
+    item_title_cn: z.string().nullable(),
+    item_image_url: z.string().nullable(),
+    quantity: z.number().int().nullable(),
+    unit_price_jpy: z.number().nullable(),
+    item_total_jpy: z.number().nullable(),
+    weight_g: z.number().nullable(),
+    tariff_rate: z.number().nullable(),
+    tariff_category: z.string().nullable(),
+    pay_at: z.string().nullable(),
+    pay_method: z.string().nullable(),
+    notes: z.string().nullable(),
+    pack_pieces: z.number().int().nullable().meta({ description: ">0 表示组包，APP 才显示「单件价」" }),
+    pack_pieces_source: z.string().nullable(),
+    pack_unit_note: z.string().nullable(),
+    landed: z
+      .object({
+        item_jpy: z.number(),
+        freight_share_jpy: z.number(),
+        item_cny: z.number().nullable(),
+        freight_share_cny: z.number().nullable(),
+        tariff_cny: z.number().nullable(),
+        landed_cny: z.number().nullable().meta({ description: "到岸总额（拆包前）" }),
+        unit_price_cny: z.number().nullable().meta({ description: "到岸单价 = landed_cny / quantity" }),
+        piece_price_jpy: z.number().nullable().meta({ description: "组包每小件 JPY；非组包为 null" }),
+        piece_price_cny: z.number().nullable().meta({ description: "组包每小件 CNY；非组包为 null" }),
+      })
+      .meta({ description: "服务端已算好的拆包成本；APP 直接展示" }),
+  })
+  .meta({ id: "ParcelDetailItem" });
+
+export const ParcelDetailRes = okEnvelope(
+  z.object({
+    parcel: z.object({
+      id: uuidSchema,
+      system_code: z.string().nullable(),
+      source_order_no: z.string().nullable(),
+      tracking_no: z.string().nullable(),
+      status: ParcelStatusEnum,
+      is_problem: z.boolean(),
+      receiver_name: z.string().nullable(),
+      receiver_address: z.string().nullable(),
+      total_weight_g: z.number().nullable(),
+      intl_pay_at: z.string().nullable(),
+      received_at: z.string().nullable(),
+      notes: z.string().nullable(),
+      created_at: z.string(),
+      status_timeline: z.array(z.any()).default([]),
+    }),
+    totals: z.object({
+      items_jpy: z.number(),
+      items_cny: z.number().nullable(),
+      intl_total_jpy: z.number().nullable(),
+      intl_total_cny: z.number().nullable(),
+      tariff_jpy: z.number(),
+      tariff_cny: z.number().nullable(),
+      fx_rate: z.number().nullable().meta({ description: "1 JPY 对应的 CNY" }),
+      total_cny: z.number().nullable().meta({ description: "拆包前包裹合计人民币（大字展示）" }),
+    }),
+    items: z.array(ParcelDetailItem),
+  }),
+);

@@ -78,6 +78,10 @@ import {
   SignReadUrlRes,
   UploadImageReq,
   UploadImageRes,
+  ParcelListQuery,
+  ParcelListRes,
+  ParcelCountsRes,
+  ParcelDetailRes,
 } from "./schemas";
 
 
@@ -105,7 +109,7 @@ const document: ZodOpenApiObject = {
   openapi: "3.1.0",
   info: {
     title: "Boomer Off — 手持终端 API",
-    version: "1.4.0",
+    version: "1.6.0",
     description: `
 所有接口都在 \`/api/public/handheld/*\` 前缀下（**绕过站点登录**）。
 
@@ -176,6 +180,7 @@ Token 由后台 **仓库管理 → 手持终端** 页面创建/复制。设备�
     { name: "RFID", description: "EPC 单点操作（v1.1+）" },
     { name: "通知", description: "APP 主动轮询的事件（v1.2+）" },
     { name: "诊断", description: "APP 上报 crash / 网络错误 / 设备状态（v1.2+）" },
+    { name: "日本小包", description: "只读；仅 super_admin 可用（v1.6+）" },
   ],
 
   paths: {
@@ -585,6 +590,34 @@ Token 由后台 **仓库管理 → 手持终端** 页面创建/复制。设备�
         summary: "把某个模板设为默认（HQ）",
         requestParams: { path: z.object({ id: z.string().uuid() }) },
         responses: { "200": jsonRes("OK", LabelTemplateSetDefaultRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/parcels": {
+      get: {
+        tags: ["日本小包"],
+        summary: "日本小包列表（super_admin 独占，v1.6）",
+        description:
+          "只读。bucket=pending 返回三档进行中，bucket=received 返回两档已签收。按 intl_pay_at desc, created_at desc 排序。非 super_admin 返回 403 `unauthorized_role`。",
+        requestParams: { query: ParcelListQuery },
+        responses: { "200": jsonRes("OK", ParcelListRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/parcels/counts": {
+      get: {
+        tags: ["日本小包"],
+        summary: "包裹 Tab 徽标数字（v1.6）",
+        description: "同一 super_admin 门槛。返回 pending / received 两个整数。",
+        responses: { "200": jsonRes("OK", ParcelCountsRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/parcels/{id}": {
+      get: {
+        tags: ["日本小包"],
+        summary: "包裹详情 + 拆包成本（v1.6）",
+        description:
+          "服务端已按重量分摊国际运费 + 关税，返回 items[].landed 里的到岸单价 / 拆包单件价 / 小计。APP 直接展示。",
+        requestParams: { path: z.object({ id: z.string().uuid() }) },
+        responses: { "200": jsonRes("OK", ParcelDetailRes), ...ERROR_RESPONSES },
       },
     },
   },

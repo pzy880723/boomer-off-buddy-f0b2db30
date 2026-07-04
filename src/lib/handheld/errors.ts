@@ -12,6 +12,7 @@ import { json } from "@/server/handheld-auth.server";
 export const HANDHELD_ERROR_CODES = {
   unauthorized: { status: 401, message: "Missing or invalid token" },
   unauthorized_location: { status: 401, message: "Session location mismatch" },
+  unauthorized_role: { status: 403, message: "Required role not granted" },
   invalid_body: { status: 400, message: "Invalid request body" },
   validation_error: { status: 422, message: "Validation failed" },
   not_found: { status: 404, message: "Resource not found" },

@@ -89,6 +89,7 @@ import { Route as ApiPublicHandheldTransfersRouteImport } from './routes/api/pub
 import { Route as ApiPublicHandheldSyncRecordsRouteImport } from './routes/api/public/handheld/sync-records'
 import { Route as ApiPublicHandheldStocktakesRouteImport } from './routes/api/public/handheld/stocktakes'
 import { Route as ApiPublicHandheldProductsRouteImport } from './routes/api/public/handheld/products'
+import { Route as ApiPublicHandheldParcelsRouteImport } from './routes/api/public/handheld/parcels'
 import { Route as ApiPublicHandheldOpenapiDotjsonRouteImport } from './routes/api/public/handheld/openapi[.]json'
 import { Route as ApiPublicHandheldNotificationsRouteImport } from './routes/api/public/handheld/notifications'
 import { Route as ApiPublicHandheldLocationsRouteImport } from './routes/api/public/handheld/locations'
@@ -111,6 +112,8 @@ import { Route as ApiPublicHandheldRfidBindItemRouteImport } from './routes/api/
 import { Route as ApiPublicHandheldRfidBatchStockInRouteImport } from './routes/api/public/handheld/rfid.batch-stock-in'
 import { Route as ApiPublicHandheldRfidEpcRouteImport } from './routes/api/public/handheld/rfid.$epc'
 import { Route as ApiPublicHandheldProductsLookupRouteImport } from './routes/api/public/handheld/products.lookup'
+import { Route as ApiPublicHandheldParcelsCountsRouteImport } from './routes/api/public/handheld/parcels.counts'
+import { Route as ApiPublicHandheldParcelsIdRouteImport } from './routes/api/public/handheld/parcels.$id'
 import { Route as ApiPublicHandheldNotificationsSinceRouteImport } from './routes/api/public/handheld/notifications.since'
 import { Route as ApiPublicHandheldNotificationsReadAllRouteImport } from './routes/api/public/handheld/notifications.read-all'
 import { Route as ApiPublicHandheldLocationSwitchRouteImport } from './routes/api/public/handheld/location.switch'
@@ -553,6 +556,12 @@ const ApiPublicHandheldProductsRoute =
     path: '/api/public/handheld/products',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHandheldParcelsRoute =
+  ApiPublicHandheldParcelsRouteImport.update({
+    id: '/api/public/handheld/parcels',
+    path: '/api/public/handheld/parcels',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHandheldOpenapiDotjsonRoute =
   ApiPublicHandheldOpenapiDotjsonRouteImport.update({
     id: '/api/public/handheld/openapi.json',
@@ -684,6 +693,18 @@ const ApiPublicHandheldProductsLookupRoute =
     id: '/lookup',
     path: '/lookup',
     getParentRoute: () => ApiPublicHandheldProductsRoute,
+  } as any)
+const ApiPublicHandheldParcelsCountsRoute =
+  ApiPublicHandheldParcelsCountsRouteImport.update({
+    id: '/counts',
+    path: '/counts',
+    getParentRoute: () => ApiPublicHandheldParcelsRoute,
+  } as any)
+const ApiPublicHandheldParcelsIdRoute =
+  ApiPublicHandheldParcelsIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => ApiPublicHandheldParcelsRoute,
   } as any)
 const ApiPublicHandheldNotificationsSinceRoute =
   ApiPublicHandheldNotificationsSinceRouteImport.update({
@@ -923,6 +944,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/locations': typeof ApiPublicHandheldLocationsRoute
   '/api/public/handheld/notifications': typeof ApiPublicHandheldNotificationsRouteWithChildren
   '/api/public/handheld/openapi.json': typeof ApiPublicHandheldOpenapiDotjsonRoute
+  '/api/public/handheld/parcels': typeof ApiPublicHandheldParcelsRouteWithChildren
   '/api/public/handheld/products': typeof ApiPublicHandheldProductsRouteWithChildren
   '/api/public/handheld/stocktakes': typeof ApiPublicHandheldStocktakesRoute
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
@@ -953,6 +975,8 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/location/switch': typeof ApiPublicHandheldLocationSwitchRoute
   '/api/public/handheld/notifications/read-all': typeof ApiPublicHandheldNotificationsReadAllRoute
   '/api/public/handheld/notifications/since': typeof ApiPublicHandheldNotificationsSinceRoute
+  '/api/public/handheld/parcels/$id': typeof ApiPublicHandheldParcelsIdRoute
+  '/api/public/handheld/parcels/counts': typeof ApiPublicHandheldParcelsCountsRoute
   '/api/public/handheld/products/lookup': typeof ApiPublicHandheldProductsLookupRoute
   '/api/public/handheld/rfid/$epc': typeof ApiPublicHandheldRfidEpcRoute
   '/api/public/handheld/rfid/batch-stock-in': typeof ApiPublicHandheldRfidBatchStockInRoute
@@ -1047,6 +1071,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/locations': typeof ApiPublicHandheldLocationsRoute
   '/api/public/handheld/notifications': typeof ApiPublicHandheldNotificationsRouteWithChildren
   '/api/public/handheld/openapi.json': typeof ApiPublicHandheldOpenapiDotjsonRoute
+  '/api/public/handheld/parcels': typeof ApiPublicHandheldParcelsRouteWithChildren
   '/api/public/handheld/products': typeof ApiPublicHandheldProductsRouteWithChildren
   '/api/public/handheld/stocktakes': typeof ApiPublicHandheldStocktakesRoute
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
@@ -1077,6 +1102,8 @@ export interface FileRoutesByTo {
   '/api/public/handheld/location/switch': typeof ApiPublicHandheldLocationSwitchRoute
   '/api/public/handheld/notifications/read-all': typeof ApiPublicHandheldNotificationsReadAllRoute
   '/api/public/handheld/notifications/since': typeof ApiPublicHandheldNotificationsSinceRoute
+  '/api/public/handheld/parcels/$id': typeof ApiPublicHandheldParcelsIdRoute
+  '/api/public/handheld/parcels/counts': typeof ApiPublicHandheldParcelsCountsRoute
   '/api/public/handheld/products/lookup': typeof ApiPublicHandheldProductsLookupRoute
   '/api/public/handheld/rfid/$epc': typeof ApiPublicHandheldRfidEpcRoute
   '/api/public/handheld/rfid/batch-stock-in': typeof ApiPublicHandheldRfidBatchStockInRoute
@@ -1179,6 +1206,7 @@ export interface FileRoutesById {
   '/api/public/handheld/locations': typeof ApiPublicHandheldLocationsRoute
   '/api/public/handheld/notifications': typeof ApiPublicHandheldNotificationsRouteWithChildren
   '/api/public/handheld/openapi.json': typeof ApiPublicHandheldOpenapiDotjsonRoute
+  '/api/public/handheld/parcels': typeof ApiPublicHandheldParcelsRouteWithChildren
   '/api/public/handheld/products': typeof ApiPublicHandheldProductsRouteWithChildren
   '/api/public/handheld/stocktakes': typeof ApiPublicHandheldStocktakesRoute
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
@@ -1209,6 +1237,8 @@ export interface FileRoutesById {
   '/api/public/handheld/location/switch': typeof ApiPublicHandheldLocationSwitchRoute
   '/api/public/handheld/notifications/read-all': typeof ApiPublicHandheldNotificationsReadAllRoute
   '/api/public/handheld/notifications/since': typeof ApiPublicHandheldNotificationsSinceRoute
+  '/api/public/handheld/parcels/$id': typeof ApiPublicHandheldParcelsIdRoute
+  '/api/public/handheld/parcels/counts': typeof ApiPublicHandheldParcelsCountsRoute
   '/api/public/handheld/products/lookup': typeof ApiPublicHandheldProductsLookupRoute
   '/api/public/handheld/rfid/$epc': typeof ApiPublicHandheldRfidEpcRoute
   '/api/public/handheld/rfid/batch-stock-in': typeof ApiPublicHandheldRfidBatchStockInRoute
@@ -1312,6 +1342,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/locations'
     | '/api/public/handheld/notifications'
     | '/api/public/handheld/openapi.json'
+    | '/api/public/handheld/parcels'
     | '/api/public/handheld/products'
     | '/api/public/handheld/stocktakes'
     | '/api/public/handheld/sync-records'
@@ -1342,6 +1373,8 @@ export interface FileRouteTypes {
     | '/api/public/handheld/location/switch'
     | '/api/public/handheld/notifications/read-all'
     | '/api/public/handheld/notifications/since'
+    | '/api/public/handheld/parcels/$id'
+    | '/api/public/handheld/parcels/counts'
     | '/api/public/handheld/products/lookup'
     | '/api/public/handheld/rfid/$epc'
     | '/api/public/handheld/rfid/batch-stock-in'
@@ -1436,6 +1469,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/locations'
     | '/api/public/handheld/notifications'
     | '/api/public/handheld/openapi.json'
+    | '/api/public/handheld/parcels'
     | '/api/public/handheld/products'
     | '/api/public/handheld/stocktakes'
     | '/api/public/handheld/sync-records'
@@ -1466,6 +1500,8 @@ export interface FileRouteTypes {
     | '/api/public/handheld/location/switch'
     | '/api/public/handheld/notifications/read-all'
     | '/api/public/handheld/notifications/since'
+    | '/api/public/handheld/parcels/$id'
+    | '/api/public/handheld/parcels/counts'
     | '/api/public/handheld/products/lookup'
     | '/api/public/handheld/rfid/$epc'
     | '/api/public/handheld/rfid/batch-stock-in'
@@ -1567,6 +1603,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/locations'
     | '/api/public/handheld/notifications'
     | '/api/public/handheld/openapi.json'
+    | '/api/public/handheld/parcels'
     | '/api/public/handheld/products'
     | '/api/public/handheld/stocktakes'
     | '/api/public/handheld/sync-records'
@@ -1597,6 +1634,8 @@ export interface FileRouteTypes {
     | '/api/public/handheld/location/switch'
     | '/api/public/handheld/notifications/read-all'
     | '/api/public/handheld/notifications/since'
+    | '/api/public/handheld/parcels/$id'
+    | '/api/public/handheld/parcels/counts'
     | '/api/public/handheld/products/lookup'
     | '/api/public/handheld/rfid/$epc'
     | '/api/public/handheld/rfid/batch-stock-in'
@@ -1660,6 +1699,7 @@ export interface RootRouteChildren {
   ApiPublicHandheldLocationsRoute: typeof ApiPublicHandheldLocationsRoute
   ApiPublicHandheldNotificationsRoute: typeof ApiPublicHandheldNotificationsRouteWithChildren
   ApiPublicHandheldOpenapiDotjsonRoute: typeof ApiPublicHandheldOpenapiDotjsonRoute
+  ApiPublicHandheldParcelsRoute: typeof ApiPublicHandheldParcelsRouteWithChildren
   ApiPublicHandheldProductsRoute: typeof ApiPublicHandheldProductsRouteWithChildren
   ApiPublicHandheldStocktakesRoute: typeof ApiPublicHandheldStocktakesRoute
   ApiPublicHandheldSyncRecordsRoute: typeof ApiPublicHandheldSyncRecordsRoute
@@ -2265,6 +2305,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldProductsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/handheld/parcels': {
+      id: '/api/public/handheld/parcels'
+      path: '/api/public/handheld/parcels'
+      fullPath: '/api/public/handheld/parcels'
+      preLoaderRoute: typeof ApiPublicHandheldParcelsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/handheld/openapi.json': {
       id: '/api/public/handheld/openapi.json'
       path: '/api/public/handheld/openapi.json'
@@ -2418,6 +2465,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/public/handheld/products/lookup'
       preLoaderRoute: typeof ApiPublicHandheldProductsLookupRouteImport
       parentRoute: typeof ApiPublicHandheldProductsRoute
+    }
+    '/api/public/handheld/parcels/counts': {
+      id: '/api/public/handheld/parcels/counts'
+      path: '/counts'
+      fullPath: '/api/public/handheld/parcels/counts'
+      preLoaderRoute: typeof ApiPublicHandheldParcelsCountsRouteImport
+      parentRoute: typeof ApiPublicHandheldParcelsRoute
+    }
+    '/api/public/handheld/parcels/$id': {
+      id: '/api/public/handheld/parcels/$id'
+      path: '/$id'
+      fullPath: '/api/public/handheld/parcels/$id'
+      preLoaderRoute: typeof ApiPublicHandheldParcelsIdRouteImport
+      parentRoute: typeof ApiPublicHandheldParcelsRoute
     }
     '/api/public/handheld/notifications/since': {
       id: '/api/public/handheld/notifications/since'
@@ -2836,6 +2897,22 @@ const ApiPublicHandheldNotificationsRouteWithChildren =
     ApiPublicHandheldNotificationsRouteChildren,
   )
 
+interface ApiPublicHandheldParcelsRouteChildren {
+  ApiPublicHandheldParcelsIdRoute: typeof ApiPublicHandheldParcelsIdRoute
+  ApiPublicHandheldParcelsCountsRoute: typeof ApiPublicHandheldParcelsCountsRoute
+}
+
+const ApiPublicHandheldParcelsRouteChildren: ApiPublicHandheldParcelsRouteChildren =
+  {
+    ApiPublicHandheldParcelsIdRoute: ApiPublicHandheldParcelsIdRoute,
+    ApiPublicHandheldParcelsCountsRoute: ApiPublicHandheldParcelsCountsRoute,
+  }
+
+const ApiPublicHandheldParcelsRouteWithChildren =
+  ApiPublicHandheldParcelsRoute._addFileChildren(
+    ApiPublicHandheldParcelsRouteChildren,
+  )
+
 interface ApiPublicHandheldProductsRouteChildren {
   ApiPublicHandheldProductsLookupRoute: typeof ApiPublicHandheldProductsLookupRoute
 }
@@ -2957,6 +3034,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHandheldNotificationsRoute:
     ApiPublicHandheldNotificationsRouteWithChildren,
   ApiPublicHandheldOpenapiDotjsonRoute: ApiPublicHandheldOpenapiDotjsonRoute,
+  ApiPublicHandheldParcelsRoute: ApiPublicHandheldParcelsRouteWithChildren,
   ApiPublicHandheldProductsRoute: ApiPublicHandheldProductsRouteWithChildren,
   ApiPublicHandheldStocktakesRoute: ApiPublicHandheldStocktakesRoute,
   ApiPublicHandheldSyncRecordsRoute: ApiPublicHandheldSyncRecordsRoute,
