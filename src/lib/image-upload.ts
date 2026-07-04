@@ -119,15 +119,40 @@ export async function uploadParcelImage(
 /** 上传商品 SKU 图片（复用 parcel-item-images 公共桶的 skus/ 子目录） */
 export async function uploadSkuImage(file: File | Blob): Promise<string> {
   const BUCKET = "parcel-item-images";
+  const t0 = performance.now();
+  const originalSize = (file as File).size ?? 0;
   const { blob, ext, mime } = await compressImage(file, (file as File).name);
-  const path = `skus/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
-  const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
-    cacheControl: "3600",
-    upsert: false,
-    contentType: mime,
-  });
-  if (error) throw new Error(error.message);
-  return supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+  const t1 = performance.now();
+
+  let lastErr: unknown = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const path = `skus/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
+    try {
+      const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType: mime,
+      });
+      if (error) throw new Error(error.message);
+      const t2 = performance.now();
+      console.debug(
+        "[sku-img] compress=%dms upload=%dms size=%dKB→%dKB attempt=%d",
+        Math.round(t1 - t0),
+        Math.round(t2 - t1),
+        Math.round(originalSize / 1024),
+        Math.round(blob.size / 1024),
+        attempt + 1,
+      );
+      return supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+    } catch (e) {
+      lastErr = e;
+      const msg = (e as Error).message || "";
+      // 仅对网络/超时类错误自动重试
+      if (!/fetch|network|timeout|abort|load failed/i.test(msg)) break;
+      await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+    }
+  }
+  throw new Error((lastErr as Error)?.message || "上传失败");
 }
 
 /** 把 Blob 转 base64（不含 data: 前缀），AI 拍照识图用 */
