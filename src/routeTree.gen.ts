@@ -89,6 +89,7 @@ import { Route as ApiPublicHandheldTransfersRouteImport } from './routes/api/pub
 import { Route as ApiPublicHandheldSyncRecordsRouteImport } from './routes/api/public/handheld/sync-records'
 import { Route as ApiPublicHandheldStocktakesRouteImport } from './routes/api/public/handheld/stocktakes'
 import { Route as ApiPublicHandheldProductsRouteImport } from './routes/api/public/handheld/products'
+import { Route as ApiPublicHandheldParcelsRouteImport } from './routes/api/public/handheld/parcels'
 import { Route as ApiPublicHandheldOpenapiDotjsonRouteImport } from './routes/api/public/handheld/openapi[.]json'
 import { Route as ApiPublicHandheldNotificationsRouteImport } from './routes/api/public/handheld/notifications'
 import { Route as ApiPublicHandheldLocationsRouteImport } from './routes/api/public/handheld/locations'
@@ -553,6 +554,12 @@ const ApiPublicHandheldProductsRoute =
     path: '/api/public/handheld/products',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHandheldParcelsRoute =
+  ApiPublicHandheldParcelsRouteImport.update({
+    id: '/api/public/handheld/parcels',
+    path: '/api/public/handheld/parcels',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHandheldOpenapiDotjsonRoute =
   ApiPublicHandheldOpenapiDotjsonRouteImport.update({
     id: '/api/public/handheld/openapi.json',
@@ -923,6 +930,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/locations': typeof ApiPublicHandheldLocationsRoute
   '/api/public/handheld/notifications': typeof ApiPublicHandheldNotificationsRouteWithChildren
   '/api/public/handheld/openapi.json': typeof ApiPublicHandheldOpenapiDotjsonRoute
+  '/api/public/handheld/parcels': typeof ApiPublicHandheldParcelsRoute
   '/api/public/handheld/products': typeof ApiPublicHandheldProductsRouteWithChildren
   '/api/public/handheld/stocktakes': typeof ApiPublicHandheldStocktakesRoute
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
@@ -1047,6 +1055,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/locations': typeof ApiPublicHandheldLocationsRoute
   '/api/public/handheld/notifications': typeof ApiPublicHandheldNotificationsRouteWithChildren
   '/api/public/handheld/openapi.json': typeof ApiPublicHandheldOpenapiDotjsonRoute
+  '/api/public/handheld/parcels': typeof ApiPublicHandheldParcelsRoute
   '/api/public/handheld/products': typeof ApiPublicHandheldProductsRouteWithChildren
   '/api/public/handheld/stocktakes': typeof ApiPublicHandheldStocktakesRoute
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
@@ -1179,6 +1188,7 @@ export interface FileRoutesById {
   '/api/public/handheld/locations': typeof ApiPublicHandheldLocationsRoute
   '/api/public/handheld/notifications': typeof ApiPublicHandheldNotificationsRouteWithChildren
   '/api/public/handheld/openapi.json': typeof ApiPublicHandheldOpenapiDotjsonRoute
+  '/api/public/handheld/parcels': typeof ApiPublicHandheldParcelsRoute
   '/api/public/handheld/products': typeof ApiPublicHandheldProductsRouteWithChildren
   '/api/public/handheld/stocktakes': typeof ApiPublicHandheldStocktakesRoute
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
@@ -1312,6 +1322,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/locations'
     | '/api/public/handheld/notifications'
     | '/api/public/handheld/openapi.json'
+    | '/api/public/handheld/parcels'
     | '/api/public/handheld/products'
     | '/api/public/handheld/stocktakes'
     | '/api/public/handheld/sync-records'
@@ -1436,6 +1447,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/locations'
     | '/api/public/handheld/notifications'
     | '/api/public/handheld/openapi.json'
+    | '/api/public/handheld/parcels'
     | '/api/public/handheld/products'
     | '/api/public/handheld/stocktakes'
     | '/api/public/handheld/sync-records'
@@ -1567,6 +1579,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/locations'
     | '/api/public/handheld/notifications'
     | '/api/public/handheld/openapi.json'
+    | '/api/public/handheld/parcels'
     | '/api/public/handheld/products'
     | '/api/public/handheld/stocktakes'
     | '/api/public/handheld/sync-records'
@@ -1660,6 +1673,7 @@ export interface RootRouteChildren {
   ApiPublicHandheldLocationsRoute: typeof ApiPublicHandheldLocationsRoute
   ApiPublicHandheldNotificationsRoute: typeof ApiPublicHandheldNotificationsRouteWithChildren
   ApiPublicHandheldOpenapiDotjsonRoute: typeof ApiPublicHandheldOpenapiDotjsonRoute
+  ApiPublicHandheldParcelsRoute: typeof ApiPublicHandheldParcelsRoute
   ApiPublicHandheldProductsRoute: typeof ApiPublicHandheldProductsRouteWithChildren
   ApiPublicHandheldStocktakesRoute: typeof ApiPublicHandheldStocktakesRoute
   ApiPublicHandheldSyncRecordsRoute: typeof ApiPublicHandheldSyncRecordsRoute
@@ -2263,6 +2277,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/handheld/products'
       fullPath: '/api/public/handheld/products'
       preLoaderRoute: typeof ApiPublicHandheldProductsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/parcels': {
+      id: '/api/public/handheld/parcels'
+      path: '/api/public/handheld/parcels'
+      fullPath: '/api/public/handheld/parcels'
+      preLoaderRoute: typeof ApiPublicHandheldParcelsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/handheld/openapi.json': {
@@ -2957,6 +2978,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHandheldNotificationsRoute:
     ApiPublicHandheldNotificationsRouteWithChildren,
   ApiPublicHandheldOpenapiDotjsonRoute: ApiPublicHandheldOpenapiDotjsonRoute,
+  ApiPublicHandheldParcelsRoute: ApiPublicHandheldParcelsRoute,
   ApiPublicHandheldProductsRoute: ApiPublicHandheldProductsRouteWithChildren,
   ApiPublicHandheldStocktakesRoute: ApiPublicHandheldStocktakesRoute,
   ApiPublicHandheldSyncRecordsRoute: ApiPublicHandheldSyncRecordsRoute,
