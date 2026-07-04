@@ -614,8 +614,27 @@ async function runStockSyncWorkerCore(opts: {
         .select("*")
         .eq("sku_id", t.sku_id);
       if (t.shop_id) linkQuery = linkQuery.eq("shop_id", t.shop_id);
-      const { data: link } = await linkQuery.maybeSingle();
-      if (!link) throw new Error("SKU 未绑定该门店的有赞商品（可能已解绑）");
+      let { data: link } = await linkQuery.maybeSingle();
+
+      // 自愈：没有 link 或 link 处于 error/未拿到 item_id → 尝试上架
+      const needsListing =
+        !link ||
+        !(link as { yz_item_id?: number }).yz_item_id ||
+        Number((link as { yz_item_id?: number }).yz_item_id ?? 0) <= 0;
+      if (needsListing) {
+        if (!t.shop_id) throw new Error("队列缺少 shop_id，无法自动上架");
+        const r = await ensureBranchListing(t.sku_id, t.shop_id);
+        if (!r.yz_item_id) throw new Error(r.error ?? "自动上架失败");
+        const refetch = await supabase
+          .from("sku_youzan_links")
+          .select("*")
+          .eq("sku_id", t.sku_id)
+          .eq("shop_id", t.shop_id)
+          .maybeSingle();
+        link = refetch.data;
+        if (!link) throw new Error("自动上架成功但 link 记录丢失");
+      }
+      if (!link) throw new Error("SKU 未绑定该门店的有赞商品");
 
       // v2：HQ 主 SPU 不推库存，直接标 done 跳过
       if ((link as { sync_stock?: boolean }).sync_stock === false) {
@@ -658,7 +677,7 @@ async function runStockSyncWorkerCore(opts: {
           status: "linked",
           last_error: null,
         } as never)
-        .eq("id", link.id);
+        .eq("id", (link as { id: string }).id);
       ok += 1;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -706,6 +725,107 @@ export const runStockSyncWorker = createServerFn({ method: "POST" })
 // 给公共路由用的不带 auth 版本
 export async function runStockSyncWorkerForCron() {
   return runStockSyncWorkerCore({ limit: 50 });
+}
+
+// ============================================================
+// ensureBranchListing —— 门店首次有库存时自动 youzan.item.add + upsert link
+// worker 和 shop-products 共用
+// ============================================================
+export async function ensureBranchListing(
+  sku_id: string,
+  shop_id: string,
+): Promise<{ yz_item_id: number | null; created: boolean; error?: string }> {
+  const { data: existed } = await supabase
+    .from("sku_youzan_links")
+    .select("yz_item_id, status")
+    .eq("sku_id", sku_id)
+    .eq("shop_id", shop_id)
+    .maybeSingle();
+  if (existed?.yz_item_id && Number(existed.yz_item_id) > 0) {
+    return { yz_item_id: Number(existed.yz_item_id), created: false };
+  }
+
+  const { data: sku } = await supabase
+    .from("inv_skus")
+    .select("id, name, price_tier, image_url, notes, stock_qty")
+    .eq("id", sku_id)
+    .maybeSingle();
+  if (!sku) return { yz_item_id: null, created: false, error: "SKU 不存在" };
+
+  const { data: shop } = await supabase
+    .from("youzan_shops")
+    .select("*")
+    .eq("id", shop_id)
+    .maybeSingle();
+  if (!shop) return { yz_item_id: null, created: false, error: "门店不存在" };
+
+  try {
+    const token = await ensureAccessToken(shop as never);
+    const params: Record<string, unknown> = {
+      title: sku.name,
+      price: Number(sku.price_tier),
+      num: Number(sku.stock_qty ?? 0),
+      desc: sku.notes ?? sku.name,
+      is_display: 1,
+      is_listing: 1,
+      auto_listing_time: 0,
+      out_product_id: sku.id,
+    };
+    if (sku.image_url) params.item_imgs = sku.image_url;
+
+    const res = await callYouzanApiVerbose({
+      accessToken: token,
+      method: "youzan.item.add",
+      version: "3.0.0",
+      params,
+      timeoutMs: 25_000,
+    });
+    const payload = res.payload as Record<string, unknown>;
+    const rawItemId = payload.item_id ?? payload.num_iid ?? payload.id;
+    const itemId = Number(rawItemId ?? 0);
+    if (!itemId) {
+      throw new Error(`有赞未返回 item_id：${res.preview.slice(0, 160)}`);
+    }
+    await supabase.from("sku_youzan_links").upsert(
+      {
+        sku_id,
+        shop_id,
+        yz_item_id: itemId,
+        status: "linked",
+        sync_stock: true,
+        role: "branch_stock",
+        last_error: null,
+      } as never,
+      { onConflict: "sku_id,shop_id" },
+    );
+    return { yz_item_id: itemId, created: true };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    await supabase.from("sku_youzan_links").upsert(
+      {
+        sku_id,
+        shop_id,
+        yz_item_id: 0,
+        status: "error",
+        sync_stock: false,
+        role: "branch_stock",
+        last_error: msg.slice(0, 400),
+      } as never,
+      { onConflict: "sku_id,shop_id" },
+    );
+    return { yz_item_id: null, created: false, error: msg };
+  }
+}
+
+// ============================================================
+// triggerStockWorker —— 服务端 fire-and-forget，异步跑一次 worker（不阻塞响应）
+// 手持机端点、shop-products、hooks 都可以调
+// ============================================================
+export function triggerStockWorker(opts: { sku_ids?: string[]; limit?: number } = {}) {
+  void runStockSyncWorkerCore({
+    sku_ids: opts.sku_ids,
+    limit: opts.limit ?? 5,
+  }).catch(() => undefined);
 }
 
 // ============================================================

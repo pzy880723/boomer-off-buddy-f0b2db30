@@ -193,12 +193,13 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
         } as never);
         if (mv.error) return err(`Stock movement failed: ${mv.error.message}`, 500);
 
-        // Youzan sync queue
+        // Youzan sync
+        // - HQ SPU：注册总部主 SPU（幂等）
+        // - 门店库存：DB 触发器已根据 movement 自动登记 push_stock 任务，此处只 fire-and-forget 触发一次 worker
         let syncStatus: "disabled" | "queued" | "linked" | "unlinked" | "hq_created" | "hq_failed" = "disabled";
         let hqYzItemId: number | null = null;
         let hqError: string | null = null;
         if (body.auto_push_youzan) {
-          // 新建 SKU 时：先在有赞总部注册 SPU 主数据（幂等），失败不阻塞入库
           if (!existSku) {
             try {
               const { ensureHqSpuLink } = await import("@/lib/youzan-sync.functions");
@@ -210,26 +211,15 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
               syncStatus = "hq_failed";
             }
           }
-          const { data: links } = await supabaseAdmin
-            .from("sku_youzan_links")
-            .select("id, sync_stock")
-            .eq("sku_id", skuId);
-          const stockLinks = (links ?? []).filter(
-            (l) => (l as { sync_stock?: boolean }).sync_stock !== false,
-          );
-          if (stockLinks.length > 0) {
-            const { data: skuRow } = await supabaseAdmin
-              .from("inv_skus")
-              .select("stock_qty")
-              .eq("id", skuId)
-              .maybeSingle();
-            await supabaseAdmin.from("youzan_stock_sync_queue").insert({
-              sku_id: skuId,
-              target_stock: skuRow?.stock_qty ?? 0,
-              reason: "handheld_smart_create",
-              status: "pending",
-            });
-            syncStatus = "queued";
+          // 触发一次门店库存 worker（触发器已入队，worker 会自愈上架 + 推库存）
+          if (loc.kind === "shop") {
+            try {
+              const { triggerStockWorker } = await import("@/lib/youzan-sync.functions");
+              triggerStockWorker({ sku_ids: [skuId] });
+              syncStatus = "queued";
+            } catch {
+              /* noop */
+            }
           } else if (syncStatus === "disabled") {
             syncStatus = "unlinked";
           }
