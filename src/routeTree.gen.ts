@@ -143,6 +143,7 @@ import { Route as ApiPublicHandheldItemsIdSyncStatusRouteImport } from './routes
 import { Route as ApiPublicHandheldItemsIdAttachImagesRouteImport } from './routes/api/public/handheld/items.$id.attach-images'
 import { Route as ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteImport } from './routes/api/public/handheld/parcels.items.$itemId.pack-pieces'
 import { Route as ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRouteImport } from './routes/api/public/handheld/parcels.items.$itemId.pack-pieces.estimate-title'
+import { Route as ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateImageRouteImport } from './routes/api/public/handheld/parcels.items.$itemId.pack-pieces.estimate-image'
 
 const YouzanRoute = YouzanRouteImport.update({
   id: '/youzan',
@@ -879,6 +880,12 @@ const ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRoute =
     path: '/estimate-title',
     getParentRoute: () => ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute,
   } as any)
+const ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateImageRoute =
+  ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateImageRouteImport.update({
+    id: '/estimate-image',
+    path: '/estimate-image',
+    getParentRoute: () => ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -1014,6 +1021,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/transfers/$id/confirm': typeof ApiPublicHandheldTransfersIdConfirmRoute
   '/api/public/handheld/transfers/$id/scan': typeof ApiPublicHandheldTransfersIdScanRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteWithChildren
+  '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-image': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateImageRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-title': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRoute
 }
 export interface FileRoutesByTo {
@@ -1143,6 +1151,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/transfers/$id/confirm': typeof ApiPublicHandheldTransfersIdConfirmRoute
   '/api/public/handheld/transfers/$id/scan': typeof ApiPublicHandheldTransfersIdScanRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteWithChildren
+  '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-image': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateImageRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-title': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRoute
 }
 export interface FileRoutesById {
@@ -1280,6 +1289,7 @@ export interface FileRoutesById {
   '/api/public/handheld/transfers/$id/confirm': typeof ApiPublicHandheldTransfersIdConfirmRoute
   '/api/public/handheld/transfers/$id/scan': typeof ApiPublicHandheldTransfersIdScanRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteWithChildren
+  '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-image': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateImageRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-title': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRoute
 }
 export interface FileRouteTypes {
@@ -1418,6 +1428,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/transfers/$id/confirm'
     | '/api/public/handheld/transfers/$id/scan'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces'
+    | '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-image'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-title'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -1547,6 +1558,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/transfers/$id/confirm'
     | '/api/public/handheld/transfers/$id/scan'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces'
+    | '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-image'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-title'
   id:
     | '__root__'
@@ -1683,6 +1695,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/transfers/$id/confirm'
     | '/api/public/handheld/transfers/$id/scan'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces'
+    | '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-image'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-title'
   fileRoutesById: FileRoutesById
 }
@@ -2709,6 +2722,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRouteImport
       parentRoute: typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute
     }
+    '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-image': {
+      id: '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-image'
+      path: '/estimate-image'
+      fullPath: '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-image'
+      preLoaderRoute: typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateImageRouteImport
+      parentRoute: typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute
+    }
   }
 }
 
@@ -2938,11 +2958,14 @@ const ApiPublicHandheldNotificationsRouteWithChildren =
   )
 
 interface ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteChildren {
+  ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateImageRoute: typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateImageRoute
   ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRoute: typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRoute
 }
 
 const ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteChildren: ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteChildren =
   {
+    ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateImageRoute:
+      ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateImageRoute,
     ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRoute:
       ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRoute,
   }
