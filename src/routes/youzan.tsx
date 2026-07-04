@@ -424,6 +424,10 @@ function YouzanPage() {
           </TabsContent>
 
 
+          <TabsContent value="realtime" className="mt-3">
+            <MessagePushPanel />
+          </TabsContent>
+
           <TabsContent value="sync" className="mt-3">
             <SyncCenterPanel />
           </TabsContent>
