@@ -24,7 +24,7 @@ export function StandardSkuDialog({
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onCreated?: () => void;
+  onCreated?: (res?: { skus: Array<{ id: string }> }) => void;
 }) {
   const fn = useServerFn(createStandardSkus);
   const [meta, setMeta] = useState<SkuMetaState>(emptySkuMeta);
@@ -73,7 +73,7 @@ export function StandardSkuDialog({
       toast.success(`已创建 ${res.skus.length} 个标准 SKU`);
       reset();
       onOpenChange(false);
-      onCreated?.();
+      onCreated?.(res as { skus: Array<{ id: string }> });
     },
     onError: (e) => toast.error((e as Error).message),
   });
