@@ -676,7 +676,7 @@ async function runStockSyncWorkerCore(opts: {
           status: "linked",
           last_error: null,
         } as never)
-        .eq("id", link.id);
+        .eq("id", (link as { id: string }).id);
       ok += 1;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
