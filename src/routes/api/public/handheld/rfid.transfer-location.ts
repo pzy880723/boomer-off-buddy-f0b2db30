@@ -70,6 +70,19 @@ export const Route = createFileRoute("/api/public/handheld/rfid/transfer-locatio
           .update({ current_location_id: to, last_seen_at: new Date().toISOString() })
           .eq("epc", body.epc);
 
+        // 若 from/to 中任一是门店库位，触发 worker 把变化推给有赞
+        try {
+          const { data: locs } = await supabaseAdmin
+            .from("inv_locations")
+            .select("id, kind")
+            .in("id", [from, to].filter(Boolean) as string[]);
+          const anyShop = (locs ?? []).some((l) => (l as { kind?: string }).kind === "shop");
+          if (anyShop) {
+            const { triggerStockWorker } = await import("@/lib/youzan-sync.functions");
+            triggerStockWorker({ sku_ids: [e.sku_id] });
+          }
+        } catch { /* noop */ }
+
         return ok({ epc: body.epc, from_location_id: from, to_location_id: to });
       },
     },
