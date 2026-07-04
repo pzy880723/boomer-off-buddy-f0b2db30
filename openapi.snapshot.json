@@ -3327,6 +3327,80 @@
                             }
                           ]
                         },
+                        "confidence": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "0~1，模型对 name/category 的整体置信度"
+                        },
+                        "warning": {
+                          "description": "低置信度或多角度矛盾时的提示，APP 用于弹人工确认",
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "alternatives": {
+                          "description": "备选识别结果，最多 3 条",
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "category": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "jp_porcelain",
+                                      "eu_porcelain",
+                                      "vintage_toy",
+                                      "anime_goods",
+                                      "media",
+                                      "digital",
+                                      "jewelry",
+                                      "fashion",
+                                      "daily",
+                                      "antique"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "confidence": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "maximum": 1
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "name"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
                         "raw": {}
                       },
                       "required": [
@@ -3336,7 +3410,8 @@
                         "era",
                         "condition_grade",
                         "description",
-                        "suggested_price_cny"
+                        "suggested_price_cny",
+                        "confidence"
                       ],
                       "additionalProperties": false
                     }
@@ -9177,7 +9252,7 @@
           },
           "images": {
             "minItems": 1,
-            "maxItems": 4,
+            "maxItems": 6,
             "type": "array",
             "items": {
               "type": "object",
@@ -9191,6 +9266,48 @@
                 }
               }
             }
+          },
+          "image_urls": {
+            "description": "外链/signed URL 数组，最多 6 张",
+            "minItems": 1,
+            "maxItems": 6,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "image_storage_paths": {
+            "description": "APP 上传后的持久 storage 路径数组，最多 6 张，服务端自动签 signed URL",
+            "minItems": 1,
+            "maxItems": 6,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "bucket": {
+                  "type": "string",
+                  "enum": [
+                    "sku-raw",
+                    "sku-listing"
+                  ]
+                },
+                "storage_path": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "bucket",
+                "storage_path"
+              ]
+            }
+          },
+          "primary_index": {
+            "description": "主图在数组中的下标，缺省 0",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5
           },
           "hint": {
             "description": "店员补充提示，可选",
