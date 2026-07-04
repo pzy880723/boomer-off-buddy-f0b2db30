@@ -197,5 +197,3 @@ export function SkuImagePicker({
   );
 }
 
-// unused import guard for supabase (kept intentionally in case future direct calls needed)
-void supabase;
