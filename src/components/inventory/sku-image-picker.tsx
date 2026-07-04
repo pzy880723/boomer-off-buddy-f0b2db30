@@ -1,7 +1,8 @@
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Upload, X, Loader2, ImageIcon, Plus, Sparkles, Search } from "lucide-react";
 import { toast } from "sonner";
-import { uploadSkuImage } from "@/lib/image-upload";
+import { compressImage, uploadSkuImage } from "@/lib/image-upload";
+import { supabase } from "@/integrations/supabase/client";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -25,33 +26,111 @@ export function SkuImagePicker({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const previewUrlRef = useRef<string | null>(null);
+  const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogTab, setDialogTab] = useState<"ai" | "search">("ai");
 
-  const handleFile = async (file: File) => {
-    setUploading(true);
-    try {
-      const url = await uploadSkuImage(file);
-      onChange(url);
-    } catch (e) {
-      toast.error((e as Error).message || "上传失败");
-    } finally {
-      setUploading(false);
+  const clearPreview = useCallback(() => {
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
     }
+    setPreviewUrl(null);
+  }, []);
+
+  useEffect(() => () => clearPreview(), [clearPreview]);
+
+  const startFakeProgress = () => {
+    setProgress(8);
+    if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+    progressTimerRef.current = setInterval(() => {
+      setProgress((p) => (p >= 90 ? p : p + Math.max(1, Math.round((90 - p) * 0.12))));
+    }, 200);
+  };
+  const stopFakeProgress = (final: number) => {
+    if (progressTimerRef.current) {
+      clearInterval(progressTimerRef.current);
+      progressTimerRef.current = null;
+    }
+    setProgress(final);
   };
 
-  if (value) {
+  const handleFile = useCallback(
+    async (file: File) => {
+      if (!file.type.startsWith("image/")) {
+        toast.error("仅支持图片文件");
+        return;
+      }
+      if (file.size > 20 * 1024 * 1024) {
+        toast.error("原图需小于 20MB");
+        return;
+      }
+      setUploading(true);
+      startFakeProgress();
+      try {
+        // 先压缩 + 立刻显示本地预览
+        const { blob } = await compressImage(file, file.name);
+        const objectUrl = URL.createObjectURL(blob);
+        if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = objectUrl;
+        setPreviewUrl(objectUrl);
+
+        // 直接把已压缩好的 Blob 交给上传（uploadSkuImage 内部对小文件会跳过二次压缩）
+        const url = await uploadSkuImage(blob);
+        onChange(url);
+        stopFakeProgress(100);
+        setTimeout(() => {
+          if (previewUrlRef.current === objectUrl) {
+            URL.revokeObjectURL(objectUrl);
+            previewUrlRef.current = null;
+            setPreviewUrl(null);
+          }
+        }, 400);
+      } catch (e) {
+        clearPreview();
+        stopFakeProgress(0);
+        toast.error((e as Error).message || "上传失败，请重试");
+      } finally {
+        setUploading(false);
+        setTimeout(() => setProgress(0), 600);
+      }
+    },
+    [onChange, clearPreview],
+  );
+
+  const shownSrc = previewUrl ?? value;
+
+  if (shownSrc) {
     return (
       <div className="relative h-32 w-32 overflow-hidden rounded-lg border bg-muted">
-        <img src={value} alt="" className="h-full w-full object-cover" />
-        <button
-          type="button"
-          onClick={() => onChange("")}
-          className="absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-background/90 text-foreground shadow hover:bg-background"
-          aria-label="移除图片"
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
+        <img src={shownSrc} alt="" className="h-full w-full object-cover" />
+        {uploading && (
+          <>
+            <div className="absolute inset-0 bg-black/20" />
+            <div className="absolute inset-x-0 bottom-0 h-1 bg-black/30">
+              <div
+                className="h-full bg-primary transition-[width] duration-200 ease-out"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </>
+        )}
+        {!uploading && (
+          <button
+            type="button"
+            onClick={() => {
+              clearPreview();
+              onChange("");
+            }}
+            className="absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-background/90 text-foreground shadow hover:bg-background"
+            aria-label="移除图片"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
     );
   }
@@ -68,7 +147,7 @@ export function SkuImagePicker({
             {uploading ? (
               <>
                 <Loader2 className="h-5 w-5 animate-spin" />
-                上传中…
+                上传中… {progress}%
               </>
             ) : (
               <>
@@ -102,7 +181,7 @@ export function SkuImagePicker({
         onChange={(e) => {
           const f = e.target.files?.[0];
           e.target.value = "";
-          if (f) handleFile(f);
+          if (f) void handleFile(f);
         }}
       />
 
@@ -117,3 +196,6 @@ export function SkuImagePicker({
     </>
   );
 }
+
+// unused import guard for supabase (kept intentionally in case future direct calls needed)
+void supabase;
