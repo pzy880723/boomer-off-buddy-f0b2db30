@@ -215,6 +215,11 @@ function NewParcelPage() {
   const [items, setItems] = useState<SubItem[]>([emptyItem()]);
   const [usedAi, setUsedAi] = useState(false);
   const [smartOpen, setSmartOpen] = useState(false);
+  const pendingUploads = useSyncExternalStore(
+    subscribePendingUploads,
+    getPendingUploadCount,
+    () => 0,
+  );
 
   const handleRecognized = (r: RecognizedResult) => {
     if (Object.keys(r.parcel).length) setParcel((p) => mergeNonNull(p, r.parcel));
