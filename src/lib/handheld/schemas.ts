@@ -34,6 +34,7 @@ import * as z from "zod";
 export const HandheldErrorCode = z.enum([
   "unauthorized",
   "unauthorized_location",
+  "unauthorized_role",
   "invalid_body",
   "validation_error",
   "not_found",
