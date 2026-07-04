@@ -182,14 +182,14 @@ export const listShopSkus = createServerFn({ method: "GET" })
       })
       .parse(input),
   )
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data, context }): Promise<{ rows: ShopSkuRow[]; location_id: string | null }> => {
     const sb = context.supabase;
     const { data: loc } = await sb
       .from("inv_locations")
       .select("id, name")
       .eq("shop_id", data.shop_id)
       .maybeSingle();
-    if (!loc) return { rows: [] as Record<string, unknown>[], location_id: null as string | null };
+    if (!loc) return { rows: [], location_id: null };
 
     // 取该门店所有 inv_stocks > 0 的 sku
     const { data: stocks, error: stErr } = await sb
@@ -208,7 +208,7 @@ export const listShopSkus = createServerFn({ method: "GET" })
     const skuIds = new Set<string>();
     (stocks ?? []).forEach((s) => skuIds.add(s.sku_id));
     (links ?? []).forEach((l) => skuIds.add(l.sku_id));
-    if (skuIds.size === 0) return { rows: [] as Record<string, unknown>[], location_id: loc.id as string | null };
+    if (skuIds.size === 0) return { rows: [], location_id: loc.id };
 
     let q = sb
       .from("inv_skus")
@@ -222,17 +222,53 @@ export const listShopSkus = createServerFn({ method: "GET" })
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
 
-    // 用门店库存覆盖 stock_qty 字段
     const stockMap = new Map((stocks ?? []).map((s) => [s.sku_id, Number(s.qty)]));
-    const patched = (rows ?? []).map((r) => ({
-      ...(r as Record<string, unknown>),
-      bundle_items: Array.isArray((r as { bundle_items?: unknown }).bundle_items)
-        ? ((r as { bundle_items?: unknown }).bundle_items as unknown[])
-        : [],
-      stock_qty: stockMap.get(r.id) ?? 0,
-    }));
-    return { rows: patched as Record<string, unknown>[], location_id: loc.id as string | null };
+    const patched: ShopSkuRow[] = (rows ?? []).map((r) => {
+      const raw = r as Record<string, unknown>;
+      const bi = raw.bundle_items;
+      return {
+        id: String(raw.id),
+        category: String(raw.category ?? ""),
+        name: String(raw.name ?? ""),
+        sku_code: (raw.sku_code as string | null) ?? null,
+        price_tier: Number(raw.price_tier ?? 0),
+        is_custom_price: Boolean(raw.is_custom_price),
+        kind: String(raw.kind ?? "single"),
+        pack_pieces: (raw.pack_pieces as number | null) ?? null,
+        bundle_items: Array.isArray(bi) ? (bi as unknown[]) : [],
+        weight_g: (raw.weight_g as number | null) ?? null,
+        image_url: (raw.image_url as string | null) ?? null,
+        image_paths: (raw.image_paths as string[] | null) ?? null,
+        notes: (raw.notes as string | null) ?? null,
+        status: String(raw.status ?? "active"),
+        epc: String(raw.epc ?? ""),
+        stock_qty: stockMap.get(String(raw.id)) ?? 0,
+        created_at: String(raw.created_at ?? ""),
+      };
+    });
+    return { rows: patched, location_id: loc.id };
   });
+
+// 门店 SKU 行（比 SkuRow 简化：bundle_items 一定是数组，方便 RPC 序列化）
+export type ShopSkuRow = {
+  id: string;
+  category: string;
+  name: string;
+  sku_code: string | null;
+  price_tier: number;
+  is_custom_price: boolean;
+  kind: string;
+  pack_pieces: number | null;
+  bundle_items: unknown[];
+  weight_g: number | null;
+  image_url: string | null;
+  image_paths: string[] | null;
+  notes: string | null;
+  status: string;
+  epc: string;
+  stock_qty: number;
+  created_at: string;
+};
 
 // ---------- addShopStock：入库 / 出库 / 调整 ----------
 
