@@ -142,6 +142,7 @@ import { Route as ApiPublicHandheldItemsUploadImageMultipartRouteImport } from '
 import { Route as ApiPublicHandheldItemsIdSyncStatusRouteImport } from './routes/api/public/handheld/items.$id.sync-status'
 import { Route as ApiPublicHandheldItemsIdAttachImagesRouteImport } from './routes/api/public/handheld/items.$id.attach-images'
 import { Route as ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteImport } from './routes/api/public/handheld/parcels.items.$itemId.pack-pieces'
+import { Route as ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRouteImport } from './routes/api/public/handheld/parcels.items.$itemId.pack-pieces.estimate-title'
 
 const YouzanRoute = YouzanRouteImport.update({
   id: '/youzan',
@@ -872,6 +873,12 @@ const ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute =
     path: '/items/$itemId/pack-pieces',
     getParentRoute: () => ApiPublicHandheldParcelsRoute,
   } as any)
+const ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRoute =
+  ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRouteImport.update({
+    id: '/estimate-title',
+    path: '/estimate-title',
+    getParentRoute: () => ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -1006,7 +1013,8 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/label-templates/$id/set-default': typeof ApiPublicHandheldLabelTemplatesIdSetDefaultRoute
   '/api/public/handheld/transfers/$id/confirm': typeof ApiPublicHandheldTransfersIdConfirmRoute
   '/api/public/handheld/transfers/$id/scan': typeof ApiPublicHandheldTransfersIdScanRoute
-  '/api/public/handheld/parcels/items/$itemId/pack-pieces': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute
+  '/api/public/handheld/parcels/items/$itemId/pack-pieces': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteWithChildren
+  '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-title': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -1134,7 +1142,8 @@ export interface FileRoutesByTo {
   '/api/public/handheld/label-templates/$id/set-default': typeof ApiPublicHandheldLabelTemplatesIdSetDefaultRoute
   '/api/public/handheld/transfers/$id/confirm': typeof ApiPublicHandheldTransfersIdConfirmRoute
   '/api/public/handheld/transfers/$id/scan': typeof ApiPublicHandheldTransfersIdScanRoute
-  '/api/public/handheld/parcels/items/$itemId/pack-pieces': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute
+  '/api/public/handheld/parcels/items/$itemId/pack-pieces': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteWithChildren
+  '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-title': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -1270,7 +1279,8 @@ export interface FileRoutesById {
   '/api/public/handheld/label-templates/$id/set-default': typeof ApiPublicHandheldLabelTemplatesIdSetDefaultRoute
   '/api/public/handheld/transfers/$id/confirm': typeof ApiPublicHandheldTransfersIdConfirmRoute
   '/api/public/handheld/transfers/$id/scan': typeof ApiPublicHandheldTransfersIdScanRoute
-  '/api/public/handheld/parcels/items/$itemId/pack-pieces': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute
+  '/api/public/handheld/parcels/items/$itemId/pack-pieces': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteWithChildren
+  '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-title': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -1408,6 +1418,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/transfers/$id/confirm'
     | '/api/public/handheld/transfers/$id/scan'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces'
+    | '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-title'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -1536,6 +1547,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/transfers/$id/confirm'
     | '/api/public/handheld/transfers/$id/scan'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces'
+    | '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-title'
   id:
     | '__root__'
     | '/'
@@ -1671,6 +1683,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/transfers/$id/confirm'
     | '/api/public/handheld/transfers/$id/scan'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces'
+    | '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-title'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -2689,6 +2702,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteImport
       parentRoute: typeof ApiPublicHandheldParcelsRoute
     }
+    '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-title': {
+      id: '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-title'
+      path: '/estimate-title'
+      fullPath: '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-title'
+      preLoaderRoute: typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRouteImport
+      parentRoute: typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute
+    }
   }
 }
 
@@ -2917,10 +2937,25 @@ const ApiPublicHandheldNotificationsRouteWithChildren =
     ApiPublicHandheldNotificationsRouteChildren,
   )
 
+interface ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteChildren {
+  ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRoute: typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRoute
+}
+
+const ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteChildren: ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteChildren =
+  {
+    ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRoute:
+      ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRoute,
+  }
+
+const ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteWithChildren =
+  ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute._addFileChildren(
+    ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteChildren,
+  )
+
 interface ApiPublicHandheldParcelsRouteChildren {
   ApiPublicHandheldParcelsIdRoute: typeof ApiPublicHandheldParcelsIdRoute
   ApiPublicHandheldParcelsCountsRoute: typeof ApiPublicHandheldParcelsCountsRoute
-  ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute: typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute
+  ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute: typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteWithChildren
 }
 
 const ApiPublicHandheldParcelsRouteChildren: ApiPublicHandheldParcelsRouteChildren =
@@ -2928,7 +2963,7 @@ const ApiPublicHandheldParcelsRouteChildren: ApiPublicHandheldParcelsRouteChildr
     ApiPublicHandheldParcelsIdRoute: ApiPublicHandheldParcelsIdRoute,
     ApiPublicHandheldParcelsCountsRoute: ApiPublicHandheldParcelsCountsRoute,
     ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute:
-      ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute,
+      ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteWithChildren,
   }
 
 const ApiPublicHandheldParcelsRouteWithChildren =
