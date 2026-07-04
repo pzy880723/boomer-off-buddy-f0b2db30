@@ -172,7 +172,7 @@ export const addShopStock = createServerFn({ method: "POST" })
       listing = await ensureBranchListing(data.sku_id, data.shop_id);
     }
     if (listing.yz_item_id) {
-      await pushStockNow({
+      triggerStockWorker({
         sku_id: data.sku_id,
         shop_id: data.shop_id,
         location_id,
@@ -223,7 +223,7 @@ export const registerNewSkuAtShop = createServerFn({ method: "POST" })
       if (error) throw new Error(error.message);
       const listing = await ensureBranchListing(sku_id, data.shop_id);
       if (listing.yz_item_id) {
-        await pushStockNow({
+        triggerStockWorker({
           sku_id,
           shop_id: data.shop_id,
           location_id,
@@ -296,7 +296,7 @@ export const retryBranchListing = createServerFn({ method: "POST" })
     const r = await ensureBranchListing(data.sku_id, data.shop_id);
     if (r.yz_item_id) {
       const { location_id } = await getShopWithLocation(data.shop_id);
-      await pushStockNow({
+      triggerStockWorker({
         sku_id: data.sku_id,
         shop_id: data.shop_id,
         location_id,
