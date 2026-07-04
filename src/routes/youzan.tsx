@@ -328,6 +328,10 @@ function YouzanPage() {
               <Activity className="mr-1.5 h-3.5 w-3.5" />
               同步明细
             </TabsTrigger>
+            <TabsTrigger value="realtime">
+              <Radio className="mr-1.5 h-3.5 w-3.5" />
+              实时同步
+            </TabsTrigger>
             <TabsTrigger value="sync">
               <Sparkles className="mr-1.5 h-3.5 w-3.5" />
               数据同步
