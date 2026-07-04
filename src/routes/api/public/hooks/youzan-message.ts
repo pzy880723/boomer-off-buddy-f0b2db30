@@ -150,9 +150,10 @@ async function handleTradeEvent(sb: unknown, shopId: string, event: Record<strin
       .maybeSingle();
     if (!link) continue;
     // 找门店 location
-    const { data: loc } = await (supa.from("inv_locations").select("id") as never)
-      .eq("shop_id", shopId)
-      .maybeSingle();
+    const locQuery = supa.from("inv_locations").select("id") as unknown as {
+      eq: (c: string, v: unknown) => { maybeSingle: () => Promise<{ data: { id?: string } | null }> };
+    };
+    const { data: loc } = await locQuery.eq("shop_id", shopId).maybeSingle();
     const locationId = (loc as { id?: string } | null)?.id;
     if (!locationId) continue;
     await supa.rpc("inv_apply_movement", {
@@ -188,9 +189,10 @@ async function handleRefundEvent(sb: unknown, shopId: string, event: Record<stri
       .eq("yz_item_id", it.item_id)
       .maybeSingle();
     if (!link) continue;
-    const { data: loc } = await (supa.from("inv_locations").select("id") as never)
-      .eq("shop_id", shopId)
-      .maybeSingle();
+    const locQuery = supa.from("inv_locations").select("id") as unknown as {
+      eq: (c: string, v: unknown) => { maybeSingle: () => Promise<{ data: { id?: string } | null }> };
+    };
+    const { data: loc } = await locQuery.eq("shop_id", shopId).maybeSingle();
     const locationId = (loc as { id?: string } | null)?.id;
     if (!locationId) continue;
     await supa.rpc("inv_apply_movement", {
