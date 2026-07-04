@@ -1,16 +1,12 @@
 // 门店商品：以"门店"为主视角展示商品和库存
 // - 每家门店对应 inv_locations(kind='shop', shop_id=…)
-// - 增减库存都走 inv_apply_movement，同步入队推送到有赞
-// - SKU 首次在某门店有库存时，自动调 youzan.item.add 上架并建立 sku_youzan_links
+// - 增减库存都走 inv_apply_movement；DB 触发器会自动登记 push_stock 任务
+// - SKU 首次在某门店有库存时，worker 自愈上架（youzan.item.add）
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin as supabase } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-// SkuRow is used only on the client side; server return is a plain object array
-import {
-  callYouzanApiVerbose,
-  ensureAccessToken,
-} from "./youzan.functions";
+import { ensureBranchListing, triggerStockWorker } from "./youzan-sync.functions";
 
 // ---------- 内部工具 ----------
 
@@ -38,137 +34,6 @@ async function getShopWithLocation(shop_id: string) {
   return { shop, location_id: loc.id as string };
 }
 
-// ---------- ensureBranchListing：自动上架到有赞分店 ----------
-
-async function ensureBranchListing(sku_id: string, shop_id: string): Promise<{
-  yz_item_id: number | null;
-  created: boolean;
-  error?: string;
-}> {
-  // 已有 link
-  const { data: existed } = await supabase
-    .from("sku_youzan_links")
-    .select("yz_item_id, status")
-    .eq("sku_id", sku_id)
-    .eq("shop_id", shop_id)
-    .maybeSingle();
-  if (existed?.yz_item_id) {
-    return { yz_item_id: Number(existed.yz_item_id), created: false };
-  }
-
-  const { data: sku } = await supabase
-    .from("inv_skus")
-    .select("id, name, price_tier, image_url, notes, stock_qty")
-    .eq("id", sku_id)
-    .maybeSingle();
-  if (!sku) return { yz_item_id: null, created: false, error: "SKU 不存在" };
-
-  const { data: shop } = await supabase
-    .from("youzan_shops")
-    .select("*")
-    .eq("id", shop_id)
-    .maybeSingle();
-  if (!shop) return { yz_item_id: null, created: false, error: "门店不存在" };
-
-  try {
-    const token = await ensureAccessToken(shop as never);
-    const params: Record<string, unknown> = {
-      title: sku.name,
-      price: Number(sku.price_tier),
-      num: Number(sku.stock_qty ?? 0),
-      desc: sku.notes ?? sku.name,
-      is_display: 1,
-      is_listing: 1,
-      auto_listing_time: 0,
-      out_product_id: sku.id,
-    };
-    if (sku.image_url) params.item_imgs = sku.image_url;
-
-    const res = await callYouzanApiVerbose({
-      accessToken: token,
-      method: "youzan.item.add",
-      version: "3.0.0",
-      params,
-      timeoutMs: 25_000,
-    });
-    const payload = res.payload as Record<string, unknown>;
-    const rawItemId = payload.item_id ?? payload.num_iid ?? payload.id;
-    const itemId = Number(rawItemId ?? 0);
-    if (!itemId) {
-      throw new Error(`有赞未返回 item_id：${res.preview.slice(0, 160)}`);
-    }
-    await supabase.from("sku_youzan_links").upsert(
-      {
-        sku_id,
-        shop_id,
-        yz_item_id: itemId,
-        status: "linked",
-        sync_stock: true,
-        role: "branch_stock",
-      } as never,
-      { onConflict: "sku_id,shop_id" },
-    );
-    return { yz_item_id: itemId, created: true };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    // 记录 pending link 让用户能在 UI 上看到错误
-    await supabase.from("sku_youzan_links").upsert(
-      {
-        sku_id,
-        shop_id,
-        yz_item_id: 0,
-        status: "error",
-        sync_stock: false,
-        role: "branch_stock",
-        last_error: msg.slice(0, 400),
-      } as never,
-      { onConflict: "sku_id,shop_id" },
-    );
-    return { yz_item_id: null, created: false, error: msg };
-  }
-}
-
-// ---------- 立即入队 + 触发一次 worker ----------
-
-async function pushStockNow(opts: {
-  sku_id: string;
-  shop_id: string;
-  location_id: string;
-  reason: string;
-}) {
-  const { data: st } = await supabase
-    .from("inv_stocks")
-    .select("qty")
-    .eq("sku_id", opts.sku_id)
-    .eq("location_id", opts.location_id)
-    .maybeSingle();
-  const target = Math.max(0, Number(st?.qty ?? 0));
-  await supabase.from("youzan_stock_sync_queue").insert({
-    sku_id: opts.sku_id,
-    shop_id: opts.shop_id,
-    location_id: opts.location_id,
-    target_stock: target,
-    action: "push_stock",
-    reason: opts.reason,
-    status: "pending",
-    next_run_at: new Date().toISOString(),
-  } as never);
-  // 触发 worker（异步 fire-and-forget）
-  try {
-    const { getRequestHost } = await import("@tanstack/react-start/server");
-    const host = getRequestHost();
-    if (host) {
-      const scheme = host.includes("localhost") ? "http" : "https";
-      void fetch(`${scheme}://${host}/api/public/hooks/youzan-stock-worker`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sku_ids: [opts.sku_id], limit: 5 }),
-      }).catch(() => undefined);
-    }
-  } catch {
-    /* noop */
-  }
-}
 
 // ---------- listShopSkus ----------
 
