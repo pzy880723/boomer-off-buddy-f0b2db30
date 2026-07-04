@@ -84,6 +84,7 @@ import { Route as ApiPublicHooksYouzanSyncWorkerRouteImport } from './routes/api
 import { Route as ApiPublicHooksYouzanSyncRouteImport } from './routes/api/public/hooks/youzan-sync'
 import { Route as ApiPublicHooksYouzanStockWorkerRouteImport } from './routes/api/public/hooks/youzan-stock-worker'
 import { Route as ApiPublicHooksYouzanReconcileRouteImport } from './routes/api/public/hooks/youzan-reconcile'
+import { Route as ApiPublicHooksYouzanMessageRouteImport } from './routes/api/public/hooks/youzan-message'
 import { Route as ApiPublicHandheldTransfersRouteImport } from './routes/api/public/handheld/transfers'
 import { Route as ApiPublicHandheldSyncRecordsRouteImport } from './routes/api/public/handheld/sync-records'
 import { Route as ApiPublicHandheldStocktakesRouteImport } from './routes/api/public/handheld/stocktakes'
@@ -522,6 +523,12 @@ const ApiPublicHooksYouzanReconcileRoute =
     path: '/api/public/hooks/youzan-reconcile',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksYouzanMessageRoute =
+  ApiPublicHooksYouzanMessageRouteImport.update({
+    id: '/api/public/hooks/youzan-message',
+    path: '/api/public/hooks/youzan-message',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHandheldTransfersRoute =
   ApiPublicHandheldTransfersRouteImport.update({
     id: '/api/public/handheld/transfers',
@@ -920,6 +927,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/stocktakes': typeof ApiPublicHandheldStocktakesRoute
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
   '/api/public/handheld/transfers': typeof ApiPublicHandheldTransfersRouteWithChildren
+  '/api/public/hooks/youzan-message': typeof ApiPublicHooksYouzanMessageRoute
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
   '/api/public/hooks/youzan-sync': typeof ApiPublicHooksYouzanSyncRoute
@@ -1043,6 +1051,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/stocktakes': typeof ApiPublicHandheldStocktakesRoute
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
   '/api/public/handheld/transfers': typeof ApiPublicHandheldTransfersRouteWithChildren
+  '/api/public/hooks/youzan-message': typeof ApiPublicHooksYouzanMessageRoute
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
   '/api/public/hooks/youzan-sync': typeof ApiPublicHooksYouzanSyncRoute
@@ -1174,6 +1183,7 @@ export interface FileRoutesById {
   '/api/public/handheld/stocktakes': typeof ApiPublicHandheldStocktakesRoute
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
   '/api/public/handheld/transfers': typeof ApiPublicHandheldTransfersRouteWithChildren
+  '/api/public/hooks/youzan-message': typeof ApiPublicHooksYouzanMessageRoute
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
   '/api/public/hooks/youzan-sync': typeof ApiPublicHooksYouzanSyncRoute
@@ -1306,6 +1316,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/stocktakes'
     | '/api/public/handheld/sync-records'
     | '/api/public/handheld/transfers'
+    | '/api/public/hooks/youzan-message'
     | '/api/public/hooks/youzan-reconcile'
     | '/api/public/hooks/youzan-stock-worker'
     | '/api/public/hooks/youzan-sync'
@@ -1429,6 +1440,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/stocktakes'
     | '/api/public/handheld/sync-records'
     | '/api/public/handheld/transfers'
+    | '/api/public/hooks/youzan-message'
     | '/api/public/hooks/youzan-reconcile'
     | '/api/public/hooks/youzan-stock-worker'
     | '/api/public/hooks/youzan-sync'
@@ -1559,6 +1571,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/stocktakes'
     | '/api/public/handheld/sync-records'
     | '/api/public/handheld/transfers'
+    | '/api/public/hooks/youzan-message'
     | '/api/public/hooks/youzan-reconcile'
     | '/api/public/hooks/youzan-stock-worker'
     | '/api/public/hooks/youzan-sync'
@@ -1651,6 +1664,7 @@ export interface RootRouteChildren {
   ApiPublicHandheldStocktakesRoute: typeof ApiPublicHandheldStocktakesRoute
   ApiPublicHandheldSyncRecordsRoute: typeof ApiPublicHandheldSyncRecordsRoute
   ApiPublicHandheldTransfersRoute: typeof ApiPublicHandheldTransfersRouteWithChildren
+  ApiPublicHooksYouzanMessageRoute: typeof ApiPublicHooksYouzanMessageRoute
   ApiPublicHooksYouzanReconcileRoute: typeof ApiPublicHooksYouzanReconcileRoute
   ApiPublicHooksYouzanStockWorkerRoute: typeof ApiPublicHooksYouzanStockWorkerRoute
   ApiPublicHooksYouzanSyncRoute: typeof ApiPublicHooksYouzanSyncRoute
@@ -2214,6 +2228,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/hooks/youzan-reconcile'
       fullPath: '/api/public/hooks/youzan-reconcile'
       preLoaderRoute: typeof ApiPublicHooksYouzanReconcileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/youzan-message': {
+      id: '/api/public/hooks/youzan-message'
+      path: '/api/public/hooks/youzan-message'
+      fullPath: '/api/public/hooks/youzan-message'
+      preLoaderRoute: typeof ApiPublicHooksYouzanMessageRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/handheld/transfers': {
@@ -2940,6 +2961,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHandheldStocktakesRoute: ApiPublicHandheldStocktakesRoute,
   ApiPublicHandheldSyncRecordsRoute: ApiPublicHandheldSyncRecordsRoute,
   ApiPublicHandheldTransfersRoute: ApiPublicHandheldTransfersRouteWithChildren,
+  ApiPublicHooksYouzanMessageRoute: ApiPublicHooksYouzanMessageRoute,
   ApiPublicHooksYouzanReconcileRoute: ApiPublicHooksYouzanReconcileRoute,
   ApiPublicHooksYouzanStockWorkerRoute: ApiPublicHooksYouzanStockWorkerRoute,
   ApiPublicHooksYouzanSyncRoute: ApiPublicHooksYouzanSyncRoute,
@@ -2990,13 +3012,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

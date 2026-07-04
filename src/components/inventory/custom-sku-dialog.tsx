@@ -47,7 +47,7 @@ export function CustomSkuForm({
   );
 }
 
-export function useCustomSkuMutation(onDone: () => void) {
+export function useCustomSkuMutation(onDone: (res?: { sku: { id: string; epc: string } }) => void) {
   const fn = useServerFn(createCustomSku);
   return useMutation({
     mutationFn: async (input: { meta: SkuMetaState; price: string }) => {
@@ -70,7 +70,7 @@ export function useCustomSkuMutation(onDone: () => void) {
     },
     onSuccess: (res) => {
       toast.success(`已创建，EPC：${res.sku.epc}`);
-      onDone();
+      onDone(res as { sku: { id: string; epc: string } });
     },
     onError: (e) => toast.error((e as Error).message),
   });
@@ -83,15 +83,15 @@ export function CustomSkuDialog({
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onCreated?: () => void;
+  onCreated?: (res?: { sku: { id: string; epc: string } }) => void;
 }) {
   const [meta, setMeta] = useState<SkuMetaState>(emptySkuMeta);
   const [price, setPrice] = useState("");
   const reset = () => { setMeta(emptySkuMeta); setPrice(""); };
-  const mut = useCustomSkuMutation(() => {
+  const mut = useCustomSkuMutation((res) => {
     reset();
     onOpenChange(false);
-    onCreated?.();
+    onCreated?.(res);
   });
 
   return (

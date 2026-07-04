@@ -37,7 +37,7 @@ export function BundleSkuDialog({
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onCreated?: () => void;
+  onCreated?: (res?: { sku: { id: string; epc: string } }) => void;
 }) {
   const fn = useServerFn(createBundleSku);
   const [meta, setMeta] = useState<SkuMetaState>(emptySkuMeta);
@@ -85,7 +85,7 @@ export function BundleSkuDialog({
       toast.success(`已创建组包，EPC：${res.sku.epc}`);
       reset();
       onOpenChange(false);
-      onCreated?.();
+      onCreated?.(res as { sku: { id: string; epc: string } });
     },
     onError: (e) => toast.error((e as Error).message),
   });
