@@ -218,12 +218,7 @@ export const registerNewSkuAtShop = createServerFn({ method: "POST" })
       if (error) throw new Error(error.message);
       const listing = await ensureBranchListing(sku_id, data.shop_id);
       if (listing.yz_item_id) {
-        triggerStockWorker({
-          sku_id,
-          shop_id: data.shop_id,
-          location_id,
-          reason: "shop_new_sku",
-        });
+        triggerStockWorker({ sku_ids: [sku_id] });
       }
       results.push({
         sku_id,
