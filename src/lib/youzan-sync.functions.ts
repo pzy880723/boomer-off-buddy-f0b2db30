@@ -349,36 +349,25 @@ export const unlinkSku = createServerFn({ method: "POST" })
 // 仅提供一个最小可用的封装；零售连锁版 spu.add 实际所需的类目 / 规格
 // 字段较多，建议用户后续按需扩展。
 // ============================================================
-async function resolveHqCategoryId(sku: {
-  category?: string | null;
-}): Promise<number> {
-  // 优先 inv_categories.youzan_hq_category_id
-  if (sku.category) {
-    const { data: cat } = await supabase
-      .from("inv_categories")
-      .select("youzan_hq_category_id")
-      .eq("code", sku.category)
-      .maybeSingle();
-    const id = Number((cat as { youzan_hq_category_id?: number | null } | null)?.youzan_hq_category_id ?? 0);
-    if (id > 0) return id;
-  }
-  // 兜底 app_settings.youzan_hq_default_category_id
+async function resolveHqCategoryId(_sku?: unknown): Promise<number> {
+  // 用户决定：ERP 类目不再和有赞分组一一绑定；同步 SPU 时统一走全局默认分组
   const { data: setting } = await supabase
     .from("app_settings")
     .select("value")
     .eq("key", "youzan_hq_default_category_id")
     .maybeSingle();
   const rawValue = (setting as { value?: unknown } | null)?.value;
-  const fallbackId = Number(
+  const id = Number(
     typeof rawValue === "number"
       ? rawValue
       : (rawValue as { id?: number } | null)?.id ?? 0,
   );
-  if (fallbackId > 0) return fallbackId;
+  if (id > 0) return id;
   throw new Error(
-    `SKU 类目「${sku.category ?? "未设置"}」尚未绑定有赞总部商品分组。请在「设置 → 商品分类」页把该类目关联到一个总部商品分组，或在「设置」里配置默认分组 id。`,
+    "尚未配置有赞默认商品分组，请到「设置 → 集成」里从有赞拉取分组并选一个作为同步默认分组。",
   );
 }
+
 
 /**
  * 按 sku_scope 汇总本次 spu.create / spu.update 要传的 sell_channel_ids。

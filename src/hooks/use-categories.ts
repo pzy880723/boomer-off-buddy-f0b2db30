@@ -10,11 +10,8 @@ const FALLBACK: CategoryRow[] = INV_CATEGORIES.map((c, i) => ({
   sort_order: (i + 1) * 10,
   is_active: true,
   is_system: true,
-  youzan_hq_category_id: null,
-  youzan_hq_parent_id: null,
-  youzan_shop_id: null,
-  synced_at: null,
 }));
+
 
 export function useCategories() {
   const q = useQuery({
