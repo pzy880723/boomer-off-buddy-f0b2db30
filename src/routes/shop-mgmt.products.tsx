@@ -459,14 +459,6 @@ function ShopProductsPage() {
         </TabsContent>
       </Tabs>
 
-      <StandardSkuDialog
-        open={openDialog === "standard"}
-        onOpenChange={(v) => !v && setOpenDialog(null)}
-        onCreated={(res) => {
-          const ids = res?.skus?.map((s) => s.id) ?? [];
-          if (ids.length > 0) void handleNewSkuCreated(ids);
-        }}
-      />
       <CustomSkuDialog
         open={openDialog === "custom"}
         onOpenChange={(v) => !v && setOpenDialog(null)}
