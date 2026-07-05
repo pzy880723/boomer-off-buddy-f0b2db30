@@ -201,7 +201,8 @@ function SettingsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="integration">
+        <TabsContent value="integration" className="space-y-4">
+          <YouzanDefaultGroupCard />
           <div className="grid gap-3 md:grid-cols-2">
             {[
               { name: "有赞连锁", status: "已连接", tone: "success" },
@@ -223,6 +224,7 @@ function SettingsPage() {
             ))}
           </div>
         </TabsContent>
+
 
         <TabsContent value="webhook">
           <Card>
