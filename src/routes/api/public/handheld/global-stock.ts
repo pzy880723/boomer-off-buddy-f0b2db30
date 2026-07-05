@@ -143,6 +143,9 @@ export const Route = createFileRoute("/api/public/handheld/global-stock")({
           price: number;
           total_qty: number;
           stocks: Record<string, number>;
+          is_display: boolean;
+          listing_status: "selling" | "sold_out" | "in_warehouse";
+          status_label: string;
         };
         const items: Item[] = skus.map((s) => {
           const stocks: Record<string, number> = {};
@@ -152,6 +155,8 @@ export const Route = createFileRoute("/api/public/handheld/global-stock")({
             stocks[r.location_id] = Number(r.qty) || 0;
           }
           const total = Object.values(stocks).reduce((a, b) => a + b, 0);
+          const isDisplay = s.is_display !== false;
+          const ls = deriveListingStatus(isDisplay, total);
           return {
             sku_id: s.id,
             name: s.name,
@@ -167,13 +172,17 @@ export const Route = createFileRoute("/api/public/handheld/global-stock")({
             price: Number(s.price_tier) || 0,
             total_qty: total,
             stocks,
+            is_display: isDisplay,
+            listing_status: ls,
+            status_label: statusLabel(ls),
           };
         });
 
-        // ---- stock_state filter ----
+        // ---- stock_state + listing_status filters ----
         const filtered = items.filter((it) => {
-          if (stockState === "out") return it.total_qty === 0;
-          if (stockState === "low") return it.total_qty > 0 && it.total_qty < lowThreshold;
+          if (stockState === "out" && it.total_qty !== 0) return false;
+          if (stockState === "low" && !(it.total_qty > 0 && it.total_qty < lowThreshold)) return false;
+          if (statusFilter !== "all" && it.listing_status !== statusFilter) return false;
           return true;
         });
 
