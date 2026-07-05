@@ -84,7 +84,7 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/restock")({
             .insert({
               sku_id: params.id,
               qty: body.delta,
-              operator: auth.device.code ?? auth.device.id,
+              operator: auth.device.device_code ?? auth.device.id,
               notes: `售罄补货 +${body.delta} @ ${(loc as { name: string }).name}`,
             } as never)
             .select("id")
