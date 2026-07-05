@@ -1416,3 +1416,64 @@ export const ParcelEstimateRes = okEnvelope(
     unit: z.string().nullable(),
   }),
 );
+
+// ============================================================
+// 15. 商品生命周期：上下架 & 售罄补货（对齐有赞连锁零售）
+// ============================================================
+
+export const SetListingStatusReq = z
+  .object({
+    is_display: z.boolean().meta({
+      description: "true=上架（销售中/已售罄由库存派生），false=下架（仓库中）",
+    }),
+  })
+  .meta({ id: "SetListingStatusReq" });
+
+export const SetListingStatusRes = okEnvelope(
+  z.object({
+    id: uuidSchema,
+    is_display: z.boolean(),
+    listing_status: z.enum(["selling", "sold_out", "in_warehouse"]),
+    status_label: z.string(),
+    total_stock_qty: z.number().int(),
+  }),
+);
+
+export const RestockReq = z
+  .object({
+    location_id: uuidSchema.optional().meta({
+      description: "缺省用设备当前 location（authenticateDevice 返回的）",
+    }),
+    delta: z.number().int().min(1).max(9999).meta({ description: "补货件数" }),
+    print_labels: z.boolean().default(true).meta({ description: "是否同时生成打印批次" }),
+    label_template_id: uuidSchema.nullable().optional(),
+    note: z.string().max(500).nullable().optional(),
+  })
+  .meta({ id: "RestockReq" });
+
+export const RestockRes = okEnvelope(
+  z.object({
+    sku: z.object({
+      id: uuidSchema,
+      is_display: z.boolean(),
+      listing_status: z.enum(["selling", "sold_out", "in_warehouse"]),
+      status_label: z.string(),
+      total_stock_qty: z.number().int(),
+    }),
+    movement: z.object({
+      delta: z.number().int(),
+      balance_after: z.number().int().nullable(),
+      location_id: uuidSchema,
+      location_name: z.string(),
+    }),
+    label_batch: z
+      .object({
+        id: uuidSchema,
+        qty: z.number().int(),
+        template_id: uuidSchema.nullable(),
+        print_payload: PrintPayloadSchema,
+      })
+      .nullable()
+      .meta({ description: "print_labels=false 时为 null" }),
+  }),
+);
