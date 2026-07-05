@@ -47,7 +47,7 @@ import {
   StandardProductRow,
   SingleSkuRow,
 } from "@/components/inventory/product-card";
-import { StandardSkuDialog } from "@/components/inventory/standard-sku-dialog";
+
 import { CustomSkuDialog } from "@/components/inventory/custom-sku-dialog";
 import { BundleSkuDialog } from "@/components/inventory/bundle-sku-dialog";
 import { ReceiveStockDialog } from "@/components/shop-mgmt/receive-stock-dialog";
