@@ -216,6 +216,14 @@ export const ProductItemSchema = z
     total_stock_qty: z.number().int(),
     stocks: z.array(ProductStockSchema),
     status: z.string(),
+    is_display: z.boolean().meta({ description: "是否上架（与有赞 is_display 语义一致）" }),
+    listing_status: z.enum(["selling", "sold_out", "in_warehouse"]).meta({
+      description: "商品状态：销售中 / 已售罄 / 仓库中（与有赞连锁零售对齐）",
+    }),
+    status_label: z.string().meta({ description: "状态中文标签" }),
+    can_restock: z.boolean().default(false).meta({
+      description: "APP 是否可弹出「补货入库」按钮（listing_status=sold_out 时为 true）",
+    }),
     created_at: z.string(),
     updated_at: z.string(),
   })
