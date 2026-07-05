@@ -99,6 +99,7 @@ export const Route = createFileRoute("/api/public/handheld/global-stock")({
           image_paths: string[] | null;
           kind: string;
           is_custom_price: boolean;
+          is_display: boolean;
           stock_qty: number;
         }>;
 
