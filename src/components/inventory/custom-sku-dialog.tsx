@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createCustomSku } from "@/lib/inventory.functions";
 import { SkuMetaFields, emptySkuMeta, type SkuMetaState } from "./sku-meta-fields";
+import { DefaultShopsSelector } from "./default-shops-selector";
 
 export function CustomSkuForm({
   meta,
@@ -87,7 +88,8 @@ export function CustomSkuDialog({
 }) {
   const [meta, setMeta] = useState<SkuMetaState>(emptySkuMeta);
   const [price, setPrice] = useState("");
-  const reset = () => { setMeta(emptySkuMeta); setPrice(""); };
+  const [defaultShopIds, setDefaultShopIds] = useState<string[]>([]);
+  const reset = () => { setMeta(emptySkuMeta); setPrice(""); setDefaultShopIds([]); };
   const mut = useCustomSkuMutation((res) => {
     reset();
     onOpenChange(false);
@@ -100,12 +102,13 @@ export function CustomSkuDialog({
         <DialogHeader>
           <DialogTitle>新建自定义商品</DialogTitle>
         </DialogHeader>
-        <div className="py-2">
+        <div className="py-2 space-y-4">
           <CustomSkuForm meta={meta} setMeta={setMeta} price={price} setPrice={setPrice} />
+          <DefaultShopsSelector value={defaultShopIds} onChange={setDefaultShopIds} />
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>取消</Button>
-          <Button onClick={() => mut.mutate({ meta, price })} disabled={mut.isPending}>
+          <Button onClick={() => mut.mutate({ meta, price, default_shop_ids: defaultShopIds })} disabled={mut.isPending}>
             {mut.isPending ? "创建中…" : "创建并生成 EPC"}
           </Button>
         </DialogFooter>
