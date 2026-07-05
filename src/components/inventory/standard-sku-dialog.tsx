@@ -16,6 +16,7 @@ import { createStandardSkus } from "@/lib/inventory.functions";
 import { generateEpc } from "@/lib/inventory.helpers";
 import { PriceTierEditor } from "./price-tier-editor";
 import { SkuMetaFields, emptySkuMeta, type SkuMetaState } from "./sku-meta-fields";
+import { DefaultShopsSelector } from "./default-shops-selector";
 
 export function StandardSkuDialog({
   open,
@@ -29,6 +30,7 @@ export function StandardSkuDialog({
   const fn = useServerFn(createStandardSkus);
   const [meta, setMeta] = useState<SkuMetaState>(emptySkuMeta);
   const [tiers, setTiers] = useState<number[]>([]);
+  const [defaultShopIds, setDefaultShopIds] = useState<string[]>([]);
 
   // 缓存 (category|tier) -> epc，避免重渲染时换随机串
   const epcCacheRef = useRef<Map<string, string>>(new Map());
@@ -47,6 +49,7 @@ export function StandardSkuDialog({
   const reset = () => {
     setMeta(emptySkuMeta);
     setTiers([]);
+    setDefaultShopIds([]);
     epcCacheRef.current.clear();
   };
 
@@ -66,6 +69,7 @@ export function StandardSkuDialog({
           notes: meta.notes.trim() || null,
           price_tiers: sortedSelected,
           epc_map,
+          default_shop_ids: defaultShopIds,
         },
       });
     },
@@ -111,6 +115,7 @@ export function StandardSkuDialog({
               </ul>
             </div>
           )}
+          <DefaultShopsSelector value={defaultShopIds} onChange={setDefaultShopIds} />
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>取消</Button>

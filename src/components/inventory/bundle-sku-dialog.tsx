@@ -19,6 +19,7 @@ import { Card } from "@/components/ui/card";
 import { createBundleSku, listSkus } from "@/lib/inventory.functions";
 import { CATEGORY_LABEL, formatPrice } from "@/lib/inventory.helpers";
 import { SkuMetaFields, emptySkuMeta, type SkuMetaState } from "./sku-meta-fields";
+import { DefaultShopsSelector } from "./default-shops-selector";
 
 type ChildRow = {
   id: string;
@@ -44,8 +45,9 @@ export function BundleSkuDialog({
   const [price, setPrice] = useState("");
   const [items, setItems] = useState<Array<{ sku: ChildRow; qty: number }>>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [defaultShopIds, setDefaultShopIds] = useState<string[]>([]);
 
-  const reset = () => { setMeta(emptySkuMeta); setPrice(""); setItems([]); };
+  const reset = () => { setMeta(emptySkuMeta); setPrice(""); setItems([]); setDefaultShopIds([]); };
 
   const refSubtotal = useMemo(
     () => items.reduce((s, x) => s + x.qty * Number(x.sku.price_tier), 0),
@@ -78,6 +80,7 @@ export function BundleSkuDialog({
           notes: meta.notes.trim() || null,
           price: Math.round(p * 100) / 100,
           items: items.map((x) => ({ sku_id: x.sku.id, qty: x.qty })),
+          default_shop_ids: defaultShopIds,
         },
       });
     },
@@ -182,6 +185,12 @@ export function BundleSkuDialog({
             </p>
           </div>
         </div>
+
+        <div className="pb-2">
+          <DefaultShopsSelector value={defaultShopIds} onChange={setDefaultShopIds} />
+        </div>
+
+
 
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>取消</Button>
