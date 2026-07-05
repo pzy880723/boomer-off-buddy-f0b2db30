@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Plus, Search, Tags, Package2, ChevronDown, Boxes, Sparkles, LayoutGrid, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -72,6 +72,9 @@ function SkusPage() {
   const q = useQuery({
     queryKey: ["inv-skus", search],
     queryFn: () => listFn({ data: { search: search || undefined, limit: 500 } }),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    placeholderData: keepPreviousData,
   });
 
   const rows = (q.data?.rows ?? []) as SkuRow[];

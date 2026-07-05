@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   Plus,
@@ -88,6 +88,8 @@ function ShopProductsPage() {
   const shopsQ = useQuery({
     queryKey: ["yz-branch-shops"],
     queryFn: () => fetchShops(),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
   });
   const branches = useMemo(
     () => (shopsQ.data?.shops ?? []).filter((s) => s.role === "branch"),
@@ -100,7 +102,7 @@ function ShopProductsPage() {
 
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
-  const [tab, setTab] = useState<TabKind>("custom");
+  const [tab, setTab] = useState<TabKind>("standard");
   const [view, setView] = useState<ViewMode>("list");
   const [openDialog, setOpenDialog] = useState<DialogKind>(null);
   const [receive, setReceive] = useState<{ sku_id: string; sku_name: string; qty: number } | null>(null);
@@ -109,14 +111,24 @@ function ShopProductsPage() {
     queryKey: ["shop-skus", activeShopId, search],
     queryFn: () => fetchRows({ data: { shop_id: activeShopId, search: search || undefined } }),
     enabled: !!activeShopId,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    placeholderData: keepPreviousData,
   });
   const rows = (rowsQ.data?.rows ?? []) as ShopSkuRow[];
 
+  const linkIdsKey = useMemo(
+    () => Array.from(new Set(rows.map((r) => r.id))).sort().join(","),
+    [rows],
+  );
   const linksQ = useQuery({
-    queryKey: ["shop-links", activeShopId, rows.map((r) => r.id).join(",")],
+    queryKey: ["shop-links", activeShopId, linkIdsKey],
     queryFn: () =>
       fetchLinks({ data: { shop_id: activeShopId, sku_ids: rows.map((r) => r.id) } }),
     enabled: !!activeShopId && rows.length > 0,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    placeholderData: keepPreviousData,
   });
   const links = linksQ.data?.links ?? {};
 
