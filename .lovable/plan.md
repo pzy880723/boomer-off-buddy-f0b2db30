@@ -1,34 +1,102 @@
-## 目标
-让「标准商品 · 编辑」弹窗里的**类目**变成可修改字段。新建弹窗本来就有类目选项，不动。
+# 计划：门店商品顺序 + 自定义商品自动同步有赞
 
-## 变更范围（都在 `updateStandardProduct` + 编辑弹窗）
+我先用白话说结论：
 
-### 1. `src/components/inventory/product-edit-dialog.tsx`
-- 去掉 `<SkuMetaFields ... hideCategory />`，改成显示类目下拉。
-- `mut.mutationFn` 里把 `category` 传给 `updateStandardProduct`：仅当用户改动了类目时才传（用 `meta.category !== group.category` 判断），避免无意义写入。
-- 弹窗顶部说明改为：「修改类目会重算 EPC 前缀并更新该商品下全部价格档；若任一价格档有库存或入库记录，修改类目会失败。」
-- 保存成功 toast 追加「已改类目」提示。
+- 你那两个测试孤品不是“没同步”，而是系统已经尝试同步了，但有赞返回了失败。
+- 失败原文是：`非法的API`。
+- 我不会再让你自己看一堆代码名；我会把页面改成能直接告诉你“哪里卡住了”，并提供按钮让你一键重试。
 
-### 2. `src/lib/inventory.functions.ts` — `updateStandardProduct`
-- 输入 schema 的 `patch` 增加 `category: z.string().min(1).optional()`。
-- handler 逻辑扩展：
-  - 拉出的 `matched` 记录同时选 `epc, sku_code, stock_qty`。
-  - 若 `patch.category` 与当前 `category` 不同：
-    1. **前置校验**：任一子 SKU `stock_qty > 0` 直接抛「类目变更前请先清空库存」；任一子 SKU 在 `inv_inbound_lines` 出现过（复用 `safeDeleteSkuById` 里那段查询逻辑抽出的 helper）→ 抛「已有入库记录，禁止改类目」。
-    2. **重算 EPC**：对每条 matched row 调 `generateEpc(newCategory, price_tier)` 生成新 EPC；同时若 `sku_code` 是「自动生成前缀」形式（`SKU-` 开头），一并调 `generateSkuCode(newCategory, "single")` 刷新，否则保留用户自定义值。
-    3. 用一次 `update` 把 `category / epc / sku_code`（可选）写回；由于 `epc` 有唯一约束，冲突时直接抛错让用户处理。
-  - 新增价格档时（`toAdd`）用**新类目**生成 `epc` / `sku_code`（把 `category` 变量指向 `patch.category ?? ref.category`，已经如此）。
-- 由于类目改后 `key` 会变（`category|name` 或 `sku_code`），返回值加 `newKey` 字段，前端 `onSaved` 触发列表 refetch 即可（详情页 route param 是 code，用户可能停留在旧 URL；此处不做自动跳转，保持最小改动）。
+## 1. 页面顺序调整
 
-### 3. 无 DB 迁移
-`inv_skus.category` 已存在且可写；不新增列。EPC 唯一冲突交由数据库约束抛错。
+在「门店商品」页面，把商品顺序改成：
 
-## 不改动
-- 新建弹窗 `StandardSkuDialog`（类目本来就有）。
-- 自定义 / 组包 SKU 的编辑逻辑。
-- 有赞同步：类目变更不主动重推有赞（用户如需重新绑定分组，走现有 `/product-categories`）。
+1. 自定义商品（孤品）
+2. 组包商品
+3. 标准商品
 
-## 边界与失败提示
-- 有库存 / 有入库记录 → 阻止（明确文案）。
-- 新 EPC 冲突 → 「EPC 冲突，请先在库存/未认领 EPC 里清理」。
-- 用户改类目 + 改价格档同一次提交：先执行类目迁移，再走原有价格档 add/remove 分支。
+打开页面默认先看到「自定义商品」。
+
+## 2. 自定义商品以后自动同步到有赞
+
+保留现有逻辑：你以后在门店里新建自定义商品，系统会自动：
+
+1. 先在本系统里创建商品
+2. 给这个门店加库存
+3. 自动把商品推到有赞
+4. 成功后显示「已同步有赞」
+5. 失败后显示「上架失败」，并且可以点一下重试
+
+## 3. 把失败原因改成普通话提示
+
+现在页面只显示「上架失败」，不够清楚。
+
+我会改成：
+
+- 如果有赞返回「非法的API」，页面显示：
+  - “有赞拒绝了这次同步。通常是当前接口不能这样调用，或店铺/应用版本不匹配。系统已记录有赞返回的追踪号。”
+- 如果默认分组没设置，页面显示：
+  - “还没选择有赞里的默认分组。去设置里选一个分组后再重试。”
+- 如果是网络、token、白名单等问题，也显示成普通话，不再只抛技术错误。
+
+## 4. 增加“一键重推失败商品”
+
+在「门店商品」页面加一个按钮：
+
+- 「重推失败商品」
+
+它会把当前门店里同步失败的自定义商品、组包商品重新推一次。
+
+这样你不用一个个点卡片。
+
+## 5. 增加“有赞同步体检”
+
+在「设置 → 集成」里加一个简单体检区：
+
+- 检查默认分组有没有选
+- 检查总部店铺 token 是否可用
+- 检查门店 token 是否可用
+- 检查推商品接口现在是否能被有赞接受
+
+结果用普通话显示：
+
+- 正常
+- 默认分组没选
+- 有赞拒绝推商品
+- token 失效
+- 网络 / 白名单问题
+
+## 6. 对现有两个测试孤品做重试入口
+
+我会保留这两个失败记录，不直接删。
+
+等页面有了「重推失败商品」后，你点一下就能重新推。
+
+如果重试还失败，页面会显示更清楚的原因，我再继续根据真实返回改同步方式。
+
+## 技术细节
+
+涉及文件：
+
+- `src/routes/shop-mgmt.products.tsx`
+  - 调整 Tab 顺序和默认 Tab
+  - 增加「重推失败商品」按钮
+  - 优化失败提示
+
+- `src/lib/shop-products.functions.ts`
+  - 增加批量重推当前门店失败商品的 server function
+
+- `src/lib/youzan-sync.functions.ts`
+  - 统一把有赞错误翻译成业务可读提示
+  - 保留原始错误和 trace，方便继续排查
+
+- `src/routes/settings.tsx`
+  - 增加有赞同步体检入口
+
+- `src/lib/app-settings.functions.ts` 或 `src/lib/youzan.functions.ts`
+  - 增加体检用 server function
+
+## 完成后的效果
+
+你以后新建孤品或组包商品时，不需要额外操作；系统会自动推到有赞。
+
+如果有赞没出现商品，页面会直接告诉你“为什么没出现”，并提供重试按钮。
