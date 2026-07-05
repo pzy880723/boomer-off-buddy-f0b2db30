@@ -220,7 +220,12 @@ export const createStandardSkus = createServerFn({ method: "POST" })
       .insert(rows as never)
       .select("*");
     if (error) throw new Error(error.message);
-    return { skus: inserted ?? [] };
+    const skuList = inserted ?? [];
+    autoDistributeInBackground(
+      skuList.map((s) => String((s as { id: string }).id)),
+      data.default_shop_ids ?? [],
+    );
+    return { skus: skuList };
   });
 
 /** 自定义商品：单条 SKU，价格手填 */
@@ -257,6 +262,10 @@ export const createCustomSku = createServerFn({ method: "POST" })
       .select("*")
       .single();
     if (error) throw new Error(error.message);
+    autoDistributeInBackground(
+      [String((row as { id: string }).id)],
+      data.default_shop_ids ?? [],
+    );
     return { sku: row };
   });
 
@@ -312,6 +321,10 @@ export const createBundleSku = createServerFn({ method: "POST" })
       .select("*")
       .single();
     if (error) throw new Error(error.message);
+    autoDistributeInBackground(
+      [String((row as { id: string }).id)],
+      data.default_shop_ids ?? [],
+    );
     return { sku: row };
   });
 
