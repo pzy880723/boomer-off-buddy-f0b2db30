@@ -80,15 +80,46 @@ async function pushStockToYouzan(
       timeoutMs: 20_000,
     });
   } else {
-    // 独立 kdt 分店：单店商品库存 API（type=3 = 覆盖设置）
+    // 连锁零售分店：走 retail.open.stock.update（type=set 覆盖）
+    const params: Record<string, unknown> = {
+      kdt_id: shop.kdt_id,
+      item_id: link.yz_item_id,
+      num,
+      type: "set",
+      client_seq: clientSeq,
+    };
+    if (link.yz_sku_id) params.sku_id = link.yz_sku_id;
     await callYouzanApiVerbose({
       accessToken: token,
-      method: "youzan.item.quantity.update",
-      version: "3.0.0",
-      params: { item_id: link.yz_item_id, type: 3, quantity: num },
+      method: "youzan.retail.open.stock.update",
+      version: "1.0.0",
+      params,
       timeoutMs: 20_000,
     });
   }
+}
+
+// ============================================================
+// pushIsDisplayToYouzan —— 分店上下架
+// ------------------------------------------------------------
+// is_display=true → retail.open.product.online；false → offline
+// ============================================================
+async function pushIsDisplayToYouzan(
+  link: LinkRow,
+  isDisplay: boolean,
+): Promise<void> {
+  const shop = await getShopById(link.shop_id);
+  const token = await ensureAccessToken(shop);
+  const method = isDisplay
+    ? "youzan.retail.open.product.online"
+    : "youzan.retail.open.product.offline";
+  await callYouzanApiVerbose({
+    accessToken: token,
+    method,
+    version: "1.0.0",
+    params: { kdt_id: shop.kdt_id, item_id: link.yz_item_id },
+    timeoutMs: 20_000,
+  });
 }
 
 // ============================================================
@@ -636,8 +667,10 @@ async function runStockSyncWorkerCore(opts: {
       }
       if (!link) throw new Error("SKU 未绑定该门店的有赞商品");
 
-      // v2：HQ 主 SPU 不推库存，直接标 done 跳过
-      if ((link as { sync_stock?: boolean }).sync_stock === false) {
+      const action = (t as { action?: string }).action ?? "push_stock";
+
+      // v2：HQ 主 SPU 不推库存 / 上下架，直接标 done 跳过
+      if ((link as { sync_stock?: boolean }).sync_stock === false && action === "push_stock") {
         await supabase
           .from("youzan_stock_sync_queue")
           .update({
@@ -646,6 +679,25 @@ async function runStockSyncWorkerCore(opts: {
             attempts: (t.attempts ?? 0) + 1,
           } as never)
           .eq("id", t.id);
+        ok += 1;
+        continue;
+      }
+
+      if (action === "push_is_display") {
+        const targetIsDisplay = Boolean((t as { target_is_display?: boolean }).target_is_display);
+        await pushIsDisplayToYouzan(link as LinkRow, targetIsDisplay);
+        await supabase
+          .from("youzan_stock_sync_queue")
+          .update({
+            status: "done",
+            last_error: null,
+            attempts: (t.attempts ?? 0) + 1,
+          } as never)
+          .eq("id", t.id);
+        await supabase
+          .from("sku_youzan_links")
+          .update({ status: "linked", last_error: null } as never)
+          .eq("id", (link as { id: string }).id);
         ok += 1;
         continue;
       }
