@@ -4,7 +4,7 @@ import { useMemo, useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Building2, Users, Bell, Plug, Webhook, Key, History, MapPin, RefreshCw, Loader2 } from "lucide-react";
+import { Building2, Users, Bell, Plug, Webhook, Key, History, MapPin, RefreshCw, Loader2, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
 import { AddressBookPanel } from "@/components/settings/address-book-panel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,6 +19,7 @@ import {
   setYouzanDefaultCategoryId,
 } from "@/lib/app-settings.functions";
 import { fetchYouzanGroupsLive, type YouzanGroupNode } from "@/lib/categories.functions";
+import { diagnoseYouzanListing } from "@/lib/youzan.functions";
 
 
 const SETTINGS_TABS = [
@@ -213,6 +214,7 @@ function SettingsPage() {
 
         <TabsContent value="integration" className="space-y-4">
           <YouzanDefaultGroupCard />
+          <YouzanDiagnosticsCard />
           <div className="grid gap-3 md:grid-cols-2">
             {[
               { name: "有赞连锁", status: "已连接", tone: "success" },
@@ -308,6 +310,71 @@ function SettingsPage() {
 
       </Tabs>
     </div>
+  );
+}
+
+function YouzanDiagnosticsCard() {
+  const diagnoseFn = useServerFn(diagnoseYouzanListing);
+  const [result, setResult] = useState<Awaited<ReturnType<typeof diagnoseFn>> | null>(null);
+  const mut = useMutation({
+    mutationFn: () => diagnoseFn(),
+    onSuccess: (data) => {
+      setResult(data);
+      if (data.ok) toast.success("有赞同步体检通过");
+      else toast.warning("有赞同步体检发现问题");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "体检失败"),
+  });
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center justify-between text-base">
+          <span>有赞同步体检</span>
+          {result ? (
+            <Badge variant="outline" className={result.ok ? "text-emerald-600" : "text-amber-600"}>
+              {result.ok ? "正常" : "需要处理"}
+            </Badge>
+          ) : null}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-xs text-muted-foreground">
+          点一下，系统会自己检查有赞连接、默认分组和推商品接口，不需要你看代码。
+        </p>
+        <Button size="sm" variant="outline" onClick={() => mut.mutate()} disabled={mut.isPending}>
+          {mut.isPending ? (
+            <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <RefreshCw className="mr-1 h-3.5 w-3.5" />
+          )}
+          开始体检
+        </Button>
+
+        {result && (
+          <div className="space-y-2 rounded-md border p-3">
+            {result.steps.map((step) => {
+              const Icon = step.status === "ok" ? CheckCircle2 : step.status === "warn" ? AlertTriangle : XCircle;
+              const tone = step.status === "ok" ? "text-emerald-600" : step.status === "warn" ? "text-amber-600" : "text-destructive";
+              return (
+                <div key={step.label} className="flex gap-2 text-xs">
+                  <Icon className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${tone}`} />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium">{step.label}</div>
+                    <div className="mt-0.5 whitespace-pre-wrap break-words text-muted-foreground">
+                      {step.message}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            <div className="border-t pt-2 text-[11px] text-muted-foreground">
+              网络出口：{result.outbound.message}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
