@@ -115,6 +115,7 @@ export function StandardSkuDialog({
               </ul>
             </div>
           )}
+          <DefaultShopsSelector value={defaultShopIds} onChange={setDefaultShopIds} />
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>取消</Button>
