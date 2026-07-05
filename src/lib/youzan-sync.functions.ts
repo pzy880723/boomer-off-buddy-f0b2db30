@@ -481,14 +481,17 @@ export async function ensureHqSpuLink(
 
   const { data: sku } = await supabase
     .from("inv_skus")
-    .select("id, sku_code, name, category, price_tier, image_url, weight_g, notes")
+    .select("id, sku_code, name, category, price_tier, image_url, weight_g, notes, sku_scope")
     .eq("id", sku_id)
     .maybeSingle();
   if (!sku) throw new Error("SKU 不存在");
   if (!sku.sku_code) throw new Error("SKU 缺少 sku_code，无法登记到有赞");
 
+  const scope: "standard" | "custom" =
+    ((sku as { sku_scope?: string }).sku_scope === "custom" ? "custom" : "standard");
   const categoryId = await resolveHqCategoryId(sku as { category?: string | null });
-  const { kdtIds } = await collectSellChannelKdtIds(sku_id, addBranchShopId);
+  const { kdtIds } = await collectSellChannelKdtIds(sku_id, scope, addBranchShopId);
+
 
   const params: Record<string, unknown> = {
     title: sku.name,
