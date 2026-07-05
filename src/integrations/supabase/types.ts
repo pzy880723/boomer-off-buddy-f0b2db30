@@ -837,6 +837,7 @@ export type Database = {
           bundle_items: Json
           category: string
           created_at: string
+          default_shop_ids: string[]
           epc: string
           grade: string | null
           id: string
@@ -860,6 +861,7 @@ export type Database = {
           bundle_items?: Json
           category: string
           created_at?: string
+          default_shop_ids?: string[]
           epc: string
           grade?: string | null
           id?: string
@@ -883,6 +885,7 @@ export type Database = {
           bundle_items?: Json
           category?: string
           created_at?: string
+          default_shop_ids?: string[]
           epc?: string
           grade?: string | null
           id?: string
