@@ -305,7 +305,7 @@ function MNewCustomSkuSheet({
           <CustomSkuForm meta={meta} setMeta={setMeta} price={price} setPrice={setPrice} mobile />
         </div>
         <SheetFooter className="fixed inset-x-0 bottom-0 border-t bg-background p-3 pb-[calc(env(safe-area-inset-bottom)+12px)]">
-          <Button className="w-full" onClick={() => mut.mutate({ meta, price })} disabled={mut.isPending}>
+          <Button className="w-full" onClick={() => mut.mutate({ meta, price, default_shop_ids: [] })} disabled={mut.isPending}>
             {mut.isPending ? "创建中…" : "创建并生成 EPC"}
           </Button>
         </SheetFooter>
