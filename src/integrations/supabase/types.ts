@@ -851,6 +851,7 @@ export type Database = {
           pack_pieces: number | null
           price_tier: number
           sku_code: string | null
+          sku_scope: string
           status: string
           stock_qty: number
           updated_at: string
@@ -875,6 +876,7 @@ export type Database = {
           pack_pieces?: number | null
           price_tier: number
           sku_code?: string | null
+          sku_scope?: string
           status?: string
           stock_qty?: number
           updated_at?: string
@@ -899,6 +901,7 @@ export type Database = {
           pack_pieces?: number | null
           price_tier?: number
           sku_code?: string | null
+          sku_scope?: string
           status?: string
           stock_qty?: number
           updated_at?: string
