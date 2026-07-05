@@ -316,11 +316,12 @@ function SettingsPage() {
 function YouzanDiagnosticsCard() {
   const diagnoseFn = useServerFn(diagnoseYouzanListing);
   const [result, setResult] = useState<Awaited<ReturnType<typeof diagnoseFn>> | null>(null);
+  const allPassed = result ? result.steps.every((step) => step.status === "ok") : false;
   const mut = useMutation({
     mutationFn: () => diagnoseFn(),
     onSuccess: (data) => {
       setResult(data);
-      if (data.ok) toast.success("有赞同步体检通过");
+      if (data.steps.every((step) => step.status === "ok")) toast.success("有赞同步体检通过");
       else toast.warning("有赞同步体检发现需要处理的地方");
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "体检失败"),
@@ -332,8 +333,8 @@ function YouzanDiagnosticsCard() {
         <CardTitle className="flex items-center justify-between text-base">
           <span>有赞同步体检</span>
           {result ? (
-            <Badge variant="outline" className={result.ok ? "text-emerald-600" : "text-amber-600"}>
-              {result.ok ? "正常" : "需要处理"}
+            <Badge variant="outline" className={allPassed ? "text-emerald-600" : "text-amber-600"}>
+              {allPassed ? "正常" : "需要处理"}
             </Badge>
           ) : null}
         </CardTitle>
