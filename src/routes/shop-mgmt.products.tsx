@@ -72,9 +72,9 @@ export const Route = createFileRoute("/shop-mgmt/products")({
   component: ShopProductsPage,
 });
 
-type TabKind = "standard" | "custom" | "bundle";
+type TabKind = "custom" | "bundle" | "standard";
 type ViewMode = "grid" | "list";
-type DialogKind = "standard" | "custom" | "bundle" | null;
+type DialogKind = "custom" | "bundle" | null;
 
 function ShopProductsPage() {
   const qc = useQueryClient();
@@ -99,7 +99,7 @@ function ShopProductsPage() {
 
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
-  const [tab, setTab] = useState<TabKind>("standard");
+  const [tab, setTab] = useState<TabKind>("custom");
   const [view, setView] = useState<ViewMode>("list");
   const [openDialog, setOpenDialog] = useState<DialogKind>(null);
   const [receive, setReceive] = useState<{ sku_id: string; sku_name: string; qty: number } | null>(null);
