@@ -55,6 +55,11 @@ export const Route = createFileRoute("/api/public/handheld/items/$id")({
             ? sku.image_url
             : null);
 
+
+        const totalQty = stockList.reduce((sum, r) => sum + (Number(r?.qty) || 0), 0);
+        const isDisplay = (sku as { is_display?: boolean }).is_display !== false;
+        const listingStatus = deriveListingStatus(isDisplay, totalQty);
+
         return ok({
           id: sku.id,
           sku_code: sku.sku_code,
@@ -72,7 +77,12 @@ export const Route = createFileRoute("/api/public/handheld/items/$id")({
           notes: sku.notes,
           weight_g: sku.weight_g,
           stock_qty: sku.stock_qty,
+          total_stock_qty: totalQty,
           status: sku.status,
+          is_display: isDisplay,
+          listing_status: listingStatus,
+          status_label: statusLabel(listingStatus),
+          can_restock: listingStatus === "sold_out",
           created_at: sku.created_at,
           updated_at: sku.updated_at,
           stocks: stockList,
