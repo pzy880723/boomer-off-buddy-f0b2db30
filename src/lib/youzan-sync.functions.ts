@@ -381,10 +381,30 @@ async function resolveHqCategoryId(sku: {
 }
 
 /**
- * 拉齐 sku_youzan_links 里所有已存在的 branch_stock 分店 kdt_id，
- * 加上传入的新分店，得到本次 spu.create / spu.update 要传的 sell_channel_ids。
+ * 按 sku_scope 汇总本次 spu.create / spu.update 要传的 sell_channel_ids。
+ *  - standard：全部启用中的分店 kdt_id（无论是否已绑定）
+ *  - custom：只包含已绑定的分店 + 本次追加的分店
  */
-async function collectSellChannelKdtIds(sku_id: string, addShopId?: string): Promise<{ shopIds: string[]; kdtIds: number[] }> {
+async function collectSellChannelKdtIds(
+  sku_id: string,
+  scope: "standard" | "custom",
+  addShopId?: string,
+): Promise<{ shopIds: string[]; kdtIds: number[] }> {
+  if (scope === "standard") {
+    const { data: shops } = await supabase
+      .from("youzan_shops")
+      .select("id, kdt_id, role, status")
+      .eq("role", "branch");
+    const active = (shops ?? []).filter(
+      (s) => (s as { status?: string }).status !== "disabled",
+    );
+    return {
+      shopIds: active.map((s) => s.id as string),
+      kdtIds: active.map((s) => Number(s.kdt_id)),
+    };
+  }
+
+  // custom：仅相关分店
   const { data: links } = await supabase
     .from("sku_youzan_links")
     .select("shop_id, role")
@@ -407,6 +427,7 @@ async function collectSellChannelKdtIds(sku_id: string, addShopId?: string): Pro
     .map((s) => Number(s.kdt_id));
   return { shopIds, kdtIds };
 }
+
 
 /**
  * 组装 retail.open.spu.create.3.0.0 的 SKU 数组。
@@ -460,14 +481,17 @@ export async function ensureHqSpuLink(
 
   const { data: sku } = await supabase
     .from("inv_skus")
-    .select("id, sku_code, name, category, price_tier, image_url, weight_g, notes")
+    .select("id, sku_code, name, category, price_tier, image_url, weight_g, notes, sku_scope")
     .eq("id", sku_id)
     .maybeSingle();
   if (!sku) throw new Error("SKU 不存在");
   if (!sku.sku_code) throw new Error("SKU 缺少 sku_code，无法登记到有赞");
 
+  const scope: "standard" | "custom" =
+    ((sku as { sku_scope?: string }).sku_scope === "custom" ? "custom" : "standard");
   const categoryId = await resolveHqCategoryId(sku as { category?: string | null });
-  const { kdtIds } = await collectSellChannelKdtIds(sku_id, addBranchShopId);
+  const { kdtIds } = await collectSellChannelKdtIds(sku_id, scope, addBranchShopId);
+
 
   const params: Record<string, unknown> = {
     title: sku.name,
@@ -518,7 +542,14 @@ export async function ensureHqSpuLink(
  */
 async function addBranchToHqSpu(sku_id: string, hqSpuId: number, addBranchShopId: string): Promise<void> {
   const hq = await getHqShop();
-  const { kdtIds } = await collectSellChannelKdtIds(sku_id, addBranchShopId);
+  const { data: sku } = await supabase
+    .from("inv_skus")
+    .select("sku_scope")
+    .eq("id", sku_id)
+    .maybeSingle();
+  const scope: "standard" | "custom" =
+    ((sku as { sku_scope?: string } | null)?.sku_scope === "custom" ? "custom" : "standard");
+  const { kdtIds } = await collectSellChannelKdtIds(sku_id, scope, addBranchShopId);
   if (kdtIds.length === 0) return;
   const token = await ensureAccessToken(hq);
   await callYouzanApiVerbose({
@@ -532,6 +563,7 @@ async function addBranchToHqSpu(sku_id: string, hqSpuId: number, addBranchShopId
     timeoutMs: 30_000,
   });
 }
+
 
 export const pushSkuAsNewYouzanItem = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
