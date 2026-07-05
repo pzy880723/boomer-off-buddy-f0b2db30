@@ -5,6 +5,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   callYouzanApiVerbose,
   ensureAccessToken,
+  explainYouzanError,
   getHqShop,
 } from "./youzan.functions";
 
@@ -879,7 +880,7 @@ async function runStockSyncWorkerCore(opts: {
         .eq("id", (link as { id: string }).id);
       ok += 1;
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = explainYouzanError(e);
       const attempts = (t.attempts ?? 0) + 1;
       const giveUp = attempts >= BACKOFF_SEC.length;
       const nextRun = giveUp
@@ -1009,7 +1010,7 @@ export async function ensureBranchProduct(
     );
     return { yz_item_id: hqSpuId, created: true };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
+    const msg = explainYouzanError(e);
     await supabase.from("sku_youzan_links").upsert(
       {
         sku_id,
