@@ -1,4 +1,4 @@
-import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
 import { Building2, Users, Bell, Plug, Webhook, Key, History, MapPin } from "lucide-react";
 import { AddressBookPanel } from "@/components/settings/address-book-panel";
