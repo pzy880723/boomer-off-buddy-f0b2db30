@@ -387,7 +387,7 @@ export const diagnoseYouzanListing = createServerFn({ method: "POST" })
     }
 
     return {
-      ok: !steps.some((s) => s.status === "error"),
+      ok: steps.every((s) => s.status === "ok"),
       checkedAt: new Date().toISOString(),
       outbound: getYouzanOutboundStatus(),
       steps,
