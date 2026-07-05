@@ -39,6 +39,11 @@ export const Route = createFileRoute("/api/public/handheld/global-stock")({
         const q = (url.searchParams.get("q") || "").trim();
         const categoryFilter = (url.searchParams.get("category") || "").trim() || null;
         const stockState = (url.searchParams.get("stock_state") || "all").toLowerCase();
+        const statusFilter = (url.searchParams.get("status") || "all").toLowerCase() as
+          | "selling"
+          | "sold_out"
+          | "in_warehouse"
+          | "all";
         const lowThreshold = Math.max(1, Number(url.searchParams.get("low_threshold") || "5") | 0);
         const page = Math.max(1, Number(url.searchParams.get("page") || "1") | 0);
         const pageSize = Math.min(
