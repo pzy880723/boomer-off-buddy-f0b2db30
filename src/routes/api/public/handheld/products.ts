@@ -65,6 +65,7 @@ type SkuRow = {
   image_paths: string[] | null;
   notes: string | null;
   status: string;
+  is_display: boolean;
   kind: string;
   is_custom_price: boolean;
   stock_qty: number;
@@ -75,7 +76,7 @@ type SkuRow = {
 type LocRow = { id: string; name: string; kind: "warehouse" | "shop" };
 
 const SKU_COLS =
-  "id, sku_code, barcode, epc, name, category, price_tier, grade, image_url, image_paths, notes, status, kind, is_custom_price, stock_qty, created_at, updated_at";
+  "id, sku_code, barcode, epc, name, category, price_tier, grade, image_url, image_paths, notes, status, is_display, kind, is_custom_price, stock_qty, created_at, updated_at";
 
 function classifyType(r: { kind: string; is_custom_price: boolean }): ProductType {
   if (r.kind === "bundle") return "bundle";
