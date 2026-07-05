@@ -321,7 +321,7 @@ function YouzanDiagnosticsCard() {
     onSuccess: (data) => {
       setResult(data);
       if (data.ok) toast.success("有赞同步体检通过");
-      else toast.warning("有赞同步体检发现问题");
+      else toast.warning("有赞同步体检发现需要处理的地方");
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "体检失败"),
   });
@@ -392,8 +392,12 @@ function YouzanDefaultGroupCard() {
   });
 
   const [selected, setSelected] = useState<number | null>(null);
+  const [manualId, setManualId] = useState("");
   useEffect(() => {
-    if (curQ.data?.id != null) setSelected(curQ.data.id);
+    if (curQ.data?.id != null) {
+      setSelected(curQ.data.id);
+      setManualId(String(curQ.data.id));
+    }
   }, [curQ.data?.id]);
 
   const rows: YouzanGroupNode[] = yzQ.data?.rows ?? [];
@@ -431,6 +435,8 @@ function YouzanDefaultGroupCard() {
   const currentName = curQ.data?.id
     ? (rows.find((r) => r.id === curQ.data!.id)?.name ?? `#${curQ.data!.id}`)
     : null;
+  const manualNumericId = Number(manualId.trim());
+  const saveId = selected ?? (Number.isInteger(manualNumericId) && manualNumericId > 0 ? manualNumericId : null);
 
   return (
     <Card>
@@ -473,8 +479,8 @@ function YouzanDefaultGroupCard() {
           </div>
         )}
 
-        <div className="flex items-end gap-2">
-          <div className="flex-1 space-y-1.5">
+        <div className="grid gap-2 md:grid-cols-[1fr_11rem_auto_auto] md:items-end">
+          <div className="space-y-1.5">
             <Label>默认分组</Label>
             <select
               className="h-9 w-full rounded-md border bg-background px-2 text-sm"
@@ -494,6 +500,20 @@ function YouzanDefaultGroupCard() {
               ))}
             </select>
           </div>
+          <div className="space-y-1.5">
+            <Label>手动填 ID</Label>
+            <Input
+              className="h-9 text-sm"
+              inputMode="numeric"
+              placeholder="例如 123456"
+              value={manualId}
+              onChange={(e) => {
+                const next = e.target.value.replace(/[^0-9]/g, "");
+                setManualId(next);
+                setSelected(next ? Number(next) : null);
+              }}
+            />
+          </div>
           <Button
             variant="outline"
             size="sm"
@@ -509,8 +529,8 @@ function YouzanDefaultGroupCard() {
           </Button>
           <Button
             size="sm"
-            onClick={() => saveMut.mutate(selected)}
-            disabled={saveMut.isPending || selected === curQ.data?.id}
+            onClick={() => saveMut.mutate(saveId)}
+            disabled={saveMut.isPending || !saveId || saveId === curQ.data?.id}
           >
             保存
           </Button>
