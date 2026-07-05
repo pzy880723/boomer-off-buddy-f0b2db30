@@ -228,6 +228,11 @@ export const Route = createFileRoute("/api/public/handheld/products")({
         const url = new URL(request.url);
         const q = (url.searchParams.get("q") || "").trim();
         const type = (url.searchParams.get("type") || "all").toLowerCase();
+        const statusFilter = (url.searchParams.get("status") || "all").toLowerCase() as
+          | "selling"
+          | "sold_out"
+          | "in_warehouse"
+          | "all";
         const scope = (url.searchParams.get("scope") || "authorized").toLowerCase();
         const locationFilter = url.searchParams.get("location_id") || null;
         const categoryFilter = (url.searchParams.get("category") || "").trim() || null;
