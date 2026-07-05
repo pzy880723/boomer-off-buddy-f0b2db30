@@ -304,7 +304,10 @@ export const Route = createFileRoute("/api/public/handheld/products")({
 
         const shopIds = locations.filter((l) => l.kind === "shop").map((l) => l.id);
         const hasWarehouse = locations.some((l) => l.kind === "warehouse");
-        if (!scoped.isHq && !hasWarehouse && shopIds.length > 0) {
+        // Non-HQ shop-only view usually filters to qty>0, but skip that when the
+        // caller explicitly asked for sold_out / in_warehouse.
+        const skipQtyGate = statusFilter === "sold_out" || statusFilter === "in_warehouse";
+        if (!scoped.isHq && !hasWarehouse && shopIds.length > 0 && !skipQtyGate) {
           const { data: sids } = await supabaseAdmin
             .from("inv_stocks")
             .select("sku_id")
@@ -322,7 +325,11 @@ export const Route = createFileRoute("/api/public/handheld/products")({
         if (skuErr) return err(skuErr.message, 500);
         const skus = (skuRows ?? []) as SkuRow[];
 
-        const items = await buildItems(skus, locations);
+        let items = await buildItems(skus, locations);
+        // Post-filter for qty-dependent listing_status buckets
+        if (statusFilter === "selling") items = items.filter((it) => it.listing_status === "selling");
+        else if (statusFilter === "sold_out") items = items.filter((it) => it.listing_status === "sold_out");
+
 
         // ---- counts (q/category-affected, type-independent) ----
         // Query in parallel with items, per-type head-counts.
