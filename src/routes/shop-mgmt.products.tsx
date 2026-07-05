@@ -335,24 +335,46 @@ function ShopProductsPage() {
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as TabKind)}>
         <TabsList>
-          <TabsTrigger value="standard">
-            标准商品 <span className="ml-1.5 text-xs text-muted-foreground">{standardGroups.length}</span>
-          </TabsTrigger>
           <TabsTrigger value="custom">
             自定义商品 <span className="ml-1.5 text-xs text-muted-foreground">{customRows.length}</span>
           </TabsTrigger>
           <TabsTrigger value="bundle">
             组包商品 <span className="ml-1.5 text-xs text-muted-foreground">{bundleRows.length}</span>
           </TabsTrigger>
+          <TabsTrigger value="standard">
+            标准商品 <span className="ml-1.5 text-xs text-muted-foreground">{standardGroups.length}</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="standard" className="mt-4">
+          <div className="mb-3 flex items-start gap-2 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs">
+            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+            <div className="flex-1">
+              <p className="font-medium">标准商品统一在仓库新建，门店会自动同步。</p>
+              <p className="mt-0.5 text-muted-foreground">
+                这里只做入库和上下架管理。SKU 定义（品名、价格档、图片、EPC）请在
+                <Link
+                  to="/inventory/skus"
+                  className="mx-1 inline-flex items-center gap-0.5 text-primary underline-offset-2 hover:underline"
+                >
+                  仓库 · 商品中心 <ArrowRight className="h-3 w-3" />
+                </Link>
+                统一维护。
+              </p>
+            </div>
+          </div>
           {standardGroups.length === 0 ? (
             <EmptyState
               icon={Tags}
               title="该门店还没有标准商品"
-              description="新建后会自动在这家门店入库 1 件、并同步上架到有赞门店后台"
-              action={NewMenu}
+              description="标准商品由仓库统一新建，进入仓库商品中心创建后会自动同步到本店"
+              action={
+                <Link to="/inventory/skus">
+                  <Button size="sm" variant="outline">
+                    去仓库 · 商品中心 <ArrowRight className="ml-1 h-3 w-3" />
+                  </Button>
+                </Link>
+              }
             />
           ) : view === "grid" ? (
             <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
@@ -368,6 +390,7 @@ function ShopProductsPage() {
             </Card>
           )}
         </TabsContent>
+
 
         <TabsContent value="custom" className="mt-4">
           {customRows.length === 0 ? (
