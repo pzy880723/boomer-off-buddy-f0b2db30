@@ -141,6 +141,7 @@ import { Route as ApiPublicHandheldLabelTemplatesIdSetDefaultRouteImport } from 
 import { Route as ApiPublicHandheldItemsUploadImageMultipartRouteImport } from './routes/api/public/handheld/items.upload-image.multipart'
 import { Route as ApiPublicHandheldItemsIdSyncStatusRouteImport } from './routes/api/public/handheld/items.$id.sync-status'
 import { Route as ApiPublicHandheldItemsIdSetStatusRouteImport } from './routes/api/public/handheld/items.$id.set-status'
+import { Route as ApiPublicHandheldItemsIdRestockRouteImport } from './routes/api/public/handheld/items.$id.restock'
 import { Route as ApiPublicHandheldItemsIdAttachImagesRouteImport } from './routes/api/public/handheld/items.$id.attach-images'
 import { Route as ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteImport } from './routes/api/public/handheld/parcels.items.$itemId.pack-pieces'
 import { Route as ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRouteImport } from './routes/api/public/handheld/parcels.items.$itemId.pack-pieces.estimate-title'
@@ -869,6 +870,12 @@ const ApiPublicHandheldItemsIdSetStatusRoute =
     path: '/set-status',
     getParentRoute: () => ApiPublicHandheldItemsIdRoute,
   } as any)
+const ApiPublicHandheldItemsIdRestockRoute =
+  ApiPublicHandheldItemsIdRestockRouteImport.update({
+    id: '/restock',
+    path: '/restock',
+    getParentRoute: () => ApiPublicHandheldItemsIdRoute,
+  } as any)
 const ApiPublicHandheldItemsIdAttachImagesRoute =
   ApiPublicHandheldItemsIdAttachImagesRouteImport.update({
     id: '/attach-images',
@@ -1022,6 +1029,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/transfer/ship-scan': typeof ApiPublicHandheldTransferShipScanRoute
   '/api/public/handheld/transfers/$id': typeof ApiPublicHandheldTransfersIdRouteWithChildren
   '/api/public/handheld/items/$id/attach-images': typeof ApiPublicHandheldItemsIdAttachImagesRoute
+  '/api/public/handheld/items/$id/restock': typeof ApiPublicHandheldItemsIdRestockRoute
   '/api/public/handheld/items/$id/set-status': typeof ApiPublicHandheldItemsIdSetStatusRoute
   '/api/public/handheld/items/$id/sync-status': typeof ApiPublicHandheldItemsIdSyncStatusRoute
   '/api/public/handheld/items/upload-image/multipart': typeof ApiPublicHandheldItemsUploadImageMultipartRoute
@@ -1153,6 +1161,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/transfer/ship-scan': typeof ApiPublicHandheldTransferShipScanRoute
   '/api/public/handheld/transfers/$id': typeof ApiPublicHandheldTransfersIdRouteWithChildren
   '/api/public/handheld/items/$id/attach-images': typeof ApiPublicHandheldItemsIdAttachImagesRoute
+  '/api/public/handheld/items/$id/restock': typeof ApiPublicHandheldItemsIdRestockRoute
   '/api/public/handheld/items/$id/set-status': typeof ApiPublicHandheldItemsIdSetStatusRoute
   '/api/public/handheld/items/$id/sync-status': typeof ApiPublicHandheldItemsIdSyncStatusRoute
   '/api/public/handheld/items/upload-image/multipart': typeof ApiPublicHandheldItemsUploadImageMultipartRoute
@@ -1292,6 +1301,7 @@ export interface FileRoutesById {
   '/api/public/handheld/transfer/ship-scan': typeof ApiPublicHandheldTransferShipScanRoute
   '/api/public/handheld/transfers/$id': typeof ApiPublicHandheldTransfersIdRouteWithChildren
   '/api/public/handheld/items/$id/attach-images': typeof ApiPublicHandheldItemsIdAttachImagesRoute
+  '/api/public/handheld/items/$id/restock': typeof ApiPublicHandheldItemsIdRestockRoute
   '/api/public/handheld/items/$id/set-status': typeof ApiPublicHandheldItemsIdSetStatusRoute
   '/api/public/handheld/items/$id/sync-status': typeof ApiPublicHandheldItemsIdSyncStatusRoute
   '/api/public/handheld/items/upload-image/multipart': typeof ApiPublicHandheldItemsUploadImageMultipartRoute
@@ -1432,6 +1442,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/transfer/ship-scan'
     | '/api/public/handheld/transfers/$id'
     | '/api/public/handheld/items/$id/attach-images'
+    | '/api/public/handheld/items/$id/restock'
     | '/api/public/handheld/items/$id/set-status'
     | '/api/public/handheld/items/$id/sync-status'
     | '/api/public/handheld/items/upload-image/multipart'
@@ -1563,6 +1574,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/transfer/ship-scan'
     | '/api/public/handheld/transfers/$id'
     | '/api/public/handheld/items/$id/attach-images'
+    | '/api/public/handheld/items/$id/restock'
     | '/api/public/handheld/items/$id/set-status'
     | '/api/public/handheld/items/$id/sync-status'
     | '/api/public/handheld/items/upload-image/multipart'
@@ -1701,6 +1713,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/transfer/ship-scan'
     | '/api/public/handheld/transfers/$id'
     | '/api/public/handheld/items/$id/attach-images'
+    | '/api/public/handheld/items/$id/restock'
     | '/api/public/handheld/items/$id/set-status'
     | '/api/public/handheld/items/$id/sync-status'
     | '/api/public/handheld/items/upload-image/multipart'
@@ -2721,6 +2734,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldItemsIdSetStatusRouteImport
       parentRoute: typeof ApiPublicHandheldItemsIdRoute
     }
+    '/api/public/handheld/items/$id/restock': {
+      id: '/api/public/handheld/items/$id/restock'
+      path: '/restock'
+      fullPath: '/api/public/handheld/items/$id/restock'
+      preLoaderRoute: typeof ApiPublicHandheldItemsIdRestockRouteImport
+      parentRoute: typeof ApiPublicHandheldItemsIdRoute
+    }
     '/api/public/handheld/items/$id/attach-images': {
       id: '/api/public/handheld/items/$id/attach-images'
       path: '/attach-images'
@@ -3063,6 +3083,7 @@ const ApiPublicHandheldTransfersRouteWithChildren =
 
 interface ApiPublicHandheldItemsIdRouteChildren {
   ApiPublicHandheldItemsIdAttachImagesRoute: typeof ApiPublicHandheldItemsIdAttachImagesRoute
+  ApiPublicHandheldItemsIdRestockRoute: typeof ApiPublicHandheldItemsIdRestockRoute
   ApiPublicHandheldItemsIdSetStatusRoute: typeof ApiPublicHandheldItemsIdSetStatusRoute
   ApiPublicHandheldItemsIdSyncStatusRoute: typeof ApiPublicHandheldItemsIdSyncStatusRoute
 }
@@ -3071,6 +3092,7 @@ const ApiPublicHandheldItemsIdRouteChildren: ApiPublicHandheldItemsIdRouteChildr
   {
     ApiPublicHandheldItemsIdAttachImagesRoute:
       ApiPublicHandheldItemsIdAttachImagesRoute,
+    ApiPublicHandheldItemsIdRestockRoute: ApiPublicHandheldItemsIdRestockRoute,
     ApiPublicHandheldItemsIdSetStatusRoute:
       ApiPublicHandheldItemsIdSetStatusRoute,
     ApiPublicHandheldItemsIdSyncStatusRoute:
