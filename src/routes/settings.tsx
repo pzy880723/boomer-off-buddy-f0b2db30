@@ -30,13 +30,9 @@ const SearchSchema = z.object({
 export const Route = createFileRoute("/settings")({
   head: () => ({ meta: [{ title: "系统设置 · BOOMER OFF" }, { name: "description", content: "权限角色、数据字典与操作日志" }] }),
   validateSearch: (s) => SearchSchema.parse(s),
-  beforeLoad: ({ search }) => {
-    if (search.tab === "categories" || search.tab === "groups") {
-      throw redirect({ to: "/product-categories" });
-    }
-  },
   component: SettingsPage,
 });
+
 
 type NavItem = { value: SettingsTab; label: string; icon: typeof Building2 };
 type NavGroup = { label: string; items: NavItem[] };
