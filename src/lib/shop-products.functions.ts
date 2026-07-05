@@ -2,6 +2,16 @@
 // - 每家门店对应 inv_locations(kind='shop', shop_id=…)
 // - 增减库存都走 inv_apply_movement；DB 触发器会自动登记 push_stock 任务
 // - SKU 首次在某门店有库存时，worker 自愈上架（youzan.item.add）
+//
+// ⚠️ DEPRECATION NOTICE（Round A / 2026-07-05）
+// `ensureBranchListing` 和 `registerNewSkuAtShop` 走的是老单店 API
+// `youzan.item.add`，在连锁零售子店铺会被网关拦截（gw 4005 非法的API）。
+// Round B 会换成 "HQ SPU + retail.open.product.distribute" 通道：
+//   1) 仓库建 SKU → 后台 ensureHqSpu → HQ SPU 落地
+//   2) 分店首次库存动作 → ensureBranchProduct 铺货 → branch item_id
+//   3) push_stock / push_is_display 队列复用现有流程
+// 届时删除这两个函数；目前 UI 层已在门店端隐藏"新建标准商品"入口，
+// 只留自定义/组包，供切回单店模式时兜底。
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin as supabase } from "@/integrations/supabase/client.server";
