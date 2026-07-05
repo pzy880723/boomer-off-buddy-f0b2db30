@@ -69,7 +69,7 @@ export const Route = createFileRoute("/api/public/handheld/global-stock")({
         let skuQ = supabaseAdmin
           .from("inv_skus")
           .select(
-            "id, sku_code, barcode, name, category, price_tier, image_url, image_paths, kind, is_custom_price, stock_qty, created_at, updated_at",
+            "id, sku_code, barcode, name, category, price_tier, image_url, image_paths, kind, is_custom_price, is_display, stock_qty, created_at, updated_at",
           )
           .order("updated_at", { ascending: false })
           .limit(3000);
