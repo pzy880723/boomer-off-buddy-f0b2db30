@@ -3,6 +3,7 @@ import { HANDHELD_CORS, authenticateDevice, ok } from "@/server/handheld-auth.se
 import { errCode } from "@/lib/handheld/errors";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { buildPrintPayload } from "@/server/handheld-print.server";
+import { deriveListingStatus, statusLabel } from "@/lib/handheld/listing-status";
 
 export const Route = createFileRoute("/api/public/handheld/items/$id")({
   server: {
