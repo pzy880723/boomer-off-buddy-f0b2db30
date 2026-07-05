@@ -18,6 +18,7 @@ import {
   Loader2,
   Info,
   ArrowRight,
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -58,6 +59,7 @@ import {
   listShopLinksForSkus,
   registerNewSkuAtShop,
   retryBranchListing,
+  retryFailedBranchListings,
   type ShopSkuRow,
 } from "@/lib/shop-products.functions";
 import { groupStandardSkus, type SkuRow, type StandardProductGroup } from "@/lib/inventory.helpers";
@@ -77,6 +79,23 @@ type TabKind = "custom" | "bundle" | "standard";
 type ViewMode = "grid" | "list";
 type DialogKind = "custom" | "bundle" | "standard" | null;
 
+function humanizeListingError(message?: string | null) {
+  const raw = message ?? "";
+  if (/尚未配置有赞默认商品分组|默认商品分组|默认分组/i.test(raw)) {
+    return "还没选择有赞里的默认分组。请到「设置 → 集成」选一个分组，保存后再点重试。";
+  }
+  if (/gw\s*4005|非法的\s*API|invalid\s*api/i.test(raw)) {
+    return `有赞拒绝了这次同步。通常是当前店铺或当前应用不能调用这个商品同步接口，或者接口版本不匹配。原始返回：${raw}`;
+  }
+  if (/gw\s*4007|白名单|whitelist|源\s*IP\s*地址/i.test(raw)) {
+    return `有赞拦住了当前网络出口，需要检查有赞白名单。原始返回：${raw}`;
+  }
+  if (/token|access_token|授权|authorize|auth/i.test(raw)) {
+    return `有赞授权可能失效。请先到「设置 → 集成」做一次同步体检。原始返回：${raw}`;
+  }
+  return raw || "有赞同步失败，点一下可以重试。";
+}
+
 function ShopProductsPage() {
   const qc = useQueryClient();
   const fetchShops = useServerFn(listYouzanShops);
@@ -84,6 +103,7 @@ function ShopProductsPage() {
   const fetchLinks = useServerFn(listShopLinksForSkus);
   const registerFn = useServerFn(registerNewSkuAtShop);
   const retryFn = useServerFn(retryBranchListing);
+  const retryAllFn = useServerFn(retryFailedBranchListings);
 
   const shopsQ = useQuery({
     queryKey: ["yz-branch-shops"],
@@ -102,10 +122,11 @@ function ShopProductsPage() {
 
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
-  const [tab, setTab] = useState<TabKind>("standard");
+  const [tab, setTab] = useState<TabKind>("custom");
   const [view, setView] = useState<ViewMode>("list");
   const [openDialog, setOpenDialog] = useState<DialogKind>(null);
   const [receive, setReceive] = useState<{ sku_id: string; sku_name: string; qty: number } | null>(null);
+  const [retryingAll, setRetryingAll] = useState(false);
 
   const rowsQ = useQuery({
     queryKey: ["shop-skus", activeShopId, search],
@@ -142,6 +163,12 @@ function ShopProductsPage() {
       bundleRows: bun,
     };
   }, [rows]);
+
+  const failedCustomBundleCount = useMemo(
+    () =>
+      [...customRows, ...bundleRows].filter((r) => links[r.id]?.status === "error").length,
+    [bundleRows, customRows, links],
+  );
 
   const allSkuIds = useMemo(() => rows.map((r) => r.id), [rows]);
   const { covers } = useSkuCovers(allSkuIds);
@@ -184,8 +211,29 @@ function ShopProductsPage() {
     if (!activeShopId) return;
     const r = await retryFn({ data: { shop_id: activeShopId, sku_id } });
     if (r.ok) toast.success("已重新上架到有赞");
-    else toast.error(r.error ?? "上架失败");
+    else toast.error(humanizeListingError(r.error));
     refresh();
+  };
+
+  const handleRetryAllFailed = async () => {
+    if (!activeShopId || retryingAll) return;
+    setRetryingAll(true);
+    try {
+      const r = await retryAllFn({ data: { shop_id: activeShopId } });
+      if (r.total === 0) {
+        toast.info("当前没有需要重推的失败商品");
+      } else if (r.failed === 0) {
+        toast.success(`已重推成功 ${r.ok} 个商品`);
+      } else {
+        const first = r.details.find((x) => !x.ok)?.error;
+        toast.warning(`重推完成：成功 ${r.ok} 个，失败 ${r.failed} 个。${first ? humanizeListingError(first) : ""}`);
+      }
+      refresh();
+    } catch (e) {
+      toast.error(humanizeListingError((e as Error).message));
+    } finally {
+      setRetryingAll(false);
+    }
   };
 
   const NewMenu = (
@@ -227,11 +275,12 @@ function ShopProductsPage() {
       );
     }
     if (l.status === "error") {
+      const message = humanizeListingError(l.last_error);
       return (
         <Badge
           variant="outline"
           className="gap-1 border-rose-500/40 text-rose-700 text-[10px] dark:text-rose-300 cursor-pointer"
-          title={l.last_error ?? undefined}
+          title={message}
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -339,6 +388,19 @@ function ShopProductsPage() {
               <List className="h-3.5 w-3.5" />
             </ToggleGroupItem>
           </ToggleGroup>
+          {failedCustomBundleCount > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 px-2 text-xs"
+              onClick={handleRetryAllFailed}
+              disabled={!activeShopId || retryingAll}
+              title="把当前门店同步失败的自定义商品和组包商品重新推到有赞"
+            >
+              <RefreshCw className={`mr-1 h-3.5 w-3.5 ${retryingAll ? "animate-spin" : ""}`} />
+              重推失败商品 {failedCustomBundleCount}
+            </Button>
+          )}
           {NewMenu}
         </div>
       </Card>
@@ -351,14 +413,14 @@ function ShopProductsPage() {
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as TabKind)}>
         <TabsList>
-          <TabsTrigger value="standard">
-            标准商品 <span className="ml-1.5 text-xs text-muted-foreground">{standardGroups.length}</span>
-          </TabsTrigger>
           <TabsTrigger value="custom">
             自定义商品 <span className="ml-1.5 text-xs text-muted-foreground">{customRows.length}</span>
           </TabsTrigger>
           <TabsTrigger value="bundle">
             组包商品 <span className="ml-1.5 text-xs text-muted-foreground">{bundleRows.length}</span>
+          </TabsTrigger>
+          <TabsTrigger value="standard">
+            标准商品 <span className="ml-1.5 text-xs text-muted-foreground">{standardGroups.length}</span>
           </TabsTrigger>
         </TabsList>
 

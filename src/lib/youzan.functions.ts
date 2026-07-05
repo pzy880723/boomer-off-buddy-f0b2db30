@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequestUrl } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { supabaseAdmin as supabase } from "@/integrations/supabase/client.server";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { yzStatusText } from "./youzan-status";
 import { getYouzanOutboundStatus, youzanFetch } from "./youzan-http";
 
@@ -110,6 +111,26 @@ function formatYouzanIpError(message: string) {
     return `${message}。当前仍是直连动态出口，发布后也不保证 IP 固定；请配置 YOUZAN_PROXY_URL 固定出口代理后，只把代理 IP 加入有赞白名单。`;
   }
   return message;
+}
+
+export function explainYouzanError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  if (/尚未配置有赞默认商品分组|默认商品分组|默认分组/i.test(message)) {
+    return "还没选择有赞里的默认商品分组。请到「设置 → 集成」里选一个分组，保存后再点重试。";
+  }
+  if (/gw\s*4005|非法的\s*API|invalid\s*api/i.test(message)) {
+    return `有赞拒绝了这次商品同步。意思是：当前这家店或当前应用不能调用这个商品同步接口，或者接口版本不匹配。系统已记录有赞返回的追踪号，方便继续查。原始返回：${message}`;
+  }
+  if (/gw\s*4007|IP\s*.*white|whitelist|白名单|源\s*IP\s*地址/i.test(message)) {
+    return formatYouzanIpError(message);
+  }
+  if (/token|access_token|授权|authorize|auth/i.test(message)) {
+    return `有赞授权失效或店铺授权不完整。请先在「设置 → 集成」里做一次有赞同步体检。原始返回：${message}`;
+  }
+  if (/timeout|超时|network|fetch|网络/i.test(message)) {
+    return `连接有赞超时或网络不稳定，请稍后重试。原始返回：${message}`;
+  }
+  return message || "有赞同步失败，但没有返回具体原因。";
 }
 
 /**
@@ -252,6 +273,126 @@ export async function callYouzanApiVerbose(opts: {
 export const getYouzanOutboundInfo = createServerFn({ method: "GET" }).handler(async () => {
   return getYouzanOutboundStatus();
 });
+
+type YouzanDiagnosticStep = {
+  label: string;
+  status: "ok" | "warn" | "error";
+  message: string;
+};
+
+function parseDefaultYouzanCategoryId(rawValue: unknown) {
+  if (typeof rawValue === "number") return rawValue;
+  if (typeof rawValue === "string") return Number(rawValue) || 0;
+  if (rawValue && typeof rawValue === "object") {
+    return Number((rawValue as { id?: unknown }).id ?? 0) || 0;
+  }
+  return 0;
+}
+
+export const diagnoseYouzanListing = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async (): Promise<{
+    ok: boolean;
+    checkedAt: string;
+    outbound: ReturnType<typeof getYouzanOutboundStatus>;
+    steps: YouzanDiagnosticStep[];
+  }> => {
+    const steps: YouzanDiagnosticStep[] = [];
+    const { data: setting } = await supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "youzan_hq_default_category_id")
+      .maybeSingle();
+    const defaultCategoryId = parseDefaultYouzanCategoryId(
+      (setting as { value?: unknown } | null)?.value,
+    );
+    steps.push(
+      defaultCategoryId > 0
+        ? { label: "默认分组", status: "ok", message: `已选择分组 #${defaultCategoryId}` }
+        : {
+            label: "默认分组",
+            status: "warn",
+            message: "还没选默认分组。新商品推到有赞时，有赞要求必须放进一个分组。",
+          },
+    );
+
+    let hq: ShopRow | null = null;
+    let hqToken: string | null = null;
+    try {
+      hq = await getHqShop();
+      hqToken = await ensureAccessToken(hq);
+      await callYouzanApiVerbose({
+        accessToken: hqToken,
+        method: "youzan.shop.get",
+        version: "3.0.0",
+        params: {},
+      });
+      steps.push({ label: "总部授权", status: "ok", message: `总部店铺可以连接：${hq.shop_name}` });
+    } catch (e) {
+      steps.push({ label: "总部授权", status: "error", message: explainYouzanError(e) });
+    }
+
+    const { data: branch } = await supabase
+      .from("youzan_shops")
+      .select("*")
+      .eq("role", "branch")
+      .neq("status", "disabled")
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (!branch) {
+      steps.push({ label: "门店授权", status: "warn", message: "还没有可用分店，暂时无法检查门店同步。" });
+    } else {
+      try {
+        const branchShop = branch as ShopRow;
+        const branchToken = await ensureAccessToken(branchShop);
+        await callYouzanApiVerbose({
+          accessToken: branchToken,
+          method: "youzan.shop.get",
+          version: "3.0.0",
+          params: {},
+        });
+        steps.push({ label: "门店授权", status: "ok", message: `门店可以连接：${branchShop.shop_name}` });
+      } catch (e) {
+        steps.push({ label: "门店授权", status: "error", message: explainYouzanError(e) });
+      }
+    }
+
+    if (!hqToken) {
+      steps.push({ label: "推商品接口", status: "warn", message: "总部授权没通过，所以暂时不能检查推商品接口。" });
+    } else {
+      try {
+        await callYouzanApiVerbose({
+          accessToken: hqToken,
+          method: "youzan.retail.open.spu.create",
+          version: "3.0.0",
+          params: {},
+          timeoutMs: 20_000,
+        });
+        steps.push({ label: "推商品接口", status: "ok", message: "有赞接受了推商品接口。" });
+      } catch (e) {
+        const raw = e instanceof Error ? e.message : String(e);
+        if (/gw\s*4005|非法的\s*API|invalid\s*api/i.test(raw)) {
+          steps.push({ label: "推商品接口", status: "error", message: explainYouzanError(e) });
+        } else if (/参数|param|required|缺少|不能为空|invalid/i.test(raw)) {
+          steps.push({
+            label: "推商品接口",
+            status: "ok",
+            message: "有赞能识别推商品接口；刚才只是因为体检没真的传商品资料，所以返回参数提示，这是正常的。",
+          });
+        } else {
+          steps.push({ label: "推商品接口", status: "warn", message: explainYouzanError(e) });
+        }
+      }
+    }
+
+    return {
+      ok: steps.every((s) => s.status === "ok"),
+      checkedAt: new Date().toISOString(),
+      outbound: getYouzanOutboundStatus(),
+      steps,
+    };
+  });
 
 /** 进入同步前，把超过 30 秒还在 running 的旧记录直接标成失败，避免页面假活 */
 async function reapStaleSyncLogs() {
