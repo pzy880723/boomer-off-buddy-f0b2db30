@@ -294,13 +294,9 @@ export type Database = {
           name: string
           parent_id: string | null
           sort_order: number
-          synced_at: string | null
           updated_at: string
           youzan_hq_category_id: number | null
-          youzan_hq_group_id: number | null
-          youzan_hq_group_parent_id: number | null
           youzan_hq_parent_id: number | null
-          youzan_shop_id: string | null
         }
         Insert: {
           code: string
@@ -312,13 +308,9 @@ export type Database = {
           name: string
           parent_id?: string | null
           sort_order?: number
-          synced_at?: string | null
           updated_at?: string
           youzan_hq_category_id?: number | null
-          youzan_hq_group_id?: number | null
-          youzan_hq_group_parent_id?: number | null
           youzan_hq_parent_id?: number | null
-          youzan_shop_id?: string | null
         }
         Update: {
           code?: string
@@ -330,13 +322,9 @@ export type Database = {
           name?: string
           parent_id?: string | null
           sort_order?: number
-          synced_at?: string | null
           updated_at?: string
           youzan_hq_category_id?: number | null
-          youzan_hq_group_id?: number | null
-          youzan_hq_group_parent_id?: number | null
           youzan_hq_parent_id?: number | null
-          youzan_shop_id?: string | null
         }
         Relationships: [
           {
@@ -344,13 +332,6 @@ export type Database = {
             columns: ["parent_id"]
             isOneToOne: false
             referencedRelation: "inv_categories"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "inv_categories_youzan_shop_id_fkey"
-            columns: ["youzan_shop_id"]
-            isOneToOne: false
-            referencedRelation: "youzan_shops"
             referencedColumns: ["id"]
           },
         ]
