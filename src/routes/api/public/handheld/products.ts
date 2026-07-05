@@ -207,6 +207,10 @@ async function buildItems(skus: SkuRow[], locations: LocRow[]): Promise<ProductI
       total_stock_qty: total,
       stocks,
       status: s.status,
+      is_display: s.is_display !== false,
+      listing_status: deriveListingStatus(s.is_display !== false, total),
+      status_label: statusLabel(deriveListingStatus(s.is_display !== false, total)),
+      can_restock: (s.is_display !== false) && total === 0,
       created_at: s.created_at,
       updated_at: s.updated_at,
     };
