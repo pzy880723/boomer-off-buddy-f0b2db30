@@ -26,6 +26,8 @@ const MetaInput = z.object({
   image_url: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
   grade: z.enum(["N", "S", "A", "B", "C", "J"]).nullable().optional(),
+  // 默认铺货门店（空数组 = 铺给所有 branch）；Round B 铺货 worker 消费
+  default_shop_ids: z.array(z.string().uuid()).max(200).optional(),
 });
 
 // 价格档校验：> 0、≤ 9999.9、最多 1 位小数
@@ -171,6 +173,7 @@ export const createStandardSkus = createServerFn({ method: "POST" })
       grade: data.grade ?? null,
       status: "active" as const,
       epc: data.epc_map?.[String(t)] || generateEpc(data.category, t),
+      default_shop_ids: data.default_shop_ids ?? [],
     }));
     const { data: inserted, error } = await sb
       .from("inv_skus")
@@ -206,6 +209,7 @@ export const createCustomSku = createServerFn({ method: "POST" })
       status: "active" as const,
       epc: generateEpc(data.category, data.price),
       stock_qty: 0,
+      default_shop_ids: data.default_shop_ids ?? [],
     };
     const { data: row, error } = await sb
       .from("inv_skus")
@@ -260,6 +264,7 @@ export const createBundleSku = createServerFn({ method: "POST" })
       grade: data.grade ?? null,
       status: "active" as const,
       epc: generateEpc(data.category, data.price),
+      default_shop_ids: data.default_shop_ids ?? [],
     };
     const { data: row, error } = await sb
       .from("inv_skus")
