@@ -44,3 +44,38 @@ export const setPriceTiers = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { tiers };
   });
+
+/* ---------- 有赞同步默认商品分组 ---------- */
+const HQ_CAT_KEY = "youzan_hq_default_category_id";
+
+export const getYouzanDefaultCategoryId = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", HQ_CAT_KEY)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    const raw = (data?.value as unknown) ?? null;
+    const id = Number(
+      typeof raw === "number" ? raw : (raw as { id?: number } | null)?.id ?? 0,
+    );
+    return { id: id > 0 ? id : null };
+  });
+
+export const setYouzanDefaultCategoryId = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ id: z.number().int().positive().nullable() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.from("app_settings").upsert({
+      key: HQ_CAT_KEY,
+      value: data.id,
+      updated_at: new Date().toISOString(),
+    });
+    if (error) throw new Error(error.message);
+    return { id: data.id };
+  });
+
