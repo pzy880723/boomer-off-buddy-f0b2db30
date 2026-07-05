@@ -45,79 +45,80 @@ export type LinkRow = {
 };
 
 // ============================================================
-// 内部：覆盖式推送库存到有赞总部
+// 内部：覆盖式推送分店库存
 // ------------------------------------------------------------
-// 零售连锁版调用 youzan.retail.open.stock.update.1.0.0
-// 参数：kdt_id（总部）、item_id 或 sku_id、num（目标值）、type=set
-// 接口若返回 [40005] / [-1] 等错误，向上抛出，由 worker 入失败队列
+// 连锁零售正确姿势：用【总部 token】+ youzan.retail.open.stock.adjust/3.0.0
+// - kdt_id = 分店 kdt_id（目标）
+// - spu_id = 总部 HQ SPU id（从 sku_youzan_links role=hq_spu 拿）
+// - outer_sku_id = 本地 sku_code（有赞 SKU 用 outer_sku_id 定位最稳）
+// - adjust_num = 目标绝对值；type=set 覆盖
+// 老的 item.quantity.update / retail.open.stock.update 对连锁分店会报
+// "不允许更新供货模式的商品库存" / "只有门店或独立仓可以操作"，一律弃用。
 // ============================================================
-// 覆盖式推送到指定店铺。
-// - 总部（role=hq）：走 retail.open.stock.update（chain 场景可后续替换回 retail 接口）
-// - 分店（role=branch，独立 kdt + 独立 item）：走 youzan.item.quantity.update type=3 (set)
 async function pushStockToYouzan(
   link: LinkRow,
   targetStock: number,
   clientSeq: string,
 ): Promise<void> {
-  const shop = await getShopById(link.shop_id);
-  const token = await ensureAccessToken(shop);
+  const branchShop = await getShopById(link.shop_id);
   const num = Math.max(0, targetStock);
 
-  if (shop.role === "hq") {
-    const params: Record<string, unknown> = {
-      kdt_id: shop.kdt_id,
-      item_id: link.yz_item_id,
-      num,
-      type: "set",
-      client_seq: clientSeq,
-    };
-    if (link.yz_sku_id) params.sku_id = link.yz_sku_id;
-    await callYouzanApiVerbose({
-      accessToken: token,
-      method: "youzan.retail.open.stock.update",
-      version: "1.0.0",
-      params,
-      timeoutMs: 20_000,
-    });
-  } else {
-    // 连锁零售分店：走 retail.open.stock.update（type=set 覆盖）
-    const params: Record<string, unknown> = {
-      kdt_id: shop.kdt_id,
-      item_id: link.yz_item_id,
-      num,
-      type: "set",
-      client_seq: clientSeq,
-    };
-    if (link.yz_sku_id) params.sku_id = link.yz_sku_id;
-    await callYouzanApiVerbose({
-      accessToken: token,
-      method: "youzan.retail.open.stock.update",
-      version: "1.0.0",
-      params,
-      timeoutMs: 20_000,
-    });
-  }
+  // 拿总部 SPU id
+  const { data: hqLink } = await supabase
+    .from("sku_youzan_links")
+    .select("yz_item_id")
+    .eq("sku_id", link.sku_id)
+    .eq("role", "hq_spu")
+    .maybeSingle();
+  const hqSpuId = Number(hqLink?.yz_item_id ?? 0);
+
+  // 拿 outer_sku_id（本地 sku_code）
+  const { data: sku } = await supabase
+    .from("inv_skus")
+    .select("sku_code")
+    .eq("id", link.sku_id)
+    .maybeSingle();
+
+  const hq = await getHqShop();
+  const hqToken = await ensureAccessToken(hq);
+
+  const params: Record<string, unknown> = {
+    kdt_id: branchShop.kdt_id,
+    adjust_num: num,
+    type: "set",
+    client_seq: clientSeq,
+  };
+  if (hqSpuId) params.spu_id = hqSpuId;
+  if (link.yz_sku_id) params.sku_id = link.yz_sku_id;
+  if (sku?.sku_code) params.outer_sku_id = sku.sku_code;
+
+  await callYouzanApiVerbose({
+    accessToken: hqToken,
+    method: "youzan.retail.open.stock.adjust",
+    version: "3.0.0",
+    params,
+    timeoutMs: 20_000,
+  });
 }
 
 // ============================================================
-// pushIsDisplayToYouzan —— 分店上下架
-// ------------------------------------------------------------
-// is_display=true → retail.open.product.online；false → offline
+// pushIsDisplayToYouzan —— 分店上下架（用 HQ token）
 // ============================================================
 async function pushIsDisplayToYouzan(
   link: LinkRow,
   isDisplay: boolean,
 ): Promise<void> {
-  const shop = await getShopById(link.shop_id);
-  const token = await ensureAccessToken(shop);
+  const branchShop = await getShopById(link.shop_id);
+  const hq = await getHqShop();
+  const hqToken = await ensureAccessToken(hq);
   const method = isDisplay
     ? "youzan.retail.open.product.online"
     : "youzan.retail.open.product.offline";
   await callYouzanApiVerbose({
-    accessToken: token,
+    accessToken: hqToken,
     method,
     version: "1.0.0",
-    params: { kdt_id: shop.kdt_id, item_id: link.yz_item_id },
+    params: { kdt_id: branchShop.kdt_id, item_id: link.yz_item_id },
     timeoutMs: 20_000,
   });
 }
