@@ -290,6 +290,11 @@ export const Route = createFileRoute("/api/public/handheld/products")({
 
         skuQ = applyCommonFilters(skuQ);
 
+        // listing_status DB-level: only in_warehouse can be filtered before qty is known
+        if (statusFilter === "in_warehouse") skuQ = skuQ.eq("is_display", false);
+        else if (statusFilter === "selling" || statusFilter === "sold_out")
+          skuQ = skuQ.eq("is_display", true);
+
         // has_image only meaningful for custom
         if (hasImage === "1" && type === "custom") {
           skuQ = skuQ.not("image_paths", "is", null);
