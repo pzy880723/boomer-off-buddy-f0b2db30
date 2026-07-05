@@ -1,73 +1,39 @@
+## 现象与根因
 
-## 现状与瓶颈
+用户在「门店管理 → 门店商品」里新建商品后，商品不出现在列表里。
 
-新建小包裹页面（`/purchase/japan-parcel/new`）里每张商品图走的是 `src/components/japan-parcel/item-image-uploader.tsx` → `uploadFile()`：
+数据库里查证：
+- 最近 2 个新建的门店 SKU（`test`、`测试商品`）在 `inv_skus` 里成功写入了，但 `inv_stock_movements` / `inv_stocks` / `sku_youzan_links` 三张表里对这两个 SKU **一行数据都没有**。
+- 上一轮加的 `shop_new_sku` / `shop_adjust` `ref_type` 约束修复是在 17:22 才应用。这两个 SKU 是 17:03 和 17:21 创建的，都在修复之前 —— 当时 `inv_apply_movement` 因为 CHECK 约束失败抛错，`registerNewSkuAtShop` 中断，SKU 却已经落库了，就成了孤立商品。
+- 而 `listShopSkus` 只显示「本门店库存 > 0」或「本门店有 sku_youzan_link」的 SKU，孤立商品哪一条都不满足，所以列表看不到。
 
-1. 选/拖/粘图 → `createImageBitmap` → OffscreenCanvas 编 webp（长边 1600、quality 0.82）
-2. 直接 `supabase.storage.from('parcel-item-images').upload(...)` 上传到 Supabase（Storage 在海外机房）
-3. 全流程串行，且要**等上传完成**后才把 URL 塞进表单，UI 上只能干等一个 loading 圈
+约束现在已经放宽了，新建流程本身通了，但：
+1. 这两个孤立 SKU 永远不会自己冒出来。
+2. 以后如果 `registerNewSkuAtShop` 的下游（比如 `ensureBranchListing` 调有赞 API）再抛错，SKU 又会重新变孤立。
 
-主要慢的原因：
+## 修复方案
 
-- **上传距离最贵**：手机截图/相册原图常常 2–5 MB，压完还剩 300–800 KB，从国内直连 Supabase Storage 一张 3–8 秒很正常，是耗时大头。
-- **压缩阈值太宽松**：`SKIP_COMPRESS_BELOW = 200 KB` + `MAX_DIM = 1600` + `quality 0.82`，商品缩略图其实用不到 1600 边，白白多传字节。
-- **UI 阻塞感强**：预览要等「压缩 + 上传」都结束才出图；用户不知道卡在哪一步，感觉「很慢」。
-- **多张图串行**：一次导入 N 个子订单时，用户逐张点上传，没有并行也没有队列提示。
+### 1. 回填历史脏数据
+对 `8ef769b3…（test）` 和 `70a6d177…（测试商品）`，在当前分店（`中信泰富店`，location `7111b585…`）走一次 `inv_apply_movement`，`+1` 库存、`ref_type='shop_new_sku'`、`note='脏数据回填：约束修复前遗留'`。执行后列表里就会看到它们。
 
-## 目标
+如果用户不需要这两个测试 SKU，改成删除也可以 —— 需要先确认。
 
-在不改后端/桶策略的前提下，把「点击选图 → 看到预览 → 表单可继续填」的等待感压到 1 秒内，实际上传在后台跑完，出错再回滚。
+### 2. 让 `registerNewSkuAtShop` 更健壮
+`src/lib/shop-products.functions.ts`：
+- 每个 sku 的 `inv_apply_movement` + `ensureBranchListing` 独立 try/catch，任意一步失败都记到本条结果的 `error` 字段里，继续处理下一个 sku（不再整体抛错）。
+- 返回结构里明确 `stock_ok` / `listing_ok` / `error`，前端可以针对性提示「商品已创建，但入库/上架失败，可点重试」。
+- 加一条兜底：即便 `inv_apply_movement` 失败，也 upsert 一行 `inv_stocks (sku_id, location_id, qty=0)`，这样 SKU 至少会出现在列表里（当作「库存 0」显示），用户能看到并手动补库存，不会再"人间蒸发"。
 
-## 改动方案（仅前端 & 展示层）
+### 3. 让 `listShopSkus` 收网
+`src/lib/shop-products.functions.ts` 里 `listShopSkus` 目前的并集是「stock > 0 ∪ 有 link」。改成：
+- 「本门店 `inv_stocks` 里有记录（即便 qty=0）∪ 本门店有 sku_youzan_link ∪ 本门店有过 `inv_stock_movements`」。
 
-改动集中在 `src/components/japan-parcel/item-image-uploader.tsx` 以及可复用工具 `src/lib/image-upload.ts`。
+这样只要该门店曾经动过这个 SKU（哪怕只是失败前的一行 movements 或一行 qty=0 的 stock），列表里都能看到，配合前端 badge 显示「库存 0，点击补货」。
 
-### 1. 更激进的压缩参数
+### 4. 前端 toast 语义微调
+`src/routes/shop-mgmt.products.tsx` 的 `handleNewSkuCreated`：
+- 遍历 `results`，分别统计「入库失败 / 上架失败 / 全成功」的条数，逐类给出 toast，避免出现「明明报了成功但列表是空的」的困惑。
 
-- `MAX_DIM`: 1600 → **1280**（列表缩略只用到 256，1280 已足够放大查看）
-- `QUALITY`: 0.82 → **0.78**（webp 感官几乎无差别）
-- `SKIP_COMPRESS_BELOW`: 200 KB → **80 KB**（超过就走压缩，避免 300 KB 的截图原样上传）
-- 预期同一张 3 MB 手机图从 ~700 KB 降到 ~250–350 KB，上传时间 ≈ 1/2。
+## 需要确认
 
-### 2. 乐观预览 + 后台上传
-
-- 选图后立刻用 `URL.createObjectURL(compressedBlob)` 生成本地预览塞进 `onChange`（同时把 blob 挂在组件 state 里）。表单立刻看到图、可以继续填其他字段。
-- 真正的 `storage.upload` 在后台跑；成功后把 `objectURL` 替换成 Supabase 公网 URL，`revokeObjectURL` 释放内存。
-- 失败：`toast.error`，把预览撤回 `null`，让用户重试。
-- 保存表单时若某张图还在上传，禁用「保存」按钮 + 显示「N 张图上传中…」；避免把本地 blob URL 写进 DB。
-
-### 3. 上传进度 & 并行
-
-- 复用 `supabase.storage.upload`，但在覆盖层里换掉「转圈」为一个细进度条（Supabase JS v2 支持 `onUploadProgress` via fetch；没有就至少显示 0→90% 假进度 + 完成置 100%，视觉不再"卡住"）。
-- 多张图同时选/粘时（未来批量），允许最多 3 个并行 upload，用一个简单的 semaphore，串行时间大概减半。当前只处理单图入口，semaphore 先落在 `image-upload.ts` 里，为后续批量做准备。
-
-### 4. 首次交互零阻塞
-
-- 组件已经用 `React.lazy` 引入，保留。
-- 在真正拿到 `createImageBitmap` 之前，先立刻在 UI 上显示"压缩中..."骨架图（避免用户以为点击没反应）。
-
-### 5. 观测
-
-- 在压缩与上传前后 `performance.now()` 打点，`console.debug("[img] compress=%dms upload=%dms size=%dKB→%dKB", ...)`，方便后续回放确认是网络问题还是压缩问题。
-- 不加任何埋点上报。
-
-## 不改的东西
-
-- Supabase 桶、RLS、路径规则不动。
-- 服务端 / 后端逻辑不动，纯前端优化。
-- `image-upload.ts` 里其他调用点（`/m`、`/store`）保持行为兼容——只把新的默认参数下沉，签名不变。
-
-## 预期效果
-
-- **感官延迟**：点图后 <500 ms 出预览、表单立刻可用；「上传中」变后台任务，不再是模态阻塞。
-- **实际上传耗时**：单图从当前 ~5s 降到 ~2s 左右（取决于网络，压缩体积减半 + 并行）。
-- **失败可回滚**：网络掉线只掉那张图，不影响正在填写的表单。
-
-## 需要你确认的 1 件事
-
-保存表单时，如果某张图还在后台上传，我的默认策略是「禁用保存按钮 + 顶部提示"还有 N 张图上传中"」。你也可以选：
-
-- (A) 等所有上传完再允许点保存（当前默认，最安全）
-- (B) 直接允许保存，未完成的图先不写入，后台上传成功后再补一次 `update`（体验最顺，但会多一次写库）
-
-若不特别说，我按 (A) 实现。
+- 两个测试 SKU（`test` / `测试商品`）是「保留并回填库存 +1」还是「直接删除」？

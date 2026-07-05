@@ -56,23 +56,30 @@ export const listShopSkus = createServerFn({ method: "GET" })
       .maybeSingle();
     if (!loc) return { rows: [], location_id: null };
 
-    // 取该门店所有 inv_stocks > 0 的 sku
+    // 取该门店所有 inv_stocks（含 qty=0，方便看到"新建但入库失败"的商品）
     const { data: stocks, error: stErr } = await sb
       .from("inv_stocks")
       .select("sku_id, qty")
-      .eq("location_id", loc.id)
-      .gt("qty", 0);
+      .eq("location_id", loc.id);
     if (stErr) throw new Error(stErr.message);
 
-    // 加上"有 link 但库存 0"的 SKU（下架状态，可以看到）
+    // 加上"有 link"的 SKU
     const { data: links } = await sb
       .from("sku_youzan_links")
       .select("sku_id")
       .eq("shop_id", data.shop_id);
 
+    // 再加上"本门店曾经动过"的 SKU（movements 里有记录，防止上一步失败留下孤立 SKU）
+    const { data: moves } = await sb
+      .from("inv_stock_movements")
+      .select("sku_id")
+      .eq("location_id", loc.id)
+      .limit(5000);
+
     const skuIds = new Set<string>();
     (stocks ?? []).forEach((s) => skuIds.add(s.sku_id));
     (links ?? []).forEach((l) => skuIds.add(l.sku_id));
+    (moves ?? []).forEach((m) => skuIds.add(m.sku_id));
     if (skuIds.size === 0) return { rows: [], location_id: loc.id };
 
     let q = sb
