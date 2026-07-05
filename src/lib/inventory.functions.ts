@@ -367,6 +367,7 @@ export const updateStandardProduct = createServerFn({ method: "POST" })
         key: z.string().min(1),
         patch: z
           .object({
+            category: z.string().min(1).optional(),
             name: z.string().min(1).max(120).optional(),
             sku_code: z.string().trim().max(64).nullable().optional(),
             weight_g: z.number().nullable().optional(),
@@ -382,7 +383,7 @@ export const updateStandardProduct = createServerFn({ method: "POST" })
     const sb = context.supabase;
     const { data: rows, error: qErr } = await sb
       .from("inv_skus")
-      .select("id, sku_code, category, name, price_tier, stock_qty")
+      .select("id, sku_code, category, name, price_tier, stock_qty, epc")
       .eq("kind", "single")
       .eq("is_custom_price", false);
     if (qErr) throw new Error(qErr.message);
@@ -391,9 +392,50 @@ export const updateStandardProduct = createServerFn({ method: "POST" })
     );
     if (matched.length === 0) throw new Error("找不到对应的标准商品");
     const ids = matched.map((r) => r.id);
+    const ref = matched[0];
+    const oldCategory = ref.category as string;
+    const newCategory = data.patch.category ?? oldCategory;
+    const categoryChanged = newCategory !== oldCategory;
 
-    if (Object.keys(data.patch).length > 0) {
-      const { error } = await sb.from("inv_skus").update(data.patch as never).in("id", ids);
+    // 类目变更：前置校验 + 逐条重算 EPC / sku_code
+    let categoryMigrated = false;
+    if (categoryChanged) {
+      const hasStock = matched.find((r) => (r.stock_qty ?? 0) > 0);
+      if (hasStock) {
+        throw new Error(`类目变更前请先清空库存：¥${hasStock.price_tier} 仍有 ${hasStock.stock_qty} 件`);
+      }
+      const { data: inbound } = await sb
+        .from("inv_inbound_lines")
+        .select("id")
+        .in("sku_id", ids)
+        .limit(1);
+      if ((inbound?.length ?? 0) > 0) {
+        throw new Error("已有入库记录，禁止修改类目（请先归档旧商品，再新建）");
+      }
+      for (const row of matched) {
+        const newEpc = generateEpc(newCategory, Number(row.price_tier));
+        const oldSkuCode = row.sku_code ?? "";
+        const autoSkuCode = /^SKU-/.test(oldSkuCode);
+        const upd: Record<string, unknown> = { category: newCategory, epc: newEpc };
+        if (autoSkuCode) upd.sku_code = generateSkuCode(newCategory, "single");
+        const { error: uErr } = await sb.from("inv_skus").update(upd as never).eq("id", row.id);
+        if (uErr) {
+          if (/duplicate|unique/i.test(uErr.message)) {
+            throw new Error("EPC 冲突，请稍后重试或先在库存/未认领 EPC 里清理");
+          }
+          throw new Error(uErr.message);
+        }
+        row.category = newCategory;
+        row.epc = newEpc;
+        if (autoSkuCode) row.sku_code = upd.sku_code as string;
+      }
+      categoryMigrated = true;
+    }
+
+    // 其余共用字段
+    const { category: _omitCat, ...restPatch } = data.patch;
+    if (Object.keys(restPatch).length > 0) {
+      const { error } = await sb.from("inv_skus").update(restPatch as never).in("id", ids);
       if (error) throw new Error(error.message);
     }
 
@@ -402,8 +444,7 @@ export const updateStandardProduct = createServerFn({ method: "POST" })
     if (data.price_tiers && data.price_tiers.length > 0) {
       const wanted = Array.from(new Set(data.price_tiers)).sort((a, b) => a - b);
       const current = new Map(matched.map((r) => [Number(r.price_tier), r]));
-      const ref = matched[0];
-      const category = ref.category as string;
+      const category = newCategory;
       const name = (data.patch.name ?? ref.name) as string;
       const sku_code =
         data.patch.sku_code !== undefined ? data.patch.sku_code : (ref.sku_code ?? null);
@@ -440,8 +481,9 @@ export const updateStandardProduct = createServerFn({ method: "POST" })
       }
     }
 
-    return { ok: true, updated: ids.length, added, removed };
+    return { ok: true, updated: ids.length, added, removed, categoryMigrated };
   });
+
 
 async function safeDeleteSkuById(sb: typeof supabaseAdmin, id: string) {
   const { data: row, error: rErr } = await sb

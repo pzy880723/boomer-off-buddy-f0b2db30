@@ -58,11 +58,14 @@ export function ProductEditDialog({
     mutationFn: async () => {
       if (!group) throw new Error("缺少商品");
       if (!meta.name.trim()) throw new Error("品名必填");
+      if (!meta.category) throw new Error("类目必填");
       if (tiers.length === 0) throw new Error("至少保留一个价格档");
+      const categoryChanged = meta.category !== group.category;
       return fn({
         data: {
           key: group.key,
           patch: {
+            ...(categoryChanged ? { category: meta.category } : {}),
             name: meta.name.trim(),
             sku_code: meta.sku_code.trim() || null,
             weight_g: meta.weight ? Number(meta.weight) : null,
@@ -74,8 +77,9 @@ export function ProductEditDialog({
       });
     },
     onSuccess: (res) => {
-      const r = res as { added?: number; removed?: number };
+      const r = res as { added?: number; removed?: number; categoryMigrated?: boolean };
       const parts: string[] = ["已保存"];
+      if (r.categoryMigrated) parts.push("已改类目 · EPC 已重算");
       if (r.added) parts.push(`新增 ${r.added} 档`);
       if (r.removed) parts.push(`删除 ${r.removed} 档`);
       toast.success(parts.join(" · "));
@@ -92,10 +96,11 @@ export function ProductEditDialog({
           <DialogTitle>编辑标准商品</DialogTitle>
         </DialogHeader>
         <p className="text-xs text-muted-foreground">
-          类目无法修改；保存后会同步到该商品下的全部价格档子 SKU。每个价格档 = 一个独立 SKU = 一个价格 = 一段规格编码。新增的价格档会自动生成 EPC，删除的价格档若仍有库存会阻止保存。
+          修改类目会重算该商品下全部价格档的 EPC 前缀；若任一价格档有库存或入库记录，改类目会失败，请先归档。每个价格档 = 一个独立 SKU = 一个价格 = 一段规格编码。
         </p>
         <div className="py-2 space-y-4">
-          <SkuMetaFields state={meta} onChange={setMeta} hideCategory hideGrade hideWeight />
+          <SkuMetaFields state={meta} onChange={setMeta} hideGrade hideWeight />
+
 
           <div className="space-y-1.5">
             <Label>价格档 *</Label>
