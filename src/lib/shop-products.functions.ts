@@ -17,6 +17,7 @@ import { z } from "zod";
 import { supabaseAdmin as supabase } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { ensureBranchListing, triggerStockWorker } from "./youzan-sync.functions";
+import { explainYouzanError } from "./youzan.functions";
 
 // ---------- 内部工具 ----------
 
@@ -353,6 +354,79 @@ export const retryBranchListing = createServerFn({ method: "POST" })
     return {
       ok: !!r.yz_item_id,
       yz_item_id: r.yz_item_id,
-      error: r.error ?? null,
+      error: r.error ? explainYouzanError(r.error) : null,
     };
+  });
+
+export const retryFailedBranchListings = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        shop_id: z.string().uuid(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { location_id } = await getShopWithLocation(data.shop_id);
+    const { data: failedRows, error } = await supabase
+      .from("sku_youzan_links")
+      .select("sku_id, inv_skus(kind, is_custom_price, name)")
+      .eq("shop_id", data.shop_id)
+      .eq("status", "error")
+      .limit(100);
+    if (error) throw new Error(error.message);
+    const rows = (failedRows ?? []).filter((row) => {
+      const sku = (row as unknown as { inv_skus?: { kind?: string; is_custom_price?: boolean } }).inv_skus;
+      return sku?.kind === "bundle" || Boolean(sku?.is_custom_price);
+    });
+
+    let ok = 0;
+    let failed = 0;
+    const details: Array<{ sku_id: string; ok: boolean; error: string | null }> = [];
+    for (const row of rows) {
+      const sku_id = String(row.sku_id);
+      await supabase
+        .from("sku_youzan_links")
+        .delete()
+        .eq("sku_id", sku_id)
+        .eq("shop_id", data.shop_id)
+        .eq("status", "error");
+      try {
+        const r = await ensureBranchListing(sku_id, data.shop_id);
+        if (r.yz_item_id) {
+          const { data: st } = await supabase
+            .from("inv_stocks")
+            .select("qty")
+            .eq("sku_id", sku_id)
+            .eq("location_id", location_id)
+            .maybeSingle();
+          await supabase.from("youzan_stock_sync_queue").upsert(
+            {
+              sku_id,
+              shop_id: data.shop_id,
+              location_id,
+              target_stock: Math.max(0, Number(st?.qty ?? 0)),
+              action: "push_stock",
+              reason: "retry_failed_listings",
+              status: "pending",
+              next_run_at: new Date().toISOString(),
+              last_error: null,
+            } as never,
+            { onConflict: "sku_id,shop_id", ignoreDuplicates: false } as never,
+          );
+          triggerStockWorker({ sku_ids: [sku_id] });
+          ok += 1;
+          details.push({ sku_id, ok: true, error: null });
+        } else {
+          failed += 1;
+          details.push({ sku_id, ok: false, error: r.error ? explainYouzanError(r.error) : "上架失败" });
+        }
+      } catch (e) {
+        failed += 1;
+        details.push({ sku_id, ok: false, error: explainYouzanError(e) });
+      }
+    }
+
+    return { total: rows.length, ok, failed, details };
   });
