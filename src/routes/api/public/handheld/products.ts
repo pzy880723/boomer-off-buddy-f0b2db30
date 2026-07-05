@@ -44,6 +44,10 @@ export type ProductItem = {
   total_stock_qty: number;
   stocks: StockRow[];
   status: string;
+  is_display: boolean;
+  listing_status: ListingStatus;
+  status_label: string;
+  can_restock: boolean;
   created_at: string;
   updated_at: string;
 };
