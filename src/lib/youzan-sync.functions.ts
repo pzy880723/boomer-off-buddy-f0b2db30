@@ -80,15 +80,46 @@ async function pushStockToYouzan(
       timeoutMs: 20_000,
     });
   } else {
-    // 独立 kdt 分店：单店商品库存 API（type=3 = 覆盖设置）
+    // 连锁零售分店：走 retail.open.stock.update（type=set 覆盖）
+    const params: Record<string, unknown> = {
+      kdt_id: shop.kdt_id,
+      item_id: link.yz_item_id,
+      num,
+      type: "set",
+      client_seq: clientSeq,
+    };
+    if (link.yz_sku_id) params.sku_id = link.yz_sku_id;
     await callYouzanApiVerbose({
       accessToken: token,
-      method: "youzan.item.quantity.update",
-      version: "3.0.0",
-      params: { item_id: link.yz_item_id, type: 3, quantity: num },
+      method: "youzan.retail.open.stock.update",
+      version: "1.0.0",
+      params,
       timeoutMs: 20_000,
     });
   }
+}
+
+// ============================================================
+// pushIsDisplayToYouzan —— 分店上下架
+// ------------------------------------------------------------
+// is_display=true → retail.open.product.online；false → offline
+// ============================================================
+async function pushIsDisplayToYouzan(
+  link: LinkRow,
+  isDisplay: boolean,
+): Promise<void> {
+  const shop = await getShopById(link.shop_id);
+  const token = await ensureAccessToken(shop);
+  const method = isDisplay
+    ? "youzan.retail.open.product.online"
+    : "youzan.retail.open.product.offline";
+  await callYouzanApiVerbose({
+    accessToken: token,
+    method,
+    version: "1.0.0",
+    params: { kdt_id: shop.kdt_id, item_id: link.yz_item_id },
+    timeoutMs: 20_000,
+  });
 }
 
 // ============================================================
@@ -636,8 +667,10 @@ async function runStockSyncWorkerCore(opts: {
       }
       if (!link) throw new Error("SKU 未绑定该门店的有赞商品");
 
-      // v2：HQ 主 SPU 不推库存，直接标 done 跳过
-      if ((link as { sync_stock?: boolean }).sync_stock === false) {
+      const action = (t as { action?: string }).action ?? "push_stock";
+
+      // v2：HQ 主 SPU 不推库存 / 上下架，直接标 done 跳过
+      if ((link as { sync_stock?: boolean }).sync_stock === false && action === "push_stock") {
         await supabase
           .from("youzan_stock_sync_queue")
           .update({
@@ -646,6 +679,25 @@ async function runStockSyncWorkerCore(opts: {
             attempts: (t.attempts ?? 0) + 1,
           } as never)
           .eq("id", t.id);
+        ok += 1;
+        continue;
+      }
+
+      if (action === "push_is_display") {
+        const targetIsDisplay = Boolean((t as { target_is_display?: boolean }).target_is_display);
+        await pushIsDisplayToYouzan(link as LinkRow, targetIsDisplay);
+        await supabase
+          .from("youzan_stock_sync_queue")
+          .update({
+            status: "done",
+            last_error: null,
+            attempts: (t.attempts ?? 0) + 1,
+          } as never)
+          .eq("id", t.id);
+        await supabase
+          .from("sku_youzan_links")
+          .update({ status: "linked", last_error: null } as never)
+          .eq("id", (link as { id: string }).id);
         ok += 1;
         continue;
       }
@@ -728,10 +780,25 @@ export async function runStockSyncWorkerForCron() {
 }
 
 // ============================================================
-// ensureBranchListing —— 门店首次有库存时自动 youzan.item.add + upsert link
-// worker 和 shop-products 共用
+// ensureHqSpu —— 确保本地 SKU 在总部有一条 SPU 绑定
+// ------------------------------------------------------------
+// 已存在 → 直接返回；否则调 youzan.retail.open.spu.add，upsert
+// sku_youzan_links(shop=hq, role=hq_spu, sync_stock=false)。
+// 是 ensureHqSpuLink 的正式别名，保留旧名兼容 smart-create 调用。
 // ============================================================
-export async function ensureBranchListing(
+export async function ensureHqSpu(sku_id: string) {
+  return ensureHqSpuLink(sku_id);
+}
+
+// ============================================================
+// ensureBranchProduct —— HQ SPU + retail.open.product.distribute 铺货
+// ------------------------------------------------------------
+// 连锁零售场景：分店无法独立建商品，必须由总部通过 distribute 铺货。
+// 老 `youzan.item.add` 路径（gw 4005 非法的API）已废弃。
+// worker、shop-products、retryBranchListing 通过 `ensureBranchListing`
+// 转调此函数，调用方零改动。
+// ============================================================
+export async function ensureBranchProduct(
   sku_id: string,
   shop_id: string,
 ): Promise<{ yz_item_id: number | null; created: boolean; error?: string }> {
@@ -745,52 +812,53 @@ export async function ensureBranchListing(
     return { yz_item_id: Number(existed.yz_item_id), created: false };
   }
 
-  const { data: sku } = await supabase
-    .from("inv_skus")
-    .select("id, name, price_tier, image_url, notes, stock_qty")
-    .eq("id", sku_id)
-    .maybeSingle();
-  if (!sku) return { yz_item_id: null, created: false, error: "SKU 不存在" };
-
-  const { data: shop } = await supabase
-    .from("youzan_shops")
-    .select("*")
-    .eq("id", shop_id)
-    .maybeSingle();
-  if (!shop) return { yz_item_id: null, created: false, error: "门店不存在" };
-
   try {
-    const token = await ensureAccessToken(shop as never);
-    const params: Record<string, unknown> = {
-      title: sku.name,
-      price: Number(sku.price_tier),
-      num: Number(sku.stock_qty ?? 0),
-      desc: sku.notes ?? sku.name,
-      is_display: 1,
-      is_listing: 1,
-      auto_listing_time: 0,
-      out_product_id: sku.id,
-    };
-    if (sku.image_url) params.item_imgs = sku.image_url;
+    // Step 1: 先保证总部 SPU 存在
+    const hqInfo = await ensureHqSpu(sku_id);
+    if (!hqInfo.yz_item_id) throw new Error("HQ SPU 建立失败");
 
-    const res = await callYouzanApiVerbose({
-      accessToken: token,
-      method: "youzan.item.add",
-      version: "3.0.0",
-      params,
-      timeoutMs: 25_000,
-    });
-    const payload = res.payload as Record<string, unknown>;
-    const rawItemId = payload.item_id ?? payload.num_iid ?? payload.id;
-    const itemId = Number(rawItemId ?? 0);
-    if (!itemId) {
-      throw new Error(`有赞未返回 item_id：${res.preview.slice(0, 160)}`);
+    // Step 2: 铺货到分店
+    const { data: branch } = await supabase
+      .from("youzan_shops")
+      .select("*")
+      .eq("id", shop_id)
+      .maybeSingle();
+    if (!branch) throw new Error("门店不存在");
+    if ((branch as { role?: string }).role !== "branch") {
+      throw new Error("目标店铺不是分店，不能铺货");
     }
+
+    const hq = await getHqShop();
+    const hqToken = await ensureAccessToken(hq);
+    const res = await callYouzanApiVerbose({
+      accessToken: hqToken,
+      method: "youzan.retail.open.product.distribute",
+      version: "1.0.0",
+      params: {
+        kdt_id: hq.kdt_id,
+        target_kdt_id: (branch as { kdt_id: number }).kdt_id,
+        item_id: hqInfo.yz_item_id,
+      },
+      timeoutMs: 30_000,
+    });
+    const payload = (res.payload ?? {}) as Record<string, unknown>;
+    // 尝试从常见响应字段拿分店 item_id
+    const rawItemId =
+      payload.item_id ??
+      payload.target_item_id ??
+      payload.branch_item_id ??
+      (payload as { data?: Record<string, unknown> }).data?.item_id ??
+      hqInfo.yz_item_id; // 兜底：连锁零售部分接口分店复用 HQ item_id
+    const branchItemId = Number(rawItemId ?? 0);
+    if (!branchItemId) {
+      throw new Error(`distribute 未返回 item_id：${res.preview.slice(0, 160)}`);
+    }
+
     await supabase.from("sku_youzan_links").upsert(
       {
         sku_id,
         shop_id,
-        yz_item_id: itemId,
+        yz_item_id: branchItemId,
         status: "linked",
         sync_stock: true,
         role: "branch_stock",
@@ -798,7 +866,7 @@ export async function ensureBranchListing(
       } as never,
       { onConflict: "sku_id,shop_id" },
     );
-    return { yz_item_id: itemId, created: true };
+    return { yz_item_id: branchItemId, created: true };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     await supabase.from("sku_youzan_links").upsert(
@@ -816,6 +884,17 @@ export async function ensureBranchListing(
     return { yz_item_id: null, created: false, error: msg };
   }
 }
+
+// ============================================================
+// ensureBranchListing —— 兼容旧调用点，转调 ensureBranchProduct
+// ============================================================
+export async function ensureBranchListing(
+  sku_id: string,
+  shop_id: string,
+): Promise<{ yz_item_id: number | null; created: boolean; error?: string }> {
+  return ensureBranchProduct(sku_id, shop_id);
+}
+
 
 // ============================================================
 // triggerStockWorker —— 服务端 fire-and-forget，异步跑一次 worker（不阻塞响应）

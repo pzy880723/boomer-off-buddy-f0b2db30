@@ -5,6 +5,46 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { generateEpc, generateSkuCode } from "./inventory.helpers";
 
+// ---- Round B：SKU 建好后，后台 fire-and-forget 建 HQ SPU + 铺货到默认分店 ----
+// 失败不阻塞主流程；错误落到 sku_youzan_links.last_error，UI 有"上架失败·点重试"的红标。
+async function autoDistributeInBackground(
+  sku_ids: string[],
+  default_shop_ids: string[],
+) {
+  if (sku_ids.length === 0) return;
+  void (async () => {
+    try {
+      const { ensureHqSpu, ensureBranchProduct, triggerStockWorker } = await import(
+        "./youzan-sync.functions"
+      );
+      // 若 default_shop_ids 为空 → 铺给所有 branch 门店
+      let targetShopIds = default_shop_ids;
+      if (targetShopIds.length === 0) {
+        const { data: branches } = await supabaseAdmin
+          .from("youzan_shops")
+          .select("id")
+          .eq("role", "branch")
+          .eq("status", "active");
+        targetShopIds = (branches ?? []).map((r) => r.id as string);
+      }
+      for (const sid of sku_ids) {
+        try {
+          await ensureHqSpu(sid);
+        } catch { /* 保留错误在 link 里 */ }
+        for (const shopId of targetShopIds) {
+          try {
+            await ensureBranchProduct(sid, shopId);
+          } catch { /* 保留错误在 link 里 */ }
+        }
+      }
+      if (targetShopIds.length > 0) {
+        triggerStockWorker({ sku_ids });
+      }
+    } catch { /* swallow */ }
+  })();
+}
+
+
 const CATEGORY_VALUES = [
   "jp_porcelain",
   "eu_porcelain",
@@ -180,7 +220,12 @@ export const createStandardSkus = createServerFn({ method: "POST" })
       .insert(rows as never)
       .select("*");
     if (error) throw new Error(error.message);
-    return { skus: inserted ?? [] };
+    const skuList = inserted ?? [];
+    autoDistributeInBackground(
+      skuList.map((s) => String((s as { id: string }).id)),
+      data.default_shop_ids ?? [],
+    );
+    return { skus: skuList };
   });
 
 /** 自定义商品：单条 SKU，价格手填 */
@@ -217,6 +262,10 @@ export const createCustomSku = createServerFn({ method: "POST" })
       .select("*")
       .single();
     if (error) throw new Error(error.message);
+    autoDistributeInBackground(
+      [String((row as { id: string }).id)],
+      data.default_shop_ids ?? [],
+    );
     return { sku: row };
   });
 
@@ -272,6 +321,10 @@ export const createBundleSku = createServerFn({ method: "POST" })
       .select("*")
       .single();
     if (error) throw new Error(error.message);
+    autoDistributeInBackground(
+      [String((row as { id: string }).id)],
+      data.default_shop_ids ?? [],
+    );
     return { sku: row };
   });
 

@@ -50,6 +50,7 @@ import {
 
 import { CustomSkuDialog } from "@/components/inventory/custom-sku-dialog";
 import { BundleSkuDialog } from "@/components/inventory/bundle-sku-dialog";
+import { StandardSkuDialog } from "@/components/inventory/standard-sku-dialog";
 import { ReceiveStockDialog } from "@/components/shop-mgmt/receive-stock-dialog";
 import { listYouzanShops } from "@/lib/youzan.functions";
 import {
@@ -74,7 +75,7 @@ export const Route = createFileRoute("/shop-mgmt/products")({
 
 type TabKind = "custom" | "bundle" | "standard";
 type ViewMode = "grid" | "list";
-type DialogKind = "custom" | "bundle" | null;
+type DialogKind = "custom" | "bundle" | "standard" | null;
 
 function ShopProductsPage() {
   const qc = useQueryClient();
@@ -190,10 +191,13 @@ function ShopProductsPage() {
         <DropdownMenuItem onClick={() => setOpenDialog("bundle")}>
           <Boxes className="mr-2 h-3.5 w-3.5" /> 组包商品
         </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setOpenDialog("standard")}>
+          <Tags className="mr-2 h-3.5 w-3.5" /> 标准商品（多价格档）
+        </DropdownMenuItem>
         <div className="border-t my-1" />
         <Link to="/inventory/skus" className="block">
-          <DropdownMenuItem className="text-muted-foreground">
-            <Tags className="mr-2 h-3.5 w-3.5" /> 标准商品去仓库新建 →
+          <DropdownMenuItem className="text-muted-foreground text-[11px]">
+            批量维护标准商品去仓库 →
           </DropdownMenuItem>
         </Link>
       </DropdownMenuContent>
@@ -473,6 +477,14 @@ function ShopProductsPage() {
         onCreated={(res) => {
           const id = res?.sku?.id;
           if (id) void handleNewSkuCreated([id]);
+        }}
+      />
+      <StandardSkuDialog
+        open={openDialog === "standard"}
+        onOpenChange={(v) => !v && setOpenDialog(null)}
+        onCreated={(res) => {
+          const ids = (res?.skus ?? []).map((s) => s.id).filter(Boolean);
+          if (ids.length > 0) void handleNewSkuCreated(ids);
         }}
       />
 
