@@ -51,8 +51,8 @@ export function CustomSkuForm({
 export function useCustomSkuMutation(onDone: (res?: { sku: { id: string; epc: string } }) => void) {
   const fn = useServerFn(createCustomSku);
   return useMutation({
-    mutationFn: async (input: { meta: SkuMetaState; price: string }) => {
-      const { meta, price } = input;
+    mutationFn: async (input: { meta: SkuMetaState; price: string; default_shop_ids: string[] }) => {
+      const { meta, price, default_shop_ids } = input;
       if (!meta.category || !meta.name.trim()) throw new Error("类目 / 品名 必填");
       const p = Number(price);
       if (!Number.isFinite(p) || p <= 0) throw new Error("请输入合法售价");
@@ -66,6 +66,7 @@ export function useCustomSkuMutation(onDone: (res?: { sku: { id: string; epc: st
           notes: meta.notes.trim() || null,
           grade: (meta.grade || null) as "N" | "S" | "A" | "B" | "C" | "J" | null,
           price: Math.round(p * 100) / 100,
+          default_shop_ids,
         },
       });
     },
