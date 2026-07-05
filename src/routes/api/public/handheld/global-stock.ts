@@ -10,6 +10,7 @@ import {
   err,
 } from "@/server/handheld-auth.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { deriveListingStatus, statusLabel } from "@/lib/handheld/listing-status";
 
 type ProductType = "standard" | "custom" | "bundle";
 type LocRow = { id: string; name: string; kind: "warehouse" | "shop" };
