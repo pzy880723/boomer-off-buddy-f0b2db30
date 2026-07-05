@@ -149,11 +149,15 @@ function ShopProductsPage() {
       const r = await registerFn({
         data: { shop_id: activeShopId, sku_ids: skuIds, qty_each: 1 },
       });
-      const errCount = r.results.filter((x) => x.listing_error).length;
-      if (errCount > 0) {
-        toast.warning(`已入库 ${r.results.length} 件；${errCount} 件上架有赞失败，可在卡片上点重试`);
+      const total = r.results.length;
+      const stockFail = r.results.filter((x) => !x.stock_ok).length;
+      const listFail = r.results.filter((x) => x.stock_ok && !x.listing_ok).length;
+      if (stockFail > 0) {
+        toast.error(`${stockFail}/${total} 件入库失败，商品已创建但库存为 0，可在列表点「补货」`);
+      } else if (listFail > 0) {
+        toast.warning(`已入库 ${total} 件；${listFail} 件上架有赞失败，可在卡片点重试`);
       } else {
-        toast.success(`已入库并同步上架 ${r.results.length} 件`);
+        toast.success(`已入库并同步上架 ${total} 件`);
       }
       refresh();
     } catch (e) {

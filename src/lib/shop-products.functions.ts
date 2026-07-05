@@ -56,23 +56,30 @@ export const listShopSkus = createServerFn({ method: "GET" })
       .maybeSingle();
     if (!loc) return { rows: [], location_id: null };
 
-    // 取该门店所有 inv_stocks > 0 的 sku
+    // 取该门店所有 inv_stocks（含 qty=0，方便看到"新建但入库失败"的商品）
     const { data: stocks, error: stErr } = await sb
       .from("inv_stocks")
       .select("sku_id, qty")
-      .eq("location_id", loc.id)
-      .gt("qty", 0);
+      .eq("location_id", loc.id);
     if (stErr) throw new Error(stErr.message);
 
-    // 加上"有 link 但库存 0"的 SKU（下架状态，可以看到）
+    // 加上"有 link"的 SKU
     const { data: links } = await sb
       .from("sku_youzan_links")
       .select("sku_id")
       .eq("shop_id", data.shop_id);
 
+    // 再加上"本门店曾经动过"的 SKU（movements 里有记录，防止上一步失败留下孤立 SKU）
+    const { data: moves } = await sb
+      .from("inv_stock_movements")
+      .select("sku_id")
+      .eq("location_id", loc.id)
+      .limit(5000);
+
     const skuIds = new Set<string>();
     (stocks ?? []).forEach((s) => skuIds.add(s.sku_id));
     (links ?? []).forEach((l) => skuIds.add(l.sku_id));
+    (moves ?? []).forEach((m) => skuIds.add(m.sku_id));
     if (skuIds.size === 0) return { rows: [], location_id: loc.id };
 
     let q = sb
@@ -203,29 +210,51 @@ export const registerNewSkuAtShop = createServerFn({ method: "POST" })
       sku_id: string;
       new_qty: number;
       yz_item_id: number | null;
+      stock_ok: boolean;
+      listing_ok: boolean;
       listing_error: string | null;
+      error: string | null;
     }> = [];
     for (const sku_id of data.sku_ids) {
-      const { data: newQty, error } = await supabase.rpc("inv_apply_movement", {
-        p_sku_id: sku_id,
-        p_location_id: location_id,
-        p_delta: data.qty_each,
-        p_ref_type: "shop_new_sku",
-        p_ref_id: null,
-        p_epc: null,
-        p_note: "新建 SKU 首店入库",
-      } as never);
-      if (error) throw new Error(error.message);
-      const listing = await ensureBranchListing(sku_id, data.shop_id);
-      if (listing.yz_item_id) {
-        triggerStockWorker({ sku_ids: [sku_id] });
+      let new_qty = 0;
+      let stock_ok = false;
+      let listing_ok = false;
+      let yz_item_id: number | null = null;
+      let listing_error: string | null = null;
+      let error: string | null = null;
+      try {
+        const { data: newQty, error: mvErr } = await supabase.rpc("inv_apply_movement", {
+          p_sku_id: sku_id,
+          p_location_id: location_id,
+          p_delta: data.qty_each,
+          p_ref_type: "shop_new_sku",
+          p_ref_id: null,
+          p_epc: null,
+          p_note: "新建 SKU 首店入库",
+        } as never);
+        if (mvErr) throw new Error(mvErr.message);
+        new_qty = Number(newQty ?? 0);
+        stock_ok = true;
+      } catch (e) {
+        error = `入库失败：${(e as Error).message}`;
+        // 兜底：即便入库失败，也 upsert 一行 qty=0 的 inv_stocks，让 SKU 在列表里可见
+        await supabase
+          .from("inv_stocks")
+          .upsert(
+            { sku_id, location_id, qty: 0, updated_at: new Date().toISOString() } as never,
+            { onConflict: "sku_id,location_id", ignoreDuplicates: true } as never,
+          );
       }
-      results.push({
-        sku_id,
-        new_qty: newQty as number,
-        yz_item_id: listing.yz_item_id,
-        listing_error: listing.error ?? null,
-      });
+      try {
+        const listing = await ensureBranchListing(sku_id, data.shop_id);
+        yz_item_id = listing.yz_item_id;
+        listing_error = listing.error ?? null;
+        listing_ok = !!listing.yz_item_id;
+        if (listing.yz_item_id) triggerStockWorker({ sku_ids: [sku_id] });
+      } catch (e) {
+        listing_error = (e as Error).message;
+      }
+      results.push({ sku_id, new_qty, yz_item_id, stock_ok, listing_ok, listing_error, error });
     }
     return { ok: true, results };
   });
