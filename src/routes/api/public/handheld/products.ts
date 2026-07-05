@@ -11,6 +11,11 @@ import {
   err,
 } from "@/server/handheld-auth.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import {
+  deriveListingStatus,
+  statusLabel,
+  type ListingStatus,
+} from "@/lib/handheld/listing-status";
 
 type ProductType = "standard" | "custom" | "bundle";
 
