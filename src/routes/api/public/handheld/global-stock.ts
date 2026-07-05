@@ -77,6 +77,9 @@ export const Route = createFileRoute("/api/public/handheld/global-stock")({
         else if (type === "custom") skuQ = skuQ.eq("kind", "single").eq("is_custom_price", true);
         else skuQ = skuQ.eq("kind", "bundle");
         if (categoryFilter) skuQ = skuQ.eq("category", categoryFilter);
+        if (statusFilter === "in_warehouse") skuQ = skuQ.eq("is_display", false);
+        else if (statusFilter === "selling" || statusFilter === "sold_out")
+          skuQ = skuQ.eq("is_display", true);
         if (q) {
           const like = `%${q.replace(/[%_]/g, (m) => `\\${m}`)}%`;
           skuQ = skuQ.or(
