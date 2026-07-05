@@ -464,6 +464,7 @@ export async function ensureHqSpuLink(
     .eq("id", sku_id)
     .maybeSingle();
   if (!sku) throw new Error("SKU 不存在");
+  if (!sku.sku_code) throw new Error("SKU 缺少 sku_code，无法登记到有赞");
 
   const categoryId = await resolveHqCategoryId(sku as { category?: string | null });
   const { kdtIds } = await collectSellChannelKdtIds(sku_id, addBranchShopId);
@@ -473,7 +474,7 @@ export async function ensureHqSpuLink(
     outer_id: sku.sku_code,
     category_id: categoryId,
     offline_create: true,
-    sku: buildSpuSkuArray(sku),
+    sku: buildSpuSkuArray(sku as { id: string; sku_code: string; name: string; price_tier: number | string; weight_g?: number | null }),
     images: sku.image_url ? [sku.image_url] : [],
   };
   if (kdtIds.length > 0) params.sell_channel_ids = kdtIds;
