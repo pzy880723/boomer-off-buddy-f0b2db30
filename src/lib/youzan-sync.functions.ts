@@ -907,22 +907,25 @@ export async function runStockSyncWorkerForCron() {
 
 // ============================================================
 // ensureHqSpu —— 确保本地 SKU 在总部有一条 SPU 绑定
-// ------------------------------------------------------------
-// 已存在 → 直接返回；否则调 youzan.retail.open.spu.add，upsert
-// sku_youzan_links(shop=hq, role=hq_spu, sync_stock=false)。
-// 是 ensureHqSpuLink 的正式别名，保留旧名兼容 smart-create 调用。
 // ============================================================
-export async function ensureHqSpu(sku_id: string) {
-  return ensureHqSpuLink(sku_id);
+// ensureHqSpu —— 别名
+// ============================================================
+export async function ensureHqSpu(sku_id: string, addBranchShopId?: string) {
+  return ensureHqSpuLink(sku_id, addBranchShopId);
 }
 
 // ============================================================
-// ensureBranchProduct —— HQ SPU + retail.open.product.distribute 铺货
+// ensureBranchProduct —— 分店"上架" = HQ SPU 的 sell_channel_ids 包含该分店
 // ------------------------------------------------------------
-// 连锁零售场景：分店无法独立建商品，必须由总部通过 distribute 铺货。
-// 老 `youzan.item.add` 路径（gw 4005 非法的API）已废弃。
-// worker、shop-products、retryBranchListing 通过 `ensureBranchListing`
-// 转调此函数，调用方零改动。
+// 连锁零售：分店无权自建商品；必须由总部 spu.create（或 spu.update）
+// 把分店 kdt_id 放进 sell_channel_ids。offline_create=true 让 SPU 直接
+// 在门店铺可销售。
+//
+// 流程：
+//  1. 已有 branch_stock link 且 yz_item_id>0 → 直接返回
+//  2. 无 HQ SPU → 走 spu.create（把该分店 kdt_id 放进 sell_channel_ids）
+//  3. 有 HQ SPU 但该分店不在 channels → 走 spu.update 追加
+//  4. upsert branch_stock link（yz_item_id 复用 HQ spu_id，方便 stock.adjust 定位）
 // ============================================================
 export async function ensureBranchProduct(
   sku_id: string,
@@ -930,7 +933,7 @@ export async function ensureBranchProduct(
 ): Promise<{ yz_item_id: number | null; created: boolean; error?: string }> {
   const { data: existed } = await supabase
     .from("sku_youzan_links")
-    .select("yz_item_id, status")
+    .select("yz_item_id")
     .eq("sku_id", sku_id)
     .eq("shop_id", shop_id)
     .maybeSingle();
@@ -939,14 +942,9 @@ export async function ensureBranchProduct(
   }
 
   try {
-    // Step 1: 先保证总部 SPU 存在
-    const hqInfo = await ensureHqSpu(sku_id);
-    if (!hqInfo.yz_item_id) throw new Error("HQ SPU 建立失败");
-
-    // Step 2: 铺货到分店
     const { data: branch } = await supabase
       .from("youzan_shops")
-      .select("*")
+      .select("id, kdt_id, role")
       .eq("id", shop_id)
       .maybeSingle();
     if (!branch) throw new Error("门店不存在");
@@ -954,37 +952,33 @@ export async function ensureBranchProduct(
       throw new Error("目标店铺不是分店，不能铺货");
     }
 
+    // 已有 HQ SPU？
     const hq = await getHqShop();
-    const hqToken = await ensureAccessToken(hq);
-    const res = await callYouzanApiVerbose({
-      accessToken: hqToken,
-      method: "youzan.retail.open.product.distribute",
-      version: "1.0.0",
-      params: {
-        kdt_id: hq.kdt_id,
-        target_kdt_id: (branch as { kdt_id: number }).kdt_id,
-        item_id: hqInfo.yz_item_id,
-      },
-      timeoutMs: 30_000,
-    });
-    const payload = (res.payload ?? {}) as Record<string, unknown>;
-    // 尝试从常见响应字段拿分店 item_id
-    const rawItemId =
-      payload.item_id ??
-      payload.target_item_id ??
-      payload.branch_item_id ??
-      (payload as { data?: Record<string, unknown> }).data?.item_id ??
-      hqInfo.yz_item_id; // 兜底：连锁零售部分接口分店复用 HQ item_id
-    const branchItemId = Number(rawItemId ?? 0);
-    if (!branchItemId) {
-      throw new Error(`distribute 未返回 item_id：${res.preview.slice(0, 160)}`);
+    const { data: hqLink } = await supabase
+      .from("sku_youzan_links")
+      .select("yz_item_id")
+      .eq("sku_id", sku_id)
+      .eq("shop_id", hq.id)
+      .maybeSingle();
+    let hqSpuId = Number(hqLink?.yz_item_id ?? 0);
+
+    if (!hqSpuId) {
+      // Step A: 无 HQ SPU → 一步 create，同时铺到目标分店
+      const hqInfo = await ensureHqSpu(sku_id, shop_id);
+      hqSpuId = hqInfo.yz_item_id;
+    } else {
+      // Step B: 已有 HQ SPU → 追加分店到 channels
+      await addBranchToHqSpu(sku_id, hqSpuId, shop_id);
     }
 
+    if (!hqSpuId) throw new Error("HQ SPU id 缺失");
+
+    // upsert branch_stock link（分店 item_id 复用 hq spu_id，stock.adjust 用 spu_id + kdt_id 定位）
     await supabase.from("sku_youzan_links").upsert(
       {
         sku_id,
         shop_id,
-        yz_item_id: branchItemId,
+        yz_item_id: hqSpuId,
         status: "linked",
         sync_stock: true,
         role: "branch_stock",
@@ -992,7 +986,7 @@ export async function ensureBranchProduct(
       } as never,
       { onConflict: "sku_id,shop_id" },
     );
-    return { yz_item_id: branchItemId, created: true };
+    return { yz_item_id: hqSpuId, created: true };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     await supabase.from("sku_youzan_links").upsert(
@@ -1010,6 +1004,7 @@ export async function ensureBranchProduct(
     return { yz_item_id: null, created: false, error: msg };
   }
 }
+
 
 // ============================================================
 // ensureBranchListing —— 兼容旧调用点，转调 ensureBranchProduct
