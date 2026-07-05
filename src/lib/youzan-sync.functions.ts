@@ -542,7 +542,14 @@ export async function ensureHqSpuLink(
  */
 async function addBranchToHqSpu(sku_id: string, hqSpuId: number, addBranchShopId: string): Promise<void> {
   const hq = await getHqShop();
-  const { kdtIds } = await collectSellChannelKdtIds(sku_id, addBranchShopId);
+  const { data: sku } = await supabase
+    .from("inv_skus")
+    .select("sku_scope")
+    .eq("id", sku_id)
+    .maybeSingle();
+  const scope: "standard" | "custom" =
+    ((sku as { sku_scope?: string } | null)?.sku_scope === "custom" ? "custom" : "standard");
+  const { kdtIds } = await collectSellChannelKdtIds(sku_id, scope, addBranchShopId);
   if (kdtIds.length === 0) return;
   const token = await ensureAccessToken(hq);
   await callYouzanApiVerbose({
@@ -556,6 +563,7 @@ async function addBranchToHqSpu(sku_id: string, hqSpuId: number, addBranchShopId
     timeoutMs: 30_000,
   });
 }
+
 
 export const pushSkuAsNewYouzanItem = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
