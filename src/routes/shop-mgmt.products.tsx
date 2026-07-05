@@ -16,6 +16,8 @@ import {
   AlertCircle,
   CheckCircle2,
   Loader2,
+  Info,
+  ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
