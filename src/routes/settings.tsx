@@ -1,6 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
-import { Building2, Users, Bell, Plug, Webhook, Key, History, MapPin } from "lucide-react";
+import { useMemo, useState, useEffect } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
+import { Building2, Users, Bell, Plug, Webhook, Key, History, MapPin, RefreshCw, Loader2 } from "lucide-react";
 import { AddressBookPanel } from "@/components/settings/address-book-panel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,6 +14,12 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/page-header";
+import {
+  getYouzanDefaultCategoryId,
+  setYouzanDefaultCategoryId,
+} from "@/lib/app-settings.functions";
+import { fetchYouzanGroupsLive, type YouzanGroupNode } from "@/lib/categories.functions";
+
 
 const SETTINGS_TABS = [
   "profile",
