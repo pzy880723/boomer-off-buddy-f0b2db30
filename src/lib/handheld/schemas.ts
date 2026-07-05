@@ -305,6 +305,9 @@ export const GlobalStockItemSchema = z
     stocks: z.record(z.string(), z.number().int()).meta({
       description: "key = location_id, value = qty；没有的库位不会出现，前端按 0 处理",
     }),
+    is_display: z.boolean(),
+    listing_status: z.enum(["selling", "sold_out", "in_warehouse"]),
+    status_label: z.string(),
   })
   .meta({ id: "GlobalStockItem" });
 
@@ -313,6 +316,7 @@ export const GlobalStockQuery = z
     type: z.enum(["standard", "custom", "bundle"]).meta({ description: "必传，按 Tab 过滤" }),
     q: z.string().optional(),
     category: z.string().optional(),
+    status: ListingStatusFilter,
     stock_state: z.enum(["all", "out", "low"]).default("all"),
     low_threshold: z.coerce.number().int().min(1).default(5),
     page: z.coerce.number().int().min(1).default(1),
