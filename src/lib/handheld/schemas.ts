@@ -233,10 +233,16 @@ export const ProductSortSchema = z
   .enum(["created_desc", "created_asc", "price_desc", "price_asc", "stock_desc", "updated_desc"])
   .default("updated_desc");
 
+export const ListingStatusFilter = z
+  .enum(["selling", "sold_out", "in_warehouse", "all"])
+  .default("all")
+  .meta({ description: "按商品生命周期状态过滤" });
+
 export const ProductsQuery = z
   .object({
     q: z.string().optional(),
     type: z.enum(["standard", "custom", "bundle", "all"]).default("all"),
+    status: ListingStatusFilter,
     scope: z.enum(["authorized", "current_location"]).default("authorized"),
     location_id: uuidSchema.optional(),
     category: z.string().optional().meta({ description: "分类精确匹配" }),
