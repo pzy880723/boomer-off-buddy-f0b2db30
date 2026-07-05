@@ -843,6 +843,7 @@ export type Database = {
           image_paths: string[]
           image_url: string | null
           is_custom_price: boolean
+          is_display: boolean
           kind: string
           name: string
           notes: string | null
@@ -865,6 +866,7 @@ export type Database = {
           image_paths?: string[]
           image_url?: string | null
           is_custom_price?: boolean
+          is_display?: boolean
           kind?: string
           name: string
           notes?: string | null
@@ -887,6 +889,7 @@ export type Database = {
           image_paths?: string[]
           image_url?: string | null
           is_custom_price?: boolean
+          is_display?: boolean
           kind?: string
           name?: string
           notes?: string | null
@@ -2205,6 +2208,7 @@ export type Database = {
           shop_id: string | null
           sku_id: string
           status: string
+          target_is_display: boolean | null
           target_stock: number
           updated_at: string
         }
@@ -2220,6 +2224,7 @@ export type Database = {
           shop_id?: string | null
           sku_id: string
           status?: string
+          target_is_display?: boolean | null
           target_stock: number
           updated_at?: string
         }
@@ -2235,6 +2240,7 @@ export type Database = {
           shop_id?: string | null
           sku_id?: string
           status?: string
+          target_is_display?: boolean | null
           target_stock?: number
           updated_at?: string
         }

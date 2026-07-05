@@ -3,6 +3,7 @@ import { HANDHELD_CORS, authenticateDevice, ok } from "@/server/handheld-auth.se
 import { errCode } from "@/lib/handheld/errors";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { buildPrintPayload } from "@/server/handheld-print.server";
+import { deriveListingStatus, statusLabel } from "@/lib/handheld/listing-status";
 
 export const Route = createFileRoute("/api/public/handheld/items/$id")({
   server: {
@@ -15,7 +16,7 @@ export const Route = createFileRoute("/api/public/handheld/items/$id")({
         const { data: sku, error } = await supabaseAdmin
           .from("inv_skus")
           .select(
-            "id, sku_code, barcode, epc, name, category, price_tier, is_custom_price, grade, image_url, image_paths, notes, weight_g, stock_qty, status, created_at, updated_at",
+            "id, sku_code, barcode, epc, name, category, price_tier, is_custom_price, grade, image_url, image_paths, notes, weight_g, stock_qty, status, is_display, created_at, updated_at",
           )
           .eq("id", params.id)
           .maybeSingle();
@@ -54,6 +55,11 @@ export const Route = createFileRoute("/api/public/handheld/items/$id")({
             ? sku.image_url
             : null);
 
+
+        const totalQty = stockList.reduce((sum, r) => sum + (Number(r?.qty) || 0), 0);
+        const isDisplay = (sku as { is_display?: boolean }).is_display !== false;
+        const listingStatus = deriveListingStatus(isDisplay, totalQty);
+
         return ok({
           id: sku.id,
           sku_code: sku.sku_code,
@@ -71,7 +77,12 @@ export const Route = createFileRoute("/api/public/handheld/items/$id")({
           notes: sku.notes,
           weight_g: sku.weight_g,
           stock_qty: sku.stock_qty,
+          total_stock_qty: totalQty,
           status: sku.status,
+          is_display: isDisplay,
+          listing_status: listingStatus,
+          status_label: statusLabel(listingStatus),
+          can_restock: listingStatus === "sold_out",
           created_at: sku.created_at,
           updated_at: sku.updated_at,
           stocks: stockList,

@@ -10,6 +10,7 @@ import {
   err,
 } from "@/server/handheld-auth.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { deriveListingStatus, statusLabel } from "@/lib/handheld/listing-status";
 
 type ProductType = "standard" | "custom" | "bundle";
 type LocRow = { id: string; name: string; kind: "warehouse" | "shop" };
@@ -38,6 +39,11 @@ export const Route = createFileRoute("/api/public/handheld/global-stock")({
         const q = (url.searchParams.get("q") || "").trim();
         const categoryFilter = (url.searchParams.get("category") || "").trim() || null;
         const stockState = (url.searchParams.get("stock_state") || "all").toLowerCase();
+        const statusFilter = (url.searchParams.get("status") || "all").toLowerCase() as
+          | "selling"
+          | "sold_out"
+          | "in_warehouse"
+          | "all";
         const lowThreshold = Math.max(1, Number(url.searchParams.get("low_threshold") || "5") | 0);
         const page = Math.max(1, Number(url.searchParams.get("page") || "1") | 0);
         const pageSize = Math.min(
@@ -63,7 +69,7 @@ export const Route = createFileRoute("/api/public/handheld/global-stock")({
         let skuQ = supabaseAdmin
           .from("inv_skus")
           .select(
-            "id, sku_code, barcode, name, category, price_tier, image_url, image_paths, kind, is_custom_price, stock_qty, created_at, updated_at",
+            "id, sku_code, barcode, name, category, price_tier, image_url, image_paths, kind, is_custom_price, is_display, stock_qty, created_at, updated_at",
           )
           .order("updated_at", { ascending: false })
           .limit(3000);
@@ -71,6 +77,9 @@ export const Route = createFileRoute("/api/public/handheld/global-stock")({
         else if (type === "custom") skuQ = skuQ.eq("kind", "single").eq("is_custom_price", true);
         else skuQ = skuQ.eq("kind", "bundle");
         if (categoryFilter) skuQ = skuQ.eq("category", categoryFilter);
+        if (statusFilter === "in_warehouse") skuQ = skuQ.eq("is_display", false);
+        else if (statusFilter === "selling" || statusFilter === "sold_out")
+          skuQ = skuQ.eq("is_display", true);
         if (q) {
           const like = `%${q.replace(/[%_]/g, (m) => `\\${m}`)}%`;
           skuQ = skuQ.or(
@@ -90,6 +99,7 @@ export const Route = createFileRoute("/api/public/handheld/global-stock")({
           image_paths: string[] | null;
           kind: string;
           is_custom_price: boolean;
+          is_display: boolean;
           stock_qty: number;
         }>;
 
@@ -133,6 +143,9 @@ export const Route = createFileRoute("/api/public/handheld/global-stock")({
           price: number;
           total_qty: number;
           stocks: Record<string, number>;
+          is_display: boolean;
+          listing_status: "selling" | "sold_out" | "in_warehouse";
+          status_label: string;
         };
         const items: Item[] = skus.map((s) => {
           const stocks: Record<string, number> = {};
@@ -142,6 +155,8 @@ export const Route = createFileRoute("/api/public/handheld/global-stock")({
             stocks[r.location_id] = Number(r.qty) || 0;
           }
           const total = Object.values(stocks).reduce((a, b) => a + b, 0);
+          const isDisplay = s.is_display !== false;
+          const ls = deriveListingStatus(isDisplay, total);
           return {
             sku_id: s.id,
             name: s.name,
@@ -157,13 +172,17 @@ export const Route = createFileRoute("/api/public/handheld/global-stock")({
             price: Number(s.price_tier) || 0,
             total_qty: total,
             stocks,
+            is_display: isDisplay,
+            listing_status: ls,
+            status_label: statusLabel(ls),
           };
         });
 
-        // ---- stock_state filter ----
+        // ---- stock_state + listing_status filters ----
         const filtered = items.filter((it) => {
-          if (stockState === "out") return it.total_qty === 0;
-          if (stockState === "low") return it.total_qty > 0 && it.total_qty < lowThreshold;
+          if (stockState === "out" && it.total_qty !== 0) return false;
+          if (stockState === "low" && !(it.total_qty > 0 && it.total_qty < lowThreshold)) return false;
+          if (statusFilter !== "all" && it.listing_status !== statusFilter) return false;
           return true;
         });
 

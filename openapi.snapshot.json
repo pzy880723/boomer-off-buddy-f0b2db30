@@ -749,6 +749,22 @@
           },
           {
             "in": "query",
+            "name": "status",
+            "schema": {
+              "default": "all",
+              "description": "按商品生命周期状态过滤",
+              "type": "string",
+              "enum": [
+                "selling",
+                "sold_out",
+                "in_warehouse",
+                "all"
+              ]
+            },
+            "description": "按商品生命周期状态过滤"
+          },
+          {
+            "in": "query",
             "name": "scope",
             "schema": {
               "default": "authorized",
@@ -1036,6 +1052,22 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "default": "all",
+              "description": "按商品生命周期状态过滤",
+              "type": "string",
+              "enum": [
+                "selling",
+                "sold_out",
+                "in_warehouse",
+                "all"
+              ]
+            },
+            "description": "按商品生命周期状态过滤"
           },
           {
             "in": "query",
@@ -5841,10 +5873,35 @@
                         "stock_qty": {
                           "type": "integer",
                           "minimum": -9007199254740991,
-                          "maximum": 9007199254740991
+                          "maximum": 9007199254740991,
+                          "description": "warehouse 仓库累计（inv_skus.stock_qty），兼容旧 APP"
+                        },
+                        "total_stock_qty": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "所有 location 累加库存"
                         },
                         "status": {
                           "type": "string"
+                        },
+                        "is_display": {
+                          "type": "boolean"
+                        },
+                        "listing_status": {
+                          "type": "string",
+                          "enum": [
+                            "selling",
+                            "sold_out",
+                            "in_warehouse"
+                          ]
+                        },
+                        "status_label": {
+                          "type": "string"
+                        },
+                        "can_restock": {
+                          "type": "boolean",
+                          "description": "listing_status=sold_out 时为 true"
                         },
                         "created_at": {
                           "type": "string"
@@ -5910,11 +5967,454 @@
                         "notes",
                         "weight_g",
                         "stock_qty",
+                        "total_stock_qty",
                         "status",
+                        "is_display",
+                        "listing_status",
+                        "status_label",
+                        "can_restock",
                         "created_at",
                         "updated_at",
                         "stocks",
                         "print_payload"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/handheld/items/{id}/set-status": {
+      "post": {
+        "tags": [
+          "商品"
+        ],
+        "summary": "上架 / 下架商品（对齐有赞 is_display）",
+        "description": "设置 inv_skus.is_display；true=上架（销售中或已售罄由库存派生），false=下架（仓库中）。同时入队 youzan_stock_sync_queue.push_is_display 供有赞侧上/下架。权限：super_admin | hq_operator | shop_manager。",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetListingStatusReq"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                          "example": "550e8400-e29b-41d4-a716-446655440000"
+                        },
+                        "is_display": {
+                          "type": "boolean"
+                        },
+                        "listing_status": {
+                          "type": "string",
+                          "enum": [
+                            "selling",
+                            "sold_out",
+                            "in_warehouse"
+                          ]
+                        },
+                        "status_label": {
+                          "type": "string"
+                        },
+                        "total_stock_qty": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "is_display",
+                        "listing_status",
+                        "status_label",
+                        "total_stock_qty"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/handheld/items/{id}/restock": {
+      "post": {
+        "tags": [
+          "商品"
+        ],
+        "summary": "已售罄补货 + 打印标签",
+        "description": "对已售罄商品的到货补录：写入库存流水（ref_type=handheld_restock），并可选生成 inv_label_batches 打印批次；APP 收到 label_batch 后调本地打印驱动，按 print_payload × qty 打印。",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestockReq"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "sku": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                              "example": "550e8400-e29b-41d4-a716-446655440000"
+                            },
+                            "is_display": {
+                              "type": "boolean"
+                            },
+                            "listing_status": {
+                              "type": "string",
+                              "enum": [
+                                "selling",
+                                "sold_out",
+                                "in_warehouse"
+                              ]
+                            },
+                            "status_label": {
+                              "type": "string"
+                            },
+                            "total_stock_qty": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "is_display",
+                            "listing_status",
+                            "status_label",
+                            "total_stock_qty"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "movement": {
+                          "type": "object",
+                          "properties": {
+                            "delta": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "balance_after": {
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "location_id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                              "example": "550e8400-e29b-41d4-a716-446655440000"
+                            },
+                            "location_name": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "delta",
+                            "balance_after",
+                            "location_id",
+                            "location_name"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "label_batch": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                                  "example": "550e8400-e29b-41d4-a716-446655440000"
+                                },
+                                "qty": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "template_id": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "format": "uuid",
+                                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                                      "example": "550e8400-e29b-41d4-a716-446655440000"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "print_payload": {
+                                  "$ref": "#/components/schemas/PrintPayload"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "qty",
+                                "template_id",
+                                "print_payload"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "print_labels=false 时为 null"
+                        }
+                      },
+                      "required": [
+                        "sku",
+                        "movement",
+                        "label_batch"
                       ],
                       "additionalProperties": false
                     }
@@ -9638,6 +10138,68 @@
           "refresh_token"
         ]
       },
+      "SetListingStatusReq": {
+        "type": "object",
+        "properties": {
+          "is_display": {
+            "type": "boolean",
+            "description": "true=上架（销售中/已售罄由库存派生），false=下架（仓库中）"
+          }
+        },
+        "required": [
+          "is_display"
+        ]
+      },
+      "RestockReq": {
+        "type": "object",
+        "properties": {
+          "location_id": {
+            "description": "缺省用设备当前 location（authenticateDevice 返回的）",
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
+          "delta": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9999,
+            "description": "补货件数"
+          },
+          "print_labels": {
+            "default": true,
+            "description": "是否同时生成打印批次",
+            "type": "boolean"
+          },
+          "label_template_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                "example": "550e8400-e29b-41d4-a716-446655440000"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "delta"
+        ]
+      },
       "AttachImagesReq": {
         "type": "object",
         "properties": {
@@ -10308,6 +10870,28 @@
           "status": {
             "type": "string"
           },
+          "is_display": {
+            "type": "boolean",
+            "description": "是否上架（与有赞 is_display 语义一致）"
+          },
+          "listing_status": {
+            "type": "string",
+            "enum": [
+              "selling",
+              "sold_out",
+              "in_warehouse"
+            ],
+            "description": "商品状态：销售中 / 已售罄 / 仓库中（与有赞连锁零售对齐）"
+          },
+          "status_label": {
+            "type": "string",
+            "description": "状态中文标签"
+          },
+          "can_restock": {
+            "default": false,
+            "description": "APP 是否可弹出「补货入库」按钮（listing_status=sold_out 时为 true）",
+            "type": "boolean"
+          },
           "created_at": {
             "type": "string"
           },
@@ -10333,6 +10917,10 @@
           "total_stock_qty",
           "stocks",
           "status",
+          "is_display",
+          "listing_status",
+          "status_label",
+          "can_restock",
           "created_at",
           "updated_at"
         ],
@@ -10477,6 +11065,20 @@
               "maximum": 9007199254740991
             },
             "description": "key = location_id, value = qty；没有的库位不会出现，前端按 0 处理"
+          },
+          "is_display": {
+            "type": "boolean"
+          },
+          "listing_status": {
+            "type": "string",
+            "enum": [
+              "selling",
+              "sold_out",
+              "in_warehouse"
+            ]
+          },
+          "status_label": {
+            "type": "string"
           }
         },
         "required": [
@@ -10489,7 +11091,10 @@
           "image_url",
           "price",
           "total_qty",
-          "stocks"
+          "stocks",
+          "is_display",
+          "listing_status",
+          "status_label"
         ],
         "additionalProperties": false
       },

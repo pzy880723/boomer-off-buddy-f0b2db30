@@ -11,6 +11,11 @@ import {
   err,
 } from "@/server/handheld-auth.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import {
+  deriveListingStatus,
+  statusLabel,
+  type ListingStatus,
+} from "@/lib/handheld/listing-status";
 
 type ProductType = "standard" | "custom" | "bundle";
 
@@ -39,6 +44,10 @@ export type ProductItem = {
   total_stock_qty: number;
   stocks: StockRow[];
   status: string;
+  is_display: boolean;
+  listing_status: ListingStatus;
+  status_label: string;
+  can_restock: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -56,6 +65,7 @@ type SkuRow = {
   image_paths: string[] | null;
   notes: string | null;
   status: string;
+  is_display: boolean;
   kind: string;
   is_custom_price: boolean;
   stock_qty: number;
@@ -66,7 +76,7 @@ type SkuRow = {
 type LocRow = { id: string; name: string; kind: "warehouse" | "shop" };
 
 const SKU_COLS =
-  "id, sku_code, barcode, epc, name, category, price_tier, grade, image_url, image_paths, notes, status, kind, is_custom_price, stock_qty, created_at, updated_at";
+  "id, sku_code, barcode, epc, name, category, price_tier, grade, image_url, image_paths, notes, status, is_display, kind, is_custom_price, stock_qty, created_at, updated_at";
 
 function classifyType(r: { kind: string; is_custom_price: boolean }): ProductType {
   if (r.kind === "bundle") return "bundle";
@@ -197,6 +207,10 @@ async function buildItems(skus: SkuRow[], locations: LocRow[]): Promise<ProductI
       total_stock_qty: total,
       stocks,
       status: s.status,
+      is_display: s.is_display !== false,
+      listing_status: deriveListingStatus(s.is_display !== false, total),
+      status_label: statusLabel(deriveListingStatus(s.is_display !== false, total)),
+      can_restock: (s.is_display !== false) && total === 0,
       created_at: s.created_at,
       updated_at: s.updated_at,
     };
@@ -214,6 +228,11 @@ export const Route = createFileRoute("/api/public/handheld/products")({
         const url = new URL(request.url);
         const q = (url.searchParams.get("q") || "").trim();
         const type = (url.searchParams.get("type") || "all").toLowerCase();
+        const statusFilter = (url.searchParams.get("status") || "all").toLowerCase() as
+          | "selling"
+          | "sold_out"
+          | "in_warehouse"
+          | "all";
         const scope = (url.searchParams.get("scope") || "authorized").toLowerCase();
         const locationFilter = url.searchParams.get("location_id") || null;
         const categoryFilter = (url.searchParams.get("category") || "").trim() || null;
@@ -271,6 +290,11 @@ export const Route = createFileRoute("/api/public/handheld/products")({
 
         skuQ = applyCommonFilters(skuQ);
 
+        // listing_status DB-level: only in_warehouse can be filtered before qty is known
+        if (statusFilter === "in_warehouse") skuQ = skuQ.eq("is_display", false);
+        else if (statusFilter === "selling" || statusFilter === "sold_out")
+          skuQ = skuQ.eq("is_display", true);
+
         // has_image only meaningful for custom
         if (hasImage === "1" && type === "custom") {
           skuQ = skuQ.not("image_paths", "is", null);
@@ -280,7 +304,10 @@ export const Route = createFileRoute("/api/public/handheld/products")({
 
         const shopIds = locations.filter((l) => l.kind === "shop").map((l) => l.id);
         const hasWarehouse = locations.some((l) => l.kind === "warehouse");
-        if (!scoped.isHq && !hasWarehouse && shopIds.length > 0) {
+        // Non-HQ shop-only view usually filters to qty>0, but skip that when the
+        // caller explicitly asked for sold_out / in_warehouse.
+        const skipQtyGate = statusFilter === "sold_out" || statusFilter === "in_warehouse";
+        if (!scoped.isHq && !hasWarehouse && shopIds.length > 0 && !skipQtyGate) {
           const { data: sids } = await supabaseAdmin
             .from("inv_stocks")
             .select("sku_id")
@@ -298,7 +325,11 @@ export const Route = createFileRoute("/api/public/handheld/products")({
         if (skuErr) return err(skuErr.message, 500);
         const skus = (skuRows ?? []) as SkuRow[];
 
-        const items = await buildItems(skus, locations);
+        let items = await buildItems(skus, locations);
+        // Post-filter for qty-dependent listing_status buckets
+        if (statusFilter === "selling") items = items.filter((it) => it.listing_status === "selling");
+        else if (statusFilter === "sold_out") items = items.filter((it) => it.listing_status === "sold_out");
+
 
         // ---- counts (q/category-affected, type-independent) ----
         // Query in parallel with items, per-type head-counts.

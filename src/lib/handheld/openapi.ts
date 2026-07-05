@@ -52,6 +52,10 @@ import {
   SkuByEpcQuery,
   SkuByEpcRes,
   SkuDetailRes,
+  SetListingStatusReq,
+  SetListingStatusRes,
+  RestockReq,
+  RestockRes,
   SkuSearchQuery,
   SkuSearchRes,
   ProductLookupQuery,
@@ -487,6 +491,28 @@ Token 由后台 **仓库管理 → 手持终端** 页面创建/复制。设备�
         summary: "SKU 详情（含 barcode / condition_grade / 多库位库存）",
         requestParams: { path: z.object({ id: z.string().uuid() }) },
         responses: { "200": jsonRes("OK", SkuDetailRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/items/{id}/set-status": {
+      post: {
+        tags: ["商品"],
+        summary: "上架 / 下架商品（对齐有赞 is_display）",
+        description:
+          "设置 inv_skus.is_display；true=上架（销售中或已售罄由库存派生），false=下架（仓库中）。同时入队 youzan_stock_sync_queue.push_is_display 供有赞侧上/下架。权限：super_admin | hq_operator | shop_manager。",
+        requestParams: { path: z.object({ id: z.string().uuid() }) },
+        requestBody: jsonBody(SetListingStatusReq),
+        responses: { "200": jsonRes("OK", SetListingStatusRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/items/{id}/restock": {
+      post: {
+        tags: ["商品"],
+        summary: "已售罄补货 + 打印标签",
+        description:
+          "对已售罄商品的到货补录：写入库存流水（ref_type=handheld_restock），并可选生成 inv_label_batches 打印批次；APP 收到 label_batch 后调本地打印驱动，按 print_payload × qty 打印。",
+        requestParams: { path: z.object({ id: z.string().uuid() }) },
+        requestBody: jsonBody(RestockReq),
+        responses: { "200": jsonRes("OK", RestockRes), ...ERROR_RESPONSES },
       },
     },
     "/api/public/handheld/items/{id}/attach-images": {
