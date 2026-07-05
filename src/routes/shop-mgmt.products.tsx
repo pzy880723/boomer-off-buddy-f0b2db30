@@ -351,14 +351,14 @@ function ShopProductsPage() {
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as TabKind)}>
         <TabsList>
+          <TabsTrigger value="standard">
+            标准商品 <span className="ml-1.5 text-xs text-muted-foreground">{standardGroups.length}</span>
+          </TabsTrigger>
           <TabsTrigger value="custom">
             自定义商品 <span className="ml-1.5 text-xs text-muted-foreground">{customRows.length}</span>
           </TabsTrigger>
           <TabsTrigger value="bundle">
             组包商品 <span className="ml-1.5 text-xs text-muted-foreground">{bundleRows.length}</span>
-          </TabsTrigger>
-          <TabsTrigger value="standard">
-            标准商品 <span className="ml-1.5 text-xs text-muted-foreground">{standardGroups.length}</span>
           </TabsTrigger>
         </TabsList>
 
