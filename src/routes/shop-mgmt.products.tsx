@@ -105,6 +105,14 @@ function ShopProductsPage() {
   const registerFn = useServerFn(registerNewSkuAtShop);
   const retryFn = useServerFn(retryBranchListing);
   const retryAllFn = useServerFn(retryFailedBranchListings);
+  const fetchDefaultCat = useServerFn(getYouzanDefaultCategoryId);
+
+  const defaultCatQ = useQuery({
+    queryKey: ["yz-default-category"],
+    queryFn: () => fetchDefaultCat(),
+    staleTime: 60 * 1000,
+  });
+  const missingDefaultCategory = defaultCatQ.data && defaultCatQ.data.id == null;
 
   const shopsQ = useQuery({
     queryKey: ["yz-branch-shops"],
