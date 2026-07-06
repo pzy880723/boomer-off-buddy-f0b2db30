@@ -10,7 +10,7 @@ export const Route = createFileRoute("/api/public/hooks/youzan-probe")({
           return new Response("unauthorized", { status: 401 });
         }
         const { callYouzanApiVerbose, ensureAccessToken, getHqShop } =
-          await import("@/integrations/youzan/client.server");
+          await import("@/lib/youzan.functions");
 
         const hq = await getHqShop();
         const token = await ensureAccessToken(hq);
