@@ -119,7 +119,16 @@ export function explainYouzanError(error: unknown): string {
     return "还没选择有赞里的默认商品分组。请到「设置 → 集成」里选一个分组，保存后再点重试。";
   }
   if (/gw\s*4005|非法的\s*API|invalid\s*api/i.test(message)) {
-    return `有赞拒绝了这次商品同步。意思是：当前这家店或当前应用不能调用这个商品同步接口，或者接口版本不匹配。系统已记录有赞返回的追踪号，方便继续查。原始返回：${message}`;
+    return [
+      "有赞把这次请求拦在了网关外面，说这个接口「不允许被当前应用调用」。",
+      "这几乎都是同一个原因：有赞开放平台 → 我的应用 → 授权 API 范围里，没有勾上下面这几个接口：",
+      "  · youzan.retail.open.spu.create 3.0.0（自定义商品第一次推到有赞时用）",
+      "  · youzan.retail.open.spu.update 3.0.0（把商品追加铺到分店时用）",
+      "  · youzan.retail.open.stock.adjust 3.0.0（推库存时用）",
+      "  · youzan.retail.open.product.online / offline 1.0.0（分店上下架时用）",
+      "勾上并保存后，还要把「总部」和「分店」两个店铺各自重新授权一次给你的应用（旧 token 里不会带上新加的接口范围）。做完再点重试就能过。",
+      `原始返回：${message}`,
+    ].join("\n");
   }
   if (/gw\s*4007|IP\s*.*white|whitelist|白名单|源\s*IP\s*地址/i.test(message)) {
     return formatYouzanIpError(message);
