@@ -612,14 +612,14 @@ function buildSpuCreateAttempts(sku: {
 }, categoryId: number, kdtIds: number[]): Array<Record<string, unknown>> {
   const priceCents = Math.round(Number(sku.price_tier) * 100);
   const base: Record<string, unknown> = {
-    title: sku.name,
+    name: sku.name,
     unit: "个",
     outer_id: sku.sku_code,
     category_id: categoryId,
     offline_create: true,
     is_display: true,
     quantity: 0,
-    item_price_param: { price: priceCents },
+    retail_price: priceCents,
   };
   if (kdtIds.length > 0) base.sell_channel_ids = kdtIds;
   if (sku.image_url) {
@@ -648,19 +648,19 @@ function buildSpuCreateAttempts(sku: {
       ...base,
     },
     {
-      title: sku.name,
+      name: sku.name,
       unit: "个",
       outer_id: sku.sku_code,
       category_id: categoryId,
       offline_create: true,
       is_display: true,
       quantity: 0,
-      price: priceCents,
+      retail_price: priceCents,
       ...(kdtIds.length > 0 ? { sell_channel_ids: kdtIds } : {}),
       sku_list: [skuListItem],
     },
     {
-      title: sku.name,
+      name: sku.name,
       unit: "个",
       outer_id: sku.sku_code,
       category_id: categoryId,
@@ -670,9 +670,10 @@ function buildSpuCreateAttempts(sku: {
       skus: [skuListItem],
     },
     {
-      title: sku.name,
+      name: sku.name,
       outer_id: sku.sku_code,
       category_id: categoryId,
+      unit: "个",
       offline_create: true,
       sku: buildSpuSkuArray(sku as { id: string; sku_code: string; name: string; price_tier: number | string; weight_g?: number | null }),
       ...(kdtIds.length > 0 ? { sell_channel_ids: kdtIds } : {}),
