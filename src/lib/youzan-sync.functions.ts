@@ -455,22 +455,41 @@ export async function ensureAutoYouzanDefaultCategory(): Promise<{ id: number; c
     return { id: existingId, created: false };
   }
 
-  const createAttempts: Array<Record<string, unknown>> = [
-    { title: AUTO_YOUZAN_GROUP_NAME, parent_group_id: 0, kdtId: hq.kdt_id },
-    { title: AUTO_YOUZAN_GROUP_NAME, parent_group_id: 0, kdt_id: hq.kdt_id },
-    { title: AUTO_YOUZAN_GROUP_NAME, parent_id: 0, kdtId: hq.kdt_id },
-    { group_name: AUTO_YOUZAN_GROUP_NAME, parent_group_id: 0, kdtId: hq.kdt_id },
-    { group_name: AUTO_YOUZAN_GROUP_NAME, parent_id: 0, kdtId: hq.kdt_id },
-    { name: AUTO_YOUZAN_GROUP_NAME, parent_group_id: 0, kdtId: hq.kdt_id },
+  const createAttempts: Array<{ method: string; version: string; params: Record<string, unknown> }> = [
+    {
+      method: "youzan.itemcategories.tag.add",
+      version: "3.0.0",
+      params: { name: AUTO_YOUZAN_GROUP_NAME },
+    },
+    {
+      method: "youzan.item.group.create",
+      version: "1.0.0",
+      params: { title: AUTO_YOUZAN_GROUP_NAME, parent_group_id: 0, kdtId: hq.kdt_id },
+    },
+    {
+      method: "youzan.item.group.create",
+      version: "1.0.0",
+      params: { title: AUTO_YOUZAN_GROUP_NAME, parent_group_id: 0, kdt_id: hq.kdt_id },
+    },
+    {
+      method: "youzan.item.group.create",
+      version: "1.0.0",
+      params: { title: AUTO_YOUZAN_GROUP_NAME, parent_id: 0, kdtId: hq.kdt_id },
+    },
+    {
+      method: "youzan.item.group.create",
+      version: "1.0.0",
+      params: { group_name: AUTO_YOUZAN_GROUP_NAME, parent_group_id: 0, kdtId: hq.kdt_id },
+    },
   ];
   let lastError = "";
-  for (const params of createAttempts) {
+  for (const attempt of createAttempts) {
     try {
       const res = await callYouzanApiVerbose({
         accessToken: token,
-        method: "youzan.item.group.create",
-        version: "1.0.0",
-        params,
+        method: attempt.method,
+        version: attempt.version,
+        params: attempt.params,
         timeoutMs: 20_000,
       });
       const createdId = pickGroupId(res.payload) || (await findAutoYouzanGroup(token));
