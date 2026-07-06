@@ -54,6 +54,7 @@ import { BundleSkuDialog } from "@/components/inventory/bundle-sku-dialog";
 import { StandardSkuDialog } from "@/components/inventory/standard-sku-dialog";
 import { ReceiveStockDialog } from "@/components/shop-mgmt/receive-stock-dialog";
 import { listYouzanShops } from "@/lib/youzan.functions";
+import { getYouzanDefaultCategoryId } from "@/lib/app-settings.functions";
 import {
   listShopSkus,
   listShopLinksForSkus,
