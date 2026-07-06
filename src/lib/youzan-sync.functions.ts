@@ -10,6 +10,8 @@ import {
 } from "./youzan.functions";
 
 const AUTO_YOUZAN_GROUP_NAME = "ERP自动同步";
+const DEFAULT_RETAIL_PRODUCT_CATEGORY_ID = 90747747;
+const DEFAULT_RETAIL_UNIT = "件";
 
 // 内部：按 shop_id 加载店铺（HQ 或分店都可）
 async function getShopById(shopId: string) {
@@ -93,7 +95,7 @@ async function pushStockToYouzan(
   };
   if (hqSpuId) params.spu_id = hqSpuId;
   if (link.yz_sku_id) params.sku_id = link.yz_sku_id;
-  if (sku?.sku_code) params.outer_sku_id = sku.sku_code;
+  if (!link.yz_sku_id && sku?.sku_code) params.outer_sku_id = sku.sku_code;
 
   await callYouzanApiVerbose({
     accessToken: hqToken,
@@ -531,6 +533,36 @@ async function resolveHqCategoryId(_sku?: unknown): Promise<number> {
   return auto.id;
 }
 
+async function resolveHqRetailProductCategoryId(): Promise<number> {
+  const hq = await getHqShop();
+  const { data: cachedItems } = await supabase
+    .from("youzan_items")
+    .select("raw")
+    .eq("shop_id", hq.id)
+    .order("updated_at", { ascending: false })
+    .limit(100);
+
+  const candidates: Array<{ id: number; name: string }> = [];
+  for (const row of cachedItems ?? []) {
+    const raw = (row as { raw?: unknown }).raw as Record<string, unknown> | null;
+    if (!raw || typeof raw !== "object") continue;
+    const directId = Number(raw.category_id ?? 0);
+    const directName = String(raw.category_name ?? "").trim();
+    if (directId > 0) candidates.push({ id: directId, name: directName });
+    const skus = Array.isArray(raw.skus) ? (raw.skus as Array<Record<string, unknown>>) : [];
+    for (const sku of skus) {
+      const id = Number(sku.category_id ?? 0);
+      const name = String(sku.category_name ?? "").trim();
+      if (id > 0) candidates.push({ id, name });
+    }
+  }
+  return (
+    candidates.find((c) => c.name === "未分类")?.id ??
+    candidates[0]?.id ??
+    DEFAULT_RETAIL_PRODUCT_CATEGORY_ID
+  );
+}
+
 
 /**
  * 按 sku_scope 汇总本次 spu.create / spu.update 要传的 sell_channel_ids。
@@ -610,16 +642,14 @@ function buildSpuCreateAttempts(sku: {
   price_tier: string | number;
   weight_g?: number | null;
 }, categoryId: number, kdtIds: number[]): Array<Record<string, unknown>> {
-  const priceCents = Math.round(Number(sku.price_tier) * 100);
+  const priceYuan = Number(sku.price_tier).toFixed(2);
   const base: Record<string, unknown> = {
     name: sku.name,
-    unit: "个",
+    unit: DEFAULT_RETAIL_UNIT,
     outer_id: sku.sku_code,
     category_id: categoryId,
     offline_create: true,
-    is_display: true,
-    quantity: 0,
-    retail_price: priceCents,
+    retail_price: priceYuan,
   };
   if (kdtIds.length > 0) base.sell_channel_ids = kdtIds;
   if (sku.image_url) {
@@ -635,9 +665,9 @@ function buildSpuCreateAttempts(sku: {
     outer_sku_id: sku.sku_code,
     sku_no: sku.sku_code,
     sku_code: sku.sku_code,
-    price: priceCents,
-    retail_price: priceCents,
-    sale_price: priceCents,
+    price: priceYuan,
+    retail_price: priceYuan,
+    sale_price: priceYuan,
     stock_num: 0,
     quantity: 0,
   };
@@ -649,23 +679,20 @@ function buildSpuCreateAttempts(sku: {
     },
     {
       name: sku.name,
-      unit: "个",
+      unit: DEFAULT_RETAIL_UNIT,
       outer_id: sku.sku_code,
       category_id: categoryId,
       offline_create: true,
-      is_display: true,
-      quantity: 0,
-      retail_price: priceCents,
+      retail_price: priceYuan,
       ...(kdtIds.length > 0 ? { sell_channel_ids: kdtIds } : {}),
       sku_list: [skuListItem],
     },
     {
       name: sku.name,
-      unit: "个",
+      unit: DEFAULT_RETAIL_UNIT,
       outer_id: sku.sku_code,
       category_id: categoryId,
       offline_create: true,
-      is_display: true,
       ...(kdtIds.length > 0 ? { sell_channel_ids: kdtIds } : {}),
       skus: [skuListItem],
     },
@@ -673,10 +700,18 @@ function buildSpuCreateAttempts(sku: {
       name: sku.name,
       outer_id: sku.sku_code,
       category_id: categoryId,
-      unit: "个",
+      unit: DEFAULT_RETAIL_UNIT,
       offline_create: true,
       sku: buildSpuSkuArray(sku as { id: string; sku_code: string; name: string; price_tier: number | string; weight_g?: number | null }),
       ...(kdtIds.length > 0 ? { sell_channel_ids: kdtIds } : {}),
+    },
+    {
+      name: sku.name,
+      unit: DEFAULT_RETAIL_UNIT,
+      outer_id: sku.sku_code,
+      category_id: categoryId,
+      retail_price: priceYuan,
+      ...(kdtIds.length > 0 ? { display_on_kdt_ids: kdtIds } : {}),
     },
   ];
 }
@@ -708,6 +743,66 @@ function pickCreatedSpuId(payload: unknown) {
   return walk(payload);
 }
 
+function pickCreatedSpuCode(payload: unknown) {
+  if (typeof payload === "string" && payload.trim()) return payload.trim();
+  if (!payload || typeof payload !== "object") return "";
+  const obj = payload as Record<string, unknown>;
+  const data = obj.data;
+  if (typeof data === "string" && data.trim()) return data.trim();
+  for (const key of ["spu_code", "spuCode", "sku_code", "skuCode", "code", "outer_id"]) {
+    const value = obj[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+function collectSpuRowsFromPayload(payload: unknown): Array<Record<string, unknown>> {
+  const rows: Array<Record<string, unknown>> = [];
+  const seen = new Set<unknown>();
+  const keys = ["spus", "spu_list", "spuList", "items", "list", "records"];
+  const walk = (value: unknown, depth = 0) => {
+    if (!value || typeof value !== "object" || depth > 5 || seen.has(value)) return;
+    seen.add(value);
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (item && typeof item === "object" && !Array.isArray(item)) rows.push(item as Record<string, unknown>);
+      }
+      return;
+    }
+    const obj = value as Record<string, unknown>;
+    for (const key of keys) walk(obj[key], depth + 1);
+    for (const key of ["data", "response", "result"]) walk(obj[key], depth + 1);
+  };
+  walk(payload);
+  return rows;
+}
+
+async function findCreatedHqSpu(token: string, code: string, name: string) {
+  const res = await callYouzanApiVerbose({
+    accessToken: token,
+    method: "youzan.retail.open.spu.query",
+    version: "3.0.0",
+    params: { page_no: 1, page_size: 50 },
+    timeoutMs: 20_000,
+  });
+  const rows = collectSpuRowsFromPayload(res.payload);
+  const matched = rows.find((row) => {
+    const skus = Array.isArray(row.skus) ? (row.skus as Array<Record<string, unknown>>) : [];
+    return (
+      String(row.spu_code ?? row.spuCode ?? "") === code ||
+      String(row.product_name ?? row.productName ?? row.name ?? "") === name ||
+      skus.some((sku) => String(sku.sku_code ?? sku.skuCode ?? "") === code)
+    );
+  });
+  if (!matched) return { spuId: 0, skuId: null as number | null };
+  const skus = Array.isArray(matched.skus) ? (matched.skus as Array<Record<string, unknown>>) : [];
+  const skuId = Number(skus[0]?.sku_id ?? skus[0]?.skuId ?? 0) || null;
+  return {
+    spuId: Number(matched.spu_id ?? matched.spuId ?? matched.item_id ?? matched.id ?? 0),
+    skuId,
+  };
+}
+
 /**
  * ensureHqSpuLink —— 保证本地 SKU 在总部有一条 SPU
  * ------------------------------------------------------------
@@ -720,12 +815,12 @@ function pickCreatedSpuId(payload: unknown) {
 export async function ensureHqSpuLink(
   sku_id: string,
   addBranchShopId?: string,
-): Promise<{ created: boolean; yz_item_id: number; shop_id: string }> {
+): Promise<{ created: boolean; yz_item_id: number; shop_id: string; yz_sku_id?: number | null }> {
   const hq = await getHqShop();
   // 已有 HQ 绑定则直接返回（不改 sell_channel_ids）
   const { data: existed } = await supabase
     .from("sku_youzan_links")
-    .select("yz_item_id")
+    .select("yz_item_id, yz_sku_id")
     .eq("sku_id", sku_id)
     .eq("shop_id", hq.id)
     .maybeSingle();
@@ -734,6 +829,7 @@ export async function ensureHqSpuLink(
       created: false,
       yz_item_id: Number(existed.yz_item_id),
       shop_id: hq.id,
+      yz_sku_id: Number(existed.yz_sku_id ?? 0) || null,
     };
   }
 
@@ -747,12 +843,14 @@ export async function ensureHqSpuLink(
 
   const scope: "standard" | "custom" =
     ((sku as { sku_scope?: string }).sku_scope === "custom" ? "custom" : "standard");
-  const categoryId = await resolveHqCategoryId(sku as { category?: string | null });
+  await resolveHqCategoryId(sku as { category?: string | null });
+  const categoryId = await resolveHqRetailProductCategoryId();
   const { kdtIds } = await collectSellChannelKdtIds(sku_id, scope, addBranchShopId);
 
 
   const token = await ensureAccessToken(hq);
   let newSpuId = 0;
+  let newSkuId: number | null = null;
   let lastPreview = "";
   let lastError = "";
   const attempts = buildSpuCreateAttempts(
@@ -778,6 +876,14 @@ export async function ensureHqSpuLink(
       });
       lastPreview = res.preview;
       newSpuId = pickCreatedSpuId(res.payload);
+      if (!newSpuId) {
+        const code = pickCreatedSpuCode(res.payload);
+        if (code) {
+          const found = await findCreatedHqSpu(token, code, sku.name);
+          newSpuId = found.spuId;
+          newSkuId = found.skuId;
+        }
+      }
       if (newSpuId > 0) break;
       lastError = `spu.create 未返回 spu_id：${res.preview.slice(0, 200)}`;
     } catch (e) {
@@ -794,6 +900,7 @@ export async function ensureHqSpuLink(
       sku_id,
       shop_id: hq.id,
       yz_item_id: newSpuId,
+      yz_sku_id: newSkuId,
       status: "linked",
       role: "hq_spu",
       sync_stock: false,
@@ -801,7 +908,7 @@ export async function ensureHqSpuLink(
     } as never,
     { onConflict: "sku_id,shop_id" },
   );
-  return { created: true, yz_item_id: newSpuId, shop_id: hq.id };
+  return { created: true, yz_item_id: newSpuId, yz_sku_id: newSkuId, shop_id: hq.id };
 }
 
 /**
