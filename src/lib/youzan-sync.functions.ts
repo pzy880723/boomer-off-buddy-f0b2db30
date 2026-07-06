@@ -97,7 +97,7 @@ async function pushStockToYouzan(
       {
         quantity: String(num),
         ...(link.yz_sku_id ? { sku_id: link.yz_sku_id } : {}),
-        ...(sku?.sku_code ? { sku_code: sku.sku_code } : {}),
+        ...(!link.yz_sku_id && sku?.sku_code ? { sku_code: sku.sku_code } : {}),
       },
     ],
   };
