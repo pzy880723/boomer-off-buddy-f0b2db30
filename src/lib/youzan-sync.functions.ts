@@ -782,16 +782,16 @@ async function findCreatedHqSpu(token: string, code: string, name: string) {
     accessToken: token,
     method: "youzan.retail.open.spu.query",
     version: "3.0.0",
-    params: { page_no: 1, page_size: 50 },
+    params: { page_no: 1, page_size: 20 },
     timeoutMs: 20_000,
   });
   const rows = collectSpuRowsFromPayload(res.payload);
   const matched = rows.find((row) => {
     const skus = Array.isArray(row.skus) ? (row.skus as Array<Record<string, unknown>>) : [];
     return (
-      String(row.spu_code ?? row.spuCode ?? "") === code ||
+      (code && String(row.spu_code ?? row.spuCode ?? "") === code) ||
       String(row.product_name ?? row.productName ?? row.name ?? "") === name ||
-      skus.some((sku) => String(sku.sku_code ?? sku.skuCode ?? "") === code)
+      (code && skus.some((sku) => String(sku.sku_code ?? sku.skuCode ?? "") === code))
     );
   });
   if (!matched) return { spuId: 0, skuId: null as number | null };
@@ -865,7 +865,12 @@ export async function ensureHqSpuLink(
     categoryId,
     kdtIds,
   );
-  for (const params of attempts) {
+  const existingRemote = await findCreatedHqSpu(token, "", sku.name);
+  if (existingRemote.spuId > 0) {
+    newSpuId = existingRemote.spuId;
+    newSkuId = existingRemote.skuId;
+  }
+  for (const params of newSpuId > 0 ? [] : attempts) {
     try {
       const res = await callYouzanApiVerbose({
         accessToken: token,
