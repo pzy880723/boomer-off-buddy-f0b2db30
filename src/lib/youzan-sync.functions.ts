@@ -1340,7 +1340,7 @@ export async function ensureBranchProduct(
 ): Promise<{ yz_item_id: number | null; created: boolean; error?: string }> {
   const { data: existed } = await supabase
     .from("sku_youzan_links")
-    .select("yz_item_id")
+    .select("yz_item_id, yz_sku_id")
     .eq("sku_id", sku_id)
     .eq("shop_id", shop_id)
     .maybeSingle();
@@ -1363,16 +1363,18 @@ export async function ensureBranchProduct(
     const hq = await getHqShop();
     const { data: hqLink } = await supabase
       .from("sku_youzan_links")
-      .select("yz_item_id")
+      .select("yz_item_id, yz_sku_id")
       .eq("sku_id", sku_id)
       .eq("shop_id", hq.id)
       .maybeSingle();
     let hqSpuId = Number(hqLink?.yz_item_id ?? 0);
+    let hqSkuId = Number(hqLink?.yz_sku_id ?? 0) || null;
 
     if (!hqSpuId) {
       // Step A: 无 HQ SPU → 一步 create，同时铺到目标分店
       const hqInfo = await ensureHqSpu(sku_id, shop_id);
       hqSpuId = hqInfo.yz_item_id;
+      hqSkuId = hqInfo.yz_sku_id ?? null;
     } else {
       // Step B: 已有 HQ SPU → 追加分店到 channels
       await addBranchToHqSpu(sku_id, hqSpuId, shop_id);
@@ -1386,6 +1388,7 @@ export async function ensureBranchProduct(
         sku_id,
         shop_id,
         yz_item_id: hqSpuId,
+        yz_sku_id: hqSkuId,
         status: "linked",
         sync_stock: true,
         role: "branch_stock",
