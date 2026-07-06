@@ -359,6 +359,28 @@ function ShopProductsPage() {
         }
       />
 
+      {missingDefaultCategory && (
+        <div className="mb-3 flex items-start gap-2 rounded-md border border-rose-500/40 bg-rose-500/5 px-3 py-2 text-xs">
+          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-600" />
+          <div className="flex-1">
+            <p className="font-medium text-rose-700 dark:text-rose-300">
+              还没选「有赞默认商品分组」，自定义商品和组包商品推不到有赞。
+            </p>
+            <p className="mt-0.5 text-muted-foreground">
+              有赞规定新商品必须放进一个分组。选好之后，之前失败的商品点右上角「重推失败商品」就会重试。
+              <Link
+                to="/settings"
+                className="ml-1 inline-flex items-center gap-0.5 text-primary underline-offset-2 hover:underline"
+              >
+                去「设置 → 集成」选分组 <ArrowRight className="h-3 w-3" />
+              </Link>
+            </p>
+          </div>
+        </div>
+      )}
+
+
+
       <Card className="mb-4 p-3">
         <div className="flex flex-wrap items-center gap-3">
           <Select value={activeShopId} onValueChange={setShopId}>
