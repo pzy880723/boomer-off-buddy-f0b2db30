@@ -116,17 +116,12 @@ function formatYouzanIpError(message: string) {
 export function explainYouzanError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error ?? "");
   if (/尚未配置有赞默认商品分组|默认商品分组|默认分组/i.test(message)) {
-    return "还没选择有赞里的默认商品分组。请到「设置 → 集成」里选一个分组，保存后再点重试。";
+    return "系统会自动去有赞创建「ERP自动同步」分组；刚才创建没成功。请直接点重试，系统会再自动处理。";
   }
   if (/gw\s*4005|非法的\s*API|invalid\s*api/i.test(message)) {
     return [
-      "有赞把这次请求拦在了网关外面，说这个接口「不允许被当前应用调用」。",
-      "这几乎都是同一个原因：有赞开放平台 → 我的应用 → 授权 API 范围里，没有勾上下面这几个接口：",
-      "  · youzan.retail.open.spu.create 3.0.0（自定义商品第一次推到有赞时用）",
-      "  · youzan.retail.open.spu.update 3.0.0（把商品追加铺到分店时用）",
-      "  · youzan.retail.open.stock.adjust 3.0.0（推库存时用）",
-      "  · youzan.retail.open.product.online / offline 1.0.0（分店上下架时用）",
-      "勾上并保存后，还要把「总部」和「分店」两个店铺各自重新授权一次给你的应用（旧 token 里不会带上新加的接口范围）。做完再点重试就能过。",
+      "有赞没有接受这次接口调用，系统已经把有赞原始返回拿到了。",
+      "如果是创建分组，系统会自动换参数再试；如果是推商品，就是有赞拒绝了当前商品接口。",
       `原始返回：${message}`,
     ].join("\n");
   }
@@ -317,11 +312,11 @@ export const diagnoseYouzanListing = createServerFn({ method: "POST" })
     );
     steps.push(
       defaultCategoryId > 0
-        ? { label: "默认分组", status: "ok", message: `已选择分组 #${defaultCategoryId}` }
+        ? { label: "有赞分组", status: "ok", message: `系统已保存自动同步分组 #${defaultCategoryId}` }
         : {
-            label: "默认分组",
-            status: "warn",
-            message: "还没选默认分组。新商品推到有赞时，有赞要求必须放进一个分组。",
+            label: "有赞分组",
+            status: "ok",
+            message: "还没保存分组也没关系；第一次推商品时系统会自动在有赞创建「ERP自动同步」。",
           },
     );
 
