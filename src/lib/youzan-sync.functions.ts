@@ -613,17 +613,13 @@ function buildSpuCreateAttempts(sku: {
   const priceCents = Math.round(Number(sku.price_tier) * 100);
   const base: Record<string, unknown> = {
     title: sku.name,
-    product_name: sku.name,
-    name: sku.name,
     unit: "个",
     outer_id: sku.sku_code,
-    outer_spu_id: sku.sku_code,
     category_id: categoryId,
-    group_id: categoryId,
-    group_ids: [categoryId],
     offline_create: true,
     is_display: true,
-    is_sale: true,
+    quantity: 0,
+    item_price_param: { price: priceCents },
   };
   if (kdtIds.length > 0) base.sell_channel_ids = kdtIds;
   if (sku.image_url) {
@@ -650,15 +646,36 @@ function buildSpuCreateAttempts(sku: {
   return [
     {
       ...base,
-      sku: buildSpuSkuArray(sku as { id: string; sku_code: string; name: string; price_tier: number | string; weight_g?: number | null }),
     },
     {
-      ...base,
+      title: sku.name,
+      unit: "个",
+      outer_id: sku.sku_code,
+      category_id: categoryId,
+      offline_create: true,
+      is_display: true,
+      quantity: 0,
+      price: priceCents,
+      ...(kdtIds.length > 0 ? { sell_channel_ids: kdtIds } : {}),
       sku_list: [skuListItem],
     },
     {
-      ...base,
+      title: sku.name,
+      unit: "个",
+      outer_id: sku.sku_code,
+      category_id: categoryId,
+      offline_create: true,
+      is_display: true,
+      ...(kdtIds.length > 0 ? { sell_channel_ids: kdtIds } : {}),
       skus: [skuListItem],
+    },
+    {
+      title: sku.name,
+      outer_id: sku.sku_code,
+      category_id: categoryId,
+      offline_create: true,
+      sku: buildSpuSkuArray(sku as { id: string; sku_code: string; name: string; price_tier: number | string; weight_g?: number | null }),
+      ...(kdtIds.length > 0 ? { sell_channel_ids: kdtIds } : {}),
     },
   ];
 }
