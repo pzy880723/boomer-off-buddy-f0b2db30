@@ -95,7 +95,7 @@ async function pushStockToYouzan(
     create_time: formatYouzanDateTime(new Date()),
     order_items: [
       {
-        quantity: num,
+        quantity: String(num),
         ...(link.yz_sku_id ? { sku_id: link.yz_sku_id } : {}),
         ...(sku?.sku_code ? { sku_code: sku.sku_code } : {}),
       },
