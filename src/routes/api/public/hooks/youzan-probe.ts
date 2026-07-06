@@ -31,24 +31,7 @@ export const Route = createFileRoute("/api/public/hooks/youzan-probe")({
         }
 
         const results = [
-          await probe("youzan.item.group.get", "3.0.0", {}),
-          await probe("youzan.retail.open.spu.create", "3.0.0", {
-            item_name: "__probe_do_not_use__",
-            title: "__probe_do_not_use__",
-            outer_id: "PROBE-" + Date.now(),
-            offline_create: true,
-            item_unit: "个",
-            unit: "个",
-            sku: [{ outer_id: "PROBE-SKU-" + Date.now(), price: 1, quantity: 0 }],
-          }),
-          await probe("youzan.retail.open.spu.create", "3.0.0", {
-            item_name: "__probe_do_not_use__",
-            outer_id: "PROBE2-" + Date.now(),
-            offline_create: true,
-            item_unit: "个",
-            category_id: 0,
-            sku: [{ outer_id: "PROBE-SKU2-" + Date.now(), price: 1, quantity: 0 }],
-          }),
+          await probe("youzan.retail.open.spu.query", "3.0.0", { page_no: 1, page_size: 1 }),
         ];
 
         return Response.json({ hq_kdt_id: hq.kdt_id, results });
