@@ -1,30 +1,28 @@
-## 我会按你的要求改
+## 目标
+把两条中信泰富店的自定义商品（`test`、`测试商品`）立即推到有赞。
 
-以后凡是有赞 API 已经给了权限、系统能自己做的事，我都让系统自己做，不再让你去有赞后台手动操作。
+## 现状确认（已查数据库）
+- 两条同步队列都是 `status=failed, attempts=2`，最后错误：`[gw 4005] 非法的API`。
+- 对应 `sku_youzan_links` 都是 `yz_item_id=0 / status=error`，说明**连总部 SPU 都还没建成**，卡在自动上架第一步。
+- 触发失败的具体接口是 `youzan.retail.open.spu.create`（连锁零售 · 总部建 SPU）。
+- `app_settings.youzan_hq_default_category_id` 仍为空，说明 `youzan.item.group.create` 也没能建成默认分组（同样是 4005 场景）。
 
-## 这次具体改法
+## 我要做的事（顺序执行）
+1. **把两条队列 reset 成 pending**（清空 last_error / attempts / next_run_at=now），让 worker 立刻挑起来。
+2. **服务端强行跑一次 `runStockSyncWorkerCore`**，只针对这两个 sku_id，limit=5，把每一步的原始 payload 回传到日志。
+3. **逐步推进**：
+   - Step A：调 `ensureAutoYouzanDefaultCategory` → `youzan.item.group.create` name=`ERP自动同步`（HQ token）。成功则写回 `app_settings`。
+   - Step B：调 `ensureHqSpuLink` → `youzan.retail.open.spu.create` v3.0.0（HQ token，`offline_create=true`，`sell_channel_ids=[中信泰富店 kdt_id]`）。成功则写 `sku_youzan_links(role=hq_spu)`。
+   - Step C：upsert 分店 `sku_youzan_links(role=branch_stock, yz_item_id=hq_spu_id, sync_stock=true)`。
+   - Step D：`youzan.retail.open.stock.adjust` 把当前 `inv_stocks.qty` 推到中信泰富店。
+4. **两种结果分别处理**：
+   - 全部成功：把两个 SKU 在有赞后台的直达链接、当前推送库存值贴出来给你确认。
+   - 仍然 4005：明确告诉你**是哪一个 API method 被拒**（group.create / spu.create / stock.adjust），因为「App 授权范围」这个开关是必须在有赞开放平台后台勾选对应 API 的授权，这一步只能你本人在开放平台点授权——不是 ERP 能替代的操作。届时我会一次性列出**需要勾选的 API method 全名**，你在开放平台一次勾完就好，之后同步全自动。
 
-1. **系统自动创建有赞分组**
-   - 第一次推自定义商品时，如果 ERP 里还没有默认分组，系统自动去有赞创建分组。
-   - 分组名：`ERP自动同步`
-   - 创建成功后保存起来，以后不重复创建。
+## 不改的地方
+- 不动库存/SKU/分店信息、不动其它同步流程、不动分类映射逻辑。
+- 只操作 `youzan_stock_sync_queue` 和 `sku_youzan_links` 这两条记录的状态。
 
-2. **如果分组已经存在，系统自动复用**
-   - 如果有赞返回“分组已存在”或类似提示，系统自动查询已有分组。
-   - 找到 `ERP自动同步` 后保存它的有赞分组 ID。
-
-3. **不再让你手动选默认分组**
-   - 设置页把“默认分组必须手动选择”的提示去掉。
-   - 门店商品页也不再因为默认分组为空而报红。
-
-4. **失败商品自动恢复可重推**
-   - 把之前卡住的测试商品同步任务重置。
-   - 后面你点“重推失败商品”时，系统会自动完成：建分组 → 保存分组 → 推商品到有赞。
-
-5. **报错文案改成白话**
-   - 如果以后真的是有赞接口拒绝，页面会直接告诉你“哪个接口被有赞拦了”。
-   - 不再用一堆技术词让你自己判断。
-
-## 以后我遵守的规则
-
-有赞 API 权限已经具备、系统能通过接口完成的事情，我会主动让系统去做；只有必须你本人登录第三方后台授权、付款、开通套餐这类我无法代替的事情，我才会用白话说明。
+## 技术细节
+- 用 `supabase--insert` 把两条队列 update 成 `status='pending', attempts=0, last_error=null, next_run_at=now()`。
+- 通过一个临时 serverFn（或直接扩展 `retryFailedBranchListings` 的入口）以「同步」方式跑一次 worker 并回传详细日志，而不是 fire-and-forget，方便当场看到 Youzan 原始返回。
