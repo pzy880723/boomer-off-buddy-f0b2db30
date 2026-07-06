@@ -84,7 +84,6 @@ import { Route as ApiPublicHooksYouzanSyncWorkerRouteImport } from './routes/api
 import { Route as ApiPublicHooksYouzanSyncRouteImport } from './routes/api/public/hooks/youzan-sync'
 import { Route as ApiPublicHooksYouzanStockWorkerRouteImport } from './routes/api/public/hooks/youzan-stock-worker'
 import { Route as ApiPublicHooksYouzanReconcileRouteImport } from './routes/api/public/hooks/youzan-reconcile'
-import { Route as ApiPublicHooksYouzanProbeRouteImport } from './routes/api/public/hooks/youzan-probe'
 import { Route as ApiPublicHooksYouzanMessageRouteImport } from './routes/api/public/hooks/youzan-message'
 import { Route as ApiPublicHandheldTransfersRouteImport } from './routes/api/public/handheld/transfers'
 import { Route as ApiPublicHandheldSyncRecordsRouteImport } from './routes/api/public/handheld/sync-records'
@@ -530,12 +529,6 @@ const ApiPublicHooksYouzanReconcileRoute =
   ApiPublicHooksYouzanReconcileRouteImport.update({
     id: '/api/public/hooks/youzan-reconcile',
     path: '/api/public/hooks/youzan-reconcile',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksYouzanProbeRoute =
-  ApiPublicHooksYouzanProbeRouteImport.update({
-    id: '/api/public/hooks/youzan-probe',
-    path: '/api/public/hooks/youzan-probe',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicHooksYouzanMessageRoute =
@@ -992,7 +985,6 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
   '/api/public/handheld/transfers': typeof ApiPublicHandheldTransfersRouteWithChildren
   '/api/public/hooks/youzan-message': typeof ApiPublicHooksYouzanMessageRoute
-  '/api/public/hooks/youzan-probe': typeof ApiPublicHooksYouzanProbeRoute
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
   '/api/public/hooks/youzan-sync': typeof ApiPublicHooksYouzanSyncRoute
@@ -1125,7 +1117,6 @@ export interface FileRoutesByTo {
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
   '/api/public/handheld/transfers': typeof ApiPublicHandheldTransfersRouteWithChildren
   '/api/public/hooks/youzan-message': typeof ApiPublicHooksYouzanMessageRoute
-  '/api/public/hooks/youzan-probe': typeof ApiPublicHooksYouzanProbeRoute
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
   '/api/public/hooks/youzan-sync': typeof ApiPublicHooksYouzanSyncRoute
@@ -1266,7 +1257,6 @@ export interface FileRoutesById {
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
   '/api/public/handheld/transfers': typeof ApiPublicHandheldTransfersRouteWithChildren
   '/api/public/hooks/youzan-message': typeof ApiPublicHooksYouzanMessageRoute
-  '/api/public/hooks/youzan-probe': typeof ApiPublicHooksYouzanProbeRoute
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
   '/api/public/hooks/youzan-sync': typeof ApiPublicHooksYouzanSyncRoute
@@ -1408,7 +1398,6 @@ export interface FileRouteTypes {
     | '/api/public/handheld/sync-records'
     | '/api/public/handheld/transfers'
     | '/api/public/hooks/youzan-message'
-    | '/api/public/hooks/youzan-probe'
     | '/api/public/hooks/youzan-reconcile'
     | '/api/public/hooks/youzan-stock-worker'
     | '/api/public/hooks/youzan-sync'
@@ -1541,7 +1530,6 @@ export interface FileRouteTypes {
     | '/api/public/handheld/sync-records'
     | '/api/public/handheld/transfers'
     | '/api/public/hooks/youzan-message'
-    | '/api/public/hooks/youzan-probe'
     | '/api/public/hooks/youzan-reconcile'
     | '/api/public/hooks/youzan-stock-worker'
     | '/api/public/hooks/youzan-sync'
@@ -1681,7 +1669,6 @@ export interface FileRouteTypes {
     | '/api/public/handheld/sync-records'
     | '/api/public/handheld/transfers'
     | '/api/public/hooks/youzan-message'
-    | '/api/public/hooks/youzan-probe'
     | '/api/public/hooks/youzan-reconcile'
     | '/api/public/hooks/youzan-stock-worker'
     | '/api/public/hooks/youzan-sync'
@@ -1783,7 +1770,6 @@ export interface RootRouteChildren {
   ApiPublicHandheldSyncRecordsRoute: typeof ApiPublicHandheldSyncRecordsRoute
   ApiPublicHandheldTransfersRoute: typeof ApiPublicHandheldTransfersRouteWithChildren
   ApiPublicHooksYouzanMessageRoute: typeof ApiPublicHooksYouzanMessageRoute
-  ApiPublicHooksYouzanProbeRoute: typeof ApiPublicHooksYouzanProbeRoute
   ApiPublicHooksYouzanReconcileRoute: typeof ApiPublicHooksYouzanReconcileRoute
   ApiPublicHooksYouzanStockWorkerRoute: typeof ApiPublicHooksYouzanStockWorkerRoute
   ApiPublicHooksYouzanSyncRoute: typeof ApiPublicHooksYouzanSyncRoute
@@ -2347,13 +2333,6 @@ declare module '@tanstack/react-router' {
       path: '/api/public/hooks/youzan-reconcile'
       fullPath: '/api/public/hooks/youzan-reconcile'
       preLoaderRoute: typeof ApiPublicHooksYouzanReconcileRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/hooks/youzan-probe': {
-      id: '/api/public/hooks/youzan-probe'
-      path: '/api/public/hooks/youzan-probe'
-      fullPath: '/api/public/hooks/youzan-probe'
-      preLoaderRoute: typeof ApiPublicHooksYouzanProbeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/youzan-message': {
@@ -3187,7 +3166,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHandheldSyncRecordsRoute: ApiPublicHandheldSyncRecordsRoute,
   ApiPublicHandheldTransfersRoute: ApiPublicHandheldTransfersRouteWithChildren,
   ApiPublicHooksYouzanMessageRoute: ApiPublicHooksYouzanMessageRoute,
-  ApiPublicHooksYouzanProbeRoute: ApiPublicHooksYouzanProbeRoute,
   ApiPublicHooksYouzanReconcileRoute: ApiPublicHooksYouzanReconcileRoute,
   ApiPublicHooksYouzanStockWorkerRoute: ApiPublicHooksYouzanStockWorkerRoute,
   ApiPublicHooksYouzanSyncRoute: ApiPublicHooksYouzanSyncRoute,
