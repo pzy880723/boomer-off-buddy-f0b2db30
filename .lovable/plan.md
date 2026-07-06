@@ -1,28 +1,56 @@
-## 目标
-把两条中信泰富店的自定义商品（`test`、`测试商品`）立即推到有赞。
+## 结论
 
-## 现状确认（已查数据库）
-- 两条同步队列都是 `status=failed, attempts=2`，最后错误：`[gw 4005] 非法的API`。
-- 对应 `sku_youzan_links` 都是 `yz_item_id=0 / status=error`，说明**连总部 SPU 都还没建成**，卡在自动上架第一步。
-- 触发失败的具体接口是 `youzan.retail.open.spu.create`（连锁零售 · 总部建 SPU）。
-- `app_settings.youzan_hq_default_category_id` 仍为空，说明 `youzan.item.group.create` 也没能建成默认分组（同样是 4005 场景）。
+是的，应该用你贴的这个接口：`youzan.item.group.create/1.0.0`。
 
-## 我要做的事（顺序执行）
-1. **把两条队列 reset 成 pending**（清空 last_error / attempts / next_run_at=now），让 worker 立刻挑起来。
-2. **服务端强行跑一次 `runStockSyncWorkerCore`**，只针对这两个 sku_id，limit=5，把每一步的原始 payload 回传到日志。
-3. **逐步推进**：
-   - Step A：调 `ensureAutoYouzanDefaultCategory` → `youzan.item.group.create` name=`ERP自动同步`（HQ token）。成功则写回 `app_settings`。
-   - Step B：调 `ensureHqSpuLink` → `youzan.retail.open.spu.create` v3.0.0（HQ token，`offline_create=true`，`sell_channel_ids=[中信泰富店 kdt_id]`）。成功则写 `sku_youzan_links(role=hq_spu)`。
-   - Step C：upsert 分店 `sku_youzan_links(role=branch_stock, yz_item_id=hq_spu_id, sync_stock=true)`。
-   - Step D：`youzan.retail.open.stock.adjust` 把当前 `inv_stocks.qty` 推到中信泰富店。
-4. **两种结果分别处理**：
-   - 全部成功：把两个 SKU 在有赞后台的直达链接、当前推送库存值贴出来给你确认。
-   - 仍然 4005：明确告诉你**是哪一个 API method 被拒**（group.create / spu.create / stock.adjust），因为「App 授权范围」这个开关是必须在有赞开放平台后台勾选对应 API 的授权，这一步只能你本人在开放平台点授权——不是 ERP 能替代的操作。届时我会一次性列出**需要勾选的 API method 全名**，你在开放平台一次勾完就好，之后同步全自动。
+我刚核对了当前代码，问题点很明确：现在自动建分组走的是 `youzan.item.group.create/3.0.0`，同时还在用 `youzan.item.group.search/list/3.0.0` 做查找兜底。这很可能就是你明明勾了权限但仍然 `gw 4005 非法的API` 的原因：**权限开的是 1.0.0 商品分组接口，但代码打到了 3.0.0 版本**。
 
-## 不改的地方
-- 不动库存/SKU/分店信息、不动其它同步流程、不动分类映射逻辑。
-- 只操作 `youzan_stock_sync_queue` 和 `sku_youzan_links` 这两条记录的状态。
+所以这次不再让你去有赞后台反复确认，我直接把调用改对，然后立刻跑同步。
 
-## 技术细节
-- 用 `supabase--insert` 把两条队列 update 成 `status='pending', attempts=0, last_error=null, next_run_at=now()`。
-- 通过一个临时 serverFn（或直接扩展 `retryFailedBranchListings` 的入口）以「同步」方式跑一次 worker 并回传详细日志，而不是 fire-and-forget，方便当场看到 Youzan 原始返回。
+## 实施计划
+
+1. **修正自动分组接口版本**
+   - 把自动创建「ERP自动同步」分组的接口从：
+     - `youzan.item.group.create/3.0.0`
+   - 改成：
+     - `youzan.item.group.create/1.0.0`
+   - 请求参数优先使用你文档响应字段匹配的格式：
+     - `title: "ERP自动同步"`
+     - `parent_group_id: 0`
+   - 保留兼容兜底参数尝试，避免有赞网关实际参数名和文档展示不一致。
+
+2. **修正分组查找/复用逻辑**
+   - 当前查找用的是 3.0.0 的 search/list 兜底，我会改成更适合 1.0.0 分组体系的查找策略。
+   - 如果查找接口仍被有赞拒绝，不阻塞同步：直接创建分组；若提示已存在，再通过返回/后续查询拿 `group_id`。
+
+3. **继续用总部 token 创建分组**
+   - 你贴的接口明确支持「连锁总部创建」，所以「ERP自动同步」分组仍然用 HQ 店 token 创建。
+   - 创建成功后把返回的 `group_id` 写入系统设置，后续不重复创建。
+
+4. **修正 SPU 创建载荷**
+   - 之前诊断显示 `youzan.retail.open.spu.create/3.0.0` 已经能进到参数校验，说明接口权限是通的。
+   - 我会同步修正当前 `spu.create` 的字段结构，避免再报「商品名称/单位为空」。
+   - 分组字段会使用刚拿到的 `group_id`。
+
+5. **只处理两个中信泰富店的自定义商品**
+   - 定位两个自定义 SKU：`test`、`测试商品`。
+   - 清掉它们历史失败的 `yz_item_id=0` 绑定。
+   - 把对应同步队列重置为 pending。
+   - 立即触发 worker，只同步这两个 SKU 到两个中信泰富店，不动其他商品。
+
+6. **验证并回报结果**
+   - 成功后回报：
+     - 两个商品的有赞 `spu_id / item_id`
+     - 两个中信泰富店的绑定状态
+     - 推送库存数量
+   - 如果仍失败，我会直接给出有赞原始错误和卡住的具体接口，不再泛泛说「权限问题」。
+
+## 预期改动文件
+
+- `src/lib/youzan-sync.functions.ts`
+
+## 不会做的事
+
+- 不让你再手动创建商品分组。
+- 不让你再手动建有赞商品。
+- 不改其他店铺商品。
+- 不改库存业务规则。

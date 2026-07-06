@@ -10,6 +10,8 @@ import {
 } from "./youzan.functions";
 
 const AUTO_YOUZAN_GROUP_NAME = "ERP自动同步";
+const DEFAULT_RETAIL_PRODUCT_CATEGORY_ID = 90747747;
+const DEFAULT_RETAIL_UNIT = "件";
 
 // 内部：按 shop_id 加载店铺（HQ 或分店都可）
 async function getShopById(shopId: string) {
@@ -84,16 +86,22 @@ async function pushStockToYouzan(
 
   const hq = await getHqShop();
   const hqToken = await ensureAccessToken(hq);
+  const warehouseCode = await resolveYouzanWarehouseCode(hqToken, branchShop.kdt_id);
 
   const params: Record<string, unknown> = {
     kdt_id: branchShop.kdt_id,
-    adjust_num: num,
-    type: "set",
-    client_seq: clientSeq,
+    warehouse_code: warehouseCode,
+    source_order_no: clientSeq,
+    create_time: formatYouzanDateTime(new Date()),
+    order_items: [
+      {
+        quantity: String(num),
+        ...(link.yz_sku_id ? { sku_id: link.yz_sku_id } : {}),
+        ...(!link.yz_sku_id && sku?.sku_code ? { sku_code: sku.sku_code } : {}),
+      },
+    ],
   };
-  if (hqSpuId) params.spu_id = hqSpuId;
-  if (link.yz_sku_id) params.sku_id = link.yz_sku_id;
-  if (sku?.sku_code) params.outer_sku_id = sku.sku_code;
+  if (hqSpuId) (params.order_items as Array<Record<string, unknown>>)[0].spu_id = hqSpuId;
 
   await callYouzanApiVerbose({
     accessToken: hqToken,
@@ -102,6 +110,47 @@ async function pushStockToYouzan(
     params,
     timeoutMs: 20_000,
   });
+}
+
+function formatYouzanDateTime(date: Date) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+function collectWarehouseRows(payload: unknown): Array<Record<string, unknown>> {
+  const rows: Array<Record<string, unknown>> = [];
+  const seen = new Set<unknown>();
+  const walk = (value: unknown, depth = 0) => {
+    if (!value || typeof value !== "object" || depth > 5 || seen.has(value)) return;
+    seen.add(value);
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (item && typeof item === "object" && !Array.isArray(item)) rows.push(item as Record<string, unknown>);
+      }
+      return;
+    }
+    const obj = value as Record<string, unknown>;
+    for (const key of ["warehouses", "warehouse_list", "warehouseList", "list", "records", "data", "response"]) {
+      walk(obj[key], depth + 1);
+    }
+  };
+  walk(payload);
+  return rows;
+}
+
+async function resolveYouzanWarehouseCode(token: string, branchKdtId: number) {
+  const res = await callYouzanApiVerbose({
+    accessToken: token,
+    method: "youzan.retail.open.warehouse.query",
+    version: "3.0.0",
+    params: { kdt_id: branchKdtId, page_no: 1, page_size: 20 },
+    timeoutMs: 20_000,
+  });
+  const rows = collectWarehouseRows(res.payload);
+  const row = rows.find((r) => Number(r.warehouse_id ?? r.kdt_id ?? 0) === branchKdtId) ?? rows[0];
+  const code = String(row?.warehouse_code ?? row?.warehouseCode ?? "").trim();
+  if (!code) throw new Error(`无法获取门店仓库编码：${res.preview.slice(0, 200)}`);
+  return code;
 }
 
 // ============================================================
@@ -403,14 +452,14 @@ async function saveAutoYouzanGroupId(id: number) {
 async function findAutoYouzanGroup(token: string) {
   const attempts = [
     {
-      method: "youzan.item.group.search",
-      version: "3.0.0",
-      params: { keyword: AUTO_YOUZAN_GROUP_NAME, page_no: 1, page_size: 50 },
+      method: "youzan.item.group.list",
+      version: "1.0.0",
+      params: { page_no: 1, page_size: 100 },
     },
     {
-      method: "youzan.item.group.list",
-      version: "3.0.0",
-      params: { page_no: 1, page_size: 100 },
+      method: "youzan.item.group.search",
+      version: "1.0.0",
+      params: { keyword: AUTO_YOUZAN_GROUP_NAME, page_no: 1, page_size: 50 },
     },
     {
       method: "youzan.itemcategories.tags.get",
@@ -455,19 +504,41 @@ export async function ensureAutoYouzanDefaultCategory(): Promise<{ id: number; c
     return { id: existingId, created: false };
   }
 
-  const createAttempts: Array<Record<string, unknown>> = [
-    { group_name: AUTO_YOUZAN_GROUP_NAME, parent_id: 0 },
-    { name: AUTO_YOUZAN_GROUP_NAME, parent_id: 0 },
-    { title: AUTO_YOUZAN_GROUP_NAME, parent_id: 0 },
+  const createAttempts: Array<{ method: string; version: string; params: Record<string, unknown> }> = [
+    {
+      method: "youzan.itemcategories.tag.add",
+      version: "3.0.0",
+      params: { name: AUTO_YOUZAN_GROUP_NAME },
+    },
+    {
+      method: "youzan.item.group.create",
+      version: "1.0.0",
+      params: { title: AUTO_YOUZAN_GROUP_NAME, parent_group_id: 0, kdtId: hq.kdt_id },
+    },
+    {
+      method: "youzan.item.group.create",
+      version: "1.0.0",
+      params: { title: AUTO_YOUZAN_GROUP_NAME, parent_group_id: 0, kdt_id: hq.kdt_id },
+    },
+    {
+      method: "youzan.item.group.create",
+      version: "1.0.0",
+      params: { title: AUTO_YOUZAN_GROUP_NAME, parent_id: 0, kdtId: hq.kdt_id },
+    },
+    {
+      method: "youzan.item.group.create",
+      version: "1.0.0",
+      params: { group_name: AUTO_YOUZAN_GROUP_NAME, parent_group_id: 0, kdtId: hq.kdt_id },
+    },
   ];
   let lastError = "";
-  for (const params of createAttempts) {
+  for (const attempt of createAttempts) {
     try {
       const res = await callYouzanApiVerbose({
         accessToken: token,
-        method: "youzan.item.group.create",
-        version: "3.0.0",
-        params,
+        method: attempt.method,
+        version: attempt.version,
+        params: attempt.params,
         timeoutMs: 20_000,
       });
       const createdId = pickGroupId(res.payload) || (await findAutoYouzanGroup(token));
@@ -507,6 +578,36 @@ async function resolveHqCategoryId(_sku?: unknown): Promise<number> {
   if (id > 0) return id;
   const auto = await ensureAutoYouzanDefaultCategory();
   return auto.id;
+}
+
+async function resolveHqRetailProductCategoryId(): Promise<number> {
+  const hq = await getHqShop();
+  const { data: cachedItems } = await supabase
+    .from("youzan_items")
+    .select("raw")
+    .eq("shop_id", hq.id)
+    .order("updated_at", { ascending: false })
+    .limit(100);
+
+  const candidates: Array<{ id: number; name: string }> = [];
+  for (const row of cachedItems ?? []) {
+    const raw = (row as { raw?: unknown }).raw as Record<string, unknown> | null;
+    if (!raw || typeof raw !== "object") continue;
+    const directId = Number(raw.category_id ?? 0);
+    const directName = String(raw.category_name ?? "").trim();
+    if (directId > 0) candidates.push({ id: directId, name: directName });
+    const skus = Array.isArray(raw.skus) ? (raw.skus as Array<Record<string, unknown>>) : [];
+    for (const sku of skus) {
+      const id = Number(sku.category_id ?? 0);
+      const name = String(sku.category_name ?? "").trim();
+      if (id > 0) candidates.push({ id, name });
+    }
+  }
+  return (
+    candidates.find((c) => c.name === "未分类")?.id ??
+    candidates[0]?.id ??
+    DEFAULT_RETAIL_PRODUCT_CATEGORY_ID
+  );
 }
 
 
@@ -580,6 +681,175 @@ function buildSpuSkuArray(sku: {
   return [item];
 }
 
+function buildSpuCreateAttempts(sku: {
+  sku_code: string;
+  name: string;
+  image_url?: string | null;
+  notes?: string | null;
+  price_tier: string | number;
+  weight_g?: number | null;
+}, categoryId: number, kdtIds: number[]): Array<Record<string, unknown>> {
+  const priceYuan = Number(sku.price_tier).toFixed(2);
+  const base: Record<string, unknown> = {
+    name: sku.name,
+    unit: DEFAULT_RETAIL_UNIT,
+    outer_id: sku.sku_code,
+    category_id: categoryId,
+    offline_create: true,
+    retail_price: priceYuan,
+  };
+  if (kdtIds.length > 0) base.sell_channel_ids = kdtIds;
+  if (sku.image_url) {
+    base.images = [sku.image_url];
+    base.photo_url = [{ url: sku.image_url }];
+  }
+  if (sku.notes) {
+    base.desc = sku.notes;
+    base.description = sku.notes;
+  }
+
+  const skuListItem: Record<string, unknown> = {
+    outer_sku_id: sku.sku_code,
+    sku_no: sku.sku_code,
+    sku_code: sku.sku_code,
+    price: priceYuan,
+    retail_price: priceYuan,
+    sale_price: priceYuan,
+    stock_num: 0,
+    quantity: 0,
+  };
+  if (sku.weight_g && Number(sku.weight_g) > 0) skuListItem.weight = Number(sku.weight_g);
+
+  return [
+    {
+      ...base,
+    },
+    {
+      name: sku.name,
+      unit: DEFAULT_RETAIL_UNIT,
+      outer_id: sku.sku_code,
+      category_id: categoryId,
+      offline_create: true,
+      retail_price: priceYuan,
+      ...(kdtIds.length > 0 ? { sell_channel_ids: kdtIds } : {}),
+      sku_list: [skuListItem],
+    },
+    {
+      name: sku.name,
+      unit: DEFAULT_RETAIL_UNIT,
+      outer_id: sku.sku_code,
+      category_id: categoryId,
+      offline_create: true,
+      ...(kdtIds.length > 0 ? { sell_channel_ids: kdtIds } : {}),
+      skus: [skuListItem],
+    },
+    {
+      name: sku.name,
+      outer_id: sku.sku_code,
+      category_id: categoryId,
+      unit: DEFAULT_RETAIL_UNIT,
+      offline_create: true,
+      sku: buildSpuSkuArray(sku as { id: string; sku_code: string; name: string; price_tier: number | string; weight_g?: number | null }),
+      ...(kdtIds.length > 0 ? { sell_channel_ids: kdtIds } : {}),
+    },
+    {
+      name: sku.name,
+      unit: DEFAULT_RETAIL_UNIT,
+      outer_id: sku.sku_code,
+      category_id: categoryId,
+      retail_price: priceYuan,
+      ...(kdtIds.length > 0 ? { display_on_kdt_ids: kdtIds } : {}),
+    },
+  ];
+}
+
+function pickCreatedSpuId(payload: unknown) {
+  const visited = new Set<unknown>();
+  const keys = ["spu_id", "spuId", "item_id", "itemId", "id"];
+  const walk = (value: unknown, depth = 0): number => {
+    if (!value || typeof value !== "object" || depth > 5 || visited.has(value)) return 0;
+    visited.add(value);
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const id = walk(item, depth + 1);
+        if (id > 0) return id;
+      }
+      return 0;
+    }
+    const obj = value as Record<string, unknown>;
+    for (const key of keys) {
+      const id = Number(obj[key] ?? 0);
+      if (Number.isFinite(id) && id > 0) return id;
+    }
+    for (const child of Object.values(obj)) {
+      const id = walk(child, depth + 1);
+      if (id > 0) return id;
+    }
+    return 0;
+  };
+  return walk(payload);
+}
+
+function pickCreatedSpuCode(payload: unknown) {
+  if (typeof payload === "string" && payload.trim()) return payload.trim();
+  if (!payload || typeof payload !== "object") return "";
+  const obj = payload as Record<string, unknown>;
+  const data = obj.data;
+  if (typeof data === "string" && data.trim()) return data.trim();
+  for (const key of ["spu_code", "spuCode", "sku_code", "skuCode", "code", "outer_id"]) {
+    const value = obj[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+function collectSpuRowsFromPayload(payload: unknown): Array<Record<string, unknown>> {
+  const rows: Array<Record<string, unknown>> = [];
+  const seen = new Set<unknown>();
+  const keys = ["spus", "spu_list", "spuList", "items", "list", "records"];
+  const walk = (value: unknown, depth = 0) => {
+    if (!value || typeof value !== "object" || depth > 5 || seen.has(value)) return;
+    seen.add(value);
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (item && typeof item === "object" && !Array.isArray(item)) rows.push(item as Record<string, unknown>);
+      }
+      return;
+    }
+    const obj = value as Record<string, unknown>;
+    for (const key of keys) walk(obj[key], depth + 1);
+    for (const key of ["data", "response", "result"]) walk(obj[key], depth + 1);
+  };
+  walk(payload);
+  return rows;
+}
+
+async function findCreatedHqSpu(token: string, code: string, name: string) {
+  const res = await callYouzanApiVerbose({
+    accessToken: token,
+    method: "youzan.retail.open.spu.query",
+    version: "3.0.0",
+    params: { page_no: 1, page_size: 20 },
+    timeoutMs: 20_000,
+  });
+  const rows = collectSpuRowsFromPayload(res.payload);
+  const matched = rows.find((row) => {
+    const skus = Array.isArray(row.skus) ? (row.skus as Array<Record<string, unknown>>) : [];
+    return (
+      (code && String(row.spu_code ?? row.spuCode ?? "") === code) ||
+      String(row.product_name ?? row.productName ?? row.name ?? "") === name ||
+      (code && skus.some((sku) => String(sku.sku_code ?? sku.skuCode ?? "") === code))
+    );
+  });
+  if (!matched) return { spuId: 0, skuId: null as number | null };
+  const skus = Array.isArray(matched.skus) ? (matched.skus as Array<Record<string, unknown>>) : [];
+  const skuId = Number(skus[0]?.sku_id ?? skus[0]?.skuId ?? 0) || null;
+  return {
+    spuId: Number(matched.spu_id ?? matched.spuId ?? matched.item_id ?? matched.id ?? 0),
+    skuId,
+  };
+}
+
 /**
  * ensureHqSpuLink —— 保证本地 SKU 在总部有一条 SPU
  * ------------------------------------------------------------
@@ -592,12 +862,12 @@ function buildSpuSkuArray(sku: {
 export async function ensureHqSpuLink(
   sku_id: string,
   addBranchShopId?: string,
-): Promise<{ created: boolean; yz_item_id: number; shop_id: string }> {
+): Promise<{ created: boolean; yz_item_id: number; shop_id: string; yz_sku_id?: number | null }> {
   const hq = await getHqShop();
   // 已有 HQ 绑定则直接返回（不改 sell_channel_ids）
   const { data: existed } = await supabase
     .from("sku_youzan_links")
-    .select("yz_item_id")
+    .select("yz_item_id, yz_sku_id")
     .eq("sku_id", sku_id)
     .eq("shop_id", hq.id)
     .maybeSingle();
@@ -606,6 +876,7 @@ export async function ensureHqSpuLink(
       created: false,
       yz_item_id: Number(existed.yz_item_id),
       shop_id: hq.id,
+      yz_sku_id: Number(existed.yz_sku_id ?? 0) || null,
     };
   }
 
@@ -619,36 +890,61 @@ export async function ensureHqSpuLink(
 
   const scope: "standard" | "custom" =
     ((sku as { sku_scope?: string }).sku_scope === "custom" ? "custom" : "standard");
-  const categoryId = await resolveHqCategoryId(sku as { category?: string | null });
+  await resolveHqCategoryId(sku as { category?: string | null });
+  const categoryId = await resolveHqRetailProductCategoryId();
   const { kdtIds } = await collectSellChannelKdtIds(sku_id, scope, addBranchShopId);
 
 
-  const params: Record<string, unknown> = {
-    title: sku.name,
-    outer_id: sku.sku_code,
-    category_id: categoryId,
-    offline_create: true,
-    sku: buildSpuSkuArray(sku as { id: string; sku_code: string; name: string; price_tier: number | string; weight_g?: number | null }),
-    images: sku.image_url ? [sku.image_url] : [],
-  };
-  if (kdtIds.length > 0) params.sell_channel_ids = kdtIds;
-  if (sku.notes) params.desc = sku.notes;
-
   const token = await ensureAccessToken(hq);
-  const res = await callYouzanApiVerbose({
-    accessToken: token,
-    method: "youzan.retail.open.spu.create",
-    version: "3.0.0",
-    params,
-    timeoutMs: 30_000,
-  });
-  const payload = res.payload as Record<string, unknown>;
-  const nested = (payload.data ?? payload) as Record<string, unknown>;
-  const newSpuId = Number(
-    nested.spu_id ?? nested.item_id ?? nested.id ?? payload.spu_id ?? payload.item_id ?? 0,
+  let newSpuId = 0;
+  let newSkuId: number | null = null;
+  let lastPreview = "";
+  let lastError = "";
+  const attempts = buildSpuCreateAttempts(
+    sku as {
+      sku_code: string;
+      name: string;
+      image_url?: string | null;
+      notes?: string | null;
+      price_tier: string | number;
+      weight_g?: number | null;
+    },
+    categoryId,
+    kdtIds,
   );
+  const existingRemote = await findCreatedHqSpu(token, "", sku.name);
+  if (existingRemote.spuId > 0) {
+    newSpuId = existingRemote.spuId;
+    newSkuId = existingRemote.skuId;
+  }
+  for (const params of newSpuId > 0 ? [] : attempts) {
+    try {
+      const res = await callYouzanApiVerbose({
+        accessToken: token,
+        method: "youzan.retail.open.spu.create",
+        version: "3.0.0",
+        params,
+        timeoutMs: 30_000,
+      });
+      lastPreview = res.preview;
+      newSpuId = pickCreatedSpuId(res.payload);
+      if (!newSpuId) {
+        const code = pickCreatedSpuCode(res.payload);
+        if (code) {
+          const found = await findCreatedHqSpu(token, code, sku.name);
+          newSpuId = found.spuId;
+          newSkuId = found.skuId;
+        }
+      }
+      if (newSpuId > 0) break;
+      lastError = `spu.create 未返回 spu_id：${res.preview.slice(0, 200)}`;
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : String(e);
+      if (/gw\s*4005|非法的\s*API|invalid\s*api/i.test(lastError)) break;
+    }
+  }
   if (!newSpuId) {
-    throw new Error(`spu.create 未返回 spu_id：${res.preview.slice(0, 200)}`);
+    throw new Error(lastError || `spu.create 未返回 spu_id：${lastPreview.slice(0, 200)}`);
   }
 
   await supabase.from("sku_youzan_links").upsert(
@@ -656,6 +952,7 @@ export async function ensureHqSpuLink(
       sku_id,
       shop_id: hq.id,
       yz_item_id: newSpuId,
+      yz_sku_id: newSkuId,
       status: "linked",
       role: "hq_spu",
       sync_stock: false,
@@ -663,7 +960,7 @@ export async function ensureHqSpuLink(
     } as never,
     { onConflict: "sku_id,shop_id" },
   );
-  return { created: true, yz_item_id: newSpuId, shop_id: hq.id };
+  return { created: true, yz_item_id: newSpuId, yz_sku_id: newSkuId, shop_id: hq.id };
 }
 
 /**
@@ -1095,7 +1392,7 @@ export async function ensureBranchProduct(
 ): Promise<{ yz_item_id: number | null; created: boolean; error?: string }> {
   const { data: existed } = await supabase
     .from("sku_youzan_links")
-    .select("yz_item_id")
+    .select("yz_item_id, yz_sku_id")
     .eq("sku_id", sku_id)
     .eq("shop_id", shop_id)
     .maybeSingle();
@@ -1118,16 +1415,18 @@ export async function ensureBranchProduct(
     const hq = await getHqShop();
     const { data: hqLink } = await supabase
       .from("sku_youzan_links")
-      .select("yz_item_id")
+      .select("yz_item_id, yz_sku_id")
       .eq("sku_id", sku_id)
       .eq("shop_id", hq.id)
       .maybeSingle();
     let hqSpuId = Number(hqLink?.yz_item_id ?? 0);
+    let hqSkuId = Number(hqLink?.yz_sku_id ?? 0) || null;
 
     if (!hqSpuId) {
       // Step A: 无 HQ SPU → 一步 create，同时铺到目标分店
       const hqInfo = await ensureHqSpu(sku_id, shop_id);
       hqSpuId = hqInfo.yz_item_id;
+      hqSkuId = hqInfo.yz_sku_id ?? null;
     } else {
       // Step B: 已有 HQ SPU → 追加分店到 channels
       await addBranchToHqSpu(sku_id, hqSpuId, shop_id);
@@ -1141,6 +1440,7 @@ export async function ensureBranchProduct(
         sku_id,
         shop_id,
         yz_item_id: hqSpuId,
+        yz_sku_id: hqSkuId,
         status: "linked",
         sync_stock: true,
         role: "branch_stock",
