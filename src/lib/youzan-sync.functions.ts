@@ -86,16 +86,22 @@ async function pushStockToYouzan(
 
   const hq = await getHqShop();
   const hqToken = await ensureAccessToken(hq);
+  const warehouseCode = await resolveYouzanWarehouseCode(hqToken, branchShop.kdt_id);
 
   const params: Record<string, unknown> = {
     kdt_id: branchShop.kdt_id,
-    adjust_num: num,
-    type: "set",
-    client_seq: clientSeq,
+    warehouse_code: warehouseCode,
+    source_order_no: clientSeq,
+    create_time: formatYouzanDateTime(new Date()),
+    order_items: [
+      {
+        quantity: num,
+        ...(link.yz_sku_id ? { sku_id: link.yz_sku_id } : {}),
+        ...(sku?.sku_code ? { sku_code: sku.sku_code } : {}),
+      },
+    ],
   };
-  if (hqSpuId) params.spu_id = hqSpuId;
-  if (link.yz_sku_id) params.sku_id = link.yz_sku_id;
-  if (!link.yz_sku_id && sku?.sku_code) params.outer_sku_id = sku.sku_code;
+  if (hqSpuId) (params.order_items as Array<Record<string, unknown>>)[0].spu_id = hqSpuId;
 
   await callYouzanApiVerbose({
     accessToken: hqToken,
@@ -104,6 +110,47 @@ async function pushStockToYouzan(
     params,
     timeoutMs: 20_000,
   });
+}
+
+function formatYouzanDateTime(date: Date) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+function collectWarehouseRows(payload: unknown): Array<Record<string, unknown>> {
+  const rows: Array<Record<string, unknown>> = [];
+  const seen = new Set<unknown>();
+  const walk = (value: unknown, depth = 0) => {
+    if (!value || typeof value !== "object" || depth > 5 || seen.has(value)) return;
+    seen.add(value);
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (item && typeof item === "object" && !Array.isArray(item)) rows.push(item as Record<string, unknown>);
+      }
+      return;
+    }
+    const obj = value as Record<string, unknown>;
+    for (const key of ["warehouses", "warehouse_list", "warehouseList", "list", "records", "data", "response"]) {
+      walk(obj[key], depth + 1);
+    }
+  };
+  walk(payload);
+  return rows;
+}
+
+async function resolveYouzanWarehouseCode(token: string, branchKdtId: number) {
+  const res = await callYouzanApiVerbose({
+    accessToken: token,
+    method: "youzan.retail.open.warehouse.query",
+    version: "3.0.0",
+    params: { kdt_id: branchKdtId, page_no: 1, page_size: 20 },
+    timeoutMs: 20_000,
+  });
+  const rows = collectWarehouseRows(res.payload);
+  const row = rows.find((r) => Number(r.warehouse_id ?? r.kdt_id ?? 0) === branchKdtId) ?? rows[0];
+  const code = String(row?.warehouse_code ?? row?.warehouseCode ?? "").trim();
+  if (!code) throw new Error(`无法获取门店仓库编码：${res.preview.slice(0, 200)}`);
+  return code;
 }
 
 // ============================================================
