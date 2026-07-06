@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
-import { useMemo, useState, useEffect } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -15,10 +15,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/page-header";
 import {
+  ensureYouzanDefaultCategoryId,
   getYouzanDefaultCategoryId,
   setYouzanDefaultCategoryId,
 } from "@/lib/app-settings.functions";
-import { fetchYouzanGroupsLive, type YouzanGroupNode } from "@/lib/categories.functions";
 import { diagnoseYouzanListing } from "@/lib/youzan.functions";
 
 
@@ -383,157 +383,77 @@ function YouzanDefaultGroupCard() {
   const qc = useQueryClient();
   const getFn = useServerFn(getYouzanDefaultCategoryId);
   const setFn = useServerFn(setYouzanDefaultCategoryId);
-  const fetchFn = useServerFn(fetchYouzanGroupsLive);
+  const ensureFn = useServerFn(ensureYouzanDefaultCategoryId);
 
   const curQ = useQuery({ queryKey: ["yz-default-cat"], queryFn: () => getFn() });
-  const yzQ = useQuery({
-    queryKey: ["yz-groups-live"],
-    queryFn: () => fetchFn(),
-    staleTime: 5 * 60 * 1000,
-  });
 
-  const [selected, setSelected] = useState<number | null>(null);
-  const [manualId, setManualId] = useState("");
-  useEffect(() => {
-    if (curQ.data?.id != null) {
-      setSelected(curQ.data.id);
-      setManualId(String(curQ.data.id));
-    }
-  }, [curQ.data?.id]);
-
-  const rows: YouzanGroupNode[] = yzQ.data?.rows ?? [];
-  const options = useMemo(() => {
-    const byParent = new Map<number | null, YouzanGroupNode[]>();
-    for (const y of rows) {
-      const pid = y.parent_id ?? null;
-      const arr = byParent.get(pid) ?? [];
-      arr.push(y);
-      byParent.set(pid, arr);
-    }
-    const flat: { id: number; label: string }[] = [];
-    const walk = (pid: number | null, depth: number) => {
-      const list = (byParent.get(pid) ?? []).sort(
-        (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name),
-      );
-      for (const y of list) {
-        flat.push({ id: y.id, label: `${"— ".repeat(depth)}${y.name}` });
-        walk(y.id, depth + 1);
-      }
-    };
-    walk(null, 0);
-    return flat;
-  }, [rows]);
-
-  const saveMut = useMutation({
-    mutationFn: (id: number | null) => setFn({ data: { id } }),
+  const ensureMut = useMutation({
+    mutationFn: () => ensureFn(),
     onSuccess: () => {
-      toast.success("已保存默认分组");
+      toast.success("有赞分组已自动准备好");
       qc.invalidateQueries({ queryKey: ["yz-default-cat"] });
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "保存失败"),
+    onError: (e) => toast.error(e instanceof Error ? e.message : "自动创建失败"),
+  });
+  const resetMut = useMutation({
+    mutationFn: () => setFn({ data: { id: null } }),
+    onSuccess: () => {
+      toast.success("已重置；下次推商品会自动重新创建");
+      qc.invalidateQueries({ queryKey: ["yz-default-cat"] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "重置失败"),
   });
 
-  const currentName = curQ.data?.id
-    ? (rows.find((r) => r.id === curQ.data!.id)?.name ?? `#${curQ.data!.id}`)
-    : null;
-  const manualNumericId = Number(manualId.trim());
-  const saveId = selected ?? (Number.isInteger(manualNumericId) && manualNumericId > 0 ? manualNumericId : null);
+  const currentName = curQ.data?.id ? (curQ.data.name ?? `#${curQ.data.id}`) : null;
 
   return (
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center justify-between">
-          <span>有赞同步 · 默认商品分组</span>
+          <span>有赞同步 · 自动商品分组</span>
           {currentName ? (
             <Badge variant="outline" className="text-emerald-600">
               当前：{currentName}
             </Badge>
           ) : (
             <Badge variant="outline" className="text-amber-600">
-              未配置
+              会自动创建
             </Badge>
           )}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-xs text-muted-foreground">
-          有赞 API 建 SPU 时必须传商品分组，这里选一个作为全局默认；ERP
-          自己的商品分类和有赞分组互不绑定。
+          推新商品到有赞时必须带一个商品分组。系统会自己在有赞创建并维护「ERP自动同步」，不用你去有赞后台手动建，也不用手动选择。
         </p>
 
-        {yzQ.data?.blocking && (
-          <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs">
-            <div className="mb-1 font-medium text-destructive">拉取分组失败</div>
-            {yzQ.data.blocking.kind === "ip_whitelist" && (
-              <div>
-                有赞拒绝了当前出口 IP，需要配置固定出口代理并把该 IP 加入有赞白名单。
-              </div>
-            )}
-            {yzQ.data.blocking.kind === "no_api" && (
-              <div>当前授权无接口：{yzQ.data.blocking.apis.join(", ")}</div>
-            )}
-            {yzQ.data.blocking.kind === "other" && (
-              <pre className="whitespace-pre-wrap break-all text-muted-foreground">
-                {yzQ.data.blocking.message}
-              </pre>
-            )}
-          </div>
-        )}
-
-        <div className="grid gap-2 md:grid-cols-[1fr_11rem_auto_auto] md:items-end">
-          <div className="space-y-1.5">
-            <Label>默认分组</Label>
-            <select
-              className="h-9 w-full rounded-md border bg-background px-2 text-sm"
-              value={selected ?? ""}
-              onChange={(e) =>
-                setSelected(e.target.value ? Number(e.target.value) : null)
-              }
-              disabled={yzQ.isLoading || options.length === 0}
-            >
-              <option value="">
-                {yzQ.isLoading ? "拉取中…" : options.length === 0 ? "无可用分组" : "— 选择分组 —"}
-              </option>
-              {options.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.label} #{o.id}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <Label>手动填 ID</Label>
-            <Input
-              className="h-9 text-sm"
-              inputMode="numeric"
-              placeholder="例如 123456"
-              value={manualId}
-              onChange={(e) => {
-                const next = e.target.value.replace(/[^0-9]/g, "");
-                setManualId(next);
-                setSelected(next ? Number(next) : null);
-              }}
-            />
+        <div className="flex flex-wrap items-center gap-2 rounded-md border p-3 text-xs">
+          <div className="min-w-[14rem] flex-1">
+            <div className="font-medium">{currentName ? `已保存有赞分组 #${curQ.data?.id}` : "还没保存分组"}</div>
+            <div className="mt-0.5 text-muted-foreground">
+              {currentName ? "后续推商品会直接使用这个分组。" : "第一次推商品或点下面按钮时，系统会自动去有赞创建。"}
+            </div>
           </div>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => qc.invalidateQueries({ queryKey: ["yz-groups-live"] })}
-            disabled={yzQ.isFetching}
+            onClick={() => ensureMut.mutate()}
+            disabled={ensureMut.isPending}
           >
-            {yzQ.isFetching ? (
+            {ensureMut.isPending ? (
               <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
             ) : (
               <RefreshCw className="mr-1 h-3.5 w-3.5" />
             )}
-            从有赞刷新
+            现在自动准备
           </Button>
           <Button
+            variant="ghost"
             size="sm"
-            onClick={() => saveMut.mutate(saveId)}
-            disabled={saveMut.isPending || !saveId || saveId === curQ.data?.id}
+            onClick={() => resetMut.mutate()}
+            disabled={resetMut.isPending || !curQ.data?.id}
           >
-            保存
+            重置
           </Button>
         </div>
       </CardContent>
