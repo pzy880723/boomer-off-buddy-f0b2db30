@@ -403,14 +403,14 @@ async function saveAutoYouzanGroupId(id: number) {
 async function findAutoYouzanGroup(token: string) {
   const attempts = [
     {
-      method: "youzan.item.group.search",
-      version: "3.0.0",
-      params: { keyword: AUTO_YOUZAN_GROUP_NAME, page_no: 1, page_size: 50 },
+      method: "youzan.item.group.list",
+      version: "1.0.0",
+      params: { page_no: 1, page_size: 100 },
     },
     {
-      method: "youzan.item.group.list",
-      version: "3.0.0",
-      params: { page_no: 1, page_size: 100 },
+      method: "youzan.item.group.search",
+      version: "1.0.0",
+      params: { keyword: AUTO_YOUZAN_GROUP_NAME, page_no: 1, page_size: 50 },
     },
     {
       method: "youzan.itemcategories.tags.get",
@@ -456,9 +456,11 @@ export async function ensureAutoYouzanDefaultCategory(): Promise<{ id: number; c
   }
 
   const createAttempts: Array<Record<string, unknown>> = [
-    { group_name: AUTO_YOUZAN_GROUP_NAME, parent_id: 0 },
-    { name: AUTO_YOUZAN_GROUP_NAME, parent_id: 0 },
+    { title: AUTO_YOUZAN_GROUP_NAME, parent_group_id: 0 },
     { title: AUTO_YOUZAN_GROUP_NAME, parent_id: 0 },
+    { group_name: AUTO_YOUZAN_GROUP_NAME, parent_group_id: 0 },
+    { group_name: AUTO_YOUZAN_GROUP_NAME, parent_id: 0 },
+    { name: AUTO_YOUZAN_GROUP_NAME, parent_group_id: 0 },
   ];
   let lastError = "";
   for (const params of createAttempts) {
@@ -466,7 +468,7 @@ export async function ensureAutoYouzanDefaultCategory(): Promise<{ id: number; c
       const res = await callYouzanApiVerbose({
         accessToken: token,
         method: "youzan.item.group.create",
-        version: "3.0.0",
+        version: "1.0.0",
         params,
         timeoutMs: 20_000,
       });
@@ -580,6 +582,94 @@ function buildSpuSkuArray(sku: {
   return [item];
 }
 
+function buildSpuCreateAttempts(sku: {
+  sku_code: string;
+  name: string;
+  image_url?: string | null;
+  notes?: string | null;
+  price_tier: string | number;
+  weight_g?: number | null;
+}, categoryId: number, kdtIds: number[]): Array<Record<string, unknown>> {
+  const priceCents = Math.round(Number(sku.price_tier) * 100);
+  const base: Record<string, unknown> = {
+    title: sku.name,
+    product_name: sku.name,
+    name: sku.name,
+    unit: "个",
+    outer_id: sku.sku_code,
+    outer_spu_id: sku.sku_code,
+    category_id: categoryId,
+    group_id: categoryId,
+    group_ids: [categoryId],
+    offline_create: true,
+    is_display: true,
+    is_sale: true,
+  };
+  if (kdtIds.length > 0) base.sell_channel_ids = kdtIds;
+  if (sku.image_url) {
+    base.images = [sku.image_url];
+    base.photo_url = [{ url: sku.image_url }];
+  }
+  if (sku.notes) {
+    base.desc = sku.notes;
+    base.description = sku.notes;
+  }
+
+  const skuListItem: Record<string, unknown> = {
+    outer_sku_id: sku.sku_code,
+    sku_no: sku.sku_code,
+    sku_code: sku.sku_code,
+    price: priceCents,
+    retail_price: priceCents,
+    sale_price: priceCents,
+    stock_num: 0,
+    quantity: 0,
+  };
+  if (sku.weight_g && Number(sku.weight_g) > 0) skuListItem.weight = Number(sku.weight_g);
+
+  return [
+    {
+      ...base,
+      sku: buildSpuSkuArray(sku as { id: string; sku_code: string; name: string; price_tier: number | string; weight_g?: number | null }),
+    },
+    {
+      ...base,
+      sku_list: [skuListItem],
+    },
+    {
+      ...base,
+      skus: [skuListItem],
+    },
+  ];
+}
+
+function pickCreatedSpuId(payload: unknown) {
+  const visited = new Set<unknown>();
+  const keys = ["spu_id", "spuId", "item_id", "itemId", "id"];
+  const walk = (value: unknown, depth = 0): number => {
+    if (!value || typeof value !== "object" || depth > 5 || visited.has(value)) return 0;
+    visited.add(value);
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const id = walk(item, depth + 1);
+        if (id > 0) return id;
+      }
+      return 0;
+    }
+    const obj = value as Record<string, unknown>;
+    for (const key of keys) {
+      const id = Number(obj[key] ?? 0);
+      if (Number.isFinite(id) && id > 0) return id;
+    }
+    for (const child of Object.values(obj)) {
+      const id = walk(child, depth + 1);
+      if (id > 0) return id;
+    }
+    return 0;
+  };
+  return walk(payload);
+}
+
 /**
  * ensureHqSpuLink —— 保证本地 SKU 在总部有一条 SPU
  * ------------------------------------------------------------
@@ -623,32 +713,42 @@ export async function ensureHqSpuLink(
   const { kdtIds } = await collectSellChannelKdtIds(sku_id, scope, addBranchShopId);
 
 
-  const params: Record<string, unknown> = {
-    title: sku.name,
-    outer_id: sku.sku_code,
-    category_id: categoryId,
-    offline_create: true,
-    sku: buildSpuSkuArray(sku as { id: string; sku_code: string; name: string; price_tier: number | string; weight_g?: number | null }),
-    images: sku.image_url ? [sku.image_url] : [],
-  };
-  if (kdtIds.length > 0) params.sell_channel_ids = kdtIds;
-  if (sku.notes) params.desc = sku.notes;
-
   const token = await ensureAccessToken(hq);
-  const res = await callYouzanApiVerbose({
-    accessToken: token,
-    method: "youzan.retail.open.spu.create",
-    version: "3.0.0",
-    params,
-    timeoutMs: 30_000,
-  });
-  const payload = res.payload as Record<string, unknown>;
-  const nested = (payload.data ?? payload) as Record<string, unknown>;
-  const newSpuId = Number(
-    nested.spu_id ?? nested.item_id ?? nested.id ?? payload.spu_id ?? payload.item_id ?? 0,
+  let newSpuId = 0;
+  let lastPreview = "";
+  let lastError = "";
+  const attempts = buildSpuCreateAttempts(
+    sku as {
+      sku_code: string;
+      name: string;
+      image_url?: string | null;
+      notes?: string | null;
+      price_tier: string | number;
+      weight_g?: number | null;
+    },
+    categoryId,
+    kdtIds,
   );
+  for (const params of attempts) {
+    try {
+      const res = await callYouzanApiVerbose({
+        accessToken: token,
+        method: "youzan.retail.open.spu.create",
+        version: "3.0.0",
+        params,
+        timeoutMs: 30_000,
+      });
+      lastPreview = res.preview;
+      newSpuId = pickCreatedSpuId(res.payload);
+      if (newSpuId > 0) break;
+      lastError = `spu.create 未返回 spu_id：${res.preview.slice(0, 200)}`;
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : String(e);
+      if (/gw\s*4005|非法的\s*API|invalid\s*api/i.test(lastError)) break;
+    }
+  }
   if (!newSpuId) {
-    throw new Error(`spu.create 未返回 spu_id：${res.preview.slice(0, 200)}`);
+    throw new Error(lastError || `spu.create 未返回 spu_id：${lastPreview.slice(0, 200)}`);
   }
 
   await supabase.from("sku_youzan_links").upsert(
