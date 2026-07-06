@@ -59,9 +59,14 @@ export const getYouzanDefaultCategoryId = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
     const raw = (data?.value as unknown) ?? null;
     const id = Number(
-      typeof raw === "number" ? raw : (raw as { id?: number } | null)?.id ?? 0,
+      typeof raw === "number"
+        ? raw
+        : typeof raw === "string"
+          ? raw
+          : (raw as { id?: number } | null)?.id ?? 0,
     );
-    return { id: id > 0 ? id : null };
+    const meta = raw && typeof raw === "object" ? (raw as { name?: string; auto?: boolean }) : null;
+    return { id: id > 0 ? id : null, name: meta?.name ?? null, auto: Boolean(meta?.auto) };
   });
 
 export const setYouzanDefaultCategoryId = createServerFn({ method: "POST" })
@@ -77,5 +82,13 @@ export const setYouzanDefaultCategoryId = createServerFn({ method: "POST" })
     });
     if (error) throw new Error(error.message);
     return { id: data.id };
+  });
+
+export const ensureYouzanDefaultCategoryId = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    const { ensureAutoYouzanDefaultCategory } = await import("@/lib/youzan-sync.functions");
+    const result = await ensureAutoYouzanDefaultCategory();
+    return { id: result.id, name: "ERP自动同步", created: result.created, auto: true };
   });
 

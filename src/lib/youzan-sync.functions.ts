@@ -9,6 +9,8 @@ import {
   getHqShop,
 } from "./youzan.functions";
 
+const AUTO_YOUZAN_GROUP_NAME = "ERP自动同步";
+
 // 内部：按 shop_id 加载店铺（HQ 或分店都可）
 async function getShopById(shopId: string) {
   const { data, error } = await supabase
@@ -350,23 +352,161 @@ export const unlinkSku = createServerFn({ method: "POST" })
 // 仅提供一个最小可用的封装；零售连锁版 spu.add 实际所需的类目 / 规格
 // 字段较多，建议用户后续按需扩展。
 // ============================================================
-async function resolveHqCategoryId(_sku?: unknown): Promise<number> {
-  // 用户决定：ERP 类目不再和有赞分组一一绑定；同步 SPU 时统一走全局默认分组
+function parseStoredYouzanCategoryId(rawValue: unknown) {
+  const id = Number(
+    typeof rawValue === "number"
+      ? rawValue
+      : typeof rawValue === "string"
+        ? rawValue
+        : (rawValue as { id?: number } | null)?.id ?? 0,
+  );
+  return Number.isFinite(id) && id > 0 ? id : 0;
+}
+
+function collectGroupNodes(payload: unknown): Array<{ id: number; name: string }> {
+  const out: Array<{ id: number; name: string }> = [];
+  const seen = new Set<number>();
+  const walk = (value: unknown) => {
+    if (!value || typeof value !== "object") return;
+    if (Array.isArray(value)) {
+      value.forEach(walk);
+      return;
+    }
+    const o = value as Record<string, unknown>;
+    const id = Number(o.group_id ?? o.category_id ?? o.tag_id ?? o.id ?? o.cid);
+    const name = String(
+      o.group_name ?? o.category_name ?? o.tag_name ?? o.name ?? o.title ?? "",
+    ).trim();
+    if (id > 0 && name && !seen.has(id)) {
+      seen.add(id);
+      out.push({ id, name });
+    }
+    for (const child of Object.values(o)) walk(child);
+  };
+  walk(payload);
+  return out;
+}
+
+function pickGroupId(payload: unknown) {
+  const nodes = collectGroupNodes(payload);
+  return nodes[0]?.id ?? 0;
+}
+
+async function saveAutoYouzanGroupId(id: number) {
+  await supabase.from("app_settings").upsert({
+    key: "youzan_hq_default_category_id",
+    value: { id, name: AUTO_YOUZAN_GROUP_NAME, auto: true },
+    updated_at: new Date().toISOString(),
+  } as never);
+}
+
+async function findAutoYouzanGroup(token: string) {
+  const attempts = [
+    {
+      method: "youzan.item.group.search",
+      version: "3.0.0",
+      params: { keyword: AUTO_YOUZAN_GROUP_NAME, page_no: 1, page_size: 50 },
+    },
+    {
+      method: "youzan.item.group.list",
+      version: "3.0.0",
+      params: { page_no: 1, page_size: 100 },
+    },
+    {
+      method: "youzan.itemcategories.tags.get",
+      version: "3.0.0",
+      params: {},
+    },
+  ];
+
+  for (const attempt of attempts) {
+    try {
+      const res = await callYouzanApiVerbose({
+        accessToken: token,
+        method: attempt.method,
+        version: attempt.version,
+        params: attempt.params,
+        timeoutMs: 20_000,
+      });
+      const found = collectGroupNodes(res.payload).find((g) => g.name === AUTO_YOUZAN_GROUP_NAME);
+      if (found?.id) return found.id;
+    } catch {
+      // 查找只是兜底，失败不阻断后面的创建/同步。
+    }
+  }
+  return 0;
+}
+
+export async function ensureAutoYouzanDefaultCategory(): Promise<{ id: number; created: boolean }> {
   const { data: setting } = await supabase
     .from("app_settings")
     .select("value")
     .eq("key", "youzan_hq_default_category_id")
     .maybeSingle();
-  const rawValue = (setting as { value?: unknown } | null)?.value;
-  const id = Number(
-    typeof rawValue === "number"
-      ? rawValue
-      : (rawValue as { id?: number } | null)?.id ?? 0,
-  );
-  if (id > 0) return id;
+  const storedId = parseStoredYouzanCategoryId((setting as { value?: unknown } | null)?.value);
+  if (storedId > 0) return { id: storedId, created: false };
+
+  const hq = await getHqShop();
+  const token = await ensureAccessToken(hq);
+
+  const existingId = await findAutoYouzanGroup(token);
+  if (existingId > 0) {
+    await saveAutoYouzanGroupId(existingId);
+    return { id: existingId, created: false };
+  }
+
+  const createAttempts: Array<Record<string, unknown>> = [
+    { group_name: AUTO_YOUZAN_GROUP_NAME, parent_id: 0 },
+    { name: AUTO_YOUZAN_GROUP_NAME, parent_id: 0 },
+    { title: AUTO_YOUZAN_GROUP_NAME, parent_id: 0 },
+  ];
+  let lastError = "";
+  for (const params of createAttempts) {
+    try {
+      const res = await callYouzanApiVerbose({
+        accessToken: token,
+        method: "youzan.item.group.create",
+        version: "3.0.0",
+        params,
+        timeoutMs: 20_000,
+      });
+      const createdId = pickGroupId(res.payload) || (await findAutoYouzanGroup(token));
+      if (createdId > 0) {
+        await saveAutoYouzanGroupId(createdId);
+        return { id: createdId, created: true };
+      }
+      lastError = `有赞说创建成功，但没返回分组 ID：${res.preview.slice(0, 200)}`;
+    } catch (e) {
+      const raw = e instanceof Error ? e.message : String(e);
+      lastError = raw;
+      if (/已存在|重复|duplicate|exist/i.test(raw)) {
+        const id = await findAutoYouzanGroup(token);
+        if (id > 0) {
+          await saveAutoYouzanGroupId(id);
+          return { id, created: false };
+        }
+      }
+      if (/gw\s*4005|非法的\s*API|invalid\s*api/i.test(raw)) break;
+    }
+  }
+
   throw new Error(
-    "尚未配置有赞默认商品分组，请到「设置 → 集成」里从有赞拉取分组并选一个作为同步默认分组。",
+    `系统已经自动尝试去有赞创建「${AUTO_YOUZAN_GROUP_NAME}」分组，但有赞没通过：${lastError}`,
   );
+}
+
+async function resolveHqCategoryId(_sku?: unknown): Promise<number> {
+  // 用户决定：ERP 类目不再和有赞分组一一绑定；同步 SPU 时统一走全局默认分组。
+  // 如果还没保存默认分组，系统主动去有赞创建/复用「ERP自动同步」，不再要求人工操作。
+  const { data: setting } = await supabase
+    .from("app_settings")
+    .select("value")
+    .eq("key", "youzan_hq_default_category_id")
+    .maybeSingle();
+  const id = parseStoredYouzanCategoryId((setting as { value?: unknown } | null)?.value);
+  if (id > 0) return id;
+  const auto = await ensureAutoYouzanDefaultCategory();
+  return auto.id;
 }
 
 

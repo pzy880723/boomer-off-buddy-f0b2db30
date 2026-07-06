@@ -54,7 +54,6 @@ import { BundleSkuDialog } from "@/components/inventory/bundle-sku-dialog";
 import { StandardSkuDialog } from "@/components/inventory/standard-sku-dialog";
 import { ReceiveStockDialog } from "@/components/shop-mgmt/receive-stock-dialog";
 import { listYouzanShops } from "@/lib/youzan.functions";
-import { getYouzanDefaultCategoryId } from "@/lib/app-settings.functions";
 import {
   listShopSkus,
   listShopLinksForSkus,
@@ -83,7 +82,7 @@ type DialogKind = "custom" | "bundle" | "standard" | null;
 function humanizeListingError(message?: string | null) {
   const raw = message ?? "";
   if (/尚未配置有赞默认商品分组|默认商品分组|默认分组/i.test(raw)) {
-    return "还没选择有赞里的默认分组。请到「设置 → 集成」选一个分组，保存后再点重试。";
+    return "系统会自动去有赞创建商品分组。请直接点重试，系统会再自动处理。";
   }
   if (/gw\s*4005|非法的\s*API|invalid\s*api/i.test(raw)) {
     return `有赞拒绝了这次同步。通常是当前店铺或当前应用不能调用这个商品同步接口，或者接口版本不匹配。原始返回：${raw}`;
@@ -105,14 +104,6 @@ function ShopProductsPage() {
   const registerFn = useServerFn(registerNewSkuAtShop);
   const retryFn = useServerFn(retryBranchListing);
   const retryAllFn = useServerFn(retryFailedBranchListings);
-  const fetchDefaultCat = useServerFn(getYouzanDefaultCategoryId);
-
-  const defaultCatQ = useQuery({
-    queryKey: ["yz-default-category"],
-    queryFn: () => fetchDefaultCat(),
-    staleTime: 60 * 1000,
-  });
-  const missingDefaultCategory = defaultCatQ.data && defaultCatQ.data.id == null;
 
   const shopsQ = useQuery({
     queryKey: ["yz-branch-shops"],
@@ -358,28 +349,6 @@ function ShopProductsPage() {
           )
         }
       />
-
-      {missingDefaultCategory && (
-        <div className="mb-3 flex items-start gap-2 rounded-md border border-rose-500/40 bg-rose-500/5 px-3 py-2 text-xs">
-          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-600" />
-          <div className="flex-1">
-            <p className="font-medium text-rose-700 dark:text-rose-300">
-              还没选「有赞默认商品分组」，自定义商品和组包商品推不到有赞。
-            </p>
-            <p className="mt-0.5 text-muted-foreground">
-              有赞规定新商品必须放进一个分组。选好之后，之前失败的商品点右上角「重推失败商品」就会重试。
-              <Link
-                to="/settings"
-                className="ml-1 inline-flex items-center gap-0.5 text-primary underline-offset-2 hover:underline"
-              >
-                去「设置 → 集成」选分组 <ArrowRight className="h-3 w-3" />
-              </Link>
-            </p>
-          </div>
-        </div>
-      )}
-
-
 
       <Card className="mb-4 p-3">
         <div className="flex flex-wrap items-center gap-3">
