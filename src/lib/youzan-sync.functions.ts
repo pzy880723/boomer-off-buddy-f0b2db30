@@ -456,11 +456,12 @@ export async function ensureAutoYouzanDefaultCategory(): Promise<{ id: number; c
   }
 
   const createAttempts: Array<Record<string, unknown>> = [
-    { title: AUTO_YOUZAN_GROUP_NAME, parent_group_id: 0 },
-    { title: AUTO_YOUZAN_GROUP_NAME, parent_id: 0 },
-    { group_name: AUTO_YOUZAN_GROUP_NAME, parent_group_id: 0 },
-    { group_name: AUTO_YOUZAN_GROUP_NAME, parent_id: 0 },
-    { name: AUTO_YOUZAN_GROUP_NAME, parent_group_id: 0 },
+    { title: AUTO_YOUZAN_GROUP_NAME, parent_group_id: 0, kdtId: hq.kdt_id },
+    { title: AUTO_YOUZAN_GROUP_NAME, parent_group_id: 0, kdt_id: hq.kdt_id },
+    { title: AUTO_YOUZAN_GROUP_NAME, parent_id: 0, kdtId: hq.kdt_id },
+    { group_name: AUTO_YOUZAN_GROUP_NAME, parent_group_id: 0, kdtId: hq.kdt_id },
+    { group_name: AUTO_YOUZAN_GROUP_NAME, parent_id: 0, kdtId: hq.kdt_id },
+    { name: AUTO_YOUZAN_GROUP_NAME, parent_group_id: 0, kdtId: hq.kdt_id },
   ];
   let lastError = "";
   for (const params of createAttempts) {
