@@ -55,6 +55,7 @@ async function run(opts: {
   branch_shop_id: string;
   target_stock: number;
   delete_existing: boolean;
+  refresh_images: boolean;
 }) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { callYouzanApiVerbose, ensureAccessToken, getHqShop } = await import(
@@ -66,15 +67,22 @@ async function run(opts: {
   const hq = await getHqShop();
   const hqToken = await ensureAccessToken(hq);
 
-  // 拿 sku_code 便于后续用 spu_code 删除/查
+  // 拿 sku_code + image_url 便于后续用 spu_code 删除/查、以及 spu.update 补图
   const { data: skus } = await supabaseAdmin
     .from("inv_skus")
-    .select("id, sku_code, name")
+    .select("id, sku_code, name, image_url")
     .in("id", opts.sku_ids);
-  const skuMap = new Map<string, { sku_code: string; name: string }>(
+  const skuMap = new Map<
+    string,
+    { sku_code: string; name: string; image_url: string | null }
+  >(
     (skus ?? []).map((s) => [
       s.id as string,
-      { sku_code: (s as { sku_code: string }).sku_code, name: (s as { name: string }).name },
+      {
+        sku_code: (s as { sku_code: string }).sku_code,
+        name: (s as { name: string }).name,
+        image_url: (s as { image_url: string | null }).image_url ?? null,
+      },
     ]),
   );
 
