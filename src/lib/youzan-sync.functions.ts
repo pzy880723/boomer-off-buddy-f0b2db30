@@ -52,12 +52,14 @@ export type LinkRow = {
 // ============================================================
 // 内部：覆盖式推送分店库存
 // ------------------------------------------------------------
-// 正确姿势：youzan.item.quantity.update / 4.0.0
-// - 用【分店自己的 access_token】（用 HQ token 会失败：商品 id 是分店 id）
-// - item_id / sku_id 都是【分店那一侧】的 id（我们表里 role='branch_stock' 就是）
-// - type=0 全量覆盖，quantity=目标绝对值
-// 参考：有赞社区 thread-697929 / thread-696379
-// 老 retail.open.stock.adjust/3.0.0 会报 "不支持的库存更新类型:3"，已废弃。
+// 正确姿势（2026-07 audit）：
+//   1) 用【分店 access_token】，不是 HQ token。
+//   2) item_id / sku_id 必须是【分店 storefront 侧真实 ID】，不是 HQ SPU id。
+//      → 先用 item.detail.get / 1.0.0（分店 token + node_kdt_id + HQ SPU id）反查
+//      → 结果写回 sku_youzan_links.role='branch_stock' 的 yz_item_id / yz_sku_id
+//   3) 调用 youzan.item.quantity.update / 4.0.0，stock_num_str 全量覆盖。
+//   4) 分店查不到 → 明确抛 "branch item not visible / distribution missing"，
+//      不再降级去调 stock.adjust 等接口。
 // ============================================================
 async function pushStockToYouzan(
   link: LinkRow,
@@ -65,34 +67,134 @@ async function pushStockToYouzan(
   _clientSeq: string,
 ): Promise<void> {
   const branchShop = await getShopById(link.shop_id);
+  if ((branchShop as { role?: string }).role !== "branch") {
+    throw new Error("quantity.update 只能推分店库存，当前 shop 不是 branch");
+  }
   const num = Math.max(0, targetStock);
+  const branchToken = await ensureAccessToken(branchShop);
 
-  // 用【总部 token】+ kdt_id=分店 打门店销售库存。
-  // item_id / sku_id 用【总部可识别的 HQ SPU/SKU id】——我们表里 role='branch_stock'
-  // 的 yz_item_id 之前就是 HQ SPU id，正好可以直接用。
-  // 无规格商品：官方规定 sku_id 传 spu_id。
-  const hq = await getHqShop();
-  const hqToken = await ensureAccessToken(hq);
+  // Step 1: 确保拿到分店真实 item_id / sku_id
+  const resolved = await resolveBranchItemIds(link, branchShop, branchToken);
 
-  const skuIdField = link.yz_sku_id ?? link.yz_item_id; // 无 SKU 时用 spu_id 兜底
-
+  // Step 2: 覆盖式推库存（分店 token + 分店真实 id）
   const params: Record<string, unknown> = {
     kdt_id: branchShop.kdt_id,
-    item_id: link.yz_item_id,
-    sku_id: skuIdField,
+    item_id: resolved.item_id,
+    sku_id: resolved.sku_id, // 无 SKU 时官方允许 sku_id 传 spu_id，resolveBranchItemIds 已处理
     channel: 1, // 1=门店
-    stock_num_str: String(num), // 覆盖式
+    stock_num_str: String(num),
   };
 
-
   await callYouzanApiVerbose({
-    accessToken: hqToken,
+    accessToken: branchToken,
     method: "youzan.item.quantity.update",
     version: "4.0.0",
     params,
     timeoutMs: 20_000,
   });
 }
+
+// ============================================================
+// resolveBranchItemIds —— 分店真实 item_id / sku_id 反查（带 3 层降级）
+// ------------------------------------------------------------
+// 1) 已有真 branch id 缓存（yz_branch_item_id）→ 直接用
+// 2) 用【分店 token】+ node_kdt_id + HQ SPU id 调 item.detail.get / 1.0.0
+// 3) 拿到后写回 sku_youzan_links.yz_item_id / yz_sku_id
+// 4) 反查失败 → 抛 "branch item not visible / distribution missing"
+// ============================================================
+async function resolveBranchItemIds(
+  link: LinkRow,
+  branchShop: { id: string; kdt_id: number },
+  branchToken: string,
+): Promise<{ item_id: number; sku_id: number }> {
+  // 拿 HQ SPU id 作为 item.detail.get 入参
+  const hq = await getHqShop();
+  const { data: hqLink } = await supabase
+    .from("sku_youzan_links")
+    .select("yz_item_id, yz_sku_id")
+    .eq("sku_id", link.sku_id)
+    .eq("shop_id", hq.id)
+    .maybeSingle();
+  const hqSpuId = Number(hqLink?.yz_item_id ?? 0);
+  if (!hqSpuId) {
+    throw new Error("branch item not visible / distribution missing：本地未登记 HQ SPU，请先 ensureBranchProduct");
+  }
+
+  const detail = await callYouzanApiVerbose({
+    accessToken: branchToken,
+    method: "youzan.item.detail.get",
+    version: "1.0.0",
+    params: {
+      node_kdt_id: branchShop.kdt_id,
+      spu_id: hqSpuId,
+    },
+    timeoutMs: 20_000,
+  }).catch((e) => {
+    throw new Error(
+      `branch item not visible / distribution missing：item.detail.get 失败 spu_id=${hqSpuId} ` +
+        `kdt=${branchShop.kdt_id}：${e instanceof Error ? e.message : String(e)}`,
+    );
+  });
+
+  // 从 payload 抽 item_id + sku_id（有赞返回结构多变，做宽松解析）
+  const extracted = pickBranchItemIds(detail.payload);
+  if (!extracted.item_id) {
+    throw new Error(
+      `branch item not visible / distribution missing：分店无此 SPU (spu_id=${hqSpuId} kdt=${branchShop.kdt_id})，需要先铺货`,
+    );
+  }
+  const sku_id = extracted.sku_id || extracted.item_id; // 无 SKU 商品：sku_id = spu_id/item_id
+
+  // 写回缓存，下次直接用
+  await supabase
+    .from("sku_youzan_links")
+    .update({
+      yz_item_id: extracted.item_id,
+      yz_sku_id: sku_id,
+    } as never)
+    .eq("id", link.id);
+
+  return { item_id: extracted.item_id, sku_id };
+}
+
+function pickBranchItemIds(payload: unknown): { item_id: number; sku_id: number } {
+  let itemId = 0;
+  let skuId = 0;
+  const seen = new Set<unknown>();
+  const itemKeys = ["item_id", "itemId", "num_iid", "id"];
+  const skuKeys = ["sku_id", "skuId"];
+  const walk = (v: unknown, depth = 0) => {
+    if (!v || typeof v !== "object" || depth > 6 || seen.has(v)) return;
+    seen.add(v);
+    if (Array.isArray(v)) {
+      for (const el of v) walk(el, depth + 1);
+      return;
+    }
+    const obj = v as Record<string, unknown>;
+    if (!itemId) {
+      for (const k of itemKeys) {
+        const n = Number(obj[k]);
+        if (n > 0) {
+          itemId = n;
+          break;
+        }
+      }
+    }
+    if (!skuId) {
+      for (const k of skuKeys) {
+        const n = Number(obj[k]);
+        if (n > 0) {
+          skuId = n;
+          break;
+        }
+      }
+    }
+    for (const val of Object.values(obj)) walk(val, depth + 1);
+  };
+  walk(payload);
+  return { item_id: itemId, sku_id: skuId };
+}
+
 
 
 
@@ -514,7 +616,8 @@ export async function ensureAutoYouzanDefaultCategory(): Promise<{ id: number; c
 
 async function resolveHqCategoryId(_sku?: unknown): Promise<number> {
   // 用户决定：ERP 类目不再和有赞分组一一绑定；同步 SPU 时统一走全局默认分组。
-  // 如果还没保存默认分组，系统主动去有赞创建/复用「ERP自动同步」，不再要求人工操作。
+  // 2026-07 audit rule 3：分组失败不能阻塞商品主链路 —— 拿不到默认分组时
+  // 直接降级到 DEFAULT_RETAIL_PRODUCT_CATEGORY_ID。
   const { data: setting } = await supabase
     .from("app_settings")
     .select("value")
@@ -522,9 +625,15 @@ async function resolveHqCategoryId(_sku?: unknown): Promise<number> {
     .maybeSingle();
   const id = parseStoredYouzanCategoryId((setting as { value?: unknown } | null)?.value);
   if (id > 0) return id;
-  const auto = await ensureAutoYouzanDefaultCategory();
-  return auto.id;
+  try {
+    const auto = await ensureAutoYouzanDefaultCategory();
+    if (auto.id > 0) return auto.id;
+  } catch (e) {
+    console.warn("[youzan] 分组创建失败，降级到默认零售类目：", e instanceof Error ? e.message : e);
+  }
+  return DEFAULT_RETAIL_PRODUCT_CATEGORY_ID;
 }
+
 
 async function resolveHqRetailProductCategoryId(): Promise<number> {
   const hq = await getHqShop();

@@ -119,6 +119,7 @@ async function run(opts: {
   steps.push({ step: "ensureBranchProduct", results: productResults });
 
   // Step 4: 直接内联推库存（不走 queue），拿到 trace_id 立刻回报
+  // 2026-07 audit：用【分店 token】+ item.detail.get 反查真实 branch item_id
   const stockResults: Array<Record<string, unknown>> = [];
   for (const sku_id of opts.sku_ids) {
     const { data: link } = await supabaseAdmin
@@ -131,24 +132,93 @@ async function run(opts: {
       stockResults.push({ sku_id, ok: false, error: "no branch link" });
       continue;
     }
-    const branchShop = await supabaseAdmin
+    const branchRow = await supabaseAdmin
       .from("youzan_shops")
-      .select("id, kdt_id")
+      .select("*")
       .eq("id", opts.branch_shop_id)
       .maybeSingle();
-    const kdtId = Number((branchShop.data as { kdt_id: number }).kdt_id);
-    const yzItemId = Number((link as { yz_item_id: number }).yz_item_id);
-    const yzSkuId = Number((link as { yz_sku_id: number | null }).yz_sku_id ?? 0) || yzItemId;
+    const branchShop = branchRow.data as {
+      id: string;
+      kdt_id: number;
+      access_token: string | null;
+      refresh_token: string | null;
+      token_expires_at: string | null;
+    };
+    const branchToken = await ensureAccessToken(branchShop as never);
+    const hqSpuId = Number((link as { yz_item_id: number }).yz_item_id);
+
+    // 反查分店真实 item_id
+    let branchItemId = 0;
+    let branchSkuId = 0;
+    let detailPreview = "";
+    try {
+      const detail = await callYouzanApiVerbose({
+        accessToken: branchToken,
+        method: "youzan.item.detail.get",
+        version: "1.0.0",
+        params: { node_kdt_id: branchShop.kdt_id, spu_id: hqSpuId },
+        timeoutMs: 20_000,
+      });
+      detailPreview = detail.preview.slice(0, 200);
+      const seen = new Set<unknown>();
+      const walk = (v: unknown, depth = 0) => {
+        if (!v || typeof v !== "object" || depth > 6 || seen.has(v)) return;
+        seen.add(v);
+        if (Array.isArray(v)) {
+          for (const el of v) walk(el, depth + 1);
+          return;
+        }
+        const obj = v as Record<string, unknown>;
+        for (const k of ["item_id", "itemId", "num_iid", "id"]) {
+          if (!branchItemId) {
+            const n = Number(obj[k]);
+            if (n > 0) branchItemId = n;
+          }
+        }
+        for (const k of ["sku_id", "skuId"]) {
+          if (!branchSkuId) {
+            const n = Number(obj[k]);
+            if (n > 0) branchSkuId = n;
+          }
+        }
+        for (const val of Object.values(obj)) walk(val, depth + 1);
+      };
+      walk(detail.payload);
+    } catch (e) {
+      stockResults.push({
+        sku_id,
+        ok: false,
+        error: `branch item not visible / distribution missing：${e instanceof Error ? e.message : String(e)}`,
+      });
+      continue;
+    }
+    if (!branchItemId) {
+      stockResults.push({
+        sku_id,
+        ok: false,
+        error: `branch item not visible / distribution missing：detail.get 未返回 item_id (spu_id=${hqSpuId})`,
+        detail_preview: detailPreview,
+      });
+      continue;
+    }
+    if (!branchSkuId) branchSkuId = branchItemId; // 无 SKU 商品
+
+    // 回写真实 branch id
+    await supabaseAdmin
+      .from("sku_youzan_links")
+      .update({ yz_item_id: branchItemId, yz_sku_id: branchSkuId } as never)
+      .eq("id", (link as { id: string }).id);
+
     const params = {
-      kdt_id: kdtId,
-      item_id: yzItemId,
-      sku_id: yzSkuId,
+      kdt_id: branchShop.kdt_id,
+      item_id: branchItemId,
+      sku_id: branchSkuId,
       channel: 1,
       stock_num_str: String(Math.max(0, opts.target_stock)),
     };
     try {
       const r = await callYouzanApiVerbose({
-        accessToken: hqToken,
+        accessToken: branchToken,
         method: "youzan.item.quantity.update",
         version: "4.0.0",
         params,
@@ -174,3 +244,4 @@ async function run(opts: {
 
   return { ok: true, steps };
 }
+
