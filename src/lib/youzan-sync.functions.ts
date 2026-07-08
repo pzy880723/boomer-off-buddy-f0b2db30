@@ -678,7 +678,11 @@ async function resolveHqCategoryId(_sku?: unknown): Promise<number> {
  * 返回有赞侧 CDN URL；失败时 fire-and-forget，返回原始 URL。
  * 对应 youzan.materials.storage.platform.img.upload/3.0.0
  */
-async function uploadImageToYouzanMaterial(token: string, url: string): Promise<string> {
+async function uploadImageToYouzanMaterial(
+  token: string,
+  url: string,
+  ctx?: { shop_id?: string | null; kdt_id?: number | null; sku_id?: string | null },
+): Promise<string> {
   if (!url) return url;
   // 已经是有赞域名的图片就不用再传一次
   if (/(?:yzcdn|youzan|qbox|qiniucdn)\./i.test(url)) return url;
@@ -687,7 +691,9 @@ async function uploadImageToYouzanMaterial(token: string, url: string): Promise<
       accessToken: token,
       method: "youzan.materials.storage.platform.img.upload",
       version: "3.0.0",
-      params: { image_url: url, image_type: 0 },
+      // 2026-07 audit：去掉 image_type（分类上传字段，非必填），
+      // 只传 image_url 即可让有赞抓取外链回落到 yzcdn。
+      params: { image_url: url },
       timeoutMs: 20_000,
     });
     const payload = res.payload as Record<string, unknown> | null;
@@ -704,7 +710,15 @@ async function uploadImageToYouzanMaterial(token: string, url: string): Promise<
         return "";
       }
       if (typeof v === "object") {
-        for (const key of ["url", "img_url", "image_url", "cdn_url"]) {
+        for (const key of [
+          "url",
+          "img_url",
+          "image_url",
+          "cdn_url",
+          "attachment_url",
+          "content",
+          "data",
+        ]) {
           const s = walk((v as Record<string, unknown>)[key]);
           if (s) return s;
         }
@@ -716,12 +730,44 @@ async function uploadImageToYouzanMaterial(token: string, url: string): Promise<
       return "";
     };
     const cdn = walk(payload);
+    if (!cdn) {
+      // 上传成功但没解析出 CDN URL —— 记一条 error，方便排查白名单/域名问题。
+      try {
+        await supabase.from("youzan_sync_logs").insert({
+          shop_id: ctx?.shop_id ?? null,
+          kdt_id: ctx?.kdt_id ?? null,
+          action: "materials_upload",
+          status: "error",
+          message: `materials 上传返回无 CDN URL；继续用外链 ${url}`,
+          error: `sku_id=${ctx?.sku_id ?? "-"} preview=${res.preview.slice(0, 400)}`,
+          finished_at: new Date().toISOString(),
+        } as never);
+      } catch {
+        // ignore
+      }
+    }
     return cdn || url;
   } catch (e) {
-    console.warn("[youzan] materials 上传失败，继续用外链：", e instanceof Error ? e.message : e);
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn("[youzan] materials 上传失败，继续用外链：", msg);
+    try {
+      await supabase.from("youzan_sync_logs").insert({
+        shop_id: ctx?.shop_id ?? null,
+        kdt_id: ctx?.kdt_id ?? null,
+        action: "materials_upload",
+        status: "error",
+        message: `materials 上传失败：${msg}`,
+        error: `sku_id=${ctx?.sku_id ?? "-"} source_url=${url}`,
+        finished_at: new Date().toISOString(),
+      } as never);
+    } catch {
+      // ignore
+    }
     return url;
   }
 }
+
+
 
 
 
@@ -849,8 +895,11 @@ function buildSpuCreateAttempts(sku: {
 
   if (kdtIds.length > 0) base.sell_channel_ids = kdtIds;
   if (sku.image_url) {
-    base.images = [sku.image_url];
-    base.photo_url = [{ url: sku.image_url }];
+    // 2026-07 audit rule 8：零售 SPU 图片字段以 pic_url / spu_pic_list 为主，
+    // 之前的 images / photo_url 会被有赞静默丢弃 → 建成的 SPU 无图。
+    base.pic_url = sku.image_url;
+    base.spu_pic_list = [sku.image_url];
+    base.spu_img_list = [{ img_url: sku.image_url }];
   }
   if (sku.notes) {
     base.desc = sku.notes;
@@ -869,6 +918,14 @@ function buildSpuCreateAttempts(sku: {
   };
   if (sku.weight_g && Number(sku.weight_g) > 0) skuListItem.weight = Number(sku.weight_g);
 
+  const imageFields: Record<string, unknown> = sku.image_url
+    ? {
+        pic_url: sku.image_url,
+        spu_pic_list: [sku.image_url],
+        spu_img_list: [{ img_url: sku.image_url }],
+      }
+    : {};
+
   return [
     {
       ...base,
@@ -882,6 +939,7 @@ function buildSpuCreateAttempts(sku: {
       retail_price: priceYuan,
       ...(kdtIds.length > 0 ? { sell_channel_ids: kdtIds } : {}),
       sku_list: [skuListItem],
+      ...imageFields,
     },
     {
       name: sku.name,
@@ -891,6 +949,7 @@ function buildSpuCreateAttempts(sku: {
       offline_create: true, is_up_offline: true,
       ...(kdtIds.length > 0 ? { sell_channel_ids: kdtIds } : {}),
       skus: [skuListItem],
+      ...imageFields,
     },
     {
       name: sku.name,
@@ -900,6 +959,7 @@ function buildSpuCreateAttempts(sku: {
       offline_create: true, is_up_offline: true,
       sku: buildSpuSkuArray(sku as { id: string; sku_code: string; name: string; price_tier: number | string; weight_g?: number | null }),
       ...(kdtIds.length > 0 ? { sell_channel_ids: kdtIds } : {}),
+      ...imageFields,
     },
     {
       name: sku.name,
@@ -908,6 +968,7 @@ function buildSpuCreateAttempts(sku: {
       category_id: categoryId,
       retail_price: priceYuan,
       ...(kdtIds.length > 0 ? { display_on_kdt_ids: kdtIds } : {}),
+      ...imageFields,
     },
   ];
 }
@@ -1052,12 +1113,19 @@ export async function ensureHqSpuLink(
   // 2026-07 audit rule 8：不要直接把 ERP 外链图片塞给 spu.create，
   // 先把外链上传到有赞素材库拿回 CDN URL；失败时回退到原始外链。
   const rawImage = (sku as { image_url?: string | null }).image_url ?? "";
-  const cdnImage = rawImage ? await uploadImageToYouzanMaterial(token, rawImage) : "";
+  const cdnImage = rawImage
+    ? await uploadImageToYouzanMaterial(token, rawImage, {
+        shop_id: hq.id,
+        kdt_id: hq.kdt_id,
+        sku_id,
+      })
+    : "";
+  const finalImage = cdnImage || rawImage || "";
   const attempts = buildSpuCreateAttempts(
     {
       sku_code: sku.sku_code as string,
       name: sku.name as string,
-      image_url: cdnImage || rawImage || null,
+      image_url: finalImage || null,
       notes: (sku as { notes?: string | null }).notes ?? null,
       price_tier: (sku as { price_tier: string | number }).price_tier,
       weight_g: (sku as { weight_g?: number | null }).weight_g ?? null,
@@ -1113,6 +1181,31 @@ export async function ensureHqSpuLink(
     } as never,
     { onConflict: "sku_id,shop_id" },
   );
+
+  // 2026-07 audit：如果命中的是既有 SPU（existingRemote），spu.create 不会执行，
+  // 图片就没有机会写进去。这里显式补一次 spu.update 回填图片。
+  if (existingRemote.spuId > 0 && finalImage) {
+    try {
+      await callYouzanApiVerbose({
+        accessToken: token,
+        method: "youzan.retail.open.spu.update",
+        version: "3.0.0",
+        params: {
+          spu_id: newSpuId,
+          pic_url: finalImage,
+          spu_pic_list: [finalImage],
+          spu_img_list: [{ img_url: finalImage }],
+        },
+        timeoutMs: 20_000,
+      });
+    } catch (e) {
+      console.warn(
+        "[youzan] spu.update 回填图片失败：",
+        e instanceof Error ? e.message : String(e),
+      );
+    }
+  }
+
   return { created: true, yz_item_id: newSpuId, yz_sku_id: newSkuId, shop_id: hq.id };
 }
 

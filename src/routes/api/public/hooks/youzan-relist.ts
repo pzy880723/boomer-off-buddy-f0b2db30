@@ -22,6 +22,7 @@ export const Route = createFileRoute("/api/public/hooks/youzan-relist")({
           branch_shop_id?: string;
           target_stock?: number;
           delete_existing?: boolean;
+          refresh_images?: boolean;
         };
         const sku_ids =
           Array.isArray(body.sku_ids) && body.sku_ids.length > 0
@@ -30,9 +31,10 @@ export const Route = createFileRoute("/api/public/hooks/youzan-relist")({
         const branch_shop_id = body.branch_shop_id ?? DEFAULT_BRANCH;
         const target_stock = typeof body.target_stock === "number" ? body.target_stock : 1;
         const delete_existing = body.delete_existing !== false;
+        const refresh_images = body.refresh_images !== false;
 
         try {
-          const out = await run({ sku_ids, branch_shop_id, target_stock, delete_existing });
+          const out = await run({ sku_ids, branch_shop_id, target_stock, delete_existing, refresh_images });
           return Response.json(out);
         } catch (e) {
           return Response.json(
@@ -53,6 +55,7 @@ async function run(opts: {
   branch_shop_id: string;
   target_stock: number;
   delete_existing: boolean;
+  refresh_images: boolean;
 }) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { callYouzanApiVerbose, ensureAccessToken, getHqShop } = await import(
@@ -64,15 +67,22 @@ async function run(opts: {
   const hq = await getHqShop();
   const hqToken = await ensureAccessToken(hq);
 
-  // 拿 sku_code 便于后续用 spu_code 删除/查
+  // 拿 sku_code + image_url 便于后续用 spu_code 删除/查、以及 spu.update 补图
   const { data: skus } = await supabaseAdmin
     .from("inv_skus")
-    .select("id, sku_code, name")
+    .select("id, sku_code, name, image_url")
     .in("id", opts.sku_ids);
-  const skuMap = new Map<string, { sku_code: string; name: string }>(
+  const skuMap = new Map<
+    string,
+    { sku_code: string; name: string; image_url: string | null }
+  >(
     (skus ?? []).map((s) => [
       s.id as string,
-      { sku_code: (s as { sku_code: string }).sku_code, name: (s as { name: string }).name },
+      {
+        sku_code: (s as { sku_code: string }).sku_code,
+        name: (s as { name: string }).name,
+        image_url: (s as { image_url: string | null }).image_url ?? null,
+      },
     ]),
   );
 
@@ -117,6 +127,59 @@ async function run(opts: {
     productResults.push({ sku_id, ...r });
   }
   steps.push({ step: "ensureBranchProduct", results: productResults });
+
+  // Step 3.5: 显式 spu.update 回填 HQ SPU 图片（pic_url + spu_pic_list）
+  if (opts.refresh_images) {
+    const imageResults: Array<Record<string, unknown>> = [];
+    for (const sku_id of opts.sku_ids) {
+      const s = skuMap.get(sku_id);
+      if (!s?.image_url) {
+        imageResults.push({ sku_id, ok: false, error: "no local image_url" });
+        continue;
+      }
+      const { data: hqLink } = await supabaseAdmin
+        .from("sku_youzan_links")
+        .select("yz_item_id")
+        .eq("sku_id", sku_id)
+        .eq("shop_id", hq.id)
+        .maybeSingle();
+      const hqSpuId = Number((hqLink as { yz_item_id?: number } | null)?.yz_item_id ?? 0);
+      if (!hqSpuId) {
+        imageResults.push({ sku_id, ok: false, error: "no hq spu link" });
+        continue;
+      }
+      try {
+        const r = await callYouzanApiVerbose({
+          accessToken: hqToken,
+          method: "youzan.retail.open.spu.update",
+          version: "3.0.0",
+          params: {
+            spu_id: hqSpuId,
+            pic_url: s.image_url,
+            spu_pic_list: [s.image_url],
+            spu_img_list: [{ img_url: s.image_url }],
+          },
+          timeoutMs: 20_000,
+        });
+        imageResults.push({
+          sku_id,
+          spu_id: hqSpuId,
+          ok: true,
+          trace_id: r.trace_id,
+          preview: r.preview.slice(0, 200),
+        });
+      } catch (e) {
+        imageResults.push({
+          sku_id,
+          spu_id: hqSpuId,
+          ok: false,
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
+    steps.push({ step: "spu.update.images", results: imageResults });
+  }
+
 
   // Step 4: 直接内联推库存（不走 queue），拿到 trace_id 立刻回报
   // 2026-07 audit：用【分店 token】+ item.detail.get 反查真实 branch item_id
