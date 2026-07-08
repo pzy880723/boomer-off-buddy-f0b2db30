@@ -78,9 +78,11 @@ async function runCleanup(names: string[], dry_run: boolean) {
         row.product_name ?? row.productName ?? row.name ?? row.title ?? "",
       ).trim();
       const spuId = Number(row.spu_id ?? row.spuId ?? row.item_id ?? row.id ?? 0);
-      return { name, spuId };
+      const spuCode = String(row.spu_code ?? row.spuCode ?? "").trim();
+      return { name, spuId, spuCode };
     })
     .filter((r) => r.spuId > 0 && wanted.has(r.name));
+
 
   const toDelete = candidates.filter((r) => !protectedIds.has(r.spuId));
   const kept = candidates.filter((r) => protectedIds.has(r.spuId));
