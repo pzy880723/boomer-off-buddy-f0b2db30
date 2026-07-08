@@ -1752,3 +1752,120 @@ export const listShopHealth = createServerFn({ method: "GET" })
 
     return { shops: shopRows, orphan_shop_locations: orphanShopLocations };
   });
+
+// ============================================================
+// cleanupHqSpusByNames —— 一次性清理有赞总部误建的 SPU
+// ------------------------------------------------------------
+// 传入名称白名单（如 ["probe-channel-a","probe-channel-b","probe-channel-c","test","测试商品"]）
+// 会：分页拉总部所有 SPU → 匹配名称 → 保护 sku_youzan_links(role=hq_spu) 已绑定的 spu_id
+// → 其余尝试用 youzan.retail.open.spu.delete/3.0.0 删除，逐条记录返回。
+// ============================================================
+export const cleanupHqSpusByNames = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        names: z.array(z.string().trim().min(1)).min(1).max(20),
+        dry_run: z.boolean().default(false),
+      })
+      .parse(input ?? {}),
+  )
+  .handler(async ({ data }) => {
+    const hq = await getHqShop();
+    const token = await ensureAccessToken(hq);
+
+    // 1. 拉总部所有 SPU（最多 5 页 × 100）
+    const allRows: Array<Record<string, unknown>> = [];
+    for (let page = 1; page <= 5; page += 1) {
+      const res = await callYouzanApiVerbose({
+        accessToken: token,
+        method: "youzan.retail.open.spu.query",
+        version: "3.0.0",
+        params: { page_no: page, page_size: 100 },
+        timeoutMs: 25_000,
+      });
+      const rows = collectSpuRowsFromPayload(res.payload);
+      if (rows.length === 0) break;
+      allRows.push(...rows);
+      if (rows.length < 100) break;
+    }
+
+    // 2. 拿到已绑定的 hq spu_id，避免误删
+    const { data: linkedRows } = await supabase
+      .from("sku_youzan_links")
+      .select("yz_item_id")
+      .eq("role", "hq_spu");
+    const protectedIds = new Set(
+      (linkedRows ?? []).map((r) => Number(r.yz_item_id)).filter((n) => n > 0),
+    );
+
+    const wantNames = new Set(data.names.map((s) => s.trim()));
+    const candidates = allRows
+      .map((row) => {
+        const name = String(
+          row.product_name ?? row.productName ?? row.name ?? row.title ?? "",
+        ).trim();
+        const spuId = Number(
+          row.spu_id ?? row.spuId ?? row.item_id ?? row.id ?? 0,
+        );
+        return { name, spuId };
+      })
+      .filter((r) => r.spuId > 0 && wantNames.has(r.name));
+
+    const toDelete = candidates.filter((r) => !protectedIds.has(r.spuId));
+    const kept = candidates.filter((r) => protectedIds.has(r.spuId));
+
+    if (data.dry_run) {
+      return {
+        total_scanned: allRows.length,
+        matched: candidates,
+        kept,
+        will_delete: toDelete,
+      };
+    }
+
+    const results: Array<{ spuId: number; name: string; ok: boolean; message: string }> = [];
+    for (const item of toDelete) {
+      let ok = false;
+      let message = "";
+      // 有赞连锁零售 SPU 删除接口
+      const methods: Array<{ method: string; version: string; params: Record<string, unknown> }> = [
+        {
+          method: "youzan.retail.open.spu.delete",
+          version: "3.0.0",
+          params: { spu_id: item.spuId },
+        },
+        {
+          method: "youzan.retail.open.product.delete",
+          version: "1.0.0",
+          params: { kdt_id: hq.kdt_id, spu_id: item.spuId },
+        },
+      ];
+      for (const m of methods) {
+        try {
+          const res = await callYouzanApiVerbose({
+            accessToken: token,
+            method: m.method,
+            version: m.version,
+            params: m.params,
+            timeoutMs: 20_000,
+          });
+          message = `${m.method}/${m.version} → ${res.preview.slice(0, 160)}`;
+          if (!/error|fail|非法|不存在|4005|4001|1000/i.test(res.preview)) {
+            ok = true;
+            break;
+          }
+        } catch (e) {
+          message = `${m.method}: ${e instanceof Error ? e.message : String(e)}`;
+        }
+      }
+      results.push({ spuId: item.spuId, name: item.name, ok, message });
+    }
+
+    return {
+      total_scanned: allRows.length,
+      matched: candidates,
+      kept,
+      results,
+    };
+  });

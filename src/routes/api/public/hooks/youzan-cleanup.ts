@@ -1,0 +1,184 @@
+// 一次性清理：删除有赞总部误建的 SPU（按名称白名单，保护已绑定 spu_id）
+// POST /api/public/hooks/youzan-cleanup   apikey 头 = SUPABASE_PUBLISHABLE_KEY
+// body: { names?: string[], dry_run?: boolean }   dry_run 默认 true
+import { createFileRoute } from "@tanstack/react-router";
+
+export const Route = createFileRoute("/api/public/hooks/youzan-cleanup")({
+  server: {
+    handlers: {
+      POST: async ({ request }) => {
+        const apikey = request.headers.get("apikey");
+        if (!apikey || apikey !== process.env.SUPABASE_PUBLISHABLE_KEY) {
+          return new Response("unauthorized", { status: 401 });
+        }
+        const body = (await request.json().catch(() => ({}))) as {
+          names?: string[];
+          dry_run?: boolean;
+        };
+        const names =
+          Array.isArray(body.names) && body.names.length > 0
+            ? body.names
+            : ["probe-channel-a", "probe-channel-b", "probe-channel-c", "test", "测试商品"];
+        const dry_run = body.dry_run !== false;
+        try {
+          return await runCleanup(names, dry_run);
+        } catch (e) {
+          return Response.json(
+            {
+              error: e instanceof Error ? e.message : String(e),
+              stack: e instanceof Error ? e.stack : null,
+            },
+            { status: 500 },
+          );
+        }
+      },
+    },
+  },
+});
+
+async function runCleanup(names: string[], dry_run: boolean) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { callYouzanApiVerbose, ensureAccessToken, getHqShop } = await import(
+    "@/lib/youzan.functions"
+  );
+
+  const hq = await getHqShop();
+  const token = await ensureAccessToken(hq);
+
+  const allRows: Array<Record<string, unknown>> = [];
+  for (let page = 1; page <= 20; page += 1) {
+    const res = await callYouzanApiVerbose({
+      accessToken: token,
+      method: "youzan.retail.open.spu.query",
+      version: "3.0.0",
+      params: { page_no: page, page_size: 20 },
+      timeoutMs: 25_000,
+    });
+    const rows = collectSpuRows(res.payload);
+    if (!rows.length) break;
+    allRows.push(...rows);
+    if (rows.length < 20) break;
+  }
+
+
+  const { data: linked } = await supabaseAdmin
+    .from("sku_youzan_links")
+    .select("yz_item_id")
+    .eq("role", "hq_spu");
+  const protectedIds = new Set(
+    (linked ?? [])
+      .map((r: { yz_item_id: number | null }) => Number(r.yz_item_id))
+      .filter((n) => n > 0),
+  );
+
+  const wanted = new Set(names.map((s) => s.trim()));
+  const candidates = allRows
+    .map((row) => {
+      const name = String(
+        row.product_name ?? row.productName ?? row.name ?? row.title ?? "",
+      ).trim();
+      const spuId = Number(row.spu_id ?? row.spuId ?? row.item_id ?? row.id ?? 0);
+      const spuCode = String(row.spu_code ?? row.spuCode ?? "").trim();
+      return { name, spuId, spuCode };
+    })
+    .filter((r) => r.spuId > 0 && wanted.has(r.name));
+
+
+  const toDelete = candidates.filter((r) => !protectedIds.has(r.spuId));
+  const kept = candidates.filter((r) => protectedIds.has(r.spuId));
+
+  if (dry_run) {
+    return Response.json({
+      dry_run: true,
+      total_scanned: allRows.length,
+      protected_ids: [...protectedIds],
+      matched: candidates,
+      kept,
+      will_delete: toDelete,
+    });
+  }
+
+  const results: Array<{ spuId: number; name: string; ok: boolean; message: string }> = [];
+  for (const item of toDelete) {
+    let ok = false;
+    const attempts: Array<{
+      method: string;
+      version: string;
+      params: Record<string, unknown>;
+    }> = [
+      {
+        method: "youzan.retail.open.spu.delete",
+        version: "3.0.0",
+        params: {
+          spu_codes: item.spuCode ? [item.spuCode] : [String(item.spuId)],
+        },
+      },
+      {
+        method: "youzan.retail.open.spu.delete",
+        version: "3.0.0",
+        params: {
+          spu_code_list: item.spuCode ? [item.spuCode] : [String(item.spuId)],
+        },
+      },
+      {
+        method: "youzan.retail.open.spu.delete",
+        version: "3.0.0",
+        params: { spu_ids: [item.spuId] },
+      },
+    ];
+
+    const logs: string[] = [];
+    for (const a of attempts) {
+      try {
+        const res = await callYouzanApiVerbose({
+          accessToken: token,
+          method: a.method,
+          version: a.version,
+          params: a.params,
+          timeoutMs: 20_000,
+        });
+        const preview = res.preview.slice(0, 220);
+        logs.push(`${a.method}/${a.version} → ${preview}`);
+        if (!/error|fail|非法|不存在|4005|4001|123000|-101|success":\s*false/i.test(res.preview)) {
+          ok = true;
+          break;
+        }
+      } catch (e) {
+        logs.push(`${a.method}/${a.version}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+    results.push({ spuId: item.spuId, name: item.name, ok, message: logs.join(" || ") });
+  }
+
+
+  return Response.json({
+    dry_run: false,
+    total_scanned: allRows.length,
+    matched: candidates,
+    kept,
+    results,
+  });
+}
+
+function collectSpuRows(payload: unknown): Array<Record<string, unknown>> {
+  const rows: Array<Record<string, unknown>> = [];
+  const seen = new Set<unknown>();
+  const keys = ["spus", "spu_list", "spuList", "items", "list", "records"];
+  const walk = (value: unknown, depth = 0) => {
+    if (!value || typeof value !== "object" || depth > 6 || seen.has(value)) return;
+    seen.add(value);
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (item && typeof item === "object" && !Array.isArray(item)) {
+          rows.push(item as Record<string, unknown>);
+        }
+      }
+      return;
+    }
+    const obj = value as Record<string, unknown>;
+    for (const key of keys) walk(obj[key], depth + 1);
+    for (const key of ["data", "response", "result"]) walk(obj[key], depth + 1);
+  };
+  walk(payload);
+  return rows;
+}
