@@ -19,6 +19,21 @@ export const Route = createFileRoute("/api/public/hooks/youzan-cleanup")({
           ? body.names
           : ["probe-channel-a", "probe-channel-b", "probe-channel-c", "test", "测试商品"];
         const dry_run = body.dry_run !== false; // 默认 dry-run，安全兜底
+        try {
+          return await runCleanup(names, dry_run);
+        } catch (e) {
+          return Response.json(
+            { error: e instanceof Error ? e.message : String(e), stack: e instanceof Error ? e.stack : null },
+            { status: 500 },
+          );
+        }
+      },
+    },
+  },
+});
+
+async function runCleanup(names: string[], dry_run: boolean) {
+
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { callYouzanApiVerbose, ensureAccessToken, getHqShop } = await import(
