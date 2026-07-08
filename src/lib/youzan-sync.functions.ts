@@ -71,12 +71,32 @@ async function pushStockToYouzan(
   // 关键：sku_youzan_links.yz_item_id 之前存的是【总部 SPU id】，
   // 但 item.quantity.update/4.0.0 需要【分店那侧的 item_id/sku_id】。
   // 用分店 token + spu_id 反查一次 item.detail.get/1.0.0 拿到真正的 item_id/sku_id。
-  const { itemId, skuId } = await resolveBranchItemIds({
-    branchToken,
-    branchKdtId: branchShop.kdt_id,
-    hqSpuId: link.yz_item_id, // 历史上 branch_stock 复用了 HQ spu_id
-    localSkuId: link.sku_id,
-  });
+  let resolved: { itemId: number; skuId: number | null };
+  try {
+    resolved = await resolveBranchItemIds({
+      branchToken,
+      branchKdtId: branchShop.kdt_id,
+      hqSpuId: link.yz_item_id,
+      localSkuId: link.sku_id,
+    });
+  } catch (e) {
+    // 分店没有这个商品 → 说明 HQ SPU 没铺到这家分店（sell_channel_ids 未包含该 kdt_id）
+    // 自愈：调 spu.update 把该分店 kdt_id 追加进 sell_channel_ids，然后再反查一次
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/234000003|商品不存在|未找到该商品/.test(msg)) {
+      await addBranchToHqSpu(link.sku_id, link.yz_item_id, link.shop_id);
+      // 有赞侧铺货通常几秒内可查；这里直接重试一次
+      resolved = await resolveBranchItemIds({
+        branchToken,
+        branchKdtId: branchShop.kdt_id,
+        hqSpuId: link.yz_item_id,
+        localSkuId: link.sku_id,
+      });
+    } else {
+      throw e;
+    }
+  }
+  const { itemId, skuId } = resolved;
 
   const params: Record<string, unknown> = {
     item_id: itemId,
@@ -101,6 +121,7 @@ async function pushStockToYouzan(
       .eq("id", link.id);
   }
 }
+
 
 async function resolveBranchItemIds(args: {
   branchToken: string;
