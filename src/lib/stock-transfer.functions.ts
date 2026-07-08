@@ -138,23 +138,48 @@ async function getShop(id: string): Promise<ShopRow> {
 }
 
 /**
- * 改有赞门店商品库存（增量）。
- * delta > 0 加库存；delta < 0 减库存。
- * 使用 youzan.item.quantity.update（type=1 增加 / type=2 减少 / type=3 设置）
- * 文档：https://doc.youzanyun.com/detail/API/0/45
+ * 改有赞门店销售库存（增量适配器）
+ * ------------------------------------------------------------
+ * 2026-07 audit：quantity.update/4.0.0 只支持"全量覆盖"，无 type=1/2 增量语义。
+ * 老 stock-transfer 走 delta 语义，这里做适配：
+ *   1) 从本地 youzan_items 拿当前 stock_qty
+ *   2) new = max(0, current + delta)
+ *   3) 用【分店 token】+ 分店 kdt_id + item_id + sku_id + stock_num_str=String(new)
+ * 注意：itemId 必须是【分店 storefront 侧真实 item_id】（来自 youzan_items 拉取），
+ * 不是 HQ SPU id；否则 [301000002] 商品ID缺失。多 SKU 商品目前默认 sku_id=item_id，
+ * 若涉及规格商品，请改走 sync_stock 主链路（pushStockToYouzan + resolveBranchItemIds）。
  */
 async function pushYouzanQuantityDelta(shop: ShopRow, itemId: number, delta: number) {
   if (delta === 0) return;
+  if ((shop as { role?: string }).role !== "branch") {
+    throw new Error("quantity.update 只允许推分店（branch）库存");
+  }
   const token = await ensureAccessToken(shop);
-  const type = delta > 0 ? 1 : 2;
-  const quantity = Math.abs(delta);
+
+  // 读当前库存（本地缓存）
+  const { data: cur } = await supabase
+    .from("youzan_items")
+    .select("stock_qty")
+    .eq("shop_id", (shop as { id: string }).id)
+    .eq("item_id", itemId)
+    .maybeSingle();
+  const currentStock = Number((cur as { stock_qty?: number } | null)?.stock_qty ?? 0);
+  const nextStock = Math.max(0, currentStock + delta);
+
   await callYouzanApi({
     accessToken: token,
     method: "youzan.item.quantity.update",
-    version: "3.0.0",
-    params: { item_id: itemId, type, quantity },
+    version: "4.0.0",
+    params: {
+      kdt_id: (shop as { kdt_id: number }).kdt_id,
+      item_id: itemId,
+      sku_id: itemId, // 无规格商品 sku_id 传 item_id/spu_id（有规格请走主链路）
+      channel: 1,
+      stock_num_str: String(nextStock),
+    },
   });
 }
+
 
 // ============================================================
 // listShopProducts — 门店商品库统一查询
