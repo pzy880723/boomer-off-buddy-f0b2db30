@@ -1113,7 +1113,14 @@ export async function ensureHqSpuLink(
   // 2026-07 audit rule 8：不要直接把 ERP 外链图片塞给 spu.create，
   // 先把外链上传到有赞素材库拿回 CDN URL；失败时回退到原始外链。
   const rawImage = (sku as { image_url?: string | null }).image_url ?? "";
-  const cdnImage = rawImage ? await uploadImageToYouzanMaterial(token, rawImage) : "";
+  const cdnImage = rawImage
+    ? await uploadImageToYouzanMaterial(token, rawImage, {
+        shop_id: hq.id,
+        kdt_id: hq.kdt_id,
+        sku_id,
+      })
+    : "";
+  const finalImage = cdnImage || rawImage || "";
   const attempts = buildSpuCreateAttempts(
     {
       sku_code: sku.sku_code as string,
