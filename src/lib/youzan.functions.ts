@@ -1397,7 +1397,19 @@ async function runOrdersSyncForShop(
       buildParams: (page: number) => Record<string, unknown>;
     }> = [
       {
-        label: "trades.sold.get",
+        label: "trades.sold.get@4.0.4",
+        method: "youzan.trades.sold.get",
+        version: "4.0.4",
+        buildParams: (page) => ({
+          page_no: page,
+          page_size: pageSize,
+          offline_id: shop.kdt_id,
+          start_update: fmt(startDate),
+          end_update: fmt(endDate),
+        }),
+      },
+      {
+        label: "trades.sold.get@4.0.2",
         method: "youzan.trades.sold.get",
         version: "4.0.2",
         buildParams: (page) => ({
