@@ -46,19 +46,20 @@ async function runCleanup(names: string[], dry_run: boolean) {
   const token = await ensureAccessToken(hq);
 
   const allRows: Array<Record<string, unknown>> = [];
-  for (let page = 1; page <= 5; page += 1) {
+  for (let page = 1; page <= 20; page += 1) {
     const res = await callYouzanApiVerbose({
       accessToken: token,
       method: "youzan.retail.open.spu.query",
       version: "3.0.0",
-      params: { page_no: page, page_size: 100 },
+      params: { page_no: page, page_size: 20 },
       timeoutMs: 25_000,
     });
     const rows = collectSpuRows(res.payload);
     if (!rows.length) break;
     allRows.push(...rows);
-    if (rows.length < 100) break;
+    if (rows.length < 20) break;
   }
+
 
   const { data: linked } = await supabaseAdmin
     .from("sku_youzan_links")
