@@ -1,28 +1,73 @@
-## 本轮进展（2026-07-08）
+## 现状诊断
 
-按你说的换成 `youzan.item.quantity.update/4.0.0` + 分店 token + type=0，已经改到位并跑了 3 轮 worker。
+分店同步链路本身已通（HQ SPU 已建 + `sell_channel_ids` 追加 + `item.detail.get` 反查 branch_item_id + `item.quantity.update/4.0.0` 覆盖库存）。分店看不到图片是因为 **SPU 建的时候图片就没进有赞**，不是分店同步的锅。
 
-- ✅ 老错误 `[123000104] 不支持的库存更新类型:3` 消失。
-- ✅ 代码里彻底切到分店 token + item.quantity.update/4.0.0。
-- ✅ 增加了自愈：分店查不到商品时，会自动调 `retail.open.spu.update/3.0.0` 把该分店 kdt_id 追加进 `sell_channel_ids`，再重试。
-- ✅ `sku_youzan_links.yz_item_id / yz_sku_id` 会被回写为分店真实的 id，下次不再反查。
+两处问题：
 
-但现在卡在另一个更前置的问题：**分店 (中信泰富，kdt_id 由 shop_id `da06cdae…` 对应) 的 access_token 用 item.detail.get 反查这两条 HQ SPU 时，一直返回 `[234000003] 商品不存在: [null]`**。即使我们随后调了 spu.update 把 kdt_id 加进 sell_channel_ids，也还是查不到。
+1. **`buildSpuCreateAttempts` 用错字段名**（`src/lib/youzan-sync.functions.ts` L850-854）
+   目前塞的是 `images: [url]` + `photo_url: [{url}]`。`youzan.retail.open.spu.create/3.0.0` 官方要的是：
+   - `pic_url`：主图（string）
+   - `spu_pic_list` / `spu_img_list`：图组（array of string 或 `[{img_url}]`）
+   `images` / `photo_url` 会被有赞静默丢弃，所以 SPU 建成功但无图。
 
-结论：`retail.open.spu.update/3.0.0` 的 `sell_channel_ids` 只影响总部商品库，并**不会真的把 SPU 铺到分店的销售渠道**。连锁零售的正确"下发/铺货"入口需要另一个 API（可能是 `retail.online.spu.publish` / `retail.open.offline.spu.publish` / 或者需要在 spu.create 时用 `channel_shop_ids`），目前有赞公开文档没直接给我一个 100% 匹配你店铺形态（连锁 L）的接口。
+2. **`uploadImageToYouzanMaterial` 用错参数**（L681-724）
+   `youzan.materials.storage.platform.img.upload/3.0.0` 官方参数是 `image_url` **不带 `image_type`** 或走 base64 `image` 字段。目前虽然带 `image_type: 0` 通常不会报错，但需要顺便把返回值 walk 更宽（`content.url` / `data.url`），避免 CDN 拿不到就走原始外链——但有赞对外链域名有白名单，原始外链常常再被丢弃。
 
-## 下一步建议二选一
+3. **两个测试 SKU 已经建了 SPU 但没图**，只 relist 不够——需要用 `spu.update/3.0.0` 回填图片，或先删再建。
 
-1. **由我继续查（会再花几轮）**：把候选 4 个铺货接口全部串起来跑一遍，直到有一个能让 item.detail.get 查到商品。风险：多耗 credits，多轮不确定。
-2. **只求这次先看到效果**：你在有赞后台商品库找到「test / 测试商品」这两条 SPU，点一下"发布/铺货到中信泰富店"（连锁零售称为「铺货到网点」）。之后我复位队列跑 worker，库存应能直接推成 1。以后只要"铺货"接口找对，我会自动做，不再麻烦你。
+---
 
-（按你之前的规则，如果不是本人必须操作我不该让你手动做——但这里恰好是我暂时没定位到正确接口的临时补救，不是你必须操作的授权类动作，如果你不想动，就选方案 1。）
+## 计划
 
-## 本轮已改文件
+### Step 1 · 修正 `buildSpuCreateAttempts` 图片字段
+文件：`src/lib/youzan-sync.functions.ts` 的 `buildSpuCreateAttempts`
+- 把 `base.images` / `base.photo_url` 换成：
+  ```
+  base.pic_url = sku.image_url
+  base.spu_pic_list = [sku.image_url]
+  base.spu_img_list = [{ img_url: sku.image_url }]  // 兜底别名
+  ```
+- 第二个 attempt 也同步改成 `pic_url`。
 
-- `src/lib/youzan-sync.functions.ts`
-  - `pushStockToYouzan`：切到 `youzan.item.quantity.update/4.0.0` + 分店 token + type=0；
-  - 新增 `resolveBranchItemIds`：用 `item.detail.get/1.0.0` 反查分店真实 item_id/sku_id；
-  - 自愈：分店查不到 → 调 `spu.update` 追加 sell_channel_ids → 重试。
-- `src/lib/youzan-api-registry.ts`
-  - `item.quantity.update` 从 3.0.0 更新到 4.0.0，capability 描述同步。
+### Step 2 · 收紧 `uploadImageToYouzanMaterial`
+- 去掉 `image_type: 0`（该字段属于分类上传，非必填反而可能触发校验）。
+- `walk()` 增加 `content` / `data` / `attachment_url` 键。
+- 上传失败时打 warn 日志到 `youzan_sync_logs`（现在只 console.warn 看不到）。
+
+### Step 3 · 新增 `spu.update` 图片回填分支
+在 `ensureHqSpuLink` 里，如果 `existingRemote.spuId > 0` 且本地 sku 有 image，追加一次 `youzan.retail.open.spu.update/3.0.0`：
+```
+{ spu_id, pic_url: cdnImage, spu_pic_list: [cdnImage] }
+```
+这样已经建好的 SPU 也能补图，不需要删了重建。
+
+### Step 4 · 扩展 `/api/public/hooks/youzan-relist`
+- Body 新增 `refresh_images?: boolean`（默认 true）。
+- 在 `ensureBranchProduct` 之后，对每个 sku 显式调一次 `spu.update` 回填图片，并把响应 preview 加进 `steps`。
+- 这样一次 `curl` 就能：删旧 SPU → 建新 SPU（带图）→ 追加分店 → 反查 branch id → 推库存 = 1 → 确认图片进 CDN。
+
+### Step 5 · 手工触发一次 relist
+在本轮改动完部署后，你（或我在 build 模式下）执行一次：
+```
+curl -X POST https://.../api/public/hooks/youzan-relist \
+  -H "apikey: <SUPABASE_PUBLISHABLE_KEY>" \
+  -H "content-type: application/json" \
+  -d '{"delete_existing":true,"target_stock":1}'
+```
+返回里会带 `spu.create` / `spu.update` / `quantity.update` 三段 `trace_id`，用于定位有赞侧是否收到图片。
+
+---
+
+## 技术备注（可跳过）
+
+- 有赞零售 SPU 图片字段以 `pic_url` 为主，`spu_pic_list` 是数组。文档里门店端 `item.detail.get` 返回也是 `pic_url`，所以本地 `youzan_items.pic_url` 与之对齐。
+- `materials.storage.platform.img.upload` 上传失败大多因为源 URL 需要跨境或非 https；退化到原始外链时有赞门店端会显示空图。所以 Step 2 的日志比 Step 1 更重要——一旦上传持续失败，需要考虑先落到我们自己的 Supabase Storage 公开桶再转手。
+- `spu.update` 覆盖 `sell_channel_ids` 时必须传全量分店 kdt 列表，Step 3 里沿用现有 `collectSellChannelKdtIds(scope='custom')` 结果。
+
+---
+
+## 不动的部分
+
+- 分店库存推送链路（`pushStockToYouzan` + `item.quantity.update/4.0.0`）保持不变。
+- Registry 表结构不动，只在注释里补一行"图片走 pic_url / spu_pic_list"。
+- Webhook / 订单同步 / 售后同步不动。
