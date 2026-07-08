@@ -102,6 +102,11 @@ export const Route = createFileRoute("/api/public/hooks/youzan-message")({
                 type === "TRADE_TradeMemoModified"
               ) {
                 await handleTradeEvent(supabaseAdmin, shopId, event);
+                // 2026-07 audit rule 9：消息推送体不可信，异步再拉一次 trade.get/4.0.2
+                // 详情覆写 youzan_orders，避免只落 push body 造成字段缺失。
+                await refreshTradeDetail(supabaseAdmin, shopId, kdtId, event).catch((e) =>
+                  console.warn("[youzan-message] trade.get 补拉失败：", e),
+                );
               }
               // 退款事件 → 加回库存
               if (type === "REFUND_RefundSuccess" || type === "REFUND_SellerAgree") {
