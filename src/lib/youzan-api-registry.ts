@@ -1,13 +1,19 @@
 // ============================================================
-// 有赞 API 全量登记表
+// 有赞 API 全量登记表（Audit 版 · 2026-07)
 // ------------------------------------------------------------
 // 用途：
 //  1. /youzan「API 能力体检」按此清单对每家门店逐个探测；
 //  2. 出现 [gw 4005] 时直接告诉运营去有赞后台开哪个中文能力名；
 //  3. 后续新增有赞接口时，先在这里登记再写调用代码。
 //
-// 只列 ERP 已经使用 (in_use=true) 或者近期规划要接入 (in_use=false)
-// 的接口；纯写入类接口 probe=null 表示体检不做真实调用（避免误改数据）。
+// 增强字段（用户 2026-07 Audit）：
+//  - token_scope      : hq | branch | both — 明确该 method 应该用哪个 token
+//  - business_scene   : 一句话业务用途（跟 spec 对齐，方便代码 review）
+//  - required_params  : 必传字段清单（帮 code review 判断入参完整性）
+//  - response_keys    : 常见响应里我们真的读的字段（帮解析代码保持一致）
+//  - retryable        : 网络/超时错误时是否允许自动重试
+//  - fire_and_forget  : 是否允许 fire-and-forget（不 await 结果）
+//  - notes            : 踩过的坑 / 版本迁移备注
 // ============================================================
 
 export type YzApiScope = "hq" | "branch" | "both";
@@ -16,10 +22,14 @@ export type YzApiFeature =
   | "auth"
   | "shop_info"
   | "category"
+  | "group"
+  | "material"
   | "product_master"
   | "product_online"
-  | "stock"
+  | "stock_sales"
+  | "stock_warehouse"
   | "trade"
+  | "refund"
   | "logistics"
   | "member"
   | "coupon";
@@ -27,12 +37,16 @@ export type YzApiFeature =
 export const YZ_FEATURE_LABELS: Record<YzApiFeature, string> = {
   auth: "授权 / Token",
   shop_info: "门店 · 员工 · 库位",
-  category: "类目 / 分组",
-  product_master: "商品主数据 (SPU)",
+  category: "零售类目 (retail category)",
+  group: "商品分组 (item group / tag)",
+  material: "素材 · 图片",
+  product_master: "总部商品库 SPU",
   product_online: "门店在售商品",
-  stock: "库存 (写入)",
+  stock_sales: "门店销售库存 (覆盖式)",
+  stock_warehouse: "实物仓库存 (进出存)",
   trade: "交易 / 订单",
-  logistics: "物流 / 售后",
+  refund: "售后 / 退款",
+  logistics: "物流 / 发货",
   member: "会员 / 客户",
   coupon: "优惠券 / 营销",
 };
@@ -42,6 +56,8 @@ export type YzApiSpec = {
   method: string;
   version: string;
   scope: YzApiScope;
+  /** Audit 新增：Token 层级 —— 决定用 HQ token 还是分店 token */
+  token_scope: YzApiScope;
   feature: YzApiFeature;
   capability_name: string;
   doc_url: string;
@@ -51,6 +67,13 @@ export type YzApiSpec = {
   probe: { params: Record<string, string | number | boolean> } | null;
   /** 用于 UI 展示的中文说明 */
   description: string;
+  /** Audit 新增字段 */
+  business_scene: string;
+  required_params: string[];
+  response_keys: string[];
+  retryable: boolean;
+  fire_and_forget: boolean;
+  notes?: string;
 };
 
 /** 生成 trades.sold.get 需要的最近 7 天窗口 */
@@ -62,27 +85,39 @@ function recentWindow() {
 }
 
 export const YOUZAN_API_REGISTRY: YzApiSpec[] = [
-  // ------ 授权 ------
+  // =====================================================
+  // 授权
+  // =====================================================
   {
     key: "auth.token",
     method: "auth/token",
     version: "silent",
     scope: "both",
+    token_scope: "both",
     feature: "auth",
     capability_name: "自用型应用授权 (client_credentials / silent)",
     doc_url: "https://doc.youzanyun.com/detail/API/0/906",
     in_use: true,
     required: true,
-    probe: { params: {} }, // 特殊：由 health 模块直接调用 ensureAccessToken
+    probe: { params: {} },
     description: "获取每家门店 access_token；所有接口的前置条件。",
+    business_scene: "HQ / 分店分别换取自用型 access_token",
+    required_params: ["kdt_id"],
+    response_keys: ["access_token", "refresh_token", "expires"],
+    retryable: true,
+    fire_and_forget: false,
+    notes: "HQ token 与分店 token 必须分开存储，永远不要混用。",
   },
 
-  // ------ 门店 / 员工 / 库位 ------
+  // =====================================================
+  // 门店 / 员工 / 库位
+  // =====================================================
   {
     key: "shop.get",
     method: "youzan.shop.get",
     version: "3.0.0",
     scope: "both",
+    token_scope: "both",
     feature: "shop_info",
     capability_name: "查询店铺基本信息",
     doc_url: "https://doc.youzanyun.com/detail/API/0/17",
@@ -90,201 +125,515 @@ export const YOUZAN_API_REGISTRY: YzApiSpec[] = [
     required: true,
     probe: { params: {} },
     description: "读取当前 kdt_id 的店铺名/类型，作为 ping 用。",
+    business_scene: "Token 可用性 / ping",
+    required_params: [],
+    response_keys: ["shop", "id", "name", "type"],
+    retryable: true,
+    fire_and_forget: false,
+  },
+  {
+    key: "shop.chain.descendent.organization.list",
+    method: "youzan.shop.chain.descendent.organization.list",
+    version: "1.0.1",
+    scope: "hq",
+    token_scope: "hq",
+    feature: "shop_info",
+    capability_name: "连锁 · 查询总部下门店组织",
+    doc_url: "https://doc.youzanyun.com/detail/API/0/1793",
+    in_use: false,
+    required: false,
+    probe: { params: {} },
+    description: "拿门店组织树、kdt_id、角色，用于映射本地 shop。",
+    business_scene: "映射 local_shop_id ↔ kdt_id",
+    required_params: [],
+    response_keys: ["organizations", "kdt_id", "role"],
+    retryable: true,
+    fire_and_forget: false,
+    notes: "对齐 spec：优先此接口取门店树，而不是 retail.shop.list.query。",
   },
   {
     key: "retail.shop.list.query",
     method: "youzan.retail.shop.list.query",
     version: "1.0.0",
     scope: "hq",
+    token_scope: "hq",
     feature: "shop_info",
-    capability_name: "连锁 · 查询门店列表",
+    capability_name: "连锁 · 查询门店列表 (旧)",
     doc_url: "https://doc.youzanyun.com/detail/API/0/1793",
     in_use: true,
-    required: true,
+    required: false,
     probe: { params: { page_no: 1, page_size: 1 } },
-    description: "总部枚举所有分店 kdt_id，用于批量导入。",
+    description: "旧版门店列表，descendent.organization.list 不可用时兜底。",
+    business_scene: "兜底门店枚举",
+    required_params: ["page_no", "page_size"],
+    response_keys: ["shops"],
+    retryable: true,
+    fire_and_forget: false,
   },
   {
-    key: "retail.shop.query",
-    method: "youzan.retail.shop.query",
-    version: "1.0.0",
-    scope: "hq",
+    key: "retail.open.warehouse.query",
+    method: "youzan.retail.open.warehouse.query",
+    version: "3.0.0",
+    scope: "both",
+    token_scope: "both",
     feature: "shop_info",
-    capability_name: "连锁 · 查询单店详情",
-    doc_url: "https://doc.youzanyun.com/detail/API/0/1792",
+    capability_name: "查询仓库 / 库位",
+    doc_url: "https://doc.youzanyun.com/detail/API/0/1794",
     in_use: false,
     required: false,
     probe: { params: { page_no: 1, page_size: 1 } },
-    description: "备用：按门店 ID 查详情。",
+    description: "只有做实物仓库存调整时才需要，用来拿 warehouse_code。",
+    business_scene: "stock.adjust 前置：拿 warehouse_code",
+    required_params: ["page_no", "page_size"],
+    response_keys: ["warehouses", "warehouse_code"],
+    retryable: true,
+    fire_and_forget: false,
   },
 
-  // ------ 类目 / 分组 ------
+  // =====================================================
+  // 类目 / 分组
+  // =====================================================
+  {
+    key: "retail.open.category.query",
+    method: "youzan.retail.open.category.query",
+    version: "3.0.0",
+    scope: "hq",
+    token_scope: "hq",
+    feature: "category",
+    capability_name: "连锁 · 查询零售商品类目",
+    doc_url: "https://doc.youzanyun.com/detail/API/0/1795",
+    in_use: false,
+    required: true,
+    probe: { params: { page_no: 1, page_size: 1 } },
+    description: "spu.create 需要的 category_id 从这里查。",
+    business_scene: "SPU 创建前拿零售类目 ID",
+    required_params: ["page_no", "page_size"],
+    response_keys: ["categories", "category_id", "name"],
+    retryable: true,
+    fire_and_forget: false,
+  },
+  {
+    key: "category.listchildren",
+    method: "youzan.category.listchildren",
+    version: "1.0.0",
+    scope: "both",
+    token_scope: "both",
+    feature: "category",
+    capability_name: "查询叶子类目",
+    doc_url: "https://doc.youzanyun.com/detail/API/0/109",
+    in_use: false,
+    required: false,
+    probe: { params: {} },
+    description: "新版类目字段 leaf_category_id 场景下备用。",
+    business_scene: "新版叶子类目",
+    required_params: [],
+    response_keys: ["categories"],
+    retryable: true,
+    fire_and_forget: false,
+  },
   {
     key: "itemcategories.tags.get",
     method: "youzan.itemcategories.tags.get",
     version: "3.0.0",
     scope: "both",
-    feature: "category",
-    capability_name: "查询店铺分组 (标签 tag)",
+    token_scope: "both",
+    feature: "group",
+    capability_name: "查询店铺分组 (tag)",
     doc_url: "https://doc.youzanyun.com/detail/API/0/108",
     in_use: true,
-    required: true,
-    probe: { params: {} },
-    description: "拉取一/二级分组，用于 ERP 分类 ↔ 有赞分组绑定。",
-  },
-  {
-    key: "itemcategories.shop.get",
-    method: "youzan.itemcategories.shop.get",
-    version: "3.0.0",
-    scope: "both",
-    feature: "category",
-    capability_name: "查询店铺自定义分类 (兜底)",
-    doc_url: "https://doc.youzanyun.com/detail/API/0/107",
-    in_use: false,
     required: false,
     probe: { params: {} },
-    description: "旧版分类接口；tags.get 不可用时兜底。",
+    description: "拉取一/二级分组，用于对账；不作为主链路阻塞点。",
+    business_scene: "查询已有分组",
+    required_params: [],
+    response_keys: ["tags", "id", "name"],
+    retryable: true,
+    fire_and_forget: false,
+  },
+  {
+    key: "item.group.create",
+    method: "youzan.item.group.create",
+    version: "1.0.0",
+    scope: "both",
+    token_scope: "both",
+    feature: "group",
+    capability_name: "创建商品分组",
+    doc_url: "https://doc.youzanyun.com/detail/API/0/38",
+    in_use: true,
+    required: false,
+    probe: null,
+    description: "创建 ERP 自动同步分组；失败不阻塞商品/库存主链路。",
+    business_scene: "首次同步时创建 ERP 自动分组",
+    required_params: ["title"],
+    response_keys: ["id", "alias", "title"],
+    retryable: false,
+    fire_and_forget: false,
+    notes: "对齐 spec：版本一律 1.0.0，不允许再用其他版本；失败必须降级。",
   },
 
-  // ------ 商品 SPU ------
+  // =====================================================
+  // 素材 / 图片
+  // =====================================================
+  {
+    key: "materials.storage.platform.img.upload",
+    method: "youzan.materials.storage.platform.img.upload",
+    version: "3.0.0",
+    scope: "hq",
+    token_scope: "hq",
+    feature: "material",
+    capability_name: "上传商品图片素材",
+    doc_url: "https://doc.youzanyun.com/detail/API/0/1233",
+    in_use: false,
+    required: false,
+    probe: null,
+    description: "商品图片必须先上传到有赞素材库，拿 img.yzcdn.cn 域名回填。",
+    business_scene: "SPU / 图片同步前置",
+    required_params: ["image"],
+    response_keys: ["url", "image_id"],
+    retryable: true,
+    fire_and_forget: false,
+    notes: "禁止把 ERP 外链图片直接塞给 spu.create。",
+  },
+
+  // =====================================================
+  // 总部商品库 SPU
+  // =====================================================
   {
     key: "retail.open.spu.query",
     method: "youzan.retail.open.spu.query",
     version: "3.0.0",
     scope: "hq",
+    token_scope: "hq",
     feature: "product_master",
     capability_name: "连锁 · 查询总部 SPU 商品库",
     doc_url: "https://doc.youzanyun.com/detail/API/0/1789",
     in_use: true,
     required: true,
     probe: { params: { page_no: 1, page_size: 1 } },
-    description: "总部商品库 SPU 主数据（HQ 侧）。",
+    description: "总部商品库 SPU 主数据；查重按 spu_codes（数组），不许按名字。",
+    business_scene: "SPU 存在性校验（唯一键 spu_code）",
+    required_params: ["page_no", "page_size"],
+    response_keys: ["spus", "spu_id", "spu_code", "product_name"],
+    retryable: true,
+    fire_and_forget: false,
+    notes: "查重唯一键：spu_code / sku_code，禁止按 name 匹配。",
+  },
+  {
+    key: "retail.open.spu.create",
+    method: "youzan.retail.open.spu.create",
+    version: "3.0.0",
+    scope: "hq",
+    token_scope: "hq",
+    feature: "product_master",
+    capability_name: "连锁 · 创建总部 SPU",
+    doc_url: "https://doc.youzanyun.com/detail/API/0/1788",
+    in_use: true,
+    required: true,
+    probe: null,
+    description: "写入类：ERP 新建 SKU 时自动登记 HQ SPU；体检不实调。",
+    business_scene: "本地 SKU → 有赞总部 SPU 首次登记",
+    required_params: [
+      "name",
+      "spu_code",
+      "unit",
+      "retail_price",
+      "category_id",
+      "offline_create",
+      "is_up_offline",
+    ],
+    response_keys: ["spu_id", "spu_code"],
+    retryable: false,
+    fire_and_forget: false,
+    notes:
+      "必须传 offline_create=true + is_up_offline=true，否则只建总部 SPU 不铺到分店。sell_channel_ids 决定门店可见范围。",
+  },
+  {
+    key: "retail.open.spu.update",
+    method: "youzan.retail.open.spu.update",
+    version: "3.0.0",
+    scope: "hq",
+    token_scope: "hq",
+    feature: "product_master",
+    capability_name: "连锁 · 更新总部 SPU",
+    doc_url: "https://doc.youzanyun.com/detail/API/0/1788",
+    in_use: true,
+    required: false,
+    probe: null,
+    description: "追加分店 kdt_id 到 sell_channel_ids；不等于门店销售端可见。",
+    business_scene: "把新分店加入 SPU 渠道",
+    required_params: ["spu_id", "sell_channel_ids"],
+    response_keys: ["spu_id"],
+    retryable: false,
+    fire_and_forget: false,
+    notes:
+      "警告：sell_channel_ids 只代表总部商品库渠道；如分店 storefront 仍然查不到，必须抛 'branch item not visible / distribution missing'。",
+  },
+  {
+    key: "retail.open.spu.delete",
+    method: "youzan.retail.open.spu.delete",
+    version: "3.0.0",
+    scope: "hq",
+    token_scope: "hq",
+    feature: "product_master",
+    capability_name: "连锁 · 删除总部 SPU（运维）",
+    doc_url: "https://doc.youzanyun.com/detail/API/0/1788",
+    in_use: true,
+    required: false,
+    probe: null,
+    description: "仅运维/清理接口，正常业务链路禁用。",
+    business_scene: "清理误建 SPU",
+    required_params: ["spu_codes"],
+    response_keys: [],
+    retryable: false,
+    fire_and_forget: false,
+    notes: "只允许 /youzan-cleanup 与 /youzan-relist 使用；主链路禁止调用。",
   },
   {
     key: "retail.open.online.spu.query",
     method: "youzan.retail.open.online.spu.query",
     version: "1.0.0",
     scope: "branch",
+    token_scope: "hq",
     feature: "product_online",
     capability_name: "连锁 · 查询门店在售 SPU",
     doc_url: "https://doc.youzanyun.com/detail/API/0/1790",
     in_use: true,
     required: true,
     probe: { params: { page_no: 1, page_size: 1 } },
-    description: "分店已上架的 SPU，用于对账。",
+    description: "分店已上架的 SPU；用于对账门店 storefront 是否真的可见。",
+    business_scene: "铺货后校验分店 storefront 可见",
+    required_params: ["page_no", "page_size", "kdt_id"],
+    response_keys: ["spus", "spu_id", "item_id"],
+    retryable: true,
+    fire_and_forget: false,
   },
   {
-    key: "retail.open.spu.add",
-    method: "youzan.retail.open.spu.add",
+    key: "item.detail.get",
+    method: "youzan.item.detail.get",
     version: "1.0.0",
-    scope: "hq",
-    feature: "product_master",
-    capability_name: "连锁 · 新增总部 SPU",
-    doc_url: "https://doc.youzanyun.com/detail/API/0/1788",
+    scope: "branch",
+    token_scope: "branch",
+    feature: "product_online",
+    capability_name: "查询单个商品详情",
+    doc_url: "https://doc.youzanyun.com/detail/API/0/28",
     in_use: true,
     required: true,
     probe: null,
-    description: "写入类：ERP 新建 SKU 时自动登记 HQ SPU；体检不实调。",
+    description: "反查分店真实 item_id / sku_id（用总部 HQ SPU id 作 spu_id 入参）。",
+    business_scene: "quantity.update 前反查分店 item_id / sku_id",
+    required_params: ["node_kdt_id", "spu_id"],
+    response_keys: ["item_id", "sku", "sku_id"],
+    retryable: true,
+    fire_and_forget: false,
+    notes:
+      "必须用【分店 access_token】+ node_kdt_id=分店 kdt_id + spu_id=总部 SPU id；找不到 → 抛 'branch item not visible'，不要继续调库存接口。",
+  },
+  {
+    key: "item.common.search",
+    method: "youzan.item.common.search",
+    version: "1.0.0",
+    scope: "branch",
+    token_scope: "branch",
+    feature: "product_online",
+    capability_name: "商品列表检索 (辅助)",
+    doc_url: "https://doc.youzanyun.com/detail/API/0/24",
+    in_use: false,
+    required: false,
+    probe: { params: { page_no: 1, page_size: 1 } },
+    description: "detail.get 拿不到时做兜底定位。",
+    business_scene: "兜底定位分店商品",
+    required_params: [],
+    response_keys: ["items", "num_iid"],
+    retryable: true,
+    fire_and_forget: false,
   },
 
-  // ------ 库存（写入类） ------
-  {
-    key: "retail.open.stock.update",
-    method: "youzan.retail.open.stock.update",
-    version: "1.0.0",
-    scope: "hq",
-    feature: "stock",
-    capability_name: "连锁 · 总部按 kdt_id 更新库存",
-    doc_url: "https://doc.youzanyun.com/detail/API/0/1791",
-    in_use: true,
-    required: true,
-    probe: null,
-    description: "写入类：ERP 分店库存推送；体检不实调，改看历史推送时间。",
-  },
+  // =====================================================
+  // 门店销售库存（覆盖式 · 主链路）
+  // =====================================================
   {
     key: "item.quantity.update",
     method: "youzan.item.quantity.update",
     version: "4.0.0",
     scope: "branch",
-    feature: "stock",
-    capability_name: "商品库存增减 / 设置 (4.0.0)",
+    token_scope: "branch",
+    feature: "stock_sales",
+    capability_name: "商品库存覆盖 (4.0.0)",
     doc_url: "https://doc.youzanyun.com/detail/API/0/45",
     in_use: true,
     required: true,
     probe: null,
-    description: "写入类：分店 token + item_id/sku_id + type=0 全量覆盖库存；体检不实调。",
+    description:
+      "写入类：分店 token + 分店真实 item_id/sku_id + stock_num_str 全量覆盖；体检不实调。",
+    business_scene: "把 ERP 本地库存覆盖同步到分店 storefront",
+    required_params: ["kdt_id", "item_id", "sku_id", "channel", "stock_num_str"],
+    response_keys: ["is_success"],
+    retryable: true,
+    fire_and_forget: false,
+    notes:
+      "废弃 retail.open.stock.adjust 用作分店销售库存。库存是全量覆盖，不是增量。无 SKU 商品时 sku_id 传 spu_id。",
   },
 
+  // =====================================================
+  // 实物仓库存（进出存 · 非主链路）
+  // =====================================================
+  {
+    key: "retail.open.stock.adjust",
+    method: "youzan.retail.open.stock.adjust",
+    version: "3.0.0",
+    scope: "both",
+    token_scope: "hq",
+    feature: "stock_warehouse",
+    capability_name: "连锁 · 实物仓库存调整",
+    doc_url: "https://doc.youzanyun.com/detail/API/0/1791",
+    in_use: false,
+    required: false,
+    probe: null,
+    description:
+      "只允许进出存 / 仓库盘点使用（需要 warehouse_code、source_order_no、order_items[].sku_code）；不允许改门店销售库存。",
+    business_scene: "仓库实物盘点 / 进出存",
+    required_params: ["warehouse_code", "source_order_no", "order_items"],
+    response_keys: ["is_success"],
+    retryable: false,
+    fire_and_forget: false,
+    notes:
+      "误用于门店销售库存会报 [123000104] 不支持的库存更新类型:3；且需要严格幂等。",
+  },
 
-  // ------ 交易 ------
+  // =====================================================
+  // 交易 / 订单
+  // =====================================================
   {
     key: "trades.sold.get",
     method: "youzan.trades.sold.get",
-    version: "3.0.0",
+    version: "4.0.4",
     scope: "branch",
+    token_scope: "branch",
     feature: "trade",
-    capability_name: "查询已卖出的交易 (订单列表)",
+    capability_name: "查询已卖出交易 (订单列表)",
     doc_url: "https://doc.youzanyun.com/detail/API/0/70",
     in_use: true,
     required: true,
     probe: { params: { page_no: 1, page_size: 1, ...recentWindow() } },
-    description: "按 kdt_id 拉取分店订单，供仪表盘使用。",
+    description: "按 kdt_id 拉取分店订单，供仪表盘与首次同步/定时兜底扫描。",
+    business_scene: "订单列表定时补拉",
+    required_params: ["page_no", "page_size", "start_created", "end_created"],
+    response_keys: ["trades", "tid", "total_results"],
+    retryable: true,
+    fire_and_forget: false,
+    notes: "spec 要求版本 4.0.4；本仓库历史遗留 3.0.0 已在 audit 中升级。",
   },
-
-  // ------ 规划但暂未接入 ------
   {
-    key: "logistics.online.confirm",
-    method: "youzan.logistics.online.confirm",
-    version: "4.0.0",
+    key: "trade.get",
+    method: "youzan.trade.get",
+    version: "4.0.2",
     scope: "branch",
-    feature: "logistics",
-    capability_name: "订单发货 (在线发货)",
-    doc_url: "https://doc.youzanyun.com/detail/API/0/49",
+    token_scope: "branch",
+    feature: "trade",
+    capability_name: "查询单笔订单详情",
+    doc_url: "https://doc.youzanyun.com/detail/API/0/71",
+    in_use: false,
+    required: true,
+    probe: null,
+    description: "消息推送后延迟 30 秒调用；不要只信 push 消息体。",
+    business_scene: "订单变更后补拉最终状态",
+    required_params: ["tid"],
+    response_keys: ["trade", "status"],
+    retryable: true,
+    fire_and_forget: false,
+  },
+  {
+    key: "trade.memo.update",
+    method: "youzan.trade.memo.update",
+    version: "3.0.0",
+    scope: "branch",
+    token_scope: "branch",
+    feature: "trade",
+    capability_name: "订单备注更新",
+    doc_url: "https://doc.youzanyun.com/detail/API/0/73",
     in_use: false,
     required: false,
     probe: null,
-    description: "规划中：ERP 触发有赞订单发货。",
+    description: "ERP 处理状态回写有赞备注。",
+    business_scene: "ERP 标记已处理",
+    required_params: ["tid", "memo"],
+    response_keys: ["is_success"],
+    retryable: false,
+    fire_and_forget: true,
   },
+
+  // =====================================================
+  // 售后 / 退款
+  // =====================================================
   {
-    key: "trades.refund.get",
-    method: "youzan.trades.refund.get",
-    version: "3.0.0",
+    key: "trade.refund.search",
+    method: "youzan.trade.refund.search",
+    version: "3.0.1",
     scope: "branch",
-    feature: "logistics",
-    capability_name: "查询退款单",
+    token_scope: "branch",
+    feature: "refund",
+    capability_name: "售后列表",
     doc_url: "https://doc.youzanyun.com/detail/API/0/69",
     in_use: false,
     required: false,
     probe: { params: { page_no: 1, page_size: 1, ...recentWindow() } },
-    description: "规划中：售后统计。",
+    description: "售后单定时同步；进独立队列处理，不与普通订单混用。",
+    business_scene: "售后列表定时补拉",
+    required_params: ["page_no", "page_size"],
+    response_keys: ["refunds", "refund_id"],
+    retryable: true,
+    fire_and_forget: false,
   },
   {
-    key: "users.weixin.follower.get",
-    method: "youzan.users.weixin.follower.get",
-    version: "3.0.0",
+    key: "trade.refund.get",
+    method: "youzan.trade.refund.get",
+    version: "3.0.1",
     scope: "branch",
-    feature: "member",
-    capability_name: "查询会员信息",
-    doc_url: "https://doc.youzanyun.com/detail/API/0/1155",
+    token_scope: "branch",
+    feature: "refund",
+    capability_name: "售后详情",
+    doc_url: "https://doc.youzanyun.com/detail/API/0/68",
     in_use: false,
     required: false,
     probe: null,
-    description: "规划中：会员数据同步。",
+    description: "单笔售后详情。",
+    business_scene: "单笔售后",
+    required_params: ["refund_id"],
+    response_keys: ["refund", "status", "refund_fee"],
+    retryable: true,
+    fire_and_forget: false,
   },
+
+  // =====================================================
+  // 物流 / 发货
+  // =====================================================
   {
-    key: "ump.coupon.list.query",
-    method: "youzan.ump.coupon.list.query",
-    version: "1.0.0",
+    key: "logistics.online.confirm",
+    method: "youzan.logistics.online.confirm",
+    version: "3.0.0",
     scope: "branch",
-    feature: "coupon",
-    capability_name: "查询优惠券列表",
-    doc_url: "https://doc.youzanyun.com/detail/API/0/2246",
+    token_scope: "branch",
+    feature: "logistics",
+    capability_name: "订单发货确认",
+    doc_url: "https://doc.youzanyun.com/detail/API/0/49",
     in_use: false,
     required: false,
-    probe: { params: { page_no: 1, page_size: 1 } },
-    description: "规划中：优惠券营销数据。",
+    probe: null,
+    description: "ERP 触发有赞订单发货。",
+    business_scene: "ERP 主导发货",
+    required_params: ["tid", "out_stype", "logistics_no"],
+    response_keys: ["is_success"],
+    retryable: false,
+    fire_and_forget: false,
   },
 ];
+
+/** 便捷查询：按 method+version 拿一条 spec */
+export function findSpec(method: string, version?: string): YzApiSpec | undefined {
+  return YOUZAN_API_REGISTRY.find(
+    (s) => s.method === method && (!version || s.version === version),
+  );
+}
 
 /** 从错误信息中提取 gw_code；识别不出返回 null */
 export function extractGwCode(msg: string): number | null {
@@ -300,9 +649,9 @@ export type YzProbeStatus =
   | "skip_write"
   | "skip_scope"
   | "token_fail"
-  | "gw_4001" // 授权错误
-  | "gw_4005" // 能力未开通
-  | "gw_4007" // IP 未白名单
+  | "gw_4001"
+  | "gw_4005"
+  | "gw_4007"
   | "gw_other"
   | "network_error";
 
