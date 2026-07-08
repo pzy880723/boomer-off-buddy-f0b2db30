@@ -1181,6 +1181,31 @@ export async function ensureHqSpuLink(
     } as never,
     { onConflict: "sku_id,shop_id" },
   );
+
+  // 2026-07 audit：如果命中的是既有 SPU（existingRemote），spu.create 不会执行，
+  // 图片就没有机会写进去。这里显式补一次 spu.update 回填图片。
+  if (existingRemote.spuId > 0 && finalImage) {
+    try {
+      await callYouzanApiVerbose({
+        accessToken: token,
+        method: "youzan.retail.open.spu.update",
+        version: "3.0.0",
+        params: {
+          spu_id: newSpuId,
+          pic_url: finalImage,
+          spu_pic_list: [finalImage],
+          spu_img_list: [{ img_url: finalImage }],
+        },
+        timeoutMs: 20_000,
+      });
+    } catch (e) {
+      console.warn(
+        "[youzan] spu.update 回填图片失败：",
+        e instanceof Error ? e.message : String(e),
+      );
+    }
+  }
+
   return { created: true, yz_item_id: newSpuId, yz_sku_id: newSkuId, shop_id: hq.id };
 }
 
