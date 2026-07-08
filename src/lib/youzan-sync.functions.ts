@@ -678,7 +678,11 @@ async function resolveHqCategoryId(_sku?: unknown): Promise<number> {
  * 返回有赞侧 CDN URL；失败时 fire-and-forget，返回原始 URL。
  * 对应 youzan.materials.storage.platform.img.upload/3.0.0
  */
-async function uploadImageToYouzanMaterial(token: string, url: string): Promise<string> {
+async function uploadImageToYouzanMaterial(
+  token: string,
+  url: string,
+  ctx?: { shop_id?: string | null; kdt_id?: number | null; sku_id?: string | null },
+): Promise<string> {
   if (!url) return url;
   // 已经是有赞域名的图片就不用再传一次
   if (/(?:yzcdn|youzan|qbox|qiniucdn)\./i.test(url)) return url;
@@ -687,7 +691,9 @@ async function uploadImageToYouzanMaterial(token: string, url: string): Promise<
       accessToken: token,
       method: "youzan.materials.storage.platform.img.upload",
       version: "3.0.0",
-      params: { image_url: url, image_type: 0 },
+      // 2026-07 audit：去掉 image_type（分类上传字段，非必填），
+      // 只传 image_url 即可让有赞抓取外链回落到 yzcdn。
+      params: { image_url: url },
       timeoutMs: 20_000,
     });
     const payload = res.payload as Record<string, unknown> | null;
@@ -704,7 +710,15 @@ async function uploadImageToYouzanMaterial(token: string, url: string): Promise<
         return "";
       }
       if (typeof v === "object") {
-        for (const key of ["url", "img_url", "image_url", "cdn_url"]) {
+        for (const key of [
+          "url",
+          "img_url",
+          "image_url",
+          "cdn_url",
+          "attachment_url",
+          "content",
+          "data",
+        ]) {
           const s = walk((v as Record<string, unknown>)[key]);
           if (s) return s;
         }
@@ -716,12 +730,44 @@ async function uploadImageToYouzanMaterial(token: string, url: string): Promise<
       return "";
     };
     const cdn = walk(payload);
+    if (!cdn) {
+      // 上传成功但没解析出 CDN URL —— 记一条 warn，方便排查白名单/域名问题。
+      try {
+        await supabase.from("youzan_sync_logs").insert({
+          shop_id: ctx?.shop_id ?? null,
+          kdt_id: ctx?.kdt_id ?? null,
+          action: "materials_upload",
+          status: "warn",
+          message: `materials 上传返回无 CDN URL；继续用外链 ${url}`,
+          detail: { sku_id: ctx?.sku_id ?? null, preview: res.preview.slice(0, 400) } as never,
+          finished_at: new Date().toISOString(),
+        } as never);
+      } catch {
+        // ignore
+      }
+    }
     return cdn || url;
   } catch (e) {
-    console.warn("[youzan] materials 上传失败，继续用外链：", e instanceof Error ? e.message : e);
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn("[youzan] materials 上传失败，继续用外链：", msg);
+    try {
+      await supabase.from("youzan_sync_logs").insert({
+        shop_id: ctx?.shop_id ?? null,
+        kdt_id: ctx?.kdt_id ?? null,
+        action: "materials_upload",
+        status: "failed",
+        message: `materials 上传失败：${msg}`,
+        detail: { sku_id: ctx?.sku_id ?? null, source_url: url } as never,
+        finished_at: new Date().toISOString(),
+      } as never);
+    } catch {
+      // ignore
+    }
     return url;
   }
 }
+
+
 
 
 
