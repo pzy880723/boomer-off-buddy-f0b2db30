@@ -1125,7 +1125,7 @@ export async function ensureHqSpuLink(
     {
       sku_code: sku.sku_code as string,
       name: sku.name as string,
-      image_url: cdnImage || rawImage || null,
+      image_url: finalImage || null,
       notes: (sku as { notes?: string | null }).notes ?? null,
       price_tier: (sku as { price_tier: string | number }).price_tier,
       weight_g: (sku as { weight_g?: number | null }).weight_g ?? null,
