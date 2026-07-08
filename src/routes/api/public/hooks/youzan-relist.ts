@@ -128,6 +128,59 @@ async function run(opts: {
   }
   steps.push({ step: "ensureBranchProduct", results: productResults });
 
+  // Step 3.5: 显式 spu.update 回填 HQ SPU 图片（pic_url + spu_pic_list）
+  if (opts.refresh_images) {
+    const imageResults: Array<Record<string, unknown>> = [];
+    for (const sku_id of opts.sku_ids) {
+      const s = skuMap.get(sku_id);
+      if (!s?.image_url) {
+        imageResults.push({ sku_id, ok: false, error: "no local image_url" });
+        continue;
+      }
+      const { data: hqLink } = await supabaseAdmin
+        .from("sku_youzan_links")
+        .select("yz_item_id")
+        .eq("sku_id", sku_id)
+        .eq("shop_id", hq.id)
+        .maybeSingle();
+      const hqSpuId = Number((hqLink as { yz_item_id?: number } | null)?.yz_item_id ?? 0);
+      if (!hqSpuId) {
+        imageResults.push({ sku_id, ok: false, error: "no hq spu link" });
+        continue;
+      }
+      try {
+        const r = await callYouzanApiVerbose({
+          accessToken: hqToken,
+          method: "youzan.retail.open.spu.update",
+          version: "3.0.0",
+          params: {
+            spu_id: hqSpuId,
+            pic_url: s.image_url,
+            spu_pic_list: [s.image_url],
+            spu_img_list: [{ img_url: s.image_url }],
+          },
+          timeoutMs: 20_000,
+        });
+        imageResults.push({
+          sku_id,
+          spu_id: hqSpuId,
+          ok: true,
+          trace_id: r.trace_id,
+          preview: r.preview.slice(0, 200),
+        });
+      } catch (e) {
+        imageResults.push({
+          sku_id,
+          spu_id: hqSpuId,
+          ok: false,
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
+    steps.push({ step: "spu.update.images", results: imageResults });
+  }
+
+
   // Step 4: 直接内联推库存（不走 queue），拿到 trace_id 立刻回报
   // 2026-07 audit：用【分店 token】+ item.detail.get 反查真实 branch item_id
   const stockResults: Array<Record<string, unknown>> = [];
