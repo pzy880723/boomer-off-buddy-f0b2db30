@@ -616,7 +616,8 @@ export async function ensureAutoYouzanDefaultCategory(): Promise<{ id: number; c
 
 async function resolveHqCategoryId(_sku?: unknown): Promise<number> {
   // 用户决定：ERP 类目不再和有赞分组一一绑定；同步 SPU 时统一走全局默认分组。
-  // 如果还没保存默认分组，系统主动去有赞创建/复用「ERP自动同步」，不再要求人工操作。
+  // 2026-07 audit rule 3：分组失败不能阻塞商品主链路 —— 拿不到默认分组时
+  // 直接降级到 DEFAULT_RETAIL_PRODUCT_CATEGORY_ID。
   const { data: setting } = await supabase
     .from("app_settings")
     .select("value")
@@ -624,9 +625,15 @@ async function resolveHqCategoryId(_sku?: unknown): Promise<number> {
     .maybeSingle();
   const id = parseStoredYouzanCategoryId((setting as { value?: unknown } | null)?.value);
   if (id > 0) return id;
-  const auto = await ensureAutoYouzanDefaultCategory();
-  return auto.id;
+  try {
+    const auto = await ensureAutoYouzanDefaultCategory();
+    if (auto.id > 0) return auto.id;
+  } catch (e) {
+    console.warn("[youzan] 分组创建失败，降级到默认零售类目：", e instanceof Error ? e.message : e);
+  }
+  return DEFAULT_RETAIL_PRODUCT_CATEGORY_ID;
 }
+
 
 async function resolveHqRetailProductCategoryId(): Promise<number> {
   const hq = await getHqShop();
