@@ -233,5 +233,83 @@ function extractOrderItems(event: Record<string, unknown>): Array<{ item_id: num
   return out;
 }
 
+// ============================================================
+// refreshTradeDetail —— 2026-07 audit rule 9
+// 消息推送体不能作为唯一真源；收到 TRADE_* 后再用店铺 token
+// 调 youzan.trade.get/4.0.2 拉一次完整详情，覆写 youzan_orders.raw。
+// ============================================================
+async function refreshTradeDetail(
+  sb: unknown,
+  shopId: string,
+  kdtId: number,
+  event: Record<string, unknown>,
+): Promise<void> {
+  const tid = extractTid(event);
+  if (!tid) return;
+  const supa = sb as {
+    from: (t: string) => {
+      select: (c: string) => {
+        eq: (
+          c: string,
+          v: unknown,
+        ) => { maybeSingle: () => Promise<{ data: Record<string, unknown> | null }> };
+      };
+      upsert: (row: unknown, opts?: unknown) => Promise<{ error: { message: string } | null }>;
+    };
+  };
+  const { data: shop } = await supa
+    .from("youzan_shops")
+    .select("id, kdt_id, role, access_token, refresh_token, token_expires_at")
+    .eq("id", shopId)
+    .maybeSingle();
+  if (!shop) return;
+  const { ensureAccessToken, callYouzanApiVerbose } = await import("@/lib/youzan.functions");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const token = await ensureAccessToken(shop as any);
+  const res = await callYouzanApiVerbose({
+    accessToken: token,
+    method: "youzan.trade.get",
+    version: "4.0.2",
+    params: { tid },
+    timeoutMs: 20_000,
+  });
+  const trade = res.payload as Record<string, unknown> | null;
+  if (!trade) return;
+  await supa.from("youzan_orders").upsert(
+    {
+      shop_id: shopId,
+      kdt_id: kdtId,
+      tid,
+      raw: trade as unknown,
+    } as never,
+    { onConflict: "kdt_id,tid" },
+  );
+}
+
+function extractTid(event: Record<string, unknown>): string {
+  const direct =
+    (typeof event.tid === "string" && event.tid) ||
+    (typeof event.tid === "number" && String(event.tid)) ||
+    "";
+  if (direct) return direct;
+  const trade = event.trade as Record<string, unknown> | undefined;
+  if (trade) {
+    const t =
+      (typeof trade.tid === "string" && trade.tid) ||
+      (typeof trade.tid === "number" && String(trade.tid)) ||
+      "";
+    if (t) return t;
+  }
+  const data = event.data as Record<string, unknown> | undefined;
+  if (data) {
+    const t =
+      (typeof data.tid === "string" && data.tid) ||
+      (typeof data.tid === "number" && String(data.tid)) ||
+      "";
+    if (t) return t;
+  }
+  return "";
+}
+
 // 显式引用避免 tree-shake（并保护 SB alias）
 void ({} as SB);
