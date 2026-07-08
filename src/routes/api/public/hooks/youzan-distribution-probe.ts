@@ -27,6 +27,18 @@ type ProbeContext = {
   dryRun: boolean;
 };
 
+type YouzanVerboseCaller = (opts: {
+  accessToken: string;
+  method: string;
+  version: string;
+  params?: Record<string, unknown>;
+  timeoutMs?: number;
+}) => Promise<{ payload: unknown; trace_id: string | null; preview: string }>;
+
+type LogClient = {
+  from: (table: string) => any;
+};
+
 export const Route = createFileRoute("/api/public/hooks/youzan-distribution-probe")({
   server: {
     handlers: {
@@ -147,7 +159,6 @@ function buildCandidates(): Candidate[] {
           params: (c) => ({
             spu_id: c.hqSpuId,
             store_kdt_ids: [c.branchKdtId],
-            dry_run: c.dryRun,
           }),
         },
         {
@@ -155,7 +166,6 @@ function buildCandidates(): Candidate[] {
           params: (c) => ({
             spu_code: c.skuCode,
             kdt_ids: [c.branchKdtId],
-            dry_run: c.dryRun,
           }),
         },
       ],
@@ -170,7 +180,6 @@ function buildCandidates(): Candidate[] {
           params: (c) => ({
             spu_id: c.hqSpuId,
             store_kdt_ids: [c.branchKdtId],
-            dry_run: c.dryRun,
           }),
         },
         {
@@ -178,7 +187,6 @@ function buildCandidates(): Candidate[] {
           params: (c) => ({
             spu_id: c.hqSpuId,
             target_kdt_ids: [c.branchKdtId],
-            dry_run: c.dryRun,
           }),
         },
       ],
@@ -193,7 +201,6 @@ function buildCandidates(): Candidate[] {
           params: (c) => ({
             spu_id: c.hqSpuId,
             kdt_id: c.branchKdtId,
-            dry_run: c.dryRun,
           }),
         },
         {
@@ -201,7 +208,6 @@ function buildCandidates(): Candidate[] {
           params: (c) => ({
             spu_id: c.hqSpuId,
             target_kdt_ids: [c.branchKdtId],
-            dry_run: c.dryRun,
           }),
         },
       ],
@@ -214,10 +220,10 @@ async function probeCandidate(
   ctx: ProbeContext,
   hqToken: string,
   deps: {
-    supabaseAdmin: Awaited<typeof import("@/integrations/supabase/client.server")>["supabaseAdmin"];
+    supabaseAdmin: LogClient;
     branchShopId: string;
     branchKdtId: number;
-    callYouzanApiVerbose: typeof import("@/lib/youzan.functions")["callYouzanApiVerbose"];
+    callYouzanApiVerbose: YouzanVerboseCaller;
   },
 ) {
   const { data: log } = await deps.supabaseAdmin
@@ -284,7 +290,7 @@ function shouldTryNextVariant(message: string) {
 }
 
 async function finishProbeLog(
-  supabaseAdmin: Awaited<typeof import("@/integrations/supabase/client.server")>["supabaseAdmin"],
+  supabaseAdmin: LogClient,
   id: string | undefined,
   patch: { status: "ok" | "error"; message: string; error: string | null },
 ) {
