@@ -872,6 +872,14 @@ function buildSpuCreateAttempts(sku: {
   };
   if (sku.weight_g && Number(sku.weight_g) > 0) skuListItem.weight = Number(sku.weight_g);
 
+  const imageFields: Record<string, unknown> = sku.image_url
+    ? {
+        pic_url: sku.image_url,
+        spu_pic_list: [sku.image_url],
+        spu_img_list: [{ img_url: sku.image_url }],
+      }
+    : {};
+
   return [
     {
       ...base,
@@ -885,6 +893,7 @@ function buildSpuCreateAttempts(sku: {
       retail_price: priceYuan,
       ...(kdtIds.length > 0 ? { sell_channel_ids: kdtIds } : {}),
       sku_list: [skuListItem],
+      ...imageFields,
     },
     {
       name: sku.name,
@@ -894,6 +903,7 @@ function buildSpuCreateAttempts(sku: {
       offline_create: true, is_up_offline: true,
       ...(kdtIds.length > 0 ? { sell_channel_ids: kdtIds } : {}),
       skus: [skuListItem],
+      ...imageFields,
     },
     {
       name: sku.name,
@@ -903,6 +913,7 @@ function buildSpuCreateAttempts(sku: {
       offline_create: true, is_up_offline: true,
       sku: buildSpuSkuArray(sku as { id: string; sku_code: string; name: string; price_tier: number | string; weight_g?: number | null }),
       ...(kdtIds.length > 0 ? { sell_channel_ids: kdtIds } : {}),
+      ...imageFields,
     },
     {
       name: sku.name,
@@ -911,6 +922,7 @@ function buildSpuCreateAttempts(sku: {
       category_id: categoryId,
       retail_price: priceYuan,
       ...(kdtIds.length > 0 ? { display_on_kdt_ids: kdtIds } : {}),
+      ...imageFields,
     },
   ];
 }
