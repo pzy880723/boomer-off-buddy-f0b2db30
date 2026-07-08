@@ -1,0 +1,2 @@
+UPDATE public.youzan_stock_sync_queue SET status='pending', attempts=0, next_run_at=now(), last_error=NULL WHERE sku_id IN ('70a6d177-97e7-4e99-be60-4fdcd2453575','8ef769b3-51dc-4576-b1f2-2c061dee74c2') AND shop_id='da06cdae-5ec1-4749-8dcb-dc972cfd05c9';
+UPDATE public.sku_youzan_links SET status='linked', last_error=NULL WHERE sku_id IN ('70a6d177-97e7-4e99-be60-4fdcd2453575','8ef769b3-51dc-4576-b1f2-2c061dee74c2');
