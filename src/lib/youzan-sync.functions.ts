@@ -849,8 +849,11 @@ function buildSpuCreateAttempts(sku: {
 
   if (kdtIds.length > 0) base.sell_channel_ids = kdtIds;
   if (sku.image_url) {
-    base.images = [sku.image_url];
-    base.photo_url = [{ url: sku.image_url }];
+    // 2026-07 audit rule 8：零售 SPU 图片字段以 pic_url / spu_pic_list 为主，
+    // 之前的 images / photo_url 会被有赞静默丢弃 → 建成的 SPU 无图。
+    base.pic_url = sku.image_url;
+    base.spu_pic_list = [sku.image_url];
+    base.spu_img_list = [{ img_url: sku.image_url }];
   }
   if (sku.notes) {
     base.desc = sku.notes;
