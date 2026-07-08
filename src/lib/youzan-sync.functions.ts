@@ -68,12 +68,22 @@ async function pushStockToYouzan(
   const num = Math.max(0, targetStock);
   const branchToken = await ensureAccessToken(branchShop);
 
+  // 关键：sku_youzan_links.yz_item_id 之前存的是【总部 SPU id】，
+  // 但 item.quantity.update/4.0.0 需要【分店那侧的 item_id/sku_id】。
+  // 用分店 token + spu_id 反查一次 item.detail.get/1.0.0 拿到真正的 item_id/sku_id。
+  const { itemId, skuId } = await resolveBranchItemIds({
+    branchToken,
+    branchKdtId: branchShop.kdt_id,
+    hqSpuId: link.yz_item_id, // 历史上 branch_stock 复用了 HQ spu_id
+    localSkuId: link.sku_id,
+  });
+
   const params: Record<string, unknown> = {
-    item_id: link.yz_item_id,
+    item_id: itemId,
     quantity: num,
     type: 0, // 0=全量覆盖
   };
-  if (link.yz_sku_id) params.sku_id = link.yz_sku_id;
+  if (skuId) params.sku_id = skuId;
 
   await callYouzanApiVerbose({
     accessToken: branchToken,
@@ -82,7 +92,66 @@ async function pushStockToYouzan(
     params,
     timeoutMs: 20_000,
   });
+
+  // 顺便把解析出的真实 branch item_id / sku_id 回写，下次直接用不重复反查
+  if (itemId !== link.yz_item_id || (skuId ?? null) !== link.yz_sku_id) {
+    await supabase
+      .from("sku_youzan_links")
+      .update({ yz_item_id: itemId, yz_sku_id: skuId ?? null } as never)
+      .eq("id", link.id);
+  }
 }
+
+async function resolveBranchItemIds(args: {
+  branchToken: string;
+  branchKdtId: number;
+  hqSpuId: number;
+  localSkuId: string;
+}): Promise<{ itemId: number; skuId: number | null }> {
+  // 优先按 spu_id 反查
+  const detail = await callYouzanApiVerbose({
+    accessToken: args.branchToken,
+    method: "youzan.item.detail.get",
+    version: "1.0.0",
+    params: { node_kdt_id: args.branchKdtId, spu_id: args.hqSpuId },
+    timeoutMs: 20_000,
+  });
+  const payload = (detail.payload ?? {}) as Record<string, unknown>;
+  const root = (payload.data ?? payload) as Record<string, unknown>;
+  const itemIdRaw =
+    (root.root_item_id as number | undefined) ??
+    (root.item_id as number | undefined) ??
+    0;
+  if (!itemIdRaw) {
+    throw new Error(
+      `分店未找到该商品 (spu_id=${args.hqSpuId})：${detail.preview.slice(0, 200)}`,
+    );
+  }
+  const skuList = Array.isArray(root.sku_list)
+    ? (root.sku_list as Array<Record<string, unknown>>)
+    : Array.isArray(root.skus)
+      ? (root.skus as Array<Record<string, unknown>>)
+      : [];
+  // 单 SKU / 无规格：拿唯一那条；多 SKU：按 outer_sku_id (本地 sku_code) 匹配
+  let skuId: number | null = null;
+  if (skuList.length === 1) {
+    skuId = Number(skuList[0].sku_id ?? skuList[0].id ?? 0) || null;
+  } else if (skuList.length > 1) {
+    const { data: sku } = await supabase
+      .from("inv_skus")
+      .select("sku_code")
+      .eq("id", args.localSkuId)
+      .maybeSingle();
+    const code = (sku?.sku_code ?? "").toString().trim();
+    const hit = skuList.find(
+      (s) => String(s.outer_sku_id ?? s.outer_id ?? "").trim() === code,
+    );
+    if (hit) skuId = Number(hit.sku_id ?? hit.id ?? 0) || null;
+  }
+  return { itemId: Number(itemIdRaw), skuId };
+}
+
+
 
 
 
