@@ -104,7 +104,7 @@ export const Route = createFileRoute("/api/public/hooks/youzan-message")({
                 await handleTradeEvent(supabaseAdmin, shopId, event);
                 // 2026-07 audit rule 9：消息推送体不可信，异步再拉一次 trade.get/4.0.2
                 // 详情覆写 youzan_orders，避免只落 push body 造成字段缺失。
-                await refreshTradeDetail(supabaseAdmin, shopId, kdtId, event).catch((e) =>
+                await refreshTradeDetail(supabaseAdmin, shopId, kdtId, event).catch((e: unknown) =>
                   console.warn("[youzan-message] trade.get 补拉失败：", e),
                 );
               }
