@@ -204,16 +204,17 @@ export const YOUZAN_API_REGISTRY: YzApiSpec[] = [
   {
     key: "item.quantity.update",
     method: "youzan.item.quantity.update",
-    version: "3.0.0",
+    version: "4.0.0",
     scope: "branch",
     feature: "stock",
-    capability_name: "商品库存增减 / 设置",
+    capability_name: "商品库存增减 / 设置 (4.0.0)",
     doc_url: "https://doc.youzanyun.com/detail/API/0/45",
     in_use: true,
     required: true,
     probe: null,
-    description: "写入类：分店直推库存 (type=1/2/3)；体检不实调。",
+    description: "写入类：分店 token + item_id/sku_id + type=0 全量覆盖库存；体检不实调。",
   },
+
 
   // ------ 交易 ------
   {
