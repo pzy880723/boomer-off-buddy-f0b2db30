@@ -102,6 +102,11 @@ export const Route = createFileRoute("/api/public/hooks/youzan-message")({
                 type === "TRADE_TradeMemoModified"
               ) {
                 await handleTradeEvent(supabaseAdmin, shopId, event);
+                // 2026-07 audit rule 9：消息推送体不可信，异步再拉一次 trade.get/4.0.2
+                // 详情覆写 youzan_orders，避免只落 push body 造成字段缺失。
+                await refreshTradeDetail(supabaseAdmin, shopId, kdtId, event).catch((e: unknown) =>
+                  console.warn("[youzan-message] trade.get 补拉失败：", e),
+                );
               }
               // 退款事件 → 加回库存
               if (type === "REFUND_RefundSuccess" || type === "REFUND_SellerAgree") {
@@ -226,6 +231,84 @@ function extractOrderItems(event: Record<string, unknown>): Array<{ item_id: num
     }
   }
   return out;
+}
+
+// ============================================================
+// refreshTradeDetail —— 2026-07 audit rule 9
+// 消息推送体不能作为唯一真源；收到 TRADE_* 后再用店铺 token
+// 调 youzan.trade.get/4.0.2 拉一次完整详情，覆写 youzan_orders.raw。
+// ============================================================
+async function refreshTradeDetail(
+  sb: unknown,
+  shopId: string,
+  kdtId: number,
+  event: Record<string, unknown>,
+): Promise<void> {
+  const tid = extractTid(event);
+  if (!tid) return;
+  const supa = sb as {
+    from: (t: string) => {
+      select: (c: string) => {
+        eq: (
+          c: string,
+          v: unknown,
+        ) => { maybeSingle: () => Promise<{ data: Record<string, unknown> | null }> };
+      };
+      upsert: (row: unknown, opts?: unknown) => Promise<{ error: { message: string } | null }>;
+    };
+  };
+  const { data: shop } = await supa
+    .from("youzan_shops")
+    .select("id, kdt_id, role, access_token, refresh_token, token_expires_at")
+    .eq("id", shopId)
+    .maybeSingle();
+  if (!shop) return;
+  const { ensureAccessToken, callYouzanApiVerbose } = await import("@/lib/youzan.functions");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const token = await ensureAccessToken(shop as any);
+  const res = await callYouzanApiVerbose({
+    accessToken: token,
+    method: "youzan.trade.get",
+    version: "4.0.2",
+    params: { tid },
+    timeoutMs: 20_000,
+  });
+  const trade = res.payload as Record<string, unknown> | null;
+  if (!trade) return;
+  await supa.from("youzan_orders").upsert(
+    {
+      shop_id: shopId,
+      kdt_id: kdtId,
+      tid,
+      raw: trade as unknown,
+    } as never,
+    { onConflict: "kdt_id,tid" },
+  );
+}
+
+function extractTid(event: Record<string, unknown>): string {
+  const direct =
+    (typeof event.tid === "string" && event.tid) ||
+    (typeof event.tid === "number" && String(event.tid)) ||
+    "";
+  if (direct) return direct;
+  const trade = event.trade as Record<string, unknown> | undefined;
+  if (trade) {
+    const t =
+      (typeof trade.tid === "string" && trade.tid) ||
+      (typeof trade.tid === "number" && String(trade.tid)) ||
+      "";
+    if (t) return t;
+  }
+  const data = event.data as Record<string, unknown> | undefined;
+  if (data) {
+    const t =
+      (typeof data.tid === "string" && data.tid) ||
+      (typeof data.tid === "number" && String(data.tid)) ||
+      "";
+    if (t) return t;
+  }
+  return "";
 }
 
 // 显式引用避免 tree-shake（并保护 SB alias）
