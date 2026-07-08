@@ -66,111 +66,34 @@ async function pushStockToYouzan(
 ): Promise<void> {
   const branchShop = await getShopById(link.shop_id);
   const num = Math.max(0, targetStock);
-  const branchToken = await ensureAccessToken(branchShop);
 
-  // 关键：sku_youzan_links.yz_item_id 之前存的是【总部 SPU id】，
-  // 但 item.quantity.update/4.0.0 需要【分店那侧的 item_id/sku_id】。
-  // 用分店 token + spu_id 反查一次 item.detail.get/1.0.0 拿到真正的 item_id/sku_id。
-  let resolved: { itemId: number; skuId: number | null };
-  try {
-    resolved = await resolveBranchItemIds({
-      branchToken,
-      branchKdtId: branchShop.kdt_id,
-      hqSpuId: link.yz_item_id,
-      localSkuId: link.sku_id,
-    });
-  } catch (e) {
-    // 分店没有这个商品 → 说明 HQ SPU 没铺到这家分店（sell_channel_ids 未包含该 kdt_id）
-    // 自愈：调 spu.update 把该分店 kdt_id 追加进 sell_channel_ids，然后再反查一次
-    const msg = e instanceof Error ? e.message : String(e);
-    if (/234000003|商品不存在|未找到该商品/.test(msg)) {
-      await addBranchToHqSpu(link.sku_id, link.yz_item_id, link.shop_id);
-      // 有赞侧铺货通常几秒内可查；这里直接重试一次
-      resolved = await resolveBranchItemIds({
-        branchToken,
-        branchKdtId: branchShop.kdt_id,
-        hqSpuId: link.yz_item_id,
-        localSkuId: link.sku_id,
-      });
-    } else {
-      throw e;
-    }
-  }
-  const { itemId, skuId } = resolved;
+  // 用【总部 token】+ kdt_id=分店 打门店销售库存。
+  // item_id / sku_id 用【总部可识别的 HQ SPU/SKU id】——我们表里 role='branch_stock'
+  // 的 yz_item_id 之前就是 HQ SPU id，正好可以直接用。
+  // 无规格商品：官方规定 sku_id 传 spu_id。
+  const hq = await getHqShop();
+  const hqToken = await ensureAccessToken(hq);
+
+  const skuIdField = link.yz_sku_id ?? link.yz_item_id; // 无 SKU 时用 spu_id 兜底
 
   const params: Record<string, unknown> = {
-    item_id: itemId,
-    quantity: num,
-    type: 0, // 0=全量覆盖
+    kdt_id: branchShop.kdt_id,
+    item_id: link.yz_item_id,
+    sku_id: skuIdField,
+    channel: 1, // 1=门店
+    stock_num_str: String(num), // 覆盖式
   };
-  if (skuId) params.sku_id = skuId;
+
 
   await callYouzanApiVerbose({
-    accessToken: branchToken,
+    accessToken: hqToken,
     method: "youzan.item.quantity.update",
     version: "4.0.0",
     params,
     timeoutMs: 20_000,
   });
-
-  // 顺便把解析出的真实 branch item_id / sku_id 回写，下次直接用不重复反查
-  if (itemId !== link.yz_item_id || (skuId ?? null) !== link.yz_sku_id) {
-    await supabase
-      .from("sku_youzan_links")
-      .update({ yz_item_id: itemId, yz_sku_id: skuId ?? null } as never)
-      .eq("id", link.id);
-  }
 }
 
-
-async function resolveBranchItemIds(args: {
-  branchToken: string;
-  branchKdtId: number;
-  hqSpuId: number;
-  localSkuId: string;
-}): Promise<{ itemId: number; skuId: number | null }> {
-  // 优先按 spu_id 反查
-  const detail = await callYouzanApiVerbose({
-    accessToken: args.branchToken,
-    method: "youzan.item.detail.get",
-    version: "1.0.0",
-    params: { node_kdt_id: args.branchKdtId, spu_id: args.hqSpuId },
-    timeoutMs: 20_000,
-  });
-  const payload = (detail.payload ?? {}) as Record<string, unknown>;
-  const root = (payload.data ?? payload) as Record<string, unknown>;
-  const itemIdRaw =
-    (root.root_item_id as number | undefined) ??
-    (root.item_id as number | undefined) ??
-    0;
-  if (!itemIdRaw) {
-    throw new Error(
-      `分店未找到该商品 (spu_id=${args.hqSpuId})：${detail.preview.slice(0, 200)}`,
-    );
-  }
-  const skuList = Array.isArray(root.sku_list)
-    ? (root.sku_list as Array<Record<string, unknown>>)
-    : Array.isArray(root.skus)
-      ? (root.skus as Array<Record<string, unknown>>)
-      : [];
-  // 单 SKU / 无规格：拿唯一那条；多 SKU：按 outer_sku_id (本地 sku_code) 匹配
-  let skuId: number | null = null;
-  if (skuList.length === 1) {
-    skuId = Number(skuList[0].sku_id ?? skuList[0].id ?? 0) || null;
-  } else if (skuList.length > 1) {
-    const { data: sku } = await supabase
-      .from("inv_skus")
-      .select("sku_code")
-      .eq("id", args.localSkuId)
-      .maybeSingle();
-    const code = (sku?.sku_code ?? "").toString().trim();
-    const hit = skuList.find(
-      (s) => String(s.outer_sku_id ?? s.outer_id ?? "").trim() === code,
-    );
-    if (hit) skuId = Number(hit.sku_id ?? hit.id ?? 0) || null;
-  }
-  return { itemId: Number(itemIdRaw), skuId };
-}
 
 
 
@@ -717,10 +640,14 @@ function buildSpuCreateAttempts(sku: {
     name: sku.name,
     unit: DEFAULT_RETAIL_UNIT,
     outer_id: sku.sku_code,
+    spu_code: sku.sku_code,
     category_id: categoryId,
     offline_create: true,
+    is_up_offline: true,
+
     retail_price: priceYuan,
   };
+
   if (kdtIds.length > 0) base.sell_channel_ids = kdtIds;
   if (sku.image_url) {
     base.images = [sku.image_url];
@@ -752,7 +679,7 @@ function buildSpuCreateAttempts(sku: {
       unit: DEFAULT_RETAIL_UNIT,
       outer_id: sku.sku_code,
       category_id: categoryId,
-      offline_create: true,
+      offline_create: true, is_up_offline: true,
       retail_price: priceYuan,
       ...(kdtIds.length > 0 ? { sell_channel_ids: kdtIds } : {}),
       sku_list: [skuListItem],
@@ -762,7 +689,7 @@ function buildSpuCreateAttempts(sku: {
       unit: DEFAULT_RETAIL_UNIT,
       outer_id: sku.sku_code,
       category_id: categoryId,
-      offline_create: true,
+      offline_create: true, is_up_offline: true,
       ...(kdtIds.length > 0 ? { sell_channel_ids: kdtIds } : {}),
       skus: [skuListItem],
     },
@@ -771,7 +698,7 @@ function buildSpuCreateAttempts(sku: {
       outer_id: sku.sku_code,
       category_id: categoryId,
       unit: DEFAULT_RETAIL_UNIT,
-      offline_create: true,
+      offline_create: true, is_up_offline: true,
       sku: buildSpuSkuArray(sku as { id: string; sku_code: string; name: string; price_tier: number | string; weight_g?: number | null }),
       ...(kdtIds.length > 0 ? { sell_channel_ids: kdtIds } : {}),
     },
