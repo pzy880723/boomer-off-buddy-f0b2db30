@@ -106,13 +106,27 @@ async function runCleanup(names: string[], dry_run: boolean) {
       version: string;
       params: Record<string, unknown>;
     }> = [
-      { method: "youzan.retail.open.spu.delete", version: "3.0.0", params: { spu_id: item.spuId, kdt_id: hq.kdt_id } },
-      { method: "youzan.retail.open.spu.remove", version: "3.0.0", params: { spu_id: item.spuId, kdt_id: hq.kdt_id } },
-      { method: "youzan.retail.open.spu.offshelf", version: "3.0.0", params: { spu_id: item.spuId, kdt_id: hq.kdt_id } },
-      { method: "youzan.retail.open.spu.delete", version: "1.0.0", params: { spu_id: item.spuId } },
-      { method: "youzan.item.delete", version: "3.0.0", params: { item_id: item.spuId } },
-      { method: "youzan.items.delete", version: "3.0.0", params: { item_ids: [item.spuId] } },
+      {
+        method: "youzan.retail.open.spu.delete",
+        version: "3.0.0",
+        params: {
+          spu_codes: item.spuCode ? [item.spuCode] : [String(item.spuId)],
+        },
+      },
+      {
+        method: "youzan.retail.open.spu.delete",
+        version: "3.0.0",
+        params: {
+          spu_code_list: item.spuCode ? [item.spuCode] : [String(item.spuId)],
+        },
+      },
+      {
+        method: "youzan.retail.open.spu.delete",
+        version: "3.0.0",
+        params: { spu_ids: [item.spuId] },
+      },
     ];
+
     const logs: string[] = [];
     for (const a of attempts) {
       try {
