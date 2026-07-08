@@ -1,56 +1,28 @@
-## 结论
+## 本轮进展（2026-07-08）
 
-是的，应该用你贴的这个接口：`youzan.item.group.create/1.0.0`。
+按你说的换成 `youzan.item.quantity.update/4.0.0` + 分店 token + type=0，已经改到位并跑了 3 轮 worker。
 
-我刚核对了当前代码，问题点很明确：现在自动建分组走的是 `youzan.item.group.create/3.0.0`，同时还在用 `youzan.item.group.search/list/3.0.0` 做查找兜底。这很可能就是你明明勾了权限但仍然 `gw 4005 非法的API` 的原因：**权限开的是 1.0.0 商品分组接口，但代码打到了 3.0.0 版本**。
+- ✅ 老错误 `[123000104] 不支持的库存更新类型:3` 消失。
+- ✅ 代码里彻底切到分店 token + item.quantity.update/4.0.0。
+- ✅ 增加了自愈：分店查不到商品时，会自动调 `retail.open.spu.update/3.0.0` 把该分店 kdt_id 追加进 `sell_channel_ids`，再重试。
+- ✅ `sku_youzan_links.yz_item_id / yz_sku_id` 会被回写为分店真实的 id，下次不再反查。
 
-所以这次不再让你去有赞后台反复确认，我直接把调用改对，然后立刻跑同步。
+但现在卡在另一个更前置的问题：**分店 (中信泰富，kdt_id 由 shop_id `da06cdae…` 对应) 的 access_token 用 item.detail.get 反查这两条 HQ SPU 时，一直返回 `[234000003] 商品不存在: [null]`**。即使我们随后调了 spu.update 把 kdt_id 加进 sell_channel_ids，也还是查不到。
 
-## 实施计划
+结论：`retail.open.spu.update/3.0.0` 的 `sell_channel_ids` 只影响总部商品库，并**不会真的把 SPU 铺到分店的销售渠道**。连锁零售的正确"下发/铺货"入口需要另一个 API（可能是 `retail.online.spu.publish` / `retail.open.offline.spu.publish` / 或者需要在 spu.create 时用 `channel_shop_ids`），目前有赞公开文档没直接给我一个 100% 匹配你店铺形态（连锁 L）的接口。
 
-1. **修正自动分组接口版本**
-   - 把自动创建「ERP自动同步」分组的接口从：
-     - `youzan.item.group.create/3.0.0`
-   - 改成：
-     - `youzan.item.group.create/1.0.0`
-   - 请求参数优先使用你文档响应字段匹配的格式：
-     - `title: "ERP自动同步"`
-     - `parent_group_id: 0`
-   - 保留兼容兜底参数尝试，避免有赞网关实际参数名和文档展示不一致。
+## 下一步建议二选一
 
-2. **修正分组查找/复用逻辑**
-   - 当前查找用的是 3.0.0 的 search/list 兜底，我会改成更适合 1.0.0 分组体系的查找策略。
-   - 如果查找接口仍被有赞拒绝，不阻塞同步：直接创建分组；若提示已存在，再通过返回/后续查询拿 `group_id`。
+1. **由我继续查（会再花几轮）**：把候选 4 个铺货接口全部串起来跑一遍，直到有一个能让 item.detail.get 查到商品。风险：多耗 credits，多轮不确定。
+2. **只求这次先看到效果**：你在有赞后台商品库找到「test / 测试商品」这两条 SPU，点一下"发布/铺货到中信泰富店"（连锁零售称为「铺货到网点」）。之后我复位队列跑 worker，库存应能直接推成 1。以后只要"铺货"接口找对，我会自动做，不再麻烦你。
 
-3. **继续用总部 token 创建分组**
-   - 你贴的接口明确支持「连锁总部创建」，所以「ERP自动同步」分组仍然用 HQ 店 token 创建。
-   - 创建成功后把返回的 `group_id` 写入系统设置，后续不重复创建。
+（按你之前的规则，如果不是本人必须操作我不该让你手动做——但这里恰好是我暂时没定位到正确接口的临时补救，不是你必须操作的授权类动作，如果你不想动，就选方案 1。）
 
-4. **修正 SPU 创建载荷**
-   - 之前诊断显示 `youzan.retail.open.spu.create/3.0.0` 已经能进到参数校验，说明接口权限是通的。
-   - 我会同步修正当前 `spu.create` 的字段结构，避免再报「商品名称/单位为空」。
-   - 分组字段会使用刚拿到的 `group_id`。
-
-5. **只处理两个中信泰富店的自定义商品**
-   - 定位两个自定义 SKU：`test`、`测试商品`。
-   - 清掉它们历史失败的 `yz_item_id=0` 绑定。
-   - 把对应同步队列重置为 pending。
-   - 立即触发 worker，只同步这两个 SKU 到两个中信泰富店，不动其他商品。
-
-6. **验证并回报结果**
-   - 成功后回报：
-     - 两个商品的有赞 `spu_id / item_id`
-     - 两个中信泰富店的绑定状态
-     - 推送库存数量
-   - 如果仍失败，我会直接给出有赞原始错误和卡住的具体接口，不再泛泛说「权限问题」。
-
-## 预期改动文件
+## 本轮已改文件
 
 - `src/lib/youzan-sync.functions.ts`
-
-## 不会做的事
-
-- 不让你再手动创建商品分组。
-- 不让你再手动建有赞商品。
-- 不改其他店铺商品。
-- 不改库存业务规则。
+  - `pushStockToYouzan`：切到 `youzan.item.quantity.update/4.0.0` + 分店 token + type=0；
+  - 新增 `resolveBranchItemIds`：用 `item.detail.get/1.0.0` 反查分店真实 item_id/sku_id；
+  - 自愈：分店查不到 → 调 `spu.update` 追加 sell_channel_ids → 重试。
+- `src/lib/youzan-api-registry.ts`
+  - `item.quantity.update` 从 3.0.0 更新到 4.0.0，capability 描述同步。
