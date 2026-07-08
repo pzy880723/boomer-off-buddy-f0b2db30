@@ -1049,14 +1049,18 @@ export async function ensureHqSpuLink(
   let newSkuId: number | null = null;
   let lastPreview = "";
   let lastError = "";
+  // 2026-07 audit rule 8：不要直接把 ERP 外链图片塞给 spu.create，
+  // 先把外链上传到有赞素材库拿回 CDN URL；失败时回退到原始外链。
+  const rawImage = (sku as { image_url?: string | null }).image_url ?? "";
+  const cdnImage = rawImage ? await uploadImageToYouzanMaterial(token, rawImage) : "";
   const attempts = buildSpuCreateAttempts(
-    sku as {
-      sku_code: string;
-      name: string;
-      image_url?: string | null;
-      notes?: string | null;
-      price_tier: string | number;
-      weight_g?: number | null;
+    {
+      sku_code: sku.sku_code as string,
+      name: sku.name as string,
+      image_url: cdnImage || rawImage || null,
+      notes: (sku as { notes?: string | null }).notes ?? null,
+      price_tier: (sku as { price_tier: string | number }).price_tier,
+      weight_g: (sku as { weight_g?: number | null }).weight_g ?? null,
     },
     categoryId,
     kdtIds,
