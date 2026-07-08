@@ -22,6 +22,7 @@ export const Route = createFileRoute("/api/public/hooks/youzan-relist")({
           branch_shop_id?: string;
           target_stock?: number;
           delete_existing?: boolean;
+          refresh_images?: boolean;
         };
         const sku_ids =
           Array.isArray(body.sku_ids) && body.sku_ids.length > 0
@@ -30,9 +31,10 @@ export const Route = createFileRoute("/api/public/hooks/youzan-relist")({
         const branch_shop_id = body.branch_shop_id ?? DEFAULT_BRANCH;
         const target_stock = typeof body.target_stock === "number" ? body.target_stock : 1;
         const delete_existing = body.delete_existing !== false;
+        const refresh_images = body.refresh_images !== false;
 
         try {
-          const out = await run({ sku_ids, branch_shop_id, target_stock, delete_existing });
+          const out = await run({ sku_ids, branch_shop_id, target_stock, delete_existing, refresh_images });
           return Response.json(out);
         } catch (e) {
           return Response.json(
