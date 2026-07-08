@@ -731,15 +731,15 @@ async function uploadImageToYouzanMaterial(
     };
     const cdn = walk(payload);
     if (!cdn) {
-      // 上传成功但没解析出 CDN URL —— 记一条 warn，方便排查白名单/域名问题。
+      // 上传成功但没解析出 CDN URL —— 记一条 error，方便排查白名单/域名问题。
       try {
         await supabase.from("youzan_sync_logs").insert({
           shop_id: ctx?.shop_id ?? null,
           kdt_id: ctx?.kdt_id ?? null,
           action: "materials_upload",
-          status: "warn",
+          status: "error",
           message: `materials 上传返回无 CDN URL；继续用外链 ${url}`,
-          detail: { sku_id: ctx?.sku_id ?? null, preview: res.preview.slice(0, 400) } as never,
+          error: `sku_id=${ctx?.sku_id ?? "-"} preview=${res.preview.slice(0, 400)}`,
           finished_at: new Date().toISOString(),
         } as never);
       } catch {
@@ -755,9 +755,9 @@ async function uploadImageToYouzanMaterial(
         shop_id: ctx?.shop_id ?? null,
         kdt_id: ctx?.kdt_id ?? null,
         action: "materials_upload",
-        status: "failed",
+        status: "error",
         message: `materials 上传失败：${msg}`,
-        detail: { sku_id: ctx?.sku_id ?? null, source_url: url } as never,
+        error: `sku_id=${ctx?.sku_id ?? "-"} source_url=${url}`,
         finished_at: new Date().toISOString(),
       } as never);
     } catch {
