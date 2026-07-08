@@ -614,10 +614,38 @@ export async function ensureAutoYouzanDefaultCategory(): Promise<{ id: number; c
   );
 }
 
+/**
+ * queryFirstRetailCategoryId —— 用 youzan.retail.open.category.query/3.0.0 拉一次官方类目树，
+ * 从中挑一个 leaf 类目 id 作为兜底；成功后写回 app_settings，下次直接命中。
+ */
+async function queryFirstRetailCategoryId(token: string): Promise<number> {
+  const attempts: Array<{ params: Record<string, unknown> }> = [
+    { params: { parent_id: 0 } },
+    { params: {} },
+  ];
+  for (const attempt of attempts) {
+    try {
+      const res = await callYouzanApiVerbose({
+        accessToken: token,
+        method: "youzan.retail.open.category.query",
+        version: "3.0.0",
+        params: attempt.params,
+        timeoutMs: 20_000,
+      });
+      const nodes = collectGroupNodes(res.payload);
+      const leaf = nodes.find((n) => n.id > 0);
+      if (leaf?.id) return leaf.id;
+    } catch {
+      // 兜底调用，失败继续下一个 attempt
+    }
+  }
+  return 0;
+}
+
 async function resolveHqCategoryId(_sku?: unknown): Promise<number> {
   // 用户决定：ERP 类目不再和有赞分组一一绑定；同步 SPU 时统一走全局默认分组。
   // 2026-07 audit rule 3：分组失败不能阻塞商品主链路 —— 拿不到默认分组时
-  // 直接降级到 DEFAULT_RETAIL_PRODUCT_CATEGORY_ID。
+  // 降级顺序：app_settings → ensureAutoYouzanDefaultCategory → retail.open.category.query → 常量。
   const { data: setting } = await supabase
     .from("app_settings")
     .select("value")
@@ -629,10 +657,72 @@ async function resolveHqCategoryId(_sku?: unknown): Promise<number> {
     const auto = await ensureAutoYouzanDefaultCategory();
     if (auto.id > 0) return auto.id;
   } catch (e) {
-    console.warn("[youzan] 分组创建失败，降级到默认零售类目：", e instanceof Error ? e.message : e);
+    console.warn("[youzan] 分组创建失败，尝试拉官方类目：", e instanceof Error ? e.message : e);
+  }
+  try {
+    const hq = await getHqShop();
+    const token = await ensureAccessToken(hq);
+    const officialId = await queryFirstRetailCategoryId(token);
+    if (officialId > 0) {
+      await saveAutoYouzanGroupId(officialId);
+      return officialId;
+    }
+  } catch (e) {
+    console.warn("[youzan] retail.open.category.query 兜底也失败，用常量：", e instanceof Error ? e.message : e);
   }
   return DEFAULT_RETAIL_PRODUCT_CATEGORY_ID;
 }
+
+/**
+ * uploadImageToYouzanMaterial —— 把 ERP 外链图片上传到有赞素材库，
+ * 返回有赞侧 CDN URL；失败时 fire-and-forget，返回原始 URL。
+ * 对应 youzan.materials.storage.platform.img.upload/3.0.0
+ */
+async function uploadImageToYouzanMaterial(token: string, url: string): Promise<string> {
+  if (!url) return url;
+  // 已经是有赞域名的图片就不用再传一次
+  if (/(?:yzcdn|youzan|qbox|qiniucdn)\./i.test(url)) return url;
+  try {
+    const res = await callYouzanApiVerbose({
+      accessToken: token,
+      method: "youzan.materials.storage.platform.img.upload",
+      version: "3.0.0",
+      params: { image_url: url, image_type: 0 },
+      timeoutMs: 20_000,
+    });
+    const payload = res.payload as Record<string, unknown> | null;
+    const walk = (v: unknown): string => {
+      if (!v) return "";
+      if (typeof v === "string") {
+        return /^https?:\/\//i.test(v) && /(?:yzcdn|youzan|qbox|qiniucdn)\./i.test(v) ? v : "";
+      }
+      if (Array.isArray(v)) {
+        for (const item of v) {
+          const s = walk(item);
+          if (s) return s;
+        }
+        return "";
+      }
+      if (typeof v === "object") {
+        for (const key of ["url", "img_url", "image_url", "cdn_url"]) {
+          const s = walk((v as Record<string, unknown>)[key]);
+          if (s) return s;
+        }
+        for (const child of Object.values(v as Record<string, unknown>)) {
+          const s = walk(child);
+          if (s) return s;
+        }
+      }
+      return "";
+    };
+    const cdn = walk(payload);
+    return cdn || url;
+  } catch (e) {
+    console.warn("[youzan] materials 上传失败，继续用外链：", e instanceof Error ? e.message : e);
+    return url;
+  }
+}
+
 
 
 async function resolveHqRetailProductCategoryId(): Promise<number> {
