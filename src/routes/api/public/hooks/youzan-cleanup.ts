@@ -99,21 +99,19 @@ async function runCleanup(names: string[], dry_run: boolean) {
   const results: Array<{ spuId: number; name: string; ok: boolean; message: string }> = [];
   for (const item of toDelete) {
     let ok = false;
-    let message = "";
     const attempts: Array<{
       method: string;
       version: string;
       params: Record<string, unknown>;
     }> = [
-      { method: "youzan.retail.open.spu.delete", version: "3.0.0", params: { spu_id: item.spuId } },
+      { method: "youzan.retail.open.spu.delete", version: "3.0.0", params: { spu_id: item.spuId, kdt_id: hq.kdt_id } },
+      { method: "youzan.retail.open.spu.remove", version: "3.0.0", params: { spu_id: item.spuId, kdt_id: hq.kdt_id } },
+      { method: "youzan.retail.open.spu.offshelf", version: "3.0.0", params: { spu_id: item.spuId, kdt_id: hq.kdt_id } },
       { method: "youzan.retail.open.spu.delete", version: "1.0.0", params: { spu_id: item.spuId } },
-      {
-        method: "youzan.retail.open.product.delete",
-        version: "1.0.0",
-        params: { kdt_id: hq.kdt_id, spu_id: item.spuId },
-      },
       { method: "youzan.item.delete", version: "3.0.0", params: { item_id: item.spuId } },
+      { method: "youzan.items.delete", version: "3.0.0", params: { item_ids: [item.spuId] } },
     ];
+    const logs: string[] = [];
     for (const a of attempts) {
       try {
         const res = await callYouzanApiVerbose({
@@ -123,17 +121,19 @@ async function runCleanup(names: string[], dry_run: boolean) {
           params: a.params,
           timeoutMs: 20_000,
         });
-        message = `${a.method}/${a.version} → ${res.preview.slice(0, 200)}`;
-        if (!/error|fail|非法|不存在|4005|4001|123000|success":\s*false/i.test(res.preview)) {
+        const preview = res.preview.slice(0, 220);
+        logs.push(`${a.method}/${a.version} → ${preview}`);
+        if (!/error|fail|非法|不存在|4005|4001|123000|-101|success":\s*false/i.test(res.preview)) {
           ok = true;
           break;
         }
       } catch (e) {
-        message = `${a.method}/${a.version}: ${e instanceof Error ? e.message : String(e)}`;
+        logs.push(`${a.method}/${a.version}: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
-    results.push({ spuId: item.spuId, name: item.name, ok, message });
+    results.push({ spuId: item.spuId, name: item.name, ok, message: logs.join(" || ") });
   }
+
 
   return Response.json({
     dry_run: false,
