@@ -183,6 +183,7 @@ async function run(opts: {
     const probe = await probeBranchItem({
       supabaseAdmin,
       callYouzanApiVerbose,
+      hqToken,
       branchToken,
       branchShopId: opts.branchShopId,
       branchKdtId,
