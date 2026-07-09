@@ -137,7 +137,7 @@ async function run(opts: {
         .maybeSingle(),
       supabaseAdmin
         .from("inv_skus")
-        .select("name, unit")
+        .select("name")
         .eq("id", skuId)
         .maybeSingle(),
     ]);
@@ -149,8 +149,7 @@ async function run(opts: {
       continue;
     }
     perSku.hq_spu_id = hqSpuId;
-    const skuName = String((skuRow as { name?: string } | null)?.name ?? "").trim();
-    const skuUnit = String((skuRow as { unit?: string } | null)?.unit ?? "").trim() || "件";
+    const skuName = String((skuRow as { name?: string } | null)?.name ?? "").trim() || `SPU ${hqSpuId}`;
     const steps: Record<string, unknown> = {};
 
     // Step 3: fix sell channel
@@ -163,7 +162,8 @@ async function run(opts: {
       hqSpuId,
       sellChannelId: branchSellChannelId,
       spuName: skuName,
-      spuUnit: skuUnit,
+      spuUnit: "件",
+      categoryId: defaultCategoryId,
       dryRun: opts.dryRun,
     });
     if ((steps.fix_channel as any).ok !== true) {
@@ -301,12 +301,14 @@ async function fixSellChannel(deps: {
   sellChannelId: number;
   spuName: string;
   spuUnit: string;
+  categoryId: number;
   dryRun: boolean;
 }) {
   const params: Record<string, unknown> = {
     spu_id: deps.hqSpuId,
-    name: deps.spuName || `SPU ${deps.hqSpuId}`,
+    name: deps.spuName,
     unit: deps.spuUnit || "件",
+    category_id: deps.categoryId,
     sell_channel_setting_request: {
       is_partial: 1,
       sell_channel_ids: [deps.sellChannelId],
