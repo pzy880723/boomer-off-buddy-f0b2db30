@@ -221,7 +221,7 @@ async function fetchOrganizationTree(deps: {
       accessToken: deps.hqToken,
       method: "youzan.shop.chain.descendent.organization.list",
       version: "1.0.1",
-      params: {},
+      params: { page_no: 1, page_size: 200 },
       timeoutMs: 15_000,
     });
     traceId = res.trace_id;
