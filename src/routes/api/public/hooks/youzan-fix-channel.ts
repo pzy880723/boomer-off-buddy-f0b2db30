@@ -79,17 +79,21 @@ async function run(opts: {
   if (branchRow.role !== "branch") throw new Error("目标 shop 不是 branch");
   const branchKdtId = Number(branchRow.kdt_id);
 
-  const catValue = (catSetting as { value?: any } | null)?.value;
-  const defaultCategoryId = Number(
-    typeof catValue === "number"
-      ? catValue
-      : typeof catValue === "string"
-        ? catValue
-        : catValue && typeof catValue === "object"
-          ? catValue.id
-          : 0,
-  );
-  if (!defaultCategoryId) throw new Error("app_settings.youzan_hq_default_category_id 未配置");
+  // app_settings.youzan_hq_default_category_id 存的是"分组 id"（tag），不是 spu 的 category_id。
+  // 优先从最近同步的 youzan_items 里挖真实 category_id，兜底 90747747。
+  const { data: sample } = await supabaseAdmin
+    .from("youzan_items")
+    .select("raw")
+    .eq("shop_id", hq.id)
+    .order("updated_at", { ascending: false })
+    .limit(50);
+  let realCategoryId = 0;
+  for (const r of (sample ?? []) as Array<{ raw?: any }>) {
+    const cid = Number(r.raw?.category_id ?? 0);
+    if (cid > 0) { realCategoryId = cid; break; }
+  }
+  void catSetting;
+  const defaultCategoryId = realCategoryId || 90747747;
 
 
   // ---- Step 1: 组织树，解析 sell_channel_id ----
