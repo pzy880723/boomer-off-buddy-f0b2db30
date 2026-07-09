@@ -309,6 +309,7 @@ async function fixSellChannel(deps: {
   spuName: string;
   spuUnit: string;
   categoryId: number;
+  retailPrice: string;
   dryRun: boolean;
 }) {
   const params: Record<string, unknown> = {
@@ -316,6 +317,7 @@ async function fixSellChannel(deps: {
     name: deps.spuName,
     unit: deps.spuUnit || "件",
     category_id: deps.categoryId,
+    retail_price: deps.retailPrice,
     sell_channel_setting_request: {
       is_partial: 1,
       sell_channel_ids: [deps.sellChannelId],
