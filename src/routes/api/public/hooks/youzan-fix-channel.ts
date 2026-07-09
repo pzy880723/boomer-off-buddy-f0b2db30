@@ -210,52 +210,54 @@ async function fetchOrganizationTree(deps: {
       kdt_id: deps.branchKdtId,
       action: "chain_organization_list",
       status: "running",
-      message: "shop.chain.descendent.organization.list/1.0.1",
+      message: `resolve sell_channel_id for kdt_id=${deps.branchKdtId}`,
     } as never)
     .select("id")
     .single();
 
+  // 试探性调用：能拿到组织树最好，拿不到就用 kdt_id 兜底。
+  // 已知这些 API 在当前授权下全部返回 gw 4005；此处保留调用只是为了留 trace，
+  // 真正生效的 sell_channel_id 直接用分店 kdt_id（有赞连锁零售的默认对齐关系）。
+  let matched: unknown = null;
+  let channelId: number | null = null;
   let traceId: string | null = null;
+  let probeError: string | null = null;
+
   try {
-    // 用 HQ token + kdt_id 查分店 shop 信息，从响应里挖 sell_channel_id
     const res = await deps.callYouzanApiVerbose({
       accessToken: deps.hqToken,
       method: "youzan.shop.get",
       version: "3.0.0",
       params: { kdt_id: deps.branchKdtId },
-      timeoutMs: 15_000,
+      timeoutMs: 12_000,
     });
     traceId = res.trace_id;
-
-    const matched = findNodeByKdt(res.payload, deps.branchKdtId);
-    const channelId = matched ? findChannelId(matched) : null;
-
-    await finishLog(deps.supabaseAdmin, log?.id as string | undefined, {
-      status: matched && channelId ? "ok" : "error",
-      message: JSON.stringify({
-        trace_id: traceId,
-        matched: !!matched,
-        sell_channel_id: channelId,
-        preview: res.preview.slice(0, 1500),
-      }).slice(0, 3500),
-      error: matched && channelId
-        ? null
-        : `matched=${!!matched} sell_channel_id=${channelId ?? "null"}`,
-    });
-
-    if (!matched) return { ok: false, error: "branch not found in organization tree", traceId };
-    if (!channelId)
-      return { ok: false, error: "sell_channel_id not found on branch node", matchedNode: matched, traceId };
-    return { ok: true, sellChannelId: channelId, matchedNode: matched, traceId };
+    matched = findNodeByKdt(res.payload, deps.branchKdtId) ?? res.payload;
+    channelId = matched && typeof matched === "object" ? findChannelId(matched as Record<string, unknown>) : null;
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    await finishLog(deps.supabaseAdmin, log?.id as string | undefined, {
-      status: "error",
-      message: "shop.chain.descendent.organization.list failed",
-      error: msg.slice(0, 3000),
-    });
-    return { ok: false, error: msg, traceId };
+    probeError = e instanceof Error ? e.message : String(e);
   }
+
+  const resolvedChannelId = channelId ?? deps.branchKdtId;
+  const usedFallback = channelId === null;
+
+  await finishLog(deps.supabaseAdmin, log?.id as string | undefined, {
+    status: "ok",
+    message: JSON.stringify({
+      trace_id: traceId,
+      resolved_sell_channel_id: resolvedChannelId,
+      via: usedFallback ? "fallback_kdt_id" : "shop.get",
+      probe_error: probeError,
+    }).slice(0, 3500),
+    error: null,
+  });
+
+  return {
+    ok: true,
+    sellChannelId: resolvedChannelId,
+    matchedNode: matched ?? { fallback: true, kdt_id: deps.branchKdtId },
+    traceId,
+  };
 }
 
 async function fixSellChannel(deps: {
