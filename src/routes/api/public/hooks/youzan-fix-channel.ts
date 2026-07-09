@@ -107,13 +107,20 @@ async function run(opts: {
   for (const skuId of opts.skuIds) {
     const perSku: Record<string, unknown> = { sku_id: skuId };
 
-    // 拿 HQ SPU id
-    const { data: hqLink } = await supabaseAdmin
-      .from("sku_youzan_links")
-      .select("yz_item_id")
-      .eq("sku_id", skuId)
-      .eq("shop_id", hq.id)
-      .maybeSingle();
+    // 拿 HQ SPU id + SKU 基础信息
+    const [{ data: hqLink }, { data: skuRow }] = await Promise.all([
+      supabaseAdmin
+        .from("sku_youzan_links")
+        .select("yz_item_id")
+        .eq("sku_id", skuId)
+        .eq("shop_id", hq.id)
+        .maybeSingle(),
+      supabaseAdmin
+        .from("inv_skus")
+        .select("name, unit")
+        .eq("id", skuId)
+        .maybeSingle(),
+    ]);
     const hqSpuId = Number((hqLink as { yz_item_id?: number } | null)?.yz_item_id ?? 0);
     if (!hqSpuId) {
       perSku.hq_spu_id = null;
@@ -122,6 +129,8 @@ async function run(opts: {
       continue;
     }
     perSku.hq_spu_id = hqSpuId;
+    const skuName = String((skuRow as { name?: string } | null)?.name ?? "").trim();
+    const skuUnit = String((skuRow as { unit?: string } | null)?.unit ?? "").trim() || "件";
     const steps: Record<string, unknown> = {};
 
     // Step 3: fix sell channel
@@ -133,6 +142,8 @@ async function run(opts: {
       branchKdtId,
       hqSpuId,
       sellChannelId: branchSellChannelId,
+      spuName: skuName,
+      spuUnit: skuUnit,
       dryRun: opts.dryRun,
     });
     if ((steps.fix_channel as any).ok !== true) {
