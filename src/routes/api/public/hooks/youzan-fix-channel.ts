@@ -368,15 +368,14 @@ async function fixSellChannel(deps: {
 async function probeBranchItem(deps: {
   supabaseAdmin: LogClient;
   callYouzanApiVerbose: YouzanVerboseCaller;
+  hqToken: string;
   branchToken: string;
   branchShopId: string;
   branchKdtId: number;
   hqSpuId: number;
   skuId: string;
   dryRun: boolean;
-}): Promise<{ ok: boolean; item_id?: string; sku_id?: string; error?: string; trace_id?: string | null }> {
-  const params = { node_kdt_id: deps.branchKdtId, spu_id: deps.hqSpuId };
-
+}): Promise<{ ok: boolean; item_id?: string; sku_id?: string; error?: string; trace_id?: string | null; attempts?: unknown }> {
   const { data: log } = await deps.supabaseAdmin
     .from("youzan_sync_logs")
     .insert({
@@ -384,62 +383,101 @@ async function probeBranchItem(deps: {
       kdt_id: deps.branchKdtId,
       action: "branch_item_probe",
       status: "running",
-      message: `item.detail.get spu_id=${deps.hqSpuId}`,
+      message: `probe branch item for spu_id=${deps.hqSpuId}`,
     } as never)
     .select("id")
     .single();
 
-  try {
-    const res = await deps.callYouzanApiVerbose({
+  const attempts: Array<Record<string, unknown>> = [];
+  const strategies: Array<{
+    label: string;
+    accessToken: string;
+    method: string;
+    version: string;
+    params: Record<string, unknown>;
+  }> = [
+    {
+      label: "retail.open.online.spu.query by spu_id (hq token)",
+      accessToken: deps.hqToken,
+      method: "youzan.retail.open.online.spu.query",
+      version: "1.0.0",
+      params: { page_no: 1, page_size: 20, kdt_id: deps.branchKdtId, spu_ids: [deps.hqSpuId] },
+    },
+    {
+      label: "retail.open.online.spu.query by spu_id (branch token)",
+      accessToken: deps.branchToken,
+      method: "youzan.retail.open.online.spu.query",
+      version: "1.0.0",
+      params: { page_no: 1, page_size: 20, kdt_id: deps.branchKdtId, spu_ids: [deps.hqSpuId] },
+    },
+    {
+      label: "item.detail.get by item_id=spu_id (branch)",
       accessToken: deps.branchToken,
       method: "youzan.item.detail.get",
       version: "1.0.0",
-      params,
-      timeoutMs: 15_000,
-    });
-    const itemId = pickString(res.payload, ["item_id", "num_iid", "itemId"]);
-    const skuId = pickString(res.payload, ["sku_id", "skuId"]);
-    if (!itemId) {
-      await finishLog(deps.supabaseAdmin, log?.id as string | undefined, {
-        status: "error",
-        message: JSON.stringify({ trace_id: res.trace_id, preview: res.preview.slice(0, 1500) }).slice(0, 3500),
-        error: "branch item not visible: item_id missing in response",
+      params: { node_kdt_id: deps.branchKdtId, item_id: deps.hqSpuId },
+    },
+  ];
+
+  let itemId: string | undefined;
+  let skuIdFound: string | undefined;
+  let lastTrace: string | null = null;
+
+  for (const s of strategies) {
+    try {
+      const res = await deps.callYouzanApiVerbose({
+        accessToken: s.accessToken,
+        method: s.method,
+        version: s.version,
+        params: s.params,
+        timeoutMs: 15_000,
       });
-      return { ok: false, error: "branch item not visible", trace_id: res.trace_id };
+      lastTrace = res.trace_id;
+      const iid = pickString(res.payload, ["item_id", "num_iid", "itemId"]);
+      const sid = pickString(res.payload, ["sku_id", "skuId"]);
+      attempts.push({ label: s.label, ok: !!iid, trace_id: res.trace_id, item_id: iid ?? null, preview: res.preview.slice(0, 400) });
+      if (iid) {
+        itemId = iid;
+        skuIdFound = sid ?? undefined;
+        break;
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      attempts.push({ label: s.label, ok: false, error: msg.slice(0, 500) });
     }
+  }
 
-    // 回写 sku_youzan_links(role='branch_stock')
-    if (!deps.dryRun) {
-      await deps.supabaseAdmin
-        .from("sku_youzan_links")
-        .upsert(
-          {
-            sku_id: deps.skuId,
-            shop_id: deps.branchShopId,
-            role: "branch_stock",
-            yz_item_id: itemId,
-            yz_sku_id: skuId ?? itemId,
-            sync_stock: true,
-          } as never,
-          { onConflict: "sku_id,shop_id" } as never,
-        );
-    }
-
-    await finishLog(deps.supabaseAdmin, log?.id as string | undefined, {
-      status: "ok",
-      message: JSON.stringify({ trace_id: res.trace_id, item_id: itemId, sku_id: skuId }).slice(0, 3500),
-      error: null,
-    });
-    return { ok: true, item_id: itemId, sku_id: skuId ?? undefined, trace_id: res.trace_id };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
+  if (!itemId) {
     await finishLog(deps.supabaseAdmin, log?.id as string | undefined, {
       status: "error",
-      message: "item.detail.get failed",
-      error: msg.slice(0, 3000),
+      message: JSON.stringify({ attempts }).slice(0, 3500),
+      error: "branch item not visible: item_id not resolved after all strategies",
     });
-    return { ok: false, error: msg };
+    return { ok: false, error: "branch item not visible", attempts };
   }
+
+  if (!deps.dryRun) {
+    await deps.supabaseAdmin
+      .from("sku_youzan_links")
+      .upsert(
+        {
+          sku_id: deps.skuId,
+          shop_id: deps.branchShopId,
+          role: "branch_stock",
+          yz_item_id: itemId,
+          yz_sku_id: skuIdFound ?? itemId,
+          sync_stock: true,
+        } as never,
+        { onConflict: "sku_id,shop_id" } as never,
+      );
+  }
+
+  await finishLog(deps.supabaseAdmin, log?.id as string | undefined, {
+    status: "ok",
+    message: JSON.stringify({ item_id: itemId, sku_id: skuIdFound, attempts }).slice(0, 3500),
+    error: null,
+  });
+  return { ok: true, item_id: itemId, sku_id: skuIdFound, trace_id: lastTrace, attempts };
 }
 
 async function pushQuantity(deps: {
