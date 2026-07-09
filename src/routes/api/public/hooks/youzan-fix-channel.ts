@@ -223,9 +223,9 @@ async function fetchOrganizationTree(deps: {
       version: "1.0.1",
       params: {
         page_no: 1,
-        page_size: 200,
+        page_size: 50,
         pageNo: 1,
-        pageSize: 200,
+        pageSize: 50,
         include_self: true,
       },
       timeoutMs: 15_000,
