@@ -219,25 +219,10 @@ async function fetchOrganizationTree(deps: {
   try {
     const res = await deps.callYouzanApiVerbose({
       accessToken: deps.hqToken,
-      method: "youzan.shop.chain.descendent.organization.list",
-      version: "1.0.1",
-      params: {
-        page_no: 1,
-        page_size: 50,
-        pageNo: 1,
-        pageSize: 50,
-        include_self: true,
-      },
+      method: "youzan.retail.shop.list.query",
+      version: "1.0.0",
+      params: { page_no: 1, page_size: 50 },
       timeoutMs: 15_000,
-    }).catch(async () => {
-      // 兜底：老 API 不认 pagination，就用 retail.shop.list.query
-      return deps.callYouzanApiVerbose({
-        accessToken: deps.hqToken,
-        method: "youzan.retail.shop.list.query",
-        version: "1.0.0",
-        params: { page_no: 1, page_size: 200 },
-        timeoutMs: 15_000,
-      });
     });
     traceId = res.trace_id;
 
