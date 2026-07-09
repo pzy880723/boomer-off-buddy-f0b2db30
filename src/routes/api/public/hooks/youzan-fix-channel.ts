@@ -154,6 +154,8 @@ async function run(opts: {
     }
     perSku.hq_spu_id = hqSpuId;
     const skuName = String((skuRow as { name?: string } | null)?.name ?? "").trim() || `SPU ${hqSpuId}`;
+    const priceTier = Number((skuRow as { price_tier?: number } | null)?.price_tier ?? 0);
+    const retailPrice = (priceTier > 0 ? priceTier : 1).toFixed(2);
     const steps: Record<string, unknown> = {};
 
     // Step 3: fix sell channel
@@ -168,6 +170,7 @@ async function run(opts: {
       spuName: skuName,
       spuUnit: "件",
       categoryId: defaultCategoryId,
+      retailPrice,
       dryRun: opts.dryRun,
     });
     if ((steps.fix_channel as any).ok !== true) {
