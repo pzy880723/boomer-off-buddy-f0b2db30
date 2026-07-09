@@ -217,11 +217,12 @@ async function fetchOrganizationTree(deps: {
 
   let traceId: string | null = null;
   try {
+    // 用 HQ token + kdt_id 查分店 shop 信息，从响应里挖 sell_channel_id
     const res = await deps.callYouzanApiVerbose({
       accessToken: deps.hqToken,
-      method: "youzan.retail.shop.list.query",
-      version: "1.0.0",
-      params: { page_no: 1, page_size: 50 },
+      method: "youzan.shop.get",
+      version: "3.0.0",
+      params: { kdt_id: deps.branchKdtId },
       timeoutMs: 15_000,
     });
     traceId = res.trace_id;
