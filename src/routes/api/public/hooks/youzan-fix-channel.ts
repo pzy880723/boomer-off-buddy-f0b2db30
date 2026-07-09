@@ -61,16 +61,36 @@ async function run(opts: {
   const hq = await getHqShop();
   const hqToken = await ensureAccessToken(hq);
 
-  const { data: branch, error: branchError } = await supabaseAdmin
-    .from("youzan_shops")
-    .select("id, kdt_id, shop_name, role")
-    .eq("id", opts.branchShopId)
-    .maybeSingle();
+  const [{ data: branch, error: branchError }, { data: catSetting }] = await Promise.all([
+    supabaseAdmin
+      .from("youzan_shops")
+      .select("id, kdt_id, shop_name, role")
+      .eq("id", opts.branchShopId)
+      .maybeSingle(),
+    supabaseAdmin
+      .from("app_settings")
+      .select("value")
+      .eq("key", "youzan_hq_default_category_id")
+      .maybeSingle(),
+  ]);
   if (branchError) throw new Error(branchError.message);
   if (!branch) throw new Error("分店不存在");
   const branchRow = branch as { id: string; kdt_id: number; shop_name: string; role?: string };
   if (branchRow.role !== "branch") throw new Error("目标 shop 不是 branch");
   const branchKdtId = Number(branchRow.kdt_id);
+
+  const catValue = (catSetting as { value?: any } | null)?.value;
+  const defaultCategoryId = Number(
+    typeof catValue === "number"
+      ? catValue
+      : typeof catValue === "string"
+        ? catValue
+        : catValue && typeof catValue === "object"
+          ? catValue.id
+          : 0,
+  );
+  if (!defaultCategoryId) throw new Error("app_settings.youzan_hq_default_category_id 未配置");
+
 
   // ---- Step 1: 组织树，解析 sell_channel_id ----
   const orgResult = await fetchOrganizationTree({
