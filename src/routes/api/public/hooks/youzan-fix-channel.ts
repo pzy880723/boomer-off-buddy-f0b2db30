@@ -279,10 +279,14 @@ async function fixSellChannel(deps: {
   branchKdtId: number;
   hqSpuId: number;
   sellChannelId: number;
+  spuName: string;
+  spuUnit: string;
   dryRun: boolean;
 }) {
-  const params = {
+  const params: Record<string, unknown> = {
     spu_id: deps.hqSpuId,
+    name: deps.spuName || `SPU ${deps.hqSpuId}`,
+    unit: deps.spuUnit || "件",
     sell_channel_setting_request: {
       is_partial: 1,
       sell_channel_ids: [deps.sellChannelId],
