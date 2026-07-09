@@ -141,7 +141,7 @@ async function run(opts: {
         .maybeSingle(),
       supabaseAdmin
         .from("inv_skus")
-        .select("name")
+        .select("name, price_tier")
         .eq("id", skuId)
         .maybeSingle(),
     ]);
