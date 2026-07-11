@@ -132,82 +132,134 @@ type SB = Awaited<
 >["constructor"] extends never ? never : never;
 
 async function handleTradeEvent(sb: unknown, shopId: string, event: Record<string, unknown>) {
+  // 2026-07 阶段 4/5：所有渠道销售扣减统一走 commit_sale RPC。
+  // - RPC 内部：原子扣库存 + 幂等 + 自动 enqueue channel_sync_outbox (set_stock_zero / delist)
+  // - dedupe key = (source_channel, source_order_id, event_type)
   const items = extractOrderItems(event);
-  for (const it of items) {
-    // 找 (shop, item_id) → sku_id
-    const supa = sb as {
-      from: (t: string) => {
-        select: (c: string) => {
-          eq: (
-            c: string,
-            v: unknown,
-          ) => { eq: (c: string, v: unknown) => { maybeSingle: () => Promise<{ data: { sku_id: string } | null }> } };
-        };
-        insert: (row: unknown) => Promise<unknown>;
-      };
-      rpc: (name: string, args: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
-    };
-    const { data: link } = await supa
-      .from("sku_youzan_links")
-      .select("sku_id")
-      .eq("shop_id", shopId)
-      .eq("yz_item_id", it.item_id)
-      .maybeSingle();
-    if (!link) continue;
-    // 找门店 location
-    const locQuery = supa.from("inv_locations").select("id") as unknown as {
-      eq: (c: string, v: unknown) => { maybeSingle: () => Promise<{ data: { id?: string } | null }> };
-    };
-    const { data: loc } = await locQuery.eq("shop_id", shopId).maybeSingle();
-    const locationId = (loc as { id?: string } | null)?.id;
-    if (!locationId) continue;
-    await supa.rpc("inv_apply_movement", {
-      p_sku_id: link.sku_id,
-      p_location_id: locationId,
-      p_delta: -Math.abs(it.qty),
-      p_ref_type: "yz_trade",
-      p_ref_id: null,
-      p_epc: null,
-      p_note: `有赞订单成交 item=${it.item_id} x${it.qty}`,
-    });
-  }
-}
-
-async function handleRefundEvent(sb: unknown, shopId: string, event: Record<string, unknown>) {
-  const items = extractOrderItems(event);
+  const tid = String(
+    (event as { tid?: string | number }).tid ??
+      (event as { trade?: { tid?: string | number } }).trade?.tid ??
+      (event as { data?: { tid?: string | number } }).data?.tid ??
+      "",
+  );
+  if (!tid) return;
   const supa = sb as {
     from: (t: string) => {
       select: (c: string) => {
         eq: (
           c: string,
           v: unknown,
-        ) => { eq: (c: string, v: unknown) => { maybeSingle: () => Promise<{ data: { sku_id: string } | null }> } };
+        ) => {
+          eq: (c: string, v: unknown) => { maybeSingle: () => Promise<{ data: { sku_id: string } | null }> };
+        };
       };
     };
-    rpc: (name: string, args: Record<string, unknown>) => Promise<unknown>;
+    rpc: (
+      name: string,
+      args: Record<string, unknown>,
+    ) => Promise<{ data: unknown; error: { message: string } | null }>;
   };
-  for (const it of items) {
-    const { data: link } = await supa
-      .from("sku_youzan_links")
+  const locQuery = (sb as {
+    from: (t: string) => {
+      select: (c: string) => {
+        eq: (c: string, v: unknown) => { maybeSingle: () => Promise<{ data: { id?: string } | null }> };
+      };
+    };
+  }).from("inv_locations").select("id").eq("shop_id", shopId);
+  const { data: loc } = await locQuery.maybeSingle();
+  const locationId = (loc as { id?: string } | null)?.id ?? null;
+
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    // 找 (shop, item_id) → sku_id （优先新表，回退旧 sku_youzan_links）
+    let skuId: string | null = null;
+    const newRow = await supa
+      .from("sku_channel_listings")
       .select("sku_id")
       .eq("shop_id", shopId)
-      .eq("yz_item_id", it.item_id)
+      .eq("external_item_id", String(it.item_id))
       .maybeSingle();
-    if (!link) continue;
-    const locQuery = supa.from("inv_locations").select("id") as unknown as {
-      eq: (c: string, v: unknown) => { maybeSingle: () => Promise<{ data: { id?: string } | null }> };
-    };
-    const { data: loc } = await locQuery.eq("shop_id", shopId).maybeSingle();
-    const locationId = (loc as { id?: string } | null)?.id;
-    if (!locationId) continue;
-    await supa.rpc("inv_apply_movement", {
-      p_sku_id: link.sku_id,
-      p_location_id: locationId,
-      p_delta: Math.abs(it.qty),
-      p_ref_type: "yz_refund",
-      p_ref_id: null,
+    if (newRow.data?.sku_id) {
+      skuId = String(newRow.data.sku_id);
+    } else {
+      const legacy = await supa
+        .from("sku_youzan_links")
+        .select("sku_id")
+        .eq("shop_id", shopId)
+        .eq("yz_item_id", it.item_id)
+        .maybeSingle();
+      if (legacy.data?.sku_id) skuId = String(legacy.data.sku_id);
+    }
+    if (!skuId) continue;
+
+    // 每单每行独立 source_order_id，防止多行订单被幂等吞掉
+    const orderKey = items.length > 1 ? `${tid}#${i}` : tid;
+    await supa.rpc("commit_sale", {
+      p_sku_id: skuId,
+      p_source_channel: "youzan_offline",
+      p_source_order_id: orderKey,
+      p_source_shop_id: shopId,
+      p_event_type: "paid",
       p_epc: null,
-      p_note: `有赞退款回补 item=${it.item_id} x${it.qty}`,
+      p_location_id: locationId,
+      p_raw_payload: {
+        item_id: it.item_id,
+        qty: it.qty,
+        tid,
+      } as never,
+    });
+  }
+}
+
+async function handleRefundEvent(sb: unknown, shopId: string, event: Record<string, unknown>) {
+  // 2026-07 阶段 6：退款不再自动回库存，先建 return_inspections 待人工复检；
+  // 复检通过后由 restore_after_return_inspection RPC 回补 + 上架。
+  const items = extractOrderItems(event);
+  const tid = String(
+    (event as { tid?: string | number }).tid ??
+      (event as { trade?: { tid?: string | number } }).trade?.tid ??
+      (event as { data?: { tid?: string | number } }).data?.tid ??
+      "",
+  );
+  const supa = sb as {
+    from: (t: string) => {
+      select: (c: string) => {
+        eq: (
+          c: string,
+          v: unknown,
+        ) => {
+          eq: (c: string, v: unknown) => { maybeSingle: () => Promise<{ data: { sku_id: string } | null }> };
+        };
+      };
+      insert: (row: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
+    };
+  };
+  for (const it of items) {
+    let skuId: string | null = null;
+    const newRow = await supa
+      .from("sku_channel_listings")
+      .select("sku_id")
+      .eq("shop_id", shopId)
+      .eq("external_item_id", String(it.item_id))
+      .maybeSingle();
+    if (newRow.data?.sku_id) skuId = String(newRow.data.sku_id);
+    if (!skuId) {
+      const legacy = await supa
+        .from("sku_youzan_links")
+        .select("sku_id")
+        .eq("shop_id", shopId)
+        .eq("yz_item_id", it.item_id)
+        .maybeSingle();
+      if (legacy.data?.sku_id) skuId = String(legacy.data.sku_id);
+    }
+    if (!skuId) continue;
+    await supa.from("return_inspections").insert({
+      sku_id: skuId,
+      refund_source_channel: "youzan_offline",
+      refund_source_order_id: tid,
+      refund_status: "refunded",
+      inspection_result: null,
+      channel_restore_status: "pending",
     });
   }
 }

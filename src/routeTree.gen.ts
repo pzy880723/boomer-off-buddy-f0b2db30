@@ -49,12 +49,14 @@ import { Route as MInboundRouteImport } from './routes/m.inbound'
 import { Route as InventoryUnclaimedRouteImport } from './routes/inventory.unclaimed'
 import { Route as InventoryTransfersRouteImport } from './routes/inventory.transfers'
 import { Route as InventorySkusRouteImport } from './routes/inventory.skus'
+import { Route as InventoryReturnInspectionRouteImport } from './routes/inventory.return-inspection'
 import { Route as InventoryProductsRouteImport } from './routes/inventory.products'
 import { Route as InventoryLocationsRouteImport } from './routes/inventory.locations'
 import { Route as InventoryInboundRouteImport } from './routes/inventory.inbound'
 import { Route as InventoryDevicesRouteImport } from './routes/inventory.devices'
 import { Route as InventoryBatchesRouteImport } from './routes/inventory.batches'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
+import { Route as AdminChannelSyncRouteImport } from './routes/admin.channel-sync'
 import { Route as PurchaseJapanParcelIndexRouteImport } from './routes/purchase.japan-parcel.index'
 import { Route as PurchaseDomesticIndexRouteImport } from './routes/purchase.domestic.index'
 import { Route as PurchaseDomesticBulkIndexRouteImport } from './routes/purchase.domestic-bulk.index'
@@ -89,6 +91,7 @@ import { Route as ApiPublicHooksYouzanMessageRouteImport } from './routes/api/pu
 import { Route as ApiPublicHooksYouzanFixChannelRouteImport } from './routes/api/public/hooks/youzan-fix-channel'
 import { Route as ApiPublicHooksYouzanDistributionProbeRouteImport } from './routes/api/public/hooks/youzan-distribution-probe'
 import { Route as ApiPublicHooksYouzanCleanupRouteImport } from './routes/api/public/hooks/youzan-cleanup'
+import { Route as ApiPublicHooksChannelSyncWorkerRouteImport } from './routes/api/public/hooks/channel-sync-worker'
 import { Route as ApiPublicHandheldTransfersRouteImport } from './routes/api/public/handheld/transfers'
 import { Route as ApiPublicHandheldSyncRecordsRouteImport } from './routes/api/public/handheld/sync-records'
 import { Route as ApiPublicHandheldStocktakesRouteImport } from './routes/api/public/handheld/stocktakes'
@@ -351,6 +354,12 @@ const InventorySkusRoute = InventorySkusRouteImport.update({
   path: '/inventory/skus',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InventoryReturnInspectionRoute =
+  InventoryReturnInspectionRouteImport.update({
+    id: '/inventory/return-inspection',
+    path: '/inventory/return-inspection',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const InventoryProductsRoute = InventoryProductsRouteImport.update({
   id: '/inventory/products',
   path: '/inventory/products',
@@ -379,6 +388,11 @@ const InventoryBatchesRoute = InventoryBatchesRouteImport.update({
 const AdminUsersRoute = AdminUsersRouteImport.update({
   id: '/admin/users',
   path: '/admin/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminChannelSyncRoute = AdminChannelSyncRouteImport.update({
+  id: '/admin/channel-sync',
+  path: '/admin/channel-sync',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PurchaseJapanParcelIndexRoute =
@@ -563,6 +577,12 @@ const ApiPublicHooksYouzanCleanupRoute =
   ApiPublicHooksYouzanCleanupRouteImport.update({
     id: '/api/public/hooks/youzan-cleanup',
     path: '/api/public/hooks/youzan-cleanup',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksChannelSyncWorkerRoute =
+  ApiPublicHooksChannelSyncWorkerRouteImport.update({
+    id: '/api/public/hooks/channel-sync-worker',
+    path: '/api/public/hooks/channel-sync-worker',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicHandheldTransfersRoute =
@@ -942,12 +962,14 @@ export interface FileRoutesByFullPath {
   '/shop-mgmt': typeof ShopMgmtRouteWithChildren
   '/store': typeof StoreRouteWithChildren
   '/youzan': typeof YouzanRouteWithChildren
+  '/admin/channel-sync': typeof AdminChannelSyncRoute
   '/admin/users': typeof AdminUsersRoute
   '/inventory/batches': typeof InventoryBatchesRoute
   '/inventory/devices': typeof InventoryDevicesRoute
   '/inventory/inbound': typeof InventoryInboundRouteWithChildren
   '/inventory/locations': typeof InventoryLocationsRoute
   '/inventory/products': typeof InventoryProductsRouteWithChildren
+  '/inventory/return-inspection': typeof InventoryReturnInspectionRoute
   '/inventory/skus': typeof InventorySkusRouteWithChildren
   '/inventory/transfers': typeof InventoryTransfersRoute
   '/inventory/unclaimed': typeof InventoryUnclaimedRoute
@@ -1012,6 +1034,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/stocktakes': typeof ApiPublicHandheldStocktakesRoute
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
   '/api/public/handheld/transfers': typeof ApiPublicHandheldTransfersRouteWithChildren
+  '/api/public/hooks/channel-sync-worker': typeof ApiPublicHooksChannelSyncWorkerRoute
   '/api/public/hooks/youzan-cleanup': typeof ApiPublicHooksYouzanCleanupRoute
   '/api/public/hooks/youzan-distribution-probe': typeof ApiPublicHooksYouzanDistributionProbeRoute
   '/api/public/hooks/youzan-fix-channel': typeof ApiPublicHooksYouzanFixChannelRoute
@@ -1083,11 +1106,13 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/shop-mgmt': typeof ShopMgmtRouteWithChildren
   '/youzan': typeof YouzanRouteWithChildren
+  '/admin/channel-sync': typeof AdminChannelSyncRoute
   '/admin/users': typeof AdminUsersRoute
   '/inventory/batches': typeof InventoryBatchesRoute
   '/inventory/devices': typeof InventoryDevicesRoute
   '/inventory/locations': typeof InventoryLocationsRoute
   '/inventory/products': typeof InventoryProductsRouteWithChildren
+  '/inventory/return-inspection': typeof InventoryReturnInspectionRoute
   '/inventory/transfers': typeof InventoryTransfersRoute
   '/inventory/unclaimed': typeof InventoryUnclaimedRoute
   '/m/inbound': typeof MInboundRoute
@@ -1148,6 +1173,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/stocktakes': typeof ApiPublicHandheldStocktakesRoute
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
   '/api/public/handheld/transfers': typeof ApiPublicHandheldTransfersRouteWithChildren
+  '/api/public/hooks/channel-sync-worker': typeof ApiPublicHooksChannelSyncWorkerRoute
   '/api/public/hooks/youzan-cleanup': typeof ApiPublicHooksYouzanCleanupRoute
   '/api/public/hooks/youzan-distribution-probe': typeof ApiPublicHooksYouzanDistributionProbeRoute
   '/api/public/hooks/youzan-fix-channel': typeof ApiPublicHooksYouzanFixChannelRoute
@@ -1222,12 +1248,14 @@ export interface FileRoutesById {
   '/shop-mgmt': typeof ShopMgmtRouteWithChildren
   '/store': typeof StoreRouteWithChildren
   '/youzan': typeof YouzanRouteWithChildren
+  '/admin/channel-sync': typeof AdminChannelSyncRoute
   '/admin/users': typeof AdminUsersRoute
   '/inventory/batches': typeof InventoryBatchesRoute
   '/inventory/devices': typeof InventoryDevicesRoute
   '/inventory/inbound': typeof InventoryInboundRouteWithChildren
   '/inventory/locations': typeof InventoryLocationsRoute
   '/inventory/products': typeof InventoryProductsRouteWithChildren
+  '/inventory/return-inspection': typeof InventoryReturnInspectionRoute
   '/inventory/skus': typeof InventorySkusRouteWithChildren
   '/inventory/transfers': typeof InventoryTransfersRoute
   '/inventory/unclaimed': typeof InventoryUnclaimedRoute
@@ -1292,6 +1320,7 @@ export interface FileRoutesById {
   '/api/public/handheld/stocktakes': typeof ApiPublicHandheldStocktakesRoute
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
   '/api/public/handheld/transfers': typeof ApiPublicHandheldTransfersRouteWithChildren
+  '/api/public/hooks/channel-sync-worker': typeof ApiPublicHooksChannelSyncWorkerRoute
   '/api/public/hooks/youzan-cleanup': typeof ApiPublicHooksYouzanCleanupRoute
   '/api/public/hooks/youzan-distribution-probe': typeof ApiPublicHooksYouzanDistributionProbeRoute
   '/api/public/hooks/youzan-fix-channel': typeof ApiPublicHooksYouzanFixChannelRoute
@@ -1367,12 +1396,14 @@ export interface FileRouteTypes {
     | '/shop-mgmt'
     | '/store'
     | '/youzan'
+    | '/admin/channel-sync'
     | '/admin/users'
     | '/inventory/batches'
     | '/inventory/devices'
     | '/inventory/inbound'
     | '/inventory/locations'
     | '/inventory/products'
+    | '/inventory/return-inspection'
     | '/inventory/skus'
     | '/inventory/transfers'
     | '/inventory/unclaimed'
@@ -1437,6 +1468,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/stocktakes'
     | '/api/public/handheld/sync-records'
     | '/api/public/handheld/transfers'
+    | '/api/public/hooks/channel-sync-worker'
     | '/api/public/hooks/youzan-cleanup'
     | '/api/public/hooks/youzan-distribution-probe'
     | '/api/public/hooks/youzan-fix-channel'
@@ -1508,11 +1540,13 @@ export interface FileRouteTypes {
     | '/settings'
     | '/shop-mgmt'
     | '/youzan'
+    | '/admin/channel-sync'
     | '/admin/users'
     | '/inventory/batches'
     | '/inventory/devices'
     | '/inventory/locations'
     | '/inventory/products'
+    | '/inventory/return-inspection'
     | '/inventory/transfers'
     | '/inventory/unclaimed'
     | '/m/inbound'
@@ -1573,6 +1607,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/stocktakes'
     | '/api/public/handheld/sync-records'
     | '/api/public/handheld/transfers'
+    | '/api/public/hooks/channel-sync-worker'
     | '/api/public/hooks/youzan-cleanup'
     | '/api/public/hooks/youzan-distribution-probe'
     | '/api/public/hooks/youzan-fix-channel'
@@ -1646,12 +1681,14 @@ export interface FileRouteTypes {
     | '/shop-mgmt'
     | '/store'
     | '/youzan'
+    | '/admin/channel-sync'
     | '/admin/users'
     | '/inventory/batches'
     | '/inventory/devices'
     | '/inventory/inbound'
     | '/inventory/locations'
     | '/inventory/products'
+    | '/inventory/return-inspection'
     | '/inventory/skus'
     | '/inventory/transfers'
     | '/inventory/unclaimed'
@@ -1716,6 +1753,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/stocktakes'
     | '/api/public/handheld/sync-records'
     | '/api/public/handheld/transfers'
+    | '/api/public/hooks/channel-sync-worker'
     | '/api/public/hooks/youzan-cleanup'
     | '/api/public/hooks/youzan-distribution-probe'
     | '/api/public/hooks/youzan-fix-channel'
@@ -1790,12 +1828,14 @@ export interface RootRouteChildren {
   ShopMgmtRoute: typeof ShopMgmtRouteWithChildren
   StoreRoute: typeof StoreRouteWithChildren
   YouzanRoute: typeof YouzanRouteWithChildren
+  AdminChannelSyncRoute: typeof AdminChannelSyncRoute
   AdminUsersRoute: typeof AdminUsersRoute
   InventoryBatchesRoute: typeof InventoryBatchesRoute
   InventoryDevicesRoute: typeof InventoryDevicesRoute
   InventoryInboundRoute: typeof InventoryInboundRouteWithChildren
   InventoryLocationsRoute: typeof InventoryLocationsRoute
   InventoryProductsRoute: typeof InventoryProductsRouteWithChildren
+  InventoryReturnInspectionRoute: typeof InventoryReturnInspectionRoute
   InventorySkusRoute: typeof InventorySkusRouteWithChildren
   InventoryTransfersRoute: typeof InventoryTransfersRoute
   InventoryUnclaimedRoute: typeof InventoryUnclaimedRoute
@@ -1821,6 +1861,7 @@ export interface RootRouteChildren {
   ApiPublicHandheldStocktakesRoute: typeof ApiPublicHandheldStocktakesRoute
   ApiPublicHandheldSyncRecordsRoute: typeof ApiPublicHandheldSyncRecordsRoute
   ApiPublicHandheldTransfersRoute: typeof ApiPublicHandheldTransfersRouteWithChildren
+  ApiPublicHooksChannelSyncWorkerRoute: typeof ApiPublicHooksChannelSyncWorkerRoute
   ApiPublicHooksYouzanCleanupRoute: typeof ApiPublicHooksYouzanCleanupRoute
   ApiPublicHooksYouzanDistributionProbeRoute: typeof ApiPublicHooksYouzanDistributionProbeRoute
   ApiPublicHooksYouzanFixChannelRoute: typeof ApiPublicHooksYouzanFixChannelRoute
@@ -2146,6 +2187,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InventorySkusRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/inventory/return-inspection': {
+      id: '/inventory/return-inspection'
+      path: '/inventory/return-inspection'
+      fullPath: '/inventory/return-inspection'
+      preLoaderRoute: typeof InventoryReturnInspectionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/inventory/products': {
       id: '/inventory/products'
       path: '/inventory/products'
@@ -2186,6 +2234,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/users'
       fullPath: '/admin/users'
       preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/channel-sync': {
+      id: '/admin/channel-sync'
+      path: '/admin/channel-sync'
+      fullPath: '/admin/channel-sync'
+      preLoaderRoute: typeof AdminChannelSyncRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/purchase/japan-parcel/': {
@@ -2424,6 +2479,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/hooks/youzan-cleanup'
       fullPath: '/api/public/hooks/youzan-cleanup'
       preLoaderRoute: typeof ApiPublicHooksYouzanCleanupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/channel-sync-worker': {
+      id: '/api/public/hooks/channel-sync-worker'
+      path: '/api/public/hooks/channel-sync-worker'
+      fullPath: '/api/public/hooks/channel-sync-worker'
+      preLoaderRoute: typeof ApiPublicHooksChannelSyncWorkerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/handheld/transfers': {
@@ -3216,12 +3278,14 @@ const rootRouteChildren: RootRouteChildren = {
   ShopMgmtRoute: ShopMgmtRouteWithChildren,
   StoreRoute: StoreRouteWithChildren,
   YouzanRoute: YouzanRouteWithChildren,
+  AdminChannelSyncRoute: AdminChannelSyncRoute,
   AdminUsersRoute: AdminUsersRoute,
   InventoryBatchesRoute: InventoryBatchesRoute,
   InventoryDevicesRoute: InventoryDevicesRoute,
   InventoryInboundRoute: InventoryInboundRouteWithChildren,
   InventoryLocationsRoute: InventoryLocationsRoute,
   InventoryProductsRoute: InventoryProductsRouteWithChildren,
+  InventoryReturnInspectionRoute: InventoryReturnInspectionRoute,
   InventorySkusRoute: InventorySkusRouteWithChildren,
   InventoryTransfersRoute: InventoryTransfersRoute,
   InventoryUnclaimedRoute: InventoryUnclaimedRoute,
@@ -3249,6 +3313,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHandheldStocktakesRoute: ApiPublicHandheldStocktakesRoute,
   ApiPublicHandheldSyncRecordsRoute: ApiPublicHandheldSyncRecordsRoute,
   ApiPublicHandheldTransfersRoute: ApiPublicHandheldTransfersRouteWithChildren,
+  ApiPublicHooksChannelSyncWorkerRoute: ApiPublicHooksChannelSyncWorkerRoute,
   ApiPublicHooksYouzanCleanupRoute: ApiPublicHooksYouzanCleanupRoute,
   ApiPublicHooksYouzanDistributionProbeRoute:
     ApiPublicHooksYouzanDistributionProbeRoute,

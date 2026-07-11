@@ -59,6 +59,8 @@ type NavTo =
   | "/inventory/devices"
   | "/inventory/unclaimed"
   | "/inventory/stocktakes"
+  | "/inventory/return-inspection"
+  | "/admin/channel-sync"
   | "/shop-mgmt/shops"
   | "/shop-mgmt/products"
   | "/shop-mgmt/online"
@@ -98,6 +100,7 @@ const groups: NavGroup[] = [
       { title: "入库记录", url: "/inventory/inbound", icon: Layers },
       { title: "调拨单", url: "/inventory/transfers", icon: ArrowLeftRight },
       { title: "盘点单", url: "/inventory/stocktakes", icon: ClipboardList },
+      { title: "退货复检", url: "/inventory/return-inspection", icon: AlertCircle },
       { title: "待认领 EPC", url: "/inventory/unclaimed", icon: AlertCircle },
       { title: "库位管理", url: "/inventory/locations", icon: Building2 },
       { title: "手持终端", url: "/inventory/devices", icon: Smartphone },
@@ -170,7 +173,10 @@ export function AppSidebar() {
         ...groups,
         {
           label: "系统",
-          items: [{ title: "账号管理", url: "/admin/users", icon: ShieldCheck }],
+          items: [
+            { title: "账号管理", url: "/admin/users", icon: ShieldCheck },
+            { title: "渠道同步异常", url: "/admin/channel-sync", icon: AlertCircle },
+          ],
         },
       ]
     : groups;
