@@ -141,6 +141,35 @@ export const Route = createFileRoute("/api/public/hooks/channel-sync-worker")({
   },
 });
 
+// 售出闭环：当 sku 的所有 published/shelved listing 的 set_stock_zero + delist 都已 succeeded，
+// 且没有还在跑的相关任务 → 把 sales_state 从 sold_syncing 落到 sold。
+async function maybeMarkSold(
+  skuId: string,
+  sb: Awaited<typeof import("@/integrations/supabase/client.server")>["supabaseAdmin"],
+) {
+  const { data: pending } = await sb
+    .from("channel_sync_outbox")
+    .select("id")
+    .eq("sku_id", skuId)
+    .in("action", ["set_stock_zero", "delist"])
+    .in("status", ["pending", "running", "retry_wait"])
+    .limit(1);
+  if (pending && pending.length > 0) return;
+  const { data: sku } = await sb
+    .from("inv_skus")
+    .select("sales_state, stock_qty")
+    .eq("id", skuId)
+    .maybeSingle();
+  const s = sku as { sales_state?: string; stock_qty?: number } | null;
+  if (!s) return;
+  if (s.sales_state === "sold_syncing" && (s.stock_qty ?? 0) <= 0) {
+    await sb
+      .from("inv_skus")
+      .update({ sales_state: "sold", updated_at: new Date().toISOString() } as never)
+      .eq("id", skuId);
+  }
+}
+
 // ============================================================
 // 分派：每个 action 一个 handler
 // ============================================================
