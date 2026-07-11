@@ -146,7 +146,7 @@ function OutboxPanel() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={r.status === "failed" || r.status === "dead" ? "destructive" : "secondary"}>
+                    <Badge variant={r.status === "retry_wait" || r.status === "dead_letter" ? "destructive" : "secondary"}>
                       {r.status}
                     </Badge>
                   </TableCell>
