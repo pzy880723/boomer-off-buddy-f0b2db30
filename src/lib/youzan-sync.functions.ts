@@ -107,7 +107,6 @@ async function resolveBranchItemIds(
   branchShop: { id: string; kdt_id: number },
   branchToken: string,
 ): Promise<{ item_id: number; sku_id: number }> {
-  // 拿 HQ SPU id 作为 item.detail.get 入参
   const hq = await getHqShop();
   const { data: hqLink } = await supabase
     .from("sku_youzan_links")
@@ -117,44 +116,123 @@ async function resolveBranchItemIds(
     .maybeSingle();
   const hqSpuId = Number(hqLink?.yz_item_id ?? 0);
   if (!hqSpuId) {
-    throw new Error("branch item not visible / distribution missing：本地未登记 HQ SPU，请先 ensureBranchProduct");
-  }
-
-  const detail = await callYouzanApiVerbose({
-    accessToken: branchToken,
-    method: "youzan.item.detail.get",
-    version: "1.0.0",
-    params: {
-      node_kdt_id: branchShop.kdt_id,
-      spu_id: hqSpuId,
-    },
-    timeoutMs: 20_000,
-  }).catch((e) => {
     throw new Error(
-      `branch item not visible / distribution missing：item.detail.get 失败 spu_id=${hqSpuId} ` +
-        `kdt=${branchShop.kdt_id}：${e instanceof Error ? e.message : String(e)}`,
+      "branch item not visible / distribution missing：本地未登记 HQ SPU，请先 ensureBranchProduct",
     );
+  }
+  const probe = await probeBranchRealIds({
+    hqSpuId,
+    branchKdtId: branchShop.kdt_id,
+    branchToken,
   });
-
-  // 从 payload 抽 item_id + sku_id（有赞返回结构多变，做宽松解析）
-  const extracted = pickBranchItemIds(detail.payload);
-  if (!extracted.item_id) {
+  if (!probe.item_id) {
     throw new Error(
-      `branch item not visible / distribution missing：分店无此 SPU (spu_id=${hqSpuId} kdt=${branchShop.kdt_id})，需要先铺货`,
+      `branch item not visible / distribution missing：分店无此 SPU (spu_id=${hqSpuId} kdt=${branchShop.kdt_id})，需要先铺货。attempts=${JSON.stringify(probe.attempts).slice(0, 400)}`,
     );
   }
-  const sku_id = extracted.sku_id || extracted.item_id; // 无 SKU 商品：sku_id = spu_id/item_id
-
-  // 写回缓存，下次直接用
+  const sku_id = probe.sku_id || probe.item_id;
   await supabase
     .from("sku_youzan_links")
     .update({
-      yz_item_id: extracted.item_id,
+      yz_item_id: probe.item_id,
       yz_sku_id: sku_id,
     } as never)
     .eq("id", link.id);
+  return { item_id: probe.item_id, sku_id };
+}
 
-  return { item_id: extracted.item_id, sku_id };
+/**
+ * 用 HQ SPU id 反查分店真实 item_id / sku_id。
+ * 有赞 item.detail.get 只接受 item_id/alias，不支持 spu_id 入参
+ * （会报 [301000002] 查询参数商品ID或商品别名缺失）。
+ * 所以主策略是先用 retail.open.online.spu.query（HQ token + kdt_id=分店 + spu_ids=[hq spu]）拿到分店 item_id，
+ * 然后用 item.detail.get(item_id=..., node_kdt_id=分店) 补 sku_id。
+ */
+export async function probeBranchRealIds(args: {
+  hqSpuId: number;
+  branchKdtId: number;
+  branchToken: string;
+}): Promise<{
+  item_id: number;
+  sku_id: number;
+  attempts: Array<{ label: string; ok: boolean; trace?: string | null; error?: string }>;
+}> {
+  const attempts: Array<{ label: string; ok: boolean; trace?: string | null; error?: string }> = [];
+  let item_id = 0;
+  let sku_id = 0;
+  const hq = await getHqShop();
+  const hqToken = await ensureAccessToken(hq);
+
+  const strategies: Array<{
+    label: string;
+    accessToken: string;
+    method: string;
+    version: string;
+    params: Record<string, unknown>;
+  }> = [
+    {
+      label: "retail.open.online.spu.query spu_ids (hq token)",
+      accessToken: hqToken,
+      method: "youzan.retail.open.online.spu.query",
+      version: "1.0.0",
+      params: { page_no: 1, page_size: 20, kdt_id: args.branchKdtId, spu_ids: [args.hqSpuId] },
+    },
+    {
+      label: "retail.open.online.spu.query spu_ids (branch token)",
+      accessToken: args.branchToken,
+      method: "youzan.retail.open.online.spu.query",
+      version: "1.0.0",
+      params: { page_no: 1, page_size: 20, kdt_id: args.branchKdtId, spu_ids: [args.hqSpuId] },
+    },
+  ];
+
+  for (const s of strategies) {
+    try {
+      const res = await callYouzanApiVerbose({
+        accessToken: s.accessToken,
+        method: s.method,
+        version: s.version,
+        params: s.params,
+        timeoutMs: 15_000,
+      });
+      const ex = pickBranchItemIds(res.payload);
+      attempts.push({ label: s.label, ok: !!ex.item_id, trace: res.trace_id });
+      if (ex.item_id) {
+        item_id = ex.item_id;
+        if (ex.sku_id) sku_id = ex.sku_id;
+        break;
+      }
+    } catch (e) {
+      attempts.push({
+        label: s.label,
+        ok: false,
+        error: (e instanceof Error ? e.message : String(e)).slice(0, 300),
+      });
+    }
+  }
+
+  // 如果拿到了 item_id 但没 sku_id，用 item.detail.get 补一次
+  if (item_id && !sku_id) {
+    try {
+      const res = await callYouzanApiVerbose({
+        accessToken: args.branchToken,
+        method: "youzan.item.detail.get",
+        version: "1.0.0",
+        params: { node_kdt_id: args.branchKdtId, item_id },
+        timeoutMs: 15_000,
+      });
+      const ex = pickBranchItemIds(res.payload);
+      attempts.push({ label: "item.detail.get item_id (branch)", ok: !!ex.sku_id, trace: res.trace_id });
+      if (ex.sku_id) sku_id = ex.sku_id;
+    } catch (e) {
+      attempts.push({
+        label: "item.detail.get item_id (branch)",
+        ok: false,
+        error: (e instanceof Error ? e.message : String(e)).slice(0, 300),
+      });
+    }
+  }
+  return { item_id, sku_id, attempts };
 }
 
 function pickBranchItemIds(payload: unknown): { item_id: number; sku_id: number } {
