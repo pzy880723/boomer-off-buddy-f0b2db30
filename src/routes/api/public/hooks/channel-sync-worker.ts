@@ -336,6 +336,8 @@ async function handleRestoreAfterReturn(
   task: OutboxTask,
   sb: Awaited<typeof import("@/integrations/supabase/client.server")>["supabaseAdmin"],
 ) {
+  // HQ 侧不参与直销，跳过（restore RPC 会为所有 listing 建任务）
+  if (task.channel === "youzan_hq" || !task.shop_id) return;
   // 回补 = 上架 + 覆盖库存到 1（单件模型）
   await handleShelfChange(task, sb, true);
   const t2 = { ...task, target_stock: task.target_stock ?? 1 } as OutboxTask;
