@@ -173,7 +173,10 @@ export function AppSidebar() {
         ...groups,
         {
           label: "系统",
-          items: [{ title: "账号管理", url: "/admin/users", icon: ShieldCheck }],
+          items: [
+            { title: "账号管理", url: "/admin/users", icon: ShieldCheck },
+            { title: "渠道同步异常", url: "/admin/channel-sync", icon: AlertCircle },
+          ],
         },
       ]
     : groups;
