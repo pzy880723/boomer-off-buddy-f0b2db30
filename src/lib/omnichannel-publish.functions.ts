@@ -24,7 +24,7 @@ import {
   explainYouzanError,
   getHqShop,
 } from "./youzan.functions";
-import { ensureHqSpuLink, ensureBranchProduct } from "./youzan-sync.functions";
+import { ensureHqSpuLink, ensureBranchProduct, probeBranchRealIds } from "./youzan-sync.functions";
 
 // --- 通用工具 ------------------------------------------------
 
