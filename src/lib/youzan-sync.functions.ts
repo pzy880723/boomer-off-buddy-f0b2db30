@@ -184,6 +184,21 @@ export async function probeBranchRealIds(args: {
       version: "1.0.0",
       params: { page_no: 1, page_size: 20, kdt_id: args.branchKdtId, spu_ids: [args.hqSpuId] },
     },
+    {
+      // 主链路兜底：分店 token + item_id=hqSpuId（连锁零售常见：分店 item_id 与 HQ spu_id 一致）
+      label: "item.detail.get item_id=hqSpuId (branch token)",
+      accessToken: args.branchToken,
+      method: "youzan.item.detail.get",
+      version: "1.0.0",
+      params: { node_kdt_id: args.branchKdtId, item_id: args.hqSpuId },
+    },
+    {
+      label: "item.detail.get item_id=hqSpuId (hq token, node_kdt_id=branch)",
+      accessToken: hqToken,
+      method: "youzan.item.detail.get",
+      version: "1.0.0",
+      params: { node_kdt_id: args.branchKdtId, item_id: args.hqSpuId },
+    },
   ];
 
   for (const s of strategies) {
