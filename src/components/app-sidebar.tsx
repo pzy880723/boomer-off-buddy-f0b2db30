@@ -59,6 +59,8 @@ type NavTo =
   | "/inventory/devices"
   | "/inventory/unclaimed"
   | "/inventory/stocktakes"
+  | "/inventory/return-inspection"
+  | "/admin/channel-sync"
   | "/shop-mgmt/shops"
   | "/shop-mgmt/products"
   | "/shop-mgmt/online"
