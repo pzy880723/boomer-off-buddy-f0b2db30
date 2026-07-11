@@ -274,6 +274,63 @@ export async function callYouzanApiVerbose(opts: {
   return { payload: j.response ?? j.data ?? json, trace_id: trace, preview };
 }
 
+/**
+ * 带版本回退的调用：读 registry 的 version_candidates，逐个版本尝试。
+ * 只在"降级性错误"（gw 4005 / 未授权 / method not found / 不支持版本 / http 404）时切下一个版本；
+ * 其他错误立即抛出。返回值携带实际命中的版本 + 每一版尝试摘要。
+ */
+export async function callYouzanApiWithVersionFallback(opts: {
+  accessToken: string;
+  method: string;
+  params?: Record<string, unknown>;
+  timeoutMs?: number;
+  /** 若不传，从 registry 读 version_candidates ?? [version]。 */
+  versions?: string[];
+}): Promise<{
+  payload: unknown;
+  trace_id: string | null;
+  preview: string;
+  version: string;
+  attempts: Array<{ version: string; ok: boolean; error?: string; trace?: string | null }>;
+}> {
+  const { YOUZAN_API_REGISTRY } = await import("./youzan-api-registry");
+  const spec = YOUZAN_API_REGISTRY.find((s) => s.method === opts.method);
+  const versions =
+    opts.versions ?? spec?.version_candidates ?? (spec ? [spec.version] : []);
+  if (versions.length === 0) {
+    throw new Error(`callYouzanApiWithVersionFallback: 未找到 ${opts.method} 的版本候选`);
+  }
+  const attempts: Array<{ version: string; ok: boolean; error?: string; trace?: string | null }> = [];
+  let lastError: unknown = null;
+  for (const v of versions) {
+    try {
+      const r = await callYouzanApiVerbose({
+        accessToken: opts.accessToken,
+        method: opts.method,
+        version: v,
+        params: opts.params,
+        timeoutMs: opts.timeoutMs,
+      });
+      attempts.push({ version: v, ok: true, trace: r.trace_id });
+      return { ...r, version: v, attempts };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      attempts.push({ version: v, ok: false, error: msg.slice(0, 240) });
+      lastError = e;
+      const downgrade =
+        /gw\s*4005|非法的\s*API|invalid\s*api|未授权|no\s*permission|not\s*authorized|method\s*not\s*found|不支持的版本|unsupported\s*version|HTTP\s*404|\[404\]/i.test(
+          msg,
+        );
+      if (!downgrade) break;
+    }
+  }
+  const finalMsg = lastError instanceof Error ? lastError.message : String(lastError);
+  throw new Error(
+    `${opts.method} 所有版本 [${versions.join(", ")}] 都失败：${finalMsg}. attempts=${JSON.stringify(attempts).slice(0, 400)}`,
+  );
+}
+
+
 export const getYouzanOutboundInfo = createServerFn({ method: "GET" }).handler(async () => {
   return getYouzanOutboundStatus();
 });
