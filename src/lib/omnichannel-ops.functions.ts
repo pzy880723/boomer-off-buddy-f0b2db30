@@ -119,8 +119,9 @@ export const listChannelSyncOutbox = createServerFn({ method: "GET" })
       )
       .order("updated_at", { ascending: false })
       .limit(data.limit);
-    if (data.status === "failed") q = q.in("status", ["failed", "dead", "retry_wait"]);
+    if (data.status === "failed") q = q.in("status", ["retry_wait", "dead_letter"]);
     else if (data.status !== "all") q = q.eq("status", data.status);
+    // eslint-disable-next-line no-empty
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
     const skuIds = Array.from(new Set((rows ?? []).map((r) => r.sku_id)));
