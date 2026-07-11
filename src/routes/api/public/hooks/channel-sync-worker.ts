@@ -99,16 +99,27 @@ export const Route = createFileRoute("/api/public/hooks/channel-sync-worker")({
                 updated_at: new Date().toISOString(),
               } as never)
               .eq("id", task.id);
+            // 售出闭环：set_stock_zero + delist 均成功 → sales_state=sold
+            if (task.action === "delist" || task.action === "set_stock_zero") {
+              await maybeMarkSold(task.sku_id, supabaseAdmin);
+            }
+            // 回补闭环：restore_after_return 成功 → sales_state=active
+            if (task.action === "restore_after_return") {
+              await supabaseAdmin
+                .from("inv_skus")
+                .update({ sales_state: "active", updated_at: new Date().toISOString() } as never)
+                .eq("id", task.sku_id);
+            }
             results.push({ id: task.id, action: task.action, ok: true });
           } catch (e) {
             const msg = explainYouzanError(e);
-            const nextAttempts = (task.attempts ?? 0);
-            const dead = nextAttempts >= task.max_attempts;
-            const backoff = BACKOFF_STEPS_MS[Math.min(nextAttempts, BACKOFF_STEPS_MS.length - 1)];
+            const attempts = task.attempts ?? 0;
+            const dead = attempts >= task.max_attempts;
+            const backoff = BACKOFF_STEPS_MS[Math.min(attempts, BACKOFF_STEPS_MS.length - 1)];
             await supabaseAdmin
               .from("channel_sync_outbox")
               .update({
-                status: dead ? "dead" : "retry_wait",
+                status: dead ? "dead_letter" : "retry_wait",
                 last_error: msg.slice(0, 500),
                 next_run_at: new Date(Date.now() + backoff).toISOString(),
                 lease_expires_at: null,
