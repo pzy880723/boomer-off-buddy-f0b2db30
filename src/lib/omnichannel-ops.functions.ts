@@ -216,11 +216,11 @@ export const rematchSaleEvent = createServerFn({ method: "POST" })
       p_sku_id: data.sku_id,
       p_source_channel: (ev as { source_channel: string }).source_channel,
       p_source_order_id: (ev as { source_order_id: string }).source_order_id,
-      p_source_shop_id: (ev as { source_shop_id: string | null }).source_shop_id,
+      p_source_shop_id: (ev as { source_shop_id: string | null }).source_shop_id ?? undefined,
       p_event_type: (ev as { event_type: string }).event_type,
-      p_epc: (ev as { epc: string | null }).epc,
-      p_location_id: data.location_id ?? null,
-      p_raw_payload: (ev as { raw_payload: Record<string, unknown> }).raw_payload,
+      p_epc: (ev as { epc: string | null }).epc ?? undefined,
+      p_location_id: data.location_id ?? undefined,
+      p_raw_payload: ((ev as { raw_payload: unknown }).raw_payload ?? {}) as never,
     });
     if (error) throw new Error(error.message);
     return { ok: true, rpc };
