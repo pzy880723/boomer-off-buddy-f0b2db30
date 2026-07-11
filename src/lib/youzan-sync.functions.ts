@@ -4,10 +4,12 @@ import { supabaseAdmin as supabase } from "@/integrations/supabase/client.server
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   callYouzanApiVerbose,
+  callYouzanApiWithVersionFallback,
   ensureAccessToken,
   explainYouzanError,
   getHqShop,
 } from "./youzan.functions";
+
 
 const AUTO_YOUZAN_GROUP_NAME = "ERP自动同步";
 const DEFAULT_RETAIL_PRODUCT_CATEGORY_ID = 90747747;
