@@ -71,6 +71,102 @@ export type Database = {
         }
         Relationships: []
       }
+      channel_sync_outbox: {
+        Row: {
+          action: string
+          attempts: number
+          channel: string
+          channel_listing_id: string | null
+          claimed_at: string | null
+          completed_at: string | null
+          created_at: string
+          dedupe_key: string
+          id: string
+          inventory_version: number
+          last_error: string | null
+          lease_expires_at: string | null
+          max_attempts: number
+          next_run_at: string
+          priority: number
+          request_payload: Json
+          response_preview: string | null
+          shop_id: string | null
+          sku_id: string
+          status: string
+          target_stock: number | null
+          trace_id: string | null
+          updated_at: string
+          worker_id: string | null
+        }
+        Insert: {
+          action: string
+          attempts?: number
+          channel: string
+          channel_listing_id?: string | null
+          claimed_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          dedupe_key: string
+          id?: string
+          inventory_version?: number
+          last_error?: string | null
+          lease_expires_at?: string | null
+          max_attempts?: number
+          next_run_at?: string
+          priority?: number
+          request_payload?: Json
+          response_preview?: string | null
+          shop_id?: string | null
+          sku_id: string
+          status?: string
+          target_stock?: number | null
+          trace_id?: string | null
+          updated_at?: string
+          worker_id?: string | null
+        }
+        Update: {
+          action?: string
+          attempts?: number
+          channel?: string
+          channel_listing_id?: string | null
+          claimed_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          dedupe_key?: string
+          id?: string
+          inventory_version?: number
+          last_error?: string | null
+          lease_expires_at?: string | null
+          max_attempts?: number
+          next_run_at?: string
+          priority?: number
+          request_payload?: Json
+          response_preview?: string | null
+          shop_id?: string | null
+          sku_id?: string
+          status?: string
+          target_stock?: number | null
+          trace_id?: string | null
+          updated_at?: string
+          worker_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "channel_sync_outbox_channel_listing_id_fkey"
+            columns: ["channel_listing_id"]
+            isOneToOne: false
+            referencedRelation: "sku_channel_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "channel_sync_outbox_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       domestic_bulk_order_lines: {
         Row: {
           created_at: string
@@ -824,6 +920,7 @@ export type Database = {
           id: string
           image_paths: string[]
           image_url: string | null
+          inventory_version: number
           is_custom_price: boolean
           is_display: boolean
           kind: string
@@ -831,6 +928,7 @@ export type Database = {
           notes: string | null
           pack_pieces: number | null
           price_tier: number
+          sales_state: string
           sku_code: string | null
           sku_scope: string
           status: string
@@ -849,6 +947,7 @@ export type Database = {
           id?: string
           image_paths?: string[]
           image_url?: string | null
+          inventory_version?: number
           is_custom_price?: boolean
           is_display?: boolean
           kind?: string
@@ -856,6 +955,7 @@ export type Database = {
           notes?: string | null
           pack_pieces?: number | null
           price_tier: number
+          sales_state?: string
           sku_code?: string | null
           sku_scope?: string
           status?: string
@@ -874,6 +974,7 @@ export type Database = {
           id?: string
           image_paths?: string[]
           image_url?: string | null
+          inventory_version?: number
           is_custom_price?: boolean
           is_display?: boolean
           kind?: string
@@ -881,6 +982,7 @@ export type Database = {
           notes?: string | null
           pack_pieces?: number | null
           price_tier?: number
+          sales_state?: string
           sku_code?: string | null
           sku_scope?: string
           status?: string
@@ -1014,6 +1116,62 @@ export type Database = {
             columns: ["last_seen_location_id"]
             isOneToOne: false
             referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_sale_events: {
+        Row: {
+          epc: string | null
+          error: string | null
+          event_type: string
+          event_version: number
+          id: string
+          processed_at: string | null
+          raw_payload: Json
+          received_at: string
+          sku_id: string | null
+          source_channel: string
+          source_order_id: string
+          source_shop_id: string | null
+          status: string
+        }
+        Insert: {
+          epc?: string | null
+          error?: string | null
+          event_type: string
+          event_version?: number
+          id?: string
+          processed_at?: string | null
+          raw_payload?: Json
+          received_at?: string
+          sku_id?: string | null
+          source_channel: string
+          source_order_id: string
+          source_shop_id?: string | null
+          status?: string
+        }
+        Update: {
+          epc?: string | null
+          error?: string | null
+          event_type?: string
+          event_version?: number
+          id?: string
+          processed_at?: string | null
+          raw_payload?: Json
+          received_at?: string
+          sku_id?: string | null
+          source_channel?: string
+          source_order_id?: string
+          source_shop_id?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_sale_events_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
             referencedColumns: ["id"]
           },
         ]
@@ -1493,6 +1651,168 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      return_inspections: {
+        Row: {
+          channel_restore_status: string
+          completed_at: string | null
+          created_at: string
+          epc: string | null
+          grade_changed: boolean
+          id: string
+          images_changed: boolean
+          inspection_result: string | null
+          inspector_id: string | null
+          notes: string | null
+          physical_status: string | null
+          price_changed: boolean
+          refund_source_channel: string | null
+          refund_source_order_id: string | null
+          refund_status: string | null
+          restock_location_id: string | null
+          restock_movement_id: string | null
+          sale_event_id: string | null
+          sku_id: string
+          updated_at: string
+        }
+        Insert: {
+          channel_restore_status?: string
+          completed_at?: string | null
+          created_at?: string
+          epc?: string | null
+          grade_changed?: boolean
+          id?: string
+          images_changed?: boolean
+          inspection_result?: string | null
+          inspector_id?: string | null
+          notes?: string | null
+          physical_status?: string | null
+          price_changed?: boolean
+          refund_source_channel?: string | null
+          refund_source_order_id?: string | null
+          refund_status?: string | null
+          restock_location_id?: string | null
+          restock_movement_id?: string | null
+          sale_event_id?: string | null
+          sku_id: string
+          updated_at?: string
+        }
+        Update: {
+          channel_restore_status?: string
+          completed_at?: string | null
+          created_at?: string
+          epc?: string | null
+          grade_changed?: boolean
+          id?: string
+          images_changed?: boolean
+          inspection_result?: string | null
+          inspector_id?: string | null
+          notes?: string | null
+          physical_status?: string | null
+          price_changed?: boolean
+          refund_source_channel?: string | null
+          refund_source_order_id?: string | null
+          refund_status?: string | null
+          restock_location_id?: string | null
+          restock_movement_id?: string | null
+          sale_event_id?: string | null
+          sku_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "return_inspections_restock_location_id_fkey"
+            columns: ["restock_location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "return_inspections_sale_event_id_fkey"
+            columns: ["sale_event_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_sale_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "return_inspections_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sku_channel_listings: {
+        Row: {
+          channel: string
+          created_at: string
+          external_item_id: string | null
+          external_sku_id: string | null
+          external_spu_id: string | null
+          extra: Json
+          id: string
+          last_error: string | null
+          last_pushed_at: string | null
+          last_stock: number | null
+          last_stock_pushed: number | null
+          last_verified_at: string | null
+          listing_status: string
+          sell_channel_id: string | null
+          shop_id: string | null
+          sku_id: string
+          stock_mode: string | null
+          updated_at: string
+        }
+        Insert: {
+          channel: string
+          created_at?: string
+          external_item_id?: string | null
+          external_sku_id?: string | null
+          external_spu_id?: string | null
+          extra?: Json
+          id?: string
+          last_error?: string | null
+          last_pushed_at?: string | null
+          last_stock?: number | null
+          last_stock_pushed?: number | null
+          last_verified_at?: string | null
+          listing_status?: string
+          sell_channel_id?: string | null
+          shop_id?: string | null
+          sku_id: string
+          stock_mode?: string | null
+          updated_at?: string
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          external_item_id?: string | null
+          external_sku_id?: string | null
+          external_spu_id?: string | null
+          extra?: Json
+          id?: string
+          last_error?: string | null
+          last_pushed_at?: string | null
+          last_stock?: number | null
+          last_stock_pushed?: number | null
+          last_verified_at?: string | null
+          listing_status?: string
+          sell_channel_id?: string | null
+          shop_id?: string | null
+          sku_id?: string
+          stock_mode?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sku_channel_listings_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sku_youzan_links: {
         Row: {
@@ -2310,6 +2630,58 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_channel_sync_tasks: {
+        Args: {
+          p_lease_seconds?: number
+          p_limit?: number
+          p_worker_id: string
+        }
+        Returns: {
+          action: string
+          attempts: number
+          channel: string
+          channel_listing_id: string | null
+          claimed_at: string | null
+          completed_at: string | null
+          created_at: string
+          dedupe_key: string
+          id: string
+          inventory_version: number
+          last_error: string | null
+          lease_expires_at: string | null
+          max_attempts: number
+          next_run_at: string
+          priority: number
+          request_payload: Json
+          response_preview: string | null
+          shop_id: string | null
+          sku_id: string
+          status: string
+          target_stock: number | null
+          trace_id: string | null
+          updated_at: string
+          worker_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "channel_sync_outbox"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      commit_sale: {
+        Args: {
+          p_epc?: string
+          p_event_type?: string
+          p_location_id?: string
+          p_raw_payload?: Json
+          p_sku_id: string
+          p_source_channel: string
+          p_source_order_id: string
+          p_source_shop_id?: string
+        }
+        Returns: Json
+      }
       gen_ean13: { Args: never; Returns: string }
       gen_stock_transfer_code: { Args: never; Returns: string }
       has_role: {
@@ -2338,6 +2710,14 @@ export type Database = {
       inv_apply_stock_delta: {
         Args: { p_delta: number; p_sku_id: string }
         Returns: undefined
+      }
+      restore_after_return_inspection: {
+        Args: {
+          p_inspection_id: string
+          p_location_id: string
+          p_notes?: string
+        }
+        Returns: Json
       }
     }
     Enums: {
