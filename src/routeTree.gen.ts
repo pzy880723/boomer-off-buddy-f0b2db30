@@ -56,6 +56,7 @@ import { Route as InventoryInboundRouteImport } from './routes/inventory.inbound
 import { Route as InventoryDevicesRouteImport } from './routes/inventory.devices'
 import { Route as InventoryBatchesRouteImport } from './routes/inventory.batches'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
+import { Route as AdminChannelSyncRouteImport } from './routes/admin.channel-sync'
 import { Route as PurchaseJapanParcelIndexRouteImport } from './routes/purchase.japan-parcel.index'
 import { Route as PurchaseDomesticIndexRouteImport } from './routes/purchase.domestic.index'
 import { Route as PurchaseDomesticBulkIndexRouteImport } from './routes/purchase.domestic-bulk.index'
@@ -387,6 +388,11 @@ const InventoryBatchesRoute = InventoryBatchesRouteImport.update({
 const AdminUsersRoute = AdminUsersRouteImport.update({
   id: '/admin/users',
   path: '/admin/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminChannelSyncRoute = AdminChannelSyncRouteImport.update({
+  id: '/admin/channel-sync',
+  path: '/admin/channel-sync',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PurchaseJapanParcelIndexRoute =
@@ -956,6 +962,7 @@ export interface FileRoutesByFullPath {
   '/shop-mgmt': typeof ShopMgmtRouteWithChildren
   '/store': typeof StoreRouteWithChildren
   '/youzan': typeof YouzanRouteWithChildren
+  '/admin/channel-sync': typeof AdminChannelSyncRoute
   '/admin/users': typeof AdminUsersRoute
   '/inventory/batches': typeof InventoryBatchesRoute
   '/inventory/devices': typeof InventoryDevicesRoute
@@ -1099,6 +1106,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/shop-mgmt': typeof ShopMgmtRouteWithChildren
   '/youzan': typeof YouzanRouteWithChildren
+  '/admin/channel-sync': typeof AdminChannelSyncRoute
   '/admin/users': typeof AdminUsersRoute
   '/inventory/batches': typeof InventoryBatchesRoute
   '/inventory/devices': typeof InventoryDevicesRoute
@@ -1240,6 +1248,7 @@ export interface FileRoutesById {
   '/shop-mgmt': typeof ShopMgmtRouteWithChildren
   '/store': typeof StoreRouteWithChildren
   '/youzan': typeof YouzanRouteWithChildren
+  '/admin/channel-sync': typeof AdminChannelSyncRoute
   '/admin/users': typeof AdminUsersRoute
   '/inventory/batches': typeof InventoryBatchesRoute
   '/inventory/devices': typeof InventoryDevicesRoute
@@ -1387,6 +1396,7 @@ export interface FileRouteTypes {
     | '/shop-mgmt'
     | '/store'
     | '/youzan'
+    | '/admin/channel-sync'
     | '/admin/users'
     | '/inventory/batches'
     | '/inventory/devices'
@@ -1530,6 +1540,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/shop-mgmt'
     | '/youzan'
+    | '/admin/channel-sync'
     | '/admin/users'
     | '/inventory/batches'
     | '/inventory/devices'
@@ -1670,6 +1681,7 @@ export interface FileRouteTypes {
     | '/shop-mgmt'
     | '/store'
     | '/youzan'
+    | '/admin/channel-sync'
     | '/admin/users'
     | '/inventory/batches'
     | '/inventory/devices'
@@ -1816,6 +1828,7 @@ export interface RootRouteChildren {
   ShopMgmtRoute: typeof ShopMgmtRouteWithChildren
   StoreRoute: typeof StoreRouteWithChildren
   YouzanRoute: typeof YouzanRouteWithChildren
+  AdminChannelSyncRoute: typeof AdminChannelSyncRoute
   AdminUsersRoute: typeof AdminUsersRoute
   InventoryBatchesRoute: typeof InventoryBatchesRoute
   InventoryDevicesRoute: typeof InventoryDevicesRoute
@@ -2221,6 +2234,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/users'
       fullPath: '/admin/users'
       preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/channel-sync': {
+      id: '/admin/channel-sync'
+      path: '/admin/channel-sync'
+      fullPath: '/admin/channel-sync'
+      preLoaderRoute: typeof AdminChannelSyncRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/purchase/japan-parcel/': {
@@ -3258,6 +3278,7 @@ const rootRouteChildren: RootRouteChildren = {
   ShopMgmtRoute: ShopMgmtRouteWithChildren,
   StoreRoute: StoreRouteWithChildren,
   YouzanRoute: YouzanRouteWithChildren,
+  AdminChannelSyncRoute: AdminChannelSyncRoute,
   AdminUsersRoute: AdminUsersRoute,
   InventoryBatchesRoute: InventoryBatchesRoute,
   InventoryDevicesRoute: InventoryDevicesRoute,
