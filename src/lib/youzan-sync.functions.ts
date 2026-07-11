@@ -4,10 +4,12 @@ import { supabaseAdmin as supabase } from "@/integrations/supabase/client.server
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   callYouzanApiVerbose,
+  callYouzanApiWithVersionFallback,
   ensureAccessToken,
   explainYouzanError,
   getHqShop,
 } from "./youzan.functions";
+
 
 const AUTO_YOUZAN_GROUP_NAME = "ERP自动同步";
 const DEFAULT_RETAIL_PRODUCT_CATEGORY_ID = 90747747;
@@ -155,9 +157,9 @@ export async function probeBranchRealIds(args: {
 }): Promise<{
   item_id: number;
   sku_id: number;
-  attempts: Array<{ label: string; ok: boolean; trace?: string | null; error?: string }>;
+  attempts: Array<{ label: string; version?: string; ok: boolean; trace?: string | null; error?: string }>;
 }> {
-  const attempts: Array<{ label: string; ok: boolean; trace?: string | null; error?: string }> = [];
+  const attempts: Array<{ label: string; version?: string; ok: boolean; trace?: string | null; error?: string }> = [];
   let item_id = 0;
   let sku_id = 0;
   const hq = await getHqShop();
@@ -167,51 +169,49 @@ export async function probeBranchRealIds(args: {
     label: string;
     accessToken: string;
     method: string;
-    version: string;
     params: Record<string, unknown>;
   }> = [
     {
-      label: "retail.open.online.spu.query spu_ids (hq token)",
+      label: "retail.open.online.spu.query spu_ids (hq token, kdt=branch)",
       accessToken: hqToken,
       method: "youzan.retail.open.online.spu.query",
-      version: "1.0.0",
       params: { page_no: 1, page_size: 20, kdt_id: args.branchKdtId, spu_ids: [args.hqSpuId] },
     },
     {
       label: "retail.open.online.spu.query spu_ids (branch token)",
       accessToken: args.branchToken,
       method: "youzan.retail.open.online.spu.query",
-      version: "1.0.0",
       params: { page_no: 1, page_size: 20, kdt_id: args.branchKdtId, spu_ids: [args.hqSpuId] },
     },
     {
-      // 主链路兜底：分店 token + item_id=hqSpuId（连锁零售常见：分店 item_id 与 HQ spu_id 一致）
+      // 常见：分店 item_id 与 HQ spu_id 一致
       label: "item.detail.get item_id=hqSpuId (branch token)",
       accessToken: args.branchToken,
       method: "youzan.item.detail.get",
-      version: "1.0.0",
       params: { node_kdt_id: args.branchKdtId, item_id: args.hqSpuId },
     },
     {
       label: "item.detail.get item_id=hqSpuId (hq token, node_kdt_id=branch)",
       accessToken: hqToken,
       method: "youzan.item.detail.get",
-      version: "1.0.0",
       params: { node_kdt_id: args.branchKdtId, item_id: args.hqSpuId },
     },
   ];
 
   for (const s of strategies) {
     try {
-      const res = await callYouzanApiVerbose({
+      const res = await callYouzanApiWithVersionFallback({
         accessToken: s.accessToken,
         method: s.method,
-        version: s.version,
         params: s.params,
         timeoutMs: 15_000,
       });
       const ex = pickBranchItemIds(res.payload);
-      attempts.push({ label: s.label, ok: !!ex.item_id, trace: res.trace_id });
+      attempts.push({ label: s.label, version: res.version, ok: !!ex.item_id, trace: res.trace_id });
+      // 把每个版本的尝试摊平进来，方便查
+      for (const a of res.attempts) {
+        if (!a.ok) attempts.push({ label: s.label, version: a.version, ok: false, error: a.error, trace: a.trace });
+      }
       if (ex.item_id) {
         item_id = ex.item_id;
         if (ex.sku_id) sku_id = ex.sku_id;
@@ -221,27 +221,26 @@ export async function probeBranchRealIds(args: {
       attempts.push({
         label: s.label,
         ok: false,
-        error: (e instanceof Error ? e.message : String(e)).slice(0, 300),
+        error: (e instanceof Error ? e.message : String(e)).slice(0, 400),
       });
     }
   }
 
-  // 如果拿到了 item_id 但没 sku_id，用 item.detail.get 补一次
+  // 拿到 item_id 但没 sku_id 时补一发
   if (item_id && !sku_id) {
     try {
-      const res = await callYouzanApiVerbose({
+      const res = await callYouzanApiWithVersionFallback({
         accessToken: args.branchToken,
         method: "youzan.item.detail.get",
-        version: "1.0.0",
         params: { node_kdt_id: args.branchKdtId, item_id },
         timeoutMs: 15_000,
       });
       const ex = pickBranchItemIds(res.payload);
-      attempts.push({ label: "item.detail.get item_id (branch)", ok: !!ex.sku_id, trace: res.trace_id });
+      attempts.push({ label: "item.detail.get item_id (branch, backfill sku)", version: res.version, ok: !!ex.sku_id, trace: res.trace_id });
       if (ex.sku_id) sku_id = ex.sku_id;
     } catch (e) {
       attempts.push({
-        label: "item.detail.get item_id (branch)",
+        label: "item.detail.get item_id (branch, backfill sku)",
         ok: false,
         error: (e instanceof Error ? e.message : String(e)).slice(0, 300),
       });
@@ -249,6 +248,7 @@ export async function probeBranchRealIds(args: {
   }
   return { item_id, sku_id, attempts };
 }
+
 
 function pickBranchItemIds(payload: unknown): { item_id: number; sku_id: number } {
   let itemId = 0;
