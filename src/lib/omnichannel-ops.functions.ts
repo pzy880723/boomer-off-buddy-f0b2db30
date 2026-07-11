@@ -144,6 +144,7 @@ export const retryChannelSyncTask = createServerFn({ method: "POST" })
       .from("channel_sync_outbox")
       .update({
         status: "pending",
+        attempts: 0,
         next_run_at: new Date().toISOString(),
         lease_expires_at: null,
         worker_id: null,
