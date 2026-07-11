@@ -80,7 +80,7 @@ export const completeReturnInspection = createServerFn({ method: "POST" })
     const { data: rpc, error } = await supabase.rpc("restore_after_return_inspection", {
       p_inspection_id: data.inspection_id,
       p_location_id: data.location_id,
-      p_notes: data.notes ?? null,
+      p_notes: data.notes ?? undefined,
     });
     if (error) throw new Error(error.message);
     return { ok: true, result: "pass" as const, rpc };
