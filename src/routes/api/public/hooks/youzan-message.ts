@@ -212,40 +212,54 @@ async function handleTradeEvent(sb: unknown, shopId: string, event: Record<strin
 }
 
 async function handleRefundEvent(sb: unknown, shopId: string, event: Record<string, unknown>) {
+  // 2026-07 阶段 6：退款不再自动回库存，先建 return_inspections 待人工复检；
+  // 复检通过后由 restore_after_return_inspection RPC 回补 + 上架。
   const items = extractOrderItems(event);
+  const tid = String(
+    (event as { tid?: string | number }).tid ??
+      (event as { trade?: { tid?: string | number } }).trade?.tid ??
+      (event as { data?: { tid?: string | number } }).data?.tid ??
+      "",
+  );
   const supa = sb as {
     from: (t: string) => {
       select: (c: string) => {
         eq: (
           c: string,
           v: unknown,
-        ) => { eq: (c: string, v: unknown) => { maybeSingle: () => Promise<{ data: { sku_id: string } | null }> } };
+        ) => {
+          eq: (c: string, v: unknown) => { maybeSingle: () => Promise<{ data: { sku_id: string } | null }> };
+        };
       };
+      insert: (row: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
     };
-    rpc: (name: string, args: Record<string, unknown>) => Promise<unknown>;
   };
   for (const it of items) {
-    const { data: link } = await supa
-      .from("sku_youzan_links")
+    let skuId: string | null = null;
+    const newRow = await supa
+      .from("sku_channel_listings")
       .select("sku_id")
       .eq("shop_id", shopId)
-      .eq("yz_item_id", it.item_id)
+      .eq("external_item_id", String(it.item_id))
       .maybeSingle();
-    if (!link) continue;
-    const locQuery = supa.from("inv_locations").select("id") as unknown as {
-      eq: (c: string, v: unknown) => { maybeSingle: () => Promise<{ data: { id?: string } | null }> };
-    };
-    const { data: loc } = await locQuery.eq("shop_id", shopId).maybeSingle();
-    const locationId = (loc as { id?: string } | null)?.id;
-    if (!locationId) continue;
-    await supa.rpc("inv_apply_movement", {
-      p_sku_id: link.sku_id,
-      p_location_id: locationId,
-      p_delta: Math.abs(it.qty),
-      p_ref_type: "yz_refund",
-      p_ref_id: null,
-      p_epc: null,
-      p_note: `有赞退款回补 item=${it.item_id} x${it.qty}`,
+    if (newRow.data?.sku_id) skuId = String(newRow.data.sku_id);
+    if (!skuId) {
+      const legacy = await supa
+        .from("sku_youzan_links")
+        .select("sku_id")
+        .eq("shop_id", shopId)
+        .eq("yz_item_id", it.item_id)
+        .maybeSingle();
+      if (legacy.data?.sku_id) skuId = String(legacy.data.sku_id);
+    }
+    if (!skuId) continue;
+    await supa.from("return_inspections").insert({
+      sku_id: skuId,
+      refund_source_channel: "youzan_offline",
+      refund_source_order_id: tid,
+      refund_status: "refunded",
+      inspection_result: null,
+      channel_restore_status: "pending",
     });
   }
 }
