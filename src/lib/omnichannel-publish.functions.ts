@@ -155,7 +155,11 @@ export const publishSkuToHq = createServerFn({ method: "POST" })
 async function probeBranchItemId(params: {
   branch_shop: { id: string; kdt_id: number };
   hq_spu_id: number;
-}): Promise<{ item_id: number; sku_id: number; raw_preview: string } | null> {
+}): Promise<{
+  item_id: number;
+  sku_id: number;
+  attempts: Array<{ label: string; ok: boolean; trace?: string | null; error?: string }>;
+} | null> {
   const { branch_shop, hq_spu_id } = params;
   const { data: branchRow } = await supabase
     .from("youzan_shops")
@@ -171,11 +175,11 @@ async function probeBranchItemId(params: {
     branchKdtId: branch_shop.kdt_id,
     branchToken,
   });
-  if (!probe.item_id) return null;
+  if (!probe.item_id) return { item_id: 0, sku_id: 0, attempts: probe.attempts };
   return {
     item_id: probe.item_id,
     sku_id: probe.sku_id || probe.item_id,
-    raw_preview: JSON.stringify(probe.attempts).slice(0, 240),
+    attempts: probe.attempts,
   };
 }
 
