@@ -19,7 +19,6 @@ import { z } from "zod";
 import { supabaseAdmin as supabase } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
-  callYouzanApiVerbose,
   ensureAccessToken,
   explainYouzanError,
   getHqShop,
