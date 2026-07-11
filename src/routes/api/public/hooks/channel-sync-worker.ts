@@ -99,16 +99,27 @@ export const Route = createFileRoute("/api/public/hooks/channel-sync-worker")({
                 updated_at: new Date().toISOString(),
               } as never)
               .eq("id", task.id);
+            // 售出闭环：set_stock_zero + delist 均成功 → sales_state=sold
+            if (task.action === "delist" || task.action === "set_stock_zero") {
+              await maybeMarkSold(task.sku_id, supabaseAdmin);
+            }
+            // 回补闭环：restore_after_return 成功 → sales_state=active
+            if (task.action === "restore_after_return") {
+              await supabaseAdmin
+                .from("inv_skus")
+                .update({ sales_state: "active", updated_at: new Date().toISOString() } as never)
+                .eq("id", task.sku_id);
+            }
             results.push({ id: task.id, action: task.action, ok: true });
           } catch (e) {
             const msg = explainYouzanError(e);
-            const nextAttempts = (task.attempts ?? 0);
-            const dead = nextAttempts >= task.max_attempts;
-            const backoff = BACKOFF_STEPS_MS[Math.min(nextAttempts, BACKOFF_STEPS_MS.length - 1)];
+            const attempts = task.attempts ?? 0;
+            const dead = attempts >= task.max_attempts;
+            const backoff = BACKOFF_STEPS_MS[Math.min(attempts, BACKOFF_STEPS_MS.length - 1)];
             await supabaseAdmin
               .from("channel_sync_outbox")
               .update({
-                status: dead ? "dead" : "retry_wait",
+                status: dead ? "dead_letter" : "retry_wait",
                 last_error: msg.slice(0, 500),
                 next_run_at: new Date(Date.now() + backoff).toISOString(),
                 lease_expires_at: null,
@@ -129,6 +140,35 @@ export const Route = createFileRoute("/api/public/hooks/channel-sync-worker")({
     },
   },
 });
+
+// 售出闭环：当 sku 的所有 published/shelved listing 的 set_stock_zero + delist 都已 succeeded，
+// 且没有还在跑的相关任务 → 把 sales_state 从 sold_syncing 落到 sold。
+async function maybeMarkSold(
+  skuId: string,
+  sb: Awaited<typeof import("@/integrations/supabase/client.server")>["supabaseAdmin"],
+) {
+  const { data: pending } = await sb
+    .from("channel_sync_outbox")
+    .select("id")
+    .eq("sku_id", skuId)
+    .in("action", ["set_stock_zero", "delist"])
+    .in("status", ["pending", "running", "retry_wait"])
+    .limit(1);
+  if (pending && pending.length > 0) return;
+  const { data: sku } = await sb
+    .from("inv_skus")
+    .select("sales_state, stock_qty")
+    .eq("id", skuId)
+    .maybeSingle();
+  const s = sku as { sales_state?: string; stock_qty?: number } | null;
+  if (!s) return;
+  if (s.sales_state === "sold_syncing" && (s.stock_qty ?? 0) <= 0) {
+    await sb
+      .from("inv_skus")
+      .update({ sales_state: "sold", updated_at: new Date().toISOString() } as never)
+      .eq("id", skuId);
+  }
+}
 
 // ============================================================
 // 分派：每个 action 一个 handler
@@ -296,6 +336,8 @@ async function handleRestoreAfterReturn(
   task: OutboxTask,
   sb: Awaited<typeof import("@/integrations/supabase/client.server")>["supabaseAdmin"],
 ) {
+  // HQ 侧不参与直销，跳过（restore RPC 会为所有 listing 建任务）
+  if (task.channel === "youzan_hq" || !task.shop_id) return;
   // 回补 = 上架 + 覆盖库存到 1（单件模型）
   await handleShelfChange(task, sb, true);
   const t2 = { ...task, target_stock: task.target_stock ?? 1 } as OutboxTask;
