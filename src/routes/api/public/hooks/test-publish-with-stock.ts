@@ -1,7 +1,6 @@
-// 一次性测试：把测试 SKU 库存置 1 并同步到中信泰富分店（线上 + 线下）
-// 调用方式：POST /api/public/hooks/test-publish-with-stock?sku_id=<uuid>
-//   header apikey: <SUPABASE_PUBLISHABLE_KEY>
-// 默认 SKU=70a6d177-97e7-4e99-be60-4fdcd2453575 (测试商品)
+// E2E test: publish SKU to HQ, release to CITIC Taifu branch, set stock=qty, push to Youzan.
+// POST /api/public/hooks/test-publish-with-stock?sku_id=<uuid>&qty=1
+//   header apikey: SUPABASE_PUBLISHABLE_KEY
 import { createFileRoute } from "@tanstack/react-router";
 
 const DEFAULT_SKU = "70a6d177-97e7-4e99-be60-4fdcd2453575";
@@ -42,18 +41,15 @@ export const Route = createFileRoute("/api/public/hooks/test-publish-with-stock"
           }
         };
 
-        try {
-          // 1) HQ 发布（幂等）
-          await record("publish_hq", () => publishSkuToHqCore(skuId));
+        const summary: Record<string, unknown> = { sku_id: skuId, qty: targetQty };
 
-          // 2) release 到中信泰富分店（幂等）
-          await record("release_branch", () =>
+        try {
+          summary.hq_publish = await record("publish_hq", () => publishSkuToHqCore(skuId));
+          summary.branch_release = await record("release_branch", () =>
             releaseSkuToBranchCore(skuId, BRANCH_SHOP_ID),
           );
 
-          // 3) 把该 SKU 在分店库位的库存调整到 targetQty
-          //    读当前 qty，算 delta，走 inv_apply_movement（会触发 push_stock 入队）
-          await record("adjust_stock", async () => {
+          summary.movement = await record("adjust_stock", async () => {
             const { data: cur } = await supabaseAdmin
               .from("inv_stocks")
               .select("qty")
@@ -67,7 +63,7 @@ export const Route = createFileRoute("/api/public/hooks/test-publish-with-stock"
               p_sku_id: skuId,
               p_location_id: BRANCH_LOCATION_ID,
               p_delta: delta,
-              p_ref_type: "test_publish",
+              p_ref_type: "manual_adjust",
               p_ref_id: undefined,
               p_epc: undefined,
               p_note: "test-publish-with-stock",
@@ -76,48 +72,49 @@ export const Route = createFileRoute("/api/public/hooks/test-publish-with-stock"
             return { current: currentQty, delta, new_balance: data };
           });
 
-          // 4) 立即跑 stock worker 把队列里的 push_stock 推到有赞
-          const workerResult = await record("run_stock_worker", () =>
-            runStockSyncWorkerForCron(),
-          );
+          summary.worker = await record("run_stock_worker", () => runStockSyncWorkerForCron());
+        } catch (e) {
+          summary.error = e instanceof Error ? e.message : String(e);
+        }
 
-          // 5) 汇总当前状态
-          const [{ data: sku }, { data: listings }, { data: queueTail }] = await Promise.all([
+        // Always dump current state, even on partial failure
+        const [{ data: sku }, { data: listings }, { data: links }, { data: queueTail }, { data: syncLogsTail }] =
+          await Promise.all([
             supabaseAdmin
               .from("inv_skus")
-              .select("id, name, stock_qty, sales_state, inventory_version")
+              .select("id, name, sku_code, stock_qty, sales_state, inventory_version")
               .eq("id", skuId)
               .maybeSingle(),
             supabaseAdmin
               .from("sku_channel_listings")
-              .select("channel, shop_id, listing_status, external_item_id, last_error, last_verified_at")
+              .select("channel, shop_id, listing_status, external_spu_id, external_item_id, external_sku_id, last_error, last_verified_at")
+              .eq("sku_id", skuId),
+            supabaseAdmin
+              .from("sku_youzan_links")
+              .select("shop_id, role, yz_item_id, yz_sku_id, status, sync_stock, last_error, updated_at")
               .eq("sku_id", skuId),
             supabaseAdmin
               .from("youzan_stock_sync_queue")
-              .select("id, action, status, target_stock, last_error, updated_at")
+              .select("id, shop_id, action, status, target_stock, attempts, last_error, updated_at")
               .eq("sku_id", skuId)
               .order("updated_at", { ascending: false })
-              .limit(5),
+              .limit(10),
+            supabaseAdmin
+              .from("youzan_sync_logs")
+              .select("action, status, message, error, kdt_id, created_at, finished_at")
+              .order("created_at", { ascending: false })
+              .limit(20),
           ]);
 
-          return Response.json({
-            ok: true,
-            sku,
-            listings,
-            queue_tail: queueTail,
-            worker: workerResult,
-            steps,
-          });
-        } catch (e) {
-          return Response.json(
-            {
-              ok: false,
-              error: e instanceof Error ? e.message : String(e),
-              steps,
-            },
-            { status: 500 },
-          );
-        }
+        summary.sku = sku;
+        summary.listings = listings ?? [];
+        summary.links = links ?? [];
+        summary.queue_tail = queueTail ?? [];
+        summary.sync_logs_tail = syncLogsTail ?? [];
+        summary.steps = steps;
+        summary.ok = !summary.error;
+
+        return Response.json(summary, { status: summary.error ? 500 : 200 });
       },
     },
   },
