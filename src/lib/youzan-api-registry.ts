@@ -55,6 +55,8 @@ export type YzApiSpec = {
   key: string;
   method: string;
   version: string;
+  /** 版本回退候选（按顺序尝试，遇到 4005/未授权/method not found/404 自动降级）。不填则只用 version。 */
+  version_candidates?: string[];
   scope: YzApiScope;
   /** Audit 新增：Token 层级 —— 决定用 HQ token 还是分店 token */
   token_scope: YzApiScope;
@@ -75,6 +77,7 @@ export type YzApiSpec = {
   fire_and_forget: boolean;
   notes?: string;
 };
+
 
 /** 生成 trades.sold.get 需要的最近 7 天窗口 */
 function recentWindow() {
