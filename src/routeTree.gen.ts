@@ -91,6 +91,7 @@ import { Route as ApiPublicHooksYouzanMessageRouteImport } from './routes/api/pu
 import { Route as ApiPublicHooksYouzanFixChannelRouteImport } from './routes/api/public/hooks/youzan-fix-channel'
 import { Route as ApiPublicHooksYouzanDistributionProbeRouteImport } from './routes/api/public/hooks/youzan-distribution-probe'
 import { Route as ApiPublicHooksYouzanCleanupRouteImport } from './routes/api/public/hooks/youzan-cleanup'
+import { Route as ApiPublicHooksTestPublishWithStockRouteImport } from './routes/api/public/hooks/test-publish-with-stock'
 import { Route as ApiPublicHooksChannelSyncWorkerRouteImport } from './routes/api/public/hooks/channel-sync-worker'
 import { Route as ApiPublicHandheldTransfersRouteImport } from './routes/api/public/handheld/transfers'
 import { Route as ApiPublicHandheldSyncRecordsRouteImport } from './routes/api/public/handheld/sync-records'
@@ -579,6 +580,12 @@ const ApiPublicHooksYouzanCleanupRoute =
     path: '/api/public/hooks/youzan-cleanup',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksTestPublishWithStockRoute =
+  ApiPublicHooksTestPublishWithStockRouteImport.update({
+    id: '/api/public/hooks/test-publish-with-stock',
+    path: '/api/public/hooks/test-publish-with-stock',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksChannelSyncWorkerRoute =
   ApiPublicHooksChannelSyncWorkerRouteImport.update({
     id: '/api/public/hooks/channel-sync-worker',
@@ -1035,6 +1042,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
   '/api/public/handheld/transfers': typeof ApiPublicHandheldTransfersRouteWithChildren
   '/api/public/hooks/channel-sync-worker': typeof ApiPublicHooksChannelSyncWorkerRoute
+  '/api/public/hooks/test-publish-with-stock': typeof ApiPublicHooksTestPublishWithStockRoute
   '/api/public/hooks/youzan-cleanup': typeof ApiPublicHooksYouzanCleanupRoute
   '/api/public/hooks/youzan-distribution-probe': typeof ApiPublicHooksYouzanDistributionProbeRoute
   '/api/public/hooks/youzan-fix-channel': typeof ApiPublicHooksYouzanFixChannelRoute
@@ -1174,6 +1182,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
   '/api/public/handheld/transfers': typeof ApiPublicHandheldTransfersRouteWithChildren
   '/api/public/hooks/channel-sync-worker': typeof ApiPublicHooksChannelSyncWorkerRoute
+  '/api/public/hooks/test-publish-with-stock': typeof ApiPublicHooksTestPublishWithStockRoute
   '/api/public/hooks/youzan-cleanup': typeof ApiPublicHooksYouzanCleanupRoute
   '/api/public/hooks/youzan-distribution-probe': typeof ApiPublicHooksYouzanDistributionProbeRoute
   '/api/public/hooks/youzan-fix-channel': typeof ApiPublicHooksYouzanFixChannelRoute
@@ -1321,6 +1330,7 @@ export interface FileRoutesById {
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
   '/api/public/handheld/transfers': typeof ApiPublicHandheldTransfersRouteWithChildren
   '/api/public/hooks/channel-sync-worker': typeof ApiPublicHooksChannelSyncWorkerRoute
+  '/api/public/hooks/test-publish-with-stock': typeof ApiPublicHooksTestPublishWithStockRoute
   '/api/public/hooks/youzan-cleanup': typeof ApiPublicHooksYouzanCleanupRoute
   '/api/public/hooks/youzan-distribution-probe': typeof ApiPublicHooksYouzanDistributionProbeRoute
   '/api/public/hooks/youzan-fix-channel': typeof ApiPublicHooksYouzanFixChannelRoute
@@ -1469,6 +1479,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/sync-records'
     | '/api/public/handheld/transfers'
     | '/api/public/hooks/channel-sync-worker'
+    | '/api/public/hooks/test-publish-with-stock'
     | '/api/public/hooks/youzan-cleanup'
     | '/api/public/hooks/youzan-distribution-probe'
     | '/api/public/hooks/youzan-fix-channel'
@@ -1608,6 +1619,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/sync-records'
     | '/api/public/handheld/transfers'
     | '/api/public/hooks/channel-sync-worker'
+    | '/api/public/hooks/test-publish-with-stock'
     | '/api/public/hooks/youzan-cleanup'
     | '/api/public/hooks/youzan-distribution-probe'
     | '/api/public/hooks/youzan-fix-channel'
@@ -1754,6 +1766,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/sync-records'
     | '/api/public/handheld/transfers'
     | '/api/public/hooks/channel-sync-worker'
+    | '/api/public/hooks/test-publish-with-stock'
     | '/api/public/hooks/youzan-cleanup'
     | '/api/public/hooks/youzan-distribution-probe'
     | '/api/public/hooks/youzan-fix-channel'
@@ -1862,6 +1875,7 @@ export interface RootRouteChildren {
   ApiPublicHandheldSyncRecordsRoute: typeof ApiPublicHandheldSyncRecordsRoute
   ApiPublicHandheldTransfersRoute: typeof ApiPublicHandheldTransfersRouteWithChildren
   ApiPublicHooksChannelSyncWorkerRoute: typeof ApiPublicHooksChannelSyncWorkerRoute
+  ApiPublicHooksTestPublishWithStockRoute: typeof ApiPublicHooksTestPublishWithStockRoute
   ApiPublicHooksYouzanCleanupRoute: typeof ApiPublicHooksYouzanCleanupRoute
   ApiPublicHooksYouzanDistributionProbeRoute: typeof ApiPublicHooksYouzanDistributionProbeRoute
   ApiPublicHooksYouzanFixChannelRoute: typeof ApiPublicHooksYouzanFixChannelRoute
@@ -2479,6 +2493,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/hooks/youzan-cleanup'
       fullPath: '/api/public/hooks/youzan-cleanup'
       preLoaderRoute: typeof ApiPublicHooksYouzanCleanupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/test-publish-with-stock': {
+      id: '/api/public/hooks/test-publish-with-stock'
+      path: '/api/public/hooks/test-publish-with-stock'
+      fullPath: '/api/public/hooks/test-publish-with-stock'
+      preLoaderRoute: typeof ApiPublicHooksTestPublishWithStockRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/channel-sync-worker': {
@@ -3314,6 +3335,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHandheldSyncRecordsRoute: ApiPublicHandheldSyncRecordsRoute,
   ApiPublicHandheldTransfersRoute: ApiPublicHandheldTransfersRouteWithChildren,
   ApiPublicHooksChannelSyncWorkerRoute: ApiPublicHooksChannelSyncWorkerRoute,
+  ApiPublicHooksTestPublishWithStockRoute:
+    ApiPublicHooksTestPublishWithStockRoute,
   ApiPublicHooksYouzanCleanupRoute: ApiPublicHooksYouzanCleanupRoute,
   ApiPublicHooksYouzanDistributionProbeRoute:
     ApiPublicHooksYouzanDistributionProbeRoute,
