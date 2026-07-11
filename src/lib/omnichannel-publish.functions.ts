@@ -167,56 +167,17 @@ async function probeBranchItemId(params: {
   const branchToken = await ensureAccessToken(
     branchRow as unknown as Parameters<typeof ensureAccessToken>[0],
   );
-  try {
-    const detail = await callYouzanApiVerbose({
-      accessToken: branchToken,
-      method: "youzan.item.detail.get",
-      version: "1.0.0",
-      params: { node_kdt_id: branch_shop.kdt_id, spu_id: hq_spu_id },
-      timeoutMs: 15_000,
-    });
-    // 宽松抽取 item_id / sku_id
-    let item_id = 0;
-    let sku_id_out = 0;
-    const seen = new Set<unknown>();
-    const walk = (v: unknown, depth = 0) => {
-      if (!v || typeof v !== "object" || depth > 6 || seen.has(v)) return;
-      seen.add(v);
-      if (Array.isArray(v)) {
-        for (const el of v) walk(el, depth + 1);
-        return;
-      }
-      const obj = v as Record<string, unknown>;
-      if (!item_id) {
-        for (const k of ["item_id", "itemId", "num_iid", "id"]) {
-          const n = Number(obj[k]);
-          if (n > 0) {
-            item_id = n;
-            break;
-          }
-        }
-      }
-      if (!sku_id_out) {
-        for (const k of ["sku_id", "skuId"]) {
-          const n = Number(obj[k]);
-          if (n > 0) {
-            sku_id_out = n;
-            break;
-          }
-        }
-      }
-      for (const val of Object.values(obj)) walk(val, depth + 1);
-    };
-    walk(detail.payload);
-    if (!item_id) return null;
-    return {
-      item_id,
-      sku_id: sku_id_out || item_id,
-      raw_preview: detail.preview.slice(0, 200),
-    };
-  } catch {
-    return null;
-  }
+  const probe = await probeBranchRealIds({
+    hqSpuId: hq_spu_id,
+    branchKdtId: branch_shop.kdt_id,
+    branchToken,
+  });
+  if (!probe.item_id) return null;
+  return {
+    item_id: probe.item_id,
+    sku_id: probe.sku_id || probe.item_id,
+    raw_preview: JSON.stringify(probe.attempts).slice(0, 240),
+  };
 }
 
 /**
