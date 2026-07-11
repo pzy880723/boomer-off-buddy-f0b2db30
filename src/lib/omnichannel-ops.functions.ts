@@ -95,7 +95,17 @@ export const listChannelSyncOutbox = createServerFn({ method: "GET" })
     z
       .object({
         status: z
-          .enum(["pending", "running", "retry_wait", "failed", "dead", "succeeded", "all"])
+          .enum([
+            "pending",
+            "running",
+            "retry_wait",
+            "dead_letter",
+            "superseded",
+            "cancelled",
+            "succeeded",
+            "failed", // 语义聚合：retry_wait + dead_letter
+            "all",
+          ])
           .default("failed"),
         limit: z.number().int().min(1).max(200).default(100),
       })
