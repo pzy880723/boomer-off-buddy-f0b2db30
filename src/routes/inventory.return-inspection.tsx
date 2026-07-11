@@ -63,7 +63,8 @@ function Page() {
     queryFn: () => listFn({ data: { status, limit: 100 } }),
   });
   const locsQ = useQuery({ queryKey: ["locations"], queryFn: () => locFn() });
-  const [open, setOpen] = useState<null | (typeof q.data extends { items: infer T } ? T : never)[number]>(null);
+  type Row = NonNullable<typeof q.data>["items"][number];
+  const [open, setOpen] = useState<Row | null>(null);
   const [result, setResult] = useState<"pass" | "fail">("pass");
   const [locId, setLocId] = useState<string>("");
   const [notes, setNotes] = useState("");
