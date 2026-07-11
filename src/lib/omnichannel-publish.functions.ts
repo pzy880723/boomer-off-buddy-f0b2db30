@@ -19,12 +19,11 @@ import { z } from "zod";
 import { supabaseAdmin as supabase } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
-  callYouzanApiVerbose,
   ensureAccessToken,
   explainYouzanError,
   getHqShop,
 } from "./youzan.functions";
-import { ensureHqSpuLink, ensureBranchProduct } from "./youzan-sync.functions";
+import { ensureHqSpuLink, ensureBranchProduct, probeBranchRealIds } from "./youzan-sync.functions";
 
 // --- 通用工具 ------------------------------------------------
 
@@ -156,7 +155,11 @@ export const publishSkuToHq = createServerFn({ method: "POST" })
 async function probeBranchItemId(params: {
   branch_shop: { id: string; kdt_id: number };
   hq_spu_id: number;
-}): Promise<{ item_id: number; sku_id: number; raw_preview: string } | null> {
+}): Promise<{
+  item_id: number;
+  sku_id: number;
+  attempts: Array<{ label: string; ok: boolean; trace?: string | null; error?: string }>;
+} | null> {
   const { branch_shop, hq_spu_id } = params;
   const { data: branchRow } = await supabase
     .from("youzan_shops")
@@ -167,56 +170,17 @@ async function probeBranchItemId(params: {
   const branchToken = await ensureAccessToken(
     branchRow as unknown as Parameters<typeof ensureAccessToken>[0],
   );
-  try {
-    const detail = await callYouzanApiVerbose({
-      accessToken: branchToken,
-      method: "youzan.item.detail.get",
-      version: "1.0.0",
-      params: { node_kdt_id: branch_shop.kdt_id, spu_id: hq_spu_id },
-      timeoutMs: 15_000,
-    });
-    // 宽松抽取 item_id / sku_id
-    let item_id = 0;
-    let sku_id_out = 0;
-    const seen = new Set<unknown>();
-    const walk = (v: unknown, depth = 0) => {
-      if (!v || typeof v !== "object" || depth > 6 || seen.has(v)) return;
-      seen.add(v);
-      if (Array.isArray(v)) {
-        for (const el of v) walk(el, depth + 1);
-        return;
-      }
-      const obj = v as Record<string, unknown>;
-      if (!item_id) {
-        for (const k of ["item_id", "itemId", "num_iid", "id"]) {
-          const n = Number(obj[k]);
-          if (n > 0) {
-            item_id = n;
-            break;
-          }
-        }
-      }
-      if (!sku_id_out) {
-        for (const k of ["sku_id", "skuId"]) {
-          const n = Number(obj[k]);
-          if (n > 0) {
-            sku_id_out = n;
-            break;
-          }
-        }
-      }
-      for (const val of Object.values(obj)) walk(val, depth + 1);
-    };
-    walk(detail.payload);
-    if (!item_id) return null;
-    return {
-      item_id,
-      sku_id: sku_id_out || item_id,
-      raw_preview: detail.preview.slice(0, 200),
-    };
-  } catch {
-    return null;
-  }
+  const probe = await probeBranchRealIds({
+    hqSpuId: hq_spu_id,
+    branchKdtId: branch_shop.kdt_id,
+    branchToken,
+  });
+  if (!probe.item_id) return { item_id: 0, sku_id: 0, attempts: probe.attempts };
+  return {
+    item_id: probe.item_id,
+    sku_id: probe.sku_id || probe.item_id,
+    attempts: probe.attempts,
+  };
 }
 
 /**
@@ -261,7 +225,7 @@ export async function releaseSkuToBranchCore(sku_id: string, shop_id: string) {
     hq_spu_id: r.yz_item_id,
   });
 
-  if (probe) {
+  if (probe && probe.item_id) {
     await upsertListing({
       sku_id,
       channel: BRANCH_CHANNEL,
@@ -282,19 +246,26 @@ export async function releaseSkuToBranchCore(sku_id: string, shop_id: string) {
       } as never)
       .eq("sku_id", sku_id)
       .eq("shop_id", shop_id);
-    return { ok: true, verified: true, item_id: probe.item_id, sku_id: probe.sku_id };
+    return {
+      ok: true,
+      verified: true,
+      item_id: probe.item_id,
+      sku_id: probe.sku_id,
+      probe_attempts: probe.attempts,
+    };
   }
 
   // release 成功但 verify 尚未可见（有赞侧分发有延迟）
+  const attempts = probe?.attempts ?? [];
   await upsertListing({
     sku_id,
     channel: BRANCH_CHANNEL,
     shop_id,
     external_spu_id: String(r.yz_item_id),
     listing_status: "unshelved",
-    last_error: "release 成功但分店 item.detail.get 暂未返回 item_id，等待 verify",
+    last_error: `release 成功但分店 probe 未返回 item_id：${JSON.stringify(attempts).slice(0, 300)}`,
   });
-  return { ok: true, verified: false, spu_id: r.yz_item_id };
+  return { ok: true, verified: false, spu_id: r.yz_item_id, probe_attempts: attempts };
 }
 
 export const releaseSkuToBranch = createServerFn({ method: "POST" })
