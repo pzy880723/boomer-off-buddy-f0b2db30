@@ -225,7 +225,7 @@ export async function releaseSkuToBranchCore(sku_id: string, shop_id: string) {
     hq_spu_id: r.yz_item_id,
   });
 
-  if (probe) {
+  if (probe && probe.item_id) {
     await upsertListing({
       sku_id,
       channel: BRANCH_CHANNEL,
@@ -246,19 +246,26 @@ export async function releaseSkuToBranchCore(sku_id: string, shop_id: string) {
       } as never)
       .eq("sku_id", sku_id)
       .eq("shop_id", shop_id);
-    return { ok: true, verified: true, item_id: probe.item_id, sku_id: probe.sku_id };
+    return {
+      ok: true,
+      verified: true,
+      item_id: probe.item_id,
+      sku_id: probe.sku_id,
+      probe_attempts: probe.attempts,
+    };
   }
 
   // release 成功但 verify 尚未可见（有赞侧分发有延迟）
+  const attempts = probe?.attempts ?? [];
   await upsertListing({
     sku_id,
     channel: BRANCH_CHANNEL,
     shop_id,
     external_spu_id: String(r.yz_item_id),
     listing_status: "unshelved",
-    last_error: "release 成功但分店 item.detail.get 暂未返回 item_id，等待 verify",
+    last_error: `release 成功但分店 probe 未返回 item_id：${JSON.stringify(attempts).slice(0, 300)}`,
   });
-  return { ok: true, verified: false, spu_id: r.yz_item_id };
+  return { ok: true, verified: false, spu_id: r.yz_item_id, probe_attempts: attempts };
 }
 
 export const releaseSkuToBranch = createServerFn({ method: "POST" })
