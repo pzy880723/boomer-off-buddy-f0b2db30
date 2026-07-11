@@ -72,7 +72,25 @@ export const Route = createFileRoute("/api/public/hooks/test-publish-with-stock"
             return { current: currentQty, delta, new_balance: data };
           });
 
+          // 重置队列里过去失败的记录，确保 worker 会真的重试
+          summary.queue_reset = await record("reset_queue", async () => {
+            const { data, error } = await supabaseAdmin
+              .from("youzan_stock_sync_queue")
+              .update({
+                status: "pending",
+                attempts: 0,
+                next_run_at: new Date().toISOString(),
+                last_error: null,
+              } as never)
+              .eq("sku_id", skuId)
+              .in("status", ["failed", "pending"])
+              .select("id, status, attempts");
+            if (error) throw new Error(error.message);
+            return { reset: data?.length ?? 0 };
+          });
+
           summary.worker = await record("run_stock_worker", () => runStockSyncWorkerForCron());
+
         } catch (e) {
           summary.error = e instanceof Error ? e.message : String(e);
         }
