@@ -70,7 +70,7 @@ export const completeReturnInspection = createServerFn({ method: "POST" })
           physical_status: "damaged",
           channel_restore_status: "skipped",
           completed_at: new Date().toISOString(),
-          notes: data.notes ?? null,
+          notes: data.notes ?? undefined,
         } as never)
         .eq("id", data.inspection_id);
       if (error) throw new Error(error.message);
