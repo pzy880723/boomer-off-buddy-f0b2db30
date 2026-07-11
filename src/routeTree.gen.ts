@@ -89,6 +89,7 @@ import { Route as ApiPublicHooksYouzanMessageRouteImport } from './routes/api/pu
 import { Route as ApiPublicHooksYouzanFixChannelRouteImport } from './routes/api/public/hooks/youzan-fix-channel'
 import { Route as ApiPublicHooksYouzanDistributionProbeRouteImport } from './routes/api/public/hooks/youzan-distribution-probe'
 import { Route as ApiPublicHooksYouzanCleanupRouteImport } from './routes/api/public/hooks/youzan-cleanup'
+import { Route as ApiPublicHooksChannelSyncWorkerRouteImport } from './routes/api/public/hooks/channel-sync-worker'
 import { Route as ApiPublicHandheldTransfersRouteImport } from './routes/api/public/handheld/transfers'
 import { Route as ApiPublicHandheldSyncRecordsRouteImport } from './routes/api/public/handheld/sync-records'
 import { Route as ApiPublicHandheldStocktakesRouteImport } from './routes/api/public/handheld/stocktakes'
@@ -565,6 +566,12 @@ const ApiPublicHooksYouzanCleanupRoute =
     path: '/api/public/hooks/youzan-cleanup',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksChannelSyncWorkerRoute =
+  ApiPublicHooksChannelSyncWorkerRouteImport.update({
+    id: '/api/public/hooks/channel-sync-worker',
+    path: '/api/public/hooks/channel-sync-worker',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHandheldTransfersRoute =
   ApiPublicHandheldTransfersRouteImport.update({
     id: '/api/public/handheld/transfers',
@@ -1012,6 +1019,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/stocktakes': typeof ApiPublicHandheldStocktakesRoute
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
   '/api/public/handheld/transfers': typeof ApiPublicHandheldTransfersRouteWithChildren
+  '/api/public/hooks/channel-sync-worker': typeof ApiPublicHooksChannelSyncWorkerRoute
   '/api/public/hooks/youzan-cleanup': typeof ApiPublicHooksYouzanCleanupRoute
   '/api/public/hooks/youzan-distribution-probe': typeof ApiPublicHooksYouzanDistributionProbeRoute
   '/api/public/hooks/youzan-fix-channel': typeof ApiPublicHooksYouzanFixChannelRoute
@@ -1148,6 +1156,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/stocktakes': typeof ApiPublicHandheldStocktakesRoute
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
   '/api/public/handheld/transfers': typeof ApiPublicHandheldTransfersRouteWithChildren
+  '/api/public/hooks/channel-sync-worker': typeof ApiPublicHooksChannelSyncWorkerRoute
   '/api/public/hooks/youzan-cleanup': typeof ApiPublicHooksYouzanCleanupRoute
   '/api/public/hooks/youzan-distribution-probe': typeof ApiPublicHooksYouzanDistributionProbeRoute
   '/api/public/hooks/youzan-fix-channel': typeof ApiPublicHooksYouzanFixChannelRoute
@@ -1292,6 +1301,7 @@ export interface FileRoutesById {
   '/api/public/handheld/stocktakes': typeof ApiPublicHandheldStocktakesRoute
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
   '/api/public/handheld/transfers': typeof ApiPublicHandheldTransfersRouteWithChildren
+  '/api/public/hooks/channel-sync-worker': typeof ApiPublicHooksChannelSyncWorkerRoute
   '/api/public/hooks/youzan-cleanup': typeof ApiPublicHooksYouzanCleanupRoute
   '/api/public/hooks/youzan-distribution-probe': typeof ApiPublicHooksYouzanDistributionProbeRoute
   '/api/public/hooks/youzan-fix-channel': typeof ApiPublicHooksYouzanFixChannelRoute
@@ -1437,6 +1447,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/stocktakes'
     | '/api/public/handheld/sync-records'
     | '/api/public/handheld/transfers'
+    | '/api/public/hooks/channel-sync-worker'
     | '/api/public/hooks/youzan-cleanup'
     | '/api/public/hooks/youzan-distribution-probe'
     | '/api/public/hooks/youzan-fix-channel'
@@ -1573,6 +1584,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/stocktakes'
     | '/api/public/handheld/sync-records'
     | '/api/public/handheld/transfers'
+    | '/api/public/hooks/channel-sync-worker'
     | '/api/public/hooks/youzan-cleanup'
     | '/api/public/hooks/youzan-distribution-probe'
     | '/api/public/hooks/youzan-fix-channel'
@@ -1716,6 +1728,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/stocktakes'
     | '/api/public/handheld/sync-records'
     | '/api/public/handheld/transfers'
+    | '/api/public/hooks/channel-sync-worker'
     | '/api/public/hooks/youzan-cleanup'
     | '/api/public/hooks/youzan-distribution-probe'
     | '/api/public/hooks/youzan-fix-channel'
@@ -1821,6 +1834,7 @@ export interface RootRouteChildren {
   ApiPublicHandheldStocktakesRoute: typeof ApiPublicHandheldStocktakesRoute
   ApiPublicHandheldSyncRecordsRoute: typeof ApiPublicHandheldSyncRecordsRoute
   ApiPublicHandheldTransfersRoute: typeof ApiPublicHandheldTransfersRouteWithChildren
+  ApiPublicHooksChannelSyncWorkerRoute: typeof ApiPublicHooksChannelSyncWorkerRoute
   ApiPublicHooksYouzanCleanupRoute: typeof ApiPublicHooksYouzanCleanupRoute
   ApiPublicHooksYouzanDistributionProbeRoute: typeof ApiPublicHooksYouzanDistributionProbeRoute
   ApiPublicHooksYouzanFixChannelRoute: typeof ApiPublicHooksYouzanFixChannelRoute
@@ -2424,6 +2438,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/hooks/youzan-cleanup'
       fullPath: '/api/public/hooks/youzan-cleanup'
       preLoaderRoute: typeof ApiPublicHooksYouzanCleanupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/channel-sync-worker': {
+      id: '/api/public/hooks/channel-sync-worker'
+      path: '/api/public/hooks/channel-sync-worker'
+      fullPath: '/api/public/hooks/channel-sync-worker'
+      preLoaderRoute: typeof ApiPublicHooksChannelSyncWorkerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/handheld/transfers': {
@@ -3249,6 +3270,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHandheldStocktakesRoute: ApiPublicHandheldStocktakesRoute,
   ApiPublicHandheldSyncRecordsRoute: ApiPublicHandheldSyncRecordsRoute,
   ApiPublicHandheldTransfersRoute: ApiPublicHandheldTransfersRouteWithChildren,
+  ApiPublicHooksChannelSyncWorkerRoute: ApiPublicHooksChannelSyncWorkerRoute,
   ApiPublicHooksYouzanCleanupRoute: ApiPublicHooksYouzanCleanupRoute,
   ApiPublicHooksYouzanDistributionProbeRoute:
     ApiPublicHooksYouzanDistributionProbeRoute,
