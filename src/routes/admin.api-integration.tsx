@@ -167,6 +167,7 @@ function PlatformMatrix({ platform }: { platform: string }) {
 
   return (
     <div className="space-y-4">
+      <ShopChainProbePanel shops={shops} onChanged={() => q.refetch()} />
       <div className="flex items-center gap-3 text-sm">
         <Badge variant="outline" className="text-xs">共 {capabilities.length} 项能力</Badge>
         <Badge className="text-xs bg-emerald-600 hover:bg-emerald-600 gap-1">
@@ -187,6 +188,153 @@ function PlatformMatrix({ platform }: { platform: string }) {
           />
         ))}
       </div>
+    </div>
+  );
+}
+
+function ShopChainProbePanel({ shops, onChanged }: { shops: ShopLite[]; onChanged: () => void }) {
+  const branchShops = shops.filter((s) => s.role === "branch");
+  const [shopId, setShopId] = useState(branchShops[0]?.id ?? "");
+  useEffect(() => {
+    if (!shopId && branchShops[0]?.id) setShopId(branchShops[0].id);
+  }, [branchShops, shopId]);
+  const selected = branchShops.find((s) => s.id === shopId) ?? null;
+  const probeFn = useServerFn(probeShopChainForIntegration);
+  const probe = useMutation({
+    mutationFn: () => probeFn({ data: { shop_id: shopId } }),
+    onSuccess: (r) => {
+      if (r.can_publish_and_sync) {
+        fireCelebration();
+        toast.success("店铺链路已打通", { description: "可以继续做商品铺货和库存同步。" });
+      } else {
+        toast.error("店铺链路还没打通", { description: "下面已经标出具体卡在哪一步。" });
+      }
+      onChanged();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Card className="overflow-hidden">
+      <CardContent className="p-5 space-y-4">
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+          <div className="space-y-1">
+            <h2 className="text-base font-semibold">一键检查店铺链路</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              选一家分店，系统会自动检查授权、总部是否能识别它、铺货渠道号、仓库/库位，并告诉你能不能继续同步商品和库存。
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2 md:min-w-[420px]">
+            <Select value={shopId} onValueChange={setShopId}>
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder="请选择分店" />
+              </SelectTrigger>
+              <SelectContent>
+                {branchShops.length === 0 && <div className="text-xs text-muted-foreground p-2">还没有已绑定的分店</div>}
+                {branchShops.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>{s.shop_name} · {s.kdt_id}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button onClick={() => probe.mutate()} disabled={probe.isPending || !shopId} className="gap-1 shrink-0">
+              {probe.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+              检查链路
+            </Button>
+          </div>
+        </div>
+
+        {selected && !probe.data && (
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
+            <InfoBox label="最近状态" value={chainStatusText(selected.chain_probe_status)} />
+            <InfoBox label="铺货渠道号" value={selected.sell_channel_id ? String(selected.sell_channel_id) : "未拿到"} />
+            <InfoBox label="仓库/库位" value={selected.warehouse_name ?? selected.warehouse_code ?? "未拿到"} />
+            <InfoBox label="上次检查" value={selected.chain_probe_at ? new Date(selected.chain_probe_at).toLocaleString("zh-CN") : "未检查"} />
+          </div>
+        )}
+
+        {probe.data && <ChainProbeResultBlock result={probe.data as ChainProbeResult} />}
+      </CardContent>
+    </Card>
+  );
+}
+
+function chainStatusText(status?: string | null) {
+  if (status === "ok") return "已打通";
+  if (status === "partial") return "部分通过";
+  if (status === "failed") return "未打通";
+  return "未检查";
+}
+
+function InfoBox({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="rounded-md border bg-muted/20 px-3 py-2 min-w-0">
+      <div className="text-muted-foreground">{label}</div>
+      <div className="font-medium truncate">{value}</div>
+    </div>
+  );
+}
+
+function ChainProbeResultBlock({ result }: { result: ChainProbeResult }) {
+  return (
+    <div className="rounded-md border p-3 space-y-3">
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <Badge className={result.can_publish_and_sync ? "bg-emerald-600 hover:bg-emerald-600" : ""} variant={result.can_publish_and_sync ? "default" : "destructive"}>
+          {result.can_publish_and_sync ? "可以继续铺货 + 同步库存" : "暂时不能继续铺货"}
+        </Badge>
+        <span className="text-muted-foreground">{result.shop_name} · {result.kdt_id}</span>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+        <InfoBox label="铺货渠道号" value={result.sell_channel_id ? `${result.sell_channel_id}${result.sell_channel_via ? ` · ${result.sell_channel_via}` : ""}` : "未拿到"} />
+        <InfoBox label="仓库/库位" value={result.warehouse_name ?? result.warehouse_code ?? "未拿到"} />
+        <InfoBox label="检查时间" value={new Date(result.checked_at).toLocaleString("zh-CN")} />
+      </div>
+
+      <div className="space-y-2">
+        {result.steps.map((step) => (
+          <div key={step.key} className="flex items-start gap-2 rounded-md border p-2 text-sm">
+            {step.status === "ok" ? (
+              <CheckCircle2 className="h-4 w-4 mt-0.5 text-emerald-600 shrink-0" />
+            ) : step.status === "warn" ? (
+              <Clock className="h-4 w-4 mt-0.5 text-amber-600 shrink-0" />
+            ) : (
+              <XCircle className="h-4 w-4 mt-0.5 text-destructive shrink-0" />
+            )}
+            <div className="min-w-0">
+              <div className="font-medium">{step.label}</div>
+              <div className="text-muted-foreground leading-relaxed">{step.message}</div>
+              {(step.version || step.trace_id) && (
+                <div className="text-[11px] text-muted-foreground mt-1">
+                  {step.version && <span>版本 {step.version}</span>}
+                  {step.trace_id && <span className="ml-2">trace_id {step.trace_id}</span>}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {result.warehouse_versions.length > 0 && (
+        <details className="text-xs">
+          <summary className="cursor-pointer text-muted-foreground">仓库接口多版本测试结果</summary>
+          <div className="mt-2 overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b"><th className="py-1 pr-3">版本</th><th className="py-1 pr-3">结果</th><th className="py-1">说明</th></tr>
+              </thead>
+              <tbody>
+                {result.warehouse_versions.map((v) => (
+                  <tr key={v.version} className="border-b last:border-0">
+                    <td className="py-1 pr-3 font-mono">{v.version}</td>
+                    <td className="py-1 pr-3">{v.ok ? "通过" : "未通过"}</td>
+                    <td className="py-1 text-muted-foreground break-all">{v.trace_id ?? v.error ?? ""}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      )}
     </div>
   );
 }
