@@ -2459,6 +2459,7 @@ export type Database = {
           manager: string | null
           notes: string | null
           opened_at: string | null
+          ownership: string
           parent_kdt_id: number | null
           phone: string | null
           refresh_token: string | null
@@ -2484,6 +2485,7 @@ export type Database = {
           manager?: string | null
           notes?: string | null
           opened_at?: string | null
+          ownership?: string
           parent_kdt_id?: number | null
           phone?: string | null
           refresh_token?: string | null
@@ -2509,6 +2511,7 @@ export type Database = {
           manager?: string | null
           notes?: string | null
           opened_at?: string | null
+          ownership?: string
           parent_kdt_id?: number | null
           phone?: string | null
           refresh_token?: string | null

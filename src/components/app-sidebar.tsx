@@ -18,12 +18,12 @@ import {
   ArrowLeftRight,
   Building2,
   Users,
-  Link2,
+  
   Activity,
   ShieldCheck,
   AlertCircle,
   Smartphone,
-  FileCode2,
+  Plug,
   Globe,
   FolderTree,
   type LucideIcon,
@@ -72,8 +72,8 @@ type NavTo =
   | "/orders/dispatch"
   | "/orders/wholesale"
   | "/knowledge"
-  | "/api-docs"
   | "/settings"
+  | "/admin/api-integration"
   | "/admin/users";
 
 type NavItem = { title: string; url: NavTo; icon: LucideIcon; search?: Record<string, string> };
@@ -112,7 +112,6 @@ const groups: NavGroup[] = [
     items: [
       { title: "门店列表", url: "/shop-mgmt/shops", icon: Building2 },
       { title: "加盟商管理", url: "/shop-mgmt/franchisees", icon: Users },
-      { title: "有赞门店", url: "/youzan", icon: Link2 },
     ],
     icon: Store,
   },
@@ -139,8 +138,6 @@ const groups: NavGroup[] = [
     label: "运营",
     items: [
       { title: "知识库", url: "/knowledge", icon: BookOpen },
-      { title: "API 文档", url: "/api-docs", icon: FileCode2 },
-      { title: "系统设置", url: "/settings", icon: Settings },
     ],
   },
 ];
@@ -168,18 +165,17 @@ export function AppSidebar() {
   };
   const preload = (to: NavTo) => void router.preloadRoute({ to });
 
-  const allGroups: NavGroup[] = isSuperAdmin
-    ? [
-        ...groups,
-        {
-          label: "系统",
-          items: [
-            { title: "账号管理", url: "/admin/users", icon: ShieldCheck },
-            { title: "渠道同步异常", url: "/admin/channel-sync", icon: AlertCircle },
-          ],
-        },
-      ]
-    : groups;
+  const systemGroup: NavGroup = {
+    label: "系统",
+    items: [
+      { title: "系统设置", url: "/settings", icon: Settings },
+      { title: "API 对接", url: "/admin/api-integration", icon: Plug },
+      ...(isSuperAdmin
+        ? [{ title: "账号管理", url: "/admin/users" as NavTo, icon: ShieldCheck }]
+        : []),
+    ],
+  };
+  const allGroups: NavGroup[] = [...groups, systemGroup];
 
   return (
     <Sidebar collapsible="icon" className="border-r-0">

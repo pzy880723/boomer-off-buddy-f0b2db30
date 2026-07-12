@@ -27,7 +27,7 @@ type ShopRow = {
   token_expires_at: string | null;
 };
 
-async function fetchSilentToken(kdtId: number) {
+export async function fetchSilentToken(kdtId: number) {
   const clientId = process.env.YOUZAN_CLIENT_ID;
   const clientSecret = process.env.YOUZAN_CLIENT_SECRET;
   if (!clientId || !clientSecret) {

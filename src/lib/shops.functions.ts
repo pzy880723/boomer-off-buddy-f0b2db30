@@ -7,6 +7,7 @@ export type ShopWithStats = {
   kdt_id: number;
   shop_name: string;
   role: string;
+  ownership: string;
   status: string;
   address: string | null;
   image_url: string | null;
@@ -18,6 +19,7 @@ export type ShopWithStats = {
   notes: string | null;
   last_ping_ok: boolean | null;
   last_ping_at: string | null;
+  access_token: string | null;
   revenue_month: number;
   order_count_month: number;
   order_count_total: number;
@@ -36,7 +38,7 @@ export const listShopsWithStats = createServerFn({ method: "GET" })
       supabase
         .from("youzan_shops")
         .select(
-          "id, kdt_id, shop_name, role, status, address, image_url, manager, area_sqm, opened_at, phone, notes, last_ping_ok, last_ping_at"
+          "id, kdt_id, shop_name, role, ownership, status, address, image_url, manager, area_sqm, opened_at, phone, notes, last_ping_ok, last_ping_at, access_token"
         )
         .order("role")
         .order("shop_name"),
@@ -126,3 +128,74 @@ export const updateShopMeta = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+export const createShop = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        shop_name: z.string().min(1).max(120),
+        ownership: z.enum(["自营", "加盟"]),
+        kdt_id: z.number().int().positive().nullable().optional(),
+        address: z.string().nullish(),
+        manager: z.string().nullish(),
+        phone: z.string().nullish(),
+      })
+      .parse(i)
+  )
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    let bound = false;
+    let token_row: {
+      access_token: string;
+      refresh_token: string | null;
+      token_expires_at: string | null;
+    } | null = null;
+
+    if (data.kdt_id) {
+      const { data: dup } = await supabaseAdmin
+        .from("youzan_shops")
+        .select("id")
+        .eq("kdt_id", data.kdt_id)
+        .maybeSingle();
+      if (dup) throw new Error(`kdt_id ${data.kdt_id} 已存在，请勿重复绑定`);
+
+      try {
+        const { fetchSilentToken } = await import("@/lib/youzan.functions");
+        const t = await fetchSilentToken(data.kdt_id);
+        token_row = {
+          access_token: t.access_token,
+          refresh_token: t.refresh_token ?? null,
+          token_expires_at: t.token_expires_at ?? null,
+        };
+        bound = true;
+      } catch (e) {
+        throw new Error(
+          `有赞授权失败（kdt_id=${data.kdt_id}）：${e instanceof Error ? e.message : String(e)}`
+        );
+      }
+    }
+
+    const { data: inserted, error } = await supabaseAdmin
+      .from("youzan_shops")
+      .insert({
+        kdt_id: data.kdt_id ?? 0,
+        shop_name: data.shop_name,
+        role: "branch",
+        ownership: data.ownership,
+        status: "active",
+        address: data.address ?? null,
+        manager: data.manager ?? null,
+        phone: data.phone ?? null,
+        access_token: token_row?.access_token ?? null,
+        refresh_token: token_row?.refresh_token ?? null,
+        token_expires_at: token_row?.token_expires_at ?? null,
+        authorized_at: bound ? new Date().toISOString() : null,
+      } as never)
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+    return { ok: true, id: inserted.id, bound };
+  });
+

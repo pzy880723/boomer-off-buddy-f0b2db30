@@ -1,0 +1,1 @@
+ALTER TABLE public.youzan_shops ADD COLUMN IF NOT EXISTS ownership text NOT NULL DEFAULT '自营' CHECK (ownership IN ('自营','加盟'));
