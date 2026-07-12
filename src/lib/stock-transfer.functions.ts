@@ -154,8 +154,6 @@ async function pushYouzanQuantityDelta(shop: ShopRow, itemId: number, delta: num
   if ((shop as { role?: string }).role !== "branch") {
     throw new Error("quantity.update 只允许推分店（branch）库存");
   }
-  const token = await ensureAccessToken(shop);
-
   // 读当前库存（本地缓存）
   const { data: cur } = await supabase
     .from("youzan_items")
@@ -166,19 +164,16 @@ async function pushYouzanQuantityDelta(shop: ShopRow, itemId: number, delta: num
   const currentStock = Number((cur as { stock_qty?: number } | null)?.stock_qty ?? 0);
   const nextStock = Math.max(0, currentStock + delta);
 
-  await callYouzanApi({
-    accessToken: token,
-    method: "youzan.item.quantity.update",
-    version: "4.0.0",
-    params: {
-      kdt_id: (shop as { kdt_id: number }).kdt_id,
-      item_id: itemId,
-      sku_id: itemId, // 无规格商品 sku_id 传 item_id/spu_id（有规格请走主链路）
-      channel: 1,
-      stock_num_str: String(nextStock),
-    },
+  const { pushYouzanQuantityUpdate } = await import("./youzan.functions");
+  await pushYouzanQuantityUpdate({
+    branchShop: shop as never,
+    itemId,
+    skuId: itemId, // 无规格商品 sku_id 传 item_id/spu_id
+    quantity: nextStock,
+    allowSameAsHqSpu: true,
   });
 }
+
 
 
 // ============================================================
