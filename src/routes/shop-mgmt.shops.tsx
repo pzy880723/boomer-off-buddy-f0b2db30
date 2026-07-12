@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
-import { listShopsWithStats, updateShopMeta, createShop, type ShopWithStats } from "@/lib/shops.functions";
+import { listShopsWithStats, updateShopMeta, createShop, syncSingleShop, type ShopWithStats } from "@/lib/shops.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { compressImage } from "@/lib/image-upload";
 
