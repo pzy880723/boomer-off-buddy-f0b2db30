@@ -1781,7 +1781,7 @@ export async function ensureBranchDistribution(
   fix_channel_trace: string | null;
   branch_item_id: number | null;
   branch_sku_id: number | null;
-  probe_attempts: unknown[];
+  probe_attempts: Array<{ label: string; ok: boolean; trace?: string | null; error?: string; code?: number; msg?: string }>;
   error?: string;
 }> {
   // 1. HQ SPU
