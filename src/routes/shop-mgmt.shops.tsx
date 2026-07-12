@@ -95,6 +95,7 @@ function ShopsPage() {
         shop={editing}
         onClose={() => setEditing(null)}
       />
+      <CreateShopDialog open={creating} onClose={() => setCreating(false)} />
     </div>
   );
 }
