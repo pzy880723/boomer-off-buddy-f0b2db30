@@ -632,7 +632,8 @@ export async function probeShopChainOrgList(input: {
     let res: Response;
     let text = "";
     try {
-      res = await fetch(url, {
+      const { youzanFetch } = await import("./youzan-http");
+      res = await youzanFetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(params),
