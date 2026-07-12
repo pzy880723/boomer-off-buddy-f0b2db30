@@ -27,6 +27,11 @@ type ShopRow = {
   role: "hq" | "branch";
   parent_kdt_id: number | null;
   status: string;
+  sell_channel_id?: number | null;
+  warehouse_code?: string | null;
+  warehouse_name?: string | null;
+  chain_probe_status?: "unknown" | "ok" | "partial" | "failed" | null;
+  chain_probe_at?: string | null;
   access_token: string | null;
   refresh_token: string | null;
   token_expires_at: string | null;
@@ -117,7 +122,7 @@ export const listIntegrationCapabilities = createServerFn({ method: "POST" })
     return {
       capabilities: (rows ?? []) as CapabilityRow[],
       last_probes: lastByKey,
-      shops: (shops ?? []) as Array<Pick<ShopRow, "id" | "kdt_id" | "shop_name" | "role" | "status">>,
+      shops: (shops ?? []) as Array<Pick<ShopRow, "id" | "kdt_id" | "shop_name" | "role" | "status" | "sell_channel_id" | "warehouse_code" | "warehouse_name" | "chain_probe_status" | "chain_probe_at">>,
     };
   });
 
