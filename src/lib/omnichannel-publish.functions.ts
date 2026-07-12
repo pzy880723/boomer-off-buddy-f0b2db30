@@ -28,7 +28,7 @@ import { ensureHqSpuLink, ensureBranchProduct, probeBranchRealIds } from "./youz
 // --- 通用工具 ------------------------------------------------
 
 const HQ_CHANNEL = "youzan_hq";
-const BRANCH_CHANNEL = "youzan_offline";
+const BRANCH_CHANNEL = "youzan_branch_offline";
 
 type ListingUpsert = {
   sku_id: string;
