@@ -397,6 +397,13 @@ function explainProbeError(input: {
       nextStep: "在右侧「测试参数」里把缺的字段补上，再点一次「立即测试」。",
     };
   }
+  if (/仓库查询接口所有版本都没有通过/.test(err)) {
+    return {
+      title: "仓库/库位查询还没有找到可用版本",
+      reason: "系统已经自动测试了这个仓库接口的多个版本，但有赞都没有接受。销售库存同步不一定受影响，但实物仓库存相关能力暂时不能自动判断。",
+      nextStep: "先用上方「一键检查店铺链路」确认授权和铺货渠道号；如果只差仓库接口，把技术细节里的版本结果发给有赞确认当前店铺支持哪个版本。",
+    };
+  }
   if (/此能力需要用.*token/.test(err)) {
     return {
       title: "选错店铺角色了",
@@ -672,6 +679,10 @@ type ProbeField = { key: string; label: string; placeholder?: string; hint?: str
 const PROBE_FIELDS: Record<string, ProbeField[]> = {
   "auth.silent_token": [],
   "shop.chain.descendent.organization.list": [],
+  "retail.open.warehouse.query": [
+    { key: "page_no", label: "第几页", defaultValue: "1" },
+    { key: "page_size", label: "每页取几条", defaultValue: "20", hint: "系统会自动连续测试 3.0.1 / 3.0.0 / 1.0.1 / 1.0.0。" },
+  ],
   "trades.sold.get": [
     { key: "hours", label: "回看多少小时的订单", placeholder: "24", defaultValue: "24" },
     { key: "page_size", label: "每页取几条", placeholder: "5", defaultValue: "5" },
