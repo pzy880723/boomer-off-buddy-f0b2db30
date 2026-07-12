@@ -110,7 +110,7 @@ export const listIntegrationCapabilities = createServerFn({ method: "POST" })
     // 店铺列表（矩阵右上角 shop picker + 参数下拉）
     const { data: shops } = await supabase
       .from("youzan_shops")
-      .select("id, kdt_id, shop_name, role, status")
+      .select("id, kdt_id, shop_name, role, status, sell_channel_id, warehouse_code, warehouse_name, chain_probe_status, chain_probe_at")
       .order("role", { ascending: true })
       .order("created_at", { ascending: true });
 
