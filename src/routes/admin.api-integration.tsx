@@ -262,6 +262,7 @@ function chainStatusText(status?: string | null) {
   if (status === "ok") return "已打通";
   if (status === "partial") return "部分通过";
   if (status === "failed") return "未打通";
+  if (status === "unknown") return "未检查";
   return "未检查";
 }
 

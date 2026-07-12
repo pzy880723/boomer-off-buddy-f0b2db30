@@ -30,7 +30,7 @@ type ShopRow = {
   sell_channel_id?: number | null;
   warehouse_code?: string | null;
   warehouse_name?: string | null;
-  chain_probe_status?: "unknown" | "ok" | "partial" | "failed" | null;
+  chain_probe_status?: "unknown" | "ok" | "partial" | "failed";
   chain_probe_at?: string | null;
   access_token: string | null;
   refresh_token: string | null;
