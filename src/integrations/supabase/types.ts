@@ -167,6 +167,255 @@ export type Database = {
           },
         ]
       }
+      commerce_listings: {
+        Row: {
+          category: string | null
+          compare_at_price: number | null
+          condition_grade: string | null
+          cover_url: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          epc: string | null
+          id: string
+          image_urls: Json
+          location_id: string
+          price: number
+          published_at: string | null
+          sku_id: string
+          sold_at: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string | null
+          compare_at_price?: number | null
+          condition_grade?: string | null
+          cover_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          epc?: string | null
+          id?: string
+          image_urls?: Json
+          location_id: string
+          price: number
+          published_at?: string | null
+          sku_id: string
+          sold_at?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string | null
+          compare_at_price?: number | null
+          condition_grade?: string | null
+          cover_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          epc?: string | null
+          id?: string
+          image_urls?: Json
+          location_id?: string
+          price?: number
+          published_at?: string | null
+          sku_id?: string
+          sold_at?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_listings_epc_fkey"
+            columns: ["epc"]
+            isOneToOne: false
+            referencedRelation: "inv_epcs"
+            referencedColumns: ["epc"]
+          },
+          {
+            foreignKeyName: "commerce_listings_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_listings_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commerce_order_items: {
+        Row: {
+          condition_snapshot: string | null
+          created_at: string
+          epc: string | null
+          id: string
+          image_snapshot: string | null
+          line_total: number
+          listing_id: string
+          location_id: string
+          order_id: string
+          quantity: number
+          sku_id: string
+          title_snapshot: string
+          unit_price: number
+        }
+        Insert: {
+          condition_snapshot?: string | null
+          created_at?: string
+          epc?: string | null
+          id?: string
+          image_snapshot?: string | null
+          line_total: number
+          listing_id: string
+          location_id: string
+          order_id: string
+          quantity?: number
+          sku_id: string
+          title_snapshot: string
+          unit_price: number
+        }
+        Update: {
+          condition_snapshot?: string | null
+          created_at?: string
+          epc?: string | null
+          id?: string
+          image_snapshot?: string | null
+          line_total?: number
+          listing_id?: string
+          location_id?: string
+          order_id?: string
+          quantity?: number
+          sku_id?: string
+          title_snapshot?: string
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_order_items_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_order_items_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_order_items_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commerce_orders: {
+        Row: {
+          cancelled_at: string | null
+          completed_at: string | null
+          courier_provider: string
+          courier_quote_snapshot: Json | null
+          courier_service_code: string
+          courier_service_name: string | null
+          created_at: string
+          currency: string
+          customer_note: string | null
+          discount_total: number
+          id: string
+          idempotency_key: string
+          order_no: string
+          order_status: string
+          paid_at: string | null
+          payment_status: string
+          provider_transaction_id: string | null
+          recipient_name: string
+          recipient_phone: string
+          reservation_expires_at: string
+          shipping_address: Json
+          shipping_fee: number
+          subtotal: number
+          total_amount: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          completed_at?: string | null
+          courier_provider: string
+          courier_quote_snapshot?: Json | null
+          courier_service_code: string
+          courier_service_name?: string | null
+          created_at?: string
+          currency?: string
+          customer_note?: string | null
+          discount_total?: number
+          id?: string
+          idempotency_key: string
+          order_no?: string
+          order_status?: string
+          paid_at?: string | null
+          payment_status?: string
+          provider_transaction_id?: string | null
+          recipient_name: string
+          recipient_phone: string
+          reservation_expires_at: string
+          shipping_address: Json
+          shipping_fee?: number
+          subtotal?: number
+          total_amount?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          completed_at?: string | null
+          courier_provider?: string
+          courier_quote_snapshot?: Json | null
+          courier_service_code?: string
+          courier_service_name?: string | null
+          created_at?: string
+          currency?: string
+          customer_note?: string | null
+          discount_total?: number
+          id?: string
+          idempotency_key?: string
+          order_no?: string
+          order_status?: string
+          paid_at?: string | null
+          payment_status?: string
+          provider_transaction_id?: string | null
+          recipient_name?: string
+          recipient_phone?: string
+          reservation_expires_at?: string
+          shipping_address?: Json
+          shipping_fee?: number
+          subtotal?: number
+          total_amount?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       domestic_bulk_order_lines: {
         Row: {
           created_at: string
@@ -378,6 +627,283 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      fulfillment_exceptions: {
+        Row: {
+          created_at: string
+          description: string | null
+          evidence_urls: Json
+          fulfillment_id: string
+          fulfillment_item_id: string | null
+          id: string
+          kind: string
+          reported_by: string | null
+          resolution: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          evidence_urls?: Json
+          fulfillment_id: string
+          fulfillment_item_id?: string | null
+          id?: string
+          kind: string
+          reported_by?: string | null
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          evidence_urls?: Json
+          fulfillment_id?: string
+          fulfillment_item_id?: string | null
+          id?: string
+          kind?: string
+          reported_by?: string | null
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fulfillment_exceptions_fulfillment_id_fkey"
+            columns: ["fulfillment_id"]
+            isOneToOne: false
+            referencedRelation: "fulfillments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fulfillment_exceptions_fulfillment_item_id_fkey"
+            columns: ["fulfillment_item_id"]
+            isOneToOne: false
+            referencedRelation: "fulfillment_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fulfillment_items: {
+        Row: {
+          epc: string | null
+          expected_qty: number
+          fulfillment_id: string
+          id: string
+          order_item_id: string
+          packed_at: string | null
+          packed_qty: number
+          picked_at: string | null
+          picked_qty: number
+          sku_id: string
+        }
+        Insert: {
+          epc?: string | null
+          expected_qty?: number
+          fulfillment_id: string
+          id?: string
+          order_item_id: string
+          packed_at?: string | null
+          packed_qty?: number
+          picked_at?: string | null
+          picked_qty?: number
+          sku_id: string
+        }
+        Update: {
+          epc?: string | null
+          expected_qty?: number
+          fulfillment_id?: string
+          id?: string
+          order_item_id?: string
+          packed_at?: string | null
+          packed_qty?: number
+          picked_at?: string | null
+          picked_qty?: number
+          sku_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fulfillment_items_fulfillment_id_fkey"
+            columns: ["fulfillment_id"]
+            isOneToOne: false
+            referencedRelation: "fulfillments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fulfillment_items_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fulfillment_items_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fulfillment_scans: {
+        Row: {
+          client_op_id: string | null
+          code: string
+          code_type: string
+          created_at: string
+          device_id: string | null
+          fulfillment_id: string
+          fulfillment_item_id: string | null
+          id: string
+          operator_id: string | null
+          phase: string
+          rejection_reason: string | null
+          result: string
+        }
+        Insert: {
+          client_op_id?: string | null
+          code: string
+          code_type: string
+          created_at?: string
+          device_id?: string | null
+          fulfillment_id: string
+          fulfillment_item_id?: string | null
+          id?: string
+          operator_id?: string | null
+          phase: string
+          rejection_reason?: string | null
+          result: string
+        }
+        Update: {
+          client_op_id?: string | null
+          code?: string
+          code_type?: string
+          created_at?: string
+          device_id?: string | null
+          fulfillment_id?: string
+          fulfillment_item_id?: string | null
+          id?: string
+          operator_id?: string | null
+          phase?: string
+          rejection_reason?: string | null
+          result?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fulfillment_scans_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "inv_handheld_devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fulfillment_scans_fulfillment_id_fkey"
+            columns: ["fulfillment_id"]
+            isOneToOne: false
+            referencedRelation: "fulfillments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fulfillment_scans_fulfillment_item_id_fkey"
+            columns: ["fulfillment_item_id"]
+            isOneToOne: false
+            referencedRelation: "fulfillment_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fulfillments: {
+        Row: {
+          claimed_at: string | null
+          claimed_by: string | null
+          claimed_device_id: string | null
+          code: string
+          created_at: string
+          handed_over_at: string | null
+          id: string
+          location_id: string
+          order_id: string
+          packed_at: string | null
+          packing_started_at: string | null
+          picked_at: string | null
+          picking_started_at: string | null
+          priority: number
+          status: string
+          tote_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          claimed_at?: string | null
+          claimed_by?: string | null
+          claimed_device_id?: string | null
+          code?: string
+          created_at?: string
+          handed_over_at?: string | null
+          id?: string
+          location_id: string
+          order_id: string
+          packed_at?: string | null
+          packing_started_at?: string | null
+          picked_at?: string | null
+          picking_started_at?: string | null
+          priority?: number
+          status?: string
+          tote_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          claimed_at?: string | null
+          claimed_by?: string | null
+          claimed_device_id?: string | null
+          code?: string
+          created_at?: string
+          handed_over_at?: string | null
+          id?: string
+          location_id?: string
+          order_id?: string
+          packed_at?: string | null
+          packing_started_at?: string | null
+          picked_at?: string | null
+          picking_started_at?: string | null
+          priority?: number
+          status?: string
+          tote_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fulfillments_claimed_device_id_fkey"
+            columns: ["claimed_device_id"]
+            isOneToOne: false
+            referencedRelation: "inv_handheld_devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fulfillments_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fulfillments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fulfillments_tote_fk"
+            columns: ["tote_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_totes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       integration_api_probes: {
         Row: {
@@ -1237,6 +1763,74 @@ export type Database = {
           },
         ]
       }
+      inventory_reservations: {
+        Row: {
+          consumed_at: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          listing_id: string
+          location_id: string
+          order_id: string
+          released_at: string | null
+          sku_id: string
+          status: string
+        }
+        Insert: {
+          consumed_at?: string | null
+          created_at?: string
+          expires_at: string
+          id?: string
+          listing_id: string
+          location_id: string
+          order_id: string
+          released_at?: string | null
+          sku_id: string
+          status?: string
+        }
+        Update: {
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          listing_id?: string
+          location_id?: string
+          order_id?: string
+          released_at?: string | null
+          sku_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_reservations_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_reservations_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_reservations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_reservations_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory_sale_events: {
         Row: {
           epc: string | null
@@ -1769,6 +2363,168 @@ export type Database = {
         }
         Relationships: []
       }
+      package_evidence: {
+        Row: {
+          captured_at: string
+          captured_by: string | null
+          device_id: string | null
+          id: string
+          kind: string
+          package_id: string
+          storage_path: string
+        }
+        Insert: {
+          captured_at?: string
+          captured_by?: string | null
+          device_id?: string | null
+          id?: string
+          kind: string
+          package_id: string
+          storage_path: string
+        }
+        Update: {
+          captured_at?: string
+          captured_by?: string | null
+          device_id?: string | null
+          id?: string
+          kind?: string
+          package_id?: string
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "package_evidence_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "inv_handheld_devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "package_evidence_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      packages: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          fulfillment_id: string
+          height_cm: number | null
+          id: string
+          length_cm: number | null
+          packaging_material: string | null
+          sealed_at: string | null
+          updated_at: string
+          weight_g: number | null
+          width_cm: number | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          fulfillment_id: string
+          height_cm?: number | null
+          id?: string
+          length_cm?: number | null
+          packaging_material?: string | null
+          sealed_at?: string | null
+          updated_at?: string
+          weight_g?: number | null
+          width_cm?: number | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          fulfillment_id?: string
+          height_cm?: number | null
+          id?: string
+          length_cm?: number | null
+          packaging_material?: string | null
+          sealed_at?: string | null
+          updated_at?: string
+          weight_g?: number | null
+          width_cm?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "packages_fulfillment_id_fkey"
+            columns: ["fulfillment_id"]
+            isOneToOne: true
+            referencedRelation: "fulfillments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      print_events: {
+        Row: {
+          client_op_id: string | null
+          copies: number
+          created_at: string
+          device_id: string | null
+          document_type: string
+          error_message: string | null
+          fulfillment_id: string | null
+          id: string
+          operator_id: string | null
+          result: string
+          shipment_id: string | null
+          template_version: string
+        }
+        Insert: {
+          client_op_id?: string | null
+          copies?: number
+          created_at?: string
+          device_id?: string | null
+          document_type: string
+          error_message?: string | null
+          fulfillment_id?: string | null
+          id?: string
+          operator_id?: string | null
+          result: string
+          shipment_id?: string | null
+          template_version: string
+        }
+        Update: {
+          client_op_id?: string | null
+          copies?: number
+          created_at?: string
+          device_id?: string | null
+          document_type?: string
+          error_message?: string | null
+          fulfillment_id?: string | null
+          id?: string
+          operator_id?: string | null
+          result?: string
+          shipment_id?: string | null
+          template_version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "print_events_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "inv_handheld_devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "print_events_fulfillment_id_fkey"
+            columns: ["fulfillment_id"]
+            isOneToOne: false
+            referencedRelation: "fulfillments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "print_events_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       return_inspections: {
         Row: {
           channel_restore_status: string
@@ -1856,6 +2612,122 @@ export type Database = {
             columns: ["sku_id"]
             isOneToOne: false
             referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shipment_events: {
+        Row: {
+          created_at: string
+          description: string | null
+          event_code: string
+          event_time: string
+          id: string
+          provider_event_id: string | null
+          raw_payload: Json | null
+          shipment_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          event_code: string
+          event_time: string
+          id?: string
+          provider_event_id?: string | null
+          raw_payload?: Json | null
+          shipment_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          event_code?: string
+          event_time?: string
+          id?: string
+          provider_event_id?: string | null
+          raw_payload?: Json | null
+          shipment_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipment_events_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shipments: {
+        Row: {
+          booked_at: string | null
+          created_at: string
+          delivered_at: string | null
+          fulfillment_id: string
+          id: string
+          idempotency_key: string
+          label_payload: Json | null
+          last_error: string | null
+          package_id: string | null
+          picked_up_at: string | null
+          pickup_window: Json | null
+          provider: string
+          provider_order_no: string | null
+          service_code: string
+          status: string
+          tracking_no: string | null
+          updated_at: string
+        }
+        Insert: {
+          booked_at?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          fulfillment_id: string
+          id?: string
+          idempotency_key: string
+          label_payload?: Json | null
+          last_error?: string | null
+          package_id?: string | null
+          picked_up_at?: string | null
+          pickup_window?: Json | null
+          provider: string
+          provider_order_no?: string | null
+          service_code: string
+          status?: string
+          tracking_no?: string | null
+          updated_at?: string
+        }
+        Update: {
+          booked_at?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          fulfillment_id?: string
+          id?: string
+          idempotency_key?: string
+          label_payload?: Json | null
+          last_error?: string | null
+          package_id?: string | null
+          picked_up_at?: string | null
+          pickup_window?: Json | null
+          provider?: string
+          provider_order_no?: string | null
+          service_code?: string
+          status?: string
+          tracking_no?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipments_fulfillment_id_fkey"
+            columns: ["fulfillment_id"]
+            isOneToOne: true
+            referencedRelation: "fulfillments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipments_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "packages"
             referencedColumns: ["id"]
           },
         ]
@@ -2414,6 +3286,51 @@ export type Database = {
         }
         Relationships: []
       }
+      warehouse_totes: {
+        Row: {
+          code: string
+          created_at: string
+          current_fulfillment_id: string | null
+          id: string
+          location_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          current_fulfillment_id?: string | null
+          id?: string
+          location_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          current_fulfillment_id?: string | null
+          id?: string
+          location_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warehouse_totes_current_fulfillment_id_fkey"
+            columns: ["current_fulfillment_id"]
+            isOneToOne: false
+            referencedRelation: "fulfillments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_totes_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       youzan_items: {
         Row: {
           created_at: string
@@ -2834,6 +3751,98 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      commerce_create_order: {
+        Args: {
+          p_courier_provider: string
+          p_courier_service_code: string
+          p_courier_service_name?: string
+          p_customer_note?: string
+          p_idempotency_key: string
+          p_listing_ids: string[]
+          p_quote_snapshot?: Json
+          p_recipient_name: string
+          p_recipient_phone: string
+          p_shipping_address: Json
+          p_shipping_fee?: number
+          p_user_id: string
+        }
+        Returns: {
+          cancelled_at: string | null
+          completed_at: string | null
+          courier_provider: string
+          courier_quote_snapshot: Json | null
+          courier_service_code: string
+          courier_service_name: string | null
+          created_at: string
+          currency: string
+          customer_note: string | null
+          discount_total: number
+          id: string
+          idempotency_key: string
+          order_no: string
+          order_status: string
+          paid_at: string | null
+          payment_status: string
+          provider_transaction_id: string | null
+          recipient_name: string
+          recipient_phone: string
+          reservation_expires_at: string
+          shipping_address: Json
+          shipping_fee: number
+          subtotal: number
+          total_amount: number
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "commerce_orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      commerce_mark_order_paid: {
+        Args: {
+          p_order_id: string
+          p_paid_at?: string
+          p_provider_transaction_id: string
+        }
+        Returns: {
+          cancelled_at: string | null
+          completed_at: string | null
+          courier_provider: string
+          courier_quote_snapshot: Json | null
+          courier_service_code: string
+          courier_service_name: string | null
+          created_at: string
+          currency: string
+          customer_note: string | null
+          discount_total: number
+          id: string
+          idempotency_key: string
+          order_no: string
+          order_status: string
+          paid_at: string | null
+          payment_status: string
+          provider_transaction_id: string | null
+          recipient_name: string
+          recipient_phone: string
+          reservation_expires_at: string
+          shipping_address: Json
+          shipping_fee: number
+          subtotal: number
+          total_amount: number
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "commerce_orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      commerce_release_expired_reservations: { Args: never; Returns: number }
       commit_sale: {
         Args: {
           p_epc?: string
@@ -2847,6 +3856,115 @@ export type Database = {
         }
         Returns: Json
       }
+      fulfillment_bind_tote: {
+        Args: {
+          p_fulfillment_id: string
+          p_location_id: string
+          p_tote_code: string
+        }
+        Returns: {
+          claimed_at: string | null
+          claimed_by: string | null
+          claimed_device_id: string | null
+          code: string
+          created_at: string
+          handed_over_at: string | null
+          id: string
+          location_id: string
+          order_id: string
+          packed_at: string | null
+          packing_started_at: string | null
+          picked_at: string | null
+          picking_started_at: string | null
+          priority: number
+          status: string
+          tote_id: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "fulfillments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      fulfillment_claim_task: {
+        Args: {
+          p_device_id: string
+          p_fulfillment_id: string
+          p_location_id: string
+          p_operator_id?: string
+        }
+        Returns: {
+          claimed_at: string | null
+          claimed_by: string | null
+          claimed_device_id: string | null
+          code: string
+          created_at: string
+          handed_over_at: string | null
+          id: string
+          location_id: string
+          order_id: string
+          packed_at: string | null
+          packing_started_at: string | null
+          picked_at: string | null
+          picking_started_at: string | null
+          priority: number
+          status: string
+          tote_id: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "fulfillments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      fulfillment_complete_pick: {
+        Args: {
+          p_device_id: string
+          p_fulfillment_id: string
+          p_location_id: string
+        }
+        Returns: {
+          claimed_at: string | null
+          claimed_by: string | null
+          claimed_device_id: string | null
+          code: string
+          created_at: string
+          handed_over_at: string | null
+          id: string
+          location_id: string
+          order_id: string
+          packed_at: string | null
+          packing_started_at: string | null
+          picked_at: string | null
+          picking_started_at: string | null
+          priority: number
+          status: string
+          tote_id: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "fulfillments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      fulfillment_pick_scan: {
+        Args: {
+          p_client_op_id?: string
+          p_code: string
+          p_device_id: string
+          p_fulfillment_id: string
+          p_location_id: string
+          p_operator_id?: string
+        }
+        Returns: Json
+      }
+      gen_commerce_order_no: { Args: never; Returns: string }
       gen_ean13: { Args: never; Returns: string }
       gen_stock_transfer_code: { Args: never; Returns: string }
       has_role: {
