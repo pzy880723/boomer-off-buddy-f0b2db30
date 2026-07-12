@@ -379,6 +379,123 @@ export type Database = {
         }
         Relationships: []
       }
+      integration_api_probes: {
+        Row: {
+          capability_key: string
+          error: string | null
+          gw_code: number | null
+          http_status: number | null
+          id: string
+          latency_ms: number | null
+          method: string
+          ok: boolean
+          platform: string
+          request_params: Json | null
+          response_snippet: string | null
+          shop_id: string | null
+          tested_at: string
+          tested_by: string | null
+          trace_id: string | null
+          version: string
+        }
+        Insert: {
+          capability_key: string
+          error?: string | null
+          gw_code?: number | null
+          http_status?: number | null
+          id?: string
+          latency_ms?: number | null
+          method: string
+          ok?: boolean
+          platform: string
+          request_params?: Json | null
+          response_snippet?: string | null
+          shop_id?: string | null
+          tested_at?: string
+          tested_by?: string | null
+          trace_id?: string | null
+          version: string
+        }
+        Update: {
+          capability_key?: string
+          error?: string | null
+          gw_code?: number | null
+          http_status?: number | null
+          id?: string
+          latency_ms?: number | null
+          method?: string
+          ok?: boolean
+          platform?: string
+          request_params?: Json | null
+          response_snippet?: string | null
+          shop_id?: string | null
+          tested_at?: string
+          tested_by?: string | null
+          trace_id?: string | null
+          version?: string
+        }
+        Relationships: []
+      }
+      integration_api_registry: {
+        Row: {
+          capability_key: string
+          capability_name: string
+          created_at: string
+          doc_url: string | null
+          http_verb: string
+          id: string
+          is_overridden: boolean
+          method: string
+          note: string | null
+          platform: string
+          requirement: string
+          scope: string
+          sort_order: number
+          token_scope: string
+          updated_at: string
+          updated_by: string | null
+          version: string
+        }
+        Insert: {
+          capability_key: string
+          capability_name: string
+          created_at?: string
+          doc_url?: string | null
+          http_verb?: string
+          id?: string
+          is_overridden?: boolean
+          method: string
+          note?: string | null
+          platform: string
+          requirement: string
+          scope: string
+          sort_order?: number
+          token_scope?: string
+          updated_at?: string
+          updated_by?: string | null
+          version: string
+        }
+        Update: {
+          capability_key?: string
+          capability_name?: string
+          created_at?: string
+          doc_url?: string | null
+          http_verb?: string
+          id?: string
+          is_overridden?: boolean
+          method?: string
+          note?: string | null
+          platform?: string
+          requirement?: string
+          scope?: string
+          sort_order?: number
+          token_scope?: string
+          updated_at?: string
+          updated_by?: string | null
+          version?: string
+        }
+        Relationships: []
+      }
       inv_categories: {
         Row: {
           code: string
