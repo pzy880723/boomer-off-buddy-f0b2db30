@@ -494,7 +494,7 @@ function EditDialog({
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>取消</Button>
-          <Button onClick={() => mut.mutate()} disabled={mut.isPending}>
+          <Button onClick={() => mut.mutate()} disabled={mut.isPending || !parsed}>
             {mut.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}保存
           </Button>
         </DialogFooter>
