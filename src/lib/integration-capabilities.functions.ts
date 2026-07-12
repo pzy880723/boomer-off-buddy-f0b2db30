@@ -147,7 +147,7 @@ export const updateIntegrationCapability = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context as any);
     const supabase = (context as any).supabase;
-    const payload: Record<string, unknown> = {
+    const payload: Record<string, any> = {
       method: data.method,
       version: data.version,
       is_overridden: true,
@@ -266,7 +266,7 @@ export const probeIntegrationCapability = createServerFn({ method: "POST" })
   .inputValidator((d: {
     id: string;
     shop_id?: string | null;
-    params?: Record<string, unknown>;
+    params?: Record<string, any>;
   }) =>
     z
       .object({
@@ -307,7 +307,7 @@ export const probeIntegrationCapability = createServerFn({ method: "POST" })
       response_snippet?: string;
       gw_code?: number | null;
       http_status?: number | null;
-      request_params?: Record<string, unknown>;
+      request_params?: Record<string, any>;
     } = { ok: false };
 
     try {
@@ -373,8 +373,8 @@ async function runProbe(input: {
   version: string;
   token_scope: "hq" | "branch" | "both";
   shop: ShopRow | null;
-  userParams: Record<string, unknown>;
-}): Promise<{ trace_id: string | null; preview: string; request_params: Record<string, unknown> }> {
+  userParams: Record<string, any>;
+}): Promise<{ trace_id: string | null; preview: string; request_params: Record<string, any> }> {
   const key = input.capability_key;
 
   // 1. token 类：单独走 fetchSilentToken，不打网关
@@ -417,9 +417,9 @@ function pickTokenShop(chosen: ShopRow, tokenScope: "hq" | "branch" | "both"): S
 
 async function buildParams(
   key: string,
-  input: { userParams: Record<string, unknown>; shop: ShopRow | null },
+  input: { userParams: Record<string, any>; shop: ShopRow | null },
   tokenShop: ShopRow,
-): Promise<Record<string, unknown>> {
+): Promise<Record<string, any>> {
   const u = input.userParams ?? {};
   const nowSec = Math.floor(Date.now() / 1000);
   const stamp = new Date(Date.now() + 8 * 3600 * 1000)
