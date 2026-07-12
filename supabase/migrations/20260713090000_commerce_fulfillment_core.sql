@@ -675,11 +675,14 @@ GRANT EXECUTE ON FUNCTION public.fulfillment_bind_tote(uuid,uuid,text) TO servic
 GRANT EXECUTE ON FUNCTION public.fulfillment_pick_scan(uuid,uuid,text,uuid,uuid,text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.fulfillment_complete_pick(uuid,uuid,uuid) TO service_role;
 
--- Extend movement audit without changing existing movement behavior.
+-- Extend movement audit while preserving all existing ref_type values.
 ALTER TABLE public.inv_stock_movements DROP CONSTRAINT IF EXISTS inv_stock_movements_ref_type_check;
 ALTER TABLE public.inv_stock_movements ADD CONSTRAINT inv_stock_movements_ref_type_check CHECK (
   ref_type IN (
     'rfid_inbound','transfer_out','transfer_in','transfer_ship','transfer_receive',
-    'stocktake_adjust','youzan_sale','unclaim','manual_adjust','commerce_sale','commerce_return'
+    'stocktake_adjust','youzan_sale','unclaim','manual_adjust',
+    'shop_adjust','shop_new_sku','return_inspection',
+    'commerce_sale','commerce_return'
   )
+  OR ref_type LIKE 'sale:%'
 );

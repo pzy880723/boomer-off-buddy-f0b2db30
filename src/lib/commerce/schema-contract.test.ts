@@ -36,4 +36,11 @@ describe("commerce fulfillment schema contract", () => {
     assert.match(migration, /location_id = p_location_id FOR UPDATE/);
     assert.match(migration, /fulfillment_complete_pick/);
   });
+
+  test("commerce movement types preserve existing ERP stock audit values", () => {
+    for (const refType of ["shop_adjust", "shop_new_sku", "return_inspection"]) {
+      assert.match(migration, new RegExp(`'${refType}'`));
+    }
+    assert.match(migration, /ref_type LIKE 'sale:%'/);
+  });
 });
