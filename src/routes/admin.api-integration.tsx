@@ -222,11 +222,17 @@ function CapabilityCard({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-              <InfoRow label="接口方法" value={<span className="font-mono text-foreground">{cap.method}</span>} />
-              <InfoRow label="版本号" value={<span className="font-mono text-foreground">v{cap.version}</span>} />
-              <InfoRow label="使用授权" value={TOKEN_ZH[cap.token_scope] ?? cap.token_scope} />
-              <InfoRow label="作用范围" value={SCOPE_ZH[cap.scope] ?? cap.scope} />
+            <div className="space-y-1.5 text-xs text-muted-foreground">
+              <div>
+                <span className="text-muted-foreground">接口全名：</span>
+                <code className="font-mono text-foreground bg-background/60 border rounded px-1.5 py-0.5 break-all">
+                  {cap.method}.{cap.version}
+                </code>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <InfoRow label="使用授权" value={TOKEN_ZH[cap.token_scope] ?? cap.token_scope} />
+                <InfoRow label="作用范围" value={SCOPE_ZH[cap.scope] ?? cap.scope} />
+              </div>
             </div>
 
             {cap.note && (
