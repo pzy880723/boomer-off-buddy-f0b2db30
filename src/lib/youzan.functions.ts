@@ -13,7 +13,7 @@ import { getYouzanOutboundStatus, youzanFetch } from "./youzan-http";
 const YZ_OAUTH_URL = "https://open.youzanyun.com/auth/token";
 // 有赞云新网关地址：POST https://open.youzanyun.com/api/{接口名}/{版本号}?access_token=xxx
 // 注意：旧的 /api/oauthentry 路径在零售连锁版接口上会被网关判定为 [gw 4005] 非法的API
-const YZ_GW_URL = "https://open.youzanyun.com/api";
+export const YZ_GW_URL = "https://open.youzanyun.com/api";
 
 type ShopRow = {
   id: string;

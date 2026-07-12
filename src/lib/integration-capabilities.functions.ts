@@ -558,18 +558,24 @@ function extractBranchNodes(payload: unknown): BranchNode[] {
   return Array.from(byKdt.values());
 }
 
-async function probeShopChainOrgList(input: {
+// —— 严格按 8 条规则重写 ——
+// 1) 永远先 1.0.1 再 1.0.0；2) 显式带 page_num/page_size；
+// 3) 1.0.1 读 data.organization_list，1.0.0 直接读 data；
+// 4) 按 total 分页；5) empty_ok / error / ok 严格三态；
+// 6) 每次 attempt 保留 code/message/errors/trace_id/raw；
+// 7) 任一版本 ok 即通过；8) 必须两版本都 empty_ok 才判 empty_confirmed。
+export async function probeShopChainOrgList(input: {
   method: string;
   version: string;
   shop: ShopRow | null;
   supabase?: any;
 }): Promise<{ trace_id: string | null; preview: string; request_params: Record<string, any> }> {
   const method = input.method || "youzan.shop.chain.descendent.organization.list";
-  const versions = [input.version, "1.0.1", "1.0.0"].filter(
-    (v, i, a) => v && a.indexOf(v) === i,
-  );
+  const versions: Array<"1.0.1" | "1.0.0"> = ["1.0.1", "1.0.0"];
+  const PAGE_SIZE = 50;
+  const MAX_PAGES = 20;
 
-  // 强制使用总部 token（不管当前选的是哪家店）
+  // 强制使用总部 token
   let hq: ShopRow;
   try {
     hq = await getHqShop();
@@ -577,42 +583,226 @@ async function probeShopChainOrgList(input: {
     throw new Error(`没有找到已绑定的总部店铺：${e instanceof Error ? e.message : String(e)}`);
   }
   const hqToken = await ensureAccessToken(hq);
+  const { YZ_GW_URL } = await import("./youzan.functions");
 
-  const attempts: Array<{
+  type AttemptStatus = "ok" | "empty_ok" | "error";
+  type PageRecord = {
+    page_num: number;
+    http_status: number;
+    code: number | null;
+    message: string | null;
+    errors: unknown;
+    trace_id: string | null;
+    raw_body_snippet: string;
+    parsed_count: number;
+    total_reported: number | null;
+  };
+  type Attempt = {
     version: string;
-    ok: boolean;
-    trace_id?: string | null;
-    error?: string;
-    gw_code?: number | null;
-  }> = [];
+    status: AttemptStatus;
+    http_status: number | null;
+    code: number | null;
+    message: string | null;
+    errors: unknown;
+    trace_id: string | null;
+    request_params: { page_num: number; page_size: number };
+    raw_body_snippet: string;
+    fetched: number;
+    total_reported: number | null;
+    pages: PageRecord[];
+    nodes_preview: BranchNode[];
+  };
 
-  for (const version of versions) {
+  const attempts: Attempt[] = [];
+
+  // —— 单次 raw call：不抛业务错误，全字段返回 ——
+  async function rawCall(version: string, params: Record<string, unknown>): Promise<{
+    http_status: number;
+    trace_id: string | null;
+    code: number | null;
+    message: string | null;
+    errors: unknown;
+    data: unknown;
+    raw_body: string;
+    network_error?: string;
+  }> {
+    const url = `${YZ_GW_URL}/${method}/${version}?access_token=${encodeURIComponent(hqToken)}`;
+    const ctl = new AbortController();
+    const tmo = setTimeout(() => ctl.abort(), 20_000);
+    let res: Response;
+    let text = "";
     try {
-      const r = await callYouzanApiVerbose({
-        accessToken: hqToken,
-        method,
-        version,
-        params: {},
-        timeoutMs: 15_000,
+      res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(params),
+        signal: ctl.signal,
       });
-      attempts.push({ version, ok: true, trace_id: r.trace_id });
+      text = await res.text();
+    } catch (e) {
+      clearTimeout(tmo);
+      return {
+        http_status: 0,
+        trace_id: null,
+        code: null,
+        message: null,
+        errors: null,
+        data: null,
+        raw_body: "",
+        network_error: e instanceof Error ? e.message : String(e),
+      };
+    }
+    clearTimeout(tmo);
+    let json: any = null;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      return {
+        http_status: res.status,
+        trace_id: null,
+        code: null,
+        message: `响应不是 JSON：${text.slice(0, 200)}`,
+        errors: null,
+        data: null,
+        raw_body: text,
+      };
+    }
+    // 有赞可能把成败塞进 gw_err_resp / error_response / code
+    const trace_id =
+      json?.trace_id ??
+      json?.gw_err_resp?.trace_id ??
+      json?.error_response?.trace_id ??
+      null;
+    let code: number | null = null;
+    let message: string | null = null;
+    let errors: unknown = null;
+    if (json?.gw_err_resp?.err_code) {
+      code = Number(json.gw_err_resp.err_code);
+      message = json.gw_err_resp.err_msg ?? null;
+    } else if (json?.error_response) {
+      code = typeof json.error_response.code === "number" ? json.error_response.code : null;
+      message = json.error_response.msg ?? json.error_response.sub_msg ?? null;
+      errors = json.error_response;
+    } else if (typeof json?.code === "number") {
+      code = json.code;
+      message = json.message ?? null;
+      if (Array.isArray(json.errors)) errors = json.errors;
+    } else {
+      code = 200;
+    }
+    return {
+      http_status: res.status,
+      trace_id,
+      code,
+      message,
+      errors,
+      data: json?.response ?? json?.data ?? null,
+      raw_body: text,
+    };
+  }
 
-      const payload = (() => {
-        try {
-          return JSON.parse(r.preview);
-        } catch {
-          return r.preview;
-        }
-      })();
-      const nodes = extractBranchNodes(payload);
+  function parseList(version: "1.0.1" | "1.0.0", data: unknown): { list: unknown[]; total: number | null } {
+    if (version === "1.0.1") {
+      const d = (data ?? {}) as any;
+      const list = Array.isArray(d.organization_list) ? d.organization_list : [];
+      const total = typeof d.total === "number" ? d.total : null;
+      return { list, total };
+    }
+    // 1.0.0：data 本身就是数组（或包一层）
+    if (Array.isArray(data)) return { list: data, total: data.length };
+    const d = (data ?? {}) as any;
+    if (Array.isArray(d.organization_list)) return { list: d.organization_list, total: d.total ?? d.organization_list.length };
+    if (Array.isArray(d.list)) return { list: d.list, total: d.total ?? d.list.length };
+    return { list: [], total: 0 };
+  }
 
-      // 命中当前选中的分店 → 落库
+  // —— 逐版本尝试 ——
+  for (const version of versions) {
+    const pages: PageRecord[] = [];
+    const collected: unknown[] = [];
+    let totalReported: number | null = null;
+    let firstTrace: string | null = null;
+    let firstErrCode: number | null = null;
+    let firstErrMsg: string | null = null;
+    let firstErrErrors: unknown = null;
+    let firstHttp: number | null = null;
+    let firstRawSnippet = "";
+    let hadHardError = false;
+
+    for (let page = 1; page <= MAX_PAGES; page += 1) {
+      const params = { page_num: page, page_size: PAGE_SIZE };
+      const r = await rawCall(version, params);
+      const snippet = r.raw_body.length > 8000 ? r.raw_body.slice(0, 8000) + " ...(truncated)" : r.raw_body;
+      firstTrace = firstTrace ?? r.trace_id;
+      firstHttp = firstHttp ?? r.http_status;
+      if (!firstRawSnippet) firstRawSnippet = snippet;
+
+      const isBusinessOk = r.code === 200 && !r.network_error;
+      if (!isBusinessOk) {
+        hadHardError = true;
+        firstErrCode = firstErrCode ?? r.code;
+        firstErrMsg = firstErrMsg ?? r.message ?? r.network_error ?? null;
+        firstErrErrors = firstErrErrors ?? r.errors;
+        pages.push({
+          page_num: page,
+          http_status: r.http_status,
+          code: r.code,
+          message: r.message,
+          errors: r.errors,
+          trace_id: r.trace_id,
+          raw_body_snippet: snippet,
+          parsed_count: 0,
+          total_reported: null,
+        });
+        break;
+      }
+      const { list, total } = parseList(version, r.data);
+      totalReported = total ?? totalReported;
+      collected.push(...list);
+      pages.push({
+        page_num: page,
+        http_status: r.http_status,
+        code: r.code,
+        message: r.message,
+        errors: r.errors,
+        trace_id: r.trace_id,
+        raw_body_snippet: snippet,
+        parsed_count: list.length,
+        total_reported: total,
+      });
+      // 结束条件：本页空 / 已够 total / 页面小于 PAGE_SIZE
+      if (list.length === 0) break;
+      if (total != null && collected.length >= total) break;
+      if (list.length < PAGE_SIZE) break;
+    }
+
+    const nodes = extractBranchNodes(collected);
+    let status: AttemptStatus;
+    if (hadHardError) status = "error";
+    else if (nodes.length === 0) status = "empty_ok";
+    else status = "ok";
+
+    attempts.push({
+      version,
+      status,
+      http_status: firstHttp,
+      code: hadHardError ? firstErrCode : 200,
+      message: hadHardError ? firstErrMsg : null,
+      errors: hadHardError ? firstErrErrors : null,
+      trace_id: firstTrace,
+      request_params: { page_num: 1, page_size: PAGE_SIZE },
+      raw_body_snippet: firstRawSnippet,
+      fetched: collected.length,
+      total_reported: totalReported,
+      pages,
+      nodes_preview: nodes.slice(0, 40),
+    });
+
+    if (status === "ok") {
+      // —— 命中即落库并返回 ——
       const target = input.shop && input.shop.role === "branch" ? input.shop : null;
       let matched: BranchNode | null = null;
-      let saved: { sell_channel_id: number | null; updated: boolean } = {
-        sell_channel_id: null,
-        updated: false,
-      };
+      let saved: { sell_channel_id: number | null; updated: boolean } = { sell_channel_id: null, updated: false };
       if (target) {
         matched = nodes.find((n) => n.kdt_id === Number(target.kdt_id)) ?? null;
         if (matched?.sell_channel_id && input.supabase) {
@@ -630,10 +820,16 @@ async function probeShopChainOrgList(input: {
         }
       }
 
-      const summary: Record<string, any> = {
+      const summary = {
         passed_version: version,
-        used_hq_shop: { kdt_id: hq.kdt_id, name: hq.shop_name },
-        total_nodes: nodes.length,
+        conclusion: "ok" as const,
+        conclusion_text: `已经拿到 ${nodes.length} 家分店节点${target ? (matched ? `，「${target.shop_name}」的渠道号已${saved.updated ? "自动落库" : "命中但未落库"}` : `，但当前选中的分店「${target.shop_name}」不在返回里`) : "（未选择分店）"}`,
+        hq: { kdt_id: hq.kdt_id, name: hq.shop_name },
+        aggregated: {
+          total_reported: totalReported,
+          fetched: collected.length,
+          nodes,
+        },
         current_branch: target
           ? {
               kdt_id: Number(target.kdt_id),
@@ -643,37 +839,70 @@ async function probeShopChainOrgList(input: {
               sell_channel_ids: matched?.sell_channel_ids ?? [],
               saved_to_db: saved.updated,
             }
-          : "未选择分店（仅列出总部下所有节点）",
-        nodes: nodes.slice(0, 40),
+          : null,
         attempts,
       };
-      // 附带原始返回（截断）
-      const rawStr = typeof payload === "string" ? payload : JSON.stringify(payload);
-      summary.raw_response_preview = rawStr.length > 4000 ? rawStr.slice(0, 4000) + " ...(truncated)" : rawStr;
-
       return {
-        trace_id: r.trace_id,
+        trace_id: firstTrace,
         preview: JSON.stringify(summary, null, 2),
-        request_params: { method, tested_versions: versions, hq_kdt_id: hq.kdt_id },
+        request_params: { method, tested_versions: versions, page_num: 1, page_size: PAGE_SIZE, hq_kdt_id: hq.kdt_id },
       };
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      const codeM = msg.match(/\[(\d{3,6})\]/);
-      const traceM = msg.match(/trace=([^\s\]]+)/);
-      attempts.push({
-        version,
-        ok: false,
-        error: msg.slice(0, 400),
-        trace_id: traceM ? traceM[1] : null,
-        gw_code: codeM ? Number(codeM[1]) : null,
-      });
     }
+    // 否则继续下一个版本
   }
 
-  throw new Error(
-    `分店组织接口所有版本都没有通过：${JSON.stringify(attempts).slice(0, 1200)}`,
+  // —— 两个版本都没有 ok ——
+  const allEmpty = attempts.every((a) => a.status === "empty_ok");
+  const hasAuthErr = attempts.some(
+    (a) =>
+      a.status === "error" &&
+      (a.code === 40009 ||
+        a.code === 4005 ||
+        (typeof a.message === "string" && /scope|授权|permission|unauthorized/i.test(a.message))),
   );
+
+  let conclusion: "empty_confirmed" | "business_error" | "auth_error";
+  let conclusion_text: string;
+  if (allEmpty) {
+    conclusion = "empty_confirmed";
+    conclusion_text = "两个版本（1.0.1 / 1.0.0）都明确返回空数组：总部下确实没有可查询分店，需要在有赞后台把分店挂到总部组织树下。";
+  } else if (hasAuthErr) {
+    conclusion = "auth_error";
+    conclusion_text = "总部授权 scope 不够（缺少连锁-组织架构相关 scope），需要重新授权总部店铺。";
+  } else {
+    conclusion = "business_error";
+    const firstErr = attempts.find((a) => a.status === "error");
+    conclusion_text = `接口业务报错：[${firstErr?.code ?? "?"}] ${firstErr?.message ?? "无 message"}（trace=${firstErr?.trace_id ?? "无"}）。见 attempts 里的完整 code / message / errors / raw_body。`;
+  }
+
+  const summary = {
+    passed_version: null,
+    conclusion,
+    conclusion_text,
+    hq: { kdt_id: hq.kdt_id, name: hq.shop_name },
+    aggregated: null,
+    current_branch: input.shop && input.shop.role === "branch"
+      ? { kdt_id: Number(input.shop.kdt_id), name: input.shop.shop_name, found_in_response: false, sell_channel_id: null, saved_to_db: false }
+      : null,
+    attempts,
+  };
+
+  // 只有明确"两个版本都业务成功但空数组"才当作"非错误"，其他一律抛出让上层显示红色失败
+  if (conclusion === "empty_confirmed") {
+    return {
+      trace_id: attempts[0]?.trace_id ?? null,
+      preview: JSON.stringify(summary, null, 2),
+      request_params: { method, tested_versions: versions, page_num: 1, page_size: PAGE_SIZE, hq_kdt_id: hq.kdt_id },
+    };
+  }
+  // 抛错时，把完整 summary 塞进 error message，前端已有的 response_snippet 面板会展开显示
+  const err: Error & { probe_summary?: any } = new Error(conclusion_text);
+  err.probe_summary = summary;
+  // 也把 summary JSON 塞在 message 里作为兜底
+  err.message = `${conclusion_text}\n\n---SUMMARY---\n${JSON.stringify(summary, null, 2)}`;
+  throw err;
 }
+
 
 function pickTokenShop(chosen: ShopRow, tokenScope: "hq" | "branch" | "both"): ShopRow {
   if (tokenScope === "both") return chosen;
