@@ -72,8 +72,8 @@ type NavTo =
   | "/orders/dispatch"
   | "/orders/wholesale"
   | "/knowledge"
-  | "/api-docs"
   | "/settings"
+  | "/admin/api-integration"
   | "/admin/users";
 
 type NavItem = { title: string; url: NavTo; icon: LucideIcon; search?: Record<string, string> };
