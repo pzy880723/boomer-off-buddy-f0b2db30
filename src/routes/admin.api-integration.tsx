@@ -38,12 +38,26 @@ type ShopLite = { id: string; kdt_id: number; shop_name: string; role: "hq" | "b
 
 const PLATFORMS = [{ key: "youzan", name: "有赞" }] as const;
 
-// 统一文档链接策略：按接口方法名去有赞文档中心搜索，永远指向对的接口
+// 手工核对过的有赞文档 detail 页；命中直接跳该接口自己的文档。
+const DOC_URL_BY_METHOD: Record<string, string> = {
+  "auth/token": "https://doc.youzanyun.com/detail/API/0/906",
+  "youzan.shop.chain.descendent.organization.list": "https://doc.youzanyun.com/detail/API/0/1793",
+  "youzan.trades.sold.get": "https://doc.youzanyun.com/detail/API/0/70",
+  "youzan.trade.get": "https://doc.youzanyun.com/detail/API/0/71",
+  "youzan.retail.open.online.spu.query": "https://doc.youzanyun.com/detail/API/0/1790",
+  "youzan.item.detail.get": "https://doc.youzanyun.com/detail/API/0/28",
+  "youzan.retail.open.spu.create": "https://doc.youzanyun.com/detail/API/0/1788",
+  "youzan.retail.open.spu.update": "https://doc.youzanyun.com/detail/API/0/1789",
+  "youzan.retail.open.spu.delete": "https://doc.youzanyun.com/detail/API/0/1791",
+  "youzan.item.quantity.update": "https://doc.youzanyun.com/detail/API/0/45",
+  "youzan.materials.storage.platform.img.upload": "https://doc.youzanyun.com/detail/API/0/1233",
+};
+
 function docLinkFor(method: string, fallback?: string | null) {
-  if (method === "auth/token") {
-    return "https://doc.youzanyun.com/detail/API/0/906";
-  }
-  return `https://doc.youzanyun.com/search?keyword=${encodeURIComponent(method)}`;
+  if (DOC_URL_BY_METHOD[method]) return DOC_URL_BY_METHOD[method];
+  if (fallback && /^https?:\/\//.test(fallback)) return fallback;
+  // 兜底：跳到文档中心分类列表页，让用户手动搜
+  return `https://doc.youzanyun.com/list?keyword=${encodeURIComponent(method)}`;
 }
 
 // token 类型的中文表述
@@ -222,24 +236,26 @@ function CapabilityCard({
               </div>
             </div>
 
-            <div className="space-y-1.5 text-xs text-muted-foreground">
-              <div>
-                <span className="text-muted-foreground">接口全名：</span>
-                <code className="font-mono text-foreground bg-background/60 border rounded px-1.5 py-0.5 break-all">
-                  {cap.method}.{cap.version}
-                </code>
+            <details className="text-xs text-muted-foreground bg-background/40 border rounded-md">
+              <summary className="cursor-pointer select-none px-2 py-1.5 text-foreground/70">
+                技术信息（接口名 / 授权）
+              </summary>
+              <div className="px-2 pb-2 pt-1 space-y-1.5">
+                <div>
+                  <span>接口全名：</span>
+                  <code className="font-mono text-foreground bg-background/60 border rounded px-1.5 py-0.5 break-all">
+                    {cap.method}.{cap.version}
+                  </code>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <InfoRow label="使用授权" value={TOKEN_ZH[cap.token_scope] ?? cap.token_scope} />
+                  <InfoRow label="作用范围" value={SCOPE_ZH[cap.scope] ?? cap.scope} />
+                </div>
+                {cap.note && (
+                  <div className="pt-1"><span className="text-foreground/70 font-medium">备注：</span>{cap.note}</div>
+                )}
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <InfoRow label="使用授权" value={TOKEN_ZH[cap.token_scope] ?? cap.token_scope} />
-                <InfoRow label="作用范围" value={SCOPE_ZH[cap.scope] ?? cap.scope} />
-              </div>
-            </div>
-
-            {cap.note && (
-              <div className="text-xs text-muted-foreground bg-background/60 border rounded-md p-2 leading-relaxed">
-                <span className="text-foreground/70 font-medium">备注：</span>{cap.note}
-              </div>
-            )}
+            </details>
 
             <div className="flex items-center gap-1 pt-1">
               <Button variant="outline" size="sm" asChild>
