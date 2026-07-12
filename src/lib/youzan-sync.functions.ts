@@ -1786,6 +1786,7 @@ export async function ensureBranchDistribution(
   ok: boolean;
   hq_spu_id: number | null;
   sell_channel_id: number | null;
+  sell_channel_ids: number[];
   sell_channel_via: string | null;
   fix_channel_trace: string | null;
   branch_item_id: number | null;
@@ -1793,6 +1794,7 @@ export async function ensureBranchDistribution(
   probe_attempts: Array<{ label: string; ok: boolean; trace?: string | null; error?: string; code?: number; msg?: string }>;
   error?: string;
 }> {
+
   // 1. HQ SPU
   const hqInfo = await ensureHqSpuLink(sku_id);
   const hqSpuId = Number(hqInfo.yz_item_id);
