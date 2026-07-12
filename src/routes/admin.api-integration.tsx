@@ -415,15 +415,26 @@ function EditDialog({
   cap: CapabilityRow;
   onSaved: () => void;
 }) {
-  const [method, setMethod] = useState(cap.method);
-  const [version, setVersion] = useState(cap.version);
+  const [fullName, setFullName] = useState(`${cap.method}.${cap.version}`);
   const [scope, setScope] = useState(cap.scope);
   const [tokenScope, setTokenScope] = useState(cap.token_scope);
   const [note, setNote] = useState(cap.note ?? "");
   const updateFn = useServerFn(updateIntegrationCapability);
+
+  // 校验：xxx.yyy.zzz.<major>.<minor>.<patch>
+  const FULL_NAME_RE = /^([a-zA-Z0-9_.]+)\.(\d+)\.(\d+)\.(\d+)$/;
+  const match = fullName.trim().match(FULL_NAME_RE);
+  const parsed = match
+    ? { method: match[1], version: `${match[2]}.${match[3]}.${match[4]}` }
+    : null;
+
   const mut = useMutation({
-    mutationFn: () =>
-      updateFn({ data: { id: cap.id, method, version, scope, token_scope: tokenScope, note } }),
+    mutationFn: () => {
+      if (!parsed) throw new Error("接口全名格式不对");
+      return updateFn({
+        data: { id: cap.id, method: parsed.method, version: parsed.version, scope, token_scope: tokenScope, note },
+      });
+    },
     onSuccess: () => {
       toast.success("已保存");
       onOpenChange(false);
@@ -438,17 +449,21 @@ function EditDialog({
           <DialogTitle>修改配置：{cap.capability_name}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
+          <div>
+            <Label className="text-xs">接口全名</Label>
+            <Input
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="youzan.retail.open.stocksupply.relaiton.query.1.0.0"
+              className="font-mono"
+            />
+            <p className={"text-[11px] mt-1 " + (parsed || !fullName ? "text-muted-foreground" : "text-destructive")}>
+              {parsed
+                ? `将保存为：接口名 ${parsed.method} · 版本 ${parsed.version}`
+                : "格式应为：接口名.主版本.次版本.修订版本，例如 youzan.trades.sold.get.4.0.4"}
+            </p>
+          </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2">
-              <Label className="text-xs">接口方法名</Label>
-              <Input value={method} onChange={(e) => setMethod(e.target.value)} />
-              <p className="text-[11px] text-muted-foreground mt-1">例如 youzan.trades.sold.get</p>
-            </div>
-            <div>
-              <Label className="text-xs">接口版本号</Label>
-              <Input value={version} onChange={(e) => setVersion(e.target.value)} />
-              <p className="text-[11px] text-muted-foreground mt-1">例如 4.0.4</p>
-            </div>
             <div>
               <Label className="text-xs">作用范围</Label>
               <Select value={scope} onValueChange={(v) => setScope(v as any)}>
