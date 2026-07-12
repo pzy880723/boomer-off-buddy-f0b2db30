@@ -194,7 +194,14 @@ function CapabilityCard({
         fireCelebration();
         toast.success(`测试通过 · 耗时 ${r.latency_ms} 毫秒`);
       } else {
-        toast.error(r.error ?? "测试失败");
+        const ex = explainProbeError({
+          capability_key: cap.capability_key,
+          method: cap.method,
+          gw_code: r.gw_code ?? null,
+          error: r.error ?? null,
+          response_snippet: (r.response_snippet ?? "") as string,
+        });
+        toast.error(ex.title, { description: ex.reason });
       }
       onChanged();
     },
