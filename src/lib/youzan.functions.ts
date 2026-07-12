@@ -25,6 +25,39 @@ type ShopRow = {
   access_token: string | null;
   refresh_token: string | null;
   token_expires_at: string | null;
+  sell_channel_id?: number | null;
+  warehouse_code?: string | null;
+  warehouse_name?: string | null;
+  chain_probe_status?: "unknown" | "ok" | "partial" | "failed";
+  chain_probe_result?: unknown;
+  chain_probe_at?: string | null;
+};
+
+export type YouzanShopChainStep = {
+  key: string;
+  label: string;
+  status: "ok" | "warn" | "error";
+  message: string;
+  version?: string | null;
+  trace_id?: string | null;
+  error?: string | null;
+};
+
+export type YouzanShopChainProbeResult = {
+  ok: boolean;
+  status: "ok" | "partial" | "failed";
+  checked_at: string;
+  shop_id: string;
+  shop_name: string;
+  kdt_id: number;
+  role: "hq" | "branch";
+  sell_channel_id: number | null;
+  sell_channel_via: string | null;
+  warehouse_code: string | null;
+  warehouse_name: string | null;
+  can_publish_and_sync: boolean;
+  steps: YouzanShopChainStep[];
+  warehouse_versions: Array<{ version: string; ok: boolean; trace_id?: string | null; error?: string | null }>;
 };
 
 export async function fetchSilentToken(kdtId: number) {
@@ -329,6 +362,303 @@ export async function callYouzanApiWithVersionFallback(opts: {
     `${opts.method} 所有版本 [${versions.join(", ")}] 都失败：${finalMsg}. attempts=${JSON.stringify(attempts).slice(0, 400)}`,
   );
 }
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function toPositiveNumber(value: unknown): number | null {
+  const n = typeof value === "string" ? Number(value) : typeof value === "number" ? value : NaN;
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function findNumberByKeys(payload: unknown, keys: string[], match?: (node: Record<string, unknown>) => boolean): number | null {
+  const seen = new Set<unknown>();
+  const walk = (node: unknown, depth = 0): number | null => {
+    if (!node || depth > 8 || seen.has(node)) return null;
+    if (Array.isArray(node)) {
+      seen.add(node);
+      for (const item of node) {
+        const found = walk(item, depth + 1);
+        if (found) return found;
+      }
+      return null;
+    }
+    const rec = asRecord(node);
+    if (!rec) return null;
+    seen.add(node);
+    if (!match || match(rec)) {
+      for (const key of keys) {
+        const found = toPositiveNumber(rec[key]);
+        if (found) return found;
+      }
+    }
+    for (const val of Object.values(rec)) {
+      const found = walk(val, depth + 1);
+      if (found) return found;
+    }
+    return null;
+  };
+  return walk(payload);
+}
+
+function findWarehouse(payload: unknown): { code: string | null; name: string | null } {
+  const seen = new Set<unknown>();
+  const codeKeys = ["warehouse_code", "warehouseCode", "warehouse_no", "warehouseNo", "code"];
+  const nameKeys = ["warehouse_name", "warehouseName", "name", "title"];
+  const walk = (node: unknown, depth = 0): { code: string | null; name: string | null } | null => {
+    if (!node || depth > 8 || seen.has(node)) return null;
+    if (Array.isArray(node)) {
+      seen.add(node);
+      for (const item of node) {
+        const found = walk(item, depth + 1);
+        if (found?.code || found?.name) return found;
+      }
+      return null;
+    }
+    const rec = asRecord(node);
+    if (!rec) return null;
+    seen.add(node);
+    const code = codeKeys.map((k) => rec[k]).find((v) => typeof v === "string" || typeof v === "number");
+    const name = nameKeys.map((k) => rec[k]).find((v) => typeof v === "string" || typeof v === "number");
+    if (code || name) return { code: code == null ? null : String(code), name: name == null ? null : String(name) };
+    for (const val of Object.values(rec)) {
+      const found = walk(val, depth + 1);
+      if (found?.code || found?.name) return found;
+    }
+    return null;
+  };
+  return walk(payload) ?? { code: null, name: null };
+}
+
+function nodeMatchesKdt(node: Record<string, unknown>, kdtId: number) {
+  return ["kdt_id", "kdtId", "shop_id", "shopId", "id", "node_kdt_id", "nodeKdtId"]
+    .some((key) => toPositiveNumber(node[key]) === kdtId);
+}
+
+async function callFirstWorkingVersion(opts: {
+  accessToken: string;
+  method: string;
+  versions: string[];
+  params?: Record<string, unknown>;
+  timeoutMs?: number;
+}): Promise<{
+  payload: unknown | null;
+  version: string | null;
+  trace_id: string | null;
+  attempts: Array<{ version: string; ok: boolean; trace_id?: string | null; error?: string | null }>;
+}> {
+  const attempts: Array<{ version: string; ok: boolean; trace_id?: string | null; error?: string | null }> = [];
+  for (const version of opts.versions) {
+    try {
+      const r = await callYouzanApiVerbose({
+        accessToken: opts.accessToken,
+        method: opts.method,
+        version,
+        params: opts.params ?? {},
+        timeoutMs: opts.timeoutMs ?? 12_000,
+      });
+      attempts.push({ version, ok: true, trace_id: r.trace_id });
+      return { payload: r.payload, version, trace_id: r.trace_id, attempts };
+    } catch (e) {
+      attempts.push({
+        version,
+        ok: false,
+        error: (e instanceof Error ? e.message : String(e)).slice(0, 500),
+      });
+    }
+  }
+  return { payload: null, version: null, trace_id: null, attempts };
+}
+
+export async function runYouzanShopChainProbe(shopId: string): Promise<YouzanShopChainProbeResult> {
+  const shop = await getShopOr404({ shop_id: shopId });
+  const checkedAt = new Date().toISOString();
+  const steps: YouzanShopChainStep[] = [];
+  const warehouseVersions: YouzanShopChainProbeResult["warehouse_versions"] = [];
+  let sellChannelId: number | null = toPositiveNumber(shop.sell_channel_id);
+  let sellChannelVia: string | null = sellChannelId ? "本地已保存" : null;
+  let warehouseCode: string | null = shop.warehouse_code ?? null;
+  let warehouseName: string | null = shop.warehouse_name ?? null;
+  let branchToken: string | null = null;
+  let hqToken: string | null = null;
+  let hqSeesBranch = shop.role === "hq";
+
+  try {
+    branchToken = await ensureAccessToken(shop);
+    await callYouzanApiVerbose({ accessToken: branchToken, method: "youzan.shop.get", version: "3.0.0", params: {}, timeoutMs: 12_000 });
+    steps.push({ key: "branch_auth", label: "这家店的授权", status: "ok", message: `授权可用：${shop.shop_name}` });
+  } catch (e) {
+    steps.push({ key: "branch_auth", label: "这家店的授权", status: "error", message: explainYouzanError(e), error: e instanceof Error ? e.message : String(e) });
+  }
+
+  let hq: ShopRow | null = null;
+  try {
+    hq = await getHqShop();
+    hqToken = await ensureAccessToken(hq);
+    await callYouzanApiVerbose({ accessToken: hqToken, method: "youzan.shop.get", version: "3.0.0", params: {}, timeoutMs: 12_000 });
+    steps.push({ key: "hq_auth", label: "总部授权", status: "ok", message: `总部授权可用：${hq.shop_name}` });
+  } catch (e) {
+    steps.push({ key: "hq_auth", label: "总部授权", status: "error", message: explainYouzanError(e), error: e instanceof Error ? e.message : String(e) });
+  }
+
+  if (shop.role === "branch" && hqToken) {
+    const chain = await callFirstWorkingVersion({
+      accessToken: hqToken,
+      method: "youzan.shop.chain.descendent.organization.list",
+      versions: ["1.0.1", "1.0.0"],
+      params: {},
+      timeoutMs: 15_000,
+    });
+    const chainChannel = chain.payload
+      ? findNumberByKeys(chain.payload, ["sell_channel_id", "sellChannelId", "channel_id", "channelId"], (node) => nodeMatchesKdt(node, shop.kdt_id))
+      : null;
+    const branchFound = chain.payload
+      ? findNumberByKeys(chain.payload, ["kdt_id", "kdtId", "shop_id", "shopId", "id"], (node) => nodeMatchesKdt(node, shop.kdt_id)) === shop.kdt_id
+      : false;
+    hqSeesBranch = branchFound;
+    if (branchFound) {
+      steps.push({
+        key: "hq_branch_relation",
+        label: "总部是否能看见这家分店",
+        status: "ok",
+        message: chainChannel ? `总部能看见这家分店，并返回渠道号 ${chainChannel}` : "总部能看见这家分店，但这次返回里没有渠道号。",
+        version: chain.version,
+        trace_id: chain.trace_id,
+      });
+      if (chainChannel) {
+        sellChannelId = chainChannel;
+        sellChannelVia = `门店组织接口 ${chain.version}`;
+      }
+    } else {
+      const err = chain.attempts.find((a) => !a.ok)?.error;
+      steps.push({
+        key: "hq_branch_relation",
+        label: "总部是否能看见这家分店",
+        status: "error",
+        message: err ? `总部接口没有确认这家分店：${explainYouzanError(err)}` : "总部接口返回了门店数据，但没有找到当前这家分店。",
+        error: err ?? null,
+      });
+    }
+  }
+
+  if (shop.role === "branch" && hqToken && !sellChannelId) {
+    try {
+      const r = await callYouzanApiVerbose({
+        accessToken: hqToken,
+        method: "youzan.shop.get",
+        version: "3.0.0",
+        params: { kdt_id: shop.kdt_id },
+        timeoutMs: 12_000,
+      });
+      const channel = findNumberByKeys(r.payload, ["sell_channel_id", "sellChannelId", "channel_id", "channelId"]);
+      if (channel) {
+        sellChannelId = channel;
+        sellChannelVia = "店铺信息接口";
+      }
+    } catch {
+      // shop.get 只是兜底探测，失败原因已由总部关系步骤表达。
+    }
+  }
+
+  if (shop.role === "branch") {
+    if (sellChannelId) {
+      steps.push({ key: "sell_channel", label: "铺货渠道号", status: "ok", message: `已拿到铺货渠道号：${sellChannelId}` });
+    } else {
+      steps.push({
+        key: "sell_channel",
+        label: "铺货渠道号",
+        status: "error",
+        message: "系统已识别这家店的授权，但没有拿到铺货用渠道号；为了避免再次把商品铺错渠道，系统会停止自动铺货。",
+      });
+    }
+  }
+
+  if (branchToken) {
+    const warehouse = await callFirstWorkingVersion({
+      accessToken: branchToken,
+      method: "youzan.retail.open.warehouse.query",
+      versions: ["3.0.1", "3.0.0", "1.0.1", "1.0.0"],
+      params: { page_no: 1, page_size: 20 },
+      timeoutMs: 15_000,
+    });
+    warehouseVersions.push(...warehouse.attempts);
+    if (warehouse.payload) {
+      const picked = findWarehouse(warehouse.payload);
+      warehouseCode = picked.code;
+      warehouseName = picked.name;
+      steps.push({
+        key: "warehouse",
+        label: "仓库 / 库位",
+        status: warehouseCode || warehouseName ? "ok" : "warn",
+        message: warehouseCode || warehouseName
+          ? `已查到仓库/库位：${warehouseName ?? "未命名"}${warehouseCode ? `（${warehouseCode}）` : ""}`
+          : `仓库接口 ${warehouse.version} 能调用，但返回里没有识别到仓库编码。`,
+        version: warehouse.version,
+        trace_id: warehouse.trace_id,
+      });
+    } else {
+      steps.push({
+        key: "warehouse",
+        label: "仓库 / 库位",
+        status: "warn",
+        message: "已逐个测试仓库查询接口的常见版本，但都没有通过；销售库存同步可以继续，实物仓库存相关能力暂时不可用。",
+        error: warehouse.attempts.map((a) => `${a.version}: ${a.error}`).join(" | ").slice(0, 800),
+      });
+    }
+  }
+
+  const canPublishAndSync = shop.role === "hq" || (!!branchToken && !!hqToken && hqSeesBranch && !!sellChannelId);
+  const hasError = steps.some((s) => s.status === "error");
+  const status: "ok" | "partial" | "failed" = canPublishAndSync && !hasError
+    ? "ok"
+    : canPublishAndSync
+      ? "partial"
+      : "failed";
+  steps.push({
+    key: "summary",
+    label: "是否可以继续铺货和同步库存",
+    status: canPublishAndSync ? "ok" : "error",
+    message: canPublishAndSync
+      ? "可以继续：系统已经拿到自动铺货和库存同步所需的关键链路信息。"
+      : "暂时不可以：授权、总部关系或铺货渠道号至少有一项没通过。",
+  });
+
+  const result: YouzanShopChainProbeResult = {
+    ok: status === "ok" || status === "partial",
+    status,
+    checked_at: checkedAt,
+    shop_id: shop.id,
+    shop_name: shop.shop_name,
+    kdt_id: shop.kdt_id,
+    role: shop.role,
+    sell_channel_id: sellChannelId,
+    sell_channel_via: sellChannelVia,
+    warehouse_code: warehouseCode,
+    warehouse_name: warehouseName,
+    can_publish_and_sync: canPublishAndSync,
+    steps,
+    warehouse_versions: warehouseVersions,
+  };
+
+  await supabase.from("youzan_shops").update({
+    sell_channel_id: sellChannelId,
+    warehouse_code: warehouseCode,
+    warehouse_name: warehouseName,
+    chain_probe_status: status,
+    chain_probe_result: result as never,
+    chain_probe_at: checkedAt,
+  } as never).eq("id", shop.id);
+
+  return result;
+}
+
+export const probeYouzanShopChain = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ shop_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data }) => runYouzanShopChainProbe(data.shop_id));
 
 
 // ============================================================
