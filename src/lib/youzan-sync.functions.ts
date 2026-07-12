@@ -1991,8 +1991,8 @@ export async function ensureBranchDistribution(
   };
 }
 
-// 让 E2E 面板能拿到已推的 channel 列表
-export function _getLastEnsureChannels(): number[] { return []; }
+
+
 
 
 type ShopLike = {
