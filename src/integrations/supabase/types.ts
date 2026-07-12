@@ -2565,6 +2565,9 @@ export type Database = {
           address: string | null
           area_sqm: number | null
           authorized_at: string | null
+          chain_probe_at: string | null
+          chain_probe_result: Json | null
+          chain_probe_status: string
           created_at: string
           expires_at: string | null
           id: string
@@ -2581,16 +2584,22 @@ export type Database = {
           phone: string | null
           refresh_token: string | null
           role: string
+          sell_channel_id: number | null
           shop_name: string
           status: string
           token_expires_at: string | null
           updated_at: string
+          warehouse_code: string | null
+          warehouse_name: string | null
         }
         Insert: {
           access_token?: string | null
           address?: string | null
           area_sqm?: number | null
           authorized_at?: string | null
+          chain_probe_at?: string | null
+          chain_probe_result?: Json | null
+          chain_probe_status?: string
           created_at?: string
           expires_at?: string | null
           id?: string
@@ -2607,16 +2616,22 @@ export type Database = {
           phone?: string | null
           refresh_token?: string | null
           role?: string
+          sell_channel_id?: number | null
           shop_name: string
           status?: string
           token_expires_at?: string | null
           updated_at?: string
+          warehouse_code?: string | null
+          warehouse_name?: string | null
         }
         Update: {
           access_token?: string | null
           address?: string | null
           area_sqm?: number | null
           authorized_at?: string | null
+          chain_probe_at?: string | null
+          chain_probe_result?: Json | null
+          chain_probe_status?: string
           created_at?: string
           expires_at?: string | null
           id?: string
@@ -2633,10 +2648,13 @@ export type Database = {
           phone?: string | null
           refresh_token?: string | null
           role?: string
+          sell_channel_id?: number | null
           shop_name?: string
           status?: string
           token_expires_at?: string | null
           updated_at?: string
+          warehouse_code?: string | null
+          warehouse_name?: string | null
         }
         Relationships: []
       }
