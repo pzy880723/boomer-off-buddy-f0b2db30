@@ -1,6 +1,40 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { runShopSyncCore } from "@/lib/youzan.functions";
+
+export const syncSingleShop = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        shop_id: z.string().uuid(),
+        days: z.number().int().min(1).max(180).default(30),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const results: Record<"items" | "orders", { ok: boolean; count: number; message: string }> = {
+      items: { ok: false, count: 0, message: "skipped" },
+      orders: { ok: false, count: 0, message: "skipped" },
+    };
+    try {
+      results.items = await runShopSyncCore({ shop_id: data.shop_id, action: "items" });
+    } catch (e) {
+      results.items = { ok: false, count: 0, message: e instanceof Error ? e.message : String(e) };
+    }
+    try {
+      results.orders = await runShopSyncCore({
+        shop_id: data.shop_id,
+        action: "orders",
+        days: data.days,
+      });
+    } catch (e) {
+      results.orders = { ok: false, count: 0, message: e instanceof Error ? e.message : String(e) };
+    }
+    return results;
+  });
+
 
 export type ShopWithStats = {
   id: string;
