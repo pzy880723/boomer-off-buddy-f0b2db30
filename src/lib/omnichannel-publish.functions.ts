@@ -4,7 +4,7 @@
 // 这一层是"新 omnichannel 模型"（sku_channel_listings + sales_state）
 // 与"旧 sku_youzan_links 主链路"的桥。所有实际 API 调用仍复用
 // youzan-sync 里久经考验的 helper，本模块只负责：
-//   1) 记录/更新 sku_channel_listings（channel='youzan_hq' | 'youzan_offline'）
+//   1) 记录/更新 sku_channel_listings（channel='youzan_hq' | 'youzan_branch_offline'）
 //   2) 维护 inv_skus.sales_state / inventory_version
 //   3) 对分店链路 verify 后回填 external_item_id / external_sku_id
 // ------------------------------------------------------------
@@ -28,7 +28,7 @@ import { ensureHqSpuLink, ensureBranchProduct, probeBranchRealIds } from "./youz
 // --- 通用工具 ------------------------------------------------
 
 const HQ_CHANNEL = "youzan_hq";
-const BRANCH_CHANNEL = "youzan_offline";
+const BRANCH_CHANNEL = "youzan_branch_offline";
 
 type ListingUpsert = {
   sku_id: string;
@@ -187,7 +187,7 @@ async function probeBranchItemId(params: {
  * 把 SKU release 到指定分店（幂等）。
  * - 复用 ensureBranchProduct（把分店 kdt 加进 HQ SPU 的 sell_channel_ids）
  * - 通过分店 token 反查 item.detail.get，拿到分店真实 item_id/sku_id
- * - 镜像到 sku_channel_listings (channel=youzan_offline, shop_id=branch)
+ * - 镜像到 sku_channel_listings (channel=youzan_branch_offline, shop_id=branch)
  *   listing_status: publishing → published（verify 成功）| unshelved（verify 失败）
  */
 export async function releaseSkuToBranchCore(sku_id: string, shop_id: string) {

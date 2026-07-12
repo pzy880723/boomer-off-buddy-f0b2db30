@@ -196,7 +196,7 @@ async function handleTradeEvent(sb: unknown, shopId: string, event: Record<strin
     const orderKey = items.length > 1 ? `${tid}#${i}` : tid;
     await supa.rpc("commit_sale", {
       p_sku_id: skuId,
-      p_source_channel: "youzan_offline",
+      p_source_channel: "youzan_branch_offline",
       p_source_order_id: orderKey,
       p_source_shop_id: shopId,
       p_event_type: "paid",
@@ -255,7 +255,7 @@ async function handleRefundEvent(sb: unknown, shopId: string, event: Record<stri
     if (!skuId) continue;
     await supa.from("return_inspections").insert({
       sku_id: skuId,
-      refund_source_channel: "youzan_offline",
+      refund_source_channel: "youzan_branch_offline",
       refund_source_order_id: tid,
       refund_status: "refunded",
       inspection_result: null,

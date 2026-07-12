@@ -52,10 +52,11 @@ export const Route = createFileRoute("/api/public/hooks/channel-sync-worker")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        // 轻量鉴权：只接受带 apikey 的调用（pg_cron/内部）
+        // 轻量鉴权：必须带正确的 apikey（pg_cron / 内部）；缺失或不匹配一律 401
         const apikey = request.headers.get("apikey") ?? "";
-        const expected = process.env.SUPABASE_ANON_KEY ?? "";
-        if (expected && apikey && apikey !== expected) {
+        const expected =
+          process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_ANON_KEY ?? "";
+        if (!expected || apikey !== expected) {
           return new Response(JSON.stringify({ error: "invalid apikey" }), {
             status: 401,
             headers: { "Content-Type": "application/json" },
@@ -89,6 +90,38 @@ export const Route = createFileRoute("/api/public/hooks/channel-sync-worker")({
         const results: Array<{ id: string; action: string; ok: boolean; error?: string }> = [];
 
         for (const task of list) {
+          // inventory_version guard：SKU 已有更新的库存版本 → 本任务过期，直接 superseded
+          try {
+            const { data: skuVer } = await supabaseAdmin
+              .from("inv_skus")
+              .select("inventory_version")
+              .eq("id", task.sku_id)
+              .maybeSingle();
+            const currentVer = Number(
+              (skuVer as { inventory_version?: number } | null)?.inventory_version ?? 0,
+            );
+            if (
+              (task.action === "set_stock" ||
+                task.action === "set_stock_zero" ||
+                task.action === "restore_after_return") &&
+              task.inventory_version > 0 &&
+              currentVer > task.inventory_version
+            ) {
+              await supabaseAdmin
+                .from("channel_sync_outbox")
+                .update({
+                  status: "superseded",
+                  completed_at: new Date().toISOString(),
+                  last_error: `superseded: sku inventory_version=${currentVer} > task ${task.inventory_version}`,
+                  updated_at: new Date().toISOString(),
+                } as never)
+                .eq("id", task.id);
+              results.push({ id: task.id, action: task.action, ok: true, error: "superseded" });
+              continue;
+            }
+          } catch {
+            /* guard best-effort */
+          }
           try {
             await dispatch(task, supabaseAdmin);
             await supabaseAdmin
@@ -110,6 +143,22 @@ export const Route = createFileRoute("/api/public/hooks/channel-sync-worker")({
                 .from("inv_skus")
                 .update({ sales_state: "active", updated_at: new Date().toISOString() } as never)
                 .eq("id", task.sku_id);
+            }
+            // 若任务带了 inventory_version，成功后把 listing 的 verified_inventory_version 抬升
+            if (
+              task.channel_listing_id &&
+              task.inventory_version > 0 &&
+              (task.action === "set_stock" ||
+                task.action === "set_stock_zero" ||
+                task.action === "restore_after_return")
+            ) {
+              await supabaseAdmin
+                .from("sku_channel_listings")
+                .update({
+                  verified_inventory_version: task.inventory_version,
+                  updated_at: new Date().toISOString(),
+                } as never)
+                .eq("id", task.channel_listing_id);
             }
             results.push({ id: task.id, action: task.action, ok: true });
           } catch (e) {
@@ -227,7 +276,7 @@ async function handleSetStock(
     external_sku_id: string | null;
     external_spu_id: string | null;
   };
-  if (l.channel !== "youzan_offline") {
+  if (l.channel !== "youzan_branch_offline") {
     // HQ/online 目前不推库存（HQ SPU 不参与直销），跳过
     return;
   }
@@ -257,15 +306,16 @@ async function handleSetStock(
   if (!branch) throw new Error("门店不存在");
   const hqSpuIdGuard = Number(l.external_spu_id ?? 0) || undefined;
   // 只推分店线下门店销售库存（channel=1）；网店由 ERP 自研，不再往有赞网店同步
+  // 严格禁止 item_id == HQ SPU id：allowSameAsHqSpu 已下线；如触发说明 listing 未 verify 到真实分店 id
   await pushYouzanQuantityUpdate({
     branchShop: branch as unknown as Parameters<typeof pushYouzanQuantityUpdate>[0]["branchShop"],
     itemId,
     skuId: skuId || itemId,
     quantity: target,
     hqSpuIdGuard,
-    allowSameAsHqSpu: true,
     channel: 1,
   });
+
 
 
 
@@ -363,7 +413,7 @@ async function handleReconcile(
     external_item_id: string | null;
     external_sku_id: string | null;
   };
-  if (l.channel !== "youzan_offline" || !l.shop_id || !l.external_item_id) return;
+  if (l.channel !== "youzan_branch_offline" || !l.shop_id || !l.external_item_id) return;
   const { data: sku } = await sb
     .from("inv_skus")
     .select("stock_qty, inventory_version")

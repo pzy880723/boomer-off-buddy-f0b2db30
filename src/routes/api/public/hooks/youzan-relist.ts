@@ -287,7 +287,6 @@ async function run(opts: {
         skuId: branchSkuId,
         quantity: Math.max(0, opts.target_stock),
         hqSpuIdGuard: hqSpuId,
-        allowSameAsHqSpu: true,
       });
       stockResults.push({
         sku_id,

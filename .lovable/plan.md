@@ -1,57 +1,77 @@
-# HQ → 分店：商品库 + 网店 + 线下 库存端到端联通 & 沉淀到 API 联调
 
-## 一、目标（用大白话）
-挑一个总部已建好的孤品 SKU（库存=1），推到「中信泰富」分店，达成三件事：
-1. **商品库出现**：分店后台的商品档案能搜到这个商品。
-2. **网店可售**：分店网店渠道有货、可下单。
-3. **线下可售**：分店线下门店渠道有货、可扫码/开单。
+# 有赞总部→分店线下门店发布 · 按 Codex 方案落地
 
-同时把这条链路上用到的每一步接口，都作为独立能力卡片写进 `/admin/api-integration`，一键可测、可看真实响应。
+严格照 Codex 审计文档 (2026-07-12) 执行，只做增量修补，不重写代理 / 组织查询 / 总部建品 / outbox / commit_sale / 退款复检。
 
-## 二、当前掌握的事实（避免重复踩坑）
-- 总部授权、分店授权、代理出口 IP、分店组织树（sell_channel_id）、仓库查询——**已全部跑通**。
-- 现有 `ensureBranchDistribution`（`src/lib/youzan-sync.functions.ts` L1782）已经做了：HQ SPU → `spu.update` 追加 `sell_channel_setting_request` → `item.detail.get` 反查真实分店 `item_id/sku_id` → 写 `sku_youzan_links`。
-- 现有 `pushYouzanQuantityUpdate` 走 `item.quantity.update/4.0.0`（全量覆盖，type=0）。
-- 但**当前只覆盖了「网店」这一个 sell_channel**；线下门店渠道号从未单独解析、也从未被塞进 `sell_channel_setting_request`。
-- 所有有赞调用必须走 `youzanFetch`（已写进 mem://constraints/youzan-must-use-proxy），本轮新写代码一律遵守。
+## 一、数据模型迁移（一支迁移）
 
-## 三、要新增/补齐的能力（写进 `integration_api_registry`）
+1. `sku_channel_listings` 里现有 `youzan_offline` 记录全部改名为 `youzan_branch_offline`（更新 CHECK 约束 + 唯一索引），CHECK 中移除 `youzan_branch_online`，永不创建。
+2. `sku_channel_listings` 新增 `verified_inventory_version int`。
+3. `youzan_shops` 新增 `offline_sell_channel_id bigint`（明确保存线下门店那一条渠道；旧 `sell_channel_ids bigint[]` 保留做诊断）。
+4. `channel_sync_outbox` 保证唯一键 `(sku_id, listing_id, action, inventory_version)`；已有则跳过。
 
-| capability_key | 名字（人话） | method | ver | token | 用途 |
-|---|---|---|---|---|---|
-| `retail.open.sellchannel.list` | 查询分店的销售渠道（网店+线下） | `youzan.retail.open.sellchannel.list` | 3.0.0 → 1.0.0 fallback | 分店 token | 拿到该分店下**网店 sell_channel_id** 和**线下 sell_channel_id**（现在我们只用了一个，导致线下无货） |
-| `retail.open.spu.distribution` | 一键铺货到分店（网店+线下都铺） | `youzan.retail.open.spu.update` | 3.0.0 | HQ token | `sell_channel_setting_request.is_partial=1`，`sell_channel_ids` **一次带 [网店, 线下]** |
-| `item.detail.get.branch` | 反查分店真实 item_id / sku_id | `youzan.item.detail.get` | 1.0.1 → 1.0.0 | 分店 token | 拿到分店 item_id 才算真的铺进去了 |
-| `item.quantity.update.online` | 同步库存到分店网店 | `youzan.item.quantity.update` | 4.0.0 | 分店 token | `type=0` 全量覆盖，`kdt_id=分店` |
-| `item.quantity.update.offline` | 同步库存到分店线下 | `youzan.item.quantity.update` | 4.0.0 | 分店 token | 与上同 method，但带**线下 sell_channel_id / warehouse_code** 参数，验证线下也能改库存 |
+## 二、注册表 (`src/lib/youzan-api-registry.ts`)
 
-顶部**再加一个「一键端到端铺货 + 双渠道库存」大按钮**，按顺序跑：
-① 解析分店渠道 → ② HQ `spu.update` 一次带两个 channel → ③ 分店反查 item_id → ④ 网店 quantity.update → ⑤ 线下 quantity.update → ⑥ 在分店后台商品库 `online.spu.query` 再确认一次能搜到；每一步展示 code / message / trace_id / 原始响应，任一步失败立刻停并高亮那一步。
+保留并明确登记：
+- `youzan.retail.open.offline.spu.release`（发布到线下门店，分店 token）
+- `youzan.retail.open.offline.spu.query`（按 spu_code/sku_code 回查，分店 token）
+- `youzan.item.quantity.update` 4.0.0（线下渠道全量覆盖，分店 token）
+- 线下上下架 / 库存回查接口（用官方文档版本）
+- `youzan.retail.open.sellchannel.list` 只用来识别渠道类型
 
-## 四、代码改动清单（都走 `youzanFetch`）
+降为「诊断禁用」不进主链路：`spu.stores.distribute`、`spu.publish.to.stores`、`product.dispatch`，以及所有 `online.*` 接口。
 
-1. **`src/lib/youzan-sync.functions.ts`**
-   - 新增 `resolveBranchSellChannels(branchToken, branchRow)`：调用 `sellchannel.list`，返回 `{ online_id, offline_id, raw }`（区分渠道类型字段以有赞返回为准，命中不到的字段保留 null 并把 raw 传回前端）。
-   - 改 `ensureBranchDistribution`：`sell_channel_ids` 从 `[chan.sellChannelId]` 改为 `[online_id, offline_id].filter(Boolean)`；线下 id 存到 `youzan_shops.offline_sell_channel_id`（新列，见迁移）。
-   - 新增 `pushYouzanQuantityUpdateOffline(sku_id, shop_id, qty)`：与 `pushYouzanQuantityUpdate` 同 helper，但把 `sell_channel_id`/`warehouse_code` 明确传给线下渠道。
-2. **`src/lib/integration-capabilities.functions.ts`**
-   - `DEFAULT_CAPABILITY_MAP` 加上表格里的 5 个 key。
-   - `runProbe`：为每个 key 写独立 probe 分支，全部通过 `youzanFetch`。
-   - 新增 `runBranchE2E(sku_id, shop_id)`：串起 5 步，返回每步 `{ step, ok, code, message, trace_id, preview }[]`。
-3. **`src/routes/admin.api-integration.tsx`**
-   - 顶部加「一键端到端铺货 + 双渠道库存」按钮，弹出选 SKU + 选分店，跑完展示 6 步时间线（成功打对勾+撒花，失败翻译成人话）。
-   - 5 个新 capability 卡片：左侧一句话说明（"给分店的网店进货""给分店的线下门店进货"），右侧一键测试。
-4. **数据库迁移**（一次 migration）：
-   - `youzan_shops` 加 `offline_sell_channel_id bigint`、`online_sell_channel_id bigint`（沿用原 `sell_channel_id` 做兼容默认=网店）。
-   - `integration_api_registry` 插 5 条 seed。
+## 三、`omnichannel-publish.functions.ts`
 
-## 五、验收步骤（本轮由我在沙箱里跑，不让你手动点后台）
-1. 迁移落库、seed 完成。
-2. 挑现有测试 SKU（库存=1）+ 中信泰富分店，调 `runBranchE2E`。
-3. 期望全绿；如某一步红，返回给你翻译后的原因（"是有赞侧还缺配置" vs "我这边代码要改"），不再让你去猜。
-4. 在 API 联调页截图验证 5 个新卡片 + 端到端按钮出现。
+- 保留 HQ 幂等建品。
+- 把 `releaseSkuToBranchCore` 改名 / 改造为 `publishSkuOfflineCore`：
+  1. HQ 建品 / 回查 hq_spu_id/hq_sku_id（保留原有）。
+  2. （可选）按官方要求先配置销售范围，但只作为前置，不当成 release 成功。
+  3. 调 `offline.spu.release`。
+  4. 调 `offline.spu.query` 用 `spu_code/sku_code` 回查，取真实 `offline_item_id/offline_sku_id`。
+  5. 拿到真实 ID 才写 `youzan_branch_offline` listing，`external_item_id != hq_spu_id` 强制校验，禁用 `allowSameAsHqSpu`。
+- 删掉一切 `online.spu.query` 证明线下成功的路径。
 
-## 六、不做的事
-- 不动 `commit_sale / channel_sync_outbox` 等已跑通的孤品状态机。
-- 不改 HQ 建品逻辑。
-- 不再引入任何 fallback 逻辑掩盖失败——任一步真的失败就报出来。
+## 四、Worker (`channel-sync-worker.ts`)
+
+- 只处理 `channel = youzan_branch_offline` 的任务。
+- `publish_offline` 真正执行 release + query，不再只 verify。
+- 支持 action：`set_stock` / `set_stock_zero` / `shelf` / `delist` / `verify_stock` / `verify_listing`。
+- 每个动作执行前比较 `task.inventory_version` 与 `inv_skus.inventory_version`；旧任务直接置 `superseded`，不写有赞。
+- 库存写入统一走分店 token + `offline_item_id/offline_sku_id` + `channel` 线下参数 + 全量覆盖，写完必须 `verify_stock` 回查。
+- 删除 `allowSameAsHqSpu: true`。
+- apikey 缺失或不匹配 `SUPABASE_PUBLISHABLE_KEY` 一律 401。
+
+## 五、`test-publish-with-stock.ts`
+
+- 复用为单件孤品灰度入口。
+- 改用 `channel_sync_outbox`（不再写 `youzan_stock_sync_queue`）。
+- 完整跑：HQ 建品/回查 → 线下 release/query → set_stock → verify_stock → shelf → verify_listing。
+- 返回 HQ + branch offline 两条 listing 各自的 `external_*_id`、每步 `trace_id`、`inventory_version`，禁止输出 token / 代理 Bearer。
+
+## 六、`reconcileAllForCron` 修正
+
+`handleReconcile` 改为真实读取有赞线下库存与上下架状态，与 ERP 期望值比对，只有不一致才 enqueue 修正任务；一致直接更新 `verified_inventory_version`。
+
+## 七、其他清理
+
+- `ensureBranchDistribution`：`spu.update` 只传「线下门店」渠道 ID（来自 `offline_sell_channel_id`），不再把整个 `sell_channel_ids` 数组灌进去。
+- 组织树探测在保存 `sell_channel_ids` 的同时，按渠道类型识别线下并写入 `offline_sell_channel_id`。
+- 全项目搜索是否还有直连 `open.youzanyun.com` 的 `fetch` 调用；有就替换为 `youzanFetch`。
+
+## 八、验收
+
+在 `/admin/api-integration` 用「一件孤品灰度」按钮跑通 §11 全部勾选项，尤其：
+- HQ 只有一条 SPU；
+- 分店线下商品库能按条码查到；
+- 分店线下可售库存 = ERP `stock_qty`；
+- 并发售出不会负库存，退款不自动恢复。
+
+## 技术细节
+
+- 迁移文件命名 `2026-07-12_youzan_branch_offline.sql`，包含 rename + 新列 + CHECK 更新 + 索引重建 + GRANT 保留。
+- 所有 API 版本 / 字段以现行有赞文档为准，注册表里每条都写 `docs_url`；未确认版本时优先取官方最新，不做多版本 fallback（除非官方文档明确列出）。
+- 所有网关调用一律走 `youzanFetch`。
+- 完成后追加「【给 Codex 的指令 · 2026-07-12 · 第N条】」代码块，报同步接口版本、字段和联调证据格式。
+
+范围之外：不改代理、组织查询实现、总部建品幂等逻辑、`commit_sale`、退款复检 UI。

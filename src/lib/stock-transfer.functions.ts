@@ -170,7 +170,6 @@ async function pushYouzanQuantityDelta(shop: ShopRow, itemId: number, delta: num
     itemId,
     skuId: itemId, // 无规格商品 sku_id 传 item_id/spu_id
     quantity: nextStock,
-    allowSameAsHqSpu: true,
   });
 }
 
