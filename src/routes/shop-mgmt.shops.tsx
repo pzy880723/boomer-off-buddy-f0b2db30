@@ -48,6 +48,7 @@ function ShopsPage() {
   const list = useServerFn(listShopsWithStats);
   const q = useQuery({ queryKey: ["shops-with-stats"], queryFn: () => list() });
   const [editing, setEditing] = useState<ShopWithStats | null>(null);
+  const [creating, setCreating] = useState(false);
 
   const shops = q.data ?? [];
   const hq = shops.filter((s) => s.role === "hq").length;
@@ -64,18 +65,13 @@ function ShopsPage() {
           </span>
         }
         actions={
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() =>
-              toast.info("新增门店需先在有赞后台完成授权，然后运行同步任务")
-            }
-          >
+          <Button size="sm" onClick={() => setCreating(true)}>
             <Plus className="mr-1.5 h-3.5 w-3.5" />
             新增门店
           </Button>
         }
       />
+
 
       {q.isLoading ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
