@@ -55,7 +55,7 @@ export type ProbeRow = {
   shop_id: string | null;
   method: string;
   version: string;
-  request_params: unknown;
+  request_params: any;
   http_status: number | null;
   gw_code: number | null;
   trace_id: string | null;
@@ -66,8 +66,8 @@ export type ProbeRow = {
   tested_at: string;
 };
 
-async function assertAdmin(ctx: { supabase: ReturnType<typeof requireSupabaseAuth> extends unknown ? any : never; userId: string }) {
-  const { data, error } = await (ctx.supabase as any)
+async function assertAdmin(ctx: { supabase: any; userId: string }) {
+  const { data, error } = await ctx.supabase
     .rpc("has_role", { _user_id: ctx.userId, _role: "super_admin" });
   if (error) throw new Error(error.message);
   if (!data) throw new Error("仅超级管理员可访问 API 对接");
