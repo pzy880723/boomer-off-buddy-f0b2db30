@@ -208,7 +208,7 @@ function CapabilityCard({
       }
     >
       <CardContent className="p-0">
-        <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x">
+        <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x">
           {/* 左：能力描述 */}
           <div className="p-5 space-y-3 bg-muted/20">
             <div className="flex items-start gap-2 flex-wrap">
