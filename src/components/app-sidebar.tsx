@@ -24,6 +24,7 @@ import {
   AlertCircle,
   Smartphone,
   Plug,
+  Globe,
   FolderTree,
   type LucideIcon,
 } from "lucide-react";
