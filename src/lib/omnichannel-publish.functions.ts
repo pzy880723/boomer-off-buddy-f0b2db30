@@ -207,57 +207,54 @@ export async function releaseSkuToBranchCore(sku_id: string, shop_id: string) {
     last_error: null,
   });
 
-  const r = await ensureBranchProduct(sku_id, shop_id);
-  if (!r.yz_item_id) {
+  const { ensureBranchDistribution } = await import("./youzan-sync.functions");
+  const dist = await ensureBranchDistribution(sku_id, shop_id);
+
+  if (!dist.ok || !dist.branch_item_id) {
     await upsertListing({
       sku_id,
       channel: BRANCH_CHANNEL,
       shop_id,
+      external_spu_id: dist.hq_spu_id ? String(dist.hq_spu_id) : undefined,
       listing_status: "error",
-      last_error: (r.error || "release 失败").slice(0, 400),
+      last_error: (dist.error ?? "distribution failed").slice(0, 400),
     });
-    throw new Error(r.error || "release 失败");
-  }
-
-  // Verify via 分店反查
-  const probe = await probeBranchItemId({
-    branch_shop: { id: (branch as { id: string }).id, kdt_id: Number((branch as { kdt_id: number }).kdt_id) },
-    hq_spu_id: r.yz_item_id,
-  });
-
-  if (probe && probe.item_id) {
-    await upsertListing({
-      sku_id,
-      channel: BRANCH_CHANNEL,
-      shop_id,
-      external_spu_id: String(r.yz_item_id),
-      external_item_id: String(probe.item_id),
-      external_sku_id: String(probe.sku_id),
-      listing_status: "published",
-      last_error: null,
-      last_verified_at: new Date().toISOString(),
-    });
-    // 回写旧表方便旧 push 链路直接用
-    await supabase
-      .from("sku_youzan_links")
-      .update({
-        yz_item_id: probe.item_id,
-        yz_sku_id: probe.sku_id,
-      } as never)
-      .eq("sku_id", sku_id)
-      .eq("shop_id", shop_id);
     return {
-      ok: true,
-      verified: true,
-      item_id: probe.item_id,
-      sku_id: probe.sku_id,
-      probe_attempts: probe.attempts,
+      ok: false,
+      verified: false,
+      hq_spu_id: dist.hq_spu_id,
+      sell_channel_id: dist.sell_channel_id,
+      sell_channel_via: dist.sell_channel_via,
+      fix_channel_trace: dist.fix_channel_trace,
+      probe_attempts: dist.probe_attempts,
+      error: dist.error,
     };
   }
 
-  // release 成功但 verify 尚未可见（有赞侧分发有延迟）
-  const attempts = probe?.attempts ?? [];
   await upsertListing({
+    sku_id,
+    channel: BRANCH_CHANNEL,
+    shop_id,
+    external_spu_id: String(dist.hq_spu_id),
+    external_item_id: String(dist.branch_item_id),
+    external_sku_id: String(dist.branch_sku_id),
+    listing_status: "published",
+    last_error: null,
+    last_verified_at: new Date().toISOString(),
+  });
+  return {
+    ok: true,
+    verified: true,
+    hq_spu_id: dist.hq_spu_id,
+    item_id: dist.branch_item_id,
+    sku_id: dist.branch_sku_id,
+    sell_channel_id: dist.sell_channel_id,
+    sell_channel_via: dist.sell_channel_via,
+    fix_channel_trace: dist.fix_channel_trace,
+    probe_attempts: dist.probe_attempts,
+  };
+}
+
     sku_id,
     channel: BRANCH_CHANNEL,
     shop_id,
