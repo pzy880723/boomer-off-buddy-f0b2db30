@@ -368,6 +368,88 @@ function StatusPill({ probe }: { probe: ProbeRow | null }) {
   );
 }
 
+type ProbeExplanation = { title: string; reason: string; nextStep: string };
+
+function explainProbeError(input: {
+  capability_key: string;
+  method: string;
+  gw_code: number | null;
+  error: string | null;
+  response_snippet: string | null;
+}): ProbeExplanation {
+  const err = (input.error ?? "").trim();
+  const snip = (input.response_snippet ?? "").trim();
+  const all = `${err}\n${snip}`;
+  const code = input.gw_code;
+
+  // 前端参数校验类（handler 里直接抛的中文错误）
+  if (/^请选择|^请填写/.test(err)) {
+    return {
+      title: "还有必填项没填",
+      reason: err,
+      nextStep: "在右侧「测试参数」里把缺的字段补上，再点一次「立即测试」。",
+    };
+  }
+  if (/此能力需要用.*token/.test(err)) {
+    return {
+      title: "选错店铺角色了",
+      reason: err,
+      nextStep: "顶部的店铺下拉里换成提示要求的那一类店（总部或分店）再测。",
+    };
+  }
+  if (/必须选分店|需要在【分店】/.test(err)) {
+    return {
+      title: "这个能力只能对分店测",
+      reason: err,
+      nextStep: "把店铺切换成一家分店再点测试。",
+    };
+  }
+
+  // 有赞网关错误码
+  if (code === 234000001 || /系统异常/.test(all)) {
+    return {
+      title: "有赞暂时拒绝了这次调用（系统异常）",
+      reason: "有赞返回了 234000001「系统异常」。通常不是我们发的参数有问题，而是这个 SPU 在有赞后台被锁、店铺零售配置异常，或有赞侧临时故障。",
+      nextStep: "过几分钟重试一次；仍失败就换一个新建的测试 SPU；再不行把下面的 trace_id 发给有赞客服排查。",
+    };
+  }
+  if (code === 301000002 || /item.*not.*found|商品不存在|not visible/i.test(all)) {
+    return {
+      title: "分店还查不到这个商品",
+      reason: "有赞说这个商品在分店那边不存在或还没显示出来。多半是总部 SPU 还没铺到这家分店，或刚铺完有赞索引没跟上。",
+      nextStep: "先在门店列表里对这家分店做一次「铺货 / 同步」，等 1–2 分钟再来测。",
+    };
+  }
+  if (code === 40009 || /access[_ ]?token|token.*(expire|invalid)|unauthorized/i.test(all)) {
+    return {
+      title: "店铺授权失效了",
+      reason: "有赞说 access_token 无效或过期。这家店的授权已经不能再用了。",
+      nextStep: "去「门店列表」找到这家店，点「重新绑定」重新走一次有赞授权。",
+    };
+  }
+  if (code && code >= 40000 && code < 50000) {
+    return {
+      title: "有赞说我们发的请求不合法",
+      reason: `有赞返回错误码 ${code}。多半是接口版本、参数名或字段类型不对。`,
+      nextStep: "看看这个能力的「接口全名 / 版本」是不是有赞文档里最新的；对照文档改一下参数再测。",
+    };
+  }
+  if (/HTTP\s*5\d\d|gateway|proxy|ETIMEDOUT|ECONNRESET|network/i.test(all)) {
+    return {
+      title: "网络没通到有赞",
+      reason: "请求还没到有赞业务层就失败了，通常是出口代理或有赞网关临时抖动。",
+      nextStep: "过一会儿再点一次；如果一直这样，去检查有赞出口代理是否在线。",
+    };
+  }
+
+  // 兜底
+  return {
+    title: "测试没通过，但有赞没给出明确原因",
+    reason: err || "有赞没有返回可读的错误信息。",
+    nextStep: "展开下面的「技术细节」，把 trace_id 和返回内容发给有赞客服，让他们帮忙查这一次请求。",
+  };
+}
+
 function ProbeResultBlock({
   latest,
   last,
@@ -387,10 +469,31 @@ function ProbeResultBlock({
       }
     : null);
   if (!shown) return null;
+
+  const explain = !shown.ok
+    ? explainProbeError({
+        capability_key: "",
+        method: "",
+        gw_code: shown.gw_code ?? null,
+        error: shown.error ?? null,
+        response_snippet: (shown.response_snippet ?? "") as string,
+      })
+    : null;
+
+  const copyTrace = async () => {
+    if (!shown.trace_id) return;
+    try {
+      await navigator.clipboard.writeText(shown.trace_id);
+      toast.success("trace_id 已复制");
+    } catch {
+      toast.error("复制失败，请手动选中");
+    }
+  };
+
   return (
     <div
       className={
-        "mt-1 rounded-md border p-3 space-y-2 " +
+        "mt-1 rounded-md border p-3 space-y-3 " +
         (shown.ok ? "bg-emerald-500/5 border-emerald-500/30" : "bg-destructive/5 border-destructive/30")
       }
     >
@@ -398,24 +501,59 @@ function ProbeResultBlock({
         <span className={shown.ok ? "text-emerald-600 font-medium" : "text-destructive font-medium"}>
           {shown.ok ? "✓ 测试通过" : "✗ 测试失败"}
         </span>
-        <span className="text-muted-foreground">耗时 {shown.latency_ms} ms</span>
-        {shown.gw_code != null && <span className="text-muted-foreground">错误码 {shown.gw_code}</span>}
+        <span className="text-muted-foreground">耗时 {shown.latency_ms} 毫秒</span>
+        {shown.gw_code != null && <span className="text-muted-foreground">有赞错误码 {shown.gw_code}</span>}
       </div>
-      {shown.error && (
-        <div className="text-xs text-destructive whitespace-pre-wrap break-all">{shown.error}</div>
+
+      {explain && (
+        <div className="space-y-2 text-sm">
+          <div>
+            <span className="font-medium">结论：</span>
+            <span>{explain.title}</span>
+          </div>
+          <div className="text-muted-foreground">
+            <span className="font-medium text-foreground">原因：</span>
+            {explain.reason}
+          </div>
+          <div className="text-muted-foreground">
+            <span className="font-medium text-foreground">下一步：</span>
+            {explain.nextStep}
+          </div>
+          {shown.trace_id && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>trace_id：</span>
+              <code className="px-1.5 py-0.5 rounded bg-background border">{shown.trace_id}</code>
+              <button type="button" className="underline hover:text-foreground" onClick={copyTrace}>
+                复制
+              </button>
+            </div>
+          )}
+        </div>
       )}
-      {shown.response_snippet && (
-        <details className="text-xs">
-          <summary className="cursor-pointer text-muted-foreground">查看返回内容</summary>
-          <pre className="mt-1 p-2 bg-background rounded border overflow-auto max-h-64 whitespace-pre-wrap break-all">{shown.response_snippet}</pre>
-        </details>
-      )}
-      {shown.request_params && Object.keys(shown.request_params as any).length > 0 && (
-        <details className="text-xs">
-          <summary className="cursor-pointer text-muted-foreground">查看发送的参数</summary>
-          <pre className="mt-1 p-2 bg-background rounded border overflow-auto max-h-64">{JSON.stringify(shown.request_params, null, 2)}</pre>
-        </details>
-      )}
+
+      <details className="text-xs">
+        <summary className="cursor-pointer text-muted-foreground">技术细节（发给客服 / 开发排查用）</summary>
+        <div className="mt-2 space-y-2">
+          {shown.error && (
+            <div>
+              <div className="text-muted-foreground mb-1">原始错误：</div>
+              <pre className="p-2 bg-background rounded border overflow-auto max-h-40 whitespace-pre-wrap break-all">{shown.error}</pre>
+            </div>
+          )}
+          {shown.response_snippet && (
+            <div>
+              <div className="text-muted-foreground mb-1">有赞返回：</div>
+              <pre className="p-2 bg-background rounded border overflow-auto max-h-40 whitespace-pre-wrap break-all">{shown.response_snippet}</pre>
+            </div>
+          )}
+          {shown.request_params && Object.keys(shown.request_params as any).length > 0 && (
+            <div>
+              <div className="text-muted-foreground mb-1">发送的参数：</div>
+              <pre className="p-2 bg-background rounded border overflow-auto max-h-40">{JSON.stringify(shown.request_params, null, 2)}</pre>
+            </div>
+          )}
+        </div>
+      </details>
     </div>
   );
 }
