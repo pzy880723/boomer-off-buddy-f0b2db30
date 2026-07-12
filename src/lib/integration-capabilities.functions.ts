@@ -807,8 +807,16 @@ export async function probeShopChainOrgList(input: {
       if (target) {
         matched = nodes.find((n) => n.kdt_id === Number(target.kdt_id)) ?? null;
         if (matched?.sell_channel_id && input.supabase) {
+          const allIds = Array.from(
+            new Set(
+              [matched.sell_channel_id, ...(matched.sell_channel_ids || [])].filter(
+                (v): v is number => typeof v === "number" && v > 0,
+              ),
+            ),
+          );
           const patch: Record<string, any> = {
             sell_channel_id: matched.sell_channel_id,
+            sell_channel_ids: allIds,
             chain_probe_status: "ok",
             chain_probe_at: new Date().toISOString(),
           };
@@ -820,6 +828,7 @@ export async function probeShopChainOrgList(input: {
           else console.error("[chain probe save]", uerr.message);
         }
       }
+
 
       const summary = {
         passed_version: version,

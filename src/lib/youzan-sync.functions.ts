@@ -1786,6 +1786,7 @@ export async function ensureBranchDistribution(
   ok: boolean;
   hq_spu_id: number | null;
   sell_channel_id: number | null;
+  sell_channel_ids: number[];
   sell_channel_via: string | null;
   fix_channel_trace: string | null;
   branch_item_id: number | null;
@@ -1793,6 +1794,7 @@ export async function ensureBranchDistribution(
   probe_attempts: Array<{ label: string; ok: boolean; trace?: string | null; error?: string; code?: number; msg?: string }>;
   error?: string;
 }> {
+
   // 1. HQ SPU
   const hqInfo = await ensureHqSpuLink(sku_id);
   const hqSpuId = Number(hqInfo.yz_item_id);
@@ -1812,9 +1814,17 @@ export async function ensureBranchDistribution(
   const hqToken = await ensureAccessToken(hq);
   const branchToken = await ensureAccessToken(branchRow as unknown as Parameters<typeof ensureAccessToken>[0]);
 
-  // 3. 解析 sell_channel_id
+  // 3. 解析 sell_channel_id（若 youzan_shops.sell_channel_ids 已保存了整套渠道，就一次性用全部）
   const chan = await resolveBranchSellChannelId(hqToken, branchRow as ShopLike & { sell_channel_id?: number | null });
-  if (!chan.sellChannelId) {
+  const savedIds = Array.isArray((branchRow as unknown as { sell_channel_ids?: number[] | null }).sell_channel_ids)
+    ? ((branchRow as unknown as { sell_channel_ids?: number[] }).sell_channel_ids ?? [])
+        .map((n) => Number(n))
+        .filter((n) => Number.isFinite(n) && n > 0)
+    : [];
+  const targetChannelIds = Array.from(new Set(
+    [chan.sellChannelId, ...savedIds].filter((n): n is number => typeof n === "number" && n > 0),
+  ));
+  if (targetChannelIds.length === 0) {
     const msg = `missing_sell_channel_id: 系统已识别分店授权，但没有拿到铺货渠道号，已停止自动铺货。${chan.error ? `原因：${chan.error}` : ""}`;
     await supabase.from("sku_youzan_links").upsert({
       sku_id, shop_id,
@@ -1829,7 +1839,9 @@ export async function ensureBranchDistribution(
       ok: false,
       hq_spu_id: hqSpuId,
       sell_channel_id: null,
+      sell_channel_ids: [],
       sell_channel_via: null,
+
       fix_channel_trace: chan.trace,
       branch_item_id: null,
       branch_sku_id: null,
@@ -1837,6 +1849,7 @@ export async function ensureBranchDistribution(
       error: msg,
     };
   }
+
 
   // 4. 补齐 spu.update 的必填字段
   const { data: skuRow } = await supabase
@@ -1857,7 +1870,7 @@ export async function ensureBranchDistribution(
       kdt_id: branchKdtId,
       action: "distribution_fix_channel",
       status: "running",
-      message: `spu.update spu_id=${hqSpuId} sell_channel_id=${chan.sellChannelId} via=${chan.via}`,
+      message: `spu.update spu_id=${hqSpuId} sell_channel_ids=[${targetChannelIds.join(",")}] via=${chan.via ?? "saved_list"}`,
     } as never)
     .select("id")
     .single();
@@ -1875,9 +1888,10 @@ export async function ensureBranchDistribution(
         retail_price: retailPrice,
         sell_channel_setting_request: {
           is_partial: 1,
-          sell_channel_ids: [chan.sellChannelId],
+          sell_channel_ids: targetChannelIds,
         },
       },
+
       timeoutMs: 20_000,
     });
     fixTrace = res.trace_id;
@@ -1908,12 +1922,15 @@ export async function ensureBranchDistribution(
       last_error: `fix_channel_failed: ${msg}`.slice(0, 400),
     } as never, { onConflict: "sku_id,shop_id" });
     return {
-      ok: false, hq_spu_id: hqSpuId, sell_channel_id: chan.sellChannelId,
+      ok: false, hq_spu_id: hqSpuId, sell_channel_id: chan.sellChannelId ?? targetChannelIds[0] ?? null,
+      sell_channel_ids: targetChannelIds,
       sell_channel_via: chan.via, fix_channel_trace: fixTrace,
+
       branch_item_id: null, branch_sku_id: null, probe_attempts: [],
       error: `fix_channel_failed: ${msg}`,
     };
   }
+
 
   // 6. 反查分店真实 item_id / sku_id
   const probe = await probeBranchRealIds({
@@ -1949,8 +1966,10 @@ export async function ensureBranchDistribution(
       last_error: `branch item not visible / distribution missing: ${JSON.stringify(probe.attempts).slice(0, 300)}`,
     } as never, { onConflict: "sku_id,shop_id" });
     return {
-      ok: false, hq_spu_id: hqSpuId, sell_channel_id: chan.sellChannelId,
+      ok: false, hq_spu_id: hqSpuId, sell_channel_id: chan.sellChannelId ?? targetChannelIds[0] ?? null,
+      sell_channel_ids: targetChannelIds,
       sell_channel_via: chan.via, fix_channel_trace: fixTrace,
+
       branch_item_id: null, branch_sku_id: null, probe_attempts: probe.attempts,
       error: "branch item not visible / distribution missing",
     };
@@ -1971,14 +1990,20 @@ export async function ensureBranchDistribution(
   return {
     ok: true,
     hq_spu_id: hqSpuId,
-    sell_channel_id: chan.sellChannelId,
+    sell_channel_id: chan.sellChannelId ?? targetChannelIds[0] ?? null,
+    sell_channel_ids: targetChannelIds,
     sell_channel_via: chan.via,
+
     fix_channel_trace: fixTrace,
     branch_item_id: probe.item_id,
     branch_sku_id: branchSkuId,
     probe_attempts: probe.attempts,
   };
 }
+
+
+
+
 
 type ShopLike = {
   id: string;

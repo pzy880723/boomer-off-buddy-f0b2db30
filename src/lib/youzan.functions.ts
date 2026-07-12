@@ -687,6 +687,13 @@ export async function pushYouzanQuantityUpdate(opts: {
   timeoutMs?: number;
   hqSpuIdGuard?: number; // 若给定 → itemId 不能等于 HQ SPU id（除非用户显式允许）
   allowSameAsHqSpu?: boolean;
+  /**
+   * item.quantity.update 4.0.0 的 channel 语义（有赞连锁零售）：
+   *  1 = 门店销售库存（线下门店 / offline）
+   *  0 = 网店销售库存（线上 / online）
+   * 默认保持 1（门店），与历史行为一致。
+   */
+  channel?: 0 | 1;
 }): Promise<{
   trace_id: string | null;
   preview: string;
@@ -720,11 +727,12 @@ export async function pushYouzanQuantityUpdate(opts: {
   }
   const qty = Math.max(0, Math.floor(Number(opts.quantity)));
   const token = await ensureAccessToken(shop as ShopRow);
+  const channel = opts.channel === 0 ? 0 : 1;
   const params: Record<string, unknown> = {
     kdt_id: Number((shop as { kdt_id: number }).kdt_id),
     item_id: itemId,
     sku_id: skuId,
-    channel: 1,
+    channel,
     stock_num_str: String(qty),
   };
   const r = await callYouzanApiVerbose({
@@ -736,6 +744,7 @@ export async function pushYouzanQuantityUpdate(opts: {
   });
   return { trace_id: r.trace_id, preview: r.preview, version: "4.0.0", params };
 }
+
 
 
 export const getYouzanOutboundInfo = createServerFn({ method: "GET" }).handler(async () => {

@@ -256,14 +256,28 @@ async function handleSetStock(
     .maybeSingle();
   if (!branch) throw new Error("门店不存在");
   const hqSpuIdGuard = Number(l.external_spu_id ?? 0) || undefined;
-  await pushYouzanQuantityUpdate({
-    branchShop: branch as unknown as Parameters<typeof pushYouzanQuantityUpdate>[0]["branchShop"],
-    itemId,
-    skuId: skuId || itemId,
-    quantity: target,
-    hqSpuIdGuard,
-    allowSameAsHqSpu: true,
-  });
+  // 分店同时推 offline(channel=1) 与 online(channel=0) 两种销售库存
+  const channels: Array<0 | 1> = [1, 0];
+  const pushErrors: string[] = [];
+  for (const ch of channels) {
+    try {
+      await pushYouzanQuantityUpdate({
+        branchShop: branch as unknown as Parameters<typeof pushYouzanQuantityUpdate>[0]["branchShop"],
+        itemId,
+        skuId: skuId || itemId,
+        quantity: target,
+        hqSpuIdGuard,
+        allowSameAsHqSpu: true,
+        channel: ch,
+      });
+    } catch (e) {
+      pushErrors.push(`channel=${ch}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+  if (pushErrors.length === channels.length) {
+    throw new Error(pushErrors.join(" | "));
+  }
+
 
   await sb
     .from("sku_channel_listings")
