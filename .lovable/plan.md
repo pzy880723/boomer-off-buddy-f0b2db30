@@ -1,131 +1,52 @@
 ## 目标
 
-「API 对接」页只做一件事：**逐个精准测试每一条平台 API 是否配对正确、是否联通**。别的花架子全砍掉。
+把 `/admin/api-integration` 每张能力卡片改成真正的「左右两栏」布局，并把接口方法名 + 版本号合并成一个整段输入框（例如 `youzan.retail.open.stocksupply.relaiton.query.1.0.0`），不再拆成两格。
 
----
+## 布局调整（`src/routes/admin.api-integration.tsx`）
 
-## 一、页面结构
-
-路由：`/admin/api-integration`
+每张卡片改成 `grid-cols-1 lg:grid-cols-2`（大屏严格左右各占一半，小屏才回退到上下）：
 
 ```text
-┌────────────────────────────────────────────────────────────┐
-│ 平台:  [ 有赞 ● ]  [ 美团 (未接入) ]  [ 淘宝 (未接入) ]     │
-├────────────────────────────────────────────────────────────┤
-│ 店铺:  [ 总部 BOOMER OFF ▼ ]   ← 影响需要 shop 的测试     │
-├────────────────────────────────────────────────────────────┤
-│ 能力矩阵（每行一个能力，一行一次测试）                      │
-└────────────────────────────────────────────────────────────┘
+┌────────────────────────────┬────────────────────────────┐
+│ 左：能力说明                │ 右：测试面板                │
+│  • 能力名称                 │  • 选择测试店铺            │
+│  • 一句话讲清做什么         │  • 参数输入区              │
+│  • 当前接口全名（只读展示） │  • 【立即测试】按钮        │
+│  • 授权方式 / 作用范围      │  • 最近一次测试结果        │
+│  • 备注                     │    （状态 / 耗时 / 响应）  │
+│  • 【编辑】【文档】【恢复】 │                            │
+└────────────────────────────┴────────────────────────────┘
 ```
 
-只有两级：**平台 Tab → 能力列表**。没有别的 Tab，没有别的面板。
+- 左栏顶部：能力中文名 + 「已通过 / 未测 / 失败」大徽章。
+- 左栏中部：需求说明（原 `requirement`）+ 备注。
+- 左栏底部：一行只读展示当前用的接口全名，例如 `youzan.trades.sold.get.4.0.4`，方便一眼核对。
+- 右栏就是原来的测试面板，纵向排布：门店选择 → 参数 → 测试按钮 → 结果。
 
-同步日志、系统检查、实时推送、渠道同步异常，全部删除入口（`ShopHealthPanel` / `ApiHealthPanel` / `SyncCenterPanel` / `MessagePushPanel` / `admin.channel-sync.tsx`）。
+## 接口全名合并成一个输入框
 
----
+现在编辑弹窗里 `method` 和 `version` 是两格，改成一格「接口全名」：
 
-## 二、能力矩阵一行的字段
+- 新增一个字段 **接口全名**，占位符示例：`youzan.retail.open.stocksupply.relaiton.query.1.0.0`
+- 保存时前端拆分：以最后两个 `.` 之前作为 `method`，最后 `major.minor` 作为 `version`。
+  - 例：`youzan.trades.sold.get.4.0.4` → method=`youzan.trades.sold.get`，version=`4.0.4`
+  - 例：`youzan.retail.open.spu.create.3.0.0` → method=`youzan.retail.open.spu.create`，version=`3.0.0`
+- 校验：必须匹配 `^[a-z0-9.]+\.\d+\.\d+\.\d+$`，不符合就红字提示「格式应为：接口名.主版本.次版本.修订版本，例如 youzan.trades.sold.get.4.0.4」，保存按钮禁用。
+- 底层数据库仍然拆开存 `method` + `version`（`updateIntegrationCapability` 签名不动），只是 UI 合并展示与输入。
+- 编辑弹窗其它字段保持中文标签不变（作用范围 / 授权方式 / 备注）。
 
-每行是**一个业务能力 = 一个 API 调用**，不合并、不复用、不重复。
+## 文档链接
 
-| 列 | 内容 |
-|---|---|
-| 能力名 | 精准业务描述，例如「获取分店近 24 小时已支付订单列表」 |
-| 需求描述 | 一句话说清：调用谁的 token、传什么关键参数、期望返回什么、系统哪里在用 |
-| 当前 API | `youzan.trades.sold.get / 4.0.4` |
-| 作用域 | HQ / 分店 / 都可 |
-| 测试参数 | 一个小表单，行内展开，字段随能力不同而不同（下面详列） |
-| 上次结果 | ✓/✗ + gw code + trace_id + 耗时 + 响应片段（点开看完整 JSON） |
-| 操作 | [测试] [编辑 API] [恢复默认] |
+保留上一版的「按接口名搜索有赞文档中心」策略，但用合并后的接口全名去掉版本号那部分再拼搜索关键词，命中率更高。
 
-**「编辑 API」**：只允许改 `method` / `version` / `scope`，不改语义。改完立即可测，也可一键回滚到代码内置默认。
+## 不改动
 
-**「测试参数」按能力精准设计**，绝不再用"最小 dummy 参数"糊弄：
+- 后端 `src/lib/integration-capabilities.functions.ts` 及数据库 schema 不动。
+- 参数字段（`PROBE_FIELDS`）保持中文标签，不合并、不拆分。
+- 侧边栏、路由结构、其它页面不变。
 
-- 获取 token → 无参数
-- 拉分店订单 → `time_range=近 24h`、`page_size=1`（可改）
-- 拉订单详情 → `tid`（下拉：最近 20 单）
-- 拉分店商品 → `page_size=1`
-- 商品详情 → `item_id`（下拉：分店最近同步到的 items）或手填
-- 建 HQ SPU → 用一个固定「探测用 SKU」草稿参数（测完自动删）
-- 更新 HQ SPU 销售渠道 → `spu_id`（下拉：本地 sku_youzan_links）+ 目标 `sell_channel_id`（下拉：门店树）
-- 分店库存覆盖 → `item_id` + `num`（默认 0，改回原值二次点回滚）
-- 上传素材图 → 选一张本地已存图，返回 CDN URL
-- 门店树查询 → 无参数
-- 删除 HQ SPU → `spu_id` 手填，二次确认
+## 验收
 
-每次测试的**请求参数、原始响应、trace_id** 全部保存在 `integration_api_probes` 里，可以往回翻。
-
----
-
-## 三、能力清单（有赞，首发版）
-
-按业务分组，每组每行都是一个**独立**的 API，不做「一键全测」。
-
-**认证**
-1. 获取店铺 access_token（silent） · `youzan.retail.open.token.silent/1.0.0`
-
-**门店 / 渠道**
-2. 查询门店树 & 销售渠道 · `youzan.retail.open.shoptree.query/3.0.0`
-
-**订单（分店 token）**
-3. 拉取分店近 24h 已支付订单列表 · `youzan.trades.sold.get/4.0.4`
-4. 拉取单笔订单详情 · `youzan.trade.get/4.0.2`
-
-**商品（HQ token · 中台）**
-5. 创建 HQ SPU · `youzan.retail.open.spu.add/3.0.0`
-6. 更新 HQ SPU（含铺货 sell_channel_setting_request） · `youzan.retail.open.spu.update/3.0.0`
-7. 删除 HQ SPU · `youzan.retail.open.spu.delete/3.0.0`
-8. 查询在售 SPU 列表 · `youzan.retail.open.online.spu.query/…`
-
-**商品（分店 token · 前台 item）**
-9. 分店商品详情（HQ SPU → 分店 item_id 反查） · `youzan.item.detail.get/1.0.0`
-10. 分店库存全量覆盖 · `youzan.item.quantity.update/4.0.0`
-
-**素材**
-11. 上传商品图到有赞 CDN · `youzan.materials.storage.platform.img.upload/3.0.0`
-
-以后加美团/淘宝就是往同一张表里插 `platform=meituan` 的新行，Tab 自动多一个。
-
----
-
-## 四、后端
-
-1. 新表 `integration_api_registry`：`platform, capability_key, capability_name, requirement, method, version, scope, note, is_overridden, updated_at, updated_by`。代码里 `src/lib/youzan-api-registry.ts` 提供内置默认，页面读取时用 DB 覆盖。
-2. 新表 `integration_api_probes`：`capability_key, shop_id, request_params, http_status, gw_code, trace_id, latency_ms, ok, response_snippet, tested_at, tested_by`。用于「上次结果」和历史回看。
-3. 新 serverFn（都带 `requireSupabaseAuth` + admin 校验）：
-   - `listIntegrationCapabilities({ platform })`
-   - `updateIntegrationCapability({ capability_key, method, version, scope })`
-   - `resetIntegrationCapability({ capability_key })`
-   - `probeIntegrationCapability({ capability_key, shop_id, params })` — 按 capability 走对应真实调用路径（复用现有 `callYouzanApiVerbose`），把入参/出参完整落盘。
-4. **业务代码改造**：`youzan-sync` / `omnichannel-publish` / `stock-transfer` / webhook 里所有 method/version 硬编码，改为 `await getCapability('trade.get').method` 这样按 key 读。这样你在页面改 API，业务立刻切换，不用发版。
-
----
-
-## 五、"默认自动同步"
-
-不进入本页 UI，只做后台配置：
-- 已有的 `channel-sync-worker` cron 保留。
-- 新增两条 pg_cron：
-  - 每 5 分钟拉一次所有已绑分店近 30 分钟订单（走能力 3+4）
-  - 每 30 分钟拉一次分店在售商品（走能力 8/9），校准 `youzan_items` 与 `sku_channel_listings`
-- 门店卡片保留「立即同步」按钮做兜底。
-
-自动同步用的就是矩阵里当前配的 API，一旦你在矩阵里换了 method/version，cron 也跟着换。
-
----
-
-## 六、删掉的东西
-
-- `admin.api-integration.tsx` 现有的 5 个 Tab（health / api-health / sync / realtime / logs / channel）全清空，只留新的矩阵。
-- 路由 `admin.channel-sync.tsx` 删除。
-- 侧栏若还有旧入口一并去掉。
-
----
-
-## 交付验收
-
-- 打开 `/admin/api-integration` 直接看到平台 Tab + 能力矩阵。
-- 11 条能力每条都能独立测，参数表单和能力语义严格对应，没有一个是「dummy 通用探针」。
-- 任一能力测失败，可就地改 method/version 再测，不用发版。
-- 业务代码不再有硬编码的 method/version 字面量（除内置默认表）。
+1. 桌面浏览器打开 `/admin/api-integration`，每张卡片肉眼可见的左右两栏（大屏左右各占一半）。
+2. 点【编辑】弹窗里只有一个「接口全名」输入框，粘贴 `youzan.retail.open.stocksupply.relaiton.query.1.0.0` 能正常保存。
+3. 保存后左栏「当前接口」立刻显示新的全名，测试仍能正常调用。
