@@ -120,9 +120,14 @@ function ShopCard({ shop, onEdit }: { shop: ShopWithStats; onEdit: () => void })
           <StatusBadge tone={shop.role === "hq" ? "brand" : "info"}>
             {roleLabel(shop.role)}
           </StatusBadge>
-          <StatusBadge tone={shop.last_ping_ok ? "success" : "warning"}>
-            {shop.last_ping_ok ? "在线" : "离线"}
+          <StatusBadge tone={shop.ownership === "自营" ? "success" : "warning"}>
+            {shop.ownership || "自营"}
           </StatusBadge>
+          {shop.kdt_id ? (
+            <StatusBadge tone={shop.access_token ? "success" : "neutral"}>
+              {shop.access_token ? "已绑定" : "未绑定"}
+            </StatusBadge>
+          ) : null}
         </div>
         <button
           className="absolute right-3 top-3 rounded-md bg-white/90 p-1.5 opacity-0 shadow-sm transition-opacity hover:bg-white group-hover:opacity-100"
