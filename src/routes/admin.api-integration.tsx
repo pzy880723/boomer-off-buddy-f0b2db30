@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import confetti from "canvas-confetti";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,6 +20,7 @@ import {
   updateIntegrationCapability,
   resetIntegrationCapability,
   probeIntegrationCapability,
+  probeShopChainForIntegration,
   type CapabilityRow,
   type ProbeRow,
 } from "@/lib/integration-capabilities.functions";
@@ -34,7 +35,41 @@ export const Route = createFileRoute("/admin/api-integration")({
   component: ApiIntegrationPage,
 });
 
-type ShopLite = { id: string; kdt_id: number; shop_name: string; role: "hq" | "branch"; status: string };
+type ShopLite = {
+  id: string;
+  kdt_id: number;
+  shop_name: string;
+  role: "hq" | "branch";
+  status: string;
+  sell_channel_id?: number | null;
+  warehouse_code?: string | null;
+  warehouse_name?: string | null;
+  chain_probe_status?: "unknown" | "ok" | "partial" | "failed";
+  chain_probe_at?: string | null;
+};
+
+type ChainProbeResult = {
+  ok: boolean;
+  status: "ok" | "partial" | "failed";
+  checked_at: string;
+  shop_name: string;
+  kdt_id: number;
+  sell_channel_id: number | null;
+  sell_channel_via: string | null;
+  warehouse_code: string | null;
+  warehouse_name: string | null;
+  can_publish_and_sync: boolean;
+  steps: Array<{
+    key: string;
+    label: string;
+    status: "ok" | "warn" | "error";
+    message: string;
+    version?: string | null;
+    trace_id?: string | null;
+    error?: string | null;
+  }>;
+  warehouse_versions: Array<{ version: string; ok: boolean; trace_id?: string | null; error?: string | null }>;
+};
 
 const PLATFORMS = [{ key: "youzan", name: "有赞" }] as const;
 
@@ -42,6 +77,7 @@ const PLATFORMS = [{ key: "youzan", name: "有赞" }] as const;
 const DOC_URL_BY_METHOD: Record<string, string> = {
   "auth/token": "https://doc.youzanyun.com/detail/API/0/906",
   "youzan.shop.chain.descendent.organization.list": "https://doc.youzanyun.com/detail/API/0/1793",
+  "youzan.retail.open.warehouse.query": "https://doc.youzanyun.com/detail/API/0/3365",
   "youzan.trades.sold.get": "https://doc.youzanyun.com/detail/API/0/70",
   "youzan.trade.get": "https://doc.youzanyun.com/detail/API/0/71",
   "youzan.retail.open.online.spu.query": "https://doc.youzanyun.com/detail/API/0/1790",
@@ -131,6 +167,7 @@ function PlatformMatrix({ platform }: { platform: string }) {
 
   return (
     <div className="space-y-4">
+      <ShopChainProbePanel shops={shops} onChanged={() => q.refetch()} />
       <div className="flex items-center gap-3 text-sm">
         <Badge variant="outline" className="text-xs">共 {capabilities.length} 项能力</Badge>
         <Badge className="text-xs bg-emerald-600 hover:bg-emerald-600 gap-1">
@@ -151,6 +188,154 @@ function PlatformMatrix({ platform }: { platform: string }) {
           />
         ))}
       </div>
+    </div>
+  );
+}
+
+function ShopChainProbePanel({ shops, onChanged }: { shops: ShopLite[]; onChanged: () => void }) {
+  const branchShops = shops.filter((s) => s.role === "branch");
+  const [shopId, setShopId] = useState(branchShops[0]?.id ?? "");
+  useEffect(() => {
+    if (!shopId && branchShops[0]?.id) setShopId(branchShops[0].id);
+  }, [branchShops, shopId]);
+  const selected = branchShops.find((s) => s.id === shopId) ?? null;
+  const probeFn = useServerFn(probeShopChainForIntegration);
+  const probe = useMutation({
+    mutationFn: () => probeFn({ data: { shop_id: shopId } }),
+    onSuccess: (r) => {
+      if (r.can_publish_and_sync) {
+        fireCelebration();
+        toast.success("店铺链路已打通", { description: "可以继续做商品铺货和库存同步。" });
+      } else {
+        toast.error("店铺链路还没打通", { description: "下面已经标出具体卡在哪一步。" });
+      }
+      onChanged();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Card className="overflow-hidden">
+      <CardContent className="p-5 space-y-4">
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+          <div className="space-y-1">
+            <h2 className="text-base font-semibold">一键检查店铺链路</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              选一家分店，系统会自动检查授权、总部是否能识别它、铺货渠道号、仓库/库位，并告诉你能不能继续同步商品和库存。
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2 md:min-w-[420px]">
+            <Select value={shopId} onValueChange={setShopId}>
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder="请选择分店" />
+              </SelectTrigger>
+              <SelectContent>
+                {branchShops.length === 0 && <div className="text-xs text-muted-foreground p-2">还没有已绑定的分店</div>}
+                {branchShops.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>{s.shop_name} · {s.kdt_id}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button onClick={() => probe.mutate()} disabled={probe.isPending || !shopId} className="gap-1 shrink-0">
+              {probe.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+              检查链路
+            </Button>
+          </div>
+        </div>
+
+        {selected && !probe.data && (
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
+            <InfoBox label="最近状态" value={chainStatusText(selected.chain_probe_status)} />
+            <InfoBox label="铺货渠道号" value={selected.sell_channel_id ? String(selected.sell_channel_id) : "未拿到"} />
+            <InfoBox label="仓库/库位" value={selected.warehouse_name ?? selected.warehouse_code ?? "未拿到"} />
+            <InfoBox label="上次检查" value={selected.chain_probe_at ? new Date(selected.chain_probe_at).toLocaleString("zh-CN") : "未检查"} />
+          </div>
+        )}
+
+        {probe.data && <ChainProbeResultBlock result={probe.data as ChainProbeResult} />}
+      </CardContent>
+    </Card>
+  );
+}
+
+function chainStatusText(status?: string | null) {
+  if (status === "ok") return "已打通";
+  if (status === "partial") return "部分通过";
+  if (status === "failed") return "未打通";
+  if (status === "unknown") return "未检查";
+  return "未检查";
+}
+
+function InfoBox({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="rounded-md border bg-muted/20 px-3 py-2 min-w-0">
+      <div className="text-muted-foreground">{label}</div>
+      <div className="font-medium truncate">{value}</div>
+    </div>
+  );
+}
+
+function ChainProbeResultBlock({ result }: { result: ChainProbeResult }) {
+  return (
+    <div className="rounded-md border p-3 space-y-3">
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <Badge className={result.can_publish_and_sync ? "bg-emerald-600 hover:bg-emerald-600" : ""} variant={result.can_publish_and_sync ? "default" : "destructive"}>
+          {result.can_publish_and_sync ? "可以继续铺货 + 同步库存" : "暂时不能继续铺货"}
+        </Badge>
+        <span className="text-muted-foreground">{result.shop_name} · {result.kdt_id}</span>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+        <InfoBox label="铺货渠道号" value={result.sell_channel_id ? `${result.sell_channel_id}${result.sell_channel_via ? ` · ${result.sell_channel_via}` : ""}` : "未拿到"} />
+        <InfoBox label="仓库/库位" value={result.warehouse_name ?? result.warehouse_code ?? "未拿到"} />
+        <InfoBox label="检查时间" value={new Date(result.checked_at).toLocaleString("zh-CN")} />
+      </div>
+
+      <div className="space-y-2">
+        {result.steps.map((step) => (
+          <div key={step.key} className="flex items-start gap-2 rounded-md border p-2 text-sm">
+            {step.status === "ok" ? (
+              <CheckCircle2 className="h-4 w-4 mt-0.5 text-emerald-600 shrink-0" />
+            ) : step.status === "warn" ? (
+              <Clock className="h-4 w-4 mt-0.5 text-amber-600 shrink-0" />
+            ) : (
+              <XCircle className="h-4 w-4 mt-0.5 text-destructive shrink-0" />
+            )}
+            <div className="min-w-0">
+              <div className="font-medium">{step.label}</div>
+              <div className="text-muted-foreground leading-relaxed">{step.message}</div>
+              {(step.version || step.trace_id) && (
+                <div className="text-[11px] text-muted-foreground mt-1">
+                  {step.version && <span>版本 {step.version}</span>}
+                  {step.trace_id && <span className="ml-2">trace_id {step.trace_id}</span>}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {result.warehouse_versions.length > 0 && (
+        <details className="text-xs">
+          <summary className="cursor-pointer text-muted-foreground">仓库接口多版本测试结果</summary>
+          <div className="mt-2 overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b"><th className="py-1 pr-3">版本</th><th className="py-1 pr-3">结果</th><th className="py-1">说明</th></tr>
+              </thead>
+              <tbody>
+                {result.warehouse_versions.map((v) => (
+                  <tr key={v.version} className="border-b last:border-0">
+                    <td className="py-1 pr-3 font-mono">{v.version}</td>
+                    <td className="py-1 pr-3">{v.ok ? "通过" : "未通过"}</td>
+                    <td className="py-1 text-muted-foreground break-all">{v.trace_id ?? v.error ?? ""}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      )}
     </div>
   );
 }
@@ -395,6 +580,13 @@ function explainProbeError(input: {
       title: "还有必填项没填",
       reason: err,
       nextStep: "在右侧「测试参数」里把缺的字段补上，再点一次「立即测试」。",
+    };
+  }
+  if (/仓库查询接口所有版本都没有通过/.test(err)) {
+    return {
+      title: "仓库/库位查询还没有找到可用版本",
+      reason: "系统已经自动测试了这个仓库接口的多个版本，但有赞都没有接受。销售库存同步不一定受影响，但实物仓库存相关能力暂时不能自动判断。",
+      nextStep: "先用上方「一键检查店铺链路」确认授权和铺货渠道号；如果只差仓库接口，把技术细节里的版本结果发给有赞确认当前店铺支持哪个版本。",
     };
   }
   if (/此能力需要用.*token/.test(err)) {
@@ -672,6 +864,10 @@ type ProbeField = { key: string; label: string; placeholder?: string; hint?: str
 const PROBE_FIELDS: Record<string, ProbeField[]> = {
   "auth.silent_token": [],
   "shop.chain.descendent.organization.list": [],
+  "retail.open.warehouse.query": [
+    { key: "page_no", label: "第几页", defaultValue: "1" },
+    { key: "page_size", label: "每页取几条", defaultValue: "20", hint: "系统会自动连续测试 3.0.1 / 3.0.0 / 1.0.1 / 1.0.0。" },
+  ],
   "trades.sold.get": [
     { key: "hours", label: "回看多少小时的订单", placeholder: "24", defaultValue: "24" },
     { key: "page_size", label: "每页取几条", placeholder: "5", defaultValue: "5" },

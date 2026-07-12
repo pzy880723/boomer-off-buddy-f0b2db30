@@ -16,6 +16,7 @@ import {
   callYouzanApiVerbose,
   ensureAccessToken,
   fetchSilentToken,
+  runYouzanShopChainProbe,
 } from "./youzan.functions";
 import { YOUZAN_API_REGISTRY } from "./youzan-api-registry";
 
@@ -26,6 +27,11 @@ type ShopRow = {
   role: "hq" | "branch";
   parent_kdt_id: number | null;
   status: string;
+  sell_channel_id?: number | null;
+  warehouse_code?: string | null;
+  warehouse_name?: string | null;
+  chain_probe_status?: "unknown" | "ok" | "partial" | "failed";
+  chain_probe_at?: string | null;
   access_token: string | null;
   refresh_token: string | null;
   token_expires_at: string | null;
@@ -109,14 +115,14 @@ export const listIntegrationCapabilities = createServerFn({ method: "POST" })
     // 店铺列表（矩阵右上角 shop picker + 参数下拉）
     const { data: shops } = await supabase
       .from("youzan_shops")
-      .select("id, kdt_id, shop_name, role, status")
+      .select("id, kdt_id, shop_name, role, status, sell_channel_id, warehouse_code, warehouse_name, chain_probe_status, chain_probe_at")
       .order("role", { ascending: true })
       .order("created_at", { ascending: true });
 
     return {
       capabilities: (rows ?? []) as CapabilityRow[],
       last_probes: lastByKey,
-      shops: (shops ?? []) as Array<Pick<ShopRow, "id" | "kdt_id" | "shop_name" | "role" | "status">>,
+      shops: (shops ?? []) as Array<Pick<ShopRow, "id" | "kdt_id" | "shop_name" | "role" | "status" | "sell_channel_id" | "warehouse_code" | "warehouse_name" | "chain_probe_status" | "chain_probe_at">>,
     };
   });
 
@@ -211,6 +217,12 @@ const DEFAULT_CAPABILITY_MAP: Record<
     version: "1.0.1",
     scope: "hq",
     token_scope: "hq",
+  },
+  "retail.open.warehouse.query": {
+    method: "youzan.retail.open.warehouse.query",
+    version: "3.0.1",
+    scope: "both",
+    token_scope: "both",
   },
   "trades.sold.get": { method: "youzan.trades.sold.get", version: "4.0.4", scope: "branch", token_scope: "branch" },
   "trade.get": { method: "youzan.trade.get", version: "4.0.2", scope: "branch", token_scope: "branch" },
@@ -364,6 +376,14 @@ export const probeIntegrationCapability = createServerFn({ method: "POST" })
     };
   });
 
+export const probeShopChainForIntegration = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { shop_id: string }) => z.object({ shop_id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context as any);
+    return runYouzanShopChainProbe(data.shop_id);
+  });
+
 // ------------------------------------------------------------
 // runProbe —— 每个 capability_key 单独走一段真实调用
 // ------------------------------------------------------------
@@ -397,6 +417,30 @@ async function runProbe(input: {
   const tokenShop = pickTokenShop(input.shop, input.token_scope);
   const token = await ensureAccessToken(tokenShop);
   const params = await buildParams(key, input, tokenShop);
+  if (key === "retail.open.warehouse.query") {
+    const versions = [input.version, "3.0.1", "3.0.0", "1.0.1", "1.0.0"].filter((v, i, arr) => v && arr.indexOf(v) === i);
+    const attempts: Array<{ version: string; ok: boolean; trace_id?: string | null; error?: string }> = [];
+    for (const version of versions) {
+      try {
+        const r = await callYouzanApiVerbose({
+          accessToken: token,
+          method: input.method,
+          version,
+          params,
+          timeoutMs: 15_000,
+        });
+        attempts.push({ version, ok: true, trace_id: r.trace_id });
+        return {
+          trace_id: r.trace_id,
+          preview: JSON.stringify({ passed_version: version, attempts, response: safePreview(r.preview) }),
+          request_params: { ...params, _tested_versions: versions },
+        };
+      } catch (e) {
+        attempts.push({ version, ok: false, error: (e instanceof Error ? e.message : String(e)).slice(0, 400) });
+      }
+    }
+    throw new Error(`仓库查询接口所有版本都没有通过：${JSON.stringify(attempts).slice(0, 1200)}`);
+  }
   const r = await callYouzanApiVerbose({
     accessToken: token,
     method: input.method,
@@ -405,6 +449,14 @@ async function runProbe(input: {
     timeoutMs: 15_000,
   });
   return { trace_id: r.trace_id, preview: r.preview, request_params: params };
+}
+
+function safePreview(preview: string) {
+  try {
+    return JSON.parse(preview);
+  } catch {
+    return preview;
+  }
 }
 
 function pickTokenShop(chosen: ShopRow, tokenScope: "hq" | "branch" | "both"): ShopRow {
@@ -430,6 +482,12 @@ async function buildParams(
   switch (key) {
     case "shop.chain.descendent.organization.list":
       return {};
+
+    case "retail.open.warehouse.query":
+      return {
+        page_no: Number(u.page_no ?? 1),
+        page_size: Number(u.page_size ?? 20),
+      };
 
     case "trades.sold.get": {
       const hours = Number(u.hours ?? 24);
