@@ -9,6 +9,7 @@ import {
   explainYouzanError,
   getHqShop,
   pushYouzanQuantityUpdate,
+  runYouzanShopChainProbe,
 } from "./youzan.functions";
 
 
@@ -1711,19 +1712,34 @@ export async function ensureHqSpu(sku_id: string, addBranchShopId?: string) {
 }
 
 // ============================================================
-// resolveBranchSellChannelId —— 通过 shop.get 拿分店 sell_channel_id，
-// 拿不到时回退到 branchKdtId（连锁零售的默认对齐关系）
+// resolveBranchSellChannelId —— 只接受真实查到的 sell_channel_id。
+// 拿不到就失败，禁止再把 kdt_id 当渠道号继续铺货。
 // ============================================================
 async function resolveBranchSellChannelId(
   hqToken: string,
-  branchKdtId: number,
-): Promise<{ sellChannelId: number; via: "shop.get" | "fallback_kdt_id"; trace: string | null; error?: string }> {
+  branch: { id: string; kdt_id: number; sell_channel_id?: number | null },
+): Promise<{ sellChannelId: number | null; via: "saved" | "chain_probe" | "shop.get" | null; trace: string | null; error?: string }> {
+  const saved = Number(branch.sell_channel_id ?? 0);
+  if (Number.isFinite(saved) && saved > 0) {
+    return { sellChannelId: saved, via: "saved", trace: null };
+  }
+
+  try {
+    const chain = await runYouzanShopChainProbe(branch.id);
+    if (chain.sell_channel_id) {
+      return { sellChannelId: chain.sell_channel_id, via: "chain_probe", trace: null };
+    }
+  } catch (e) {
+    // 继续用 shop.get 做最后一次只读探测；最终仍然没有渠道号则明确失败。
+    void e;
+  }
+
   try {
     const res = await callYouzanApiVerbose({
       accessToken: hqToken,
       method: "youzan.shop.get",
       version: "3.0.0",
-      params: { kdt_id: branchKdtId },
+      params: { kdt_id: branch.kdt_id },
       timeoutMs: 12_000,
     });
     let channelId: number | null = null;
@@ -1741,11 +1757,11 @@ async function resolveBranchSellChannelId(
     };
     walk(res.payload);
     if (channelId) return { sellChannelId: channelId, via: "shop.get", trace: res.trace_id };
-    return { sellChannelId: branchKdtId, via: "fallback_kdt_id", trace: res.trace_id };
+    return { sellChannelId: null, via: null, trace: res.trace_id, error: "shop.get 没有返回 sell_channel_id" };
   } catch (e) {
     return {
-      sellChannelId: branchKdtId,
-      via: "fallback_kdt_id",
+      sellChannelId: null,
+      via: null,
       trace: null,
       error: e instanceof Error ? e.message : String(e),
     };
@@ -1797,7 +1813,30 @@ export async function ensureBranchDistribution(
   const branchToken = await ensureAccessToken(branchRow as unknown as Parameters<typeof ensureAccessToken>[0]);
 
   // 3. 解析 sell_channel_id
-  const chan = await resolveBranchSellChannelId(hqToken, branchKdtId);
+  const chan = await resolveBranchSellChannelId(hqToken, branchRow as ShopLike & { sell_channel_id?: number | null });
+  if (!chan.sellChannelId) {
+    const msg = `missing_sell_channel_id: 系统已识别分店授权，但没有拿到铺货渠道号，已停止自动铺货。${chan.error ? `原因：${chan.error}` : ""}`;
+    await supabase.from("sku_youzan_links").upsert({
+      sku_id, shop_id,
+      yz_item_id: 0,
+      yz_sku_id: null,
+      status: "error",
+      sync_stock: false,
+      role: "branch_stock",
+      last_error: msg.slice(0, 400),
+    } as never, { onConflict: "sku_id,shop_id" });
+    return {
+      ok: false,
+      hq_spu_id: hqSpuId,
+      sell_channel_id: null,
+      sell_channel_via: null,
+      fix_channel_trace: chan.trace,
+      branch_item_id: null,
+      branch_sku_id: null,
+      probe_attempts: [],
+      error: msg,
+    };
+  }
 
   // 4. 补齐 spu.update 的必填字段
   const { data: skuRow } = await supabase
