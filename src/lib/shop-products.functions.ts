@@ -16,7 +16,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin as supabase } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { ensureBranchListing, triggerStockWorker } from "./youzan-sync.functions";
+import { triggerStockWorker } from "./youzan-sync.functions";
+import { releaseSkuToOfflineShopsCore } from "./youzan-offline-products.functions";
 import { explainYouzanError } from "./youzan.functions";
 
 // ---------- 内部工具 ----------
@@ -257,11 +258,16 @@ export const registerNewSkuAtShop = createServerFn({ method: "POST" })
           );
       }
       try {
-        const listing = await ensureBranchListing(sku_id, data.shop_id);
-        yz_item_id = listing.yz_item_id;
-        listing_error = listing.error ?? null;
-        listing_ok = !!listing.yz_item_id;
-        if (listing.yz_item_id) triggerStockWorker({ sku_ids: [sku_id] });
+        const release = await releaseSkuToOfflineShopsCore({
+          sku_id,
+          shop_ids: [data.shop_id],
+          stock_override: new_qty,
+        });
+        const listing = release.results[0];
+        yz_item_id = listing?.item_id ?? null;
+        listing_error = listing?.error ?? null;
+        listing_ok = Boolean(listing?.ok && listing.item_id);
+        if (listing_ok) triggerStockWorker({ sku_ids: [sku_id] });
       } catch (e) {
         listing_error = (e as Error).message;
       }

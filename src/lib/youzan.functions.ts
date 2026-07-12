@@ -5,6 +5,7 @@ import { supabaseAdmin as supabase } from "@/integrations/supabase/client.server
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { yzStatusText } from "./youzan-status";
 import { getYouzanOutboundStatus, youzanFetch } from "./youzan-http";
+import { buildYouzanQuantityUpdateParams } from "./youzan-quantity.server";
 
 // ============================================================
 // 有赞自用型应用 OAuth：grant_type=silent + kdt_id
@@ -666,10 +667,10 @@ export const probeYouzanShopChain = createServerFn({ method: "POST" })
 // ------------------------------------------------------------
 // 有赞连锁零售确认的调用姿势（youzan.item.quantity.update / 4.0.0）：
 //   token   : 分店 access_token（必须是 branch 的，非 HQ）
-//   params  : { kdt_id, item_id, sku_id, channel:1, stock_num_str: String(qty) }
+//   params  : { param: { kdtId, kdt_id, item_id, sku_id, channel:1, stock_num } }
 //     - item_id / sku_id 都是【分店 storefront 侧真实 id】，不是 HQ SPU id
 //     - channel=1 表示门店销售库存
-//     - stock_num_str 为字符串，全量覆盖到该值
+//     - stock_num 为数字，全量覆盖到该值
 // 任何库存推送都必须走这个 helper，禁止散落再写一份 params。
 // ============================================================
 export async function pushYouzanQuantityUpdate(opts: {
@@ -728,13 +729,13 @@ export async function pushYouzanQuantityUpdate(opts: {
   const qty = Math.max(0, Math.floor(Number(opts.quantity)));
   const token = await ensureAccessToken(shop as ShopRow);
   const channel = opts.channel === 0 ? 0 : 1;
-  const params: Record<string, unknown> = {
-    kdt_id: Number((shop as { kdt_id: number }).kdt_id),
-    item_id: itemId,
-    sku_id: skuId,
+  const params = buildYouzanQuantityUpdateParams({
+    kdtId: Number((shop as { kdt_id: number }).kdt_id),
+    itemId,
+    skuId,
     channel,
-    stock_num_str: String(qty),
-  };
+    quantity: qty,
+  });
   const r = await callYouzanApiVerbose({
     accessToken: token,
     method: "youzan.item.quantity.update",
@@ -2263,6 +2264,4 @@ export const backfillShopOrders = createServerFn({ method: "POST" }).handler(
     return { scanned, updated };
   },
 );
-
-
 

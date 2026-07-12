@@ -14,8 +14,9 @@ async function autoDistributeInBackground(
   if (sku_ids.length === 0) return;
   void (async () => {
     try {
-      const { ensureHqSpu, ensureBranchProduct, triggerStockWorker } = await import(
-        "./youzan-sync.functions"
+      const { triggerStockWorker } = await import("./youzan-sync.functions");
+      const { releaseSkuToOfflineShopsCore } = await import(
+        "./youzan-offline-products.functions"
       );
       // 若 default_shop_ids 为空 → 铺给所有 branch 门店
       let targetShopIds = default_shop_ids;
@@ -29,13 +30,11 @@ async function autoDistributeInBackground(
       }
       for (const sid of sku_ids) {
         try {
-          await ensureHqSpu(sid);
+          await releaseSkuToOfflineShopsCore({
+            sku_id: sid,
+            shop_ids: targetShopIds,
+          });
         } catch { /* 保留错误在 link 里 */ }
-        for (const shopId of targetShopIds) {
-          try {
-            await ensureBranchProduct(sid, shopId);
-          } catch { /* 保留错误在 link 里 */ }
-        }
       }
       if (targetShopIds.length > 0) {
         triggerStockWorker({ sku_ids });
