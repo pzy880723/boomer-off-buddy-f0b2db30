@@ -1967,7 +1967,9 @@ export async function ensureBranchDistribution(
     } as never, { onConflict: "sku_id,shop_id" });
     return {
       ok: false, hq_spu_id: hqSpuId, sell_channel_id: chan.sellChannelId ?? targetChannelIds[0] ?? null,
+      sell_channel_ids: targetChannelIds,
       sell_channel_via: chan.via, fix_channel_trace: fixTrace,
+
       branch_item_id: null, branch_sku_id: null, probe_attempts: probe.attempts,
       error: "branch item not visible / distribution missing",
     };
