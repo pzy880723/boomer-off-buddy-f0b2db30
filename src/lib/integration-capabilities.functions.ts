@@ -564,7 +564,7 @@ function extractBranchNodes(payload: unknown): BranchNode[] {
 // 4) 按 total 分页；5) empty_ok / error / ok 严格三态；
 // 6) 每次 attempt 保留 code/message/errors/trace_id/raw；
 // 7) 任一版本 ok 即通过；8) 必须两版本都 empty_ok 才判 empty_confirmed。
-async function probeShopChainOrgList(input: {
+export async function probeShopChainOrgList(input: {
   method: string;
   version: string;
   shop: ShopRow | null;
