@@ -11,7 +11,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 type DashboardTask = {
   id: string;
-  type: "transfer_in" | "stocktake" | "transfer_out";
+  type: "transfer_in" | "stocktake" | "transfer_out" | "commerce_pick";
   urgency: "normal" | "urgent";
   title: string;
   description: string;
@@ -30,6 +30,42 @@ type DashboardItem = {
   image_url: string | null;
   status: string | null;
 };
+
+type TransferRow = {
+  id: string;
+  code: string | null;
+  qty: number | null;
+  shipped_at: string | null;
+};
+
+type StocktakeRow = {
+  id: string;
+  code: string | null;
+  opened_at: string | null;
+};
+
+type FulfillmentRow = {
+  id: string;
+  code: string | null;
+  status: string;
+  priority: number | null;
+  created_at: string | null;
+  order: { order_no: string } | null;
+  items: Array<{ id: string }> | null;
+};
+
+type SkuRow = {
+  id: string;
+  name: string;
+  sku_code: string | null;
+  barcode: string | null;
+  price_tier: number | null;
+  grade: string | null;
+  image_url: string | null;
+  status: string | null;
+};
+
+type StockRow = { sku: SkuRow | null };
 
 function fmtTime(ts: string | null | undefined): string {
   if (!ts) return "";
@@ -76,9 +112,7 @@ export const Route = createFileRoute("/api/public/handheld/dashboard")({
         // 门店库存 = SUM(inv_stocks.qty where location_id = 门店)
         let stock_count = 0;
         if (auth.device.location_kind === "warehouse") {
-          const { data: sumRows } = await supabaseAdmin
-            .from("inv_skus")
-            .select("stock_qty");
+          const { data: sumRows } = await supabaseAdmin.from("inv_skus").select("stock_qty");
           stock_count = ((sumRows as { stock_qty: number }[] | null) ?? []).reduce(
             (s, r) => s + (Number(r.stock_qty) || 0),
             0,
@@ -109,7 +143,7 @@ export const Route = createFileRoute("/api/public/handheld/dashboard")({
           .order("shipped_at", { ascending: false })
           .limit(10);
 
-        const tasks: DashboardTask[] = ((tferRows as any[] | null) ?? []).map((t) => ({
+        const tasks: DashboardTask[] = ((tferRows as TransferRow[] | null) ?? []).map((t) => ({
           id: t.id,
           type: "transfer_in",
           urgency: "urgent",
@@ -128,7 +162,7 @@ export const Route = createFileRoute("/api/public/handheld/dashboard")({
           .eq("status", "open")
           .order("opened_at", { ascending: false })
           .limit(5);
-        for (const s of (stkRows as any[] | null) ?? []) {
+        for (const s of (stkRows as StocktakeRow[] | null) ?? []) {
           tasks.push({
             id: s.id,
             type: "stocktake",
@@ -141,18 +175,39 @@ export const Route = createFileRoute("/api/public/handheld/dashboard")({
           });
         }
 
+        const { data: fulfillmentRows } = await supabaseAdmin
+          .from("fulfillments" as never)
+          .select(
+            "id, code, status, priority, created_at, order:commerce_orders!order_id(order_no), items:fulfillment_items(id)",
+          )
+          .eq("location_id", locationId)
+          .in("status", ["allocated", "picking", "exception"])
+          .order("priority", { ascending: false })
+          .order("created_at", { ascending: true })
+          .limit(20);
+        for (const f of (fulfillmentRows as FulfillmentRow[] | null) ?? []) {
+          tasks.push({
+            id: f.id,
+            type: "commerce_pick",
+            urgency: Number(f.priority ?? 0) > 0 ? "urgent" : "normal",
+            title: `商城拣货 ${f.order?.order_no ?? f.code ?? ""}`.trim(),
+            description: `共 ${f.items?.length ?? 0} 件 · ${f.status === "picking" ? "拣货中" : f.status === "exception" ? "异常待处理" : "待拣货"}`,
+            meta: fmtTime(f.created_at),
+            action: "fulfillment_detail",
+            target_id: f.id,
+          });
+        }
+
         // ---- 3. recent items: most recent SKUs (warehouse only carries stock_qty;
         // for shops we approximate via inv_stocks at this location)
         let recent_items: DashboardItem[] = [];
         if (auth.device.location_kind === "warehouse") {
           const { data: skuRows } = await supabaseAdmin
             .from("inv_skus")
-            .select(
-              "id, name, sku_code, barcode, price_tier, grade, image_url, status, updated_at",
-            )
+            .select("id, name, sku_code, barcode, price_tier, grade, image_url, status, updated_at")
             .order("updated_at", { ascending: false })
             .limit(6);
-          recent_items = ((skuRows as any[] | null) ?? []).map((r) => ({
+          recent_items = ((skuRows as SkuRow[] | null) ?? []).map((r) => ({
             id: r.id,
             name: r.name,
             sku_code: r.sku_code ?? null,
@@ -165,13 +220,15 @@ export const Route = createFileRoute("/api/public/handheld/dashboard")({
         } else {
           const { data: stRows } = await supabaseAdmin
             .from("inv_stocks")
-            .select("sku_id, updated_at, qty, sku:inv_skus!sku_id(id, name, sku_code, barcode, price_tier, grade, image_url, status)" as never)
+            .select(
+              "sku_id, updated_at, qty, sku:inv_skus!sku_id(id, name, sku_code, barcode, price_tier, grade, image_url, status)" as never,
+            )
             .eq("location_id", locationId)
             .gt("qty", 0)
             .order("updated_at", { ascending: false })
             .limit(6);
-          recent_items = ((stRows as any[] | null) ?? [])
-            .filter((r) => r.sku)
+          recent_items = ((stRows as unknown as StockRow[] | null) ?? [])
+            .filter((r): r is { sku: SkuRow } => r.sku !== null)
             .map((r) => ({
               id: r.sku.id,
               name: r.sku.name,

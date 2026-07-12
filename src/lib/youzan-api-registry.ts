@@ -78,7 +78,6 @@ export type YzApiSpec = {
   notes?: string;
 };
 
-
 /** 生成 trades.sold.get 需要的最近 7 天窗口 */
 function recentWindow() {
   const end = new Date();
@@ -153,7 +152,8 @@ export const YOUZAN_API_REGISTRY: YzApiSpec[] = [
     response_keys: ["organizations", "kdt_id", "role", "sell_channel_id"],
     retryable: true,
     fire_and_forget: false,
-    notes: "对齐 spec：优先此接口取门店树，而不是 retail.shop.list.query。/api/public/hooks/youzan-fix-channel 用它拿门店 sell_channel_id。",
+    notes:
+      "对齐 spec：优先此接口取门店树，而不是 retail.shop.list.query。/api/public/hooks/youzan-fix-channel 用它拿门店 sell_channel_id。",
   },
   {
     key: "retail.shop.list.query",
@@ -365,7 +365,8 @@ export const YOUZAN_API_REGISTRY: YzApiSpec[] = [
     in_use: true,
     required: false,
     probe: null,
-    description: "修正 sell_channel_setting_request 到门店渠道 (is_partial=1 + sell_channel_ids=[门店渠道])；也用于追加分店渠道。",
+    description:
+      "修正 sell_channel_setting_request 到门店渠道 (is_partial=1 + sell_channel_ids=[门店渠道])；也用于追加分店渠道。",
     business_scene: "把 HQ SPU 的销售渠道设置成分店门店渠道（而不是网店渠道）",
     required_params: ["spu_id", "sell_channel_setting_request"],
     response_keys: ["spu_id"],
@@ -413,6 +414,56 @@ export const YOUZAN_API_REGISTRY: YzApiSpec[] = [
     retryable: false,
     fire_and_forget: false,
     notes: "仅 /api/public/hooks/youzan-distribution-probe 使用；确认可用前禁止接入正式同步。",
+  },
+  {
+    key: "retail.open.offline.spu.query",
+    method: "youzan.retail.open.offline.spu.query",
+    version: "3.0.0",
+    scope: "hq",
+    token_scope: "hq",
+    feature: "product_online",
+    capability_name: "连锁 · 查询门店商品信息",
+    doc_url: "https://doc.youzanyun.com/detail/API/0/294",
+    in_use: true,
+    required: true,
+    probe: { params: { page_no: 1, page_size: 1, show_display: 1 } },
+    description: "查询总部或指定 warehouse_code 下的门店商品，建立 item_id / sku_id 渠道映射。",
+    business_scene: "首次导入门店商品映射、铺货后回查和人工恢复绑定",
+    required_params: ["page_no", "page_size"],
+    response_keys: ["offline_spus", "item_id", "sku_models", "sku_id", "sku_no"],
+    retryable: true,
+    fire_and_forget: false,
+    notes: "page_no * page_size 不得超过 3300；sell_stock_count 已废弃，禁止用于库存对账。",
+  },
+  {
+    key: "retail.open.offline.spu.release",
+    method: "youzan.retail.open.offline.spu.release",
+    version: "3.0.0",
+    scope: "hq",
+    token_scope: "hq",
+    feature: "product_online",
+    capability_name: "连锁 · 发布总部商品到分店",
+    doc_url: "https://doc.youzanyun.com/detail/API/0/209",
+    in_use: true,
+    required: true,
+    probe: null,
+    description: "将总部商品库商品正式发布到选定分店，并返回门店 item_id / sku_ids。",
+    business_scene: "HQ SPU 首次发布到分店；发布成功后保存渠道映射并回查",
+    required_params: [
+      "category_id",
+      "unit",
+      "price",
+      "title",
+      "picture",
+      "spu_code",
+      "sku_center_code",
+      "sub_kdt_status_param",
+      "stocks",
+    ],
+    response_keys: ["item_id", "sku_ids"],
+    retryable: false,
+    fire_and_forget: false,
+    notes: "首次发布专用；已发布商品走 update/库存接口。金额字段同时存在元和分，必须字段级转换。",
   },
   {
     key: "retail.open.spu.publish.to.stores",
@@ -467,7 +518,8 @@ export const YOUZAN_API_REGISTRY: YzApiSpec[] = [
     in_use: true,
     required: true,
     probe: { params: { page_no: 1, page_size: 1 } },
-    description: "分店已上架的 SPU；用于对账门店 storefront 是否真的可见。默认 3.0.0，降级到 1.0.0。",
+    description:
+      "分店已上架的 SPU；用于对账门店 storefront 是否真的可见。默认 3.0.0，降级到 1.0.0。",
     business_scene: "铺货后校验分店 storefront 可见 / 反查分店 item_id",
     required_params: ["page_no", "page_size", "kdt_id"],
     response_keys: ["spus", "spu_id", "item_id"],

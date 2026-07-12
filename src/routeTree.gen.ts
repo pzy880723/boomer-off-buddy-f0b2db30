@@ -83,6 +83,8 @@ import { Route as InventoryProductsCodeRouteImport } from './routes/inventory.pr
 import { Route as InventoryInboundNewRouteImport } from './routes/inventory.inbound.new'
 import { Route as InventoryInboundIdRouteImport } from './routes/inventory.inbound.$id'
 import { Route as ApiPublicMerukiIngestRouteImport } from './routes/api/public/meruki-ingest'
+import { Route as ApiPublicStorefrontProductsRouteImport } from './routes/api/public/storefront/products'
+import { Route as ApiPublicStorefrontOrdersRouteImport } from './routes/api/public/storefront/orders'
 import { Route as ApiPublicHooksYouzanSyncWorkerRouteImport } from './routes/api/public/hooks/youzan-sync-worker'
 import { Route as ApiPublicHooksYouzanSyncRouteImport } from './routes/api/public/hooks/youzan-sync'
 import { Route as ApiPublicHooksYouzanStockWorkerRouteImport } from './routes/api/public/hooks/youzan-stock-worker'
@@ -105,7 +107,10 @@ import { Route as ApiPublicHandheldNotificationsRouteImport } from './routes/api
 import { Route as ApiPublicHandheldLocationsRouteImport } from './routes/api/public/handheld/locations'
 import { Route as ApiPublicHandheldLabelTemplatesRouteImport } from './routes/api/public/handheld/label-templates'
 import { Route as ApiPublicHandheldGlobalStockRouteImport } from './routes/api/public/handheld/global-stock'
+import { Route as ApiPublicHandheldFulfillmentsRouteImport } from './routes/api/public/handheld/fulfillments'
 import { Route as ApiPublicHandheldDashboardRouteImport } from './routes/api/public/handheld/dashboard'
+import { Route as ApiPublicStorefrontProductsIdRouteImport } from './routes/api/public/storefront/products.$id'
+import { Route as ApiPublicStorefrontOrdersIdRouteImport } from './routes/api/public/storefront/orders.$id'
 import { Route as ApiPublicHandheldTransfersIdRouteImport } from './routes/api/public/handheld/transfers.$id'
 import { Route as ApiPublicHandheldTransferShipScanRouteImport } from './routes/api/public/handheld/transfer.ship-scan'
 import { Route as ApiPublicHandheldTransferShipConfirmRouteImport } from './routes/api/public/handheld/transfer.ship-confirm'
@@ -134,6 +139,7 @@ import { Route as ApiPublicHandheldItemsSignReadUrlRouteImport } from './routes/
 import { Route as ApiPublicHandheldItemsBindRfidRouteImport } from './routes/api/public/handheld/items.bind-rfid'
 import { Route as ApiPublicHandheldItemsIdRouteImport } from './routes/api/public/handheld/items.$id'
 import { Route as ApiPublicHandheldInboundScanRouteImport } from './routes/api/public/handheld/inbound.scan'
+import { Route as ApiPublicHandheldFulfillmentsIdRouteImport } from './routes/api/public/handheld/fulfillments.$id'
 import { Route as ApiPublicHandheldDiagReportRouteImport } from './routes/api/public/handheld/diag.report'
 import { Route as ApiPublicHandheldAuthRefreshRouteImport } from './routes/api/public/handheld/auth.refresh'
 import { Route as ApiPublicHandheldAuthPingRouteImport } from './routes/api/public/handheld/auth.ping'
@@ -153,6 +159,10 @@ import { Route as ApiPublicHandheldItemsIdSyncStatusRouteImport } from './routes
 import { Route as ApiPublicHandheldItemsIdSetStatusRouteImport } from './routes/api/public/handheld/items.$id.set-status'
 import { Route as ApiPublicHandheldItemsIdRestockRouteImport } from './routes/api/public/handheld/items.$id.restock'
 import { Route as ApiPublicHandheldItemsIdAttachImagesRouteImport } from './routes/api/public/handheld/items.$id.attach-images'
+import { Route as ApiPublicHandheldFulfillmentsIdPickScanRouteImport } from './routes/api/public/handheld/fulfillments.$id.pick-scan'
+import { Route as ApiPublicHandheldFulfillmentsIdPickCompleteRouteImport } from './routes/api/public/handheld/fulfillments.$id.pick-complete'
+import { Route as ApiPublicHandheldFulfillmentsIdClaimRouteImport } from './routes/api/public/handheld/fulfillments.$id.claim'
+import { Route as ApiPublicHandheldFulfillmentsIdBindToteRouteImport } from './routes/api/public/handheld/fulfillments.$id.bind-tote'
 import { Route as ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteImport } from './routes/api/public/handheld/parcels.items.$itemId.pack-pieces'
 import { Route as ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRouteImport } from './routes/api/public/handheld/parcels.items.$itemId.pack-pieces.estimate-title'
 import { Route as ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateImageRouteImport } from './routes/api/public/handheld/parcels.items.$itemId.pack-pieces.estimate-image'
@@ -533,6 +543,18 @@ const ApiPublicMerukiIngestRoute = ApiPublicMerukiIngestRouteImport.update({
   path: '/api/public/meruki-ingest',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicStorefrontProductsRoute =
+  ApiPublicStorefrontProductsRouteImport.update({
+    id: '/api/public/storefront/products',
+    path: '/api/public/storefront/products',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicStorefrontOrdersRoute =
+  ApiPublicStorefrontOrdersRouteImport.update({
+    id: '/api/public/storefront/orders',
+    path: '/api/public/storefront/orders',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksYouzanSyncWorkerRoute =
   ApiPublicHooksYouzanSyncWorkerRouteImport.update({
     id: '/api/public/hooks/youzan-sync-worker',
@@ -665,11 +687,29 @@ const ApiPublicHandheldGlobalStockRoute =
     path: '/api/public/handheld/global-stock',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHandheldFulfillmentsRoute =
+  ApiPublicHandheldFulfillmentsRouteImport.update({
+    id: '/api/public/handheld/fulfillments',
+    path: '/api/public/handheld/fulfillments',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHandheldDashboardRoute =
   ApiPublicHandheldDashboardRouteImport.update({
     id: '/api/public/handheld/dashboard',
     path: '/api/public/handheld/dashboard',
     getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicStorefrontProductsIdRoute =
+  ApiPublicStorefrontProductsIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => ApiPublicStorefrontProductsRoute,
+  } as any)
+const ApiPublicStorefrontOrdersIdRoute =
+  ApiPublicStorefrontOrdersIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => ApiPublicStorefrontOrdersRoute,
   } as any)
 const ApiPublicHandheldTransfersIdRoute =
   ApiPublicHandheldTransfersIdRouteImport.update({
@@ -839,6 +879,12 @@ const ApiPublicHandheldInboundScanRoute =
     path: '/api/public/handheld/inbound/scan',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHandheldFulfillmentsIdRoute =
+  ApiPublicHandheldFulfillmentsIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => ApiPublicHandheldFulfillmentsRoute,
+  } as any)
 const ApiPublicHandheldDiagReportRoute =
   ApiPublicHandheldDiagReportRouteImport.update({
     id: '/api/public/handheld/diag/report',
@@ -950,6 +996,30 @@ const ApiPublicHandheldItemsIdAttachImagesRoute =
     path: '/attach-images',
     getParentRoute: () => ApiPublicHandheldItemsIdRoute,
   } as any)
+const ApiPublicHandheldFulfillmentsIdPickScanRoute =
+  ApiPublicHandheldFulfillmentsIdPickScanRouteImport.update({
+    id: '/pick-scan',
+    path: '/pick-scan',
+    getParentRoute: () => ApiPublicHandheldFulfillmentsIdRoute,
+  } as any)
+const ApiPublicHandheldFulfillmentsIdPickCompleteRoute =
+  ApiPublicHandheldFulfillmentsIdPickCompleteRouteImport.update({
+    id: '/pick-complete',
+    path: '/pick-complete',
+    getParentRoute: () => ApiPublicHandheldFulfillmentsIdRoute,
+  } as any)
+const ApiPublicHandheldFulfillmentsIdClaimRoute =
+  ApiPublicHandheldFulfillmentsIdClaimRouteImport.update({
+    id: '/claim',
+    path: '/claim',
+    getParentRoute: () => ApiPublicHandheldFulfillmentsIdRoute,
+  } as any)
+const ApiPublicHandheldFulfillmentsIdBindToteRoute =
+  ApiPublicHandheldFulfillmentsIdBindToteRouteImport.update({
+    id: '/bind-tote',
+    path: '/bind-tote',
+    getParentRoute: () => ApiPublicHandheldFulfillmentsIdRoute,
+  } as any)
 const ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute =
   ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteImport.update({
     id: '/items/$itemId/pack-pieces',
@@ -1045,6 +1115,7 @@ export interface FileRoutesByFullPath {
   '/purchase/domestic/': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
   '/api/public/handheld/dashboard': typeof ApiPublicHandheldDashboardRoute
+  '/api/public/handheld/fulfillments': typeof ApiPublicHandheldFulfillmentsRouteWithChildren
   '/api/public/handheld/global-stock': typeof ApiPublicHandheldGlobalStockRoute
   '/api/public/handheld/label-templates': typeof ApiPublicHandheldLabelTemplatesRouteWithChildren
   '/api/public/handheld/locations': typeof ApiPublicHandheldLocationsRoute
@@ -1067,6 +1138,8 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
   '/api/public/hooks/youzan-sync': typeof ApiPublicHooksYouzanSyncRoute
   '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
+  '/api/public/storefront/orders': typeof ApiPublicStorefrontOrdersRouteWithChildren
+  '/api/public/storefront/products': typeof ApiPublicStorefrontProductsRouteWithChildren
   '/api/public/auth/otp/send': typeof ApiPublicAuthOtpSendRoute
   '/api/public/auth/otp/verify': typeof ApiPublicAuthOtpVerifyRoute
   '/api/public/handheld/ai/prepare-listing-image': typeof ApiPublicHandheldAiPrepareListingImageRoute
@@ -1078,6 +1151,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/auth/ping': typeof ApiPublicHandheldAuthPingRoute
   '/api/public/handheld/auth/refresh': typeof ApiPublicHandheldAuthRefreshRoute
   '/api/public/handheld/diag/report': typeof ApiPublicHandheldDiagReportRoute
+  '/api/public/handheld/fulfillments/$id': typeof ApiPublicHandheldFulfillmentsIdRouteWithChildren
   '/api/public/handheld/inbound/scan': typeof ApiPublicHandheldInboundScanRoute
   '/api/public/handheld/items/$id': typeof ApiPublicHandheldItemsIdRouteWithChildren
   '/api/public/handheld/items/bind-rfid': typeof ApiPublicHandheldItemsBindRfidRoute
@@ -1106,6 +1180,12 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/transfer/ship-confirm': typeof ApiPublicHandheldTransferShipConfirmRoute
   '/api/public/handheld/transfer/ship-scan': typeof ApiPublicHandheldTransferShipScanRoute
   '/api/public/handheld/transfers/$id': typeof ApiPublicHandheldTransfersIdRouteWithChildren
+  '/api/public/storefront/orders/$id': typeof ApiPublicStorefrontOrdersIdRoute
+  '/api/public/storefront/products/$id': typeof ApiPublicStorefrontProductsIdRoute
+  '/api/public/handheld/fulfillments/$id/bind-tote': typeof ApiPublicHandheldFulfillmentsIdBindToteRoute
+  '/api/public/handheld/fulfillments/$id/claim': typeof ApiPublicHandheldFulfillmentsIdClaimRoute
+  '/api/public/handheld/fulfillments/$id/pick-complete': typeof ApiPublicHandheldFulfillmentsIdPickCompleteRoute
+  '/api/public/handheld/fulfillments/$id/pick-scan': typeof ApiPublicHandheldFulfillmentsIdPickScanRoute
   '/api/public/handheld/items/$id/attach-images': typeof ApiPublicHandheldItemsIdAttachImagesRoute
   '/api/public/handheld/items/$id/restock': typeof ApiPublicHandheldItemsIdRestockRoute
   '/api/public/handheld/items/$id/set-status': typeof ApiPublicHandheldItemsIdSetStatusRoute
@@ -1187,6 +1267,7 @@ export interface FileRoutesByTo {
   '/purchase/domestic': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel': typeof PurchaseJapanParcelIndexRoute
   '/api/public/handheld/dashboard': typeof ApiPublicHandheldDashboardRoute
+  '/api/public/handheld/fulfillments': typeof ApiPublicHandheldFulfillmentsRouteWithChildren
   '/api/public/handheld/global-stock': typeof ApiPublicHandheldGlobalStockRoute
   '/api/public/handheld/label-templates': typeof ApiPublicHandheldLabelTemplatesRouteWithChildren
   '/api/public/handheld/locations': typeof ApiPublicHandheldLocationsRoute
@@ -1209,6 +1290,8 @@ export interface FileRoutesByTo {
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
   '/api/public/hooks/youzan-sync': typeof ApiPublicHooksYouzanSyncRoute
   '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
+  '/api/public/storefront/orders': typeof ApiPublicStorefrontOrdersRouteWithChildren
+  '/api/public/storefront/products': typeof ApiPublicStorefrontProductsRouteWithChildren
   '/api/public/auth/otp/send': typeof ApiPublicAuthOtpSendRoute
   '/api/public/auth/otp/verify': typeof ApiPublicAuthOtpVerifyRoute
   '/api/public/handheld/ai/prepare-listing-image': typeof ApiPublicHandheldAiPrepareListingImageRoute
@@ -1220,6 +1303,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/auth/ping': typeof ApiPublicHandheldAuthPingRoute
   '/api/public/handheld/auth/refresh': typeof ApiPublicHandheldAuthRefreshRoute
   '/api/public/handheld/diag/report': typeof ApiPublicHandheldDiagReportRoute
+  '/api/public/handheld/fulfillments/$id': typeof ApiPublicHandheldFulfillmentsIdRouteWithChildren
   '/api/public/handheld/inbound/scan': typeof ApiPublicHandheldInboundScanRoute
   '/api/public/handheld/items/$id': typeof ApiPublicHandheldItemsIdRouteWithChildren
   '/api/public/handheld/items/bind-rfid': typeof ApiPublicHandheldItemsBindRfidRoute
@@ -1248,6 +1332,12 @@ export interface FileRoutesByTo {
   '/api/public/handheld/transfer/ship-confirm': typeof ApiPublicHandheldTransferShipConfirmRoute
   '/api/public/handheld/transfer/ship-scan': typeof ApiPublicHandheldTransferShipScanRoute
   '/api/public/handheld/transfers/$id': typeof ApiPublicHandheldTransfersIdRouteWithChildren
+  '/api/public/storefront/orders/$id': typeof ApiPublicStorefrontOrdersIdRoute
+  '/api/public/storefront/products/$id': typeof ApiPublicStorefrontProductsIdRoute
+  '/api/public/handheld/fulfillments/$id/bind-tote': typeof ApiPublicHandheldFulfillmentsIdBindToteRoute
+  '/api/public/handheld/fulfillments/$id/claim': typeof ApiPublicHandheldFulfillmentsIdClaimRoute
+  '/api/public/handheld/fulfillments/$id/pick-complete': typeof ApiPublicHandheldFulfillmentsIdPickCompleteRoute
+  '/api/public/handheld/fulfillments/$id/pick-scan': typeof ApiPublicHandheldFulfillmentsIdPickScanRoute
   '/api/public/handheld/items/$id/attach-images': typeof ApiPublicHandheldItemsIdAttachImagesRoute
   '/api/public/handheld/items/$id/restock': typeof ApiPublicHandheldItemsIdRestockRoute
   '/api/public/handheld/items/$id/set-status': typeof ApiPublicHandheldItemsIdSetStatusRoute
@@ -1337,6 +1427,7 @@ export interface FileRoutesById {
   '/purchase/domestic/': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
   '/api/public/handheld/dashboard': typeof ApiPublicHandheldDashboardRoute
+  '/api/public/handheld/fulfillments': typeof ApiPublicHandheldFulfillmentsRouteWithChildren
   '/api/public/handheld/global-stock': typeof ApiPublicHandheldGlobalStockRoute
   '/api/public/handheld/label-templates': typeof ApiPublicHandheldLabelTemplatesRouteWithChildren
   '/api/public/handheld/locations': typeof ApiPublicHandheldLocationsRoute
@@ -1359,6 +1450,8 @@ export interface FileRoutesById {
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
   '/api/public/hooks/youzan-sync': typeof ApiPublicHooksYouzanSyncRoute
   '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
+  '/api/public/storefront/orders': typeof ApiPublicStorefrontOrdersRouteWithChildren
+  '/api/public/storefront/products': typeof ApiPublicStorefrontProductsRouteWithChildren
   '/api/public/auth/otp/send': typeof ApiPublicAuthOtpSendRoute
   '/api/public/auth/otp/verify': typeof ApiPublicAuthOtpVerifyRoute
   '/api/public/handheld/ai/prepare-listing-image': typeof ApiPublicHandheldAiPrepareListingImageRoute
@@ -1370,6 +1463,7 @@ export interface FileRoutesById {
   '/api/public/handheld/auth/ping': typeof ApiPublicHandheldAuthPingRoute
   '/api/public/handheld/auth/refresh': typeof ApiPublicHandheldAuthRefreshRoute
   '/api/public/handheld/diag/report': typeof ApiPublicHandheldDiagReportRoute
+  '/api/public/handheld/fulfillments/$id': typeof ApiPublicHandheldFulfillmentsIdRouteWithChildren
   '/api/public/handheld/inbound/scan': typeof ApiPublicHandheldInboundScanRoute
   '/api/public/handheld/items/$id': typeof ApiPublicHandheldItemsIdRouteWithChildren
   '/api/public/handheld/items/bind-rfid': typeof ApiPublicHandheldItemsBindRfidRoute
@@ -1398,6 +1492,12 @@ export interface FileRoutesById {
   '/api/public/handheld/transfer/ship-confirm': typeof ApiPublicHandheldTransferShipConfirmRoute
   '/api/public/handheld/transfer/ship-scan': typeof ApiPublicHandheldTransferShipScanRoute
   '/api/public/handheld/transfers/$id': typeof ApiPublicHandheldTransfersIdRouteWithChildren
+  '/api/public/storefront/orders/$id': typeof ApiPublicStorefrontOrdersIdRoute
+  '/api/public/storefront/products/$id': typeof ApiPublicStorefrontProductsIdRoute
+  '/api/public/handheld/fulfillments/$id/bind-tote': typeof ApiPublicHandheldFulfillmentsIdBindToteRoute
+  '/api/public/handheld/fulfillments/$id/claim': typeof ApiPublicHandheldFulfillmentsIdClaimRoute
+  '/api/public/handheld/fulfillments/$id/pick-complete': typeof ApiPublicHandheldFulfillmentsIdPickCompleteRoute
+  '/api/public/handheld/fulfillments/$id/pick-scan': typeof ApiPublicHandheldFulfillmentsIdPickScanRoute
   '/api/public/handheld/items/$id/attach-images': typeof ApiPublicHandheldItemsIdAttachImagesRoute
   '/api/public/handheld/items/$id/restock': typeof ApiPublicHandheldItemsIdRestockRoute
   '/api/public/handheld/items/$id/set-status': typeof ApiPublicHandheldItemsIdSetStatusRoute
@@ -1488,6 +1588,7 @@ export interface FileRouteTypes {
     | '/purchase/domestic/'
     | '/purchase/japan-parcel/'
     | '/api/public/handheld/dashboard'
+    | '/api/public/handheld/fulfillments'
     | '/api/public/handheld/global-stock'
     | '/api/public/handheld/label-templates'
     | '/api/public/handheld/locations'
@@ -1510,6 +1611,8 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-stock-worker'
     | '/api/public/hooks/youzan-sync'
     | '/api/public/hooks/youzan-sync-worker'
+    | '/api/public/storefront/orders'
+    | '/api/public/storefront/products'
     | '/api/public/auth/otp/send'
     | '/api/public/auth/otp/verify'
     | '/api/public/handheld/ai/prepare-listing-image'
@@ -1521,6 +1624,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/auth/ping'
     | '/api/public/handheld/auth/refresh'
     | '/api/public/handheld/diag/report'
+    | '/api/public/handheld/fulfillments/$id'
     | '/api/public/handheld/inbound/scan'
     | '/api/public/handheld/items/$id'
     | '/api/public/handheld/items/bind-rfid'
@@ -1549,6 +1653,12 @@ export interface FileRouteTypes {
     | '/api/public/handheld/transfer/ship-confirm'
     | '/api/public/handheld/transfer/ship-scan'
     | '/api/public/handheld/transfers/$id'
+    | '/api/public/storefront/orders/$id'
+    | '/api/public/storefront/products/$id'
+    | '/api/public/handheld/fulfillments/$id/bind-tote'
+    | '/api/public/handheld/fulfillments/$id/claim'
+    | '/api/public/handheld/fulfillments/$id/pick-complete'
+    | '/api/public/handheld/fulfillments/$id/pick-scan'
     | '/api/public/handheld/items/$id/attach-images'
     | '/api/public/handheld/items/$id/restock'
     | '/api/public/handheld/items/$id/set-status'
@@ -1630,6 +1740,7 @@ export interface FileRouteTypes {
     | '/purchase/domestic'
     | '/purchase/japan-parcel'
     | '/api/public/handheld/dashboard'
+    | '/api/public/handheld/fulfillments'
     | '/api/public/handheld/global-stock'
     | '/api/public/handheld/label-templates'
     | '/api/public/handheld/locations'
@@ -1652,6 +1763,8 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-stock-worker'
     | '/api/public/hooks/youzan-sync'
     | '/api/public/hooks/youzan-sync-worker'
+    | '/api/public/storefront/orders'
+    | '/api/public/storefront/products'
     | '/api/public/auth/otp/send'
     | '/api/public/auth/otp/verify'
     | '/api/public/handheld/ai/prepare-listing-image'
@@ -1663,6 +1776,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/auth/ping'
     | '/api/public/handheld/auth/refresh'
     | '/api/public/handheld/diag/report'
+    | '/api/public/handheld/fulfillments/$id'
     | '/api/public/handheld/inbound/scan'
     | '/api/public/handheld/items/$id'
     | '/api/public/handheld/items/bind-rfid'
@@ -1691,6 +1805,12 @@ export interface FileRouteTypes {
     | '/api/public/handheld/transfer/ship-confirm'
     | '/api/public/handheld/transfer/ship-scan'
     | '/api/public/handheld/transfers/$id'
+    | '/api/public/storefront/orders/$id'
+    | '/api/public/storefront/products/$id'
+    | '/api/public/handheld/fulfillments/$id/bind-tote'
+    | '/api/public/handheld/fulfillments/$id/claim'
+    | '/api/public/handheld/fulfillments/$id/pick-complete'
+    | '/api/public/handheld/fulfillments/$id/pick-scan'
     | '/api/public/handheld/items/$id/attach-images'
     | '/api/public/handheld/items/$id/restock'
     | '/api/public/handheld/items/$id/set-status'
@@ -1779,6 +1899,7 @@ export interface FileRouteTypes {
     | '/purchase/domestic/'
     | '/purchase/japan-parcel/'
     | '/api/public/handheld/dashboard'
+    | '/api/public/handheld/fulfillments'
     | '/api/public/handheld/global-stock'
     | '/api/public/handheld/label-templates'
     | '/api/public/handheld/locations'
@@ -1801,6 +1922,8 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-stock-worker'
     | '/api/public/hooks/youzan-sync'
     | '/api/public/hooks/youzan-sync-worker'
+    | '/api/public/storefront/orders'
+    | '/api/public/storefront/products'
     | '/api/public/auth/otp/send'
     | '/api/public/auth/otp/verify'
     | '/api/public/handheld/ai/prepare-listing-image'
@@ -1812,6 +1935,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/auth/ping'
     | '/api/public/handheld/auth/refresh'
     | '/api/public/handheld/diag/report'
+    | '/api/public/handheld/fulfillments/$id'
     | '/api/public/handheld/inbound/scan'
     | '/api/public/handheld/items/$id'
     | '/api/public/handheld/items/bind-rfid'
@@ -1840,6 +1964,12 @@ export interface FileRouteTypes {
     | '/api/public/handheld/transfer/ship-confirm'
     | '/api/public/handheld/transfer/ship-scan'
     | '/api/public/handheld/transfers/$id'
+    | '/api/public/storefront/orders/$id'
+    | '/api/public/storefront/products/$id'
+    | '/api/public/handheld/fulfillments/$id/bind-tote'
+    | '/api/public/handheld/fulfillments/$id/claim'
+    | '/api/public/handheld/fulfillments/$id/pick-complete'
+    | '/api/public/handheld/fulfillments/$id/pick-scan'
     | '/api/public/handheld/items/$id/attach-images'
     | '/api/public/handheld/items/$id/restock'
     | '/api/public/handheld/items/$id/set-status'
@@ -1890,6 +2020,7 @@ export interface RootRouteChildren {
   InventoryStocktakesIdRoute: typeof InventoryStocktakesIdRoute
   InventoryStocktakesIndexRoute: typeof InventoryStocktakesIndexRoute
   ApiPublicHandheldDashboardRoute: typeof ApiPublicHandheldDashboardRoute
+  ApiPublicHandheldFulfillmentsRoute: typeof ApiPublicHandheldFulfillmentsRouteWithChildren
   ApiPublicHandheldGlobalStockRoute: typeof ApiPublicHandheldGlobalStockRoute
   ApiPublicHandheldLabelTemplatesRoute: typeof ApiPublicHandheldLabelTemplatesRouteWithChildren
   ApiPublicHandheldLocationsRoute: typeof ApiPublicHandheldLocationsRoute
@@ -1912,6 +2043,8 @@ export interface RootRouteChildren {
   ApiPublicHooksYouzanStockWorkerRoute: typeof ApiPublicHooksYouzanStockWorkerRoute
   ApiPublicHooksYouzanSyncRoute: typeof ApiPublicHooksYouzanSyncRoute
   ApiPublicHooksYouzanSyncWorkerRoute: typeof ApiPublicHooksYouzanSyncWorkerRoute
+  ApiPublicStorefrontOrdersRoute: typeof ApiPublicStorefrontOrdersRouteWithChildren
+  ApiPublicStorefrontProductsRoute: typeof ApiPublicStorefrontProductsRouteWithChildren
   ApiPublicAuthOtpSendRoute: typeof ApiPublicAuthOtpSendRoute
   ApiPublicAuthOtpVerifyRoute: typeof ApiPublicAuthOtpVerifyRoute
   ApiPublicHandheldAiPrepareListingImageRoute: typeof ApiPublicHandheldAiPrepareListingImageRoute
@@ -2466,6 +2599,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicMerukiIngestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/storefront/products': {
+      id: '/api/public/storefront/products'
+      path: '/api/public/storefront/products'
+      fullPath: '/api/public/storefront/products'
+      preLoaderRoute: typeof ApiPublicStorefrontProductsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/storefront/orders': {
+      id: '/api/public/storefront/orders'
+      path: '/api/public/storefront/orders'
+      fullPath: '/api/public/storefront/orders'
+      preLoaderRoute: typeof ApiPublicStorefrontOrdersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/youzan-sync-worker': {
       id: '/api/public/hooks/youzan-sync-worker'
       path: '/api/public/hooks/youzan-sync-worker'
@@ -2620,12 +2767,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldGlobalStockRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/handheld/fulfillments': {
+      id: '/api/public/handheld/fulfillments'
+      path: '/api/public/handheld/fulfillments'
+      fullPath: '/api/public/handheld/fulfillments'
+      preLoaderRoute: typeof ApiPublicHandheldFulfillmentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/handheld/dashboard': {
       id: '/api/public/handheld/dashboard'
       path: '/api/public/handheld/dashboard'
       fullPath: '/api/public/handheld/dashboard'
       preLoaderRoute: typeof ApiPublicHandheldDashboardRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/api/public/storefront/products/$id': {
+      id: '/api/public/storefront/products/$id'
+      path: '/$id'
+      fullPath: '/api/public/storefront/products/$id'
+      preLoaderRoute: typeof ApiPublicStorefrontProductsIdRouteImport
+      parentRoute: typeof ApiPublicStorefrontProductsRoute
+    }
+    '/api/public/storefront/orders/$id': {
+      id: '/api/public/storefront/orders/$id'
+      path: '/$id'
+      fullPath: '/api/public/storefront/orders/$id'
+      preLoaderRoute: typeof ApiPublicStorefrontOrdersIdRouteImport
+      parentRoute: typeof ApiPublicStorefrontOrdersRoute
     }
     '/api/public/handheld/transfers/$id': {
       id: '/api/public/handheld/transfers/$id'
@@ -2823,6 +2991,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldInboundScanRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/handheld/fulfillments/$id': {
+      id: '/api/public/handheld/fulfillments/$id'
+      path: '/$id'
+      fullPath: '/api/public/handheld/fulfillments/$id'
+      preLoaderRoute: typeof ApiPublicHandheldFulfillmentsIdRouteImport
+      parentRoute: typeof ApiPublicHandheldFulfillmentsRoute
+    }
     '/api/public/handheld/diag/report': {
       id: '/api/public/handheld/diag/report'
       path: '/api/public/handheld/diag/report'
@@ -2955,6 +3130,34 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/public/handheld/items/$id/attach-images'
       preLoaderRoute: typeof ApiPublicHandheldItemsIdAttachImagesRouteImport
       parentRoute: typeof ApiPublicHandheldItemsIdRoute
+    }
+    '/api/public/handheld/fulfillments/$id/pick-scan': {
+      id: '/api/public/handheld/fulfillments/$id/pick-scan'
+      path: '/pick-scan'
+      fullPath: '/api/public/handheld/fulfillments/$id/pick-scan'
+      preLoaderRoute: typeof ApiPublicHandheldFulfillmentsIdPickScanRouteImport
+      parentRoute: typeof ApiPublicHandheldFulfillmentsIdRoute
+    }
+    '/api/public/handheld/fulfillments/$id/pick-complete': {
+      id: '/api/public/handheld/fulfillments/$id/pick-complete'
+      path: '/pick-complete'
+      fullPath: '/api/public/handheld/fulfillments/$id/pick-complete'
+      preLoaderRoute: typeof ApiPublicHandheldFulfillmentsIdPickCompleteRouteImport
+      parentRoute: typeof ApiPublicHandheldFulfillmentsIdRoute
+    }
+    '/api/public/handheld/fulfillments/$id/claim': {
+      id: '/api/public/handheld/fulfillments/$id/claim'
+      path: '/claim'
+      fullPath: '/api/public/handheld/fulfillments/$id/claim'
+      preLoaderRoute: typeof ApiPublicHandheldFulfillmentsIdClaimRouteImport
+      parentRoute: typeof ApiPublicHandheldFulfillmentsIdRoute
+    }
+    '/api/public/handheld/fulfillments/$id/bind-tote': {
+      id: '/api/public/handheld/fulfillments/$id/bind-tote'
+      path: '/bind-tote'
+      fullPath: '/api/public/handheld/fulfillments/$id/bind-tote'
+      preLoaderRoute: typeof ApiPublicHandheldFulfillmentsIdBindToteRouteImport
+      parentRoute: typeof ApiPublicHandheldFulfillmentsIdRoute
     }
     '/api/public/handheld/parcels/items/$itemId/pack-pieces': {
       id: '/api/public/handheld/parcels/items/$itemId/pack-pieces'
@@ -3157,6 +3360,45 @@ const PurchaseJapanParcelRouteChildren: PurchaseJapanParcelRouteChildren = {
 const PurchaseJapanParcelRouteWithChildren =
   PurchaseJapanParcelRoute._addFileChildren(PurchaseJapanParcelRouteChildren)
 
+interface ApiPublicHandheldFulfillmentsIdRouteChildren {
+  ApiPublicHandheldFulfillmentsIdBindToteRoute: typeof ApiPublicHandheldFulfillmentsIdBindToteRoute
+  ApiPublicHandheldFulfillmentsIdClaimRoute: typeof ApiPublicHandheldFulfillmentsIdClaimRoute
+  ApiPublicHandheldFulfillmentsIdPickCompleteRoute: typeof ApiPublicHandheldFulfillmentsIdPickCompleteRoute
+  ApiPublicHandheldFulfillmentsIdPickScanRoute: typeof ApiPublicHandheldFulfillmentsIdPickScanRoute
+}
+
+const ApiPublicHandheldFulfillmentsIdRouteChildren: ApiPublicHandheldFulfillmentsIdRouteChildren =
+  {
+    ApiPublicHandheldFulfillmentsIdBindToteRoute:
+      ApiPublicHandheldFulfillmentsIdBindToteRoute,
+    ApiPublicHandheldFulfillmentsIdClaimRoute:
+      ApiPublicHandheldFulfillmentsIdClaimRoute,
+    ApiPublicHandheldFulfillmentsIdPickCompleteRoute:
+      ApiPublicHandheldFulfillmentsIdPickCompleteRoute,
+    ApiPublicHandheldFulfillmentsIdPickScanRoute:
+      ApiPublicHandheldFulfillmentsIdPickScanRoute,
+  }
+
+const ApiPublicHandheldFulfillmentsIdRouteWithChildren =
+  ApiPublicHandheldFulfillmentsIdRoute._addFileChildren(
+    ApiPublicHandheldFulfillmentsIdRouteChildren,
+  )
+
+interface ApiPublicHandheldFulfillmentsRouteChildren {
+  ApiPublicHandheldFulfillmentsIdRoute: typeof ApiPublicHandheldFulfillmentsIdRouteWithChildren
+}
+
+const ApiPublicHandheldFulfillmentsRouteChildren: ApiPublicHandheldFulfillmentsRouteChildren =
+  {
+    ApiPublicHandheldFulfillmentsIdRoute:
+      ApiPublicHandheldFulfillmentsIdRouteWithChildren,
+  }
+
+const ApiPublicHandheldFulfillmentsRouteWithChildren =
+  ApiPublicHandheldFulfillmentsRoute._addFileChildren(
+    ApiPublicHandheldFulfillmentsRouteChildren,
+  )
+
 interface ApiPublicHandheldLabelTemplatesIdRouteChildren {
   ApiPublicHandheldLabelTemplatesIdSetDefaultRoute: typeof ApiPublicHandheldLabelTemplatesIdSetDefaultRoute
 }
@@ -3289,6 +3531,34 @@ const ApiPublicHandheldTransfersRouteWithChildren =
     ApiPublicHandheldTransfersRouteChildren,
   )
 
+interface ApiPublicStorefrontOrdersRouteChildren {
+  ApiPublicStorefrontOrdersIdRoute: typeof ApiPublicStorefrontOrdersIdRoute
+}
+
+const ApiPublicStorefrontOrdersRouteChildren: ApiPublicStorefrontOrdersRouteChildren =
+  {
+    ApiPublicStorefrontOrdersIdRoute: ApiPublicStorefrontOrdersIdRoute,
+  }
+
+const ApiPublicStorefrontOrdersRouteWithChildren =
+  ApiPublicStorefrontOrdersRoute._addFileChildren(
+    ApiPublicStorefrontOrdersRouteChildren,
+  )
+
+interface ApiPublicStorefrontProductsRouteChildren {
+  ApiPublicStorefrontProductsIdRoute: typeof ApiPublicStorefrontProductsIdRoute
+}
+
+const ApiPublicStorefrontProductsRouteChildren: ApiPublicStorefrontProductsRouteChildren =
+  {
+    ApiPublicStorefrontProductsIdRoute: ApiPublicStorefrontProductsIdRoute,
+  }
+
+const ApiPublicStorefrontProductsRouteWithChildren =
+  ApiPublicStorefrontProductsRoute._addFileChildren(
+    ApiPublicStorefrontProductsRouteChildren,
+  )
+
 interface ApiPublicHandheldItemsIdRouteChildren {
   ApiPublicHandheldItemsIdAttachImagesRoute: typeof ApiPublicHandheldItemsIdAttachImagesRoute
   ApiPublicHandheldItemsIdRestockRoute: typeof ApiPublicHandheldItemsIdRestockRoute
@@ -3364,6 +3634,8 @@ const rootRouteChildren: RootRouteChildren = {
   InventoryStocktakesIdRoute: InventoryStocktakesIdRoute,
   InventoryStocktakesIndexRoute: InventoryStocktakesIndexRoute,
   ApiPublicHandheldDashboardRoute: ApiPublicHandheldDashboardRoute,
+  ApiPublicHandheldFulfillmentsRoute:
+    ApiPublicHandheldFulfillmentsRouteWithChildren,
   ApiPublicHandheldGlobalStockRoute: ApiPublicHandheldGlobalStockRoute,
   ApiPublicHandheldLabelTemplatesRoute:
     ApiPublicHandheldLabelTemplatesRouteWithChildren,
@@ -3390,6 +3662,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksYouzanStockWorkerRoute: ApiPublicHooksYouzanStockWorkerRoute,
   ApiPublicHooksYouzanSyncRoute: ApiPublicHooksYouzanSyncRoute,
   ApiPublicHooksYouzanSyncWorkerRoute: ApiPublicHooksYouzanSyncWorkerRoute,
+  ApiPublicStorefrontOrdersRoute: ApiPublicStorefrontOrdersRouteWithChildren,
+  ApiPublicStorefrontProductsRoute:
+    ApiPublicStorefrontProductsRouteWithChildren,
   ApiPublicAuthOtpSendRoute: ApiPublicAuthOtpSendRoute,
   ApiPublicAuthOtpVerifyRoute: ApiPublicAuthOtpVerifyRoute,
   ApiPublicHandheldAiPrepareListingImageRoute:
@@ -3436,3 +3711,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
