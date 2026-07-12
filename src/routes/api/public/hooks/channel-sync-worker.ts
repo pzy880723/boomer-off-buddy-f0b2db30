@@ -19,6 +19,7 @@ import {
   ensureAccessToken,
   explainYouzanError,
   getHqShop,
+  pushYouzanQuantityUpdate,
 } from "@/lib/youzan.functions";
 import { verifyListingCore } from "@/lib/omnichannel-publish.functions";
 
