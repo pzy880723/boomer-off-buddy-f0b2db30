@@ -2585,6 +2585,7 @@ export type Database = {
           refresh_token: string | null
           role: string
           sell_channel_id: number | null
+          sell_channel_ids: number[]
           shop_name: string
           status: string
           token_expires_at: string | null
@@ -2617,6 +2618,7 @@ export type Database = {
           refresh_token?: string | null
           role?: string
           sell_channel_id?: number | null
+          sell_channel_ids?: number[]
           shop_name: string
           status?: string
           token_expires_at?: string | null
@@ -2649,6 +2651,7 @@ export type Database = {
           refresh_token?: string | null
           role?: string
           sell_channel_id?: number | null
+          sell_channel_ids?: number[]
           shop_name?: string
           status?: string
           token_expires_at?: string | null
