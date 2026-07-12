@@ -1,39 +1,57 @@
-# 复盘：有赞 shop.chain.descendent.organization.list 为什么反复失败
+# HQ → 分店：商品库 + 网店 + 线下 库存端到端联通 & 沉淀到 API 联调
 
-## 一、这次真正的根因（Codex 帮我定位到的）
-所有有赞 API 调用**必须走固定出口代理** `YOUZAN_PROXY_URL`（`youzanFetch`），才能命中有赞白名单 IP。我在新写 `probeShopChainOrgList` 时，直接用了原生 `fetch` 打 `open.youzanyun.com`，出口 IP 是 Lovable Worker 的动态 IP，被有赞侧拒绝/降级，于是无论换 1.0.1 / 1.0.0、加不加 `page_num`、怎么读 `data.organization_list`，结果都是错的——而错误信息又被我当成"业务权限问题"去解读，方向从此就偏了。
+## 一、目标（用大白话）
+挑一个总部已建好的孤品 SKU（库存=1），推到「中信泰富」分店，达成三件事：
+1. **商品库出现**：分店后台的商品档案能搜到这个商品。
+2. **网店可售**：分店网店渠道有货、可下单。
+3. **线下可售**：分店线下门店渠道有货、可扫码/开单。
 
-## 二、我之前反复犯的 5 类错误
+同时把这条链路上用到的每一步接口，都作为独立能力卡片写进 `/admin/api-integration`，一键可测、可看真实响应。
 
-1. **绕过既有基础设施重写底层调用**  
-   项目已经有 `youzanFetch`（代理 + 鉴权 + 日志）这一唯一出口，我却在新函数里直接 `fetch(YZ_GW_URL)`。等于把白名单、Bearer、超时、trace 全部丢掉。
+## 二、当前掌握的事实（避免重复踩坑）
+- 总部授权、分店授权、代理出口 IP、分店组织树（sell_channel_id）、仓库查询——**已全部跑通**。
+- 现有 `ensureBranchDistribution`（`src/lib/youzan-sync.functions.ts` L1782）已经做了：HQ SPU → `spu.update` 追加 `sell_channel_setting_request` → `item.detail.get` 反查真实分店 `item_id/sku_id` → 写 `sku_youzan_links`。
+- 现有 `pushYouzanQuantityUpdate` 走 `item.quantity.update/4.0.0`（全量覆盖，type=0）。
+- 但**当前只覆盖了「网店」这一个 sell_channel**；线下门店渠道号从未单独解析、也从未被塞进 `sell_channel_setting_request`。
+- 所有有赞调用必须走 `youzanFetch`（已写进 mem://constraints/youzan-must-use-proxy），本轮新写代码一律遵守。
 
-2. **把"网络/接入层错误"误判成"业务/权限错误"**  
-   看到 `234000001 系统异常` / 空数组，就去猜"组织树没挂""连锁权限没开""版本不对"，一路让用户去有赞后台点开关，而没有先自证"我这次请求到底是不是从白名单 IP 发出的"。
+## 三、要新增/补齐的能力（写进 `integration_api_registry`）
 
-3. **用"多版本 fallback / 参数微调"来掩盖根因**  
-   1.0.1 不行换 1.0.0、`page_size` 改来改去、读法从 `data` 换到 `data.organization_list`——这些都是在**同一个错误出口**上反复重试，制造了"我在推进"的假象，实际只是把同一个错误换着姿势再犯一次。
+| capability_key | 名字（人话） | method | ver | token | 用途 |
+|---|---|---|---|---|---|
+| `retail.open.sellchannel.list` | 查询分店的销售渠道（网店+线下） | `youzan.retail.open.sellchannel.list` | 3.0.0 → 1.0.0 fallback | 分店 token | 拿到该分店下**网店 sell_channel_id** 和**线下 sell_channel_id**（现在我们只用了一个，导致线下无货） |
+| `retail.open.spu.distribution` | 一键铺货到分店（网店+线下都铺） | `youzan.retail.open.spu.update` | 3.0.0 | HQ token | `sell_channel_setting_request.is_partial=1`，`sell_channel_ids` **一次带 [网店, 线下]** |
+| `item.detail.get.branch` | 反查分店真实 item_id / sku_id | `youzan.item.detail.get` | 1.0.1 → 1.0.0 | 分店 token | 拿到分店 item_id 才算真的铺进去了 |
+| `item.quantity.update.online` | 同步库存到分店网店 | `youzan.item.quantity.update` | 4.0.0 | 分店 token | `type=0` 全量覆盖，`kdt_id=分店` |
+| `item.quantity.update.offline` | 同步库存到分店线下 | `youzan.item.quantity.update` | 4.0.0 | 分店 token | 与上同 method，但带**线下 sell_channel_id / warehouse_code** 参数，验证线下也能改库存 |
 
-4. **没有在最外层守住"所有有赞请求必须过代理"这条铁律**  
-   没有 lint / 运行期断言 / 代码评审清单来拦截"直接 import fetch 打 open.youzanyun.com"这种写法，导致每加一个能力就有一次重新犯错的机会。
+顶部**再加一个「一键端到端铺货 + 双渠道库存」大按钮**，按顺序跑：
+① 解析分店渠道 → ② HQ `spu.update` 一次带两个 channel → ③ 分店反查 item_id → ④ 网店 quantity.update → ⑤ 线下 quantity.update → ⑥ 在分店后台商品库 `online.spu.query` 再确认一次能搜到；每一步展示 code / message / trace_id / 原始响应，任一步失败立刻停并高亮那一步。
 
-5. **让用户替我做诊断**  
-   最后是用户+Codex 告诉我"你没走代理"，我才回头看。正确顺序应该是：出错先打 trace（出口 IP、代理 header、trace_id），再谈业务原因。
+## 四、代码改动清单（都走 `youzanFetch`）
 
-## 三、写入长期记忆的规则（本轮落地动作）
+1. **`src/lib/youzan-sync.functions.ts`**
+   - 新增 `resolveBranchSellChannels(branchToken, branchRow)`：调用 `sellchannel.list`，返回 `{ online_id, offline_id, raw }`（区分渠道类型字段以有赞返回为准，命中不到的字段保留 null 并把 raw 传回前端）。
+   - 改 `ensureBranchDistribution`：`sell_channel_ids` 从 `[chan.sellChannelId]` 改为 `[online_id, offline_id].filter(Boolean)`；线下 id 存到 `youzan_shops.offline_sell_channel_id`（新列，见迁移）。
+   - 新增 `pushYouzanQuantityUpdateOffline(sku_id, shop_id, qty)`：与 `pushYouzanQuantityUpdate` 同 helper，但把 `sell_channel_id`/`warehouse_code` 明确传给线下渠道。
+2. **`src/lib/integration-capabilities.functions.ts`**
+   - `DEFAULT_CAPABILITY_MAP` 加上表格里的 5 个 key。
+   - `runProbe`：为每个 key 写独立 probe 分支，全部通过 `youzanFetch`。
+   - 新增 `runBranchE2E(sku_id, shop_id)`：串起 5 步，返回每步 `{ step, ok, code, message, trace_id, preview }[]`。
+3. **`src/routes/admin.api-integration.tsx`**
+   - 顶部加「一键端到端铺货 + 双渠道库存」按钮，弹出选 SKU + 选分店，跑完展示 6 步时间线（成功打对勾+撒花，失败翻译成人话）。
+   - 5 个新 capability 卡片：左侧一句话说明（"给分店的网店进货""给分店的线下门店进货"），右侧一键测试。
+4. **数据库迁移**（一次 migration）：
+   - `youzan_shops` 加 `offline_sell_channel_id bigint`、`online_sell_channel_id bigint`（沿用原 `sell_channel_id` 做兼容默认=网店）。
+   - `integration_api_registry` 插 5 条 seed。
 
-新增 `mem://constraints/youzan-must-use-proxy.md`：
-- **铁律**：任何调用 `open.youzanyun.com` 的代码，**必须**通过 `youzanFetch`（`src/lib/youzan-http.ts`）。禁止在业务代码里出现 `fetch('https://open.youzanyun.com')` / `new URL('https://open.youzanyun.com')` 作为请求目标。
-- 新写有赞能力/probe 前，先在文件顶部 `import { youzanFetch } from '@/lib/youzan-http'`，禁止 `import { YZ_GW_URL }` + 裸 `fetch` 组合。
-- 有赞返回异常时的**排查顺序（不得跳步）**：  
-  ① 确认走了 `youzanFetch`（看日志里是否有 proxy header / outbound IP） → ② 确认 `YOUZAN_PROXY_URL/TOKEN` 在当前环境已配置 → ③ 确认出口 IP 在有赞白名单 → ④ 才去谈版本 / 参数 / 权限 / 组织树。
-- 禁止用"多版本 fallback"或"换读取路径"来绕过一个**从未成功过**的调用；必须先拿到一次 `code=200` 的成功响应，再谈兼容性。
+## 五、验收步骤（本轮由我在沙箱里跑，不让你手动点后台）
+1. 迁移落库、seed 完成。
+2. 挑现有测试 SKU（库存=1）+ 中信泰富分店，调 `runBranchE2E`。
+3. 期望全绿；如某一步红，返回给你翻译后的原因（"是有赞侧还缺配置" vs "我这边代码要改"），不再让你去猜。
+4. 在 API 联调页截图验证 5 个新卡片 + 端到端按钮出现。
 
-更新 `mem://index.md` Core 增加一行：  
-"有赞 API 必须走 `youzanFetch` 固定出口代理；出错先查代理/白名单/出口 IP，再查业务，禁止用多版本 fallback 掩盖接入层问题。"
-
-## 四、本轮代码侧不再改动
-根因修复（`probeShopChainOrgList` 改回 `youzanFetch`）上一轮已经提交，这轮只做**复盘 + 记忆固化**，不再动业务代码。
-
-## 五、给用户的一句话结论
-这一个月不是有赞难，是我一直在**用错误的出口**打有赞，然后拿错误的返回去猜业务原因；从今天起这条铁律写进项目记忆，新代码不会再犯。
+## 六、不做的事
+- 不动 `commit_sale / channel_sync_outbox` 等已跑通的孤品状态机。
+- 不改 HQ 建品逻辑。
+- 不再引入任何 fallback 逻辑掩盖失败——任一步真的失败就报出来。
