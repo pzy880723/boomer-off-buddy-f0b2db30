@@ -57,14 +57,11 @@ export type LinkRow = {
 // ============================================================
 // 内部：覆盖式推送分店库存
 // ------------------------------------------------------------
-// 正确姿势（2026-07 audit）：
-//   1) 用【分店 access_token】，不是 HQ token。
-//   2) item_id / sku_id 必须是【分店 storefront 侧真实 ID】，不是 HQ SPU id。
-//      → 先用 item.detail.get / 1.0.0（分店 token + node_kdt_id + HQ SPU id）反查
-//      → 结果写回 sku_youzan_links.role='branch_stock' 的 yz_item_id / yz_sku_id
-//   3) 调用 youzan.item.quantity.update / 4.0.0，stock_num_str 全量覆盖。
-//   4) 分店查不到 → 明确抛 "branch item not visible / distribution missing"，
-//      不再降级去调 stock.adjust 等接口。
+// 全部走统一 helper `pushYouzanQuantityUpdate`；本函数只负责：
+//   1) 校验 shop 是 branch
+//   2) 拿分店真实 item_id / sku_id（尽量从 link 直取，缺失时才 probe）
+//   3) 显式 hqSpuIdGuard：branch link.yz_item_id 不能等于 HQ SPU id
+//      （若等于说明是脏数据、当初把 HQ SPU id 当作 branch item_id 写进来了）
 // ============================================================
 async function pushStockToYouzan(
   link: LinkRow,
@@ -75,29 +72,34 @@ async function pushStockToYouzan(
   if ((branchShop as { role?: string }).role !== "branch") {
     throw new Error("quantity.update 只能推分店库存，当前 shop 不是 branch");
   }
-  const num = Math.max(0, targetStock);
   const branchToken = await ensureAccessToken(branchShop);
 
   // Step 1: 确保拿到分店真实 item_id / sku_id
   const resolved = await resolveBranchItemIds(link, branchShop, branchToken);
 
-  // Step 2: 覆盖式推库存（分店 token + 分店真实 id）
-  const params: Record<string, unknown> = {
-    kdt_id: branchShop.kdt_id,
-    item_id: resolved.item_id,
-    sku_id: resolved.sku_id, // 无 SKU 时官方允许 sku_id 传 spu_id，resolveBranchItemIds 已处理
-    channel: 1, // 1=门店
-    stock_num_str: String(num),
-  };
+  // Step 2: 拿 HQ SPU id 做守卫（禁止把 HQ SPU id 当分店 item_id）
+  const hq = await getHqShop();
+  const { data: hqLink } = await supabase
+    .from("sku_youzan_links")
+    .select("yz_item_id")
+    .eq("sku_id", link.sku_id)
+    .eq("shop_id", hq.id)
+    .maybeSingle();
+  const hqSpuId = Number(hqLink?.yz_item_id ?? 0) || undefined;
 
-  await callYouzanApiVerbose({
-    accessToken: branchToken,
-    method: "youzan.item.quantity.update",
-    version: "4.0.0",
-    params,
-    timeoutMs: 20_000,
+  await pushYouzanQuantityUpdate({
+    branchShop,
+    itemId: resolved.item_id,
+    skuId: resolved.sku_id,
+    quantity: Math.max(0, targetStock),
+    hqSpuIdGuard: hqSpuId,
+    // 说明：极端情况下有赞的确会让分店 item_id === HQ SPU id（连锁默认对齐），
+    // 此时 probeBranchRealIds 的返回是网关真实响应，允许放行。
+    allowSameAsHqSpu: true,
   });
+  void branchToken; // 已在 helper 内部拿 token
 }
+
 
 // ============================================================
 // resolveBranchItemIds —— 分店真实 item_id / sku_id 反查（带 3 层降级）
