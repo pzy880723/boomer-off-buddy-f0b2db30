@@ -8,7 +8,10 @@ import {
   ensureAccessToken,
   explainYouzanError,
   getHqShop,
+  pushYouzanQuantityUpdate,
 } from "./youzan.functions";
+
+
 
 
 const AUTO_YOUZAN_GROUP_NAME = "ERP自动同步";
@@ -54,14 +57,11 @@ export type LinkRow = {
 // ============================================================
 // 内部：覆盖式推送分店库存
 // ------------------------------------------------------------
-// 正确姿势（2026-07 audit）：
-//   1) 用【分店 access_token】，不是 HQ token。
-//   2) item_id / sku_id 必须是【分店 storefront 侧真实 ID】，不是 HQ SPU id。
-//      → 先用 item.detail.get / 1.0.0（分店 token + node_kdt_id + HQ SPU id）反查
-//      → 结果写回 sku_youzan_links.role='branch_stock' 的 yz_item_id / yz_sku_id
-//   3) 调用 youzan.item.quantity.update / 4.0.0，stock_num_str 全量覆盖。
-//   4) 分店查不到 → 明确抛 "branch item not visible / distribution missing"，
-//      不再降级去调 stock.adjust 等接口。
+// 全部走统一 helper `pushYouzanQuantityUpdate`；本函数只负责：
+//   1) 校验 shop 是 branch
+//   2) 拿分店真实 item_id / sku_id（尽量从 link 直取，缺失时才 probe）
+//   3) 显式 hqSpuIdGuard：branch link.yz_item_id 不能等于 HQ SPU id
+//      （若等于说明是脏数据、当初把 HQ SPU id 当作 branch item_id 写进来了）
 // ============================================================
 async function pushStockToYouzan(
   link: LinkRow,
@@ -72,29 +72,34 @@ async function pushStockToYouzan(
   if ((branchShop as { role?: string }).role !== "branch") {
     throw new Error("quantity.update 只能推分店库存，当前 shop 不是 branch");
   }
-  const num = Math.max(0, targetStock);
   const branchToken = await ensureAccessToken(branchShop);
 
   // Step 1: 确保拿到分店真实 item_id / sku_id
   const resolved = await resolveBranchItemIds(link, branchShop, branchToken);
 
-  // Step 2: 覆盖式推库存（分店 token + 分店真实 id）
-  const params: Record<string, unknown> = {
-    kdt_id: branchShop.kdt_id,
-    item_id: resolved.item_id,
-    sku_id: resolved.sku_id, // 无 SKU 时官方允许 sku_id 传 spu_id，resolveBranchItemIds 已处理
-    channel: 1, // 1=门店
-    stock_num_str: String(num),
-  };
+  // Step 2: 拿 HQ SPU id 做守卫（禁止把 HQ SPU id 当分店 item_id）
+  const hq = await getHqShop();
+  const { data: hqLink } = await supabase
+    .from("sku_youzan_links")
+    .select("yz_item_id")
+    .eq("sku_id", link.sku_id)
+    .eq("shop_id", hq.id)
+    .maybeSingle();
+  const hqSpuId = Number(hqLink?.yz_item_id ?? 0) || undefined;
 
-  await callYouzanApiVerbose({
-    accessToken: branchToken,
-    method: "youzan.item.quantity.update",
-    version: "4.0.0",
-    params,
-    timeoutMs: 20_000,
+  await pushYouzanQuantityUpdate({
+    branchShop,
+    itemId: resolved.item_id,
+    skuId: resolved.sku_id,
+    quantity: Math.max(0, targetStock),
+    hqSpuIdGuard: hqSpuId,
+    // 说明：极端情况下有赞的确会让分店 item_id === HQ SPU id（连锁默认对齐），
+    // 此时 probeBranchRealIds 的返回是网关真实响应，允许放行。
+    allowSameAsHqSpu: true,
   });
+  void branchToken; // 已在 helper 内部拿 token
 }
+
 
 // ============================================================
 // resolveBranchItemIds —— 分店真实 item_id / sku_id 反查（带 3 层降级）
@@ -1713,98 +1718,292 @@ export async function ensureHqSpu(sku_id: string, addBranchShopId?: string) {
 }
 
 // ============================================================
-// ensureBranchProduct —— 分店"上架" = HQ SPU 的 sell_channel_ids 包含该分店
+// resolveBranchSellChannelId —— 通过 shop.get 拿分店 sell_channel_id，
+// 拿不到时回退到 branchKdtId（连锁零售的默认对齐关系）
+// ============================================================
+async function resolveBranchSellChannelId(
+  hqToken: string,
+  branchKdtId: number,
+): Promise<{ sellChannelId: number; via: "shop.get" | "fallback_kdt_id"; trace: string | null; error?: string }> {
+  try {
+    const res = await callYouzanApiVerbose({
+      accessToken: hqToken,
+      method: "youzan.shop.get",
+      version: "3.0.0",
+      params: { kdt_id: branchKdtId },
+      timeoutMs: 12_000,
+    });
+    let channelId: number | null = null;
+    const walk = (v: unknown) => {
+      if (channelId !== null || !v) return;
+      if (Array.isArray(v)) { for (const x of v) walk(x); return; }
+      if (typeof v !== "object") return;
+      const rec = v as Record<string, unknown>;
+      for (const k of ["sell_channel_id", "sellChannelId", "channel_id", "channelId"]) {
+        const raw = rec[k];
+        const n = typeof raw === "string" ? Number(raw) : (raw as number);
+        if (typeof n === "number" && Number.isFinite(n) && n > 0) { channelId = n; return; }
+      }
+      for (const val of Object.values(rec)) walk(val);
+    };
+    walk(res.payload);
+    if (channelId) return { sellChannelId: channelId, via: "shop.get", trace: res.trace_id };
+    return { sellChannelId: branchKdtId, via: "fallback_kdt_id", trace: res.trace_id };
+  } catch (e) {
+    return {
+      sellChannelId: branchKdtId,
+      via: "fallback_kdt_id",
+      trace: null,
+      error: e instanceof Error ? e.message : String(e),
+    };
+  }
+}
+
+// ============================================================
+// ensureBranchDistribution —— 分店真正的"铺货 + 反查真实 id"
 // ------------------------------------------------------------
-// 连锁零售：分店无权自建商品；必须由总部 spu.create（或 spu.update）
-// 把分店 kdt_id 放进 sell_channel_ids。offline_create=true 让 SPU 直接
-// 在门店铺可销售。
-//
-// 流程：
-//  1. 已有 branch_stock link 且 yz_item_id>0 → 直接返回
-//  2. 无 HQ SPU → 走 spu.create（把该分店 kdt_id 放进 sell_channel_ids）
-//  3. 有 HQ SPU 但该分店不在 channels → 走 spu.update 追加
-//  4. upsert branch_stock link（yz_item_id 复用 HQ spu_id，方便 stock.adjust 定位）
+// 严格分三步；每一步必须走完，才能把 branch_stock link 标 linked：
+//   1) 保证 HQ SPU 已存在（ensureHqSpuLink）
+//   2) spu.update / 3.0.0，sell_channel_setting_request(is_partial=1)
+//      指定 resolveBranchSellChannelId 拿到的 sell_channel_id；带上有赞要求的
+//      name / unit / category_id / retail_price 必填字段。
+//   3) 分店 token 反查分店真实 item_id / sku_id（probeBranchRealIds）
+//      拿到才 upsert branch_stock link；拿不到 → status=error、不写假 id。
+// ============================================================
+export async function ensureBranchDistribution(
+  sku_id: string,
+  shop_id: string,
+): Promise<{
+  ok: boolean;
+  hq_spu_id: number | null;
+  sell_channel_id: number | null;
+  sell_channel_via: string | null;
+  fix_channel_trace: string | null;
+  branch_item_id: number | null;
+  branch_sku_id: number | null;
+  probe_attempts: Array<{ label: string; ok: boolean; trace?: string | null; error?: string; code?: number; msg?: string }>;
+  error?: string;
+}> {
+  // 1. HQ SPU
+  const hqInfo = await ensureHqSpuLink(sku_id);
+  const hqSpuId = Number(hqInfo.yz_item_id);
+  if (!hqSpuId) throw new Error("HQ SPU id 缺失");
+
+  // 2. 分店店铺 + token
+  const { data: branch } = await supabase
+    .from("youzan_shops")
+    .select("*")
+    .eq("id", shop_id)
+    .maybeSingle();
+  if (!branch) throw new Error("门店不存在");
+  const branchRow = branch as unknown as ShopLike;
+  if (branchRow.role !== "branch") throw new Error("目标店铺不是分店，不能铺货");
+  const branchKdtId = Number(branchRow.kdt_id);
+  const hq = await getHqShop();
+  const hqToken = await ensureAccessToken(hq);
+  const branchToken = await ensureAccessToken(branchRow as unknown as Parameters<typeof ensureAccessToken>[0]);
+
+  // 3. 解析 sell_channel_id
+  const chan = await resolveBranchSellChannelId(hqToken, branchKdtId);
+
+  // 4. 补齐 spu.update 的必填字段
+  const { data: skuRow } = await supabase
+    .from("inv_skus")
+    .select("name, price_tier")
+    .eq("id", sku_id)
+    .maybeSingle();
+  const skuName = String((skuRow as { name?: string } | null)?.name ?? "").trim() || `SPU ${hqSpuId}`;
+  const priceTier = Number((skuRow as { price_tier?: number } | null)?.price_tier ?? 0);
+  const retailPrice = (priceTier > 0 ? priceTier : 1).toFixed(2);
+  const categoryId = await resolveHqRetailProductCategoryId();
+
+  // 5. spu.update 修正 sell_channel（partial 追加，不覆盖既有 channels）
+  const { data: fixLog } = await supabase
+    .from("youzan_sync_logs")
+    .insert({
+      shop_id,
+      kdt_id: branchKdtId,
+      action: "distribution_fix_channel",
+      status: "running",
+      message: `spu.update spu_id=${hqSpuId} sell_channel_id=${chan.sellChannelId} via=${chan.via}`,
+    } as never)
+    .select("id")
+    .single();
+  let fixTrace: string | null = null;
+  try {
+    const res = await callYouzanApiVerbose({
+      accessToken: hqToken,
+      method: "youzan.retail.open.spu.update",
+      version: "3.0.0",
+      params: {
+        spu_id: hqSpuId,
+        name: skuName,
+        unit: DEFAULT_RETAIL_UNIT,
+        category_id: categoryId,
+        retail_price: retailPrice,
+        sell_channel_setting_request: {
+          is_partial: 1,
+          sell_channel_ids: [chan.sellChannelId],
+        },
+      },
+      timeoutMs: 20_000,
+    });
+    fixTrace = res.trace_id;
+    if (fixLog?.id) {
+      await supabase.from("youzan_sync_logs").update({
+        status: "ok",
+        message: JSON.stringify({ trace: res.trace_id, preview: res.preview.slice(0, 800) }).slice(0, 3500),
+        finished_at: new Date().toISOString(),
+      } as never).eq("id", fixLog.id);
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (fixLog?.id) {
+      await supabase.from("youzan_sync_logs").update({
+        status: "error",
+        message: "spu.update failed",
+        error: msg.slice(0, 3000),
+        finished_at: new Date().toISOString(),
+      } as never).eq("id", fixLog.id);
+    }
+    await supabase.from("sku_youzan_links").upsert({
+      sku_id, shop_id,
+      yz_item_id: 0,
+      yz_sku_id: null,
+      status: "error",
+      sync_stock: false,
+      role: "branch_stock",
+      last_error: `fix_channel_failed: ${msg}`.slice(0, 400),
+    } as never, { onConflict: "sku_id,shop_id" });
+    return {
+      ok: false, hq_spu_id: hqSpuId, sell_channel_id: chan.sellChannelId,
+      sell_channel_via: chan.via, fix_channel_trace: fixTrace,
+      branch_item_id: null, branch_sku_id: null, probe_attempts: [],
+      error: `fix_channel_failed: ${msg}`,
+    };
+  }
+
+  // 6. 反查分店真实 item_id / sku_id
+  const probe = await probeBranchRealIds({
+    hqSpuId,
+    branchKdtId,
+    branchToken,
+  });
+
+  // 7. 记 release 日志（不论成功失败）
+  const { data: probeLog } = await supabase
+    .from("youzan_sync_logs")
+    .insert({
+      shop_id,
+      kdt_id: branchKdtId,
+      action: "distribution_branch_probe",
+      status: probe.item_id ? "ok" : "error",
+      message: JSON.stringify({ item_id: probe.item_id, sku_id: probe.sku_id, attempts: probe.attempts }).slice(0, 3500),
+      error: probe.item_id ? null : "branch item not visible after fix_channel",
+      finished_at: new Date().toISOString(),
+    } as never)
+    .select("id")
+    .single();
+  void probeLog;
+
+  if (!probe.item_id) {
+    await supabase.from("sku_youzan_links").upsert({
+      sku_id, shop_id,
+      yz_item_id: 0,
+      yz_sku_id: null,
+      status: "error",
+      sync_stock: false,
+      role: "branch_stock",
+      last_error: `branch item not visible / distribution missing: ${JSON.stringify(probe.attempts).slice(0, 300)}`,
+    } as never, { onConflict: "sku_id,shop_id" });
+    return {
+      ok: false, hq_spu_id: hqSpuId, sell_channel_id: chan.sellChannelId,
+      sell_channel_via: chan.via, fix_channel_trace: fixTrace,
+      branch_item_id: null, branch_sku_id: null, probe_attempts: probe.attempts,
+      error: "branch item not visible / distribution missing",
+    };
+  }
+
+  const branchSkuId = probe.sku_id || probe.item_id;
+  await supabase.from("sku_youzan_links").upsert({
+    sku_id,
+    shop_id,
+    yz_item_id: probe.item_id,
+    yz_sku_id: branchSkuId,
+    status: "linked",
+    sync_stock: true,
+    role: "branch_stock",
+    last_error: null,
+  } as never, { onConflict: "sku_id,shop_id" });
+
+  return {
+    ok: true,
+    hq_spu_id: hqSpuId,
+    sell_channel_id: chan.sellChannelId,
+    sell_channel_via: chan.via,
+    fix_channel_trace: fixTrace,
+    branch_item_id: probe.item_id,
+    branch_sku_id: branchSkuId,
+    probe_attempts: probe.attempts,
+  };
+}
+
+type ShopLike = {
+  id: string;
+  kdt_id: number;
+  role: "hq" | "branch";
+  shop_name: string;
+  access_token: string | null;
+  refresh_token: string | null;
+  token_expires_at: string | null;
+};
+
+// ============================================================
+// ensureBranchProduct —— 兼容旧调用点，转发到 ensureBranchDistribution
+// ------------------------------------------------------------
+// 之前会把 yz_item_id 直接写成 HQ SPU id（错的，会导致库存推送 [301000002]）；
+// 现在必须走 ensureBranchDistribution，只有 probe 到真实分店 item_id 才 linked。
 // ============================================================
 export async function ensureBranchProduct(
   sku_id: string,
   shop_id: string,
 ): Promise<{ yz_item_id: number | null; created: boolean; error?: string }> {
+  // 已经 linked 且 yz_item_id>0：跳过（真实 branch item_id 已回填）
   const { data: existed } = await supabase
     .from("sku_youzan_links")
-    .select("yz_item_id, yz_sku_id")
+    .select("yz_item_id, status, role")
     .eq("sku_id", sku_id)
     .eq("shop_id", shop_id)
     .maybeSingle();
-  if (existed?.yz_item_id && Number(existed.yz_item_id) > 0) {
-    return { yz_item_id: Number(existed.yz_item_id), created: false };
+  if (
+    existed &&
+    (existed as { status?: string }).status === "linked" &&
+    (existed as { role?: string }).role === "branch_stock" &&
+    Number((existed as { yz_item_id?: number }).yz_item_id ?? 0) > 0
+  ) {
+    return { yz_item_id: Number((existed as { yz_item_id?: number }).yz_item_id), created: false };
   }
-
   try {
-    const { data: branch } = await supabase
-      .from("youzan_shops")
-      .select("id, kdt_id, role")
-      .eq("id", shop_id)
-      .maybeSingle();
-    if (!branch) throw new Error("门店不存在");
-    if ((branch as { role?: string }).role !== "branch") {
-      throw new Error("目标店铺不是分店，不能铺货");
+    const r = await ensureBranchDistribution(sku_id, shop_id);
+    if (!r.ok || !r.branch_item_id) {
+      return { yz_item_id: null, created: false, error: r.error ?? "distribution failed" };
     }
-
-    // 已有 HQ SPU？
-    const hq = await getHqShop();
-    const { data: hqLink } = await supabase
-      .from("sku_youzan_links")
-      .select("yz_item_id, yz_sku_id")
-      .eq("sku_id", sku_id)
-      .eq("shop_id", hq.id)
-      .maybeSingle();
-    let hqSpuId = Number(hqLink?.yz_item_id ?? 0);
-    let hqSkuId = Number(hqLink?.yz_sku_id ?? 0) || null;
-
-    if (!hqSpuId) {
-      // Step A: 无 HQ SPU → 一步 create，同时铺到目标分店
-      const hqInfo = await ensureHqSpu(sku_id, shop_id);
-      hqSpuId = hqInfo.yz_item_id;
-      hqSkuId = hqInfo.yz_sku_id ?? null;
-    } else {
-      // Step B: 已有 HQ SPU → 追加分店到 channels
-      await addBranchToHqSpu(sku_id, hqSpuId, shop_id);
-    }
-
-    if (!hqSpuId) throw new Error("HQ SPU id 缺失");
-
-    // upsert branch_stock link（分店 item_id 复用 hq spu_id，stock.adjust 用 spu_id + kdt_id 定位）
-    await supabase.from("sku_youzan_links").upsert(
-      {
-        sku_id,
-        shop_id,
-        yz_item_id: hqSpuId,
-        yz_sku_id: hqSkuId,
-        status: "linked",
-        sync_stock: true,
-        role: "branch_stock",
-        last_error: null,
-      } as never,
-      { onConflict: "sku_id,shop_id" },
-    );
-    return { yz_item_id: hqSpuId, created: true };
+    return { yz_item_id: r.branch_item_id, created: true };
   } catch (e) {
     const msg = explainYouzanError(e);
-    await supabase.from("sku_youzan_links").upsert(
-      {
-        sku_id,
-        shop_id,
-        yz_item_id: 0,
-        status: "error",
-        sync_stock: false,
-        role: "branch_stock",
-        last_error: msg.slice(0, 400),
-      } as never,
-      { onConflict: "sku_id,shop_id" },
-    );
+    await supabase.from("sku_youzan_links").upsert({
+      sku_id, shop_id,
+      yz_item_id: 0,
+      yz_sku_id: null,
+      status: "error",
+      sync_stock: false,
+      role: "branch_stock",
+      last_error: msg.slice(0, 400),
+    } as never, { onConflict: "sku_id,shop_id" });
     return { yz_item_id: null, created: false, error: msg };
   }
 }
+
 
 
 // ============================================================

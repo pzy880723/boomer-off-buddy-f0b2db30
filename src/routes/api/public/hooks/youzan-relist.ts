@@ -280,12 +280,14 @@ async function run(opts: {
       stock_num_str: String(Math.max(0, opts.target_stock)),
     };
     try {
-      const r = await callYouzanApiVerbose({
-        accessToken: branchToken,
-        method: "youzan.item.quantity.update",
-        version: "4.0.0",
-        params,
-        timeoutMs: 20_000,
+      const { pushYouzanQuantityUpdate } = await import("@/lib/youzan.functions");
+      const r = await pushYouzanQuantityUpdate({
+        branchShop: branchShop as never,
+        itemId: branchItemId,
+        skuId: branchSkuId,
+        quantity: Math.max(0, opts.target_stock),
+        hqSpuIdGuard: hqSpuId,
+        allowSameAsHqSpu: true,
       });
       stockResults.push({
         sku_id,

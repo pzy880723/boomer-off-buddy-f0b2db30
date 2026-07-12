@@ -19,6 +19,7 @@ import {
   ensureAccessToken,
   explainYouzanError,
   getHqShop,
+  pushYouzanQuantityUpdate,
 } from "@/lib/youzan.functions";
 import { verifyListingCore } from "@/lib/omnichannel-publish.functions";
 
@@ -254,21 +255,14 @@ async function handleSetStock(
     .eq("id", l.shop_id)
     .maybeSingle();
   if (!branch) throw new Error("门店不存在");
-  const branchToken = await ensureAccessToken(
-    branch as unknown as Parameters<typeof ensureAccessToken>[0],
-  );
-  await callYouzanApiVerbose({
-    accessToken: branchToken,
-    method: "youzan.item.quantity.update",
-    version: "4.0.0",
-    params: {
-      kdt_id: Number((branch as { kdt_id: number }).kdt_id),
-      item_id: itemId,
-      sku_id: skuId || itemId,
-      channel: 1,
-      stock_num_str: String(target),
-    },
-    timeoutMs: 20_000,
+  const hqSpuIdGuard = Number(l.external_spu_id ?? 0) || undefined;
+  await pushYouzanQuantityUpdate({
+    branchShop: branch as unknown as Parameters<typeof pushYouzanQuantityUpdate>[0]["branchShop"],
+    itemId,
+    skuId: skuId || itemId,
+    quantity: target,
+    hqSpuIdGuard,
+    allowSameAsHqSpu: true,
   });
 
   await sb
