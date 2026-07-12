@@ -467,6 +467,214 @@ function safePreview(preview: string) {
   }
 }
 
+// -----------------------------------------------------------------
+// 查询总部下分店组织：多版本回退 + 节点解析 + 命中当前分店时落库 sell_channel_id
+// -----------------------------------------------------------------
+type BranchNode = {
+  kdt_id: number;
+  shop_name: string | null;
+  role: string | null;
+  sell_channel_id: number | null;
+  sell_channel_ids: number[];
+  path: string;
+};
+
+function toPosNum(v: unknown): number | null {
+  const n = typeof v === "string" ? Number(v) : typeof v === "number" ? v : NaN;
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function extractBranchNodes(payload: unknown): BranchNode[] {
+  const out: BranchNode[] = [];
+  const seen = new Set<unknown>();
+  const KDT_KEYS = ["kdt_id", "kdtId", "shop_id", "shopId", "node_kdt_id", "nodeKdtId"];
+  const NAME_KEYS = ["shop_name", "shopName", "name", "node_name", "nodeName", "title"];
+  const ROLE_KEYS = ["role", "shop_role", "shopRole", "type", "node_type", "nodeType"];
+  const CHAN_KEYS = ["sell_channel_id", "sellChannelId", "channel_id", "channelId"];
+  const CHAN_ARR_KEYS = ["sell_channel_ids", "sellChannelIds", "channel_ids", "channelIds"];
+
+  const walk = (node: unknown, path: string, depth: number) => {
+    if (!node || depth > 10 || seen.has(node)) return;
+    if (Array.isArray(node)) {
+      seen.add(node);
+      node.forEach((item, i) => walk(item, `${path}[${i}]`, depth + 1));
+      return;
+    }
+    if (typeof node !== "object") return;
+    seen.add(node);
+    const rec = node as Record<string, unknown>;
+    let kdt: number | null = null;
+    for (const k of KDT_KEYS) {
+      kdt = toPosNum(rec[k]);
+      if (kdt) break;
+    }
+    if (kdt) {
+      const nameKey = NAME_KEYS.find((k) => typeof rec[k] === "string" && (rec[k] as string).length > 0);
+      const roleKey = ROLE_KEYS.find((k) => rec[k] != null);
+      let chan: number | null = null;
+      for (const k of CHAN_KEYS) {
+        chan = toPosNum(rec[k]);
+        if (chan) break;
+      }
+      const chanArr: number[] = [];
+      for (const k of CHAN_ARR_KEYS) {
+        const arr = rec[k];
+        if (Array.isArray(arr)) {
+          for (const v of arr) {
+            const n = toPosNum(v);
+            if (n) chanArr.push(n);
+          }
+        }
+      }
+      out.push({
+        kdt_id: kdt,
+        shop_name: nameKey ? String(rec[nameKey]) : null,
+        role: roleKey ? String(rec[roleKey]) : null,
+        sell_channel_id: chan ?? (chanArr[0] ?? null),
+        sell_channel_ids: chanArr,
+        path,
+      });
+    }
+    for (const [k, v] of Object.entries(rec)) walk(v, `${path}.${k}`, depth + 1);
+  };
+  walk(payload, "$", 0);
+  // 去重（同一个 kdt_id 保留信息最全的一条）
+  const byKdt = new Map<number, BranchNode>();
+  for (const n of out) {
+    const prev = byKdt.get(n.kdt_id);
+    if (!prev) {
+      byKdt.set(n.kdt_id, n);
+    } else {
+      byKdt.set(n.kdt_id, {
+        kdt_id: n.kdt_id,
+        shop_name: prev.shop_name ?? n.shop_name,
+        role: prev.role ?? n.role,
+        sell_channel_id: prev.sell_channel_id ?? n.sell_channel_id,
+        sell_channel_ids: Array.from(new Set([...prev.sell_channel_ids, ...n.sell_channel_ids])),
+        path: prev.path,
+      });
+    }
+  }
+  return Array.from(byKdt.values());
+}
+
+async function probeShopChainOrgList(input: {
+  method: string;
+  version: string;
+  shop: ShopRow | null;
+  supabase?: any;
+}): Promise<{ trace_id: string | null; preview: string; request_params: Record<string, any> }> {
+  const method = input.method || "youzan.shop.chain.descendent.organization.list";
+  const versions = [input.version, "1.0.1", "1.0.0"].filter(
+    (v, i, a) => v && a.indexOf(v) === i,
+  );
+
+  // 强制使用总部 token（不管当前选的是哪家店）
+  let hq: ShopRow;
+  try {
+    hq = await getHqShop();
+  } catch (e) {
+    throw new Error(`没有找到已绑定的总部店铺：${e instanceof Error ? e.message : String(e)}`);
+  }
+  const hqToken = await ensureAccessToken(hq);
+
+  const attempts: Array<{
+    version: string;
+    ok: boolean;
+    trace_id?: string | null;
+    error?: string;
+    gw_code?: number | null;
+  }> = [];
+
+  for (const version of versions) {
+    try {
+      const r = await callYouzanApiVerbose({
+        accessToken: hqToken,
+        method,
+        version,
+        params: {},
+        timeoutMs: 15_000,
+      });
+      attempts.push({ version, ok: true, trace_id: r.trace_id });
+
+      const payload = (() => {
+        try {
+          return JSON.parse(r.preview);
+        } catch {
+          return r.preview;
+        }
+      })();
+      const nodes = extractBranchNodes(payload);
+
+      // 命中当前选中的分店 → 落库
+      const target = input.shop && input.shop.role === "branch" ? input.shop : null;
+      let matched: BranchNode | null = null;
+      let saved: { sell_channel_id: number | null; updated: boolean } = {
+        sell_channel_id: null,
+        updated: false,
+      };
+      if (target) {
+        matched = nodes.find((n) => n.kdt_id === Number(target.kdt_id)) ?? null;
+        if (matched?.sell_channel_id && input.supabase) {
+          const patch: Record<string, any> = {
+            sell_channel_id: matched.sell_channel_id,
+            chain_probe_status: "ok",
+            chain_probe_at: new Date().toISOString(),
+          };
+          const { error: uerr } = await input.supabase
+            .from("youzan_shops")
+            .update(patch)
+            .eq("id", target.id);
+          if (!uerr) saved = { sell_channel_id: matched.sell_channel_id, updated: true };
+          else console.error("[chain probe save]", uerr.message);
+        }
+      }
+
+      const summary: Record<string, any> = {
+        passed_version: version,
+        used_hq_shop: { kdt_id: hq.kdt_id, name: hq.shop_name },
+        total_nodes: nodes.length,
+        current_branch: target
+          ? {
+              kdt_id: Number(target.kdt_id),
+              name: target.shop_name,
+              found_in_response: !!matched,
+              sell_channel_id: matched?.sell_channel_id ?? null,
+              sell_channel_ids: matched?.sell_channel_ids ?? [],
+              saved_to_db: saved.updated,
+            }
+          : "未选择分店（仅列出总部下所有节点）",
+        nodes: nodes.slice(0, 40),
+        attempts,
+      };
+      // 附带原始返回（截断）
+      const rawStr = typeof payload === "string" ? payload : JSON.stringify(payload);
+      summary.raw_response_preview = rawStr.length > 4000 ? rawStr.slice(0, 4000) + " ...(truncated)" : rawStr;
+
+      return {
+        trace_id: r.trace_id,
+        preview: JSON.stringify(summary, null, 2),
+        request_params: { method, tested_versions: versions, hq_kdt_id: hq.kdt_id },
+      };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      const codeM = msg.match(/\[(\d{3,6})\]/);
+      const traceM = msg.match(/trace=([^\s\]]+)/);
+      attempts.push({
+        version,
+        ok: false,
+        error: msg.slice(0, 400),
+        trace_id: traceM ? traceM[1] : null,
+        gw_code: codeM ? Number(codeM[1]) : null,
+      });
+    }
+  }
+
+  throw new Error(
+    `分店组织接口所有版本都没有通过：${JSON.stringify(attempts).slice(0, 1200)}`,
+  );
+}
+
 function pickTokenShop(chosen: ShopRow, tokenScope: "hq" | "branch" | "both"): ShopRow {
   if (tokenScope === "both") return chosen;
   if (tokenScope === chosen.role) return chosen;
