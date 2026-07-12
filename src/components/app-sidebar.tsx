@@ -165,18 +165,17 @@ export function AppSidebar() {
   };
   const preload = (to: NavTo) => void router.preloadRoute({ to });
 
-  const allGroups: NavGroup[] = isSuperAdmin
-    ? [
-        ...groups,
-        {
-          label: "系统",
-          items: [
-            { title: "账号管理", url: "/admin/users", icon: ShieldCheck },
-            { title: "渠道同步异常", url: "/admin/channel-sync", icon: AlertCircle },
-          ],
-        },
-      ]
-    : groups;
+  const systemGroup: NavGroup = {
+    label: "系统",
+    items: [
+      { title: "系统设置", url: "/settings", icon: Settings },
+      { title: "API 对接", url: "/admin/api-integration", icon: Plug },
+      ...(isSuperAdmin
+        ? [{ title: "账号管理", url: "/admin/users" as NavTo, icon: ShieldCheck }]
+        : []),
+    ],
+  };
+  const allGroups: NavGroup[] = [...groups, systemGroup];
 
   return (
     <Sidebar collapsible="icon" className="border-r-0">
