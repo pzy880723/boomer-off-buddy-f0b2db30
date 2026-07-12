@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import confetti from "canvas-confetti";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,6 +20,7 @@ import {
   updateIntegrationCapability,
   resetIntegrationCapability,
   probeIntegrationCapability,
+  probeShopChainForIntegration,
   type CapabilityRow,
   type ProbeRow,
 } from "@/lib/integration-capabilities.functions";
@@ -34,7 +35,41 @@ export const Route = createFileRoute("/admin/api-integration")({
   component: ApiIntegrationPage,
 });
 
-type ShopLite = { id: string; kdt_id: number; shop_name: string; role: "hq" | "branch"; status: string };
+type ShopLite = {
+  id: string;
+  kdt_id: number;
+  shop_name: string;
+  role: "hq" | "branch";
+  status: string;
+  sell_channel_id?: number | null;
+  warehouse_code?: string | null;
+  warehouse_name?: string | null;
+  chain_probe_status?: "unknown" | "ok" | "partial" | "failed";
+  chain_probe_at?: string | null;
+};
+
+type ChainProbeResult = {
+  ok: boolean;
+  status: "ok" | "partial" | "failed";
+  checked_at: string;
+  shop_name: string;
+  kdt_id: number;
+  sell_channel_id: number | null;
+  sell_channel_via: string | null;
+  warehouse_code: string | null;
+  warehouse_name: string | null;
+  can_publish_and_sync: boolean;
+  steps: Array<{
+    key: string;
+    label: string;
+    status: "ok" | "warn" | "error";
+    message: string;
+    version?: string | null;
+    trace_id?: string | null;
+    error?: string | null;
+  }>;
+  warehouse_versions: Array<{ version: string; ok: boolean; trace_id?: string | null; error?: string | null }>;
+};
 
 const PLATFORMS = [{ key: "youzan", name: "有赞" }] as const;
 
@@ -42,6 +77,7 @@ const PLATFORMS = [{ key: "youzan", name: "有赞" }] as const;
 const DOC_URL_BY_METHOD: Record<string, string> = {
   "auth/token": "https://doc.youzanyun.com/detail/API/0/906",
   "youzan.shop.chain.descendent.organization.list": "https://doc.youzanyun.com/detail/API/0/1793",
+  "youzan.retail.open.warehouse.query": "https://doc.youzanyun.com/detail/API/0/3365",
   "youzan.trades.sold.get": "https://doc.youzanyun.com/detail/API/0/70",
   "youzan.trade.get": "https://doc.youzanyun.com/detail/API/0/71",
   "youzan.retail.open.online.spu.query": "https://doc.youzanyun.com/detail/API/0/1790",
