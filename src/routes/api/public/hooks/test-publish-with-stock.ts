@@ -45,9 +45,13 @@ export const Route = createFileRoute("/api/public/hooks/test-publish-with-stock"
 
         try {
           summary.hq_publish = await record("publish_hq", () => publishSkuToHqCore(skuId));
-          summary.branch_release = await record("release_branch", () =>
-            releaseSkuToBranchCore(skuId, BRANCH_SHOP_ID),
-          );
+          summary.branch_release = await record("release_branch", async () => {
+            const r = await releaseSkuToBranchCore(skuId, BRANCH_SHOP_ID);
+            if (!r.ok) {
+              throw new Error(String(r.error ?? "release_branch failed"));
+            }
+            return r;
+          });
 
           summary.movement = await record("adjust_stock", async () => {
             const { data: cur } = await supabaseAdmin

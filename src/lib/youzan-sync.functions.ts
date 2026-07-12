@@ -93,21 +93,16 @@ async function pushStockToYouzan(
     skuId: resolved.sku_id,
     quantity: Math.max(0, targetStock),
     hqSpuIdGuard: hqSpuId,
-    // 说明：极端情况下有赞的确会让分店 item_id === HQ SPU id（连锁默认对齐），
-    // 此时 probeBranchRealIds 的返回是网关真实响应，允许放行。
-    allowSameAsHqSpu: true,
   });
   void branchToken; // 已在 helper 内部拿 token
 }
 
 
 // ============================================================
-// resolveBranchItemIds —— 分店真实 item_id / sku_id 反查（带 3 层降级）
+// resolveBranchItemIds —— 分店真实 item_id / sku_id 反查
 // ------------------------------------------------------------
-// 1) 已有真 branch id 缓存（yz_branch_item_id）→ 直接用
-// 2) 用【分店 token】+ node_kdt_id + HQ SPU id 调 item.detail.get / 1.0.0
-// 3) 拿到后写回 sku_youzan_links.yz_item_id / yz_sku_id
-// 4) 反查失败 → 抛 "branch item not visible / distribution missing"
+// 只允许：HQ SPU id -> online.spu.query 反查分店真实 item_id；
+// 禁止把 HQ SPU id 直接传给 item.detail.get 或库存接口。
 // ============================================================
 async function resolveBranchItemIds(
   link: LinkRow,
@@ -154,6 +149,7 @@ async function resolveBranchItemIds(
  * （会报 [301000002] 查询参数商品ID或商品别名缺失）。
  * 所以主策略是先用 retail.open.online.spu.query（HQ token + kdt_id=分店 + spu_ids=[hq spu]）拿到分店 item_id，
  * 然后用 item.detail.get(item_id=..., node_kdt_id=分店) 补 sku_id。
+ * 禁止用 item.detail.get(item_id=hqSpuId) 兜底；那会重新把 HQ SPU id 当分店 item_id。
  */
 export async function probeBranchRealIds(args: {
   hqSpuId: number;
@@ -188,19 +184,6 @@ export async function probeBranchRealIds(args: {
       method: "youzan.retail.open.online.spu.query",
       params: { page_no: 1, page_size: 20, kdt_id: args.branchKdtId, spu_ids: [args.hqSpuId] },
     },
-    {
-      // 常见：分店 item_id 与 HQ spu_id 一致
-      label: "item.detail.get item_id=hqSpuId (branch token)",
-      accessToken: args.branchToken,
-      method: "youzan.item.detail.get",
-      params: { node_kdt_id: args.branchKdtId, item_id: args.hqSpuId },
-    },
-    {
-      label: "item.detail.get item_id=hqSpuId (hq token, node_kdt_id=branch)",
-      accessToken: hqToken,
-      method: "youzan.item.detail.get",
-      params: { node_kdt_id: args.branchKdtId, item_id: args.hqSpuId },
-    },
   ];
 
   for (const s of strategies) {
@@ -218,6 +201,16 @@ export async function probeBranchRealIds(args: {
         if (!a.ok) attempts.push({ label: s.label, version: a.version, ok: false, error: a.error, trace: a.trace });
       }
       if (ex.item_id) {
+        if (ex.item_id === args.hqSpuId) {
+          attempts.push({
+            label: `${s.label} rejected`,
+            version: res.version,
+            ok: false,
+            trace: res.trace_id,
+            error: "反查结果 item_id 等于 HQ SPU id，拒绝写入分店 link",
+          });
+          continue;
+        }
         item_id = ex.item_id;
         if (ex.sku_id) sku_id = ex.sku_id;
         break;
