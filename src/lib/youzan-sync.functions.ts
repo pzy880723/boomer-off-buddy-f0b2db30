@@ -1812,9 +1812,17 @@ export async function ensureBranchDistribution(
   const hqToken = await ensureAccessToken(hq);
   const branchToken = await ensureAccessToken(branchRow as unknown as Parameters<typeof ensureAccessToken>[0]);
 
-  // 3. 解析 sell_channel_id
+  // 3. 解析 sell_channel_id（若 youzan_shops.sell_channel_ids 已保存了整套渠道，就一次性用全部）
   const chan = await resolveBranchSellChannelId(hqToken, branchRow as ShopLike & { sell_channel_id?: number | null });
-  if (!chan.sellChannelId) {
+  const savedIds = Array.isArray((branchRow as unknown as { sell_channel_ids?: number[] | null }).sell_channel_ids)
+    ? ((branchRow as unknown as { sell_channel_ids?: number[] }).sell_channel_ids ?? [])
+        .map((n) => Number(n))
+        .filter((n) => Number.isFinite(n) && n > 0)
+    : [];
+  const targetChannelIds = Array.from(new Set(
+    [chan.sellChannelId, ...savedIds].filter((n): n is number => typeof n === "number" && n > 0),
+  ));
+  if (targetChannelIds.length === 0) {
     const msg = `missing_sell_channel_id: 系统已识别分店授权，但没有拿到铺货渠道号，已停止自动铺货。${chan.error ? `原因：${chan.error}` : ""}`;
     await supabase.from("sku_youzan_links").upsert({
       sku_id, shop_id,
@@ -1837,6 +1845,7 @@ export async function ensureBranchDistribution(
       error: msg,
     };
   }
+
 
   // 4. 补齐 spu.update 的必填字段
   const { data: skuRow } = await supabase
