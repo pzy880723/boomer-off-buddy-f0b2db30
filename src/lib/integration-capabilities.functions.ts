@@ -396,6 +396,7 @@ async function runProbe(input: {
   token_scope: "hq" | "branch" | "both";
   shop: ShopRow | null;
   userParams: Record<string, any>;
+  supabase?: any;
 }): Promise<{ trace_id: string | null; preview: string; request_params: Record<string, any> }> {
   const key = input.capability_key;
 
@@ -412,6 +413,11 @@ async function runProbe(input: {
       }),
       request_params: { kdt_id: input.shop.kdt_id, authorize_type: "silent" },
     };
+  }
+
+  // 1.5 查询总部下分店组织：始终用 HQ token；多版本重试；解析节点；命中当前分店时把 sell_channel_id 落库
+  if (key === "shop.chain.descendent.organization.list") {
+    return await probeShopChainOrgList(input);
   }
 
   // 2. 其他都要 token
