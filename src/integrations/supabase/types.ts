@@ -2445,16 +2445,22 @@ export type Database = {
       youzan_shops: {
         Row: {
           access_token: string | null
+          address: string | null
+          area_sqm: number | null
           authorized_at: string | null
           created_at: string
           expires_at: string | null
           id: string
+          image_url: string | null
           kdt_id: number
           last_ping_at: string | null
           last_ping_msg: string | null
           last_ping_ok: boolean | null
+          manager: string | null
           notes: string | null
+          opened_at: string | null
           parent_kdt_id: number | null
+          phone: string | null
           refresh_token: string | null
           role: string
           shop_name: string
@@ -2464,16 +2470,22 @@ export type Database = {
         }
         Insert: {
           access_token?: string | null
+          address?: string | null
+          area_sqm?: number | null
           authorized_at?: string | null
           created_at?: string
           expires_at?: string | null
           id?: string
+          image_url?: string | null
           kdt_id: number
           last_ping_at?: string | null
           last_ping_msg?: string | null
           last_ping_ok?: boolean | null
+          manager?: string | null
           notes?: string | null
+          opened_at?: string | null
           parent_kdt_id?: number | null
+          phone?: string | null
           refresh_token?: string | null
           role?: string
           shop_name: string
@@ -2483,16 +2495,22 @@ export type Database = {
         }
         Update: {
           access_token?: string | null
+          address?: string | null
+          area_sqm?: number | null
           authorized_at?: string | null
           created_at?: string
           expires_at?: string | null
           id?: string
+          image_url?: string | null
           kdt_id?: number
           last_ping_at?: string | null
           last_ping_msg?: string | null
           last_ping_ok?: boolean | null
+          manager?: string | null
           notes?: string | null
+          opened_at?: string | null
           parent_kdt_id?: number | null
+          phone?: string | null
           refresh_token?: string | null
           role?: string
           shop_name?: string
