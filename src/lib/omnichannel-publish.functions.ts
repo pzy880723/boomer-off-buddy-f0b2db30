@@ -255,15 +255,7 @@ export async function releaseSkuToBranchCore(sku_id: string, shop_id: string) {
   };
 }
 
-    sku_id,
-    channel: BRANCH_CHANNEL,
-    shop_id,
-    external_spu_id: String(r.yz_item_id),
-    listing_status: "unshelved",
-    last_error: `release 成功但分店 probe 未返回 item_id：${JSON.stringify(attempts).slice(0, 300)}`,
-  });
-  return { ok: true, verified: false, spu_id: r.yz_item_id, probe_attempts: attempts };
-}
+
 
 export const releaseSkuToBranch = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
