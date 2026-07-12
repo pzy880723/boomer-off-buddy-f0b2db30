@@ -112,7 +112,6 @@ const groups: NavGroup[] = [
     items: [
       { title: "门店列表", url: "/shop-mgmt/shops", icon: Building2 },
       { title: "加盟商管理", url: "/shop-mgmt/franchisees", icon: Users },
-      { title: "有赞门店", url: "/youzan", icon: Link2 },
     ],
     icon: Store,
   },
@@ -139,8 +138,6 @@ const groups: NavGroup[] = [
     label: "运营",
     items: [
       { title: "知识库", url: "/knowledge", icon: BookOpen },
-      { title: "API 文档", url: "/api-docs", icon: FileCode2 },
-      { title: "系统设置", url: "/settings", icon: Settings },
     ],
   },
 ];
