@@ -94,6 +94,7 @@ import { Route as ApiPublicHooksYouzanDistributionProbeRouteImport } from './rou
 import { Route as ApiPublicHooksYouzanCleanupRouteImport } from './routes/api/public/hooks/youzan-cleanup'
 import { Route as ApiPublicHooksTestPublishWithStockRouteImport } from './routes/api/public/hooks/test-publish-with-stock'
 import { Route as ApiPublicHooksChannelSyncWorkerRouteImport } from './routes/api/public/hooks/channel-sync-worker'
+import { Route as ApiPublicHooksChainProbeVerifyRouteImport } from './routes/api/public/hooks/chain-probe-verify'
 import { Route as ApiPublicHandheldTransfersRouteImport } from './routes/api/public/handheld/transfers'
 import { Route as ApiPublicHandheldSyncRecordsRouteImport } from './routes/api/public/handheld/sync-records'
 import { Route as ApiPublicHandheldStocktakesRouteImport } from './routes/api/public/handheld/stocktakes'
@@ -598,6 +599,12 @@ const ApiPublicHooksChannelSyncWorkerRoute =
     path: '/api/public/hooks/channel-sync-worker',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksChainProbeVerifyRoute =
+  ApiPublicHooksChainProbeVerifyRouteImport.update({
+    id: '/api/public/hooks/chain-probe-verify',
+    path: '/api/public/hooks/chain-probe-verify',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHandheldTransfersRoute =
   ApiPublicHandheldTransfersRouteImport.update({
     id: '/api/public/handheld/transfers',
@@ -1048,6 +1055,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/stocktakes': typeof ApiPublicHandheldStocktakesRoute
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
   '/api/public/handheld/transfers': typeof ApiPublicHandheldTransfersRouteWithChildren
+  '/api/public/hooks/chain-probe-verify': typeof ApiPublicHooksChainProbeVerifyRoute
   '/api/public/hooks/channel-sync-worker': typeof ApiPublicHooksChannelSyncWorkerRoute
   '/api/public/hooks/test-publish-with-stock': typeof ApiPublicHooksTestPublishWithStockRoute
   '/api/public/hooks/youzan-cleanup': typeof ApiPublicHooksYouzanCleanupRoute
@@ -1189,6 +1197,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/stocktakes': typeof ApiPublicHandheldStocktakesRoute
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
   '/api/public/handheld/transfers': typeof ApiPublicHandheldTransfersRouteWithChildren
+  '/api/public/hooks/chain-probe-verify': typeof ApiPublicHooksChainProbeVerifyRoute
   '/api/public/hooks/channel-sync-worker': typeof ApiPublicHooksChannelSyncWorkerRoute
   '/api/public/hooks/test-publish-with-stock': typeof ApiPublicHooksTestPublishWithStockRoute
   '/api/public/hooks/youzan-cleanup': typeof ApiPublicHooksYouzanCleanupRoute
@@ -1338,6 +1347,7 @@ export interface FileRoutesById {
   '/api/public/handheld/stocktakes': typeof ApiPublicHandheldStocktakesRoute
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
   '/api/public/handheld/transfers': typeof ApiPublicHandheldTransfersRouteWithChildren
+  '/api/public/hooks/chain-probe-verify': typeof ApiPublicHooksChainProbeVerifyRoute
   '/api/public/hooks/channel-sync-worker': typeof ApiPublicHooksChannelSyncWorkerRoute
   '/api/public/hooks/test-publish-with-stock': typeof ApiPublicHooksTestPublishWithStockRoute
   '/api/public/hooks/youzan-cleanup': typeof ApiPublicHooksYouzanCleanupRoute
@@ -1488,6 +1498,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/stocktakes'
     | '/api/public/handheld/sync-records'
     | '/api/public/handheld/transfers'
+    | '/api/public/hooks/chain-probe-verify'
     | '/api/public/hooks/channel-sync-worker'
     | '/api/public/hooks/test-publish-with-stock'
     | '/api/public/hooks/youzan-cleanup'
@@ -1629,6 +1640,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/stocktakes'
     | '/api/public/handheld/sync-records'
     | '/api/public/handheld/transfers'
+    | '/api/public/hooks/chain-probe-verify'
     | '/api/public/hooks/channel-sync-worker'
     | '/api/public/hooks/test-publish-with-stock'
     | '/api/public/hooks/youzan-cleanup'
@@ -1777,6 +1789,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/stocktakes'
     | '/api/public/handheld/sync-records'
     | '/api/public/handheld/transfers'
+    | '/api/public/hooks/chain-probe-verify'
     | '/api/public/hooks/channel-sync-worker'
     | '/api/public/hooks/test-publish-with-stock'
     | '/api/public/hooks/youzan-cleanup'
@@ -1887,6 +1900,7 @@ export interface RootRouteChildren {
   ApiPublicHandheldStocktakesRoute: typeof ApiPublicHandheldStocktakesRoute
   ApiPublicHandheldSyncRecordsRoute: typeof ApiPublicHandheldSyncRecordsRoute
   ApiPublicHandheldTransfersRoute: typeof ApiPublicHandheldTransfersRouteWithChildren
+  ApiPublicHooksChainProbeVerifyRoute: typeof ApiPublicHooksChainProbeVerifyRoute
   ApiPublicHooksChannelSyncWorkerRoute: typeof ApiPublicHooksChannelSyncWorkerRoute
   ApiPublicHooksTestPublishWithStockRoute: typeof ApiPublicHooksTestPublishWithStockRoute
   ApiPublicHooksYouzanCleanupRoute: typeof ApiPublicHooksYouzanCleanupRoute
@@ -2527,6 +2541,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/hooks/channel-sync-worker'
       fullPath: '/api/public/hooks/channel-sync-worker'
       preLoaderRoute: typeof ApiPublicHooksChannelSyncWorkerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/chain-probe-verify': {
+      id: '/api/public/hooks/chain-probe-verify'
+      path: '/api/public/hooks/chain-probe-verify'
+      fullPath: '/api/public/hooks/chain-probe-verify'
+      preLoaderRoute: typeof ApiPublicHooksChainProbeVerifyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/handheld/transfers': {
@@ -3355,6 +3376,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHandheldStocktakesRoute: ApiPublicHandheldStocktakesRoute,
   ApiPublicHandheldSyncRecordsRoute: ApiPublicHandheldSyncRecordsRoute,
   ApiPublicHandheldTransfersRoute: ApiPublicHandheldTransfersRouteWithChildren,
+  ApiPublicHooksChainProbeVerifyRoute: ApiPublicHooksChainProbeVerifyRoute,
   ApiPublicHooksChannelSyncWorkerRoute: ApiPublicHooksChannelSyncWorkerRoute,
   ApiPublicHooksTestPublishWithStockRoute:
     ApiPublicHooksTestPublishWithStockRoute,

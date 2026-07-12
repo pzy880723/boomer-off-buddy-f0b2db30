@@ -20,7 +20,6 @@ export const Route = createFileRoute("/api/public/hooks/chain-probe-verify")({
         }
         // Dynamic import so we don't leak server-only code into client
         const mod: any = await import("@/lib/integration-capabilities.functions");
-        // @ts-expect-error — internal helper exported for verification only
         const probe = mod.__probeShopChainOrgList ?? mod.probeShopChainOrgList;
         if (typeof probe !== "function") {
           return Response.json({ ok: false, error: "probe helper not exported" }, { status: 500 });
