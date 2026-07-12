@@ -7,6 +7,7 @@ export type ShopWithStats = {
   kdt_id: number;
   shop_name: string;
   role: string;
+  ownership: string;
   status: string;
   address: string | null;
   image_url: string | null;
@@ -18,6 +19,7 @@ export type ShopWithStats = {
   notes: string | null;
   last_ping_ok: boolean | null;
   last_ping_at: string | null;
+  access_token: string | null;
   revenue_month: number;
   order_count_month: number;
   order_count_total: number;
