@@ -331,6 +331,7 @@ export const probeIntegrationCapability = createServerFn({ method: "POST" })
         token_scope: cap.token_scope as "hq" | "branch" | "both",
         shop,
         userParams: data.params ?? {},
+        supabase,
       });
       probe.ok = true;
       probe.trace_id = out.trace_id;
