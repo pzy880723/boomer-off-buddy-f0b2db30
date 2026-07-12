@@ -1866,7 +1866,7 @@ export async function ensureBranchDistribution(
       kdt_id: branchKdtId,
       action: "distribution_fix_channel",
       status: "running",
-      message: `spu.update spu_id=${hqSpuId} sell_channel_id=${chan.sellChannelId} via=${chan.via}`,
+      message: `spu.update spu_id=${hqSpuId} sell_channel_ids=[${targetChannelIds.join(",")}] via=${chan.via ?? "saved_list"}`,
     } as never)
     .select("id")
     .single();
@@ -1884,9 +1884,10 @@ export async function ensureBranchDistribution(
         retail_price: retailPrice,
         sell_channel_setting_request: {
           is_partial: 1,
-          sell_channel_ids: [chan.sellChannelId],
+          sell_channel_ids: targetChannelIds,
         },
       },
+
       timeoutMs: 20_000,
     });
     fixTrace = res.trace_id;
