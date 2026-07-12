@@ -23,8 +23,7 @@ import {
   ShieldCheck,
   AlertCircle,
   Smartphone,
-  FileCode2,
-  Globe,
+  Plug,
   FolderTree,
   type LucideIcon,
 } from "lucide-react";
