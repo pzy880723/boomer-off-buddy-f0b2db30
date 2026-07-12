@@ -38,7 +38,7 @@ export const listShopsWithStats = createServerFn({ method: "GET" })
       supabase
         .from("youzan_shops")
         .select(
-          "id, kdt_id, shop_name, role, status, address, image_url, manager, area_sqm, opened_at, phone, notes, last_ping_ok, last_ping_at"
+          "id, kdt_id, shop_name, role, ownership, status, address, image_url, manager, area_sqm, opened_at, phone, notes, last_ping_ok, last_ping_at, access_token"
         )
         .order("role")
         .order("shop_name"),
