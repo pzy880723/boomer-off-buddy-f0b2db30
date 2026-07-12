@@ -331,6 +331,83 @@ export async function callYouzanApiWithVersionFallback(opts: {
 }
 
 
+// ============================================================
+// pushYouzanQuantityUpdate —— 统一的门店销售库存覆盖入口
+// ------------------------------------------------------------
+// 有赞连锁零售确认的调用姿势（youzan.item.quantity.update / 4.0.0）：
+//   token   : 分店 access_token（必须是 branch 的，非 HQ）
+//   params  : { kdt_id, item_id, sku_id, channel:1, stock_num_str: String(qty) }
+//     - item_id / sku_id 都是【分店 storefront 侧真实 id】，不是 HQ SPU id
+//     - channel=1 表示门店销售库存
+//     - stock_num_str 为字符串，全量覆盖到该值
+// 任何库存推送都必须走这个 helper，禁止散落再写一份 params。
+// ============================================================
+export async function pushYouzanQuantityUpdate(opts: {
+  branchShop: Pick<ShopRow, "id" | "kdt_id" | "role"> & {
+    access_token?: string | null;
+    refresh_token?: string | null;
+    token_expires_at?: string | null;
+    shop_name?: string;
+    parent_kdt_id?: number | null;
+    status?: string;
+  };
+  itemId: number;
+  skuId: number;
+  quantity: number;
+  timeoutMs?: number;
+  hqSpuIdGuard?: number; // 若给定 → itemId 不能等于 HQ SPU id（除非用户显式允许）
+  allowSameAsHqSpu?: boolean;
+}): Promise<{
+  trace_id: string | null;
+  preview: string;
+  version: string;
+  params: Record<string, unknown>;
+}> {
+  const shop = opts.branchShop;
+  if ((shop as { role?: string }).role !== "branch") {
+    throw new Error("pushYouzanQuantityUpdate: 只能推 branch 门店库存");
+  }
+  const itemId = Number(opts.itemId);
+  const skuId = Number(opts.skuId);
+  if (!Number.isFinite(itemId) || itemId <= 0) {
+    throw new Error(
+      "pushYouzanQuantityUpdate: item_id 无效（请先跑分店铺货 + probe 拿真实 item_id，不要把 HQ SPU id 传进来）",
+    );
+  }
+  if (!Number.isFinite(skuId) || skuId <= 0) {
+    throw new Error(
+      "pushYouzanQuantityUpdate: sku_id 无效（请先跑分店 probe 拿真实 sku_id，无 SKU 商品也应等于分店真实 item_id）",
+    );
+  }
+  if (
+    opts.hqSpuIdGuard &&
+    !opts.allowSameAsHqSpu &&
+    Number(opts.hqSpuIdGuard) === itemId
+  ) {
+    throw new Error(
+      `pushYouzanQuantityUpdate: 分店 item_id (${itemId}) 等于 HQ SPU id，疑似脏数据/未 probe。请先 ensureBranchDistribution。`,
+    );
+  }
+  const qty = Math.max(0, Math.floor(Number(opts.quantity)));
+  const token = await ensureAccessToken(shop as ShopRow);
+  const params: Record<string, unknown> = {
+    kdt_id: Number((shop as { kdt_id: number }).kdt_id),
+    item_id: itemId,
+    sku_id: skuId,
+    channel: 1,
+    stock_num_str: String(qty),
+  };
+  const r = await callYouzanApiVerbose({
+    accessToken: token,
+    method: "youzan.item.quantity.update",
+    version: "4.0.0",
+    params,
+    timeoutMs: opts.timeoutMs ?? 20_000,
+  });
+  return { trace_id: r.trace_id, preview: r.preview, version: "4.0.0", params };
+}
+
+
 export const getYouzanOutboundInfo = createServerFn({ method: "GET" }).handler(async () => {
   return getYouzanOutboundStatus();
 });
