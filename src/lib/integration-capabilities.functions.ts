@@ -16,6 +16,7 @@ import {
   callYouzanApiVerbose,
   ensureAccessToken,
   fetchSilentToken,
+  getHqShop,
   runYouzanShopChainProbe,
 } from "./youzan.functions";
 import { YOUZAN_API_REGISTRY } from "./youzan-api-registry";
