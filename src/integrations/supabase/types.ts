@@ -1880,6 +1880,7 @@ export type Database = {
           sku_id: string
           stock_mode: string | null
           updated_at: string
+          verified_inventory_version: number
         }
         Insert: {
           channel: string
@@ -1900,6 +1901,7 @@ export type Database = {
           sku_id: string
           stock_mode?: string | null
           updated_at?: string
+          verified_inventory_version?: number
         }
         Update: {
           channel?: string
@@ -1920,6 +1922,7 @@ export type Database = {
           sku_id?: string
           stock_mode?: string | null
           updated_at?: string
+          verified_inventory_version?: number
         }
         Relationships: [
           {
@@ -2578,6 +2581,7 @@ export type Database = {
           last_ping_ok: boolean | null
           manager: string | null
           notes: string | null
+          offline_sell_channel_id: number | null
           opened_at: string | null
           ownership: string
           parent_kdt_id: number | null
@@ -2611,6 +2615,7 @@ export type Database = {
           last_ping_ok?: boolean | null
           manager?: string | null
           notes?: string | null
+          offline_sell_channel_id?: number | null
           opened_at?: string | null
           ownership?: string
           parent_kdt_id?: number | null
@@ -2644,6 +2649,7 @@ export type Database = {
           last_ping_ok?: boolean | null
           manager?: string | null
           notes?: string | null
+          offline_sell_channel_id?: number | null
           opened_at?: string | null
           ownership?: string
           parent_kdt_id?: number | null
