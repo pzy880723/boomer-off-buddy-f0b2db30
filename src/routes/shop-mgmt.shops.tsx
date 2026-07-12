@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Plus, MapPin, User, Store, Pencil, ImagePlus, Loader2 } from "lucide-react";
+import { Plus, MapPin, User, Store, Pencil, ImagePlus, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
-import { listShopsWithStats, updateShopMeta, createShop, type ShopWithStats } from "@/lib/shops.functions";
+import { listShopsWithStats, updateShopMeta, createShop, syncSingleShop, type ShopWithStats } from "@/lib/shops.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { compressImage } from "@/lib/image-upload";
 
@@ -101,6 +101,24 @@ function ShopsPage() {
 }
 
 function ShopCard({ shop, onEdit }: { shop: ShopWithStats; onEdit: () => void }) {
+  const qc = useQueryClient();
+  const syncFn = useServerFn(syncSingleShop);
+  const syncM = useMutation({
+    mutationFn: () => syncFn({ data: { shop_id: shop.id, days: 30 } }),
+    onSuccess: (r) => {
+      const parts: string[] = [];
+      parts.push(`商品 ${r.items.ok ? `✓ ${r.items.count}` : `✗ ${r.items.message}`}`);
+      parts.push(`订单 ${r.orders.ok ? `✓ ${r.orders.count}` : `✗ ${r.orders.message}`}`);
+      const allOk = r.items.ok && r.orders.ok;
+      (allOk ? toast.success : toast.error)(`${shop.shop_name}：${parts.join(" · ")}`);
+      qc.invalidateQueries({ queryKey: ["shops-with-stats"] });
+    },
+    onError: (e: Error) => toast.error(e.message || "同步失败"),
+  });
+  const canSync = !!shop.kdt_id && !!shop.access_token;
+  const lastSync = shop.last_ping_at
+    ? new Date(shop.last_ping_at).toLocaleString("zh-CN", { hour12: false })
+    : null;
   return (
     <Card className="group overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-card-hover">
       <div className="relative h-36 overflow-hidden bg-muted">
@@ -129,13 +147,29 @@ function ShopCard({ shop, onEdit }: { shop: ShopWithStats; onEdit: () => void })
             </StatusBadge>
           ) : null}
         </div>
-        <button
-          className="absolute right-3 top-3 rounded-md bg-white/90 p-1.5 opacity-0 shadow-sm transition-opacity hover:bg-white group-hover:opacity-100"
-          onClick={onEdit}
-          title="编辑门店"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
+        <div className="absolute right-3 top-3 flex gap-1.5">
+          {canSync && (
+            <button
+              className="rounded-md bg-white/90 p-1.5 shadow-sm transition-colors hover:bg-white disabled:opacity-60"
+              onClick={() => syncM.mutate()}
+              disabled={syncM.isPending}
+              title="从有赞同步商品与订单（近30天）"
+            >
+              {syncM.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3.5 w-3.5" />
+              )}
+            </button>
+          )}
+          <button
+            className="rounded-md bg-white/90 p-1.5 shadow-sm transition-colors hover:bg-white"
+            onClick={onEdit}
+            title="编辑门店"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+        </div>
         <div className="absolute bottom-3 left-3 right-3">
           <p className="text-base font-semibold text-white">{shop.shop_name}</p>
           <p className="mt-0.5 flex items-center gap-1 text-xs text-white/80">
@@ -173,10 +207,36 @@ function ShopCard({ shop, onEdit }: { shop: ShopWithStats; onEdit: () => void })
           </span>
           <span className="tabular-nums">kdt {shop.kdt_id}</span>
         </div>
+        <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground">
+          <span className="inline-flex items-center gap-1">
+            <span
+              className={`inline-block h-1.5 w-1.5 rounded-full ${
+                shop.last_ping_ok === true
+                  ? "bg-emerald-500"
+                  : shop.last_ping_ok === false
+                    ? "bg-rose-500"
+                    : "bg-muted-foreground/40"
+              }`}
+            />
+            {lastSync ? `最近同步 ${lastSync}` : "尚未同步"}
+          </span>
+          {canSync ? (
+            <button
+              className="text-primary hover:underline disabled:opacity-60"
+              onClick={() => syncM.mutate()}
+              disabled={syncM.isPending}
+            >
+              {syncM.isPending ? "同步中…" : "立即同步"}
+            </button>
+          ) : (
+            <span className="text-muted-foreground/70">未绑定有赞</span>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
 }
+
 
 function EditShopDialog({
   shop,
