@@ -1839,7 +1839,9 @@ export async function ensureBranchDistribution(
       ok: false,
       hq_spu_id: hqSpuId,
       sell_channel_id: null,
+      sell_channel_ids: [],
       sell_channel_via: null,
+
       fix_channel_trace: chan.trace,
       branch_item_id: null,
       branch_sku_id: null,
