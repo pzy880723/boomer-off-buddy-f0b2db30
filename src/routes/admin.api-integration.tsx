@@ -236,24 +236,26 @@ function CapabilityCard({
               </div>
             </div>
 
-            <div className="space-y-1.5 text-xs text-muted-foreground">
-              <div>
-                <span className="text-muted-foreground">接口全名：</span>
-                <code className="font-mono text-foreground bg-background/60 border rounded px-1.5 py-0.5 break-all">
-                  {cap.method}.{cap.version}
-                </code>
+            <details className="text-xs text-muted-foreground bg-background/40 border rounded-md">
+              <summary className="cursor-pointer select-none px-2 py-1.5 text-foreground/70">
+                技术信息（接口名 / 授权）
+              </summary>
+              <div className="px-2 pb-2 pt-1 space-y-1.5">
+                <div>
+                  <span>接口全名：</span>
+                  <code className="font-mono text-foreground bg-background/60 border rounded px-1.5 py-0.5 break-all">
+                    {cap.method}.{cap.version}
+                  </code>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <InfoRow label="使用授权" value={TOKEN_ZH[cap.token_scope] ?? cap.token_scope} />
+                  <InfoRow label="作用范围" value={SCOPE_ZH[cap.scope] ?? cap.scope} />
+                </div>
+                {cap.note && (
+                  <div className="pt-1"><span className="text-foreground/70 font-medium">备注：</span>{cap.note}</div>
+                )}
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <InfoRow label="使用授权" value={TOKEN_ZH[cap.token_scope] ?? cap.token_scope} />
-                <InfoRow label="作用范围" value={SCOPE_ZH[cap.scope] ?? cap.scope} />
-              </div>
-            </div>
-
-            {cap.note && (
-              <div className="text-xs text-muted-foreground bg-background/60 border rounded-md p-2 leading-relaxed">
-                <span className="text-foreground/70 font-medium">备注：</span>{cap.note}
-              </div>
-            )}
+            </details>
 
             <div className="flex items-center gap-1 pt-1">
               <Button variant="outline" size="sm" asChild>
