@@ -208,7 +208,7 @@ function CapabilityCard({
       }
     >
       <CardContent className="p-0">
-        <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x">
+        <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x">
           {/* 左：能力描述 */}
           <div className="p-5 space-y-3 bg-muted/20">
             <div className="flex items-start gap-2 flex-wrap">
@@ -222,11 +222,17 @@ function CapabilityCard({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-              <InfoRow label="接口方法" value={<span className="font-mono text-foreground">{cap.method}</span>} />
-              <InfoRow label="版本号" value={<span className="font-mono text-foreground">v{cap.version}</span>} />
-              <InfoRow label="使用授权" value={TOKEN_ZH[cap.token_scope] ?? cap.token_scope} />
-              <InfoRow label="作用范围" value={SCOPE_ZH[cap.scope] ?? cap.scope} />
+            <div className="space-y-1.5 text-xs text-muted-foreground">
+              <div>
+                <span className="text-muted-foreground">接口全名：</span>
+                <code className="font-mono text-foreground bg-background/60 border rounded px-1.5 py-0.5 break-all">
+                  {cap.method}.{cap.version}
+                </code>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <InfoRow label="使用授权" value={TOKEN_ZH[cap.token_scope] ?? cap.token_scope} />
+                <InfoRow label="作用范围" value={SCOPE_ZH[cap.scope] ?? cap.scope} />
+              </div>
             </div>
 
             {cap.note && (
@@ -409,15 +415,26 @@ function EditDialog({
   cap: CapabilityRow;
   onSaved: () => void;
 }) {
-  const [method, setMethod] = useState(cap.method);
-  const [version, setVersion] = useState(cap.version);
+  const [fullName, setFullName] = useState(`${cap.method}.${cap.version}`);
   const [scope, setScope] = useState(cap.scope);
   const [tokenScope, setTokenScope] = useState(cap.token_scope);
   const [note, setNote] = useState(cap.note ?? "");
   const updateFn = useServerFn(updateIntegrationCapability);
+
+  // 校验：xxx.yyy.zzz.<major>.<minor>.<patch>
+  const FULL_NAME_RE = /^([a-zA-Z0-9_.]+)\.(\d+)\.(\d+)\.(\d+)$/;
+  const match = fullName.trim().match(FULL_NAME_RE);
+  const parsed = match
+    ? { method: match[1], version: `${match[2]}.${match[3]}.${match[4]}` }
+    : null;
+
   const mut = useMutation({
-    mutationFn: () =>
-      updateFn({ data: { id: cap.id, method, version, scope, token_scope: tokenScope, note } }),
+    mutationFn: () => {
+      if (!parsed) throw new Error("接口全名格式不对");
+      return updateFn({
+        data: { id: cap.id, method: parsed.method, version: parsed.version, scope, token_scope: tokenScope, note },
+      });
+    },
     onSuccess: () => {
       toast.success("已保存");
       onOpenChange(false);
@@ -432,17 +449,21 @@ function EditDialog({
           <DialogTitle>修改配置：{cap.capability_name}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
+          <div>
+            <Label className="text-xs">接口全名</Label>
+            <Input
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="youzan.retail.open.stocksupply.relaiton.query.1.0.0"
+              className="font-mono"
+            />
+            <p className={"text-[11px] mt-1 " + (parsed || !fullName ? "text-muted-foreground" : "text-destructive")}>
+              {parsed
+                ? `将保存为：接口名 ${parsed.method} · 版本 ${parsed.version}`
+                : "格式应为：接口名.主版本.次版本.修订版本，例如 youzan.trades.sold.get.4.0.4"}
+            </p>
+          </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2">
-              <Label className="text-xs">接口方法名</Label>
-              <Input value={method} onChange={(e) => setMethod(e.target.value)} />
-              <p className="text-[11px] text-muted-foreground mt-1">例如 youzan.trades.sold.get</p>
-            </div>
-            <div>
-              <Label className="text-xs">接口版本号</Label>
-              <Input value={version} onChange={(e) => setVersion(e.target.value)} />
-              <p className="text-[11px] text-muted-foreground mt-1">例如 4.0.4</p>
-            </div>
             <div>
               <Label className="text-xs">作用范围</Label>
               <Select value={scope} onValueChange={(v) => setScope(v as any)}>
@@ -473,7 +494,7 @@ function EditDialog({
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>取消</Button>
-          <Button onClick={() => mut.mutate()} disabled={mut.isPending}>
+          <Button onClick={() => mut.mutate()} disabled={mut.isPending || !parsed}>
             {mut.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}保存
           </Button>
         </DialogFooter>
