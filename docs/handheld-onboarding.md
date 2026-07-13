@@ -86,7 +86,7 @@ X-Session-Token: <access_token>   # Supabase access token，2h 过期 → /auth/
 3. 进入扫描：每条 EPC 触发 `GET /rfid/{epc}`
    - `known:true` → 直接显示 SKU 卡；
    - `code:unlinked` → 跳「认领」或「智能上架」；
-4. 智能上架：`ai/recognize-item` → `items/upload-image`（×N） → `ai/prepare-listing-image`（可选） → `items/smart-create`（带 `auto_push_youzan=false` 默认）；
+4. 智能上架：`ai/recognize-item` → `items/upload-image`（×N） → `ai/prepare-listing-image`（可选） → `items/smart-create`（`auto_push_youzan` 默认 false；开启后发布到所选门店库位绑定的有赞分店并同步库存）；
 5. 出现 `transfer_required` / `already_exists` → 进入调拨或冲突处理；
 6. 后台静默：每 30 分钟 `auth/refresh`。
 

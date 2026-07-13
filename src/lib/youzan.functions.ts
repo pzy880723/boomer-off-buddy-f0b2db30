@@ -6,6 +6,12 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { yzStatusText } from "./youzan-status";
 import { getYouzanOutboundStatus, youzanFetch } from "./youzan-http";
 import { buildYouzanQuantityUpdateParams } from "./youzan-quantity.server";
+import { createSupabaseYouzanSaleAdapter } from "./youzan-sale.functions";
+import {
+  extractYouzanSale,
+  isYouzanSaleStatus,
+  processYouzanSale,
+} from "./youzan-sale.server";
 
 // ============================================================
 // 有赞自用型应用 OAuth：grant_type=silent + kdt_id
@@ -198,8 +204,8 @@ export async function ensureAccessToken(shop: ShopRow): Promise<string> {
 }
 
 function getYouzanSyncActions(shop: Pick<ShopRow, "role">): Array<"items" | "orders"> {
-  // 总部只同步商品总账；真实销售订单属于分店。
-  return shop.role === "hq" ? ["items"] : ["items", "orders"];
+  // 分店轮询门店成交，总部轮询网店成交；成交扣减统一走幂等 commit_sale。
+  return ["items", "orders"];
 }
 
 function dispatchYouzanSyncWorker(opts: {
@@ -1814,7 +1820,7 @@ export function enrichOrderFields(
 // ============================================================
 // 内部：单店订单同步（零售连锁版）
 // ------------------------------------------------------------
-// HQ      → 跳过，总部没有销售
+// HQ      → 不带 offline_id，拉网店订单并按 node_kdt_id 映射分店
 // Branch  → 优先 youzan.trades.sold.get（通用交易接口，offline_id=分店 kdt_id）
 //           兜底再试 retail.trade.order.search / retail.trade.search
 // ============================================================
@@ -1827,19 +1833,6 @@ async function runOrdersSyncForShop(
     const pad = (n: number) => String(n).padStart(2, "0");
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
   };
-
-  // HQ 不同步订单
-  if (shop.role === "hq") {
-    await supabase.from("youzan_sync_logs").insert({
-      shop_id: shop.id,
-      kdt_id: shop.kdt_id,
-      action: "orders",
-      status: "skipped",
-      message: "总部门店无销售数据（已跳过）",
-      finished_at: new Date().toISOString(),
-    } as never);
-    return { ok: true, count: 0, message: "总部门店无销售数据（已跳过）" };
-  }
 
   const { data: log } = await supabase
     .from("youzan_sync_logs")
@@ -1855,6 +1848,10 @@ async function runOrdersSyncForShop(
 
   let totalReturned = 0;
   let totalUpserted = 0;
+  let saleProcessed = 0;
+  let saleIdempotent = 0;
+  let saleUnmatched = 0;
+  let saleFailed = 0;
   const attemptMsgs: string[] = [];
   let lastPreview = "";
   let lastTrace: string | null = null;
@@ -1863,6 +1860,16 @@ async function runOrdersSyncForShop(
     const hq = await getHqShop();
     const token = await ensureAccessToken(hq);
     const pageSize = 20;
+    const { data: activeShops } = await supabase
+      .from("youzan_shops")
+      .select("id,kdt_id,role,status")
+      .eq("status", "active");
+    const shopsByKdt = new Map(
+      (activeShops ?? []).map((row) => [Number(row.kdt_id), row]),
+    );
+    const saleAdapter = createSupabaseYouzanSaleAdapter();
+    const scopedParams = () =>
+      shop.role === "branch" ? { offline_id: shop.kdt_id } : {};
 
     const attempts: Array<{
       label: string;
@@ -1877,7 +1884,7 @@ async function runOrdersSyncForShop(
         buildParams: (page) => ({
           page_no: page,
           page_size: pageSize,
-          offline_id: shop.kdt_id,
+          ...scopedParams(),
           start_update: fmt(startDate),
           end_update: fmt(endDate),
         }),
@@ -1889,7 +1896,7 @@ async function runOrdersSyncForShop(
         buildParams: (page) => ({
           page_no: page,
           page_size: pageSize,
-          offline_id: shop.kdt_id,
+          ...scopedParams(),
           start_update: fmt(startDate),
           end_update: fmt(endDate),
         }),
@@ -1901,7 +1908,7 @@ async function runOrdersSyncForShop(
         buildParams: (page) => ({
           page_no: page,
           page_size: pageSize,
-          offline_id: shop.kdt_id,
+          ...scopedParams(),
           start_update: fmt(startDate),
           end_update: fmt(endDate),
         }),
@@ -1935,9 +1942,15 @@ async function runOrdersSyncForShop(
             sampleRaw = JSON.stringify(trades[0]).slice(0, 3500);
           }
 
-          const rows = trades
+          const mapped = trades
             .map((t) => {
               const n = flattenTrade(t);
+              const sale = extractYouzanSale(t);
+              if (shop.role === "hq" && sale?.sourceChannel !== "youzan_online") return null;
+              if (shop.role === "branch" && sale?.sourceChannel === "youzan_online") return null;
+              const targetShop = sale?.targetKdtId
+                ? shopsByKdt.get(sale.targetKdtId) ?? shop
+                : shop;
               const tid = pickStr(n, [
                 "tid",
                 "orderNo",
@@ -2011,8 +2024,8 @@ async function runOrdersSyncForShop(
               // 件数：优先用子单累加（更准），否则回退到 num 字段
               const finalNum = enriched.item_count ?? (num || null);
               const row = {
-                shop_id: shop.id,
-                kdt_id: shop.kdt_id,
+                shop_id: targetShop.id,
+                kdt_id: targetShop.kdt_id,
                 tid,
                 status,
                 buyer_nick: enriched.buyer_nick ?? buyer,
@@ -2036,9 +2049,10 @@ async function runOrdersSyncForShop(
                 status_text: enriched.status_text,
               };
               if (!sampleMapped) sampleMapped = JSON.stringify(row).slice(0, 1500);
-              return row;
+              return { row, trade: t, targetShopId: targetShop.id, status };
             })
             .filter((r): r is NonNullable<typeof r> => r !== null);
+          const rows = mapped.map((entry) => entry.row);
 
           if (rows.length > 0) {
             const { error } = await supabase
@@ -2046,6 +2060,23 @@ async function runOrdersSyncForShop(
               .upsert(rows as never, { onConflict: "kdt_id,tid" });
             if (error) throw new Error(error.message);
             attemptUpserted += rows.length;
+            for (const entry of mapped) {
+              if (!isYouzanSaleStatus(entry.status)) continue;
+              try {
+                const saleResult = await processYouzanSale({
+                  trade: entry.trade,
+                  shopId: entry.targetShopId,
+                  adapter: saleAdapter,
+                });
+                saleProcessed += saleResult.processed;
+                saleIdempotent += saleResult.idempotent;
+                saleUnmatched += saleResult.unmatched;
+                saleFailed += saleResult.failed;
+              } catch (saleError) {
+                saleFailed += 1;
+                console.error("[youzan-orders] 库存对账失败", saleError);
+              }
+            }
           }
           if (trades.length < pageSize) break;
           page += 1;
@@ -2063,7 +2094,7 @@ async function runOrdersSyncForShop(
     }
 
     const status = totalReturned > 0 ? (totalUpserted > 0 ? "ok" : "empty") : "empty";
-    let msg = `订单同步 入库 ${totalUpserted} / 返回 ${totalReturned}（${fmt(startDate)} ~ ${fmt(endDate)}）｜${attemptMsgs.join(" / ")}`;
+    let msg = `订单同步 入库 ${totalUpserted} / 返回 ${totalReturned}（${fmt(startDate)} ~ ${fmt(endDate)}）｜库存扣减 ${saleProcessed}（幂等 ${saleIdempotent}）未匹配 ${saleUnmatched} 失败 ${saleFailed}｜${attemptMsgs.join(" / ")}`;
     if (totalReturned === 0 && lastPreview) {
       msg += `｜末次响应: ${lastPreview}`;
       if (lastTrace) msg += ` (trace=${lastTrace})`;
@@ -2264,4 +2295,3 @@ export const backfillShopOrders = createServerFn({ method: "POST" }).handler(
     return { scanned, updated };
   },
 );
-

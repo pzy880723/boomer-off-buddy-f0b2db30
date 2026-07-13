@@ -15,6 +15,8 @@
 //   5. 记 log 到 youzan_sync_logs
 import { createFileRoute } from "@tanstack/react-router";
 import { createHash } from "crypto";
+import { reconcileYouzanTradeSale } from "@/lib/youzan-sale.functions";
+import { extractYouzanSale } from "@/lib/youzan-sale.server";
 
 type YZMessage = {
   id?: string;
@@ -71,17 +73,23 @@ export const Route = createFileRoute("/api/public/hooks/youzan-message")({
           /* keep empty */
         }
 
+        let logId: string | null = null;
         try {
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
           // 记 log（成功/失败都记）
-          await supabaseAdmin.from("youzan_sync_logs").insert({
-            action: "message_push",
-            status: "running",
-            message: `type=${payload.type ?? "?"} kdt=${payload.kdt_id ?? "?"}`,
-            raw: { payload, event } as never,
-            kdt_id: payload.kdt_id ?? null,
-          } as never);
+          const { data: log } = await supabaseAdmin
+            .from("youzan_sync_logs")
+            .insert({
+              action: "message_push",
+              status: "running",
+              message: `type=${payload.type ?? "?"} kdt=${payload.kdt_id ?? "?"}`,
+              raw: { payload, event } as never,
+              kdt_id: payload.kdt_id ?? null,
+            } as never)
+            .select("id")
+            .single();
+          logId = log?.id ?? null;
 
           const type = String(payload.type ?? "");
           const kdtId = Number(payload.kdt_id ?? 0);
@@ -101,12 +109,25 @@ export const Route = createFileRoute("/api/public/hooks/youzan-message")({
                 type === "TRADE_TradeSuccess" ||
                 type === "TRADE_TradeMemoModified"
               ) {
-                await handleTradeEvent(supabaseAdmin, shopId, event);
                 // 2026-07 audit rule 9：消息推送体不可信，异步再拉一次 trade.get/4.0.2
-                // 详情覆写 youzan_orders，避免只落 push body 造成字段缺失。
-                await refreshTradeDetail(supabaseAdmin, shopId, kdtId, event).catch((e: unknown) =>
-                  console.warn("[youzan-message] trade.get 补拉失败：", e),
-                );
+                // 先拉详情，再扣库存；推送通常只有 tid，没有商品行。
+                let detail: Record<string, unknown> | null = null;
+                try {
+                  detail = await refreshTradeDetail(supabaseAdmin, shopId, kdtId, event);
+                } catch (e) {
+                  console.warn("[youzan-message] trade.get 补拉失败：", e);
+                }
+                const trade = detail ?? event;
+                const extracted = extractYouzanSale(trade);
+                if (!extracted || extracted.items.length === 0) {
+                  throw new Error("订单详情缺少商品行，未执行库存扣减");
+                }
+                const sale = await reconcileYouzanTradeSale({ trade, shopId });
+                if (sale.unmatched > 0 || sale.failed > 0) {
+                  throw new Error(
+                    `库存扣减未完成：processed=${sale.processed} unmatched=${sale.unmatched} failed=${sale.failed}`,
+                  );
+                }
               }
               // 退款事件 → 加回库存
               if (type === "REFUND_RefundSuccess" || type === "REFUND_SellerAgree") {
@@ -114,8 +135,29 @@ export const Route = createFileRoute("/api/public/hooks/youzan-message")({
               }
             }
           }
+          if (logId) {
+            await supabaseAdmin
+              .from("youzan_sync_logs")
+              .update({
+                status: "ok",
+                message: `type=${payload.type ?? "?"} kdt=${payload.kdt_id ?? "?"} 已处理`,
+                finished_at: new Date().toISOString(),
+              } as never)
+              .eq("id", logId);
+          }
         } catch (e) {
-          // 内部错误也回 success 给有赞（避免它无限重试），日志已经记了
+          if (logId) {
+            const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+            await supabaseAdmin
+              .from("youzan_sync_logs")
+              .update({
+                status: "error",
+                error: e instanceof Error ? e.message : String(e),
+                finished_at: new Date().toISOString(),
+              } as never)
+              .eq("id", logId);
+          }
+          // 业务异常已持久化；仍确认接收，轮询同步会再次幂等对账。
           console.error("[youzan-message]", e);
         }
 
@@ -124,92 +166,6 @@ export const Route = createFileRoute("/api/public/hooks/youzan-message")({
     },
   },
 });
-
-type SB = Awaited<
-  ReturnType<
-    typeof import("@/integrations/supabase/client.server").supabaseAdmin.from
-  >
->["constructor"] extends never ? never : never;
-
-async function handleTradeEvent(sb: unknown, shopId: string, event: Record<string, unknown>) {
-  // 2026-07 阶段 4/5：所有渠道销售扣减统一走 commit_sale RPC。
-  // - RPC 内部：原子扣库存 + 幂等 + 自动 enqueue channel_sync_outbox (set_stock_zero / delist)
-  // - dedupe key = (source_channel, source_order_id, event_type)
-  const items = extractOrderItems(event);
-  const tid = String(
-    (event as { tid?: string | number }).tid ??
-      (event as { trade?: { tid?: string | number } }).trade?.tid ??
-      (event as { data?: { tid?: string | number } }).data?.tid ??
-      "",
-  );
-  if (!tid) return;
-  const supa = sb as {
-    from: (t: string) => {
-      select: (c: string) => {
-        eq: (
-          c: string,
-          v: unknown,
-        ) => {
-          eq: (c: string, v: unknown) => { maybeSingle: () => Promise<{ data: { sku_id: string } | null }> };
-        };
-      };
-    };
-    rpc: (
-      name: string,
-      args: Record<string, unknown>,
-    ) => Promise<{ data: unknown; error: { message: string } | null }>;
-  };
-  const locQuery = (sb as {
-    from: (t: string) => {
-      select: (c: string) => {
-        eq: (c: string, v: unknown) => { maybeSingle: () => Promise<{ data: { id?: string } | null }> };
-      };
-    };
-  }).from("inv_locations").select("id").eq("shop_id", shopId);
-  const { data: loc } = await locQuery.maybeSingle();
-  const locationId = (loc as { id?: string } | null)?.id ?? null;
-
-  for (let i = 0; i < items.length; i++) {
-    const it = items[i];
-    // 找 (shop, item_id) → sku_id （优先新表，回退旧 sku_youzan_links）
-    let skuId: string | null = null;
-    const newRow = await supa
-      .from("sku_channel_listings")
-      .select("sku_id")
-      .eq("shop_id", shopId)
-      .eq("external_item_id", String(it.item_id))
-      .maybeSingle();
-    if (newRow.data?.sku_id) {
-      skuId = String(newRow.data.sku_id);
-    } else {
-      const legacy = await supa
-        .from("sku_youzan_links")
-        .select("sku_id")
-        .eq("shop_id", shopId)
-        .eq("yz_item_id", it.item_id)
-        .maybeSingle();
-      if (legacy.data?.sku_id) skuId = String(legacy.data.sku_id);
-    }
-    if (!skuId) continue;
-
-    // 每单每行独立 source_order_id，防止多行订单被幂等吞掉
-    const orderKey = items.length > 1 ? `${tid}#${i}` : tid;
-    await supa.rpc("commit_sale", {
-      p_sku_id: skuId,
-      p_source_channel: "youzan_branch_offline",
-      p_source_order_id: orderKey,
-      p_source_shop_id: shopId,
-      p_event_type: "paid",
-      p_epc: null,
-      p_location_id: locationId,
-      p_raw_payload: {
-        item_id: it.item_id,
-        qty: it.qty,
-        tid,
-      } as never,
-    });
-  }
-}
 
 async function handleRefundEvent(sb: unknown, shopId: string, event: Record<string, unknown>) {
   // 2026-07 阶段 6：退款不再自动回库存，先建 return_inspections 待人工复检；
@@ -228,7 +184,10 @@ async function handleRefundEvent(sb: unknown, shopId: string, event: Record<stri
           c: string,
           v: unknown,
         ) => {
-          eq: (c: string, v: unknown) => { maybeSingle: () => Promise<{ data: { sku_id: string } | null }> };
+          eq: (
+            c: string,
+            v: unknown,
+          ) => { maybeSingle: () => Promise<{ data: { sku_id: string } | null }> };
         };
       };
       insert: (row: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
@@ -265,24 +224,13 @@ async function handleRefundEvent(sb: unknown, shopId: string, event: Record<stri
 }
 
 // 从有赞消息里挖出 order_items（不同事件字段结构略有差异）
-function extractOrderItems(event: Record<string, unknown>): Array<{ item_id: number; qty: number }> {
-  const out: Array<{ item_id: number; qty: number }> = [];
-  const candidates = [
-    event.orders,
-    (event.trade as Record<string, unknown> | undefined)?.orders,
-    (event.data as Record<string, unknown> | undefined)?.orders,
-  ];
-  for (const c of candidates) {
-    if (Array.isArray(c)) {
-      for (const row of c) {
-        const r = row as { num_iid?: number; item_id?: number; num?: number; quantity?: number };
-        const item_id = Number(r.num_iid ?? r.item_id ?? 0);
-        const qty = Number(r.num ?? r.quantity ?? 0);
-        if (item_id && qty) out.push({ item_id, qty });
-      }
-    }
-  }
-  return out;
+function extractOrderItems(
+  event: Record<string, unknown>,
+): Array<{ item_id: number; qty: number }> {
+  return (extractYouzanSale(event)?.items ?? []).map((item) => ({
+    item_id: item.itemId,
+    qty: item.quantity,
+  }));
 }
 
 // ============================================================
@@ -295,9 +243,9 @@ async function refreshTradeDetail(
   shopId: string,
   kdtId: number,
   event: Record<string, unknown>,
-): Promise<void> {
+): Promise<Record<string, unknown> | null> {
   const tid = extractTid(event);
-  if (!tid) return;
+  if (!tid) return null;
   const supa = sb as {
     from: (t: string) => {
       select: (c: string) => {
@@ -314,7 +262,7 @@ async function refreshTradeDetail(
     .select("id, kdt_id, role, access_token, refresh_token, token_expires_at")
     .eq("id", shopId)
     .maybeSingle();
-  if (!shop) return;
+  if (!shop) return null;
   const { ensureAccessToken, callYouzanApiVerbose } = await import("@/lib/youzan.functions");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const token = await ensureAccessToken(shop as any);
@@ -326,7 +274,7 @@ async function refreshTradeDetail(
     timeoutMs: 20_000,
   });
   const trade = res.payload as Record<string, unknown> | null;
-  if (!trade) return;
+  if (!trade) return null;
   await supa.from("youzan_orders").upsert(
     {
       shop_id: shopId,
@@ -336,6 +284,7 @@ async function refreshTradeDetail(
     } as never,
     { onConflict: "kdt_id,tid" },
   );
+  return trade;
 }
 
 function extractTid(event: Record<string, unknown>): string {
@@ -362,6 +311,3 @@ function extractTid(event: Record<string, unknown>): string {
   }
   return "";
 }
-
-// 显式引用避免 tree-shake（并保护 SB alias）
-void ({} as SB);

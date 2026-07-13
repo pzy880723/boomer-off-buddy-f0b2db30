@@ -410,7 +410,7 @@ Token 由后台 **仓库管理 → 手持终端** 页面创建/复制。设备�
         tags: ["商品"],
         summary: "智能上架（建 SKU + 入库存 + 绑 EPC + 入有赞队列）",
         description:
-          "如果已经存在 (category, price_tier, name) 完全相同的 SKU，会复用并 +1；否则新建。`epcs` 可选，传了就一并绑定到这个 SKU。`auto_push_youzan` 默认 false，对齐 ERP 现行「手动推送 + 人工绑定」策略；true 时若 SKU 已有有赞绑定则入 `youzan_stock_sync_queue`，否则返回 `unlinked`。返回的 `label` 字段供 APP 自渲染打印。",
+          "如果已经存在 (category, price_tier, name) 完全相同的 SKU，会复用并 +1；否则新建。`epcs` 可选，传了就一并绑定到这个 SKU。`auto_push_youzan` 默认 false；true 时会把商品发布到所选门店库位绑定的有赞分店，并登记库存同步任务。仓库库位不会自动发布到任意门店。返回的 `label` 字段供 APP 自渲染打印。",
         requestBody: jsonBody(SmartCreateReq),
         responses: { "200": jsonRes("OK", SmartCreateRes), ...ERROR_RESPONSES },
       },
@@ -691,4 +691,3 @@ export function buildHandheldOpenApi() {
   if (!cached) cached = createDocument(document);
   return cached;
 }
-

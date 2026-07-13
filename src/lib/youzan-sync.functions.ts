@@ -1688,7 +1688,7 @@ async function runStockSyncWorkerCore(opts: {
           last_error: msg.slice(0, 500),
         } as never)
         .eq("sku_id", t.sku_id)
-        .eq("shop_id", t.shop_id);
+        .eq("shop_id", t.shop_id!);
       failed += 1;
     }
   }

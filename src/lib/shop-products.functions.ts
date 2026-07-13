@@ -16,7 +16,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin as supabase } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { triggerStockWorker } from "./youzan-sync.functions";
+import { ensureBranchListing, triggerStockWorker } from "./youzan-sync.functions";
 import { releaseSkuToOfflineShopsCore } from "./youzan-offline-products.functions";
 import { explainYouzanError } from "./youzan.functions";
 

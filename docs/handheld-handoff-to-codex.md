@@ -66,7 +66,7 @@ M6 有赞同步状态查看（只读）
 1. 多张原图 → `POST /items/upload-image?mode=signed` 直传 Supabase（弱网回退 `mode=multipart`）。
 2. 主图 → `POST /ai/recognize-item` 拿建议 title / category / grade / keywords。
 3. 可选 → `POST /ai/prepare-listing-image`（抠图换底）。
-4. `POST /items/smart-create`：APP 顶部放 Switch 控制 `auto_push_youzan`（默认 false）。
+4. `POST /items/smart-create`：APP 顶部放 Switch 控制 `auto_push_youzan`（默认 false）；开启后，门店库位会直接走正式门店商品发布链路并同步库存，仓库库位不会随意铺货到门店。
 5. 拿回 `sku_id + barcode + label`，APP 自渲染 ZPL/ESC-POS 标签直接打印。
 6. 紧接 `POST /rfid/bind-item` 把刚才那批 EPC 绑到这个 SKU。
 
