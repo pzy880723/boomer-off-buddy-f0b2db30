@@ -5,8 +5,10 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { ensureAccessToken, getHqShop } from "./youzan.functions";
 import {
   buildOfflineSkuReleaseInput,
+  buildOfflineProductLookupTerms,
   buildOfflineStockQueueRow,
   findOfflineProductMatch,
+  normalizeYouzanProductCode,
   queryYouzanOfflineProducts,
   releaseYouzanOfflineProduct,
 } from "./youzan-offline-products.server";
@@ -24,6 +26,42 @@ type OfflineReleaseResult = {
   recovered: boolean;
   error: string | null;
 };
+
+async function findExistingOfflineProduct(args: {
+  accessToken: string;
+  warehouseCode: string | null;
+  skuCode: string;
+  name: string;
+}) {
+  if (!args.warehouseCode) return null;
+  const target = {
+    skuCode: normalizeYouzanProductCode(args.skuCode),
+    name: args.name,
+  };
+
+  for (const lookupTerm of buildOfflineProductLookupTerms(args)) {
+    const rows = [];
+    for (const displayStatus of [1, 2, 0] as const) {
+      const queried = await queryYouzanOfflineProducts({
+        accessToken: args.accessToken,
+        input: {
+          pageNo: 1,
+          pageSize: 20,
+          displayStatus,
+          warehouseCode: args.warehouseCode,
+          nameOrSkuNo: lookupTerm,
+        },
+      });
+      rows.push(...queried.rows);
+    }
+    const uniqueRows = Array.from(
+      new Map(rows.map((row) => [row.itemId, row])).values(),
+    );
+    const matched = findOfflineProductMatch(uniqueRows, target);
+    if (matched) return matched;
+  }
+  return null;
+}
 
 async function upsertBranchLink(args: {
   skuId: string;
@@ -183,6 +221,37 @@ export async function releaseSkuToOfflineShopsCore(args: {
       continue;
     }
 
+    const remoteExisting = await findExistingOfflineProduct({
+      accessToken,
+      warehouseCode: branch.warehouse_code,
+      skuCode: String(sku.sku_code ?? ""),
+      name: sku.name,
+    });
+    if (remoteExisting) {
+      const remoteSkuId = remoteExisting.skus[0]?.skuId ?? null;
+      await upsertBranchLink({
+        skuId: args.sku_id,
+        shopId: branch.id,
+        itemId: remoteExisting.itemId,
+        skuIdRemote: remoteSkuId,
+      });
+      await enqueueBranchStock({
+        skuId: args.sku_id,
+        shopId: branch.id,
+        locationId: location.id,
+        targetStock: stock,
+      });
+      results.push({
+        shop_id: branch.id,
+        ok: true,
+        item_id: remoteExisting.itemId,
+        sku_id: remoteSkuId,
+        recovered: true,
+        error: null,
+      });
+      continue;
+    }
+
     try {
       const released = await releaseYouzanOfflineProduct({
         accessToken,
@@ -222,35 +291,18 @@ export async function releaseSkuToOfflineShopsCore(args: {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       let recovered: { itemId: number; skuId: number | null } | null = null;
-      if (branch.warehouse_code) {
-        try {
-          const recoveredRows = [];
-          for (const displayStatus of [1, 2, 0] as const) {
-            const queried = await queryYouzanOfflineProducts({
-              accessToken,
-              input: {
-                pageNo: 1,
-                pageSize: 20,
-                displayStatus,
-                warehouseCode: branch.warehouse_code,
-                nameOrSkuNo: String(sku.sku_code ?? ""),
-              },
-            });
-            recoveredRows.push(...queried.rows);
-          }
-          const uniqueRows = Array.from(
-            new Map(recoveredRows.map((row) => [row.itemId, row])).values(),
-          );
-          const matched = findOfflineProductMatch(uniqueRows, {
-            skuCode: String(sku.sku_code ?? ""),
-            name: sku.name,
-          });
-          if (matched) {
-            recovered = { itemId: matched.itemId, skuId: matched.skus[0]?.skuId ?? null };
-          }
-        } catch {
-          // 保留原始发布错误，避免查询失败覆盖真正原因。
+      try {
+        const matched = await findExistingOfflineProduct({
+          accessToken,
+          warehouseCode: branch.warehouse_code,
+          skuCode: String(sku.sku_code ?? ""),
+          name: sku.name,
+        });
+        if (matched) {
+          recovered = { itemId: matched.itemId, skuId: matched.skus[0]?.skuId ?? null };
         }
+      } catch {
+        // 保留原始发布错误，避免查询失败覆盖真正原因。
       }
       if (recovered) {
         await upsertBranchLink({

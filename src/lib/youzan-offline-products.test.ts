@@ -5,7 +5,9 @@ import {
   buildOfflineStockQueueRow,
   buildOfflineProductQueryParams,
   buildOfflineProductReleaseParams,
+  buildOfflineProductLookupTerms,
   findOfflineProductMatch,
+  normalizeYouzanProductCode,
   parseOfflineProductRows,
 } from "./youzan-offline-products.server";
 
@@ -82,10 +84,21 @@ describe("youzan offline products", () => {
     });
 
     assert.deepEqual(input.saleUpKdtIds, [233, 666]);
-    assert.equal(input.spuCode, "SKU-JP-001");
-    assert.equal(input.skuCenterCode, "SKU-JP-001");
-    assert.equal(input.stock.skuNo, "SKU-JP-001");
+    assert.equal(input.spuCode, "SKUJP001");
+    assert.equal(input.skuCenterCode, "SKUJP001");
+    assert.equal(input.stock.skuNo, "SKUJP001");
     assert.equal(input.unit, "件");
+  });
+
+  test("release lookup checks a Youzan-safe code before the product title", () => {
+    assert.equal(normalizeYouzanProductCode("SKU-JP-260712-C8FG"), "SKUJP260712C8FG");
+    assert.deepEqual(
+      buildOfflineProductLookupTerms({
+        skuCode: "SKU-JP-260712-C8FG",
+        name: "test2",
+      }),
+      ["SKUJP260712C8FG", "test2"],
+    );
   });
 
   test("recovery accepts a unique title when Youzan rewrites the product code", () => {

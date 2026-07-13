@@ -85,6 +85,21 @@ export function findOfflineProductMatch(
   return sameTitle.length === 1 ? sameTitle[0] : null;
 }
 
+export function normalizeYouzanProductCode(value: string) {
+  return value.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+}
+
+export function buildOfflineProductLookupTerms(target: {
+  skuCode: string;
+  name: string;
+}) {
+  return Array.from(
+    new Set(
+      [normalizeYouzanProductCode(target.skuCode), target.name.trim()].filter(Boolean),
+    ),
+  );
+}
+
 export function buildOfflineStockQueueRow(args: {
   skuId: string;
   shopId: string;
@@ -133,7 +148,7 @@ export function buildOfflineSkuReleaseInput(args: {
   branchKdtIds: number[];
   stock: number;
 }): OfflineProductReleaseInput {
-  const skuCode = args.sku.skuCode.trim();
+  const skuCode = normalizeYouzanProductCode(args.sku.skuCode);
   const branchKdtIds = Array.from(
     new Set(args.branchKdtIds.filter((id) => Number.isInteger(id) && id > 0)),
   );
