@@ -351,7 +351,7 @@ function EditDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>{initial ? "编辑品牌" : "新建品牌"}</DialogTitle>
+          <DialogTitle>{initial ? "编辑" : "新建"} · {EDITABLE_TYPES.find((t) => t.value === entityType)?.label ?? "品牌"}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-3">
           <div className="grid grid-cols-2 gap-3">
