@@ -324,14 +324,13 @@ function EditDialog({
   parents: CategoryRow[];
   onSave: (p: {
     id?: string;
-    code: string;
+    code?: string;
     name: string;
     parent_id: string | null;
     sort_order: number;
     is_active: boolean;
   }) => void;
 }) {
-  const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [parent, setParent] = useState<string>("");
   const [sort, setSort] = useState<string>("100");
@@ -339,7 +338,6 @@ function EditDialog({
 
   useEffect(() => {
     if (!open) return;
-    setCode(initial?.code ?? "");
     setName(initial?.name ?? "");
     setParent(initial?.parent_id ?? defaultParentId ?? "");
     setSort(String(initial?.sort_order ?? 100));
@@ -353,21 +351,16 @@ function EditDialog({
           <DialogTitle>{initial ? "编辑分类" : "新建分类"}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label>名称 *</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>短码 *</Label>
-              <Input
-                className="font-mono"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                placeholder="如 CLOTHING"
-              />
-            </div>
+          <div className="space-y-1.5">
+            <Label>名称 *</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+            {!initial && (
+              <p className="text-[11px] text-muted-foreground">
+                短码由系统根据名称自动生成，无需手动填写
+              </p>
+            )}
           </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>排序</Label>
@@ -406,8 +399,8 @@ function EditDialog({
             onClick={() =>
               onSave({
                 id: initial?.id,
-                code: code.trim(),
                 name: name.trim(),
+
                 parent_id: parent || null,
                 sort_order: Number(sort) || 0,
                 is_active: active,

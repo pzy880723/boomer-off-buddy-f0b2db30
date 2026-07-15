@@ -43,26 +43,62 @@ const UpsertInput = z.object({
     .trim()
     .min(1)
     .max(32)
-    .regex(/^[a-zA-Z0-9_]+$/u, "code 仅支持字母、数字、下划线"),
+    .regex(/^[a-zA-Z0-9_]+$/u, "code 仅支持字母、数字、下划线")
+    .optional(),
   name: z.string().trim().min(1).max(64),
   parent_id: z.string().uuid().nullable().optional(),
   sort_order: z.number().int().min(0).max(9999).default(0),
   is_active: z.boolean().default(true),
 });
+
+const BASE36 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+function randSuffix(n = 6) {
+  let s = "";
+  for (let i = 0; i < n; i++) s += BASE36[Math.floor(Math.random() * BASE36.length)];
+  return s;
+}
+
+async function generateCategoryCode(
+  name: string,
+  supabase: { from: (t: never) => { select: (c: string) => { eq: (col: string, v: string) => { maybeSingle: () => Promise<{ data: unknown }> } } } },
+): Promise<string> {
+  let prefix = "CAT";
+  try {
+    const { pinyin } = await import("pinyin-pro");
+    const initials = pinyin(name, { pattern: "first", toneType: "none", type: "string" })
+      .replace(/[^a-zA-Z0-9]/g, "")
+      .toUpperCase();
+    if (initials.length >= 2) prefix = initials.slice(0, 8);
+    else if (initials.length === 1) prefix = initials + "X";
+  } catch {
+    /* fallback CAT */
+  }
+  for (let i = 0; i < 6; i++) {
+    const candidate = `${prefix}_${randSuffix(6)}`;
+    const { data } = await supabase
+      .from("inv_categories" as never)
+      .select("id")
+      .eq("code", candidate)
+      .maybeSingle();
+    if (!data) return candidate;
+  }
+  throw new Error("无法生成唯一分类短码，请重试");
+}
+
 export const upsertCategory = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => UpsertInput.parse(input))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
-    const payload = {
-      code: data.code,
-      name: data.name,
-      parent_id: data.parent_id ?? null,
-      sort_order: data.sort_order ?? 0,
-      is_active: data.is_active,
-      kind: "category",
-    };
     if (data.id) {
+      const payload: Record<string, unknown> = {
+        name: data.name,
+        parent_id: data.parent_id ?? null,
+        sort_order: data.sort_order ?? 0,
+        is_active: data.is_active,
+        kind: "category",
+      };
+      if (data.code) payload.code = data.code;
       const { error } = await supabase
         .from("inv_categories" as never)
         .update(payload as never)
@@ -70,6 +106,15 @@ export const upsertCategory = createServerFn({ method: "POST" })
       if (error) throw new Error(error.message);
       return { id: data.id };
     }
+    const code = data.code ?? (await generateCategoryCode(data.name, supabase as never));
+    const payload = {
+      code,
+      name: data.name,
+      parent_id: data.parent_id ?? null,
+      sort_order: data.sort_order ?? 0,
+      is_active: data.is_active,
+      kind: "category",
+    };
     const { data: ins, error } = await supabase
       .from("inv_categories" as never)
       .insert(payload as never)
@@ -78,6 +123,7 @@ export const upsertCategory = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { id: (ins as { id: string }).id };
   });
+
 
 /* ---------- 停用 / 删除 ---------- */
 export const setCategoryActive = createServerFn({ method: "POST" })
