@@ -12,6 +12,10 @@ import { generateEpc, generateSkuCode } from "@/lib/inventory.helpers";
 import { buildPrintPayload } from "@/server/handheld-print.server";
 import { replayIfPresent, recordOp, jsonReplay } from "@/server/handheld-idempotency.server";
 import { getSmartCreateReleaseTarget } from "@/server/handheld-smart-create.server";
+import {
+  assertActiveLeafCategory,
+  attachProductClassificationAuditToSku,
+} from "@/server/product-classification.server";
 
 const SKU_IMAGE_BUCKETS = new Set(["sku-raw", "sku-listing"]);
 
@@ -73,6 +77,11 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
         } catch (e) {
           return err("Invalid body", 400, { code: "validation_error", detail: String(e) });
         }
+        try {
+          await assertActiveLeafCategory(body.category);
+        } catch (e) {
+          return err((e as Error).message, 422, { code: "validation_error" });
+        }
         // 幂等回放
         const replay = await replayIfPresent({
           deviceId: auth.device.id,
@@ -101,6 +110,17 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
         }
         const normalizedImageUrl = normalizeIncomingImageUrl(body.image_url);
         if (normalizedImageUrl) incomingPaths.push(normalizedImageUrl);
+        const hasRecognition = !!body.recognition_request_id;
+        const recognitionFields = hasRecognition
+          ? {
+              attributes: body.attributes,
+              category_source: "ai",
+              category_confidence: body.category_confidence ?? null,
+              classification_status: body.classification_status ?? "fallback",
+              ai_suggested_price: body.ai_suggested_price ?? null,
+              recognition_request_id: body.recognition_request_id,
+            }
+          : {};
 
         // Reuse existing SKU if (category, price_tier, name) already exists; else create.
         const { data: existSku } = await supabaseAdmin
@@ -128,16 +148,21 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
             seen.add(x);
             merged.push(x);
           }
-          if (incomingPaths.length > 0) {
+          if (incomingPaths.length > 0 || hasRecognition) {
             await supabaseAdmin
               .from("inv_skus")
               .update({
-                image_paths: merged,
-                // 兼容：旧 image_url 仍指向第 0 张外链（无外链则保持原值）
-                image_url:
-                  merged.find((p) => /^https?:\/\//i.test(p)) ?? existSku.image_url ?? null,
+                ...(incomingPaths.length > 0
+                  ? {
+                      image_paths: merged,
+                      // 兼容：旧 image_url 仍指向第 0 张外链（无外链则保持原值）
+                      image_url:
+                        merged.find((p) => /^https?:\/\//i.test(p)) ?? existSku.image_url ?? null,
+                    }
+                  : {}),
+                ...recognitionFields,
                 updated_at: new Date().toISOString(),
-              })
+              } as never)
               .eq("id", skuId);
           }
         } else {
@@ -159,15 +184,35 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
               weight_g: body.weight_g ?? null,
               notes: body.notes ?? null,
               grade: body.grade ?? null,
+              attributes: body.attributes,
+              category_source: hasRecognition ? "ai" : "manual",
+              category_confidence: body.category_confidence ?? null,
+              classification_status: hasRecognition
+                ? (body.classification_status ?? "fallback")
+                : "legacy",
+              ai_suggested_price: body.ai_suggested_price ?? null,
+              recognition_request_id: body.recognition_request_id ?? null,
               stock_qty: 0,
               status: "active",
-            })
+            } as never)
             .select("id, sku_code, epc, barcode, grade")
             .single();
           if (ins.error || !ins.data) return err(`Create SKU failed: ${ins.error?.message}`, 500);
           skuId = ins.data.id;
           skuCode = ins.data.sku_code ?? skuCode;
           epc = ins.data.epc;
+        }
+
+        if (body.recognition_request_id) {
+          try {
+            await attachProductClassificationAuditToSku({
+              requestId: body.recognition_request_id,
+              skuId,
+              finalCategoryCode: body.category,
+            });
+          } catch (e) {
+            return err(`Link AI classification failed: ${(e as Error).message}`, 500);
+          }
         }
 
         // Bind extra EPCs (if APP scanned labels already)

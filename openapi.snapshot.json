@@ -3275,30 +3275,51 @@
                     "data": {
                       "type": "object",
                       "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                          "example": "550e8400-e29b-41d4-a716-446655440000"
+                        },
                         "name": {
                           "type": "string"
                         },
-                        "category": {
+                        "category_code": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64,
+                          "description": "ERP 当前启用的二级商品分类 code"
+                        },
+                        "predicted_category_code": {
                           "anyOf": [
                             {
-                              "type": "string",
-                              "enum": [
-                                "jp_porcelain",
-                                "eu_porcelain",
-                                "vintage_toy",
-                                "anime_goods",
-                                "media",
-                                "digital",
-                                "jewelry",
-                                "fashion",
-                                "daily",
-                                "antique"
-                              ]
+                              "type": "string"
                             },
                             {
                               "type": "null"
                             }
                           ]
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "auto_classified",
+                            "fallback"
+                          ]
+                        },
+                        "category": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64,
+                              "description": "ERP 当前启用的二级商品分类 code"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "兼容旧 APP；等同 category_code"
                         },
                         "brand": {
                           "anyOf": [
@@ -3320,6 +3341,9 @@
                             }
                           ],
                           "description": "年代，如 1970s"
+                        },
+                        "attributes": {
+                          "$ref": "#/components/schemas/ProductRecognitionAttributes"
                         },
                         "condition_grade": {
                           "anyOf": [
@@ -3348,6 +3372,12 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "keywords": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
                         },
                         "suggested_price_cny": {
                           "anyOf": [
@@ -3396,18 +3426,9 @@
                                 "anyOf": [
                                   {
                                     "type": "string",
-                                    "enum": [
-                                      "jp_porcelain",
-                                      "eu_porcelain",
-                                      "vintage_toy",
-                                      "anime_goods",
-                                      "media",
-                                      "digital",
-                                      "jewelry",
-                                      "fashion",
-                                      "daily",
-                                      "antique"
-                                    ]
+                                    "minLength": 1,
+                                    "maxLength": 64,
+                                    "description": "ERP 当前启用的二级商品分类 code"
                                   },
                                   {
                                     "type": "null"
@@ -3433,17 +3454,92 @@
                             "additionalProperties": false
                           }
                         },
+                        "alternative_categories": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "category_code": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64,
+                                "description": "ERP 当前启用的二级商品分类 code"
+                              },
+                              "confidence": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "maximum": 1
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "reason": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "category_code",
+                              "confidence",
+                              "reason"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "compliance_flags": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "evidence": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "model": {
+                          "type": "string"
+                        },
+                        "prompt_version": {
+                          "type": "string"
+                        },
+                        "taxonomy_version": {
+                          "type": "string"
+                        },
                         "raw": {}
                       },
                       "required": [
+                        "request_id",
                         "name",
+                        "category_code",
+                        "predicted_category_code",
+                        "status",
                         "category",
                         "brand",
                         "era",
+                        "attributes",
                         "condition_grade",
                         "description",
+                        "keywords",
                         "suggested_price_cny",
-                        "confidence"
+                        "confidence",
+                        "alternative_categories",
+                        "compliance_flags",
+                        "evidence",
+                        "model",
+                        "prompt_version",
+                        "taxonomy_version"
                       ],
                       "additionalProperties": false
                     }
@@ -4013,7 +4109,7 @@
           "商品"
         ],
         "summary": "智能上架（建 SKU + 入库存 + 绑 EPC + 入有赞队列）",
-        "description": "如果已经存在 (category, price_tier, name) 完全相同的 SKU，会复用并 +1；否则新建。`epcs` 可选，传了就一并绑定到这个 SKU。`auto_push_youzan` 默认 false，对齐 ERP 现行「手动推送 + 人工绑定」策略；true 时若 SKU 已有有赞绑定则入 `youzan_stock_sync_queue`，否则返回 `unlinked`。返回的 `label` 字段供 APP 自渲染打印。",
+        "description": "如果已经存在 (category, price_tier, name) 完全相同的 SKU，会复用并 +1；否则新建。`epcs` 可选，传了就一并绑定到这个 SKU。`auto_push_youzan` 默认 false；true 时会把商品发布到所选门店库位绑定的有赞分店，并登记库存同步任务。仓库库位不会自动发布到任意门店。返回的 `label` 字段供 APP 自渲染打印。",
         "requestBody": {
           "content": {
             "application/json": {
@@ -9910,18 +10006,9 @@
           },
           "category": {
             "type": "string",
-            "enum": [
-              "jp_porcelain",
-              "eu_porcelain",
-              "vintage_toy",
-              "anime_goods",
-              "media",
-              "digital",
-              "jewelry",
-              "fashion",
-              "daily",
-              "antique"
-            ]
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "ERP 当前启用的二级商品分类 code"
           },
           "price_tier": {
             "type": "number",
@@ -10001,6 +10088,65 @@
             "anyOf": [
               {
                 "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "recognition_request_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                "example": "550e8400-e29b-41d4-a716-446655440000"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "attributes": {
+            "default": {},
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "category_confidence": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "classification_status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "auto_classified",
+                  "fallback",
+                  "corrected"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ai_suggested_price": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0
               },
               {
                 "type": "null"
@@ -11277,6 +11423,149 @@
           "name",
           "kind",
           "is_active"
+        ],
+        "additionalProperties": false
+      },
+      "ProductRecognitionAttributes": {
+        "type": "object",
+        "properties": {
+          "brand": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "maker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "origin_region": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "origin_country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "era": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "material": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "craft": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "object_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "colors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "dimensions": {
+            "anyOf": [
+              {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "functional_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "missing_parts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "brand",
+          "maker",
+          "origin_region",
+          "origin_country",
+          "era",
+          "material",
+          "craft",
+          "object_type",
+          "colors",
+          "dimensions",
+          "functional_status",
+          "missing_parts"
         ],
         "additionalProperties": false
       },

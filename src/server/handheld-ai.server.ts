@@ -1,8 +1,8 @@
 // Server-only AI helpers for handheld smart-create flow.
-// 默认模型：gemini-2.5-pro 识别，gemini-3.1-flash-image 修图。
+// 识别共用 ERP 动态分类核心；gemini-3.1-flash-image 仅负责上架图修整。
 // 走 Lovable AI Gateway，无需单独 key。
-import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { recognizeProductFromImages } from "@/server/product-recognition.server";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1";
 
@@ -11,50 +11,6 @@ function getKey(): string {
   if (!k) throw new Error("LOVABLE_API_KEY not configured");
   return k;
 }
-
-const CATEGORY_ENUM = [
-  "jp_porcelain",
-  "eu_porcelain",
-  "vintage_toy",
-  "anime_goods",
-  "media",
-  "digital",
-  "jewelry",
-  "fashion",
-  "daily",
-  "antique",
-] as const;
-
-const AltSchema = z.object({
-  name: z.string(),
-  category: z.enum(CATEGORY_ENUM).nullable().optional(),
-  confidence: z.number().min(0).max(1).nullable().optional(),
-});
-
-const RecognizeSchema = z.object({
-  name: z.string(),
-  category: z.enum(CATEGORY_ENUM).nullable(),
-  brand: z.string().nullable(),
-  era: z.string().nullable(),
-  condition_grade: z.enum(["N", "S", "A", "B", "C", "J"]).nullable(),
-  description: z.string().nullable(),
-  suggested_price_cny: z.number().nullable(),
-  confidence: z.number().min(0).max(1).nullable(),
-  warning: z.string().nullable().optional(),
-  alternatives: z.array(AltSchema).max(3).optional(),
-});
-
-const SYSTEM_RECOGNIZE = `你是中古杂货识别助手。看图后只输出 JSON，不要 markdown。
-多张图时：第 1 张为主图（正面外观），其余为背面/包装/logo/型号/配件/尺寸等辅助角度，请综合判断，不要把广告词或场景文字误当商品名。
-category 枚举（必须从中选）：jp_porcelain(日本瓷器) / eu_porcelain(欧洲瓷器) / vintage_toy(中古玩具) / anime_goods(二次元周边) / media(音像) / digital(数码家电) / jewelry(珠宝) / fashion(时尚配件) / daily(日用) / antique(古美术)。
-name 用中文，格式「品牌/系列 + 具体物品 + 关键规格」，不超过 28 字。
-condition_grade：N全新 / S近全新 / A良好 / B一般 / C较旧 / J有瑕疵。
-era 用 1970s / 昭和后期 这种粒度，不知就 null。
-suggested_price_cny 给整数 RMB 估值，没把握就 null。
-confidence 是 0~1 数字，反映 name+category 的整体把握。
-alternatives 最多 3 条备选（只填 name/category/confidence），若唯一确定可省略。
-warning 用于低置信度或多张图信息矛盾时的一句提醒，一切正常就 null。
-不知道的字段一律 null，不要瞎编。`;
 
 function toDataUrl(input: { image_url?: string; image_base64?: string }): string {
   if (input.image_url) return input.image_url;
@@ -82,9 +38,7 @@ async function signStoragePaths(
     });
   }
   // 按输入顺序返回
-  return paths
-    .map((p) => urlByPath.get(p.storage_path))
-    .filter((u): u is string => !!u);
+  return paths.map((p) => urlByPath.get(p.storage_path)).filter((u): u is string => !!u);
 }
 
 export async function aiRecognizeItem(input: {
@@ -121,75 +75,24 @@ export async function aiRecognizeItem(input: {
     capped.unshift(main);
   }
 
-  const imageParts = capped.map((s) => ({
-    type: "image_url" as const,
-    image_url: { url: toDataUrl(s) },
-  }));
-
-  const hintLine = input.hint ? `店员补充：${input.hint}\n` : "";
-  const multiNote =
-    capped.length > 1
-      ? `共 ${capped.length} 张图，第 1 张是主图，其余为细节/不同角度，请综合判断。\n`
-      : "";
-
-  const body = {
-    model: "google/gemini-2.5-pro",
-    messages: [
-      { role: "system", content: SYSTEM_RECOGNIZE },
-      {
-        role: "user",
-        content: [
-          { type: "text", text: `${hintLine}${multiNote}请按要求输出 JSON。` },
-          ...imageParts,
-        ],
-      },
-    ],
-    response_format: { type: "json_object" },
-  };
-
-  const res = await fetch(`${GATEWAY}/chat/completions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${getKey()}`,
-      "Content-Type": "application/json",
-      "X-Lovable-AIG-SDK": "vercel-ai-sdk",
-    },
-    body: JSON.stringify(body),
+  const out = await recognizeProductFromImages({
+    images: capped.map(toDataUrl),
+    source: "handheld",
+    hint: input.hint,
   });
-  if (!res.ok) {
-    const t = await res.text().catch(() => "");
-    throw new Error(`AI gateway ${res.status}: ${t.slice(0, 300)}`);
-  }
-  const j = await res.json();
-  const text: string = j?.choices?.[0]?.message?.content ?? "{}";
-  let raw: unknown;
-  try {
-    raw = JSON.parse(text);
-  } catch {
-    raw = {};
-  }
-  const parsed = RecognizeSchema.partial().safeParse(raw);
-  const out = parsed.success ? parsed.data : {};
-  const confidence = typeof out.confidence === "number" ? out.confidence : null;
-  const lowConf = confidence !== null && confidence < 0.6;
-  const warning =
-    out.warning ??
-    (lowConf ? "识别置信度较低，建议人工核对名称与分类" : null);
   return {
-    name: out.name ?? "",
-    category: out.category ?? null,
-    brand: out.brand ?? null,
-    era: out.era ?? null,
-    condition_grade: out.condition_grade ?? null,
-    description: out.description ?? null,
-    suggested_price_cny: out.suggested_price_cny ?? null,
-    confidence,
-    warning,
-    alternatives: out.alternatives ?? [],
-    raw,
+    ...out,
+    // 兼容旧版手持 App；新版应读取 category_code / attributes。
+    category: out.category_code,
+    brand: out.attributes.brand,
+    era: out.attributes.era,
+    alternatives: out.alternative_categories.map((item) => ({
+      name: item.reason ?? item.category_code,
+      category: item.category_code,
+      confidence: item.confidence,
+    })),
   };
 }
-
 
 const SYSTEM_LISTING_IMAGE = `把这张中古杂货实物图修整成上架主图：
 - 输出必须是 1:1 正方形（1024x1024），主体居中裁切、四周留白均匀
@@ -207,8 +110,8 @@ export async function aiPrepareListingImage(input: {
   const dataUrl = input.image_url
     ? input.image_url
     : input.image_base64?.startsWith("data:")
-    ? input.image_base64
-    : `data:image/jpeg;base64,${input.image_base64}`;
+      ? input.image_base64
+      : `data:image/jpeg;base64,${input.image_base64}`;
 
   const body = {
     model: "google/gemini-3.1-flash-image",
@@ -219,8 +122,7 @@ export async function aiPrepareListingImage(input: {
           {
             type: "text",
             text:
-              SYSTEM_LISTING_IMAGE +
-              (input.instruction ? `\n额外要求：${input.instruction}` : ""),
+              SYSTEM_LISTING_IMAGE + (input.instruction ? `\n额外要求：${input.instruction}` : ""),
           },
           { type: "image_url", image_url: { url: dataUrl } },
         ],
