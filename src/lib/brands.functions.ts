@@ -8,7 +8,7 @@ export type BrandRow = {
   name_original: string | null;
   normalized_name: string;
   aliases: string[];
-  entity_type: "brand" | "manufacturer" | "kiln" | "studio" | "designer";
+  entity_type: "brand" | "manufacturer" | "kiln" | "studio" | "designer" | "ip";
   origin_country: string | null;
   origin_region: string | null;
   category_codes: string[];
@@ -36,7 +36,7 @@ export const listBrands = createServerFn({ method: "GET" })
     return { rows: (data ?? []) as unknown as BrandRow[] };
   });
 
-const EntityType = z.enum(["brand", "manufacturer", "kiln", "studio", "designer"]);
+const EntityType = z.enum(["brand", "kiln", "ip", "manufacturer", "studio", "designer"]);
 const Status = z.enum(["active", "inactive", "review"]);
 
 const UpsertInput = z.object({

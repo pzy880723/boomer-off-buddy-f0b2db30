@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -36,10 +37,10 @@ import {
 export const Route = createFileRoute("/product-brands")({
   head: () => ({
     meta: [
-      { title: "品牌 / 制造商 · BOOMER OFF" },
+      { title: "品牌 / 窑口 / IP · BOOMER OFF" },
       {
         name: "description",
-        content: "维护品牌、窑口、制造商及其别名，供 SKU 智能识别与搜索使用。",
+        content: "维护品牌、窑口、动漫 IP 及其别名，供 SKU 智能识别与搜索使用。",
       },
     ],
   }),
@@ -48,11 +49,27 @@ export const Route = createFileRoute("/product-brands")({
 
 const ENTITY_LABEL: Record<BrandRow["entity_type"], string> = {
   brand: "品牌",
-  manufacturer: "制造商",
+  manufacturer: "品牌",
   kiln: "窑口",
-  studio: "工作室",
-  designer: "设计师",
+  studio: "IP",
+  designer: "品牌",
+  ip: "IP",
 };
+
+// UI 可选类型（编辑弹窗下拉）
+const EDITABLE_TYPES: { value: BrandRow["entity_type"]; label: string }[] = [
+  { value: "brand", label: "品牌" },
+  { value: "kiln", label: "窑口" },
+  { value: "ip", label: "IP（动漫）" },
+];
+
+type TabKey = "all" | "brand" | "kiln" | "ip";
+
+function bucketOf(t: BrandRow["entity_type"]): "brand" | "kiln" | "ip" {
+  if (t === "kiln") return "kiln";
+  if (t === "ip" || t === "studio") return "ip";
+  return "brand"; // brand / manufacturer / designer
+}
 
 const STATUS_LABEL: Record<BrandRow["status"], string> = {
   active: "启用",
@@ -71,13 +88,21 @@ function ProductBrandsPage() {
   const rows: BrandRow[] = q.data?.rows ?? [];
 
   const [keyword, setKeyword] = useState("");
+  const [tab, setTab] = useState<TabKey>("all");
   const [editing, setEditing] = useState<BrandRow | null>(null);
   const [creating, setCreating] = useState(false);
 
+  const counts = useMemo(() => {
+    const c = { all: rows.length, brand: 0, kiln: 0, ip: 0 };
+    for (const r of rows) c[bucketOf(r.entity_type)] += 1;
+    return c;
+  }, [rows]);
+
   const filtered = useMemo(() => {
     const k = keyword.trim().toLowerCase();
-    if (!k) return rows;
     return rows.filter((r) => {
+      if (tab !== "all" && bucketOf(r.entity_type) !== tab) return false;
+      if (!k) return true;
       if (r.name.toLowerCase().includes(k)) return true;
       if (r.name_original?.toLowerCase().includes(k)) return true;
       if (r.normalized_name.includes(k)) return true;
@@ -85,7 +110,7 @@ function ProductBrandsPage() {
       if (r.origin_country?.toLowerCase().includes(k)) return true;
       return false;
     });
-  }, [rows, keyword]);
+  }, [rows, keyword, tab]);
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["inv-brands"] });
 
@@ -108,13 +133,26 @@ function ProductBrandsPage() {
   });
 
   const activeCount = rows.filter((r) => r.status === "active").length;
+  const createDefaultType: BrandRow["entity_type"] =
+    tab === "kiln" ? "kiln" : tab === "ip" ? "ip" : "brand";
+  const createLabel =
+    tab === "kiln" ? "新建窑口" : tab === "ip" ? "新建 IP" : "新建品牌";
 
   return (
     <div>
       <PageHeader
-        title="品牌 / 制造商"
-        description="维护品牌、窑口、制造商及其别名——用于 SKU 智能识别、多维筛选和搜索。"
+        title="品牌 / 窑口 / IP"
+        description="维护品牌、窑口、动漫 IP 及其别名——用于 SKU 智能识别、多维筛选和搜索。"
       />
+
+      <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)} className="mb-3">
+        <TabsList>
+          <TabsTrigger value="all">全部 <span className="ml-1 text-muted-foreground">{counts.all}</span></TabsTrigger>
+          <TabsTrigger value="brand">品牌 <span className="ml-1 text-muted-foreground">{counts.brand}</span></TabsTrigger>
+          <TabsTrigger value="kiln">窑口 <span className="ml-1 text-muted-foreground">{counts.kiln}</span></TabsTrigger>
+          <TabsTrigger value="ip">IP（动漫） <span className="ml-1 text-muted-foreground">{counts.ip}</span></TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <Badge variant="outline" className="gap-1">
@@ -130,9 +168,10 @@ function ProductBrandsPage() {
           />
         </div>
         <Button size="sm" onClick={() => setCreating(true)}>
-          <Plus className="mr-1 h-3.5 w-3.5" /> 新建品牌
+          <Plus className="mr-1 h-3.5 w-3.5" /> {createLabel}
         </Button>
       </div>
+
 
       <Card>
         <CardContent className="p-0">
@@ -142,7 +181,7 @@ function ProductBrandsPage() {
             )}
             {!q.isLoading && filtered.length === 0 && (
               <div className="p-6 text-center text-sm text-muted-foreground">
-                {keyword ? "没有匹配的品牌" : "暂无品牌，点右上「新建品牌」"}
+                {keyword ? "没有匹配的记录" : "暂无记录，点右上按钮新建"}
               </div>
             )}
             {filtered.map((r) => (
@@ -218,7 +257,7 @@ function ProductBrandsPage() {
                     className="h-7 w-7 text-destructive"
                     title="删除"
                     onClick={() => {
-                      if (confirm(`删除品牌「${r.name}」？`)) deleteMut.mutate(r.id);
+                      if (confirm(`删除「${r.name}」？`)) deleteMut.mutate(r.id);
                     }}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -239,6 +278,7 @@ function ProductBrandsPage() {
           }
         }}
         initial={editing}
+        defaultType={createDefaultType}
         onSave={async (payload) => {
           try {
             await upsert({ data: payload });
@@ -273,11 +313,13 @@ function EditDialog({
   open,
   onOpenChange,
   initial,
+  defaultType,
   onSave,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   initial: BrandRow | null;
+  defaultType: BrandRow["entity_type"];
   onSave: (p: EditPayload) => void;
 }) {
   const [name, setName] = useState("");
@@ -295,19 +337,21 @@ function EditDialog({
     setName(initial?.name ?? "");
     setNameOriginal(initial?.name_original ?? "");
     setAliasesText((initial?.aliases ?? []).join(", "));
-    setEntityType(initial?.entity_type ?? "brand");
+    // 归一化历史类型到 UI 三档：manufacturer/designer→brand, studio→ip
+    const raw = initial?.entity_type ?? defaultType;
+    setEntityType(bucketOf(raw));
     setCountry(initial?.origin_country ?? "");
     setRegion(initial?.origin_region ?? "");
     setLogoUrl(initial?.logo_url ?? "");
     setStatus(initial?.status ?? "active");
     setNotes(initial?.notes ?? "");
-  }, [open, initial]);
+  }, [open, initial, defaultType]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>{initial ? "编辑品牌" : "新建品牌"}</DialogTitle>
+          <DialogTitle>{initial ? "编辑" : "新建"} · {EDITABLE_TYPES.find((t) => t.value === entityType)?.label ?? "品牌"}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-3">
           <div className="grid grid-cols-2 gap-3">
@@ -350,9 +394,9 @@ function EditDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {(Object.keys(ENTITY_LABEL) as BrandRow["entity_type"][]).map((k) => (
-                    <SelectItem key={k} value={k}>
-                      {ENTITY_LABEL[k]}
+                  {EDITABLE_TYPES.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>
+                      {t.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
