@@ -36,7 +36,7 @@ export const listBrands = createServerFn({ method: "GET" })
     return { rows: (data ?? []) as unknown as BrandRow[] };
   });
 
-const EntityType = z.enum(["brand", "manufacturer", "kiln", "studio", "designer"]);
+const EntityType = z.enum(["brand", "kiln", "ip", "manufacturer", "studio", "designer"]);
 const Status = z.enum(["active", "inactive", "review"]);
 
 const UpsertInput = z.object({
