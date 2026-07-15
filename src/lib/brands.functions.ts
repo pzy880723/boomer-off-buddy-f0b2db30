@@ -8,7 +8,7 @@ export type BrandRow = {
   name_original: string | null;
   normalized_name: string;
   aliases: string[];
-  entity_type: "brand" | "manufacturer" | "kiln" | "studio" | "designer";
+  entity_type: "brand" | "manufacturer" | "kiln" | "studio" | "designer" | "ip";
   origin_country: string | null;
   origin_region: string | null;
   category_codes: string[];
