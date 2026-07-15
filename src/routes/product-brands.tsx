@@ -88,13 +88,21 @@ function ProductBrandsPage() {
   const rows: BrandRow[] = q.data?.rows ?? [];
 
   const [keyword, setKeyword] = useState("");
+  const [tab, setTab] = useState<TabKey>("all");
   const [editing, setEditing] = useState<BrandRow | null>(null);
   const [creating, setCreating] = useState(false);
 
+  const counts = useMemo(() => {
+    const c = { all: rows.length, brand: 0, kiln: 0, ip: 0 };
+    for (const r of rows) c[bucketOf(r.entity_type)] += 1;
+    return c;
+  }, [rows]);
+
   const filtered = useMemo(() => {
     const k = keyword.trim().toLowerCase();
-    if (!k) return rows;
     return rows.filter((r) => {
+      if (tab !== "all" && bucketOf(r.entity_type) !== tab) return false;
+      if (!k) return true;
       if (r.name.toLowerCase().includes(k)) return true;
       if (r.name_original?.toLowerCase().includes(k)) return true;
       if (r.normalized_name.includes(k)) return true;
@@ -102,7 +110,7 @@ function ProductBrandsPage() {
       if (r.origin_country?.toLowerCase().includes(k)) return true;
       return false;
     });
-  }, [rows, keyword]);
+  }, [rows, keyword, tab]);
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["inv-brands"] });
 
@@ -125,13 +133,26 @@ function ProductBrandsPage() {
   });
 
   const activeCount = rows.filter((r) => r.status === "active").length;
+  const createDefaultType: BrandRow["entity_type"] =
+    tab === "kiln" ? "kiln" : tab === "ip" ? "ip" : "brand";
+  const createLabel =
+    tab === "kiln" ? "新建窑口" : tab === "ip" ? "新建 IP" : "新建品牌";
 
   return (
     <div>
       <PageHeader
-        title="品牌 / 制造商"
-        description="维护品牌、窑口、制造商及其别名——用于 SKU 智能识别、多维筛选和搜索。"
+        title="品牌 / 窑口 / IP"
+        description="维护品牌、窑口、动漫 IP 及其别名——用于 SKU 智能识别、多维筛选和搜索。"
       />
+
+      <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)} className="mb-3">
+        <TabsList>
+          <TabsTrigger value="all">全部 <span className="ml-1 text-muted-foreground">{counts.all}</span></TabsTrigger>
+          <TabsTrigger value="brand">品牌 <span className="ml-1 text-muted-foreground">{counts.brand}</span></TabsTrigger>
+          <TabsTrigger value="kiln">窑口 <span className="ml-1 text-muted-foreground">{counts.kiln}</span></TabsTrigger>
+          <TabsTrigger value="ip">IP（动漫） <span className="ml-1 text-muted-foreground">{counts.ip}</span></TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <Badge variant="outline" className="gap-1">
@@ -147,9 +168,10 @@ function ProductBrandsPage() {
           />
         </div>
         <Button size="sm" onClick={() => setCreating(true)}>
-          <Plus className="mr-1 h-3.5 w-3.5" /> 新建品牌
+          <Plus className="mr-1 h-3.5 w-3.5" /> {createLabel}
         </Button>
       </div>
+
 
       <Card>
         <CardContent className="p-0">
