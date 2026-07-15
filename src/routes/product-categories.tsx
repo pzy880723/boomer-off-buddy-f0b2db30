@@ -399,8 +399,8 @@ function EditDialog({
             onClick={() =>
               onSave({
                 id: initial?.id,
-                code: code.trim(),
                 name: name.trim(),
+
                 parent_id: parent || null,
                 sort_order: Number(sort) || 0,
                 is_active: active,
