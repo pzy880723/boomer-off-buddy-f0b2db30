@@ -13,7 +13,9 @@ import { Route as YouzanRouteImport } from './routes/youzan'
 import { Route as StoreRouteImport } from './routes/store'
 import { Route as ShopMgmtRouteImport } from './routes/shop-mgmt'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ProductFacetsRouteImport } from './routes/product-facets'
 import { Route as ProductCategoriesRouteImport } from './routes/product-categories'
+import { Route as ProductBrandsRouteImport } from './routes/product-brands'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as MRouteImport } from './routes/m'
 import { Route as LoginRouteImport } from './routes/login'
@@ -83,6 +85,7 @@ import { Route as InventoryProductsCodeRouteImport } from './routes/inventory.pr
 import { Route as InventoryInboundNewRouteImport } from './routes/inventory.inbound.new'
 import { Route as InventoryInboundIdRouteImport } from './routes/inventory.inbound.$id'
 import { Route as ApiPublicMerukiIngestRouteImport } from './routes/api/public/meruki-ingest'
+import { Route as ApiPublicStorefrontTaxonomyRouteImport } from './routes/api/public/storefront/taxonomy'
 import { Route as ApiPublicStorefrontProductsRouteImport } from './routes/api/public/storefront/products'
 import { Route as ApiPublicStorefrontOrdersRouteImport } from './routes/api/public/storefront/orders'
 import { Route as ApiPublicHooksYouzanSyncWorkerRouteImport } from './routes/api/public/hooks/youzan-sync-worker'
@@ -188,9 +191,19 @@ const SettingsRoute = SettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProductFacetsRoute = ProductFacetsRouteImport.update({
+  id: '/product-facets',
+  path: '/product-facets',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProductCategoriesRoute = ProductCategoriesRouteImport.update({
   id: '/product-categories',
   path: '/product-categories',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProductBrandsRoute = ProductBrandsRouteImport.update({
+  id: '/product-brands',
+  path: '/product-brands',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OrdersRoute = OrdersRouteImport.update({
@@ -544,6 +557,12 @@ const ApiPublicMerukiIngestRoute = ApiPublicMerukiIngestRouteImport.update({
   path: '/api/public/meruki-ingest',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicStorefrontTaxonomyRoute =
+  ApiPublicStorefrontTaxonomyRouteImport.update({
+    id: '/api/public/storefront/taxonomy',
+    path: '/api/public/storefront/taxonomy',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicStorefrontProductsRoute =
   ApiPublicStorefrontProductsRouteImport.update({
     id: '/api/public/storefront/products',
@@ -1054,7 +1073,9 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/m': typeof MRouteWithChildren
   '/orders': typeof OrdersRouteWithChildren
+  '/product-brands': typeof ProductBrandsRoute
   '/product-categories': typeof ProductCategoriesRoute
+  '/product-facets': typeof ProductFacetsRoute
   '/settings': typeof SettingsRoute
   '/shop-mgmt': typeof ShopMgmtRouteWithChildren
   '/store': typeof StoreRouteWithChildren
@@ -1148,6 +1169,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
   '/api/public/storefront/orders': typeof ApiPublicStorefrontOrdersRouteWithChildren
   '/api/public/storefront/products': typeof ApiPublicStorefrontProductsRouteWithChildren
+  '/api/public/storefront/taxonomy': typeof ApiPublicStorefrontTaxonomyRoute
   '/api/public/auth/otp/send': typeof ApiPublicAuthOtpSendRoute
   '/api/public/auth/otp/verify': typeof ApiPublicAuthOtpVerifyRoute
   '/api/public/handheld/ai/prepare-listing-image': typeof ApiPublicHandheldAiPrepareListingImageRoute
@@ -1213,7 +1235,9 @@ export interface FileRoutesByTo {
   '/knowledge': typeof KnowledgeRoute
   '/login': typeof LoginRoute
   '/orders': typeof OrdersRouteWithChildren
+  '/product-brands': typeof ProductBrandsRoute
   '/product-categories': typeof ProductCategoriesRoute
+  '/product-facets': typeof ProductFacetsRoute
   '/settings': typeof SettingsRoute
   '/shop-mgmt': typeof ShopMgmtRouteWithChildren
   '/youzan': typeof YouzanRouteWithChildren
@@ -1301,6 +1325,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
   '/api/public/storefront/orders': typeof ApiPublicStorefrontOrdersRouteWithChildren
   '/api/public/storefront/products': typeof ApiPublicStorefrontProductsRouteWithChildren
+  '/api/public/storefront/taxonomy': typeof ApiPublicStorefrontTaxonomyRoute
   '/api/public/auth/otp/send': typeof ApiPublicAuthOtpSendRoute
   '/api/public/auth/otp/verify': typeof ApiPublicAuthOtpVerifyRoute
   '/api/public/handheld/ai/prepare-listing-image': typeof ApiPublicHandheldAiPrepareListingImageRoute
@@ -1368,7 +1393,9 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/m': typeof MRouteWithChildren
   '/orders': typeof OrdersRouteWithChildren
+  '/product-brands': typeof ProductBrandsRoute
   '/product-categories': typeof ProductCategoriesRoute
+  '/product-facets': typeof ProductFacetsRoute
   '/settings': typeof SettingsRoute
   '/shop-mgmt': typeof ShopMgmtRouteWithChildren
   '/store': typeof StoreRouteWithChildren
@@ -1462,6 +1489,7 @@ export interface FileRoutesById {
   '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
   '/api/public/storefront/orders': typeof ApiPublicStorefrontOrdersRouteWithChildren
   '/api/public/storefront/products': typeof ApiPublicStorefrontProductsRouteWithChildren
+  '/api/public/storefront/taxonomy': typeof ApiPublicStorefrontTaxonomyRoute
   '/api/public/auth/otp/send': typeof ApiPublicAuthOtpSendRoute
   '/api/public/auth/otp/verify': typeof ApiPublicAuthOtpVerifyRoute
   '/api/public/handheld/ai/prepare-listing-image': typeof ApiPublicHandheldAiPrepareListingImageRoute
@@ -1530,7 +1558,9 @@ export interface FileRouteTypes {
     | '/login'
     | '/m'
     | '/orders'
+    | '/product-brands'
     | '/product-categories'
+    | '/product-facets'
     | '/settings'
     | '/shop-mgmt'
     | '/store'
@@ -1624,6 +1654,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-sync-worker'
     | '/api/public/storefront/orders'
     | '/api/public/storefront/products'
+    | '/api/public/storefront/taxonomy'
     | '/api/public/auth/otp/send'
     | '/api/public/auth/otp/verify'
     | '/api/public/handheld/ai/prepare-listing-image'
@@ -1689,7 +1720,9 @@ export interface FileRouteTypes {
     | '/knowledge'
     | '/login'
     | '/orders'
+    | '/product-brands'
     | '/product-categories'
+    | '/product-facets'
     | '/settings'
     | '/shop-mgmt'
     | '/youzan'
@@ -1777,6 +1810,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-sync-worker'
     | '/api/public/storefront/orders'
     | '/api/public/storefront/products'
+    | '/api/public/storefront/taxonomy'
     | '/api/public/auth/otp/send'
     | '/api/public/auth/otp/verify'
     | '/api/public/handheld/ai/prepare-listing-image'
@@ -1843,7 +1877,9 @@ export interface FileRouteTypes {
     | '/login'
     | '/m'
     | '/orders'
+    | '/product-brands'
     | '/product-categories'
+    | '/product-facets'
     | '/settings'
     | '/shop-mgmt'
     | '/store'
@@ -1937,6 +1973,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-sync-worker'
     | '/api/public/storefront/orders'
     | '/api/public/storefront/products'
+    | '/api/public/storefront/taxonomy'
     | '/api/public/auth/otp/send'
     | '/api/public/auth/otp/verify'
     | '/api/public/handheld/ai/prepare-listing-image'
@@ -2004,7 +2041,9 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   MRoute: typeof MRouteWithChildren
   OrdersRoute: typeof OrdersRouteWithChildren
+  ProductBrandsRoute: typeof ProductBrandsRoute
   ProductCategoriesRoute: typeof ProductCategoriesRoute
+  ProductFacetsRoute: typeof ProductFacetsRoute
   SettingsRoute: typeof SettingsRoute
   ShopMgmtRoute: typeof ShopMgmtRouteWithChildren
   StoreRoute: typeof StoreRouteWithChildren
@@ -2059,6 +2098,7 @@ export interface RootRouteChildren {
   ApiPublicHooksYouzanSyncWorkerRoute: typeof ApiPublicHooksYouzanSyncWorkerRoute
   ApiPublicStorefrontOrdersRoute: typeof ApiPublicStorefrontOrdersRouteWithChildren
   ApiPublicStorefrontProductsRoute: typeof ApiPublicStorefrontProductsRouteWithChildren
+  ApiPublicStorefrontTaxonomyRoute: typeof ApiPublicStorefrontTaxonomyRoute
   ApiPublicAuthOtpSendRoute: typeof ApiPublicAuthOtpSendRoute
   ApiPublicAuthOtpVerifyRoute: typeof ApiPublicAuthOtpVerifyRoute
   ApiPublicHandheldAiPrepareListingImageRoute: typeof ApiPublicHandheldAiPrepareListingImageRoute
@@ -2123,11 +2163,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/product-facets': {
+      id: '/product-facets'
+      path: '/product-facets'
+      fullPath: '/product-facets'
+      preLoaderRoute: typeof ProductFacetsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/product-categories': {
       id: '/product-categories'
       path: '/product-categories'
       fullPath: '/product-categories'
       preLoaderRoute: typeof ProductCategoriesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/product-brands': {
+      id: '/product-brands'
+      path: '/product-brands'
+      fullPath: '/product-brands'
+      preLoaderRoute: typeof ProductBrandsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/orders': {
@@ -2611,6 +2665,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/meruki-ingest'
       fullPath: '/api/public/meruki-ingest'
       preLoaderRoute: typeof ApiPublicMerukiIngestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/storefront/taxonomy': {
+      id: '/api/public/storefront/taxonomy'
+      path: '/api/public/storefront/taxonomy'
+      fullPath: '/api/public/storefront/taxonomy'
+      preLoaderRoute: typeof ApiPublicStorefrontTaxonomyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/storefront/products': {
@@ -3626,7 +3687,9 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   MRoute: MRouteWithChildren,
   OrdersRoute: OrdersRouteWithChildren,
+  ProductBrandsRoute: ProductBrandsRoute,
   ProductCategoriesRoute: ProductCategoriesRoute,
+  ProductFacetsRoute: ProductFacetsRoute,
   SettingsRoute: SettingsRoute,
   ShopMgmtRoute: ShopMgmtRouteWithChildren,
   StoreRoute: StoreRouteWithChildren,
@@ -3688,6 +3751,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicStorefrontOrdersRoute: ApiPublicStorefrontOrdersRouteWithChildren,
   ApiPublicStorefrontProductsRoute:
     ApiPublicStorefrontProductsRouteWithChildren,
+  ApiPublicStorefrontTaxonomyRoute: ApiPublicStorefrontTaxonomyRoute,
   ApiPublicAuthOtpSendRoute: ApiPublicAuthOtpSendRoute,
   ApiPublicAuthOtpVerifyRoute: ApiPublicAuthOtpVerifyRoute,
   ApiPublicHandheldAiPrepareListingImageRoute:
@@ -3734,3 +3798,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

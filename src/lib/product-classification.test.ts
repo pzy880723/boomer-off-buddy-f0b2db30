@@ -7,6 +7,7 @@ import {
   normalizeProductRecognition,
   type CategoryNode,
 } from "./product-classification";
+import type { BrandCandidate, FacetTerm } from "./product-taxonomy";
 
 const categories: CategoryNode[] = [
   { id: "root-p", code: "porcelain", name: "瓷器", parent_id: null, is_active: true },
@@ -76,6 +77,26 @@ const categories: CategoryNode[] = [
   },
 ];
 
+const facets: FacetTerm[] = [
+  { code: "origin_uk", name: "英国", dimension: "origin", aliases: ["UK", "England"] },
+  {
+    code: "material_bone_china",
+    name: "骨瓷",
+    dimension: "material",
+    aliases: ["Bone China"],
+  },
+  { code: "craft_gilt", name: "描金", dimension: "craft", aliases: ["金彩"] },
+];
+
+const brands: BrandCandidate[] = [
+  {
+    id: "brand-wedgwood",
+    name: "Wedgwood",
+    name_original: null,
+    aliases: ["韦奇伍德"],
+  },
+];
+
 describe("product classification policy", () => {
   test("only exposes active leaves whose parent is active", () => {
     assert.deepEqual(
@@ -128,6 +149,25 @@ describe("product classification policy", () => {
     assert.equal(result.status, "fallback");
   });
 
+  test("uses the new object-based porcelain fallback after origin categories are retired", () => {
+    const modernCategories = categories.map((row) =>
+      row.code === "porcelain_origin_unknown"
+        ? { ...row, code: "porcelain_other", name: "其他陶瓷物件" }
+        : row,
+    );
+    const result = normalizeProductRecognition(
+      {
+        category_code: null,
+        confidence: 0.88,
+        name: "无底款陶瓷摆件",
+        attributes: { material: ["陶瓷"], object_type: "摆件" },
+      },
+      modernCategories,
+    );
+
+    assert.equal(result.category_code, "porcelain_other");
+  });
+
   test("uses the low-confidence leaf when confidence is below the automatic threshold", () => {
     const result = normalizeProductRecognition(
       {
@@ -169,5 +209,55 @@ describe("product classification policy", () => {
     assert.deepEqual(result.attributes.material, []);
     assert.deepEqual(result.keywords, []);
     assert.deepEqual(result.evidence, []);
+  });
+
+  test("normalizes facets, brand matching, and per-field confidence without inventing records", () => {
+    const result = normalizeProductRecognition(
+      {
+        category_code: "porcelain_europe",
+        confidence: 0.95,
+        name: "Wedgwood 描金骨瓷杯",
+        attributes: { brand: "韦奇伍德", origin_country: "英国", material: ["骨瓷"] },
+        facet_predictions: [
+          { dimension: "origin", value: "UK", confidence: 0.91 },
+          { dimension: "material", value: "Bone China", confidence: 0.96 },
+          { dimension: "craft", value: "金彩", confidence: 0.77 },
+          { dimension: "style", value: "AI 自创风格", confidence: 0.66 },
+        ],
+        attribute_confidence: { brand: 0.93, era: 1.5, material: -0.2 },
+        clarification_requests: [
+          { field: "era", question: "请补拍底款", reason: "当前图片无法确认年代" },
+        ],
+      },
+      categories,
+      { facets, brands },
+    );
+
+    assert.equal(result.brand_id, "brand-wedgwood");
+    assert.equal(result.brand_candidate_text, "韦奇伍德");
+    assert.equal(result.brand_match_status, "matched");
+    assert.deepEqual(
+      result.facets.map((item) => item.code),
+      ["origin_uk", "material_bone_china", "craft_gilt"],
+    );
+    assert.equal(result.unmatched_facets[0]?.value, "AI 自创风格");
+    assert.deepEqual(result.attribute_confidence, { brand: 0.93, era: 1, material: 0 });
+    assert.equal(result.clarification_requests[0]?.field, "era");
+  });
+
+  test("keeps an unknown brand as a review candidate", () => {
+    const result = normalizeProductRecognition(
+      {
+        category_code: "toy_character_figure",
+        confidence: 0.9,
+        attributes: { brand: "Unknown Toy Works" },
+      },
+      categories,
+      { facets, brands },
+    );
+
+    assert.equal(result.brand_id, null);
+    assert.equal(result.brand_candidate_text, "Unknown Toy Works");
+    assert.equal(result.brand_match_status, "review_required");
   });
 });

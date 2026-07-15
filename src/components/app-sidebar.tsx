@@ -26,6 +26,7 @@ import {
   Plug,
   Globe,
   FolderTree,
+  LibraryBig,
   type LucideIcon,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks/use-auth-session";
@@ -66,6 +67,8 @@ type NavTo =
   | "/shop-mgmt/online"
   | "/shop-mgmt/franchisees"
   | "/product-categories"
+  | "/product-brands"
+  | "/product-facets"
   | "/youzan"
   | "/youzan/sync"
   | "/orders/shops"
@@ -91,6 +94,8 @@ const groups: NavGroup[] = [
       { title: "门店商品", url: "/shop-mgmt/products", icon: Package },
       { title: "网店商品", url: "/shop-mgmt/online", icon: Globe },
       { title: "商品分类", url: "/product-categories", icon: FolderTree },
+      { title: "品牌库", url: "/product-brands", icon: LibraryBig },
+      { title: "商品标签", url: "/product-facets", icon: Tags },
     ],
     icon: Package,
   },

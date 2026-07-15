@@ -1,3 +1,12 @@
+import {
+  matchBrandCandidate,
+  normalizeFacetPredictions,
+  type BrandCandidate,
+  type FacetPrediction,
+  type FacetTerm,
+  type NormalizedFacetMatch,
+} from "./product-taxonomy";
+
 export type CategoryNode = {
   id: string;
   code: string;
@@ -50,6 +59,18 @@ export type RawProductRecognition = {
   compliance_flags?: string[] | string | null;
   evidence?: string[] | string | null;
   warning?: string | null;
+  facet_predictions?: FacetPrediction[] | null;
+  attribute_confidence?: Record<string, number | null> | null;
+  clarification_requests?: Array<{
+    field?: string | null;
+    question?: string | null;
+    reason?: string | null;
+  }> | null;
+};
+
+export type ProductTaxonomyContext = {
+  facets: FacetTerm[];
+  brands: BrandCandidate[];
 };
 
 export type NormalizedProductRecognition = {
@@ -71,11 +92,23 @@ export type NormalizedProductRecognition = {
   compliance_flags: string[];
   evidence: string[];
   warning: string | null;
+  brand_id: string | null;
+  brand_candidate_text: string | null;
+  brand_match_status: "empty" | "matched" | "review_required";
+  brand_suggestions: Array<{ id: string; name: string; score: number }>;
+  facets: NormalizedFacetMatch[];
+  unmatched_facets: FacetPrediction[];
+  attribute_confidence: Record<string, number>;
+  clarification_requests: Array<{
+    field: string;
+    question: string;
+    reason: string | null;
+  }>;
 };
 
 const FALLBACK_LOW_CONFIDENCE = "ai_low_confidence";
 const FALLBACK_COMPLIANCE = "compliance_review";
-const FALLBACK_PORCELAIN_ORIGIN = "porcelain_origin_unknown";
+const FALLBACK_PORCELAIN_CODES = ["porcelain_other", "porcelain_origin_unknown"];
 const AUTO_CLASSIFY_THRESHOLD = 0.75;
 
 function cleanString(value: unknown): string | null {
@@ -103,6 +136,32 @@ function cleanGrade(value: unknown): "N" | "S" | "A" | "B" | "C" | "J" | null {
   return ["N", "S", "A", "B", "C", "J"].includes(String(value))
     ? (String(value) as "N" | "S" | "A" | "B" | "C" | "J")
     : null;
+}
+
+function cleanConfidenceMap(value: unknown): Record<string, number> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const output: Record<string, number> = {};
+  for (const [key, raw] of Object.entries(value)) {
+    const cleanKey = cleanString(key);
+    const confidence = cleanConfidence(raw);
+    if (cleanKey && confidence !== null) output[cleanKey] = confidence;
+  }
+  return output;
+}
+
+function cleanClarificationRequests(
+  value: RawProductRecognition["clarification_requests"],
+): NormalizedProductRecognition["clarification_requests"] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      const field = cleanString(item?.field);
+      const question = cleanString(item?.question);
+      if (!field || !question) return null;
+      return { field, question, reason: cleanString(item?.reason) };
+    })
+    .filter((item): item is NonNullable<typeof item> => !!item)
+    .slice(0, 8);
 }
 
 export function activeLeafCategories(categories: CategoryNode[]): CategoryNode[] {
@@ -139,6 +198,7 @@ function isPorcelain(raw: RawProductRecognition, predictedCode: string | null): 
 export function normalizeProductRecognition(
   raw: RawProductRecognition,
   categories: CategoryNode[],
+  taxonomy: ProductTaxonomyContext = { facets: [], brands: [] },
 ): NormalizedProductRecognition {
   const leaves = activeLeafCategories(categories);
   if (leaves.length === 0) throw new Error("ERP 分类树没有启用的二级分类");
@@ -154,6 +214,12 @@ export function normalizeProductRecognition(
     return code;
   };
 
+  const requireFirstFallback = (codes: string[]): string => {
+    const code = codes.find((candidate) => leafCodes.has(candidate));
+    if (!code) throw new Error(`ERP 分类树缺少系统兜底分类：${codes.join(" / ")}`);
+    return code;
+  };
+
   let categoryCode: string;
   let status: "auto_classified" | "fallback" = "fallback";
   if (complianceFlags.length > 0) {
@@ -164,12 +230,14 @@ export function normalizeProductRecognition(
     categoryCode = predictedCode;
     status = "auto_classified";
   } else if (isPorcelain(raw, predictedCode)) {
-    categoryCode = requireFallback(FALLBACK_PORCELAIN_ORIGIN);
+    categoryCode = requireFirstFallback(FALLBACK_PORCELAIN_CODES);
   } else {
     categoryCode = requireFallback(FALLBACK_LOW_CONFIDENCE);
   }
 
   const nested = raw.attributes ?? {};
+  const normalizedFacets = normalizeFacetPredictions(raw.facet_predictions ?? [], taxonomy.facets);
+  const brand = matchBrandCandidate(nested.brand ?? raw.brand, taxonomy.brands);
   const alternatives = (raw.alternative_categories ?? [])
     .map((item) => {
       const code = cleanString(item.category_code);
@@ -216,5 +284,17 @@ export function normalizeProductRecognition(
     compliance_flags: complianceFlags,
     evidence: cleanStringArray(raw.evidence),
     warning: cleanString(raw.warning),
+    brand_id: brand.match?.id ?? null,
+    brand_candidate_text: brand.candidate_text,
+    brand_match_status: brand.status,
+    brand_suggestions: brand.suggestions.map((item) => ({
+      id: item.brand.id,
+      name: item.brand.name,
+      score: Math.round(item.score * 1000) / 1000,
+    })),
+    facets: normalizedFacets.matches,
+    unmatched_facets: normalizedFacets.unmatched,
+    attribute_confidence: cleanConfidenceMap(raw.attribute_confidence),
+    clarification_requests: cleanClarificationRequests(raw.clarification_requests),
   };
 }

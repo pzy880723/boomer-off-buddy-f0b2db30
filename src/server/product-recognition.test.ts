@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
 import type { CategoryNode } from "../lib/product-classification";
+import type { BrandCandidate, FacetTerm } from "../lib/product-taxonomy";
 import {
   runProductRecognition,
   type ProductRecognitionAuditInput,
@@ -62,12 +63,23 @@ const categories: CategoryNode[] = [
   },
 ];
 
+const facets: FacetTerm[] = [
+  { code: "origin_uk", name: "英国", dimension: "origin", aliases: ["UK"] },
+  { code: "material_bone_china", name: "骨瓷", dimension: "material", aliases: [] },
+];
+
+const brands: BrandCandidate[] = [
+  { id: "brand-wedgwood", name: "Wedgwood", name_original: null, aliases: ["韦奇伍德"] },
+];
+
 function depsFor(
   modelCall: ProductRecognitionDeps["callModel"],
   audits: ProductRecognitionAuditInput[],
 ): ProductRecognitionDeps {
   return {
     loadCategories: async () => categories,
+    loadFacets: async () => facets,
+    loadBrands: async () => brands,
     callModel: modelCall,
     saveAudit: async (input) => {
       audits.push(input);
@@ -82,8 +94,10 @@ describe("shared product recognition core", () => {
     const audits: ProductRecognitionAuditInput[] = [];
     const result = await runProductRecognition(
       { images: ["data:image/jpeg;base64,abc"], source: "erp" },
-      depsFor(async ({ taxonomyPrompt }) => {
+      depsFor(async ({ taxonomyPrompt, facetPrompt, brandPrompt }) => {
         assert.match(taxonomyPrompt, /porcelain_europe \| 瓷器 > 欧洲瓷器/);
+        assert.match(facetPrompt, /origin_uk \| origin \| 英国/);
+        assert.match(brandPrompt, /Wedgwood/);
         return {
           model: "test-vision",
           raw: {
@@ -97,6 +111,11 @@ describe("shared product recognition core", () => {
               material: ["骨瓷"],
               object_type: "茶杯碟",
             },
+            facet_predictions: [
+              { dimension: "origin", value: "UK", confidence: 0.92 },
+              { dimension: "material", value: "骨瓷", confidence: 0.95 },
+            ],
+            attribute_confidence: { brand: 0.96, origin_country: 0.92 },
             evidence: ["底款可见 Wedgwood"],
             suggested_price_cny: 399,
           },
@@ -107,9 +126,16 @@ describe("shared product recognition core", () => {
     assert.equal(result.request_id, "audit-1");
     assert.equal(result.category_code, "porcelain_europe");
     assert.equal(result.attributes.origin_country, "英国");
+    assert.equal(result.brand_id, "brand-wedgwood");
+    assert.deepEqual(
+      result.facets.map((item) => item.code),
+      ["origin_uk", "material_bone_china"],
+    );
     assert.equal(result.suggested_price_cny, 399);
     assert.equal(audits[0].status, "completed");
     assert.equal(audits[0].image_count, 1);
+    assert.equal(audits[0].brand_id, "brand-wedgwood");
+    assert.equal(audits[0].facet_predictions.length, 2);
   });
 
   test("normalizes an invented category into the automatic fallback", async () => {

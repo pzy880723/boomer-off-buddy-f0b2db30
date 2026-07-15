@@ -43,6 +43,7 @@ describe("handheld AI classification contract", () => {
   const schemas = readFileSync("src/lib/handheld/schemas.ts", "utf8");
   const recognition = readFileSync("src/server/handheld-ai.server.ts", "utf8");
   const smartCreate = readFileSync("src/routes/api/public/handheld/items.smart-create.ts", "utf8");
+  const classification = readFileSync("src/server/product-classification.server.ts", "utf8");
 
   test("uses dynamic ERP category codes instead of the legacy enum", () => {
     assert.doesNotMatch(schemas, /const INV_CATEGORY = z\.enum/);
@@ -75,5 +76,13 @@ describe("handheld AI classification contract", () => {
     }
     assert.match(smartCreate, /assertActiveLeafCategory/);
     assert.match(smartCreate, /attachProductClassificationAuditToSku/);
+  });
+
+  test("smart-create applies recognized brands, facets and confidence to the SKU", () => {
+    assert.match(classification, /normalized_result/);
+    assert.match(classification, /applyRecognitionMetadataToSku/);
+    assert.match(classification, /brand_id/);
+    assert.match(classification, /attribute_confidence/);
+    assert.match(classification, /inv_sku_facets/);
   });
 });

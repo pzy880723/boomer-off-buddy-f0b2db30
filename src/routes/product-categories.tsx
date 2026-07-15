@@ -1,16 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import {
-  Plus,
-  Trash2,
-  Pencil,
-  ChevronDown,
-  ChevronRight,
-  FolderTree,
-} from "lucide-react";
+import { Plus, Trash2, Pencil, ChevronDown, ChevronRight, FolderTree } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -51,7 +44,7 @@ function ProductCategoriesPage() {
   const setActive = useServerFn(setCategoryActive);
 
   const erpQ = useQuery({ queryKey: ["inv-categories"], queryFn: () => list() });
-  const rows: CategoryRow[] = erpQ.data?.rows ?? [];
+  const rows = useMemo<CategoryRow[]>(() => erpQ.data?.rows ?? [], [erpQ.data?.rows]);
 
   const [editing, setEditing] = useState<CategoryRow | null>(null);
   const [creating, setCreating] = useState<{ parent_id: string | null } | null>(null);
@@ -83,8 +76,7 @@ function ProductCategoriesPage() {
   });
 
   const toggleActiveMut = useMutation({
-    mutationFn: (r: CategoryRow) =>
-      setActive({ data: { id: r.id, is_active: !r.is_active } }),
+    mutationFn: (r: CategoryRow) => setActive({ data: { id: r.id, is_active: !r.is_active } }),
     onSuccess: () => invalidate(),
     onError: (e) => toast.error(e instanceof Error ? e.message : "操作失败"),
   });
@@ -95,8 +87,20 @@ function ProductCategoriesPage() {
     <div>
       <PageHeader
         title="商品分类"
-        description="ERP 内部的一二级商品分类（唯一真源）。同步到有赞时统一走「设置 → 集成」里配置的默认分组，不再与此处一一对应。"
+        description="主分类只描述商品是什么，并保持一件商品只选一个叶子分类。产地、材质、年代、工艺、IP 等请使用商品标签。"
       />
+
+      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-md border bg-muted/25 px-3 py-2 text-sm">
+        <span className="text-muted-foreground">
+          例：Noritake 咖啡杯的主分类是“瓷器与陶瓷 → 杯具与饮用器”，日本、骨瓷、昭和、描金是标签。
+        </span>
+        <Button asChild size="sm" variant="outline" className="ml-auto h-8">
+          <Link to="/product-facets">管理商品标签</Link>
+        </Button>
+        <Button asChild size="sm" variant="outline" className="h-8">
+          <Link to="/product-brands">管理品牌库</Link>
+        </Button>
+      </div>
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <Badge variant="outline" className="gap-1">
@@ -134,9 +138,7 @@ function ProductCategoriesPage() {
                     hasChildren={kids.length > 0}
                     isOpen={open}
                     childCount={kids.length}
-                    onToggleOpen={() =>
-                      setCollapsed((s) => ({ ...s, [r.id]: !collapsed[r.id] }))
-                    }
+                    onToggleOpen={() => setCollapsed((s) => ({ ...s, [r.id]: !collapsed[r.id] }))}
                     onEdit={() => setEditing(r)}
                     onAddChild={() => setCreating({ parent_id: r.id })}
                     onDelete={() => {
@@ -224,11 +226,7 @@ function ErpRow({
     >
       {depth === 0 ? (
         hasChildren ? (
-          <button
-            type="button"
-            className="text-muted-foreground"
-            onClick={() => onToggleOpen?.()}
-          >
+          <button type="button" className="text-muted-foreground" onClick={() => onToggleOpen?.()}>
             {isOpen ? (
               <ChevronDown className="h-3.5 w-3.5" />
             ) : (
@@ -246,9 +244,7 @@ function ErpRow({
         <div className="flex flex-wrap items-center gap-1.5">
           <span
             className={
-              row.is_active
-                ? "font-medium"
-                : "font-medium text-muted-foreground line-through"
+              row.is_active ? "font-medium" : "font-medium text-muted-foreground line-through"
             }
           >
             {row.name}
@@ -257,9 +253,7 @@ function ErpRow({
             {row.code}
           </Badge>
           {depth === 0 && childCount ? (
-            <span className="text-[11px] text-muted-foreground">
-              · {childCount} 个子级
-            </span>
+            <span className="text-[11px] text-muted-foreground">· {childCount} 个子级</span>
           ) : null}
         </div>
       </div>
@@ -276,21 +270,10 @@ function ErpRow({
             <Plus className="h-3.5 w-3.5" />
           </Button>
         )}
-        <Button
-          size="icon"
-          variant="ghost"
-          className="h-7 w-7"
-          title="编辑"
-          onClick={onEdit}
-        >
+        <Button size="icon" variant="ghost" className="h-7 w-7" title="编辑" onClick={onEdit}>
           <Pencil className="h-3.5 w-3.5" />
         </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-7 px-2 text-[11px]"
-          onClick={onToggleActive}
-        >
+        <Button size="sm" variant="ghost" className="h-7 px-2 text-[11px]" onClick={onToggleActive}>
           {row.is_active ? "停用" : "启用"}
         </Button>
         {!row.is_system && (
@@ -371,11 +354,7 @@ function EditDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>排序</Label>
-              <Input
-                type="number"
-                value={sort}
-                onChange={(e) => setSort(e.target.value)}
-              />
+              <Input type="number" value={sort} onChange={(e) => setSort(e.target.value)} />
             </div>
             <div className="space-y-1.5">
               <Label>上级分类</Label>

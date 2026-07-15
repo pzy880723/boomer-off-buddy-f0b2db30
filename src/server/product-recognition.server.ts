@@ -6,8 +6,9 @@ import {
   type NormalizedProductRecognition,
   type RawProductRecognition,
 } from "../lib/product-classification";
+import type { BrandCandidate, FacetTerm } from "../lib/product-taxonomy";
 
-export const PRODUCT_RECOGNITION_PROMPT_VERSION = "boomer-product-v1";
+export const PRODUCT_RECOGNITION_PROMPT_VERSION = "boomer-product-v2";
 export const DEFAULT_PRODUCT_RECOGNITION_MODEL = "google/gemini-2.5-pro";
 
 export type ProductRecognitionSource = "erp" | "handheld" | "migration";
@@ -35,15 +36,25 @@ export type ProductRecognitionAuditInput = {
   taxonomy_version: string;
   status: "completed" | "fallback" | "failed";
   warning: string | null;
+  brand_id: string | null;
+  brand_candidate_text: string | null;
+  facet_predictions: NormalizedProductRecognition["facets"];
+  unmatched_facets: NormalizedProductRecognition["unmatched_facets"];
+  attribute_confidence: NormalizedProductRecognition["attribute_confidence"];
+  clarification_requests: NormalizedProductRecognition["clarification_requests"];
   created_by?: string | null;
 };
 
 export type ProductRecognitionDeps = {
   loadCategories: () => Promise<CategoryNode[]>;
+  loadFacets?: () => Promise<FacetTerm[]>;
+  loadBrands?: () => Promise<BrandCandidate[]>;
   callModel: (input: {
     images: string[];
     hint?: string | null;
     taxonomyPrompt: string;
+    facetPrompt: string;
+    brandPrompt: string;
   }) => Promise<{ model: string; raw: RawProductRecognition }>;
   saveAudit: (input: ProductRecognitionAuditInput) => Promise<{ id: string }>;
   sleep?: (milliseconds: number) => Promise<void>;
@@ -56,25 +67,51 @@ export type ProductRecognitionResult = NormalizedProductRecognition & {
   taxonomy_version: string;
 };
 
-function taxonomyVersion(categories: CategoryNode[]): string {
-  const signature = activeLeafCategories(categories)
-    .map((row) => `${row.code}:${row.name}`)
-    .join("|");
+function taxonomyVersion(
+  categories: CategoryNode[],
+  facets: FacetTerm[],
+  brands: BrandCandidate[],
+): string {
+  const signature = [
+    ...activeLeafCategories(categories).map((row) => `category:${row.code}:${row.name}`),
+    ...facets.map((row) => `facet:${row.dimension}:${row.code}:${row.name}`),
+    ...brands.map((row) => `brand:${row.id}:${row.name}:${row.aliases.join(",")}`),
+  ].join("|");
   let hash = 2166136261;
   for (let index = 0; index < signature.length; index += 1) {
     hash ^= signature.charCodeAt(index);
     hash = Math.imul(hash, 16777619);
   }
-  return `taxonomy-v1-${(hash >>> 0).toString(16)}`;
+  return `taxonomy-v2-${(hash >>> 0).toString(16)}`;
+}
+
+function formatFacetsForPrompt(facets: FacetTerm[]): string {
+  return facets
+    .map(
+      (facet) =>
+        `${facet.code} | ${facet.dimension} | ${facet.name}${
+          facet.aliases.length ? ` | 别名: ${facet.aliases.join("、")}` : ""
+        }`,
+    )
+    .join("\n");
+}
+
+function formatBrandsForPrompt(brands: BrandCandidate[]): string {
+  return brands
+    .map(
+      (brand) =>
+        `${brand.id} | ${brand.name}${brand.name_original ? ` | ${brand.name_original}` : ""}${
+          brand.aliases.length ? ` | 别名: ${brand.aliases.join("、")}` : ""
+        }`,
+    )
+    .join("\n");
 }
 
 function sleep(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
-function auditStatus(
-  normalized: NormalizedProductRecognition,
-): "completed" | "fallback" {
+function auditStatus(normalized: NormalizedProductRecognition): "completed" | "fallback" {
   return normalized.status === "auto_classified" ? "completed" : "fallback";
 }
 
@@ -86,9 +123,15 @@ export async function runProductRecognition(
   if (images.length === 0) throw new Error("至少需要一张商品照片");
 
   const categories = await deps.loadCategories();
+  const [facets, brands] = await Promise.all([
+    deps.loadFacets?.() ?? Promise.resolve([]),
+    deps.loadBrands?.() ?? Promise.resolve([]),
+  ]);
   const taxonomyPrompt = formatTaxonomyForPrompt(categories);
   if (!taxonomyPrompt) throw new Error("ERP 分类树没有可用于识别的二级分类");
-  const version = taxonomyVersion(categories);
+  const version = taxonomyVersion(categories, facets, brands);
+  const facetPrompt = formatFacetsForPrompt(facets);
+  const brandPrompt = formatBrandsForPrompt(brands);
   const wait = deps.sleep ?? sleep;
 
   let model = DEFAULT_PRODUCT_RECOGNITION_MODEL;
@@ -100,6 +143,8 @@ export async function runProductRecognition(
         images,
         hint: input.hint,
         taxonomyPrompt,
+        facetPrompt,
+        brandPrompt,
       });
       model = response.model;
       raw = response.raw;
@@ -111,14 +156,13 @@ export async function runProductRecognition(
   }
 
   const failed = raw === null;
-  const modelResult: RawProductRecognition =
-    raw ?? {
-      category_code: "ai_low_confidence",
-      confidence: 0,
-      name: "未命名中古商品",
-      warning: `AI 识别暂时不可用：${lastError?.message ?? "未知错误"}`,
-    };
-  const normalized = normalizeProductRecognition(modelResult, categories);
+  const modelResult: RawProductRecognition = raw ?? {
+    category_code: "ai_low_confidence",
+    confidence: 0,
+    name: "未命名中古商品",
+    warning: `AI 识别暂时不可用：${lastError?.message ?? "未知错误"}`,
+  };
+  const normalized = normalizeProductRecognition(modelResult, categories, { facets, brands });
   const status = failed ? "failed" : auditStatus(normalized);
   const saved = await deps.saveAudit({
     source: input.source,
@@ -129,15 +173,19 @@ export async function runProductRecognition(
     alternative_categories: normalized.alternative_categories,
     attributes: normalized.attributes,
     evidence: normalized.evidence,
-    raw_result: failed
-      ? { error: lastError?.message ?? "unknown AI error" }
-      : modelResult,
+    raw_result: failed ? { error: lastError?.message ?? "unknown AI error" } : modelResult,
     normalized_result: normalized,
     model,
     prompt_version: PRODUCT_RECOGNITION_PROMPT_VERSION,
     taxonomy_version: version,
     status,
     warning: normalized.warning,
+    brand_id: normalized.brand_id,
+    brand_candidate_text: normalized.brand_candidate_text,
+    facet_predictions: normalized.facets,
+    unmatched_facets: normalized.unmatched_facets,
+    attribute_confidence: normalized.attribute_confidence,
+    clarification_requests: normalized.clarification_requests,
     created_by: input.created_by,
   });
 
@@ -168,6 +216,8 @@ async function callLovableProductModel(input: {
   images: string[];
   hint?: string | null;
   taxonomyPrompt: string;
+  facetPrompt: string;
+  brandPrompt: string;
 }): Promise<{ model: string; raw: RawProductRecognition }> {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
@@ -177,8 +227,16 @@ async function callLovableProductModel(input: {
 你必须从下面 ERP 当前启用的二级分类中选择且只选择一个 category_code，禁止创造新分类：
 ${input.taxonomyPrompt}
 
-返回字段：category_code、confidence(0~1)、alternative_categories(最多3个)、name、attributes、condition_grade、description、keywords、suggested_price_cny、compliance_flags、evidence、warning。
+返回字段：category_code、confidence(0~1)、alternative_categories(最多3个)、name、attributes、facet_predictions、attribute_confidence、clarification_requests、condition_grade、description、keywords、suggested_price_cny、compliance_flags、evidence、warning。
 attributes 必须包含 brand、maker、origin_region、origin_country、era、material(数组)、craft(数组)、object_type、colors(数组)、dimensions、functional_status、missing_parts(数组)。
+facet_predictions 必须是数组，每项包含 dimension、value、confidence；只能使用下面标签库中已有的名称或别名，不能创造正式标签：
+${input.facetPrompt || "（当前标签库为空，返回空数组）"}
+
+品牌只能参考下面品牌库。请在 attributes.brand 返回图片中识别到的原文；未匹配时保留原文，禁止创造品牌记录：
+${input.brandPrompt || "（当前品牌库为空）"}
+
+attribute_confidence 返回逐字段置信度对象，例如 brand、era、origin_country、material、craft、object_type。
+clarification_requests 返回需要店员补拍或确认的问题数组，每项包含 field、question、reason；无需追问时返回空数组。
 品名使用中文，不超过40字；描述不超过160字。只根据图片可见证据判断，不确定字段返回 null 或空数组。
 瓷器产地不明确时必须选 porcelain_origin_unknown。疑似受监管文物、违禁品或无法安全销售的物品，将风险写入 compliance_flags。
 suggested_price_cny 只是人民币参考价，没有依据时返回 null。`;
@@ -221,12 +279,18 @@ suggested_price_cny 只是人民币参考价，没有依据时返回 null。`;
 export async function recognizeProductFromImages(
   input: ProductRecognitionInput,
 ): Promise<ProductRecognitionResult> {
-  const {
-    loadActiveProductCategories,
-    persistProductClassificationAudit,
-  } = await import("./product-classification.server");
+  const { loadActiveProductCategories, persistProductClassificationAudit } =
+    await import("./product-classification.server");
   return runProductRecognition(input, {
     loadCategories: loadActiveProductCategories,
+    loadFacets: async () => {
+      const { loadActiveProductFacets } = await import("./product-classification.server");
+      return loadActiveProductFacets();
+    },
+    loadBrands: async () => {
+      const { loadActiveProductBrands } = await import("./product-classification.server");
+      return loadActiveProductBrands();
+    },
     callModel: callLovableProductModel,
     saveAudit: persistProductClassificationAudit,
   });
