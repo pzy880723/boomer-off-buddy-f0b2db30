@@ -394,9 +394,9 @@ function EditDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {(Object.keys(ENTITY_LABEL) as BrandRow["entity_type"][]).map((k) => (
-                    <SelectItem key={k} value={k}>
-                      {ENTITY_LABEL[k]}
+                  {EDITABLE_TYPES.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>
+                      {t.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
