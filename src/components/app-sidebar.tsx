@@ -26,6 +26,7 @@ import {
   Plug,
   Globe,
   FolderTree,
+  Tag,
   type LucideIcon,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks/use-auth-session";
