@@ -92,6 +92,7 @@ const groups: NavGroup[] = [
       { title: "门店商品", url: "/shop-mgmt/products", icon: Package },
       { title: "网店商品", url: "/shop-mgmt/online", icon: Globe },
       { title: "商品分类", url: "/product-categories", icon: FolderTree },
+      { title: "品牌 / 制造商", url: "/product-brands", icon: Tag },
     ],
     icon: Package,
   },
