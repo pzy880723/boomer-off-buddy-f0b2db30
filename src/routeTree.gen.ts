@@ -14,6 +14,7 @@ import { Route as StoreRouteImport } from './routes/store'
 import { Route as ShopMgmtRouteImport } from './routes/shop-mgmt'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ProductCategoriesRouteImport } from './routes/product-categories'
+import { Route as ProductBrandsRouteImport } from './routes/product-brands'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as MRouteImport } from './routes/m'
 import { Route as LoginRouteImport } from './routes/login'
@@ -191,6 +192,11 @@ const SettingsRoute = SettingsRouteImport.update({
 const ProductCategoriesRoute = ProductCategoriesRouteImport.update({
   id: '/product-categories',
   path: '/product-categories',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProductBrandsRoute = ProductBrandsRouteImport.update({
+  id: '/product-brands',
+  path: '/product-brands',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OrdersRoute = OrdersRouteImport.update({
@@ -1054,6 +1060,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/m': typeof MRouteWithChildren
   '/orders': typeof OrdersRouteWithChildren
+  '/product-brands': typeof ProductBrandsRoute
   '/product-categories': typeof ProductCategoriesRoute
   '/settings': typeof SettingsRoute
   '/shop-mgmt': typeof ShopMgmtRouteWithChildren
@@ -1213,6 +1220,7 @@ export interface FileRoutesByTo {
   '/knowledge': typeof KnowledgeRoute
   '/login': typeof LoginRoute
   '/orders': typeof OrdersRouteWithChildren
+  '/product-brands': typeof ProductBrandsRoute
   '/product-categories': typeof ProductCategoriesRoute
   '/settings': typeof SettingsRoute
   '/shop-mgmt': typeof ShopMgmtRouteWithChildren
@@ -1368,6 +1376,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/m': typeof MRouteWithChildren
   '/orders': typeof OrdersRouteWithChildren
+  '/product-brands': typeof ProductBrandsRoute
   '/product-categories': typeof ProductCategoriesRoute
   '/settings': typeof SettingsRoute
   '/shop-mgmt': typeof ShopMgmtRouteWithChildren
@@ -1530,6 +1539,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/m'
     | '/orders'
+    | '/product-brands'
     | '/product-categories'
     | '/settings'
     | '/shop-mgmt'
@@ -1689,6 +1699,7 @@ export interface FileRouteTypes {
     | '/knowledge'
     | '/login'
     | '/orders'
+    | '/product-brands'
     | '/product-categories'
     | '/settings'
     | '/shop-mgmt'
@@ -1843,6 +1854,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/m'
     | '/orders'
+    | '/product-brands'
     | '/product-categories'
     | '/settings'
     | '/shop-mgmt'
@@ -2004,6 +2016,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   MRoute: typeof MRouteWithChildren
   OrdersRoute: typeof OrdersRouteWithChildren
+  ProductBrandsRoute: typeof ProductBrandsRoute
   ProductCategoriesRoute: typeof ProductCategoriesRoute
   SettingsRoute: typeof SettingsRoute
   ShopMgmtRoute: typeof ShopMgmtRouteWithChildren
@@ -2128,6 +2141,13 @@ declare module '@tanstack/react-router' {
       path: '/product-categories'
       fullPath: '/product-categories'
       preLoaderRoute: typeof ProductCategoriesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/product-brands': {
+      id: '/product-brands'
+      path: '/product-brands'
+      fullPath: '/product-brands'
+      preLoaderRoute: typeof ProductBrandsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/orders': {
@@ -3626,6 +3646,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   MRoute: MRouteWithChildren,
   OrdersRoute: OrdersRouteWithChildren,
+  ProductBrandsRoute: ProductBrandsRoute,
   ProductCategoriesRoute: ProductCategoriesRoute,
   SettingsRoute: SettingsRoute,
   ShopMgmtRoute: ShopMgmtRouteWithChildren,
