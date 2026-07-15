@@ -1551,11 +1551,102 @@ export type Database = {
           },
         ]
       }
+      inv_sku_classifications: {
+        Row: {
+          alternative_categories: Json
+          attributes: Json
+          category_code: string
+          confidence: number | null
+          corrected_at: string | null
+          corrected_by: string | null
+          corrected_category_code: string | null
+          created_at: string
+          created_by: string | null
+          evidence: Json
+          id: string
+          image_count: number
+          model: string
+          normalized_result: Json
+          predicted_category_code: string | null
+          prompt_version: string
+          raw_result: Json
+          sku_id: string | null
+          source: string
+          status: string
+          taxonomy_version: string
+          updated_at: string
+          warning: string | null
+        }
+        Insert: {
+          alternative_categories?: Json
+          attributes?: Json
+          category_code: string
+          confidence?: number | null
+          corrected_at?: string | null
+          corrected_by?: string | null
+          corrected_category_code?: string | null
+          created_at?: string
+          created_by?: string | null
+          evidence?: Json
+          id?: string
+          image_count?: number
+          model: string
+          normalized_result?: Json
+          predicted_category_code?: string | null
+          prompt_version: string
+          raw_result?: Json
+          sku_id?: string | null
+          source?: string
+          status?: string
+          taxonomy_version: string
+          updated_at?: string
+          warning?: string | null
+        }
+        Update: {
+          alternative_categories?: Json
+          attributes?: Json
+          category_code?: string
+          confidence?: number | null
+          corrected_at?: string | null
+          corrected_by?: string | null
+          corrected_category_code?: string | null
+          created_at?: string
+          created_by?: string | null
+          evidence?: Json
+          id?: string
+          image_count?: number
+          model?: string
+          normalized_result?: Json
+          predicted_category_code?: string | null
+          prompt_version?: string
+          raw_result?: Json
+          sku_id?: string | null
+          source?: string
+          status?: string
+          taxonomy_version?: string
+          updated_at?: string
+          warning?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inv_sku_classifications_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inv_skus: {
         Row: {
+          ai_suggested_price: number | null
+          attributes: Json
           barcode: string | null
           bundle_items: Json
           category: string
+          category_confidence: number | null
+          category_source: string
+          classification_status: string
           created_at: string
           default_shop_ids: string[]
           epc: string
@@ -1571,6 +1662,7 @@ export type Database = {
           notes: string | null
           pack_pieces: number | null
           price_tier: number
+          recognition_request_id: string | null
           sales_state: string
           sku_code: string | null
           sku_scope: string
@@ -1580,9 +1672,14 @@ export type Database = {
           weight_g: number | null
         }
         Insert: {
+          ai_suggested_price?: number | null
+          attributes?: Json
           barcode?: string | null
           bundle_items?: Json
           category: string
+          category_confidence?: number | null
+          category_source?: string
+          classification_status?: string
           created_at?: string
           default_shop_ids?: string[]
           epc: string
@@ -1598,6 +1695,7 @@ export type Database = {
           notes?: string | null
           pack_pieces?: number | null
           price_tier: number
+          recognition_request_id?: string | null
           sales_state?: string
           sku_code?: string | null
           sku_scope?: string
@@ -1607,9 +1705,14 @@ export type Database = {
           weight_g?: number | null
         }
         Update: {
+          ai_suggested_price?: number | null
+          attributes?: Json
           barcode?: string | null
           bundle_items?: Json
           category?: string
+          category_confidence?: number | null
+          category_source?: string
+          classification_status?: string
           created_at?: string
           default_shop_ids?: string[]
           epc?: string
@@ -1625,6 +1728,7 @@ export type Database = {
           notes?: string | null
           pack_pieces?: number | null
           price_tier?: number
+          recognition_request_id?: string | null
           sales_state?: string
           sku_code?: string | null
           sku_scope?: string
@@ -1633,7 +1737,15 @@ export type Database = {
           updated_at?: string
           weight_g?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "inv_skus_recognition_request_id_fkey"
+            columns: ["recognition_request_id"]
+            isOneToOne: false
+            referencedRelation: "inv_sku_classifications"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       inv_stock_movements: {
         Row: {
