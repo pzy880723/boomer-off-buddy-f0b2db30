@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -36,10 +37,10 @@ import {
 export const Route = createFileRoute("/product-brands")({
   head: () => ({
     meta: [
-      { title: "品牌 / 制造商 · BOOMER OFF" },
+      { title: "品牌 / 窑口 / IP · BOOMER OFF" },
       {
         name: "description",
-        content: "维护品牌、窑口、制造商及其别名，供 SKU 智能识别与搜索使用。",
+        content: "维护品牌、窑口、动漫 IP 及其别名，供 SKU 智能识别与搜索使用。",
       },
     ],
   }),
@@ -48,11 +49,27 @@ export const Route = createFileRoute("/product-brands")({
 
 const ENTITY_LABEL: Record<BrandRow["entity_type"], string> = {
   brand: "品牌",
-  manufacturer: "制造商",
+  manufacturer: "品牌",
   kiln: "窑口",
-  studio: "工作室",
-  designer: "设计师",
+  studio: "IP",
+  designer: "品牌",
+  ip: "IP",
 };
+
+// UI 可选类型（编辑弹窗下拉）
+const EDITABLE_TYPES: { value: BrandRow["entity_type"]; label: string }[] = [
+  { value: "brand", label: "品牌" },
+  { value: "kiln", label: "窑口" },
+  { value: "ip", label: "IP（动漫）" },
+];
+
+type TabKey = "all" | "brand" | "kiln" | "ip";
+
+function bucketOf(t: BrandRow["entity_type"]): "brand" | "kiln" | "ip" {
+  if (t === "kiln") return "kiln";
+  if (t === "ip" || t === "studio") return "ip";
+  return "brand"; // brand / manufacturer / designer
+}
 
 const STATUS_LABEL: Record<BrandRow["status"], string> = {
   active: "启用",
