@@ -313,11 +313,13 @@ function EditDialog({
   open,
   onOpenChange,
   initial,
+  defaultType,
   onSave,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   initial: BrandRow | null;
+  defaultType: BrandRow["entity_type"];
   onSave: (p: EditPayload) => void;
 }) {
   const [name, setName] = useState("");
@@ -335,13 +337,15 @@ function EditDialog({
     setName(initial?.name ?? "");
     setNameOriginal(initial?.name_original ?? "");
     setAliasesText((initial?.aliases ?? []).join(", "));
-    setEntityType(initial?.entity_type ?? "brand");
+    // 归一化历史类型到 UI 三档：manufacturer/designer→brand, studio→ip
+    const raw = initial?.entity_type ?? defaultType;
+    setEntityType(bucketOf(raw));
     setCountry(initial?.origin_country ?? "");
     setRegion(initial?.origin_region ?? "");
     setLogoUrl(initial?.logo_url ?? "");
     setStatus(initial?.status ?? "active");
     setNotes(initial?.notes ?? "");
-  }, [open, initial]);
+  }, [open, initial, defaultType]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
