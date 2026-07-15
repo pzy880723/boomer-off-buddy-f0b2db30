@@ -257,7 +257,7 @@ function ProductBrandsPage() {
                     className="h-7 w-7 text-destructive"
                     title="删除"
                     onClick={() => {
-                      if (confirm(`删除品牌「${r.name}」？`)) deleteMut.mutate(r.id);
+                      if (confirm(`删除「${r.name}」？`)) deleteMut.mutate(r.id);
                     }}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
