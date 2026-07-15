@@ -16,7 +16,7 @@ export type ProductRecognitionAttributes = {
   craft: string[];
   object_type: string | null;
   colors: string[];
-  dimensions: Record<string, unknown> | null;
+  dimensions: Record<string, string | number | boolean | null> | null;
   functional_status: string | null;
   missing_parts: string[];
 };
@@ -40,7 +40,7 @@ export type RawProductRecognition = {
   craft?: string[] | string | null;
   object_type?: string | null;
   colors?: string[] | string | null;
-  dimensions?: Record<string, unknown> | null;
+  dimensions?: Record<string, string | number | boolean | null> | null;
   condition_grade?: string | null;
   functional_status?: string | null;
   missing_parts?: string[] | string | null;
@@ -99,9 +99,7 @@ function cleanPrice(value: unknown): number | null {
   return Math.round(value * 100) / 100;
 }
 
-function cleanGrade(
-  value: unknown,
-): "N" | "S" | "A" | "B" | "C" | "J" | null {
+function cleanGrade(value: unknown): "N" | "S" | "A" | "B" | "C" | "J" | null {
   return ["N", "S", "A", "B", "C", "J"].includes(String(value))
     ? (String(value) as "N" | "S" | "A" | "B" | "C" | "J")
     : null;
@@ -109,9 +107,7 @@ function cleanGrade(
 
 export function activeLeafCategories(categories: CategoryNode[]): CategoryNode[] {
   const activeRoots = new Set(
-    categories
-      .filter((row) => row.is_active && row.parent_id === null)
-      .map((row) => row.id),
+    categories.filter((row) => row.is_active && row.parent_id === null).map((row) => row.id),
   );
   return categories.filter(
     (row) => row.is_active && row.parent_id !== null && activeRoots.has(row.parent_id),
@@ -120,9 +116,7 @@ export function activeLeafCategories(categories: CategoryNode[]): CategoryNode[]
 
 export function formatTaxonomyForPrompt(categories: CategoryNode[]): string {
   const parents = new Map(
-    categories
-      .filter((row) => row.is_active && row.parent_id === null)
-      .map((row) => [row.id, row]),
+    categories.filter((row) => row.is_active && row.parent_id === null).map((row) => [row.id, row]),
   );
   return activeLeafCategories(categories)
     .map((row) => `${row.code} | ${parents.get(row.parent_id!)?.name ?? "未知"} > ${row.name}`)
@@ -212,9 +206,7 @@ export function normalizeProductRecognition(
           : raw.dimensions && typeof raw.dimensions === "object"
             ? raw.dimensions
             : null,
-      functional_status: cleanString(
-        nested.functional_status ?? raw.functional_status,
-      ),
+      functional_status: cleanString(nested.functional_status ?? raw.functional_status),
       missing_parts: cleanStringArray(nested.missing_parts ?? raw.missing_parts),
     },
     condition_grade: cleanGrade(raw.condition_grade),
