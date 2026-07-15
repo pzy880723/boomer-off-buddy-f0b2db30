@@ -278,6 +278,7 @@ function ProductBrandsPage() {
           }
         }}
         initial={editing}
+        defaultType={createDefaultType}
         onSave={async (payload) => {
           try {
             await upsert({ data: payload });
