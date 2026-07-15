@@ -583,14 +583,9 @@ export const AiRecognizeReq = z
       .max(6)
       .optional()
       .meta({ description: "外链/signed URL 数组，最多 6 张" }),
-    image_storage_paths: z
-      .array(AiRecognizeStoragePath)
-      .min(1)
-      .max(6)
-      .optional()
-      .meta({
-        description: "APP 上传后的持久 storage 路径数组，最多 6 张，服务端自动签 signed URL",
-      }),
+    image_storage_paths: z.array(AiRecognizeStoragePath).min(1).max(6).optional().meta({
+      description: "APP 上传后的持久 storage 路径数组，最多 6 张，服务端自动签 signed URL",
+    }),
     primary_index: z
       .number()
       .int()
@@ -704,13 +699,9 @@ export const UploadImageReq = z
 export const UploadImageRes = okEnvelope(
   z.object({
     storage_path: z.string(),
-    upload_url: z
-      .string()
-      .url()
-      .meta({
-        description:
-          "30 分钟有效；signed 模式为 Storage PUT URL，multipart 模式为 ERP 中转 POST URL",
-      }),
+    upload_url: z.string().url().meta({
+      description: "30 分钟有效；signed 模式为 Storage PUT URL，multipart 模式为 ERP 中转 POST URL",
+    }),
     read_url: z.string().url().nullable().meta({
       description:
         "上传前对象还不存在，无法签发 read URL；总是返回 null。上传完成后调 POST /items/sign-read-url 拿 7 天 signed GET URL。",
