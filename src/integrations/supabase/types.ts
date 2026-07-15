@@ -1022,6 +1022,57 @@ export type Database = {
         }
         Relationships: []
       }
+      inv_brands: {
+        Row: {
+          aliases: string[]
+          category_codes: string[]
+          created_at: string
+          entity_type: string
+          id: string
+          logo_url: string | null
+          name: string
+          name_original: string | null
+          normalized_name: string
+          notes: string | null
+          origin_country: string | null
+          origin_region: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          aliases?: string[]
+          category_codes?: string[]
+          created_at?: string
+          entity_type?: string
+          id?: string
+          logo_url?: string | null
+          name: string
+          name_original?: string | null
+          normalized_name: string
+          notes?: string | null
+          origin_country?: string | null
+          origin_region?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          aliases?: string[]
+          category_codes?: string[]
+          created_at?: string
+          entity_type?: string
+          id?: string
+          logo_url?: string | null
+          name?: string
+          name_original?: string | null
+          normalized_name?: string
+          notes?: string | null
+          origin_country?: string | null
+          origin_region?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       inv_categories: {
         Row: {
           code: string
@@ -1126,6 +1177,59 @@ export type Database = {
             columns: ["sku_id"]
             isOneToOne: false
             referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inv_facets: {
+        Row: {
+          aliases: string[]
+          category_codes: string[]
+          code: string
+          created_at: string
+          dimension: string
+          id: string
+          is_active: boolean
+          is_system: boolean
+          name: string
+          parent_id: string | null
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          aliases?: string[]
+          category_codes?: string[]
+          code: string
+          created_at?: string
+          dimension: string
+          id?: string
+          is_active?: boolean
+          is_system?: boolean
+          name: string
+          parent_id?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          aliases?: string[]
+          category_codes?: string[]
+          code?: string
+          created_at?: string
+          dimension?: string
+          id?: string
+          is_active?: boolean
+          is_system?: boolean
+          name?: string
+          parent_id?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inv_facets_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "inv_facets"
             referencedColumns: ["id"]
           },
         ]
@@ -1554,8 +1658,12 @@ export type Database = {
       inv_sku_classifications: {
         Row: {
           alternative_categories: Json
+          attribute_confidence: Json
           attributes: Json
+          brand_candidate_text: string | null
+          brand_id: string | null
           category_code: string
+          clarification_requests: Json
           confidence: number | null
           corrected_at: string | null
           corrected_by: string | null
@@ -1563,6 +1671,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           evidence: Json
+          facet_predictions: Json
           id: string
           image_count: number
           model: string
@@ -1574,13 +1683,18 @@ export type Database = {
           source: string
           status: string
           taxonomy_version: string
+          unmatched_facets: Json
           updated_at: string
           warning: string | null
         }
         Insert: {
           alternative_categories?: Json
+          attribute_confidence?: Json
           attributes?: Json
+          brand_candidate_text?: string | null
+          brand_id?: string | null
           category_code: string
+          clarification_requests?: Json
           confidence?: number | null
           corrected_at?: string | null
           corrected_by?: string | null
@@ -1588,6 +1702,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           evidence?: Json
+          facet_predictions?: Json
           id?: string
           image_count?: number
           model: string
@@ -1599,13 +1714,18 @@ export type Database = {
           source?: string
           status?: string
           taxonomy_version: string
+          unmatched_facets?: Json
           updated_at?: string
           warning?: string | null
         }
         Update: {
           alternative_categories?: Json
+          attribute_confidence?: Json
           attributes?: Json
+          brand_candidate_text?: string | null
+          brand_id?: string | null
           category_code?: string
+          clarification_requests?: Json
           confidence?: number | null
           corrected_at?: string | null
           corrected_by?: string | null
@@ -1613,6 +1733,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           evidence?: Json
+          facet_predictions?: Json
           id?: string
           image_count?: number
           model?: string
@@ -1624,12 +1745,62 @@ export type Database = {
           source?: string
           status?: string
           taxonomy_version?: string
+          unmatched_facets?: Json
           updated_at?: string
           warning?: string | null
         }
         Relationships: [
           {
+            foreignKeyName: "inv_sku_classifications_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "inv_brands"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "inv_sku_classifications_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inv_sku_facets: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          created_by: string | null
+          facet_id: string
+          sku_id: string
+          source: string
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          created_by?: string | null
+          facet_id: string
+          sku_id: string
+          source?: string
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          created_by?: string | null
+          facet_id?: string
+          sku_id?: string
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inv_sku_facets_facet_id_fkey"
+            columns: ["facet_id"]
+            isOneToOne: false
+            referencedRelation: "inv_facets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inv_sku_facets_sku_id_fkey"
             columns: ["sku_id"]
             isOneToOne: false
             referencedRelation: "inv_skus"
@@ -1640,12 +1811,16 @@ export type Database = {
       inv_skus: {
         Row: {
           ai_suggested_price: number | null
+          attribute_confidence: Json
           attributes: Json
           barcode: string | null
+          brand_candidate_text: string | null
+          brand_id: string | null
           bundle_items: Json
           category: string
           category_confidence: number | null
           category_source: string
+          clarification_requests: Json
           classification_status: string
           created_at: string
           default_shop_ids: string[]
@@ -1657,6 +1832,7 @@ export type Database = {
           inventory_version: number
           is_custom_price: boolean
           is_display: boolean
+          keywords: string[]
           kind: string
           name: string
           notes: string | null
@@ -1673,12 +1849,16 @@ export type Database = {
         }
         Insert: {
           ai_suggested_price?: number | null
+          attribute_confidence?: Json
           attributes?: Json
           barcode?: string | null
+          brand_candidate_text?: string | null
+          brand_id?: string | null
           bundle_items?: Json
           category: string
           category_confidence?: number | null
           category_source?: string
+          clarification_requests?: Json
           classification_status?: string
           created_at?: string
           default_shop_ids?: string[]
@@ -1690,6 +1870,7 @@ export type Database = {
           inventory_version?: number
           is_custom_price?: boolean
           is_display?: boolean
+          keywords?: string[]
           kind?: string
           name: string
           notes?: string | null
@@ -1706,12 +1887,16 @@ export type Database = {
         }
         Update: {
           ai_suggested_price?: number | null
+          attribute_confidence?: Json
           attributes?: Json
           barcode?: string | null
+          brand_candidate_text?: string | null
+          brand_id?: string | null
           bundle_items?: Json
           category?: string
           category_confidence?: number | null
           category_source?: string
+          clarification_requests?: Json
           classification_status?: string
           created_at?: string
           default_shop_ids?: string[]
@@ -1723,6 +1908,7 @@ export type Database = {
           inventory_version?: number
           is_custom_price?: boolean
           is_display?: boolean
+          keywords?: string[]
           kind?: string
           name?: string
           notes?: string | null
@@ -1738,6 +1924,13 @@ export type Database = {
           weight_g?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "inv_skus_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "inv_brands"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "inv_skus_recognition_request_id_fkey"
             columns: ["recognition_request_id"]
@@ -4114,6 +4307,22 @@ export type Database = {
         }
         Returns: Json
       }
+      search_inv_skus: {
+        Args: {
+          p_brand_ids?: string[]
+          p_facet_codes?: string[]
+          p_limit?: number
+          p_offset?: number
+          p_primary_category?: string
+          p_query?: string
+        }
+        Returns: {
+          search_rank: number
+          sku_id: string
+        }[]
+      }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
       app_role:
