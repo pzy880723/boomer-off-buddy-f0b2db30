@@ -181,7 +181,7 @@ function ProductBrandsPage() {
             )}
             {!q.isLoading && filtered.length === 0 && (
               <div className="p-6 text-center text-sm text-muted-foreground">
-                {keyword ? "没有匹配的品牌" : "暂无品牌，点右上「新建品牌」"}
+                {keyword ? "没有匹配的记录" : "暂无记录，点右上按钮新建"}
               </div>
             )}
             {filtered.map((r) => (
