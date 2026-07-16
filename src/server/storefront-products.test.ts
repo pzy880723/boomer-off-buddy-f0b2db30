@@ -62,6 +62,7 @@ describe("storefront compound taxonomy contract", () => {
         { dimension: "origin", code: "origin_japan", name: "日本", confidence: 0.96 },
         { dimension: "craft", code: "craft_gilt", name: "描金", confidence: 0.82 },
       ],
+      locationStock: 1,
     });
 
     assert.equal(product.id, "listing-1");
@@ -76,7 +77,33 @@ describe("storefront compound taxonomy contract", () => {
       ["origin_japan", "craft_gilt"],
     );
     assert.deepEqual(product.keywords, ["杯碟", "咖啡"]);
-    assert.equal(product.stock, 2);
+    assert.equal(product.stock, 1);
+  });
+
+  test("uses listing store stock instead of aggregate SKU stock", () => {
+    const product = buildStorefrontProduct({
+      listing: {
+        id: "listing-store-a",
+        sku_id: "sku-shared",
+        location_id: "store-a",
+        title: "门店孤品",
+        description: null,
+        cover_url: null,
+        image_urls: [],
+        price: 100,
+        compare_at_price: null,
+        condition_grade: "A",
+        published_at: null,
+        location: { id: "store-a", name: "上海店", kind: "shop" },
+      },
+      sku: { id: "sku-shared", category: null, keywords: [], stock_qty: 3 },
+      category: null,
+      brand: null,
+      facets: [],
+      locationStock: 1,
+    });
+
+    assert.equal(product.stock, 1);
   });
 
   test("inherits root category brand and facet applicability for leaf filters", () => {

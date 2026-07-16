@@ -63,11 +63,13 @@ export const Route = createFileRoute("/api/public/storefront/products")({
           }
           return String(right.published_at ?? "").localeCompare(String(left.published_at ?? ""));
         });
-        const total = listings.length;
-        const start = (query.page - 1) * query.page_size;
-        const pageListings = listings.slice(start, start + query.page_size);
         try {
-          const products = await enrichStorefrontListings(pageListings);
+          const availableProducts = (await enrichStorefrontListings(listings)).filter(
+            (product) => product.stock > 0,
+          );
+          const total = availableProducts.length;
+          const start = (query.page - 1) * query.page_size;
+          const products = availableProducts.slice(start, start + query.page_size);
           return storefrontJson({
             ok: true,
             data: products,

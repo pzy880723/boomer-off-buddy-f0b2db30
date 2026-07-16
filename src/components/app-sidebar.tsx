@@ -11,6 +11,7 @@ import {
   ShoppingBag,
   PackageCheck,
   ClipboardList,
+  ClipboardCheck,
   Truck,
   Receipt,
   Tags,
@@ -72,6 +73,8 @@ type NavTo =
   | "/youzan"
   | "/youzan/sync"
   | "/orders/shops"
+  | "/orders/online"
+  | "/orders/after-sales"
   | "/orders/dispatch"
   | "/orders/wholesale"
   | "/knowledge"
@@ -123,6 +126,8 @@ const groups: NavGroup[] = [
   {
     label: "订单管理",
     items: [
+      { title: "网店订单", url: "/orders/online", icon: ShoppingBag },
+      { title: "售后订单", url: "/orders/after-sales", icon: ClipboardCheck },
       { title: "门店订单", url: "/orders/shops", icon: Receipt },
       { title: "铺货订单", url: "/orders/dispatch", icon: Truck },
       { title: "批发订单", url: "/orders/wholesale", icon: PackageCheck },

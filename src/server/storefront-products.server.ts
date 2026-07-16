@@ -93,8 +93,9 @@ export function buildStorefrontProduct(input: {
   category: { code: string; name: string; parent_name: string | null } | null;
   brand: StorefrontBrand | null;
   facets: StorefrontFacet[];
+  locationStock: number;
 }) {
-  const { listing, sku, category, brand, facets } = input;
+  const { listing, sku, category, brand, facets, locationStock } = input;
   const categoryCode = category?.code ?? sku.category ?? "uncategorized";
   const categoryName = category?.name ?? "待归类";
   return {
@@ -114,7 +115,7 @@ export function buildStorefrontProduct(input: {
     compare_at_price: listing.compare_at_price == null ? null : Number(listing.compare_at_price),
     image_url: listing.cover_url,
     image_urls: listing.image_urls ?? [],
-    stock: Number(sku.stock_qty) || 0,
+    stock: Math.max(0, Number(locationStock) || 0),
     condition_grade: listing.condition_grade,
     location: listing.location,
     published_at: listing.published_at,
@@ -125,7 +126,10 @@ export async function enrichStorefrontListings(listings: StorefrontListing[]) {
   const skuIds = [...new Set(listings.map((listing) => listing.sku_id).filter(Boolean))];
   if (skuIds.length === 0) return [];
 
-  const [skuResult, facetResult] = await Promise.all([
+  const locationIds = [
+    ...new Set(listings.map((listing) => listing.location_id).filter(Boolean)),
+  ] as string[];
+  const [skuResult, facetResult, stockResult] = await Promise.all([
     supabaseAdmin
       .from("inv_skus")
       .select("id, category, brand_id, keywords, stock_qty")
@@ -134,9 +138,15 @@ export async function enrichStorefrontListings(listings: StorefrontListing[]) {
       .from("inv_sku_facets" as never)
       .select("sku_id, confidence, facet:inv_facets(code, name, dimension)")
       .in("sku_id", skuIds),
+    supabaseAdmin
+      .from("inv_stocks")
+      .select("sku_id, location_id, qty")
+      .in("sku_id", skuIds)
+      .in("location_id", locationIds),
   ]);
   if (skuResult.error) throw new Error(skuResult.error.message);
   if (facetResult.error) throw new Error(facetResult.error.message);
+  if (stockResult.error) throw new Error(stockResult.error.message);
 
   const skus = (skuResult.data ?? []) as unknown as Array<
     StorefrontSku & { brand_id: string | null }
@@ -197,6 +207,11 @@ export async function enrichStorefrontListings(listings: StorefrontListing[]) {
     ((brandResult.data ?? []) as unknown as StorefrontBrand[]).map((row) => [row.id, row]),
   );
   const skuMap = new Map(skus.map((row) => [row.id, row]));
+  const locationStock = new Map(
+    ((stockResult.data ?? []) as Array<{ sku_id: string; location_id: string; qty: number }>).map(
+      (row) => [`${row.sku_id}:${row.location_id}`, Number(row.qty) || 0],
+    ),
+  );
   const facets = new Map<string, StorefrontFacet[]>();
   for (const relation of (facetResult.data ?? []) as unknown as Array<{
     sku_id: string;
@@ -220,6 +235,7 @@ export async function enrichStorefrontListings(listings: StorefrontListing[]) {
         category: sku.category ? (categories.get(sku.category) ?? null) : null,
         brand: sku.brand_id ? (brands.get(sku.brand_id) ?? null) : null,
         facets: facets.get(sku.id) ?? [],
+        locationStock: locationStock.get(`${listing.sku_id}:${listing.location_id}`) ?? 0,
       }),
     ];
   });

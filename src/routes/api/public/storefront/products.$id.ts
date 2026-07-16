@@ -23,7 +23,9 @@ export const Route = createFileRoute("/api/public/storefront/products/$id")({
         if (!data) return storefrontError("Product not found", 404);
         try {
           const products = await enrichStorefrontListings([data as unknown as StorefrontListing]);
-          if (!products[0]) return storefrontError("Product metadata not found", 404);
+          if (!products[0] || products[0].stock < 1) {
+            return storefrontError("Product not available", 404);
+          }
           return storefrontJson({ ok: true, data: products[0] });
         } catch (metadataError) {
           return storefrontError(
