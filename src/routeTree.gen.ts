@@ -13,6 +13,7 @@ import { Route as YouzanRouteImport } from './routes/youzan'
 import { Route as StoreRouteImport } from './routes/store'
 import { Route as ShopMgmtRouteImport } from './routes/shop-mgmt'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ProductFacetsRouteImport } from './routes/product-facets'
 import { Route as ProductCategoriesRouteImport } from './routes/product-categories'
 import { Route as ProductBrandsRouteImport } from './routes/product-brands'
 import { Route as OrdersRouteImport } from './routes/orders'
@@ -42,7 +43,9 @@ import { Route as PurchaseDomesticBulkRouteImport } from './routes/purchase.dome
 import { Route as PurchaseDomesticRouteImport } from './routes/purchase.domestic'
 import { Route as OrdersWholesaleRouteImport } from './routes/orders.wholesale'
 import { Route as OrdersShopsRouteImport } from './routes/orders.shops'
+import { Route as OrdersOnlineRouteImport } from './routes/orders.online'
 import { Route as OrdersDispatchRouteImport } from './routes/orders.dispatch'
+import { Route as OrdersAfterSalesRouteImport } from './routes/orders.after-sales'
 import { Route as MScanRouteImport } from './routes/m.scan'
 import { Route as MPhotoSearchRouteImport } from './routes/m.photo-search'
 import { Route as MParcelsRouteImport } from './routes/m.parcels'
@@ -84,6 +87,7 @@ import { Route as InventoryProductsCodeRouteImport } from './routes/inventory.pr
 import { Route as InventoryInboundNewRouteImport } from './routes/inventory.inbound.new'
 import { Route as InventoryInboundIdRouteImport } from './routes/inventory.inbound.$id'
 import { Route as ApiPublicMerukiIngestRouteImport } from './routes/api/public/meruki-ingest'
+import { Route as ApiPublicStorefrontTaxonomyRouteImport } from './routes/api/public/storefront/taxonomy'
 import { Route as ApiPublicStorefrontProductsRouteImport } from './routes/api/public/storefront/products'
 import { Route as ApiPublicStorefrontOrdersRouteImport } from './routes/api/public/storefront/orders'
 import { Route as ApiPublicHooksYouzanSyncWorkerRouteImport } from './routes/api/public/hooks/youzan-sync-worker'
@@ -187,6 +191,11 @@ const ShopMgmtRoute = ShopMgmtRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProductFacetsRoute = ProductFacetsRouteImport.update({
+  id: '/product-facets',
+  path: '/product-facets',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProductCategoriesRoute = ProductCategoriesRouteImport.update({
@@ -334,9 +343,19 @@ const OrdersShopsRoute = OrdersShopsRouteImport.update({
   path: '/shops',
   getParentRoute: () => OrdersRoute,
 } as any)
+const OrdersOnlineRoute = OrdersOnlineRouteImport.update({
+  id: '/online',
+  path: '/online',
+  getParentRoute: () => OrdersRoute,
+} as any)
 const OrdersDispatchRoute = OrdersDispatchRouteImport.update({
   id: '/dispatch',
   path: '/dispatch',
+  getParentRoute: () => OrdersRoute,
+} as any)
+const OrdersAfterSalesRoute = OrdersAfterSalesRouteImport.update({
+  id: '/after-sales',
+  path: '/after-sales',
   getParentRoute: () => OrdersRoute,
 } as any)
 const MScanRoute = MScanRouteImport.update({
@@ -550,6 +569,12 @@ const ApiPublicMerukiIngestRoute = ApiPublicMerukiIngestRouteImport.update({
   path: '/api/public/meruki-ingest',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicStorefrontTaxonomyRoute =
+  ApiPublicStorefrontTaxonomyRouteImport.update({
+    id: '/api/public/storefront/taxonomy',
+    path: '/api/public/storefront/taxonomy',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicStorefrontProductsRoute =
   ApiPublicStorefrontProductsRouteImport.update({
     id: '/api/public/storefront/products',
@@ -1062,6 +1087,7 @@ export interface FileRoutesByFullPath {
   '/orders': typeof OrdersRouteWithChildren
   '/product-brands': typeof ProductBrandsRoute
   '/product-categories': typeof ProductCategoriesRoute
+  '/product-facets': typeof ProductFacetsRoute
   '/settings': typeof SettingsRoute
   '/shop-mgmt': typeof ShopMgmtRouteWithChildren
   '/store': typeof StoreRouteWithChildren
@@ -1082,7 +1108,9 @@ export interface FileRoutesByFullPath {
   '/m/parcels': typeof MParcelsRoute
   '/m/photo-search': typeof MPhotoSearchRoute
   '/m/scan': typeof MScanRoute
+  '/orders/after-sales': typeof OrdersAfterSalesRoute
   '/orders/dispatch': typeof OrdersDispatchRoute
+  '/orders/online': typeof OrdersOnlineRoute
   '/orders/shops': typeof OrdersShopsRoute
   '/orders/wholesale': typeof OrdersWholesaleRoute
   '/purchase/domestic': typeof PurchaseDomesticRouteWithChildren
@@ -1155,6 +1183,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
   '/api/public/storefront/orders': typeof ApiPublicStorefrontOrdersRouteWithChildren
   '/api/public/storefront/products': typeof ApiPublicStorefrontProductsRouteWithChildren
+  '/api/public/storefront/taxonomy': typeof ApiPublicStorefrontTaxonomyRoute
   '/api/public/auth/otp/send': typeof ApiPublicAuthOtpSendRoute
   '/api/public/auth/otp/verify': typeof ApiPublicAuthOtpVerifyRoute
   '/api/public/handheld/ai/prepare-listing-image': typeof ApiPublicHandheldAiPrepareListingImageRoute
@@ -1222,6 +1251,7 @@ export interface FileRoutesByTo {
   '/orders': typeof OrdersRouteWithChildren
   '/product-brands': typeof ProductBrandsRoute
   '/product-categories': typeof ProductCategoriesRoute
+  '/product-facets': typeof ProductFacetsRoute
   '/settings': typeof SettingsRoute
   '/shop-mgmt': typeof ShopMgmtRouteWithChildren
   '/youzan': typeof YouzanRouteWithChildren
@@ -1239,7 +1269,9 @@ export interface FileRoutesByTo {
   '/m/parcels': typeof MParcelsRoute
   '/m/photo-search': typeof MPhotoSearchRoute
   '/m/scan': typeof MScanRoute
+  '/orders/after-sales': typeof OrdersAfterSalesRoute
   '/orders/dispatch': typeof OrdersDispatchRoute
+  '/orders/online': typeof OrdersOnlineRoute
   '/orders/shops': typeof OrdersShopsRoute
   '/orders/wholesale': typeof OrdersWholesaleRoute
   '/purchase/japan-bulk': typeof PurchaseJapanBulkRoute
@@ -1309,6 +1341,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
   '/api/public/storefront/orders': typeof ApiPublicStorefrontOrdersRouteWithChildren
   '/api/public/storefront/products': typeof ApiPublicStorefrontProductsRouteWithChildren
+  '/api/public/storefront/taxonomy': typeof ApiPublicStorefrontTaxonomyRoute
   '/api/public/auth/otp/send': typeof ApiPublicAuthOtpSendRoute
   '/api/public/auth/otp/verify': typeof ApiPublicAuthOtpVerifyRoute
   '/api/public/handheld/ai/prepare-listing-image': typeof ApiPublicHandheldAiPrepareListingImageRoute
@@ -1378,6 +1411,7 @@ export interface FileRoutesById {
   '/orders': typeof OrdersRouteWithChildren
   '/product-brands': typeof ProductBrandsRoute
   '/product-categories': typeof ProductCategoriesRoute
+  '/product-facets': typeof ProductFacetsRoute
   '/settings': typeof SettingsRoute
   '/shop-mgmt': typeof ShopMgmtRouteWithChildren
   '/store': typeof StoreRouteWithChildren
@@ -1398,7 +1432,9 @@ export interface FileRoutesById {
   '/m/parcels': typeof MParcelsRoute
   '/m/photo-search': typeof MPhotoSearchRoute
   '/m/scan': typeof MScanRoute
+  '/orders/after-sales': typeof OrdersAfterSalesRoute
   '/orders/dispatch': typeof OrdersDispatchRoute
+  '/orders/online': typeof OrdersOnlineRoute
   '/orders/shops': typeof OrdersShopsRoute
   '/orders/wholesale': typeof OrdersWholesaleRoute
   '/purchase/domestic': typeof PurchaseDomesticRouteWithChildren
@@ -1471,6 +1507,7 @@ export interface FileRoutesById {
   '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
   '/api/public/storefront/orders': typeof ApiPublicStorefrontOrdersRouteWithChildren
   '/api/public/storefront/products': typeof ApiPublicStorefrontProductsRouteWithChildren
+  '/api/public/storefront/taxonomy': typeof ApiPublicStorefrontTaxonomyRoute
   '/api/public/auth/otp/send': typeof ApiPublicAuthOtpSendRoute
   '/api/public/auth/otp/verify': typeof ApiPublicAuthOtpVerifyRoute
   '/api/public/handheld/ai/prepare-listing-image': typeof ApiPublicHandheldAiPrepareListingImageRoute
@@ -1541,6 +1578,7 @@ export interface FileRouteTypes {
     | '/orders'
     | '/product-brands'
     | '/product-categories'
+    | '/product-facets'
     | '/settings'
     | '/shop-mgmt'
     | '/store'
@@ -1561,7 +1599,9 @@ export interface FileRouteTypes {
     | '/m/parcels'
     | '/m/photo-search'
     | '/m/scan'
+    | '/orders/after-sales'
     | '/orders/dispatch'
+    | '/orders/online'
     | '/orders/shops'
     | '/orders/wholesale'
     | '/purchase/domestic'
@@ -1634,6 +1674,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-sync-worker'
     | '/api/public/storefront/orders'
     | '/api/public/storefront/products'
+    | '/api/public/storefront/taxonomy'
     | '/api/public/auth/otp/send'
     | '/api/public/auth/otp/verify'
     | '/api/public/handheld/ai/prepare-listing-image'
@@ -1701,6 +1742,7 @@ export interface FileRouteTypes {
     | '/orders'
     | '/product-brands'
     | '/product-categories'
+    | '/product-facets'
     | '/settings'
     | '/shop-mgmt'
     | '/youzan'
@@ -1718,7 +1760,9 @@ export interface FileRouteTypes {
     | '/m/parcels'
     | '/m/photo-search'
     | '/m/scan'
+    | '/orders/after-sales'
     | '/orders/dispatch'
+    | '/orders/online'
     | '/orders/shops'
     | '/orders/wholesale'
     | '/purchase/japan-bulk'
@@ -1788,6 +1832,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-sync-worker'
     | '/api/public/storefront/orders'
     | '/api/public/storefront/products'
+    | '/api/public/storefront/taxonomy'
     | '/api/public/auth/otp/send'
     | '/api/public/auth/otp/verify'
     | '/api/public/handheld/ai/prepare-listing-image'
@@ -1856,6 +1901,7 @@ export interface FileRouteTypes {
     | '/orders'
     | '/product-brands'
     | '/product-categories'
+    | '/product-facets'
     | '/settings'
     | '/shop-mgmt'
     | '/store'
@@ -1876,7 +1922,9 @@ export interface FileRouteTypes {
     | '/m/parcels'
     | '/m/photo-search'
     | '/m/scan'
+    | '/orders/after-sales'
     | '/orders/dispatch'
+    | '/orders/online'
     | '/orders/shops'
     | '/orders/wholesale'
     | '/purchase/domestic'
@@ -1949,6 +1997,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-sync-worker'
     | '/api/public/storefront/orders'
     | '/api/public/storefront/products'
+    | '/api/public/storefront/taxonomy'
     | '/api/public/auth/otp/send'
     | '/api/public/auth/otp/verify'
     | '/api/public/handheld/ai/prepare-listing-image'
@@ -2018,6 +2067,7 @@ export interface RootRouteChildren {
   OrdersRoute: typeof OrdersRouteWithChildren
   ProductBrandsRoute: typeof ProductBrandsRoute
   ProductCategoriesRoute: typeof ProductCategoriesRoute
+  ProductFacetsRoute: typeof ProductFacetsRoute
   SettingsRoute: typeof SettingsRoute
   ShopMgmtRoute: typeof ShopMgmtRouteWithChildren
   StoreRoute: typeof StoreRouteWithChildren
@@ -2072,6 +2122,7 @@ export interface RootRouteChildren {
   ApiPublicHooksYouzanSyncWorkerRoute: typeof ApiPublicHooksYouzanSyncWorkerRoute
   ApiPublicStorefrontOrdersRoute: typeof ApiPublicStorefrontOrdersRouteWithChildren
   ApiPublicStorefrontProductsRoute: typeof ApiPublicStorefrontProductsRouteWithChildren
+  ApiPublicStorefrontTaxonomyRoute: typeof ApiPublicStorefrontTaxonomyRoute
   ApiPublicAuthOtpSendRoute: typeof ApiPublicAuthOtpSendRoute
   ApiPublicAuthOtpVerifyRoute: typeof ApiPublicAuthOtpVerifyRoute
   ApiPublicHandheldAiPrepareListingImageRoute: typeof ApiPublicHandheldAiPrepareListingImageRoute
@@ -2134,6 +2185,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/product-facets': {
+      id: '/product-facets'
+      path: '/product-facets'
+      fullPath: '/product-facets'
+      preLoaderRoute: typeof ProductFacetsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/product-categories': {
@@ -2339,11 +2397,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrdersShopsRouteImport
       parentRoute: typeof OrdersRoute
     }
+    '/orders/online': {
+      id: '/orders/online'
+      path: '/online'
+      fullPath: '/orders/online'
+      preLoaderRoute: typeof OrdersOnlineRouteImport
+      parentRoute: typeof OrdersRoute
+    }
     '/orders/dispatch': {
       id: '/orders/dispatch'
       path: '/dispatch'
       fullPath: '/orders/dispatch'
       preLoaderRoute: typeof OrdersDispatchRouteImport
+      parentRoute: typeof OrdersRoute
+    }
+    '/orders/after-sales': {
+      id: '/orders/after-sales'
+      path: '/after-sales'
+      fullPath: '/orders/after-sales'
+      preLoaderRoute: typeof OrdersAfterSalesRouteImport
       parentRoute: typeof OrdersRoute
     }
     '/m/scan': {
@@ -2631,6 +2703,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/meruki-ingest'
       fullPath: '/api/public/meruki-ingest'
       preLoaderRoute: typeof ApiPublicMerukiIngestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/storefront/taxonomy': {
+      id: '/api/public/storefront/taxonomy'
+      path: '/api/public/storefront/taxonomy'
+      fullPath: '/api/public/storefront/taxonomy'
+      preLoaderRoute: typeof ApiPublicStorefrontTaxonomyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/storefront/products': {
@@ -3253,13 +3332,17 @@ const MRouteChildren: MRouteChildren = {
 const MRouteWithChildren = MRoute._addFileChildren(MRouteChildren)
 
 interface OrdersRouteChildren {
+  OrdersAfterSalesRoute: typeof OrdersAfterSalesRoute
   OrdersDispatchRoute: typeof OrdersDispatchRoute
+  OrdersOnlineRoute: typeof OrdersOnlineRoute
   OrdersShopsRoute: typeof OrdersShopsRoute
   OrdersWholesaleRoute: typeof OrdersWholesaleRoute
 }
 
 const OrdersRouteChildren: OrdersRouteChildren = {
+  OrdersAfterSalesRoute: OrdersAfterSalesRoute,
   OrdersDispatchRoute: OrdersDispatchRoute,
+  OrdersOnlineRoute: OrdersOnlineRoute,
   OrdersShopsRoute: OrdersShopsRoute,
   OrdersWholesaleRoute: OrdersWholesaleRoute,
 }
@@ -3648,6 +3731,7 @@ const rootRouteChildren: RootRouteChildren = {
   OrdersRoute: OrdersRouteWithChildren,
   ProductBrandsRoute: ProductBrandsRoute,
   ProductCategoriesRoute: ProductCategoriesRoute,
+  ProductFacetsRoute: ProductFacetsRoute,
   SettingsRoute: SettingsRoute,
   ShopMgmtRoute: ShopMgmtRouteWithChildren,
   StoreRoute: StoreRouteWithChildren,
@@ -3709,6 +3793,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicStorefrontOrdersRoute: ApiPublicStorefrontOrdersRouteWithChildren,
   ApiPublicStorefrontProductsRoute:
     ApiPublicStorefrontProductsRouteWithChildren,
+  ApiPublicStorefrontTaxonomyRoute: ApiPublicStorefrontTaxonomyRoute,
   ApiPublicAuthOtpSendRoute: ApiPublicAuthOtpSendRoute,
   ApiPublicAuthOtpVerifyRoute: ApiPublicAuthOtpVerifyRoute,
   ApiPublicHandheldAiPrepareListingImageRoute:
@@ -3755,3 +3840,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

@@ -134,6 +134,9 @@ const breadcrumbMap: Record<string, string> = {
   youzan: "有赞对接",
   knowledge: "知识库",
   settings: "系统设置",
+  "product-categories": "商品分类",
+  "product-brands": "品牌库",
+  "product-facets": "商品标签",
   admin: "管理",
   users: "用户",
   orders: "订单",
@@ -354,4 +357,3 @@ function UserMenu() {
     </DropdownMenu>
   );
 }
-

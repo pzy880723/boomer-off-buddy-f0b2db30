@@ -9,6 +9,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { useCategories } from "@/hooks/use-categories";
+import type { ProductRecognitionAttributes } from "@/lib/product-classification";
 import { SkuImagePicker } from "./sku-image-picker";
 
 export type SkuGrade = "N" | "S" | "A" | "B" | "C" | "J";
@@ -30,6 +31,27 @@ export type SkuMetaState = {
   imageUrl: string;
   notes: string;
   grade: string;
+  attributes: ProductRecognitionAttributes;
+  recognitionRequestId: string;
+  categoryConfidence: number | null;
+  classificationStatus: "" | "auto_classified" | "fallback" | "corrected";
+  aiSuggestedPrice: number | null;
+  evidence: string[];
+};
+
+const emptyAttributes: ProductRecognitionAttributes = {
+  brand: null,
+  maker: null,
+  origin_region: null,
+  origin_country: null,
+  era: null,
+  material: [],
+  craft: [],
+  object_type: null,
+  colors: [],
+  dimensions: null,
+  functional_status: null,
+  missing_parts: [],
 };
 
 export const emptySkuMeta: SkuMetaState = {
@@ -40,6 +62,12 @@ export const emptySkuMeta: SkuMetaState = {
   imageUrl: "",
   notes: "",
   grade: "",
+  attributes: emptyAttributes,
+  recognitionRequestId: "",
+  categoryConfidence: null,
+  classificationStatus: "",
+  aiSuggestedPrice: null,
+  evidence: [],
 };
 
 export function SkuMetaFields({
@@ -60,7 +88,7 @@ export function SkuMetaFields({
   hideGrade?: boolean;
   hideWeight?: boolean;
 }) {
-  const { active: categories, labelOf } = useCategories();
+  const { active: categories, labelOf, displayLabelOf } = useCategories();
   const patch = (p: Partial<SkuMetaState>) => onChange({ ...state, ...p });
   return (
     <div className="grid gap-3">
@@ -74,11 +102,40 @@ export function SkuMetaFields({
             <SelectContent>
               {categories.map((c) => (
                 <SelectItem key={c.code} value={c.code}>
-                  {c.name}
+                  {displayLabelOf(c.code)}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+        </div>
+      )}
+
+      {state.recognitionRequestId && (
+        <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs">
+          <div className="flex items-center justify-between gap-3">
+            <span className="font-medium text-primary">
+              {state.classificationStatus === "auto_classified"
+                ? "AI 已自动分类"
+                : "AI 建议人工复核"}
+            </span>
+            {state.categoryConfidence != null && (
+              <span className="text-muted-foreground">
+                置信度 {Math.round(state.categoryConfidence * 100)}%
+              </span>
+            )}
+          </div>
+          {[state.attributes.origin_country, state.attributes.era]
+            .filter(Boolean)
+            .concat(state.attributes.material)
+            .slice(0, 4).length > 0 && (
+            <p className="mt-1 text-muted-foreground">
+              {[state.attributes.origin_country, state.attributes.era]
+                .filter((value): value is string => !!value)
+                .concat(state.attributes.material)
+                .slice(0, 4)
+                .join(" · ")}
+            </p>
+          )}
         </div>
       )}
 
@@ -130,7 +187,6 @@ export function SkuMetaFields({
           </Select>
         </div>
       )}
-
 
       <div className="space-y-1.5">
         <Label>商品图片</Label>

@@ -11,6 +11,7 @@ import {
   ShoppingBag,
   PackageCheck,
   ClipboardList,
+  ClipboardCheck,
   Truck,
   Receipt,
   Tags,
@@ -68,9 +69,12 @@ type NavTo =
   | "/shop-mgmt/franchisees"
   | "/product-categories"
   | "/product-brands"
+  | "/product-facets"
   | "/youzan"
   | "/youzan/sync"
   | "/orders/shops"
+  | "/orders/online"
+  | "/orders/after-sales"
   | "/orders/dispatch"
   | "/orders/wholesale"
   | "/knowledge"
@@ -94,6 +98,7 @@ const groups: NavGroup[] = [
       { title: "网店商品", url: "/shop-mgmt/online", icon: Globe },
       { title: "商品分类", url: "/product-categories", icon: FolderTree },
       { title: "品牌 / 窑口 / IP", url: "/product-brands", icon: Tag },
+      { title: "商品标签", url: "/product-facets", icon: Tags },
     ],
     icon: Package,
   },
@@ -121,6 +126,8 @@ const groups: NavGroup[] = [
   {
     label: "订单管理",
     items: [
+      { title: "网店订单", url: "/orders/online", icon: ShoppingBag },
+      { title: "售后订单", url: "/orders/after-sales", icon: ClipboardCheck },
       { title: "门店订单", url: "/orders/shops", icon: Receipt },
       { title: "铺货订单", url: "/orders/dispatch", icon: Truck },
       { title: "批发订单", url: "/orders/wholesale", icon: PackageCheck },

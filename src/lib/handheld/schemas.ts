@@ -82,9 +82,7 @@ export const ClientOpId = z
 /** v1.2：设备能力上报，APP 启动后用于自适应 UI。 */
 export const DeviceCapabilities = z
   .object({
-    reader_model: z
-      .enum(["SUNMI_V3", "RFID_PDA", "UNKNOWN"])
-      .default("UNKNOWN"),
+    reader_model: z.enum(["SUNMI_V3", "RFID_PDA", "UNKNOWN"]).default("UNKNOWN"),
     has_printer: z.boolean().default(false),
     has_rfid_reader: z.boolean().default(false),
     has_barcode_scanner: z.boolean().default(false),
@@ -394,9 +392,7 @@ export const StocktakeSummarySchema = z
     code: z.string().meta({ example: "ST-20260627-AB12" }),
     status: z.enum(["scanning", "submitted", "reviewed", "applied", "cancelled"]),
     opened_at: z.string().datetime(),
-    reused: z
-      .boolean()
-      .meta({ description: "true=复用了同库位的已开盘点单；false=新建" }),
+    reused: z.boolean().meta({ description: "true=复用了同库位的已开盘点单；false=新建" }),
     participants: z
       .array(StocktakeParticipant)
       .default([])
@@ -507,7 +503,9 @@ export const SessionUserSchema = z
 
 export const LoginRes = okEnvelope(
   z.object({
-    access_token: z.string().meta({ description: "Supabase access token；后续接口请放到 X-Session-Token Header" }),
+    access_token: z
+      .string()
+      .meta({ description: "Supabase access token；后续接口请放到 X-Session-Token Header" }),
     refresh_token: z.string(),
     expires_at: z.number().int().meta({ description: "unix 秒" }),
     user: SessionUserSchema,
@@ -532,18 +530,31 @@ export const LocationSwitchRes = okEnvelope(
 // 7. AI 识别 / 出图（v1.1 新增）
 // ============================================================
 
-const INV_CATEGORY = z.enum([
-  "jp_porcelain",
-  "eu_porcelain",
-  "vintage_toy",
-  "anime_goods",
-  "media",
-  "digital",
-  "jewelry",
-  "fashion",
-  "daily",
-  "antique",
-]);
+export const ProductCategoryCode = z
+  .string()
+  .trim()
+  .min(1)
+  .max(64)
+  .meta({ description: "ERP 当前启用的二级商品分类 code" });
+
+export const ProductRecognitionAttributesSchema = z
+  .object({
+    brand: z.string().nullable(),
+    maker: z.string().nullable(),
+    origin_region: z.string().nullable(),
+    origin_country: z.string().nullable(),
+    era: z.string().nullable(),
+    material: z.array(z.string()),
+    craft: z.array(z.string()),
+    object_type: z.string().nullable(),
+    colors: z.array(z.string()),
+    dimensions: z
+      .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
+      .nullable(),
+    functional_status: z.string().nullable(),
+    missing_parts: z.array(z.string()),
+  })
+  .meta({ id: "ProductRecognitionAttributes" });
 
 export const AiRecognizeImage = z
   .object({
@@ -572,12 +583,9 @@ export const AiRecognizeReq = z
       .max(6)
       .optional()
       .meta({ description: "外链/signed URL 数组，最多 6 张" }),
-    image_storage_paths: z
-      .array(AiRecognizeStoragePath)
-      .min(1)
-      .max(6)
-      .optional()
-      .meta({ description: "APP 上传后的持久 storage 路径数组，最多 6 张，服务端自动签 signed URL" }),
+    image_storage_paths: z.array(AiRecognizeStoragePath).min(1).max(6).optional().meta({
+      description: "APP 上传后的持久 storage 路径数组，最多 6 张，服务端自动签 signed URL",
+    }),
     primary_index: z
       .number()
       .int()
@@ -600,12 +608,20 @@ export const AiRecognizeReq = z
 
 export const AiRecognizeRes = okEnvelope(
   z.object({
+    request_id: uuidSchema,
     name: z.string(),
-    category: INV_CATEGORY.nullable(),
+    category_code: ProductCategoryCode,
+    predicted_category_code: z.string().nullable(),
+    status: z.enum(["auto_classified", "fallback"]),
+    category: ProductCategoryCode.nullable().meta({
+      description: "兼容旧 APP；等同 category_code",
+    }),
     brand: z.string().nullable(),
     era: z.string().nullable().meta({ description: "年代，如 1970s" }),
+    attributes: ProductRecognitionAttributesSchema,
     condition_grade: z.enum(["N", "S", "A", "B", "C", "J"]).nullable(),
     description: z.string().nullable(),
+    keywords: z.array(z.string()),
     suggested_price_cny: z.number().nullable(),
     confidence: z
       .number()
@@ -622,12 +638,24 @@ export const AiRecognizeRes = okEnvelope(
       .array(
         z.object({
           name: z.string(),
-          category: INV_CATEGORY.nullable().optional(),
+          category: ProductCategoryCode.nullable().optional(),
           confidence: z.number().min(0).max(1).nullable().optional(),
         }),
       )
       .optional()
       .meta({ description: "备选识别结果，最多 3 条" }),
+    alternative_categories: z.array(
+      z.object({
+        category_code: ProductCategoryCode,
+        confidence: z.number().min(0).max(1).nullable(),
+        reason: z.string().nullable(),
+      }),
+    ),
+    compliance_flags: z.array(z.string()),
+    evidence: z.array(z.string()),
+    model: z.string(),
+    prompt_version: z.string(),
+    taxonomy_version: z.string(),
     raw: z.unknown().optional(),
   }),
 );
@@ -636,7 +664,10 @@ export const AiListingImageReq = z
   .object({
     image_url: z.string().url().optional(),
     image_base64: z.string().optional(),
-    instruction: z.string().optional().meta({ description: "可选额外指令；默认只做角度/裁切/底色/光线" }),
+    instruction: z
+      .string()
+      .optional()
+      .meta({ description: "可选额外指令；默认只做角度/裁切/底色/光线" }),
   })
   .refine((v) => v.image_url || v.image_base64, { message: "image_url 或 image_base64 必传其一" })
   .meta({ id: "AiListingImageReq" });
@@ -658,28 +689,23 @@ export const UploadImageReq = z
     bucket: z.enum(["sku-raw", "sku-listing"]).default("sku-raw"),
     filename: z.string().min(1).meta({ description: "原始文件名，仅用于扩展名识别" }),
     content_type: z.string().min(1).meta({ example: "image/jpeg" }),
-    mode: z
-      .enum(["signed", "multipart"])
-      .default("signed")
-      .meta({
-        description:
-          "signed=返回 signed PUT URL，APP 直传 Storage（推荐）；multipart=同时返回一个 ERP 中转 POST 端点，APP 走 multipart/form-data 上传（兼容受限网络）。",
-      }),
+    mode: z.enum(["signed", "multipart"]).default("signed").meta({
+      description:
+        "signed=返回 signed PUT URL，APP 直传 Storage（推荐）；multipart=同时返回一个 ERP 中转 POST 端点，APP 走 multipart/form-data 上传（兼容受限网络）。",
+    }),
   })
   .meta({ id: "UploadImageReq" });
 
 export const UploadImageRes = okEnvelope(
   z.object({
     storage_path: z.string(),
-    upload_url: z.string().url().meta({ description: "30 分钟有效；signed 模式为 Storage PUT URL，multipart 模式为 ERP 中转 POST URL" }),
-    read_url: z
-      .string()
-      .url()
-      .nullable()
-      .meta({
-        description:
-          "上传前对象还不存在，无法签发 read URL；总是返回 null。上传完成后调 POST /items/sign-read-url 拿 7 天 signed GET URL。",
-      }),
+    upload_url: z.string().url().meta({
+      description: "30 分钟有效；signed 模式为 Storage PUT URL，multipart 模式为 ERP 中转 POST URL",
+    }),
+    read_url: z.string().url().nullable().meta({
+      description:
+        "上传前对象还不存在，无法签发 read URL；总是返回 null。上传完成后调 POST /items/sign-read-url 拿 7 天 signed GET URL。",
+    }),
     method: z.enum(["PUT", "POST"]),
     mode: z.enum(["signed", "multipart"]),
     headers: z.record(z.string(), z.string()).meta({ description: "上传时必须带这些 header" }),
@@ -690,7 +716,12 @@ export const SignReadUrlReq = z
   .object({
     bucket: z.enum(["sku-raw", "sku-listing"]),
     storage_path: z.string().min(1),
-    expires_in: z.number().int().min(60).max(60 * 60 * 24 * 30).default(60 * 60 * 24 * 7),
+    expires_in: z
+      .number()
+      .int()
+      .min(60)
+      .max(60 * 60 * 24 * 30)
+      .default(60 * 60 * 24 * 7),
   })
   .meta({ id: "SignReadUrlReq" });
 
@@ -747,7 +778,7 @@ export const SmartCreateReq = z
   .object({
     location_id: uuidSchema.optional().meta({ description: "默认用当前设备库位" }),
     name: z.string().min(1).max(120),
-    category: INV_CATEGORY,
+    category: ProductCategoryCode,
     price_tier: z.number().positive().max(9999.9),
     is_custom_price: z.boolean().default(false),
     grade: z.enum(["N", "S", "A", "B", "C", "J"]).nullable().optional(),
@@ -772,8 +803,19 @@ export const SmartCreateReq = z
           "APP 通过 /items/upload-image 上传得到的 storage_path 列表。第 0 张是主图。永久保存到 inv_skus.image_paths，ERP 端按需签 URL。",
       }),
     weight_g: z.number().nullable().optional(),
+    recognition_request_id: uuidSchema.nullable().optional(),
+    attributes: z.record(z.string(), z.unknown()).default({}),
+    category_confidence: z.number().min(0).max(1).nullable().optional(),
+    classification_status: z
+      .enum(["auto_classified", "fallback", "corrected"])
+      .nullable()
+      .optional(),
+    ai_suggested_price: z.number().nonnegative().nullable().optional(),
     epcs: z.array(epcSchema).max(50).optional().meta({ description: "已打好标签则一并绑定" }),
-    auto_push_youzan: z.boolean().default(false).meta({ description: "默认 false，APP 给开关；true 时入库存同步队列" }),
+    auto_push_youzan: z
+      .boolean()
+      .default(false)
+      .meta({ description: "默认 false，APP 给开关；true 时入库存同步队列" }),
     client_op_id: ClientOpId.optional(),
   })
   .meta({ id: "SmartCreateReq" });
@@ -810,7 +852,14 @@ export const SmartCreateRes = okEnvelope(
       qrcode_payload: z.string(),
     }),
     print_payload: PrintPayloadSchema.meta({ description: "v1.2：扁平结构，直接灌打印模板" }),
-    youzan_sync_status: z.enum(["disabled", "queued", "linked", "unlinked", "hq_created", "hq_failed"]),
+    youzan_sync_status: z.enum([
+      "disabled",
+      "queued",
+      "linked",
+      "unlinked",
+      "hq_created",
+      "hq_failed",
+    ]),
   }),
 );
 
@@ -855,7 +904,12 @@ export const RfidBindReq = z
   .meta({ id: "RfidBindReq" });
 
 export const RfidBindRes = okEnvelope(
-  z.object({ epc: epcSchema, sku_id: uuidSchema, location_id: uuidSchema, stock_after: z.number().int() }),
+  z.object({
+    epc: epcSchema,
+    sku_id: uuidSchema,
+    location_id: uuidSchema,
+    stock_after: z.number().int(),
+  }),
 );
 
 export const RfidTransferReq = z
@@ -930,21 +984,30 @@ export const SkuDetailRes = okEnvelope(
     is_custom_price: z.boolean(),
     condition_grade: z.enum(["N", "S", "A", "B", "C", "J"]).nullable(),
     grade: z.string().nullable().meta({ description: "兼容旧字段，等同 condition_grade" }),
-    image_url: z.string().nullable().meta({ description: "主图 read URL（兼容旧 APP）；优先用 images" }),
+    image_url: z
+      .string()
+      .nullable()
+      .meta({ description: "主图 read URL（兼容旧 APP）；优先用 images" }),
     image_paths: z.array(z.string()).meta({
-      description: "持久化的图片来源列表：可能是 'sku-listing/2026-06-29/xxx.jpg' 形式的私桶路径或 https:// 外链",
+      description:
+        "持久化的图片来源列表：可能是 'sku-listing/2026-06-29/xxx.jpg' 形式的私桶路径或 https:// 外链",
     }),
     images: z
       .array(
         z.object({
           storage_path: z.string().meta({ description: "对应 image_paths 里的原值" }),
-          read_url: z.string().meta({ description: "可直接渲染的 URL；私桶为 24h signed，外链原样" }),
+          read_url: z
+            .string()
+            .meta({ description: "可直接渲染的 URL；私桶为 24h signed，外链原样" }),
         }),
       )
       .meta({ description: "image_paths 顺序签名后的结果；第 0 张是主图" }),
     notes: z.string().nullable(),
     weight_g: z.number().nullable(),
-    stock_qty: z.number().int().meta({ description: "warehouse 仓库累计（inv_skus.stock_qty），兼容旧 APP" }),
+    stock_qty: z
+      .number()
+      .int()
+      .meta({ description: "warehouse 仓库累计（inv_skus.stock_qty），兼容旧 APP" }),
     total_stock_qty: z.number().int().meta({ description: "所有 location 累加库存" }),
     status: z.string(),
     is_display: z.boolean(),
@@ -1007,7 +1070,11 @@ export const NotificationKind = z.enum([
 
 export const NotificationsSinceQuery = z
   .object({
-    ts: z.string().datetime().optional().meta({ description: "上次拉取的 server_ts；空=最近 50 条" }),
+    ts: z
+      .string()
+      .datetime()
+      .optional()
+      .meta({ description: "上次拉取的 server_ts；空=最近 50 条" }),
     limit: z.coerce.number().int().min(1).max(200).default(50),
   })
   .meta({ id: "NotificationsSinceQuery" });
@@ -1070,7 +1137,9 @@ export const BootstrapRes = okEnvelope(
     }),
     device: DeviceContextSchema,
     access_token: z.string(),
-    session_token: z.string().meta({ description: "等同 access_token；供 APP 统一写入 X-Session-Token" }),
+    session_token: z
+      .string()
+      .meta({ description: "等同 access_token；供 APP 统一写入 X-Session-Token" }),
     refresh_token: z.string(),
     expires_at: z.number().int(),
     user: SessionUserSchema,
@@ -1084,7 +1153,10 @@ export const BootstrapRes = okEnvelope(
 
 export const OtpSendReq = z
   .object({
-    phone: z.string().regex(/^1[3-9]\d{9}$/).meta({ description: "11 位中国大陆手机号" }),
+    phone: z
+      .string()
+      .regex(/^1[3-9]\d{9}$/)
+      .meta({ description: "11 位中国大陆手机号" }),
     purpose: z.enum(["login"]).default("login"),
   })
   .meta({ id: "OtpSendReq" });
@@ -1169,15 +1241,7 @@ export const LabelTemplateRes = okEnvelope(LabelTemplateItem);
 
 export const LabelTemplateDeleteRes = okEnvelope(z.object({ deleted: z.boolean() }));
 
-export const LabelTemplateSetDefaultRes = okEnvelope(
-  z.object({ default_template_id: uuidSchema }),
-);
-
-
-
-
-
-
+export const LabelTemplateSetDefaultRes = okEnvelope(z.object({ default_template_id: uuidSchema }));
 
 // ============================================================
 // 日本小包（v1.6，仅 super_admin 可用；只读）
@@ -1204,7 +1268,12 @@ export const ParcelListQuery = z
   .object({
     bucket: ParcelBucketQuery.default("pending"),
     mode: ParcelModeQuery.default("item"),
-    q: z.string().trim().max(200).optional().meta({ description: "关键词（品名 / 子单号 / 追踪号 / 系统编码）" }),
+    q: z
+      .string()
+      .trim()
+      .max(200)
+      .optional()
+      .meta({ description: "关键词（品名 / 子单号 / 追踪号 / 系统编码）" }),
     limit: z.coerce.number().int().min(1).max(50).default(30),
     offset: z.coerce.number().int().min(0).default(0),
   })
@@ -1286,7 +1355,9 @@ export const ParcelListItem = z
 export const ParcelListRes = okEnvelope(
   z.object({
     mode: ParcelModeQuery,
-    items: z.array(ParcelItemListItem).meta({ description: "mode=item 时有值；mode=parcel 时为空数组" }),
+    items: z
+      .array(ParcelItemListItem)
+      .meta({ description: "mode=item 时有值；mode=parcel 时为空数组" }),
     rows: z.array(ParcelListItem).meta({ description: "mode=parcel 时有值；mode=item 时为空数组" }),
     has_more: z.boolean(),
     next_offset: z.number().int(),
@@ -1295,7 +1366,10 @@ export const ParcelListRes = okEnvelope(
 
 export const ParcelCountsRes = okEnvelope(
   z.object({
-    pending: z.number().int().meta({ description: "待收货包裹数（purchased/at_jp_warehouse/shipping_intl）" }),
+    pending: z
+      .number()
+      .int()
+      .meta({ description: "待收货包裹数（purchased/at_jp_warehouse/shipping_intl）" }),
     received: z.number().int().meta({ description: "已签收包裹数（delivered/completed）" }),
   }),
 );
@@ -1330,7 +1404,11 @@ const ParcelDetailItem = z
     arrival_photo_urls: z.array(z.string()).default([]),
     created_by: z.string().nullable(),
     created_at: z.string().nullable(),
-    pack_pieces: z.number().int().nullable().meta({ description: ">0 表示组包，APP 才显示「单件价」" }),
+    pack_pieces: z
+      .number()
+      .int()
+      .nullable()
+      .meta({ description: ">0 表示组包，APP 才显示「单件价」" }),
     pack_pieces_source: z.string().nullable(),
     pack_unit_note: z.string().nullable(),
     landed: z
@@ -1341,9 +1419,18 @@ const ParcelDetailItem = z
         freight_share_cny: z.number().nullable(),
         tariff_cny: z.number().nullable(),
         landed_cny: z.number().nullable().meta({ description: "到岸总额（拆包前）" }),
-        unit_price_cny: z.number().nullable().meta({ description: "到岸单价 = landed_cny / quantity" }),
-        piece_price_jpy: z.number().nullable().meta({ description: "组包每小件 JPY；非组包为 null" }),
-        piece_price_cny: z.number().nullable().meta({ description: "组包每小件 CNY；非组包为 null" }),
+        unit_price_cny: z
+          .number()
+          .nullable()
+          .meta({ description: "到岸单价 = landed_cny / quantity" }),
+        piece_price_jpy: z
+          .number()
+          .nullable()
+          .meta({ description: "组包每小件 JPY；非组包为 null" }),
+        piece_price_cny: z
+          .number()
+          .nullable()
+          .meta({ description: "组包每小件 CNY；非组包为 null" }),
       })
       .meta({ description: "服务端已算好的拆包成本；APP 直接展示" }),
   })

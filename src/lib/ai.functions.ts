@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { generateText, Output } from "ai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const ParcelExtractSchema = z.object({
   source_order_no: z.string().nullable().optional(),
@@ -162,9 +163,8 @@ export const recognizeParcelBlock = createServerFn({ method: "POST" })
     });
     const model = gateway("google/gemini-3-flash-preview");
 
-    const userContent: Array<
-      { type: "text"; text: string } | { type: "image"; image: string }
-    > = [];
+    const userContent: Array<{ type: "text"; text: string } | { type: "image"; image: string }> =
+      [];
     if (data.text) userContent.push({ type: "text", text: data.text });
     if (data.image_base64) {
       const dataUrl = data.image_base64.startsWith("data:")
@@ -189,42 +189,8 @@ export const recognizeParcelBlock = createServerFn({ method: "POST" })
     }
   });
 
-// ============================================================
-// 中古杂货 SKU 智能识别：从多张照片识别 类目 / 品名 / 描述 / 评级
-// ============================================================
-
-const SkuRecognizeSchema = z.object({
-  category: z
-    .enum([
-      "jp_porcelain",
-      "eu_porcelain",
-      "vintage_toy",
-      "anime_goods",
-      "media",
-      "digital",
-      "jewelry",
-      "fashion",
-      "daily",
-      "antique",
-    ])
-    .nullable()
-    .optional(),
-  name: z.string().nullable().optional(),
-  description: z.string().nullable().optional(),
-  grade: z.enum(["N", "S", "A", "B", "C", "J"]).nullable().optional(),
-});
-
-const SKU_RECOGNIZE_SYSTEM = `你是中古杂货商品识别助手。根据用户拍摄的若干张商品照片，输出 JSON：
-- category：从以下枚举里选一个，选不准就 null：
-  jp_porcelain 日本瓷器 / eu_porcelain 欧洲瓷器 / vintage_toy 中古玩具 / anime_goods 二次元周边 /
-  media 音像制品 / digital 数码家电 / jewelry 珠宝首饰 / fashion 时尚配件 / daily 日用杂货 / antique 古美术
-- name：6-20 字简洁中文品名，能体现品类/材质/特征，例如"日本九谷烧花鸟纹盖碗"。
-- description：80 字以内中文卖点描述，突出年代感/工艺/品相/适用场景，便于挂网店。不要写"图中所示""根据照片"之类。
-- grade：观察外观判断成色档：
-  N 全新未拆 / S 已拆封但完好 / A 轻微痕迹 / B 明显痕迹或轻微缺陷 / C 严重瑕疵但能用 / J 残缺当垃圾。
-拿不准的字段返回 null，不要瞎编。`;
-
 export const recognizeSkuFromPhotos = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -240,47 +206,19 @@ export const recognizeSkuFromPhotos = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
-    const apiKey = process.env.LOVABLE_API_KEY;
-    if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
-    const gateway = createOpenAICompatible({
-      name: "lovable",
-      baseURL: "https://ai.gateway.lovable.dev/v1",
-      headers: {
-        "Lovable-API-Key": apiKey,
-        "X-Lovable-AIG-SDK": "vercel-ai-sdk",
-      },
-    });
-    const model = gateway("google/gemini-3-flash-preview");
-
-    const userContent: Array<
-      { type: "text"; text: string } | { type: "image"; image: string }
-    > = [{ type: "text", text: `请识别以下 ${data.images.length} 张商品照片。` }];
-    for (const img of data.images) {
-      const url = img.base64.startsWith("data:")
-        ? img.base64
-        : `data:${img.mime};base64,${img.base64}`;
-      userContent.push({ type: "image", image: url });
-    }
-
+  .handler(async ({ data, context }) => {
     try {
-      const { output } = await generateText({
-        model,
-        output: Output.object({ schema: SkuRecognizeSchema }),
-        messages: [
-          { role: "system", content: SKU_RECOGNIZE_SYSTEM },
-          { role: "user", content: userContent },
-        ],
+      const { recognizeProductFromImages } = await import("@/server/product-recognition.server");
+      const fields = await recognizeProductFromImages({
+        images: data.images.map((image) =>
+          image.base64.startsWith("data:")
+            ? image.base64
+            : `data:${image.mime};base64,${image.base64}`,
+        ),
+        source: "erp",
+        created_by: context.userId,
       });
-      return {
-        ok: true as const,
-        fields: {
-          category: output.category ?? "",
-          name: output.name ?? "",
-          description: output.description ?? "",
-          grade: output.grade ?? "",
-        },
-      };
+      return { ok: true as const, fields };
     } catch (e) {
       return { ok: false as const, reason: (e as Error).message };
     }

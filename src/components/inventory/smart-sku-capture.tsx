@@ -8,8 +8,6 @@ import { recognizeSkuFromPhotos } from "@/lib/ai.functions";
 import type { SkuMetaState } from "./sku-meta-fields";
 
 const MAX_SHOTS = 5;
-/** 智能识别可能覆盖的字段集合（重拍前会先清空） */
-const SMART_FIELDS: (keyof SkuMetaState)[] = ["imageUrl", "category", "name", "notes", "grade"];
 
 export function SmartSkuCapture({
   onApply,
@@ -112,16 +110,38 @@ export function SmartSkuCapture({
     if (fileRef.current) fileRef.current.value = "";
   };
 
-  const removeShot = (i: number) =>
-    setShots((prev) => prev.filter((_, idx) => idx !== i));
+  const removeShot = (i: number) => setShots((prev) => prev.filter((_, idx) => idx !== i));
 
   /** 清空照片与已填的智能字段，回到初始状态 */
   const restart = () => {
     setShots([]);
     setRecognized(false);
-    const clear: Partial<SkuMetaState> = {};
-    for (const k of SMART_FIELDS) clear[k] = "";
-    onApply(clear);
+    onApply({
+      imageUrl: "",
+      category: "",
+      name: "",
+      notes: "",
+      grade: "",
+      attributes: {
+        brand: null,
+        maker: null,
+        origin_region: null,
+        origin_country: null,
+        era: null,
+        material: [],
+        craft: [],
+        object_type: null,
+        colors: [],
+        dimensions: null,
+        functional_status: null,
+        missing_parts: [],
+      },
+      recognitionRequestId: "",
+      categoryConfidence: null,
+      classificationStatus: "",
+      aiSuggestedPrice: null,
+      evidence: [],
+    });
     toast.message("已清空，请重新拍摄");
   };
 
@@ -148,13 +168,23 @@ export function SmartSkuCapture({
         const f = res.fields;
         onApply({
           imageUrl: urls[0],
-          category: f.category || "",
+          category: f.category_code || "",
           name: f.name || "",
           notes: f.description || "",
-          grade: f.grade || "",
+          grade: f.condition_grade || "",
+          attributes: f.attributes,
+          recognitionRequestId: f.request_id,
+          categoryConfidence: f.confidence,
+          classificationStatus: f.status,
+          aiSuggestedPrice: f.suggested_price_cny,
+          evidence: f.evidence,
         });
         setRecognized(true);
-        toast.success("已自动填充，可微调或重拍");
+        toast.success(
+          f.status === "auto_classified"
+            ? "已自动识别分类和商品字段"
+            : "识别完成，请复核待确认分类",
+        );
       } catch (e) {
         if (token === analyzeTokenRef.current) {
           toast.error((e as Error).message || "识别失败");
@@ -190,9 +220,7 @@ export function SmartSkuCapture({
               <Loader2 className="h-3 w-3 animate-spin" /> 识别中
             </span>
           )}
-          {!analyzing && recognized && (
-            <span className="ml-2 text-xs text-success">已识别</span>
-          )}
+          {!analyzing && recognized && <span className="ml-2 text-xs text-success">已识别</span>}
         </div>
         <div className="flex items-center gap-1">
           {shots.length > 0 && (
@@ -207,12 +235,7 @@ export function SmartSkuCapture({
       </div>
 
       <div className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-black">
-        <video
-          ref={videoRef}
-          playsInline
-          muted
-          className="h-full w-full object-cover"
-        />
+        <video ref={videoRef} playsInline muted className="h-full w-full object-cover" />
         {!streaming && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-xs text-white/80">
             <Camera className="h-7 w-7" />
@@ -267,11 +290,7 @@ export function SmartSkuCapture({
             <Camera className="mr-1 h-4 w-4" /> 开启摄像头
           </Button>
         ) : (
-          <Button
-            size="sm"
-            onClick={grab}
-            disabled={shots.length >= MAX_SHOTS || analyzing}
-          >
+          <Button size="sm" onClick={grab} disabled={shots.length >= MAX_SHOTS || analyzing}>
             <Camera className="mr-1 h-4 w-4" /> 拍照 ({shots.length}/{MAX_SHOTS})
           </Button>
         )}

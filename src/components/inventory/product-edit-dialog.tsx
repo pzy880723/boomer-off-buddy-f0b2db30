@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { SkuMetaFields, type SkuMetaState } from "./sku-meta-fields";
+import { SkuMetaFields, emptySkuMeta, type SkuMetaState } from "./sku-meta-fields";
 import { PriceTierEditor } from "./price-tier-editor";
 import { updateStandardProduct } from "@/lib/inventory.functions";
 import type { StandardProductGroup } from "@/lib/inventory.helpers";
@@ -29,19 +29,14 @@ export function ProductEditDialog({
 }) {
   const fn = useServerFn(updateStandardProduct);
   const [meta, setMeta] = useState<SkuMetaState>({
-    category: "",
-    name: "",
-    sku_code: "",
-    weight: "",
-    imageUrl: "",
-    notes: "",
-    grade: "",
+    ...emptySkuMeta,
   });
   const [tiers, setTiers] = useState<number[]>([]);
 
   useEffect(() => {
     if (group && open) {
       setMeta({
+        ...emptySkuMeta,
         category: group.category,
         name: group.name,
         sku_code: group.code ?? "",
@@ -96,11 +91,12 @@ export function ProductEditDialog({
           <DialogTitle>编辑标准商品</DialogTitle>
         </DialogHeader>
         <p className="text-xs text-muted-foreground">
-          修改类目会重算该商品下全部价格档的 EPC 前缀；若任一价格档有库存或入库记录，改类目会失败，请先归档。每个价格档 = 一个独立 SKU = 一个价格 = 一段规格编码。
+          修改类目会重算该商品下全部价格档的 EPC
+          前缀；若任一价格档有库存或入库记录，改类目会失败，请先归档。每个价格档 = 一个独立 SKU =
+          一个价格 = 一段规格编码。
         </p>
         <div className="py-2 space-y-4">
           <SkuMetaFields state={meta} onChange={setMeta} hideGrade hideWeight />
-
 
           <div className="space-y-1.5">
             <Label>价格档 *</Label>

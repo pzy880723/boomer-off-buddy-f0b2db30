@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SkuMetaFields, type SkuMetaState } from "./sku-meta-fields";
+import { SkuMetaFields, emptySkuMeta, type SkuMetaState } from "./sku-meta-fields";
 import { updateSku } from "@/lib/inventory.functions";
 import type { SkuRow } from "@/lib/inventory.helpers";
 
@@ -29,13 +29,7 @@ export function SkuEditDialog({
 }) {
   const fn = useServerFn(updateSku);
   const [meta, setMeta] = useState<SkuMetaState>({
-    category: "",
-    name: "",
-    sku_code: "",
-    weight: "",
-    imageUrl: "",
-    notes: "",
-    grade: "",
+    ...emptySkuMeta,
   });
   const [price, setPrice] = useState("");
 
@@ -45,6 +39,7 @@ export function SkuEditDialog({
   useEffect(() => {
     if (sku && open) {
       setMeta({
+        ...emptySkuMeta,
         category: sku.category,
         name: sku.name,
         sku_code: sku.sku_code ?? "",
@@ -98,7 +93,8 @@ export function SkuEditDialog({
         </DialogHeader>
         {isStandard && (
           <p className="text-xs text-muted-foreground">
-            该 SKU 属于某个标准商品的价格档，价格档不可修改。如需调整品名 / 图片 / 编码，请在标准商品详情页操作。
+            该 SKU 属于某个标准商品的价格档，价格档不可修改。如需调整品名 / 图片 /
+            编码，请在标准商品详情页操作。
           </p>
         )}
         <div className="py-2 space-y-4">

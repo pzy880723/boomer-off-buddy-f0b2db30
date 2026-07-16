@@ -1,11 +1,348 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { supabaseAdmin as supabase } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { ensureAccessToken, getHqShop } from "./youzan.functions";
 import {
+  buildOfflineSkuReleaseInput,
+  buildOfflineProductLookupTerms,
+  buildOfflineStockQueueRow,
+  findOfflineProductMatch,
+  normalizeYouzanProductCode,
   queryYouzanOfflineProducts,
   releaseYouzanOfflineProduct,
 } from "./youzan-offline-products.server";
+import {
+  ensureAutoYouzanDefaultCategory,
+  triggerStockWorker,
+  uploadImageToYouzanMaterial,
+} from "./youzan-sync.functions";
+
+type OfflineReleaseResult = {
+  shop_id: string;
+  ok: boolean;
+  item_id: number | null;
+  sku_id: number | null;
+  recovered: boolean;
+  error: string | null;
+};
+
+async function findExistingOfflineProduct(args: {
+  accessToken: string;
+  warehouseCode: string | null;
+  skuCode: string;
+  name: string;
+}) {
+  if (!args.warehouseCode) return null;
+  const target = {
+    skuCode: normalizeYouzanProductCode(args.skuCode),
+    name: args.name,
+  };
+
+  for (const lookupTerm of buildOfflineProductLookupTerms(args)) {
+    const rows = [];
+    for (const displayStatus of [1, 2, 0] as const) {
+      const queried = await queryYouzanOfflineProducts({
+        accessToken: args.accessToken,
+        input: {
+          pageNo: 1,
+          pageSize: 20,
+          displayStatus,
+          warehouseCode: args.warehouseCode,
+          nameOrSkuNo: lookupTerm,
+        },
+      });
+      rows.push(...queried.rows);
+    }
+    const uniqueRows = Array.from(
+      new Map(rows.map((row) => [row.itemId, row])).values(),
+    );
+    const matched = findOfflineProductMatch(uniqueRows, target);
+    if (matched) return matched;
+  }
+  return null;
+}
+
+async function upsertBranchLink(args: {
+  skuId: string;
+  shopId: string;
+  itemId: number;
+  skuIdRemote: number | null;
+}) {
+  const { error } = await supabase.from("sku_youzan_links").upsert(
+    {
+      sku_id: args.skuId,
+      shop_id: args.shopId,
+      yz_item_id: args.itemId,
+      yz_sku_id: args.skuIdRemote,
+      status: "linked",
+      role: "branch_stock",
+      sync_stock: true,
+      last_error: null,
+    } as never,
+    { onConflict: "sku_id,shop_id" },
+  );
+  if (error) throw new Error(error.message);
+}
+
+async function markBranchReleaseError(skuId: string, shopId: string, message: string) {
+  await supabase.from("sku_youzan_links").upsert(
+    {
+      sku_id: skuId,
+      shop_id: shopId,
+      yz_item_id: 0,
+      yz_sku_id: null,
+      status: "error",
+      role: "branch_stock",
+      sync_stock: false,
+      last_error: message.slice(0, 400),
+    } as never,
+    { onConflict: "sku_id,shop_id" },
+  );
+}
+
+async function enqueueBranchStock(args: {
+  skuId: string;
+  shopId: string;
+  locationId: string;
+  targetStock: number;
+}) {
+  const row = buildOfflineStockQueueRow(args);
+  const { data: existing } = await supabase
+    .from("youzan_stock_sync_queue")
+    .select("id")
+    .eq("sku_id", args.skuId)
+    .eq("shop_id", args.shopId)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const query = existing?.id
+    ? supabase.from("youzan_stock_sync_queue").update(row as never).eq("id", existing.id)
+    : supabase.from("youzan_stock_sync_queue").insert(row as never);
+  const { error } = await query;
+  if (error) throw new Error(error.message);
+}
+
+export async function releaseSkuToOfflineShopsCore(args: {
+  sku_id: string;
+  shop_ids: string[];
+  stock_override?: number;
+}): Promise<{ ok: boolean; results: OfflineReleaseResult[] }> {
+  const shopIds = Array.from(new Set(args.shop_ids));
+  if (shopIds.length === 0) return { ok: true, results: [] };
+
+  const [{ data: sku, error: skuError }, { data: shops, error: shopsError }] =
+    await Promise.all([
+      supabase
+        .from("inv_skus")
+        .select("id,name,sku_code,price_tier,image_url,image_paths")
+        .eq("id", args.sku_id)
+        .maybeSingle(),
+      supabase
+        .from("youzan_shops")
+        .select("id,kdt_id,role,status,warehouse_code")
+        .in("id", shopIds),
+    ]);
+  if (skuError) throw new Error(skuError.message);
+  if (shopsError) throw new Error(shopsError.message);
+  if (!sku) throw new Error("SKU 不存在");
+
+  const branches = (shops ?? []).filter(
+    (shop) => shop.role === "branch" && shop.status === "active",
+  );
+  if (branches.length !== shopIds.length) {
+    throw new Error("部分目标门店不存在、已停用或不是分店");
+  }
+
+  const rawImages = Array.from(
+    new Set(
+      [sku.image_url, ...(Array.isArray(sku.image_paths) ? sku.image_paths : [])]
+        .map((value) => String(value ?? "").trim())
+        .filter(Boolean),
+    ),
+  ).slice(0, 5);
+  if (rawImages.length === 0) throw new Error("商品缺少图片，无法发布到有赞门店");
+
+  const hq = await getHqShop();
+  const accessToken = await ensureAccessToken(hq);
+  const category = await ensureAutoYouzanDefaultCategory();
+  const imageUrls = await Promise.all(
+    rawImages.map((url) =>
+      uploadImageToYouzanMaterial(accessToken, url, {
+        shop_id: hq.id,
+        kdt_id: hq.kdt_id,
+        sku_id: args.sku_id,
+      }),
+    ),
+  );
+
+  const results: OfflineReleaseResult[] = [];
+  for (const branch of branches) {
+    const { data: location } = await supabase
+      .from("inv_locations")
+      .select("id")
+      .eq("shop_id", branch.id)
+      .maybeSingle();
+    if (!location?.id) {
+      throw new Error(`门店 ${branch.id} 未映射库位`);
+    }
+    let stock = Math.max(0, Math.trunc(args.stock_override ?? 0));
+    if (args.stock_override === undefined) {
+      const { data: localStock } = await supabase
+        .from("inv_stocks")
+        .select("qty")
+        .eq("sku_id", args.sku_id)
+        .eq("location_id", location.id)
+        .maybeSingle();
+      stock = Math.max(0, Math.trunc(Number(localStock?.qty ?? 0)));
+    }
+
+    const { data: existing } = await supabase
+      .from("sku_youzan_links")
+      .select("yz_item_id,yz_sku_id,status")
+      .eq("sku_id", args.sku_id)
+      .eq("shop_id", branch.id)
+      .maybeSingle();
+    if (existing?.status === "linked" && Number(existing.yz_item_id) > 0) {
+      await enqueueBranchStock({
+        skuId: args.sku_id,
+        shopId: branch.id,
+        locationId: location.id,
+        targetStock: stock,
+      });
+      results.push({
+        shop_id: branch.id,
+        ok: true,
+        item_id: Number(existing.yz_item_id),
+        sku_id: Number(existing.yz_sku_id ?? 0) || null,
+        recovered: false,
+        error: null,
+      });
+      continue;
+    }
+
+    const remoteExisting = await findExistingOfflineProduct({
+      accessToken,
+      warehouseCode: branch.warehouse_code,
+      skuCode: String(sku.sku_code ?? ""),
+      name: sku.name,
+    });
+    if (remoteExisting) {
+      const remoteSkuId = remoteExisting.skus[0]?.skuId ?? null;
+      await upsertBranchLink({
+        skuId: args.sku_id,
+        shopId: branch.id,
+        itemId: remoteExisting.itemId,
+        skuIdRemote: remoteSkuId,
+      });
+      await enqueueBranchStock({
+        skuId: args.sku_id,
+        shopId: branch.id,
+        locationId: location.id,
+        targetStock: stock,
+      });
+      results.push({
+        shop_id: branch.id,
+        ok: true,
+        item_id: remoteExisting.itemId,
+        sku_id: remoteSkuId,
+        recovered: true,
+        error: null,
+      });
+      continue;
+    }
+
+    try {
+      const released = await releaseYouzanOfflineProduct({
+        accessToken,
+        input: buildOfflineSkuReleaseInput({
+          sku: {
+            name: sku.name,
+            skuCode: String(sku.sku_code ?? ""),
+            priceYuan: Number(sku.price_tier ?? 0),
+            imageUrls,
+          },
+          categoryId: category.id,
+          branchKdtIds: [Number(branch.kdt_id)],
+          stock,
+        }),
+      });
+      const remoteSkuId = released.skuIds[0] ?? null;
+      await upsertBranchLink({
+        skuId: args.sku_id,
+        shopId: branch.id,
+        itemId: released.itemId,
+        skuIdRemote: remoteSkuId,
+      });
+      await enqueueBranchStock({
+        skuId: args.sku_id,
+        shopId: branch.id,
+        locationId: location.id,
+        targetStock: stock,
+      });
+      results.push({
+        shop_id: branch.id,
+        ok: true,
+        item_id: released.itemId,
+        sku_id: remoteSkuId,
+        recovered: false,
+        error: null,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      let recovered: { itemId: number; skuId: number | null } | null = null;
+      try {
+        const matched = await findExistingOfflineProduct({
+          accessToken,
+          warehouseCode: branch.warehouse_code,
+          skuCode: String(sku.sku_code ?? ""),
+          name: sku.name,
+        });
+        if (matched) {
+          recovered = { itemId: matched.itemId, skuId: matched.skus[0]?.skuId ?? null };
+        }
+      } catch {
+        // 保留原始发布错误，避免查询失败覆盖真正原因。
+      }
+      if (recovered) {
+        await upsertBranchLink({
+          skuId: args.sku_id,
+          shopId: branch.id,
+          itemId: recovered.itemId,
+          skuIdRemote: recovered.skuId,
+        });
+        await enqueueBranchStock({
+          skuId: args.sku_id,
+          shopId: branch.id,
+          locationId: location.id,
+          targetStock: stock,
+        });
+        results.push({
+          shop_id: branch.id,
+          ok: true,
+          item_id: recovered.itemId,
+          sku_id: recovered.skuId,
+          recovered: true,
+          error: null,
+        });
+      } else {
+        await markBranchReleaseError(args.sku_id, branch.id, message);
+        results.push({
+          shop_id: branch.id,
+          ok: false,
+          item_id: null,
+          sku_id: null,
+          recovered: false,
+          error: message,
+        });
+      }
+    }
+  }
+  if (results.some((result) => result.ok)) {
+    triggerStockWorker({ sku_ids: [args.sku_id] });
+  }
+  return { ok: results.every((result) => result.ok), results };
+}
 
 export const queryOfflineProducts = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

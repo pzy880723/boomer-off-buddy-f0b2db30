@@ -4,19 +4,19 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { generateEpc, generateSkuCode } from "./inventory.helpers";
+import {
+  assertActiveLeafCategory,
+  attachProductClassificationAuditToSku,
+} from "@/server/product-classification.server";
 
 // ---- Round B：SKU 建好后，后台 fire-and-forget 建 HQ SPU + 铺货到默认分店 ----
 // 失败不阻塞主流程；错误落到 sku_youzan_links.last_error，UI 有"上架失败·点重试"的红标。
-async function autoDistributeInBackground(
-  sku_ids: string[],
-  default_shop_ids: string[],
-) {
+async function autoDistributeInBackground(sku_ids: string[], default_shop_ids: string[]) {
   if (sku_ids.length === 0) return;
   void (async () => {
     try {
-      const { ensureHqSpu, ensureBranchProduct, triggerStockWorker } = await import(
-        "./youzan-sync.functions"
-      );
+      const { triggerStockWorker } = await import("./youzan-sync.functions");
+      const { releaseSkuToOfflineShopsCore } = await import("./youzan-offline-products.functions");
       // 若 default_shop_ids 为空 → 铺给所有 branch 门店
       let targetShopIds = default_shop_ids;
       if (targetShopIds.length === 0) {
@@ -29,43 +29,36 @@ async function autoDistributeInBackground(
       }
       for (const sid of sku_ids) {
         try {
-          await ensureHqSpu(sid);
-        } catch { /* 保留错误在 link 里 */ }
-        for (const shopId of targetShopIds) {
-          try {
-            await ensureBranchProduct(sid, shopId);
-          } catch { /* 保留错误在 link 里 */ }
+          await releaseSkuToOfflineShopsCore({
+            sku_id: sid,
+            shop_ids: targetShopIds,
+          });
+        } catch {
+          /* 保留错误在 link 里 */
         }
       }
       if (targetShopIds.length > 0) {
         triggerStockWorker({ sku_ids });
       }
-    } catch { /* swallow */ }
+    } catch {
+      /* swallow */
+    }
   })();
 }
 
-
-const CATEGORY_VALUES = [
-  "jp_porcelain",
-  "eu_porcelain",
-  "vintage_toy",
-  "anime_goods",
-  "media",
-  "digital",
-  "jewelry",
-  "fashion",
-  "daily",
-  "antique",
-] as const;
-
 const MetaInput = z.object({
-  category: z.enum(CATEGORY_VALUES),
+  category: z.string().trim().min(1).max(64),
   name: z.string().min(1).max(120),
   sku_code: z.string().trim().max(64).nullable().optional(),
   weight_g: z.number().nullable().optional(),
   image_url: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
   grade: z.enum(["N", "S", "A", "B", "C", "J"]).nullable().optional(),
+  attributes: z.record(z.string(), z.unknown()).default({}),
+  recognition_request_id: z.string().uuid().nullable().optional(),
+  category_confidence: z.number().min(0).max(1).nullable().optional(),
+  classification_status: z.enum(["auto_classified", "fallback", "corrected"]).nullable().optional(),
+  ai_suggested_price: z.number().nonnegative().nullable().optional(),
   // 默认铺货门店（空数组 = 铺给所有 branch）；Round B 铺货 worker 消费
   default_shop_ids: z.array(z.string().uuid()).max(200).optional(),
 });
@@ -116,15 +109,18 @@ export const getSku = createServerFn({ method: "GET" })
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const sb = context.supabase;
-    const { data: row, error } = await sb
-      .from("inv_skus")
-      .select("*")
-      .eq("id", data.id)
-      .single();
+    const { data: row, error } = await sb.from("inv_skus").select("*").eq("id", data.id).single();
     if (error) throw new Error(error.message);
 
     // 解析组包子项
-    let bundleChildren: Array<{ id: string; name: string; epc: string; image_url: string | null; price_tier: number; qty: number }> = [];
+    let bundleChildren: Array<{
+      id: string;
+      name: string;
+      epc: string;
+      image_url: string | null;
+      price_tier: number;
+      qty: number;
+    }> = [];
     const bi = (row as { bundle_items?: unknown }).bundle_items;
     if (row && row.kind === "bundle" && Array.isArray(bi) && bi.length > 0) {
       const items = bi as Array<{ sku_id: string; qty: number }>;
@@ -172,7 +168,12 @@ export const getSku = createServerFn({ method: "GET" })
       signedImages = signed.filter((x): x is string => !!x);
     }
     // 兜底外链 image_url
-    if (signedImages.length === 0 && row?.image_url && /^https?:\/\//i.test(row.image_url) && !row.image_url.includes("token=")) {
+    if (
+      signedImages.length === 0 &&
+      row?.image_url &&
+      /^https?:\/\//i.test(row.image_url) &&
+      !row.image_url.includes("token=")
+    ) {
       signedImages = [row.image_url];
     }
 
@@ -195,9 +196,10 @@ export const createStandardSkus = createServerFn({ method: "POST" })
     }).parse(input),
   )
   .handler(async ({ data, context }) => {
+    await assertActiveLeafCategory(data.category);
     const sb = context.supabase;
     const tiers = Array.from(new Set(data.price_tiers)).sort((a, b) => a - b);
-    const code = (data.sku_code?.trim() || generateSkuCode(data.category, "single"));
+    const code = data.sku_code?.trim() || generateSkuCode(data.category, "single");
     const rows = tiers.map((t) => ({
       category: data.category,
       name: data.name.trim(),
@@ -211,6 +213,14 @@ export const createStandardSkus = createServerFn({ method: "POST" })
       image_url: data.image_url ?? null,
       notes: data.notes ?? null,
       grade: data.grade ?? null,
+      attributes: data.attributes,
+      category_source: data.recognition_request_id ? "ai" : "manual",
+      category_confidence: data.category_confidence ?? null,
+      classification_status: data.recognition_request_id
+        ? (data.classification_status ?? "fallback")
+        : "legacy",
+      ai_suggested_price: data.ai_suggested_price ?? null,
+      recognition_request_id: data.recognition_request_id ?? null,
       status: "active" as const,
       epc: data.epc_map?.[String(t)] || generateEpc(data.category, t),
       default_shop_ids: data.default_shop_ids ?? [],
@@ -237,6 +247,7 @@ export const createCustomSku = createServerFn({ method: "POST" })
     }).parse(input),
   )
   .handler(async ({ data, context }) => {
+    await assertActiveLeafCategory(data.category);
     const sb = context.supabase;
     const payload = {
       category: data.category,
@@ -251,6 +262,14 @@ export const createCustomSku = createServerFn({ method: "POST" })
       image_url: data.image_url ?? null,
       notes: data.notes ?? null,
       grade: data.grade ?? null,
+      attributes: data.attributes,
+      category_source: data.recognition_request_id ? "ai" : "manual",
+      category_confidence: data.category_confidence ?? null,
+      classification_status: data.recognition_request_id
+        ? (data.classification_status ?? "fallback")
+        : "legacy",
+      ai_suggested_price: data.ai_suggested_price ?? null,
+      recognition_request_id: data.recognition_request_id ?? null,
       status: "active" as const,
       epc: generateEpc(data.category, data.price),
       stock_qty: 0,
@@ -262,10 +281,14 @@ export const createCustomSku = createServerFn({ method: "POST" })
       .select("*")
       .single();
     if (error) throw new Error(error.message);
-    autoDistributeInBackground(
-      [String((row as { id: string }).id)],
-      data.default_shop_ids ?? [],
-    );
+    if (data.recognition_request_id) {
+      await attachProductClassificationAuditToSku({
+        requestId: data.recognition_request_id,
+        skuId: String((row as { id: string }).id),
+        finalCategoryCode: data.category,
+      });
+    }
+    autoDistributeInBackground([String((row as { id: string }).id)], data.default_shop_ids ?? []);
     return { sku: row };
   });
 
@@ -282,6 +305,7 @@ export const createBundleSku = createServerFn({ method: "POST" })
     }).parse(input),
   )
   .handler(async ({ data, context }) => {
+    await assertActiveLeafCategory(data.category);
     const sb = context.supabase;
     // 校验子 SKU 存在且不是 bundle
     const ids = data.items.map((x) => x.sku_id);
@@ -311,6 +335,14 @@ export const createBundleSku = createServerFn({ method: "POST" })
       image_url: data.image_url ?? null,
       notes: data.notes ?? null,
       grade: data.grade ?? null,
+      attributes: data.attributes,
+      category_source: data.recognition_request_id ? "ai" : "manual",
+      category_confidence: data.category_confidence ?? null,
+      classification_status: data.recognition_request_id
+        ? (data.classification_status ?? "fallback")
+        : "legacy",
+      ai_suggested_price: data.ai_suggested_price ?? null,
+      recognition_request_id: data.recognition_request_id ?? null,
       status: "active" as const,
       epc: generateEpc(data.category, data.price),
       default_shop_ids: data.default_shop_ids ?? [],
@@ -321,10 +353,14 @@ export const createBundleSku = createServerFn({ method: "POST" })
       .select("*")
       .single();
     if (error) throw new Error(error.message);
-    autoDistributeInBackground(
-      [String((row as { id: string }).id)],
-      data.default_shop_ids ?? [],
-    );
+    if (data.recognition_request_id) {
+      await attachProductClassificationAuditToSku({
+        requestId: data.recognition_request_id,
+        skuId: String((row as { id: string }).id),
+        finalCategoryCode: data.category,
+      });
+    }
+    autoDistributeInBackground([String((row as { id: string }).id)], data.default_shop_ids ?? []);
     return { sku: row };
   });
 
@@ -400,9 +436,12 @@ export const updateStandardProduct = createServerFn({ method: "POST" })
     // 类目变更：前置校验 + 逐条重算 EPC / sku_code
     let categoryMigrated = false;
     if (categoryChanged) {
+      await assertActiveLeafCategory(newCategory);
       const hasStock = matched.find((r) => (r.stock_qty ?? 0) > 0);
       if (hasStock) {
-        throw new Error(`类目变更前请先清空库存：¥${hasStock.price_tier} 仍有 ${hasStock.stock_qty} 件`);
+        throw new Error(
+          `类目变更前请先清空库存：¥${hasStock.price_tier} 仍有 ${hasStock.stock_qty} 件`,
+        );
       }
       const { data: inbound } = await sb
         .from("inv_inbound_lines")
@@ -418,7 +457,10 @@ export const updateStandardProduct = createServerFn({ method: "POST" })
         const autoSkuCode = /^SKU-/.test(oldSkuCode);
         const upd: Record<string, unknown> = { category: newCategory, epc: newEpc };
         if (autoSkuCode) upd.sku_code = generateSkuCode(newCategory, "single");
-        const { error: uErr } = await sb.from("inv_skus").update(upd as never).eq("id", row.id);
+        const { error: uErr } = await sb
+          .from("inv_skus")
+          .update(upd as never)
+          .eq("id", row.id);
         if (uErr) {
           if (/duplicate|unique/i.test(uErr.message)) {
             throw new Error("EPC 冲突，请稍后重试或先在库存/未认领 EPC 里清理");
@@ -435,7 +477,10 @@ export const updateStandardProduct = createServerFn({ method: "POST" })
     // 其余共用字段
     const { category: _omitCat, ...restPatch } = data.patch;
     if (Object.keys(restPatch).length > 0) {
-      const { error } = await sb.from("inv_skus").update(restPatch as never).in("id", ids);
+      const { error } = await sb
+        .from("inv_skus")
+        .update(restPatch as never)
+        .in("id", ids);
       if (error) throw new Error(error.message);
     }
 
@@ -484,7 +529,6 @@ export const updateStandardProduct = createServerFn({ method: "POST" })
     return { ok: true, updated: ids.length, added, removed, categoryMigrated };
   });
 
-
 async function safeDeleteSkuById(sb: typeof supabaseAdmin, id: string) {
   const { data: row, error: rErr } = await sb
     .from("inv_skus")
@@ -496,11 +540,7 @@ async function safeDeleteSkuById(sb: typeof supabaseAdmin, id: string) {
   if ((row.stock_qty ?? 0) > 0) {
     throw new Error(`【${row.name}】仍有 ${row.stock_qty} 件库存，无法删除`);
   }
-  const { data: lines } = await sb
-    .from("inv_inbound_lines")
-    .select("id")
-    .eq("sku_id", id)
-    .limit(1);
+  const { data: lines } = await sb.from("inv_inbound_lines").select("id").eq("sku_id", id).limit(1);
   if ((lines?.length ?? 0) > 0) {
     throw new Error(`【${row.name}】存在入库记录，请先归档而不是删除`);
   }
@@ -651,8 +691,6 @@ export const submitInbound = createServerFn({ method: "POST" })
 
     return { order_id: order.id, total_qty: totalQty, total_value_cny: totalValue };
   });
-
-
 
 export const listInboundOrders = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])

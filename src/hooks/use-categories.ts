@@ -12,7 +12,6 @@ const FALLBACK: CategoryRow[] = INV_CATEGORIES.map((c, i) => ({
   is_system: true,
 }));
 
-
 export function useCategories() {
   const q = useQuery({
     queryKey: ["inv-categories"],
@@ -20,8 +19,30 @@ export function useCategories() {
     staleTime: 30_000,
   });
   const rows = q.data?.rows && q.data.rows.length > 0 ? q.data.rows : FALLBACK;
-  const active = rows.filter((r) => r.is_active);
+  const hasTree = rows.some((row) => row.parent_id !== null);
+  const activeRootIds = new Set(
+    rows.filter((row) => row.is_active && row.parent_id === null).map((row) => row.id),
+  );
+  const active = hasTree
+    ? rows.filter(
+        (row) => row.is_active && row.parent_id !== null && activeRootIds.has(row.parent_id),
+      )
+    : rows.filter((row) => row.is_active);
+  const byId = new Map(rows.map((row) => [row.id, row]));
   const labelOf = (code: string) =>
     rows.find((r) => r.code === code)?.name ?? SEED_LABEL[code] ?? code;
-  return { rows, active, labelOf, loading: q.isLoading, refetch: q.refetch };
+  const displayLabelOf = (code: string) => {
+    const row = rows.find((item) => item.code === code);
+    if (!row) return SEED_LABEL[code] ?? code;
+    const parent = row.parent_id ? byId.get(row.parent_id) : null;
+    return parent ? `${parent.name} / ${row.name}` : row.name;
+  };
+  return {
+    rows,
+    active,
+    labelOf,
+    displayLabelOf,
+    loading: q.isLoading,
+    refetch: q.refetch,
+  };
 }
