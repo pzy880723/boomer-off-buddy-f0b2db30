@@ -246,9 +246,10 @@ export function AppSidebar() {
         ))}
       </SidebarContent>
 
-      {!collapsed && (
-        <SidebarFooter className="border-t border-sidebar-border">
-          <div className="rounded-lg bg-sidebar-accent/40 p-3">
+      <SidebarFooter className="border-t border-sidebar-border">
+        <AigcLauncherButton collapsed={collapsed} />
+        {!collapsed && (
+          <div className="mt-2 rounded-lg bg-sidebar-accent/40 p-3">
             <div className="flex items-center gap-2 text-xs text-sidebar-foreground/80">
               <Activity className="h-3.5 w-3.5 text-success" />
               <span className="font-medium">系统状态</span>
@@ -271,8 +272,9 @@ export function AppSidebar() {
               </div>
             </div>
           </div>
-        </SidebarFooter>
-      )}
+        )}
+      </SidebarFooter>
+
     </Sidebar>
   );
 }
