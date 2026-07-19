@@ -27,7 +27,9 @@ import {
   Globe,
   FolderTree,
   Tag,
+  Sparkles,
   type LucideIcon,
+
 } from "lucide-react";
 import { useAuthSession } from "@/hooks/use-auth-session";
 import { isSuperAdminPhone, resolveUserPhone } from "@/lib/auth-config";
