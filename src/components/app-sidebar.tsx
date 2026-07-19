@@ -309,7 +309,7 @@ function AigcLauncherButton({ collapsed }: { collapsed: boolean }) {
       });
       const json = (await resp.json().catch(() => ({}))) as {
         ok?: boolean;
-        data?: { ticket?: string };
+        data?: { ticket?: string; redirect_url?: string };
         error?: string;
       };
       if (!resp.ok || !json.ok || !json.data?.ticket) {
@@ -317,7 +317,9 @@ function AigcLauncherButton({ collapsed }: { collapsed: boolean }) {
         toast.error(json.error || "打开 AI 营销中心失败，请稍后再试");
         return;
       }
-      const url = `${AIGC_BASE_URL}/auth/erp?ticket=${encodeURIComponent(json.data.ticket)}`;
+      const url =
+        json.data.redirect_url ||
+        `${AIGC_BASE_URL}/auth/erp?ticket=${encodeURIComponent(json.data.ticket)}`;
       if (win) {
         win.location.href = url;
       } else {

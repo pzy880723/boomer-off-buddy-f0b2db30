@@ -143,6 +143,7 @@ export const Route = createFileRoute("/api/public/sso/aigc-exchange")({
               phone,
               display_name: displayName,
               roles,
+              permissions: ["aigc_access"],
               shops,
             },
           },
