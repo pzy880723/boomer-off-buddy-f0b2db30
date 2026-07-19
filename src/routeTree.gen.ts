@@ -87,6 +87,7 @@ import { Route as ApiPublicMerukiIngestRouteImport } from './routes/api/public/m
 import { Route as ApiPublicStorefrontProductsRouteImport } from './routes/api/public/storefront/products'
 import { Route as ApiPublicStorefrontOrdersRouteImport } from './routes/api/public/storefront/orders'
 import { Route as ApiPublicSsoAigcTicketRouteImport } from './routes/api/public/sso/aigc-ticket'
+import { Route as ApiPublicSsoAigcExchangeRouteImport } from './routes/api/public/sso/aigc-exchange'
 import { Route as ApiPublicHooksYouzanSyncWorkerRouteImport } from './routes/api/public/hooks/youzan-sync-worker'
 import { Route as ApiPublicHooksYouzanSyncRouteImport } from './routes/api/public/hooks/youzan-sync'
 import { Route as ApiPublicHooksYouzanStockWorkerRouteImport } from './routes/api/public/hooks/youzan-stock-worker'
@@ -568,6 +569,12 @@ const ApiPublicSsoAigcTicketRoute = ApiPublicSsoAigcTicketRouteImport.update({
   path: '/api/public/sso/aigc-ticket',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicSsoAigcExchangeRoute =
+  ApiPublicSsoAigcExchangeRouteImport.update({
+    id: '/api/public/sso/aigc-exchange',
+    path: '/api/public/sso/aigc-exchange',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksYouzanSyncWorkerRoute =
   ApiPublicHooksYouzanSyncWorkerRouteImport.update({
     id: '/api/public/hooks/youzan-sync-worker',
@@ -1159,6 +1166,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
   '/api/public/hooks/youzan-sync': typeof ApiPublicHooksYouzanSyncRoute
   '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
+  '/api/public/sso/aigc-exchange': typeof ApiPublicSsoAigcExchangeRoute
   '/api/public/sso/aigc-ticket': typeof ApiPublicSsoAigcTicketRoute
   '/api/public/storefront/orders': typeof ApiPublicStorefrontOrdersRouteWithChildren
   '/api/public/storefront/products': typeof ApiPublicStorefrontProductsRouteWithChildren
@@ -1314,6 +1322,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
   '/api/public/hooks/youzan-sync': typeof ApiPublicHooksYouzanSyncRoute
   '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
+  '/api/public/sso/aigc-exchange': typeof ApiPublicSsoAigcExchangeRoute
   '/api/public/sso/aigc-ticket': typeof ApiPublicSsoAigcTicketRoute
   '/api/public/storefront/orders': typeof ApiPublicStorefrontOrdersRouteWithChildren
   '/api/public/storefront/products': typeof ApiPublicStorefrontProductsRouteWithChildren
@@ -1477,6 +1486,7 @@ export interface FileRoutesById {
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
   '/api/public/hooks/youzan-sync': typeof ApiPublicHooksYouzanSyncRoute
   '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
+  '/api/public/sso/aigc-exchange': typeof ApiPublicSsoAigcExchangeRoute
   '/api/public/sso/aigc-ticket': typeof ApiPublicSsoAigcTicketRoute
   '/api/public/storefront/orders': typeof ApiPublicStorefrontOrdersRouteWithChildren
   '/api/public/storefront/products': typeof ApiPublicStorefrontProductsRouteWithChildren
@@ -1641,6 +1651,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-stock-worker'
     | '/api/public/hooks/youzan-sync'
     | '/api/public/hooks/youzan-sync-worker'
+    | '/api/public/sso/aigc-exchange'
     | '/api/public/sso/aigc-ticket'
     | '/api/public/storefront/orders'
     | '/api/public/storefront/products'
@@ -1796,6 +1807,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-stock-worker'
     | '/api/public/hooks/youzan-sync'
     | '/api/public/hooks/youzan-sync-worker'
+    | '/api/public/sso/aigc-exchange'
     | '/api/public/sso/aigc-ticket'
     | '/api/public/storefront/orders'
     | '/api/public/storefront/products'
@@ -1958,6 +1970,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-stock-worker'
     | '/api/public/hooks/youzan-sync'
     | '/api/public/hooks/youzan-sync-worker'
+    | '/api/public/sso/aigc-exchange'
     | '/api/public/sso/aigc-ticket'
     | '/api/public/storefront/orders'
     | '/api/public/storefront/products'
@@ -2082,6 +2095,7 @@ export interface RootRouteChildren {
   ApiPublicHooksYouzanStockWorkerRoute: typeof ApiPublicHooksYouzanStockWorkerRoute
   ApiPublicHooksYouzanSyncRoute: typeof ApiPublicHooksYouzanSyncRoute
   ApiPublicHooksYouzanSyncWorkerRoute: typeof ApiPublicHooksYouzanSyncWorkerRoute
+  ApiPublicSsoAigcExchangeRoute: typeof ApiPublicSsoAigcExchangeRoute
   ApiPublicSsoAigcTicketRoute: typeof ApiPublicSsoAigcTicketRoute
   ApiPublicStorefrontOrdersRoute: typeof ApiPublicStorefrontOrdersRouteWithChildren
   ApiPublicStorefrontProductsRoute: typeof ApiPublicStorefrontProductsRouteWithChildren
@@ -2665,6 +2679,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/sso/aigc-ticket'
       fullPath: '/api/public/sso/aigc-ticket'
       preLoaderRoute: typeof ApiPublicSsoAigcTicketRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/sso/aigc-exchange': {
+      id: '/api/public/sso/aigc-exchange'
+      path: '/api/public/sso/aigc-exchange'
+      fullPath: '/api/public/sso/aigc-exchange'
+      preLoaderRoute: typeof ApiPublicSsoAigcExchangeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/youzan-sync-worker': {
@@ -3726,6 +3747,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksYouzanStockWorkerRoute: ApiPublicHooksYouzanStockWorkerRoute,
   ApiPublicHooksYouzanSyncRoute: ApiPublicHooksYouzanSyncRoute,
   ApiPublicHooksYouzanSyncWorkerRoute: ApiPublicHooksYouzanSyncWorkerRoute,
+  ApiPublicSsoAigcExchangeRoute: ApiPublicSsoAigcExchangeRoute,
   ApiPublicSsoAigcTicketRoute: ApiPublicSsoAigcTicketRoute,
   ApiPublicStorefrontOrdersRoute: ApiPublicStorefrontOrdersRouteWithChildren,
   ApiPublicStorefrontProductsRoute:
