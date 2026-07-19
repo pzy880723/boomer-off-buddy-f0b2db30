@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { emailToPhone } from "@/lib/auth-config";
+import { hasAigcAccess, isActiveBan, isValidSsoTicket } from "@/lib/aigc-sso-contract";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -14,6 +15,7 @@ function json(body: unknown, init: ResponseInit = {}) {
     ...init,
     headers: {
       "Content-Type": "application/json",
+      "Cache-Control": "no-store",
       ...CORS,
       ...(init.headers || {}),
     },
@@ -60,40 +62,33 @@ export const Route = createFileRoute("/api/public/sso/aigc-exchange")({
         }
         const ticket = (body.ticket ?? "").trim();
         if (!ticket) return err("缺少 ticket", 400, "ticket_required");
+        if (!isValidSsoTicket(ticket)) return err("票据无效", 400, "ticket_invalid");
 
         const tokenHash = createHash("sha256").update(ticket).digest("hex");
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-        // Atomic consume: update only if not consumed and not expired
         const nowIso = new Date().toISOString();
-        const { data: consumed, error: consumeErr } = await supabaseAdmin
+        const { data: ticketRow, error: ticketErr } = await supabaseAdmin
           .from("aigc_sso_tickets" as never)
-          .update({ consumed_at: nowIso } as never)
+          .select("id, user_id, consumed_at, expires_at")
           .eq("token_hash" as never, tokenHash)
-          .is("consumed_at" as never, null)
-          .gt("expires_at" as never, nowIso)
-          .select("id, user_id, expires_at")
           .maybeSingle();
-
-        if (consumeErr) {
-          console.error("[aigc-sso] consume failed", consumeErr);
-          return err("兑换失败", 500, "consume_failed");
+        if (ticketErr) {
+          console.error("[aigc-sso] ticket lookup failed", ticketErr);
+          return err("兑换失败", 500, "ticket_lookup_failed");
         }
-        if (!consumed) {
-          // Distinguish: does the ticket exist at all?
-          const { data: existing } = await supabaseAdmin
-            .from("aigc_sso_tickets" as never)
-            .select("consumed_at, expires_at")
-            .eq("token_hash" as never, tokenHash)
-            .maybeSingle();
-          if (!existing) return err("票据无效", 400, "ticket_invalid");
-          const row = existing as { consumed_at: string | null; expires_at: string };
-          if (row.consumed_at) return err("票据已被使用", 400, "ticket_consumed");
-          return err("票据已过期", 400, "ticket_expired");
-        }
+        if (!ticketRow) return err("票据无效", 400, "ticket_invalid");
+        const pendingTicket = ticketRow as {
+          id: string;
+          user_id: string;
+          consumed_at: string | null;
+          expires_at: string;
+        };
+        if (pendingTicket.consumed_at) return err("票据已被使用", 400, "ticket_consumed");
+        if (pendingTicket.expires_at <= nowIso) return err("票据已过期", 400, "ticket_expired");
 
-        const userId = (consumed as { user_id: string }).user_id;
+        const userId = pendingTicket.user_id;
 
         const { data: userRes, error: userErr } =
           await supabaseAdmin.auth.admin.getUserById(userId);
@@ -101,7 +96,7 @@ export const Route = createFileRoute("/api/public/sso/aigc-exchange")({
           return err("用户不存在", 404, "user_not_found");
         }
         const u = userRes.user;
-        if ((u as { banned_until?: string | null }).banned_until) {
+        if (isActiveBan((u as { banned_until?: string | null }).banned_until)) {
           return err("账号已停用", 403, "user_banned");
         }
 
@@ -117,23 +112,81 @@ export const Route = createFileRoute("/api/public/sso/aigc-exchange")({
           (u.user_metadata?.full_name as string | undefined) ??
           null;
 
-        const { data: roleRows } = await supabaseAdmin
+        const { data: roleRows, error: roleErr } = await supabaseAdmin
           .from("user_roles" as never)
           .select("role")
           .eq("user_id" as never, userId);
+        if (roleErr) {
+          console.error("[aigc-sso] role lookup failed", roleErr);
+          return err("读取账号权限失败", 500, "role_lookup_failed");
+        }
         const roles = ((roleRows as { role: string }[] | null) ?? []).map((r) => r.role);
+        if (!hasAigcAccess(roles, [])) {
+          return err("该账号暂无 AI 营销中心权限", 403, "no_aigc_permission");
+        }
 
-        // Shops the user has access to (kind='shop')
-        const { data: permRows } = await supabaseAdmin
-          .from("user_location_perms" as never)
-          .select("location_id, location:inv_locations!location_id(id, name, kind)")
-          .eq("user_id" as never, userId);
-        const shops = ((permRows as Array<{
-          location: { id: string; name: string; kind: string } | null;
-        }> | null) ?? [])
-          .map((r) => r.location)
-          .filter((l): l is { id: string; name: string; kind: string } => !!l && l.kind === "shop")
-          .map((l) => ({ id: l.id, name: l.name }));
+        let shops: Array<{ id: string; name: string }> = [];
+        const isHeadquarters = roles.includes("super_admin") || roles.includes("hq_operator");
+        if (isHeadquarters) {
+          const { data: allShops, error: shopErr } = await supabaseAdmin
+            .from("inv_locations" as never)
+            .select("id, name")
+            .eq("kind" as never, "shop")
+            .eq("is_active" as never, true)
+            .order("name" as never, { ascending: true });
+          if (shopErr) {
+            console.error("[aigc-sso] headquarters shop lookup failed", shopErr);
+            return err("读取门店范围失败", 500, "shop_lookup_failed");
+          }
+          shops = ((allShops as Array<{ id: string; name: string }> | null) ?? []).map((shop) => ({
+            id: shop.id,
+            name: shop.name,
+          }));
+        } else {
+          const { data: permRows, error: permErr } = await supabaseAdmin
+            .from("user_location_perms" as never)
+            .select("location_id, location:inv_locations!location_id(id, name, kind)")
+            .eq("user_id" as never, userId);
+          if (permErr) {
+            console.error("[aigc-sso] user shop lookup failed", permErr);
+            return err("读取门店范围失败", 500, "shop_lookup_failed");
+          }
+          shops = (
+            (permRows as Array<{
+              location: { id: string; name: string; kind: string } | null;
+            }> | null) ?? []
+          )
+            .map((row) => row.location)
+            .filter((location): location is { id: string; name: string; kind: string } =>
+              Boolean(location && location.kind === "shop"),
+            )
+            .map((location) => ({ id: location.id, name: location.name }));
+        }
+
+        // Consume only after the account, permissions and shop scope have been verified.
+        // The conditional update remains atomic, so only one concurrent request can win.
+        const { data: consumed, error: consumeErr } = await supabaseAdmin
+          .from("aigc_sso_tickets" as never)
+          .update({ consumed_at: nowIso } as never)
+          .eq("id" as never, pendingTicket.id)
+          .is("consumed_at" as never, null)
+          .gt("expires_at" as never, nowIso)
+          .select("id")
+          .maybeSingle();
+        if (consumeErr) {
+          console.error("[aigc-sso] consume failed", consumeErr);
+          return err("兑换失败", 500, "consume_failed");
+        }
+        if (!consumed) {
+          const { data: latest } = await supabaseAdmin
+            .from("aigc_sso_tickets" as never)
+            .select("consumed_at, expires_at")
+            .eq("id" as never, pendingTicket.id)
+            .maybeSingle();
+          const latestTicket = latest as { consumed_at: string | null; expires_at: string } | null;
+          if (latestTicket?.consumed_at) return err("票据已被使用", 400, "ticket_consumed");
+          return err("票据已过期", 400, "ticket_expired");
+        }
 
         return json({
           ok: true,

@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createHash, randomBytes } from "node:crypto";
+import { buildAigcRedirectUrl, hasAigcAccess, isActiveBan } from "@/lib/aigc-sso-contract";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -13,6 +14,7 @@ function json(body: unknown, init: ResponseInit = {}) {
     ...init,
     headers: {
       "Content-Type": "application/json",
+      "Cache-Control": "no-store",
       ...CORS,
       ...(init.headers || {}),
     },
@@ -43,8 +45,21 @@ export const Route = createFileRoute("/api/public/sso/aigc-ticket")({
           return err("登录已失效，请重新登录", 401, "invalid_session");
         }
         const user = userData.user;
-        if ((user as { banned_until?: string | null }).banned_until) {
+        if (isActiveBan((user as { banned_until?: string | null }).banned_until)) {
           return err("账号已停用", 403, "user_banned");
+        }
+
+        const { data: roleRows, error: roleErr } = await supabaseAdmin
+          .from("user_roles" as never)
+          .select("role")
+          .eq("user_id" as never, user.id);
+        if (roleErr) {
+          console.error("[aigc-sso] role lookup failed", roleErr);
+          return err("读取账号权限失败", 500, "role_lookup_failed");
+        }
+        const roles = ((roleRows as { role: string }[] | null) ?? []).map((row) => row.role);
+        if (!hasAigcAccess(roles, [])) {
+          return err("该账号暂无 AI 营销中心权限", 403, "no_aigc_permission");
         }
 
         const rawTicket = randomBytes(32).toString("base64url");
@@ -57,22 +72,20 @@ export const Route = createFileRoute("/api/public/sso/aigc-ticket")({
           null;
         const ua = request.headers.get("user-agent") || null;
 
-        const { error: insertErr } = await supabaseAdmin
-          .from("aigc_sso_tickets" as never)
-          .insert({
-            user_id: user.id,
-            token_hash: tokenHash,
-            expires_at: expiresAt,
-            ip,
-            user_agent: ua,
-          } as never);
+        const { error: insertErr } = await supabaseAdmin.from("aigc_sso_tickets" as never).insert({
+          user_id: user.id,
+          token_hash: tokenHash,
+          expires_at: expiresAt,
+          ip,
+          user_agent: ua,
+        } as never);
         if (insertErr) {
           console.error("[aigc-sso] insert ticket failed", insertErr);
           return err("生成登录票据失败", 500, "ticket_persist_failed");
         }
 
-        const aigcBase = (process.env.AIGC_PUBLIC_URL || "https://aigc.boomeroff.com").replace(/\/+$/, "");
-        const redirectUrl = `${aigcBase}/auth/erp?ticket=${encodeURIComponent(rawTicket)}`;
+        const aigcBase = process.env.AIGC_PUBLIC_URL || "https://aigc.boomeroff.com";
+        const redirectUrl = buildAigcRedirectUrl(aigcBase, rawTicket);
 
         return json({
           ok: true,

@@ -21,7 +21,6 @@ import {
   ArrowLeftRight,
   Building2,
   Users,
-  
   Activity,
   ShieldCheck,
   AlertCircle,
@@ -32,7 +31,6 @@ import {
   Tag,
   Sparkles,
   type LucideIcon,
-
 } from "lucide-react";
 import { useAuthSession } from "@/hooks/use-auth-session";
 import { isSuperAdminPhone, resolveUserPhone } from "@/lib/auth-config";
@@ -144,16 +142,16 @@ const groups: NavGroup[] = [
   },
   {
     label: "运营",
-    items: [
-      { title: "知识库", url: "/knowledge", icon: BookOpen },
-    ],
+    items: [{ title: "知识库", url: "/knowledge", icon: BookOpen }],
   },
 ];
 
 export function AppSidebar() {
   const router = useRouter();
   const currentPath = useRouterState({ select: (s) => s.location.pathname });
-  const currentSearch = useRouterState({ select: (s) => s.location.search as Record<string, unknown> });
+  const currentSearch = useRouterState({
+    select: (s) => s.location.search as Record<string, unknown>,
+  });
   const { state } = useSidebar();
   const { session } = useAuthSession();
   const isSuperAdmin = isSuperAdminPhone(resolveUserPhone(session?.user));
@@ -218,7 +216,9 @@ export function AppSidebar() {
               <SidebarMenu>
                 {group.items.map((item) => {
                   const active = isActive(item);
-                  const key = item.url + (item.search ? `?${new URLSearchParams(item.search).toString()}` : "");
+                  const key =
+                    item.url +
+                    (item.search ? `?${new URLSearchParams(item.search).toString()}` : "");
                   return (
                     <SidebarMenuItem key={key}>
                       <SidebarMenuButton
@@ -279,7 +279,6 @@ export function AppSidebar() {
           </div>
         )}
       </SidebarFooter>
-
     </Sidebar>
   );
 }
@@ -293,7 +292,8 @@ function AigcLauncherButton({ collapsed }: { collapsed: boolean }) {
     if (loading) return;
     setLoading(true);
     // Open blank tab synchronously to avoid popup blockers.
-    const win = window.open("about:blank", "_blank", "noopener,noreferrer");
+    const win = window.open("about:blank", "_blank");
+    if (win) win.opener = null;
     try {
       const { supabase } = await import("@/integrations/supabase/client");
       const { data: sessionData } = await supabase.auth.getSession();
@@ -321,7 +321,7 @@ function AigcLauncherButton({ collapsed }: { collapsed: boolean }) {
         json.data.redirect_url ||
         `${AIGC_BASE_URL}/auth/erp?ticket=${encodeURIComponent(json.data.ticket)}`;
       if (win) {
-        win.location.href = url;
+        win.location.replace(url);
       } else {
         window.open(url, "_blank", "noopener,noreferrer");
       }
@@ -365,4 +365,3 @@ function AigcLauncherButton({ collapsed }: { collapsed: boolean }) {
     </button>
   );
 }
-
