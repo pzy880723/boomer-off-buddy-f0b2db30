@@ -280,3 +280,84 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
+
+const AIGC_BASE_URL = "https://aigc.boomeroff.com";
+
+function AigcLauncherButton({ collapsed }: { collapsed: boolean }) {
+  const [loading, setLoading] = useState(false);
+
+  const openAigc = async () => {
+    if (loading) return;
+    setLoading(true);
+    // Open blank tab synchronously to avoid popup blockers.
+    const win = window.open("about:blank", "_blank", "noopener,noreferrer");
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        win?.close();
+        toast.error("请先登录 ERP 后再进入 AI 营销中心");
+        return;
+      }
+      const resp = await fetch("/api/public/sso/aigc-ticket", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const json = (await resp.json().catch(() => ({}))) as {
+        ok?: boolean;
+        data?: { ticket?: string };
+        error?: string;
+      };
+      if (!resp.ok || !json.ok || !json.data?.ticket) {
+        win?.close();
+        toast.error(json.error || "打开 AI 营销中心失败，请稍后再试");
+        return;
+      }
+      const url = `${AIGC_BASE_URL}/auth/erp?ticket=${encodeURIComponent(json.data.ticket)}`;
+      if (win) {
+        win.location.href = url;
+      } else {
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
+    } catch (e) {
+      win?.close();
+      toast.error(e instanceof Error ? e.message : "网络异常，请稍后再试");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (collapsed) {
+    return (
+      <SidebarMenuButton
+        tooltip="AI 营销中心 · 内容生成与全平台发布"
+        onClick={openAigc}
+        disabled={loading}
+        className="h-9 justify-center text-[#d32f2f] hover:bg-[#d32f2f]/10 hover:text-[#d32f2f]"
+      >
+        <Sparkles className="h-4 w-4" />
+      </SidebarMenuButton>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={openAigc}
+      disabled={loading}
+      className="group flex w-full items-center gap-2.5 rounded-lg border border-[#d32f2f]/25 bg-[#d32f2f]/5 px-3 py-2 text-left transition hover:border-[#d32f2f]/50 hover:bg-[#d32f2f]/10 disabled:opacity-60"
+    >
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#d32f2f]/15 text-[#d32f2f]">
+        <Sparkles className="h-4 w-4" />
+      </span>
+      <span className="flex min-w-0 flex-col">
+        <span className="text-sm font-semibold text-[#d32f2f]">AI 营销中心</span>
+        <span className="truncate text-[11px] text-sidebar-foreground/60">
+          {loading ? "正在打开…" : "内容生成与全平台发布"}
+        </span>
+      </span>
+    </button>
+  );
+}
+
