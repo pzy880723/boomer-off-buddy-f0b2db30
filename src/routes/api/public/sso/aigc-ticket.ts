@@ -71,12 +71,16 @@ export const Route = createFileRoute("/api/public/sso/aigc-ticket")({
           return err("生成登录票据失败", 500, "ticket_persist_failed");
         }
 
+        const aigcBase = (process.env.AIGC_PUBLIC_URL || "https://aigc.boomeroff.com").replace(/\/+$/, "");
+        const redirectUrl = `${aigcBase}/auth/erp?ticket=${encodeURIComponent(rawTicket)}`;
+
         return json({
           ok: true,
           data: {
             ticket: rawTicket,
             expires_at: expiresAt,
             expires_in: TICKET_TTL_SECONDS,
+            redirect_url: redirectUrl,
           },
         });
       },
