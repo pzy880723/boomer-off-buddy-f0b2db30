@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      aigc_sso_tickets: {
+        Row: {
+          consumed_at: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          ip: string | null
+          token_hash: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          consumed_at?: string | null
+          created_at?: string
+          expires_at: string
+          id?: string
+          ip?: string | null
+          token_hash: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          ip?: string | null
+          token_hash?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       app_settings: {
         Row: {
           key: string
@@ -4017,6 +4050,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      aigc_sso_cleanup_expired: { Args: never; Returns: undefined }
       claim_channel_sync_tasks: {
         Args: {
           p_lease_seconds?: number
