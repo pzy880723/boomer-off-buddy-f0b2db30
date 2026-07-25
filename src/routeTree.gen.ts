@@ -9,221 +9,171 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as YouzanRouteImport } from './routes/youzan'
-import { Route as StoreRouteImport } from './routes/store'
-import { Route as ShopMgmtRouteImport } from './routes/shop-mgmt'
-import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as ProductCategoriesRouteImport } from './routes/product-categories'
-import { Route as ProductBrandsRouteImport } from './routes/product-brands'
-import { Route as OrdersRouteImport } from './routes/orders'
-import { Route as MRouteImport } from './routes/m'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as KnowledgeRouteImport } from './routes/knowledge'
-import { Route as DashboardRouteImport } from './routes/dashboard'
-import { Route as ApiDocsRouteImport } from './routes/api-docs'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as StoreIndexRouteImport } from './routes/store.index'
-import { Route as MIndexRouteImport } from './routes/m.index'
-import { Route as YouzanSyncRouteImport } from './routes/youzan.sync'
-import { Route as StoresYouzanRouteImport } from './routes/stores.youzan'
-import { Route as StoresProductsRouteImport } from './routes/stores.products'
-import { Route as StoresListRouteImport } from './routes/stores.list'
-import { Route as StoresFranchiseesRouteImport } from './routes/stores.franchisees'
-import { Route as StoreScanRouteImport } from './routes/store.scan'
-import { Route as StoreInventoryRouteImport } from './routes/store.inventory'
-import { Route as StoreIncomingRouteImport } from './routes/store.incoming'
-import { Route as ShopMgmtShopsRouteImport } from './routes/shop-mgmt.shops'
-import { Route as ShopMgmtProductsRouteImport } from './routes/shop-mgmt.products'
-import { Route as ShopMgmtOnlineRouteImport } from './routes/shop-mgmt.online'
-import { Route as ShopMgmtFranchiseesRouteImport } from './routes/shop-mgmt.franchisees'
-import { Route as PurchaseJapanParcelRouteImport } from './routes/purchase.japan-parcel'
-import { Route as PurchaseJapanBulkRouteImport } from './routes/purchase.japan-bulk'
-import { Route as PurchaseDomesticBulkRouteImport } from './routes/purchase.domestic-bulk'
-import { Route as PurchaseDomesticRouteImport } from './routes/purchase.domestic'
-import { Route as OrdersWholesaleRouteImport } from './routes/orders.wholesale'
-import { Route as OrdersShopsRouteImport } from './routes/orders.shops'
-import { Route as OrdersDispatchRouteImport } from './routes/orders.dispatch'
-import { Route as MScanRouteImport } from './routes/m.scan'
-import { Route as MPhotoSearchRouteImport } from './routes/m.photo-search'
-import { Route as MParcelsRouteImport } from './routes/m.parcels'
-import { Route as MInboundRouteImport } from './routes/m.inbound'
-import { Route as InventoryUnclaimedRouteImport } from './routes/inventory.unclaimed'
-import { Route as InventoryTransfersRouteImport } from './routes/inventory.transfers'
-import { Route as InventorySkusRouteImport } from './routes/inventory.skus'
-import { Route as InventoryReturnInspectionRouteImport } from './routes/inventory.return-inspection'
-import { Route as InventoryProductsRouteImport } from './routes/inventory.products'
-import { Route as InventoryLocationsRouteImport } from './routes/inventory.locations'
-import { Route as InventoryInboundRouteImport } from './routes/inventory.inbound'
-import { Route as InventoryDevicesRouteImport } from './routes/inventory.devices'
-import { Route as InventoryBatchesRouteImport } from './routes/inventory.batches'
-import { Route as AdminUsersRouteImport } from './routes/admin.users'
-import { Route as AdminChannelSyncRouteImport } from './routes/admin.channel-sync'
+import { Route as ApiDocsRouteImport } from './routes/api-docs'
+import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as KnowledgeRouteImport } from './routes/knowledge'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as MRouteImport } from './routes/m'
+import { Route as OrdersRouteImport } from './routes/orders'
+import { Route as ProductBrandsRouteImport } from './routes/product-brands'
+import { Route as ProductCategoriesRouteImport } from './routes/product-categories'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ShopMgmtRouteImport } from './routes/shop-mgmt'
+import { Route as StoreRouteImport } from './routes/store'
+import { Route as YouzanRouteImport } from './routes/youzan'
 import { Route as AdminApiIntegrationRouteImport } from './routes/admin.api-integration'
-import { Route as PurchaseJapanParcelIndexRouteImport } from './routes/purchase.japan-parcel.index'
-import { Route as PurchaseDomesticIndexRouteImport } from './routes/purchase.domestic.index'
-import { Route as PurchaseDomesticBulkIndexRouteImport } from './routes/purchase.domestic-bulk.index'
-import { Route as MSkusIndexRouteImport } from './routes/m.skus.index'
-import { Route as InventoryStocktakesIndexRouteImport } from './routes/inventory.stocktakes.index'
-import { Route as InventorySkusIndexRouteImport } from './routes/inventory.skus.index'
-import { Route as InventoryInboundIndexRouteImport } from './routes/inventory.inbound.index'
-import { Route as PurchaseJapanParcelNewRouteImport } from './routes/purchase.japan-parcel.new'
-import { Route as PurchaseJapanParcelImportRouteImport } from './routes/purchase.japan-parcel.import'
-import { Route as PurchaseJapanParcelAccountsRouteImport } from './routes/purchase.japan-parcel.accounts'
-import { Route as PurchaseJapanParcelIdRouteImport } from './routes/purchase.japan-parcel.$id'
-import { Route as PurchaseDomesticImportRouteImport } from './routes/purchase.domestic.import'
-import { Route as PurchaseDomesticIdRouteImport } from './routes/purchase.domestic.$id'
-import { Route as PurchaseDomesticBulkNewRouteImport } from './routes/purchase.domestic-bulk.new'
-import { Route as PurchaseDomesticBulkIdRouteImport } from './routes/purchase.domestic-bulk.$id'
-import { Route as MSkusIdRouteImport } from './routes/m.skus.$id'
-import { Route as MReceiveIdRouteImport } from './routes/m.receive.$id'
-import { Route as MProductsCodeRouteImport } from './routes/m.products.$code'
-import { Route as MDomesticQuickAddRouteImport } from './routes/m.domestic.quick-add'
-import { Route as InventoryStocktakesIdRouteImport } from './routes/inventory.stocktakes.$id'
-import { Route as InventorySkusIdRouteImport } from './routes/inventory.skus.$id'
-import { Route as InventoryProductsCodeRouteImport } from './routes/inventory.products.$code'
-import { Route as InventoryInboundNewRouteImport } from './routes/inventory.inbound.new'
-import { Route as InventoryInboundIdRouteImport } from './routes/inventory.inbound.$id'
+import { Route as AdminChannelSyncRouteImport } from './routes/admin.channel-sync'
+import { Route as AdminUsersRouteImport } from './routes/admin.users'
+import { Route as InventoryBatchesRouteImport } from './routes/inventory.batches'
+import { Route as InventoryDevicesRouteImport } from './routes/inventory.devices'
+import { Route as InventoryInboundRouteImport } from './routes/inventory.inbound'
+import { Route as InventoryLocationsRouteImport } from './routes/inventory.locations'
+import { Route as InventoryProductsRouteImport } from './routes/inventory.products'
+import { Route as InventoryReturnInspectionRouteImport } from './routes/inventory.return-inspection'
+import { Route as InventorySkusRouteImport } from './routes/inventory.skus'
+import { Route as InventoryTransfersRouteImport } from './routes/inventory.transfers'
+import { Route as InventoryUnclaimedRouteImport } from './routes/inventory.unclaimed'
+import { Route as MIndexRouteImport } from './routes/m.index'
+import { Route as MInboundRouteImport } from './routes/m.inbound'
+import { Route as MParcelsRouteImport } from './routes/m.parcels'
+import { Route as MPhotoSearchRouteImport } from './routes/m.photo-search'
+import { Route as MScanRouteImport } from './routes/m.scan'
+import { Route as OrdersDispatchRouteImport } from './routes/orders.dispatch'
+import { Route as OrdersShopsRouteImport } from './routes/orders.shops'
+import { Route as OrdersWholesaleRouteImport } from './routes/orders.wholesale'
+import { Route as PurchaseDomesticRouteImport } from './routes/purchase.domestic'
+import { Route as PurchaseDomesticBulkRouteImport } from './routes/purchase.domestic-bulk'
+import { Route as PurchaseJapanBulkRouteImport } from './routes/purchase.japan-bulk'
+import { Route as PurchaseJapanParcelRouteImport } from './routes/purchase.japan-parcel'
+import { Route as ShopMgmtFranchiseesRouteImport } from './routes/shop-mgmt.franchisees'
+import { Route as ShopMgmtOnlineRouteImport } from './routes/shop-mgmt.online'
+import { Route as ShopMgmtProductsRouteImport } from './routes/shop-mgmt.products'
+import { Route as ShopMgmtShopsRouteImport } from './routes/shop-mgmt.shops'
+import { Route as StoreIndexRouteImport } from './routes/store.index'
+import { Route as StoreIncomingRouteImport } from './routes/store.incoming'
+import { Route as StoreInventoryRouteImport } from './routes/store.inventory'
+import { Route as StoreScanRouteImport } from './routes/store.scan'
+import { Route as StoresFranchiseesRouteImport } from './routes/stores.franchisees'
+import { Route as StoresListRouteImport } from './routes/stores.list'
+import { Route as StoresProductsRouteImport } from './routes/stores.products'
+import { Route as StoresYouzanRouteImport } from './routes/stores.youzan'
+import { Route as YouzanSyncRouteImport } from './routes/youzan.sync'
 import { Route as ApiPublicMerukiIngestRouteImport } from './routes/api/public/meruki-ingest'
-import { Route as ApiPublicStorefrontProductsRouteImport } from './routes/api/public/storefront/products'
-import { Route as ApiPublicStorefrontOrdersRouteImport } from './routes/api/public/storefront/orders'
-import { Route as ApiPublicSsoAigcTicketRouteImport } from './routes/api/public/sso/aigc-ticket'
-import { Route as ApiPublicSsoAigcExchangeRouteImport } from './routes/api/public/sso/aigc-exchange'
-import { Route as ApiPublicHooksYouzanSyncWorkerRouteImport } from './routes/api/public/hooks/youzan-sync-worker'
-import { Route as ApiPublicHooksYouzanSyncRouteImport } from './routes/api/public/hooks/youzan-sync'
-import { Route as ApiPublicHooksYouzanStockWorkerRouteImport } from './routes/api/public/hooks/youzan-stock-worker'
-import { Route as ApiPublicHooksYouzanRelistRouteImport } from './routes/api/public/hooks/youzan-relist'
-import { Route as ApiPublicHooksYouzanReconcileRouteImport } from './routes/api/public/hooks/youzan-reconcile'
-import { Route as ApiPublicHooksYouzanMessageRouteImport } from './routes/api/public/hooks/youzan-message'
-import { Route as ApiPublicHooksYouzanFixChannelRouteImport } from './routes/api/public/hooks/youzan-fix-channel'
-import { Route as ApiPublicHooksYouzanDistributionProbeRouteImport } from './routes/api/public/hooks/youzan-distribution-probe'
-import { Route as ApiPublicHooksYouzanCleanupRouteImport } from './routes/api/public/hooks/youzan-cleanup'
-import { Route as ApiPublicHooksTestPublishWithStockRouteImport } from './routes/api/public/hooks/test-publish-with-stock'
-import { Route as ApiPublicHooksCommerceReleaseExpiredRouteImport } from './routes/api/public/hooks/commerce-release-expired'
-import { Route as ApiPublicHooksChannelSyncWorkerRouteImport } from './routes/api/public/hooks/channel-sync-worker'
-import { Route as ApiPublicHooksChainProbeVerifyRouteImport } from './routes/api/public/hooks/chain-probe-verify'
-import { Route as ApiPublicHandheldTransfersRouteImport } from './routes/api/public/handheld/transfers'
-import { Route as ApiPublicHandheldSyncRecordsRouteImport } from './routes/api/public/handheld/sync-records'
-import { Route as ApiPublicHandheldStocktakesRouteImport } from './routes/api/public/handheld/stocktakes'
-import { Route as ApiPublicHandheldProductsRouteImport } from './routes/api/public/handheld/products'
-import { Route as ApiPublicHandheldParcelsRouteImport } from './routes/api/public/handheld/parcels'
-import { Route as ApiPublicHandheldOpenapiDotjsonRouteImport } from './routes/api/public/handheld/openapi[.]json'
-import { Route as ApiPublicHandheldNotificationsRouteImport } from './routes/api/public/handheld/notifications'
-import { Route as ApiPublicHandheldLocationsRouteImport } from './routes/api/public/handheld/locations'
-import { Route as ApiPublicHandheldLabelTemplatesRouteImport } from './routes/api/public/handheld/label-templates'
-import { Route as ApiPublicHandheldGlobalStockRouteImport } from './routes/api/public/handheld/global-stock'
-import { Route as ApiPublicHandheldFulfillmentsRouteImport } from './routes/api/public/handheld/fulfillments'
+import { Route as InventoryInboundIndexRouteImport } from './routes/inventory.inbound.index'
+import { Route as InventoryInboundIdRouteImport } from './routes/inventory.inbound.$id'
+import { Route as InventoryInboundNewRouteImport } from './routes/inventory.inbound.new'
+import { Route as InventoryProductsCodeRouteImport } from './routes/inventory.products.$code'
+import { Route as InventorySkusIndexRouteImport } from './routes/inventory.skus.index'
+import { Route as InventorySkusIdRouteImport } from './routes/inventory.skus.$id'
+import { Route as InventoryStocktakesIndexRouteImport } from './routes/inventory.stocktakes.index'
+import { Route as InventoryStocktakesIdRouteImport } from './routes/inventory.stocktakes.$id'
+import { Route as MDomesticQuickAddRouteImport } from './routes/m.domestic.quick-add'
+import { Route as MProductsCodeRouteImport } from './routes/m.products.$code'
+import { Route as MReceiveIdRouteImport } from './routes/m.receive.$id'
+import { Route as MSkusIndexRouteImport } from './routes/m.skus.index'
+import { Route as MSkusIdRouteImport } from './routes/m.skus.$id'
+import { Route as PurchaseDomesticBulkIndexRouteImport } from './routes/purchase.domestic-bulk.index'
+import { Route as PurchaseDomesticBulkIdRouteImport } from './routes/purchase.domestic-bulk.$id'
+import { Route as PurchaseDomesticBulkNewRouteImport } from './routes/purchase.domestic-bulk.new'
+import { Route as PurchaseDomesticIndexRouteImport } from './routes/purchase.domestic.index'
+import { Route as PurchaseDomesticIdRouteImport } from './routes/purchase.domestic.$id'
+import { Route as PurchaseDomesticImportRouteImport } from './routes/purchase.domestic.import'
+import { Route as PurchaseJapanParcelIndexRouteImport } from './routes/purchase.japan-parcel.index'
+import { Route as PurchaseJapanParcelIdRouteImport } from './routes/purchase.japan-parcel.$id'
+import { Route as PurchaseJapanParcelAccountsRouteImport } from './routes/purchase.japan-parcel.accounts'
+import { Route as PurchaseJapanParcelImportRouteImport } from './routes/purchase.japan-parcel.import'
+import { Route as PurchaseJapanParcelNewRouteImport } from './routes/purchase.japan-parcel.new'
 import { Route as ApiPublicHandheldDashboardRouteImport } from './routes/api/public/handheld/dashboard'
-import { Route as ApiPublicStorefrontProductsIdRouteImport } from './routes/api/public/storefront/products.$id'
-import { Route as ApiPublicStorefrontOrdersIdRouteImport } from './routes/api/public/storefront/orders.$id'
-import { Route as ApiPublicHandheldTransfersIdRouteImport } from './routes/api/public/handheld/transfers.$id'
-import { Route as ApiPublicHandheldTransferShipScanRouteImport } from './routes/api/public/handheld/transfer.ship-scan'
-import { Route as ApiPublicHandheldTransferShipConfirmRouteImport } from './routes/api/public/handheld/transfer.ship-confirm'
-import { Route as ApiPublicHandheldTransferReceiveScanRouteImport } from './routes/api/public/handheld/transfer.receive-scan'
-import { Route as ApiPublicHandheldTransferReceiveConfirmRouteImport } from './routes/api/public/handheld/transfer.receive-confirm'
-import { Route as ApiPublicHandheldStocktakeSubmitRouteImport } from './routes/api/public/handheld/stocktake.submit'
-import { Route as ApiPublicHandheldStocktakeScanRouteImport } from './routes/api/public/handheld/stocktake.scan'
-import { Route as ApiPublicHandheldStocktakeOpenRouteImport } from './routes/api/public/handheld/stocktake.open'
-import { Route as ApiPublicHandheldSkuSearchRouteImport } from './routes/api/public/handheld/sku.search'
-import { Route as ApiPublicHandheldSkuByEpcRouteImport } from './routes/api/public/handheld/sku.by-epc'
-import { Route as ApiPublicHandheldRfidTransferLocationRouteImport } from './routes/api/public/handheld/rfid.transfer-location'
-import { Route as ApiPublicHandheldRfidStockInRouteImport } from './routes/api/public/handheld/rfid.stock-in'
-import { Route as ApiPublicHandheldRfidBindItemRouteImport } from './routes/api/public/handheld/rfid.bind-item'
-import { Route as ApiPublicHandheldRfidBatchStockInRouteImport } from './routes/api/public/handheld/rfid.batch-stock-in'
-import { Route as ApiPublicHandheldRfidEpcRouteImport } from './routes/api/public/handheld/rfid.$epc'
-import { Route as ApiPublicHandheldProductsLookupRouteImport } from './routes/api/public/handheld/products.lookup'
-import { Route as ApiPublicHandheldParcelsCountsRouteImport } from './routes/api/public/handheld/parcels.counts'
-import { Route as ApiPublicHandheldParcelsIdRouteImport } from './routes/api/public/handheld/parcels.$id'
-import { Route as ApiPublicHandheldNotificationsSinceRouteImport } from './routes/api/public/handheld/notifications.since'
-import { Route as ApiPublicHandheldNotificationsReadAllRouteImport } from './routes/api/public/handheld/notifications.read-all'
-import { Route as ApiPublicHandheldLocationSwitchRouteImport } from './routes/api/public/handheld/location.switch'
-import { Route as ApiPublicHandheldLabelTemplatesIdRouteImport } from './routes/api/public/handheld/label-templates.$id'
-import { Route as ApiPublicHandheldItemsUploadImageRouteImport } from './routes/api/public/handheld/items.upload-image'
-import { Route as ApiPublicHandheldItemsSmartCreateRouteImport } from './routes/api/public/handheld/items.smart-create'
-import { Route as ApiPublicHandheldItemsSignReadUrlRouteImport } from './routes/api/public/handheld/items.sign-read-url'
-import { Route as ApiPublicHandheldItemsBindRfidRouteImport } from './routes/api/public/handheld/items.bind-rfid'
-import { Route as ApiPublicHandheldItemsIdRouteImport } from './routes/api/public/handheld/items.$id'
-import { Route as ApiPublicHandheldInboundScanRouteImport } from './routes/api/public/handheld/inbound.scan'
-import { Route as ApiPublicHandheldFulfillmentsIdRouteImport } from './routes/api/public/handheld/fulfillments.$id'
-import { Route as ApiPublicHandheldDiagReportRouteImport } from './routes/api/public/handheld/diag.report'
-import { Route as ApiPublicHandheldAuthRefreshRouteImport } from './routes/api/public/handheld/auth.refresh'
-import { Route as ApiPublicHandheldAuthPingRouteImport } from './routes/api/public/handheld/auth.ping'
-import { Route as ApiPublicHandheldAuthMeRouteImport } from './routes/api/public/handheld/auth.me'
-import { Route as ApiPublicHandheldAuthLogoutRouteImport } from './routes/api/public/handheld/auth.logout'
-import { Route as ApiPublicHandheldAuthLoginRouteImport } from './routes/api/public/handheld/auth.login'
-import { Route as ApiPublicHandheldAuthBootstrapRouteImport } from './routes/api/public/handheld/auth.bootstrap'
-import { Route as ApiPublicHandheldAiRecognizeItemRouteImport } from './routes/api/public/handheld/ai.recognize-item'
-import { Route as ApiPublicHandheldAiPrepareListingImageRouteImport } from './routes/api/public/handheld/ai.prepare-listing-image'
-import { Route as ApiPublicAuthOtpVerifyRouteImport } from './routes/api/public/auth/otp.verify'
+import { Route as ApiPublicHandheldFulfillmentsRouteImport } from './routes/api/public/handheld/fulfillments'
+import { Route as ApiPublicHandheldGlobalStockRouteImport } from './routes/api/public/handheld/global-stock'
+import { Route as ApiPublicHandheldLabelTemplatesRouteImport } from './routes/api/public/handheld/label-templates'
+import { Route as ApiPublicHandheldLocationsRouteImport } from './routes/api/public/handheld/locations'
+import { Route as ApiPublicHandheldNotificationsRouteImport } from './routes/api/public/handheld/notifications'
+import { Route as ApiPublicHandheldOpenapiDotjsonRouteImport } from './routes/api/public/handheld/openapi[.]json'
+import { Route as ApiPublicHandheldParcelsRouteImport } from './routes/api/public/handheld/parcels'
+import { Route as ApiPublicHandheldProductsRouteImport } from './routes/api/public/handheld/products'
+import { Route as ApiPublicHandheldStocktakesRouteImport } from './routes/api/public/handheld/stocktakes'
+import { Route as ApiPublicHandheldSyncRecordsRouteImport } from './routes/api/public/handheld/sync-records'
+import { Route as ApiPublicHandheldTransfersRouteImport } from './routes/api/public/handheld/transfers'
+import { Route as ApiPublicHooksChainProbeVerifyRouteImport } from './routes/api/public/hooks/chain-probe-verify'
+import { Route as ApiPublicHooksChannelSyncWorkerRouteImport } from './routes/api/public/hooks/channel-sync-worker'
+import { Route as ApiPublicHooksCommerceReleaseExpiredRouteImport } from './routes/api/public/hooks/commerce-release-expired'
+import { Route as ApiPublicHooksTestPublishWithStockRouteImport } from './routes/api/public/hooks/test-publish-with-stock'
+import { Route as ApiPublicHooksYouzanCleanupRouteImport } from './routes/api/public/hooks/youzan-cleanup'
+import { Route as ApiPublicHooksYouzanDistributionProbeRouteImport } from './routes/api/public/hooks/youzan-distribution-probe'
+import { Route as ApiPublicHooksYouzanFixChannelRouteImport } from './routes/api/public/hooks/youzan-fix-channel'
+import { Route as ApiPublicHooksYouzanMessageRouteImport } from './routes/api/public/hooks/youzan-message'
+import { Route as ApiPublicHooksYouzanReconcileRouteImport } from './routes/api/public/hooks/youzan-reconcile'
+import { Route as ApiPublicHooksYouzanRelistRouteImport } from './routes/api/public/hooks/youzan-relist'
+import { Route as ApiPublicHooksYouzanStockWorkerRouteImport } from './routes/api/public/hooks/youzan-stock-worker'
+import { Route as ApiPublicHooksYouzanSyncRouteImport } from './routes/api/public/hooks/youzan-sync'
+import { Route as ApiPublicHooksYouzanSyncWorkerRouteImport } from './routes/api/public/hooks/youzan-sync-worker'
+import { Route as ApiPublicSsoAigcExchangeRouteImport } from './routes/api/public/sso/aigc-exchange'
+import { Route as ApiPublicSsoAigcTicketRouteImport } from './routes/api/public/sso/aigc-ticket'
+import { Route as ApiPublicStorefrontOrdersRouteImport } from './routes/api/public/storefront/orders'
+import { Route as ApiPublicStorefrontProductsRouteImport } from './routes/api/public/storefront/products'
 import { Route as ApiPublicAuthOtpSendRouteImport } from './routes/api/public/auth/otp.send'
-import { Route as ApiPublicHandheldTransfersIdScanRouteImport } from './routes/api/public/handheld/transfers.$id.scan'
-import { Route as ApiPublicHandheldTransfersIdConfirmRouteImport } from './routes/api/public/handheld/transfers.$id.confirm'
-import { Route as ApiPublicHandheldLabelTemplatesIdSetDefaultRouteImport } from './routes/api/public/handheld/label-templates.$id.set-default'
-import { Route as ApiPublicHandheldItemsUploadImageMultipartRouteImport } from './routes/api/public/handheld/items.upload-image.multipart'
-import { Route as ApiPublicHandheldItemsIdSyncStatusRouteImport } from './routes/api/public/handheld/items.$id.sync-status'
-import { Route as ApiPublicHandheldItemsIdSetStatusRouteImport } from './routes/api/public/handheld/items.$id.set-status'
-import { Route as ApiPublicHandheldItemsIdRestockRouteImport } from './routes/api/public/handheld/items.$id.restock'
-import { Route as ApiPublicHandheldItemsIdAttachImagesRouteImport } from './routes/api/public/handheld/items.$id.attach-images'
-import { Route as ApiPublicHandheldFulfillmentsIdPickScanRouteImport } from './routes/api/public/handheld/fulfillments.$id.pick-scan'
-import { Route as ApiPublicHandheldFulfillmentsIdPickCompleteRouteImport } from './routes/api/public/handheld/fulfillments.$id.pick-complete'
-import { Route as ApiPublicHandheldFulfillmentsIdClaimRouteImport } from './routes/api/public/handheld/fulfillments.$id.claim'
+import { Route as ApiPublicAuthOtpVerifyRouteImport } from './routes/api/public/auth/otp.verify'
+import { Route as ApiPublicHandheldAiPrepareListingImageRouteImport } from './routes/api/public/handheld/ai.prepare-listing-image'
+import { Route as ApiPublicHandheldAiRecognizeItemRouteImport } from './routes/api/public/handheld/ai.recognize-item'
+import { Route as ApiPublicHandheldAuthBootstrapRouteImport } from './routes/api/public/handheld/auth.bootstrap'
+import { Route as ApiPublicHandheldAuthLoginRouteImport } from './routes/api/public/handheld/auth.login'
+import { Route as ApiPublicHandheldAuthLogoutRouteImport } from './routes/api/public/handheld/auth.logout'
+import { Route as ApiPublicHandheldAuthMeRouteImport } from './routes/api/public/handheld/auth.me'
+import { Route as ApiPublicHandheldAuthPingRouteImport } from './routes/api/public/handheld/auth.ping'
+import { Route as ApiPublicHandheldAuthRefreshRouteImport } from './routes/api/public/handheld/auth.refresh'
+import { Route as ApiPublicHandheldDiagReportRouteImport } from './routes/api/public/handheld/diag.report'
+import { Route as ApiPublicHandheldFulfillmentsIdRouteImport } from './routes/api/public/handheld/fulfillments.$id'
+import { Route as ApiPublicHandheldInboundScanRouteImport } from './routes/api/public/handheld/inbound.scan'
+import { Route as ApiPublicHandheldItemsIdRouteImport } from './routes/api/public/handheld/items.$id'
+import { Route as ApiPublicHandheldItemsBindRfidRouteImport } from './routes/api/public/handheld/items.bind-rfid'
+import { Route as ApiPublicHandheldItemsSignReadUrlRouteImport } from './routes/api/public/handheld/items.sign-read-url'
+import { Route as ApiPublicHandheldItemsSmartCreateRouteImport } from './routes/api/public/handheld/items.smart-create'
+import { Route as ApiPublicHandheldItemsUploadImageRouteImport } from './routes/api/public/handheld/items.upload-image'
+import { Route as ApiPublicHandheldLabelTemplatesIdRouteImport } from './routes/api/public/handheld/label-templates.$id'
+import { Route as ApiPublicHandheldLocationSwitchRouteImport } from './routes/api/public/handheld/location.switch'
+import { Route as ApiPublicHandheldNotificationsReadAllRouteImport } from './routes/api/public/handheld/notifications.read-all'
+import { Route as ApiPublicHandheldNotificationsSinceRouteImport } from './routes/api/public/handheld/notifications.since'
+import { Route as ApiPublicHandheldParcelsIdRouteImport } from './routes/api/public/handheld/parcels.$id'
+import { Route as ApiPublicHandheldParcelsCountsRouteImport } from './routes/api/public/handheld/parcels.counts'
+import { Route as ApiPublicHandheldProductsLookupRouteImport } from './routes/api/public/handheld/products.lookup'
+import { Route as ApiPublicHandheldRfidEpcRouteImport } from './routes/api/public/handheld/rfid.$epc'
+import { Route as ApiPublicHandheldRfidBatchStockInRouteImport } from './routes/api/public/handheld/rfid.batch-stock-in'
+import { Route as ApiPublicHandheldRfidBindItemRouteImport } from './routes/api/public/handheld/rfid.bind-item'
+import { Route as ApiPublicHandheldRfidStockInRouteImport } from './routes/api/public/handheld/rfid.stock-in'
+import { Route as ApiPublicHandheldRfidTransferLocationRouteImport } from './routes/api/public/handheld/rfid.transfer-location'
+import { Route as ApiPublicHandheldSkuByEpcRouteImport } from './routes/api/public/handheld/sku.by-epc'
+import { Route as ApiPublicHandheldSkuSearchRouteImport } from './routes/api/public/handheld/sku.search'
+import { Route as ApiPublicHandheldStocktakeOpenRouteImport } from './routes/api/public/handheld/stocktake.open'
+import { Route as ApiPublicHandheldStocktakeScanRouteImport } from './routes/api/public/handheld/stocktake.scan'
+import { Route as ApiPublicHandheldStocktakeSubmitRouteImport } from './routes/api/public/handheld/stocktake.submit'
+import { Route as ApiPublicHandheldTransferReceiveConfirmRouteImport } from './routes/api/public/handheld/transfer.receive-confirm'
+import { Route as ApiPublicHandheldTransferReceiveScanRouteImport } from './routes/api/public/handheld/transfer.receive-scan'
+import { Route as ApiPublicHandheldTransferShipConfirmRouteImport } from './routes/api/public/handheld/transfer.ship-confirm'
+import { Route as ApiPublicHandheldTransferShipScanRouteImport } from './routes/api/public/handheld/transfer.ship-scan'
+import { Route as ApiPublicHandheldTransfersIdRouteImport } from './routes/api/public/handheld/transfers.$id'
+import { Route as ApiPublicStorefrontOrdersIdRouteImport } from './routes/api/public/storefront/orders.$id'
+import { Route as ApiPublicStorefrontProductsIdRouteImport } from './routes/api/public/storefront/products.$id'
 import { Route as ApiPublicHandheldFulfillmentsIdBindToteRouteImport } from './routes/api/public/handheld/fulfillments.$id.bind-tote'
+import { Route as ApiPublicHandheldFulfillmentsIdClaimRouteImport } from './routes/api/public/handheld/fulfillments.$id.claim'
+import { Route as ApiPublicHandheldFulfillmentsIdPickCompleteRouteImport } from './routes/api/public/handheld/fulfillments.$id.pick-complete'
+import { Route as ApiPublicHandheldFulfillmentsIdPickScanRouteImport } from './routes/api/public/handheld/fulfillments.$id.pick-scan'
+import { Route as ApiPublicHandheldItemsIdAttachImagesRouteImport } from './routes/api/public/handheld/items.$id.attach-images'
+import { Route as ApiPublicHandheldItemsIdRestockRouteImport } from './routes/api/public/handheld/items.$id.restock'
+import { Route as ApiPublicHandheldItemsIdSetStatusRouteImport } from './routes/api/public/handheld/items.$id.set-status'
+import { Route as ApiPublicHandheldItemsIdSyncStatusRouteImport } from './routes/api/public/handheld/items.$id.sync-status'
+import { Route as ApiPublicHandheldItemsUploadImageMultipartRouteImport } from './routes/api/public/handheld/items.upload-image.multipart'
+import { Route as ApiPublicHandheldLabelTemplatesIdSetDefaultRouteImport } from './routes/api/public/handheld/label-templates.$id.set-default'
+import { Route as ApiPublicHandheldTransfersIdConfirmRouteImport } from './routes/api/public/handheld/transfers.$id.confirm'
+import { Route as ApiPublicHandheldTransfersIdScanRouteImport } from './routes/api/public/handheld/transfers.$id.scan'
 import { Route as ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteImport } from './routes/api/public/handheld/parcels.items.$itemId.pack-pieces'
-import { Route as ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRouteImport } from './routes/api/public/handheld/parcels.items.$itemId.pack-pieces.estimate-title'
 import { Route as ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateImageRouteImport } from './routes/api/public/handheld/parcels.items.$itemId.pack-pieces.estimate-image'
+import { Route as ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRouteImport } from './routes/api/public/handheld/parcels.items.$itemId.pack-pieces.estimate-title'
 
-const YouzanRoute = YouzanRouteImport.update({
-  id: '/youzan',
-  path: '/youzan',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const StoreRoute = StoreRouteImport.update({
-  id: '/store',
-  path: '/store',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ShopMgmtRoute = ShopMgmtRouteImport.update({
-  id: '/shop-mgmt',
-  path: '/shop-mgmt',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProductCategoriesRoute = ProductCategoriesRouteImport.update({
-  id: '/product-categories',
-  path: '/product-categories',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProductBrandsRoute = ProductBrandsRouteImport.update({
-  id: '/product-brands',
-  path: '/product-brands',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OrdersRoute = OrdersRouteImport.update({
-  id: '/orders',
-  path: '/orders',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MRoute = MRouteImport.update({
-  id: '/m',
-  path: '/m',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const KnowledgeRoute = KnowledgeRouteImport.update({
-  id: '/knowledge',
-  path: '/knowledge',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DashboardRoute = DashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiDocsRoute = ApiDocsRouteImport.update({
@@ -231,149 +181,99 @@ const ApiDocsRoute = ApiDocsRouteImport.update({
   path: '/api-docs',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
-const StoreIndexRoute = StoreIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => StoreRoute,
-} as any)
-const MIndexRoute = MIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => MRoute,
-} as any)
-const YouzanSyncRoute = YouzanSyncRouteImport.update({
-  id: '/sync',
-  path: '/sync',
-  getParentRoute: () => YouzanRoute,
-} as any)
-const StoresYouzanRoute = StoresYouzanRouteImport.update({
-  id: '/stores/youzan',
-  path: '/stores/youzan',
+const KnowledgeRoute = KnowledgeRouteImport.update({
+  id: '/knowledge',
+  path: '/knowledge',
   getParentRoute: () => rootRouteImport,
 } as any)
-const StoresProductsRoute = StoresProductsRouteImport.update({
-  id: '/stores/products',
-  path: '/stores/products',
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const StoresListRoute = StoresListRouteImport.update({
-  id: '/stores/list',
-  path: '/stores/list',
+const MRoute = MRouteImport.update({
+  id: '/m',
+  path: '/m',
   getParentRoute: () => rootRouteImport,
 } as any)
-const StoresFranchiseesRoute = StoresFranchiseesRouteImport.update({
-  id: '/stores/franchisees',
-  path: '/stores/franchisees',
+const OrdersRoute = OrdersRouteImport.update({
+  id: '/orders',
+  path: '/orders',
   getParentRoute: () => rootRouteImport,
 } as any)
-const StoreScanRoute = StoreScanRouteImport.update({
-  id: '/scan',
-  path: '/scan',
-  getParentRoute: () => StoreRoute,
-} as any)
-const StoreInventoryRoute = StoreInventoryRouteImport.update({
-  id: '/inventory',
-  path: '/inventory',
-  getParentRoute: () => StoreRoute,
-} as any)
-const StoreIncomingRoute = StoreIncomingRouteImport.update({
-  id: '/incoming',
-  path: '/incoming',
-  getParentRoute: () => StoreRoute,
-} as any)
-const ShopMgmtShopsRoute = ShopMgmtShopsRouteImport.update({
-  id: '/shops',
-  path: '/shops',
-  getParentRoute: () => ShopMgmtRoute,
-} as any)
-const ShopMgmtProductsRoute = ShopMgmtProductsRouteImport.update({
-  id: '/products',
-  path: '/products',
-  getParentRoute: () => ShopMgmtRoute,
-} as any)
-const ShopMgmtOnlineRoute = ShopMgmtOnlineRouteImport.update({
-  id: '/online',
-  path: '/online',
-  getParentRoute: () => ShopMgmtRoute,
-} as any)
-const ShopMgmtFranchiseesRoute = ShopMgmtFranchiseesRouteImport.update({
-  id: '/franchisees',
-  path: '/franchisees',
-  getParentRoute: () => ShopMgmtRoute,
-} as any)
-const PurchaseJapanParcelRoute = PurchaseJapanParcelRouteImport.update({
-  id: '/purchase/japan-parcel',
-  path: '/purchase/japan-parcel',
+const ProductBrandsRoute = ProductBrandsRouteImport.update({
+  id: '/product-brands',
+  path: '/product-brands',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PurchaseJapanBulkRoute = PurchaseJapanBulkRouteImport.update({
-  id: '/purchase/japan-bulk',
-  path: '/purchase/japan-bulk',
+const ProductCategoriesRoute = ProductCategoriesRouteImport.update({
+  id: '/product-categories',
+  path: '/product-categories',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PurchaseDomesticBulkRoute = PurchaseDomesticBulkRouteImport.update({
-  id: '/purchase/domestic-bulk',
-  path: '/purchase/domestic-bulk',
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PurchaseDomesticRoute = PurchaseDomesticRouteImport.update({
-  id: '/purchase/domestic',
-  path: '/purchase/domestic',
+const ShopMgmtRoute = ShopMgmtRouteImport.update({
+  id: '/shop-mgmt',
+  path: '/shop-mgmt',
   getParentRoute: () => rootRouteImport,
 } as any)
-const OrdersWholesaleRoute = OrdersWholesaleRouteImport.update({
-  id: '/wholesale',
-  path: '/wholesale',
-  getParentRoute: () => OrdersRoute,
-} as any)
-const OrdersShopsRoute = OrdersShopsRouteImport.update({
-  id: '/shops',
-  path: '/shops',
-  getParentRoute: () => OrdersRoute,
-} as any)
-const OrdersDispatchRoute = OrdersDispatchRouteImport.update({
-  id: '/dispatch',
-  path: '/dispatch',
-  getParentRoute: () => OrdersRoute,
-} as any)
-const MScanRoute = MScanRouteImport.update({
-  id: '/scan',
-  path: '/scan',
-  getParentRoute: () => MRoute,
-} as any)
-const MPhotoSearchRoute = MPhotoSearchRouteImport.update({
-  id: '/photo-search',
-  path: '/photo-search',
-  getParentRoute: () => MRoute,
-} as any)
-const MParcelsRoute = MParcelsRouteImport.update({
-  id: '/parcels',
-  path: '/parcels',
-  getParentRoute: () => MRoute,
-} as any)
-const MInboundRoute = MInboundRouteImport.update({
-  id: '/inbound',
-  path: '/inbound',
-  getParentRoute: () => MRoute,
-} as any)
-const InventoryUnclaimedRoute = InventoryUnclaimedRouteImport.update({
-  id: '/inventory/unclaimed',
-  path: '/inventory/unclaimed',
+const StoreRoute = StoreRouteImport.update({
+  id: '/store',
+  path: '/store',
   getParentRoute: () => rootRouteImport,
 } as any)
-const InventoryTransfersRoute = InventoryTransfersRouteImport.update({
-  id: '/inventory/transfers',
-  path: '/inventory/transfers',
+const YouzanRoute = YouzanRouteImport.update({
+  id: '/youzan',
+  path: '/youzan',
   getParentRoute: () => rootRouteImport,
 } as any)
-const InventorySkusRoute = InventorySkusRouteImport.update({
-  id: '/inventory/skus',
-  path: '/inventory/skus',
+const AdminApiIntegrationRoute = AdminApiIntegrationRouteImport.update({
+  id: '/admin/api-integration',
+  path: '/admin/api-integration',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminChannelSyncRoute = AdminChannelSyncRouteImport.update({
+  id: '/admin/channel-sync',
+  path: '/admin/channel-sync',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/admin/users',
+  path: '/admin/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InventoryBatchesRoute = InventoryBatchesRouteImport.update({
+  id: '/inventory/batches',
+  path: '/inventory/batches',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InventoryDevicesRoute = InventoryDevicesRouteImport.update({
+  id: '/inventory/devices',
+  path: '/inventory/devices',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InventoryInboundRoute = InventoryInboundRouteImport.update({
+  id: '/inventory/inbound',
+  path: '/inventory/inbound',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InventoryLocationsRoute = InventoryLocationsRouteImport.update({
+  id: '/inventory/locations',
+  path: '/inventory/locations',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InventoryProductsRoute = InventoryProductsRouteImport.update({
+  id: '/inventory/products',
+  path: '/inventory/products',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InventoryReturnInspectionRoute =
@@ -382,164 +282,154 @@ const InventoryReturnInspectionRoute =
     path: '/inventory/return-inspection',
     getParentRoute: () => rootRouteImport,
   } as any)
-const InventoryProductsRoute = InventoryProductsRouteImport.update({
-  id: '/inventory/products',
-  path: '/inventory/products',
+const InventorySkusRoute = InventorySkusRouteImport.update({
+  id: '/inventory/skus',
+  path: '/inventory/skus',
   getParentRoute: () => rootRouteImport,
 } as any)
-const InventoryLocationsRoute = InventoryLocationsRouteImport.update({
-  id: '/inventory/locations',
-  path: '/inventory/locations',
+const InventoryTransfersRoute = InventoryTransfersRouteImport.update({
+  id: '/inventory/transfers',
+  path: '/inventory/transfers',
   getParentRoute: () => rootRouteImport,
 } as any)
-const InventoryInboundRoute = InventoryInboundRouteImport.update({
-  id: '/inventory/inbound',
-  path: '/inventory/inbound',
+const InventoryUnclaimedRoute = InventoryUnclaimedRouteImport.update({
+  id: '/inventory/unclaimed',
+  path: '/inventory/unclaimed',
   getParentRoute: () => rootRouteImport,
 } as any)
-const InventoryDevicesRoute = InventoryDevicesRouteImport.update({
-  id: '/inventory/devices',
-  path: '/inventory/devices',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const InventoryBatchesRoute = InventoryBatchesRouteImport.update({
-  id: '/inventory/batches',
-  path: '/inventory/batches',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminUsersRoute = AdminUsersRouteImport.update({
-  id: '/admin/users',
-  path: '/admin/users',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminChannelSyncRoute = AdminChannelSyncRouteImport.update({
-  id: '/admin/channel-sync',
-  path: '/admin/channel-sync',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminApiIntegrationRoute = AdminApiIntegrationRouteImport.update({
-  id: '/admin/api-integration',
-  path: '/admin/api-integration',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PurchaseJapanParcelIndexRoute =
-  PurchaseJapanParcelIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => PurchaseJapanParcelRoute,
-  } as any)
-const PurchaseDomesticIndexRoute = PurchaseDomesticIndexRouteImport.update({
+const MIndexRoute = MIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => PurchaseDomesticRoute,
-} as any)
-const PurchaseDomesticBulkIndexRoute =
-  PurchaseDomesticBulkIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => PurchaseDomesticBulkRoute,
-  } as any)
-const MSkusIndexRoute = MSkusIndexRouteImport.update({
-  id: '/skus/',
-  path: '/skus/',
   getParentRoute: () => MRoute,
 } as any)
-const InventoryStocktakesIndexRoute =
-  InventoryStocktakesIndexRouteImport.update({
-    id: '/inventory/stocktakes/',
-    path: '/inventory/stocktakes/',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const InventorySkusIndexRoute = InventorySkusIndexRouteImport.update({
+const MInboundRoute = MInboundRouteImport.update({
+  id: '/inbound',
+  path: '/inbound',
+  getParentRoute: () => MRoute,
+} as any)
+const MParcelsRoute = MParcelsRouteImport.update({
+  id: '/parcels',
+  path: '/parcels',
+  getParentRoute: () => MRoute,
+} as any)
+const MPhotoSearchRoute = MPhotoSearchRouteImport.update({
+  id: '/photo-search',
+  path: '/photo-search',
+  getParentRoute: () => MRoute,
+} as any)
+const MScanRoute = MScanRouteImport.update({
+  id: '/scan',
+  path: '/scan',
+  getParentRoute: () => MRoute,
+} as any)
+const OrdersDispatchRoute = OrdersDispatchRouteImport.update({
+  id: '/dispatch',
+  path: '/dispatch',
+  getParentRoute: () => OrdersRoute,
+} as any)
+const OrdersShopsRoute = OrdersShopsRouteImport.update({
+  id: '/shops',
+  path: '/shops',
+  getParentRoute: () => OrdersRoute,
+} as any)
+const OrdersWholesaleRoute = OrdersWholesaleRouteImport.update({
+  id: '/wholesale',
+  path: '/wholesale',
+  getParentRoute: () => OrdersRoute,
+} as any)
+const PurchaseDomesticRoute = PurchaseDomesticRouteImport.update({
+  id: '/purchase/domestic',
+  path: '/purchase/domestic',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PurchaseDomesticBulkRoute = PurchaseDomesticBulkRouteImport.update({
+  id: '/purchase/domestic-bulk',
+  path: '/purchase/domestic-bulk',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PurchaseJapanBulkRoute = PurchaseJapanBulkRouteImport.update({
+  id: '/purchase/japan-bulk',
+  path: '/purchase/japan-bulk',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PurchaseJapanParcelRoute = PurchaseJapanParcelRouteImport.update({
+  id: '/purchase/japan-parcel',
+  path: '/purchase/japan-parcel',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShopMgmtFranchiseesRoute = ShopMgmtFranchiseesRouteImport.update({
+  id: '/franchisees',
+  path: '/franchisees',
+  getParentRoute: () => ShopMgmtRoute,
+} as any)
+const ShopMgmtOnlineRoute = ShopMgmtOnlineRouteImport.update({
+  id: '/online',
+  path: '/online',
+  getParentRoute: () => ShopMgmtRoute,
+} as any)
+const ShopMgmtProductsRoute = ShopMgmtProductsRouteImport.update({
+  id: '/products',
+  path: '/products',
+  getParentRoute: () => ShopMgmtRoute,
+} as any)
+const ShopMgmtShopsRoute = ShopMgmtShopsRouteImport.update({
+  id: '/shops',
+  path: '/shops',
+  getParentRoute: () => ShopMgmtRoute,
+} as any)
+const StoreIndexRoute = StoreIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => InventorySkusRoute,
+  getParentRoute: () => StoreRoute,
+} as any)
+const StoreIncomingRoute = StoreIncomingRouteImport.update({
+  id: '/incoming',
+  path: '/incoming',
+  getParentRoute: () => StoreRoute,
+} as any)
+const StoreInventoryRoute = StoreInventoryRouteImport.update({
+  id: '/inventory',
+  path: '/inventory',
+  getParentRoute: () => StoreRoute,
+} as any)
+const StoreScanRoute = StoreScanRouteImport.update({
+  id: '/scan',
+  path: '/scan',
+  getParentRoute: () => StoreRoute,
+} as any)
+const StoresFranchiseesRoute = StoresFranchiseesRouteImport.update({
+  id: '/stores/franchisees',
+  path: '/stores/franchisees',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StoresListRoute = StoresListRouteImport.update({
+  id: '/stores/list',
+  path: '/stores/list',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StoresProductsRoute = StoresProductsRouteImport.update({
+  id: '/stores/products',
+  path: '/stores/products',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StoresYouzanRoute = StoresYouzanRouteImport.update({
+  id: '/stores/youzan',
+  path: '/stores/youzan',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const YouzanSyncRoute = YouzanSyncRouteImport.update({
+  id: '/sync',
+  path: '/sync',
+  getParentRoute: () => YouzanRoute,
+} as any)
+const ApiPublicMerukiIngestRoute = ApiPublicMerukiIngestRouteImport.update({
+  id: '/api/public/meruki-ingest',
+  path: '/api/public/meruki-ingest',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const InventoryInboundIndexRoute = InventoryInboundIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => InventoryInboundRoute,
-} as any)
-const PurchaseJapanParcelNewRoute = PurchaseJapanParcelNewRouteImport.update({
-  id: '/new',
-  path: '/new',
-  getParentRoute: () => PurchaseJapanParcelRoute,
-} as any)
-const PurchaseJapanParcelImportRoute =
-  PurchaseJapanParcelImportRouteImport.update({
-    id: '/import',
-    path: '/import',
-    getParentRoute: () => PurchaseJapanParcelRoute,
-  } as any)
-const PurchaseJapanParcelAccountsRoute =
-  PurchaseJapanParcelAccountsRouteImport.update({
-    id: '/accounts',
-    path: '/accounts',
-    getParentRoute: () => PurchaseJapanParcelRoute,
-  } as any)
-const PurchaseJapanParcelIdRoute = PurchaseJapanParcelIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => PurchaseJapanParcelRoute,
-} as any)
-const PurchaseDomesticImportRoute = PurchaseDomesticImportRouteImport.update({
-  id: '/import',
-  path: '/import',
-  getParentRoute: () => PurchaseDomesticRoute,
-} as any)
-const PurchaseDomesticIdRoute = PurchaseDomesticIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => PurchaseDomesticRoute,
-} as any)
-const PurchaseDomesticBulkNewRoute = PurchaseDomesticBulkNewRouteImport.update({
-  id: '/new',
-  path: '/new',
-  getParentRoute: () => PurchaseDomesticBulkRoute,
-} as any)
-const PurchaseDomesticBulkIdRoute = PurchaseDomesticBulkIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => PurchaseDomesticBulkRoute,
-} as any)
-const MSkusIdRoute = MSkusIdRouteImport.update({
-  id: '/skus/$id',
-  path: '/skus/$id',
-  getParentRoute: () => MRoute,
-} as any)
-const MReceiveIdRoute = MReceiveIdRouteImport.update({
-  id: '/receive/$id',
-  path: '/receive/$id',
-  getParentRoute: () => MRoute,
-} as any)
-const MProductsCodeRoute = MProductsCodeRouteImport.update({
-  id: '/products/$code',
-  path: '/products/$code',
-  getParentRoute: () => MRoute,
-} as any)
-const MDomesticQuickAddRoute = MDomesticQuickAddRouteImport.update({
-  id: '/domestic/quick-add',
-  path: '/domestic/quick-add',
-  getParentRoute: () => MRoute,
-} as any)
-const InventoryStocktakesIdRoute = InventoryStocktakesIdRouteImport.update({
-  id: '/inventory/stocktakes/$id',
-  path: '/inventory/stocktakes/$id',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const InventorySkusIdRoute = InventorySkusIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => InventorySkusRoute,
-} as any)
-const InventoryProductsCodeRoute = InventoryProductsCodeRouteImport.update({
-  id: '/$code',
-  path: '/$code',
-  getParentRoute: () => InventoryProductsRoute,
-} as any)
-const InventoryInboundNewRoute = InventoryInboundNewRouteImport.update({
-  id: '/new',
-  path: '/new',
   getParentRoute: () => InventoryInboundRoute,
 } as any)
 const InventoryInboundIdRoute = InventoryInboundIdRouteImport.update({
@@ -547,170 +437,125 @@ const InventoryInboundIdRoute = InventoryInboundIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => InventoryInboundRoute,
 } as any)
-const ApiPublicMerukiIngestRoute = ApiPublicMerukiIngestRouteImport.update({
-  id: '/api/public/meruki-ingest',
-  path: '/api/public/meruki-ingest',
+const InventoryInboundNewRoute = InventoryInboundNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => InventoryInboundRoute,
+} as any)
+const InventoryProductsCodeRoute = InventoryProductsCodeRouteImport.update({
+  id: '/$code',
+  path: '/$code',
+  getParentRoute: () => InventoryProductsRoute,
+} as any)
+const InventorySkusIndexRoute = InventorySkusIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => InventorySkusRoute,
+} as any)
+const InventorySkusIdRoute = InventorySkusIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => InventorySkusRoute,
+} as any)
+const InventoryStocktakesIndexRoute =
+  InventoryStocktakesIndexRouteImport.update({
+    id: '/inventory/stocktakes/',
+    path: '/inventory/stocktakes/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const InventoryStocktakesIdRoute = InventoryStocktakesIdRouteImport.update({
+  id: '/inventory/stocktakes/$id',
+  path: '/inventory/stocktakes/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicStorefrontProductsRoute =
-  ApiPublicStorefrontProductsRouteImport.update({
-    id: '/api/public/storefront/products',
-    path: '/api/public/storefront/products',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicStorefrontOrdersRoute =
-  ApiPublicStorefrontOrdersRouteImport.update({
-    id: '/api/public/storefront/orders',
-    path: '/api/public/storefront/orders',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicSsoAigcTicketRoute = ApiPublicSsoAigcTicketRouteImport.update({
-  id: '/api/public/sso/aigc-ticket',
-  path: '/api/public/sso/aigc-ticket',
-  getParentRoute: () => rootRouteImport,
+const MDomesticQuickAddRoute = MDomesticQuickAddRouteImport.update({
+  id: '/domestic/quick-add',
+  path: '/domestic/quick-add',
+  getParentRoute: () => MRoute,
 } as any)
-const ApiPublicSsoAigcExchangeRoute =
-  ApiPublicSsoAigcExchangeRouteImport.update({
-    id: '/api/public/sso/aigc-exchange',
-    path: '/api/public/sso/aigc-exchange',
-    getParentRoute: () => rootRouteImport,
+const MProductsCodeRoute = MProductsCodeRouteImport.update({
+  id: '/products/$code',
+  path: '/products/$code',
+  getParentRoute: () => MRoute,
+} as any)
+const MReceiveIdRoute = MReceiveIdRouteImport.update({
+  id: '/receive/$id',
+  path: '/receive/$id',
+  getParentRoute: () => MRoute,
+} as any)
+const MSkusIndexRoute = MSkusIndexRouteImport.update({
+  id: '/skus/',
+  path: '/skus/',
+  getParentRoute: () => MRoute,
+} as any)
+const MSkusIdRoute = MSkusIdRouteImport.update({
+  id: '/skus/$id',
+  path: '/skus/$id',
+  getParentRoute: () => MRoute,
+} as any)
+const PurchaseDomesticBulkIndexRoute =
+  PurchaseDomesticBulkIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => PurchaseDomesticBulkRoute,
   } as any)
-const ApiPublicHooksYouzanSyncWorkerRoute =
-  ApiPublicHooksYouzanSyncWorkerRouteImport.update({
-    id: '/api/public/hooks/youzan-sync-worker',
-    path: '/api/public/hooks/youzan-sync-worker',
-    getParentRoute: () => rootRouteImport,
+const PurchaseDomesticBulkIdRoute = PurchaseDomesticBulkIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => PurchaseDomesticBulkRoute,
+} as any)
+const PurchaseDomesticBulkNewRoute = PurchaseDomesticBulkNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => PurchaseDomesticBulkRoute,
+} as any)
+const PurchaseDomesticIndexRoute = PurchaseDomesticIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => PurchaseDomesticRoute,
+} as any)
+const PurchaseDomesticIdRoute = PurchaseDomesticIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => PurchaseDomesticRoute,
+} as any)
+const PurchaseDomesticImportRoute = PurchaseDomesticImportRouteImport.update({
+  id: '/import',
+  path: '/import',
+  getParentRoute: () => PurchaseDomesticRoute,
+} as any)
+const PurchaseJapanParcelIndexRoute =
+  PurchaseJapanParcelIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => PurchaseJapanParcelRoute,
   } as any)
-const ApiPublicHooksYouzanSyncRoute =
-  ApiPublicHooksYouzanSyncRouteImport.update({
-    id: '/api/public/hooks/youzan-sync',
-    path: '/api/public/hooks/youzan-sync',
-    getParentRoute: () => rootRouteImport,
+const PurchaseJapanParcelIdRoute = PurchaseJapanParcelIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => PurchaseJapanParcelRoute,
+} as any)
+const PurchaseJapanParcelAccountsRoute =
+  PurchaseJapanParcelAccountsRouteImport.update({
+    id: '/accounts',
+    path: '/accounts',
+    getParentRoute: () => PurchaseJapanParcelRoute,
   } as any)
-const ApiPublicHooksYouzanStockWorkerRoute =
-  ApiPublicHooksYouzanStockWorkerRouteImport.update({
-    id: '/api/public/hooks/youzan-stock-worker',
-    path: '/api/public/hooks/youzan-stock-worker',
-    getParentRoute: () => rootRouteImport,
+const PurchaseJapanParcelImportRoute =
+  PurchaseJapanParcelImportRouteImport.update({
+    id: '/import',
+    path: '/import',
+    getParentRoute: () => PurchaseJapanParcelRoute,
   } as any)
-const ApiPublicHooksYouzanRelistRoute =
-  ApiPublicHooksYouzanRelistRouteImport.update({
-    id: '/api/public/hooks/youzan-relist',
-    path: '/api/public/hooks/youzan-relist',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksYouzanReconcileRoute =
-  ApiPublicHooksYouzanReconcileRouteImport.update({
-    id: '/api/public/hooks/youzan-reconcile',
-    path: '/api/public/hooks/youzan-reconcile',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksYouzanMessageRoute =
-  ApiPublicHooksYouzanMessageRouteImport.update({
-    id: '/api/public/hooks/youzan-message',
-    path: '/api/public/hooks/youzan-message',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksYouzanFixChannelRoute =
-  ApiPublicHooksYouzanFixChannelRouteImport.update({
-    id: '/api/public/hooks/youzan-fix-channel',
-    path: '/api/public/hooks/youzan-fix-channel',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksYouzanDistributionProbeRoute =
-  ApiPublicHooksYouzanDistributionProbeRouteImport.update({
-    id: '/api/public/hooks/youzan-distribution-probe',
-    path: '/api/public/hooks/youzan-distribution-probe',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksYouzanCleanupRoute =
-  ApiPublicHooksYouzanCleanupRouteImport.update({
-    id: '/api/public/hooks/youzan-cleanup',
-    path: '/api/public/hooks/youzan-cleanup',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksTestPublishWithStockRoute =
-  ApiPublicHooksTestPublishWithStockRouteImport.update({
-    id: '/api/public/hooks/test-publish-with-stock',
-    path: '/api/public/hooks/test-publish-with-stock',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksCommerceReleaseExpiredRoute =
-  ApiPublicHooksCommerceReleaseExpiredRouteImport.update({
-    id: '/api/public/hooks/commerce-release-expired',
-    path: '/api/public/hooks/commerce-release-expired',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksChannelSyncWorkerRoute =
-  ApiPublicHooksChannelSyncWorkerRouteImport.update({
-    id: '/api/public/hooks/channel-sync-worker',
-    path: '/api/public/hooks/channel-sync-worker',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksChainProbeVerifyRoute =
-  ApiPublicHooksChainProbeVerifyRouteImport.update({
-    id: '/api/public/hooks/chain-probe-verify',
-    path: '/api/public/hooks/chain-probe-verify',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHandheldTransfersRoute =
-  ApiPublicHandheldTransfersRouteImport.update({
-    id: '/api/public/handheld/transfers',
-    path: '/api/public/handheld/transfers',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHandheldSyncRecordsRoute =
-  ApiPublicHandheldSyncRecordsRouteImport.update({
-    id: '/api/public/handheld/sync-records',
-    path: '/api/public/handheld/sync-records',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHandheldStocktakesRoute =
-  ApiPublicHandheldStocktakesRouteImport.update({
-    id: '/api/public/handheld/stocktakes',
-    path: '/api/public/handheld/stocktakes',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHandheldProductsRoute =
-  ApiPublicHandheldProductsRouteImport.update({
-    id: '/api/public/handheld/products',
-    path: '/api/public/handheld/products',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHandheldParcelsRoute =
-  ApiPublicHandheldParcelsRouteImport.update({
-    id: '/api/public/handheld/parcels',
-    path: '/api/public/handheld/parcels',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHandheldOpenapiDotjsonRoute =
-  ApiPublicHandheldOpenapiDotjsonRouteImport.update({
-    id: '/api/public/handheld/openapi.json',
-    path: '/api/public/handheld/openapi.json',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHandheldNotificationsRoute =
-  ApiPublicHandheldNotificationsRouteImport.update({
-    id: '/api/public/handheld/notifications',
-    path: '/api/public/handheld/notifications',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHandheldLocationsRoute =
-  ApiPublicHandheldLocationsRouteImport.update({
-    id: '/api/public/handheld/locations',
-    path: '/api/public/handheld/locations',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHandheldLabelTemplatesRoute =
-  ApiPublicHandheldLabelTemplatesRouteImport.update({
-    id: '/api/public/handheld/label-templates',
-    path: '/api/public/handheld/label-templates',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHandheldGlobalStockRoute =
-  ApiPublicHandheldGlobalStockRouteImport.update({
-    id: '/api/public/handheld/global-stock',
-    path: '/api/public/handheld/global-stock',
+const PurchaseJapanParcelNewRoute = PurchaseJapanParcelNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => PurchaseJapanParcelRoute,
+} as any)
+const ApiPublicHandheldDashboardRoute =
+  ApiPublicHandheldDashboardRouteImport.update({
+    id: '/api/public/handheld/dashboard',
+    path: '/api/public/handheld/dashboard',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicHandheldFulfillmentsRoute =
@@ -719,237 +564,181 @@ const ApiPublicHandheldFulfillmentsRoute =
     path: '/api/public/handheld/fulfillments',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldDashboardRoute =
-  ApiPublicHandheldDashboardRouteImport.update({
-    id: '/api/public/handheld/dashboard',
-    path: '/api/public/handheld/dashboard',
+const ApiPublicHandheldGlobalStockRoute =
+  ApiPublicHandheldGlobalStockRouteImport.update({
+    id: '/api/public/handheld/global-stock',
+    path: '/api/public/handheld/global-stock',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicStorefrontProductsIdRoute =
-  ApiPublicStorefrontProductsIdRouteImport.update({
-    id: '/$id',
-    path: '/$id',
-    getParentRoute: () => ApiPublicStorefrontProductsRoute,
-  } as any)
-const ApiPublicStorefrontOrdersIdRoute =
-  ApiPublicStorefrontOrdersIdRouteImport.update({
-    id: '/$id',
-    path: '/$id',
-    getParentRoute: () => ApiPublicStorefrontOrdersRoute,
-  } as any)
-const ApiPublicHandheldTransfersIdRoute =
-  ApiPublicHandheldTransfersIdRouteImport.update({
-    id: '/$id',
-    path: '/$id',
-    getParentRoute: () => ApiPublicHandheldTransfersRoute,
-  } as any)
-const ApiPublicHandheldTransferShipScanRoute =
-  ApiPublicHandheldTransferShipScanRouteImport.update({
-    id: '/api/public/handheld/transfer/ship-scan',
-    path: '/api/public/handheld/transfer/ship-scan',
+const ApiPublicHandheldLabelTemplatesRoute =
+  ApiPublicHandheldLabelTemplatesRouteImport.update({
+    id: '/api/public/handheld/label-templates',
+    path: '/api/public/handheld/label-templates',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldTransferShipConfirmRoute =
-  ApiPublicHandheldTransferShipConfirmRouteImport.update({
-    id: '/api/public/handheld/transfer/ship-confirm',
-    path: '/api/public/handheld/transfer/ship-confirm',
+const ApiPublicHandheldLocationsRoute =
+  ApiPublicHandheldLocationsRouteImport.update({
+    id: '/api/public/handheld/locations',
+    path: '/api/public/handheld/locations',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldTransferReceiveScanRoute =
-  ApiPublicHandheldTransferReceiveScanRouteImport.update({
-    id: '/api/public/handheld/transfer/receive-scan',
-    path: '/api/public/handheld/transfer/receive-scan',
+const ApiPublicHandheldNotificationsRoute =
+  ApiPublicHandheldNotificationsRouteImport.update({
+    id: '/api/public/handheld/notifications',
+    path: '/api/public/handheld/notifications',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldTransferReceiveConfirmRoute =
-  ApiPublicHandheldTransferReceiveConfirmRouteImport.update({
-    id: '/api/public/handheld/transfer/receive-confirm',
-    path: '/api/public/handheld/transfer/receive-confirm',
+const ApiPublicHandheldOpenapiDotjsonRoute =
+  ApiPublicHandheldOpenapiDotjsonRouteImport.update({
+    id: '/api/public/handheld/openapi.json',
+    path: '/api/public/handheld/openapi.json',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldStocktakeSubmitRoute =
-  ApiPublicHandheldStocktakeSubmitRouteImport.update({
-    id: '/api/public/handheld/stocktake/submit',
-    path: '/api/public/handheld/stocktake/submit',
+const ApiPublicHandheldParcelsRoute =
+  ApiPublicHandheldParcelsRouteImport.update({
+    id: '/api/public/handheld/parcels',
+    path: '/api/public/handheld/parcels',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldStocktakeScanRoute =
-  ApiPublicHandheldStocktakeScanRouteImport.update({
-    id: '/api/public/handheld/stocktake/scan',
-    path: '/api/public/handheld/stocktake/scan',
+const ApiPublicHandheldProductsRoute =
+  ApiPublicHandheldProductsRouteImport.update({
+    id: '/api/public/handheld/products',
+    path: '/api/public/handheld/products',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldStocktakeOpenRoute =
-  ApiPublicHandheldStocktakeOpenRouteImport.update({
-    id: '/api/public/handheld/stocktake/open',
-    path: '/api/public/handheld/stocktake/open',
+const ApiPublicHandheldStocktakesRoute =
+  ApiPublicHandheldStocktakesRouteImport.update({
+    id: '/api/public/handheld/stocktakes',
+    path: '/api/public/handheld/stocktakes',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldSkuSearchRoute =
-  ApiPublicHandheldSkuSearchRouteImport.update({
-    id: '/api/public/handheld/sku/search',
-    path: '/api/public/handheld/sku/search',
+const ApiPublicHandheldSyncRecordsRoute =
+  ApiPublicHandheldSyncRecordsRouteImport.update({
+    id: '/api/public/handheld/sync-records',
+    path: '/api/public/handheld/sync-records',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldSkuByEpcRoute =
-  ApiPublicHandheldSkuByEpcRouteImport.update({
-    id: '/api/public/handheld/sku/by-epc',
-    path: '/api/public/handheld/sku/by-epc',
+const ApiPublicHandheldTransfersRoute =
+  ApiPublicHandheldTransfersRouteImport.update({
+    id: '/api/public/handheld/transfers',
+    path: '/api/public/handheld/transfers',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldRfidTransferLocationRoute =
-  ApiPublicHandheldRfidTransferLocationRouteImport.update({
-    id: '/api/public/handheld/rfid/transfer-location',
-    path: '/api/public/handheld/rfid/transfer-location',
+const ApiPublicHooksChainProbeVerifyRoute =
+  ApiPublicHooksChainProbeVerifyRouteImport.update({
+    id: '/api/public/hooks/chain-probe-verify',
+    path: '/api/public/hooks/chain-probe-verify',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldRfidStockInRoute =
-  ApiPublicHandheldRfidStockInRouteImport.update({
-    id: '/api/public/handheld/rfid/stock-in',
-    path: '/api/public/handheld/rfid/stock-in',
+const ApiPublicHooksChannelSyncWorkerRoute =
+  ApiPublicHooksChannelSyncWorkerRouteImport.update({
+    id: '/api/public/hooks/channel-sync-worker',
+    path: '/api/public/hooks/channel-sync-worker',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldRfidBindItemRoute =
-  ApiPublicHandheldRfidBindItemRouteImport.update({
-    id: '/api/public/handheld/rfid/bind-item',
-    path: '/api/public/handheld/rfid/bind-item',
+const ApiPublicHooksCommerceReleaseExpiredRoute =
+  ApiPublicHooksCommerceReleaseExpiredRouteImport.update({
+    id: '/api/public/hooks/commerce-release-expired',
+    path: '/api/public/hooks/commerce-release-expired',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldRfidBatchStockInRoute =
-  ApiPublicHandheldRfidBatchStockInRouteImport.update({
-    id: '/api/public/handheld/rfid/batch-stock-in',
-    path: '/api/public/handheld/rfid/batch-stock-in',
+const ApiPublicHooksTestPublishWithStockRoute =
+  ApiPublicHooksTestPublishWithStockRouteImport.update({
+    id: '/api/public/hooks/test-publish-with-stock',
+    path: '/api/public/hooks/test-publish-with-stock',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldRfidEpcRoute =
-  ApiPublicHandheldRfidEpcRouteImport.update({
-    id: '/api/public/handheld/rfid/$epc',
-    path: '/api/public/handheld/rfid/$epc',
+const ApiPublicHooksYouzanCleanupRoute =
+  ApiPublicHooksYouzanCleanupRouteImport.update({
+    id: '/api/public/hooks/youzan-cleanup',
+    path: '/api/public/hooks/youzan-cleanup',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldProductsLookupRoute =
-  ApiPublicHandheldProductsLookupRouteImport.update({
-    id: '/lookup',
-    path: '/lookup',
-    getParentRoute: () => ApiPublicHandheldProductsRoute,
-  } as any)
-const ApiPublicHandheldParcelsCountsRoute =
-  ApiPublicHandheldParcelsCountsRouteImport.update({
-    id: '/counts',
-    path: '/counts',
-    getParentRoute: () => ApiPublicHandheldParcelsRoute,
-  } as any)
-const ApiPublicHandheldParcelsIdRoute =
-  ApiPublicHandheldParcelsIdRouteImport.update({
-    id: '/$id',
-    path: '/$id',
-    getParentRoute: () => ApiPublicHandheldParcelsRoute,
-  } as any)
-const ApiPublicHandheldNotificationsSinceRoute =
-  ApiPublicHandheldNotificationsSinceRouteImport.update({
-    id: '/since',
-    path: '/since',
-    getParentRoute: () => ApiPublicHandheldNotificationsRoute,
-  } as any)
-const ApiPublicHandheldNotificationsReadAllRoute =
-  ApiPublicHandheldNotificationsReadAllRouteImport.update({
-    id: '/read-all',
-    path: '/read-all',
-    getParentRoute: () => ApiPublicHandheldNotificationsRoute,
-  } as any)
-const ApiPublicHandheldLocationSwitchRoute =
-  ApiPublicHandheldLocationSwitchRouteImport.update({
-    id: '/api/public/handheld/location/switch',
-    path: '/api/public/handheld/location/switch',
+const ApiPublicHooksYouzanDistributionProbeRoute =
+  ApiPublicHooksYouzanDistributionProbeRouteImport.update({
+    id: '/api/public/hooks/youzan-distribution-probe',
+    path: '/api/public/hooks/youzan-distribution-probe',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldLabelTemplatesIdRoute =
-  ApiPublicHandheldLabelTemplatesIdRouteImport.update({
-    id: '/$id',
-    path: '/$id',
-    getParentRoute: () => ApiPublicHandheldLabelTemplatesRoute,
-  } as any)
-const ApiPublicHandheldItemsUploadImageRoute =
-  ApiPublicHandheldItemsUploadImageRouteImport.update({
-    id: '/api/public/handheld/items/upload-image',
-    path: '/api/public/handheld/items/upload-image',
+const ApiPublicHooksYouzanFixChannelRoute =
+  ApiPublicHooksYouzanFixChannelRouteImport.update({
+    id: '/api/public/hooks/youzan-fix-channel',
+    path: '/api/public/hooks/youzan-fix-channel',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldItemsSmartCreateRoute =
-  ApiPublicHandheldItemsSmartCreateRouteImport.update({
-    id: '/api/public/handheld/items/smart-create',
-    path: '/api/public/handheld/items/smart-create',
+const ApiPublicHooksYouzanMessageRoute =
+  ApiPublicHooksYouzanMessageRouteImport.update({
+    id: '/api/public/hooks/youzan-message',
+    path: '/api/public/hooks/youzan-message',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldItemsSignReadUrlRoute =
-  ApiPublicHandheldItemsSignReadUrlRouteImport.update({
-    id: '/api/public/handheld/items/sign-read-url',
-    path: '/api/public/handheld/items/sign-read-url',
+const ApiPublicHooksYouzanReconcileRoute =
+  ApiPublicHooksYouzanReconcileRouteImport.update({
+    id: '/api/public/hooks/youzan-reconcile',
+    path: '/api/public/hooks/youzan-reconcile',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldItemsBindRfidRoute =
-  ApiPublicHandheldItemsBindRfidRouteImport.update({
-    id: '/api/public/handheld/items/bind-rfid',
-    path: '/api/public/handheld/items/bind-rfid',
+const ApiPublicHooksYouzanRelistRoute =
+  ApiPublicHooksYouzanRelistRouteImport.update({
+    id: '/api/public/hooks/youzan-relist',
+    path: '/api/public/hooks/youzan-relist',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldItemsIdRoute =
-  ApiPublicHandheldItemsIdRouteImport.update({
-    id: '/api/public/handheld/items/$id',
-    path: '/api/public/handheld/items/$id',
+const ApiPublicHooksYouzanStockWorkerRoute =
+  ApiPublicHooksYouzanStockWorkerRouteImport.update({
+    id: '/api/public/hooks/youzan-stock-worker',
+    path: '/api/public/hooks/youzan-stock-worker',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldInboundScanRoute =
-  ApiPublicHandheldInboundScanRouteImport.update({
-    id: '/api/public/handheld/inbound/scan',
-    path: '/api/public/handheld/inbound/scan',
+const ApiPublicHooksYouzanSyncRoute =
+  ApiPublicHooksYouzanSyncRouteImport.update({
+    id: '/api/public/hooks/youzan-sync',
+    path: '/api/public/hooks/youzan-sync',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldFulfillmentsIdRoute =
-  ApiPublicHandheldFulfillmentsIdRouteImport.update({
-    id: '/$id',
-    path: '/$id',
-    getParentRoute: () => ApiPublicHandheldFulfillmentsRoute,
-  } as any)
-const ApiPublicHandheldDiagReportRoute =
-  ApiPublicHandheldDiagReportRouteImport.update({
-    id: '/api/public/handheld/diag/report',
-    path: '/api/public/handheld/diag/report',
+const ApiPublicHooksYouzanSyncWorkerRoute =
+  ApiPublicHooksYouzanSyncWorkerRouteImport.update({
+    id: '/api/public/hooks/youzan-sync-worker',
+    path: '/api/public/hooks/youzan-sync-worker',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldAuthRefreshRoute =
-  ApiPublicHandheldAuthRefreshRouteImport.update({
-    id: '/api/public/handheld/auth/refresh',
-    path: '/api/public/handheld/auth/refresh',
+const ApiPublicSsoAigcExchangeRoute =
+  ApiPublicSsoAigcExchangeRouteImport.update({
+    id: '/api/public/sso/aigc-exchange',
+    path: '/api/public/sso/aigc-exchange',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldAuthPingRoute =
-  ApiPublicHandheldAuthPingRouteImport.update({
-    id: '/api/public/handheld/auth/ping',
-    path: '/api/public/handheld/auth/ping',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHandheldAuthMeRoute = ApiPublicHandheldAuthMeRouteImport.update({
-  id: '/api/public/handheld/auth/me',
-  path: '/api/public/handheld/auth/me',
+const ApiPublicSsoAigcTicketRoute = ApiPublicSsoAigcTicketRouteImport.update({
+  id: '/api/public/sso/aigc-ticket',
+  path: '/api/public/sso/aigc-ticket',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicHandheldAuthLogoutRoute =
-  ApiPublicHandheldAuthLogoutRouteImport.update({
-    id: '/api/public/handheld/auth/logout',
-    path: '/api/public/handheld/auth/logout',
+const ApiPublicStorefrontOrdersRoute =
+  ApiPublicStorefrontOrdersRouteImport.update({
+    id: '/api/public/storefront/orders',
+    path: '/api/public/storefront/orders',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldAuthLoginRoute =
-  ApiPublicHandheldAuthLoginRouteImport.update({
-    id: '/api/public/handheld/auth/login',
-    path: '/api/public/handheld/auth/login',
+const ApiPublicStorefrontProductsRoute =
+  ApiPublicStorefrontProductsRouteImport.update({
+    id: '/api/public/storefront/products',
+    path: '/api/public/storefront/products',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldAuthBootstrapRoute =
-  ApiPublicHandheldAuthBootstrapRouteImport.update({
-    id: '/api/public/handheld/auth/bootstrap',
-    path: '/api/public/handheld/auth/bootstrap',
+const ApiPublicAuthOtpSendRoute = ApiPublicAuthOtpSendRouteImport.update({
+  id: '/api/public/auth/otp/send',
+  path: '/api/public/auth/otp/send',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicAuthOtpVerifyRoute = ApiPublicAuthOtpVerifyRouteImport.update({
+  id: '/api/public/auth/otp/verify',
+  path: '/api/public/auth/otp/verify',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicHandheldAiPrepareListingImageRoute =
+  ApiPublicHandheldAiPrepareListingImageRouteImport.update({
+    id: '/api/public/handheld/ai/prepare-listing-image',
+    path: '/api/public/handheld/ai/prepare-listing-image',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicHandheldAiRecognizeItemRoute =
@@ -958,80 +747,237 @@ const ApiPublicHandheldAiRecognizeItemRoute =
     path: '/api/public/handheld/ai/recognize-item',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldAiPrepareListingImageRoute =
-  ApiPublicHandheldAiPrepareListingImageRouteImport.update({
-    id: '/api/public/handheld/ai/prepare-listing-image',
-    path: '/api/public/handheld/ai/prepare-listing-image',
+const ApiPublicHandheldAuthBootstrapRoute =
+  ApiPublicHandheldAuthBootstrapRouteImport.update({
+    id: '/api/public/handheld/auth/bootstrap',
+    path: '/api/public/handheld/auth/bootstrap',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicAuthOtpVerifyRoute = ApiPublicAuthOtpVerifyRouteImport.update({
-  id: '/api/public/auth/otp/verify',
-  path: '/api/public/auth/otp/verify',
+const ApiPublicHandheldAuthLoginRoute =
+  ApiPublicHandheldAuthLoginRouteImport.update({
+    id: '/api/public/handheld/auth/login',
+    path: '/api/public/handheld/auth/login',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldAuthLogoutRoute =
+  ApiPublicHandheldAuthLogoutRouteImport.update({
+    id: '/api/public/handheld/auth/logout',
+    path: '/api/public/handheld/auth/logout',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldAuthMeRoute = ApiPublicHandheldAuthMeRouteImport.update({
+  id: '/api/public/handheld/auth/me',
+  path: '/api/public/handheld/auth/me',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicAuthOtpSendRoute = ApiPublicAuthOtpSendRouteImport.update({
-  id: '/api/public/auth/otp/send',
-  path: '/api/public/auth/otp/send',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPublicHandheldTransfersIdScanRoute =
-  ApiPublicHandheldTransfersIdScanRouteImport.update({
-    id: '/scan',
-    path: '/scan',
-    getParentRoute: () => ApiPublicHandheldTransfersIdRoute,
+const ApiPublicHandheldAuthPingRoute =
+  ApiPublicHandheldAuthPingRouteImport.update({
+    id: '/api/public/handheld/auth/ping',
+    path: '/api/public/handheld/auth/ping',
+    getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldTransfersIdConfirmRoute =
-  ApiPublicHandheldTransfersIdConfirmRouteImport.update({
-    id: '/confirm',
-    path: '/confirm',
-    getParentRoute: () => ApiPublicHandheldTransfersIdRoute,
+const ApiPublicHandheldAuthRefreshRoute =
+  ApiPublicHandheldAuthRefreshRouteImport.update({
+    id: '/api/public/handheld/auth/refresh',
+    path: '/api/public/handheld/auth/refresh',
+    getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldLabelTemplatesIdSetDefaultRoute =
-  ApiPublicHandheldLabelTemplatesIdSetDefaultRouteImport.update({
-    id: '/set-default',
-    path: '/set-default',
-    getParentRoute: () => ApiPublicHandheldLabelTemplatesIdRoute,
+const ApiPublicHandheldDiagReportRoute =
+  ApiPublicHandheldDiagReportRouteImport.update({
+    id: '/api/public/handheld/diag/report',
+    path: '/api/public/handheld/diag/report',
+    getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldItemsUploadImageMultipartRoute =
-  ApiPublicHandheldItemsUploadImageMultipartRouteImport.update({
-    id: '/multipart',
-    path: '/multipart',
-    getParentRoute: () => ApiPublicHandheldItemsUploadImageRoute,
+const ApiPublicHandheldFulfillmentsIdRoute =
+  ApiPublicHandheldFulfillmentsIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => ApiPublicHandheldFulfillmentsRoute,
   } as any)
-const ApiPublicHandheldItemsIdSyncStatusRoute =
-  ApiPublicHandheldItemsIdSyncStatusRouteImport.update({
-    id: '/sync-status',
-    path: '/sync-status',
-    getParentRoute: () => ApiPublicHandheldItemsIdRoute,
+const ApiPublicHandheldInboundScanRoute =
+  ApiPublicHandheldInboundScanRouteImport.update({
+    id: '/api/public/handheld/inbound/scan',
+    path: '/api/public/handheld/inbound/scan',
+    getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldItemsIdSetStatusRoute =
-  ApiPublicHandheldItemsIdSetStatusRouteImport.update({
-    id: '/set-status',
-    path: '/set-status',
-    getParentRoute: () => ApiPublicHandheldItemsIdRoute,
+const ApiPublicHandheldItemsIdRoute =
+  ApiPublicHandheldItemsIdRouteImport.update({
+    id: '/api/public/handheld/items/$id',
+    path: '/api/public/handheld/items/$id',
+    getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldItemsIdRestockRoute =
-  ApiPublicHandheldItemsIdRestockRouteImport.update({
-    id: '/restock',
-    path: '/restock',
-    getParentRoute: () => ApiPublicHandheldItemsIdRoute,
+const ApiPublicHandheldItemsBindRfidRoute =
+  ApiPublicHandheldItemsBindRfidRouteImport.update({
+    id: '/api/public/handheld/items/bind-rfid',
+    path: '/api/public/handheld/items/bind-rfid',
+    getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldItemsIdAttachImagesRoute =
-  ApiPublicHandheldItemsIdAttachImagesRouteImport.update({
-    id: '/attach-images',
-    path: '/attach-images',
-    getParentRoute: () => ApiPublicHandheldItemsIdRoute,
+const ApiPublicHandheldItemsSignReadUrlRoute =
+  ApiPublicHandheldItemsSignReadUrlRouteImport.update({
+    id: '/api/public/handheld/items/sign-read-url',
+    path: '/api/public/handheld/items/sign-read-url',
+    getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldFulfillmentsIdPickScanRoute =
-  ApiPublicHandheldFulfillmentsIdPickScanRouteImport.update({
-    id: '/pick-scan',
-    path: '/pick-scan',
-    getParentRoute: () => ApiPublicHandheldFulfillmentsIdRoute,
+const ApiPublicHandheldItemsSmartCreateRoute =
+  ApiPublicHandheldItemsSmartCreateRouteImport.update({
+    id: '/api/public/handheld/items/smart-create',
+    path: '/api/public/handheld/items/smart-create',
+    getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHandheldFulfillmentsIdPickCompleteRoute =
-  ApiPublicHandheldFulfillmentsIdPickCompleteRouteImport.update({
-    id: '/pick-complete',
-    path: '/pick-complete',
+const ApiPublicHandheldItemsUploadImageRoute =
+  ApiPublicHandheldItemsUploadImageRouteImport.update({
+    id: '/api/public/handheld/items/upload-image',
+    path: '/api/public/handheld/items/upload-image',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldLabelTemplatesIdRoute =
+  ApiPublicHandheldLabelTemplatesIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => ApiPublicHandheldLabelTemplatesRoute,
+  } as any)
+const ApiPublicHandheldLocationSwitchRoute =
+  ApiPublicHandheldLocationSwitchRouteImport.update({
+    id: '/api/public/handheld/location/switch',
+    path: '/api/public/handheld/location/switch',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldNotificationsReadAllRoute =
+  ApiPublicHandheldNotificationsReadAllRouteImport.update({
+    id: '/read-all',
+    path: '/read-all',
+    getParentRoute: () => ApiPublicHandheldNotificationsRoute,
+  } as any)
+const ApiPublicHandheldNotificationsSinceRoute =
+  ApiPublicHandheldNotificationsSinceRouteImport.update({
+    id: '/since',
+    path: '/since',
+    getParentRoute: () => ApiPublicHandheldNotificationsRoute,
+  } as any)
+const ApiPublicHandheldParcelsIdRoute =
+  ApiPublicHandheldParcelsIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => ApiPublicHandheldParcelsRoute,
+  } as any)
+const ApiPublicHandheldParcelsCountsRoute =
+  ApiPublicHandheldParcelsCountsRouteImport.update({
+    id: '/counts',
+    path: '/counts',
+    getParentRoute: () => ApiPublicHandheldParcelsRoute,
+  } as any)
+const ApiPublicHandheldProductsLookupRoute =
+  ApiPublicHandheldProductsLookupRouteImport.update({
+    id: '/lookup',
+    path: '/lookup',
+    getParentRoute: () => ApiPublicHandheldProductsRoute,
+  } as any)
+const ApiPublicHandheldRfidEpcRoute =
+  ApiPublicHandheldRfidEpcRouteImport.update({
+    id: '/api/public/handheld/rfid/$epc',
+    path: '/api/public/handheld/rfid/$epc',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldRfidBatchStockInRoute =
+  ApiPublicHandheldRfidBatchStockInRouteImport.update({
+    id: '/api/public/handheld/rfid/batch-stock-in',
+    path: '/api/public/handheld/rfid/batch-stock-in',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldRfidBindItemRoute =
+  ApiPublicHandheldRfidBindItemRouteImport.update({
+    id: '/api/public/handheld/rfid/bind-item',
+    path: '/api/public/handheld/rfid/bind-item',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldRfidStockInRoute =
+  ApiPublicHandheldRfidStockInRouteImport.update({
+    id: '/api/public/handheld/rfid/stock-in',
+    path: '/api/public/handheld/rfid/stock-in',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldRfidTransferLocationRoute =
+  ApiPublicHandheldRfidTransferLocationRouteImport.update({
+    id: '/api/public/handheld/rfid/transfer-location',
+    path: '/api/public/handheld/rfid/transfer-location',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldSkuByEpcRoute =
+  ApiPublicHandheldSkuByEpcRouteImport.update({
+    id: '/api/public/handheld/sku/by-epc',
+    path: '/api/public/handheld/sku/by-epc',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldSkuSearchRoute =
+  ApiPublicHandheldSkuSearchRouteImport.update({
+    id: '/api/public/handheld/sku/search',
+    path: '/api/public/handheld/sku/search',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldStocktakeOpenRoute =
+  ApiPublicHandheldStocktakeOpenRouteImport.update({
+    id: '/api/public/handheld/stocktake/open',
+    path: '/api/public/handheld/stocktake/open',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldStocktakeScanRoute =
+  ApiPublicHandheldStocktakeScanRouteImport.update({
+    id: '/api/public/handheld/stocktake/scan',
+    path: '/api/public/handheld/stocktake/scan',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldStocktakeSubmitRoute =
+  ApiPublicHandheldStocktakeSubmitRouteImport.update({
+    id: '/api/public/handheld/stocktake/submit',
+    path: '/api/public/handheld/stocktake/submit',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldTransferReceiveConfirmRoute =
+  ApiPublicHandheldTransferReceiveConfirmRouteImport.update({
+    id: '/api/public/handheld/transfer/receive-confirm',
+    path: '/api/public/handheld/transfer/receive-confirm',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldTransferReceiveScanRoute =
+  ApiPublicHandheldTransferReceiveScanRouteImport.update({
+    id: '/api/public/handheld/transfer/receive-scan',
+    path: '/api/public/handheld/transfer/receive-scan',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldTransferShipConfirmRoute =
+  ApiPublicHandheldTransferShipConfirmRouteImport.update({
+    id: '/api/public/handheld/transfer/ship-confirm',
+    path: '/api/public/handheld/transfer/ship-confirm',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldTransferShipScanRoute =
+  ApiPublicHandheldTransferShipScanRouteImport.update({
+    id: '/api/public/handheld/transfer/ship-scan',
+    path: '/api/public/handheld/transfer/ship-scan',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldTransfersIdRoute =
+  ApiPublicHandheldTransfersIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => ApiPublicHandheldTransfersRoute,
+  } as any)
+const ApiPublicStorefrontOrdersIdRoute =
+  ApiPublicStorefrontOrdersIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => ApiPublicStorefrontOrdersRoute,
+  } as any)
+const ApiPublicStorefrontProductsIdRoute =
+  ApiPublicStorefrontProductsIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => ApiPublicStorefrontProductsRoute,
+  } as any)
+const ApiPublicHandheldFulfillmentsIdBindToteRoute =
+  ApiPublicHandheldFulfillmentsIdBindToteRouteImport.update({
+    id: '/bind-tote',
+    path: '/bind-tote',
     getParentRoute: () => ApiPublicHandheldFulfillmentsIdRoute,
   } as any)
 const ApiPublicHandheldFulfillmentsIdClaimRoute =
@@ -1040,11 +986,65 @@ const ApiPublicHandheldFulfillmentsIdClaimRoute =
     path: '/claim',
     getParentRoute: () => ApiPublicHandheldFulfillmentsIdRoute,
   } as any)
-const ApiPublicHandheldFulfillmentsIdBindToteRoute =
-  ApiPublicHandheldFulfillmentsIdBindToteRouteImport.update({
-    id: '/bind-tote',
-    path: '/bind-tote',
+const ApiPublicHandheldFulfillmentsIdPickCompleteRoute =
+  ApiPublicHandheldFulfillmentsIdPickCompleteRouteImport.update({
+    id: '/pick-complete',
+    path: '/pick-complete',
     getParentRoute: () => ApiPublicHandheldFulfillmentsIdRoute,
+  } as any)
+const ApiPublicHandheldFulfillmentsIdPickScanRoute =
+  ApiPublicHandheldFulfillmentsIdPickScanRouteImport.update({
+    id: '/pick-scan',
+    path: '/pick-scan',
+    getParentRoute: () => ApiPublicHandheldFulfillmentsIdRoute,
+  } as any)
+const ApiPublicHandheldItemsIdAttachImagesRoute =
+  ApiPublicHandheldItemsIdAttachImagesRouteImport.update({
+    id: '/attach-images',
+    path: '/attach-images',
+    getParentRoute: () => ApiPublicHandheldItemsIdRoute,
+  } as any)
+const ApiPublicHandheldItemsIdRestockRoute =
+  ApiPublicHandheldItemsIdRestockRouteImport.update({
+    id: '/restock',
+    path: '/restock',
+    getParentRoute: () => ApiPublicHandheldItemsIdRoute,
+  } as any)
+const ApiPublicHandheldItemsIdSetStatusRoute =
+  ApiPublicHandheldItemsIdSetStatusRouteImport.update({
+    id: '/set-status',
+    path: '/set-status',
+    getParentRoute: () => ApiPublicHandheldItemsIdRoute,
+  } as any)
+const ApiPublicHandheldItemsIdSyncStatusRoute =
+  ApiPublicHandheldItemsIdSyncStatusRouteImport.update({
+    id: '/sync-status',
+    path: '/sync-status',
+    getParentRoute: () => ApiPublicHandheldItemsIdRoute,
+  } as any)
+const ApiPublicHandheldItemsUploadImageMultipartRoute =
+  ApiPublicHandheldItemsUploadImageMultipartRouteImport.update({
+    id: '/multipart',
+    path: '/multipart',
+    getParentRoute: () => ApiPublicHandheldItemsUploadImageRoute,
+  } as any)
+const ApiPublicHandheldLabelTemplatesIdSetDefaultRoute =
+  ApiPublicHandheldLabelTemplatesIdSetDefaultRouteImport.update({
+    id: '/set-default',
+    path: '/set-default',
+    getParentRoute: () => ApiPublicHandheldLabelTemplatesIdRoute,
+  } as any)
+const ApiPublicHandheldTransfersIdConfirmRoute =
+  ApiPublicHandheldTransfersIdConfirmRouteImport.update({
+    id: '/confirm',
+    path: '/confirm',
+    getParentRoute: () => ApiPublicHandheldTransfersIdRoute,
+  } as any)
+const ApiPublicHandheldTransfersIdScanRoute =
+  ApiPublicHandheldTransfersIdScanRouteImport.update({
+    id: '/scan',
+    path: '/scan',
+    getParentRoute: () => ApiPublicHandheldTransfersIdRoute,
   } as any)
 const ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute =
   ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteImport.update({
@@ -1052,16 +1052,16 @@ const ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute =
     path: '/items/$itemId/pack-pieces',
     getParentRoute: () => ApiPublicHandheldParcelsRoute,
   } as any)
-const ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRoute =
-  ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRouteImport.update({
-    id: '/estimate-title',
-    path: '/estimate-title',
-    getParentRoute: () => ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute,
-  } as any)
 const ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateImageRoute =
   ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateImageRouteImport.update({
     id: '/estimate-image',
     path: '/estimate-image',
+    getParentRoute: () => ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute,
+  } as any)
+const ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRoute =
+  ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRouteImport.update({
+    id: '/estimate-title',
+    path: '/estimate-title',
     getParentRoute: () => ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute,
   } as any)
 
@@ -2135,81 +2135,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/youzan': {
-      id: '/youzan'
-      path: '/youzan'
-      fullPath: '/youzan'
-      preLoaderRoute: typeof YouzanRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/store': {
-      id: '/store'
-      path: '/store'
-      fullPath: '/store'
-      preLoaderRoute: typeof StoreRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/shop-mgmt': {
-      id: '/shop-mgmt'
-      path: '/shop-mgmt'
-      fullPath: '/shop-mgmt'
-      preLoaderRoute: typeof ShopMgmtRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/product-categories': {
-      id: '/product-categories'
-      path: '/product-categories'
-      fullPath: '/product-categories'
-      preLoaderRoute: typeof ProductCategoriesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/product-brands': {
-      id: '/product-brands'
-      path: '/product-brands'
-      fullPath: '/product-brands'
-      preLoaderRoute: typeof ProductBrandsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/orders': {
-      id: '/orders'
-      path: '/orders'
-      fullPath: '/orders'
-      preLoaderRoute: typeof OrdersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/m': {
-      id: '/m'
-      path: '/m'
-      fullPath: '/m'
-      preLoaderRoute: typeof MRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/knowledge': {
-      id: '/knowledge'
-      path: '/knowledge'
-      fullPath: '/knowledge'
-      preLoaderRoute: typeof KnowledgeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/dashboard': {
-      id: '/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof DashboardRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api-docs': {
@@ -2219,263 +2149,81 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDocsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/store/': {
-      id: '/store/'
-      path: '/'
-      fullPath: '/store/'
-      preLoaderRoute: typeof StoreIndexRouteImport
-      parentRoute: typeof StoreRoute
-    }
-    '/m/': {
-      id: '/m/'
-      path: '/'
-      fullPath: '/m/'
-      preLoaderRoute: typeof MIndexRouteImport
-      parentRoute: typeof MRoute
-    }
-    '/youzan/sync': {
-      id: '/youzan/sync'
-      path: '/sync'
-      fullPath: '/youzan/sync'
-      preLoaderRoute: typeof YouzanSyncRouteImport
-      parentRoute: typeof YouzanRoute
-    }
-    '/stores/youzan': {
-      id: '/stores/youzan'
-      path: '/stores/youzan'
-      fullPath: '/stores/youzan'
-      preLoaderRoute: typeof StoresYouzanRouteImport
+    '/knowledge': {
+      id: '/knowledge'
+      path: '/knowledge'
+      fullPath: '/knowledge'
+      preLoaderRoute: typeof KnowledgeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/stores/products': {
-      id: '/stores/products'
-      path: '/stores/products'
-      fullPath: '/stores/products'
-      preLoaderRoute: typeof StoresProductsRouteImport
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/stores/list': {
-      id: '/stores/list'
-      path: '/stores/list'
-      fullPath: '/stores/list'
-      preLoaderRoute: typeof StoresListRouteImport
+    '/m': {
+      id: '/m'
+      path: '/m'
+      fullPath: '/m'
+      preLoaderRoute: typeof MRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/stores/franchisees': {
-      id: '/stores/franchisees'
-      path: '/stores/franchisees'
-      fullPath: '/stores/franchisees'
-      preLoaderRoute: typeof StoresFranchiseesRouteImport
+    '/orders': {
+      id: '/orders'
+      path: '/orders'
+      fullPath: '/orders'
+      preLoaderRoute: typeof OrdersRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/store/scan': {
-      id: '/store/scan'
-      path: '/scan'
-      fullPath: '/store/scan'
-      preLoaderRoute: typeof StoreScanRouteImport
-      parentRoute: typeof StoreRoute
-    }
-    '/store/inventory': {
-      id: '/store/inventory'
-      path: '/inventory'
-      fullPath: '/store/inventory'
-      preLoaderRoute: typeof StoreInventoryRouteImport
-      parentRoute: typeof StoreRoute
-    }
-    '/store/incoming': {
-      id: '/store/incoming'
-      path: '/incoming'
-      fullPath: '/store/incoming'
-      preLoaderRoute: typeof StoreIncomingRouteImport
-      parentRoute: typeof StoreRoute
-    }
-    '/shop-mgmt/shops': {
-      id: '/shop-mgmt/shops'
-      path: '/shops'
-      fullPath: '/shop-mgmt/shops'
-      preLoaderRoute: typeof ShopMgmtShopsRouteImport
-      parentRoute: typeof ShopMgmtRoute
-    }
-    '/shop-mgmt/products': {
-      id: '/shop-mgmt/products'
-      path: '/products'
-      fullPath: '/shop-mgmt/products'
-      preLoaderRoute: typeof ShopMgmtProductsRouteImport
-      parentRoute: typeof ShopMgmtRoute
-    }
-    '/shop-mgmt/online': {
-      id: '/shop-mgmt/online'
-      path: '/online'
-      fullPath: '/shop-mgmt/online'
-      preLoaderRoute: typeof ShopMgmtOnlineRouteImport
-      parentRoute: typeof ShopMgmtRoute
-    }
-    '/shop-mgmt/franchisees': {
-      id: '/shop-mgmt/franchisees'
-      path: '/franchisees'
-      fullPath: '/shop-mgmt/franchisees'
-      preLoaderRoute: typeof ShopMgmtFranchiseesRouteImport
-      parentRoute: typeof ShopMgmtRoute
-    }
-    '/purchase/japan-parcel': {
-      id: '/purchase/japan-parcel'
-      path: '/purchase/japan-parcel'
-      fullPath: '/purchase/japan-parcel'
-      preLoaderRoute: typeof PurchaseJapanParcelRouteImport
+    '/product-brands': {
+      id: '/product-brands'
+      path: '/product-brands'
+      fullPath: '/product-brands'
+      preLoaderRoute: typeof ProductBrandsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/purchase/japan-bulk': {
-      id: '/purchase/japan-bulk'
-      path: '/purchase/japan-bulk'
-      fullPath: '/purchase/japan-bulk'
-      preLoaderRoute: typeof PurchaseJapanBulkRouteImport
+    '/product-categories': {
+      id: '/product-categories'
+      path: '/product-categories'
+      fullPath: '/product-categories'
+      preLoaderRoute: typeof ProductCategoriesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/purchase/domestic-bulk': {
-      id: '/purchase/domestic-bulk'
-      path: '/purchase/domestic-bulk'
-      fullPath: '/purchase/domestic-bulk'
-      preLoaderRoute: typeof PurchaseDomesticBulkRouteImport
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/purchase/domestic': {
-      id: '/purchase/domestic'
-      path: '/purchase/domestic'
-      fullPath: '/purchase/domestic'
-      preLoaderRoute: typeof PurchaseDomesticRouteImport
+    '/shop-mgmt': {
+      id: '/shop-mgmt'
+      path: '/shop-mgmt'
+      fullPath: '/shop-mgmt'
+      preLoaderRoute: typeof ShopMgmtRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/orders/wholesale': {
-      id: '/orders/wholesale'
-      path: '/wholesale'
-      fullPath: '/orders/wholesale'
-      preLoaderRoute: typeof OrdersWholesaleRouteImport
-      parentRoute: typeof OrdersRoute
-    }
-    '/orders/shops': {
-      id: '/orders/shops'
-      path: '/shops'
-      fullPath: '/orders/shops'
-      preLoaderRoute: typeof OrdersShopsRouteImport
-      parentRoute: typeof OrdersRoute
-    }
-    '/orders/dispatch': {
-      id: '/orders/dispatch'
-      path: '/dispatch'
-      fullPath: '/orders/dispatch'
-      preLoaderRoute: typeof OrdersDispatchRouteImport
-      parentRoute: typeof OrdersRoute
-    }
-    '/m/scan': {
-      id: '/m/scan'
-      path: '/scan'
-      fullPath: '/m/scan'
-      preLoaderRoute: typeof MScanRouteImport
-      parentRoute: typeof MRoute
-    }
-    '/m/photo-search': {
-      id: '/m/photo-search'
-      path: '/photo-search'
-      fullPath: '/m/photo-search'
-      preLoaderRoute: typeof MPhotoSearchRouteImport
-      parentRoute: typeof MRoute
-    }
-    '/m/parcels': {
-      id: '/m/parcels'
-      path: '/parcels'
-      fullPath: '/m/parcels'
-      preLoaderRoute: typeof MParcelsRouteImport
-      parentRoute: typeof MRoute
-    }
-    '/m/inbound': {
-      id: '/m/inbound'
-      path: '/inbound'
-      fullPath: '/m/inbound'
-      preLoaderRoute: typeof MInboundRouteImport
-      parentRoute: typeof MRoute
-    }
-    '/inventory/unclaimed': {
-      id: '/inventory/unclaimed'
-      path: '/inventory/unclaimed'
-      fullPath: '/inventory/unclaimed'
-      preLoaderRoute: typeof InventoryUnclaimedRouteImport
+    '/store': {
+      id: '/store'
+      path: '/store'
+      fullPath: '/store'
+      preLoaderRoute: typeof StoreRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/inventory/transfers': {
-      id: '/inventory/transfers'
-      path: '/inventory/transfers'
-      fullPath: '/inventory/transfers'
-      preLoaderRoute: typeof InventoryTransfersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/inventory/skus': {
-      id: '/inventory/skus'
-      path: '/inventory/skus'
-      fullPath: '/inventory/skus'
-      preLoaderRoute: typeof InventorySkusRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/inventory/return-inspection': {
-      id: '/inventory/return-inspection'
-      path: '/inventory/return-inspection'
-      fullPath: '/inventory/return-inspection'
-      preLoaderRoute: typeof InventoryReturnInspectionRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/inventory/products': {
-      id: '/inventory/products'
-      path: '/inventory/products'
-      fullPath: '/inventory/products'
-      preLoaderRoute: typeof InventoryProductsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/inventory/locations': {
-      id: '/inventory/locations'
-      path: '/inventory/locations'
-      fullPath: '/inventory/locations'
-      preLoaderRoute: typeof InventoryLocationsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/inventory/inbound': {
-      id: '/inventory/inbound'
-      path: '/inventory/inbound'
-      fullPath: '/inventory/inbound'
-      preLoaderRoute: typeof InventoryInboundRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/inventory/devices': {
-      id: '/inventory/devices'
-      path: '/inventory/devices'
-      fullPath: '/inventory/devices'
-      preLoaderRoute: typeof InventoryDevicesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/inventory/batches': {
-      id: '/inventory/batches'
-      path: '/inventory/batches'
-      fullPath: '/inventory/batches'
-      preLoaderRoute: typeof InventoryBatchesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin/users': {
-      id: '/admin/users'
-      path: '/admin/users'
-      fullPath: '/admin/users'
-      preLoaderRoute: typeof AdminUsersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin/channel-sync': {
-      id: '/admin/channel-sync'
-      path: '/admin/channel-sync'
-      fullPath: '/admin/channel-sync'
-      preLoaderRoute: typeof AdminChannelSyncRouteImport
+    '/youzan': {
+      id: '/youzan'
+      path: '/youzan'
+      fullPath: '/youzan'
+      preLoaderRoute: typeof YouzanRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/api-integration': {
@@ -2485,165 +2233,270 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminApiIntegrationRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/purchase/japan-parcel/': {
-      id: '/purchase/japan-parcel/'
-      path: '/'
-      fullPath: '/purchase/japan-parcel/'
-      preLoaderRoute: typeof PurchaseJapanParcelIndexRouteImport
-      parentRoute: typeof PurchaseJapanParcelRoute
-    }
-    '/purchase/domestic/': {
-      id: '/purchase/domestic/'
-      path: '/'
-      fullPath: '/purchase/domestic/'
-      preLoaderRoute: typeof PurchaseDomesticIndexRouteImport
-      parentRoute: typeof PurchaseDomesticRoute
-    }
-    '/purchase/domestic-bulk/': {
-      id: '/purchase/domestic-bulk/'
-      path: '/'
-      fullPath: '/purchase/domestic-bulk/'
-      preLoaderRoute: typeof PurchaseDomesticBulkIndexRouteImport
-      parentRoute: typeof PurchaseDomesticBulkRoute
-    }
-    '/m/skus/': {
-      id: '/m/skus/'
-      path: '/skus'
-      fullPath: '/m/skus/'
-      preLoaderRoute: typeof MSkusIndexRouteImport
-      parentRoute: typeof MRoute
-    }
-    '/inventory/stocktakes/': {
-      id: '/inventory/stocktakes/'
-      path: '/inventory/stocktakes'
-      fullPath: '/inventory/stocktakes/'
-      preLoaderRoute: typeof InventoryStocktakesIndexRouteImport
+    '/admin/channel-sync': {
+      id: '/admin/channel-sync'
+      path: '/admin/channel-sync'
+      fullPath: '/admin/channel-sync'
+      preLoaderRoute: typeof AdminChannelSyncRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/inventory/skus/': {
-      id: '/inventory/skus/'
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/admin/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inventory/batches': {
+      id: '/inventory/batches'
+      path: '/inventory/batches'
+      fullPath: '/inventory/batches'
+      preLoaderRoute: typeof InventoryBatchesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inventory/devices': {
+      id: '/inventory/devices'
+      path: '/inventory/devices'
+      fullPath: '/inventory/devices'
+      preLoaderRoute: typeof InventoryDevicesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inventory/inbound': {
+      id: '/inventory/inbound'
+      path: '/inventory/inbound'
+      fullPath: '/inventory/inbound'
+      preLoaderRoute: typeof InventoryInboundRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inventory/locations': {
+      id: '/inventory/locations'
+      path: '/inventory/locations'
+      fullPath: '/inventory/locations'
+      preLoaderRoute: typeof InventoryLocationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inventory/products': {
+      id: '/inventory/products'
+      path: '/inventory/products'
+      fullPath: '/inventory/products'
+      preLoaderRoute: typeof InventoryProductsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inventory/return-inspection': {
+      id: '/inventory/return-inspection'
+      path: '/inventory/return-inspection'
+      fullPath: '/inventory/return-inspection'
+      preLoaderRoute: typeof InventoryReturnInspectionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inventory/skus': {
+      id: '/inventory/skus'
+      path: '/inventory/skus'
+      fullPath: '/inventory/skus'
+      preLoaderRoute: typeof InventorySkusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inventory/transfers': {
+      id: '/inventory/transfers'
+      path: '/inventory/transfers'
+      fullPath: '/inventory/transfers'
+      preLoaderRoute: typeof InventoryTransfersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inventory/unclaimed': {
+      id: '/inventory/unclaimed'
+      path: '/inventory/unclaimed'
+      fullPath: '/inventory/unclaimed'
+      preLoaderRoute: typeof InventoryUnclaimedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/m/': {
+      id: '/m/'
       path: '/'
-      fullPath: '/inventory/skus/'
-      preLoaderRoute: typeof InventorySkusIndexRouteImport
-      parentRoute: typeof InventorySkusRoute
+      fullPath: '/m/'
+      preLoaderRoute: typeof MIndexRouteImport
+      parentRoute: typeof MRoute
+    }
+    '/m/inbound': {
+      id: '/m/inbound'
+      path: '/inbound'
+      fullPath: '/m/inbound'
+      preLoaderRoute: typeof MInboundRouteImport
+      parentRoute: typeof MRoute
+    }
+    '/m/parcels': {
+      id: '/m/parcels'
+      path: '/parcels'
+      fullPath: '/m/parcels'
+      preLoaderRoute: typeof MParcelsRouteImport
+      parentRoute: typeof MRoute
+    }
+    '/m/photo-search': {
+      id: '/m/photo-search'
+      path: '/photo-search'
+      fullPath: '/m/photo-search'
+      preLoaderRoute: typeof MPhotoSearchRouteImport
+      parentRoute: typeof MRoute
+    }
+    '/m/scan': {
+      id: '/m/scan'
+      path: '/scan'
+      fullPath: '/m/scan'
+      preLoaderRoute: typeof MScanRouteImport
+      parentRoute: typeof MRoute
+    }
+    '/orders/dispatch': {
+      id: '/orders/dispatch'
+      path: '/dispatch'
+      fullPath: '/orders/dispatch'
+      preLoaderRoute: typeof OrdersDispatchRouteImport
+      parentRoute: typeof OrdersRoute
+    }
+    '/orders/shops': {
+      id: '/orders/shops'
+      path: '/shops'
+      fullPath: '/orders/shops'
+      preLoaderRoute: typeof OrdersShopsRouteImport
+      parentRoute: typeof OrdersRoute
+    }
+    '/orders/wholesale': {
+      id: '/orders/wholesale'
+      path: '/wholesale'
+      fullPath: '/orders/wholesale'
+      preLoaderRoute: typeof OrdersWholesaleRouteImport
+      parentRoute: typeof OrdersRoute
+    }
+    '/purchase/domestic': {
+      id: '/purchase/domestic'
+      path: '/purchase/domestic'
+      fullPath: '/purchase/domestic'
+      preLoaderRoute: typeof PurchaseDomesticRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/purchase/domestic-bulk': {
+      id: '/purchase/domestic-bulk'
+      path: '/purchase/domestic-bulk'
+      fullPath: '/purchase/domestic-bulk'
+      preLoaderRoute: typeof PurchaseDomesticBulkRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/purchase/japan-bulk': {
+      id: '/purchase/japan-bulk'
+      path: '/purchase/japan-bulk'
+      fullPath: '/purchase/japan-bulk'
+      preLoaderRoute: typeof PurchaseJapanBulkRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/purchase/japan-parcel': {
+      id: '/purchase/japan-parcel'
+      path: '/purchase/japan-parcel'
+      fullPath: '/purchase/japan-parcel'
+      preLoaderRoute: typeof PurchaseJapanParcelRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/shop-mgmt/franchisees': {
+      id: '/shop-mgmt/franchisees'
+      path: '/franchisees'
+      fullPath: '/shop-mgmt/franchisees'
+      preLoaderRoute: typeof ShopMgmtFranchiseesRouteImport
+      parentRoute: typeof ShopMgmtRoute
+    }
+    '/shop-mgmt/online': {
+      id: '/shop-mgmt/online'
+      path: '/online'
+      fullPath: '/shop-mgmt/online'
+      preLoaderRoute: typeof ShopMgmtOnlineRouteImport
+      parentRoute: typeof ShopMgmtRoute
+    }
+    '/shop-mgmt/products': {
+      id: '/shop-mgmt/products'
+      path: '/products'
+      fullPath: '/shop-mgmt/products'
+      preLoaderRoute: typeof ShopMgmtProductsRouteImport
+      parentRoute: typeof ShopMgmtRoute
+    }
+    '/shop-mgmt/shops': {
+      id: '/shop-mgmt/shops'
+      path: '/shops'
+      fullPath: '/shop-mgmt/shops'
+      preLoaderRoute: typeof ShopMgmtShopsRouteImport
+      parentRoute: typeof ShopMgmtRoute
+    }
+    '/store/': {
+      id: '/store/'
+      path: '/'
+      fullPath: '/store/'
+      preLoaderRoute: typeof StoreIndexRouteImport
+      parentRoute: typeof StoreRoute
+    }
+    '/store/incoming': {
+      id: '/store/incoming'
+      path: '/incoming'
+      fullPath: '/store/incoming'
+      preLoaderRoute: typeof StoreIncomingRouteImport
+      parentRoute: typeof StoreRoute
+    }
+    '/store/inventory': {
+      id: '/store/inventory'
+      path: '/inventory'
+      fullPath: '/store/inventory'
+      preLoaderRoute: typeof StoreInventoryRouteImport
+      parentRoute: typeof StoreRoute
+    }
+    '/store/scan': {
+      id: '/store/scan'
+      path: '/scan'
+      fullPath: '/store/scan'
+      preLoaderRoute: typeof StoreScanRouteImport
+      parentRoute: typeof StoreRoute
+    }
+    '/stores/franchisees': {
+      id: '/stores/franchisees'
+      path: '/stores/franchisees'
+      fullPath: '/stores/franchisees'
+      preLoaderRoute: typeof StoresFranchiseesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/stores/list': {
+      id: '/stores/list'
+      path: '/stores/list'
+      fullPath: '/stores/list'
+      preLoaderRoute: typeof StoresListRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/stores/products': {
+      id: '/stores/products'
+      path: '/stores/products'
+      fullPath: '/stores/products'
+      preLoaderRoute: typeof StoresProductsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/stores/youzan': {
+      id: '/stores/youzan'
+      path: '/stores/youzan'
+      fullPath: '/stores/youzan'
+      preLoaderRoute: typeof StoresYouzanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/youzan/sync': {
+      id: '/youzan/sync'
+      path: '/sync'
+      fullPath: '/youzan/sync'
+      preLoaderRoute: typeof YouzanSyncRouteImport
+      parentRoute: typeof YouzanRoute
+    }
+    '/api/public/meruki-ingest': {
+      id: '/api/public/meruki-ingest'
+      path: '/api/public/meruki-ingest'
+      fullPath: '/api/public/meruki-ingest'
+      preLoaderRoute: typeof ApiPublicMerukiIngestRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/inventory/inbound/': {
       id: '/inventory/inbound/'
       path: '/'
       fullPath: '/inventory/inbound/'
       preLoaderRoute: typeof InventoryInboundIndexRouteImport
-      parentRoute: typeof InventoryInboundRoute
-    }
-    '/purchase/japan-parcel/new': {
-      id: '/purchase/japan-parcel/new'
-      path: '/new'
-      fullPath: '/purchase/japan-parcel/new'
-      preLoaderRoute: typeof PurchaseJapanParcelNewRouteImport
-      parentRoute: typeof PurchaseJapanParcelRoute
-    }
-    '/purchase/japan-parcel/import': {
-      id: '/purchase/japan-parcel/import'
-      path: '/import'
-      fullPath: '/purchase/japan-parcel/import'
-      preLoaderRoute: typeof PurchaseJapanParcelImportRouteImport
-      parentRoute: typeof PurchaseJapanParcelRoute
-    }
-    '/purchase/japan-parcel/accounts': {
-      id: '/purchase/japan-parcel/accounts'
-      path: '/accounts'
-      fullPath: '/purchase/japan-parcel/accounts'
-      preLoaderRoute: typeof PurchaseJapanParcelAccountsRouteImport
-      parentRoute: typeof PurchaseJapanParcelRoute
-    }
-    '/purchase/japan-parcel/$id': {
-      id: '/purchase/japan-parcel/$id'
-      path: '/$id'
-      fullPath: '/purchase/japan-parcel/$id'
-      preLoaderRoute: typeof PurchaseJapanParcelIdRouteImport
-      parentRoute: typeof PurchaseJapanParcelRoute
-    }
-    '/purchase/domestic/import': {
-      id: '/purchase/domestic/import'
-      path: '/import'
-      fullPath: '/purchase/domestic/import'
-      preLoaderRoute: typeof PurchaseDomesticImportRouteImport
-      parentRoute: typeof PurchaseDomesticRoute
-    }
-    '/purchase/domestic/$id': {
-      id: '/purchase/domestic/$id'
-      path: '/$id'
-      fullPath: '/purchase/domestic/$id'
-      preLoaderRoute: typeof PurchaseDomesticIdRouteImport
-      parentRoute: typeof PurchaseDomesticRoute
-    }
-    '/purchase/domestic-bulk/new': {
-      id: '/purchase/domestic-bulk/new'
-      path: '/new'
-      fullPath: '/purchase/domestic-bulk/new'
-      preLoaderRoute: typeof PurchaseDomesticBulkNewRouteImport
-      parentRoute: typeof PurchaseDomesticBulkRoute
-    }
-    '/purchase/domestic-bulk/$id': {
-      id: '/purchase/domestic-bulk/$id'
-      path: '/$id'
-      fullPath: '/purchase/domestic-bulk/$id'
-      preLoaderRoute: typeof PurchaseDomesticBulkIdRouteImport
-      parentRoute: typeof PurchaseDomesticBulkRoute
-    }
-    '/m/skus/$id': {
-      id: '/m/skus/$id'
-      path: '/skus/$id'
-      fullPath: '/m/skus/$id'
-      preLoaderRoute: typeof MSkusIdRouteImport
-      parentRoute: typeof MRoute
-    }
-    '/m/receive/$id': {
-      id: '/m/receive/$id'
-      path: '/receive/$id'
-      fullPath: '/m/receive/$id'
-      preLoaderRoute: typeof MReceiveIdRouteImport
-      parentRoute: typeof MRoute
-    }
-    '/m/products/$code': {
-      id: '/m/products/$code'
-      path: '/products/$code'
-      fullPath: '/m/products/$code'
-      preLoaderRoute: typeof MProductsCodeRouteImport
-      parentRoute: typeof MRoute
-    }
-    '/m/domestic/quick-add': {
-      id: '/m/domestic/quick-add'
-      path: '/domestic/quick-add'
-      fullPath: '/m/domestic/quick-add'
-      preLoaderRoute: typeof MDomesticQuickAddRouteImport
-      parentRoute: typeof MRoute
-    }
-    '/inventory/stocktakes/$id': {
-      id: '/inventory/stocktakes/$id'
-      path: '/inventory/stocktakes/$id'
-      fullPath: '/inventory/stocktakes/$id'
-      preLoaderRoute: typeof InventoryStocktakesIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/inventory/skus/$id': {
-      id: '/inventory/skus/$id'
-      path: '/$id'
-      fullPath: '/inventory/skus/$id'
-      preLoaderRoute: typeof InventorySkusIdRouteImport
-      parentRoute: typeof InventorySkusRoute
-    }
-    '/inventory/products/$code': {
-      id: '/inventory/products/$code'
-      path: '/$code'
-      fullPath: '/inventory/products/$code'
-      preLoaderRoute: typeof InventoryProductsCodeRouteImport
-      parentRoute: typeof InventoryProductsRoute
-    }
-    '/inventory/inbound/new': {
-      id: '/inventory/inbound/new'
-      path: '/new'
-      fullPath: '/inventory/inbound/new'
-      preLoaderRoute: typeof InventoryInboundNewRouteImport
       parentRoute: typeof InventoryInboundRoute
     }
     '/inventory/inbound/$id': {
@@ -2653,200 +2506,165 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InventoryInboundIdRouteImport
       parentRoute: typeof InventoryInboundRoute
     }
-    '/api/public/meruki-ingest': {
-      id: '/api/public/meruki-ingest'
-      path: '/api/public/meruki-ingest'
-      fullPath: '/api/public/meruki-ingest'
-      preLoaderRoute: typeof ApiPublicMerukiIngestRouteImport
+    '/inventory/inbound/new': {
+      id: '/inventory/inbound/new'
+      path: '/new'
+      fullPath: '/inventory/inbound/new'
+      preLoaderRoute: typeof InventoryInboundNewRouteImport
+      parentRoute: typeof InventoryInboundRoute
+    }
+    '/inventory/products/$code': {
+      id: '/inventory/products/$code'
+      path: '/$code'
+      fullPath: '/inventory/products/$code'
+      preLoaderRoute: typeof InventoryProductsCodeRouteImport
+      parentRoute: typeof InventoryProductsRoute
+    }
+    '/inventory/skus/': {
+      id: '/inventory/skus/'
+      path: '/'
+      fullPath: '/inventory/skus/'
+      preLoaderRoute: typeof InventorySkusIndexRouteImport
+      parentRoute: typeof InventorySkusRoute
+    }
+    '/inventory/skus/$id': {
+      id: '/inventory/skus/$id'
+      path: '/$id'
+      fullPath: '/inventory/skus/$id'
+      preLoaderRoute: typeof InventorySkusIdRouteImport
+      parentRoute: typeof InventorySkusRoute
+    }
+    '/inventory/stocktakes/': {
+      id: '/inventory/stocktakes/'
+      path: '/inventory/stocktakes'
+      fullPath: '/inventory/stocktakes/'
+      preLoaderRoute: typeof InventoryStocktakesIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/storefront/products': {
-      id: '/api/public/storefront/products'
-      path: '/api/public/storefront/products'
-      fullPath: '/api/public/storefront/products'
-      preLoaderRoute: typeof ApiPublicStorefrontProductsRouteImport
+    '/inventory/stocktakes/$id': {
+      id: '/inventory/stocktakes/$id'
+      path: '/inventory/stocktakes/$id'
+      fullPath: '/inventory/stocktakes/$id'
+      preLoaderRoute: typeof InventoryStocktakesIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/storefront/orders': {
-      id: '/api/public/storefront/orders'
-      path: '/api/public/storefront/orders'
-      fullPath: '/api/public/storefront/orders'
-      preLoaderRoute: typeof ApiPublicStorefrontOrdersRouteImport
-      parentRoute: typeof rootRouteImport
+    '/m/domestic/quick-add': {
+      id: '/m/domestic/quick-add'
+      path: '/domestic/quick-add'
+      fullPath: '/m/domestic/quick-add'
+      preLoaderRoute: typeof MDomesticQuickAddRouteImport
+      parentRoute: typeof MRoute
     }
-    '/api/public/sso/aigc-ticket': {
-      id: '/api/public/sso/aigc-ticket'
-      path: '/api/public/sso/aigc-ticket'
-      fullPath: '/api/public/sso/aigc-ticket'
-      preLoaderRoute: typeof ApiPublicSsoAigcTicketRouteImport
-      parentRoute: typeof rootRouteImport
+    '/m/products/$code': {
+      id: '/m/products/$code'
+      path: '/products/$code'
+      fullPath: '/m/products/$code'
+      preLoaderRoute: typeof MProductsCodeRouteImport
+      parentRoute: typeof MRoute
     }
-    '/api/public/sso/aigc-exchange': {
-      id: '/api/public/sso/aigc-exchange'
-      path: '/api/public/sso/aigc-exchange'
-      fullPath: '/api/public/sso/aigc-exchange'
-      preLoaderRoute: typeof ApiPublicSsoAigcExchangeRouteImport
-      parentRoute: typeof rootRouteImport
+    '/m/receive/$id': {
+      id: '/m/receive/$id'
+      path: '/receive/$id'
+      fullPath: '/m/receive/$id'
+      preLoaderRoute: typeof MReceiveIdRouteImport
+      parentRoute: typeof MRoute
     }
-    '/api/public/hooks/youzan-sync-worker': {
-      id: '/api/public/hooks/youzan-sync-worker'
-      path: '/api/public/hooks/youzan-sync-worker'
-      fullPath: '/api/public/hooks/youzan-sync-worker'
-      preLoaderRoute: typeof ApiPublicHooksYouzanSyncWorkerRouteImport
-      parentRoute: typeof rootRouteImport
+    '/m/skus/': {
+      id: '/m/skus/'
+      path: '/skus'
+      fullPath: '/m/skus/'
+      preLoaderRoute: typeof MSkusIndexRouteImport
+      parentRoute: typeof MRoute
     }
-    '/api/public/hooks/youzan-sync': {
-      id: '/api/public/hooks/youzan-sync'
-      path: '/api/public/hooks/youzan-sync'
-      fullPath: '/api/public/hooks/youzan-sync'
-      preLoaderRoute: typeof ApiPublicHooksYouzanSyncRouteImport
-      parentRoute: typeof rootRouteImport
+    '/m/skus/$id': {
+      id: '/m/skus/$id'
+      path: '/skus/$id'
+      fullPath: '/m/skus/$id'
+      preLoaderRoute: typeof MSkusIdRouteImport
+      parentRoute: typeof MRoute
     }
-    '/api/public/hooks/youzan-stock-worker': {
-      id: '/api/public/hooks/youzan-stock-worker'
-      path: '/api/public/hooks/youzan-stock-worker'
-      fullPath: '/api/public/hooks/youzan-stock-worker'
-      preLoaderRoute: typeof ApiPublicHooksYouzanStockWorkerRouteImport
-      parentRoute: typeof rootRouteImport
+    '/purchase/domestic-bulk/': {
+      id: '/purchase/domestic-bulk/'
+      path: '/'
+      fullPath: '/purchase/domestic-bulk/'
+      preLoaderRoute: typeof PurchaseDomesticBulkIndexRouteImport
+      parentRoute: typeof PurchaseDomesticBulkRoute
     }
-    '/api/public/hooks/youzan-relist': {
-      id: '/api/public/hooks/youzan-relist'
-      path: '/api/public/hooks/youzan-relist'
-      fullPath: '/api/public/hooks/youzan-relist'
-      preLoaderRoute: typeof ApiPublicHooksYouzanRelistRouteImport
-      parentRoute: typeof rootRouteImport
+    '/purchase/domestic-bulk/$id': {
+      id: '/purchase/domestic-bulk/$id'
+      path: '/$id'
+      fullPath: '/purchase/domestic-bulk/$id'
+      preLoaderRoute: typeof PurchaseDomesticBulkIdRouteImport
+      parentRoute: typeof PurchaseDomesticBulkRoute
     }
-    '/api/public/hooks/youzan-reconcile': {
-      id: '/api/public/hooks/youzan-reconcile'
-      path: '/api/public/hooks/youzan-reconcile'
-      fullPath: '/api/public/hooks/youzan-reconcile'
-      preLoaderRoute: typeof ApiPublicHooksYouzanReconcileRouteImport
-      parentRoute: typeof rootRouteImport
+    '/purchase/domestic-bulk/new': {
+      id: '/purchase/domestic-bulk/new'
+      path: '/new'
+      fullPath: '/purchase/domestic-bulk/new'
+      preLoaderRoute: typeof PurchaseDomesticBulkNewRouteImport
+      parentRoute: typeof PurchaseDomesticBulkRoute
     }
-    '/api/public/hooks/youzan-message': {
-      id: '/api/public/hooks/youzan-message'
-      path: '/api/public/hooks/youzan-message'
-      fullPath: '/api/public/hooks/youzan-message'
-      preLoaderRoute: typeof ApiPublicHooksYouzanMessageRouteImport
-      parentRoute: typeof rootRouteImport
+    '/purchase/domestic/': {
+      id: '/purchase/domestic/'
+      path: '/'
+      fullPath: '/purchase/domestic/'
+      preLoaderRoute: typeof PurchaseDomesticIndexRouteImport
+      parentRoute: typeof PurchaseDomesticRoute
     }
-    '/api/public/hooks/youzan-fix-channel': {
-      id: '/api/public/hooks/youzan-fix-channel'
-      path: '/api/public/hooks/youzan-fix-channel'
-      fullPath: '/api/public/hooks/youzan-fix-channel'
-      preLoaderRoute: typeof ApiPublicHooksYouzanFixChannelRouteImport
-      parentRoute: typeof rootRouteImport
+    '/purchase/domestic/$id': {
+      id: '/purchase/domestic/$id'
+      path: '/$id'
+      fullPath: '/purchase/domestic/$id'
+      preLoaderRoute: typeof PurchaseDomesticIdRouteImport
+      parentRoute: typeof PurchaseDomesticRoute
     }
-    '/api/public/hooks/youzan-distribution-probe': {
-      id: '/api/public/hooks/youzan-distribution-probe'
-      path: '/api/public/hooks/youzan-distribution-probe'
-      fullPath: '/api/public/hooks/youzan-distribution-probe'
-      preLoaderRoute: typeof ApiPublicHooksYouzanDistributionProbeRouteImport
-      parentRoute: typeof rootRouteImport
+    '/purchase/domestic/import': {
+      id: '/purchase/domestic/import'
+      path: '/import'
+      fullPath: '/purchase/domestic/import'
+      preLoaderRoute: typeof PurchaseDomesticImportRouteImport
+      parentRoute: typeof PurchaseDomesticRoute
     }
-    '/api/public/hooks/youzan-cleanup': {
-      id: '/api/public/hooks/youzan-cleanup'
-      path: '/api/public/hooks/youzan-cleanup'
-      fullPath: '/api/public/hooks/youzan-cleanup'
-      preLoaderRoute: typeof ApiPublicHooksYouzanCleanupRouteImport
-      parentRoute: typeof rootRouteImport
+    '/purchase/japan-parcel/': {
+      id: '/purchase/japan-parcel/'
+      path: '/'
+      fullPath: '/purchase/japan-parcel/'
+      preLoaderRoute: typeof PurchaseJapanParcelIndexRouteImport
+      parentRoute: typeof PurchaseJapanParcelRoute
     }
-    '/api/public/hooks/test-publish-with-stock': {
-      id: '/api/public/hooks/test-publish-with-stock'
-      path: '/api/public/hooks/test-publish-with-stock'
-      fullPath: '/api/public/hooks/test-publish-with-stock'
-      preLoaderRoute: typeof ApiPublicHooksTestPublishWithStockRouteImport
-      parentRoute: typeof rootRouteImport
+    '/purchase/japan-parcel/$id': {
+      id: '/purchase/japan-parcel/$id'
+      path: '/$id'
+      fullPath: '/purchase/japan-parcel/$id'
+      preLoaderRoute: typeof PurchaseJapanParcelIdRouteImport
+      parentRoute: typeof PurchaseJapanParcelRoute
     }
-    '/api/public/hooks/commerce-release-expired': {
-      id: '/api/public/hooks/commerce-release-expired'
-      path: '/api/public/hooks/commerce-release-expired'
-      fullPath: '/api/public/hooks/commerce-release-expired'
-      preLoaderRoute: typeof ApiPublicHooksCommerceReleaseExpiredRouteImport
-      parentRoute: typeof rootRouteImport
+    '/purchase/japan-parcel/accounts': {
+      id: '/purchase/japan-parcel/accounts'
+      path: '/accounts'
+      fullPath: '/purchase/japan-parcel/accounts'
+      preLoaderRoute: typeof PurchaseJapanParcelAccountsRouteImport
+      parentRoute: typeof PurchaseJapanParcelRoute
     }
-    '/api/public/hooks/channel-sync-worker': {
-      id: '/api/public/hooks/channel-sync-worker'
-      path: '/api/public/hooks/channel-sync-worker'
-      fullPath: '/api/public/hooks/channel-sync-worker'
-      preLoaderRoute: typeof ApiPublicHooksChannelSyncWorkerRouteImport
-      parentRoute: typeof rootRouteImport
+    '/purchase/japan-parcel/import': {
+      id: '/purchase/japan-parcel/import'
+      path: '/import'
+      fullPath: '/purchase/japan-parcel/import'
+      preLoaderRoute: typeof PurchaseJapanParcelImportRouteImport
+      parentRoute: typeof PurchaseJapanParcelRoute
     }
-    '/api/public/hooks/chain-probe-verify': {
-      id: '/api/public/hooks/chain-probe-verify'
-      path: '/api/public/hooks/chain-probe-verify'
-      fullPath: '/api/public/hooks/chain-probe-verify'
-      preLoaderRoute: typeof ApiPublicHooksChainProbeVerifyRouteImport
-      parentRoute: typeof rootRouteImport
+    '/purchase/japan-parcel/new': {
+      id: '/purchase/japan-parcel/new'
+      path: '/new'
+      fullPath: '/purchase/japan-parcel/new'
+      preLoaderRoute: typeof PurchaseJapanParcelNewRouteImport
+      parentRoute: typeof PurchaseJapanParcelRoute
     }
-    '/api/public/handheld/transfers': {
-      id: '/api/public/handheld/transfers'
-      path: '/api/public/handheld/transfers'
-      fullPath: '/api/public/handheld/transfers'
-      preLoaderRoute: typeof ApiPublicHandheldTransfersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/handheld/sync-records': {
-      id: '/api/public/handheld/sync-records'
-      path: '/api/public/handheld/sync-records'
-      fullPath: '/api/public/handheld/sync-records'
-      preLoaderRoute: typeof ApiPublicHandheldSyncRecordsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/handheld/stocktakes': {
-      id: '/api/public/handheld/stocktakes'
-      path: '/api/public/handheld/stocktakes'
-      fullPath: '/api/public/handheld/stocktakes'
-      preLoaderRoute: typeof ApiPublicHandheldStocktakesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/handheld/products': {
-      id: '/api/public/handheld/products'
-      path: '/api/public/handheld/products'
-      fullPath: '/api/public/handheld/products'
-      preLoaderRoute: typeof ApiPublicHandheldProductsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/handheld/parcels': {
-      id: '/api/public/handheld/parcels'
-      path: '/api/public/handheld/parcels'
-      fullPath: '/api/public/handheld/parcels'
-      preLoaderRoute: typeof ApiPublicHandheldParcelsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/handheld/openapi.json': {
-      id: '/api/public/handheld/openapi.json'
-      path: '/api/public/handheld/openapi.json'
-      fullPath: '/api/public/handheld/openapi.json'
-      preLoaderRoute: typeof ApiPublicHandheldOpenapiDotjsonRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/handheld/notifications': {
-      id: '/api/public/handheld/notifications'
-      path: '/api/public/handheld/notifications'
-      fullPath: '/api/public/handheld/notifications'
-      preLoaderRoute: typeof ApiPublicHandheldNotificationsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/handheld/locations': {
-      id: '/api/public/handheld/locations'
-      path: '/api/public/handheld/locations'
-      fullPath: '/api/public/handheld/locations'
-      preLoaderRoute: typeof ApiPublicHandheldLocationsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/handheld/label-templates': {
-      id: '/api/public/handheld/label-templates'
-      path: '/api/public/handheld/label-templates'
-      fullPath: '/api/public/handheld/label-templates'
-      preLoaderRoute: typeof ApiPublicHandheldLabelTemplatesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/handheld/global-stock': {
-      id: '/api/public/handheld/global-stock'
-      path: '/api/public/handheld/global-stock'
-      fullPath: '/api/public/handheld/global-stock'
-      preLoaderRoute: typeof ApiPublicHandheldGlobalStockRouteImport
+    '/api/public/handheld/dashboard': {
+      id: '/api/public/handheld/dashboard'
+      path: '/api/public/handheld/dashboard'
+      fullPath: '/api/public/handheld/dashboard'
+      preLoaderRoute: typeof ApiPublicHandheldDashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/handheld/fulfillments': {
@@ -2856,298 +2674,193 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldFulfillmentsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/dashboard': {
-      id: '/api/public/handheld/dashboard'
-      path: '/api/public/handheld/dashboard'
-      fullPath: '/api/public/handheld/dashboard'
-      preLoaderRoute: typeof ApiPublicHandheldDashboardRouteImport
+    '/api/public/handheld/global-stock': {
+      id: '/api/public/handheld/global-stock'
+      path: '/api/public/handheld/global-stock'
+      fullPath: '/api/public/handheld/global-stock'
+      preLoaderRoute: typeof ApiPublicHandheldGlobalStockRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/storefront/products/$id': {
-      id: '/api/public/storefront/products/$id'
-      path: '/$id'
-      fullPath: '/api/public/storefront/products/$id'
-      preLoaderRoute: typeof ApiPublicStorefrontProductsIdRouteImport
-      parentRoute: typeof ApiPublicStorefrontProductsRoute
-    }
-    '/api/public/storefront/orders/$id': {
-      id: '/api/public/storefront/orders/$id'
-      path: '/$id'
-      fullPath: '/api/public/storefront/orders/$id'
-      preLoaderRoute: typeof ApiPublicStorefrontOrdersIdRouteImport
-      parentRoute: typeof ApiPublicStorefrontOrdersRoute
-    }
-    '/api/public/handheld/transfers/$id': {
-      id: '/api/public/handheld/transfers/$id'
-      path: '/$id'
-      fullPath: '/api/public/handheld/transfers/$id'
-      preLoaderRoute: typeof ApiPublicHandheldTransfersIdRouteImport
-      parentRoute: typeof ApiPublicHandheldTransfersRoute
-    }
-    '/api/public/handheld/transfer/ship-scan': {
-      id: '/api/public/handheld/transfer/ship-scan'
-      path: '/api/public/handheld/transfer/ship-scan'
-      fullPath: '/api/public/handheld/transfer/ship-scan'
-      preLoaderRoute: typeof ApiPublicHandheldTransferShipScanRouteImport
+    '/api/public/handheld/label-templates': {
+      id: '/api/public/handheld/label-templates'
+      path: '/api/public/handheld/label-templates'
+      fullPath: '/api/public/handheld/label-templates'
+      preLoaderRoute: typeof ApiPublicHandheldLabelTemplatesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/transfer/ship-confirm': {
-      id: '/api/public/handheld/transfer/ship-confirm'
-      path: '/api/public/handheld/transfer/ship-confirm'
-      fullPath: '/api/public/handheld/transfer/ship-confirm'
-      preLoaderRoute: typeof ApiPublicHandheldTransferShipConfirmRouteImport
+    '/api/public/handheld/locations': {
+      id: '/api/public/handheld/locations'
+      path: '/api/public/handheld/locations'
+      fullPath: '/api/public/handheld/locations'
+      preLoaderRoute: typeof ApiPublicHandheldLocationsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/transfer/receive-scan': {
-      id: '/api/public/handheld/transfer/receive-scan'
-      path: '/api/public/handheld/transfer/receive-scan'
-      fullPath: '/api/public/handheld/transfer/receive-scan'
-      preLoaderRoute: typeof ApiPublicHandheldTransferReceiveScanRouteImport
+    '/api/public/handheld/notifications': {
+      id: '/api/public/handheld/notifications'
+      path: '/api/public/handheld/notifications'
+      fullPath: '/api/public/handheld/notifications'
+      preLoaderRoute: typeof ApiPublicHandheldNotificationsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/transfer/receive-confirm': {
-      id: '/api/public/handheld/transfer/receive-confirm'
-      path: '/api/public/handheld/transfer/receive-confirm'
-      fullPath: '/api/public/handheld/transfer/receive-confirm'
-      preLoaderRoute: typeof ApiPublicHandheldTransferReceiveConfirmRouteImport
+    '/api/public/handheld/openapi.json': {
+      id: '/api/public/handheld/openapi.json'
+      path: '/api/public/handheld/openapi.json'
+      fullPath: '/api/public/handheld/openapi.json'
+      preLoaderRoute: typeof ApiPublicHandheldOpenapiDotjsonRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/stocktake/submit': {
-      id: '/api/public/handheld/stocktake/submit'
-      path: '/api/public/handheld/stocktake/submit'
-      fullPath: '/api/public/handheld/stocktake/submit'
-      preLoaderRoute: typeof ApiPublicHandheldStocktakeSubmitRouteImport
+    '/api/public/handheld/parcels': {
+      id: '/api/public/handheld/parcels'
+      path: '/api/public/handheld/parcels'
+      fullPath: '/api/public/handheld/parcels'
+      preLoaderRoute: typeof ApiPublicHandheldParcelsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/stocktake/scan': {
-      id: '/api/public/handheld/stocktake/scan'
-      path: '/api/public/handheld/stocktake/scan'
-      fullPath: '/api/public/handheld/stocktake/scan'
-      preLoaderRoute: typeof ApiPublicHandheldStocktakeScanRouteImport
+    '/api/public/handheld/products': {
+      id: '/api/public/handheld/products'
+      path: '/api/public/handheld/products'
+      fullPath: '/api/public/handheld/products'
+      preLoaderRoute: typeof ApiPublicHandheldProductsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/stocktake/open': {
-      id: '/api/public/handheld/stocktake/open'
-      path: '/api/public/handheld/stocktake/open'
-      fullPath: '/api/public/handheld/stocktake/open'
-      preLoaderRoute: typeof ApiPublicHandheldStocktakeOpenRouteImport
+    '/api/public/handheld/stocktakes': {
+      id: '/api/public/handheld/stocktakes'
+      path: '/api/public/handheld/stocktakes'
+      fullPath: '/api/public/handheld/stocktakes'
+      preLoaderRoute: typeof ApiPublicHandheldStocktakesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/sku/search': {
-      id: '/api/public/handheld/sku/search'
-      path: '/api/public/handheld/sku/search'
-      fullPath: '/api/public/handheld/sku/search'
-      preLoaderRoute: typeof ApiPublicHandheldSkuSearchRouteImport
+    '/api/public/handheld/sync-records': {
+      id: '/api/public/handheld/sync-records'
+      path: '/api/public/handheld/sync-records'
+      fullPath: '/api/public/handheld/sync-records'
+      preLoaderRoute: typeof ApiPublicHandheldSyncRecordsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/sku/by-epc': {
-      id: '/api/public/handheld/sku/by-epc'
-      path: '/api/public/handheld/sku/by-epc'
-      fullPath: '/api/public/handheld/sku/by-epc'
-      preLoaderRoute: typeof ApiPublicHandheldSkuByEpcRouteImport
+    '/api/public/handheld/transfers': {
+      id: '/api/public/handheld/transfers'
+      path: '/api/public/handheld/transfers'
+      fullPath: '/api/public/handheld/transfers'
+      preLoaderRoute: typeof ApiPublicHandheldTransfersRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/rfid/transfer-location': {
-      id: '/api/public/handheld/rfid/transfer-location'
-      path: '/api/public/handheld/rfid/transfer-location'
-      fullPath: '/api/public/handheld/rfid/transfer-location'
-      preLoaderRoute: typeof ApiPublicHandheldRfidTransferLocationRouteImport
+    '/api/public/hooks/chain-probe-verify': {
+      id: '/api/public/hooks/chain-probe-verify'
+      path: '/api/public/hooks/chain-probe-verify'
+      fullPath: '/api/public/hooks/chain-probe-verify'
+      preLoaderRoute: typeof ApiPublicHooksChainProbeVerifyRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/rfid/stock-in': {
-      id: '/api/public/handheld/rfid/stock-in'
-      path: '/api/public/handheld/rfid/stock-in'
-      fullPath: '/api/public/handheld/rfid/stock-in'
-      preLoaderRoute: typeof ApiPublicHandheldRfidStockInRouteImport
+    '/api/public/hooks/channel-sync-worker': {
+      id: '/api/public/hooks/channel-sync-worker'
+      path: '/api/public/hooks/channel-sync-worker'
+      fullPath: '/api/public/hooks/channel-sync-worker'
+      preLoaderRoute: typeof ApiPublicHooksChannelSyncWorkerRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/rfid/bind-item': {
-      id: '/api/public/handheld/rfid/bind-item'
-      path: '/api/public/handheld/rfid/bind-item'
-      fullPath: '/api/public/handheld/rfid/bind-item'
-      preLoaderRoute: typeof ApiPublicHandheldRfidBindItemRouteImport
+    '/api/public/hooks/commerce-release-expired': {
+      id: '/api/public/hooks/commerce-release-expired'
+      path: '/api/public/hooks/commerce-release-expired'
+      fullPath: '/api/public/hooks/commerce-release-expired'
+      preLoaderRoute: typeof ApiPublicHooksCommerceReleaseExpiredRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/rfid/batch-stock-in': {
-      id: '/api/public/handheld/rfid/batch-stock-in'
-      path: '/api/public/handheld/rfid/batch-stock-in'
-      fullPath: '/api/public/handheld/rfid/batch-stock-in'
-      preLoaderRoute: typeof ApiPublicHandheldRfidBatchStockInRouteImport
+    '/api/public/hooks/test-publish-with-stock': {
+      id: '/api/public/hooks/test-publish-with-stock'
+      path: '/api/public/hooks/test-publish-with-stock'
+      fullPath: '/api/public/hooks/test-publish-with-stock'
+      preLoaderRoute: typeof ApiPublicHooksTestPublishWithStockRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/rfid/$epc': {
-      id: '/api/public/handheld/rfid/$epc'
-      path: '/api/public/handheld/rfid/$epc'
-      fullPath: '/api/public/handheld/rfid/$epc'
-      preLoaderRoute: typeof ApiPublicHandheldRfidEpcRouteImport
+    '/api/public/hooks/youzan-cleanup': {
+      id: '/api/public/hooks/youzan-cleanup'
+      path: '/api/public/hooks/youzan-cleanup'
+      fullPath: '/api/public/hooks/youzan-cleanup'
+      preLoaderRoute: typeof ApiPublicHooksYouzanCleanupRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/products/lookup': {
-      id: '/api/public/handheld/products/lookup'
-      path: '/lookup'
-      fullPath: '/api/public/handheld/products/lookup'
-      preLoaderRoute: typeof ApiPublicHandheldProductsLookupRouteImport
-      parentRoute: typeof ApiPublicHandheldProductsRoute
-    }
-    '/api/public/handheld/parcels/counts': {
-      id: '/api/public/handheld/parcels/counts'
-      path: '/counts'
-      fullPath: '/api/public/handheld/parcels/counts'
-      preLoaderRoute: typeof ApiPublicHandheldParcelsCountsRouteImport
-      parentRoute: typeof ApiPublicHandheldParcelsRoute
-    }
-    '/api/public/handheld/parcels/$id': {
-      id: '/api/public/handheld/parcels/$id'
-      path: '/$id'
-      fullPath: '/api/public/handheld/parcels/$id'
-      preLoaderRoute: typeof ApiPublicHandheldParcelsIdRouteImport
-      parentRoute: typeof ApiPublicHandheldParcelsRoute
-    }
-    '/api/public/handheld/notifications/since': {
-      id: '/api/public/handheld/notifications/since'
-      path: '/since'
-      fullPath: '/api/public/handheld/notifications/since'
-      preLoaderRoute: typeof ApiPublicHandheldNotificationsSinceRouteImport
-      parentRoute: typeof ApiPublicHandheldNotificationsRoute
-    }
-    '/api/public/handheld/notifications/read-all': {
-      id: '/api/public/handheld/notifications/read-all'
-      path: '/read-all'
-      fullPath: '/api/public/handheld/notifications/read-all'
-      preLoaderRoute: typeof ApiPublicHandheldNotificationsReadAllRouteImport
-      parentRoute: typeof ApiPublicHandheldNotificationsRoute
-    }
-    '/api/public/handheld/location/switch': {
-      id: '/api/public/handheld/location/switch'
-      path: '/api/public/handheld/location/switch'
-      fullPath: '/api/public/handheld/location/switch'
-      preLoaderRoute: typeof ApiPublicHandheldLocationSwitchRouteImport
+    '/api/public/hooks/youzan-distribution-probe': {
+      id: '/api/public/hooks/youzan-distribution-probe'
+      path: '/api/public/hooks/youzan-distribution-probe'
+      fullPath: '/api/public/hooks/youzan-distribution-probe'
+      preLoaderRoute: typeof ApiPublicHooksYouzanDistributionProbeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/label-templates/$id': {
-      id: '/api/public/handheld/label-templates/$id'
-      path: '/$id'
-      fullPath: '/api/public/handheld/label-templates/$id'
-      preLoaderRoute: typeof ApiPublicHandheldLabelTemplatesIdRouteImport
-      parentRoute: typeof ApiPublicHandheldLabelTemplatesRoute
-    }
-    '/api/public/handheld/items/upload-image': {
-      id: '/api/public/handheld/items/upload-image'
-      path: '/api/public/handheld/items/upload-image'
-      fullPath: '/api/public/handheld/items/upload-image'
-      preLoaderRoute: typeof ApiPublicHandheldItemsUploadImageRouteImport
+    '/api/public/hooks/youzan-fix-channel': {
+      id: '/api/public/hooks/youzan-fix-channel'
+      path: '/api/public/hooks/youzan-fix-channel'
+      fullPath: '/api/public/hooks/youzan-fix-channel'
+      preLoaderRoute: typeof ApiPublicHooksYouzanFixChannelRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/items/smart-create': {
-      id: '/api/public/handheld/items/smart-create'
-      path: '/api/public/handheld/items/smart-create'
-      fullPath: '/api/public/handheld/items/smart-create'
-      preLoaderRoute: typeof ApiPublicHandheldItemsSmartCreateRouteImport
+    '/api/public/hooks/youzan-message': {
+      id: '/api/public/hooks/youzan-message'
+      path: '/api/public/hooks/youzan-message'
+      fullPath: '/api/public/hooks/youzan-message'
+      preLoaderRoute: typeof ApiPublicHooksYouzanMessageRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/items/sign-read-url': {
-      id: '/api/public/handheld/items/sign-read-url'
-      path: '/api/public/handheld/items/sign-read-url'
-      fullPath: '/api/public/handheld/items/sign-read-url'
-      preLoaderRoute: typeof ApiPublicHandheldItemsSignReadUrlRouteImport
+    '/api/public/hooks/youzan-reconcile': {
+      id: '/api/public/hooks/youzan-reconcile'
+      path: '/api/public/hooks/youzan-reconcile'
+      fullPath: '/api/public/hooks/youzan-reconcile'
+      preLoaderRoute: typeof ApiPublicHooksYouzanReconcileRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/items/bind-rfid': {
-      id: '/api/public/handheld/items/bind-rfid'
-      path: '/api/public/handheld/items/bind-rfid'
-      fullPath: '/api/public/handheld/items/bind-rfid'
-      preLoaderRoute: typeof ApiPublicHandheldItemsBindRfidRouteImport
+    '/api/public/hooks/youzan-relist': {
+      id: '/api/public/hooks/youzan-relist'
+      path: '/api/public/hooks/youzan-relist'
+      fullPath: '/api/public/hooks/youzan-relist'
+      preLoaderRoute: typeof ApiPublicHooksYouzanRelistRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/items/$id': {
-      id: '/api/public/handheld/items/$id'
-      path: '/api/public/handheld/items/$id'
-      fullPath: '/api/public/handheld/items/$id'
-      preLoaderRoute: typeof ApiPublicHandheldItemsIdRouteImport
+    '/api/public/hooks/youzan-stock-worker': {
+      id: '/api/public/hooks/youzan-stock-worker'
+      path: '/api/public/hooks/youzan-stock-worker'
+      fullPath: '/api/public/hooks/youzan-stock-worker'
+      preLoaderRoute: typeof ApiPublicHooksYouzanStockWorkerRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/inbound/scan': {
-      id: '/api/public/handheld/inbound/scan'
-      path: '/api/public/handheld/inbound/scan'
-      fullPath: '/api/public/handheld/inbound/scan'
-      preLoaderRoute: typeof ApiPublicHandheldInboundScanRouteImport
+    '/api/public/hooks/youzan-sync': {
+      id: '/api/public/hooks/youzan-sync'
+      path: '/api/public/hooks/youzan-sync'
+      fullPath: '/api/public/hooks/youzan-sync'
+      preLoaderRoute: typeof ApiPublicHooksYouzanSyncRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/fulfillments/$id': {
-      id: '/api/public/handheld/fulfillments/$id'
-      path: '/$id'
-      fullPath: '/api/public/handheld/fulfillments/$id'
-      preLoaderRoute: typeof ApiPublicHandheldFulfillmentsIdRouteImport
-      parentRoute: typeof ApiPublicHandheldFulfillmentsRoute
-    }
-    '/api/public/handheld/diag/report': {
-      id: '/api/public/handheld/diag/report'
-      path: '/api/public/handheld/diag/report'
-      fullPath: '/api/public/handheld/diag/report'
-      preLoaderRoute: typeof ApiPublicHandheldDiagReportRouteImport
+    '/api/public/hooks/youzan-sync-worker': {
+      id: '/api/public/hooks/youzan-sync-worker'
+      path: '/api/public/hooks/youzan-sync-worker'
+      fullPath: '/api/public/hooks/youzan-sync-worker'
+      preLoaderRoute: typeof ApiPublicHooksYouzanSyncWorkerRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/auth/refresh': {
-      id: '/api/public/handheld/auth/refresh'
-      path: '/api/public/handheld/auth/refresh'
-      fullPath: '/api/public/handheld/auth/refresh'
-      preLoaderRoute: typeof ApiPublicHandheldAuthRefreshRouteImport
+    '/api/public/sso/aigc-exchange': {
+      id: '/api/public/sso/aigc-exchange'
+      path: '/api/public/sso/aigc-exchange'
+      fullPath: '/api/public/sso/aigc-exchange'
+      preLoaderRoute: typeof ApiPublicSsoAigcExchangeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/auth/ping': {
-      id: '/api/public/handheld/auth/ping'
-      path: '/api/public/handheld/auth/ping'
-      fullPath: '/api/public/handheld/auth/ping'
-      preLoaderRoute: typeof ApiPublicHandheldAuthPingRouteImport
+    '/api/public/sso/aigc-ticket': {
+      id: '/api/public/sso/aigc-ticket'
+      path: '/api/public/sso/aigc-ticket'
+      fullPath: '/api/public/sso/aigc-ticket'
+      preLoaderRoute: typeof ApiPublicSsoAigcTicketRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/auth/me': {
-      id: '/api/public/handheld/auth/me'
-      path: '/api/public/handheld/auth/me'
-      fullPath: '/api/public/handheld/auth/me'
-      preLoaderRoute: typeof ApiPublicHandheldAuthMeRouteImport
+    '/api/public/storefront/orders': {
+      id: '/api/public/storefront/orders'
+      path: '/api/public/storefront/orders'
+      fullPath: '/api/public/storefront/orders'
+      preLoaderRoute: typeof ApiPublicStorefrontOrdersRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/auth/logout': {
-      id: '/api/public/handheld/auth/logout'
-      path: '/api/public/handheld/auth/logout'
-      fullPath: '/api/public/handheld/auth/logout'
-      preLoaderRoute: typeof ApiPublicHandheldAuthLogoutRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/handheld/auth/login': {
-      id: '/api/public/handheld/auth/login'
-      path: '/api/public/handheld/auth/login'
-      fullPath: '/api/public/handheld/auth/login'
-      preLoaderRoute: typeof ApiPublicHandheldAuthLoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/handheld/auth/bootstrap': {
-      id: '/api/public/handheld/auth/bootstrap'
-      path: '/api/public/handheld/auth/bootstrap'
-      fullPath: '/api/public/handheld/auth/bootstrap'
-      preLoaderRoute: typeof ApiPublicHandheldAuthBootstrapRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/handheld/ai/recognize-item': {
-      id: '/api/public/handheld/ai/recognize-item'
-      path: '/api/public/handheld/ai/recognize-item'
-      fullPath: '/api/public/handheld/ai/recognize-item'
-      preLoaderRoute: typeof ApiPublicHandheldAiRecognizeItemRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/handheld/ai/prepare-listing-image': {
-      id: '/api/public/handheld/ai/prepare-listing-image'
-      path: '/api/public/handheld/ai/prepare-listing-image'
-      fullPath: '/api/public/handheld/ai/prepare-listing-image'
-      preLoaderRoute: typeof ApiPublicHandheldAiPrepareListingImageRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/auth/otp/verify': {
-      id: '/api/public/auth/otp/verify'
-      path: '/api/public/auth/otp/verify'
-      fullPath: '/api/public/auth/otp/verify'
-      preLoaderRoute: typeof ApiPublicAuthOtpVerifyRouteImport
+    '/api/public/storefront/products': {
+      id: '/api/public/storefront/products'
+      path: '/api/public/storefront/products'
+      fullPath: '/api/public/storefront/products'
+      preLoaderRoute: typeof ApiPublicStorefrontProductsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/auth/otp/send': {
@@ -3157,74 +2870,298 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicAuthOtpSendRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/transfers/$id/scan': {
-      id: '/api/public/handheld/transfers/$id/scan'
-      path: '/scan'
-      fullPath: '/api/public/handheld/transfers/$id/scan'
-      preLoaderRoute: typeof ApiPublicHandheldTransfersIdScanRouteImport
-      parentRoute: typeof ApiPublicHandheldTransfersIdRoute
+    '/api/public/auth/otp/verify': {
+      id: '/api/public/auth/otp/verify'
+      path: '/api/public/auth/otp/verify'
+      fullPath: '/api/public/auth/otp/verify'
+      preLoaderRoute: typeof ApiPublicAuthOtpVerifyRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/transfers/$id/confirm': {
-      id: '/api/public/handheld/transfers/$id/confirm'
-      path: '/confirm'
-      fullPath: '/api/public/handheld/transfers/$id/confirm'
-      preLoaderRoute: typeof ApiPublicHandheldTransfersIdConfirmRouteImport
-      parentRoute: typeof ApiPublicHandheldTransfersIdRoute
+    '/api/public/handheld/ai/prepare-listing-image': {
+      id: '/api/public/handheld/ai/prepare-listing-image'
+      path: '/api/public/handheld/ai/prepare-listing-image'
+      fullPath: '/api/public/handheld/ai/prepare-listing-image'
+      preLoaderRoute: typeof ApiPublicHandheldAiPrepareListingImageRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/label-templates/$id/set-default': {
-      id: '/api/public/handheld/label-templates/$id/set-default'
-      path: '/set-default'
-      fullPath: '/api/public/handheld/label-templates/$id/set-default'
-      preLoaderRoute: typeof ApiPublicHandheldLabelTemplatesIdSetDefaultRouteImport
-      parentRoute: typeof ApiPublicHandheldLabelTemplatesIdRoute
+    '/api/public/handheld/ai/recognize-item': {
+      id: '/api/public/handheld/ai/recognize-item'
+      path: '/api/public/handheld/ai/recognize-item'
+      fullPath: '/api/public/handheld/ai/recognize-item'
+      preLoaderRoute: typeof ApiPublicHandheldAiRecognizeItemRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/items/upload-image/multipart': {
-      id: '/api/public/handheld/items/upload-image/multipart'
-      path: '/multipart'
-      fullPath: '/api/public/handheld/items/upload-image/multipart'
-      preLoaderRoute: typeof ApiPublicHandheldItemsUploadImageMultipartRouteImport
-      parentRoute: typeof ApiPublicHandheldItemsUploadImageRoute
+    '/api/public/handheld/auth/bootstrap': {
+      id: '/api/public/handheld/auth/bootstrap'
+      path: '/api/public/handheld/auth/bootstrap'
+      fullPath: '/api/public/handheld/auth/bootstrap'
+      preLoaderRoute: typeof ApiPublicHandheldAuthBootstrapRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/items/$id/sync-status': {
-      id: '/api/public/handheld/items/$id/sync-status'
-      path: '/sync-status'
-      fullPath: '/api/public/handheld/items/$id/sync-status'
-      preLoaderRoute: typeof ApiPublicHandheldItemsIdSyncStatusRouteImport
-      parentRoute: typeof ApiPublicHandheldItemsIdRoute
+    '/api/public/handheld/auth/login': {
+      id: '/api/public/handheld/auth/login'
+      path: '/api/public/handheld/auth/login'
+      fullPath: '/api/public/handheld/auth/login'
+      preLoaderRoute: typeof ApiPublicHandheldAuthLoginRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/items/$id/set-status': {
-      id: '/api/public/handheld/items/$id/set-status'
-      path: '/set-status'
-      fullPath: '/api/public/handheld/items/$id/set-status'
-      preLoaderRoute: typeof ApiPublicHandheldItemsIdSetStatusRouteImport
-      parentRoute: typeof ApiPublicHandheldItemsIdRoute
+    '/api/public/handheld/auth/logout': {
+      id: '/api/public/handheld/auth/logout'
+      path: '/api/public/handheld/auth/logout'
+      fullPath: '/api/public/handheld/auth/logout'
+      preLoaderRoute: typeof ApiPublicHandheldAuthLogoutRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/items/$id/restock': {
-      id: '/api/public/handheld/items/$id/restock'
-      path: '/restock'
-      fullPath: '/api/public/handheld/items/$id/restock'
-      preLoaderRoute: typeof ApiPublicHandheldItemsIdRestockRouteImport
-      parentRoute: typeof ApiPublicHandheldItemsIdRoute
+    '/api/public/handheld/auth/me': {
+      id: '/api/public/handheld/auth/me'
+      path: '/api/public/handheld/auth/me'
+      fullPath: '/api/public/handheld/auth/me'
+      preLoaderRoute: typeof ApiPublicHandheldAuthMeRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/items/$id/attach-images': {
-      id: '/api/public/handheld/items/$id/attach-images'
-      path: '/attach-images'
-      fullPath: '/api/public/handheld/items/$id/attach-images'
-      preLoaderRoute: typeof ApiPublicHandheldItemsIdAttachImagesRouteImport
-      parentRoute: typeof ApiPublicHandheldItemsIdRoute
+    '/api/public/handheld/auth/ping': {
+      id: '/api/public/handheld/auth/ping'
+      path: '/api/public/handheld/auth/ping'
+      fullPath: '/api/public/handheld/auth/ping'
+      preLoaderRoute: typeof ApiPublicHandheldAuthPingRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/fulfillments/$id/pick-scan': {
-      id: '/api/public/handheld/fulfillments/$id/pick-scan'
-      path: '/pick-scan'
-      fullPath: '/api/public/handheld/fulfillments/$id/pick-scan'
-      preLoaderRoute: typeof ApiPublicHandheldFulfillmentsIdPickScanRouteImport
-      parentRoute: typeof ApiPublicHandheldFulfillmentsIdRoute
+    '/api/public/handheld/auth/refresh': {
+      id: '/api/public/handheld/auth/refresh'
+      path: '/api/public/handheld/auth/refresh'
+      fullPath: '/api/public/handheld/auth/refresh'
+      preLoaderRoute: typeof ApiPublicHandheldAuthRefreshRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/api/public/handheld/fulfillments/$id/pick-complete': {
-      id: '/api/public/handheld/fulfillments/$id/pick-complete'
-      path: '/pick-complete'
-      fullPath: '/api/public/handheld/fulfillments/$id/pick-complete'
-      preLoaderRoute: typeof ApiPublicHandheldFulfillmentsIdPickCompleteRouteImport
+    '/api/public/handheld/diag/report': {
+      id: '/api/public/handheld/diag/report'
+      path: '/api/public/handheld/diag/report'
+      fullPath: '/api/public/handheld/diag/report'
+      preLoaderRoute: typeof ApiPublicHandheldDiagReportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/fulfillments/$id': {
+      id: '/api/public/handheld/fulfillments/$id'
+      path: '/$id'
+      fullPath: '/api/public/handheld/fulfillments/$id'
+      preLoaderRoute: typeof ApiPublicHandheldFulfillmentsIdRouteImport
+      parentRoute: typeof ApiPublicHandheldFulfillmentsRoute
+    }
+    '/api/public/handheld/inbound/scan': {
+      id: '/api/public/handheld/inbound/scan'
+      path: '/api/public/handheld/inbound/scan'
+      fullPath: '/api/public/handheld/inbound/scan'
+      preLoaderRoute: typeof ApiPublicHandheldInboundScanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/items/$id': {
+      id: '/api/public/handheld/items/$id'
+      path: '/api/public/handheld/items/$id'
+      fullPath: '/api/public/handheld/items/$id'
+      preLoaderRoute: typeof ApiPublicHandheldItemsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/items/bind-rfid': {
+      id: '/api/public/handheld/items/bind-rfid'
+      path: '/api/public/handheld/items/bind-rfid'
+      fullPath: '/api/public/handheld/items/bind-rfid'
+      preLoaderRoute: typeof ApiPublicHandheldItemsBindRfidRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/items/sign-read-url': {
+      id: '/api/public/handheld/items/sign-read-url'
+      path: '/api/public/handheld/items/sign-read-url'
+      fullPath: '/api/public/handheld/items/sign-read-url'
+      preLoaderRoute: typeof ApiPublicHandheldItemsSignReadUrlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/items/smart-create': {
+      id: '/api/public/handheld/items/smart-create'
+      path: '/api/public/handheld/items/smart-create'
+      fullPath: '/api/public/handheld/items/smart-create'
+      preLoaderRoute: typeof ApiPublicHandheldItemsSmartCreateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/items/upload-image': {
+      id: '/api/public/handheld/items/upload-image'
+      path: '/api/public/handheld/items/upload-image'
+      fullPath: '/api/public/handheld/items/upload-image'
+      preLoaderRoute: typeof ApiPublicHandheldItemsUploadImageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/label-templates/$id': {
+      id: '/api/public/handheld/label-templates/$id'
+      path: '/$id'
+      fullPath: '/api/public/handheld/label-templates/$id'
+      preLoaderRoute: typeof ApiPublicHandheldLabelTemplatesIdRouteImport
+      parentRoute: typeof ApiPublicHandheldLabelTemplatesRoute
+    }
+    '/api/public/handheld/location/switch': {
+      id: '/api/public/handheld/location/switch'
+      path: '/api/public/handheld/location/switch'
+      fullPath: '/api/public/handheld/location/switch'
+      preLoaderRoute: typeof ApiPublicHandheldLocationSwitchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/notifications/read-all': {
+      id: '/api/public/handheld/notifications/read-all'
+      path: '/read-all'
+      fullPath: '/api/public/handheld/notifications/read-all'
+      preLoaderRoute: typeof ApiPublicHandheldNotificationsReadAllRouteImport
+      parentRoute: typeof ApiPublicHandheldNotificationsRoute
+    }
+    '/api/public/handheld/notifications/since': {
+      id: '/api/public/handheld/notifications/since'
+      path: '/since'
+      fullPath: '/api/public/handheld/notifications/since'
+      preLoaderRoute: typeof ApiPublicHandheldNotificationsSinceRouteImport
+      parentRoute: typeof ApiPublicHandheldNotificationsRoute
+    }
+    '/api/public/handheld/parcels/$id': {
+      id: '/api/public/handheld/parcels/$id'
+      path: '/$id'
+      fullPath: '/api/public/handheld/parcels/$id'
+      preLoaderRoute: typeof ApiPublicHandheldParcelsIdRouteImport
+      parentRoute: typeof ApiPublicHandheldParcelsRoute
+    }
+    '/api/public/handheld/parcels/counts': {
+      id: '/api/public/handheld/parcels/counts'
+      path: '/counts'
+      fullPath: '/api/public/handheld/parcels/counts'
+      preLoaderRoute: typeof ApiPublicHandheldParcelsCountsRouteImport
+      parentRoute: typeof ApiPublicHandheldParcelsRoute
+    }
+    '/api/public/handheld/products/lookup': {
+      id: '/api/public/handheld/products/lookup'
+      path: '/lookup'
+      fullPath: '/api/public/handheld/products/lookup'
+      preLoaderRoute: typeof ApiPublicHandheldProductsLookupRouteImport
+      parentRoute: typeof ApiPublicHandheldProductsRoute
+    }
+    '/api/public/handheld/rfid/$epc': {
+      id: '/api/public/handheld/rfid/$epc'
+      path: '/api/public/handheld/rfid/$epc'
+      fullPath: '/api/public/handheld/rfid/$epc'
+      preLoaderRoute: typeof ApiPublicHandheldRfidEpcRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/rfid/batch-stock-in': {
+      id: '/api/public/handheld/rfid/batch-stock-in'
+      path: '/api/public/handheld/rfid/batch-stock-in'
+      fullPath: '/api/public/handheld/rfid/batch-stock-in'
+      preLoaderRoute: typeof ApiPublicHandheldRfidBatchStockInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/rfid/bind-item': {
+      id: '/api/public/handheld/rfid/bind-item'
+      path: '/api/public/handheld/rfid/bind-item'
+      fullPath: '/api/public/handheld/rfid/bind-item'
+      preLoaderRoute: typeof ApiPublicHandheldRfidBindItemRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/rfid/stock-in': {
+      id: '/api/public/handheld/rfid/stock-in'
+      path: '/api/public/handheld/rfid/stock-in'
+      fullPath: '/api/public/handheld/rfid/stock-in'
+      preLoaderRoute: typeof ApiPublicHandheldRfidStockInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/rfid/transfer-location': {
+      id: '/api/public/handheld/rfid/transfer-location'
+      path: '/api/public/handheld/rfid/transfer-location'
+      fullPath: '/api/public/handheld/rfid/transfer-location'
+      preLoaderRoute: typeof ApiPublicHandheldRfidTransferLocationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/sku/by-epc': {
+      id: '/api/public/handheld/sku/by-epc'
+      path: '/api/public/handheld/sku/by-epc'
+      fullPath: '/api/public/handheld/sku/by-epc'
+      preLoaderRoute: typeof ApiPublicHandheldSkuByEpcRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/sku/search': {
+      id: '/api/public/handheld/sku/search'
+      path: '/api/public/handheld/sku/search'
+      fullPath: '/api/public/handheld/sku/search'
+      preLoaderRoute: typeof ApiPublicHandheldSkuSearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/stocktake/open': {
+      id: '/api/public/handheld/stocktake/open'
+      path: '/api/public/handheld/stocktake/open'
+      fullPath: '/api/public/handheld/stocktake/open'
+      preLoaderRoute: typeof ApiPublicHandheldStocktakeOpenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/stocktake/scan': {
+      id: '/api/public/handheld/stocktake/scan'
+      path: '/api/public/handheld/stocktake/scan'
+      fullPath: '/api/public/handheld/stocktake/scan'
+      preLoaderRoute: typeof ApiPublicHandheldStocktakeScanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/stocktake/submit': {
+      id: '/api/public/handheld/stocktake/submit'
+      path: '/api/public/handheld/stocktake/submit'
+      fullPath: '/api/public/handheld/stocktake/submit'
+      preLoaderRoute: typeof ApiPublicHandheldStocktakeSubmitRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/transfer/receive-confirm': {
+      id: '/api/public/handheld/transfer/receive-confirm'
+      path: '/api/public/handheld/transfer/receive-confirm'
+      fullPath: '/api/public/handheld/transfer/receive-confirm'
+      preLoaderRoute: typeof ApiPublicHandheldTransferReceiveConfirmRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/transfer/receive-scan': {
+      id: '/api/public/handheld/transfer/receive-scan'
+      path: '/api/public/handheld/transfer/receive-scan'
+      fullPath: '/api/public/handheld/transfer/receive-scan'
+      preLoaderRoute: typeof ApiPublicHandheldTransferReceiveScanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/transfer/ship-confirm': {
+      id: '/api/public/handheld/transfer/ship-confirm'
+      path: '/api/public/handheld/transfer/ship-confirm'
+      fullPath: '/api/public/handheld/transfer/ship-confirm'
+      preLoaderRoute: typeof ApiPublicHandheldTransferShipConfirmRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/transfer/ship-scan': {
+      id: '/api/public/handheld/transfer/ship-scan'
+      path: '/api/public/handheld/transfer/ship-scan'
+      fullPath: '/api/public/handheld/transfer/ship-scan'
+      preLoaderRoute: typeof ApiPublicHandheldTransferShipScanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/transfers/$id': {
+      id: '/api/public/handheld/transfers/$id'
+      path: '/$id'
+      fullPath: '/api/public/handheld/transfers/$id'
+      preLoaderRoute: typeof ApiPublicHandheldTransfersIdRouteImport
+      parentRoute: typeof ApiPublicHandheldTransfersRoute
+    }
+    '/api/public/storefront/orders/$id': {
+      id: '/api/public/storefront/orders/$id'
+      path: '/$id'
+      fullPath: '/api/public/storefront/orders/$id'
+      preLoaderRoute: typeof ApiPublicStorefrontOrdersIdRouteImport
+      parentRoute: typeof ApiPublicStorefrontOrdersRoute
+    }
+    '/api/public/storefront/products/$id': {
+      id: '/api/public/storefront/products/$id'
+      path: '/$id'
+      fullPath: '/api/public/storefront/products/$id'
+      preLoaderRoute: typeof ApiPublicStorefrontProductsIdRouteImport
+      parentRoute: typeof ApiPublicStorefrontProductsRoute
+    }
+    '/api/public/handheld/fulfillments/$id/bind-tote': {
+      id: '/api/public/handheld/fulfillments/$id/bind-tote'
+      path: '/bind-tote'
+      fullPath: '/api/public/handheld/fulfillments/$id/bind-tote'
+      preLoaderRoute: typeof ApiPublicHandheldFulfillmentsIdBindToteRouteImport
       parentRoute: typeof ApiPublicHandheldFulfillmentsIdRoute
     }
     '/api/public/handheld/fulfillments/$id/claim': {
@@ -3234,12 +3171,75 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldFulfillmentsIdClaimRouteImport
       parentRoute: typeof ApiPublicHandheldFulfillmentsIdRoute
     }
-    '/api/public/handheld/fulfillments/$id/bind-tote': {
-      id: '/api/public/handheld/fulfillments/$id/bind-tote'
-      path: '/bind-tote'
-      fullPath: '/api/public/handheld/fulfillments/$id/bind-tote'
-      preLoaderRoute: typeof ApiPublicHandheldFulfillmentsIdBindToteRouteImport
+    '/api/public/handheld/fulfillments/$id/pick-complete': {
+      id: '/api/public/handheld/fulfillments/$id/pick-complete'
+      path: '/pick-complete'
+      fullPath: '/api/public/handheld/fulfillments/$id/pick-complete'
+      preLoaderRoute: typeof ApiPublicHandheldFulfillmentsIdPickCompleteRouteImport
       parentRoute: typeof ApiPublicHandheldFulfillmentsIdRoute
+    }
+    '/api/public/handheld/fulfillments/$id/pick-scan': {
+      id: '/api/public/handheld/fulfillments/$id/pick-scan'
+      path: '/pick-scan'
+      fullPath: '/api/public/handheld/fulfillments/$id/pick-scan'
+      preLoaderRoute: typeof ApiPublicHandheldFulfillmentsIdPickScanRouteImport
+      parentRoute: typeof ApiPublicHandheldFulfillmentsIdRoute
+    }
+    '/api/public/handheld/items/$id/attach-images': {
+      id: '/api/public/handheld/items/$id/attach-images'
+      path: '/attach-images'
+      fullPath: '/api/public/handheld/items/$id/attach-images'
+      preLoaderRoute: typeof ApiPublicHandheldItemsIdAttachImagesRouteImport
+      parentRoute: typeof ApiPublicHandheldItemsIdRoute
+    }
+    '/api/public/handheld/items/$id/restock': {
+      id: '/api/public/handheld/items/$id/restock'
+      path: '/restock'
+      fullPath: '/api/public/handheld/items/$id/restock'
+      preLoaderRoute: typeof ApiPublicHandheldItemsIdRestockRouteImport
+      parentRoute: typeof ApiPublicHandheldItemsIdRoute
+    }
+    '/api/public/handheld/items/$id/set-status': {
+      id: '/api/public/handheld/items/$id/set-status'
+      path: '/set-status'
+      fullPath: '/api/public/handheld/items/$id/set-status'
+      preLoaderRoute: typeof ApiPublicHandheldItemsIdSetStatusRouteImport
+      parentRoute: typeof ApiPublicHandheldItemsIdRoute
+    }
+    '/api/public/handheld/items/$id/sync-status': {
+      id: '/api/public/handheld/items/$id/sync-status'
+      path: '/sync-status'
+      fullPath: '/api/public/handheld/items/$id/sync-status'
+      preLoaderRoute: typeof ApiPublicHandheldItemsIdSyncStatusRouteImport
+      parentRoute: typeof ApiPublicHandheldItemsIdRoute
+    }
+    '/api/public/handheld/items/upload-image/multipart': {
+      id: '/api/public/handheld/items/upload-image/multipart'
+      path: '/multipart'
+      fullPath: '/api/public/handheld/items/upload-image/multipart'
+      preLoaderRoute: typeof ApiPublicHandheldItemsUploadImageMultipartRouteImport
+      parentRoute: typeof ApiPublicHandheldItemsUploadImageRoute
+    }
+    '/api/public/handheld/label-templates/$id/set-default': {
+      id: '/api/public/handheld/label-templates/$id/set-default'
+      path: '/set-default'
+      fullPath: '/api/public/handheld/label-templates/$id/set-default'
+      preLoaderRoute: typeof ApiPublicHandheldLabelTemplatesIdSetDefaultRouteImport
+      parentRoute: typeof ApiPublicHandheldLabelTemplatesIdRoute
+    }
+    '/api/public/handheld/transfers/$id/confirm': {
+      id: '/api/public/handheld/transfers/$id/confirm'
+      path: '/confirm'
+      fullPath: '/api/public/handheld/transfers/$id/confirm'
+      preLoaderRoute: typeof ApiPublicHandheldTransfersIdConfirmRouteImport
+      parentRoute: typeof ApiPublicHandheldTransfersIdRoute
+    }
+    '/api/public/handheld/transfers/$id/scan': {
+      id: '/api/public/handheld/transfers/$id/scan'
+      path: '/scan'
+      fullPath: '/api/public/handheld/transfers/$id/scan'
+      preLoaderRoute: typeof ApiPublicHandheldTransfersIdScanRouteImport
+      parentRoute: typeof ApiPublicHandheldTransfersIdRoute
     }
     '/api/public/handheld/parcels/items/$itemId/pack-pieces': {
       id: '/api/public/handheld/parcels/items/$itemId/pack-pieces'
@@ -3248,18 +3248,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteImport
       parentRoute: typeof ApiPublicHandheldParcelsRoute
     }
-    '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-title': {
-      id: '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-title'
-      path: '/estimate-title'
-      fullPath: '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-title'
-      preLoaderRoute: typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRouteImport
-      parentRoute: typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute
-    }
     '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-image': {
       id: '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-image'
       path: '/estimate-image'
       fullPath: '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-image'
       preLoaderRoute: typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateImageRouteImport
+      parentRoute: typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute
+    }
+    '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-title': {
+      id: '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-title'
+      path: '/estimate-title'
+      fullPath: '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-title'
+      preLoaderRoute: typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRouteImport
       parentRoute: typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute
     }
   }
@@ -3798,13 +3798,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
