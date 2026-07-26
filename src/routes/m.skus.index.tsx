@@ -26,10 +26,7 @@ import {
 } from "@/lib/inventory.helpers";
 import { useSkuCovers, pickCover } from "@/hooks/use-sku-covers";
 import { toThumbUrl } from "@/lib/image";
-import {
-  CustomSkuForm,
-  useCustomSkuMutation,
-} from "@/components/inventory/custom-sku-dialog";
+import { CustomSkuForm, useCustomSkuMutation } from "@/components/inventory/custom-sku-dialog";
 import { StandardSkuDialog } from "@/components/inventory/standard-sku-dialog";
 import { BundleSkuDialog } from "@/components/inventory/bundle-sku-dialog";
 import { emptySkuMeta, type SkuMetaState } from "@/components/inventory/sku-meta-fields";
@@ -118,21 +115,32 @@ function MSkusPage() {
         <Tabs value={tab} onValueChange={(v) => setTab(v as TabKind)}>
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="custom">
-              自定义 <span className="ml-1 text-[10px] text-muted-foreground">{customRows.length}</span>
+              自定义{" "}
+              <span className="ml-1 text-[10px] text-muted-foreground">{customRows.length}</span>
             </TabsTrigger>
             <TabsTrigger value="bundle">
-              组包 <span className="ml-1 text-[10px] text-muted-foreground">{bundleRows.length}</span>
+              组包{" "}
+              <span className="ml-1 text-[10px] text-muted-foreground">{bundleRows.length}</span>
             </TabsTrigger>
             <TabsTrigger value="standard">
-              标准 <span className="ml-1 text-[10px] text-muted-foreground">{standardGroups.length}</span>
+              标准{" "}
+              <span className="ml-1 text-[10px] text-muted-foreground">
+                {standardGroups.length}
+              </span>
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="custom" className="mt-3 space-y-2">
             {customRows.length === 0 ? (
-              <EmptyState icon={Sparkles} title="还没有自定义商品" description="点右上「新建」→ 自定义商品" />
+              <EmptyState
+                icon={Sparkles}
+                title="还没有自定义商品"
+                description="点右上「新建」→ 自定义商品"
+              />
             ) : (
-              customRows.map((r) => <MSingleRow key={r.id} row={r} cover={pickCover(covers[r.id], r.image_url)} />)
+              customRows.map((r) => (
+                <MSingleRow key={r.id} row={r} cover={pickCover(covers[r.id], r.image_url)} />
+              ))
             )}
           </TabsContent>
 
@@ -140,7 +148,9 @@ function MSkusPage() {
             {bundleRows.length === 0 ? (
               <EmptyState icon={Boxes} title="还没有组包商品" />
             ) : (
-              bundleRows.map((r) => <MSingleRow key={r.id} row={r} cover={pickCover(covers[r.id], r.image_url)} />)
+              bundleRows.map((r) => (
+                <MSingleRow key={r.id} row={r} cover={pickCover(covers[r.id], r.image_url)} />
+              ))
             )}
           </TabsContent>
 
@@ -148,7 +158,9 @@ function MSkusPage() {
             {standardGroups.length === 0 ? (
               <EmptyState icon={Tags} title="还没有标准商品" description="点右上「新建」开始" />
             ) : (
-              standardGroups.map((g) => <MStandardRow key={g.key} group={g} cover={groupCover(g)} />)
+              standardGroups.map((g) => (
+                <MStandardRow key={g.key} group={g} cover={groupCover(g)} />
+              ))
             )}
           </TabsContent>
         </Tabs>
@@ -187,7 +199,13 @@ function MStandardRow({ group, cover }: { group: StandardProductGroup; cover?: s
     >
       <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-muted">
         {src ? (
-          <img src={toThumbUrl(src, 128) ?? src} alt={group.name} loading="lazy" decoding="async" className="h-full w-full object-cover" />
+          <img
+            src={toThumbUrl(src, 128) ?? src}
+            alt={group.name}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover"
+          />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-muted-foreground">
             <Tags className="h-5 w-5" />
@@ -225,7 +243,13 @@ function MSingleRow({ row, cover }: { row: SkuRow; cover?: string | null }) {
     >
       <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-muted">
         {src ? (
-          <img src={toThumbUrl(src, 128) ?? src} alt={row.name} loading="lazy" decoding="async" className="h-full w-full object-cover" />
+          <img
+            src={toThumbUrl(src, 128) ?? src}
+            alt={row.name}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover"
+          />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-muted-foreground">
             <Tags className="h-5 w-5" />
@@ -234,10 +258,13 @@ function MSingleRow({ row, cover }: { row: SkuRow; cover?: string | null }) {
       </div>
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex items-center gap-1.5">
-          <Badge className="bg-primary/90 text-primary-foreground">{formatPrice(row.price_tier)}</Badge>
+          <Badge className="bg-primary/90 text-primary-foreground">
+            {formatPrice(row.price_tier)}
+          </Badge>
           {isBundle ? (
             <Badge variant="secondary">
-              <Boxes className="mr-0.5 h-2.5 w-2.5" />组包
+              <Boxes className="mr-0.5 h-2.5 w-2.5" />
+              组包
             </Badge>
           ) : (
             <Badge variant="outline">自定义</Badge>
@@ -281,7 +308,13 @@ function MNewCustomSkuSheet({
   });
 
   return (
-    <Sheet open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
+    <Sheet
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) reset();
+        onOpenChange(v);
+      }}
+    >
       <SheetContent side="bottom" className="h-[92dvh] overflow-y-auto p-0">
         <SheetHeader className="border-b p-4">
           <SheetTitle>新建自定义商品</SheetTitle>
@@ -289,7 +322,9 @@ function MNewCustomSkuSheet({
         <div className="space-y-3 p-4 pb-24">
           {smartOpen ? (
             <SmartSkuCapture
-              onApply={(patch: Partial<SkuMetaState>) => setMeta({ ...meta, ...patch })}
+              onApply={(patch: Partial<SkuMetaState>) =>
+                setMeta((current) => ({ ...current, ...patch }))
+              }
               onClose={() => setSmartOpen(false)}
             />
           ) : (
@@ -305,7 +340,11 @@ function MNewCustomSkuSheet({
           <CustomSkuForm meta={meta} setMeta={setMeta} price={price} setPrice={setPrice} mobile />
         </div>
         <SheetFooter className="fixed inset-x-0 bottom-0 border-t bg-background p-3 pb-[calc(env(safe-area-inset-bottom)+12px)]">
-          <Button className="w-full" onClick={() => mut.mutate({ meta, price, default_shop_ids: [] })} disabled={mut.isPending}>
+          <Button
+            className="w-full"
+            onClick={() => mut.mutate({ meta, price, default_shop_ids: [] })}
+            disabled={mut.isPending}
+          >
             {mut.isPending ? "创建中…" : "创建并生成 EPC"}
           </Button>
         </SheetFooter>

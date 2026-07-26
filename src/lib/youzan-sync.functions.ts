@@ -11,6 +11,7 @@ import {
   pushYouzanQuantityUpdate,
   runYouzanShopChainProbe,
 } from "./youzan.functions";
+import { selectTrustedBranchItemIds } from "./youzan-quantity.server";
 
 
 
@@ -123,6 +124,14 @@ async function resolveBranchItemIds(
       "branch item not visible / distribution missing：本地未登记 HQ SPU，请先 ensureBranchProduct",
     );
   }
+
+  const trustedIds = selectTrustedBranchItemIds({
+    linkItemId: link.yz_item_id,
+    linkSkuId: link.yz_sku_id,
+    hqSpuId,
+  });
+  if (trustedIds) return trustedIds;
+
   const probe = await probeBranchRealIds({
     hqSpuId,
     branchKdtId: branchShop.kdt_id,
@@ -770,7 +779,7 @@ async function resolveHqCategoryId(_sku?: unknown): Promise<number> {
  * 返回有赞侧 CDN URL；失败时 fire-and-forget，返回原始 URL。
  * 对应 youzan.materials.storage.platform.img.upload/3.0.0
  */
-async function uploadImageToYouzanMaterial(
+export async function uploadImageToYouzanMaterial(
   token: string,
   url: string,
   ctx?: { shop_id?: string | null; kdt_id?: number | null; sku_id?: string | null },
@@ -1678,7 +1687,8 @@ async function runStockSyncWorkerCore(opts: {
           status: "error",
           last_error: msg.slice(0, 500),
         } as never)
-        .eq("sku_id", t.sku_id);
+        .eq("sku_id", t.sku_id)
+        .eq("shop_id", t.shop_id!);
       failed += 1;
     }
   }

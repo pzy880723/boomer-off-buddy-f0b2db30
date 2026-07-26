@@ -70,6 +70,55 @@ export function parseOfflineProductRows(payload: unknown): OfflineProductRow[] {
   });
 }
 
+export function findOfflineProductMatch(
+  rows: OfflineProductRow[],
+  target: { skuCode: string; name: string },
+) {
+  const skuCode = target.skuCode.trim();
+  const exactCode = rows.find(
+    (row) =>
+      row.spuNo === skuCode || row.skus.some((remoteSku) => remoteSku.skuNo === skuCode),
+  );
+  if (exactCode) return exactCode;
+
+  const sameTitle = rows.filter((row) => row.title.trim() === target.name.trim());
+  return sameTitle.length === 1 ? sameTitle[0] : null;
+}
+
+export function normalizeYouzanProductCode(value: string) {
+  return value.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+}
+
+export function buildOfflineProductLookupTerms(target: {
+  skuCode: string;
+  name: string;
+}) {
+  return Array.from(
+    new Set(
+      [normalizeYouzanProductCode(target.skuCode), target.name.trim()].filter(Boolean),
+    ),
+  );
+}
+
+export function buildOfflineStockQueueRow(args: {
+  skuId: string;
+  shopId: string;
+  locationId: string;
+  targetStock: number;
+}) {
+  return {
+    sku_id: args.skuId,
+    shop_id: args.shopId,
+    location_id: args.locationId,
+    target_stock: Math.max(0, Math.trunc(args.targetStock)),
+    action: "push_stock",
+    reason: "offline_product_release",
+    status: "pending",
+    next_run_at: new Date().toISOString(),
+    last_error: null,
+  };
+}
+
 export type OfflineProductReleaseInput = {
   title: string;
   categoryId: number;
@@ -87,6 +136,42 @@ export type OfflineProductReleaseInput = {
     sellStockCount: number;
   };
 };
+
+export function buildOfflineSkuReleaseInput(args: {
+  sku: {
+    name: string;
+    skuCode: string;
+    priceYuan: number;
+    imageUrls: string[];
+  };
+  categoryId: number;
+  branchKdtIds: number[];
+  stock: number;
+}): OfflineProductReleaseInput {
+  const skuCode = normalizeYouzanProductCode(args.sku.skuCode);
+  const branchKdtIds = Array.from(
+    new Set(args.branchKdtIds.filter((id) => Number.isInteger(id) && id > 0)),
+  );
+  if (!skuCode) throw new Error("SKU 缺少 sku_code，无法发布到有赞门店");
+  if (branchKdtIds.length === 0) throw new Error("没有可发布的有赞分店");
+  return {
+    title: args.sku.name.trim(),
+    categoryId: args.categoryId,
+    unit: "件",
+    priceYuan: args.sku.priceYuan,
+    imageUrls: args.sku.imageUrls,
+    spuCode: skuCode,
+    skuCenterCode: skuCode,
+    saleUpKdtIds: branchKdtIds,
+    saleDownKdtIds: [],
+    stock: {
+      skuNo: skuCode,
+      relatedSpuCode: skuCode,
+      relatedSkuCode: skuCode,
+      sellStockCount: Math.max(0, Math.trunc(args.stock)),
+    },
+  };
+}
 
 export function buildOfflineProductReleaseParams(input: OfflineProductReleaseInput) {
   if (!input.title.trim() || !input.spuCode.trim() || !input.skuCenterCode.trim()) {
