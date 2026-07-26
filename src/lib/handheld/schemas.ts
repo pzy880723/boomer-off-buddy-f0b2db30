@@ -1564,3 +1564,206 @@ export const RestockRes = okEnvelope(
       .meta({ description: "print_labels=false 时为 null" }),
   }),
 );
+
+// ============================================================
+// 16. 自营商城 Public API
+// ============================================================
+
+export const StorefrontErrorResponse = z
+  .object({
+    ok: z.literal(false),
+    error: z.string(),
+    code: z.string().optional(),
+  })
+  .meta({ id: "StorefrontErrorResponse" });
+
+export const StorefrontProductsQuery = z
+  .object({
+    q: z.string().optional(),
+    primary_category: z.string().optional(),
+    category: z.string().optional().meta({ description: "primary_category 的兼容别名" }),
+    brand_ids: z.array(z.string()).optional().meta({
+      description: "可重复传参，也支持逗号分隔",
+    }),
+    facet_codes: z.array(z.string()).optional().meta({
+      description: "同维度内 OR、不同维度间 AND；可重复传参，也支持逗号分隔",
+    }),
+    location_id: uuidSchema.optional(),
+    sort: z.enum(["newest", "price_asc", "price_desc", "relevance"]).optional(),
+    page: z.coerce.number().int().min(1).default(1),
+    page_size: z.coerce.number().int().min(1).max(50).default(20),
+  })
+  .meta({ id: "StorefrontProductsQuery" });
+
+export const StorefrontCategorySchema = z
+  .object({
+    code: z.string(),
+    name: z.string(),
+    path: z.array(z.string()),
+  })
+  .meta({ id: "StorefrontCategory" });
+
+export const StorefrontBrandSchema = z
+  .object({
+    id: uuidSchema,
+    name: z.string(),
+    name_original: z.string().nullable(),
+    logo_url: z.string().nullable(),
+  })
+  .meta({ id: "StorefrontBrand" });
+
+export const StorefrontFacetSchema = z
+  .object({
+    dimension: z.string(),
+    code: z.string(),
+    name: z.string(),
+    confidence: z.number().nullable(),
+  })
+  .meta({ id: "StorefrontFacet" });
+
+export const StorefrontLocationSchema = z
+  .object({
+    id: uuidSchema,
+    name: z.string(),
+    kind: z.string(),
+  })
+  .meta({ id: "StorefrontLocation" });
+
+export const StorefrontProductSchema = z
+  .object({
+    id: uuidSchema,
+    sku_id: uuidSchema,
+    name: z.string(),
+    description: z.string().nullable(),
+    primary_category: StorefrontCategorySchema,
+    brand: StorefrontBrandSchema.nullable(),
+    facets: z.array(StorefrontFacetSchema),
+    keywords: z.array(z.string()),
+    price: z.number(),
+    compare_at_price: z.number().nullable(),
+    image_url: z.string().nullable(),
+    image_urls: z.array(z.string()),
+    stock: z.number().int().min(0),
+    condition_grade: z.string().nullable(),
+    location: StorefrontLocationSchema.nullable(),
+    published_at: z.string().nullable(),
+  })
+  .meta({ id: "StorefrontProduct" });
+
+export const StorefrontProductsRes = z
+  .object({
+    ok: z.literal(true),
+    data: z.array(StorefrontProductSchema),
+    pagination: z.object({
+      page: z.number().int(),
+      page_size: z.number().int(),
+      total: z.number().int(),
+    }),
+    filters: z.object({
+      q: z.string().nullable(),
+      primary_category: z.string().nullable(),
+      brand_ids: z.array(z.string()),
+      facet_codes: z.array(z.string()),
+      location_id: z.string().nullable(),
+      sort: z.enum(["newest", "price_asc", "price_desc", "relevance"]),
+      page: z.number().int(),
+      page_size: z.number().int(),
+    }),
+  })
+  .meta({ id: "StorefrontProductsResponse" });
+
+export const StorefrontProductRes = okEnvelope(StorefrontProductSchema);
+
+export const StorefrontTaxonomyQuery = z
+  .object({
+    primary_category: z.string().optional(),
+  })
+  .meta({ id: "StorefrontTaxonomyQuery" });
+
+export const StorefrontTaxonomyRes = z
+  .object({
+    ok: z.literal(true),
+    data: z.object({
+      primary_categories: z.array(
+        z.object({
+          code: z.string(),
+          name: z.string(),
+          children: z.array(z.object({ code: z.string(), name: z.string() })),
+        }),
+      ),
+      brands: z.array(
+        z.object({
+          id: uuidSchema,
+          name: z.string(),
+          name_original: z.string().nullable(),
+          aliases: z.array(z.string()).nullable(),
+          entity_type: z.string().nullable(),
+          origin_country: z.string().nullable(),
+          logo_url: z.string().nullable(),
+          category_codes: z.array(z.string()).nullable(),
+        }),
+      ),
+      facets: z.array(
+        z.object({
+          id: uuidSchema,
+          code: z.string(),
+          name: z.string(),
+          dimension: z.string(),
+          aliases: z.array(z.string()).nullable(),
+          category_codes: z.array(z.string()).nullable(),
+          sort_order: z.number().int(),
+        }),
+      ),
+    }),
+    selected_primary_category: z.string().nullable(),
+  })
+  .meta({ id: "StorefrontTaxonomyResponse" });
+
+export const StorefrontCreateOrderReq = z
+  .object({
+    listing_ids: z.array(uuidSchema).min(1).max(20).meta({
+      description: "当前版本每个 listing 为孤品，数量恒为 1；M2 将升级为 items + quantity",
+    }),
+    recipient_name: z.string().min(1).max(80),
+    recipient_phone: z.string().min(6).max(30),
+    shipping_address: z.record(z.string(), z.unknown()),
+    courier_service_code: z.string().min(1).max(80),
+    courier_service_name: z.string().max(120).optional(),
+    shipping_fee: z.number().min(0).max(100000).default(0),
+    courier_quote_snapshot: z.record(z.string(), z.unknown()).optional(),
+    customer_note: z.string().max(500).optional(),
+  })
+  .meta({ id: "StorefrontCreateOrderRequest" });
+
+export const StorefrontOrderSummarySchema = z
+  .object({
+    id: uuidSchema,
+    order_no: z.string(),
+    payment_status: z.string(),
+    order_status: z.string(),
+    total_amount: z.number(),
+    currency: z.string(),
+    courier_provider: z.string().nullable(),
+    courier_service_code: z.string().nullable(),
+    paid_at: z.string().nullable(),
+    created_at: z.string(),
+  })
+  .meta({ id: "StorefrontOrderSummary" });
+
+export const StorefrontOrdersRes = okEnvelope(z.array(StorefrontOrderSummarySchema));
+
+export const StorefrontCreateOrderRes = z
+  .object({
+    ok: z.literal(true),
+    data: z.record(z.string(), z.unknown()),
+  })
+  .meta({ id: "StorefrontCreateOrderResponse" });
+
+export const StorefrontOrderDetailRes = z
+  .object({
+    ok: z.literal(true),
+    data: z.record(z.string(), z.unknown()).meta({
+      description: "订单主表字段，并包含 items、fulfillments、shipment.events",
+    }),
+  })
+  .meta({ id: "StorefrontOrderDetailResponse" });

@@ -89,6 +89,16 @@ import {
   ParcelPackPiecesReq,
   ParcelPackPiecesRes,
   ParcelEstimateRes,
+  StorefrontCreateOrderReq,
+  StorefrontCreateOrderRes,
+  StorefrontErrorResponse,
+  StorefrontOrderDetailRes,
+  StorefrontOrdersRes,
+  StorefrontProductRes,
+  StorefrontProductsQuery,
+  StorefrontProductsRes,
+  StorefrontTaxonomyQuery,
+  StorefrontTaxonomyRes,
 } from "./schemas";
 
 
@@ -106,6 +116,15 @@ const ERROR_RESPONSES = {
   "500": { description: "服务端错误（code: internal_error）", content: { "application/json": { schema: ErrorResponse } } },
 };
 
+const STOREFRONT_ERROR_RESPONSES = {
+  "400": { description: "请求参数错误", content: { "application/json": { schema: StorefrontErrorResponse } } },
+  "401": { description: "商城用户未登录或会话失效", content: { "application/json": { schema: StorefrontErrorResponse } } },
+  "404": { description: "商品或订单不存在", content: { "application/json": { schema: StorefrontErrorResponse } } },
+  "409": { description: "库存冲突或商品不可售", content: { "application/json": { schema: StorefrontErrorResponse } } },
+  "422": { description: "业务规则校验失败", content: { "application/json": { schema: StorefrontErrorResponse } } },
+  "500": { description: "服务端错误", content: { "application/json": { schema: StorefrontErrorResponse } } },
+};
+
 const jsonBody = (schema: z.ZodType) => ({ content: { "application/json": { schema } } });
 const jsonRes = (description: string, schema: z.ZodType) => ({
   description,
@@ -115,19 +134,27 @@ const jsonRes = (description: string, schema: z.ZodType) => ({
 const document: ZodOpenApiObject = {
   openapi: "3.1.0",
   info: {
-    title: "Boomer Off — 手持终端 API",
-    version: "1.7.0",
+    title: "Boomer Off — Public API",
+    version: "1.8.0",
     description: `
-所有接口都在 \`/api/public/handheld/*\` 前缀下（**绕过站点登录**）。
+本文档覆盖：
 
-## 鉴权
-每个请求必须带 HTTP Header：
+- \`/api/public/handheld/*\`：ERP 手持终端接口。
+- \`/api/public/storefront/*\`：自营商城商品、分类和订单接口。
+
+## 手持终端鉴权
+手持终端业务请求带：
 
 \`\`\`
 X-Device-Token: <设备 token>
+X-Session-Token: <操作员 session token>
 \`\`\`
 
-Token 由后台 **仓库管理 → 手持终端** 页面创建/复制。设备绑定的库位决定上报的目标位置。
+## 商城鉴权
+
+- 商品和分类接口公开读取。
+- 订单接口使用 \`Authorization: Bearer <Supabase access token>\`。
+- 创建订单还必须带 \`Idempotency-Key\`。
 
 ## 统一响应
 
@@ -171,6 +198,12 @@ Token 由后台 **仓库管理 → 手持终端** 页面创建/复制。设备�
         description:
           "操作员 Supabase access_token（来自 /auth/login）。所有写请求 + AI 请求都必须带；ERP 会按此关联操作员审计。",
       },
+      StorefrontBearer: {
+        type: "http",
+        scheme: "bearer",
+        bearerFormat: "JWT",
+        description: "消费者商城 Supabase access token。",
+      },
     },
   },
   security: SECURITY,
@@ -188,9 +221,93 @@ Token 由后台 **仓库管理 → 手持终端** 页面创建/复制。设备�
     { name: "通知", description: "APP 主动轮询的事件（v1.2+）" },
     { name: "诊断", description: "APP 上报 crash / 网络错误 / 设备状态（v1.2+）" },
     { name: "日本小包", description: "只读；仅 super_admin 可用（v1.6+）" },
+    { name: "商城商品", description: "消费者商城公开商品与统一分类" },
+    { name: "商城订单", description: "消费者商城订单；需要 Bearer 用户会话" },
   ],
 
   paths: {
+    "/api/public/storefront/products": {
+      get: {
+        tags: ["商城商品"],
+        summary: "商城商品列表",
+        description:
+          "只返回已发布且当前门店库存大于 0 的商品。分类、品牌、facet 与 ERP 主数据共用同一套编码。",
+        security: [],
+        requestParams: { query: StorefrontProductsQuery },
+        responses: {
+          "200": jsonRes("OK", StorefrontProductsRes),
+          ...STOREFRONT_ERROR_RESPONSES,
+        },
+      },
+    },
+    "/api/public/storefront/products/{id}": {
+      get: {
+        tags: ["商城商品"],
+        summary: "商城商品详情",
+        security: [],
+        requestParams: { path: z.object({ id: z.string().uuid() }) },
+        responses: {
+          "200": jsonRes("OK", StorefrontProductRes),
+          ...STOREFRONT_ERROR_RESPONSES,
+        },
+      },
+    },
+    "/api/public/storefront/taxonomy": {
+      get: {
+        tags: ["商城商品"],
+        summary: "商城分类、品牌与筛选维度",
+        description:
+          "返回 ERP 当前启用的主分类/叶子分类、品牌和 facet；传 primary_category 时按适用范围过滤。",
+        security: [],
+        requestParams: { query: StorefrontTaxonomyQuery },
+        responses: {
+          "200": jsonRes("OK", StorefrontTaxonomyRes),
+          ...STOREFRONT_ERROR_RESPONSES,
+        },
+      },
+    },
+    "/api/public/storefront/orders": {
+      get: {
+        tags: ["商城订单"],
+        summary: "当前用户订单列表",
+        security: [{ StorefrontBearer: [] }],
+        responses: {
+          "200": jsonRes("OK", StorefrontOrdersRes),
+          ...STOREFRONT_ERROR_RESPONSES,
+        },
+      },
+      post: {
+        tags: ["商城订单"],
+        summary: "创建商城订单并锁定库存",
+        security: [{ StorefrontBearer: [] }],
+        parameters: [
+          {
+            name: "Idempotency-Key",
+            in: "header",
+            required: true,
+            schema: { type: "string" },
+            description: "同一次下单重试必须复用相同值。",
+          },
+        ],
+        requestBody: jsonBody(StorefrontCreateOrderReq),
+        responses: {
+          "201": jsonRes("Created", StorefrontCreateOrderRes),
+          ...STOREFRONT_ERROR_RESPONSES,
+        },
+      },
+    },
+    "/api/public/storefront/orders/{id}": {
+      get: {
+        tags: ["商城订单"],
+        summary: "当前用户订单详情",
+        security: [{ StorefrontBearer: [] }],
+        requestParams: { path: z.object({ id: z.string().uuid() }) },
+        responses: {
+          "200": jsonRes("OK", StorefrontOrderDetailRes),
+          ...STOREFRONT_ERROR_RESPONSES,
+        },
+      },
+    },
     "/api/public/handheld/auth/ping": {
       post: {
         tags: ["鉴权"],
