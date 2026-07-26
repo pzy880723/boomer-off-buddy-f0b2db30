@@ -31,7 +31,6 @@ import {
   DiagReportRes,
   ErrorResponse,
   HandheldErrorCode,
-
   InboundScanReq,
   InboundScanRes,
   LocationsRes,
@@ -101,29 +100,116 @@ import {
   StorefrontTaxonomyRes,
 } from "./schemas";
 
-
-
 const SECURITY = [{ DeviceToken: [], SessionToken: [] }];
 
 const ERROR_RESPONSES = {
-  "400": { description: "入参不合法（code: invalid_body / validation_error）", content: { "application/json": { schema: ErrorResponse } } },
-  "401": { description: "缺少 / 无效 token（code: unauthorized）", content: { "application/json": { schema: ErrorResponse } } },
-  "403": { description: "设备被停用 / 库位/角色不匹配（code: unauthorized_location）", content: { "application/json": { schema: ErrorResponse } } },
-  "404": { description: "资源不存在（code: not_found / unlinked）", content: { "application/json": { schema: ErrorResponse } } },
-  "409": { description: "状态冲突（code: already_exists / transfer_required）", content: { "application/json": { schema: ErrorResponse } } },
-  "422": { description: "校验失败（数量不一致等，code: validation_error）", content: { "application/json": { schema: ErrorResponse } } },
-  "429": { description: "限流（code: rate_limited / ai_credits_exhausted）", content: { "application/json": { schema: ErrorResponse } } },
-  "500": { description: "服务端错误（code: internal_error）", content: { "application/json": { schema: ErrorResponse } } },
+  "400": {
+    description: "入参不合法（code: invalid_body / validation_error）",
+    content: { "application/json": { schema: ErrorResponse } },
+  },
+  "401": {
+    description: "缺少 / 无效 token（code: unauthorized）",
+    content: { "application/json": { schema: ErrorResponse } },
+  },
+  "403": {
+    description: "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+    content: { "application/json": { schema: ErrorResponse } },
+  },
+  "404": {
+    description: "资源不存在（code: not_found / unlinked）",
+    content: { "application/json": { schema: ErrorResponse } },
+  },
+  "409": {
+    description: "状态冲突（code: already_exists / transfer_required）",
+    content: { "application/json": { schema: ErrorResponse } },
+  },
+  "422": {
+    description: "校验失败（数量不一致等，code: validation_error）",
+    content: { "application/json": { schema: ErrorResponse } },
+  },
+  "429": {
+    description: "限流（code: rate_limited / ai_credits_exhausted）",
+    content: { "application/json": { schema: ErrorResponse } },
+  },
+  "500": {
+    description: "服务端错误（code: internal_error）",
+    content: { "application/json": { schema: ErrorResponse } },
+  },
 };
 
 const STOREFRONT_ERROR_RESPONSES = {
-  "400": { description: "请求参数错误", content: { "application/json": { schema: StorefrontErrorResponse } } },
-  "401": { description: "商城用户未登录或会话失效", content: { "application/json": { schema: StorefrontErrorResponse } } },
-  "404": { description: "商品或订单不存在", content: { "application/json": { schema: StorefrontErrorResponse } } },
-  "409": { description: "库存冲突或商品不可售", content: { "application/json": { schema: StorefrontErrorResponse } } },
-  "422": { description: "业务规则校验失败", content: { "application/json": { schema: StorefrontErrorResponse } } },
-  "500": { description: "服务端错误", content: { "application/json": { schema: StorefrontErrorResponse } } },
+  "400": {
+    description: "请求参数错误",
+    content: { "application/json": { schema: StorefrontErrorResponse } },
+  },
+  "401": {
+    description: "商城用户未登录或会话失效",
+    content: { "application/json": { schema: StorefrontErrorResponse } },
+  },
+  "404": {
+    description: "商品或订单不存在",
+    content: { "application/json": { schema: StorefrontErrorResponse } },
+  },
+  "409": {
+    description: "库存冲突或商品不可售",
+    content: { "application/json": { schema: StorefrontErrorResponse } },
+  },
+  "422": {
+    description: "业务规则校验失败",
+    content: { "application/json": { schema: StorefrontErrorResponse } },
+  },
+  "500": {
+    description: "服务端错误",
+    content: { "application/json": { schema: StorefrontErrorResponse } },
+  },
 };
+
+const StorefrontCreatePaymentReq = z.object({
+  order_id: z.string().uuid(),
+  provider: z.enum(["wechat", "alipay"]),
+  client_context: z
+    .object({
+      platform: z.enum(["app", "miniapp", "web"]),
+      openid: z.string().min(1).max(200).optional(),
+      return_url: z.string().url().optional(),
+    })
+    .default({ platform: "app" }),
+});
+
+const StorefrontCreatePaymentRes = z.object({
+  ok: z.literal(true),
+  data: z.object({
+    payment: z.object({
+      id: z.string().uuid(),
+      order_id: z.string().uuid(),
+      provider: z.enum(["wechat", "alipay"]),
+      status: z.string(),
+      amount: z.number(),
+      currency: z.string(),
+      provider_transaction_id: z.string(),
+      created_at: z.string(),
+    }),
+    payment_payload: z.record(z.string(), z.unknown()),
+    expires_at: z.string(),
+  }),
+});
+
+const StorefrontPaymentCallbackReq = z.object({
+  event_id: z.string().min(1).max(200),
+  event_type: z.string().min(1).max(100),
+  transaction_id: z.string().min(1).max(200),
+  merchant_order_no: z.string().min(1).max(100),
+  status: z.enum(["succeeded", "failed", "cancelled"]),
+  amount: z.number().positive(),
+  paid_at: z.string().datetime().optional(),
+  failure_code: z.string().max(100).optional(),
+  failure_message: z.string().max(500).optional(),
+});
+
+const StorefrontPaymentCallbackRes = z.object({
+  ok: z.literal(true),
+  replayed: z.boolean().optional(),
+});
 
 const jsonBody = (schema: z.ZodType) => ({ content: { "application/json": { schema } } });
 const jsonRes = (description: string, schema: z.ZodType) => ({
@@ -135,7 +221,7 @@ const document: ZodOpenApiObject = {
   openapi: "3.1.0",
   info: {
     title: "Boomer Off — Public API",
-    version: "1.8.0",
+    version: "1.9.0",
     description: `
 本文档覆盖：
 
@@ -154,7 +240,7 @@ X-Session-Token: <操作员 session token>
 
 - 商品和分类接口公开读取。
 - 订单接口使用 \`Authorization: Bearer <Supabase access token>\`。
-- 创建订单还必须带 \`Idempotency-Key\`。
+- 创建订单和支付还必须带 \`Idempotency-Key\`。
 
 ## 统一响应
 
@@ -223,6 +309,7 @@ X-Session-Token: <操作员 session token>
     { name: "日本小包", description: "只读；仅 super_admin 可用（v1.6+）" },
     { name: "商城商品", description: "消费者商城公开商品与统一分类" },
     { name: "商城订单", description: "消费者商城订单；需要 Bearer 用户会话" },
+    { name: "商城支付", description: "消费者支付发起与支付网关签名回调" },
   ],
 
   paths: {
@@ -308,11 +395,73 @@ X-Session-Token: <操作员 session token>
         },
       },
     },
+    "/api/public/storefront/payments": {
+      post: {
+        tags: ["商城支付"],
+        summary: "为商城订单创建支付",
+        description:
+          "通过服务端支付网关适配器创建微信或支付宝支付。APP 只消费 payment_payload，不持有商户密钥。",
+        security: [{ StorefrontBearer: [] }],
+        parameters: [
+          {
+            name: "Idempotency-Key",
+            in: "header",
+            required: true,
+            schema: { type: "string" },
+            description: "同一次支付发起重试必须复用相同值。",
+          },
+        ],
+        requestBody: jsonBody(StorefrontCreatePaymentReq),
+        responses: {
+          "201": jsonRes("Created", StorefrontCreatePaymentRes),
+          "502": {
+            description: "支付网关响应失败",
+            content: { "application/json": { schema: StorefrontErrorResponse } },
+          },
+          "503": {
+            description: "支付网关尚未配置",
+            content: { "application/json": { schema: StorefrontErrorResponse } },
+          },
+          ...STOREFRONT_ERROR_RESPONSES,
+        },
+      },
+    },
+    "/api/public/storefront/payments/callback/{provider}": {
+      post: {
+        tags: ["商城支付"],
+        summary: "支付网关签名回调",
+        description:
+          "支付网关调用。服务端校验原始请求体的 HMAC-SHA256 签名、金额及事件幂等后完成订单。",
+        security: [],
+        requestParams: {
+          path: z.object({ provider: z.enum(["wechat", "alipay"]) }),
+        },
+        parameters: [
+          {
+            name: "X-Payment-Signature",
+            in: "header",
+            required: true,
+            schema: { type: "string" },
+            description: "原始 JSON 请求体的 HMAC-SHA256 十六进制签名。",
+          },
+        ],
+        requestBody: jsonBody(StorefrontPaymentCallbackReq),
+        responses: {
+          "200": jsonRes("OK", StorefrontPaymentCallbackRes),
+          "503": {
+            description: "支付回调密钥尚未配置",
+            content: { "application/json": { schema: StorefrontErrorResponse } },
+          },
+          ...STOREFRONT_ERROR_RESPONSES,
+        },
+      },
+    },
     "/api/public/handheld/auth/ping": {
       post: {
         tags: ["鉴权"],
         summary: "设备心跳 / 登录信息",
-        description: "APP 启动时调用一次。返回当前设备绑定的库位信息，决定界面是「仓库模式」还是「门店模式」。",
+        description:
+          "APP 启动时调用一次。返回当前设备绑定的库位信息，决定界面是「仓库模式」还是「门店模式」。",
         responses: { "200": jsonRes("OK", AuthPingRes), ...ERROR_RESPONSES },
       },
       get: {
@@ -334,7 +483,8 @@ X-Session-Token: <操作员 session token>
       get: {
         tags: ["SKU"],
         summary: "搜索 SKU",
-        description: "按 sku_code / name 模糊匹配，最多返回 20 条；返回 image_url / image_paths / images，APP 可直接展示主图。",
+        description:
+          "按 sku_code / name 模糊匹配，最多返回 20 条；返回 image_url / image_paths / images，APP 可直接展示主图。",
         requestParams: { query: SkuSearchQuery },
         responses: { "200": jsonRes("OK", SkuSearchRes), ...ERROR_RESPONSES },
       },
@@ -708,7 +858,8 @@ X-Session-Token: <操作员 session token>
       post: {
         tags: ["标签模板"],
         summary: "新建标签模板（HQ）",
-        description: "仅总部权限（super_admin / hq_operator）可用。传 `is_default:true` 会自动把其它模板取消默认。",
+        description:
+          "仅总部权限（super_admin / hq_operator）可用。传 `is_default:true` 会自动把其它模板取消默认。",
         requestBody: jsonBody(LabelTemplateCreateReq),
         responses: { "200": jsonRes("OK", LabelTemplateRes), ...ERROR_RESPONSES },
       },
@@ -798,9 +949,7 @@ X-Session-Token: <操作员 session token>
       },
     },
   },
-
 };
-
 
 let cached: ReturnType<typeof createDocument> | null = null;
 

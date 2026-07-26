@@ -66,7 +66,9 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
             重试
           </Button>
           <Button variant="outline" asChild>
-            <Link to="/dashboard" preload="intent">返回首页</Link>
+            <Link to="/dashboard" preload="intent">
+              返回首页
+            </Link>
           </Button>
         </div>
       </div>
@@ -85,8 +87,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:title", content: "BOOMER OFF · 品牌管理后台" },
       { property: "og:description", content: "中古杂货品牌的全链路 ERP 管理系统" },
       { name: "twitter:description", content: "中古杂货品牌的全链路 ERP 管理系统" },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/20b76984-169b-41b2-9cc8-899b97c3917e/id-preview-e9d47cb9--2158bffa-7f82-4bc6-9df9-c59319d262f7.lovable.app-1778911275898.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/20b76984-169b-41b2-9cc8-899b97c3917e/id-preview-e9d47cb9--2158bffa-7f82-4bc6-9df9-c59319d262f7.lovable.app-1778911275898.png" },
+      {
+        property: "og:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/20b76984-169b-41b2-9cc8-899b97c3917e/id-preview-e9d47cb9--2158bffa-7f82-4bc6-9df9-c59319d262f7.lovable.app-1778911275898.png",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/20b76984-169b-41b2-9cc8-899b97c3917e/id-preview-e9d47cb9--2158bffa-7f82-4bc6-9df9-c59319d262f7.lovable.app-1778911275898.png",
+      },
       { name: "twitter:card", content: "summary_large_image" },
       { property: "og:type", content: "website" },
     ],
@@ -231,9 +241,13 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
-  const isMobileShell = pathname === "/login" || pathname.startsWith("/m") || pathname.startsWith("/store");
+  const isMobileShell =
+    pathname === "/login" ||
+    pathname.startsWith("/m") ||
+    pathname.startsWith("/store") ||
+    pathname.startsWith("/pos");
 
-  // 登录页 + 手机端 PWA：不渲染侧栏/顶栏外壳
+  // 登录页、手机端 PWA 与收银台使用独立全屏外壳。
   if (isMobileShell) {
     return (
       <QueryClientProvider client={queryClient}>
@@ -248,47 +262,47 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthGate>
-      <SidebarProvider>
-        <div className="flex min-h-screen w-full bg-background">
-          <AppSidebar />
-          <div className="flex min-w-0 flex-1 flex-col">
-            <header className="sticky top-0 z-10 flex h-14 items-center gap-3 border-b bg-card/80 px-4 backdrop-blur supports-[backdrop-filter]:bg-card/60">
-              <SidebarTrigger className="-ml-1" />
-              <div className="hidden h-5 w-px bg-border md:block" />
-              <Breadcrumbs />
-              <div className="ml-auto flex items-center gap-1.5">
-                <button
-                  type="button"
-                  className="hidden h-9 w-72 items-center gap-2 rounded-md border bg-background/60 px-3 text-sm text-muted-foreground transition-colors hover:bg-background hover:text-foreground md:inline-flex"
-                >
-                  <Search className="h-4 w-4" />
-                  <span className="flex-1 text-left">搜索商品、订单、批次…</span>
-                  <kbd className="inline-flex h-5 items-center gap-0.5 rounded border bg-muted px-1.5 text-[10px] font-medium text-muted-foreground">
-                    <Command className="h-2.5 w-2.5" />K
-                  </kbd>
-                </button>
-                <div className="hidden items-center gap-1.5 rounded-md border border-success/20 bg-success/10 px-2 py-1 text-xs text-success lg:flex">
-                  <CheckCircle2 className="h-3 w-3" />
-                  数据已同步 · 2 分钟前
+        <SidebarProvider>
+          <div className="flex min-h-screen w-full bg-background">
+            <AppSidebar />
+            <div className="flex min-w-0 flex-1 flex-col">
+              <header className="sticky top-0 z-10 flex h-14 items-center gap-3 border-b bg-card/80 px-4 backdrop-blur supports-[backdrop-filter]:bg-card/60">
+                <SidebarTrigger className="-ml-1" />
+                <div className="hidden h-5 w-px bg-border md:block" />
+                <Breadcrumbs />
+                <div className="ml-auto flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    className="hidden h-9 w-72 items-center gap-2 rounded-md border bg-background/60 px-3 text-sm text-muted-foreground transition-colors hover:bg-background hover:text-foreground md:inline-flex"
+                  >
+                    <Search className="h-4 w-4" />
+                    <span className="flex-1 text-left">搜索商品、订单、批次…</span>
+                    <kbd className="inline-flex h-5 items-center gap-0.5 rounded border bg-muted px-1.5 text-[10px] font-medium text-muted-foreground">
+                      <Command className="h-2.5 w-2.5" />K
+                    </kbd>
+                  </button>
+                  <div className="hidden items-center gap-1.5 rounded-md border border-success/20 bg-success/10 px-2 py-1 text-xs text-success lg:flex">
+                    <CheckCircle2 className="h-3 w-3" />
+                    数据已同步 · 2 分钟前
+                  </div>
+                  <Button variant="ghost" size="icon" className="relative h-9 w-9">
+                    <Bell className="h-4 w-4" />
+                    <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-primary-foreground">
+                      5
+                    </span>
+                  </Button>
+                  <UserMenu />
                 </div>
-                <Button variant="ghost" size="icon" className="relative h-9 w-9">
-                  <Bell className="h-4 w-4" />
-                  <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-primary-foreground">
-                    5
-                  </span>
-                </Button>
-                <UserMenu />
-              </div>
-            </header>
-            <main className="flex-1 overflow-auto">
-              <div className="mx-auto w-full max-w-[1480px] p-6">
-                <Outlet />
-              </div>
-            </main>
+              </header>
+              <main className="flex-1 overflow-auto">
+                <div className="mx-auto w-full max-w-[1480px] p-6">
+                  <Outlet />
+                </div>
+              </main>
+            </div>
           </div>
-        </div>
-        <Toaster />
-      </SidebarProvider>
+          <Toaster />
+        </SidebarProvider>
       </AuthGate>
     </QueryClientProvider>
   );

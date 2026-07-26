@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Boomer Off — Public API",
-    "version": "1.8.0",
-    "description": "本文档覆盖：\n\n- `/api/public/handheld/*`：ERP 手持终端接口。\n- `/api/public/storefront/*`：自营商城商品、分类和订单接口。\n\n## 手持终端鉴权\n手持终端业务请求带：\n\n```\nX-Device-Token: <设备 token>\nX-Session-Token: <操作员 session token>\n```\n\n## 商城鉴权\n\n- 商品和分类接口公开读取。\n- 订单接口使用 `Authorization: Bearer <Supabase access token>`。\n- 创建订单还必须带 `Idempotency-Key`。\n\n## 统一响应\n\n```json\n{ \"ok\": true, \"data\": { ... } }\n{ \"ok\": false, \"error\": \"...\", \"...\": \"...\" }\n```\n\n## 字段同步约定\n\n服务端的 Zod schema 是唯一真源（`src/lib/handheld/schemas.ts`）。\n本文档 + APP 端 SDK 都从它生成。改字段流程：\n\n1. 改 `schemas.ts`\n2. 运行 `bun run sdk:gen` 生成新的 `openapi.snapshot.json` 和 TS 类型\n3. APP 端拉取 `/api/public/handheld/openapi.json` 重新生成本地 SDK"
+    "version": "1.9.0",
+    "description": "本文档覆盖：\n\n- `/api/public/handheld/*`：ERP 手持终端接口。\n- `/api/public/storefront/*`：自营商城商品、分类和订单接口。\n\n## 手持终端鉴权\n手持终端业务请求带：\n\n```\nX-Device-Token: <设备 token>\nX-Session-Token: <操作员 session token>\n```\n\n## 商城鉴权\n\n- 商品和分类接口公开读取。\n- 订单接口使用 `Authorization: Bearer <Supabase access token>`。\n- 创建订单和支付还必须带 `Idempotency-Key`。\n\n## 统一响应\n\n```json\n{ \"ok\": true, \"data\": { ... } }\n{ \"ok\": false, \"error\": \"...\", \"...\": \"...\" }\n```\n\n## 字段同步约定\n\n服务端的 Zod schema 是唯一真源（`src/lib/handheld/schemas.ts`）。\n本文档 + APP 端 SDK 都从它生成。改字段流程：\n\n1. 改 `schemas.ts`\n2. 运行 `bun run sdk:gen` 生成新的 `openapi.snapshot.json` 和 TS 类型\n3. APP 端拉取 `/api/public/handheld/openapi.json` 重新生成本地 SDK"
   },
   "servers": [
     {
@@ -81,6 +81,10 @@
     {
       "name": "商城订单",
       "description": "消费者商城订单；需要 Bearer 用户会话"
+    },
+    {
+      "name": "商城支付",
+      "description": "消费者支付发起与支付网关签名回调"
     }
   ],
   "paths": {
@@ -747,6 +751,450 @@
           },
           "500": {
             "description": "服务端错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/storefront/payments": {
+      "post": {
+        "tags": [
+          "商城支付"
+        ],
+        "summary": "为商城订单创建支付",
+        "description": "通过服务端支付网关适配器创建微信或支付宝支付。APP 只消费 payment_payload，不持有商户密钥。",
+        "security": [
+          {
+            "StorefrontBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "同一次支付发起重试必须复用相同值。"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "order_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "provider": {
+                    "type": "string",
+                    "enum": [
+                      "wechat",
+                      "alipay"
+                    ]
+                  },
+                  "client_context": {
+                    "default": {
+                      "platform": "app"
+                    },
+                    "type": "object",
+                    "properties": {
+                      "platform": {
+                        "type": "string",
+                        "enum": [
+                          "app",
+                          "miniapp",
+                          "web"
+                        ]
+                      },
+                      "openid": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                      },
+                      "return_url": {
+                        "type": "string",
+                        "format": "uri"
+                      }
+                    },
+                    "required": [
+                      "platform"
+                    ]
+                  }
+                },
+                "required": [
+                  "order_id",
+                  "provider"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "payment": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "order_id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "provider": {
+                              "type": "string",
+                              "enum": [
+                                "wechat",
+                                "alipay"
+                              ]
+                            },
+                            "status": {
+                              "type": "string"
+                            },
+                            "amount": {
+                              "type": "number"
+                            },
+                            "currency": {
+                              "type": "string"
+                            },
+                            "provider_transaction_id": {
+                              "type": "string"
+                            },
+                            "created_at": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "order_id",
+                            "provider",
+                            "status",
+                            "amount",
+                            "currency",
+                            "provider_transaction_id",
+                            "created_at"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "payment_payload": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        "expires_at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "payment",
+                        "payment_payload",
+                        "expires_at"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "商城用户未登录或会话失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "商品或订单不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "库存冲突或商品不可售",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "业务规则校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "支付网关响应失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "支付网关尚未配置",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/storefront/payments/callback/{provider}": {
+      "post": {
+        "tags": [
+          "商城支付"
+        ],
+        "summary": "支付网关签名回调",
+        "description": "支付网关调用。服务端校验原始请求体的 HMAC-SHA256 签名、金额及事件幂等后完成订单。",
+        "security": [],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "wechat",
+                "alipay"
+              ]
+            },
+            "required": true
+          },
+          {
+            "name": "X-Payment-Signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "原始 JSON 请求体的 HMAC-SHA256 十六进制签名。"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "event_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "event_type": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "transaction_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "merchant_order_no": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "succeeded",
+                      "failed",
+                      "cancelled"
+                    ]
+                  },
+                  "amount": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "paid_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                  },
+                  "failure_code": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "failure_message": {
+                    "type": "string",
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "event_id",
+                  "event_type",
+                  "transaction_id",
+                  "merchant_order_no",
+                  "status",
+                  "amount"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "replayed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "商城用户未登录或会话失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "商品或订单不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "库存冲突或商品不可售",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "业务规则校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorefrontErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "支付回调密钥尚未配置",
             "content": {
               "application/json": {
                 "schema": {

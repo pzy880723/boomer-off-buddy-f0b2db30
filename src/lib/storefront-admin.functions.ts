@@ -15,6 +15,7 @@ export type StorefrontAdminRow = {
   cover_url: string | null;
   price: number;
   condition_grade: string | null;
+  product_type: "custom" | "standard" | "bundle";
   status: "draft" | "published" | "reserved" | "sold" | "hidden" | "archived";
   lifecycle: StorefrontLifecycle;
   category_code: string | null;
@@ -38,6 +39,7 @@ type ListingRelationRow = {
   cover_url: string | null;
   price: number;
   condition_grade: string | null;
+  product_type: StorefrontAdminRow["product_type"];
   status: StorefrontAdminRow["status"];
   published_at: string | null;
   sold_at: string | null;
@@ -74,7 +76,7 @@ export const listStorefrontListings = createServerFn({ method: "GET" })
     let query = supabaseAdmin
       .from("commerce_listings" as never)
       .select(
-        "id,sku_id,location_id,title,cover_url,price,condition_grade,status,published_at,sold_at,updated_at,sku:inv_skus!sku_id(sku_code,barcode,category,kind,is_custom_price,brand:inv_brands!brand_id(name,name_original)),location:inv_locations!location_id(name,kind)",
+        "id,sku_id,location_id,title,cover_url,price,condition_grade,product_type,status,published_at,sold_at,updated_at,sku:inv_skus!sku_id(sku_code,barcode,category,kind,is_custom_price,brand:inv_brands!brand_id(name,name_original)),location:inv_locations!location_id(name,kind)",
       )
       .order("updated_at", { ascending: false })
       .limit(1000);
@@ -83,13 +85,10 @@ export const listStorefrontListings = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
 
     const relationRows = (rawRows ?? []) as unknown as ListingRelationRow[];
-    const customRows = relationRows.filter(
-      (row) => row.sku?.kind === "single" && row.sku.is_custom_price,
-    );
-    const skuIds = [...new Set(customRows.map((row) => row.sku_id))];
-    const locationIds = [...new Set(customRows.map((row) => row.location_id))];
+    const skuIds = [...new Set(relationRows.map((row) => row.sku_id))];
+    const locationIds = [...new Set(relationRows.map((row) => row.location_id))];
     const categoryCodes = [
-      ...new Set(customRows.map((row) => row.sku?.category).filter(Boolean)),
+      ...new Set(relationRows.map((row) => row.sku?.category).filter(Boolean)),
     ] as string[];
 
     const [stockResult, categoryResult] = await Promise.all([
@@ -121,7 +120,7 @@ export const listStorefrontListings = createServerFn({ method: "GET" })
       ),
     );
     const needle = data.search?.toLocaleLowerCase() ?? "";
-    const rows: StorefrontAdminRow[] = customRows
+    const rows: StorefrontAdminRow[] = relationRows
       .map((row) => ({
         id: row.id,
         sku_id: row.sku_id,
@@ -131,6 +130,7 @@ export const listStorefrontListings = createServerFn({ method: "GET" })
         cover_url: row.cover_url,
         price: Number(row.price) || 0,
         condition_grade: row.condition_grade,
+        product_type: row.product_type,
         status: row.status,
         lifecycle: lifecycleFor(row.status),
         category_code: row.sku?.category ?? null,
@@ -225,7 +225,9 @@ export const updateStorefrontListingLifecycle = createServerFn({ method: "POST" 
     const payload = {
       status: nextStatus,
       published_at:
-        nextStatus === "published" ? (row.published_at ?? new Date().toISOString()) : row.published_at,
+        nextStatus === "published"
+          ? (row.published_at ?? new Date().toISOString())
+          : row.published_at,
       updated_at: new Date().toISOString(),
     };
     const { error: updateError } = await supabaseAdmin

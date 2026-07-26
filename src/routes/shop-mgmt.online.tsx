@@ -94,6 +94,7 @@ function OnlineProductsPage() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("全部分类");
+  const [productType, setProductType] = useState<"all" | StorefrontAdminRow["product_type"]>("all");
 
   const query = useQuery({
     queryKey: ["storefront-admin-listings", search],
@@ -110,9 +111,10 @@ function OnlineProductsPage() {
       rows.filter(
         (row) =>
           row.lifecycle === lifecycle &&
+          (productType === "all" || row.product_type === productType) &&
           (category === "全部分类" || row.category_name === category),
       ),
-    [category, lifecycle, rows],
+    [category, lifecycle, productType, rows],
   );
 
   const mutation = useMutation({
@@ -134,10 +136,10 @@ function OnlineProductsPage() {
     <div>
       <PageHeader
         title="网店商品"
-        description="管理自研网店的自定义商品。商品仍归属门店，门店库存是唯一可售库存。"
+        description="统一管理自营网店的自定义商品、组包商品和标准商品。ERP 库存是唯一可售库存。"
         meta={
           <span>
-            当前 {filteredRows.length} 件 · 全部自定义商品 {rows.length} 件
+            当前 {filteredRows.length} 件 · 全部网店商品 {rows.length} 件
           </span>
         }
         actions={
@@ -189,6 +191,27 @@ function OnlineProductsPage() {
           </div>
 
           <div className="flex gap-1.5 overflow-x-auto pb-1">
+            {[
+              { value: "all", label: "全部类型" },
+              { value: "custom", label: "自定义商品" },
+              { value: "bundle", label: "组包商品" },
+              { value: "standard", label: "标准商品" },
+            ].map((item) => (
+              <Button
+                key={item.value}
+                size="sm"
+                variant={productType === item.value ? "default" : "outline"}
+                className="h-8 shrink-0 px-3 text-xs"
+                onClick={() =>
+                  setProductType(item.value as "all" | StorefrontAdminRow["product_type"])
+                }
+              >
+                {item.label}
+              </Button>
+            ))}
+          </div>
+
+          <div className="flex gap-1.5 overflow-x-auto pb-1">
             {categories.map((item) => (
               <Button
                 key={item}
@@ -209,6 +232,7 @@ function OnlineProductsPage() {
           <TableHeader>
             <TableRow>
               <TableHead>商品</TableHead>
+              <TableHead>商品类型</TableHead>
               <TableHead>商品分类</TableHead>
               <TableHead>品牌</TableHead>
               <TableHead>所属门店</TableHead>
@@ -240,6 +264,15 @@ function OnlineProductsPage() {
                   </div>
                 </TableCell>
                 <TableCell>
+                  <Badge variant="outline" className="rounded-sm font-normal">
+                    {row.product_type === "custom"
+                      ? "自定义商品"
+                      : row.product_type === "bundle"
+                        ? "组包商品"
+                        : "标准商品"}
+                  </Badge>
+                </TableCell>
+                <TableCell>
                   <Badge variant="secondary" className="rounded-sm font-normal">
                     {row.category_name}
                   </Badge>
@@ -267,7 +300,11 @@ function OnlineProductsPage() {
                   {formatDate(row.updated_at)}
                 </TableCell>
                 <TableCell className="text-right">
-                  <ListingActions row={row} pending={mutation.isPending} onAction={mutation.mutate} />
+                  <ListingActions
+                    row={row}
+                    pending={mutation.isPending}
+                    onAction={mutation.mutate}
+                  />
                 </TableCell>
               </TableRow>
             ))}
@@ -278,7 +315,7 @@ function OnlineProductsPage() {
           <EmptyState
             icon={Globe}
             title={`暂无${lifecycleTabs.find((tab) => tab.value === lifecycle)?.label}商品`}
-            description="商品由门店自定义商品上架生成，网店不维护第二套库存。"
+            description="请从 ERP 商品中心发布商品；网店不维护第二套库存。"
           />
         )}
       </div>
@@ -293,10 +330,7 @@ function ListingActions({
 }: {
   row: StorefrontAdminRow;
   pending: boolean;
-  onAction: (input: {
-    id: string;
-    action: "publish" | "hide" | "archive" | "restore";
-  }) => void;
+  onAction: (input: { id: string; action: "publish" | "hide" | "archive" | "restore" }) => void;
 }) {
   if (row.status === "reserved") {
     return (
@@ -307,7 +341,12 @@ function ListingActions({
   }
   if (row.lifecycle === "online") {
     return (
-      <Button size="sm" variant="outline" disabled={pending} onClick={() => onAction({ id: row.id, action: "hide" })}>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={pending}
+        onClick={() => onAction({ id: row.id, action: "hide" })}
+      >
         <EyeOff className="mr-1 h-3.5 w-3.5" /> 下架
       </Button>
     );
@@ -315,10 +354,20 @@ function ListingActions({
   if (row.lifecycle === "offline") {
     return (
       <div className="flex justify-end gap-1.5">
-        <Button size="sm" disabled={pending} onClick={() => onAction({ id: row.id, action: "publish" })}>
+        <Button
+          size="sm"
+          disabled={pending}
+          onClick={() => onAction({ id: row.id, action: "publish" })}
+        >
           <Upload className="mr-1 h-3.5 w-3.5" /> 上架
         </Button>
-        <Button size="icon" variant="ghost" disabled={pending} title="移入回收站" onClick={() => onAction({ id: row.id, action: "archive" })}>
+        <Button
+          size="icon"
+          variant="ghost"
+          disabled={pending}
+          title="移入回收站"
+          onClick={() => onAction({ id: row.id, action: "archive" })}
+        >
           <Archive className="h-3.5 w-3.5" />
         </Button>
       </div>
@@ -326,13 +375,23 @@ function ListingActions({
   }
   if (row.lifecycle === "sold") {
     return (
-      <Button size="sm" variant="ghost" disabled={pending} onClick={() => onAction({ id: row.id, action: "archive" })}>
+      <Button
+        size="sm"
+        variant="ghost"
+        disabled={pending}
+        onClick={() => onAction({ id: row.id, action: "archive" })}
+      >
         <Archive className="mr-1 h-3.5 w-3.5" /> 归档
       </Button>
     );
   }
   return (
-    <Button size="sm" variant="outline" disabled={pending} onClick={() => onAction({ id: row.id, action: "restore" })}>
+    <Button
+      size="sm"
+      variant="outline"
+      disabled={pending}
+      onClick={() => onAction({ id: row.id, action: "restore" })}
+    >
       <RotateCcw className="mr-1 h-3.5 w-3.5" /> 恢复到已下架
     </Button>
   );

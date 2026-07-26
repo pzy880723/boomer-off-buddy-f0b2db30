@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { normalizeCourierChoice } from "@/lib/commerce/order-policy";
+import { normalizeStorefrontOrderItems } from "@/lib/commerce/storefront-order-request";
 import {
   STOREFRONT_CORS,
   authenticateStorefrontUser,
@@ -9,17 +10,31 @@ import {
   storefrontJson,
 } from "@/server/storefront-auth.server";
 
-const CreateOrderBody = z.object({
-  listing_ids: z.array(z.string().uuid()).min(1).max(20),
-  recipient_name: z.string().trim().min(1).max(80),
-  recipient_phone: z.string().trim().min(6).max(30),
-  shipping_address: z.record(z.string(), z.unknown()),
-  courier_service_code: z.string().trim().min(1).max(80),
-  courier_service_name: z.string().trim().max(120).optional(),
-  shipping_fee: z.number().min(0).max(100000).default(0),
-  courier_quote_snapshot: z.record(z.string(), z.unknown()).optional(),
-  customer_note: z.string().trim().max(500).optional(),
-});
+const CreateOrderBody = z
+  .object({
+    items: z
+      .array(
+        z.object({
+          listing_id: z.string().uuid(),
+          quantity: z.number().int().min(1).max(999),
+        }),
+      )
+      .min(1)
+      .max(50)
+      .optional(),
+    listing_ids: z.array(z.string().uuid()).min(1).max(50).optional(),
+    recipient_name: z.string().trim().min(1).max(80),
+    recipient_phone: z.string().trim().min(6).max(30),
+    shipping_address: z.record(z.string(), z.unknown()),
+    courier_service_code: z.string().trim().min(1).max(80),
+    courier_service_name: z.string().trim().max(120).optional(),
+    shipping_fee: z.number().min(0).max(100000).default(0),
+    courier_quote_snapshot: z.record(z.string(), z.unknown()).optional(),
+    customer_note: z.string().trim().max(500).optional(),
+  })
+  .refine((body) => body.items || body.listing_ids, {
+    message: "items or listing_ids is required",
+  });
 
 export const Route = createFileRoute("/api/public/storefront/orders")({
   server: {
@@ -50,6 +65,12 @@ export const Route = createFileRoute("/api/public/storefront/orders")({
         } catch (error) {
           return storefrontError(`Invalid request: ${String(error)}`, 400);
         }
+        let items;
+        try {
+          items = normalizeStorefrontOrderItems(body);
+        } catch (error) {
+          return storefrontError(error instanceof Error ? error.message : String(error), 400);
+        }
         let courier;
         try {
           courier = normalizeCourierChoice(body.courier_service_code);
@@ -57,11 +78,11 @@ export const Route = createFileRoute("/api/public/storefront/orders")({
           return storefrontError(error instanceof Error ? error.message : String(error), 422);
         }
         const { data, error } = await supabaseAdmin.rpc(
-          "commerce_create_order" as never,
+          "commerce_create_order_v2" as never,
           {
             p_user_id: auth.user.id,
             p_idempotency_key: idempotencyKey,
-            p_listing_ids: body.listing_ids,
+            p_items: items,
             p_recipient_name: body.recipient_name,
             p_recipient_phone: body.recipient_phone,
             p_shipping_address: body.shipping_address,

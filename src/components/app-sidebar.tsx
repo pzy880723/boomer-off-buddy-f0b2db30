@@ -31,6 +31,7 @@ import {
   FolderTree,
   Tag,
   Sparkles,
+  ScanLine,
   type LucideIcon,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks/use-auth-session";
@@ -52,6 +53,7 @@ import logoWide from "@/assets/logo-boomeroff-wide.png";
 
 type NavTo =
   | "/dashboard"
+  | "/pos"
   | "/purchase/japan-bulk"
   | "/purchase/japan-parcel"
   | "/purchase/domestic"
@@ -67,6 +69,7 @@ type NavTo =
   | "/inventory/return-inspection"
   | "/admin/channel-sync"
   | "/shop-mgmt/shops"
+  | "/shop-mgmt/commerce"
   | "/shop-mgmt/products"
   | "/shop-mgmt/online"
   | "/shop-mgmt/franchisees"
@@ -91,7 +94,10 @@ type NavGroup = { label: string; items: NavItem[]; icon?: LucideIcon };
 const groups: NavGroup[] = [
   {
     label: "总览",
-    items: [{ title: "仪表盘", url: "/dashboard", icon: LayoutDashboard }],
+    items: [
+      { title: "仪表盘", url: "/dashboard", icon: LayoutDashboard },
+      { title: "门店收银", url: "/pos", icon: ScanLine },
+    ],
   },
   {
     label: "商品管理",
@@ -121,6 +127,7 @@ const groups: NavGroup[] = [
   {
     label: "门店管理",
     items: [
+      { title: "网店运营", url: "/shop-mgmt/commerce", icon: Globe },
       { title: "门店列表", url: "/shop-mgmt/shops", icon: Building2 },
       { title: "加盟商管理", url: "/shop-mgmt/franchisees", icon: Users },
     ],

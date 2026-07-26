@@ -2,10 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, test } from "node:test";
 
-const openapiSource = readFileSync(
-  new URL("./handheld/openapi.ts", import.meta.url),
-  "utf8",
-);
+const openapiSource = readFileSync(new URL("./handheld/openapi.ts", import.meta.url), "utf8");
 
 const snapshot = JSON.parse(
   readFileSync(new URL("../../openapi.snapshot.json", import.meta.url), "utf8"),
@@ -17,6 +14,8 @@ const storefrontPaths = [
   "/api/public/storefront/taxonomy",
   "/api/public/storefront/orders",
   "/api/public/storefront/orders/{id}",
+  "/api/public/storefront/payments",
+  "/api/public/storefront/payments/callback/{provider}",
 ];
 
 describe("storefront OpenAPI contract", () => {
