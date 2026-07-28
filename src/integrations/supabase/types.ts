@@ -200,6 +200,195 @@ export type Database = {
           },
         ]
       }
+      commerce_after_sales: {
+        Row: {
+          after_sale_no: string
+          approved_amount: number | null
+          assigned_to: string | null
+          closed_at: string | null
+          created_at: string
+          evidence_urls: Json
+          id: string
+          inspected_at: string | null
+          location_id: string
+          order_id: string
+          order_item_id: string
+          reason_code: string
+          reason_text: string | null
+          received_at: string | null
+          refund_requested_at: string | null
+          refunded_at: string | null
+          rejection_reason: string | null
+          requested_amount: number
+          requested_at: string
+          return_carrier: string | null
+          return_tracking_no: string | null
+          reviewed_at: string | null
+          status: string
+          store_note: string | null
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          after_sale_no?: string
+          approved_amount?: number | null
+          assigned_to?: string | null
+          closed_at?: string | null
+          created_at?: string
+          evidence_urls?: Json
+          id?: string
+          inspected_at?: string | null
+          location_id: string
+          order_id: string
+          order_item_id: string
+          reason_code: string
+          reason_text?: string | null
+          received_at?: string | null
+          refund_requested_at?: string | null
+          refunded_at?: string | null
+          rejection_reason?: string | null
+          requested_amount: number
+          requested_at?: string
+          return_carrier?: string | null
+          return_tracking_no?: string | null
+          reviewed_at?: string | null
+          status?: string
+          store_note?: string | null
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          after_sale_no?: string
+          approved_amount?: number | null
+          assigned_to?: string | null
+          closed_at?: string | null
+          created_at?: string
+          evidence_urls?: Json
+          id?: string
+          inspected_at?: string | null
+          location_id?: string
+          order_id?: string
+          order_item_id?: string
+          reason_code?: string
+          reason_text?: string | null
+          received_at?: string | null
+          refund_requested_at?: string | null
+          refunded_at?: string | null
+          rejection_reason?: string | null
+          requested_amount?: number
+          requested_at?: string
+          return_carrier?: string | null
+          return_tracking_no?: string | null
+          reviewed_at?: string | null
+          status?: string
+          store_note?: string | null
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_after_sales_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_after_sales_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_after_sales_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_order_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commerce_customer_identities: {
+        Row: {
+          created_at: string
+          customer_id: string
+          id: string
+          provider: string
+          provider_subject: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          id?: string
+          provider: string
+          provider_subject: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          id?: string
+          provider?: string
+          provider_subject?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_customer_identities_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commerce_customers: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          external_subject: string
+          id: string
+          last_login_at: string | null
+          nickname: string | null
+          phone: string | null
+          status: string
+          updated_at: string
+          wechat_openid: string | null
+          wechat_unionid: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          external_subject: string
+          id?: string
+          last_login_at?: string | null
+          nickname?: string | null
+          phone?: string | null
+          status?: string
+          updated_at?: string
+          wechat_openid?: string | null
+          wechat_unionid?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          external_subject?: string
+          id?: string
+          last_login_at?: string | null
+          nickname?: string | null
+          phone?: string | null
+          status?: string
+          updated_at?: string
+          wechat_openid?: string | null
+          wechat_unionid?: string | null
+        }
+        Relationships: []
+      }
       commerce_listings: {
         Row: {
           category: string | null
@@ -214,6 +403,7 @@ export type Database = {
           image_urls: Json
           location_id: string
           price: number
+          product_type: string
           published_at: string | null
           sku_id: string
           sold_at: string | null
@@ -234,6 +424,7 @@ export type Database = {
           image_urls?: Json
           location_id: string
           price: number
+          product_type?: string
           published_at?: string | null
           sku_id: string
           sold_at?: string | null
@@ -254,6 +445,7 @@ export type Database = {
           image_urls?: Json
           location_id?: string
           price?: number
+          product_type?: string
           published_at?: string | null
           sku_id?: string
           sold_at?: string | null
@@ -289,13 +481,17 @@ export type Database = {
         Row: {
           condition_snapshot: string | null
           created_at: string
+          discount_snapshot: Json
+          discount_total: number
           epc: string | null
           id: string
           image_snapshot: string | null
           line_total: number
-          listing_id: string
+          listing_id: string | null
           location_id: string
           order_id: string
+          original_unit_price: number | null
+          ownership_snapshot: string | null
           quantity: number
           sku_id: string
           title_snapshot: string
@@ -304,13 +500,17 @@ export type Database = {
         Insert: {
           condition_snapshot?: string | null
           created_at?: string
+          discount_snapshot?: Json
+          discount_total?: number
           epc?: string | null
           id?: string
           image_snapshot?: string | null
           line_total: number
-          listing_id: string
+          listing_id?: string | null
           location_id: string
           order_id: string
+          original_unit_price?: number | null
+          ownership_snapshot?: string | null
           quantity?: number
           sku_id: string
           title_snapshot: string
@@ -319,13 +519,17 @@ export type Database = {
         Update: {
           condition_snapshot?: string | null
           created_at?: string
+          discount_snapshot?: Json
+          discount_total?: number
           epc?: string | null
           id?: string
           image_snapshot?: string | null
           line_total?: number
-          listing_id?: string
+          listing_id?: string | null
           location_id?: string
           order_id?: string
+          original_unit_price?: number | null
+          ownership_snapshot?: string | null
           quantity?: number
           sku_id?: string
           title_snapshot?: string
@@ -364,90 +568,340 @@ export type Database = {
       }
       commerce_orders: {
         Row: {
+          authorization_id: string | null
+          benefit_snapshot: Json
           cancelled_at: string | null
           completed_at: string | null
-          courier_provider: string
+          courier_provider: string | null
           courier_quote_snapshot: Json | null
-          courier_service_code: string
+          courier_service_code: string | null
           courier_service_name: string | null
           created_at: string
           currency: string
+          customer_id: string | null
           customer_note: string | null
+          discount_snapshot: Json
           discount_total: number
+          fulfillment_method: string
           id: string
           idempotency_key: string
+          metadata: Json
+          operator_id: string | null
           order_no: string
           order_status: string
           paid_at: string | null
           payment_status: string
+          pos_shift_id: string | null
           provider_transaction_id: string | null
-          recipient_name: string
-          recipient_phone: string
+          recipient_name: string | null
+          recipient_phone: string | null
           reservation_expires_at: string
-          shipping_address: Json
+          sale_location_id: string | null
+          shipping_address: Json | null
           shipping_fee: number
+          source_channel: string
           subtotal: number
           total_amount: number
           updated_at: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
+          authorization_id?: string | null
+          benefit_snapshot?: Json
           cancelled_at?: string | null
           completed_at?: string | null
-          courier_provider: string
+          courier_provider?: string | null
           courier_quote_snapshot?: Json | null
-          courier_service_code: string
+          courier_service_code?: string | null
           courier_service_name?: string | null
           created_at?: string
           currency?: string
+          customer_id?: string | null
           customer_note?: string | null
+          discount_snapshot?: Json
           discount_total?: number
+          fulfillment_method?: string
           id?: string
           idempotency_key: string
+          metadata?: Json
+          operator_id?: string | null
           order_no?: string
           order_status?: string
           paid_at?: string | null
           payment_status?: string
+          pos_shift_id?: string | null
           provider_transaction_id?: string | null
-          recipient_name: string
-          recipient_phone: string
+          recipient_name?: string | null
+          recipient_phone?: string | null
           reservation_expires_at: string
-          shipping_address: Json
+          sale_location_id?: string | null
+          shipping_address?: Json | null
           shipping_fee?: number
+          source_channel?: string
           subtotal?: number
           total_amount?: number
           updated_at?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
+          authorization_id?: string | null
+          benefit_snapshot?: Json
           cancelled_at?: string | null
           completed_at?: string | null
-          courier_provider?: string
+          courier_provider?: string | null
           courier_quote_snapshot?: Json | null
-          courier_service_code?: string
+          courier_service_code?: string | null
           courier_service_name?: string | null
           created_at?: string
           currency?: string
+          customer_id?: string | null
           customer_note?: string | null
+          discount_snapshot?: Json
           discount_total?: number
+          fulfillment_method?: string
           id?: string
           idempotency_key?: string
+          metadata?: Json
+          operator_id?: string | null
           order_no?: string
           order_status?: string
           paid_at?: string | null
           payment_status?: string
+          pos_shift_id?: string | null
           provider_transaction_id?: string | null
-          recipient_name?: string
-          recipient_phone?: string
+          recipient_name?: string | null
+          recipient_phone?: string | null
           reservation_expires_at?: string
-          shipping_address?: Json
+          sale_location_id?: string | null
+          shipping_address?: Json | null
           shipping_fee?: number
+          source_channel?: string
           subtotal?: number
           total_amount?: number
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "commerce_orders_authorization_id_fkey"
+            columns: ["authorization_id"]
+            isOneToOne: false
+            referencedRelation: "pos_authorizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_orders_pos_shift_id_fkey"
+            columns: ["pos_shift_id"]
+            isOneToOne: false
+            referencedRelation: "pos_shifts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_orders_sale_location_id_fkey"
+            columns: ["sale_location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commerce_payment_events: {
+        Row: {
+          error: string | null
+          event_type: string
+          id: string
+          payload: Json
+          payment_id: string | null
+          processed_at: string | null
+          processing_status: string
+          provider: string
+          provider_event_id: string | null
+          received_at: string
+          signature_verified: boolean
+        }
+        Insert: {
+          error?: string | null
+          event_type: string
+          id?: string
+          payload?: Json
+          payment_id?: string | null
+          processed_at?: string | null
+          processing_status?: string
+          provider: string
+          provider_event_id?: string | null
+          received_at?: string
+          signature_verified?: boolean
+        }
+        Update: {
+          error?: string | null
+          event_type?: string
+          id?: string
+          payload?: Json
+          payment_id?: string | null
+          processed_at?: string | null
+          processing_status?: string
+          provider?: string
+          provider_event_id?: string | null
+          received_at?: string
+          signature_verified?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_payment_events_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commerce_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          expires_at: string | null
+          failure_code: string | null
+          failure_message: string | null
+          id: string
+          idempotency_key: string
+          order_id: string
+          paid_at: string | null
+          payment_payload: Json
+          provider: string
+          provider_transaction_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          expires_at?: string | null
+          failure_code?: string | null
+          failure_message?: string | null
+          id?: string
+          idempotency_key: string
+          order_id: string
+          paid_at?: string | null
+          payment_payload?: Json
+          provider: string
+          provider_transaction_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          expires_at?: string | null
+          failure_code?: string | null
+          failure_message?: string | null
+          id?: string
+          idempotency_key?: string
+          order_id?: string
+          paid_at?: string | null
+          payment_payload?: Json
+          provider?: string
+          provider_transaction_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_payments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commerce_refunds: {
+        Row: {
+          after_sale_id: string | null
+          amount: number
+          created_at: string
+          failure_message: string | null
+          id: string
+          idempotency_key: string
+          order_id: string
+          payment_id: string
+          provider: string
+          provider_refund_id: string | null
+          reason: string | null
+          refunded_at: string | null
+          requested_at: string
+          requested_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          after_sale_id?: string | null
+          amount: number
+          created_at?: string
+          failure_message?: string | null
+          id?: string
+          idempotency_key: string
+          order_id: string
+          payment_id: string
+          provider: string
+          provider_refund_id?: string | null
+          reason?: string | null
+          refunded_at?: string | null
+          requested_at?: string
+          requested_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          after_sale_id?: string | null
+          amount?: number
+          created_at?: string
+          failure_message?: string | null
+          id?: string
+          idempotency_key?: string
+          order_id?: string
+          payment_id?: string
+          provider?: string
+          provider_refund_id?: string | null
+          reason?: string | null
+          refunded_at?: string | null
+          requested_at?: string
+          requested_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_refunds_after_sale_id_fkey"
+            columns: ["after_sale_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_after_sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_refunds_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_refunds_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_payments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       domestic_bulk_order_lines: {
         Row: {
@@ -1857,6 +2311,7 @@ export type Database = {
           classification_status: string
           created_at: string
           default_shop_ids: string[]
+          discount_eligible: boolean
           epc: string
           grade: string | null
           id: string
@@ -1872,7 +2327,9 @@ export type Database = {
           pack_pieces: number | null
           price_tier: number
           recognition_request_id: string | null
+          sale_ownership: string
           sales_state: string
+          settlement_party_ref: string | null
           sku_code: string | null
           sku_scope: string
           status: string
@@ -1895,6 +2352,7 @@ export type Database = {
           classification_status?: string
           created_at?: string
           default_shop_ids?: string[]
+          discount_eligible?: boolean
           epc: string
           grade?: string | null
           id?: string
@@ -1910,7 +2368,9 @@ export type Database = {
           pack_pieces?: number | null
           price_tier: number
           recognition_request_id?: string | null
+          sale_ownership?: string
           sales_state?: string
+          settlement_party_ref?: string | null
           sku_code?: string | null
           sku_scope?: string
           status?: string
@@ -1933,6 +2393,7 @@ export type Database = {
           classification_status?: string
           created_at?: string
           default_shop_ids?: string[]
+          discount_eligible?: boolean
           epc?: string
           grade?: string | null
           id?: string
@@ -1948,7 +2409,9 @@ export type Database = {
           pack_pieces?: number | null
           price_tier?: number
           recognition_request_id?: string | null
+          sale_ownership?: string
           sales_state?: string
+          settlement_party_ref?: string | null
           sku_code?: string | null
           sku_scope?: string
           status?: string
@@ -2101,6 +2564,65 @@ export type Database = {
           },
         ]
       }
+      inventory_reservation_lines: {
+        Row: {
+          created_at: string
+          id: string
+          location_id: string
+          order_item_id: string
+          quantity: number
+          reservation_id: string
+          stock_sku_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          location_id: string
+          order_item_id: string
+          quantity: number
+          reservation_id: string
+          stock_sku_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          location_id?: string
+          order_item_id?: string
+          quantity?: number
+          reservation_id?: string
+          stock_sku_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_reservation_lines_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_reservation_lines_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_reservation_lines_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_reservations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_reservation_lines_stock_sku_id_fkey"
+            columns: ["stock_sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory_reservations: {
         Row: {
           consumed_at: string | null
@@ -2110,6 +2632,7 @@ export type Database = {
           listing_id: string
           location_id: string
           order_id: string
+          quantity: number
           released_at: string | null
           sku_id: string
           status: string
@@ -2122,6 +2645,7 @@ export type Database = {
           listing_id: string
           location_id: string
           order_id: string
+          quantity?: number
           released_at?: string | null
           sku_id: string
           status?: string
@@ -2134,6 +2658,7 @@ export type Database = {
           listing_id?: string
           location_id?: string
           order_id?: string
+          quantity?: number
           released_at?: string | null
           sku_id?: string
           status?: string
@@ -2792,6 +3317,663 @@ export type Database = {
             columns: ["fulfillment_id"]
             isOneToOne: true
             referencedRelation: "fulfillments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pos_authorizations: {
+        Row: {
+          action: string
+          approved_value: Json
+          authorizer_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          location_id: string
+          operator_id: string
+          reason: string | null
+          requested_value: Json
+          status: string
+        }
+        Insert: {
+          action: string
+          approved_value?: Json
+          authorizer_id: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          location_id: string
+          operator_id: string
+          reason?: string | null
+          requested_value?: Json
+          status?: string
+        }
+        Update: {
+          action?: string
+          approved_value?: Json
+          authorizer_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          location_id?: string
+          operator_id?: string
+          reason?: string | null
+          requested_value?: Json
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_authorizations_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pos_cash_movements: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          operator_id: string
+          order_id: string | null
+          reason: string | null
+          shift_id: string
+          type: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          operator_id: string
+          order_id?: string | null
+          reason?: string | null
+          shift_id: string
+          type: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          operator_id?: string
+          order_id?: string | null
+          reason?: string | null
+          shift_id?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_cash_movements_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_cash_movements_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "pos_shifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pos_customer_coupons: {
+        Row: {
+          code: string
+          created_at: string
+          customer_id: string
+          discount_type: string
+          expires_at: string | null
+          id: string
+          metadata: Json
+          min_spend: number
+          name: string
+          starts_at: string | null
+          status: string
+          updated_at: string
+          value: number
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          customer_id: string
+          discount_type: string
+          expires_at?: string | null
+          id?: string
+          metadata?: Json
+          min_spend?: number
+          name: string
+          starts_at?: string | null
+          status?: string
+          updated_at?: string
+          value: number
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          customer_id?: string
+          discount_type?: string
+          expires_at?: string | null
+          id?: string
+          metadata?: Json
+          min_spend?: number
+          name?: string
+          starts_at?: string | null
+          status?: string
+          updated_at?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_customer_coupons_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pos_customer_wallets: {
+        Row: {
+          customer_id: string
+          member_level: string
+          metadata: Json
+          points: number
+          store_credit: number
+          updated_at: string
+        }
+        Insert: {
+          customer_id: string
+          member_level?: string
+          metadata?: Json
+          points?: number
+          store_credit?: number
+          updated_at?: string
+        }
+        Update: {
+          customer_id?: string
+          member_level?: string
+          metadata?: Json
+          points?: number
+          store_credit?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_customer_wallets_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: true
+            referencedRelation: "commerce_customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pos_discount_policies: {
+        Row: {
+          allowed_roles: string[]
+          applies_to_ownership: string[]
+          created_at: string
+          discount_type: string
+          id: string
+          is_active: boolean
+          location_id: string | null
+          max_amount: number | null
+          min_pay_rate: number
+          name: string
+          requires_reason: boolean
+          scope: string
+          updated_at: string
+        }
+        Insert: {
+          allowed_roles?: string[]
+          applies_to_ownership?: string[]
+          created_at?: string
+          discount_type: string
+          id?: string
+          is_active?: boolean
+          location_id?: string | null
+          max_amount?: number | null
+          min_pay_rate?: number
+          name: string
+          requires_reason?: boolean
+          scope?: string
+          updated_at?: string
+        }
+        Update: {
+          allowed_roles?: string[]
+          applies_to_ownership?: string[]
+          created_at?: string
+          discount_type?: string
+          id?: string
+          is_active?: boolean
+          location_id?: string | null
+          max_amount?: number | null
+          min_pay_rate?: number
+          name?: string
+          requires_reason?: boolean
+          scope?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_discount_policies_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pos_held_cart_items: {
+        Row: {
+          discount_eligible: boolean
+          held_cart_id: string
+          id: string
+          ownership_snapshot: string
+          price_snapshot: number
+          quantity: number
+          sku_id: string
+        }
+        Insert: {
+          discount_eligible?: boolean
+          held_cart_id: string
+          id?: string
+          ownership_snapshot?: string
+          price_snapshot: number
+          quantity: number
+          sku_id: string
+        }
+        Update: {
+          discount_eligible?: boolean
+          held_cart_id?: string
+          id?: string
+          ownership_snapshot?: string
+          price_snapshot?: number
+          quantity?: number
+          sku_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_held_cart_items_held_cart_id_fkey"
+            columns: ["held_cart_id"]
+            isOneToOne: false
+            referencedRelation: "pos_held_carts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_held_cart_items_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pos_held_carts: {
+        Row: {
+          benefit_snapshot: Json
+          client_op_id: string
+          customer_id: string | null
+          discount_snapshot: Json
+          held_at: string
+          id: string
+          location_id: string
+          note: string | null
+          operator_id: string
+          resumed_at: string | null
+          shift_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          benefit_snapshot?: Json
+          client_op_id: string
+          customer_id?: string | null
+          discount_snapshot?: Json
+          held_at?: string
+          id?: string
+          location_id: string
+          note?: string | null
+          operator_id: string
+          resumed_at?: string | null
+          shift_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          benefit_snapshot?: Json
+          client_op_id?: string
+          customer_id?: string | null
+          discount_snapshot?: Json
+          held_at?: string
+          id?: string
+          location_id?: string
+          note?: string | null
+          operator_id?: string
+          resumed_at?: string | null
+          shift_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_held_carts_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_held_carts_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_held_carts_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "pos_shifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pos_receipts: {
+        Row: {
+          created_at: string
+          id: string
+          last_printed_at: string | null
+          order_id: string
+          payload: Json
+          print_count: number
+          receipt_no: string
+          shift_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_printed_at?: string | null
+          order_id: string
+          payload?: Json
+          print_count?: number
+          receipt_no: string
+          shift_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_printed_at?: string | null
+          order_id?: string
+          payload?: Json
+          print_count?: number
+          receipt_no?: string
+          shift_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_receipts_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "commerce_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_receipts_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "pos_shifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pos_registers: {
+        Row: {
+          code: string
+          created_at: string
+          device_id: string | null
+          id: string
+          is_active: boolean
+          location_id: string
+          name: string
+          receipt_prefix: string
+          settings: Json
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          device_id?: string | null
+          id?: string
+          is_active?: boolean
+          location_id: string
+          name: string
+          receipt_prefix?: string
+          settings?: Json
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          device_id?: string | null
+          id?: string
+          is_active?: boolean
+          location_id?: string
+          name?: string
+          receipt_prefix?: string
+          settings?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_registers_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "inv_handheld_devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_registers_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pos_return_items: {
+        Row: {
+          id: string
+          inspection_status: string
+          order_item_id: string
+          physical_status: string
+          quantity: number
+          refund_amount: number
+          return_id: string
+          sku_id: string
+        }
+        Insert: {
+          id?: string
+          inspection_status?: string
+          order_item_id: string
+          physical_status?: string
+          quantity: number
+          refund_amount: number
+          return_id: string
+          sku_id: string
+        }
+        Update: {
+          id?: string
+          inspection_status?: string
+          order_item_id?: string
+          physical_status?: string
+          quantity?: number
+          refund_amount?: number
+          return_id?: string
+          sku_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_return_items_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_return_items_return_id_fkey"
+            columns: ["return_id"]
+            isOneToOne: false
+            referencedRelation: "pos_returns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_return_items_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pos_returns: {
+        Row: {
+          authorization_id: string | null
+          client_op_id: string
+          completed_at: string | null
+          created_at: string
+          id: string
+          location_id: string
+          operator_id: string
+          order_id: string
+          reason: string
+          refund_total: number
+          shift_id: string
+          status: string
+        }
+        Insert: {
+          authorization_id?: string | null
+          client_op_id: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          location_id: string
+          operator_id: string
+          order_id: string
+          reason: string
+          refund_total?: number
+          shift_id: string
+          status?: string
+        }
+        Update: {
+          authorization_id?: string | null
+          client_op_id?: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          location_id?: string
+          operator_id?: string
+          order_id?: string
+          reason?: string
+          refund_total?: number
+          shift_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_returns_authorization_id_fkey"
+            columns: ["authorization_id"]
+            isOneToOne: false
+            referencedRelation: "pos_authorizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_returns_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_returns_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_returns_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "pos_shifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pos_shifts: {
+        Row: {
+          cash_difference: number | null
+          close_note: string | null
+          closed_at: string | null
+          counted_cash: number | null
+          created_at: string
+          expected_cash: number | null
+          id: string
+          location_id: string
+          opened_at: string
+          opening_cash: number
+          operator_id: string
+          register_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          cash_difference?: number | null
+          close_note?: string | null
+          closed_at?: string | null
+          counted_cash?: number | null
+          created_at?: string
+          expected_cash?: number | null
+          id?: string
+          location_id: string
+          opened_at?: string
+          opening_cash?: number
+          operator_id: string
+          register_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          cash_difference?: number | null
+          close_note?: string | null
+          closed_at?: string | null
+          counted_cash?: number | null
+          created_at?: string
+          expected_cash?: number | null
+          id?: string
+          location_id?: string
+          opened_at?: string
+          opening_cash?: number
+          operator_id?: string
+          register_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_shifts_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_shifts_register_id_fkey"
+            columns: ["register_id"]
+            isOneToOne: false
+            referencedRelation: "pos_registers"
             referencedColumns: ["id"]
           },
         ]
@@ -4090,6 +5272,52 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      commerce_create_after_sale: {
+        Args: {
+          p_evidence_urls?: Json
+          p_order_item_id: string
+          p_reason_code: string
+          p_reason_text?: string
+          p_requested_amount?: number
+          p_type: string
+          p_user_id: string
+        }
+        Returns: {
+          after_sale_no: string
+          approved_amount: number | null
+          assigned_to: string | null
+          closed_at: string | null
+          created_at: string
+          evidence_urls: Json
+          id: string
+          inspected_at: string | null
+          location_id: string
+          order_id: string
+          order_item_id: string
+          reason_code: string
+          reason_text: string | null
+          received_at: string | null
+          refund_requested_at: string | null
+          refunded_at: string | null
+          rejection_reason: string | null
+          requested_amount: number
+          requested_at: string
+          return_carrier: string | null
+          return_tracking_no: string | null
+          reviewed_at: string | null
+          status: string
+          store_note: string | null
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "commerce_after_sales"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       commerce_create_order: {
         Args: {
           p_courier_provider: string
@@ -4106,32 +5334,42 @@ export type Database = {
           p_user_id: string
         }
         Returns: {
+          authorization_id: string | null
+          benefit_snapshot: Json
           cancelled_at: string | null
           completed_at: string | null
-          courier_provider: string
+          courier_provider: string | null
           courier_quote_snapshot: Json | null
-          courier_service_code: string
+          courier_service_code: string | null
           courier_service_name: string | null
           created_at: string
           currency: string
+          customer_id: string | null
           customer_note: string | null
+          discount_snapshot: Json
           discount_total: number
+          fulfillment_method: string
           id: string
           idempotency_key: string
+          metadata: Json
+          operator_id: string | null
           order_no: string
           order_status: string
           paid_at: string | null
           payment_status: string
+          pos_shift_id: string | null
           provider_transaction_id: string | null
-          recipient_name: string
-          recipient_phone: string
+          recipient_name: string | null
+          recipient_phone: string | null
           reservation_expires_at: string
-          shipping_address: Json
+          sale_location_id: string | null
+          shipping_address: Json | null
           shipping_fee: number
+          source_channel: string
           subtotal: number
           total_amount: number
           updated_at: string
-          user_id: string
+          user_id: string | null
         }
         SetofOptions: {
           from: "*"
@@ -4140,6 +5378,74 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      commerce_create_order_v2: {
+        Args: {
+          p_courier_provider: string
+          p_courier_service_code: string
+          p_courier_service_name?: string
+          p_customer_note?: string
+          p_idempotency_key: string
+          p_items: Json
+          p_quote_snapshot?: Json
+          p_recipient_name: string
+          p_recipient_phone: string
+          p_shipping_address: Json
+          p_shipping_fee?: number
+          p_user_id: string
+        }
+        Returns: {
+          authorization_id: string | null
+          benefit_snapshot: Json
+          cancelled_at: string | null
+          completed_at: string | null
+          courier_provider: string | null
+          courier_quote_snapshot: Json | null
+          courier_service_code: string | null
+          courier_service_name: string | null
+          created_at: string
+          currency: string
+          customer_id: string | null
+          customer_note: string | null
+          discount_snapshot: Json
+          discount_total: number
+          fulfillment_method: string
+          id: string
+          idempotency_key: string
+          metadata: Json
+          operator_id: string | null
+          order_no: string
+          order_status: string
+          paid_at: string | null
+          payment_status: string
+          pos_shift_id: string | null
+          provider_transaction_id: string | null
+          recipient_name: string | null
+          recipient_phone: string | null
+          reservation_expires_at: string
+          sale_location_id: string | null
+          shipping_address: Json | null
+          shipping_fee: number
+          source_channel: string
+          subtotal: number
+          total_amount: number
+          updated_at: string
+          user_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "commerce_orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      commerce_listing_availability: {
+        Args: { p_listing_ids: string[] }
+        Returns: {
+          available_qty: number
+          listing_id: string
+          product_type: string
+        }[]
+      }
       commerce_mark_order_paid: {
         Args: {
           p_order_id: string
@@ -4147,32 +5453,42 @@ export type Database = {
           p_provider_transaction_id: string
         }
         Returns: {
+          authorization_id: string | null
+          benefit_snapshot: Json
           cancelled_at: string | null
           completed_at: string | null
-          courier_provider: string
+          courier_provider: string | null
           courier_quote_snapshot: Json | null
-          courier_service_code: string
+          courier_service_code: string | null
           courier_service_name: string | null
           created_at: string
           currency: string
+          customer_id: string | null
           customer_note: string | null
+          discount_snapshot: Json
           discount_total: number
+          fulfillment_method: string
           id: string
           idempotency_key: string
+          metadata: Json
+          operator_id: string | null
           order_no: string
           order_status: string
           paid_at: string | null
           payment_status: string
+          pos_shift_id: string | null
           provider_transaction_id: string | null
-          recipient_name: string
-          recipient_phone: string
+          recipient_name: string | null
+          recipient_phone: string | null
           reservation_expires_at: string
-          shipping_address: Json
+          sale_location_id: string | null
+          shipping_address: Json | null
           shipping_fee: number
+          source_channel: string
           subtotal: number
           total_amount: number
           updated_at: string
-          user_id: string
+          user_id: string | null
         }
         SetofOptions: {
           from: "*"
@@ -4182,6 +5498,51 @@ export type Database = {
         }
       }
       commerce_release_expired_reservations: { Args: never; Returns: number }
+      commerce_transition_after_sale: {
+        Args: {
+          p_after_sale_id: string
+          p_approved_amount?: number
+          p_next_status: string
+          p_operator_id?: string
+          p_rejection_reason?: string
+          p_store_note?: string
+        }
+        Returns: {
+          after_sale_no: string
+          approved_amount: number | null
+          assigned_to: string | null
+          closed_at: string | null
+          created_at: string
+          evidence_urls: Json
+          id: string
+          inspected_at: string | null
+          location_id: string
+          order_id: string
+          order_item_id: string
+          reason_code: string
+          reason_text: string | null
+          received_at: string | null
+          refund_requested_at: string | null
+          refunded_at: string | null
+          rejection_reason: string | null
+          requested_amount: number
+          requested_at: string
+          return_carrier: string | null
+          return_tracking_no: string | null
+          reviewed_at: string | null
+          status: string
+          store_note: string | null
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "commerce_after_sales"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       commit_sale: {
         Args: {
           p_epc?: string
@@ -4303,6 +5664,7 @@ export type Database = {
         }
         Returns: Json
       }
+      gen_commerce_after_sale_no: { Args: never; Returns: string }
       gen_commerce_order_no: { Args: never; Returns: string }
       gen_ean13: { Args: never; Returns: string }
       gen_stock_transfer_code: { Args: never; Returns: string }
@@ -4333,6 +5695,45 @@ export type Database = {
         Args: { p_delta: number; p_sku_id: string }
         Returns: undefined
       }
+      pos_complete_return: {
+        Args: {
+          p_authorization_id?: string
+          p_client_op_id: string
+          p_items: Json
+          p_operator_id: string
+          p_order_id: string
+          p_reason: string
+          p_shift_id: string
+        }
+        Returns: Json
+      }
+      pos_complete_sale: {
+        Args: {
+          p_client_op_id: string
+          p_customer_id?: string
+          p_items: Json
+          p_note?: string
+          p_operator_id: string
+          p_shift_id: string
+          p_tenders: Json
+        }
+        Returns: Json
+      }
+      pos_complete_sale_v2: {
+        Args: {
+          p_authorization_id?: string
+          p_benefit_snapshot?: Json
+          p_client_op_id: string
+          p_customer_id?: string
+          p_discount_snapshot?: Json
+          p_items: Json
+          p_note?: string
+          p_operator_id: string
+          p_shift_id: string
+          p_tenders: Json
+        }
+        Returns: Json
+      }
       restore_after_return_inspection: {
         Args: {
           p_inspection_id: string
@@ -4340,6 +5741,10 @@ export type Database = {
           p_notes?: string
         }
         Returns: Json
+      }
+      sales_sku_available_qty: {
+        Args: { p_location_id: string; p_sku_id: string }
+        Returns: number
       }
       search_inv_skus: {
         Args: {
