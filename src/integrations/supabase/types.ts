@@ -5734,6 +5734,16 @@ export type Database = {
         }
         Returns: Json
       }
+      pos_record_cash_adjustment: {
+        Args: {
+          p_amount: number
+          p_operator_id: string
+          p_reason: string
+          p_shift_id: string
+          p_type: string
+        }
+        Returns: Json
+      }
       restore_after_return_inspection: {
         Args: {
           p_inspection_id: string
