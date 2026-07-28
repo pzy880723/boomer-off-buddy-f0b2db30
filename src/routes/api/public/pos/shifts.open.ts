@@ -7,7 +7,7 @@ const OpenShiftBody = z.object({
   location_id: z.string().uuid(),
   register_code: z.string().trim().min(1).max(40),
   register_name: z.string().trim().min(1).max(80),
-  opening_cash: z.number().min(0).max(1_000_000).default(0),
+  opening_cash: z.number().min(0).max(1_000_000).optional(),
 });
 
 export const Route = createFileRoute("/api/public/pos/shifts/open")({
@@ -54,13 +54,29 @@ export const Route = createFileRoute("/api/public/pos/shifts/open")({
           }
           return posError("该收银机已有其他员工开班", 409, "register_in_use");
         }
+
+        const { data: previousShift, error: previousShiftError } = await supabaseAdmin
+          .from("pos_shifts" as never)
+          .select("counted_cash,expected_cash")
+          .eq("register_id", registerRow.id)
+          .eq("status", "closed")
+          .order("closed_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (previousShiftError) return posError(previousShiftError.message, 500);
+        const previous = previousShift as unknown as {
+          counted_cash: number | null;
+          expected_cash: number | null;
+        } | null;
+        const carriedCash = Number(previous?.counted_cash ?? previous?.expected_cash ?? 0);
+
         const { data: shift, error: shiftError } = await supabaseAdmin
           .from("pos_shifts" as never)
           .insert({
             register_id: registerRow.id,
             location_id: body.location_id,
             operator_id: auth.user.id,
-            opening_cash: body.opening_cash,
+            opening_cash: carriedCash,
           } as never)
           .select("*")
           .single();

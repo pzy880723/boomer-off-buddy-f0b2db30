@@ -10,7 +10,6 @@ import {
   CreditCard,
   History,
   Loader2,
-  LogOut,
   Minus,
   PackageOpen,
   PauseCircle,
@@ -182,6 +181,18 @@ type ReceiptData = {
     provider_transaction_id: string | null;
   }>;
 };
+type CashMovementData = {
+  opening_cash: number;
+  balance: number;
+  items: Array<{
+    id: string;
+    type: "opening" | "sale" | "refund" | "cash_in" | "cash_out" | "closing_adjustment";
+    amount: number;
+    reason: string | null;
+    order_id: string | null;
+    created_at: string;
+  }>;
+};
 type ApiResponse<T> =
   | { ok: true; data: T; replayed?: boolean }
   | { ok: false; message?: string; error?: string; code?: string };
@@ -242,18 +253,19 @@ function PosPage() {
   const [browseOpen, setBrowseOpen] = useState(true);
   const [browseLoading, setBrowseLoading] = useState(false);
   const [browseProducts, setBrowseProducts] = useState<LookupProduct[]>([]);
-  const [openShiftDialog, setOpenShiftDialog] = useState(false);
-  const [openingCash, setOpeningCash] = useState("0");
-  const [registerName, setRegisterName] = useState("前台收银机");
+  const [shiftLoading, setShiftLoading] = useState(false);
+  const [cashDialog, setCashDialog] = useState(false);
+  const [cashMode, setCashMode] = useState<"cash_out" | "cash_in">("cash_out");
+  const [cashAmount, setCashAmount] = useState("");
+  const [cashReason, setCashReason] = useState("");
+  const [cashSummary, setCashSummary] = useState<CashMovementData | null>(null);
+  const [cashLoading, setCashLoading] = useState(false);
   const [paymentDialog, setPaymentDialog] = useState(false);
   const [tenders, setTenders] = useState<PosTender[]>([]);
   const [paying, setPaying] = useState(false);
   const [saleResult, setSaleResult] = useState<Record<string, unknown> | null>(null);
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
   const [receiptDialog, setReceiptDialog] = useState(false);
-  const [closeDialog, setCloseDialog] = useState(false);
-  const [countedCash, setCountedCash] = useState("0");
-  const [closing, setClosing] = useState(false);
   const [memberDialog, setMemberDialog] = useState(false);
   const [memberQuery, setMemberQuery] = useState("");
   const [memberLoading, setMemberLoading] = useState(false);
@@ -276,6 +288,22 @@ function PosPage() {
   const [orders, setOrders] = useState<PosOrder[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
 
+  async function ensureAutomaticShift(locationId: string) {
+    const result = await posRequest<PosShift>("/api/public/pos/shifts/open", token, {
+      method: "POST",
+      body: JSON.stringify({
+        location_id: locationId,
+        register_code: `POS-${locationId.slice(0, 6).toUpperCase()}`,
+        register_name: "门店收银机",
+      }),
+    });
+    if (!result.ok) {
+      toast.error(result.message ?? "收银台自动启用失败");
+      return null;
+    }
+    return result.data;
+  }
+
   async function loadBootstrap() {
     if (!token) return;
     setLoading(true);
@@ -286,17 +314,30 @@ function PosPage() {
       setLoading(false);
       return;
     }
-    setBootstrap(result.data);
-    const existingShift = result.data.open_shifts[0];
     const nextLocationId =
-      existingShift?.location_id ||
+      result.data.open_shifts[0]?.location_id ||
       (selectedLocationId &&
       result.data.locations.some((location) => location.id === selectedLocationId)
         ? selectedLocationId
         : result.data.locations[0]?.id) ||
       "";
+    let nextBootstrap = result.data;
+    const existingShift = result.data.open_shifts.find(
+      (shift) => shift.location_id === nextLocationId && shift.status !== "closed",
+    );
+    if (nextLocationId && !existingShift) {
+      setShiftLoading(true);
+      const shift = await ensureAutomaticShift(nextLocationId);
+      setShiftLoading(false);
+      if (shift) {
+        nextBootstrap = {
+          ...result.data,
+          open_shifts: [...result.data.open_shifts, shift],
+        };
+      }
+    }
+    setBootstrap(nextBootstrap);
     setSelectedLocationId(nextLocationId);
-    setOpenShiftDialog(Boolean(nextLocationId && !existingShift));
     setLoading(false);
     window.setTimeout(() => scanRef.current?.focus(), 80);
   }
@@ -369,8 +410,7 @@ function PosPage() {
     const code = scanCode.trim();
     if (!code) return;
     if (!activeShift || !selectedLocationId) {
-      toast.error("请先开班，再开始扫码");
-      setOpenShiftDialog(true);
+      toast.error("收银台正在初始化，请稍候");
       return;
     }
     setScanning(true);
@@ -595,8 +635,7 @@ function PosPage() {
 
   async function loadProductBrowser() {
     if (!activeShift || !selectedLocationId) {
-      toast.error("请先开班，再浏览商品");
-      setOpenShiftDialog(true);
+      toast.error("收银台正在初始化，请稍候");
       return;
     }
     setBrowseOpen(true);
@@ -676,32 +715,89 @@ function PosPage() {
     );
   }
 
-  async function openShift() {
-    if (!selectedLocationId) {
-      toast.error("请选择门店或仓库");
+  async function switchLocation(locationId: string) {
+    if (cart.length > 0) {
+      toast.warning("请先清空当前购物车再切换库位");
       return;
     }
-    const cash = Number(openingCash);
-    if (!Number.isFinite(cash) || cash < 0) {
-      toast.error("备用金金额不正确");
+    setSelectedLocationId(locationId);
+    const existing = bootstrap?.open_shifts.find(
+      (shift) => shift.location_id === locationId && shift.status !== "closed",
+    );
+    if (existing) return;
+
+    setShiftLoading(true);
+    const shift = await ensureAutomaticShift(locationId);
+    setShiftLoading(false);
+    if (!shift) return;
+    setBootstrap((current) =>
+      current
+        ? {
+            ...current,
+            open_shifts: [
+              ...current.open_shifts.filter(
+                (item) => item.location_id !== locationId || item.status === "closed",
+              ),
+              shift,
+            ],
+          }
+        : current,
+    );
+  }
+
+  async function loadCashDrawer() {
+    if (!activeShift) {
+      toast.error("收银台正在初始化，请稍候");
       return;
     }
-    const result = await posRequest<PosShift>("/api/public/pos/shifts/open", token, {
-      method: "POST",
-      body: JSON.stringify({
-        location_id: selectedLocationId,
-        register_code: `POS-${selectedLocationId.slice(0, 6).toUpperCase()}`,
-        register_name: registerName.trim() || "前台收银机",
-        opening_cash: cash,
-      }),
-    });
+    setCashDialog(true);
+    setCashLoading(true);
+    const result = await posRequest<CashMovementData>(
+      `/api/public/pos/cash-movements?shift_id=${encodeURIComponent(activeShift.id)}`,
+      token,
+    );
+    setCashLoading(false);
     if (!result.ok) {
-      toast.error(result.message ?? "开班失败");
+      toast.error(result.message ?? "钱箱记录读取失败");
       return;
     }
-    toast.success("开班成功，可以开始收银");
-    setOpenShiftDialog(false);
-    await loadBootstrap();
+    setCashSummary(result.data);
+  }
+
+  async function recordCashMovement() {
+    if (!activeShift) return;
+    const amount = Number(cashAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.warning("请输入正确的现金金额");
+      return;
+    }
+    if (!cashReason.trim()) {
+      toast.warning("请填写现金变动原因");
+      return;
+    }
+    setCashLoading(true);
+    const result = await posRequest<Record<string, unknown>>(
+      "/api/public/pos/cash-movements",
+      token,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          shift_id: activeShift.id,
+          type: cashMode,
+          amount,
+          reason: cashReason.trim(),
+        }),
+      },
+    );
+    setCashLoading(false);
+    if (!result.ok) {
+      toast.error(result.message ?? "钱箱登记失败");
+      return;
+    }
+    toast.success(cashMode === "cash_out" ? "现金取出已记录" : "现金补入已记录");
+    setCashAmount("");
+    setCashReason("");
+    await loadCashDrawer();
   }
 
   function startPayment() {
@@ -767,33 +863,6 @@ function PosPage() {
     if (orderId) await loadReceipt(orderId);
   }
 
-  async function closeShift() {
-    if (!activeShift) return;
-    const cash = Number(countedCash);
-    if (!Number.isFinite(cash) || cash < 0) {
-      toast.error("实点现金金额不正确");
-      return;
-    }
-    setClosing(true);
-    const result = await posRequest<Record<string, unknown>>(
-      `/api/public/pos/shifts/${activeShift.id}/close`,
-      token,
-      {
-        method: "POST",
-        body: JSON.stringify({ counted_cash: cash }),
-      },
-    );
-    setClosing(false);
-    if (!result.ok) {
-      toast.error(result.message ?? "交班失败");
-      return;
-    }
-    toast.success("交班完成");
-    setCloseDialog(false);
-    setCart([]);
-    await loadBootstrap();
-  }
-
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#f5f6f8]">
@@ -852,21 +921,7 @@ function PosPage() {
           <span className="hidden text-sm font-medium text-[#667085] sm:inline">门店收银</span>
         </div>
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2 sm:gap-3">
-          <Select
-            value={selectedLocationId}
-            onValueChange={(value) => {
-              if (cart.length > 0) {
-                toast.warning("请先清空当前购物车再切换库位");
-                return;
-              }
-              setSelectedLocationId(value);
-              setOpenShiftDialog(
-                !bootstrap.open_shifts.some(
-                  (shift) => shift.location_id === value && shift.status !== "closed",
-                ),
-              );
-            }}
-          >
+          <Select value={selectedLocationId} onValueChange={(value) => void switchLocation(value)}>
             <SelectTrigger className="h-10 w-40 rounded-xl border-[#d0d5dd] bg-white sm:w-52">
               <SelectValue placeholder="选择门店" />
             </SelectTrigger>
@@ -886,16 +941,20 @@ function PosPage() {
                 : "hidden h-8 rounded-full border-[#fedf89] bg-[#fffaeb] px-3 text-[#b54708] md:inline-flex"
             }
           >
-            {activeShift ? `已开班 · ${activeShift.register?.name ?? "收银机"}` : "未开班"}
+            {activeShift
+              ? `收银可用 · ${activeShift.register?.name ?? "收银机"}`
+              : shiftLoading
+                ? "正在准备收银"
+                : "收银暂不可用"}
           </Badge>
           <Button
             variant="outline"
             className="hidden h-10 rounded-xl border-[#d0d5dd] sm:inline-flex"
-            disabled={!activeShift || cart.length > 0}
-            onClick={() => setCloseDialog(true)}
+            disabled={!activeShift || shiftLoading}
+            onClick={() => void loadCashDrawer()}
           >
-            <LogOut className="mr-2 h-4 w-4" />
-            交班
+            <Banknote className="mr-2 h-4 w-4" />
+            钱箱
           </Button>
         </div>
       </header>
@@ -1263,43 +1322,124 @@ function PosPage() {
         </aside>
       </main>
 
-      <Dialog open={openShiftDialog} onOpenChange={setOpenShiftDialog}>
-        <DialogContent className="max-w-md rounded-2xl">
+      <Dialog open={cashDialog} onOpenChange={setCashDialog}>
+        <DialogContent className="max-w-lg rounded-2xl">
           <DialogHeader>
-            <DialogTitle>开始收银班次</DialogTitle>
+            <DialogTitle>钱箱管理</DialogTitle>
           </DialogHeader>
-          <div className="space-y-5 pt-2">
-            <div className="rounded-xl bg-[#eef4fb] p-4">
-              <p className="text-sm font-semibold text-[#0a315d]">{selectedLocation?.name}</p>
-              <p className="mt-1 text-xs text-[#475467]">开班后才能扫码、收款和打印小票。</p>
+          <div className="space-y-5 pt-1">
+            <div className="rounded-2xl bg-[#0a315d] p-5 text-white">
+              <p className="text-xs text-white/65">{selectedLocation?.name} · 当前应有现金</p>
+              <p className="mt-1 text-4xl font-black tracking-[-0.04em] tabular-nums">
+                {cashLoading && !cashSummary ? "读取中" : money(cashSummary?.balance ?? 0)}
+              </p>
+              <p className="mt-3 text-xs leading-5 text-white/65">
+                现金会连续结转到下一天，只有实际取走或补入现金时才需要登记。
+              </p>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="register-name">收银机名称</Label>
-              <Input
-                id="register-name"
-                value={registerName}
-                onChange={(event) => setRegisterName(event.target.value)}
-                className="h-11 rounded-xl"
-              />
+
+            <div className="grid grid-cols-2 rounded-xl bg-[#f2f4f7] p-1">
+              <button
+                type="button"
+                className={`h-10 rounded-lg text-sm font-semibold transition ${
+                  cashMode === "cash_out" ? "bg-white text-[#b42318] shadow-sm" : "text-[#667085]"
+                }`}
+                onClick={() => setCashMode("cash_out")}
+              >
+                取出现金
+              </button>
+              <button
+                type="button"
+                className={`h-10 rounded-lg text-sm font-semibold transition ${
+                  cashMode === "cash_in" ? "bg-white text-[#067647] shadow-sm" : "text-[#667085]"
+                }`}
+                onClick={() => setCashMode("cash_in")}
+              >
+                补入现金
+              </button>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="opening-cash">开班备用金</Label>
-              <Input
-                id="opening-cash"
-                type="number"
-                min="0"
-                step="0.01"
-                value={openingCash}
-                onChange={(event) => setOpeningCash(event.target.value)}
-                className="h-11 rounded-xl"
-              />
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="cash-amount">金额</Label>
+                <Input
+                  id="cash-amount"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={cashAmount}
+                  onChange={(event) => setCashAmount(event.target.value)}
+                  placeholder="0.00"
+                  className="h-12 rounded-xl text-lg font-semibold tabular-nums"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cash-reason">原因</Label>
+                <Input
+                  id="cash-reason"
+                  value={cashReason}
+                  onChange={(event) => setCashReason(event.target.value)}
+                  placeholder={cashMode === "cash_out" ? "如：存入银行" : "如：补充找零"}
+                  className="h-12 rounded-xl"
+                />
+              </div>
             </div>
+
             <Button
               className="h-12 w-full rounded-xl bg-[#0a315d] hover:bg-[#08284c]"
-              onClick={() => void openShift()}
+              disabled={cashLoading}
+              onClick={() => void recordCashMovement()}
             >
-              确认开班
+              {cashLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {cashMode === "cash_out" ? "确认取出" : "确认补入"}
             </Button>
+
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-sm font-semibold">最近钱箱记录</p>
+                <span className="text-xs text-[#667085]">
+                  起始结转 {money(cashSummary?.opening_cash ?? 0)}
+                </span>
+              </div>
+              <div className="max-h-48 space-y-2 overflow-y-auto">
+                {(cashSummary?.items ?? []).slice(0, 8).map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between rounded-xl bg-[#f9fafb] px-3 py-2.5"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">
+                        {item.type === "sale"
+                          ? "现金销售"
+                          : item.type === "refund"
+                            ? "现金退款"
+                            : item.type === "cash_out"
+                              ? "取出现金"
+                              : item.type === "cash_in"
+                                ? "补入现金"
+                                : "钱箱调整"}
+                      </p>
+                      <p className="mt-0.5 truncate text-xs text-[#667085]">
+                        {item.reason || new Date(item.created_at).toLocaleString("zh-CN")}
+                      </p>
+                    </div>
+                    <span
+                      className={`ml-3 font-semibold tabular-nums ${
+                        Number(item.amount) < 0 ? "text-[#b42318]" : "text-[#067647]"
+                      }`}
+                    >
+                      {Number(item.amount) > 0 ? "+" : ""}
+                      {money(Number(item.amount))}
+                    </span>
+                  </div>
+                ))}
+                {!cashLoading && (cashSummary?.items.length ?? 0) === 0 && (
+                  <div className="flex h-20 items-center justify-center rounded-xl bg-[#f9fafb] text-sm text-[#667085]">
+                    暂无钱箱变动
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -1679,53 +1819,6 @@ function PosPage() {
             {paying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             确认收款
           </Button>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={closeDialog} onOpenChange={setCloseDialog}>
-        <DialogContent className="max-w-md rounded-2xl">
-          <DialogHeader>
-            <DialogTitle>交班与现金对账</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-5 pt-2">
-            <div className="rounded-xl bg-[#f2f4f7] p-4 text-sm">
-              <div className="flex justify-between">
-                <span className="text-[#667085]">开班时间</span>
-                <span>
-                  {activeShift?.opened_at
-                    ? new Date(activeShift.opened_at).toLocaleString("zh-CN")
-                    : "—"}
-                </span>
-              </div>
-              <div className="mt-3 flex justify-between">
-                <span className="text-[#667085]">开班备用金</span>
-                <span className="font-semibold">
-                  {money(Number(activeShift?.opening_cash ?? 0))}
-                </span>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="counted-cash">实点现金</Label>
-              <Input
-                id="counted-cash"
-                type="number"
-                min="0"
-                step="0.01"
-                value={countedCash}
-                onChange={(event) => setCountedCash(event.target.value)}
-                className="h-12 rounded-xl text-lg font-semibold tabular-nums"
-              />
-              <p className="text-xs text-[#667085]">系统会计算应有现金和交班差异并永久记录。</p>
-            </div>
-            <Button
-              className="h-12 w-full rounded-xl bg-[#0a315d] hover:bg-[#08284c]"
-              disabled={closing}
-              onClick={() => void closeShift()}
-            >
-              {closing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              确认交班
-            </Button>
-          </div>
         </DialogContent>
       </Dialog>
 

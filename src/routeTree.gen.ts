@@ -116,6 +116,7 @@ import { Route as ApiPublicHooksYouzanSyncRouteImport } from './routes/api/publi
 import { Route as ApiPublicHooksYouzanSyncWorkerRouteImport } from './routes/api/public/hooks/youzan-sync-worker'
 import { Route as ApiPublicPosAuthorizationsRouteImport } from './routes/api/public/pos/authorizations'
 import { Route as ApiPublicPosBootstrapRouteImport } from './routes/api/public/pos/bootstrap'
+import { Route as ApiPublicPosCashMovementsRouteImport } from './routes/api/public/pos/cash-movements'
 import { Route as ApiPublicPosProductsRouteImport } from './routes/api/public/pos/products'
 import { Route as ApiPublicPosResolveCodeRouteImport } from './routes/api/public/pos/resolve-code'
 import { Route as ApiPublicPosSalesRouteImport } from './routes/api/public/pos/sales'
@@ -765,6 +766,12 @@ const ApiPublicPosBootstrapRoute = ApiPublicPosBootstrapRouteImport.update({
   path: '/api/public/pos/bootstrap',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicPosCashMovementsRoute =
+  ApiPublicPosCashMovementsRouteImport.update({
+    id: '/api/public/pos/cash-movements',
+    path: '/api/public/pos/cash-movements',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicPosProductsRoute = ApiPublicPosProductsRouteImport.update({
   id: '/api/public/pos/products',
   path: '/api/public/pos/products',
@@ -1349,6 +1356,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
   '/api/public/pos/authorizations': typeof ApiPublicPosAuthorizationsRoute
   '/api/public/pos/bootstrap': typeof ApiPublicPosBootstrapRoute
+  '/api/public/pos/cash-movements': typeof ApiPublicPosCashMovementsRoute
   '/api/public/pos/products': typeof ApiPublicPosProductsRouteWithChildren
   '/api/public/pos/resolve-code': typeof ApiPublicPosResolveCodeRoute
   '/api/public/pos/sales': typeof ApiPublicPosSalesRouteWithChildren
@@ -1532,6 +1540,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
   '/api/public/pos/authorizations': typeof ApiPublicPosAuthorizationsRoute
   '/api/public/pos/bootstrap': typeof ApiPublicPosBootstrapRoute
+  '/api/public/pos/cash-movements': typeof ApiPublicPosCashMovementsRoute
   '/api/public/pos/products': typeof ApiPublicPosProductsRouteWithChildren
   '/api/public/pos/resolve-code': typeof ApiPublicPosResolveCodeRoute
   '/api/public/pos/sales': typeof ApiPublicPosSalesRouteWithChildren
@@ -1723,6 +1732,7 @@ export interface FileRoutesById {
   '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
   '/api/public/pos/authorizations': typeof ApiPublicPosAuthorizationsRoute
   '/api/public/pos/bootstrap': typeof ApiPublicPosBootstrapRoute
+  '/api/public/pos/cash-movements': typeof ApiPublicPosCashMovementsRoute
   '/api/public/pos/products': typeof ApiPublicPosProductsRouteWithChildren
   '/api/public/pos/resolve-code': typeof ApiPublicPosResolveCodeRoute
   '/api/public/pos/sales': typeof ApiPublicPosSalesRouteWithChildren
@@ -1915,6 +1925,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-sync-worker'
     | '/api/public/pos/authorizations'
     | '/api/public/pos/bootstrap'
+    | '/api/public/pos/cash-movements'
     | '/api/public/pos/products'
     | '/api/public/pos/resolve-code'
     | '/api/public/pos/sales'
@@ -2098,6 +2109,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-sync-worker'
     | '/api/public/pos/authorizations'
     | '/api/public/pos/bootstrap'
+    | '/api/public/pos/cash-movements'
     | '/api/public/pos/products'
     | '/api/public/pos/resolve-code'
     | '/api/public/pos/sales'
@@ -2288,6 +2300,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-sync-worker'
     | '/api/public/pos/authorizations'
     | '/api/public/pos/bootstrap'
+    | '/api/public/pos/cash-movements'
     | '/api/public/pos/products'
     | '/api/public/pos/resolve-code'
     | '/api/public/pos/sales'
@@ -2437,6 +2450,7 @@ export interface RootRouteChildren {
   ApiPublicHooksYouzanSyncWorkerRoute: typeof ApiPublicHooksYouzanSyncWorkerRoute
   ApiPublicPosAuthorizationsRoute: typeof ApiPublicPosAuthorizationsRoute
   ApiPublicPosBootstrapRoute: typeof ApiPublicPosBootstrapRoute
+  ApiPublicPosCashMovementsRoute: typeof ApiPublicPosCashMovementsRoute
   ApiPublicPosProductsRoute: typeof ApiPublicPosProductsRouteWithChildren
   ApiPublicPosResolveCodeRoute: typeof ApiPublicPosResolveCodeRoute
   ApiPublicPosSalesRoute: typeof ApiPublicPosSalesRouteWithChildren
@@ -3239,6 +3253,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/pos/bootstrap'
       fullPath: '/api/public/pos/bootstrap'
       preLoaderRoute: typeof ApiPublicPosBootstrapRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/pos/cash-movements': {
+      id: '/api/public/pos/cash-movements'
+      path: '/api/public/pos/cash-movements'
+      fullPath: '/api/public/pos/cash-movements'
+      preLoaderRoute: typeof ApiPublicPosCashMovementsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/pos/products': {
@@ -4366,6 +4387,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksYouzanSyncWorkerRoute: ApiPublicHooksYouzanSyncWorkerRoute,
   ApiPublicPosAuthorizationsRoute: ApiPublicPosAuthorizationsRoute,
   ApiPublicPosBootstrapRoute: ApiPublicPosBootstrapRoute,
+  ApiPublicPosCashMovementsRoute: ApiPublicPosCashMovementsRoute,
   ApiPublicPosProductsRoute: ApiPublicPosProductsRouteWithChildren,
   ApiPublicPosResolveCodeRoute: ApiPublicPosResolveCodeRoute,
   ApiPublicPosSalesRoute: ApiPublicPosSalesRouteWithChildren,

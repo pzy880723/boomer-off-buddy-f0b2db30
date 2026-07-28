@@ -6,6 +6,10 @@ const migrationUrl = new URL(
   "../../../supabase/migrations/20260728120000_pos_member_discount_workflows.sql",
   import.meta.url,
 );
+const continuousCashMigrationUrl = new URL(
+  "../../../supabase/migrations/20260728070735_pos_continuous_cash_register.sql",
+  import.meta.url,
+);
 
 describe("POS member, discount, hold and return schema contract", () => {
   test("stores member benefits, discount authorization and held carts", () => {
@@ -35,6 +39,22 @@ describe("POS member, discount, hold and return schema contract", () => {
     assert.match(
       sql,
       /GRANT EXECUTE ON FUNCTION public\.pos_complete_sale_v2[\s\S]+TO service_role/,
+    );
+  });
+
+  test("records continuous cash drawer adjustments atomically", () => {
+    assert.equal(existsSync(continuousCashMigrationUrl), true);
+    const sql = readFileSync(continuousCashMigrationUrl, "utf8");
+    assert.match(sql, /CREATE OR REPLACE FUNCTION public\.pos_record_cash_adjustment/);
+    assert.match(sql, /FOR UPDATE/);
+    assert.match(sql, /insufficient_drawer_balance/);
+    assert.match(
+      sql,
+      /REVOKE ALL ON FUNCTION public\.pos_record_cash_adjustment[\s\S]+FROM PUBLIC/,
+    );
+    assert.match(
+      sql,
+      /GRANT EXECUTE ON FUNCTION public\.pos_record_cash_adjustment[\s\S]+TO service_role/,
     );
   });
 });

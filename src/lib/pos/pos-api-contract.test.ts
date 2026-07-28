@@ -22,6 +22,7 @@ describe("POS API contract", () => {
     "orders.$id.returns.preview.ts",
     "orders.$id.returns.ts",
     "shifts.open.ts",
+    "cash-movements.ts",
     "sales.ts",
     "sales.$id.receipt.ts",
     "shifts.$id.close.ts",

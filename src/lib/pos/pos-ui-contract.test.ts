@@ -9,10 +9,13 @@ describe("POS UI contract", () => {
     const routeUrl = new URL("pos.tsx", routesRoot);
     assert.equal(existsSync(routeUrl), true);
     const source = readFileSync(routeUrl, "utf8");
-    for (const capability of ["开班", "扫码", "商品浏览", "购物车", "收款", "打印小票", "交班"]) {
+    for (const capability of ["扫码", "商品浏览", "购物车", "收款", "打印小票", "钱箱"]) {
       assert.match(source, new RegExp(capability));
     }
+    assert.doesNotMatch(source, /开班备用金|确认开班|确认交班/);
     assert.match(source, /\/api\/public\/pos\/bootstrap/);
+    assert.match(source, /\/api\/public\/pos\/shifts\/open/);
+    assert.match(source, /\/api\/public\/pos\/cash-movements/);
     assert.match(source, /\/api\/public\/pos\/products\?/);
     assert.match(source, /\/api\/public\/pos\/products\/lookup/);
     assert.match(source, /\/api\/public\/pos\/sales/);
