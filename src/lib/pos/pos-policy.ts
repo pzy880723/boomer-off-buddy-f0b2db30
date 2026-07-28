@@ -18,6 +18,20 @@ export type PosTender = {
   provider_transaction_id?: string;
 };
 
+export type PosDiscountType = "amount" | "percentage" | "final_price";
+
+export type PosDiscountInput = {
+  type: PosDiscountType;
+  value: number;
+};
+
+export type PosDiscountLine = {
+  sku_id: string;
+  quantity: number;
+  unit_price: number;
+  discount_eligible: boolean;
+};
+
 export function addScannedProduct(
   cart: PosCartLine[],
   product: PosScannableProduct,
@@ -38,6 +52,51 @@ export function addScannedProduct(
 
 function cents(value: number): number {
   return Math.round(value * 100);
+}
+
+export function calculatePosDiscount(lines: PosDiscountLine[], discount: PosDiscountInput) {
+  if (lines.length === 0) throw new Error("discount requires at least one item");
+  if (!Number.isFinite(discount.value) || discount.value < 0) {
+    throw new Error("discount value is invalid");
+  }
+
+  const subtotalCents = lines.reduce(
+    (sum, line) => sum + cents(line.unit_price) * line.quantity,
+    0,
+  );
+  const eligibleCents = lines.reduce(
+    (sum, line) => (line.discount_eligible ? sum + cents(line.unit_price) * line.quantity : sum),
+    0,
+  );
+  const excludedCents = subtotalCents - eligibleCents;
+  let discountCents = 0;
+
+  if (discount.type === "amount") {
+    discountCents = cents(discount.value);
+  } else if (discount.type === "percentage") {
+    if (discount.value < 0 || discount.value > 100) {
+      throw new Error("percentage discount is invalid");
+    }
+    discountCents = Math.round(eligibleCents * (1 - discount.value / 100));
+  } else {
+    const finalCents = cents(discount.value);
+    if (finalCents < excludedCents || finalCents > subtotalCents) {
+      throw new Error("final price exceeds eligible discount range");
+    }
+    discountCents = subtotalCents - finalCents;
+  }
+
+  if (discountCents > eligibleCents) {
+    throw new Error("discount exceeds eligible amount");
+  }
+
+  return {
+    subtotal: subtotalCents / 100,
+    eligible_total: eligibleCents / 100,
+    excluded_total: excludedCents / 100,
+    discount_total: discountCents / 100,
+    payable_total: (subtotalCents - discountCents) / 100,
+  };
 }
 
 export function validatePosTenders(total: number, tenders: PosTender[]): PosTender[] {

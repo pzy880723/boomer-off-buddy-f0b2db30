@@ -19,7 +19,7 @@ describe("storefront payment contract", () => {
       new URL("../../server/storefront-payment.server.ts", import.meta.url),
       "utf8",
     );
-    assert.match(createSource, /authenticateStorefrontUser/);
+    assert.match(createSource, /authenticateStorefrontCustomer/);
     assert.match(createSource, /idempotency-key/i);
     assert.match(createSource, /payment_payload/);
     assert.match(createSource, /replayed: true/);

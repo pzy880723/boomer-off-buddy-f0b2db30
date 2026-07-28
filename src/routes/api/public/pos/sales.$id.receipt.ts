@@ -9,7 +9,9 @@ export const Route = createFileRoute("/api/public/pos/sales/$id/receipt")({
       GET: async ({ request, params }) => {
         const { data: order, error: orderError } = await supabaseAdmin
           .from("commerce_orders" as never)
-          .select("id,order_no,sale_location_id,total_amount,paid_at,completed_at,source_channel")
+          .select(
+            "id,order_no,sale_location_id,subtotal,discount_total,total_amount,customer_id,paid_at,completed_at,source_channel",
+          )
           .eq("id", params.id)
           .eq("source_channel", "pos")
           .maybeSingle();
@@ -20,36 +22,51 @@ export const Route = createFileRoute("/api/public/pos/sales/$id/receipt")({
           order_no: string;
           sale_location_id: string;
           total_amount: number;
+          subtotal: number;
+          discount_total: number;
+          customer_id: string | null;
           paid_at: string;
           completed_at: string;
         };
         const auth = await authenticatePosUser(request, orderRow.sale_location_id);
         if (!auth.ok) return auth.response;
 
-        const [receiptResult, itemsResult, paymentsResult, locationResult] = await Promise.all([
-          supabaseAdmin
-            .from("pos_receipts" as never)
-            .select("receipt_no,print_count,created_at")
-            .eq("order_id", params.id)
-            .single(),
-          supabaseAdmin
-            .from("commerce_order_items" as never)
-            .select("sku_id,title_snapshot,unit_price,quantity,line_total")
-            .eq("order_id", params.id)
-            .order("created_at", { ascending: true }),
-          supabaseAdmin
-            .from("commerce_payments" as never)
-            .select("provider,amount,provider_transaction_id")
-            .eq("order_id", params.id)
-            .eq("status", "succeeded"),
-          supabaseAdmin
-            .from("inv_locations")
-            .select("id,name")
-            .eq("id", orderRow.sale_location_id)
-            .single(),
-        ]);
+        const [receiptResult, itemsResult, paymentsResult, locationResult, customerResult] =
+          await Promise.all([
+            supabaseAdmin
+              .from("pos_receipts" as never)
+              .select("receipt_no,print_count,created_at")
+              .eq("order_id", params.id)
+              .single(),
+            supabaseAdmin
+              .from("commerce_order_items" as never)
+              .select("sku_id,title_snapshot,unit_price,quantity,line_total,discount_total")
+              .eq("order_id", params.id)
+              .order("created_at", { ascending: true }),
+            supabaseAdmin
+              .from("commerce_payments" as never)
+              .select("provider,amount,provider_transaction_id")
+              .eq("order_id", params.id)
+              .eq("status", "succeeded"),
+            supabaseAdmin
+              .from("inv_locations")
+              .select("id,name")
+              .eq("id", orderRow.sale_location_id)
+              .single(),
+            orderRow.customer_id
+              ? supabaseAdmin
+                  .from("commerce_customers" as never)
+                  .select("id,phone,nickname")
+                  .eq("id", orderRow.customer_id)
+                  .maybeSingle()
+              : Promise.resolve({ data: null, error: null }),
+          ]);
         const firstError =
-          receiptResult.error || itemsResult.error || paymentsResult.error || locationResult.error;
+          receiptResult.error ||
+          itemsResult.error ||
+          paymentsResult.error ||
+          locationResult.error ||
+          customerResult.error;
         if (firstError) return posError(firstError.message, 500);
 
         return posJson({
@@ -59,7 +76,10 @@ export const Route = createFileRoute("/api/public/pos/sales/$id/receipt")({
             order_no: orderRow.order_no,
             receipt_no: (receiptResult.data as unknown as { receipt_no: string }).receipt_no,
             location_name: (locationResult.data as unknown as { name: string }).name,
+            subtotal: Number(orderRow.subtotal),
+            discount_total: Number(orderRow.discount_total),
             total_amount: Number(orderRow.total_amount),
+            customer: customerResult.data,
             paid_at: orderRow.paid_at ?? orderRow.completed_at,
             items: itemsResult.data ?? [],
             payments: paymentsResult.data ?? [],

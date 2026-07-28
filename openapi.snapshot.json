@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Boomer Off — Public API",
-    "version": "1.9.0",
-    "description": "本文档覆盖：\n\n- `/api/public/handheld/*`：ERP 手持终端接口。\n- `/api/public/storefront/*`：自营商城商品、分类和订单接口。\n\n## 手持终端鉴权\n手持终端业务请求带：\n\n```\nX-Device-Token: <设备 token>\nX-Session-Token: <操作员 session token>\n```\n\n## 商城鉴权\n\n- 商品和分类接口公开读取。\n- 订单接口使用 `Authorization: Bearer <Supabase access token>`。\n- 创建订单和支付还必须带 `Idempotency-Key`。\n\n## 统一响应\n\n```json\n{ \"ok\": true, \"data\": { ... } }\n{ \"ok\": false, \"error\": \"...\", \"...\": \"...\" }\n```\n\n## 字段同步约定\n\n服务端的 Zod schema 是唯一真源（`src/lib/handheld/schemas.ts`）。\n本文档 + APP 端 SDK 都从它生成。改字段流程：\n\n1. 改 `schemas.ts`\n2. 运行 `bun run sdk:gen` 生成新的 `openapi.snapshot.json` 和 TS 类型\n3. APP 端拉取 `/api/public/handheld/openapi.json` 重新生成本地 SDK"
+    "version": "1.10.0",
+    "description": "本文档覆盖：\n\n- `/api/public/handheld/*`：ERP 手持终端接口。\n- `/api/public/storefront/*`：自营商城商品、分类和订单接口。\n\n## 手持终端鉴权\n手持终端业务请求带：\n\n```\nX-Device-Token: <设备 token>\nX-Session-Token: <操作员 session token>\n```\n\n## 商城鉴权\n\n- 商品和分类接口公开读取。\n- 订单接口使用 `Authorization: Bearer <腾讯云消费者 JWT>`。\n- 消费者 JWT 由独立身份服务签发，ERP 通过 JWKS 验签，不复用 ERP 员工账号。\n- 创建订单和支付还必须带 `Idempotency-Key`。\n\n## 统一响应\n\n```json\n{ \"ok\": true, \"data\": { ... } }\n{ \"ok\": false, \"error\": \"...\", \"...\": \"...\" }\n```\n\n## 字段同步约定\n\n服务端的 Zod schema 是唯一真源（`src/lib/handheld/schemas.ts`）。\n本文档 + APP 端 SDK 都从它生成。改字段流程：\n\n1. 改 `schemas.ts`\n2. 运行 `bun run sdk:gen` 生成新的 `openapi.snapshot.json` 和 TS 类型\n3. APP 端拉取 `/api/public/handheld/openapi.json` 重新生成本地 SDK"
   },
   "servers": [
     {
@@ -14844,7 +14844,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "消费者商城 Supabase access token。"
+        "description": "腾讯云消费者身份服务签发的 RS256 JWT。ERP 使用 CONSUMER_AUTH_JWKS_URL 验签。"
       }
     }
   }

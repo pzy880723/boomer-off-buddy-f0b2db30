@@ -22,6 +22,15 @@ const SaleBody = z.object({
     .max(5),
   customer_id: z.string().uuid().optional(),
   note: z.string().trim().max(500).optional(),
+  discount: z
+    .object({
+      type: z.enum(["amount", "percentage", "final_price"]),
+      value: z.number().nonnegative(),
+      reason: z.string().trim().min(2).max(200),
+    })
+    .optional(),
+  benefit_snapshot: z.record(z.string(), z.unknown()).optional(),
+  authorization_id: z.string().uuid().optional(),
 });
 
 export const Route = createFileRoute("/api/public/pos/sales")({
@@ -55,7 +64,7 @@ export const Route = createFileRoute("/api/public/pos/sales")({
           return posError("不能使用其他员工的班次", 403, "shift_forbidden");
         }
         const { data, error } = await supabaseAdmin.rpc(
-          "pos_complete_sale" as never,
+          "pos_complete_sale_v2" as never,
           {
             p_shift_id: body.shift_id,
             p_operator_id: auth.user.id,
@@ -64,6 +73,9 @@ export const Route = createFileRoute("/api/public/pos/sales")({
             p_tenders: body.tenders,
             p_customer_id: body.customer_id ?? null,
             p_note: body.note ?? null,
+            p_discount_snapshot: body.discount ?? {},
+            p_benefit_snapshot: body.benefit_snapshot ?? {},
+            p_authorization_id: body.authorization_id ?? null,
           } as never,
         );
         if (error) {

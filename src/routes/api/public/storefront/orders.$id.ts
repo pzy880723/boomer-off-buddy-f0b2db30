@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   STOREFRONT_CORS,
-  authenticateStorefrontUser,
+  authenticateStorefrontCustomer,
   storefrontError,
   storefrontJson,
 } from "@/server/storefront-auth.server";
@@ -12,7 +12,7 @@ export const Route = createFileRoute("/api/public/storefront/orders/$id")({
     handlers: {
       OPTIONS: async () => new Response(null, { status: 204, headers: STOREFRONT_CORS }),
       GET: async ({ request, params }) => {
-        const auth = await authenticateStorefrontUser(request);
+        const auth = await authenticateStorefrontCustomer(request);
         if (!auth.ok) return auth.response;
         const { data, error } = await supabaseAdmin
           .from("commerce_orders" as never)
@@ -20,7 +20,7 @@ export const Route = createFileRoute("/api/public/storefront/orders/$id")({
             "*, items:commerce_order_items(*), fulfillments(*, shipment:shipments(*, events:shipment_events(*)))",
           )
           .eq("id", params.id)
-          .eq("user_id", auth.user.id)
+          .eq("customer_id", auth.customer.id)
           .maybeSingle();
         if (error) return storefrontError(error.message, 500);
         if (!data) return storefrontError("Order not found", 404);

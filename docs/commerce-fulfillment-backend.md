@@ -27,9 +27,12 @@ supabase/migrations/20260713090000_commerce_fulfillment_core.sql
 | ---- | --------------- | ---------------------------------------------------------- |
 | GET  | `/products`     | 已发布商品列表，支持 `category`、`location_id`、`q`、分页  |
 | GET  | `/products/:id` | 商品详情                                                   |
-| GET  | `/orders`       | 当前用户订单列表，需要 Supabase Bearer Token               |
+| GET  | `/orders`       | 当前用户订单列表，需要腾讯云消费者 Bearer JWT              |
 | POST | `/orders`       | 创建订单并预留库存，需要 Bearer Token 和 `Idempotency-Key` |
 | GET  | `/orders/:id`   | 当前用户订单详情、履约和物流信息                           |
+
+消费者账号与 ERP 员工账号分离，完整约定见
+[`consumer-auth-tencent.md`](./consumer-auth-tencent.md)。
 
 创建订单的 `courier_service_code` 当前支持：
 

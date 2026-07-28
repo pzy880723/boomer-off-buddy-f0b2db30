@@ -114,8 +114,10 @@ import { Route as ApiPublicHooksYouzanRelistRouteImport } from './routes/api/pub
 import { Route as ApiPublicHooksYouzanStockWorkerRouteImport } from './routes/api/public/hooks/youzan-stock-worker'
 import { Route as ApiPublicHooksYouzanSyncRouteImport } from './routes/api/public/hooks/youzan-sync'
 import { Route as ApiPublicHooksYouzanSyncWorkerRouteImport } from './routes/api/public/hooks/youzan-sync-worker'
+import { Route as ApiPublicPosAuthorizationsRouteImport } from './routes/api/public/pos/authorizations'
 import { Route as ApiPublicPosBootstrapRouteImport } from './routes/api/public/pos/bootstrap'
 import { Route as ApiPublicPosProductsRouteImport } from './routes/api/public/pos/products'
+import { Route as ApiPublicPosResolveCodeRouteImport } from './routes/api/public/pos/resolve-code'
 import { Route as ApiPublicPosSalesRouteImport } from './routes/api/public/pos/sales'
 import { Route as ApiPublicSsoAigcExchangeRouteImport } from './routes/api/public/sso/aigc-exchange'
 import { Route as ApiPublicSsoAigcTicketRouteImport } from './routes/api/public/sso/aigc-ticket'
@@ -163,6 +165,12 @@ import { Route as ApiPublicHandheldTransferReceiveScanRouteImport } from './rout
 import { Route as ApiPublicHandheldTransferShipConfirmRouteImport } from './routes/api/public/handheld/transfer.ship-confirm'
 import { Route as ApiPublicHandheldTransferShipScanRouteImport } from './routes/api/public/handheld/transfer.ship-scan'
 import { Route as ApiPublicHandheldTransfersIdRouteImport } from './routes/api/public/handheld/transfers.$id'
+import { Route as ApiPublicPosCartsIdRouteImport } from './routes/api/public/pos/carts.$id'
+import { Route as ApiPublicPosCartsHeldRouteImport } from './routes/api/public/pos/carts.held'
+import { Route as ApiPublicPosCartsHoldRouteImport } from './routes/api/public/pos/carts.hold'
+import { Route as ApiPublicPosCustomersSearchRouteImport } from './routes/api/public/pos/customers.search'
+import { Route as ApiPublicPosDiscountsPreviewRouteImport } from './routes/api/public/pos/discounts.preview'
+import { Route as ApiPublicPosOrdersSearchRouteImport } from './routes/api/public/pos/orders.search'
 import { Route as ApiPublicPosProductsLookupRouteImport } from './routes/api/public/pos/products.lookup'
 import { Route as ApiPublicPosShiftsOpenRouteImport } from './routes/api/public/pos/shifts.open'
 import { Route as ApiPublicStorefrontOrdersIdRouteImport } from './routes/api/public/storefront/orders.$id'
@@ -179,10 +187,14 @@ import { Route as ApiPublicHandheldItemsUploadImageMultipartRouteImport } from '
 import { Route as ApiPublicHandheldLabelTemplatesIdSetDefaultRouteImport } from './routes/api/public/handheld/label-templates.$id.set-default'
 import { Route as ApiPublicHandheldTransfersIdConfirmRouteImport } from './routes/api/public/handheld/transfers.$id.confirm'
 import { Route as ApiPublicHandheldTransfersIdScanRouteImport } from './routes/api/public/handheld/transfers.$id.scan'
+import { Route as ApiPublicPosCartsIdResumeRouteImport } from './routes/api/public/pos/carts.$id.resume'
+import { Route as ApiPublicPosCustomersIdBenefitsRouteImport } from './routes/api/public/pos/customers.$id.benefits'
+import { Route as ApiPublicPosOrdersIdReturnsRouteImport } from './routes/api/public/pos/orders.$id.returns'
 import { Route as ApiPublicPosSalesIdReceiptRouteImport } from './routes/api/public/pos/sales.$id.receipt'
 import { Route as ApiPublicPosShiftsIdCloseRouteImport } from './routes/api/public/pos/shifts.$id.close'
 import { Route as ApiPublicStorefrontPaymentsCallbackProviderRouteImport } from './routes/api/public/storefront/payments.callback.$provider'
 import { Route as ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteImport } from './routes/api/public/handheld/parcels.items.$itemId.pack-pieces'
+import { Route as ApiPublicPosOrdersIdReturnsPreviewRouteImport } from './routes/api/public/pos/orders.$id.returns.preview'
 import { Route as ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateImageRouteImport } from './routes/api/public/handheld/parcels.items.$itemId.pack-pieces.estimate-image'
 import { Route as ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRouteImport } from './routes/api/public/handheld/parcels.items.$itemId.pack-pieces.estimate-title'
 
@@ -742,6 +754,12 @@ const ApiPublicHooksYouzanSyncWorkerRoute =
     path: '/api/public/hooks/youzan-sync-worker',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicPosAuthorizationsRoute =
+  ApiPublicPosAuthorizationsRouteImport.update({
+    id: '/api/public/pos/authorizations',
+    path: '/api/public/pos/authorizations',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicPosBootstrapRoute = ApiPublicPosBootstrapRouteImport.update({
   id: '/api/public/pos/bootstrap',
   path: '/api/public/pos/bootstrap',
@@ -750,6 +768,11 @@ const ApiPublicPosBootstrapRoute = ApiPublicPosBootstrapRouteImport.update({
 const ApiPublicPosProductsRoute = ApiPublicPosProductsRouteImport.update({
   id: '/api/public/pos/products',
   path: '/api/public/pos/products',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicPosResolveCodeRoute = ApiPublicPosResolveCodeRouteImport.update({
+  id: '/api/public/pos/resolve-code',
+  path: '/api/public/pos/resolve-code',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicPosSalesRoute = ApiPublicPosSalesRouteImport.update({
@@ -1029,6 +1052,39 @@ const ApiPublicHandheldTransfersIdRoute =
     path: '/$id',
     getParentRoute: () => ApiPublicHandheldTransfersRoute,
   } as any)
+const ApiPublicPosCartsIdRoute = ApiPublicPosCartsIdRouteImport.update({
+  id: '/api/public/pos/carts/$id',
+  path: '/api/public/pos/carts/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicPosCartsHeldRoute = ApiPublicPosCartsHeldRouteImport.update({
+  id: '/api/public/pos/carts/held',
+  path: '/api/public/pos/carts/held',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicPosCartsHoldRoute = ApiPublicPosCartsHoldRouteImport.update({
+  id: '/api/public/pos/carts/hold',
+  path: '/api/public/pos/carts/hold',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicPosCustomersSearchRoute =
+  ApiPublicPosCustomersSearchRouteImport.update({
+    id: '/api/public/pos/customers/search',
+    path: '/api/public/pos/customers/search',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicPosDiscountsPreviewRoute =
+  ApiPublicPosDiscountsPreviewRouteImport.update({
+    id: '/api/public/pos/discounts/preview',
+    path: '/api/public/pos/discounts/preview',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicPosOrdersSearchRoute =
+  ApiPublicPosOrdersSearchRouteImport.update({
+    id: '/api/public/pos/orders/search',
+    path: '/api/public/pos/orders/search',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicPosProductsLookupRoute =
   ApiPublicPosProductsLookupRouteImport.update({
     id: '/lookup',
@@ -1124,6 +1180,24 @@ const ApiPublicHandheldTransfersIdScanRoute =
     path: '/scan',
     getParentRoute: () => ApiPublicHandheldTransfersIdRoute,
   } as any)
+const ApiPublicPosCartsIdResumeRoute =
+  ApiPublicPosCartsIdResumeRouteImport.update({
+    id: '/resume',
+    path: '/resume',
+    getParentRoute: () => ApiPublicPosCartsIdRoute,
+  } as any)
+const ApiPublicPosCustomersIdBenefitsRoute =
+  ApiPublicPosCustomersIdBenefitsRouteImport.update({
+    id: '/api/public/pos/customers/$id/benefits',
+    path: '/api/public/pos/customers/$id/benefits',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicPosOrdersIdReturnsRoute =
+  ApiPublicPosOrdersIdReturnsRouteImport.update({
+    id: '/api/public/pos/orders/$id/returns',
+    path: '/api/public/pos/orders/$id/returns',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicPosSalesIdReceiptRoute =
   ApiPublicPosSalesIdReceiptRouteImport.update({
     id: '/$id/receipt',
@@ -1147,6 +1221,12 @@ const ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute =
     id: '/items/$itemId/pack-pieces',
     path: '/items/$itemId/pack-pieces',
     getParentRoute: () => ApiPublicHandheldParcelsRoute,
+  } as any)
+const ApiPublicPosOrdersIdReturnsPreviewRoute =
+  ApiPublicPosOrdersIdReturnsPreviewRouteImport.update({
+    id: '/preview',
+    path: '/preview',
+    getParentRoute: () => ApiPublicPosOrdersIdReturnsRoute,
   } as any)
 const ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateImageRoute =
   ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateImageRouteImport.update({
@@ -1267,8 +1347,10 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
   '/api/public/hooks/youzan-sync': typeof ApiPublicHooksYouzanSyncRoute
   '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
+  '/api/public/pos/authorizations': typeof ApiPublicPosAuthorizationsRoute
   '/api/public/pos/bootstrap': typeof ApiPublicPosBootstrapRoute
   '/api/public/pos/products': typeof ApiPublicPosProductsRouteWithChildren
+  '/api/public/pos/resolve-code': typeof ApiPublicPosResolveCodeRoute
   '/api/public/pos/sales': typeof ApiPublicPosSalesRouteWithChildren
   '/api/public/sso/aigc-exchange': typeof ApiPublicSsoAigcExchangeRoute
   '/api/public/sso/aigc-ticket': typeof ApiPublicSsoAigcTicketRoute
@@ -1316,6 +1398,12 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/transfer/ship-confirm': typeof ApiPublicHandheldTransferShipConfirmRoute
   '/api/public/handheld/transfer/ship-scan': typeof ApiPublicHandheldTransferShipScanRoute
   '/api/public/handheld/transfers/$id': typeof ApiPublicHandheldTransfersIdRouteWithChildren
+  '/api/public/pos/carts/$id': typeof ApiPublicPosCartsIdRouteWithChildren
+  '/api/public/pos/carts/held': typeof ApiPublicPosCartsHeldRoute
+  '/api/public/pos/carts/hold': typeof ApiPublicPosCartsHoldRoute
+  '/api/public/pos/customers/search': typeof ApiPublicPosCustomersSearchRoute
+  '/api/public/pos/discounts/preview': typeof ApiPublicPosDiscountsPreviewRoute
+  '/api/public/pos/orders/search': typeof ApiPublicPosOrdersSearchRoute
   '/api/public/pos/products/lookup': typeof ApiPublicPosProductsLookupRoute
   '/api/public/pos/shifts/open': typeof ApiPublicPosShiftsOpenRoute
   '/api/public/storefront/orders/$id': typeof ApiPublicStorefrontOrdersIdRoute
@@ -1332,10 +1420,14 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/label-templates/$id/set-default': typeof ApiPublicHandheldLabelTemplatesIdSetDefaultRoute
   '/api/public/handheld/transfers/$id/confirm': typeof ApiPublicHandheldTransfersIdConfirmRoute
   '/api/public/handheld/transfers/$id/scan': typeof ApiPublicHandheldTransfersIdScanRoute
+  '/api/public/pos/carts/$id/resume': typeof ApiPublicPosCartsIdResumeRoute
+  '/api/public/pos/customers/$id/benefits': typeof ApiPublicPosCustomersIdBenefitsRoute
+  '/api/public/pos/orders/$id/returns': typeof ApiPublicPosOrdersIdReturnsRouteWithChildren
   '/api/public/pos/sales/$id/receipt': typeof ApiPublicPosSalesIdReceiptRoute
   '/api/public/pos/shifts/$id/close': typeof ApiPublicPosShiftsIdCloseRoute
   '/api/public/storefront/payments/callback/$provider': typeof ApiPublicStorefrontPaymentsCallbackProviderRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteWithChildren
+  '/api/public/pos/orders/$id/returns/preview': typeof ApiPublicPosOrdersIdReturnsPreviewRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-image': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateImageRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-title': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRoute
 }
@@ -1438,8 +1530,10 @@ export interface FileRoutesByTo {
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
   '/api/public/hooks/youzan-sync': typeof ApiPublicHooksYouzanSyncRoute
   '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
+  '/api/public/pos/authorizations': typeof ApiPublicPosAuthorizationsRoute
   '/api/public/pos/bootstrap': typeof ApiPublicPosBootstrapRoute
   '/api/public/pos/products': typeof ApiPublicPosProductsRouteWithChildren
+  '/api/public/pos/resolve-code': typeof ApiPublicPosResolveCodeRoute
   '/api/public/pos/sales': typeof ApiPublicPosSalesRouteWithChildren
   '/api/public/sso/aigc-exchange': typeof ApiPublicSsoAigcExchangeRoute
   '/api/public/sso/aigc-ticket': typeof ApiPublicSsoAigcTicketRoute
@@ -1487,6 +1581,12 @@ export interface FileRoutesByTo {
   '/api/public/handheld/transfer/ship-confirm': typeof ApiPublicHandheldTransferShipConfirmRoute
   '/api/public/handheld/transfer/ship-scan': typeof ApiPublicHandheldTransferShipScanRoute
   '/api/public/handheld/transfers/$id': typeof ApiPublicHandheldTransfersIdRouteWithChildren
+  '/api/public/pos/carts/$id': typeof ApiPublicPosCartsIdRouteWithChildren
+  '/api/public/pos/carts/held': typeof ApiPublicPosCartsHeldRoute
+  '/api/public/pos/carts/hold': typeof ApiPublicPosCartsHoldRoute
+  '/api/public/pos/customers/search': typeof ApiPublicPosCustomersSearchRoute
+  '/api/public/pos/discounts/preview': typeof ApiPublicPosDiscountsPreviewRoute
+  '/api/public/pos/orders/search': typeof ApiPublicPosOrdersSearchRoute
   '/api/public/pos/products/lookup': typeof ApiPublicPosProductsLookupRoute
   '/api/public/pos/shifts/open': typeof ApiPublicPosShiftsOpenRoute
   '/api/public/storefront/orders/$id': typeof ApiPublicStorefrontOrdersIdRoute
@@ -1503,10 +1603,14 @@ export interface FileRoutesByTo {
   '/api/public/handheld/label-templates/$id/set-default': typeof ApiPublicHandheldLabelTemplatesIdSetDefaultRoute
   '/api/public/handheld/transfers/$id/confirm': typeof ApiPublicHandheldTransfersIdConfirmRoute
   '/api/public/handheld/transfers/$id/scan': typeof ApiPublicHandheldTransfersIdScanRoute
+  '/api/public/pos/carts/$id/resume': typeof ApiPublicPosCartsIdResumeRoute
+  '/api/public/pos/customers/$id/benefits': typeof ApiPublicPosCustomersIdBenefitsRoute
+  '/api/public/pos/orders/$id/returns': typeof ApiPublicPosOrdersIdReturnsRouteWithChildren
   '/api/public/pos/sales/$id/receipt': typeof ApiPublicPosSalesIdReceiptRoute
   '/api/public/pos/shifts/$id/close': typeof ApiPublicPosShiftsIdCloseRoute
   '/api/public/storefront/payments/callback/$provider': typeof ApiPublicStorefrontPaymentsCallbackProviderRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteWithChildren
+  '/api/public/pos/orders/$id/returns/preview': typeof ApiPublicPosOrdersIdReturnsPreviewRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-image': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateImageRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-title': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRoute
 }
@@ -1617,8 +1721,10 @@ export interface FileRoutesById {
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
   '/api/public/hooks/youzan-sync': typeof ApiPublicHooksYouzanSyncRoute
   '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
+  '/api/public/pos/authorizations': typeof ApiPublicPosAuthorizationsRoute
   '/api/public/pos/bootstrap': typeof ApiPublicPosBootstrapRoute
   '/api/public/pos/products': typeof ApiPublicPosProductsRouteWithChildren
+  '/api/public/pos/resolve-code': typeof ApiPublicPosResolveCodeRoute
   '/api/public/pos/sales': typeof ApiPublicPosSalesRouteWithChildren
   '/api/public/sso/aigc-exchange': typeof ApiPublicSsoAigcExchangeRoute
   '/api/public/sso/aigc-ticket': typeof ApiPublicSsoAigcTicketRoute
@@ -1666,6 +1772,12 @@ export interface FileRoutesById {
   '/api/public/handheld/transfer/ship-confirm': typeof ApiPublicHandheldTransferShipConfirmRoute
   '/api/public/handheld/transfer/ship-scan': typeof ApiPublicHandheldTransferShipScanRoute
   '/api/public/handheld/transfers/$id': typeof ApiPublicHandheldTransfersIdRouteWithChildren
+  '/api/public/pos/carts/$id': typeof ApiPublicPosCartsIdRouteWithChildren
+  '/api/public/pos/carts/held': typeof ApiPublicPosCartsHeldRoute
+  '/api/public/pos/carts/hold': typeof ApiPublicPosCartsHoldRoute
+  '/api/public/pos/customers/search': typeof ApiPublicPosCustomersSearchRoute
+  '/api/public/pos/discounts/preview': typeof ApiPublicPosDiscountsPreviewRoute
+  '/api/public/pos/orders/search': typeof ApiPublicPosOrdersSearchRoute
   '/api/public/pos/products/lookup': typeof ApiPublicPosProductsLookupRoute
   '/api/public/pos/shifts/open': typeof ApiPublicPosShiftsOpenRoute
   '/api/public/storefront/orders/$id': typeof ApiPublicStorefrontOrdersIdRoute
@@ -1682,10 +1794,14 @@ export interface FileRoutesById {
   '/api/public/handheld/label-templates/$id/set-default': typeof ApiPublicHandheldLabelTemplatesIdSetDefaultRoute
   '/api/public/handheld/transfers/$id/confirm': typeof ApiPublicHandheldTransfersIdConfirmRoute
   '/api/public/handheld/transfers/$id/scan': typeof ApiPublicHandheldTransfersIdScanRoute
+  '/api/public/pos/carts/$id/resume': typeof ApiPublicPosCartsIdResumeRoute
+  '/api/public/pos/customers/$id/benefits': typeof ApiPublicPosCustomersIdBenefitsRoute
+  '/api/public/pos/orders/$id/returns': typeof ApiPublicPosOrdersIdReturnsRouteWithChildren
   '/api/public/pos/sales/$id/receipt': typeof ApiPublicPosSalesIdReceiptRoute
   '/api/public/pos/shifts/$id/close': typeof ApiPublicPosShiftsIdCloseRoute
   '/api/public/storefront/payments/callback/$provider': typeof ApiPublicStorefrontPaymentsCallbackProviderRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteWithChildren
+  '/api/public/pos/orders/$id/returns/preview': typeof ApiPublicPosOrdersIdReturnsPreviewRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-image': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateImageRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-title': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRoute
 }
@@ -1797,8 +1913,10 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-stock-worker'
     | '/api/public/hooks/youzan-sync'
     | '/api/public/hooks/youzan-sync-worker'
+    | '/api/public/pos/authorizations'
     | '/api/public/pos/bootstrap'
     | '/api/public/pos/products'
+    | '/api/public/pos/resolve-code'
     | '/api/public/pos/sales'
     | '/api/public/sso/aigc-exchange'
     | '/api/public/sso/aigc-ticket'
@@ -1846,6 +1964,12 @@ export interface FileRouteTypes {
     | '/api/public/handheld/transfer/ship-confirm'
     | '/api/public/handheld/transfer/ship-scan'
     | '/api/public/handheld/transfers/$id'
+    | '/api/public/pos/carts/$id'
+    | '/api/public/pos/carts/held'
+    | '/api/public/pos/carts/hold'
+    | '/api/public/pos/customers/search'
+    | '/api/public/pos/discounts/preview'
+    | '/api/public/pos/orders/search'
     | '/api/public/pos/products/lookup'
     | '/api/public/pos/shifts/open'
     | '/api/public/storefront/orders/$id'
@@ -1862,10 +1986,14 @@ export interface FileRouteTypes {
     | '/api/public/handheld/label-templates/$id/set-default'
     | '/api/public/handheld/transfers/$id/confirm'
     | '/api/public/handheld/transfers/$id/scan'
+    | '/api/public/pos/carts/$id/resume'
+    | '/api/public/pos/customers/$id/benefits'
+    | '/api/public/pos/orders/$id/returns'
     | '/api/public/pos/sales/$id/receipt'
     | '/api/public/pos/shifts/$id/close'
     | '/api/public/storefront/payments/callback/$provider'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces'
+    | '/api/public/pos/orders/$id/returns/preview'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-image'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-title'
   fileRoutesByTo: FileRoutesByTo
@@ -1968,8 +2096,10 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-stock-worker'
     | '/api/public/hooks/youzan-sync'
     | '/api/public/hooks/youzan-sync-worker'
+    | '/api/public/pos/authorizations'
     | '/api/public/pos/bootstrap'
     | '/api/public/pos/products'
+    | '/api/public/pos/resolve-code'
     | '/api/public/pos/sales'
     | '/api/public/sso/aigc-exchange'
     | '/api/public/sso/aigc-ticket'
@@ -2017,6 +2147,12 @@ export interface FileRouteTypes {
     | '/api/public/handheld/transfer/ship-confirm'
     | '/api/public/handheld/transfer/ship-scan'
     | '/api/public/handheld/transfers/$id'
+    | '/api/public/pos/carts/$id'
+    | '/api/public/pos/carts/held'
+    | '/api/public/pos/carts/hold'
+    | '/api/public/pos/customers/search'
+    | '/api/public/pos/discounts/preview'
+    | '/api/public/pos/orders/search'
     | '/api/public/pos/products/lookup'
     | '/api/public/pos/shifts/open'
     | '/api/public/storefront/orders/$id'
@@ -2033,10 +2169,14 @@ export interface FileRouteTypes {
     | '/api/public/handheld/label-templates/$id/set-default'
     | '/api/public/handheld/transfers/$id/confirm'
     | '/api/public/handheld/transfers/$id/scan'
+    | '/api/public/pos/carts/$id/resume'
+    | '/api/public/pos/customers/$id/benefits'
+    | '/api/public/pos/orders/$id/returns'
     | '/api/public/pos/sales/$id/receipt'
     | '/api/public/pos/shifts/$id/close'
     | '/api/public/storefront/payments/callback/$provider'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces'
+    | '/api/public/pos/orders/$id/returns/preview'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-image'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-title'
   id:
@@ -2146,8 +2286,10 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-stock-worker'
     | '/api/public/hooks/youzan-sync'
     | '/api/public/hooks/youzan-sync-worker'
+    | '/api/public/pos/authorizations'
     | '/api/public/pos/bootstrap'
     | '/api/public/pos/products'
+    | '/api/public/pos/resolve-code'
     | '/api/public/pos/sales'
     | '/api/public/sso/aigc-exchange'
     | '/api/public/sso/aigc-ticket'
@@ -2195,6 +2337,12 @@ export interface FileRouteTypes {
     | '/api/public/handheld/transfer/ship-confirm'
     | '/api/public/handheld/transfer/ship-scan'
     | '/api/public/handheld/transfers/$id'
+    | '/api/public/pos/carts/$id'
+    | '/api/public/pos/carts/held'
+    | '/api/public/pos/carts/hold'
+    | '/api/public/pos/customers/search'
+    | '/api/public/pos/discounts/preview'
+    | '/api/public/pos/orders/search'
     | '/api/public/pos/products/lookup'
     | '/api/public/pos/shifts/open'
     | '/api/public/storefront/orders/$id'
@@ -2211,10 +2359,14 @@ export interface FileRouteTypes {
     | '/api/public/handheld/label-templates/$id/set-default'
     | '/api/public/handheld/transfers/$id/confirm'
     | '/api/public/handheld/transfers/$id/scan'
+    | '/api/public/pos/carts/$id/resume'
+    | '/api/public/pos/customers/$id/benefits'
+    | '/api/public/pos/orders/$id/returns'
     | '/api/public/pos/sales/$id/receipt'
     | '/api/public/pos/shifts/$id/close'
     | '/api/public/storefront/payments/callback/$provider'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces'
+    | '/api/public/pos/orders/$id/returns/preview'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-image'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-title'
   fileRoutesById: FileRoutesById
@@ -2283,8 +2435,10 @@ export interface RootRouteChildren {
   ApiPublicHooksYouzanStockWorkerRoute: typeof ApiPublicHooksYouzanStockWorkerRoute
   ApiPublicHooksYouzanSyncRoute: typeof ApiPublicHooksYouzanSyncRoute
   ApiPublicHooksYouzanSyncWorkerRoute: typeof ApiPublicHooksYouzanSyncWorkerRoute
+  ApiPublicPosAuthorizationsRoute: typeof ApiPublicPosAuthorizationsRoute
   ApiPublicPosBootstrapRoute: typeof ApiPublicPosBootstrapRoute
   ApiPublicPosProductsRoute: typeof ApiPublicPosProductsRouteWithChildren
+  ApiPublicPosResolveCodeRoute: typeof ApiPublicPosResolveCodeRoute
   ApiPublicPosSalesRoute: typeof ApiPublicPosSalesRouteWithChildren
   ApiPublicSsoAigcExchangeRoute: typeof ApiPublicSsoAigcExchangeRoute
   ApiPublicSsoAigcTicketRoute: typeof ApiPublicSsoAigcTicketRoute
@@ -2324,7 +2478,15 @@ export interface RootRouteChildren {
   ApiPublicHandheldTransferReceiveScanRoute: typeof ApiPublicHandheldTransferReceiveScanRoute
   ApiPublicHandheldTransferShipConfirmRoute: typeof ApiPublicHandheldTransferShipConfirmRoute
   ApiPublicHandheldTransferShipScanRoute: typeof ApiPublicHandheldTransferShipScanRoute
+  ApiPublicPosCartsIdRoute: typeof ApiPublicPosCartsIdRouteWithChildren
+  ApiPublicPosCartsHeldRoute: typeof ApiPublicPosCartsHeldRoute
+  ApiPublicPosCartsHoldRoute: typeof ApiPublicPosCartsHoldRoute
+  ApiPublicPosCustomersSearchRoute: typeof ApiPublicPosCustomersSearchRoute
+  ApiPublicPosDiscountsPreviewRoute: typeof ApiPublicPosDiscountsPreviewRoute
+  ApiPublicPosOrdersSearchRoute: typeof ApiPublicPosOrdersSearchRoute
   ApiPublicPosShiftsOpenRoute: typeof ApiPublicPosShiftsOpenRoute
+  ApiPublicPosCustomersIdBenefitsRoute: typeof ApiPublicPosCustomersIdBenefitsRoute
+  ApiPublicPosOrdersIdReturnsRoute: typeof ApiPublicPosOrdersIdReturnsRouteWithChildren
   ApiPublicPosShiftsIdCloseRoute: typeof ApiPublicPosShiftsIdCloseRoute
 }
 
@@ -3065,6 +3227,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksYouzanSyncWorkerRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/pos/authorizations': {
+      id: '/api/public/pos/authorizations'
+      path: '/api/public/pos/authorizations'
+      fullPath: '/api/public/pos/authorizations'
+      preLoaderRoute: typeof ApiPublicPosAuthorizationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/pos/bootstrap': {
       id: '/api/public/pos/bootstrap'
       path: '/api/public/pos/bootstrap'
@@ -3077,6 +3246,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/pos/products'
       fullPath: '/api/public/pos/products'
       preLoaderRoute: typeof ApiPublicPosProductsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/pos/resolve-code': {
+      id: '/api/public/pos/resolve-code'
+      path: '/api/public/pos/resolve-code'
+      fullPath: '/api/public/pos/resolve-code'
+      preLoaderRoute: typeof ApiPublicPosResolveCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/pos/sales': {
@@ -3408,6 +3584,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldTransfersIdRouteImport
       parentRoute: typeof ApiPublicHandheldTransfersRoute
     }
+    '/api/public/pos/carts/$id': {
+      id: '/api/public/pos/carts/$id'
+      path: '/api/public/pos/carts/$id'
+      fullPath: '/api/public/pos/carts/$id'
+      preLoaderRoute: typeof ApiPublicPosCartsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/pos/carts/held': {
+      id: '/api/public/pos/carts/held'
+      path: '/api/public/pos/carts/held'
+      fullPath: '/api/public/pos/carts/held'
+      preLoaderRoute: typeof ApiPublicPosCartsHeldRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/pos/carts/hold': {
+      id: '/api/public/pos/carts/hold'
+      path: '/api/public/pos/carts/hold'
+      fullPath: '/api/public/pos/carts/hold'
+      preLoaderRoute: typeof ApiPublicPosCartsHoldRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/pos/customers/search': {
+      id: '/api/public/pos/customers/search'
+      path: '/api/public/pos/customers/search'
+      fullPath: '/api/public/pos/customers/search'
+      preLoaderRoute: typeof ApiPublicPosCustomersSearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/pos/discounts/preview': {
+      id: '/api/public/pos/discounts/preview'
+      path: '/api/public/pos/discounts/preview'
+      fullPath: '/api/public/pos/discounts/preview'
+      preLoaderRoute: typeof ApiPublicPosDiscountsPreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/pos/orders/search': {
+      id: '/api/public/pos/orders/search'
+      path: '/api/public/pos/orders/search'
+      fullPath: '/api/public/pos/orders/search'
+      preLoaderRoute: typeof ApiPublicPosOrdersSearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/pos/products/lookup': {
       id: '/api/public/pos/products/lookup'
       path: '/lookup'
@@ -3520,6 +3738,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldTransfersIdScanRouteImport
       parentRoute: typeof ApiPublicHandheldTransfersIdRoute
     }
+    '/api/public/pos/carts/$id/resume': {
+      id: '/api/public/pos/carts/$id/resume'
+      path: '/resume'
+      fullPath: '/api/public/pos/carts/$id/resume'
+      preLoaderRoute: typeof ApiPublicPosCartsIdResumeRouteImport
+      parentRoute: typeof ApiPublicPosCartsIdRoute
+    }
+    '/api/public/pos/customers/$id/benefits': {
+      id: '/api/public/pos/customers/$id/benefits'
+      path: '/api/public/pos/customers/$id/benefits'
+      fullPath: '/api/public/pos/customers/$id/benefits'
+      preLoaderRoute: typeof ApiPublicPosCustomersIdBenefitsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/pos/orders/$id/returns': {
+      id: '/api/public/pos/orders/$id/returns'
+      path: '/api/public/pos/orders/$id/returns'
+      fullPath: '/api/public/pos/orders/$id/returns'
+      preLoaderRoute: typeof ApiPublicPosOrdersIdReturnsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/pos/sales/$id/receipt': {
       id: '/api/public/pos/sales/$id/receipt'
       path: '/$id/receipt'
@@ -3547,6 +3786,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/public/handheld/parcels/items/$itemId/pack-pieces'
       preLoaderRoute: typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteImport
       parentRoute: typeof ApiPublicHandheldParcelsRoute
+    }
+    '/api/public/pos/orders/$id/returns/preview': {
+      id: '/api/public/pos/orders/$id/returns/preview'
+      path: '/preview'
+      fullPath: '/api/public/pos/orders/$id/returns/preview'
+      preLoaderRoute: typeof ApiPublicPosOrdersIdReturnsPreviewRouteImport
+      parentRoute: typeof ApiPublicPosOrdersIdReturnsRoute
     }
     '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-image': {
       id: '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-image'
@@ -4022,6 +4268,32 @@ const ApiPublicHandheldItemsUploadImageRouteWithChildren =
     ApiPublicHandheldItemsUploadImageRouteChildren,
   )
 
+interface ApiPublicPosCartsIdRouteChildren {
+  ApiPublicPosCartsIdResumeRoute: typeof ApiPublicPosCartsIdResumeRoute
+}
+
+const ApiPublicPosCartsIdRouteChildren: ApiPublicPosCartsIdRouteChildren = {
+  ApiPublicPosCartsIdResumeRoute: ApiPublicPosCartsIdResumeRoute,
+}
+
+const ApiPublicPosCartsIdRouteWithChildren =
+  ApiPublicPosCartsIdRoute._addFileChildren(ApiPublicPosCartsIdRouteChildren)
+
+interface ApiPublicPosOrdersIdReturnsRouteChildren {
+  ApiPublicPosOrdersIdReturnsPreviewRoute: typeof ApiPublicPosOrdersIdReturnsPreviewRoute
+}
+
+const ApiPublicPosOrdersIdReturnsRouteChildren: ApiPublicPosOrdersIdReturnsRouteChildren =
+  {
+    ApiPublicPosOrdersIdReturnsPreviewRoute:
+      ApiPublicPosOrdersIdReturnsPreviewRoute,
+  }
+
+const ApiPublicPosOrdersIdReturnsRouteWithChildren =
+  ApiPublicPosOrdersIdReturnsRoute._addFileChildren(
+    ApiPublicPosOrdersIdReturnsRouteChildren,
+  )
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiDocsRoute: ApiDocsRoute,
@@ -4092,8 +4364,10 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksYouzanStockWorkerRoute: ApiPublicHooksYouzanStockWorkerRoute,
   ApiPublicHooksYouzanSyncRoute: ApiPublicHooksYouzanSyncRoute,
   ApiPublicHooksYouzanSyncWorkerRoute: ApiPublicHooksYouzanSyncWorkerRoute,
+  ApiPublicPosAuthorizationsRoute: ApiPublicPosAuthorizationsRoute,
   ApiPublicPosBootstrapRoute: ApiPublicPosBootstrapRoute,
   ApiPublicPosProductsRoute: ApiPublicPosProductsRouteWithChildren,
+  ApiPublicPosResolveCodeRoute: ApiPublicPosResolveCodeRoute,
   ApiPublicPosSalesRoute: ApiPublicPosSalesRouteWithChildren,
   ApiPublicSsoAigcExchangeRoute: ApiPublicSsoAigcExchangeRoute,
   ApiPublicSsoAigcTicketRoute: ApiPublicSsoAigcTicketRoute,
@@ -4145,7 +4419,16 @@ const rootRouteChildren: RootRouteChildren = {
     ApiPublicHandheldTransferShipConfirmRoute,
   ApiPublicHandheldTransferShipScanRoute:
     ApiPublicHandheldTransferShipScanRoute,
+  ApiPublicPosCartsIdRoute: ApiPublicPosCartsIdRouteWithChildren,
+  ApiPublicPosCartsHeldRoute: ApiPublicPosCartsHeldRoute,
+  ApiPublicPosCartsHoldRoute: ApiPublicPosCartsHoldRoute,
+  ApiPublicPosCustomersSearchRoute: ApiPublicPosCustomersSearchRoute,
+  ApiPublicPosDiscountsPreviewRoute: ApiPublicPosDiscountsPreviewRoute,
+  ApiPublicPosOrdersSearchRoute: ApiPublicPosOrdersSearchRoute,
   ApiPublicPosShiftsOpenRoute: ApiPublicPosShiftsOpenRoute,
+  ApiPublicPosCustomersIdBenefitsRoute: ApiPublicPosCustomersIdBenefitsRoute,
+  ApiPublicPosOrdersIdReturnsRoute:
+    ApiPublicPosOrdersIdReturnsRouteWithChildren,
   ApiPublicPosShiftsIdCloseRoute: ApiPublicPosShiftsIdCloseRoute,
 }
 export const routeTree = rootRouteImport

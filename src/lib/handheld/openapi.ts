@@ -221,7 +221,7 @@ const document: ZodOpenApiObject = {
   openapi: "3.1.0",
   info: {
     title: "Boomer Off — Public API",
-    version: "1.9.0",
+    version: "1.10.0",
     description: `
 本文档覆盖：
 
@@ -239,7 +239,8 @@ X-Session-Token: <操作员 session token>
 ## 商城鉴权
 
 - 商品和分类接口公开读取。
-- 订单接口使用 \`Authorization: Bearer <Supabase access token>\`。
+- 订单接口使用 \`Authorization: Bearer <腾讯云消费者 JWT>\`。
+- 消费者 JWT 由独立身份服务签发，ERP 通过 JWKS 验签，不复用 ERP 员工账号。
 - 创建订单和支付还必须带 \`Idempotency-Key\`。
 
 ## 统一响应
@@ -288,7 +289,8 @@ X-Session-Token: <操作员 session token>
         type: "http",
         scheme: "bearer",
         bearerFormat: "JWT",
-        description: "消费者商城 Supabase access token。",
+        description:
+          "腾讯云消费者身份服务签发的 RS256 JWT。ERP 使用 CONSUMER_AUTH_JWKS_URL 验签。",
       },
     },
   },

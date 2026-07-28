@@ -2,7 +2,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 export const POS_CORS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization, Idempotency-Key",
   "Access-Control-Max-Age": "86400",
 };
@@ -29,6 +29,11 @@ type PosLocation = {
 };
 
 const POS_ROLES = new Set(["super_admin", "hq_operator", "store_manager", "store_staff"]);
+const POS_MANAGER_ROLES = new Set(["super_admin", "hq_operator", "store_manager"]);
+
+export function hasPosManagerRole(roles: string[]) {
+  return roles.some((role) => POS_MANAGER_ROLES.has(role));
+}
 
 export async function authenticatePosUser(
   request: Request,

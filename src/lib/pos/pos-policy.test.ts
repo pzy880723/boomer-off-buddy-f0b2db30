@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { addScannedProduct, validatePosTenders, type PosCartLine } from "./pos-policy";
+import {
+  addScannedProduct,
+  calculatePosDiscount,
+  validatePosTenders,
+  type PosCartLine,
+} from "./pos-policy";
 
 const standard = {
   sku_id: "7baf7ec2-8061-4d3c-8f4d-d4698f5ac2bf",
@@ -57,5 +62,36 @@ describe("POS tender policy", () => {
 
   test("rejects an underpaid or overpaid sale", () => {
     assert.throws(() => validatePosTenders(100, [{ provider: "cash", amount: 99.99 }]), /match/i);
+  });
+});
+
+describe("POS discount policy", () => {
+  const lines = [
+    { sku_id: standard.sku_id, quantity: 2, unit_price: 100, discount_eligible: true },
+    { sku_id: custom.sku_id, quantity: 1, unit_price: 368, discount_eligible: false },
+  ];
+
+  test("applies a fixed reduction only to eligible merchandise", () => {
+    assert.deepEqual(calculatePosDiscount(lines, { type: "amount", value: 20 }), {
+      subtotal: 568,
+      eligible_total: 200,
+      excluded_total: 368,
+      discount_total: 20,
+      payable_total: 548,
+    });
+  });
+
+  test("applies a percentage discount without changing excluded consignment", () => {
+    assert.deepEqual(calculatePosDiscount(lines, { type: "percentage", value: 90 }), {
+      subtotal: 568,
+      eligible_total: 200,
+      excluded_total: 368,
+      discount_total: 20,
+      payable_total: 548,
+    });
+  });
+
+  test("rejects discounts larger than the eligible amount", () => {
+    assert.throws(() => calculatePosDiscount(lines, { type: "amount", value: 201 }), /eligible/i);
   });
 });

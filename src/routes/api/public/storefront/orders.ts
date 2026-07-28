@@ -5,7 +5,7 @@ import { normalizeCourierChoice } from "@/lib/commerce/order-policy";
 import { normalizeStorefrontOrderItems } from "@/lib/commerce/storefront-order-request";
 import {
   STOREFRONT_CORS,
-  authenticateStorefrontUser,
+  authenticateStorefrontCustomer,
   storefrontError,
   storefrontJson,
 } from "@/server/storefront-auth.server";
@@ -41,21 +41,21 @@ export const Route = createFileRoute("/api/public/storefront/orders")({
     handlers: {
       OPTIONS: async () => new Response(null, { status: 204, headers: STOREFRONT_CORS }),
       GET: async ({ request }) => {
-        const auth = await authenticateStorefrontUser(request);
+        const auth = await authenticateStorefrontCustomer(request);
         if (!auth.ok) return auth.response;
         const { data, error } = await supabaseAdmin
           .from("commerce_orders" as never)
           .select(
             "id, order_no, payment_status, order_status, total_amount, currency, courier_provider, courier_service_code, paid_at, created_at",
           )
-          .eq("user_id", auth.user.id)
+          .eq("customer_id", auth.customer.id)
           .order("created_at", { ascending: false })
           .limit(100);
         if (error) return storefrontError(error.message, 500);
         return storefrontJson({ ok: true, data: data ?? [] });
       },
       POST: async ({ request }) => {
-        const auth = await authenticateStorefrontUser(request);
+        const auth = await authenticateStorefrontCustomer(request);
         if (!auth.ok) return auth.response;
         const idempotencyKey = request.headers.get("idempotency-key")?.trim();
         if (!idempotencyKey) return storefrontError("Missing Idempotency-Key", 400);
@@ -80,7 +80,7 @@ export const Route = createFileRoute("/api/public/storefront/orders")({
         const { data, error } = await supabaseAdmin.rpc(
           "commerce_create_order_v2" as never,
           {
-            p_user_id: auth.user.id,
+            p_user_id: auth.customer.id,
             p_idempotency_key: idempotencyKey,
             p_items: items,
             p_recipient_name: body.recipient_name,

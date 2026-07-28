@@ -3,7 +3,7 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   STOREFRONT_CORS,
-  authenticateStorefrontUser,
+  authenticateStorefrontCustomer,
   storefrontError,
   storefrontJson,
 } from "@/server/storefront-auth.server";
@@ -32,7 +32,7 @@ export const Route = createFileRoute("/api/public/storefront/payments")({
     handlers: {
       OPTIONS: async () => new Response(null, { status: 204, headers: STOREFRONT_CORS }),
       POST: async ({ request }) => {
-        const auth = await authenticateStorefrontUser(request);
+        const auth = await authenticateStorefrontCustomer(request);
         if (!auth.ok) return auth.response;
         const idempotencyKey = request.headers.get("idempotency-key")?.trim();
         if (!idempotencyKey) return storefrontError("Missing Idempotency-Key", 400);
@@ -47,10 +47,10 @@ export const Route = createFileRoute("/api/public/storefront/payments")({
         const { data: order, error: orderError } = await supabaseAdmin
           .from("commerce_orders" as never)
           .select(
-            "id,order_no,user_id,payment_status,order_status,total_amount,currency,reservation_expires_at",
+            "id,order_no,customer_id,payment_status,order_status,total_amount,currency,reservation_expires_at",
           )
           .eq("id", body.order_id)
-          .eq("user_id", auth.user.id)
+          .eq("customer_id", auth.customer.id)
           .maybeSingle();
         if (orderError) return storefrontError(orderError.message, 500);
         if (!order) return storefrontError("Order not found", 404);

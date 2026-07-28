@@ -17,6 +17,10 @@ describe("POS UI contract", () => {
     assert.match(source, /\/api\/public\/pos\/products\/lookup/);
     assert.match(source, /\/api\/public\/pos\/sales/);
     assert.match(source, /\/receipt/);
+    for (const capability of ["识别会员", "整单优惠", "挂单", "组合支付", "订单退换", "电子小票"]) {
+      assert.match(source, new RegExp(capability));
+    }
+    assert.doesNotMatch(source, /挂单功能即将接入/);
   });
 
   test("registers POS as a full-screen navigation destination", () => {

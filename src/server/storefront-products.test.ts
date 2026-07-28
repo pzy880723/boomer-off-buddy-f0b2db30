@@ -38,6 +38,7 @@ describe("storefront compound taxonomy contract", () => {
         price: 299,
         compare_at_price: 399,
         condition_grade: "A",
+        product_type: "custom",
         published_at: "2026-07-15T00:00:00Z",
         location: { id: "location-1", name: "上海店", kind: "shop" },
       },
@@ -62,7 +63,7 @@ describe("storefront compound taxonomy contract", () => {
         { dimension: "origin", code: "origin_japan", name: "日本", confidence: 0.96 },
         { dimension: "craft", code: "craft_gilt", name: "描金", confidence: 0.82 },
       ],
-      locationStock: 1,
+      availableQty: 1,
     });
 
     assert.equal(product.id, "listing-1");
@@ -93,6 +94,7 @@ describe("storefront compound taxonomy contract", () => {
         price: 100,
         compare_at_price: null,
         condition_grade: "A",
+        product_type: "custom",
         published_at: null,
         location: { id: "store-a", name: "上海店", kind: "shop" },
       },
@@ -100,7 +102,7 @@ describe("storefront compound taxonomy contract", () => {
       category: null,
       brand: null,
       facets: [],
-      locationStock: 1,
+      availableQty: 1,
     });
 
     assert.equal(product.stock, 1);

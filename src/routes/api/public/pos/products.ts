@@ -4,7 +4,7 @@ import { signSkuImagePaths } from "@/lib/sku-image-resolver.server";
 import { POS_CORS, authenticatePosUser, posError, posJson } from "@/server/pos-auth.server";
 
 const SKU_COLUMNS =
-  "id,sku_code,barcode,name,kind,is_custom_price,price_tier,grade,image_url,image_paths";
+  "id,sku_code,barcode,name,kind,is_custom_price,price_tier,grade,image_url,image_paths,sale_ownership,discount_eligible";
 
 export const Route = createFileRoute("/api/public/pos/products")({
   server: {
@@ -45,6 +45,8 @@ export const Route = createFileRoute("/api/public/pos/products")({
           grade: string | null;
           image_url: string | null;
           image_paths: string[] | null;
+          sale_ownership: string;
+          discount_eligible: boolean;
         }>;
         let items;
         try {
@@ -72,6 +74,8 @@ export const Route = createFileRoute("/api/public/pos/products")({
                 image_url: imageUrl,
                 available_qty: Number(availableQty) || 0,
                 location_id: locationId,
+                sale_ownership: sku.sale_ownership,
+                discount_eligible: sku.discount_eligible,
               };
             }),
           );

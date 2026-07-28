@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { POS_CORS, authenticatePosUser, posError, posJson } from "@/server/pos-auth.server";
 
 const SKU_COLUMNS =
-  "id,sku_code,barcode,epc,name,kind,is_custom_price,price_tier,grade,image_url,image_paths,status,is_display";
+  "id,sku_code,barcode,epc,name,kind,is_custom_price,price_tier,grade,image_url,image_paths,status,is_display,sale_ownership,discount_eligible";
 
 export const Route = createFileRoute("/api/public/pos/products/lookup")({
   server: {
@@ -18,7 +18,7 @@ export const Route = createFileRoute("/api/public/pos/products/lookup")({
         if (!auth.ok) return auth.response;
 
         const results = await Promise.all(
-          ["barcode", "sku_code", "epc"].map((field) =>
+          ["id", "barcode", "sku_code", "epc"].map((field) =>
             supabaseAdmin
               .from("inv_skus")
               .select(SKU_COLUMNS)
@@ -43,6 +43,8 @@ export const Route = createFileRoute("/api/public/pos/products/lookup")({
               image_url: string | null;
               image_paths: string[] | null;
               is_display: boolean;
+              sale_ownership: string;
+              discount_eligible: boolean;
             }
           | undefined;
         if (!sku || !sku.is_display) return posError("未找到可售商品", 404, "product_not_found");
@@ -73,6 +75,8 @@ export const Route = createFileRoute("/api/public/pos/products/lookup")({
             image_url: imageUrl,
             available_qty: Number(availableQty) || 0,
             location_id: locationId,
+            sale_ownership: sku.sale_ownership,
+            discount_eligible: sku.discount_eligible,
           },
         });
       },
