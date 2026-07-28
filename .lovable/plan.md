@@ -1,25 +1,40 @@
-## 目标
-在 `/product-brands` 页顶部加 Tab 筛选，把「制造商」合并进「品牌」，Tab 分为三块：**品牌**、**窑口**、**IP（动漫）**。
+## 只读诊断报告（未修改任何代码、未发布、未发送短信）
 
-## 变更点
+### 1. 腾讯短信相关环境变量
 
-### 1. 数据侧（一次迁移）
-- 将 `inv_brands` 中 `entity_type='manufacturer'` 的记录批量更新为 `'brand'`。
-- 新增 IP 类型：扩展 `entity_type` 枚举加入 `'ip'`（保留 `studio`/`designer` 以兼容旧数据，但 UI 不再单独暴露）。
-- 对现有明显是 IP / 动漫题材的品牌（如吉卜力、万代等）批量归类为 `'ip'`；不确定的保持 `'brand'`，后续可在编辑里手动调整。
+按你给的名字逐一核对生产 Secrets（值不显示）：
 
-### 2. 前端 `src/routes/product-brands.tsx`
-- 顶部加 `Tabs`：`全部 / 品牌 / 窑口 / IP`（默认「全部」）。
-- 每个 Tab 显示该分类下的数量徽章。
-- 列表按当前 Tab + 搜索关键字过滤。
-- 「新建品牌」按钮根据当前 Tab 预设 `entity_type`（在 IP Tab 下默认新建为 IP）。
-- 编辑弹窗的「类型」下拉精简为三项：品牌 / 窑口 / IP（动漫）。旧的 `manufacturer / studio / designer` 若历史数据存在则只读展示，不出现在下拉里。
+| 你要求的变量名 | 生产状态 |
+|---|---|
+| `TENCENT_SECRET_ID` | ❌ 缺失（实际使用的是 `TENCENTCLOUD_SECRET_ID`） |
+| `TENCENT_SECRET_KEY` | ❌ 缺失（实际使用的是 `TENCENTCLOUD_SECRET_KEY`） |
+| `TENCENT_SMS_SDK_APP_ID` | ✅ 存在 |
+| `TENCENT_SMS_SIGN_NAME` | ✅ 存在 |
+| `TENCENT_SMS_TEMPLATE_ID` | ✅ 存在 |
 
-### 3. 侧栏 & 文案
-- 侧边栏入口名称由「品牌 / 制造商」改为「品牌 / 窑口 / IP」。
-- 页面标题与描述同步更新。
+补充：代码 `src/server/sms.tencent.server.ts` 里读的密钥变量名是 `TENCENTCLOUD_SECRET_ID` / `TENCENTCLOUD_SECRET_KEY`（带 `CLOUD`），这两个在生产 Secrets 中 **均存在**。也就是说：
+- 如果按“你列出的命名（不带 CLOUD）”核对 → 缺 2 个；
+- 如果按“代码实际读取的命名（带 CLOUD）”核对 → 5 个全部齐全，短信调用具备发送条件。
 
-## 不做
-- 不动 `inv_skus.brand_id` 关联逻辑。
-- 不改搜索/别名匹配规则。
-- 不动其他页面。
+请确认你希望的命名口径；如需统一改名为 `TENCENT_SECRET_ID/KEY`，那是一次改动（代码 + 新增 Secret），不在本次只读诊断范围。
+
+### 2. `/api/public/auth/otp/send` 归属
+
+- **归属：ERP 员工登录（含 PC Web 端 + 手持 APP 端），不是消费者登录。**
+- 证据：
+  - `src/routes/login.tsx` 第 128 行调用 `/api/public/auth/otp/send`——这是 ERP 后台登录页。
+  - 配对的 `/api/public/auth/otp/verify` 里，校验通过后会：
+    1. 用 `phoneToEmail(phone)` 拼成 `{phone}@users.local` 伪邮箱；
+    2. 调用 `supabaseAdmin.auth.admin.listUsers` 查找已有 ERP 用户；
+    3. **找不到就直接返回 `user_not_found / 该手机号未注册，请联系管理员`**，不会创建任何账号；
+    4. 找到后签发 Supabase 员工 session，可选带 `install_id` 时再绑定 `inv_handheld_devices`（手持机）。
+  - 完全没有触碰 `commerce_customers` / `commerce_customer_identities`。消费者账号走的是腾讯云 JWKS + `src/server/storefront-auth.server.ts`，与本接口无关。
+
+- **是否自动创建消费者账号：否。** 也不会自动创建 ERP 员工账号；未注册手机号会被拒绝。
+
+### 结论
+
+- 短信 5 个 Secret 按“代码实际命名”均已齐全，可以发送；按“你列出的命名”缺 `TENCENT_SECRET_ID/KEY` 两项。
+- `/api/public/auth/otp/send` 只服务 ERP 员工登录，不会创建消费者账号，也不会创建员工账号。
+
+需要我下一步做什么？例如：把 Secret 命名统一为不带 `CLOUD` 的版本，或另行为消费者端建独立的 OTP 通道？
