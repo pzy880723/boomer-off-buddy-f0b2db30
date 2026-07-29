@@ -1115,6 +1115,242 @@ export type Database = {
         }
         Relationships: []
       }
+      editorial_content_channels: {
+        Row: {
+          group_name: string
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          group_name?: string
+          id: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          group_name?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      editorial_content_comments: {
+        Row: {
+          author_name: string
+          body: string
+          content_id: string
+          created_at: string
+          id: string
+          status: string
+          user_id: string | null
+        }
+        Insert: {
+          author_name?: string
+          body: string
+          content_id: string
+          created_at?: string
+          id?: string
+          status?: string
+          user_id?: string | null
+        }
+        Update: {
+          author_name?: string
+          body?: string
+          content_id?: string
+          created_at?: string
+          id?: string
+          status?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "editorial_content_comments_content_id_fkey"
+            columns: ["content_id"]
+            isOneToOne: false
+            referencedRelation: "editorial_contents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      editorial_content_engagement: {
+        Row: {
+          bookmark_count: number
+          comment_count: number
+          content_id: string
+          like_count: number
+          share_count: number
+          updated_at: string
+        }
+        Insert: {
+          bookmark_count?: number
+          comment_count?: number
+          content_id: string
+          like_count?: number
+          share_count?: number
+          updated_at?: string
+        }
+        Update: {
+          bookmark_count?: number
+          comment_count?: number
+          content_id?: string
+          like_count?: number
+          share_count?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "editorial_content_engagement_content_id_fkey"
+            columns: ["content_id"]
+            isOneToOne: true
+            referencedRelation: "editorial_contents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      editorial_content_relations: {
+        Row: {
+          content_id: string
+          created_at: string
+          entity_key: string
+          entity_type: string
+          id: string
+          label: string
+        }
+        Insert: {
+          content_id: string
+          created_at?: string
+          entity_key: string
+          entity_type: string
+          id?: string
+          label: string
+        }
+        Update: {
+          content_id?: string
+          created_at?: string
+          entity_key?: string
+          entity_type?: string
+          id?: string
+          label?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "editorial_content_relations_content_id_fkey"
+            columns: ["content_id"]
+            isOneToOne: false
+            referencedRelation: "editorial_contents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      editorial_content_user_actions: {
+        Row: {
+          action: string
+          content_id: string
+          created_at: string
+          user_key: string
+        }
+        Insert: {
+          action: string
+          content_id: string
+          created_at?: string
+          user_key: string
+        }
+        Update: {
+          action?: string
+          content_id?: string
+          created_at?: string
+          user_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "editorial_content_user_actions_content_id_fkey"
+            columns: ["content_id"]
+            isOneToOne: false
+            referencedRelation: "editorial_contents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      editorial_contents: {
+        Row: {
+          aspect_ratio: number
+          body: string | null
+          channel_ids: string[]
+          cover_url: string | null
+          created_at: string
+          created_by: string | null
+          duration_seconds: number
+          id: string
+          keywords: string[]
+          published_at: string | null
+          related_knowledge_ids: string[]
+          related_product_ids: string[]
+          reviewed_by: string | null
+          scheduled_at: string | null
+          slug: string
+          source: Json
+          status: Database["public"]["Enums"]["editorial_content_status"]
+          summary: string
+          title: string
+          type: Database["public"]["Enums"]["editorial_content_type"]
+          updated_at: string
+          video_url: string | null
+        }
+        Insert: {
+          aspect_ratio?: number
+          body?: string | null
+          channel_ids?: string[]
+          cover_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          duration_seconds?: number
+          id?: string
+          keywords?: string[]
+          published_at?: string | null
+          related_knowledge_ids?: string[]
+          related_product_ids?: string[]
+          reviewed_by?: string | null
+          scheduled_at?: string | null
+          slug: string
+          source?: Json
+          status?: Database["public"]["Enums"]["editorial_content_status"]
+          summary: string
+          title: string
+          type: Database["public"]["Enums"]["editorial_content_type"]
+          updated_at?: string
+          video_url?: string | null
+        }
+        Update: {
+          aspect_ratio?: number
+          body?: string | null
+          channel_ids?: string[]
+          cover_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          duration_seconds?: number
+          id?: string
+          keywords?: string[]
+          published_at?: string | null
+          related_knowledge_ids?: string[]
+          related_product_ids?: string[]
+          reviewed_by?: string | null
+          scheduled_at?: string | null
+          slug?: string
+          source?: Json
+          status?: Database["public"]["Enums"]["editorial_content_status"]
+          summary?: string
+          title?: string
+          type?: Database["public"]["Enums"]["editorial_content_type"]
+          updated_at?: string
+          video_url?: string | null
+        }
+        Relationships: []
+      }
       fulfillment_exceptions: {
         Row: {
           created_at: string
@@ -2068,6 +2304,7 @@ export type Database = {
           id: string
           is_default: boolean
           name: string
+          print_type: string
           updated_at: string
           updated_by: string | null
           version: number
@@ -2081,6 +2318,7 @@ export type Database = {
           id?: string
           is_default?: boolean
           name: string
+          print_type?: string
           updated_at?: string
           updated_by?: string | null
           version?: number
@@ -2094,6 +2332,7 @@ export type Database = {
           id?: string
           is_default?: boolean
           name?: string
+          print_type?: string
           updated_at?: string
           updated_by?: string | null
           version?: number
@@ -3186,6 +3425,101 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "meruki_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      official_knowledge_entries: {
+        Row: {
+          care_advice: string[]
+          cover_url: string | null
+          created_at: string
+          created_by: string | null
+          evidence: string[]
+          id: string
+          keywords: string[]
+          published_at: string | null
+          reviewed_by: string | null
+          slug: string
+          status: Database["public"]["Enums"]["editorial_content_status"]
+          story: string
+          summary: string
+          title: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          care_advice?: string[]
+          cover_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          evidence?: string[]
+          id?: string
+          keywords?: string[]
+          published_at?: string | null
+          reviewed_by?: string | null
+          slug: string
+          status?: Database["public"]["Enums"]["editorial_content_status"]
+          story: string
+          summary: string
+          title: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          care_advice?: string[]
+          cover_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          evidence?: string[]
+          id?: string
+          keywords?: string[]
+          published_at?: string | null
+          reviewed_by?: string | null
+          slug?: string
+          status?: Database["public"]["Enums"]["editorial_content_status"]
+          story?: string
+          summary?: string
+          title?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      official_knowledge_relations: {
+        Row: {
+          created_at: string
+          entity_key: string
+          entity_type: string
+          id: string
+          is_primary: boolean
+          knowledge_id: string
+          label: string
+        }
+        Insert: {
+          created_at?: string
+          entity_key: string
+          entity_type: string
+          id?: string
+          is_primary?: boolean
+          knowledge_id: string
+          label: string
+        }
+        Update: {
+          created_at?: string
+          entity_key?: string
+          entity_type?: string
+          id?: string
+          is_primary?: boolean
+          knowledge_id?: string
+          label?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "official_knowledge_relations_knowledge_id_fkey"
+            columns: ["knowledge_id"]
+            isOneToOne: false
+            referencedRelation: "official_knowledge_entries"
             referencedColumns: ["id"]
           },
         ]
@@ -5675,6 +6009,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_editorial_content_share: {
+        Args: { p_content_id: string }
+        Returns: number
+      }
       inv_apply_inbound_stock: {
         Args: { p_delta: number; p_sku_id: string }
         Returns: undefined
@@ -5778,6 +6116,13 @@ export type Database = {
         | "store_manager"
         | "store_staff"
         | "warehouse_staff"
+      editorial_content_status:
+        | "draft"
+        | "pending_review"
+        | "scheduled"
+        | "published"
+        | "archived"
+      editorial_content_type: "article" | "horizontal_video" | "vertical_video"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -5912,6 +6257,14 @@ export const Constants = {
         "store_staff",
         "warehouse_staff",
       ],
+      editorial_content_status: [
+        "draft",
+        "pending_review",
+        "scheduled",
+        "published",
+        "archived",
+      ],
+      editorial_content_type: ["article", "horizontal_video", "vertical_video"],
     },
   },
 } as const
