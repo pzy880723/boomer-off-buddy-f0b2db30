@@ -1196,10 +1196,13 @@ export const OtpVerifyWebRes = okEnvelope(
 // 标签模板（总部统一管理，v1.5）
 // ============================================================
 
+export const PrintTemplateType = z.enum(["label", "receipt"]);
+
 export const LabelTemplateItem = z
   .object({
     id: uuidSchema,
     name: z.string(),
+    print_type: PrintTemplateType.default("label"),
     width_mm: z.number(),
     height_mm: z.number(),
     is_default: z.boolean(),
@@ -1207,11 +1210,19 @@ export const LabelTemplateItem = z
     version: z.number().int().default(1),
     updated_at: z.string(),
   })
+  .transform((value) => ({
+    ...value,
+    width_mm: value.print_type === "receipt" ? 58 : value.width_mm,
+  }))
   .meta({ id: "LabelTemplateItem" });
 
 export const LabelTemplatesRes = okEnvelope(
   z.object({
     default_template_id: z.string().uuid().nullable(),
+    default_template_ids: z.object({
+      label: z.string().uuid().nullable(),
+      receipt: z.string().uuid().nullable(),
+    }),
     items: z.array(LabelTemplateItem),
     can_manage: z.boolean(),
   }),
@@ -1220,16 +1231,22 @@ export const LabelTemplatesRes = okEnvelope(
 export const LabelTemplateCreateReq = z
   .object({
     name: z.string().min(1).max(120),
+    print_type: PrintTemplateType.default("label"),
     width_mm: z.number().positive().default(53),
     height_mm: z.number().positive().default(35),
     elements: z.array(z.any()).default([]),
     is_default: z.boolean().optional(),
   })
+  .transform((value) => ({
+    ...value,
+    width_mm: value.print_type === "receipt" ? 58 : value.width_mm,
+  }))
   .meta({ id: "LabelTemplateCreateReq" });
 
 export const LabelTemplateUpdateReq = z
   .object({
     name: z.string().min(1).max(120).optional(),
+    print_type: PrintTemplateType.optional(),
     width_mm: z.number().positive().optional(),
     height_mm: z.number().positive().optional(),
     elements: z.array(z.any()).optional(),

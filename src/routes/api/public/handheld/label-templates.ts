@@ -15,7 +15,7 @@ function isHq(roles: string[]) {
 
 async function listTemplates() {
   const { data, error } = await (supabaseAdmin.from("inv_label_templates" as never) as any)
-    .select("id, name, width_mm, height_mm, elements, is_default, version, updated_at")
+    .select("id, name, print_type, width_mm, height_mm, elements, is_default, version, updated_at")
     .order("is_default", { ascending: false })
     .order("updated_at", { ascending: false });
   if (error) throw new Error(error.message);
@@ -34,13 +34,23 @@ export const Route = createFileRoute("/api/public/handheld/label-templates")({
         const roles = user ? await loadUserRoles(user.user_id) : [];
         try {
           const items = await listTemplates();
-          const def = items.find((r) => r.is_default);
+          const labelDefault = items.find(
+            (item) => item.is_default && (item.print_type ?? "label") === "label",
+          );
+          const receiptDefault = items.find(
+            (item) => item.is_default && item.print_type === "receipt",
+          );
           return ok({
-            default_template_id: def?.id ?? null,
+            default_template_id: labelDefault?.id ?? null,
+            default_template_ids: {
+              label: labelDefault?.id ?? null,
+              receipt: receiptDefault?.id ?? null,
+            },
             items: items.map((r) => ({
               id: r.id,
               name: r.name,
-              width_mm: Number(r.width_mm),
+              print_type: r.print_type ?? "label",
+              width_mm: r.print_type === "receipt" ? 58 : Number(r.width_mm),
               height_mm: Number(r.height_mm),
               is_default: !!r.is_default,
               elements: r.elements ?? [],
@@ -70,7 +80,8 @@ export const Route = createFileRoute("/api/public/handheld/label-templates")({
         }
         const name = String(body?.name ?? "").trim();
         if (!name) return err("name required", 422, { code: "validation_error" });
-        const width_mm = Number(body?.width_mm ?? 53);
+        const print_type = body?.print_type === "receipt" ? "receipt" : "label";
+        const width_mm = print_type === "receipt" ? 58 : Number(body?.width_mm ?? 53);
         const height_mm = Number(body?.height_mm ?? 35);
         const elements = Array.isArray(body?.elements) ? body.elements : [];
         const setDefault = body?.is_default === true;
@@ -78,12 +89,14 @@ export const Route = createFileRoute("/api/public/handheld/label-templates")({
         if (setDefault) {
           await (supabaseAdmin.from("inv_label_templates" as never) as any)
             .update({ is_default: false })
-            .eq("is_default", true);
+            .eq("is_default", true)
+            .eq("print_type", print_type);
         }
 
         const { data, error } = await (supabaseAdmin.from("inv_label_templates" as never) as any)
           .insert({
             name,
+            print_type,
             width_mm,
             height_mm,
             elements,
@@ -91,7 +104,9 @@ export const Route = createFileRoute("/api/public/handheld/label-templates")({
             created_by: user.user_id,
             updated_by: user.user_id,
           })
-          .select("id, name, width_mm, height_mm, elements, is_default, version, updated_at")
+          .select(
+            "id, name, print_type, width_mm, height_mm, elements, is_default, version, updated_at",
+          )
           .single();
         if (error) return err(error.message, 500);
         return ok(data);

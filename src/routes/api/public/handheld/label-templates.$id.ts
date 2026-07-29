@@ -48,28 +48,43 @@ export const Route = createFileRoute("/api/public/handheld/label-templates/$id")
         }
         const patch: Record<string, unknown> = { updated_by: g.user.user_id };
         if (typeof body?.name === "string") patch.name = body.name.trim();
-        if (body?.width_mm != null) patch.width_mm = Number(body.width_mm);
+        if (body?.print_type === "label" || body?.print_type === "receipt") {
+          patch.print_type = body.print_type;
+        }
+        if (body?.width_mm != null) {
+          patch.width_mm = body?.print_type === "receipt" ? 58 : Number(body.width_mm);
+        }
         if (body?.height_mm != null) patch.height_mm = Number(body.height_mm);
         if (Array.isArray(body?.elements)) patch.elements = body.elements;
         // version bump
         const { data: cur } = await (supabaseAdmin.from("inv_label_templates" as never) as any)
-          .select("version, is_default")
+          .select("version, is_default, print_type")
           .eq("id", params.id)
           .maybeSingle();
         if (!cur) return err("Not found", 404, { code: "not_found" });
         patch.version = ((cur as any).version ?? 1) + 1;
+        const printType =
+          body?.print_type === "receipt"
+            ? "receipt"
+            : body?.print_type === "label"
+              ? "label"
+              : ((cur as any).print_type ?? "label");
+        if (printType === "receipt") patch.width_mm = 58;
 
         if (body?.is_default === true && !(cur as any).is_default) {
           await (supabaseAdmin.from("inv_label_templates" as never) as any)
             .update({ is_default: false })
-            .eq("is_default", true);
+            .eq("is_default", true)
+            .eq("print_type", printType);
           patch.is_default = true;
         }
 
         const { data, error } = await (supabaseAdmin.from("inv_label_templates" as never) as any)
           .update(patch)
           .eq("id", params.id)
-          .select("id, name, width_mm, height_mm, elements, is_default, version, updated_at")
+          .select(
+            "id, name, print_type, width_mm, height_mm, elements, is_default, version, updated_at",
+          )
           .single();
         if (error) return err(error.message, 500);
         return ok(data);
@@ -80,7 +95,7 @@ export const Route = createFileRoute("/api/public/handheld/label-templates/$id")
         if (!g.ok) return g.response;
 
         const { data: cur } = await (supabaseAdmin.from("inv_label_templates" as never) as any)
-          .select("id, is_default")
+          .select("id, is_default, print_type")
           .eq("id", params.id)
           .maybeSingle();
         if (!cur) return err("Not found", 404, { code: "not_found" });
@@ -94,6 +109,7 @@ export const Route = createFileRoute("/api/public/handheld/label-templates/$id")
         if ((cur as any).is_default) {
           const { data: next } = await (supabaseAdmin.from("inv_label_templates" as never) as any)
             .select("id")
+            .eq("print_type", (cur as any).print_type ?? "label")
             .order("updated_at", { ascending: false })
             .limit(1)
             .maybeSingle();

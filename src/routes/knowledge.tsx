@@ -11,7 +11,12 @@ import { knowledgeArticles, knowledgeCategories } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/knowledge")({
-  head: () => ({ meta: [{ title: "知识库 · BOOMER OFF" }, { name: "description", content: "商品知识、SOP、QA 与装修流程" }] }),
+  head: () => ({
+    meta: [
+      { title: "内部知识库 · BOOMER OFF" },
+      { name: "description", content: "内部 SOP、QA、培训与门店流程" },
+    ],
+  }),
   component: KnowledgePage,
 });
 
@@ -35,11 +40,20 @@ function KnowledgePage() {
   return (
     <div>
       <PageHeader
-        title="知识库"
-        description="商品知识、标准 SOP、问答手册与加盟商培训资料"
-        meta={<span>共 {knowledgeArticles.length} 篇文章 · 累计阅读 {knowledgeArticles.reduce((s, a) => s + a.views, 0).toLocaleString()} 次</span>}
+        title="内部知识库"
+        description="仅供员工使用的标准 SOP、问答手册、门店流程与加盟商培训资料"
+        meta={
+          <span>
+            共 {knowledgeArticles.length} 篇文章 · 累计阅读{" "}
+            {knowledgeArticles.reduce((s, a) => s + a.views, 0).toLocaleString()} 次
+          </span>
+        }
         actions={
-          <Button size="sm" className="bg-gradient-brand hover:opacity-90" onClick={() => toast.info("功能开发中")}>
+          <Button
+            size="sm"
+            className="bg-gradient-brand hover:opacity-90"
+            onClick={() => toast.info("功能开发中")}
+          >
             <Plus className="mr-1.5 h-3.5 w-3.5" />
             新增文章
           </Button>
@@ -80,12 +94,21 @@ function KnowledgePage() {
         {/* Article list */}
         <div className="space-y-3">
           {list.map((a) => (
-            <Card key={a.id} className="cursor-pointer overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-card-hover">
+            <Card
+              key={a.id}
+              className="cursor-pointer overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-card-hover"
+            >
               <div className="flex">
-                <img src={a.cover} alt="" className="h-28 w-32 shrink-0 object-cover sm:h-32 sm:w-40" />
+                <img
+                  src={a.cover}
+                  alt=""
+                  className="h-28 w-32 shrink-0 object-cover sm:h-32 sm:w-40"
+                />
                 <CardContent className="flex-1 p-4">
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-[10px]">{a.type}</Badge>
+                    <Badge variant="outline" className="text-[10px]">
+                      {a.type}
+                    </Badge>
                     <span className="text-[11px] text-muted-foreground tabular-nums inline-flex items-center gap-1">
                       <Calendar className="h-3 w-3" />
                       {a.updated}
@@ -118,7 +141,9 @@ function KnowledgePage() {
                   <span
                     className={cn(
                       "flex h-5 w-5 shrink-0 items-center justify-center rounded text-[11px] font-semibold",
-                      i < 3 ? "bg-gradient-brand text-primary-foreground" : "bg-muted text-muted-foreground",
+                      i < 3
+                        ? "bg-gradient-brand text-primary-foreground"
+                        : "bg-muted text-muted-foreground",
                     )}
                   >
                     {i + 1}

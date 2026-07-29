@@ -1,6 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { HANDHELD_CORS, authenticateDevice, ok } from "@/server/handheld-auth.server";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import {
+  HANDHELD_CORS,
+  authenticateDevice,
+  loadVisibleLocationsForDevice,
+  ok,
+  resolveSessionUser,
+} from "@/server/handheld-auth.server";
 
 export const Route = createFileRoute("/api/public/handheld/locations")({
   server: {
@@ -9,12 +14,13 @@ export const Route = createFileRoute("/api/public/handheld/locations")({
       GET: async ({ request }) => {
         const auth = await authenticateDevice(request);
         if (!auth.ok) return auth.response;
-        const { data } = await supabaseAdmin
-          .from("inv_locations")
-          .select("id, name, kind, is_active")
-          .order("kind")
-          .order("name");
-        return ok({ items: data ?? [] });
+        const sessionUser = await resolveSessionUser(request);
+        const { locations } = await loadVisibleLocationsForDevice(
+          auth.device.id,
+          auth.device.location_id,
+          sessionUser?.user_id,
+        );
+        return ok({ items: locations });
       },
     },
   },

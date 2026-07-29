@@ -895,13 +895,13 @@ function PosPage() {
     <div className="min-h-screen bg-[#f5f6f8] text-[#101828]">
       <style>{`
         @media print {
-          @page { size: 80mm auto; margin: 4mm; }
+          @page { size: 58mm auto; margin: 4mm; }
           body * { visibility: hidden !important; }
           .pos-receipt, .pos-receipt * { visibility: visible !important; }
           .pos-receipt {
             position: absolute !important;
             inset: 0 auto auto 0 !important;
-            width: 72mm !important;
+            width: 50mm !important;
             border: 0 !important;
             box-shadow: none !important;
           }

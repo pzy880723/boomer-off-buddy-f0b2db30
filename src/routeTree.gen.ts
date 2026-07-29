@@ -41,6 +41,8 @@ import { Route as MInboundRouteImport } from './routes/m.inbound'
 import { Route as MParcelsRouteImport } from './routes/m.parcels'
 import { Route as MPhotoSearchRouteImport } from './routes/m.photo-search'
 import { Route as MScanRouteImport } from './routes/m.scan'
+import { Route as OperationsContentRouteImport } from './routes/operations.content'
+import { Route as OperationsOfficialKnowledgeRouteImport } from './routes/operations.official-knowledge'
 import { Route as OrdersAfterSalesRouteImport } from './routes/orders.after-sales'
 import { Route as OrdersDispatchRouteImport } from './routes/orders.dispatch'
 import { Route as OrdersOnlineRouteImport } from './routes/orders.online'
@@ -65,6 +67,7 @@ import { Route as StoresProductsRouteImport } from './routes/stores.products'
 import { Route as StoresYouzanRouteImport } from './routes/stores.youzan'
 import { Route as YouzanSyncRouteImport } from './routes/youzan.sync'
 import { Route as ApiPublicMerukiIngestRouteImport } from './routes/api/public/meruki-ingest'
+import { Route as ApiPublicOfficialKnowledgeRouteImport } from './routes/api/public/official-knowledge'
 import { Route as InventoryInboundIndexRouteImport } from './routes/inventory.inbound.index'
 import { Route as InventoryInboundIdRouteImport } from './routes/inventory.inbound.$id'
 import { Route as InventoryInboundNewRouteImport } from './routes/inventory.inbound.new'
@@ -78,6 +81,10 @@ import { Route as MProductsCodeRouteImport } from './routes/m.products.$code'
 import { Route as MReceiveIdRouteImport } from './routes/m.receive.$id'
 import { Route as MSkusIndexRouteImport } from './routes/m.skus.index'
 import { Route as MSkusIdRouteImport } from './routes/m.skus.$id'
+import { Route as OperationsContentIdRouteImport } from './routes/operations.content.$id'
+import { Route as OperationsContentNewRouteImport } from './routes/operations.content.new'
+import { Route as OperationsOfficialKnowledgeIdRouteImport } from './routes/operations.official-knowledge.$id'
+import { Route as OperationsOfficialKnowledgeNewRouteImport } from './routes/operations.official-knowledge.new'
 import { Route as PurchaseDomesticBulkIndexRouteImport } from './routes/purchase.domestic-bulk.index'
 import { Route as PurchaseDomesticBulkIdRouteImport } from './routes/purchase.domestic-bulk.$id'
 import { Route as PurchaseDomesticBulkNewRouteImport } from './routes/purchase.domestic-bulk.new'
@@ -89,6 +96,8 @@ import { Route as PurchaseJapanParcelIdRouteImport } from './routes/purchase.jap
 import { Route as PurchaseJapanParcelAccountsRouteImport } from './routes/purchase.japan-parcel.accounts'
 import { Route as PurchaseJapanParcelImportRouteImport } from './routes/purchase.japan-parcel.import'
 import { Route as PurchaseJapanParcelNewRouteImport } from './routes/purchase.japan-parcel.new'
+import { Route as ApiPublicContentIdRouteImport } from './routes/api/public/content/$id'
+import { Route as ApiPublicContentFeedRouteImport } from './routes/api/public/content/feed'
 import { Route as ApiPublicHandheldDashboardRouteImport } from './routes/api/public/handheld/dashboard'
 import { Route as ApiPublicHandheldFulfillmentsRouteImport } from './routes/api/public/handheld/fulfillments'
 import { Route as ApiPublicHandheldGlobalStockRouteImport } from './routes/api/public/handheld/global-stock'
@@ -114,6 +123,7 @@ import { Route as ApiPublicHooksYouzanRelistRouteImport } from './routes/api/pub
 import { Route as ApiPublicHooksYouzanStockWorkerRouteImport } from './routes/api/public/hooks/youzan-stock-worker'
 import { Route as ApiPublicHooksYouzanSyncRouteImport } from './routes/api/public/hooks/youzan-sync'
 import { Route as ApiPublicHooksYouzanSyncWorkerRouteImport } from './routes/api/public/hooks/youzan-sync-worker'
+import { Route as ApiPublicOfficialKnowledgeIdRouteImport } from './routes/api/public/official-knowledge/$id'
 import { Route as ApiPublicPosAuthorizationsRouteImport } from './routes/api/public/pos/authorizations'
 import { Route as ApiPublicPosBootstrapRouteImport } from './routes/api/public/pos/bootstrap'
 import { Route as ApiPublicPosCashMovementsRouteImport } from './routes/api/public/pos/cash-movements'
@@ -128,6 +138,10 @@ import { Route as ApiPublicStorefrontProductsRouteImport } from './routes/api/pu
 import { Route as ApiPublicStorefrontTaxonomyRouteImport } from './routes/api/public/storefront/taxonomy'
 import { Route as ApiPublicAuthOtpSendRouteImport } from './routes/api/public/auth/otp.send'
 import { Route as ApiPublicAuthOtpVerifyRouteImport } from './routes/api/public/auth/otp.verify'
+import { Route as ApiPublicContentIdBookmarkRouteImport } from './routes/api/public/content/$id.bookmark'
+import { Route as ApiPublicContentIdCommentsRouteImport } from './routes/api/public/content/$id.comments'
+import { Route as ApiPublicContentIdLikeRouteImport } from './routes/api/public/content/$id.like'
+import { Route as ApiPublicContentIdShareRouteImport } from './routes/api/public/content/$id.share'
 import { Route as ApiPublicHandheldAiPrepareListingImageRouteImport } from './routes/api/public/handheld/ai.prepare-listing-image'
 import { Route as ApiPublicHandheldAiRecognizeItemRouteImport } from './routes/api/public/handheld/ai.recognize-item'
 import { Route as ApiPublicHandheldAuthBootstrapRouteImport } from './routes/api/public/handheld/auth.bootstrap'
@@ -360,6 +374,17 @@ const MScanRoute = MScanRouteImport.update({
   path: '/scan',
   getParentRoute: () => MRoute,
 } as any)
+const OperationsContentRoute = OperationsContentRouteImport.update({
+  id: '/operations/content',
+  path: '/operations/content',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OperationsOfficialKnowledgeRoute =
+  OperationsOfficialKnowledgeRouteImport.update({
+    id: '/operations/official-knowledge',
+    path: '/operations/official-knowledge',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const OrdersAfterSalesRoute = OrdersAfterSalesRouteImport.update({
   id: '/after-sales',
   path: '/after-sales',
@@ -480,6 +505,12 @@ const ApiPublicMerukiIngestRoute = ApiPublicMerukiIngestRouteImport.update({
   path: '/api/public/meruki-ingest',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicOfficialKnowledgeRoute =
+  ApiPublicOfficialKnowledgeRouteImport.update({
+    id: '/api/public/official-knowledge',
+    path: '/api/public/official-knowledge',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const InventoryInboundIndexRoute = InventoryInboundIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -546,6 +577,28 @@ const MSkusIdRoute = MSkusIdRouteImport.update({
   path: '/skus/$id',
   getParentRoute: () => MRoute,
 } as any)
+const OperationsContentIdRoute = OperationsContentIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => OperationsContentRoute,
+} as any)
+const OperationsContentNewRoute = OperationsContentNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => OperationsContentRoute,
+} as any)
+const OperationsOfficialKnowledgeIdRoute =
+  OperationsOfficialKnowledgeIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => OperationsOfficialKnowledgeRoute,
+  } as any)
+const OperationsOfficialKnowledgeNewRoute =
+  OperationsOfficialKnowledgeNewRouteImport.update({
+    id: '/new',
+    path: '/new',
+    getParentRoute: () => OperationsOfficialKnowledgeRoute,
+  } as any)
 const PurchaseDomesticBulkIndexRoute =
   PurchaseDomesticBulkIndexRouteImport.update({
     id: '/',
@@ -604,6 +657,16 @@ const PurchaseJapanParcelNewRoute = PurchaseJapanParcelNewRouteImport.update({
   id: '/new',
   path: '/new',
   getParentRoute: () => PurchaseJapanParcelRoute,
+} as any)
+const ApiPublicContentIdRoute = ApiPublicContentIdRouteImport.update({
+  id: '/api/public/content/$id',
+  path: '/api/public/content/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicContentFeedRoute = ApiPublicContentFeedRouteImport.update({
+  id: '/api/public/content/feed',
+  path: '/api/public/content/feed',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicHandheldDashboardRoute =
   ApiPublicHandheldDashboardRouteImport.update({
@@ -755,6 +818,12 @@ const ApiPublicHooksYouzanSyncWorkerRoute =
     path: '/api/public/hooks/youzan-sync-worker',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicOfficialKnowledgeIdRoute =
+  ApiPublicOfficialKnowledgeIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => ApiPublicOfficialKnowledgeRoute,
+  } as any)
 const ApiPublicPosAuthorizationsRoute =
   ApiPublicPosAuthorizationsRouteImport.update({
     id: '/api/public/pos/authorizations',
@@ -831,6 +900,28 @@ const ApiPublicAuthOtpVerifyRoute = ApiPublicAuthOtpVerifyRouteImport.update({
   id: '/api/public/auth/otp/verify',
   path: '/api/public/auth/otp/verify',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicContentIdBookmarkRoute =
+  ApiPublicContentIdBookmarkRouteImport.update({
+    id: '/bookmark',
+    path: '/bookmark',
+    getParentRoute: () => ApiPublicContentIdRoute,
+  } as any)
+const ApiPublicContentIdCommentsRoute =
+  ApiPublicContentIdCommentsRouteImport.update({
+    id: '/comments',
+    path: '/comments',
+    getParentRoute: () => ApiPublicContentIdRoute,
+  } as any)
+const ApiPublicContentIdLikeRoute = ApiPublicContentIdLikeRouteImport.update({
+  id: '/like',
+  path: '/like',
+  getParentRoute: () => ApiPublicContentIdRoute,
+} as any)
+const ApiPublicContentIdShareRoute = ApiPublicContentIdShareRouteImport.update({
+  id: '/share',
+  path: '/share',
+  getParentRoute: () => ApiPublicContentIdRoute,
 } as any)
 const ApiPublicHandheldAiPrepareListingImageRoute =
   ApiPublicHandheldAiPrepareListingImageRouteImport.update({
@@ -1280,6 +1371,8 @@ export interface FileRoutesByFullPath {
   '/m/parcels': typeof MParcelsRoute
   '/m/photo-search': typeof MPhotoSearchRoute
   '/m/scan': typeof MScanRoute
+  '/operations/content': typeof OperationsContentRouteWithChildren
+  '/operations/official-knowledge': typeof OperationsOfficialKnowledgeRouteWithChildren
   '/orders/after-sales': typeof OrdersAfterSalesRoute
   '/orders/dispatch': typeof OrdersDispatchRoute
   '/orders/online': typeof OrdersOnlineRoute
@@ -1305,6 +1398,7 @@ export interface FileRoutesByFullPath {
   '/m/': typeof MIndexRoute
   '/store/': typeof StoreIndexRoute
   '/api/public/meruki-ingest': typeof ApiPublicMerukiIngestRoute
+  '/api/public/official-knowledge': typeof ApiPublicOfficialKnowledgeRouteWithChildren
   '/inventory/inbound/$id': typeof InventoryInboundIdRoute
   '/inventory/inbound/new': typeof InventoryInboundNewRoute
   '/inventory/products/$code': typeof InventoryProductsCodeRoute
@@ -1314,6 +1408,10 @@ export interface FileRoutesByFullPath {
   '/m/products/$code': typeof MProductsCodeRoute
   '/m/receive/$id': typeof MReceiveIdRoute
   '/m/skus/$id': typeof MSkusIdRoute
+  '/operations/content/$id': typeof OperationsContentIdRoute
+  '/operations/content/new': typeof OperationsContentNewRoute
+  '/operations/official-knowledge/$id': typeof OperationsOfficialKnowledgeIdRoute
+  '/operations/official-knowledge/new': typeof OperationsOfficialKnowledgeNewRoute
   '/purchase/domestic-bulk/$id': typeof PurchaseDomesticBulkIdRoute
   '/purchase/domestic-bulk/new': typeof PurchaseDomesticBulkNewRoute
   '/purchase/domestic/$id': typeof PurchaseDomesticIdRoute
@@ -1329,6 +1427,8 @@ export interface FileRoutesByFullPath {
   '/purchase/domestic-bulk/': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic/': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
+  '/api/public/content/$id': typeof ApiPublicContentIdRouteWithChildren
+  '/api/public/content/feed': typeof ApiPublicContentFeedRoute
   '/api/public/handheld/dashboard': typeof ApiPublicHandheldDashboardRoute
   '/api/public/handheld/fulfillments': typeof ApiPublicHandheldFulfillmentsRouteWithChildren
   '/api/public/handheld/global-stock': typeof ApiPublicHandheldGlobalStockRoute
@@ -1354,6 +1454,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
   '/api/public/hooks/youzan-sync': typeof ApiPublicHooksYouzanSyncRoute
   '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
+  '/api/public/official-knowledge/$id': typeof ApiPublicOfficialKnowledgeIdRoute
   '/api/public/pos/authorizations': typeof ApiPublicPosAuthorizationsRoute
   '/api/public/pos/bootstrap': typeof ApiPublicPosBootstrapRoute
   '/api/public/pos/cash-movements': typeof ApiPublicPosCashMovementsRoute
@@ -1368,6 +1469,10 @@ export interface FileRoutesByFullPath {
   '/api/public/storefront/taxonomy': typeof ApiPublicStorefrontTaxonomyRoute
   '/api/public/auth/otp/send': typeof ApiPublicAuthOtpSendRoute
   '/api/public/auth/otp/verify': typeof ApiPublicAuthOtpVerifyRoute
+  '/api/public/content/$id/bookmark': typeof ApiPublicContentIdBookmarkRoute
+  '/api/public/content/$id/comments': typeof ApiPublicContentIdCommentsRoute
+  '/api/public/content/$id/like': typeof ApiPublicContentIdLikeRoute
+  '/api/public/content/$id/share': typeof ApiPublicContentIdShareRoute
   '/api/public/handheld/ai/prepare-listing-image': typeof ApiPublicHandheldAiPrepareListingImageRoute
   '/api/public/handheld/ai/recognize-item': typeof ApiPublicHandheldAiRecognizeItemRoute
   '/api/public/handheld/auth/bootstrap': typeof ApiPublicHandheldAuthBootstrapRoute
@@ -1467,6 +1572,8 @@ export interface FileRoutesByTo {
   '/m/parcels': typeof MParcelsRoute
   '/m/photo-search': typeof MPhotoSearchRoute
   '/m/scan': typeof MScanRoute
+  '/operations/content': typeof OperationsContentRouteWithChildren
+  '/operations/official-knowledge': typeof OperationsOfficialKnowledgeRouteWithChildren
   '/orders/after-sales': typeof OrdersAfterSalesRoute
   '/orders/dispatch': typeof OrdersDispatchRoute
   '/orders/online': typeof OrdersOnlineRoute
@@ -1489,6 +1596,7 @@ export interface FileRoutesByTo {
   '/m': typeof MIndexRoute
   '/store': typeof StoreIndexRoute
   '/api/public/meruki-ingest': typeof ApiPublicMerukiIngestRoute
+  '/api/public/official-knowledge': typeof ApiPublicOfficialKnowledgeRouteWithChildren
   '/inventory/inbound/$id': typeof InventoryInboundIdRoute
   '/inventory/inbound/new': typeof InventoryInboundNewRoute
   '/inventory/products/$code': typeof InventoryProductsCodeRoute
@@ -1498,6 +1606,10 @@ export interface FileRoutesByTo {
   '/m/products/$code': typeof MProductsCodeRoute
   '/m/receive/$id': typeof MReceiveIdRoute
   '/m/skus/$id': typeof MSkusIdRoute
+  '/operations/content/$id': typeof OperationsContentIdRoute
+  '/operations/content/new': typeof OperationsContentNewRoute
+  '/operations/official-knowledge/$id': typeof OperationsOfficialKnowledgeIdRoute
+  '/operations/official-knowledge/new': typeof OperationsOfficialKnowledgeNewRoute
   '/purchase/domestic-bulk/$id': typeof PurchaseDomesticBulkIdRoute
   '/purchase/domestic-bulk/new': typeof PurchaseDomesticBulkNewRoute
   '/purchase/domestic/$id': typeof PurchaseDomesticIdRoute
@@ -1513,6 +1625,8 @@ export interface FileRoutesByTo {
   '/purchase/domestic-bulk': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel': typeof PurchaseJapanParcelIndexRoute
+  '/api/public/content/$id': typeof ApiPublicContentIdRouteWithChildren
+  '/api/public/content/feed': typeof ApiPublicContentFeedRoute
   '/api/public/handheld/dashboard': typeof ApiPublicHandheldDashboardRoute
   '/api/public/handheld/fulfillments': typeof ApiPublicHandheldFulfillmentsRouteWithChildren
   '/api/public/handheld/global-stock': typeof ApiPublicHandheldGlobalStockRoute
@@ -1538,6 +1652,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
   '/api/public/hooks/youzan-sync': typeof ApiPublicHooksYouzanSyncRoute
   '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
+  '/api/public/official-knowledge/$id': typeof ApiPublicOfficialKnowledgeIdRoute
   '/api/public/pos/authorizations': typeof ApiPublicPosAuthorizationsRoute
   '/api/public/pos/bootstrap': typeof ApiPublicPosBootstrapRoute
   '/api/public/pos/cash-movements': typeof ApiPublicPosCashMovementsRoute
@@ -1552,6 +1667,10 @@ export interface FileRoutesByTo {
   '/api/public/storefront/taxonomy': typeof ApiPublicStorefrontTaxonomyRoute
   '/api/public/auth/otp/send': typeof ApiPublicAuthOtpSendRoute
   '/api/public/auth/otp/verify': typeof ApiPublicAuthOtpVerifyRoute
+  '/api/public/content/$id/bookmark': typeof ApiPublicContentIdBookmarkRoute
+  '/api/public/content/$id/comments': typeof ApiPublicContentIdCommentsRoute
+  '/api/public/content/$id/like': typeof ApiPublicContentIdLikeRoute
+  '/api/public/content/$id/share': typeof ApiPublicContentIdShareRoute
   '/api/public/handheld/ai/prepare-listing-image': typeof ApiPublicHandheldAiPrepareListingImageRoute
   '/api/public/handheld/ai/recognize-item': typeof ApiPublicHandheldAiRecognizeItemRoute
   '/api/public/handheld/auth/bootstrap': typeof ApiPublicHandheldAuthBootstrapRoute
@@ -1656,6 +1775,8 @@ export interface FileRoutesById {
   '/m/parcels': typeof MParcelsRoute
   '/m/photo-search': typeof MPhotoSearchRoute
   '/m/scan': typeof MScanRoute
+  '/operations/content': typeof OperationsContentRouteWithChildren
+  '/operations/official-knowledge': typeof OperationsOfficialKnowledgeRouteWithChildren
   '/orders/after-sales': typeof OrdersAfterSalesRoute
   '/orders/dispatch': typeof OrdersDispatchRoute
   '/orders/online': typeof OrdersOnlineRoute
@@ -1681,6 +1802,7 @@ export interface FileRoutesById {
   '/m/': typeof MIndexRoute
   '/store/': typeof StoreIndexRoute
   '/api/public/meruki-ingest': typeof ApiPublicMerukiIngestRoute
+  '/api/public/official-knowledge': typeof ApiPublicOfficialKnowledgeRouteWithChildren
   '/inventory/inbound/$id': typeof InventoryInboundIdRoute
   '/inventory/inbound/new': typeof InventoryInboundNewRoute
   '/inventory/products/$code': typeof InventoryProductsCodeRoute
@@ -1690,6 +1812,10 @@ export interface FileRoutesById {
   '/m/products/$code': typeof MProductsCodeRoute
   '/m/receive/$id': typeof MReceiveIdRoute
   '/m/skus/$id': typeof MSkusIdRoute
+  '/operations/content/$id': typeof OperationsContentIdRoute
+  '/operations/content/new': typeof OperationsContentNewRoute
+  '/operations/official-knowledge/$id': typeof OperationsOfficialKnowledgeIdRoute
+  '/operations/official-knowledge/new': typeof OperationsOfficialKnowledgeNewRoute
   '/purchase/domestic-bulk/$id': typeof PurchaseDomesticBulkIdRoute
   '/purchase/domestic-bulk/new': typeof PurchaseDomesticBulkNewRoute
   '/purchase/domestic/$id': typeof PurchaseDomesticIdRoute
@@ -1705,6 +1831,8 @@ export interface FileRoutesById {
   '/purchase/domestic-bulk/': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic/': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
+  '/api/public/content/$id': typeof ApiPublicContentIdRouteWithChildren
+  '/api/public/content/feed': typeof ApiPublicContentFeedRoute
   '/api/public/handheld/dashboard': typeof ApiPublicHandheldDashboardRoute
   '/api/public/handheld/fulfillments': typeof ApiPublicHandheldFulfillmentsRouteWithChildren
   '/api/public/handheld/global-stock': typeof ApiPublicHandheldGlobalStockRoute
@@ -1730,6 +1858,7 @@ export interface FileRoutesById {
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
   '/api/public/hooks/youzan-sync': typeof ApiPublicHooksYouzanSyncRoute
   '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
+  '/api/public/official-knowledge/$id': typeof ApiPublicOfficialKnowledgeIdRoute
   '/api/public/pos/authorizations': typeof ApiPublicPosAuthorizationsRoute
   '/api/public/pos/bootstrap': typeof ApiPublicPosBootstrapRoute
   '/api/public/pos/cash-movements': typeof ApiPublicPosCashMovementsRoute
@@ -1744,6 +1873,10 @@ export interface FileRoutesById {
   '/api/public/storefront/taxonomy': typeof ApiPublicStorefrontTaxonomyRoute
   '/api/public/auth/otp/send': typeof ApiPublicAuthOtpSendRoute
   '/api/public/auth/otp/verify': typeof ApiPublicAuthOtpVerifyRoute
+  '/api/public/content/$id/bookmark': typeof ApiPublicContentIdBookmarkRoute
+  '/api/public/content/$id/comments': typeof ApiPublicContentIdCommentsRoute
+  '/api/public/content/$id/like': typeof ApiPublicContentIdLikeRoute
+  '/api/public/content/$id/share': typeof ApiPublicContentIdShareRoute
   '/api/public/handheld/ai/prepare-listing-image': typeof ApiPublicHandheldAiPrepareListingImageRoute
   '/api/public/handheld/ai/recognize-item': typeof ApiPublicHandheldAiRecognizeItemRoute
   '/api/public/handheld/auth/bootstrap': typeof ApiPublicHandheldAuthBootstrapRoute
@@ -1849,6 +1982,8 @@ export interface FileRouteTypes {
     | '/m/parcels'
     | '/m/photo-search'
     | '/m/scan'
+    | '/operations/content'
+    | '/operations/official-knowledge'
     | '/orders/after-sales'
     | '/orders/dispatch'
     | '/orders/online'
@@ -1874,6 +2009,7 @@ export interface FileRouteTypes {
     | '/m/'
     | '/store/'
     | '/api/public/meruki-ingest'
+    | '/api/public/official-knowledge'
     | '/inventory/inbound/$id'
     | '/inventory/inbound/new'
     | '/inventory/products/$code'
@@ -1883,6 +2019,10 @@ export interface FileRouteTypes {
     | '/m/products/$code'
     | '/m/receive/$id'
     | '/m/skus/$id'
+    | '/operations/content/$id'
+    | '/operations/content/new'
+    | '/operations/official-knowledge/$id'
+    | '/operations/official-knowledge/new'
     | '/purchase/domestic-bulk/$id'
     | '/purchase/domestic-bulk/new'
     | '/purchase/domestic/$id'
@@ -1898,6 +2038,8 @@ export interface FileRouteTypes {
     | '/purchase/domestic-bulk/'
     | '/purchase/domestic/'
     | '/purchase/japan-parcel/'
+    | '/api/public/content/$id'
+    | '/api/public/content/feed'
     | '/api/public/handheld/dashboard'
     | '/api/public/handheld/fulfillments'
     | '/api/public/handheld/global-stock'
@@ -1923,6 +2065,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-stock-worker'
     | '/api/public/hooks/youzan-sync'
     | '/api/public/hooks/youzan-sync-worker'
+    | '/api/public/official-knowledge/$id'
     | '/api/public/pos/authorizations'
     | '/api/public/pos/bootstrap'
     | '/api/public/pos/cash-movements'
@@ -1937,6 +2080,10 @@ export interface FileRouteTypes {
     | '/api/public/storefront/taxonomy'
     | '/api/public/auth/otp/send'
     | '/api/public/auth/otp/verify'
+    | '/api/public/content/$id/bookmark'
+    | '/api/public/content/$id/comments'
+    | '/api/public/content/$id/like'
+    | '/api/public/content/$id/share'
     | '/api/public/handheld/ai/prepare-listing-image'
     | '/api/public/handheld/ai/recognize-item'
     | '/api/public/handheld/auth/bootstrap'
@@ -2036,6 +2183,8 @@ export interface FileRouteTypes {
     | '/m/parcels'
     | '/m/photo-search'
     | '/m/scan'
+    | '/operations/content'
+    | '/operations/official-knowledge'
     | '/orders/after-sales'
     | '/orders/dispatch'
     | '/orders/online'
@@ -2058,6 +2207,7 @@ export interface FileRouteTypes {
     | '/m'
     | '/store'
     | '/api/public/meruki-ingest'
+    | '/api/public/official-knowledge'
     | '/inventory/inbound/$id'
     | '/inventory/inbound/new'
     | '/inventory/products/$code'
@@ -2067,6 +2217,10 @@ export interface FileRouteTypes {
     | '/m/products/$code'
     | '/m/receive/$id'
     | '/m/skus/$id'
+    | '/operations/content/$id'
+    | '/operations/content/new'
+    | '/operations/official-knowledge/$id'
+    | '/operations/official-knowledge/new'
     | '/purchase/domestic-bulk/$id'
     | '/purchase/domestic-bulk/new'
     | '/purchase/domestic/$id'
@@ -2082,6 +2236,8 @@ export interface FileRouteTypes {
     | '/purchase/domestic-bulk'
     | '/purchase/domestic'
     | '/purchase/japan-parcel'
+    | '/api/public/content/$id'
+    | '/api/public/content/feed'
     | '/api/public/handheld/dashboard'
     | '/api/public/handheld/fulfillments'
     | '/api/public/handheld/global-stock'
@@ -2107,6 +2263,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-stock-worker'
     | '/api/public/hooks/youzan-sync'
     | '/api/public/hooks/youzan-sync-worker'
+    | '/api/public/official-knowledge/$id'
     | '/api/public/pos/authorizations'
     | '/api/public/pos/bootstrap'
     | '/api/public/pos/cash-movements'
@@ -2121,6 +2278,10 @@ export interface FileRouteTypes {
     | '/api/public/storefront/taxonomy'
     | '/api/public/auth/otp/send'
     | '/api/public/auth/otp/verify'
+    | '/api/public/content/$id/bookmark'
+    | '/api/public/content/$id/comments'
+    | '/api/public/content/$id/like'
+    | '/api/public/content/$id/share'
     | '/api/public/handheld/ai/prepare-listing-image'
     | '/api/public/handheld/ai/recognize-item'
     | '/api/public/handheld/auth/bootstrap'
@@ -2224,6 +2385,8 @@ export interface FileRouteTypes {
     | '/m/parcels'
     | '/m/photo-search'
     | '/m/scan'
+    | '/operations/content'
+    | '/operations/official-knowledge'
     | '/orders/after-sales'
     | '/orders/dispatch'
     | '/orders/online'
@@ -2249,6 +2412,7 @@ export interface FileRouteTypes {
     | '/m/'
     | '/store/'
     | '/api/public/meruki-ingest'
+    | '/api/public/official-knowledge'
     | '/inventory/inbound/$id'
     | '/inventory/inbound/new'
     | '/inventory/products/$code'
@@ -2258,6 +2422,10 @@ export interface FileRouteTypes {
     | '/m/products/$code'
     | '/m/receive/$id'
     | '/m/skus/$id'
+    | '/operations/content/$id'
+    | '/operations/content/new'
+    | '/operations/official-knowledge/$id'
+    | '/operations/official-knowledge/new'
     | '/purchase/domestic-bulk/$id'
     | '/purchase/domestic-bulk/new'
     | '/purchase/domestic/$id'
@@ -2273,6 +2441,8 @@ export interface FileRouteTypes {
     | '/purchase/domestic-bulk/'
     | '/purchase/domestic/'
     | '/purchase/japan-parcel/'
+    | '/api/public/content/$id'
+    | '/api/public/content/feed'
     | '/api/public/handheld/dashboard'
     | '/api/public/handheld/fulfillments'
     | '/api/public/handheld/global-stock'
@@ -2298,6 +2468,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-stock-worker'
     | '/api/public/hooks/youzan-sync'
     | '/api/public/hooks/youzan-sync-worker'
+    | '/api/public/official-knowledge/$id'
     | '/api/public/pos/authorizations'
     | '/api/public/pos/bootstrap'
     | '/api/public/pos/cash-movements'
@@ -2312,6 +2483,10 @@ export interface FileRouteTypes {
     | '/api/public/storefront/taxonomy'
     | '/api/public/auth/otp/send'
     | '/api/public/auth/otp/verify'
+    | '/api/public/content/$id/bookmark'
+    | '/api/public/content/$id/comments'
+    | '/api/public/content/$id/like'
+    | '/api/public/content/$id/share'
     | '/api/public/handheld/ai/prepare-listing-image'
     | '/api/public/handheld/ai/recognize-item'
     | '/api/public/handheld/auth/bootstrap'
@@ -2412,6 +2587,8 @@ export interface RootRouteChildren {
   InventorySkusRoute: typeof InventorySkusRouteWithChildren
   InventoryTransfersRoute: typeof InventoryTransfersRoute
   InventoryUnclaimedRoute: typeof InventoryUnclaimedRoute
+  OperationsContentRoute: typeof OperationsContentRouteWithChildren
+  OperationsOfficialKnowledgeRoute: typeof OperationsOfficialKnowledgeRouteWithChildren
   PurchaseDomesticRoute: typeof PurchaseDomesticRouteWithChildren
   PurchaseDomesticBulkRoute: typeof PurchaseDomesticBulkRouteWithChildren
   PurchaseJapanBulkRoute: typeof PurchaseJapanBulkRoute
@@ -2421,8 +2598,11 @@ export interface RootRouteChildren {
   StoresProductsRoute: typeof StoresProductsRoute
   StoresYouzanRoute: typeof StoresYouzanRoute
   ApiPublicMerukiIngestRoute: typeof ApiPublicMerukiIngestRoute
+  ApiPublicOfficialKnowledgeRoute: typeof ApiPublicOfficialKnowledgeRouteWithChildren
   InventoryStocktakesIdRoute: typeof InventoryStocktakesIdRoute
   InventoryStocktakesIndexRoute: typeof InventoryStocktakesIndexRoute
+  ApiPublicContentIdRoute: typeof ApiPublicContentIdRouteWithChildren
+  ApiPublicContentFeedRoute: typeof ApiPublicContentFeedRoute
   ApiPublicHandheldDashboardRoute: typeof ApiPublicHandheldDashboardRoute
   ApiPublicHandheldFulfillmentsRoute: typeof ApiPublicHandheldFulfillmentsRouteWithChildren
   ApiPublicHandheldGlobalStockRoute: typeof ApiPublicHandheldGlobalStockRoute
@@ -2730,6 +2910,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MScanRouteImport
       parentRoute: typeof MRoute
     }
+    '/operations/content': {
+      id: '/operations/content'
+      path: '/operations/content'
+      fullPath: '/operations/content'
+      preLoaderRoute: typeof OperationsContentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/operations/official-knowledge': {
+      id: '/operations/official-knowledge'
+      path: '/operations/official-knowledge'
+      fullPath: '/operations/official-knowledge'
+      preLoaderRoute: typeof OperationsOfficialKnowledgeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/orders/after-sales': {
       id: '/orders/after-sales'
       path: '/after-sales'
@@ -2898,6 +3092,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicMerukiIngestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/official-knowledge': {
+      id: '/api/public/official-knowledge'
+      path: '/api/public/official-knowledge'
+      fullPath: '/api/public/official-knowledge'
+      preLoaderRoute: typeof ApiPublicOfficialKnowledgeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/inventory/inbound/': {
       id: '/inventory/inbound/'
       path: '/'
@@ -2989,6 +3190,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MSkusIdRouteImport
       parentRoute: typeof MRoute
     }
+    '/operations/content/$id': {
+      id: '/operations/content/$id'
+      path: '/$id'
+      fullPath: '/operations/content/$id'
+      preLoaderRoute: typeof OperationsContentIdRouteImport
+      parentRoute: typeof OperationsContentRoute
+    }
+    '/operations/content/new': {
+      id: '/operations/content/new'
+      path: '/new'
+      fullPath: '/operations/content/new'
+      preLoaderRoute: typeof OperationsContentNewRouteImport
+      parentRoute: typeof OperationsContentRoute
+    }
+    '/operations/official-knowledge/$id': {
+      id: '/operations/official-knowledge/$id'
+      path: '/$id'
+      fullPath: '/operations/official-knowledge/$id'
+      preLoaderRoute: typeof OperationsOfficialKnowledgeIdRouteImport
+      parentRoute: typeof OperationsOfficialKnowledgeRoute
+    }
+    '/operations/official-knowledge/new': {
+      id: '/operations/official-knowledge/new'
+      path: '/new'
+      fullPath: '/operations/official-knowledge/new'
+      preLoaderRoute: typeof OperationsOfficialKnowledgeNewRouteImport
+      parentRoute: typeof OperationsOfficialKnowledgeRoute
+    }
     '/purchase/domestic-bulk/': {
       id: '/purchase/domestic-bulk/'
       path: '/'
@@ -3065,6 +3294,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/purchase/japan-parcel/new'
       preLoaderRoute: typeof PurchaseJapanParcelNewRouteImport
       parentRoute: typeof PurchaseJapanParcelRoute
+    }
+    '/api/public/content/$id': {
+      id: '/api/public/content/$id'
+      path: '/api/public/content/$id'
+      fullPath: '/api/public/content/$id'
+      preLoaderRoute: typeof ApiPublicContentIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/content/feed': {
+      id: '/api/public/content/feed'
+      path: '/api/public/content/feed'
+      fullPath: '/api/public/content/feed'
+      preLoaderRoute: typeof ApiPublicContentFeedRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/public/handheld/dashboard': {
       id: '/api/public/handheld/dashboard'
@@ -3241,6 +3484,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksYouzanSyncWorkerRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/official-knowledge/$id': {
+      id: '/api/public/official-knowledge/$id'
+      path: '/$id'
+      fullPath: '/api/public/official-knowledge/$id'
+      preLoaderRoute: typeof ApiPublicOfficialKnowledgeIdRouteImport
+      parentRoute: typeof ApiPublicOfficialKnowledgeRoute
+    }
     '/api/public/pos/authorizations': {
       id: '/api/public/pos/authorizations'
       path: '/api/public/pos/authorizations'
@@ -3338,6 +3588,34 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/public/auth/otp/verify'
       preLoaderRoute: typeof ApiPublicAuthOtpVerifyRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/api/public/content/$id/bookmark': {
+      id: '/api/public/content/$id/bookmark'
+      path: '/bookmark'
+      fullPath: '/api/public/content/$id/bookmark'
+      preLoaderRoute: typeof ApiPublicContentIdBookmarkRouteImport
+      parentRoute: typeof ApiPublicContentIdRoute
+    }
+    '/api/public/content/$id/comments': {
+      id: '/api/public/content/$id/comments'
+      path: '/comments'
+      fullPath: '/api/public/content/$id/comments'
+      preLoaderRoute: typeof ApiPublicContentIdCommentsRouteImport
+      parentRoute: typeof ApiPublicContentIdRoute
+    }
+    '/api/public/content/$id/like': {
+      id: '/api/public/content/$id/like'
+      path: '/like'
+      fullPath: '/api/public/content/$id/like'
+      preLoaderRoute: typeof ApiPublicContentIdLikeRouteImport
+      parentRoute: typeof ApiPublicContentIdRoute
+    }
+    '/api/public/content/$id/share': {
+      id: '/api/public/content/$id/share'
+      path: '/share'
+      fullPath: '/api/public/content/$id/share'
+      preLoaderRoute: typeof ApiPublicContentIdShareRouteImport
+      parentRoute: typeof ApiPublicContentIdRoute
     }
     '/api/public/handheld/ai/prepare-listing-image': {
       id: '/api/public/handheld/ai/prepare-listing-image'
@@ -3966,6 +4244,35 @@ const InventorySkusRouteWithChildren = InventorySkusRoute._addFileChildren(
   InventorySkusRouteChildren,
 )
 
+interface OperationsContentRouteChildren {
+  OperationsContentIdRoute: typeof OperationsContentIdRoute
+  OperationsContentNewRoute: typeof OperationsContentNewRoute
+}
+
+const OperationsContentRouteChildren: OperationsContentRouteChildren = {
+  OperationsContentIdRoute: OperationsContentIdRoute,
+  OperationsContentNewRoute: OperationsContentNewRoute,
+}
+
+const OperationsContentRouteWithChildren =
+  OperationsContentRoute._addFileChildren(OperationsContentRouteChildren)
+
+interface OperationsOfficialKnowledgeRouteChildren {
+  OperationsOfficialKnowledgeIdRoute: typeof OperationsOfficialKnowledgeIdRoute
+  OperationsOfficialKnowledgeNewRoute: typeof OperationsOfficialKnowledgeNewRoute
+}
+
+const OperationsOfficialKnowledgeRouteChildren: OperationsOfficialKnowledgeRouteChildren =
+  {
+    OperationsOfficialKnowledgeIdRoute: OperationsOfficialKnowledgeIdRoute,
+    OperationsOfficialKnowledgeNewRoute: OperationsOfficialKnowledgeNewRoute,
+  }
+
+const OperationsOfficialKnowledgeRouteWithChildren =
+  OperationsOfficialKnowledgeRoute._addFileChildren(
+    OperationsOfficialKnowledgeRouteChildren,
+  )
+
 interface PurchaseDomesticRouteChildren {
   PurchaseDomesticIdRoute: typeof PurchaseDomesticIdRoute
   PurchaseDomesticImportRoute: typeof PurchaseDomesticImportRoute
@@ -4014,6 +4321,37 @@ const PurchaseJapanParcelRouteChildren: PurchaseJapanParcelRouteChildren = {
 
 const PurchaseJapanParcelRouteWithChildren =
   PurchaseJapanParcelRoute._addFileChildren(PurchaseJapanParcelRouteChildren)
+
+interface ApiPublicOfficialKnowledgeRouteChildren {
+  ApiPublicOfficialKnowledgeIdRoute: typeof ApiPublicOfficialKnowledgeIdRoute
+}
+
+const ApiPublicOfficialKnowledgeRouteChildren: ApiPublicOfficialKnowledgeRouteChildren =
+  {
+    ApiPublicOfficialKnowledgeIdRoute: ApiPublicOfficialKnowledgeIdRoute,
+  }
+
+const ApiPublicOfficialKnowledgeRouteWithChildren =
+  ApiPublicOfficialKnowledgeRoute._addFileChildren(
+    ApiPublicOfficialKnowledgeRouteChildren,
+  )
+
+interface ApiPublicContentIdRouteChildren {
+  ApiPublicContentIdBookmarkRoute: typeof ApiPublicContentIdBookmarkRoute
+  ApiPublicContentIdCommentsRoute: typeof ApiPublicContentIdCommentsRoute
+  ApiPublicContentIdLikeRoute: typeof ApiPublicContentIdLikeRoute
+  ApiPublicContentIdShareRoute: typeof ApiPublicContentIdShareRoute
+}
+
+const ApiPublicContentIdRouteChildren: ApiPublicContentIdRouteChildren = {
+  ApiPublicContentIdBookmarkRoute: ApiPublicContentIdBookmarkRoute,
+  ApiPublicContentIdCommentsRoute: ApiPublicContentIdCommentsRoute,
+  ApiPublicContentIdLikeRoute: ApiPublicContentIdLikeRoute,
+  ApiPublicContentIdShareRoute: ApiPublicContentIdShareRoute,
+}
+
+const ApiPublicContentIdRouteWithChildren =
+  ApiPublicContentIdRoute._addFileChildren(ApiPublicContentIdRouteChildren)
 
 interface ApiPublicHandheldFulfillmentsIdRouteChildren {
   ApiPublicHandheldFulfillmentsIdBindToteRoute: typeof ApiPublicHandheldFulfillmentsIdBindToteRoute
@@ -4343,6 +4681,9 @@ const rootRouteChildren: RootRouteChildren = {
   InventorySkusRoute: InventorySkusRouteWithChildren,
   InventoryTransfersRoute: InventoryTransfersRoute,
   InventoryUnclaimedRoute: InventoryUnclaimedRoute,
+  OperationsContentRoute: OperationsContentRouteWithChildren,
+  OperationsOfficialKnowledgeRoute:
+    OperationsOfficialKnowledgeRouteWithChildren,
   PurchaseDomesticRoute: PurchaseDomesticRouteWithChildren,
   PurchaseDomesticBulkRoute: PurchaseDomesticBulkRouteWithChildren,
   PurchaseJapanBulkRoute: PurchaseJapanBulkRoute,
@@ -4352,8 +4693,11 @@ const rootRouteChildren: RootRouteChildren = {
   StoresProductsRoute: StoresProductsRoute,
   StoresYouzanRoute: StoresYouzanRoute,
   ApiPublicMerukiIngestRoute: ApiPublicMerukiIngestRoute,
+  ApiPublicOfficialKnowledgeRoute: ApiPublicOfficialKnowledgeRouteWithChildren,
   InventoryStocktakesIdRoute: InventoryStocktakesIdRoute,
   InventoryStocktakesIndexRoute: InventoryStocktakesIndexRoute,
+  ApiPublicContentIdRoute: ApiPublicContentIdRouteWithChildren,
+  ApiPublicContentFeedRoute: ApiPublicContentFeedRoute,
   ApiPublicHandheldDashboardRoute: ApiPublicHandheldDashboardRoute,
   ApiPublicHandheldFulfillmentsRoute:
     ApiPublicHandheldFulfillmentsRouteWithChildren,

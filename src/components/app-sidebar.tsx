@@ -31,6 +31,8 @@ import {
   Tag,
   Sparkles,
   ScanLine,
+  Newspaper,
+  LibraryBig,
   type LucideIcon,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks/use-auth-session";
@@ -82,6 +84,8 @@ type NavTo =
   | "/orders/after-sales"
   | "/orders/dispatch"
   | "/orders/wholesale"
+  | "/operations/content"
+  | "/operations/official-knowledge"
   | "/knowledge"
   | "/settings"
   | "/admin/api-integration"
@@ -155,7 +159,11 @@ const groups: NavGroup[] = [
   },
   {
     label: "运营",
-    items: [{ title: "知识库", url: "/knowledge", icon: BookOpen }],
+    items: [
+      { title: "资讯管理", url: "/operations/content", icon: Newspaper },
+      { title: "官方知识", url: "/operations/official-knowledge", icon: LibraryBig },
+      { title: "内部知识库", url: "/knowledge", icon: BookOpen },
+    ],
   },
 ];
 

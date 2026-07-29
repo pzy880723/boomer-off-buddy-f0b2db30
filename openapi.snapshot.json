@@ -8728,6 +8728,40 @@
                             }
                           ]
                         },
+                        "default_template_ids": {
+                          "type": "object",
+                          "properties": {
+                            "label": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "receipt": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "label",
+                            "receipt"
+                          ],
+                          "additionalProperties": false
+                        },
                         "items": {
                           "type": "array",
                           "items": {
@@ -8740,6 +8774,7 @@
                       },
                       "required": [
                         "default_template_id",
+                        "default_template_ids",
                         "items",
                         "can_manage"
                       ],
@@ -11732,6 +11767,14 @@
             "minLength": 1,
             "maxLength": 120
           },
+          "print_type": {
+            "default": "label",
+            "type": "string",
+            "enum": [
+              "label",
+              "receipt"
+            ]
+          },
           "width_mm": {
             "default": 53,
             "type": "number",
@@ -11762,6 +11805,13 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 120
+          },
+          "print_type": {
+            "type": "string",
+            "enum": [
+              "label",
+              "receipt"
+            ]
           },
           "width_mm": {
             "type": "number",
@@ -13617,54 +13667,7 @@
         ],
         "additionalProperties": false
       },
-      "LabelTemplateItem": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-            "example": "550e8400-e29b-41d4-a716-446655440000"
-          },
-          "name": {
-            "type": "string"
-          },
-          "width_mm": {
-            "type": "number"
-          },
-          "height_mm": {
-            "type": "number"
-          },
-          "is_default": {
-            "type": "boolean"
-          },
-          "elements": {
-            "default": [],
-            "type": "array",
-            "items": {}
-          },
-          "version": {
-            "default": 1,
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991
-          },
-          "updated_at": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "width_mm",
-          "height_mm",
-          "is_default",
-          "elements",
-          "version",
-          "updated_at"
-        ],
-        "additionalProperties": false
-      },
+      "LabelTemplateItem": {},
       "ParcelItemListItem": {
         "type": "object",
         "properties": {
