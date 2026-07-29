@@ -10,6 +10,9 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
+    "test:login-hydration": "node --test scripts/check-login-hydration.test.mjs",
+    "check:login-hydration": "node scripts/check-login-hydration.mjs",
+    "deploy:tencent": "bash scripts/deploy-tencent-erp.sh",
     "sdk:gen": "bun run scripts/gen-sdk.ts",
     "sdk:check": "bun run scripts/check-openapi-drift.ts"
   },
