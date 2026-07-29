@@ -22,6 +22,7 @@ set +a
 cd "$APP_DIR"
 exec "$APP_DIR/node_modules/.bin/wrangler" dev \
   --config "$APP_DIR/.output/server/wrangler.json" \
+  --env-file "$APP_DIR/.env" \
   --ip "$BIND_HOST" \
   --port "$BIND_PORT" \
   --assets "$APP_DIR/.output/public" \
