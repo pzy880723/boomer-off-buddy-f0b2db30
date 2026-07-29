@@ -22,7 +22,6 @@ import {
   ArrowLeftRight,
   Building2,
   Users,
-  Activity,
   ShieldCheck,
   AlertCircle,
   Smartphone,
@@ -267,31 +266,6 @@ export function AppSidebar() {
 
       <SidebarFooter className="border-t border-sidebar-border">
         <AigcLauncherButton collapsed={collapsed} />
-        {!collapsed && (
-          <div className="mt-2 rounded-lg bg-sidebar-accent/40 p-3">
-            <div className="flex items-center gap-2 text-xs text-sidebar-foreground/80">
-              <Activity className="h-3.5 w-3.5 text-success" />
-              <span className="font-medium">系统状态</span>
-            </div>
-            <div className="mt-2 space-y-1 text-[11px] text-sidebar-foreground/60">
-              <div className="flex items-center justify-between">
-                <span>在线门店</span>
-                <span className="font-medium tabular-nums text-sidebar-foreground">12 / 14</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>有赞同步</span>
-                <span className="inline-flex items-center gap-1 text-success">
-                  <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
-                  正常
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>版本</span>
-                <span className="tabular-nums">v0.8.4</span>
-              </div>
-            </div>
-          </div>
-        )}
       </SidebarFooter>
     </Sidebar>
   );
