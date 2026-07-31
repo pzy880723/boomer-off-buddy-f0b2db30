@@ -1,0 +1,10 @@
+[Unit]
+Description=Synchronize BOOMER OPEN into the Tencent unified database
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/boomer-data-platform/ops/sync-boomer-open.sh
+Nice=5

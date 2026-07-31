@@ -1,0 +1,11 @@
+[Unit]
+Description=Back up the BOOMER Tencent data platform
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/boomer-data-platform/ops/backup.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

@@ -1,0 +1,8 @@
+[Unit]
+Description=Check the BOOMER Tencent data platform
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/boomer-data-platform/ops/healthcheck.sh
