@@ -1,0 +1,11 @@
+[Unit]
+Description=BOOMER Tencent data platform health check
+
+[Timer]
+OnBootSec=2m
+OnUnitActiveSec=5m
+AccuracySec=30s
+Persistent=true
+
+[Install]
+WantedBy=timers.target
