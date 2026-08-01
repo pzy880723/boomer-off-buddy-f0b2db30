@@ -55,6 +55,7 @@ import { Route as PurchaseJapanParcelRouteImport } from './routes/purchase.japan
 import { Route as ShopMgmtCommerceRouteImport } from './routes/shop-mgmt.commerce'
 import { Route as ShopMgmtFranchiseesRouteImport } from './routes/shop-mgmt.franchisees'
 import { Route as ShopMgmtOnlineRouteImport } from './routes/shop-mgmt.online'
+import { Route as ShopMgmtPaymentsRouteImport } from './routes/shop-mgmt.payments'
 import { Route as ShopMgmtProductsRouteImport } from './routes/shop-mgmt.products'
 import { Route as ShopMgmtShopsRouteImport } from './routes/shop-mgmt.shops'
 import { Route as StoreIndexRouteImport } from './routes/store.index'
@@ -127,6 +128,7 @@ import { Route as ApiPublicOfficialKnowledgeIdRouteImport } from './routes/api/p
 import { Route as ApiPublicPosAuthorizationsRouteImport } from './routes/api/public/pos/authorizations'
 import { Route as ApiPublicPosBootstrapRouteImport } from './routes/api/public/pos/bootstrap'
 import { Route as ApiPublicPosCashMovementsRouteImport } from './routes/api/public/pos/cash-movements'
+import { Route as ApiPublicPosPaymentCodeRouteImport } from './routes/api/public/pos/payment-code'
 import { Route as ApiPublicPosProductsRouteImport } from './routes/api/public/pos/products'
 import { Route as ApiPublicPosResolveCodeRouteImport } from './routes/api/public/pos/resolve-code'
 import { Route as ApiPublicPosSalesRouteImport } from './routes/api/public/pos/sales'
@@ -443,6 +445,11 @@ const ShopMgmtFranchiseesRoute = ShopMgmtFranchiseesRouteImport.update({
 const ShopMgmtOnlineRoute = ShopMgmtOnlineRouteImport.update({
   id: '/online',
   path: '/online',
+  getParentRoute: () => ShopMgmtRoute,
+} as any)
+const ShopMgmtPaymentsRoute = ShopMgmtPaymentsRouteImport.update({
+  id: '/payments',
+  path: '/payments',
   getParentRoute: () => ShopMgmtRoute,
 } as any)
 const ShopMgmtProductsRoute = ShopMgmtProductsRouteImport.update({
@@ -841,6 +848,11 @@ const ApiPublicPosCashMovementsRoute =
     path: '/api/public/pos/cash-movements',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicPosPaymentCodeRoute = ApiPublicPosPaymentCodeRouteImport.update({
+  id: '/api/public/pos/payment-code',
+  path: '/api/public/pos/payment-code',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicPosProductsRoute = ApiPublicPosProductsRouteImport.update({
   id: '/api/public/pos/products',
   path: '/api/public/pos/products',
@@ -1385,6 +1397,7 @@ export interface FileRoutesByFullPath {
   '/shop-mgmt/commerce': typeof ShopMgmtCommerceRoute
   '/shop-mgmt/franchisees': typeof ShopMgmtFranchiseesRoute
   '/shop-mgmt/online': typeof ShopMgmtOnlineRoute
+  '/shop-mgmt/payments': typeof ShopMgmtPaymentsRoute
   '/shop-mgmt/products': typeof ShopMgmtProductsRoute
   '/shop-mgmt/shops': typeof ShopMgmtShopsRoute
   '/store/incoming': typeof StoreIncomingRoute
@@ -1458,6 +1471,7 @@ export interface FileRoutesByFullPath {
   '/api/public/pos/authorizations': typeof ApiPublicPosAuthorizationsRoute
   '/api/public/pos/bootstrap': typeof ApiPublicPosBootstrapRoute
   '/api/public/pos/cash-movements': typeof ApiPublicPosCashMovementsRoute
+  '/api/public/pos/payment-code': typeof ApiPublicPosPaymentCodeRoute
   '/api/public/pos/products': typeof ApiPublicPosProductsRouteWithChildren
   '/api/public/pos/resolve-code': typeof ApiPublicPosResolveCodeRoute
   '/api/public/pos/sales': typeof ApiPublicPosSalesRouteWithChildren
@@ -1583,6 +1597,7 @@ export interface FileRoutesByTo {
   '/shop-mgmt/commerce': typeof ShopMgmtCommerceRoute
   '/shop-mgmt/franchisees': typeof ShopMgmtFranchiseesRoute
   '/shop-mgmt/online': typeof ShopMgmtOnlineRoute
+  '/shop-mgmt/payments': typeof ShopMgmtPaymentsRoute
   '/shop-mgmt/products': typeof ShopMgmtProductsRoute
   '/shop-mgmt/shops': typeof ShopMgmtShopsRoute
   '/store/incoming': typeof StoreIncomingRoute
@@ -1656,6 +1671,7 @@ export interface FileRoutesByTo {
   '/api/public/pos/authorizations': typeof ApiPublicPosAuthorizationsRoute
   '/api/public/pos/bootstrap': typeof ApiPublicPosBootstrapRoute
   '/api/public/pos/cash-movements': typeof ApiPublicPosCashMovementsRoute
+  '/api/public/pos/payment-code': typeof ApiPublicPosPaymentCodeRoute
   '/api/public/pos/products': typeof ApiPublicPosProductsRouteWithChildren
   '/api/public/pos/resolve-code': typeof ApiPublicPosResolveCodeRoute
   '/api/public/pos/sales': typeof ApiPublicPosSalesRouteWithChildren
@@ -1789,6 +1805,7 @@ export interface FileRoutesById {
   '/shop-mgmt/commerce': typeof ShopMgmtCommerceRoute
   '/shop-mgmt/franchisees': typeof ShopMgmtFranchiseesRoute
   '/shop-mgmt/online': typeof ShopMgmtOnlineRoute
+  '/shop-mgmt/payments': typeof ShopMgmtPaymentsRoute
   '/shop-mgmt/products': typeof ShopMgmtProductsRoute
   '/shop-mgmt/shops': typeof ShopMgmtShopsRoute
   '/store/incoming': typeof StoreIncomingRoute
@@ -1862,6 +1879,7 @@ export interface FileRoutesById {
   '/api/public/pos/authorizations': typeof ApiPublicPosAuthorizationsRoute
   '/api/public/pos/bootstrap': typeof ApiPublicPosBootstrapRoute
   '/api/public/pos/cash-movements': typeof ApiPublicPosCashMovementsRoute
+  '/api/public/pos/payment-code': typeof ApiPublicPosPaymentCodeRoute
   '/api/public/pos/products': typeof ApiPublicPosProductsRouteWithChildren
   '/api/public/pos/resolve-code': typeof ApiPublicPosResolveCodeRoute
   '/api/public/pos/sales': typeof ApiPublicPosSalesRouteWithChildren
@@ -1996,6 +2014,7 @@ export interface FileRouteTypes {
     | '/shop-mgmt/commerce'
     | '/shop-mgmt/franchisees'
     | '/shop-mgmt/online'
+    | '/shop-mgmt/payments'
     | '/shop-mgmt/products'
     | '/shop-mgmt/shops'
     | '/store/incoming'
@@ -2069,6 +2088,7 @@ export interface FileRouteTypes {
     | '/api/public/pos/authorizations'
     | '/api/public/pos/bootstrap'
     | '/api/public/pos/cash-movements'
+    | '/api/public/pos/payment-code'
     | '/api/public/pos/products'
     | '/api/public/pos/resolve-code'
     | '/api/public/pos/sales'
@@ -2194,6 +2214,7 @@ export interface FileRouteTypes {
     | '/shop-mgmt/commerce'
     | '/shop-mgmt/franchisees'
     | '/shop-mgmt/online'
+    | '/shop-mgmt/payments'
     | '/shop-mgmt/products'
     | '/shop-mgmt/shops'
     | '/store/incoming'
@@ -2267,6 +2288,7 @@ export interface FileRouteTypes {
     | '/api/public/pos/authorizations'
     | '/api/public/pos/bootstrap'
     | '/api/public/pos/cash-movements'
+    | '/api/public/pos/payment-code'
     | '/api/public/pos/products'
     | '/api/public/pos/resolve-code'
     | '/api/public/pos/sales'
@@ -2399,6 +2421,7 @@ export interface FileRouteTypes {
     | '/shop-mgmt/commerce'
     | '/shop-mgmt/franchisees'
     | '/shop-mgmt/online'
+    | '/shop-mgmt/payments'
     | '/shop-mgmt/products'
     | '/shop-mgmt/shops'
     | '/store/incoming'
@@ -2472,6 +2495,7 @@ export interface FileRouteTypes {
     | '/api/public/pos/authorizations'
     | '/api/public/pos/bootstrap'
     | '/api/public/pos/cash-movements'
+    | '/api/public/pos/payment-code'
     | '/api/public/pos/products'
     | '/api/public/pos/resolve-code'
     | '/api/public/pos/sales'
@@ -2631,6 +2655,7 @@ export interface RootRouteChildren {
   ApiPublicPosAuthorizationsRoute: typeof ApiPublicPosAuthorizationsRoute
   ApiPublicPosBootstrapRoute: typeof ApiPublicPosBootstrapRoute
   ApiPublicPosCashMovementsRoute: typeof ApiPublicPosCashMovementsRoute
+  ApiPublicPosPaymentCodeRoute: typeof ApiPublicPosPaymentCodeRoute
   ApiPublicPosProductsRoute: typeof ApiPublicPosProductsRouteWithChildren
   ApiPublicPosResolveCodeRoute: typeof ApiPublicPosResolveCodeRoute
   ApiPublicPosSalesRoute: typeof ApiPublicPosSalesRouteWithChildren
@@ -3006,6 +3031,13 @@ declare module '@tanstack/react-router' {
       path: '/online'
       fullPath: '/shop-mgmt/online'
       preLoaderRoute: typeof ShopMgmtOnlineRouteImport
+      parentRoute: typeof ShopMgmtRoute
+    }
+    '/shop-mgmt/payments': {
+      id: '/shop-mgmt/payments'
+      path: '/payments'
+      fullPath: '/shop-mgmt/payments'
+      preLoaderRoute: typeof ShopMgmtPaymentsRouteImport
       parentRoute: typeof ShopMgmtRoute
     }
     '/shop-mgmt/products': {
@@ -3510,6 +3542,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/pos/cash-movements'
       fullPath: '/api/public/pos/cash-movements'
       preLoaderRoute: typeof ApiPublicPosCashMovementsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/pos/payment-code': {
+      id: '/api/public/pos/payment-code'
+      path: '/api/public/pos/payment-code'
+      fullPath: '/api/public/pos/payment-code'
+      preLoaderRoute: typeof ApiPublicPosPaymentCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/pos/products': {
@@ -4161,6 +4200,7 @@ interface ShopMgmtRouteChildren {
   ShopMgmtCommerceRoute: typeof ShopMgmtCommerceRoute
   ShopMgmtFranchiseesRoute: typeof ShopMgmtFranchiseesRoute
   ShopMgmtOnlineRoute: typeof ShopMgmtOnlineRoute
+  ShopMgmtPaymentsRoute: typeof ShopMgmtPaymentsRoute
   ShopMgmtProductsRoute: typeof ShopMgmtProductsRoute
   ShopMgmtShopsRoute: typeof ShopMgmtShopsRoute
 }
@@ -4169,6 +4209,7 @@ const ShopMgmtRouteChildren: ShopMgmtRouteChildren = {
   ShopMgmtCommerceRoute: ShopMgmtCommerceRoute,
   ShopMgmtFranchiseesRoute: ShopMgmtFranchiseesRoute,
   ShopMgmtOnlineRoute: ShopMgmtOnlineRoute,
+  ShopMgmtPaymentsRoute: ShopMgmtPaymentsRoute,
   ShopMgmtProductsRoute: ShopMgmtProductsRoute,
   ShopMgmtShopsRoute: ShopMgmtShopsRoute,
 }
@@ -4732,6 +4773,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicPosAuthorizationsRoute: ApiPublicPosAuthorizationsRoute,
   ApiPublicPosBootstrapRoute: ApiPublicPosBootstrapRoute,
   ApiPublicPosCashMovementsRoute: ApiPublicPosCashMovementsRoute,
+  ApiPublicPosPaymentCodeRoute: ApiPublicPosPaymentCodeRoute,
   ApiPublicPosProductsRoute: ApiPublicPosProductsRouteWithChildren,
   ApiPublicPosResolveCodeRoute: ApiPublicPosResolveCodeRoute,
   ApiPublicPosSalesRoute: ApiPublicPosSalesRouteWithChildren,

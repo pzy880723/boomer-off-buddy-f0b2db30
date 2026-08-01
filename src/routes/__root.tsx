@@ -154,6 +154,7 @@ const breadcrumbMap: Record<string, string> = {
   shops: "店铺",
   wholesale: "批发",
   "shop-mgmt": "店铺管理",
+  payments: "门店支付",
 };
 
 // 部分父路由是 Outlet-only（没有 index 子路由），点击会 404；

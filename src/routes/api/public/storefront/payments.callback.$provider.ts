@@ -118,6 +118,11 @@ export const Route = createFileRoute("/api/public/storefront/payments/callback/$
               } as never)
               .eq("id", paymentRow.id);
             if (updateError) throw new Error(updateError.message);
+            const { error: suborderError } = await supabaseAdmin
+              .from("commerce_payment_suborders" as never)
+              .update({ status: "succeeded", updated_at: new Date().toISOString() } as never)
+              .eq("payment_id", paymentRow.id);
+            if (suborderError) throw new Error(suborderError.message);
           } else {
             const { error: updateError } = await supabaseAdmin
               .from("commerce_payments" as never)
@@ -129,6 +134,11 @@ export const Route = createFileRoute("/api/public/storefront/payments/callback/$
               } as never)
               .eq("id", paymentRow.id);
             if (updateError) throw new Error(updateError.message);
+            const { error: suborderError } = await supabaseAdmin
+              .from("commerce_payment_suborders" as never)
+              .update({ status: event.status, updated_at: new Date().toISOString() } as never)
+              .eq("payment_id", paymentRow.id);
+            if (suborderError) throw new Error(suborderError.message);
           }
           await supabaseAdmin
             .from("commerce_payment_events" as never)

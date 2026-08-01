@@ -23,6 +23,10 @@ describe("storefront payment contract", () => {
     assert.match(createSource, /idempotency-key/i);
     assert.match(createSource, /payment_payload/);
     assert.match(createSource, /replayed: true/);
+    assert.match(createSource, /buildStorePaymentPlan/);
+    assert.match(createSource, /commerce_payment_suborders/);
+    assert.match(createSource, /store_payment_not_ready/);
+    assert.match(createSource, /sub_orders/);
     assert.match(helperSource, /STOREFRONT_PAYMENT_GATEWAY_URL/);
     assert.match(helperSource, /STOREFRONT_PAYMENT_WEBHOOK_SECRET/);
     assert.match(callbackSource, /commerce_mark_order_paid/);

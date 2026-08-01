@@ -33,6 +33,7 @@ import {
   ScanLine,
   Newspaper,
   LibraryBig,
+  WalletCards,
   type LucideIcon,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks/use-auth-session";
@@ -74,6 +75,7 @@ type NavTo =
   | "/shop-mgmt/products"
   | "/shop-mgmt/online"
   | "/shop-mgmt/franchisees"
+  | "/shop-mgmt/payments"
   | "/product-categories"
   | "/product-brands"
   | "/product-facets"
@@ -132,6 +134,7 @@ const groups: NavGroup[] = [
     items: [
       { title: "网店运营", url: "/shop-mgmt/commerce", icon: Globe },
       { title: "门店列表", url: "/shop-mgmt/shops", icon: Building2 },
+      { title: "门店支付", url: "/shop-mgmt/payments", icon: WalletCards },
       { title: "加盟商管理", url: "/shop-mgmt/franchisees", icon: Users },
     ],
     icon: Store,
