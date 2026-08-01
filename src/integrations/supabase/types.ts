@@ -493,6 +493,8 @@ export type Database = {
           original_unit_price: number | null
           ownership_snapshot: string | null
           quantity: number
+          settlement_snapshot: Json | null
+          settlement_subject_id: string | null
           sku_id: string
           title_snapshot: string
           unit_price: number
@@ -512,6 +514,8 @@ export type Database = {
           original_unit_price?: number | null
           ownership_snapshot?: string | null
           quantity?: number
+          settlement_snapshot?: Json | null
+          settlement_subject_id?: string | null
           sku_id: string
           title_snapshot: string
           unit_price: number
@@ -531,6 +535,8 @@ export type Database = {
           original_unit_price?: number | null
           ownership_snapshot?: string | null
           quantity?: number
+          settlement_snapshot?: Json | null
+          settlement_subject_id?: string | null
           sku_id?: string
           title_snapshot?: string
           unit_price?: number
@@ -555,6 +561,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "commerce_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_order_items_settlement_subject_id_fkey"
+            columns: ["settlement_subject_id"]
+            isOneToOne: false
+            referencedRelation: "payment_subjects"
             referencedColumns: ["id"]
           },
           {
@@ -762,6 +775,95 @@ export type Database = {
           },
         ]
       }
+      commerce_payment_suborders: {
+        Row: {
+          allocation_snapshot: Json
+          amount: number
+          created_at: string
+          currency: string
+          id: string
+          line_amount: number
+          merchant_id_snapshot: string
+          order_adjustment: number
+          order_id: string
+          payment_code_snapshot: string
+          payment_id: string
+          payment_profile_id: string
+          provider: string
+          provider_suborder_id: string | null
+          settlement_subject_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          allocation_snapshot?: Json
+          amount: number
+          created_at?: string
+          currency?: string
+          id?: string
+          line_amount: number
+          merchant_id_snapshot: string
+          order_adjustment?: number
+          order_id: string
+          payment_code_snapshot: string
+          payment_id: string
+          payment_profile_id: string
+          provider?: string
+          provider_suborder_id?: string | null
+          settlement_subject_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          allocation_snapshot?: Json
+          amount?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          line_amount?: number
+          merchant_id_snapshot?: string
+          order_adjustment?: number
+          order_id?: string
+          payment_code_snapshot?: string
+          payment_id?: string
+          payment_profile_id?: string
+          provider?: string
+          provider_suborder_id?: string | null
+          settlement_subject_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_payment_suborders_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_payment_suborders_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_payment_suborders_payment_profile_id_fkey"
+            columns: ["payment_profile_id"]
+            isOneToOne: false
+            referencedRelation: "store_payment_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_payment_suborders_settlement_subject_id_fkey"
+            columns: ["settlement_subject_id"]
+            isOneToOne: false
+            referencedRelation: "payment_subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commerce_payments: {
         Row: {
           amount: number
@@ -772,9 +874,11 @@ export type Database = {
           failure_message: string | null
           id: string
           idempotency_key: string
+          merchant_snapshot: Json
           order_id: string
           paid_at: string | null
           payment_payload: Json
+          payment_profile_id: string | null
           provider: string
           provider_transaction_id: string | null
           status: string
@@ -789,9 +893,11 @@ export type Database = {
           failure_message?: string | null
           id?: string
           idempotency_key: string
+          merchant_snapshot?: Json
           order_id: string
           paid_at?: string | null
           payment_payload?: Json
+          payment_profile_id?: string | null
           provider: string
           provider_transaction_id?: string | null
           status?: string
@@ -806,9 +912,11 @@ export type Database = {
           failure_message?: string | null
           id?: string
           idempotency_key?: string
+          merchant_snapshot?: Json
           order_id?: string
           paid_at?: string | null
           payment_payload?: Json
+          payment_profile_id?: string | null
           provider?: string
           provider_transaction_id?: string | null
           status?: string
@@ -820,6 +928,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "commerce_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_payments_payment_profile_id_fkey"
+            columns: ["payment_profile_id"]
+            isOneToOne: false
+            referencedRelation: "store_payment_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -3655,6 +3770,131 @@ export type Database = {
           },
         ]
       }
+      payment_subject_applications: {
+        Row: {
+          application_snapshot: Json
+          created_at: string
+          id: string
+          note: string | null
+          provider: string
+          provider_application_id: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          subject_id: string
+          submitted_at: string | null
+          submitted_by: string | null
+        }
+        Insert: {
+          application_snapshot?: Json
+          created_at?: string
+          id?: string
+          note?: string | null
+          provider?: string
+          provider_application_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status: string
+          subject_id: string
+          submitted_at?: string | null
+          submitted_by?: string | null
+        }
+        Update: {
+          application_snapshot?: Json
+          created_at?: string
+          id?: string
+          note?: string | null
+          provider?: string
+          provider_application_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          subject_id?: string
+          submitted_at?: string | null
+          submitted_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_subject_applications_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "payment_subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_subjects: {
+        Row: {
+          business_license_storage_path: string | null
+          contact_name: string
+          contact_phone: string
+          created_at: string
+          created_by: string | null
+          erp_verification_note: string | null
+          erp_verification_status: string
+          id: string
+          legal_name: string
+          legal_representative_name: string
+          provider_application_id: string | null
+          provider_application_status: string
+          provider_status_note: string | null
+          subject_code: string
+          subject_type: string
+          unified_social_credit_code: string
+          updated_at: string
+          verified_at: string | null
+          verified_by: string | null
+          wechat_appid: string | null
+          wechat_sub_mchid: string | null
+        }
+        Insert: {
+          business_license_storage_path?: string | null
+          contact_name: string
+          contact_phone: string
+          created_at?: string
+          created_by?: string | null
+          erp_verification_note?: string | null
+          erp_verification_status?: string
+          id?: string
+          legal_name: string
+          legal_representative_name: string
+          provider_application_id?: string | null
+          provider_application_status?: string
+          provider_status_note?: string | null
+          subject_code?: string
+          subject_type: string
+          unified_social_credit_code: string
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+          wechat_appid?: string | null
+          wechat_sub_mchid?: string | null
+        }
+        Update: {
+          business_license_storage_path?: string | null
+          contact_name?: string
+          contact_phone?: string
+          created_at?: string
+          created_by?: string | null
+          erp_verification_note?: string | null
+          erp_verification_status?: string
+          id?: string
+          legal_name?: string
+          legal_representative_name?: string
+          provider_application_id?: string | null
+          provider_application_status?: string
+          provider_status_note?: string | null
+          subject_code?: string
+          subject_type?: string
+          unified_social_credit_code?: string
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+          wechat_appid?: string | null
+          wechat_sub_mchid?: string | null
+        }
+        Relationships: []
+      }
       pos_authorizations: {
         Row: {
           action: string
@@ -5093,6 +5333,63 @@ export type Database = {
           },
         ]
       }
+      store_payment_profiles: {
+        Row: {
+          channel: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_enabled: boolean
+          location_id: string
+          payment_code: string
+          qr_mode: string
+          status: string
+          subject_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          channel?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_enabled?: boolean
+          location_id: string
+          payment_code?: string
+          qr_mode?: string
+          status?: string
+          subject_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_enabled?: boolean
+          location_id?: string
+          payment_code?: string
+          qr_mode?: string
+          status?: string
+          subject_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_payment_profiles_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: true
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_payment_profiles_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "payment_subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_location_perms: {
         Row: {
           created_at: string
@@ -5605,6 +5902,15 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      commerce_capture_payment_allocation: {
+        Args: {
+          p_item_snapshots: Json
+          p_order_id: string
+          p_payment_id: string
+          p_suborders: Json
+        }
+        Returns: undefined
       }
       commerce_create_after_sale: {
         Args: {
