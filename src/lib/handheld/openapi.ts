@@ -211,6 +211,73 @@ const StorefrontPaymentCallbackRes = z.object({
   replayed: z.boolean().optional(),
 });
 
+const PosSaleItem = z.object({
+  sku_id: z.string().uuid(),
+  quantity: z.number().int().min(1).max(999),
+});
+const PosDiscount = z.object({
+  type: z.enum(["amount", "percentage", "final_price"]),
+  value: z.number().nonnegative(),
+  reason: z.string().min(2).max(200),
+});
+const PosQrOrderBody = z.object({
+  location_id: z.string().uuid(),
+  shift_id: z.string().uuid(),
+  provider: z.enum(["wechat", "alipay"]),
+  client_op_id: z.string().min(8).max(100),
+  items: z.array(PosSaleItem).min(1).max(100),
+  customer_id: z.string().uuid().optional(),
+  note: z.string().max(500).optional(),
+  authorization_id: z.string().uuid().optional(),
+  discount: PosDiscount.optional(),
+});
+const PosMicropayBody = PosQrOrderBody.extend({
+  auth_code: z.string().min(16).max(24).describe("客户微信/支付宝付款码；服务端不落明文"),
+});
+const PosPaymentReceipt = z.object({
+  order_id: z.string().uuid(),
+  order_no: z.string(),
+  receipt_no: z.string().nullable(),
+  total_amount: z.number(),
+  subtotal: z.number(),
+  discount_total: z.number(),
+  payment_provider: z.string(),
+  provider_transaction_id: z.string().nullable(),
+  paid_at: z.string().nullable(),
+  location_name: z.string(),
+  cashier_name: z.string(),
+  customer_name: z.string().nullable().optional(),
+  items: z.array(
+    z.object({
+      name: z.string(),
+      sku_code: z.string().nullable(),
+      quantity: z.number(),
+      unit_price: z.number(),
+      line_total: z.number(),
+    }),
+  ),
+});
+const PosPaymentAttemptRes = z.object({
+  ok: z.literal(true),
+  data: z.object({
+    id: z.string().uuid(),
+    provider: z.enum(["wechat", "alipay"]),
+    mode: z.enum(["merchant_scan", "customer_scan"]),
+    status: z.enum(["pending", "user_paying", "paid", "failed", "closed", "expired"]),
+    amount: z.number(),
+    out_trade_no: z.string(),
+    provider_transaction_id: z.string().nullable(),
+    qr_content: z.string().nullable(),
+    code_url: z.string().nullable(),
+    expires_at: z.string().nullable(),
+    order_id: z.string().uuid().nullable(),
+    message: z.string().nullable().optional(),
+    error_code: z.string().nullable().optional(),
+    receipt: PosPaymentReceipt.optional(),
+  }),
+});
+
+
 const jsonBody = (schema: z.ZodType) => ({ content: { "application/json": { schema } } });
 const jsonRes = (description: string, schema: z.ZodType) => ({
   description,
