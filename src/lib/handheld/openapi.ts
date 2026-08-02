@@ -211,6 +211,73 @@ const StorefrontPaymentCallbackRes = z.object({
   replayed: z.boolean().optional(),
 });
 
+const PosSaleItem = z.object({
+  sku_id: z.string().uuid(),
+  quantity: z.number().int().min(1).max(999),
+});
+const PosDiscount = z.object({
+  type: z.enum(["amount", "percentage", "final_price"]),
+  value: z.number().nonnegative(),
+  reason: z.string().min(2).max(200),
+});
+const PosQrOrderBody = z.object({
+  location_id: z.string().uuid(),
+  shift_id: z.string().uuid(),
+  provider: z.enum(["wechat", "alipay"]),
+  client_op_id: z.string().min(8).max(100),
+  items: z.array(PosSaleItem).min(1).max(100),
+  customer_id: z.string().uuid().optional(),
+  note: z.string().max(500).optional(),
+  authorization_id: z.string().uuid().optional(),
+  discount: PosDiscount.optional(),
+});
+const PosMicropayBody = PosQrOrderBody.extend({
+  auth_code: z.string().min(16).max(24).describe("客户微信/支付宝付款码；服务端不落明文"),
+});
+const PosPaymentReceipt = z.object({
+  order_id: z.string().uuid(),
+  order_no: z.string(),
+  receipt_no: z.string().nullable(),
+  total_amount: z.number(),
+  subtotal: z.number(),
+  discount_total: z.number(),
+  payment_provider: z.string(),
+  provider_transaction_id: z.string().nullable(),
+  paid_at: z.string().nullable(),
+  location_name: z.string(),
+  cashier_name: z.string(),
+  customer_name: z.string().nullable().optional(),
+  items: z.array(
+    z.object({
+      name: z.string(),
+      sku_code: z.string().nullable(),
+      quantity: z.number(),
+      unit_price: z.number(),
+      line_total: z.number(),
+    }),
+  ),
+});
+const PosPaymentAttemptRes = z.object({
+  ok: z.literal(true),
+  data: z.object({
+    id: z.string().uuid(),
+    provider: z.enum(["wechat", "alipay"]),
+    mode: z.enum(["merchant_scan", "customer_scan"]),
+    status: z.enum(["pending", "user_paying", "paid", "failed", "closed", "expired"]),
+    amount: z.number(),
+    out_trade_no: z.string(),
+    provider_transaction_id: z.string().nullable(),
+    qr_content: z.string().nullable(),
+    code_url: z.string().nullable(),
+    expires_at: z.string().nullable(),
+    order_id: z.string().uuid().nullable(),
+    message: z.string().nullable().optional(),
+    error_code: z.string().nullable().optional(),
+    receipt: PosPaymentReceipt.optional(),
+  }),
+});
+
+
 const jsonBody = (schema: z.ZodType) => ({ content: { "application/json": { schema } } });
 const jsonRes = (description: string, schema: z.ZodType) => ({
   description,
@@ -312,6 +379,7 @@ X-Session-Token: <操作员 session token>
     { name: "商城商品", description: "消费者商城公开商品与统一分类" },
     { name: "商城订单", description: "消费者商城订单；需要 Bearer 用户会话" },
     { name: "商城支付", description: "消费者支付发起与支付网关签名回调" },
+    { name: "收银支付", description: "POS 微信/支付宝主扫与客扫收款（v1.8+）" },
   ],
 
   paths: {
@@ -950,7 +1018,56 @@ X-Session-Token: <操作员 session token>
         responses: { "200": jsonRes("OK", ParcelEstimateRes), ...ERROR_RESPONSES },
       },
     },
+    "/api/public/pos/payments/micropay": {
+      post: {
+        tags: ["收银支付"],
+        summary: "主扫：收银员扫客户微信/支付宝付款码",
+        description:
+          "服务端重算应收金额、校验班次与门店支付主体后调用支付机构。返回 status=user_paying 时表示客户正在输入密码，APP 需轮询 GET /api/public/pos/payments/{id}。门店未完成支付主体认证或服务端未配置密钥时返回 503 payment_not_configured。",
+        requestBody: jsonBody(PosMicropayBody),
+        responses: { "200": jsonRes("OK", PosPaymentAttemptRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/pos/payments/qr-order": {
+      post: {
+        tags: ["收银支付"],
+        summary: "客扫：生成本单动态收款二维码",
+        description: "只生成订单专属动态码（微信 Native / 支付宝 precreate），不使用门店静态码。",
+        requestBody: jsonBody(PosQrOrderBody),
+        responses: { "201": jsonRes("Created", PosPaymentAttemptRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/pos/payments/{id}": {
+      get: {
+        tags: ["收银支付"],
+        summary: "查询支付流水（APP 轮询）",
+        description: "未终态时会主动向支付机构查单；支付成功会返回 receipt 小票数据。",
+        requestParams: { path: z.object({ id: z.string().uuid() }) },
+        responses: { "200": jsonRes("OK", PosPaymentAttemptRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/pos/payments/{id}/close": {
+      post: {
+        tags: ["收银支付"],
+        summary: "关闭支付流水",
+        description: "只允许关闭 pending / user_paying；关闭前会再查一次，避免误关已支付订单。",
+        requestParams: { path: z.object({ id: z.string().uuid() }) },
+        responses: { "200": jsonRes("OK", PosPaymentAttemptRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/pos/payments/callback/{provider}": {
+      post: {
+        tags: ["收银支付"],
+        summary: "微信 / 支付宝异步回调",
+        description:
+          "支付机构服务器回调。严格验签 + 金额 + 商户校验后幂等完成销售。不对 APP 开放。",
+        security: [],
+        requestParams: { path: z.object({ provider: z.enum(["wechat", "alipay"]) }) },
+        responses: { "200": jsonRes("OK", z.object({ code: z.string().optional() })) },
+      },
+    },
   },
+
 };
 
 let cached: ReturnType<typeof createDocument> | null = null;

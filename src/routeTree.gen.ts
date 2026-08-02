@@ -188,6 +188,9 @@ import { Route as ApiPublicPosCartsHoldRouteImport } from './routes/api/public/p
 import { Route as ApiPublicPosCustomersSearchRouteImport } from './routes/api/public/pos/customers.search'
 import { Route as ApiPublicPosDiscountsPreviewRouteImport } from './routes/api/public/pos/discounts.preview'
 import { Route as ApiPublicPosOrdersSearchRouteImport } from './routes/api/public/pos/orders.search'
+import { Route as ApiPublicPosPaymentsIdRouteImport } from './routes/api/public/pos/payments.$id'
+import { Route as ApiPublicPosPaymentsMicropayRouteImport } from './routes/api/public/pos/payments.micropay'
+import { Route as ApiPublicPosPaymentsQrOrderRouteImport } from './routes/api/public/pos/payments.qr-order'
 import { Route as ApiPublicPosProductsLookupRouteImport } from './routes/api/public/pos/products.lookup'
 import { Route as ApiPublicPosShiftsOpenRouteImport } from './routes/api/public/pos/shifts.open'
 import { Route as ApiPublicStorefrontOrdersIdRouteImport } from './routes/api/public/storefront/orders.$id'
@@ -207,6 +210,8 @@ import { Route as ApiPublicHandheldTransfersIdScanRouteImport } from './routes/a
 import { Route as ApiPublicPosCartsIdResumeRouteImport } from './routes/api/public/pos/carts.$id.resume'
 import { Route as ApiPublicPosCustomersIdBenefitsRouteImport } from './routes/api/public/pos/customers.$id.benefits'
 import { Route as ApiPublicPosOrdersIdReturnsRouteImport } from './routes/api/public/pos/orders.$id.returns'
+import { Route as ApiPublicPosPaymentsIdCloseRouteImport } from './routes/api/public/pos/payments.$id.close'
+import { Route as ApiPublicPosPaymentsCallbackProviderRouteImport } from './routes/api/public/pos/payments.callback.$provider'
 import { Route as ApiPublicPosSalesIdReceiptRouteImport } from './routes/api/public/pos/sales.$id.receipt'
 import { Route as ApiPublicPosShiftsIdCloseRouteImport } from './routes/api/public/pos/shifts.$id.close'
 import { Route as ApiPublicStorefrontPaymentsCallbackProviderRouteImport } from './routes/api/public/storefront/payments.callback.$provider'
@@ -1195,6 +1200,23 @@ const ApiPublicPosOrdersSearchRoute =
     path: '/api/public/pos/orders/search',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicPosPaymentsIdRoute = ApiPublicPosPaymentsIdRouteImport.update({
+  id: '/api/public/pos/payments/$id',
+  path: '/api/public/pos/payments/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicPosPaymentsMicropayRoute =
+  ApiPublicPosPaymentsMicropayRouteImport.update({
+    id: '/api/public/pos/payments/micropay',
+    path: '/api/public/pos/payments/micropay',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicPosPaymentsQrOrderRoute =
+  ApiPublicPosPaymentsQrOrderRouteImport.update({
+    id: '/api/public/pos/payments/qr-order',
+    path: '/api/public/pos/payments/qr-order',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicPosProductsLookupRoute =
   ApiPublicPosProductsLookupRouteImport.update({
     id: '/lookup',
@@ -1306,6 +1328,18 @@ const ApiPublicPosOrdersIdReturnsRoute =
   ApiPublicPosOrdersIdReturnsRouteImport.update({
     id: '/api/public/pos/orders/$id/returns',
     path: '/api/public/pos/orders/$id/returns',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicPosPaymentsIdCloseRoute =
+  ApiPublicPosPaymentsIdCloseRouteImport.update({
+    id: '/close',
+    path: '/close',
+    getParentRoute: () => ApiPublicPosPaymentsIdRoute,
+  } as any)
+const ApiPublicPosPaymentsCallbackProviderRoute =
+  ApiPublicPosPaymentsCallbackProviderRouteImport.update({
+    id: '/api/public/pos/payments/callback/$provider',
+    path: '/api/public/pos/payments/callback/$provider',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicPosSalesIdReceiptRoute =
@@ -1531,6 +1565,9 @@ export interface FileRoutesByFullPath {
   '/api/public/pos/customers/search': typeof ApiPublicPosCustomersSearchRoute
   '/api/public/pos/discounts/preview': typeof ApiPublicPosDiscountsPreviewRoute
   '/api/public/pos/orders/search': typeof ApiPublicPosOrdersSearchRoute
+  '/api/public/pos/payments/$id': typeof ApiPublicPosPaymentsIdRouteWithChildren
+  '/api/public/pos/payments/micropay': typeof ApiPublicPosPaymentsMicropayRoute
+  '/api/public/pos/payments/qr-order': typeof ApiPublicPosPaymentsQrOrderRoute
   '/api/public/pos/products/lookup': typeof ApiPublicPosProductsLookupRoute
   '/api/public/pos/shifts/open': typeof ApiPublicPosShiftsOpenRoute
   '/api/public/storefront/orders/$id': typeof ApiPublicStorefrontOrdersIdRoute
@@ -1550,6 +1587,8 @@ export interface FileRoutesByFullPath {
   '/api/public/pos/carts/$id/resume': typeof ApiPublicPosCartsIdResumeRoute
   '/api/public/pos/customers/$id/benefits': typeof ApiPublicPosCustomersIdBenefitsRoute
   '/api/public/pos/orders/$id/returns': typeof ApiPublicPosOrdersIdReturnsRouteWithChildren
+  '/api/public/pos/payments/$id/close': typeof ApiPublicPosPaymentsIdCloseRoute
+  '/api/public/pos/payments/callback/$provider': typeof ApiPublicPosPaymentsCallbackProviderRoute
   '/api/public/pos/sales/$id/receipt': typeof ApiPublicPosSalesIdReceiptRoute
   '/api/public/pos/shifts/$id/close': typeof ApiPublicPosShiftsIdCloseRoute
   '/api/public/storefront/payments/callback/$provider': typeof ApiPublicStorefrontPaymentsCallbackProviderRoute
@@ -1731,6 +1770,9 @@ export interface FileRoutesByTo {
   '/api/public/pos/customers/search': typeof ApiPublicPosCustomersSearchRoute
   '/api/public/pos/discounts/preview': typeof ApiPublicPosDiscountsPreviewRoute
   '/api/public/pos/orders/search': typeof ApiPublicPosOrdersSearchRoute
+  '/api/public/pos/payments/$id': typeof ApiPublicPosPaymentsIdRouteWithChildren
+  '/api/public/pos/payments/micropay': typeof ApiPublicPosPaymentsMicropayRoute
+  '/api/public/pos/payments/qr-order': typeof ApiPublicPosPaymentsQrOrderRoute
   '/api/public/pos/products/lookup': typeof ApiPublicPosProductsLookupRoute
   '/api/public/pos/shifts/open': typeof ApiPublicPosShiftsOpenRoute
   '/api/public/storefront/orders/$id': typeof ApiPublicStorefrontOrdersIdRoute
@@ -1750,6 +1792,8 @@ export interface FileRoutesByTo {
   '/api/public/pos/carts/$id/resume': typeof ApiPublicPosCartsIdResumeRoute
   '/api/public/pos/customers/$id/benefits': typeof ApiPublicPosCustomersIdBenefitsRoute
   '/api/public/pos/orders/$id/returns': typeof ApiPublicPosOrdersIdReturnsRouteWithChildren
+  '/api/public/pos/payments/$id/close': typeof ApiPublicPosPaymentsIdCloseRoute
+  '/api/public/pos/payments/callback/$provider': typeof ApiPublicPosPaymentsCallbackProviderRoute
   '/api/public/pos/sales/$id/receipt': typeof ApiPublicPosSalesIdReceiptRoute
   '/api/public/pos/shifts/$id/close': typeof ApiPublicPosShiftsIdCloseRoute
   '/api/public/storefront/payments/callback/$provider': typeof ApiPublicStorefrontPaymentsCallbackProviderRoute
@@ -1939,6 +1983,9 @@ export interface FileRoutesById {
   '/api/public/pos/customers/search': typeof ApiPublicPosCustomersSearchRoute
   '/api/public/pos/discounts/preview': typeof ApiPublicPosDiscountsPreviewRoute
   '/api/public/pos/orders/search': typeof ApiPublicPosOrdersSearchRoute
+  '/api/public/pos/payments/$id': typeof ApiPublicPosPaymentsIdRouteWithChildren
+  '/api/public/pos/payments/micropay': typeof ApiPublicPosPaymentsMicropayRoute
+  '/api/public/pos/payments/qr-order': typeof ApiPublicPosPaymentsQrOrderRoute
   '/api/public/pos/products/lookup': typeof ApiPublicPosProductsLookupRoute
   '/api/public/pos/shifts/open': typeof ApiPublicPosShiftsOpenRoute
   '/api/public/storefront/orders/$id': typeof ApiPublicStorefrontOrdersIdRoute
@@ -1958,6 +2005,8 @@ export interface FileRoutesById {
   '/api/public/pos/carts/$id/resume': typeof ApiPublicPosCartsIdResumeRoute
   '/api/public/pos/customers/$id/benefits': typeof ApiPublicPosCustomersIdBenefitsRoute
   '/api/public/pos/orders/$id/returns': typeof ApiPublicPosOrdersIdReturnsRouteWithChildren
+  '/api/public/pos/payments/$id/close': typeof ApiPublicPosPaymentsIdCloseRoute
+  '/api/public/pos/payments/callback/$provider': typeof ApiPublicPosPaymentsCallbackProviderRoute
   '/api/public/pos/sales/$id/receipt': typeof ApiPublicPosSalesIdReceiptRoute
   '/api/public/pos/shifts/$id/close': typeof ApiPublicPosShiftsIdCloseRoute
   '/api/public/storefront/payments/callback/$provider': typeof ApiPublicStorefrontPaymentsCallbackProviderRoute
@@ -2148,6 +2197,9 @@ export interface FileRouteTypes {
     | '/api/public/pos/customers/search'
     | '/api/public/pos/discounts/preview'
     | '/api/public/pos/orders/search'
+    | '/api/public/pos/payments/$id'
+    | '/api/public/pos/payments/micropay'
+    | '/api/public/pos/payments/qr-order'
     | '/api/public/pos/products/lookup'
     | '/api/public/pos/shifts/open'
     | '/api/public/storefront/orders/$id'
@@ -2167,6 +2219,8 @@ export interface FileRouteTypes {
     | '/api/public/pos/carts/$id/resume'
     | '/api/public/pos/customers/$id/benefits'
     | '/api/public/pos/orders/$id/returns'
+    | '/api/public/pos/payments/$id/close'
+    | '/api/public/pos/payments/callback/$provider'
     | '/api/public/pos/sales/$id/receipt'
     | '/api/public/pos/shifts/$id/close'
     | '/api/public/storefront/payments/callback/$provider'
@@ -2348,6 +2402,9 @@ export interface FileRouteTypes {
     | '/api/public/pos/customers/search'
     | '/api/public/pos/discounts/preview'
     | '/api/public/pos/orders/search'
+    | '/api/public/pos/payments/$id'
+    | '/api/public/pos/payments/micropay'
+    | '/api/public/pos/payments/qr-order'
     | '/api/public/pos/products/lookup'
     | '/api/public/pos/shifts/open'
     | '/api/public/storefront/orders/$id'
@@ -2367,6 +2424,8 @@ export interface FileRouteTypes {
     | '/api/public/pos/carts/$id/resume'
     | '/api/public/pos/customers/$id/benefits'
     | '/api/public/pos/orders/$id/returns'
+    | '/api/public/pos/payments/$id/close'
+    | '/api/public/pos/payments/callback/$provider'
     | '/api/public/pos/sales/$id/receipt'
     | '/api/public/pos/shifts/$id/close'
     | '/api/public/storefront/payments/callback/$provider'
@@ -2555,6 +2614,9 @@ export interface FileRouteTypes {
     | '/api/public/pos/customers/search'
     | '/api/public/pos/discounts/preview'
     | '/api/public/pos/orders/search'
+    | '/api/public/pos/payments/$id'
+    | '/api/public/pos/payments/micropay'
+    | '/api/public/pos/payments/qr-order'
     | '/api/public/pos/products/lookup'
     | '/api/public/pos/shifts/open'
     | '/api/public/storefront/orders/$id'
@@ -2574,6 +2636,8 @@ export interface FileRouteTypes {
     | '/api/public/pos/carts/$id/resume'
     | '/api/public/pos/customers/$id/benefits'
     | '/api/public/pos/orders/$id/returns'
+    | '/api/public/pos/payments/$id/close'
+    | '/api/public/pos/payments/callback/$provider'
     | '/api/public/pos/sales/$id/receipt'
     | '/api/public/pos/shifts/$id/close'
     | '/api/public/storefront/payments/callback/$provider'
@@ -2703,9 +2767,13 @@ export interface RootRouteChildren {
   ApiPublicPosCustomersSearchRoute: typeof ApiPublicPosCustomersSearchRoute
   ApiPublicPosDiscountsPreviewRoute: typeof ApiPublicPosDiscountsPreviewRoute
   ApiPublicPosOrdersSearchRoute: typeof ApiPublicPosOrdersSearchRoute
+  ApiPublicPosPaymentsIdRoute: typeof ApiPublicPosPaymentsIdRouteWithChildren
+  ApiPublicPosPaymentsMicropayRoute: typeof ApiPublicPosPaymentsMicropayRoute
+  ApiPublicPosPaymentsQrOrderRoute: typeof ApiPublicPosPaymentsQrOrderRoute
   ApiPublicPosShiftsOpenRoute: typeof ApiPublicPosShiftsOpenRoute
   ApiPublicPosCustomersIdBenefitsRoute: typeof ApiPublicPosCustomersIdBenefitsRoute
   ApiPublicPosOrdersIdReturnsRoute: typeof ApiPublicPosOrdersIdReturnsRouteWithChildren
+  ApiPublicPosPaymentsCallbackProviderRoute: typeof ApiPublicPosPaymentsCallbackProviderRoute
   ApiPublicPosShiftsIdCloseRoute: typeof ApiPublicPosShiftsIdCloseRoute
 }
 
@@ -3964,6 +4032,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicPosOrdersSearchRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/pos/payments/$id': {
+      id: '/api/public/pos/payments/$id'
+      path: '/api/public/pos/payments/$id'
+      fullPath: '/api/public/pos/payments/$id'
+      preLoaderRoute: typeof ApiPublicPosPaymentsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/pos/payments/micropay': {
+      id: '/api/public/pos/payments/micropay'
+      path: '/api/public/pos/payments/micropay'
+      fullPath: '/api/public/pos/payments/micropay'
+      preLoaderRoute: typeof ApiPublicPosPaymentsMicropayRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/pos/payments/qr-order': {
+      id: '/api/public/pos/payments/qr-order'
+      path: '/api/public/pos/payments/qr-order'
+      fullPath: '/api/public/pos/payments/qr-order'
+      preLoaderRoute: typeof ApiPublicPosPaymentsQrOrderRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/pos/products/lookup': {
       id: '/api/public/pos/products/lookup'
       path: '/lookup'
@@ -4095,6 +4184,20 @@ declare module '@tanstack/react-router' {
       path: '/api/public/pos/orders/$id/returns'
       fullPath: '/api/public/pos/orders/$id/returns'
       preLoaderRoute: typeof ApiPublicPosOrdersIdReturnsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/pos/payments/$id/close': {
+      id: '/api/public/pos/payments/$id/close'
+      path: '/close'
+      fullPath: '/api/public/pos/payments/$id/close'
+      preLoaderRoute: typeof ApiPublicPosPaymentsIdCloseRouteImport
+      parentRoute: typeof ApiPublicPosPaymentsIdRoute
+    }
+    '/api/public/pos/payments/callback/$provider': {
+      id: '/api/public/pos/payments/callback/$provider'
+      path: '/api/public/pos/payments/callback/$provider'
+      fullPath: '/api/public/pos/payments/callback/$provider'
+      preLoaderRoute: typeof ApiPublicPosPaymentsCallbackProviderRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/pos/sales/$id/receipt': {
@@ -4679,6 +4782,20 @@ const ApiPublicPosCartsIdRouteChildren: ApiPublicPosCartsIdRouteChildren = {
 const ApiPublicPosCartsIdRouteWithChildren =
   ApiPublicPosCartsIdRoute._addFileChildren(ApiPublicPosCartsIdRouteChildren)
 
+interface ApiPublicPosPaymentsIdRouteChildren {
+  ApiPublicPosPaymentsIdCloseRoute: typeof ApiPublicPosPaymentsIdCloseRoute
+}
+
+const ApiPublicPosPaymentsIdRouteChildren: ApiPublicPosPaymentsIdRouteChildren =
+  {
+    ApiPublicPosPaymentsIdCloseRoute: ApiPublicPosPaymentsIdCloseRoute,
+  }
+
+const ApiPublicPosPaymentsIdRouteWithChildren =
+  ApiPublicPosPaymentsIdRoute._addFileChildren(
+    ApiPublicPosPaymentsIdRouteChildren,
+  )
+
 interface ApiPublicPosOrdersIdReturnsRouteChildren {
   ApiPublicPosOrdersIdReturnsPreviewRoute: typeof ApiPublicPosOrdersIdReturnsPreviewRoute
 }
@@ -4833,22 +4950,17 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicPosCustomersSearchRoute: ApiPublicPosCustomersSearchRoute,
   ApiPublicPosDiscountsPreviewRoute: ApiPublicPosDiscountsPreviewRoute,
   ApiPublicPosOrdersSearchRoute: ApiPublicPosOrdersSearchRoute,
+  ApiPublicPosPaymentsIdRoute: ApiPublicPosPaymentsIdRouteWithChildren,
+  ApiPublicPosPaymentsMicropayRoute: ApiPublicPosPaymentsMicropayRoute,
+  ApiPublicPosPaymentsQrOrderRoute: ApiPublicPosPaymentsQrOrderRoute,
   ApiPublicPosShiftsOpenRoute: ApiPublicPosShiftsOpenRoute,
   ApiPublicPosCustomersIdBenefitsRoute: ApiPublicPosCustomersIdBenefitsRoute,
   ApiPublicPosOrdersIdReturnsRoute:
     ApiPublicPosOrdersIdReturnsRouteWithChildren,
+  ApiPublicPosPaymentsCallbackProviderRoute:
+    ApiPublicPosPaymentsCallbackProviderRoute,
   ApiPublicPosShiftsIdCloseRoute: ApiPublicPosShiftsIdCloseRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
