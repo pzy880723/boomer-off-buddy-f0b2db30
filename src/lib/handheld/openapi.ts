@@ -958,6 +958,8 @@ X-Session-Token: <操作员 session token>
       post: {
         tags: ["标签模板"],
         summary: "把某个模板设为默认（HQ）",
+        description:
+          "只会替换 **同一 print_type** 的默认模板：设置小票默认不会覆盖商品标签默认，反之亦然。",
         requestParams: { path: z.object({ id: z.string().uuid() }) },
         responses: { "200": jsonRes("OK", LabelTemplateSetDefaultRes), ...ERROR_RESPONSES },
       },
