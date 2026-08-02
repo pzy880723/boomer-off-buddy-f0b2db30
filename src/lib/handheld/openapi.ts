@@ -379,6 +379,7 @@ X-Session-Token: <操作员 session token>
     { name: "商城商品", description: "消费者商城公开商品与统一分类" },
     { name: "商城订单", description: "消费者商城订单；需要 Bearer 用户会话" },
     { name: "商城支付", description: "消费者支付发起与支付网关签名回调" },
+    { name: "收银支付", description: "POS 微信/支付宝主扫与客扫收款（v1.8+）" },
   ],
 
   paths: {
