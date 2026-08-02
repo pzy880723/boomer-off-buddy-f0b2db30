@@ -83,7 +83,8 @@ export function mapAlipayResponse(input: {
   const code = (input.code || "").trim();
   if (code === "10000") return "paid";
   if (code === "10003") return "user_paying";
-  if (code === "10000" || code === "20000") return "pending";
+  if (code === "20000") return "pending";
+
   return "failed";
 }
 
