@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import {
-  assertCallbackAmountMatches,
-  mapAlipayResponse,
+  callbackAmountMatches,
+  mapAlipayTradeStatus,
   mapWechatTradeState,
 } from "@/lib/pos/pos-scan-payment";
 import {
@@ -59,7 +59,7 @@ export const Route = createFileRoute("/api/public/pos/payments/callback/$provide
           const amountMinor = Number(
             (resource["amount"] as { total?: number } | undefined)?.total ?? -1,
           );
-          if (!assertCallbackAmountMatches(Number(attempt.amount), amountMinor)) {
+          if (!callbackAmountMatches(Number(attempt.amount), amountMinor)) {
             return wechatReply("FAIL", "amount_mismatch", 422);
           }
           const merchant = await resolveStoreMerchant(attempt.location_id, "wechat");
@@ -95,7 +95,7 @@ export const Route = createFileRoute("/api/public/pos/payments/callback/$provide
         const attempt = await findAttemptByOutTradeNo(params_["out_trade_no"] ?? "");
         if (!attempt) return alipayReply("failure", 404);
         const amountMinor = Math.round(Number(params_["total_amount"] ?? 0) * 100);
-        if (!assertCallbackAmountMatches(Number(attempt.amount), amountMinor)) {
+        if (!callbackAmountMatches(Number(attempt.amount), amountMinor)) {
           return alipayReply("failure", 422);
         }
         const merchant = await resolveStoreMerchant(attempt.location_id, "alipay");
@@ -103,7 +103,7 @@ export const Route = createFileRoute("/api/public/pos/payments/callback/$provide
         if (merchant.ok && merchant.merchant.alipaySellerId && sellerId && sellerId !== merchant.merchant.alipaySellerId) {
           return alipayReply("failure", 422);
         }
-        const status = mapAlipayResponse({ tradeStatus: params_["trade_status"] ?? null });
+        const status = mapAlipayTradeStatus(params_["trade_status"] ?? null);
         if (status === "paid") {
           await finalizePaidAttempt(attempt, {
             providerTransactionId: params_["trade_no"] ?? "",
