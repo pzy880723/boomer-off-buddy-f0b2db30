@@ -188,6 +188,7 @@ import { Route as ApiPublicPosCartsHoldRouteImport } from './routes/api/public/p
 import { Route as ApiPublicPosCustomersSearchRouteImport } from './routes/api/public/pos/customers.search'
 import { Route as ApiPublicPosDiscountsPreviewRouteImport } from './routes/api/public/pos/discounts.preview'
 import { Route as ApiPublicPosOrdersSearchRouteImport } from './routes/api/public/pos/orders.search'
+import { Route as ApiPublicPosPaymentsMicropayRouteImport } from './routes/api/public/pos/payments.micropay'
 import { Route as ApiPublicPosProductsLookupRouteImport } from './routes/api/public/pos/products.lookup'
 import { Route as ApiPublicPosShiftsOpenRouteImport } from './routes/api/public/pos/shifts.open'
 import { Route as ApiPublicStorefrontOrdersIdRouteImport } from './routes/api/public/storefront/orders.$id'
@@ -1195,6 +1196,12 @@ const ApiPublicPosOrdersSearchRoute =
     path: '/api/public/pos/orders/search',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicPosPaymentsMicropayRoute =
+  ApiPublicPosPaymentsMicropayRouteImport.update({
+    id: '/api/public/pos/payments/micropay',
+    path: '/api/public/pos/payments/micropay',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicPosProductsLookupRoute =
   ApiPublicPosProductsLookupRouteImport.update({
     id: '/lookup',
@@ -1531,6 +1538,7 @@ export interface FileRoutesByFullPath {
   '/api/public/pos/customers/search': typeof ApiPublicPosCustomersSearchRoute
   '/api/public/pos/discounts/preview': typeof ApiPublicPosDiscountsPreviewRoute
   '/api/public/pos/orders/search': typeof ApiPublicPosOrdersSearchRoute
+  '/api/public/pos/payments/micropay': typeof ApiPublicPosPaymentsMicropayRoute
   '/api/public/pos/products/lookup': typeof ApiPublicPosProductsLookupRoute
   '/api/public/pos/shifts/open': typeof ApiPublicPosShiftsOpenRoute
   '/api/public/storefront/orders/$id': typeof ApiPublicStorefrontOrdersIdRoute
@@ -1731,6 +1739,7 @@ export interface FileRoutesByTo {
   '/api/public/pos/customers/search': typeof ApiPublicPosCustomersSearchRoute
   '/api/public/pos/discounts/preview': typeof ApiPublicPosDiscountsPreviewRoute
   '/api/public/pos/orders/search': typeof ApiPublicPosOrdersSearchRoute
+  '/api/public/pos/payments/micropay': typeof ApiPublicPosPaymentsMicropayRoute
   '/api/public/pos/products/lookup': typeof ApiPublicPosProductsLookupRoute
   '/api/public/pos/shifts/open': typeof ApiPublicPosShiftsOpenRoute
   '/api/public/storefront/orders/$id': typeof ApiPublicStorefrontOrdersIdRoute
@@ -1939,6 +1948,7 @@ export interface FileRoutesById {
   '/api/public/pos/customers/search': typeof ApiPublicPosCustomersSearchRoute
   '/api/public/pos/discounts/preview': typeof ApiPublicPosDiscountsPreviewRoute
   '/api/public/pos/orders/search': typeof ApiPublicPosOrdersSearchRoute
+  '/api/public/pos/payments/micropay': typeof ApiPublicPosPaymentsMicropayRoute
   '/api/public/pos/products/lookup': typeof ApiPublicPosProductsLookupRoute
   '/api/public/pos/shifts/open': typeof ApiPublicPosShiftsOpenRoute
   '/api/public/storefront/orders/$id': typeof ApiPublicStorefrontOrdersIdRoute
@@ -2148,6 +2158,7 @@ export interface FileRouteTypes {
     | '/api/public/pos/customers/search'
     | '/api/public/pos/discounts/preview'
     | '/api/public/pos/orders/search'
+    | '/api/public/pos/payments/micropay'
     | '/api/public/pos/products/lookup'
     | '/api/public/pos/shifts/open'
     | '/api/public/storefront/orders/$id'
@@ -2348,6 +2359,7 @@ export interface FileRouteTypes {
     | '/api/public/pos/customers/search'
     | '/api/public/pos/discounts/preview'
     | '/api/public/pos/orders/search'
+    | '/api/public/pos/payments/micropay'
     | '/api/public/pos/products/lookup'
     | '/api/public/pos/shifts/open'
     | '/api/public/storefront/orders/$id'
@@ -2555,6 +2567,7 @@ export interface FileRouteTypes {
     | '/api/public/pos/customers/search'
     | '/api/public/pos/discounts/preview'
     | '/api/public/pos/orders/search'
+    | '/api/public/pos/payments/micropay'
     | '/api/public/pos/products/lookup'
     | '/api/public/pos/shifts/open'
     | '/api/public/storefront/orders/$id'
@@ -2703,6 +2716,7 @@ export interface RootRouteChildren {
   ApiPublicPosCustomersSearchRoute: typeof ApiPublicPosCustomersSearchRoute
   ApiPublicPosDiscountsPreviewRoute: typeof ApiPublicPosDiscountsPreviewRoute
   ApiPublicPosOrdersSearchRoute: typeof ApiPublicPosOrdersSearchRoute
+  ApiPublicPosPaymentsMicropayRoute: typeof ApiPublicPosPaymentsMicropayRoute
   ApiPublicPosShiftsOpenRoute: typeof ApiPublicPosShiftsOpenRoute
   ApiPublicPosCustomersIdBenefitsRoute: typeof ApiPublicPosCustomersIdBenefitsRoute
   ApiPublicPosOrdersIdReturnsRoute: typeof ApiPublicPosOrdersIdReturnsRouteWithChildren
@@ -3964,6 +3978,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicPosOrdersSearchRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/pos/payments/micropay': {
+      id: '/api/public/pos/payments/micropay'
+      path: '/api/public/pos/payments/micropay'
+      fullPath: '/api/public/pos/payments/micropay'
+      preLoaderRoute: typeof ApiPublicPosPaymentsMicropayRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/pos/products/lookup': {
       id: '/api/public/pos/products/lookup'
       path: '/lookup'
@@ -4833,6 +4854,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicPosCustomersSearchRoute: ApiPublicPosCustomersSearchRoute,
   ApiPublicPosDiscountsPreviewRoute: ApiPublicPosDiscountsPreviewRoute,
   ApiPublicPosOrdersSearchRoute: ApiPublicPosOrdersSearchRoute,
+  ApiPublicPosPaymentsMicropayRoute: ApiPublicPosPaymentsMicropayRoute,
   ApiPublicPosShiftsOpenRoute: ApiPublicPosShiftsOpenRoute,
   ApiPublicPosCustomersIdBenefitsRoute: ApiPublicPosCustomersIdBenefitsRoute,
   ApiPublicPosOrdersIdReturnsRoute:
