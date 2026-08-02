@@ -4255,6 +4255,138 @@ export type Database = {
           },
         ]
       }
+      pos_payment_attempts: {
+        Row: {
+          amount: number
+          auth_code_hash: string | null
+          auth_code_last4: string | null
+          client_op_id: string
+          closed_at: string | null
+          code_url: string | null
+          created_at: string
+          currency: string
+          customer_id: string | null
+          error_code: string | null
+          error_message: string | null
+          expires_at: string | null
+          id: string
+          location_id: string
+          mode: string
+          operator_id: string
+          order_id: string | null
+          out_trade_no: string
+          paid_at: string | null
+          payment_profile_id: string | null
+          provider: string
+          provider_response: Json
+          provider_transaction_id: string | null
+          qr_content: string | null
+          sale_payload: Json
+          settlement_subject_id: string | null
+          shift_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          auth_code_hash?: string | null
+          auth_code_last4?: string | null
+          client_op_id: string
+          closed_at?: string | null
+          code_url?: string | null
+          created_at?: string
+          currency?: string
+          customer_id?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          expires_at?: string | null
+          id?: string
+          location_id: string
+          mode: string
+          operator_id: string
+          order_id?: string | null
+          out_trade_no: string
+          paid_at?: string | null
+          payment_profile_id?: string | null
+          provider: string
+          provider_response?: Json
+          provider_transaction_id?: string | null
+          qr_content?: string | null
+          sale_payload?: Json
+          settlement_subject_id?: string | null
+          shift_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          auth_code_hash?: string | null
+          auth_code_last4?: string | null
+          client_op_id?: string
+          closed_at?: string | null
+          code_url?: string | null
+          created_at?: string
+          currency?: string
+          customer_id?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          expires_at?: string | null
+          id?: string
+          location_id?: string
+          mode?: string
+          operator_id?: string
+          order_id?: string | null
+          out_trade_no?: string
+          paid_at?: string | null
+          payment_profile_id?: string | null
+          provider?: string
+          provider_response?: Json
+          provider_transaction_id?: string | null
+          qr_content?: string | null
+          sale_payload?: Json
+          settlement_subject_id?: string | null
+          shift_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_payment_attempts_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_payment_attempts_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_payment_attempts_payment_profile_id_fkey"
+            columns: ["payment_profile_id"]
+            isOneToOne: false
+            referencedRelation: "store_payment_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_payment_attempts_settlement_subject_id_fkey"
+            columns: ["settlement_subject_id"]
+            isOneToOne: false
+            referencedRelation: "payment_subjects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_payment_attempts_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "pos_shifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pos_receipts: {
         Row: {
           created_at: string
