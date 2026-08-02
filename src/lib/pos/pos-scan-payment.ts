@@ -101,9 +101,29 @@ export function isPosPaymentExpired(expiresAt: string | null, now = new Date()) 
   return new Date(expiresAt).getTime() <= now.getTime();
 }
 
+/** 支付宝异步通知的 trade_status 映射。 */
+export function mapAlipayTradeStatus(status: string | null | undefined): PosPaymentStatus {
+  switch ((status || "").toUpperCase()) {
+    case "TRADE_SUCCESS":
+    case "TRADE_FINISHED":
+      return "paid";
+    case "WAIT_BUYER_PAY":
+      return "user_paying";
+    case "TRADE_CLOSED":
+      return "closed";
+    default:
+      return "pending";
+  }
+}
+
 /** 回调金额必须与本地记录一致（按分比较），否则拒绝。 */
+export function callbackAmountMatches(expected: number, actualMinor: number) {
+  return toMinorUnits(expected) === Math.round(actualMinor);
+}
+
 export function assertCallbackAmountMatches(expected: number, actualMinor: number) {
-  if (toMinorUnits(expected) !== Math.round(actualMinor)) {
+  if (!callbackAmountMatches(expected, actualMinor)) {
     throw new Error("回调金额与订单金额不一致");
   }
 }
+
