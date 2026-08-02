@@ -13,11 +13,13 @@ function isHq(roles: string[]) {
   return roles.includes("super_admin") || roles.includes("hq_operator");
 }
 
-async function listTemplates() {
-  const { data, error } = await (supabaseAdmin.from("inv_label_templates" as never) as any)
+async function listTemplates(printType?: "label" | "receipt") {
+  let query = (supabaseAdmin.from("inv_label_templates" as never) as any)
     .select("id, name, print_type, width_mm, height_mm, elements, is_default, version, updated_at")
     .order("is_default", { ascending: false })
     .order("updated_at", { ascending: false });
+  if (printType) query = query.eq("print_type", printType);
+  const { data, error } = await query;
   if (error) throw new Error(error.message);
   return (data as any[]) ?? [];
 }
@@ -32,8 +34,12 @@ export const Route = createFileRoute("/api/public/handheld/label-templates")({
         if (!auth.ok) return auth.response;
         const user = await resolveSessionUser(request);
         const roles = user ? await loadUserRoles(user.user_id) : [];
+        const url = new URL(request.url);
+        const rawType = url.searchParams.get("print_type");
+        const printType =
+          rawType === "label" || rawType === "receipt" ? (rawType as "label" | "receipt") : undefined;
         try {
-          const items = await listTemplates();
+          const items = await listTemplates(printType);
           const labelDefault = items.find(
             (item) => item.is_default && (item.print_type ?? "label") === "label",
           );

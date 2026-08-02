@@ -38,3 +38,22 @@ test("POS print stylesheet uses the supported 58mm receipt width", () => {
   assert.match(source, /@page \{ size: 58mm auto;/);
   assert.doesNotMatch(source, /@page \{ size: 80mm auto;/);
 });
+
+test("openapi documents per-print-type defaults and receipt templates", async () => {
+  const { buildHandheldOpenApi } = await import("./handheld/openapi");
+  const doc = buildHandheldOpenApi() as any;
+  const list = doc.paths["/api/public/handheld/label-templates"];
+  assert.match(list.get.description, /default_template_ids/);
+  assert.match(list.post.description, /print_type/);
+  assert.match(
+    doc.paths["/api/public/handheld/label-templates/{id}/set-default"].post.description,
+    /同一 print_type/,
+  );
+});
+
+test("label-templates GET supports print_type filtering without touching other types", () => {
+  const source = readFileSync("src/routes/api/public/handheld/label-templates.ts", "utf8");
+  assert.match(source, /searchParams\.get\("print_type"\)/);
+  // 默认切换只在同一 print_type 范围内生效
+  assert.match(source, /\.eq\("is_default", true\)\s*\n\s*\.eq\("print_type", print_type\)/);
+});
