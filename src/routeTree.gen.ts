@@ -211,6 +211,7 @@ import { Route as ApiPublicPosCartsIdResumeRouteImport } from './routes/api/publ
 import { Route as ApiPublicPosCustomersIdBenefitsRouteImport } from './routes/api/public/pos/customers.$id.benefits'
 import { Route as ApiPublicPosOrdersIdReturnsRouteImport } from './routes/api/public/pos/orders.$id.returns'
 import { Route as ApiPublicPosPaymentsIdCloseRouteImport } from './routes/api/public/pos/payments.$id.close'
+import { Route as ApiPublicPosPaymentsCallbackProviderRouteImport } from './routes/api/public/pos/payments.callback.$provider'
 import { Route as ApiPublicPosSalesIdReceiptRouteImport } from './routes/api/public/pos/sales.$id.receipt'
 import { Route as ApiPublicPosShiftsIdCloseRouteImport } from './routes/api/public/pos/shifts.$id.close'
 import { Route as ApiPublicStorefrontPaymentsCallbackProviderRouteImport } from './routes/api/public/storefront/payments.callback.$provider'
@@ -1335,6 +1336,12 @@ const ApiPublicPosPaymentsIdCloseRoute =
     path: '/close',
     getParentRoute: () => ApiPublicPosPaymentsIdRoute,
   } as any)
+const ApiPublicPosPaymentsCallbackProviderRoute =
+  ApiPublicPosPaymentsCallbackProviderRouteImport.update({
+    id: '/api/public/pos/payments/callback/$provider',
+    path: '/api/public/pos/payments/callback/$provider',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicPosSalesIdReceiptRoute =
   ApiPublicPosSalesIdReceiptRouteImport.update({
     id: '/$id/receipt',
@@ -1581,6 +1588,7 @@ export interface FileRoutesByFullPath {
   '/api/public/pos/customers/$id/benefits': typeof ApiPublicPosCustomersIdBenefitsRoute
   '/api/public/pos/orders/$id/returns': typeof ApiPublicPosOrdersIdReturnsRouteWithChildren
   '/api/public/pos/payments/$id/close': typeof ApiPublicPosPaymentsIdCloseRoute
+  '/api/public/pos/payments/callback/$provider': typeof ApiPublicPosPaymentsCallbackProviderRoute
   '/api/public/pos/sales/$id/receipt': typeof ApiPublicPosSalesIdReceiptRoute
   '/api/public/pos/shifts/$id/close': typeof ApiPublicPosShiftsIdCloseRoute
   '/api/public/storefront/payments/callback/$provider': typeof ApiPublicStorefrontPaymentsCallbackProviderRoute
@@ -1785,6 +1793,7 @@ export interface FileRoutesByTo {
   '/api/public/pos/customers/$id/benefits': typeof ApiPublicPosCustomersIdBenefitsRoute
   '/api/public/pos/orders/$id/returns': typeof ApiPublicPosOrdersIdReturnsRouteWithChildren
   '/api/public/pos/payments/$id/close': typeof ApiPublicPosPaymentsIdCloseRoute
+  '/api/public/pos/payments/callback/$provider': typeof ApiPublicPosPaymentsCallbackProviderRoute
   '/api/public/pos/sales/$id/receipt': typeof ApiPublicPosSalesIdReceiptRoute
   '/api/public/pos/shifts/$id/close': typeof ApiPublicPosShiftsIdCloseRoute
   '/api/public/storefront/payments/callback/$provider': typeof ApiPublicStorefrontPaymentsCallbackProviderRoute
@@ -1997,6 +2006,7 @@ export interface FileRoutesById {
   '/api/public/pos/customers/$id/benefits': typeof ApiPublicPosCustomersIdBenefitsRoute
   '/api/public/pos/orders/$id/returns': typeof ApiPublicPosOrdersIdReturnsRouteWithChildren
   '/api/public/pos/payments/$id/close': typeof ApiPublicPosPaymentsIdCloseRoute
+  '/api/public/pos/payments/callback/$provider': typeof ApiPublicPosPaymentsCallbackProviderRoute
   '/api/public/pos/sales/$id/receipt': typeof ApiPublicPosSalesIdReceiptRoute
   '/api/public/pos/shifts/$id/close': typeof ApiPublicPosShiftsIdCloseRoute
   '/api/public/storefront/payments/callback/$provider': typeof ApiPublicStorefrontPaymentsCallbackProviderRoute
@@ -2210,6 +2220,7 @@ export interface FileRouteTypes {
     | '/api/public/pos/customers/$id/benefits'
     | '/api/public/pos/orders/$id/returns'
     | '/api/public/pos/payments/$id/close'
+    | '/api/public/pos/payments/callback/$provider'
     | '/api/public/pos/sales/$id/receipt'
     | '/api/public/pos/shifts/$id/close'
     | '/api/public/storefront/payments/callback/$provider'
@@ -2414,6 +2425,7 @@ export interface FileRouteTypes {
     | '/api/public/pos/customers/$id/benefits'
     | '/api/public/pos/orders/$id/returns'
     | '/api/public/pos/payments/$id/close'
+    | '/api/public/pos/payments/callback/$provider'
     | '/api/public/pos/sales/$id/receipt'
     | '/api/public/pos/shifts/$id/close'
     | '/api/public/storefront/payments/callback/$provider'
@@ -2625,6 +2637,7 @@ export interface FileRouteTypes {
     | '/api/public/pos/customers/$id/benefits'
     | '/api/public/pos/orders/$id/returns'
     | '/api/public/pos/payments/$id/close'
+    | '/api/public/pos/payments/callback/$provider'
     | '/api/public/pos/sales/$id/receipt'
     | '/api/public/pos/shifts/$id/close'
     | '/api/public/storefront/payments/callback/$provider'
@@ -2760,6 +2773,7 @@ export interface RootRouteChildren {
   ApiPublicPosShiftsOpenRoute: typeof ApiPublicPosShiftsOpenRoute
   ApiPublicPosCustomersIdBenefitsRoute: typeof ApiPublicPosCustomersIdBenefitsRoute
   ApiPublicPosOrdersIdReturnsRoute: typeof ApiPublicPosOrdersIdReturnsRouteWithChildren
+  ApiPublicPosPaymentsCallbackProviderRoute: typeof ApiPublicPosPaymentsCallbackProviderRoute
   ApiPublicPosShiftsIdCloseRoute: typeof ApiPublicPosShiftsIdCloseRoute
 }
 
@@ -4179,6 +4193,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicPosPaymentsIdCloseRouteImport
       parentRoute: typeof ApiPublicPosPaymentsIdRoute
     }
+    '/api/public/pos/payments/callback/$provider': {
+      id: '/api/public/pos/payments/callback/$provider'
+      path: '/api/public/pos/payments/callback/$provider'
+      fullPath: '/api/public/pos/payments/callback/$provider'
+      preLoaderRoute: typeof ApiPublicPosPaymentsCallbackProviderRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/pos/sales/$id/receipt': {
       id: '/api/public/pos/sales/$id/receipt'
       path: '/$id/receipt'
@@ -4936,6 +4957,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicPosCustomersIdBenefitsRoute: ApiPublicPosCustomersIdBenefitsRoute,
   ApiPublicPosOrdersIdReturnsRoute:
     ApiPublicPosOrdersIdReturnsRouteWithChildren,
+  ApiPublicPosPaymentsCallbackProviderRoute:
+    ApiPublicPosPaymentsCallbackProviderRoute,
   ApiPublicPosShiftsIdCloseRoute: ApiPublicPosShiftsIdCloseRoute,
 }
 export const routeTree = rootRouteImport
