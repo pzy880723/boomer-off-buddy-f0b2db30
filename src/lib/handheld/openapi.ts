@@ -920,16 +920,19 @@ X-Session-Token: <操作员 session token>
     "/api/public/handheld/label-templates": {
       get: {
         tags: ["标签模板"],
-        summary: "列出所有标签模板（v1.5）",
+        summary: "列出所有打印模板（商品标签 + 销售小票，v1.5）",
         description:
-          "返回全部模板 + 默认模板 id；`can_manage=true` 表示当前登录账号为总部权限，可增删改。任何登录设备都可读取，用于本地缓存。",
+          "返回全部模板 + 按 `print_type` 分别维护的默认模板 id（`default_template_ids.label` / `default_template_ids.receipt`）；`default_template_id` 为兼容字段，等同标签默认。`can_manage=true` 表示当前登录账号为总部权限，可增删改；非总部只读。可用 `print_type` 过滤（label / receipt）。小票模板宽度固定 58mm。",
+        requestParams: {
+          query: z.object({ print_type: z.enum(["label", "receipt"]).optional() }),
+        },
         responses: { "200": jsonRes("OK", LabelTemplatesRes), ...ERROR_RESPONSES },
       },
       post: {
         tags: ["标签模板"],
-        summary: "新建标签模板（HQ）",
+        summary: "新建打印模板（HQ）",
         description:
-          "仅总部权限（super_admin / hq_operator）可用。传 `is_default:true` 会自动把其它模板取消默认。",
+          "仅总部权限（super_admin / hq_operator）可用。`print_type` 默认 label，可传 receipt 建小票模板（宽度强制 58mm）。传 `is_default:true` 只会取消 **同一 print_type** 下的其它默认模板，不影响另一种类型的默认。",
         requestBody: jsonBody(LabelTemplateCreateReq),
         responses: { "200": jsonRes("OK", LabelTemplateRes), ...ERROR_RESPONSES },
       },
@@ -955,6 +958,8 @@ X-Session-Token: <操作员 session token>
       post: {
         tags: ["标签模板"],
         summary: "把某个模板设为默认（HQ）",
+        description:
+          "只会替换 **同一 print_type** 的默认模板：设置小票默认不会覆盖商品标签默认，反之亦然。",
         requestParams: { path: z.object({ id: z.string().uuid() }) },
         responses: { "200": jsonRes("OK", LabelTemplateSetDefaultRes), ...ERROR_RESPONSES },
       },
