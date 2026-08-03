@@ -1,18 +1,24 @@
 // 中古杂货库存模块常量与工具函数（client-safe）
 
+/**
+ * 13 个业务一级类目。一级类目同时是标准商品名称。
+ * 「待归类 / AI低置信度 / 新品类候选 / 合规待审」是后台系统兜底类目，
+ * 不生成标准商品、不在 POS 展示，因此不在这里列出。
+ */
 export const INV_CATEGORIES = [
-  { value: "porcelain", label: "瓷器", code: "PC" },
-  { value: "tableware_other", label: "其他餐厨器皿", code: "TW" },
+  { value: "porcelain_jp", label: "日本瓷器", code: "JP" },
+  { value: "porcelain_eu", label: "欧洲瓷器", code: "EU" },
   { value: "toy_model", label: "玩具模型", code: "TY" },
-  { value: "character_ip_goods", label: "角色与IP杂货", code: "AN" },
+  { value: "character_ip_goods", label: "角色周边", code: "AN" },
   { value: "audio_media", label: "唱片影音", code: "MD" },
-  { value: "digital_appliance", label: "数码电器", code: "DG" },
-  { value: "home_decor", label: "家居陈设", code: "HM" },
+  { value: "digital_appliance", label: "数码家电", code: "DG" },
+  { value: "game_device", label: "游戏设备", code: "GM" },
+  { value: "home_goods", label: "家居杂货", code: "HM" },
   { value: "stationery_publication", label: "文具书刊", code: "SP" },
   { value: "fashion_wearable", label: "服饰穿戴", code: "FS" },
-  { value: "art_collectible", label: "艺术收藏", code: "AT" },
+  { value: "fashion_jewelry", label: "珠宝首饰", code: "JW" },
+  { value: "art_collectible", label: "古美术", code: "AT" },
   { value: "daily_misc", label: "日用杂货", code: "DL" },
-  { value: "classification_pending", label: "待归类", code: "PD" },
 ] as const;
 
 export type InvCategory = (typeof INV_CATEGORIES)[number]["value"];
@@ -25,7 +31,11 @@ export const CATEGORY_CODE: Record<string, string> = Object.fromEntries(
   INV_CATEGORIES.map((c) => [c.value, c.code]),
 );
 
-export const PRICE_TIERS = [6.9, 9.9, 15.9, 19.9, 29.9, 39.9, 49.9] as const;
+export const PRICE_TIERS = [
+  6.9, 9.9, 15.9, 19.9, 29.9, 39.9, 49.9, 59.9, 69, 79, 89, 99, 129, 159, 199, 259, 299, 359, 399,
+  459, 499, 580, 680, 780, 880, 980, 1080, 1180, 1280, 1380, 1580,
+] as const;
+
 
 export type SkuKind = "single" | "pack" | "bundle";
 
