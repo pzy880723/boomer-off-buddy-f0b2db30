@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import assert from "node:assert/strict";
+import { describe, test } from "node:test";
 
 import {
   addScannedProduct,
@@ -32,21 +33,21 @@ function standard(overrides: Partial<PosScannableProduct> = {}): PosScannablePro
 }
 
 describe("标准商品目录契约", () => {
-  it("13 个业务一级类目 + 31 个价格档", () => {
-    expect(INV_CATEGORIES).toHaveLength(13);
-    expect(PRICE_TIERS).toHaveLength(31);
-    expect(STANDARD_CATEGORY_CODES).toHaveLength(13);
-    expect(STANDARD_PRICE_TIERS[0]).toBe(6.9);
-    expect(STANDARD_PRICE_TIERS.at(-1)).toBe(1580);
-    expect(STANDARD_CATEGORY_CODES).toContain("game_device");
+  test("13 个业务一级类目 + 31 个价格档", () => {
+    assert.equal((INV_CATEGORIES).length, 13);
+    assert.equal((PRICE_TIERS).length, 31);
+    assert.equal((STANDARD_CATEGORY_CODES).length, 13);
+    assert.equal(STANDARD_PRICE_TIERS[0], 6.9);
+    assert.equal(STANDARD_PRICE_TIERS.at(-1), 1580);
+    assert.equal(STANDARD_CATEGORY_CODES).toContain("game_device");
   });
 
-  it("系统兜底类目永不进入 POS", () => {
-    expect(isSystemFallbackCategory("classification_pending")).toBe(true);
-    expect(STANDARD_CATEGORY_CODES.some(isSystemFallbackCategory)).toBe(false);
+  test("系统兜底类目永不进入 POS", () => {
+    assert.deepEqual(isSystemFallbackCategory("classification_pending"), true);
+    assert.equal(STANDARD_CATEGORY_CODES.some(isSystemFallbackCategory), false);
   });
 
-  it("buildStandardCatalog 按一级类目聚合子类与价格", () => {
+  test("buildStandardCatalog 按一级类目聚合子类与价格", () => {
     const groups = buildStandardCatalog(
       [
         { id: "r1", code: "game_device", name: "游戏设备", parent_id: null, is_active: true },
@@ -80,36 +81,36 @@ describe("标准商品目录契约", () => {
       ],
     );
     const game = groups.find((group) => group.category_code === "game_device")!;
-    expect(groups).toHaveLength(13);
-    expect(game.subcategories.map((sub) => sub.code)).toEqual([
+    assert.equal((groups).length, 13);
+    assert.equal(game.subcategories.map((sub) => sub.code), [
       "game_handheld",
       "game_cartridge",
     ]);
-    expect(game.prices.map((price) => price.sku_id)).toEqual(["sku-a", "sku-b"]);
+    assert.deepEqual(game.prices.map((price) => price.sku_id), ["sku-a", "sku-b"]);
   });
 });
 
 describe("POS 购物车合并键", () => {
-  it("同 sku + 同二级类目合并数量", () => {
+  test("同 sku + 同二级类目合并数量", () => {
     let cart: PosCartLine[] = [];
     cart = addScannedProduct(cart, standard({ subcategory_code: "porcelain_eu_cup" }));
     cart = addScannedProduct(cart, standard({ subcategory_code: "porcelain_eu_cup" }));
-    expect(cart).toHaveLength(1);
-    expect(cart[0].quantity).toBe(2);
+    assert.equal((cart).length, 1);
+    expect(cart[0].quantity, 2);
   });
 
-  it("同 sku 不同二级类目必须分行，null 与非 null 也分行", () => {
+  test("同 sku 不同二级类目必须分行，null 与非 null 也分行", () => {
     let cart: PosCartLine[] = [];
     cart = addScannedProduct(cart, standard());
     cart = addScannedProduct(cart, standard({ subcategory_code: "porcelain_eu_cup" }));
     cart = addScannedProduct(cart, standard({ subcategory_code: "porcelain_eu_plate" }));
-    expect(cart).toHaveLength(3);
-    expect(new Set(cart.map(posCartLineKey)).size).toBe(3);
+    assert.equal((cart).length, 3);
+    assert.equal(new Set(cart.map(posCartLineKey)).size, 3);
   });
 
-  it("展示名按是否选择二级类目切换", () => {
-    expect(posCartLineLabel({ name: "欧洲瓷器", subcategory_name: null })).toBe("欧洲瓷器");
-    expect(posCartLineLabel({ name: "欧洲瓷器", subcategory_name: "散瓷杯碟" })).toBe(
+  test("展示名按是否选择二级类目切换", () => {
+    assert.equal(posCartLineLabel({ name: "欧洲瓷器", subcategory_name: null }), "欧洲瓷器");
+    assert.equal(posCartLineLabel({ name: "欧洲瓷器", subcategory_name: "散瓷杯碟" }), 
       "欧洲瓷器 · 散瓷杯碟",
     );
   });
