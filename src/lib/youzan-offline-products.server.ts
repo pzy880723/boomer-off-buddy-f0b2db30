@@ -126,6 +126,30 @@ export function buildOfflineStockQueueRow(args: {
   };
 }
 
+export function buildOfflineChannelListingRow(args: {
+  skuId: string;
+  shopId: string;
+  hqSpuId: number;
+  itemId: number;
+  skuIdRemote: number | null;
+  stock: number;
+  recovered: boolean;
+}) {
+  return {
+    sku_id: args.skuId,
+    channel: "youzan_branch_offline",
+    shop_id: args.shopId,
+    external_spu_id: String(args.hqSpuId),
+    external_item_id: String(args.itemId),
+    external_sku_id: args.skuIdRemote ? String(args.skuIdRemote) : null,
+    listing_status: "published",
+    stock_mode: "absolute",
+    last_stock: Math.max(0, Math.trunc(args.stock)),
+    last_error: null,
+    extra: { source: args.recovered ? "offline.spu.query" : "offline.spu.release" },
+  };
+}
+
 export type OfflineProductReleaseInput = {
   title: string;
   categoryId: number;

@@ -6,6 +6,7 @@ import { ensureAccessToken, getHqShop } from "./youzan.functions";
 import { getPublicOrigin, resolvePublicSkuImageUrls } from "./sku-media";
 import {
   buildOfflineSkuReleaseInput,
+  buildOfflineChannelListingRow,
   buildOfflineProductLookupTerms,
   buildOfflineStockQueueRow,
   findOfflineProductMatch,
@@ -67,8 +68,11 @@ async function findExistingOfflineProduct(args: {
 async function upsertBranchLink(args: {
   skuId: string;
   shopId: string;
+  hqSpuId: number;
   itemId: number;
   skuIdRemote: number | null;
+  stock: number;
+  recovered: boolean;
 }) {
   const { error } = await supabase.from("sku_youzan_links").upsert(
     {
@@ -84,6 +88,26 @@ async function upsertBranchLink(args: {
     { onConflict: "sku_id,shop_id" },
   );
   if (error) throw new Error(error.message);
+
+  const listing = buildOfflineChannelListingRow(args);
+  const existingQuery = supabase
+    .from("sku_channel_listings")
+    .select("id")
+    .eq("sku_id", args.skuId)
+    .eq("channel", "youzan_branch_offline")
+    .eq("shop_id", args.shopId);
+  const { data: existing, error: existingError } = await existingQuery.maybeSingle();
+  if (existingError) throw new Error(existingError.message);
+  const payload = {
+    ...listing,
+    last_verified_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  const write = existing?.id
+    ? supabase.from("sku_channel_listings").update(payload as never).eq("id", existing.id)
+    : supabase.from("sku_channel_listings").insert(payload as never);
+  const { error: listingError } = await write;
+  if (listingError) throw new Error(listingError.message);
 }
 
 async function markBranchReleaseError(skuId: string, shopId: string, message: string) {
@@ -182,7 +206,7 @@ export async function releaseSkuToOfflineShopsCore(args: {
   for (const branch of branches) {
     // offline.spu.release only publishes an existing HQ product to a branch.
     // Keep the HQ and branch product codes identical so barcode lookups remain stable.
-    await ensureHqSpuLink(args.sku_id, branch.id);
+    const hqLink = await ensureHqSpuLink(args.sku_id, branch.id);
     const { data: location } = await supabase
       .from("inv_locations")
       .select("id")
@@ -215,8 +239,11 @@ export async function releaseSkuToOfflineShopsCore(args: {
       await upsertBranchLink({
         skuId: args.sku_id,
         shopId: branch.id,
+        hqSpuId: hqLink.yz_item_id,
         itemId: remoteExisting.itemId,
         skuIdRemote: remoteSkuId,
+        stock,
+        recovered: true,
       });
       await enqueueBranchStock({
         skuId: args.sku_id,
@@ -254,8 +281,11 @@ export async function releaseSkuToOfflineShopsCore(args: {
       await upsertBranchLink({
         skuId: args.sku_id,
         shopId: branch.id,
+        hqSpuId: hqLink.yz_item_id,
         itemId: released.itemId,
         skuIdRemote: remoteSkuId,
+        stock,
+        recovered: false,
       });
       await enqueueBranchStock({
         skuId: args.sku_id,
@@ -291,8 +321,11 @@ export async function releaseSkuToOfflineShopsCore(args: {
         await upsertBranchLink({
           skuId: args.sku_id,
           shopId: branch.id,
+          hqSpuId: hqLink.yz_item_id,
           itemId: recovered.itemId,
           skuIdRemote: recovered.skuId,
+          stock,
+          recovered: true,
         });
         await enqueueBranchStock({
           skuId: args.sku_id,

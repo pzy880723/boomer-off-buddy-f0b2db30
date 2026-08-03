@@ -6,6 +6,7 @@ import {
   buildOfflineProductQueryParams,
   buildOfflineProductReleaseParams,
   buildOfflineProductLookupTerms,
+  buildOfflineChannelListingRow,
   findOfflineProductMatch,
   normalizeYouzanProductCode,
   parseOfflineProductRows,
@@ -187,5 +188,32 @@ describe("youzan offline products", () => {
     assert.equal(row.status, "pending");
     assert.equal(row.target_stock, 1);
     assert.equal(row.last_error, null);
+  });
+
+  test("offline publication mirrors the real branch ids into the unified channel listing", () => {
+    assert.deepEqual(
+      buildOfflineChannelListingRow({
+        skuId: "ee2e611e-94d2-4658-b992-63dc25581378",
+        shopId: "da06cdae-5ec1-4749-8dcb-dc972cfd05c9",
+        hqSpuId: 4964712644,
+        itemId: 6128079637,
+        skuIdRemote: 26228487296,
+        stock: 1,
+        recovered: true,
+      }),
+      {
+        sku_id: "ee2e611e-94d2-4658-b992-63dc25581378",
+        channel: "youzan_branch_offline",
+        shop_id: "da06cdae-5ec1-4749-8dcb-dc972cfd05c9",
+        external_spu_id: "4964712644",
+        external_item_id: "6128079637",
+        external_sku_id: "26228487296",
+        listing_status: "published",
+        stock_mode: "absolute",
+        last_stock: 1,
+        last_error: null,
+        extra: { source: "offline.spu.query" },
+      },
+    );
   });
 });
