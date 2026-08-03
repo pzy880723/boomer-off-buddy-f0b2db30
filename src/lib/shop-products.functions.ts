@@ -59,13 +59,19 @@ export const listShopSkus = createServerFn({ method: "GET" })
       })
       .parse(input),
   )
-  .handler(async ({ data, context }): Promise<{ rows: ShopSkuRow[]; location_id: string | null }> => {
-    const sb = context.supabase;
-    const [{ data: loc }, { data: shop }] = await Promise.all([
-      sb.from("inv_locations").select("id, name").eq("shop_id", data.shop_id).maybeSingle(),
-      sb.from("youzan_shops").select("store_format").eq("id", data.shop_id).maybeSingle(),
-    ]);
-    if (!loc) return { rows: [], location_id: null };
+  .handler(
+    async ({
+      data,
+      context,
+    }): Promise<{ rows: ShopSkuRow[]; location_id: string | null; store_format: string | null }> => {
+      const sb = context.supabase;
+      const [{ data: loc }, { data: shop }] = await Promise.all([
+        sb.from("inv_locations").select("id, name").eq("shop_id", data.shop_id).maybeSingle(),
+        sb.from("youzan_shops").select("store_format").eq("id", data.shop_id).maybeSingle(),
+      ]);
+      const storeFormat = (shop as { store_format?: string } | null)?.store_format ?? null;
+      if (!loc) return { rows: [], location_id: null, store_format: storeFormat };
+
 
     // 取该门店所有 inv_stocks（含 qty=0，方便看到"新建但入库失败"的商品）
     const { data: stocks, error: stErr } = await sb
