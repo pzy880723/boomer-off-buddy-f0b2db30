@@ -148,7 +148,7 @@ export function buildOfflineSkuReleaseInput(args: {
   branchKdtIds: number[];
   stock: number;
 }): OfflineProductReleaseInput {
-  const skuCode = normalizeYouzanProductCode(args.sku.skuCode);
+  const skuCode = args.sku.skuCode.trim();
   const branchKdtIds = Array.from(
     new Set(args.branchKdtIds.filter((id) => Number.isInteger(id) && id > 0)),
   );

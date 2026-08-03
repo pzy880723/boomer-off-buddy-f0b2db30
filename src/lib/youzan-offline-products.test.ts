@@ -99,7 +99,7 @@ describe("youzan offline products", () => {
     assert.equal(params.stocks[0].max_retail_price, "1");
   });
 
-  test("ERP SKU maps to the official offline release payload without sell_channel_id", () => {
+  test("ERP SKU keeps the same stable code in HQ and branch release payloads", () => {
     const input = buildOfflineSkuReleaseInput({
       sku: {
         name: "昭和小钵",
@@ -113,9 +113,9 @@ describe("youzan offline products", () => {
     });
 
     assert.deepEqual(input.saleUpKdtIds, [233, 666]);
-    assert.equal(input.spuCode, "SKUJP001");
-    assert.equal(input.skuCenterCode, "SKUJP001");
-    assert.equal(input.stock.skuNo, "SKUJP001");
+    assert.equal(input.spuCode, "SKU-JP-001");
+    assert.equal(input.skuCenterCode, "SKU-JP-001");
+    assert.equal(input.stock.skuNo, "SKU-JP-001");
     assert.equal(input.unit, "件");
   });
 

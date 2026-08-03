@@ -15,6 +15,7 @@ import {
 } from "./youzan-offline-products.server";
 import {
   ensureAutoYouzanDefaultCategory,
+  ensureHqSpuLink,
   triggerStockWorker,
   uploadImageToYouzanMaterial,
 } from "./youzan-sync.functions";
@@ -180,6 +181,9 @@ export async function releaseSkuToOfflineShopsCore(args: {
 
   const results: OfflineReleaseResult[] = [];
   for (const branch of branches) {
+    // offline.spu.release only publishes an existing HQ product to a branch.
+    // Keep the HQ and branch product codes identical so barcode lookups remain stable.
+    await ensureHqSpuLink(args.sku_id, branch.id);
     const { data: location } = await supabase
       .from("inv_locations")
       .select("id")
