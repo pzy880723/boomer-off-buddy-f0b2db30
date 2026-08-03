@@ -4,7 +4,8 @@ import test from "node:test";
 
 import { addScannedProduct, type PosScannableProduct } from "./pos/pos-policy";
 
-const ROOT_CATEGORIES = [
+// 旧一级类目已被永久清理，现行一级类目见 INV_CATEGORIES
+const LEGACY_ROOT_CATEGORIES = [
   "jp_porcelain",
   "eu_porcelain",
   "vintage_toy",
@@ -15,6 +16,17 @@ const ROOT_CATEGORIES = [
   "fashion",
   "daily",
   "antique",
+] as const;
+
+const CURRENT_ROOT_CATEGORIES = [
+  "porcelain",
+  "toy_model",
+  "character_ip_goods",
+  "audio_media",
+  "digital_appliance",
+  "fashion_wearable",
+  "daily_misc",
+  "art_collectible",
 ] as const;
 
 const PRICE_TIERS = [
@@ -57,9 +69,16 @@ test("an unlimited standard product is not capped by available_qty", () => {
   assert.equal(addScannedProduct(once, product)[0].quantity, 2);
 });
 
-test("the catalog migration covers every ERP root category and all 31 price tiers", () => {
+function categoryCleanupMigration(): string {
+  const filename = readdirSync("supabase/migrations").find((name) =>
+    readFileSync(`supabase/migrations/${name}`, "utf8").includes("停用商品类目永久清理"),
+  );
+  assert.ok(filename, "inactive-category cleanup migration must exist");
+  return readFileSync(`supabase/migrations/${filename}`, "utf8");
+}
+
+test("the catalog migration covers all 31 price tiers", () => {
   const sql = standardCatalogMigration();
-  for (const category of ROOT_CATEGORIES) assert.match(sql, new RegExp(`'${category}'`));
   for (const price of PRICE_TIERS) {
     assert.match(
       sql,
@@ -67,6 +86,23 @@ test("the catalog migration covers every ERP root category and all 31 price tier
     );
   }
   assert.match(sql, /array_length\(v_price_tiers,\s*1\)\s*<>\s*31/i);
+});
+
+test("legacy root categories are remapped and permanently deleted, never re-inserted", () => {
+  const sql = categoryCleanupMigration();
+  for (const category of LEGACY_ROOT_CATEGORIES) assert.match(sql, new RegExp(`'${category}'`));
+  assert.match(sql, /DELETE FROM public\.inv_categories WHERE is_active = false/i);
+  assert.doesNotMatch(sql, /INSERT INTO public\.inv_categories/i);
+});
+
+test("app-level category constants only carry current root categories", () => {
+  const helpers = readFileSync("src/lib/inventory.helpers.ts", "utf8");
+  for (const category of LEGACY_ROOT_CATEGORIES) {
+    assert.doesNotMatch(helpers, new RegExp(`"${category}"`));
+  }
+  for (const category of CURRENT_ROOT_CATEGORIES) {
+    assert.match(helpers, new RegExp(`"${category}"`));
+  }
 });
 
 test("the migration makes standards unlimited and Vintage stores the default", () => {
