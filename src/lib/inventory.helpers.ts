@@ -1,16 +1,18 @@
 // 中古杂货库存模块常量与工具函数（client-safe）
 
 export const INV_CATEGORIES = [
-  { value: "jp_porcelain", label: "日本瓷器", code: "JP" },
-  { value: "eu_porcelain", label: "欧洲瓷器", code: "EU" },
-  { value: "vintage_toy", label: "中古玩具", code: "TY" },
-  { value: "anime_goods", label: "二次元周边", code: "AN" },
-  { value: "media", label: "音像制品", code: "MD" },
-  { value: "digital", label: "数码家电", code: "DG" },
-  { value: "jewelry", label: "珠宝首饰", code: "JW" },
-  { value: "fashion", label: "时尚配件", code: "FS" },
-  { value: "daily", label: "日用杂货", code: "DL" },
-  { value: "antique", label: "古美术", code: "AT" },
+  { value: "porcelain", label: "瓷器", code: "PC" },
+  { value: "tableware_other", label: "其他餐厨器皿", code: "TW" },
+  { value: "toy_model", label: "玩具模型", code: "TY" },
+  { value: "character_ip_goods", label: "角色与IP杂货", code: "AN" },
+  { value: "audio_media", label: "唱片影音", code: "MD" },
+  { value: "digital_appliance", label: "数码电器", code: "DG" },
+  { value: "home_decor", label: "家居陈设", code: "HM" },
+  { value: "stationery_publication", label: "文具书刊", code: "SP" },
+  { value: "fashion_wearable", label: "服饰穿戴", code: "FS" },
+  { value: "art_collectible", label: "艺术收藏", code: "AT" },
+  { value: "daily_misc", label: "日用杂货", code: "DL" },
+  { value: "classification_pending", label: "待归类", code: "PD" },
 ] as const;
 
 export type InvCategory = (typeof INV_CATEGORIES)[number]["value"];
