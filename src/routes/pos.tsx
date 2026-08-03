@@ -34,6 +34,8 @@ import { toast } from "sonner";
 import { useAuthSession } from "@/hooks/use-auth-session";
 import {
   addScannedProduct,
+  posCartLineKey,
+  posCartLineLabel,
   validatePosTenders,
   type PosCartLine,
   type PosScannableProduct,
@@ -52,6 +54,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import type { StandardCatalogGroup } from "@/lib/pos/standard-catalog";
 
 export const Route = createFileRoute("/pos")({
   head: () => ({
@@ -143,6 +146,8 @@ type HeldCart = {
     price_snapshot: number;
     ownership_snapshot: LookupProduct["sale_ownership"];
     discount_eligible: boolean;
+    subcategory_code: string | null;
+    subcategory_name: string | null;
   }>;
 };
 type PosOrder = {
@@ -251,6 +256,13 @@ function PosPage() {
   const [scanCode, setScanCode] = useState("");
   const [scanning, setScanning] = useState(false);
   const [browseOpen, setBrowseOpen] = useState(true);
+  const [standardGroups, setStandardGroups] = useState<StandardCatalogGroup[]>([]);
+  const [standardLoading, setStandardLoading] = useState(false);
+  const [activeCategoryCode, setActiveCategoryCode] = useState<string | null>(null);
+  const [activeSubcategory, setActiveSubcategory] = useState<{
+    code: string;
+    name: string;
+  } | null>(null);
   const [browseLoading, setBrowseLoading] = useState(false);
   const [browseProducts, setBrowseProducts] = useState<LookupProduct[]>([]);
   const [shiftLoading, setShiftLoading] = useState(false);
@@ -365,10 +377,15 @@ function PosPage() {
   const discountTotal = discountPreview?.discount_total ?? 0;
   const total = discountPreview?.payable_total ?? subtotal;
   const itemCount = useMemo(() => cart.reduce((sum, line) => sum + line.quantity, 0), [cart]);
+  const activeGroup = useMemo(
+    () => standardGroups.find((group) => group.category_code === activeCategoryCode) ?? null,
+    [standardGroups, activeCategoryCode],
+  );
 
   useEffect(() => {
     if (activeShift && selectedLocationId) {
       void loadProductBrowser();
+      void loadStandardCatalog();
     }
     // Refresh the local product shelf only when the active cashier context changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -389,6 +406,41 @@ function PosPage() {
     } catch {
       // Sound is an enhancement; the visual result remains authoritative.
     }
+  }
+
+  async function loadStandardCatalog() {
+    if (!selectedLocationId) return;
+    setStandardLoading(true);
+    const result = await posRequest<{ groups: StandardCatalogGroup[] }>(
+      `/api/public/pos/standard-catalog?location_id=${encodeURIComponent(selectedLocationId)}`,
+      token,
+    );
+    setStandardLoading(false);
+    if (!result.ok) {
+      setStandardGroups([]);
+      return;
+    }
+    setStandardGroups(result.data.groups);
+  }
+
+  function addStandardPrice(group: StandardCatalogGroup, price: { sku_id: string; price: number }) {
+    addProduct({
+      sku_id: price.sku_id,
+      product_type: "standard",
+      name: group.category_name,
+      unit_price: price.price,
+      available_qty: 9999,
+      is_unlimited_stock: true,
+      image_url: null,
+      barcode: null,
+      sku_code: null,
+      sale_ownership: null,
+      category_code: group.category_code,
+      category_name: group.category_name,
+      subcategory_code: activeSubcategory?.code ?? null,
+      subcategory_name: activeSubcategory?.name ?? null,
+    } as unknown as LookupProduct);
+    setActiveSubcategory(null);
   }
 
   function addProduct(product: LookupProduct) {
@@ -523,7 +575,12 @@ function PosPage() {
         shift_id: activeShift.id,
         client_op_id: crypto.randomUUID(),
         customer_id: selectedCustomer?.id ?? null,
-        items: cart.map((line) => ({ sku_id: line.sku_id, quantity: line.quantity })),
+        items: cart.map((line) => ({
+          sku_id: line.sku_id,
+          quantity: line.quantity,
+          subcategory_code: line.subcategory_code ?? null,
+          subcategory_name: line.subcategory_name ?? null,
+        })),
         discount_snapshot: discountPreview ? discount : {},
         benefit_snapshot: customerBenefits ?? {},
       }),
@@ -575,9 +632,17 @@ function PosPage() {
       );
       if (lookup.ok) products.push(lookup.data);
     }
-    const resumedCart = products.map((product) => {
-      const heldItem = items.find((item) => item.sku_id === product.sku_id);
-      return { ...product, quantity: heldItem?.quantity ?? 1 };
+    const resumedCart = items.flatMap((heldItem) => {
+      const product = products.find((item) => item.sku_id === heldItem.sku_id);
+      if (!product) return [];
+      return [
+        {
+          ...product,
+          quantity: heldItem.quantity ?? 1,
+          subcategory_code: heldItem.subcategory_code ?? null,
+          subcategory_name: heldItem.subcategory_name ?? null,
+        },
+      ];
     });
     setCart(resumedCart);
     setProductMeta(Object.fromEntries(products.map((product) => [product.sku_id, product])));
@@ -696,11 +761,11 @@ function PosPage() {
     }
   }
 
-  function updateQuantity(skuId: string, nextQuantity: number) {
+  function updateQuantity(lineKey: string, nextQuantity: number) {
     setDiscountPreview(null);
     setCart((current) =>
       current.flatMap((line) => {
-        if (line.sku_id !== skuId) return [line];
+        if (posCartLineKey(line) !== lineKey) return [line];
         if (nextQuantity <= 0) return [];
         if (line.product_type === "custom" && nextQuantity > 1) {
           toast.warning("孤品每单只能销售 1 件");
@@ -838,7 +903,11 @@ function PosPage() {
       body: JSON.stringify({
         shift_id: activeShift.id,
         client_op_id: crypto.randomUUID(),
-        items: cart.map((line) => ({ sku_id: line.sku_id, quantity: line.quantity })),
+        items: cart.map((line) => ({
+          sku_id: line.sku_id,
+          quantity: line.quantity,
+          subcategory_code: line.subcategory_code ?? null,
+        })),
         tenders: checked,
         customer_id: selectedCustomer?.id,
         discount: discountPreview ? discount : undefined,
@@ -1009,6 +1078,97 @@ function PosPage() {
                 </button>
               </div>
             </div>
+            <div className="mt-4 border-t border-[#eaecf0] pt-4">
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold">标准商品</p>
+                  <p className="mt-0.5 text-xs text-[#667085]">
+                    选择一级类目后直接点价格即可加入；细分类可选，不选也能结算。
+                  </p>
+                </div>
+                {standardLoading && <Loader2 className="h-4 w-4 animate-spin text-[#0a315d]" />}
+              </div>
+              {standardGroups.length === 0 ? (
+                <div className="flex h-20 items-center justify-center rounded-xl bg-[#f9fafb] text-sm text-[#667085]">
+                  当前门店不继承标准商品目录
+                </div>
+              ) : activeGroup ? (
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="rounded-lg px-2"
+                      onClick={() => {
+                        setActiveCategoryCode(null);
+                        setActiveSubcategory(null);
+                      }}
+                    >
+                      <ArrowLeft className="mr-1 h-3.5 w-3.5" />
+                      全部类目
+                    </Button>
+                    <span className="text-sm font-semibold">{activeGroup.category_name}</span>
+                  </div>
+                  {activeGroup.subcategories.length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-xs text-[#667085]">细分类（可选）</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {activeGroup.subcategories.map((sub) => {
+                          const active = activeSubcategory?.code === sub.code;
+                          return (
+                            <button
+                              type="button"
+                              key={sub.code}
+                              aria-pressed={active}
+                              className={`rounded-full border px-3 py-1.5 text-xs transition ${
+                                active
+                                  ? "border-[#0a315d] bg-[#0a315d] text-white"
+                                  : "border-[#d0d5dd] bg-white text-[#475467] hover:border-[#0a315d]"
+                              }`}
+                              onClick={() =>
+                                setActiveSubcategory(
+                                  active ? null : { code: sub.code, name: sub.name },
+                                )
+                              }
+                            >
+                              {sub.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  <div className="mt-4 grid grid-cols-4 gap-2 sm:grid-cols-6 xl:grid-cols-8">
+                    {activeGroup.prices.map((price) => (
+                      <button
+                        type="button"
+                        key={price.sku_id}
+                        className="rounded-xl border border-[#e4e7ec] bg-white py-3 text-sm font-bold tabular-nums text-[#e8343a] transition hover:border-[#e8343a] hover:bg-[#fff1f2]"
+                        onClick={() => addStandardPrice(activeGroup, price)}
+                      >
+                        {money(price.price)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-5">
+                  {standardGroups.map((group) => (
+                    <button
+                      type="button"
+                      key={group.category_code}
+                      className="rounded-xl border border-[#e4e7ec] bg-white px-3 py-4 text-sm font-semibold transition hover:border-[#0a315d] hover:bg-[#eef4fb]"
+                      onClick={() => {
+                        setActiveCategoryCode(group.category_code);
+                        setActiveSubcategory(null);
+                      }}
+                    >
+                      {group.category_name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             {browseOpen && (
               <div className="mt-4 border-t border-[#eaecf0] pt-4">
                 <div className="mb-3 flex items-center justify-between">
@@ -1118,9 +1278,10 @@ function PosPage() {
               <div className="min-h-0 overflow-y-auto p-2">
                 {cart.map((line) => {
                   const meta = productMeta[line.sku_id];
+                  const lineKey = posCartLineKey(line);
                   return (
                     <div
-                      key={line.sku_id}
+                      key={lineKey}
                       className="mb-2 rounded-xl bg-white p-3 shadow-[0_1px_2px_rgba(15,23,42,0.05)] last:mb-0"
                     >
                       <div className="flex items-start gap-3">
@@ -1136,7 +1297,9 @@ function PosPage() {
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold">{line.name}</p>
+                          <p className="truncate text-sm font-semibold">
+                            {posCartLineLabel(line)}
+                          </p>
                           <p className="mt-1 truncate font-mono text-[11px] text-[#667085]">
                             {meta?.barcode || meta?.sku_code || line.sku_id}
                           </p>
@@ -1157,7 +1320,7 @@ function PosPage() {
                           <button
                             type="button"
                             className="flex h-8 w-8 items-center justify-center rounded-l-lg border border-[#d0d5dd]"
-                            onClick={() => updateQuantity(line.sku_id, line.quantity - 1)}
+                            onClick={() => updateQuantity(lineKey, line.quantity - 1)}
                           >
                             <Minus className="h-3.5 w-3.5" />
                           </button>
@@ -1171,15 +1334,15 @@ function PosPage() {
                               line.product_type === "custom" ||
                               (!line.is_unlimited_stock && line.quantity >= line.available_qty)
                             }
-                            onClick={() => updateQuantity(line.sku_id, line.quantity + 1)}
+                            onClick={() => updateQuantity(lineKey, line.quantity + 1)}
                           >
                             <Plus className="h-3.5 w-3.5" />
                           </button>
                           <button
                             type="button"
                             className="ml-2 flex h-8 w-8 items-center justify-center rounded-lg text-[#98a2b3] hover:bg-[#fff1f2] hover:text-[#e8343a]"
-                            onClick={() => updateQuantity(line.sku_id, 0)}
-                            aria-label={`删除 ${line.name}`}
+                            onClick={() => updateQuantity(lineKey, 0)}
+                            aria-label={`删除 ${posCartLineLabel(line)}`}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>

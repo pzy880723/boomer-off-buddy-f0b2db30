@@ -238,7 +238,9 @@ ${input.brandPrompt || "（当前品牌库为空）"}
 attribute_confidence 返回逐字段置信度对象，例如 brand、era、origin_country、material、craft、object_type。
 clarification_requests 返回需要店员补拍或确认的问题数组，每项包含 field、question、reason；无需追问时返回空数组。
 品名使用中文，不超过40字；描述不超过160字。只根据图片可见证据判断，不确定字段返回 null 或空数组。
-瓷器产地不明确时必须选 porcelain_origin_unknown。疑似受监管文物、违禁品或无法安全销售的物品，将风险写入 compliance_flags。
+瓷器产地不明确时必须选 porcelain_origin_unknown；瓷器按日本 / 欧洲产地归类，古美术不收瓷器。
+游戏设备：Switch Lite 等掌上主机选 game_handheld；PS5、Xbox 等桌面主机选 game_desktop_console；实体游戏卡带/卡匣选 game_cartridge；手柄、底座、保护壳等选 game_accessory。禁止再返回 digital_game_console。
+疑似受监管文物、违禁品或无法安全销售的物品，将风险写入 compliance_flags。
 suggested_price_cny 只是人民币参考价，没有依据时返回 null。`;
   const userContent = [
     {
