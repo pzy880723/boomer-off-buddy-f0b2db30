@@ -4157,6 +4157,8 @@ export type Database = {
       }
       pos_held_cart_items: {
         Row: {
+          category_code: string | null
+          category_name_snapshot: string | null
           discount_eligible: boolean
           held_cart_id: string
           id: string
@@ -4166,8 +4168,11 @@ export type Database = {
           sku_id: string
           subcategory_code: string | null
           subcategory_name: string | null
+          subcategory_name_snapshot: string | null
         }
         Insert: {
+          category_code?: string | null
+          category_name_snapshot?: string | null
           discount_eligible?: boolean
           held_cart_id: string
           id?: string
@@ -4177,8 +4182,11 @@ export type Database = {
           sku_id: string
           subcategory_code?: string | null
           subcategory_name?: string | null
+          subcategory_name_snapshot?: string | null
         }
         Update: {
+          category_code?: string | null
+          category_name_snapshot?: string | null
           discount_eligible?: boolean
           held_cart_id?: string
           id?: string
@@ -4188,6 +4196,7 @@ export type Database = {
           sku_id?: string
           subcategory_code?: string | null
           subcategory_name?: string | null
+          subcategory_name_snapshot?: string | null
         }
         Relationships: [
           {
