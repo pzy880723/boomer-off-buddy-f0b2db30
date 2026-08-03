@@ -66,7 +66,7 @@ describe("youzan offline products", () => {
     });
     assert.equal(params.all_batch_operate, -1);
     assert.equal(params.price, "16800");
-    assert.equal(params.retail_price, "168");
+    assert.equal(params.retail_price, "16800");
     assert.deepEqual(params.sub_kdt_status_param.sale_up_kdt_ids, [233, 666]);
     assert.equal(params.stocks[0].price, "16800");
     assert.equal(params.stocks[0].sell_stock_count, "1");
@@ -93,7 +93,7 @@ describe("youzan offline products", () => {
     });
 
     assert.equal(params.price, "1");
-    assert.equal(params.retail_price, "0.01");
+    assert.equal(params.retail_price, "1");
     assert.equal(params.stocks[0].price, "1");
     assert.equal(params.stocks[0].min_retail_price, "1");
     assert.equal(params.stocks[0].max_retail_price, "1");

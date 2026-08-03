@@ -200,7 +200,7 @@ export function buildOfflineProductReleaseParams(input: OfflineProductReleaseInp
     all_batch_operate: -1,
     name: input.title,
     display: 1,
-    retail_price: String(input.priceYuan),
+    retail_price: priceFen,
     photo_url: JSON.stringify(pictures),
     stocks: [
       {
