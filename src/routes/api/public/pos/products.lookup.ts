@@ -57,6 +57,19 @@ export const Route = createFileRoute("/api/public/pos/products/lookup")({
         if (availabilityError) return posError(availabilityError.message, 500);
         const productType =
           sku.kind === "bundle" ? "bundle" : sku.is_custom_price ? "custom" : "standard";
+        const { locationInheritsStandardCatalog, isGlobalStandardItem } = await import(
+          "@/server/standard-catalog-scope.server"
+        );
+        if (
+          isGlobalStandardItem({
+            product_type: productType,
+            is_unlimited_stock: sku.inventory_policy === "unlimited",
+          }) &&
+          !(await locationInheritsStandardCatalog(locationId))
+        ) {
+          return posError("未找到可售商品", 404, "product_not_found");
+        }
+
         let imageUrl = sku.image_url && /^https?:\/\//i.test(sku.image_url) ? sku.image_url : null;
         if (sku.image_paths?.[0]) {
           const { signSkuImagePaths } = await import("@/lib/sku-image-resolver.server");
