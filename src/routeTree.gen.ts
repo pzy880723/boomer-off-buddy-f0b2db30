@@ -121,6 +121,7 @@ import { Route as ApiPublicHooksYouzanFixChannelRouteImport } from './routes/api
 import { Route as ApiPublicHooksYouzanMessageRouteImport } from './routes/api/public/hooks/youzan-message'
 import { Route as ApiPublicHooksYouzanReconcileRouteImport } from './routes/api/public/hooks/youzan-reconcile'
 import { Route as ApiPublicHooksYouzanRelistRouteImport } from './routes/api/public/hooks/youzan-relist'
+import { Route as ApiPublicHooksYouzanStandardCatalogSyncRouteImport } from './routes/api/public/hooks/youzan-standard-catalog-sync'
 import { Route as ApiPublicHooksYouzanStockWorkerRouteImport } from './routes/api/public/hooks/youzan-stock-worker'
 import { Route as ApiPublicHooksYouzanSyncRouteImport } from './routes/api/public/hooks/youzan-sync'
 import { Route as ApiPublicHooksYouzanSyncWorkerRouteImport } from './routes/api/public/hooks/youzan-sync-worker'
@@ -812,6 +813,12 @@ const ApiPublicHooksYouzanRelistRoute =
     path: '/api/public/hooks/youzan-relist',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksYouzanStandardCatalogSyncRoute =
+  ApiPublicHooksYouzanStandardCatalogSyncRouteImport.update({
+    id: '/api/public/hooks/youzan-standard-catalog-sync',
+    path: '/api/public/hooks/youzan-standard-catalog-sync',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksYouzanStockWorkerRoute =
   ApiPublicHooksYouzanStockWorkerRouteImport.update({
     id: '/api/public/hooks/youzan-stock-worker',
@@ -1498,6 +1505,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/youzan-message': typeof ApiPublicHooksYouzanMessageRoute
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
   '/api/public/hooks/youzan-relist': typeof ApiPublicHooksYouzanRelistRoute
+  '/api/public/hooks/youzan-standard-catalog-sync': typeof ApiPublicHooksYouzanStandardCatalogSyncRoute
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
   '/api/public/hooks/youzan-sync': typeof ApiPublicHooksYouzanSyncRoute
   '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
@@ -1703,6 +1711,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/youzan-message': typeof ApiPublicHooksYouzanMessageRoute
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
   '/api/public/hooks/youzan-relist': typeof ApiPublicHooksYouzanRelistRoute
+  '/api/public/hooks/youzan-standard-catalog-sync': typeof ApiPublicHooksYouzanStandardCatalogSyncRoute
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
   '/api/public/hooks/youzan-sync': typeof ApiPublicHooksYouzanSyncRoute
   '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
@@ -1916,6 +1925,7 @@ export interface FileRoutesById {
   '/api/public/hooks/youzan-message': typeof ApiPublicHooksYouzanMessageRoute
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
   '/api/public/hooks/youzan-relist': typeof ApiPublicHooksYouzanRelistRoute
+  '/api/public/hooks/youzan-standard-catalog-sync': typeof ApiPublicHooksYouzanStandardCatalogSyncRoute
   '/api/public/hooks/youzan-stock-worker': typeof ApiPublicHooksYouzanStockWorkerRoute
   '/api/public/hooks/youzan-sync': typeof ApiPublicHooksYouzanSyncRoute
   '/api/public/hooks/youzan-sync-worker': typeof ApiPublicHooksYouzanSyncWorkerRoute
@@ -2130,6 +2140,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-message'
     | '/api/public/hooks/youzan-reconcile'
     | '/api/public/hooks/youzan-relist'
+    | '/api/public/hooks/youzan-standard-catalog-sync'
     | '/api/public/hooks/youzan-stock-worker'
     | '/api/public/hooks/youzan-sync'
     | '/api/public/hooks/youzan-sync-worker'
@@ -2335,6 +2346,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-message'
     | '/api/public/hooks/youzan-reconcile'
     | '/api/public/hooks/youzan-relist'
+    | '/api/public/hooks/youzan-standard-catalog-sync'
     | '/api/public/hooks/youzan-stock-worker'
     | '/api/public/hooks/youzan-sync'
     | '/api/public/hooks/youzan-sync-worker'
@@ -2547,6 +2559,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-message'
     | '/api/public/hooks/youzan-reconcile'
     | '/api/public/hooks/youzan-relist'
+    | '/api/public/hooks/youzan-standard-catalog-sync'
     | '/api/public/hooks/youzan-stock-worker'
     | '/api/public/hooks/youzan-sync'
     | '/api/public/hooks/youzan-sync-worker'
@@ -2713,6 +2726,7 @@ export interface RootRouteChildren {
   ApiPublicHooksYouzanMessageRoute: typeof ApiPublicHooksYouzanMessageRoute
   ApiPublicHooksYouzanReconcileRoute: typeof ApiPublicHooksYouzanReconcileRoute
   ApiPublicHooksYouzanRelistRoute: typeof ApiPublicHooksYouzanRelistRoute
+  ApiPublicHooksYouzanStandardCatalogSyncRoute: typeof ApiPublicHooksYouzanStandardCatalogSyncRoute
   ApiPublicHooksYouzanStockWorkerRoute: typeof ApiPublicHooksYouzanStockWorkerRoute
   ApiPublicHooksYouzanSyncRoute: typeof ApiPublicHooksYouzanSyncRoute
   ApiPublicHooksYouzanSyncWorkerRoute: typeof ApiPublicHooksYouzanSyncWorkerRoute
@@ -3561,6 +3575,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/hooks/youzan-relist'
       fullPath: '/api/public/hooks/youzan-relist'
       preLoaderRoute: typeof ApiPublicHooksYouzanRelistRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/youzan-standard-catalog-sync': {
+      id: '/api/public/hooks/youzan-standard-catalog-sync'
+      path: '/api/public/hooks/youzan-standard-catalog-sync'
+      fullPath: '/api/public/hooks/youzan-standard-catalog-sync'
+      preLoaderRoute: typeof ApiPublicHooksYouzanStandardCatalogSyncRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/youzan-stock-worker': {
@@ -4884,6 +4905,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksYouzanMessageRoute: ApiPublicHooksYouzanMessageRoute,
   ApiPublicHooksYouzanReconcileRoute: ApiPublicHooksYouzanReconcileRoute,
   ApiPublicHooksYouzanRelistRoute: ApiPublicHooksYouzanRelistRoute,
+  ApiPublicHooksYouzanStandardCatalogSyncRoute:
+    ApiPublicHooksYouzanStandardCatalogSyncRoute,
   ApiPublicHooksYouzanStockWorkerRoute: ApiPublicHooksYouzanStockWorkerRoute,
   ApiPublicHooksYouzanSyncRoute: ApiPublicHooksYouzanSyncRoute,
   ApiPublicHooksYouzanSyncWorkerRoute: ApiPublicHooksYouzanSyncWorkerRoute,
