@@ -49,12 +49,14 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/restock")({
         const { data: sku, error: skuErr } = await supabaseAdmin
           .from("inv_skus")
           .select(
-            "id, sku_code, barcode, name, category, price_tier, grade, is_display",
+            "id, sku_code, barcode, name, category, price_tier, grade, is_display, is_custom_price",
           )
           .eq("id", params.id)
           .maybeSingle();
         if (skuErr) return err(skuErr.message, 500);
         if (!sku) return errCode("not_found", "SKU not found");
+        const isDisplay = (sku as { is_display?: boolean }).is_display !== false;
+        const isCustom = (sku as { is_custom_price?: boolean }).is_custom_price === true;
 
         // Apply movement (+delta) — trigger tg_shop_movement_enqueue handles youzan stock push
         const { data: balanceAfter, error: rpcErr } = await supabaseAdmin.rpc(
@@ -70,6 +72,27 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/restock")({
           } as never,
         );
         if (rpcErr) return err(rpcErr.message, 500);
+
+        if (isCustom) {
+          const [{ error: skuStateError }, { error: listingError }] = await Promise.all([
+            supabaseAdmin
+              .from("inv_skus")
+              .update({ sales_state: "active", updated_at: new Date().toISOString() } as never)
+              .eq("id", params.id),
+            supabaseAdmin
+              .from("commerce_listings")
+              .update({
+                status: isDisplay ? "published" : "hidden",
+                sold_at: null,
+                updated_at: new Date().toISOString(),
+              } as never)
+              .eq("sku_id", params.id)
+              .eq("product_type", "custom")
+              .eq("status", "sold"),
+          ]);
+          if (skuStateError) return err(skuStateError.message, 500);
+          if (listingError) return err(listingError.message, 500);
+        }
 
         // Optional print batch
         let labelBatch: {
@@ -115,7 +138,6 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/restock")({
           0,
         );
 
-        const isDisplay = (sku as { is_display?: boolean }).is_display !== false;
         const ls = deriveListingStatus(isDisplay, totalQty);
 
         return ok({
