@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
+  buildOfflineProductShelfParams,
   buildOfflineSkuReleaseInput,
   buildOfflineStockQueueRow,
   buildOfflineProductQueryParams,
@@ -13,6 +14,33 @@ import {
 } from "./youzan-offline-products.server";
 
 describe("youzan offline products", () => {
+  test("branch shelf changes use the retail offline batch API contract", () => {
+    assert.deepEqual(
+      buildOfflineProductShelfParams({
+        warehouseCodes: ["MD00001"],
+        itemIds: [6128079637],
+        online: false,
+      }),
+      {
+        warehouse_code: ["MD00001"],
+        item_ids: [6128079637],
+        display: 2,
+      },
+    );
+    assert.deepEqual(
+      buildOfflineProductShelfParams({
+        warehouseCodes: ["MD00001"],
+        itemIds: [6128079637],
+        online: true,
+      }),
+      {
+        warehouse_code: ["MD00001"],
+        item_ids: [6128079637],
+        display: 1,
+      },
+    );
+  });
+
   test("query pagination never exceeds the documented 3300 window", () => {
     assert.throws(() => buildOfflineProductQueryParams({ pageNo: 34, pageSize: 100 }));
     assert.deepEqual(buildOfflineProductQueryParams({ pageNo: 33, pageSize: 100 }), {

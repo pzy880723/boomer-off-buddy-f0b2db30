@@ -21,6 +21,7 @@ import {
   getHqShop,
   pushYouzanQuantityUpdate,
 } from "@/lib/youzan.functions";
+import { buildOfflineProductShelfParams } from "@/lib/youzan-offline-products.server";
 import { verifyListingCore } from "@/lib/omnichannel-publish.functions";
 
 const DEFAULT_LEASE_SECONDS = 60;
@@ -351,22 +352,24 @@ async function handleShelfChange(
   if (!l.shop_id || !l.external_item_id) throw new Error("listing 未 verify");
   const { data: branch } = await sb
     .from("youzan_shops")
-    .select("kdt_id")
+    .select("warehouse_code")
     .eq("id", l.shop_id)
     .maybeSingle();
   if (!branch) throw new Error("门店不存在");
+  const warehouseCode = String(
+    (branch as { warehouse_code?: string | null }).warehouse_code ?? "",
+  ).trim();
   const hq = await getHqShop();
   const hqToken = await ensureAccessToken(hq);
   await callYouzanApiVerbose({
     accessToken: hqToken,
-    method: online
-      ? "youzan.retail.open.product.online"
-      : "youzan.retail.open.product.offline",
-    version: "1.0.0",
-    params: {
-      kdt_id: Number((branch as { kdt_id: number }).kdt_id),
-      item_id: Number(l.external_item_id),
-    },
+    method: "youzan.retail.open.offline.spu.batch.shelf",
+    version: "3.0.0",
+    params: buildOfflineProductShelfParams({
+      warehouseCodes: [warehouseCode],
+      itemIds: [Number(l.external_item_id)],
+      online,
+    }),
     timeoutMs: 20_000,
   });
   await sb

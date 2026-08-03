@@ -7,6 +7,26 @@ export type OfflineProductQueryInput = {
   itemIds?: number[];
 };
 
+export function buildOfflineProductShelfParams(input: {
+  warehouseCodes: string[];
+  itemIds: number[];
+  online: boolean;
+}) {
+  const warehouseCodes = Array.from(
+    new Set(input.warehouseCodes.map((value) => value.trim()).filter(Boolean)),
+  );
+  const itemIds = Array.from(
+    new Set(input.itemIds.filter((value) => Number.isInteger(value) && value > 0)),
+  );
+  if (warehouseCodes.length === 0) throw new Error("Youzan warehouse code is required");
+  if (itemIds.length === 0) throw new Error("Youzan offline item id is required");
+  return {
+    warehouse_code: warehouseCodes,
+    item_ids: itemIds,
+    display: input.online ? 1 : 2,
+  };
+}
+
 export function buildOfflineProductQueryParams(input: OfflineProductQueryInput) {
   const pageNo = input.pageNo ?? 1;
   const pageSize = input.pageSize ?? 20;
