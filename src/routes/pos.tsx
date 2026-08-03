@@ -706,7 +706,7 @@ function PosPage() {
           toast.warning("孤品每单只能销售 1 件");
           return [line];
         }
-        if (nextQuantity > line.available_qty) {
+        if (!line.is_unlimited_stock && nextQuantity > line.available_qty) {
           toast.warning("数量不能超过当前可售库存");
           return [line];
         }
@@ -1067,7 +1067,7 @@ function PosPage() {
                               {money(product.unit_price)}
                             </span>
                             <span className="text-[11px] text-[#667085]">
-                              库存 {product.available_qty}
+                              {product.is_unlimited_stock ? "库存不限" : `库存 ${product.available_qty}`}
                             </span>
                           </div>
                         </div>
@@ -1168,7 +1168,8 @@ function PosPage() {
                             type="button"
                             className="flex h-8 w-8 items-center justify-center rounded-r-lg border border-[#d0d5dd] disabled:opacity-35"
                             disabled={
-                              line.product_type === "custom" || line.quantity >= line.available_qty
+                              line.product_type === "custom" ||
+                              (!line.is_unlimited_stock && line.quantity >= line.available_qty)
                             }
                             onClick={() => updateQuantity(line.sku_id, line.quantity + 1)}
                           >

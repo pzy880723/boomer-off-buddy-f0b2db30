@@ -2671,6 +2671,7 @@ export type Database = {
           id: string
           image_paths: string[]
           image_url: string | null
+          inventory_policy: string
           inventory_version: number
           is_custom_price: boolean
           is_display: boolean
@@ -2712,6 +2713,7 @@ export type Database = {
           id?: string
           image_paths?: string[]
           image_url?: string | null
+          inventory_policy?: string
           inventory_version?: number
           is_custom_price?: boolean
           is_display?: boolean
@@ -2753,6 +2755,7 @@ export type Database = {
           id?: string
           image_paths?: string[]
           image_url?: string | null
+          inventory_policy?: string
           inventory_version?: number
           is_custom_price?: boolean
           is_display?: boolean
@@ -5791,6 +5794,7 @@ export type Database = {
           sell_channel_id: number | null
           sell_channel_ids: number[]
           shop_name: string
+          store_format: string
           status: string
           token_expires_at: string | null
           updated_at: string
@@ -5825,6 +5829,7 @@ export type Database = {
           sell_channel_id?: number | null
           sell_channel_ids?: number[]
           shop_name: string
+          store_format?: string
           status?: string
           token_expires_at?: string | null
           updated_at?: string
@@ -5859,6 +5864,7 @@ export type Database = {
           sell_channel_id?: number | null
           sell_channel_ids?: number[]
           shop_name?: string
+          store_format?: string
           status?: string
           token_expires_at?: string | null
           updated_at?: string

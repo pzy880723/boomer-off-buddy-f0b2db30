@@ -4,7 +4,7 @@ import { signSkuImagePaths } from "@/lib/sku-image-resolver.server";
 import { POS_CORS, authenticatePosUser, posError, posJson } from "@/server/pos-auth.server";
 
 const SKU_COLUMNS =
-  "id,sku_code,barcode,name,kind,is_custom_price,price_tier,grade,image_url,image_paths,sale_ownership,discount_eligible";
+  "id,sku_code,barcode,name,kind,is_custom_price,inventory_policy,price_tier,grade,image_url,image_paths,sale_ownership,discount_eligible";
 
 export const Route = createFileRoute("/api/public/pos/products")({
   server: {
@@ -41,6 +41,7 @@ export const Route = createFileRoute("/api/public/pos/products")({
           name: string;
           kind: string;
           is_custom_price: boolean;
+          inventory_policy: "tracked" | "unlimited";
           price_tier: number;
           grade: string | null;
           image_url: string | null;
@@ -73,6 +74,7 @@ export const Route = createFileRoute("/api/public/pos/products")({
                 condition_grade: sku.grade,
                 image_url: imageUrl,
                 available_qty: Number(availableQty) || 0,
+                is_unlimited_stock: sku.inventory_policy === "unlimited",
                 location_id: locationId,
                 sale_ownership: sku.sale_ownership,
                 discount_eligible: sku.discount_eligible,
@@ -87,7 +89,9 @@ export const Route = createFileRoute("/api/public/pos/products")({
         }
         return posJson({
           ok: true,
-          data: { items: items.filter((item) => item.available_qty > 0) },
+          data: {
+            items: items.filter((item) => item.is_unlimited_stock || item.available_qty > 0),
+          },
         });
       },
     },

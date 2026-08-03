@@ -315,19 +315,6 @@ function ShopProductsPage() {
   const groupActions = (g: StandardProductGroup) => (
     <div className="flex items-center gap-1">
       {g.skus.length > 0 && renderLinkBadge(g.skus[0].id)}
-      <Button
-        size="sm"
-        variant="outline"
-        className="h-7 px-2 text-[11px]"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          const first = g.skus[0];
-          if (first) setReceive({ sku_id: first.id, sku_name: `${g.name} · ¥${first.price_tier}`, qty: first.stock_qty });
-        }}
-      >
-        <Package2 className="mr-1 h-3 w-3" /> 库存
-      </Button>
     </div>
   );
 
@@ -428,9 +415,9 @@ function ShopProductsPage() {
           <div className="mb-3 flex items-start gap-2 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs">
             <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
             <div className="flex-1">
-              <p className="font-medium">标准商品统一在仓库新建，门店会自动同步。</p>
+              <p className="font-medium">标准商品统一维护，所有 Vintage 门店自动可售。</p>
               <p className="mt-0.5 text-muted-foreground">
-                这里只做入库和上下架管理。SKU 定义（品名、价格档、图片、EPC）请在
+                标准商品当前为无限库存，无需入库。SKU 定义（品名、价格档、图片、EPC）请在
                 <Link
                   to="/inventory/skus"
                   className="mx-1 inline-flex items-center gap-0.5 text-primary underline-offset-2 hover:underline"

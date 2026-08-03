@@ -12,6 +12,7 @@ import {
   runYouzanShopChainProbe,
 } from "./youzan.functions";
 import { selectTrustedBranchItemIds } from "./youzan-quantity.server";
+import { buildStandardYouzanRemoteIdentity } from "./standard-catalog-youzan-sync";
 
 
 
@@ -916,10 +917,12 @@ async function collectSellChannelKdtIds(
   if (scope === "standard") {
     const { data: shops } = await supabase
       .from("youzan_shops")
-      .select("id, kdt_id, role, status")
+      .select("id, kdt_id, role, status, store_format")
       .eq("role", "branch");
     const active = (shops ?? []).filter(
-      (s) => (s as { status?: string }).status !== "disabled",
+      (s) =>
+        (s as { status?: string; store_format?: string }).status !== "disabled" &&
+        (s as { store_format?: string }).store_format === "vintage",
     );
     return {
       shopIds: active.map((s) => s.id as string),
@@ -1201,6 +1204,14 @@ export async function ensureHqSpuLink(
 
   const scope: "standard" | "custom" =
     ((sku as { sku_scope?: string }).sku_scope === "custom" ? "custom" : "standard");
+  const remoteIdentity = scope === "standard"
+    ? buildStandardYouzanRemoteIdentity({
+        skuId: sku.id as string,
+        skuCode: sku.sku_code as string,
+        name: sku.name as string,
+        priceTier: (sku as { price_tier: string | number }).price_tier,
+      })
+    : { code: sku.sku_code as string, name: sku.name as string };
   await resolveHqCategoryId(sku as { category?: string | null });
   const categoryId = await resolveHqRetailProductCategoryId();
   const { kdtIds } = await collectSellChannelKdtIds(sku_id, scope, addBranchShopId);
@@ -1224,8 +1235,8 @@ export async function ensureHqSpuLink(
   const finalImage = cdnImage || rawImage || "";
   const attempts = buildSpuCreateAttempts(
     {
-      sku_code: sku.sku_code as string,
-      name: sku.name as string,
+      sku_code: remoteIdentity.code,
+      name: remoteIdentity.name,
       image_url: finalImage || null,
       notes: (sku as { notes?: string | null }).notes ?? null,
       price_tier: (sku as { price_tier: string | number }).price_tier,
@@ -1234,7 +1245,9 @@ export async function ensureHqSpuLink(
     categoryId,
     kdtIds,
   );
-  const existingRemote = await findCreatedHqSpu(token, "", sku.name);
+  const existingRemote = scope === "standard"
+    ? await findCreatedHqSpu(token, remoteIdentity.code, remoteIdentity.name)
+    : await findCreatedHqSpu(token, "", remoteIdentity.name);
   if (existingRemote.spuId > 0) {
     newSpuId = existingRemote.spuId;
     newSkuId = existingRemote.skuId;
@@ -1253,7 +1266,7 @@ export async function ensureHqSpuLink(
       if (!newSpuId) {
         const code = pickCreatedSpuCode(res.payload);
         if (code) {
-          const found = await findCreatedHqSpu(token, code, sku.name);
+          const found = await findCreatedHqSpu(token, code, remoteIdentity.name);
           newSpuId = found.spuId;
           newSkuId = found.skuId;
         }

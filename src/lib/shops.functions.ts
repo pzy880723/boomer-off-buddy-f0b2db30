@@ -217,6 +217,7 @@ export const createShop = createServerFn({ method: "POST" })
         kdt_id: data.kdt_id ?? 0,
         shop_name: data.shop_name,
         role: "branch",
+        store_format: "vintage",
         ownership: data.ownership,
         status: "active",
         address: data.address ?? null,
@@ -232,4 +233,3 @@ export const createShop = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true, id: inserted.id, bound };
   });
-
