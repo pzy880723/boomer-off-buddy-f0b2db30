@@ -176,6 +176,7 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
               name: body.name,
               price_tier: body.price_tier,
               is_custom_price: body.is_custom_price,
+              inventory_policy: body.is_custom_price ? "tracked" : "unlimited",
               kind: "single",
               epc,
               sku_code: skuCode,

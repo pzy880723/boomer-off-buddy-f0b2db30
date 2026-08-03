@@ -6,6 +6,7 @@ export type PosScannableProduct = {
   name: string;
   unit_price: number;
   available_qty: number;
+  is_unlimited_stock?: boolean;
 };
 
 export type PosCartLine = PosScannableProduct & {
@@ -38,11 +39,13 @@ export function addScannedProduct(
 ): PosCartLine[] {
   const existing = cart.find((line) => line.sku_id === product.sku_id);
   if (!existing) {
-    if (product.available_qty < 1) throw new Error("product has no available stock");
+    if (!product.is_unlimited_stock && product.available_qty < 1) {
+      throw new Error("product has no available stock");
+    }
     return [...cart, { ...product, quantity: 1 }];
   }
   if (product.product_type === "custom") throw new Error("custom product is already in cart");
-  if (existing.quantity >= product.available_qty) {
+  if (!product.is_unlimited_stock && existing.quantity >= product.available_qty) {
     throw new Error("quantity exceeds available stock");
   }
   return cart.map((line) =>

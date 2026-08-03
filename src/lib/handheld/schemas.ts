@@ -211,6 +211,9 @@ export const ProductItemSchema = z
       )
       .default([]),
     notes: z.string().nullable(),
+    is_unlimited_stock: z.boolean().default(false).meta({
+      description: "true 时标准商品不跟踪物理库存，所有 Vintage 门店持续可售",
+    }),
     total_stock_qty: z.number().int(),
     stocks: z.array(ProductStockSchema),
     status: z.string(),

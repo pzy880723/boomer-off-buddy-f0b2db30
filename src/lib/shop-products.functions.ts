@@ -61,11 +61,10 @@ export const listShopSkus = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }): Promise<{ rows: ShopSkuRow[]; location_id: string | null }> => {
     const sb = context.supabase;
-    const { data: loc } = await sb
-      .from("inv_locations")
-      .select("id, name")
-      .eq("shop_id", data.shop_id)
-      .maybeSingle();
+    const [{ data: loc }, { data: shop }] = await Promise.all([
+      sb.from("inv_locations").select("id, name").eq("shop_id", data.shop_id).maybeSingle(),
+      sb.from("youzan_shops").select("store_format").eq("id", data.shop_id).maybeSingle(),
+    ]);
     if (!loc) return { rows: [], location_id: null };
 
     // 取该门店所有 inv_stocks（含 qty=0，方便看到"新建但入库失败"的商品）
@@ -92,6 +91,16 @@ export const listShopSkus = createServerFn({ method: "GET" })
     (stocks ?? []).forEach((s) => skuIds.add(s.sku_id));
     (links ?? []).forEach((l) => skuIds.add(l.sku_id));
     (moves ?? []).forEach((m) => skuIds.add(m.sku_id));
+    if ((shop as { store_format?: string } | null)?.store_format === "vintage") {
+      const { data: standardSkus, error: standardErr } = await sb
+        .from("inv_skus")
+        .select("id")
+        .eq("kind", "single")
+        .eq("is_custom_price", false)
+        .eq("status", "active");
+      if (standardErr) throw new Error(standardErr.message);
+      (standardSkus ?? []).forEach((sku) => skuIds.add(sku.id));
+    }
     if (skuIds.size === 0) return { rows: [], location_id: loc.id };
 
     let q = sb
@@ -117,6 +126,7 @@ export const listShopSkus = createServerFn({ method: "GET" })
         sku_code: (raw.sku_code as string | null) ?? null,
         price_tier: Number(raw.price_tier ?? 0),
         is_custom_price: Boolean(raw.is_custom_price),
+        inventory_policy: String(raw.inventory_policy ?? "tracked") as "tracked" | "unlimited",
         kind: String(raw.kind ?? "single"),
         pack_pieces: (raw.pack_pieces as number | null) ?? null,
         bundle_items: Array.isArray(bi) ? (bi as Array<{ sku_id: string; qty: number }>) : [],
@@ -141,6 +151,7 @@ export type ShopSkuRow = {
   sku_code: string | null;
   price_tier: number;
   is_custom_price: boolean;
+  inventory_policy: "tracked" | "unlimited";
   kind: string;
   pack_pieces: number | null;
   bundle_items: Array<{ sku_id: string; qty: number }>;

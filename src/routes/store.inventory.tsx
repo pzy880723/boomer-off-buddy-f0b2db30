@@ -48,7 +48,7 @@ export const Route = createFileRoute("/store/inventory")({
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium">{r.name}</div>
                 <div className="text-[10px] text-muted-foreground">
-                  {CATEGORY_LABEL[r.category] ?? r.category} · ¥{Number(r.price_tier).toFixed(1)} · 库存 {r.stock_qty}
+                  {CATEGORY_LABEL[r.category] ?? r.category} · ¥{Number(r.price_tier).toFixed(1)} · {r.inventory_policy === "unlimited" ? "库存不限" : `库存 ${r.stock_qty}`}
                 </div>
               </div>
             </li>

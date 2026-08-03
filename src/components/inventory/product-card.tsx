@@ -49,7 +49,7 @@ export function StandardProductCard({
             </div>
             <div className="absolute right-2 top-2">
               <Badge variant="outline" className="bg-background/80 backdrop-blur">
-                库存 {group.totalStock}
+                库存不限
               </Badge>
             </div>
           </div>
@@ -196,7 +196,7 @@ export function StandardProductRow({
           {remaining > 0 && <Badge variant="secondary">+{remaining}</Badge>}
         </div>
         <div className="w-20 text-right text-xs tabular-nums">
-          库存 <span className="font-semibold">{group.totalStock}</span>
+          <span className="font-semibold">库存不限</span>
         </div>
         <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
       </Link>
