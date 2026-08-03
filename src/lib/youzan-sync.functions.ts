@@ -12,6 +12,7 @@ import {
   runYouzanShopChainProbe,
 } from "./youzan.functions";
 import { selectTrustedBranchItemIds } from "./youzan-quantity.server";
+import { buildBranchItemShelfRequest } from "./youzan-offline-products.server";
 import { buildStandardYouzanRemoteIdentity } from "./standard-catalog-youzan-sync";
 
 
@@ -304,23 +305,21 @@ function pickBranchItemIds(payload: unknown): { item_id: number; sku_id: number 
 
 
 // ============================================================
-// pushIsDisplayToYouzan —— 分店上下架（用 HQ token）
+// pushIsDisplayToYouzan —— 分店商品用分店授权上下架
 // ============================================================
 async function pushIsDisplayToYouzan(
   link: LinkRow,
   isDisplay: boolean,
 ): Promise<void> {
   const branchShop = await getShopById(link.shop_id);
-  const hq = await getHqShop();
-  const hqToken = await ensureAccessToken(hq);
-  const method = isDisplay
-    ? "youzan.retail.open.product.online"
-    : "youzan.retail.open.product.offline";
+  const branchToken = await ensureAccessToken(branchShop);
+  const request = buildBranchItemShelfRequest({
+    itemId: Number(link.yz_item_id),
+    online: isDisplay,
+  });
   await callYouzanApiVerbose({
-    accessToken: hqToken,
-    method,
-    version: "1.0.0",
-    params: { kdt_id: branchShop.kdt_id, item_id: link.yz_item_id },
+    accessToken: branchToken,
+    ...request,
     timeoutMs: 20_000,
   });
 }

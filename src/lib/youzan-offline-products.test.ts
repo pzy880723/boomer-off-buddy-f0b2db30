@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
-  buildOfflineProductShelfParams,
+  buildBranchItemShelfRequest,
   buildOfflineSkuReleaseInput,
   buildOfflineStockQueueRow,
   buildOfflineProductQueryParams,
@@ -14,31 +14,30 @@ import {
 } from "./youzan-offline-products.server";
 
 describe("youzan offline products", () => {
-  test("branch shelf changes use the retail offline batch API contract", () => {
+  test("branch shelf changes use the branch item listing API contract", () => {
     assert.deepEqual(
-      buildOfflineProductShelfParams({
-        warehouseCodes: ["MD00001"],
-        itemIds: [6128079637],
+      buildBranchItemShelfRequest({
+        itemId: 6128079637,
         online: false,
       }),
       {
-        warehouse_code: ["MD00001"],
-        item_ids: [6128079637],
-        display: 2,
+        method: "youzan.item.update.delisting",
+        version: "3.0.1",
+        params: { item_id: 6128079637 },
       },
     );
     assert.deepEqual(
-      buildOfflineProductShelfParams({
-        warehouseCodes: ["MD00001"],
-        itemIds: [6128079637],
+      buildBranchItemShelfRequest({
+        itemId: 6128079637,
         online: true,
       }),
       {
-        warehouse_code: ["MD00001"],
-        item_ids: [6128079637],
-        display: 1,
+        method: "youzan.item.update.listing",
+        version: "3.0.0",
+        params: { item_id: 6128079637 },
       },
     );
+    assert.throws(() => buildBranchItemShelfRequest({ itemId: 0, online: true }));
   });
 
   test("query pagination never exceeds the documented 3300 window", () => {

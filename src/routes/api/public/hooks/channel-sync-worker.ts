@@ -18,10 +18,9 @@ import {
   callYouzanApiVerbose,
   ensureAccessToken,
   explainYouzanError,
-  getHqShop,
   pushYouzanQuantityUpdate,
 } from "@/lib/youzan.functions";
-import { buildOfflineProductShelfParams } from "@/lib/youzan-offline-products.server";
+import { buildBranchItemShelfRequest } from "@/lib/youzan-offline-products.server";
 import { verifyListingCore } from "@/lib/omnichannel-publish.functions";
 
 const DEFAULT_LEASE_SECONDS = 60;
@@ -352,24 +351,20 @@ async function handleShelfChange(
   if (!l.shop_id || !l.external_item_id) throw new Error("listing 未 verify");
   const { data: branch } = await sb
     .from("youzan_shops")
-    .select("warehouse_code")
+    .select("*")
     .eq("id", l.shop_id)
     .maybeSingle();
   if (!branch) throw new Error("门店不存在");
-  const warehouseCode = String(
-    (branch as { warehouse_code?: string | null }).warehouse_code ?? "",
-  ).trim();
-  const hq = await getHqShop();
-  const hqToken = await ensureAccessToken(hq);
+  const branchToken = await ensureAccessToken(
+    branch as unknown as Parameters<typeof ensureAccessToken>[0],
+  );
+  const request = buildBranchItemShelfRequest({
+    itemId: Number(l.external_item_id),
+    online,
+  });
   await callYouzanApiVerbose({
-    accessToken: hqToken,
-    method: "youzan.retail.open.offline.spu.batch.shelf",
-    version: "3.0.0",
-    params: buildOfflineProductShelfParams({
-      warehouseCodes: [warehouseCode],
-      itemIds: [Number(l.external_item_id)],
-      online,
-    }),
+    accessToken: branchToken,
+    ...request,
     timeoutMs: 20_000,
   });
   await sb

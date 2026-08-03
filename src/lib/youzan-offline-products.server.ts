@@ -7,23 +7,17 @@ export type OfflineProductQueryInput = {
   itemIds?: number[];
 };
 
-export function buildOfflineProductShelfParams(input: {
-  warehouseCodes: string[];
-  itemIds: number[];
+export function buildBranchItemShelfRequest(input: {
+  itemId: number;
   online: boolean;
 }) {
-  const warehouseCodes = Array.from(
-    new Set(input.warehouseCodes.map((value) => value.trim()).filter(Boolean)),
-  );
-  const itemIds = Array.from(
-    new Set(input.itemIds.filter((value) => Number.isInteger(value) && value > 0)),
-  );
-  if (warehouseCodes.length === 0) throw new Error("Youzan warehouse code is required");
-  if (itemIds.length === 0) throw new Error("Youzan offline item id is required");
+  if (!Number.isInteger(input.itemId) || input.itemId <= 0) {
+    throw new Error("Youzan branch item id is required");
+  }
   return {
-    warehouse_code: warehouseCodes,
-    item_ids: itemIds,
-    display: input.online ? 1 : 2,
+    method: input.online ? "youzan.item.update.listing" : "youzan.item.update.delisting",
+    version: input.online ? "3.0.0" : "3.0.1",
+    params: { item_id: input.itemId },
   };
 }
 
