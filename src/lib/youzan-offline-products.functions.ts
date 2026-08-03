@@ -15,6 +15,7 @@ import {
 } from "./youzan-offline-products.server";
 import {
   ensureAutoYouzanDefaultCategory,
+  ensureBranchProduct,
   ensureHqSpuLink,
   triggerStockWorker,
   uploadImageToYouzanMaterial,
@@ -201,6 +202,33 @@ export async function releaseSkuToOfflineShopsCore(args: {
         .eq("location_id", location.id)
         .maybeSingle();
       stock = Math.max(0, Math.trunc(Number(localStock?.qty ?? 0)));
+    }
+
+    // HQ creation with the target branch may already distribute the product.
+    // Probe and persist the real branch item IDs before attempting another release.
+    const distributed = await ensureBranchProduct(args.sku_id, branch.id);
+    if (distributed.yz_item_id) {
+      const { data: branchLink } = await supabase
+        .from("sku_youzan_links")
+        .select("yz_sku_id")
+        .eq("sku_id", args.sku_id)
+        .eq("shop_id", branch.id)
+        .maybeSingle();
+      await enqueueBranchStock({
+        skuId: args.sku_id,
+        shopId: branch.id,
+        locationId: location.id,
+        targetStock: stock,
+      });
+      results.push({
+        shop_id: branch.id,
+        ok: true,
+        item_id: distributed.yz_item_id,
+        sku_id: Number(branchLink?.yz_sku_id ?? 0) || null,
+        recovered: !distributed.created,
+        error: null,
+      });
+      continue;
     }
 
     const { data: existing } = await supabase

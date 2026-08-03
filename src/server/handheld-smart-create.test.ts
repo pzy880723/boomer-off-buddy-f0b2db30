@@ -120,4 +120,15 @@ describe("handheld AI classification contract", () => {
     assert.match(retryRoute, /items\.sync-youzan/);
     assert.match(openapi, /items\/\{id\}\/sync-youzan/);
   });
+
+  test("branch publication creates HQ first and recovers real branch item IDs", () => {
+    const publisher = readFileSync(
+      "src/lib/youzan-offline-products.functions.ts",
+      "utf8",
+    );
+
+    assert.match(publisher, /ensureHqSpuLink\(args\.sku_id, branch\.id\)/);
+    assert.match(publisher, /ensureBranchProduct\(args\.sku_id, branch\.id\)/);
+    assert.match(publisher, /select\("yz_sku_id"\)/);
+  });
 });
