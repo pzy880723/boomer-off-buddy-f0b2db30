@@ -19,6 +19,11 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { ensureBranchListing, triggerStockWorker } from "./youzan-sync.functions";
 import { releaseSkuToOfflineShopsCore } from "./youzan-offline-products.functions";
 import { explainYouzanError } from "./youzan.functions";
+import {
+  GLOBAL_STANDARD_SKU_FILTER,
+  inheritsGlobalStandardCatalog,
+  resolveShopVisibleSkuIds,
+} from "./shop-standard-catalog";
 
 // ---------- 内部工具 ----------
 
@@ -125,7 +130,7 @@ export const listShopSkus = createServerFn({ method: "GET" })
       let q = sb
         .from("inv_skus")
         .select("*")
-        .in("id", Array.from(skuIds))
+        .in("id", skuIds)
         .order("created_at", { ascending: false });
       if (data.search) {
         const s = `%${data.search}%`;
