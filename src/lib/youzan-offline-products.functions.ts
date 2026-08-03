@@ -17,6 +17,7 @@ import {
   ensureAutoYouzanDefaultCategory,
   ensureBranchProduct,
   ensureHqSpuLink,
+  probeBranchRealIds,
   triggerStockWorker,
   uploadImageToYouzanMaterial,
 } from "./youzan-sync.functions";
@@ -143,7 +144,7 @@ export async function releaseSkuToOfflineShopsCore(args: {
         .maybeSingle(),
       supabase
         .from("youzan_shops")
-        .select("id,kdt_id,role,status,warehouse_code")
+        .select("id,kdt_id,role,status,warehouse_code,access_token,refresh_token,token_expires_at")
         .in("id", shopIds),
     ]);
   if (skuError) throw new Error(skuError.message);
@@ -184,7 +185,7 @@ export async function releaseSkuToOfflineShopsCore(args: {
   for (const branch of branches) {
     // offline.spu.release only publishes an existing HQ product to a branch.
     // Keep the HQ and branch product codes identical so barcode lookups remain stable.
-    await ensureHqSpuLink(args.sku_id, branch.id);
+    const hqProduct = await ensureHqSpuLink(args.sku_id, branch.id);
     const { data: location } = await supabase
       .from("inv_locations")
       .select("id")
@@ -202,6 +203,39 @@ export async function releaseSkuToOfflineShopsCore(args: {
         .eq("location_id", location.id)
         .maybeSingle();
       stock = Math.max(0, Math.trunc(Number(localStock?.qty ?? 0)));
+    }
+
+    const branchToken = await ensureAccessToken(
+      branch as Parameters<typeof ensureAccessToken>[0],
+    );
+    const probed = await probeBranchRealIds({
+      hqSpuId: hqProduct.yz_item_id,
+      branchKdtId: Number(branch.kdt_id),
+      branchToken,
+    });
+    if (probed.item_id) {
+      const remoteSkuId = probed.sku_id || probed.item_id;
+      await upsertBranchLink({
+        skuId: args.sku_id,
+        shopId: branch.id,
+        itemId: probed.item_id,
+        skuIdRemote: remoteSkuId,
+      });
+      await enqueueBranchStock({
+        skuId: args.sku_id,
+        shopId: branch.id,
+        locationId: location.id,
+        targetStock: stock,
+      });
+      results.push({
+        shop_id: branch.id,
+        ok: true,
+        item_id: probed.item_id,
+        sku_id: remoteSkuId,
+        recovered: true,
+        error: null,
+      });
+      continue;
     }
 
     // HQ creation with the target branch may already distribute the product.
