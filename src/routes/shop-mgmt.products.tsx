@@ -540,14 +540,8 @@ function ShopProductsPage() {
           if (id) void handleNewSkuCreated([id]);
         }}
       />
-      <StandardSkuDialog
-        open={openDialog === "standard"}
-        onOpenChange={(v) => !v && setOpenDialog(null)}
-        onCreated={(res) => {
-          const ids = (res?.skus ?? []).map((s) => s.id).filter(Boolean);
-          if (ids.length > 0) void handleNewSkuCreated(ids);
-        }}
-      />
+      {/* 标准商品为总部全局目录，门店端不提供新建入口 */}
+
 
       {receive && activeShop && (
         <ReceiveStockDialog
