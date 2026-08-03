@@ -146,8 +146,10 @@ type HeldCart = {
     price_snapshot: number;
     ownership_snapshot: LookupProduct["sale_ownership"];
     discount_eligible: boolean;
+    category_code: string | null;
+    category_name_snapshot: string | null;
     subcategory_code: string | null;
-    subcategory_name: string | null;
+    subcategory_name_snapshot: string | null;
   }>;
 };
 type PosOrder = {
@@ -578,8 +580,10 @@ function PosPage() {
         items: cart.map((line) => ({
           sku_id: line.sku_id,
           quantity: line.quantity,
+          category_code: line.category_code ?? null,
+          category_name_snapshot: line.category_name ?? null,
           subcategory_code: line.subcategory_code ?? null,
-          subcategory_name: line.subcategory_name ?? null,
+          subcategory_name_snapshot: line.subcategory_name ?? null,
         })),
         discount_snapshot: discountPreview ? discount : {},
         benefit_snapshot: customerBenefits ?? {},
@@ -639,8 +643,10 @@ function PosPage() {
         {
           ...product,
           quantity: heldItem.quantity ?? 1,
+          category_code: heldItem.category_code ?? product.category_code ?? null,
+          category_name: heldItem.category_name_snapshot ?? product.name ?? null,
           subcategory_code: heldItem.subcategory_code ?? null,
-          subcategory_name: heldItem.subcategory_name ?? null,
+          subcategory_name: heldItem.subcategory_name_snapshot ?? null,
         },
       ];
     });
