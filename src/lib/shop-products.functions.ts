@@ -95,26 +95,32 @@ export const listShopSkus = createServerFn({ method: "GET" })
         .eq("location_id", loc.id)
         .limit(5000);
 
-      const skuIds = new Set<string>();
-      (stocks ?? []).forEach((s) => skuIds.add(s.sku_id));
-      (links ?? []).forEach((l) => skuIds.add(l.sku_id));
-      (moves ?? []).forEach((m) => skuIds.add(m.sku_id));
       // Vintage 门店：无条件继承总部全局标准商品目录（无限库存，无需入库 / 同步 / 建 link）
-      if ((shop as { store_format?: string } | null)?.store_format === "vintage") {
+      let globalStandardSkuIds: string[] = [];
+      if (inheritsGlobalStandardCatalog(storeFormat)) {
         const { data: standardSkus, error: standardErr } = await sb
           .from("inv_skus")
           .select("id")
-          .eq("kind", "single")
-          .eq("is_custom_price", false)
-          .eq("inventory_policy", "unlimited")
-          .eq("is_display", true)
-          .eq("status", "active")
+          .eq("kind", GLOBAL_STANDARD_SKU_FILTER.kind)
+          .eq("is_custom_price", GLOBAL_STANDARD_SKU_FILTER.is_custom_price)
+          .eq("inventory_policy", GLOBAL_STANDARD_SKU_FILTER.inventory_policy)
+          .eq("is_display", GLOBAL_STANDARD_SKU_FILTER.is_display)
+          .eq("status", GLOBAL_STANDARD_SKU_FILTER.status)
           .limit(5000);
         if (standardErr) throw new Error(standardErr.message);
-        (standardSkus ?? []).forEach((sku) => skuIds.add(sku.id));
+        globalStandardSkuIds = (standardSkus ?? []).map((sku) => String(sku.id));
       }
 
-      if (skuIds.size === 0) return { rows: [], location_id: loc.id, store_format: storeFormat };
+      const skuIds = resolveShopVisibleSkuIds({
+        storeFormat,
+        stockSkuIds: (stocks ?? []).map((s) => String(s.sku_id)),
+        linkSkuIds: (links ?? []).map((l) => String(l.sku_id)),
+        movementSkuIds: (moves ?? []).map((m) => String(m.sku_id)),
+        globalStandardSkuIds,
+      });
+
+      if (skuIds.length === 0) return { rows: [], location_id: loc.id, store_format: storeFormat };
+
 
       let q = sb
         .from("inv_skus")
