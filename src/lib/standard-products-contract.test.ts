@@ -176,3 +176,34 @@ test("POS 标准目录接口与购物车合并键已落地", () => {
   assert.match(policy, /posCartLineKey/);
   assert.match(pos, /细分类（可选）/);
 });
+
+test("瓷器产地不明确必须落到 ai_low_confidence 并要求人工核对", () => {
+  const prompt = readFileSync("src/server/product-recognition.server.ts", "utf8");
+  assert.doesNotMatch(prompt, /必须选 porcelain_origin_unknown/);
+  assert.doesNotMatch(prompt, /porcelain_origin_unknown[；;]?\s*瓷器按/);
+  assert.match(prompt, /产地无法确认时必须返回 ai_low_confidence/);
+  assert.match(prompt, /人工核对/);
+  assert.match(prompt, /禁止返回 porcelain_origin_unknown/);
+});
+
+test("停用叶子清理 migration 契约：active SKU 不得引用非 active 类目", () => {
+  const sql = readFileSync(
+    "supabase/migrations/20260803144636_86f58a65-bd81-4513-b651-c46e5d53305d.sql",
+    "utf8",
+  );
+  assert.match(sql, /UPDATE public\.inv_skus/);
+  assert.match(sql, /category = 'ai_low_confidence'/);
+  assert.match(sql, /classification_status = 'fallback'/);
+  assert.match(sql, /category_confidence = NULL/);
+  assert.match(sql, /updated_at = now\(\)/);
+  assert.match(sql, /s\.status = 'active'/);
+  assert.match(sql, /c\.is_active = true/);
+  assert.doesNotMatch(sql, /DELETE/i);
+  assert.doesNotMatch(sql, /porcelain_jp|porcelain_eu/);
+});
+
+test("active 一级/叶子枚举不含已停用旧码", () => {
+  const helpers = readFileSync("src/lib/inventory.helpers.ts", "utf8");
+  assert.doesNotMatch(helpers, /porcelain_origin_unknown/);
+  assert.doesNotMatch(helpers, /digital_game_console/);
+});
