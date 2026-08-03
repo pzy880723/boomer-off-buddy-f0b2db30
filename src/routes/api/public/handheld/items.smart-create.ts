@@ -12,6 +12,7 @@ import { generateEpc, generateSkuCode } from "@/lib/inventory.helpers";
 import { buildPrintPayload } from "@/server/handheld-print.server";
 import { replayIfPresent, recordOp, jsonReplay } from "@/server/handheld-idempotency.server";
 import { getSmartCreateReleaseTarget } from "@/server/handheld-smart-create.server";
+import { upsertCustomListingForSku } from "@/server/commerce-listing.server";
 import {
   assertActiveLeafCategory,
   attachProductClassificationAuditToSku,
@@ -269,6 +270,27 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
           syncStatus = "unlinked";
         }
 
+        // 自定义（唯一件）商品同步到 BOOMEROFF 市集；标准/组合品永远跳过。
+        let storefrontListingId: string | null = null;
+        let storefrontStatus: "skipped" | "published" | "sold" | "failed" = "skipped";
+        try {
+          const listing = await upsertCustomListingForSku({
+            skuId,
+            locationId,
+            createdBy: session?.user_id ?? null,
+          });
+          if (listing.ok && !listing.skipped) {
+            storefrontListingId = listing.listing_id;
+            storefrontStatus = listing.status === "published" ? "published" : "sold";
+          } else if (!listing.ok) {
+            storefrontStatus = "failed";
+            console.error("[handheld smart-create] 市集上架失败", listing.error);
+          }
+        } catch (e) {
+          storefrontStatus = "failed";
+          console.error("[handheld smart-create] 市集上架异常", e);
+        }
+
         const { data: finalSku } = await supabaseAdmin
           .from("inv_skus")
           .select("stock_qty, barcode, grade")
@@ -308,6 +330,8 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
             condition_grade: conditionGrade,
           }),
           youzan_sync_status: syncStatus,
+          storefront_listing_id: storefrontListingId,
+          storefront_status: storefrontStatus,
         };
         await recordOp({
           deviceId: auth.device.id,

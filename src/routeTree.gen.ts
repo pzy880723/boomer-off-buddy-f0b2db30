@@ -154,6 +154,7 @@ import { Route as ApiPublicHandheldAuthLogoutRouteImport } from './routes/api/pu
 import { Route as ApiPublicHandheldAuthMeRouteImport } from './routes/api/public/handheld/auth.me'
 import { Route as ApiPublicHandheldAuthPingRouteImport } from './routes/api/public/handheld/auth.ping'
 import { Route as ApiPublicHandheldAuthRefreshRouteImport } from './routes/api/public/handheld/auth.refresh'
+import { Route as ApiPublicHandheldContentGenerateFromSkuRouteImport } from './routes/api/public/handheld/content.generate-from-sku'
 import { Route as ApiPublicHandheldDiagReportRouteImport } from './routes/api/public/handheld/diag.report'
 import { Route as ApiPublicHandheldFulfillmentsIdRouteImport } from './routes/api/public/handheld/fulfillments.$id'
 import { Route as ApiPublicHandheldInboundScanRouteImport } from './routes/api/public/handheld/inbound.scan'
@@ -184,6 +185,7 @@ import { Route as ApiPublicHandheldTransferReceiveScanRouteImport } from './rout
 import { Route as ApiPublicHandheldTransferShipConfirmRouteImport } from './routes/api/public/handheld/transfer.ship-confirm'
 import { Route as ApiPublicHandheldTransferShipScanRouteImport } from './routes/api/public/handheld/transfer.ship-scan'
 import { Route as ApiPublicHandheldTransfersIdRouteImport } from './routes/api/public/handheld/transfers.$id'
+import { Route as ApiPublicMediaSkuSplatRouteImport } from './routes/api/public/media/sku/$'
 import { Route as ApiPublicPosCartsIdRouteImport } from './routes/api/public/pos/carts.$id'
 import { Route as ApiPublicPosCartsHeldRouteImport } from './routes/api/public/pos/carts.held'
 import { Route as ApiPublicPosCartsHoldRouteImport } from './routes/api/public/pos/carts.hold'
@@ -1001,6 +1003,12 @@ const ApiPublicHandheldAuthRefreshRoute =
     path: '/api/public/handheld/auth/refresh',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHandheldContentGenerateFromSkuRoute =
+  ApiPublicHandheldContentGenerateFromSkuRouteImport.update({
+    id: '/api/public/handheld/content/generate-from-sku',
+    path: '/api/public/handheld/content/generate-from-sku',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHandheldDiagReportRoute =
   ApiPublicHandheldDiagReportRouteImport.update({
     id: '/api/public/handheld/diag/report',
@@ -1181,6 +1189,11 @@ const ApiPublicHandheldTransfersIdRoute =
     path: '/$id',
     getParentRoute: () => ApiPublicHandheldTransfersRoute,
   } as any)
+const ApiPublicMediaSkuSplatRoute = ApiPublicMediaSkuSplatRouteImport.update({
+  id: '/api/public/media/sku/$',
+  path: '/api/public/media/sku/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicPosCartsIdRoute = ApiPublicPosCartsIdRouteImport.update({
   id: '/api/public/pos/carts/$id',
   path: '/api/public/pos/carts/$id',
@@ -1545,6 +1558,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/auth/me': typeof ApiPublicHandheldAuthMeRoute
   '/api/public/handheld/auth/ping': typeof ApiPublicHandheldAuthPingRoute
   '/api/public/handheld/auth/refresh': typeof ApiPublicHandheldAuthRefreshRoute
+  '/api/public/handheld/content/generate-from-sku': typeof ApiPublicHandheldContentGenerateFromSkuRoute
   '/api/public/handheld/diag/report': typeof ApiPublicHandheldDiagReportRoute
   '/api/public/handheld/fulfillments/$id': typeof ApiPublicHandheldFulfillmentsIdRouteWithChildren
   '/api/public/handheld/inbound/scan': typeof ApiPublicHandheldInboundScanRoute
@@ -1575,6 +1589,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/transfer/ship-confirm': typeof ApiPublicHandheldTransferShipConfirmRoute
   '/api/public/handheld/transfer/ship-scan': typeof ApiPublicHandheldTransferShipScanRoute
   '/api/public/handheld/transfers/$id': typeof ApiPublicHandheldTransfersIdRouteWithChildren
+  '/api/public/media/sku/$': typeof ApiPublicMediaSkuSplatRoute
   '/api/public/pos/carts/$id': typeof ApiPublicPosCartsIdRouteWithChildren
   '/api/public/pos/carts/held': typeof ApiPublicPosCartsHeldRoute
   '/api/public/pos/carts/hold': typeof ApiPublicPosCartsHoldRoute
@@ -1752,6 +1767,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/auth/me': typeof ApiPublicHandheldAuthMeRoute
   '/api/public/handheld/auth/ping': typeof ApiPublicHandheldAuthPingRoute
   '/api/public/handheld/auth/refresh': typeof ApiPublicHandheldAuthRefreshRoute
+  '/api/public/handheld/content/generate-from-sku': typeof ApiPublicHandheldContentGenerateFromSkuRoute
   '/api/public/handheld/diag/report': typeof ApiPublicHandheldDiagReportRoute
   '/api/public/handheld/fulfillments/$id': typeof ApiPublicHandheldFulfillmentsIdRouteWithChildren
   '/api/public/handheld/inbound/scan': typeof ApiPublicHandheldInboundScanRoute
@@ -1782,6 +1798,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/transfer/ship-confirm': typeof ApiPublicHandheldTransferShipConfirmRoute
   '/api/public/handheld/transfer/ship-scan': typeof ApiPublicHandheldTransferShipScanRoute
   '/api/public/handheld/transfers/$id': typeof ApiPublicHandheldTransfersIdRouteWithChildren
+  '/api/public/media/sku/$': typeof ApiPublicMediaSkuSplatRoute
   '/api/public/pos/carts/$id': typeof ApiPublicPosCartsIdRouteWithChildren
   '/api/public/pos/carts/held': typeof ApiPublicPosCartsHeldRoute
   '/api/public/pos/carts/hold': typeof ApiPublicPosCartsHoldRoute
@@ -1967,6 +1984,7 @@ export interface FileRoutesById {
   '/api/public/handheld/auth/me': typeof ApiPublicHandheldAuthMeRoute
   '/api/public/handheld/auth/ping': typeof ApiPublicHandheldAuthPingRoute
   '/api/public/handheld/auth/refresh': typeof ApiPublicHandheldAuthRefreshRoute
+  '/api/public/handheld/content/generate-from-sku': typeof ApiPublicHandheldContentGenerateFromSkuRoute
   '/api/public/handheld/diag/report': typeof ApiPublicHandheldDiagReportRoute
   '/api/public/handheld/fulfillments/$id': typeof ApiPublicHandheldFulfillmentsIdRouteWithChildren
   '/api/public/handheld/inbound/scan': typeof ApiPublicHandheldInboundScanRoute
@@ -1997,6 +2015,7 @@ export interface FileRoutesById {
   '/api/public/handheld/transfer/ship-confirm': typeof ApiPublicHandheldTransferShipConfirmRoute
   '/api/public/handheld/transfer/ship-scan': typeof ApiPublicHandheldTransferShipScanRoute
   '/api/public/handheld/transfers/$id': typeof ApiPublicHandheldTransfersIdRouteWithChildren
+  '/api/public/media/sku/$': typeof ApiPublicMediaSkuSplatRoute
   '/api/public/pos/carts/$id': typeof ApiPublicPosCartsIdRouteWithChildren
   '/api/public/pos/carts/held': typeof ApiPublicPosCartsHeldRoute
   '/api/public/pos/carts/hold': typeof ApiPublicPosCartsHoldRoute
@@ -2183,6 +2202,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/auth/me'
     | '/api/public/handheld/auth/ping'
     | '/api/public/handheld/auth/refresh'
+    | '/api/public/handheld/content/generate-from-sku'
     | '/api/public/handheld/diag/report'
     | '/api/public/handheld/fulfillments/$id'
     | '/api/public/handheld/inbound/scan'
@@ -2213,6 +2233,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/transfer/ship-confirm'
     | '/api/public/handheld/transfer/ship-scan'
     | '/api/public/handheld/transfers/$id'
+    | '/api/public/media/sku/$'
     | '/api/public/pos/carts/$id'
     | '/api/public/pos/carts/held'
     | '/api/public/pos/carts/hold'
@@ -2390,6 +2411,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/auth/me'
     | '/api/public/handheld/auth/ping'
     | '/api/public/handheld/auth/refresh'
+    | '/api/public/handheld/content/generate-from-sku'
     | '/api/public/handheld/diag/report'
     | '/api/public/handheld/fulfillments/$id'
     | '/api/public/handheld/inbound/scan'
@@ -2420,6 +2442,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/transfer/ship-confirm'
     | '/api/public/handheld/transfer/ship-scan'
     | '/api/public/handheld/transfers/$id'
+    | '/api/public/media/sku/$'
     | '/api/public/pos/carts/$id'
     | '/api/public/pos/carts/held'
     | '/api/public/pos/carts/hold'
@@ -2604,6 +2627,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/auth/me'
     | '/api/public/handheld/auth/ping'
     | '/api/public/handheld/auth/refresh'
+    | '/api/public/handheld/content/generate-from-sku'
     | '/api/public/handheld/diag/report'
     | '/api/public/handheld/fulfillments/$id'
     | '/api/public/handheld/inbound/scan'
@@ -2634,6 +2658,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/transfer/ship-confirm'
     | '/api/public/handheld/transfer/ship-scan'
     | '/api/public/handheld/transfers/$id'
+    | '/api/public/media/sku/$'
     | '/api/public/pos/carts/$id'
     | '/api/public/pos/carts/held'
     | '/api/public/pos/carts/hold'
@@ -2767,6 +2792,7 @@ export interface RootRouteChildren {
   ApiPublicHandheldAuthMeRoute: typeof ApiPublicHandheldAuthMeRoute
   ApiPublicHandheldAuthPingRoute: typeof ApiPublicHandheldAuthPingRoute
   ApiPublicHandheldAuthRefreshRoute: typeof ApiPublicHandheldAuthRefreshRoute
+  ApiPublicHandheldContentGenerateFromSkuRoute: typeof ApiPublicHandheldContentGenerateFromSkuRoute
   ApiPublicHandheldDiagReportRoute: typeof ApiPublicHandheldDiagReportRoute
   ApiPublicHandheldInboundScanRoute: typeof ApiPublicHandheldInboundScanRoute
   ApiPublicHandheldItemsIdRoute: typeof ApiPublicHandheldItemsIdRouteWithChildren
@@ -2789,6 +2815,7 @@ export interface RootRouteChildren {
   ApiPublicHandheldTransferReceiveScanRoute: typeof ApiPublicHandheldTransferReceiveScanRoute
   ApiPublicHandheldTransferShipConfirmRoute: typeof ApiPublicHandheldTransferShipConfirmRoute
   ApiPublicHandheldTransferShipScanRoute: typeof ApiPublicHandheldTransferShipScanRoute
+  ApiPublicMediaSkuSplatRoute: typeof ApiPublicMediaSkuSplatRoute
   ApiPublicPosCartsIdRoute: typeof ApiPublicPosCartsIdRouteWithChildren
   ApiPublicPosCartsHeldRoute: typeof ApiPublicPosCartsHeldRoute
   ApiPublicPosCartsHoldRoute: typeof ApiPublicPosCartsHoldRoute
@@ -3822,6 +3849,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldAuthRefreshRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/handheld/content/generate-from-sku': {
+      id: '/api/public/handheld/content/generate-from-sku'
+      path: '/api/public/handheld/content/generate-from-sku'
+      fullPath: '/api/public/handheld/content/generate-from-sku'
+      preLoaderRoute: typeof ApiPublicHandheldContentGenerateFromSkuRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/handheld/diag/report': {
       id: '/api/public/handheld/diag/report'
       path: '/api/public/handheld/diag/report'
@@ -4031,6 +4065,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/public/handheld/transfers/$id'
       preLoaderRoute: typeof ApiPublicHandheldTransfersIdRouteImport
       parentRoute: typeof ApiPublicHandheldTransfersRoute
+    }
+    '/api/public/media/sku/$': {
+      id: '/api/public/media/sku/$'
+      path: '/api/public/media/sku/$'
+      fullPath: '/api/public/media/sku/$'
+      preLoaderRoute: typeof ApiPublicMediaSkuSplatRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/public/pos/carts/$id': {
       id: '/api/public/pos/carts/$id'
@@ -4958,6 +4999,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHandheldAuthMeRoute: ApiPublicHandheldAuthMeRoute,
   ApiPublicHandheldAuthPingRoute: ApiPublicHandheldAuthPingRoute,
   ApiPublicHandheldAuthRefreshRoute: ApiPublicHandheldAuthRefreshRoute,
+  ApiPublicHandheldContentGenerateFromSkuRoute:
+    ApiPublicHandheldContentGenerateFromSkuRoute,
   ApiPublicHandheldDiagReportRoute: ApiPublicHandheldDiagReportRoute,
   ApiPublicHandheldInboundScanRoute: ApiPublicHandheldInboundScanRoute,
   ApiPublicHandheldItemsIdRoute: ApiPublicHandheldItemsIdRouteWithChildren,
@@ -4989,6 +5032,7 @@ const rootRouteChildren: RootRouteChildren = {
     ApiPublicHandheldTransferShipConfirmRoute,
   ApiPublicHandheldTransferShipScanRoute:
     ApiPublicHandheldTransferShipScanRoute,
+  ApiPublicMediaSkuSplatRoute: ApiPublicMediaSkuSplatRoute,
   ApiPublicPosCartsIdRoute: ApiPublicPosCartsIdRouteWithChildren,
   ApiPublicPosCartsHeldRoute: ApiPublicPosCartsHeldRoute,
   ApiPublicPosCartsHoldRoute: ApiPublicPosCartsHoldRoute,
@@ -5009,13 +5053,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
