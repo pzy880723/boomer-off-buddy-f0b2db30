@@ -25,6 +25,16 @@ function latestFunctionBody(name: string): string {
 }
 
 describe("self-operated storefront inventory synchronization", () => {
+  test("a store sale validates the selected location stock instead of the legacy SKU total", () => {
+    const body = latestFunctionBody("commit_sale");
+    assert.match(body, /FROM public\.inv_stocks/);
+    assert.match(body, /sku_id = p_sku_id/);
+    assert.match(body, /location_id = p_location_id/);
+    assert.match(body, /FOR UPDATE/);
+    assert.match(body, /p_location_id IS NOT NULL/);
+    assert.match(body, /COALESCE\(v_location_qty, 0\) < 1/);
+  });
+
   test("a physical store sale marks the self-operated listing sold", () => {
     const body = latestFunctionBody("sync_commerce_listing_on_store_sale");
     assert.match(body, /UPDATE public\.commerce_listings/);
