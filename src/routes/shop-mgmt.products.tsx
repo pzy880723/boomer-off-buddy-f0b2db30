@@ -5,7 +5,6 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   Plus,
   Search,
-  Tags,
   Boxes,
   Sparkles,
   ChevronDown,
@@ -51,7 +50,6 @@ import {
 
 import { CustomSkuDialog } from "@/components/inventory/custom-sku-dialog";
 import { BundleSkuDialog } from "@/components/inventory/bundle-sku-dialog";
-import { StandardSkuDialog } from "@/components/inventory/standard-sku-dialog";
 import { ReceiveStockDialog } from "@/components/shop-mgmt/receive-stock-dialog";
 import { listYouzanShops } from "@/lib/youzan.functions";
 import {
@@ -77,7 +75,7 @@ export const Route = createFileRoute("/shop-mgmt/products")({
 
 type TabKind = "custom" | "bundle" | "standard";
 type ViewMode = "grid" | "list";
-type DialogKind = "custom" | "bundle" | "standard" | null;
+type DialogKind = "custom" | "bundle" | null;
 
 function humanizeListingError(message?: string | null) {
   const raw = message ?? "";
@@ -125,7 +123,9 @@ function ShopProductsPage() {
   const [tab, setTab] = useState<TabKind>("custom");
   const [view, setView] = useState<ViewMode>("list");
   const [openDialog, setOpenDialog] = useState<DialogKind>(null);
-  const [receive, setReceive] = useState<{ sku_id: string; sku_name: string; qty: number } | null>(null);
+  const [receive, setReceive] = useState<{ sku_id: string; sku_name: string; qty: number } | null>(
+    null,
+  );
   const [retryingAll, setRetryingAll] = useState(false);
 
   const rowsQ = useQuery({
@@ -139,13 +139,15 @@ function ShopProductsPage() {
   const rows = (rowsQ.data?.rows ?? []) as ShopSkuRow[];
 
   const linkIdsKey = useMemo(
-    () => Array.from(new Set(rows.map((r) => r.id))).sort().join(","),
+    () =>
+      Array.from(new Set(rows.map((r) => r.id)))
+        .sort()
+        .join(","),
     [rows],
   );
   const linksQ = useQuery({
     queryKey: ["shop-links", activeShopId, linkIdsKey],
-    queryFn: () =>
-      fetchLinks({ data: { shop_id: activeShopId, sku_ids: rows.map((r) => r.id) } }),
+    queryFn: () => fetchLinks({ data: { shop_id: activeShopId, sku_ids: rows.map((r) => r.id) } }),
     enabled: !!activeShopId && rows.length > 0,
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
@@ -165,8 +167,7 @@ function ShopProductsPage() {
   }, [rows]);
 
   const failedCustomBundleCount = useMemo(
-    () =>
-      [...customRows, ...bundleRows].filter((r) => links[r.id]?.status === "error").length,
+    () => [...customRows, ...bundleRows].filter((r) => links[r.id]?.status === "error").length,
     [bundleRows, customRows, links],
   );
 
@@ -226,7 +227,9 @@ function ShopProductsPage() {
         toast.success(`已重推成功 ${r.ok} 个商品`);
       } else {
         const first = r.details.find((x) => !x.ok)?.error;
-        toast.warning(`重推完成：成功 ${r.ok} 个，失败 ${r.failed} 个。${first ? humanizeListingError(first) : ""}`);
+        toast.warning(
+          `重推完成：成功 ${r.ok} 个，失败 ${r.failed} 个。${first ? humanizeListingError(first) : ""}`,
+        );
       }
       refresh();
     } catch (e) {
@@ -251,15 +254,10 @@ function ShopProductsPage() {
         <DropdownMenuItem onClick={() => setOpenDialog("bundle")}>
           <Boxes className="mr-2 h-3.5 w-3.5" /> 组包商品
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setOpenDialog("standard")}>
-          <Tags className="mr-2 h-3.5 w-3.5" /> 标准商品（多价格档）
-        </DropdownMenuItem>
         <div className="border-t my-1" />
-        <Link to="/inventory/skus" className="block">
-          <DropdownMenuItem className="text-muted-foreground text-[11px]">
-            批量维护标准商品去仓库 →
-          </DropdownMenuItem>
-        </Link>
+        <div className="px-2 py-1.5 text-[11px] text-muted-foreground">
+          标准商品由总部统一维护，门店自动可售
+        </div>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -269,7 +267,10 @@ function ShopProductsPage() {
     if (!l) return null;
     if (l.status === "linked" && l.yz_item_id) {
       return (
-        <Badge variant="outline" className="gap-1 border-emerald-500/40 text-emerald-700 text-[10px] dark:text-emerald-300">
+        <Badge
+          variant="outline"
+          className="gap-1 border-emerald-500/40 text-emerald-700 text-[10px] dark:text-emerald-300"
+        >
           <CheckCircle2 className="h-2.5 w-2.5" /> 已同步有赞
         </Badge>
       );
@@ -367,7 +368,12 @@ function ShopProductsPage() {
               className="h-9 pl-8 text-xs"
             />
           </div>
-          <ToggleGroup type="single" value={view} onValueChange={(v) => v && setView(v as ViewMode)} size="sm">
+          <ToggleGroup
+            type="single"
+            value={view}
+            onValueChange={(v) => v && setView(v as ViewMode)}
+            size="sm"
+          >
             <ToggleGroupItem value="grid" className="h-8 w-8 p-0">
               <LayoutGrid className="h-3.5 w-3.5" />
             </ToggleGroupItem>
@@ -401,13 +407,16 @@ function ShopProductsPage() {
       <Tabs value={tab} onValueChange={(v) => setTab(v as TabKind)}>
         <TabsList>
           <TabsTrigger value="custom">
-            自定义商品 <span className="ml-1.5 text-xs text-muted-foreground">{customRows.length}</span>
+            自定义商品{" "}
+            <span className="ml-1.5 text-xs text-muted-foreground">{customRows.length}</span>
           </TabsTrigger>
           <TabsTrigger value="bundle">
-            组包商品 <span className="ml-1.5 text-xs text-muted-foreground">{bundleRows.length}</span>
+            组包商品{" "}
+            <span className="ml-1.5 text-xs text-muted-foreground">{bundleRows.length}</span>
           </TabsTrigger>
           <TabsTrigger value="standard">
-            标准商品 <span className="ml-1.5 text-xs text-muted-foreground">{standardGroups.length}</span>
+            标准商品{" "}
+            <span className="ml-1.5 text-xs text-muted-foreground">{standardGroups.length}</span>
           </TabsTrigger>
         </TabsList>
 
@@ -415,47 +424,56 @@ function ShopProductsPage() {
           <div className="mb-3 flex items-start gap-2 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs">
             <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
             <div className="flex-1">
-              <p className="font-medium">标准商品统一维护，所有 Vintage 门店自动可售。</p>
+              <p className="font-medium">
+                标准商品由总部统一维护，所有 Vintage 门店自动可售，无需入库或同步。
+              </p>
               <p className="mt-0.5 text-muted-foreground">
-                标准商品当前为无限库存，无需入库。SKU 定义（品名、价格档、图片、EPC）请在
+                标准商品为无限库存的全局目录。SKU 定义（品名、价格档、图片、EPC）只在
                 <Link
                   to="/inventory/skus"
                   className="mx-1 inline-flex items-center gap-0.5 text-primary underline-offset-2 hover:underline"
                 >
-                  仓库 · 商品中心 <ArrowRight className="h-3 w-3" />
+                  全局商品中心 <ArrowRight className="h-3 w-3" />
                 </Link>
-                统一维护。
+                维护。
               </p>
             </div>
           </div>
           {standardGroups.length === 0 ? (
             <EmptyState
-              icon={Tags}
-              title="该门店还没有标准商品"
-              description="标准商品由仓库统一新建，进入仓库商品中心创建后会自动同步到本店"
+              icon={AlertCircle}
+              title="标准商品加载异常"
+              description="所有 Vintage 门店都自动拥有总部标准商品目录，这里为空说明数据没有加载成功。"
               action={
-                <Link to="/inventory/skus">
-                  <Button size="sm" variant="outline">
-                    去仓库 · 商品中心 <ArrowRight className="ml-1 h-3 w-3" />
-                  </Button>
-                </Link>
+                <Button size="sm" variant="outline" onClick={() => void rowsQ.refetch()}>
+                  <RefreshCw className="mr-1 h-3 w-3" /> 重新加载
+                </Button>
               }
             />
           ) : view === "grid" ? (
             <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {standardGroups.map((g) => (
-                <StandardProductCard key={g.key} group={g} actions={groupActions(g)} coverOverride={groupCover(g)} />
+                <StandardProductCard
+                  key={g.key}
+                  group={g}
+                  actions={groupActions(g)}
+                  coverOverride={groupCover(g)}
+                />
               ))}
             </div>
           ) : (
             <Card className="overflow-hidden">
               {standardGroups.map((g) => (
-                <StandardProductRow key={g.key} group={g} actions={groupActions(g)} coverOverride={groupCover(g)} />
+                <StandardProductRow
+                  key={g.key}
+                  group={g}
+                  actions={groupActions(g)}
+                  coverOverride={groupCover(g)}
+                />
               ))}
             </Card>
           )}
         </TabsContent>
-
 
         <TabsContent value="custom" className="mt-4">
           {customRows.length === 0 ? (
@@ -540,14 +558,7 @@ function ShopProductsPage() {
           if (id) void handleNewSkuCreated([id]);
         }}
       />
-      <StandardSkuDialog
-        open={openDialog === "standard"}
-        onOpenChange={(v) => !v && setOpenDialog(null)}
-        onCreated={(res) => {
-          const ids = (res?.skus ?? []).map((s) => s.id).filter(Boolean);
-          if (ids.length > 0) void handleNewSkuCreated(ids);
-        }}
-      />
+      {/* 标准商品为总部全局目录，门店端不提供新建入口 */}
 
       {receive && activeShop && (
         <ReceiveStockDialog
