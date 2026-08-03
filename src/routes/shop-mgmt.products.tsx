@@ -51,7 +51,6 @@ import {
 
 import { CustomSkuDialog } from "@/components/inventory/custom-sku-dialog";
 import { BundleSkuDialog } from "@/components/inventory/bundle-sku-dialog";
-import { StandardSkuDialog } from "@/components/inventory/standard-sku-dialog";
 import { ReceiveStockDialog } from "@/components/shop-mgmt/receive-stock-dialog";
 import { listYouzanShops } from "@/lib/youzan.functions";
 import {
@@ -77,7 +76,7 @@ export const Route = createFileRoute("/shop-mgmt/products")({
 
 type TabKind = "custom" | "bundle" | "standard";
 type ViewMode = "grid" | "list";
-type DialogKind = "custom" | "bundle" | "standard" | null;
+type DialogKind = "custom" | "bundle" | null;
 
 function humanizeListingError(message?: string | null) {
   const raw = message ?? "";
