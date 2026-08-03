@@ -5794,8 +5794,8 @@ export type Database = {
           sell_channel_id: number | null
           sell_channel_ids: number[]
           shop_name: string
-          store_format: string
           status: string
+          store_format: string
           token_expires_at: string | null
           updated_at: string
           warehouse_code: string | null
@@ -5829,8 +5829,8 @@ export type Database = {
           sell_channel_id?: number | null
           sell_channel_ids?: number[]
           shop_name: string
-          store_format?: string
           status?: string
+          store_format?: string
           token_expires_at?: string | null
           updated_at?: string
           warehouse_code?: string | null
@@ -5864,8 +5864,8 @@ export type Database = {
           sell_channel_id?: number | null
           sell_channel_ids?: number[]
           shop_name?: string
-          store_format?: string
           status?: string
+          store_format?: string
           token_expires_at?: string | null
           updated_at?: string
           warehouse_code?: string | null
