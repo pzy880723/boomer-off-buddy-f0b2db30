@@ -67,9 +67,14 @@ test("new shops default to store_format=vintage and get an auto shop location tr
   const shops = readFileSync("src/lib/shops.functions.ts", "utf8");
   assert.match(shops, /store_format:\s*"vintage"/);
 
-  const trigger = readFileSync("supabase/migrations", "utf8", { flag: "r" } as never);
-  assert.ok(trigger === undefined || true);
+  const migration = readdirSync("supabase/migrations").find((name) =>
+    readFileSync(`supabase/migrations/${name}`, "utf8").includes(
+      "trg_youzan_shop_ensure_location",
+    ),
+  );
+  assert.ok(migration, "shop location trigger migration must exist");
 });
+
 
 test("the shop products page has no manual sync / create-standard-product entry points", () => {
   const page = readFileSync("src/routes/shop-mgmt.products.tsx", "utf8");
