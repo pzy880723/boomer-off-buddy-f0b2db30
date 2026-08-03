@@ -415,17 +415,20 @@ function ShopProductsPage() {
           <div className="mb-3 flex items-start gap-2 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs">
             <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
             <div className="flex-1">
-              <p className="font-medium">标准商品统一维护，所有 Vintage 门店自动可售。</p>
+              <p className="font-medium">
+                标准商品由总部统一维护，所有 Vintage 门店自动可售，无需入库或同步。
+              </p>
               <p className="mt-0.5 text-muted-foreground">
-                标准商品当前为无限库存，无需入库。SKU 定义（品名、价格档、图片、EPC）请在
+                标准商品为无限库存的全局目录。SKU 定义（品名、价格档、图片、EPC）只在
                 <Link
                   to="/inventory/skus"
                   className="mx-1 inline-flex items-center gap-0.5 text-primary underline-offset-2 hover:underline"
                 >
-                  仓库 · 商品中心 <ArrowRight className="h-3 w-3" />
+                  全局商品中心 <ArrowRight className="h-3 w-3" />
                 </Link>
-                统一维护。
+                维护。
               </p>
+
             </div>
           </div>
           {standardGroups.length === 0 ? (
