@@ -7,3 +7,7 @@ export function getSmartCreateReleaseTarget(input: {
   if (input.locationKind !== "shop") return null;
   return input.shopId?.trim() || null;
 }
+
+export function shouldReuseSmartCreateSku(isCustomPrice: boolean): boolean {
+  return !isCustomPrice;
+}

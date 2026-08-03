@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, test } from "node:test";
 
-import { buildStorefrontProduct, parseStorefrontProductQuery } from "./storefront-products.server";
+import {
+  buildStorefrontProduct,
+  parseStorefrontProductQuery,
+  resolveStorefrontListingImages,
+} from "./storefront-products.server";
 
 describe("storefront compound taxonomy contract", () => {
   const taxonomyRoute = readFileSync(
@@ -35,6 +39,7 @@ describe("storefront compound taxonomy contract", () => {
         description: "杯碟一套",
         cover_url: "https://img.test/cup.jpg",
         image_urls: ["https://img.test/cup.jpg"],
+        image_paths: [],
         price: 299,
         compare_at_price: 399,
         condition_grade: "A",
@@ -91,6 +96,7 @@ describe("storefront compound taxonomy contract", () => {
         description: null,
         cover_url: null,
         image_urls: [],
+        image_paths: [],
         price: 100,
         compare_at_price: null,
         condition_grade: "A",
@@ -112,5 +118,34 @@ describe("storefront compound taxonomy contract", () => {
     assert.match(taxonomyRoute, /selectedCategoryCodes\.add\(primaryCategory\)/);
     assert.match(taxonomyRoute, /selectedCategoryCodes\.add\(parent\.code\)/);
     assert.match(taxonomyRoute, /selectedCategoryCodes\.has\(code\)/);
+  });
+
+  test("resolves durable private image paths instead of persisting signed URLs", async () => {
+    const listing = {
+      id: "listing-images",
+      sku_id: "sku-images",
+      location_id: "store-a",
+      title: "多角度中古杯",
+      description: null,
+      cover_url: "https://expired.test/old.jpg",
+      image_urls: ["https://expired.test/old.jpg"],
+      image_paths: ["sku-listing/front.png", "sku-listing/back.png"],
+      price: 199,
+      compare_at_price: null,
+      condition_grade: "A",
+      product_type: "custom" as const,
+      published_at: null,
+      location: { id: "store-a", name: "上海店", kind: "shop" },
+    };
+
+    const resolved = await resolveStorefrontListingImages(listing, async (paths) =>
+      paths.map((path) => `https://signed.test/${path}`),
+    );
+
+    assert.equal(resolved.cover_url, "https://signed.test/sku-listing/front.png");
+    assert.deepEqual(resolved.image_urls, [
+      "https://signed.test/sku-listing/front.png",
+      "https://signed.test/sku-listing/back.png",
+    ]);
   });
 });

@@ -11,7 +11,10 @@ import { SmartCreateReq } from "@/lib/handheld/schemas";
 import { generateEpc, generateSkuCode } from "@/lib/inventory.helpers";
 import { buildPrintPayload } from "@/server/handheld-print.server";
 import { replayIfPresent, recordOp, jsonReplay } from "@/server/handheld-idempotency.server";
-import { getSmartCreateReleaseTarget } from "@/server/handheld-smart-create.server";
+import {
+  getSmartCreateReleaseTarget,
+  shouldReuseSmartCreateSku,
+} from "@/server/handheld-smart-create.server";
 import {
   assertActiveLeafCategory,
   attachProductClassificationAuditToSku,
@@ -122,14 +125,17 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
             }
           : {};
 
-        // Reuse existing SKU if (category, price_tier, name) already exists; else create.
-        const { data: existSku } = await supabaseAdmin
-          .from("inv_skus")
-          .select("id, sku_code, epc, stock_qty, image_paths, image_url")
-          .eq("category", body.category)
-          .eq("price_tier", body.price_tier)
-          .eq("name", body.name)
-          .maybeSingle();
+        // Standard catalog rows may be reused; every custom vintage item owns a distinct SKU.
+        const reuseSku = shouldReuseSmartCreateSku(body.is_custom_price);
+        const { data: existSku } = reuseSku
+          ? await supabaseAdmin
+              .from("inv_skus")
+              .select("id, sku_code, epc, stock_qty, image_paths, image_url")
+              .eq("category", body.category)
+              .eq("price_tier", body.price_tier)
+              .eq("name", body.name)
+              .maybeSingle()
+          : { data: null };
 
         let skuId: string;
         let skuCode: string;

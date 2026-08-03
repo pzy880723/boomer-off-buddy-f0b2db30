@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../integrations/supabase/client.server";
+import { signSkuImagePaths } from "../lib/sku-image-resolver.server";
 
 export type StorefrontProductQuery = {
   q: string | null;
@@ -19,6 +20,7 @@ export type StorefrontListing = {
   description: string | null;
   cover_url: string | null;
   image_urls: string[] | null;
+  image_paths: string[] | null;
   price: number;
   compare_at_price: number | null;
   condition_grade: string | null;
@@ -26,6 +28,17 @@ export type StorefrontListing = {
   published_at: string | null;
   location: { id: string; name: string; kind: string } | null;
 };
+
+export async function resolveStorefrontListingImages(
+  listing: StorefrontListing,
+  signer: (paths: readonly string[]) => Promise<(string | null)[]> = signSkuImagePaths,
+): Promise<StorefrontListing> {
+  const paths = (listing.image_paths ?? []).filter(Boolean);
+  if (paths.length === 0) return listing;
+  const signed = (await signer(paths)).filter((url): url is string => Boolean(url));
+  if (signed.length === 0) return listing;
+  return { ...listing, cover_url: signed[0], image_urls: signed };
+}
 
 type StorefrontSku = {
   id: string;
@@ -126,6 +139,7 @@ export function buildStorefrontProduct(input: {
 }
 
 export async function enrichStorefrontListings(listings: StorefrontListing[]) {
+  listings = await Promise.all(listings.map((listing) => resolveStorefrontListingImages(listing)));
   const skuIds = [...new Set(listings.map((listing) => listing.sku_id).filter(Boolean))];
   if (skuIds.length === 0) return [];
 

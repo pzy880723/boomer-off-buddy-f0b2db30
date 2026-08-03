@@ -21,7 +21,7 @@ export function buildPrintPayload(input: {
   const title = (input.name ?? "").trim();
   const titleShort = title.length > 24 ? `${title.slice(0, 23)}…` : title;
   const price = Number(input.price_tier ?? 0);
-  const priceTag = `¥${Number.isFinite(price) ? Math.round(price) : 0}`;
+  const priceTag = `¥${Number.isFinite(price) ? Number(price.toFixed(2)) : 0}`;
   return {
     sku_code: input.sku_code ?? null,
     barcode: input.barcode ?? null,

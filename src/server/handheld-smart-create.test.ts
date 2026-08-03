@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, test } from "node:test";
 
-import { getSmartCreateReleaseTarget } from "./handheld-smart-create.server";
+import {
+  getSmartCreateReleaseTarget,
+  shouldReuseSmartCreateSku,
+} from "./handheld-smart-create.server";
 
 describe("handheld smart-create auto listing", () => {
   test("publishes to the shop bound to the selected store location", () => {
@@ -36,6 +39,16 @@ describe("handheld smart-create auto listing", () => {
       }),
       null,
     );
+  });
+});
+
+describe("handheld smart-create SKU identity", () => {
+  test("never reuses a custom one-off SKU", () => {
+    assert.equal(shouldReuseSmartCreateSku(true), false);
+  });
+
+  test("allows a standard SKU to reuse its catalog identity", () => {
+    assert.equal(shouldReuseSmartCreateSku(false), true);
   });
 });
 

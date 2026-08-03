@@ -45,7 +45,7 @@ export const Route = createFileRoute("/api/public/storefront/products")({
         let db = supabaseAdmin
           .from("commerce_listings" as never)
           .select(
-            "id, sku_id, location_id, title, description, cover_url, image_urls, price, compare_at_price, condition_grade, product_type, published_at, location:inv_locations!location_id(id,name,kind)",
+            "id, sku_id, location_id, title, description, cover_url, image_urls, image_paths, price, compare_at_price, condition_grade, product_type, published_at, location:inv_locations!location_id(id,name,kind)",
           )
           .eq("status", "published")
           .in("sku_id", skuIds)
