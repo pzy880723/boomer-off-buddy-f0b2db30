@@ -153,8 +153,10 @@ export const listShopSkus = createServerFn({ method: "GET" })
         created_at: String(raw.created_at ?? ""),
       };
     });
-    return { rows: patched, location_id: loc.id };
-  });
+      return { rows: patched, location_id: loc.id, store_format: storeFormat };
+    },
+  );
+
 
 // 门店 SKU 行（比 SkuRow 简化：bundle_items 一定是数组，方便 RPC 序列化）
 export type ShopSkuRow = {
