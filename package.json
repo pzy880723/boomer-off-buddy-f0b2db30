@@ -12,6 +12,7 @@
     "format": "prettier --write .",
     "test:login-hydration": "node --test scripts/check-login-hydration.test.mjs",
     "check:login-hydration": "node scripts/check-login-hydration.mjs",
+    "sync:youzan-standard-catalog": "node scripts/sync-standard-catalog-youzan.mjs",
     "deploy:tencent": "bash scripts/deploy-tencent-erp.sh",
     "sdk:gen": "bun run scripts/gen-sdk.ts",
     "sdk:check": "bun run scripts/check-openapi-drift.ts"

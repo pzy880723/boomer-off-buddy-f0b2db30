@@ -41,6 +41,7 @@ export type ProductItem = {
   image_paths: string[];
   images: { storage_path: string; read_url: string }[];
   notes: string | null;
+  is_unlimited_stock: boolean;
   total_stock_qty: number;
   stocks: StockRow[];
   status: string;
@@ -68,15 +69,21 @@ type SkuRow = {
   is_display: boolean;
   kind: string;
   is_custom_price: boolean;
+  inventory_policy: "tracked" | "unlimited";
   stock_qty: number;
   created_at: string;
   updated_at: string;
 };
 
-type LocRow = { id: string; name: string; kind: "warehouse" | "shop" };
+type LocRow = {
+  id: string;
+  name: string;
+  kind: "warehouse" | "shop";
+  shop_id: string | null;
+};
 
 const SKU_COLS =
-  "id, sku_code, barcode, epc, name, category, price_tier, grade, image_url, image_paths, notes, status, is_display, kind, is_custom_price, stock_qty, created_at, updated_at";
+  "id, sku_code, barcode, epc, name, category, price_tier, grade, image_url, image_paths, notes, status, is_display, kind, is_custom_price, inventory_policy, stock_qty, created_at, updated_at";
 
 function classifyType(r: { kind: string; is_custom_price: boolean }): ProductType {
   if (r.kind === "bundle") return "bundle";
@@ -112,7 +119,7 @@ async function loadScopedLocations(
   }
   let locQ = supabaseAdmin
     .from("inv_locations")
-    .select("id, name, kind, is_active")
+    .select("id, name, kind, shop_id, is_active")
     .eq("is_active", true);
   if (allowedIds) {
     if (allowedIds.length === 0) return { ok: true, locations: [], isHq, allowedIds };
@@ -182,6 +189,10 @@ async function buildItems(skus: SkuRow[], locations: LocRow[]): Promise<ProductI
       });
     }
     const total = stocks.reduce((sum, r) => sum + r.stock_qty, 0);
+    const isUnlimitedStock = s.inventory_policy === "unlimited";
+    const listingStatus = isUnlimitedStock && s.is_display !== false
+      ? "selling"
+      : deriveListingStatus(s.is_display !== false, total);
     const imagePaths = (s.image_paths ?? []) as string[];
     const images = imagesBySkuId.get(s.id) ?? [];
     const cover =
@@ -204,13 +215,14 @@ async function buildItems(skus: SkuRow[], locations: LocRow[]): Promise<ProductI
       image_paths: imagePaths,
       images,
       notes: s.notes,
+      is_unlimited_stock: isUnlimitedStock,
       total_stock_qty: total,
       stocks,
       status: s.status,
       is_display: s.is_display !== false,
-      listing_status: deriveListingStatus(s.is_display !== false, total),
-      status_label: statusLabel(deriveListingStatus(s.is_display !== false, total)),
-      can_restock: (s.is_display !== false) && total === 0,
+      listing_status: listingStatus,
+      status_label: statusLabel(listingStatus),
+      can_restock: !isUnlimitedStock && (s.is_display !== false) && total === 0,
       created_at: s.created_at,
       updated_at: s.updated_at,
     };
@@ -308,17 +320,39 @@ export const Route = createFileRoute("/api/public/handheld/products")({
         // caller explicitly asked for sold_out / in_warehouse.
         const skipQtyGate = statusFilter === "sold_out" || statusFilter === "in_warehouse";
         if (!scoped.isHq && !hasWarehouse && shopIds.length > 0 && !skipQtyGate) {
-          const { data: sids } = await supabaseAdmin
-            .from("inv_stocks")
-            .select("sku_id")
-            .in("location_id", shopIds)
-            .gt("qty", 0);
+          const scopedShopIds = locations
+            .map((location) => location.shop_id)
+            .filter((shopId): shopId is string => !!shopId);
+          const [{ data: sids }, { data: vintageShops }] = await Promise.all([
+            supabaseAdmin
+              .from("inv_stocks")
+              .select("sku_id")
+              .in("location_id", shopIds)
+              .gt("qty", 0),
+            scopedShopIds.length > 0
+              ? supabaseAdmin
+                  .from("youzan_shops")
+                  .select("id")
+                  .in("id", scopedShopIds)
+                  .eq("store_format", "vintage")
+              : Promise.resolve({ data: [] as Array<{ id: string }> }),
+          ]);
           const ids = Array.from(
             new Set(((sids as { sku_id: string }[] | null) ?? []).map((r) => r.sku_id)),
           );
-          if (ids.length === 0)
+          if ((vintageShops?.length ?? 0) > 0) {
+            const { data: standards } = await supabaseAdmin
+              .from("inv_skus")
+              .select("id")
+              .eq("kind", "single")
+              .eq("is_custom_price", false)
+              .eq("status", "active");
+            for (const standard of standards ?? []) ids.push(standard.id);
+          }
+          const visibleIds = Array.from(new Set(ids));
+          if (visibleIds.length === 0)
             return ok({ items: [], total: 0, page, page_size: pageSize, counts: EMPTY_COUNTS });
-          skuQ = skuQ.in("id", ids);
+          skuQ = skuQ.in("id", visibleIds);
         }
 
         const { data: skuRows, error: skuErr } = await skuQ;
