@@ -4,7 +4,8 @@ import test from "node:test";
 
 import { addScannedProduct, type PosScannableProduct } from "./pos/pos-policy";
 
-const ROOT_CATEGORIES = [
+// 旧一级类目已被永久清理，现行一级类目见 INV_CATEGORIES
+const LEGACY_ROOT_CATEGORIES = [
   "jp_porcelain",
   "eu_porcelain",
   "vintage_toy",
@@ -15,6 +16,17 @@ const ROOT_CATEGORIES = [
   "fashion",
   "daily",
   "antique",
+] as const;
+
+const CURRENT_ROOT_CATEGORIES = [
+  "porcelain",
+  "toy_model",
+  "character_ip_goods",
+  "audio_media",
+  "digital_appliance",
+  "fashion_wearable",
+  "daily_misc",
+  "art_collectible",
 ] as const;
 
 const PRICE_TIERS = [
