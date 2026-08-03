@@ -9,6 +9,10 @@ import {
   type OfficialKnowledge,
 } from "./content-contract";
 import type { PublicContentQuery } from "./content.repository";
+import {
+  normalizePublicContentSource,
+  normalizePublicContentTimestamp,
+} from "./content-public";
 
 type LooseQuery = {
   select(columns?: string, options?: Record<string, unknown>): LooseQuery;
@@ -51,7 +55,9 @@ function toEditorialContent(
   const engagementRow = asRecord(engagement);
   return EditorialContentSchema.parse({
     ...row,
-    source: asRecord(row.source),
+    source: normalizePublicContentSource(row.source),
+    published_at: normalizePublicContentTimestamp(row.published_at),
+    scheduled_at: normalizePublicContentTimestamp(row.scheduled_at),
     relations: relations.map((relation) => {
       const entry = asRecord(relation);
       return {

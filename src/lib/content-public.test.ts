@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { parsePublicContentQuery, toPublicContentDto } from "./content-public";
+import {
+  normalizePublicContentSource,
+  normalizePublicContentTimestamp,
+  parsePublicContentQuery,
+  toPublicContentDto,
+} from "./content-public";
 import type { EditorialContent } from "./content-contract";
 
 const entry: EditorialContent = {
@@ -63,4 +68,29 @@ test("public dto exposes app fields without internal status", () => {
   assert.equal(dto.media.video_url, entry.video_url);
   assert.equal("status" in dto, false);
   assert.equal("reviewed_by" in dto, false);
+});
+
+test("normalizes PostgreSQL timestamps for the public contract", () => {
+  assert.equal(
+    normalizePublicContentTimestamp("2026-08-03 17:58:01.676+00"),
+    "2026-08-03T17:58:01.676Z",
+  );
+  assert.equal(normalizePublicContentTimestamp(null), null);
+});
+
+test("keeps legacy handheld AI sources readable", () => {
+  assert.deepEqual(
+    normalizePublicContentSource({
+      generator: "handheld.content.generate-from-sku",
+      model: "google/gemini-3.6-flash",
+    }),
+    {
+      id: "boomer-handheld-ai",
+      name: "BOOMER OFF 编辑部",
+      kind: "boomer_store",
+      label: "中古买手推荐",
+      original_url: null,
+      ai_summarized: true,
+    },
+  );
 });

@@ -145,7 +145,17 @@ export async function generateEditorialForSku(args: {
       cover_url: images[0] ?? null,
       keywords: (parsed.keywords ?? []).slice(0, 6),
       related_product_ids: [row.id],
-      source: { generator: "handheld.content.generate-from-sku", model: MODEL, sku_id: row.id },
+      source: {
+        id: "boomer-handheld-ai",
+        name: "BOOMER OFF 编辑部",
+        kind: "boomer_store",
+        label: "中古买手推荐",
+        original_url: null,
+        ai_summarized: true,
+        generator: "handheld.content.generate-from-sku",
+        model: MODEL,
+        sku_id: row.id,
+      },
       published_at: status === "published" ? nowIso : null,
     } as never)
     .select("id, slug, status, title, summary, cover_url")

@@ -1,5 +1,40 @@
-import { ContentTypeSchema, type EditorialContent } from "./content-contract";
+import {
+  ContentSourceSchema,
+  ContentTypeSchema,
+  type EditorialContent,
+} from "./content-contract";
 import type { PublicContentQuery } from "./content.repository";
+
+export function normalizePublicContentTimestamp(value: unknown): string | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+export function normalizePublicContentSource(value: unknown) {
+  const source = value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+  const parsed = ContentSourceSchema.safeParse(source);
+  if (parsed.success) return parsed.data;
+
+  const generated = typeof source["generator"] === "string";
+  return ContentSourceSchema.parse({
+    id: typeof source["id"] === "string" && source["id"] ? source["id"] : "boomer-handheld-ai",
+    name:
+      typeof source["name"] === "string" && source["name"]
+        ? source["name"]
+        : "BOOMER OFF 编辑部",
+    kind: "boomer_store",
+    label:
+      typeof source["label"] === "string" && source["label"]
+        ? source["label"]
+        : "中古买手推荐",
+    original_url: typeof source["original_url"] === "string" ? source["original_url"] : null,
+    ai_summarized:
+      typeof source["ai_summarized"] === "boolean" ? source["ai_summarized"] : generated,
+  });
+}
 
 export function parsePublicContentQuery(url: URL): PublicContentQuery {
   const page = Math.max(1, Number.parseInt(url.searchParams.get("page") ?? "1", 10) || 1);
