@@ -133,6 +133,7 @@ import { Route as ApiPublicPosPaymentCodeRouteImport } from './routes/api/public
 import { Route as ApiPublicPosProductsRouteImport } from './routes/api/public/pos/products'
 import { Route as ApiPublicPosResolveCodeRouteImport } from './routes/api/public/pos/resolve-code'
 import { Route as ApiPublicPosSalesRouteImport } from './routes/api/public/pos/sales'
+import { Route as ApiPublicPosStandardCatalogRouteImport } from './routes/api/public/pos/standard-catalog'
 import { Route as ApiPublicSsoAigcExchangeRouteImport } from './routes/api/public/sso/aigc-exchange'
 import { Route as ApiPublicSsoAigcTicketRouteImport } from './routes/api/public/sso/aigc-ticket'
 import { Route as ApiPublicStorefrontOrdersRouteImport } from './routes/api/public/storefront/orders'
@@ -880,6 +881,12 @@ const ApiPublicPosSalesRoute = ApiPublicPosSalesRouteImport.update({
   path: '/api/public/pos/sales',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicPosStandardCatalogRoute =
+  ApiPublicPosStandardCatalogRouteImport.update({
+    id: '/api/public/pos/standard-catalog',
+    path: '/api/public/pos/standard-catalog',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicSsoAigcExchangeRoute =
   ApiPublicSsoAigcExchangeRouteImport.update({
     id: '/api/public/sso/aigc-exchange',
@@ -1517,6 +1524,7 @@ export interface FileRoutesByFullPath {
   '/api/public/pos/products': typeof ApiPublicPosProductsRouteWithChildren
   '/api/public/pos/resolve-code': typeof ApiPublicPosResolveCodeRoute
   '/api/public/pos/sales': typeof ApiPublicPosSalesRouteWithChildren
+  '/api/public/pos/standard-catalog': typeof ApiPublicPosStandardCatalogRoute
   '/api/public/sso/aigc-exchange': typeof ApiPublicSsoAigcExchangeRoute
   '/api/public/sso/aigc-ticket': typeof ApiPublicSsoAigcTicketRoute
   '/api/public/storefront/orders': typeof ApiPublicStorefrontOrdersRouteWithChildren
@@ -1723,6 +1731,7 @@ export interface FileRoutesByTo {
   '/api/public/pos/products': typeof ApiPublicPosProductsRouteWithChildren
   '/api/public/pos/resolve-code': typeof ApiPublicPosResolveCodeRoute
   '/api/public/pos/sales': typeof ApiPublicPosSalesRouteWithChildren
+  '/api/public/pos/standard-catalog': typeof ApiPublicPosStandardCatalogRoute
   '/api/public/sso/aigc-exchange': typeof ApiPublicSsoAigcExchangeRoute
   '/api/public/sso/aigc-ticket': typeof ApiPublicSsoAigcTicketRoute
   '/api/public/storefront/orders': typeof ApiPublicStorefrontOrdersRouteWithChildren
@@ -1937,6 +1946,7 @@ export interface FileRoutesById {
   '/api/public/pos/products': typeof ApiPublicPosProductsRouteWithChildren
   '/api/public/pos/resolve-code': typeof ApiPublicPosResolveCodeRoute
   '/api/public/pos/sales': typeof ApiPublicPosSalesRouteWithChildren
+  '/api/public/pos/standard-catalog': typeof ApiPublicPosStandardCatalogRoute
   '/api/public/sso/aigc-exchange': typeof ApiPublicSsoAigcExchangeRoute
   '/api/public/sso/aigc-ticket': typeof ApiPublicSsoAigcTicketRoute
   '/api/public/storefront/orders': typeof ApiPublicStorefrontOrdersRouteWithChildren
@@ -2152,6 +2162,7 @@ export interface FileRouteTypes {
     | '/api/public/pos/products'
     | '/api/public/pos/resolve-code'
     | '/api/public/pos/sales'
+    | '/api/public/pos/standard-catalog'
     | '/api/public/sso/aigc-exchange'
     | '/api/public/sso/aigc-ticket'
     | '/api/public/storefront/orders'
@@ -2358,6 +2369,7 @@ export interface FileRouteTypes {
     | '/api/public/pos/products'
     | '/api/public/pos/resolve-code'
     | '/api/public/pos/sales'
+    | '/api/public/pos/standard-catalog'
     | '/api/public/sso/aigc-exchange'
     | '/api/public/sso/aigc-ticket'
     | '/api/public/storefront/orders'
@@ -2571,6 +2583,7 @@ export interface FileRouteTypes {
     | '/api/public/pos/products'
     | '/api/public/pos/resolve-code'
     | '/api/public/pos/sales'
+    | '/api/public/pos/standard-catalog'
     | '/api/public/sso/aigc-exchange'
     | '/api/public/sso/aigc-ticket'
     | '/api/public/storefront/orders'
@@ -2737,6 +2750,7 @@ export interface RootRouteChildren {
   ApiPublicPosProductsRoute: typeof ApiPublicPosProductsRouteWithChildren
   ApiPublicPosResolveCodeRoute: typeof ApiPublicPosResolveCodeRoute
   ApiPublicPosSalesRoute: typeof ApiPublicPosSalesRouteWithChildren
+  ApiPublicPosStandardCatalogRoute: typeof ApiPublicPosStandardCatalogRoute
   ApiPublicSsoAigcExchangeRoute: typeof ApiPublicSsoAigcExchangeRoute
   ApiPublicSsoAigcTicketRoute: typeof ApiPublicSsoAigcTicketRoute
   ApiPublicStorefrontOrdersRoute: typeof ApiPublicStorefrontOrdersRouteWithChildren
@@ -3659,6 +3673,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/pos/sales'
       fullPath: '/api/public/pos/sales'
       preLoaderRoute: typeof ApiPublicPosSalesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/pos/standard-catalog': {
+      id: '/api/public/pos/standard-catalog'
+      path: '/api/public/pos/standard-catalog'
+      fullPath: '/api/public/pos/standard-catalog'
+      preLoaderRoute: typeof ApiPublicPosStandardCatalogRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/sso/aigc-exchange': {
@@ -4917,6 +4938,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicPosProductsRoute: ApiPublicPosProductsRouteWithChildren,
   ApiPublicPosResolveCodeRoute: ApiPublicPosResolveCodeRoute,
   ApiPublicPosSalesRoute: ApiPublicPosSalesRouteWithChildren,
+  ApiPublicPosStandardCatalogRoute: ApiPublicPosStandardCatalogRoute,
   ApiPublicSsoAigcExchangeRoute: ApiPublicSsoAigcExchangeRoute,
   ApiPublicSsoAigcTicketRoute: ApiPublicSsoAigcTicketRoute,
   ApiPublicStorefrontOrdersRoute: ApiPublicStorefrontOrdersRouteWithChildren,
