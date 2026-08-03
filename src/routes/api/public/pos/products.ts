@@ -87,10 +87,17 @@ export const Route = createFileRoute("/api/public/pos/products")({
             500,
           );
         }
+        const { locationInheritsStandardCatalog, isGlobalStandardItem } =
+          await import("@/server/standard-catalog-scope.server");
+        const inheritsStandards = await locationInheritsStandardCatalog(locationId);
         return posJson({
           ok: true,
           data: {
-            items: items.filter((item) => item.is_unlimited_stock || item.available_qty > 0),
+            items: items.filter(
+              (item) =>
+                (inheritsStandards || !isGlobalStandardItem(item)) &&
+                (item.is_unlimited_stock || item.available_qty > 0),
+            ),
           },
         });
       },
