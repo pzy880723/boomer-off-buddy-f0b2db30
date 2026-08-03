@@ -479,6 +479,8 @@ export type Database = {
       }
       commerce_order_items: {
         Row: {
+          category_code: string | null
+          category_name_snapshot: string | null
           condition_snapshot: string | null
           created_at: string
           discount_snapshot: Json
@@ -496,10 +498,14 @@ export type Database = {
           settlement_snapshot: Json | null
           settlement_subject_id: string | null
           sku_id: string
+          subcategory_code: string | null
+          subcategory_name_snapshot: string | null
           title_snapshot: string
           unit_price: number
         }
         Insert: {
+          category_code?: string | null
+          category_name_snapshot?: string | null
           condition_snapshot?: string | null
           created_at?: string
           discount_snapshot?: Json
@@ -517,10 +523,14 @@ export type Database = {
           settlement_snapshot?: Json | null
           settlement_subject_id?: string | null
           sku_id: string
+          subcategory_code?: string | null
+          subcategory_name_snapshot?: string | null
           title_snapshot: string
           unit_price: number
         }
         Update: {
+          category_code?: string | null
+          category_name_snapshot?: string | null
           condition_snapshot?: string | null
           created_at?: string
           discount_snapshot?: Json
@@ -538,6 +548,8 @@ export type Database = {
           settlement_snapshot?: Json | null
           settlement_subject_id?: string | null
           sku_id?: string
+          subcategory_code?: string | null
+          subcategory_name_snapshot?: string | null
           title_snapshot?: string
           unit_price?: number
         }
@@ -4152,6 +4164,8 @@ export type Database = {
           price_snapshot: number
           quantity: number
           sku_id: string
+          subcategory_code: string | null
+          subcategory_name: string | null
         }
         Insert: {
           discount_eligible?: boolean
@@ -4161,6 +4175,8 @@ export type Database = {
           price_snapshot: number
           quantity: number
           sku_id: string
+          subcategory_code?: string | null
+          subcategory_name?: string | null
         }
         Update: {
           discount_eligible?: boolean
@@ -4170,6 +4186,8 @@ export type Database = {
           price_snapshot?: number
           quantity?: number
           sku_id?: string
+          subcategory_code?: string | null
+          subcategory_name?: string | null
         }
         Relationships: [
           {
