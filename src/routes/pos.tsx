@@ -34,6 +34,8 @@ import { toast } from "sonner";
 import { useAuthSession } from "@/hooks/use-auth-session";
 import {
   addScannedProduct,
+  posCartLineKey,
+  posCartLineLabel,
   validatePosTenders,
   type PosCartLine,
   type PosScannableProduct,
@@ -143,6 +145,8 @@ type HeldCart = {
     price_snapshot: number;
     ownership_snapshot: LookupProduct["sale_ownership"];
     discount_eligible: boolean;
+    subcategory_code: string | null;
+    subcategory_name: string | null;
   }>;
 };
 type PosOrder = {
@@ -251,6 +255,13 @@ function PosPage() {
   const [scanCode, setScanCode] = useState("");
   const [scanning, setScanning] = useState(false);
   const [browseOpen, setBrowseOpen] = useState(true);
+  const [standardGroups, setStandardGroups] = useState<StandardCatalogGroup[]>([]);
+  const [standardLoading, setStandardLoading] = useState(false);
+  const [activeCategoryCode, setActiveCategoryCode] = useState<string | null>(null);
+  const [activeSubcategory, setActiveSubcategory] = useState<{
+    code: string;
+    name: string;
+  } | null>(null);
   const [browseLoading, setBrowseLoading] = useState(false);
   const [browseProducts, setBrowseProducts] = useState<LookupProduct[]>([]);
   const [shiftLoading, setShiftLoading] = useState(false);
@@ -369,6 +380,7 @@ function PosPage() {
   useEffect(() => {
     if (activeShift && selectedLocationId) {
       void loadProductBrowser();
+      void loadStandardCatalog();
     }
     // Refresh the local product shelf only when the active cashier context changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -389,6 +401,41 @@ function PosPage() {
     } catch {
       // Sound is an enhancement; the visual result remains authoritative.
     }
+  }
+
+  async function loadStandardCatalog() {
+    if (!selectedLocationId) return;
+    setStandardLoading(true);
+    const result = await posRequest<{ groups: StandardCatalogGroup[] }>(
+      `/api/public/pos/standard-catalog?location_id=${encodeURIComponent(selectedLocationId)}`,
+      token,
+    );
+    setStandardLoading(false);
+    if (!result.ok) {
+      setStandardGroups([]);
+      return;
+    }
+    setStandardGroups(result.data.groups);
+  }
+
+  function addStandardPrice(group: StandardCatalogGroup, price: { sku_id: string; price: number }) {
+    addProduct({
+      sku_id: price.sku_id,
+      product_type: "standard",
+      name: group.category_name,
+      unit_price: price.price,
+      available_qty: 9999,
+      is_unlimited_stock: true,
+      image_url: null,
+      barcode: null,
+      sku_code: null,
+      sale_ownership: null,
+      category_code: group.category_code,
+      category_name: group.category_name,
+      subcategory_code: activeSubcategory?.code ?? null,
+      subcategory_name: activeSubcategory?.name ?? null,
+    } as unknown as LookupProduct);
+    setActiveSubcategory(null);
   }
 
   function addProduct(product: LookupProduct) {
@@ -523,7 +570,12 @@ function PosPage() {
         shift_id: activeShift.id,
         client_op_id: crypto.randomUUID(),
         customer_id: selectedCustomer?.id ?? null,
-        items: cart.map((line) => ({ sku_id: line.sku_id, quantity: line.quantity })),
+        items: cart.map((line) => ({
+          sku_id: line.sku_id,
+          quantity: line.quantity,
+          subcategory_code: line.subcategory_code ?? null,
+          subcategory_name: line.subcategory_name ?? null,
+        })),
         discount_snapshot: discountPreview ? discount : {},
         benefit_snapshot: customerBenefits ?? {},
       }),
@@ -575,9 +627,17 @@ function PosPage() {
       );
       if (lookup.ok) products.push(lookup.data);
     }
-    const resumedCart = products.map((product) => {
-      const heldItem = items.find((item) => item.sku_id === product.sku_id);
-      return { ...product, quantity: heldItem?.quantity ?? 1 };
+    const resumedCart = items.flatMap((heldItem) => {
+      const product = products.find((item) => item.sku_id === heldItem.sku_id);
+      if (!product) return [];
+      return [
+        {
+          ...product,
+          quantity: heldItem.quantity ?? 1,
+          subcategory_code: heldItem.subcategory_code ?? null,
+          subcategory_name: heldItem.subcategory_name ?? null,
+        },
+      ];
     });
     setCart(resumedCart);
     setProductMeta(Object.fromEntries(products.map((product) => [product.sku_id, product])));
@@ -696,11 +756,11 @@ function PosPage() {
     }
   }
 
-  function updateQuantity(skuId: string, nextQuantity: number) {
+  function updateQuantity(lineKey: string, nextQuantity: number) {
     setDiscountPreview(null);
     setCart((current) =>
       current.flatMap((line) => {
-        if (line.sku_id !== skuId) return [line];
+        if (posCartLineKey(line) !== lineKey) return [line];
         if (nextQuantity <= 0) return [];
         if (line.product_type === "custom" && nextQuantity > 1) {
           toast.warning("孤品每单只能销售 1 件");
@@ -838,7 +898,11 @@ function PosPage() {
       body: JSON.stringify({
         shift_id: activeShift.id,
         client_op_id: crypto.randomUUID(),
-        items: cart.map((line) => ({ sku_id: line.sku_id, quantity: line.quantity })),
+        items: cart.map((line) => ({
+          sku_id: line.sku_id,
+          quantity: line.quantity,
+          subcategory_code: line.subcategory_code ?? null,
+        })),
         tenders: checked,
         customer_id: selectedCustomer?.id,
         discount: discountPreview ? discount : undefined,
@@ -1118,9 +1182,10 @@ function PosPage() {
               <div className="min-h-0 overflow-y-auto p-2">
                 {cart.map((line) => {
                   const meta = productMeta[line.sku_id];
+                  const lineKey = posCartLineKey(line);
                   return (
                     <div
-                      key={line.sku_id}
+                      key={lineKey}
                       className="mb-2 rounded-xl bg-white p-3 shadow-[0_1px_2px_rgba(15,23,42,0.05)] last:mb-0"
                     >
                       <div className="flex items-start gap-3">
@@ -1136,7 +1201,9 @@ function PosPage() {
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold">{line.name}</p>
+                          <p className="truncate text-sm font-semibold">
+                            {posCartLineLabel(line)}
+                          </p>
                           <p className="mt-1 truncate font-mono text-[11px] text-[#667085]">
                             {meta?.barcode || meta?.sku_code || line.sku_id}
                           </p>
@@ -1157,7 +1224,7 @@ function PosPage() {
                           <button
                             type="button"
                             className="flex h-8 w-8 items-center justify-center rounded-l-lg border border-[#d0d5dd]"
-                            onClick={() => updateQuantity(line.sku_id, line.quantity - 1)}
+                            onClick={() => updateQuantity(lineKey, line.quantity - 1)}
                           >
                             <Minus className="h-3.5 w-3.5" />
                           </button>
@@ -1171,15 +1238,15 @@ function PosPage() {
                               line.product_type === "custom" ||
                               (!line.is_unlimited_stock && line.quantity >= line.available_qty)
                             }
-                            onClick={() => updateQuantity(line.sku_id, line.quantity + 1)}
+                            onClick={() => updateQuantity(lineKey, line.quantity + 1)}
                           >
                             <Plus className="h-3.5 w-3.5" />
                           </button>
                           <button
                             type="button"
                             className="ml-2 flex h-8 w-8 items-center justify-center rounded-lg text-[#98a2b3] hover:bg-[#fff1f2] hover:text-[#e8343a]"
-                            onClick={() => updateQuantity(line.sku_id, 0)}
-                            aria-label={`删除 ${line.name}`}
+                            onClick={() => updateQuantity(lineKey, 0)}
+                            aria-label={`删除 ${posCartLineLabel(line)}`}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
