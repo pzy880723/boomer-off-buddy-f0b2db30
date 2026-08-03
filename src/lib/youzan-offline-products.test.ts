@@ -119,14 +119,38 @@ describe("youzan offline products", () => {
     assert.equal(input.unit, "件");
   });
 
-  test("release lookup checks a Youzan-safe code before the product title", () => {
+  test("release lookup preserves the exact ERP code before normalized fallbacks", () => {
     assert.equal(normalizeYouzanProductCode("SKU-JP-260712-C8FG"), "SKUJP260712C8FG");
     assert.deepEqual(
       buildOfflineProductLookupTerms({
         skuCode: "SKU-JP-260712-C8FG",
         name: "test2",
       }),
-      ["SKUJP260712C8FG", "test2"],
+      ["SKU-JP-260712-C8FG", "SKUJP260712C8FG", "test2"],
+    );
+  });
+
+  test("recovery matches a remote code with or without separators", () => {
+    const rows = parseOfflineProductRows({
+      data: {
+        offline_spus: [
+          {
+            item_id: 6128079637,
+            title: "联调测试商品",
+            spu_no: "SKUXX260803VZ42",
+            is_display: 1,
+            sku_models: [{ sku_id: 26228487296, sku_no: "", price: "0.01" }],
+          },
+        ],
+      },
+    });
+
+    assert.equal(
+      findOfflineProductMatch(rows, {
+        skuCode: "SKU-XX-260803-VZ42",
+        name: "联调测试商品",
+      })?.itemId,
+      6128079637,
     );
   });
 

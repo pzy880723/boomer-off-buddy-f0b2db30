@@ -9,15 +9,12 @@ import {
   buildOfflineProductLookupTerms,
   buildOfflineStockQueueRow,
   findOfflineProductMatch,
-  normalizeYouzanProductCode,
   queryYouzanOfflineProducts,
   releaseYouzanOfflineProduct,
 } from "./youzan-offline-products.server";
 import {
   ensureAutoYouzanDefaultCategory,
-  ensureBranchProduct,
   ensureHqSpuLink,
-  probeBranchRealIds,
   runStockSyncWorkerForSkus,
   uploadImageToYouzanMaterial,
 } from "./youzan-sync.functions";
@@ -39,7 +36,7 @@ async function findExistingOfflineProduct(args: {
 }) {
   if (!args.warehouseCode) return null;
   const target = {
-    skuCode: normalizeYouzanProductCode(args.skuCode),
+    skuCode: args.skuCode,
     name: args.name,
   };
 
@@ -185,7 +182,7 @@ export async function releaseSkuToOfflineShopsCore(args: {
   for (const branch of branches) {
     // offline.spu.release only publishes an existing HQ product to a branch.
     // Keep the HQ and branch product codes identical so barcode lookups remain stable.
-    const hqProduct = await ensureHqSpuLink(args.sku_id, branch.id);
+    await ensureHqSpuLink(args.sku_id, branch.id);
     const { data: location } = await supabase
       .from("inv_locations")
       .select("id")
@@ -205,90 +202,8 @@ export async function releaseSkuToOfflineShopsCore(args: {
       stock = Math.max(0, Math.trunc(Number(localStock?.qty ?? 0)));
     }
 
-    const branchToken = await ensureAccessToken(
-      branch as Parameters<typeof ensureAccessToken>[0],
-    );
-    const probed = await probeBranchRealIds({
-      hqSpuId: hqProduct.yz_item_id,
-      branchKdtId: Number(branch.kdt_id),
-      branchToken,
-    });
-    if (probed.item_id) {
-      const remoteSkuId = probed.sku_id || probed.item_id;
-      await upsertBranchLink({
-        skuId: args.sku_id,
-        shopId: branch.id,
-        itemId: probed.item_id,
-        skuIdRemote: remoteSkuId,
-      });
-      await enqueueBranchStock({
-        skuId: args.sku_id,
-        shopId: branch.id,
-        locationId: location.id,
-        targetStock: stock,
-      });
-      results.push({
-        shop_id: branch.id,
-        ok: true,
-        item_id: probed.item_id,
-        sku_id: remoteSkuId,
-        recovered: true,
-        error: null,
-      });
-      continue;
-    }
-
-    // HQ creation with the target branch may already distribute the product.
-    // Probe and persist the real branch item IDs before attempting another release.
-    const distributed = await ensureBranchProduct(args.sku_id, branch.id);
-    if (distributed.yz_item_id) {
-      const { data: branchLink } = await supabase
-        .from("sku_youzan_links")
-        .select("yz_sku_id")
-        .eq("sku_id", args.sku_id)
-        .eq("shop_id", branch.id)
-        .maybeSingle();
-      await enqueueBranchStock({
-        skuId: args.sku_id,
-        shopId: branch.id,
-        locationId: location.id,
-        targetStock: stock,
-      });
-      results.push({
-        shop_id: branch.id,
-        ok: true,
-        item_id: distributed.yz_item_id,
-        sku_id: Number(branchLink?.yz_sku_id ?? 0) || null,
-        recovered: !distributed.created,
-        error: null,
-      });
-      continue;
-    }
-
-    const { data: existing } = await supabase
-      .from("sku_youzan_links")
-      .select("yz_item_id,yz_sku_id,status")
-      .eq("sku_id", args.sku_id)
-      .eq("shop_id", branch.id)
-      .maybeSingle();
-    if (existing?.status === "linked" && Number(existing.yz_item_id) > 0) {
-      await enqueueBranchStock({
-        skuId: args.sku_id,
-        shopId: branch.id,
-        locationId: location.id,
-        targetStock: stock,
-      });
-      results.push({
-        shop_id: branch.id,
-        ok: true,
-        item_id: Number(existing.yz_item_id),
-        sku_id: Number(existing.yz_sku_id ?? 0) || null,
-        recovered: false,
-        error: null,
-      });
-      continue;
-    }
-
+    // Online channel item IDs are not valid for an offline retail-store stock update.
+    // Recover only through offline.spu.query, otherwise create through offline.spu.release.
     const remoteExisting = await findExistingOfflineProduct({
       accessToken,
       warehouseCode: branch.warehouse_code,

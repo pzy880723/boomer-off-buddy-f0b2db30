@@ -75,9 +75,15 @@ export function findOfflineProductMatch(
   target: { skuCode: string; name: string },
 ) {
   const skuCode = target.skuCode.trim();
+  const normalizedSkuCode = normalizeYouzanProductCode(skuCode);
+  const codesMatch = (value: string | null) =>
+    Boolean(
+      value &&
+        (value === skuCode || normalizeYouzanProductCode(value) === normalizedSkuCode),
+    );
   const exactCode = rows.find(
     (row) =>
-      row.spuNo === skuCode || row.skus.some((remoteSku) => remoteSku.skuNo === skuCode),
+      codesMatch(row.spuNo) || row.skus.some((remoteSku) => codesMatch(remoteSku.skuNo)),
   );
   if (exactCode) return exactCode;
 
@@ -93,9 +99,10 @@ export function buildOfflineProductLookupTerms(target: {
   skuCode: string;
   name: string;
 }) {
+  const rawSkuCode = target.skuCode.trim();
   return Array.from(
     new Set(
-      [normalizeYouzanProductCode(target.skuCode), target.name.trim()].filter(Boolean),
+      [rawSkuCode, normalizeYouzanProductCode(rawSkuCode), target.name.trim()].filter(Boolean),
     ),
   );
 }
