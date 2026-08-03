@@ -54,6 +54,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import type { StandardCatalogGroup } from "@/lib/pos/standard-catalog";
 
 export const Route = createFileRoute("/pos")({
   head: () => ({
@@ -376,6 +377,10 @@ function PosPage() {
   const discountTotal = discountPreview?.discount_total ?? 0;
   const total = discountPreview?.payable_total ?? subtotal;
   const itemCount = useMemo(() => cart.reduce((sum, line) => sum + line.quantity, 0), [cart]);
+  const activeGroup = useMemo(
+    () => standardGroups.find((group) => group.category_code === activeCategoryCode) ?? null,
+    [standardGroups, activeCategoryCode],
+  );
 
   useEffect(() => {
     if (activeShift && selectedLocationId) {
@@ -1072,6 +1077,97 @@ function PosPage() {
                   />
                 </button>
               </div>
+            </div>
+            <div className="mt-4 border-t border-[#eaecf0] pt-4">
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold">标准商品</p>
+                  <p className="mt-0.5 text-xs text-[#667085]">
+                    选择一级类目后直接点价格即可加入；细分类可选，不选也能结算。
+                  </p>
+                </div>
+                {standardLoading && <Loader2 className="h-4 w-4 animate-spin text-[#0a315d]" />}
+              </div>
+              {standardGroups.length === 0 ? (
+                <div className="flex h-20 items-center justify-center rounded-xl bg-[#f9fafb] text-sm text-[#667085]">
+                  当前门店不继承标准商品目录
+                </div>
+              ) : activeGroup ? (
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="rounded-lg px-2"
+                      onClick={() => {
+                        setActiveCategoryCode(null);
+                        setActiveSubcategory(null);
+                      }}
+                    >
+                      <ArrowLeft className="mr-1 h-3.5 w-3.5" />
+                      全部类目
+                    </Button>
+                    <span className="text-sm font-semibold">{activeGroup.category_name}</span>
+                  </div>
+                  {activeGroup.subcategories.length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-xs text-[#667085]">细分类（可选）</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {activeGroup.subcategories.map((sub) => {
+                          const active = activeSubcategory?.code === sub.code;
+                          return (
+                            <button
+                              type="button"
+                              key={sub.code}
+                              aria-pressed={active}
+                              className={`rounded-full border px-3 py-1.5 text-xs transition ${
+                                active
+                                  ? "border-[#0a315d] bg-[#0a315d] text-white"
+                                  : "border-[#d0d5dd] bg-white text-[#475467] hover:border-[#0a315d]"
+                              }`}
+                              onClick={() =>
+                                setActiveSubcategory(
+                                  active ? null : { code: sub.code, name: sub.name },
+                                )
+                              }
+                            >
+                              {sub.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  <div className="mt-4 grid grid-cols-4 gap-2 sm:grid-cols-6 xl:grid-cols-8">
+                    {activeGroup.prices.map((price) => (
+                      <button
+                        type="button"
+                        key={price.sku_id}
+                        className="rounded-xl border border-[#e4e7ec] bg-white py-3 text-sm font-bold tabular-nums text-[#e8343a] transition hover:border-[#e8343a] hover:bg-[#fff1f2]"
+                        onClick={() => addStandardPrice(activeGroup, price)}
+                      >
+                        {money(price.price)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-5">
+                  {standardGroups.map((group) => (
+                    <button
+                      type="button"
+                      key={group.category_code}
+                      className="rounded-xl border border-[#e4e7ec] bg-white px-3 py-4 text-sm font-semibold transition hover:border-[#0a315d] hover:bg-[#eef4fb]"
+                      onClick={() => {
+                        setActiveCategoryCode(group.category_code);
+                        setActiveSubcategory(null);
+                      }}
+                    >
+                      {group.category_name}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             {browseOpen && (
               <div className="mt-4 border-t border-[#eaecf0] pt-4">
