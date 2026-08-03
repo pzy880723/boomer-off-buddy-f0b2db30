@@ -251,15 +251,11 @@ function ShopProductsPage() {
         <DropdownMenuItem onClick={() => setOpenDialog("bundle")}>
           <Boxes className="mr-2 h-3.5 w-3.5" /> 组包商品
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setOpenDialog("standard")}>
-          <Tags className="mr-2 h-3.5 w-3.5" /> 标准商品（多价格档）
-        </DropdownMenuItem>
         <div className="border-t my-1" />
-        <Link to="/inventory/skus" className="block">
-          <DropdownMenuItem className="text-muted-foreground text-[11px]">
-            批量维护标准商品去仓库 →
-          </DropdownMenuItem>
-        </Link>
+        <div className="px-2 py-1.5 text-[11px] text-muted-foreground">
+          标准商品由总部统一维护，门店自动可售
+        </div>
+
       </DropdownMenuContent>
     </DropdownMenu>
   );
