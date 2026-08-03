@@ -65,9 +65,38 @@ describe("youzan offline products", () => {
       },
     });
     assert.equal(params.all_batch_operate, -1);
+    assert.equal(params.price, "16800");
+    assert.equal(params.retail_price, "168");
     assert.deepEqual(params.sub_kdt_status_param.sale_up_kdt_ids, [233, 666]);
+    assert.equal(params.stocks[0].price, "16800");
     assert.equal(params.stocks[0].sell_stock_count, "1");
     assert.equal(params.picture, JSON.stringify([{ url: "https://img.yzcdn.cn/a.webp" }]));
+  });
+
+  test("release keeps the minimum retail price at one fen", () => {
+    const params = buildOfflineProductReleaseParams({
+      title: "联调测试商品",
+      categoryId: 345202,
+      unit: "件",
+      priceYuan: 0.01,
+      imageUrls: ["https://img.yzcdn.cn/a.webp"],
+      spuCode: "E2E001",
+      skuCenterCode: "E2E001",
+      saleUpKdtIds: [233],
+      saleDownKdtIds: [],
+      stock: {
+        skuNo: "E2E001",
+        relatedSpuCode: "E2E001",
+        relatedSkuCode: "E2E001",
+        sellStockCount: 1,
+      },
+    });
+
+    assert.equal(params.price, "1");
+    assert.equal(params.retail_price, "0.01");
+    assert.equal(params.stocks[0].price, "1");
+    assert.equal(params.stocks[0].min_retail_price, "1");
+    assert.equal(params.stocks[0].max_retail_price, "1");
   });
 
   test("ERP SKU maps to the official offline release payload without sell_channel_id", () => {

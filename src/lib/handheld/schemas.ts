@@ -893,6 +893,36 @@ export const SyncStatusRes = okEnvelope(
   }),
 );
 
+export const SyncYouzanReq = z
+  .object({
+    location_id: uuidSchema.optional().meta({
+      description: "目标门店库位；总部设备必须显式选择，门店设备默认使用当前库位",
+    }),
+    client_op_id: ClientOpId.optional(),
+  })
+  .meta({ id: "SyncYouzanReq" });
+
+export const SyncYouzanRes = okEnvelope(
+  z
+    .object({
+      sku_id: uuidSchema,
+      location_id: uuidSchema,
+      shop_id: uuidSchema,
+      status: z.enum(["queued", "failed"]),
+      results: z.array(
+        z.object({
+          shop_id: uuidSchema,
+          ok: z.boolean(),
+          item_id: z.number().nullable(),
+          sku_id: z.number().nullable(),
+          recovered: z.boolean(),
+          error: z.string().nullable(),
+        }),
+      ),
+    })
+    .meta({ id: "SyncYouzanData" }),
+);
+
 // ============================================================
 // 10. RFID 单点操作
 // ============================================================

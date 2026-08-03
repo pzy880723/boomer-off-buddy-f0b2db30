@@ -107,4 +107,17 @@ describe("handheld AI classification contract", () => {
     assert.doesNotMatch(smartCreate, /qrcode_payload:\s*`vg:\/\/sku\//);
     assert.match(smartCreate, /qrcode_payload:\s*barcode\s*\?\?/);
   });
+
+  test("failed Youzan publication can be retried for the existing SKU", () => {
+    const retryRoute = readFileSync(
+      "src/routes/api/public/handheld/items.$id.sync-youzan.ts",
+      "utf8",
+    );
+    const openapi = readFileSync("src/lib/handheld/openapi.ts", "utf8");
+
+    assert.match(retryRoute, /releaseSkuToOfflineShopsCore/);
+    assert.match(retryRoute, /userCanAccessLocation/);
+    assert.match(retryRoute, /items\.sync-youzan/);
+    assert.match(openapi, /items\/\{id\}\/sync-youzan/);
+  });
 });

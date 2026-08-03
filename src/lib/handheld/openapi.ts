@@ -74,6 +74,8 @@ import {
   StocktakeSubmitReq,
   StocktakeSubmitRes,
   SyncStatusRes,
+  SyncYouzanReq,
+  SyncYouzanRes,
   TransferConfirmReq,
   TransferReceiveConfirmRes,
   TransferScanReq,
@@ -770,6 +772,17 @@ X-Session-Token: <操作员 session token>
         summary: "查 SKU 在各有赞店铺的同步状态",
         requestParams: { path: z.object({ id: z.string().uuid() }) },
         responses: { "200": jsonRes("OK", SyncStatusRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/items/{id}/sync-youzan": {
+      post: {
+        tags: ["商品"],
+        summary: "重试把现有自定义商品发布到有赞门店",
+        description:
+          "只重试现有 SKU 的有赞建品与库存入队，不新建 ERP 商品、不增加库存。总部设备通过 location_id 指定目标门店；仓库库位不能直接发布到有赞。",
+        requestParams: { path: z.object({ id: z.string().uuid() }) },
+        requestBody: jsonBody(SyncYouzanReq),
+        responses: { "200": jsonRes("OK", SyncYouzanRes), ...ERROR_RESPONSES },
       },
     },
     "/api/public/handheld/rfid/{epc}": {

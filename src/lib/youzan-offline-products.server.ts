@@ -181,13 +181,14 @@ export function buildOfflineProductReleaseParams(input: OfflineProductReleaseInp
     throw new Error("Youzan release requires between one and five images");
   }
   const pictures = input.imageUrls.map((url) => ({ url }));
+  const priceFen = String(Math.round(input.priceYuan * 100));
   return {
     join_level_discount: 1,
     measurement: 0,
     category_id: input.categoryId,
     unit: input.unit,
     sell_type: 1,
-    price: String(input.priceYuan),
+    price: priceFen,
     title: input.title,
     picture: JSON.stringify(pictures),
     spu_code: input.spuCode,
@@ -203,15 +204,15 @@ export function buildOfflineProductReleaseParams(input: OfflineProductReleaseInp
     photo_url: JSON.stringify(pictures),
     stocks: [
       {
-        price: String(Math.round(input.priceYuan * 100)),
+        price: priceFen,
         cost_price: "0",
         sell_stock_count: String(Math.max(0, Math.trunc(input.stock.sellStockCount))),
         sku_no: input.stock.skuNo,
         related_spu_code: input.stock.relatedSpuCode,
         related_sku_code: input.stock.relatedSkuCode,
         is_sell: 1,
-        min_retail_price: String(Math.round(input.priceYuan * 100)),
-        max_retail_price: String(Math.round(input.priceYuan * 100)),
+        min_retail_price: priceFen,
+        max_retail_price: priceFen,
       },
     ],
   };
