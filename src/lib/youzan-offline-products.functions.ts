@@ -18,7 +18,7 @@ import {
   ensureBranchProduct,
   ensureHqSpuLink,
   probeBranchRealIds,
-  triggerStockWorker,
+  runStockSyncWorkerForSkus,
   uploadImageToYouzanMaterial,
 } from "./youzan-sync.functions";
 
@@ -407,7 +407,7 @@ export async function releaseSkuToOfflineShopsCore(args: {
     }
   }
   if (results.some((result) => result.ok)) {
-    triggerStockWorker({ sku_ids: [args.sku_id] });
+    await runStockSyncWorkerForSkus([args.sku_id]);
   }
   return { ok: results.every((result) => result.ok), results };
 }

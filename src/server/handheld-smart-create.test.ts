@@ -132,5 +132,6 @@ describe("handheld AI classification contract", () => {
     assert.match(publisher, /hqSpuId:\s*hqProduct\.yz_item_id/);
     assert.match(publisher, /ensureBranchProduct\(args\.sku_id, branch\.id\)/);
     assert.match(publisher, /select\("yz_sku_id"\)/);
+    assert.match(publisher, /await runStockSyncWorkerForSkus\(\[args\.sku_id\]\)/);
   });
 });
