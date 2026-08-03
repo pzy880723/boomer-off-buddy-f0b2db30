@@ -85,4 +85,13 @@ describe("handheld AI classification contract", () => {
     assert.match(classification, /attribute_confidence/);
     assert.match(classification, /inv_sku_facets/);
   });
+
+  test("smart-create records a movement reference required by the production RPC", () => {
+    assert.match(smartCreate, /p_ref_id:\s*skuId/);
+  });
+
+  test("label QR uses the stable retail barcode instead of an app-only deep link", () => {
+    assert.doesNotMatch(smartCreate, /qrcode_payload:\s*`vg:\/\/sku\//);
+    assert.match(smartCreate, /qrcode_payload:\s*barcode\s*\?\?/);
+  });
 });

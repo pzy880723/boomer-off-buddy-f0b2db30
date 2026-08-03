@@ -238,6 +238,7 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
           p_location_id: locationId,
           p_delta: 1 + boundCount,
           p_ref_type: "handheld_smart_create",
+          p_ref_id: skuId,
           p_epc: epc,
           p_note: `device:${auth.device.device_code}${session ? ` user:${session.email ?? session.user_id}` : ""}`,
         } as never);
@@ -278,13 +279,14 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
         const conditionGrade = (finalSku?.grade ?? body.grade ?? null) as
           "N" | "S" | "A" | "B" | "C" | "J" | null;
 
+        const locationStockQty = Number(mv.data ?? finalSku?.stock_qty ?? 0);
         const responseBody = {
           sku_id: skuId,
           sku_code: skuCode,
           barcode,
           epc,
           condition_grade: conditionGrade,
-          stock_qty: finalSku?.stock_qty ?? 0,
+          stock_qty: locationStockQty,
           bound_epcs: boundCount,
           label: {
             sku_code: skuCode,
@@ -295,7 +297,7 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
             grade: body.grade ?? null,
             condition_grade: conditionGrade,
             location_name: loc.name,
-            qrcode_payload: `vg://sku/${skuId}`,
+            qrcode_payload: barcode ?? skuCode,
           },
           print_payload: buildPrintPayload({
             sku_code: skuCode,
