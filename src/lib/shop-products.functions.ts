@@ -46,7 +46,6 @@ async function getShopWithLocation(shop_id: string) {
   return { shop, location_id: loc.id as string };
 }
 
-
 // ---------- listShopSkus ----------
 
 export const listShopSkus = createServerFn({ method: "GET" })
@@ -63,7 +62,11 @@ export const listShopSkus = createServerFn({ method: "GET" })
     async ({
       data,
       context,
-    }): Promise<{ rows: ShopSkuRow[]; location_id: string | null; store_format: string | null }> => {
+    }): Promise<{
+      rows: ShopSkuRow[];
+      location_id: string | null;
+      store_format: string | null;
+    }> => {
       const sb = context.supabase;
       const [{ data: loc }, { data: shop }] = await Promise.all([
         sb.from("inv_locations").select("id, name").eq("shop_id", data.shop_id).maybeSingle(),
@@ -72,91 +75,87 @@ export const listShopSkus = createServerFn({ method: "GET" })
       const storeFormat = (shop as { store_format?: string } | null)?.store_format ?? null;
       if (!loc) return { rows: [], location_id: null, store_format: storeFormat };
 
+      // 取该门店所有 inv_stocks（含 qty=0，方便看到"新建但入库失败"的商品）
+      const { data: stocks, error: stErr } = await sb
+        .from("inv_stocks")
+        .select("sku_id, qty")
+        .eq("location_id", loc.id);
+      if (stErr) throw new Error(stErr.message);
 
-    // 取该门店所有 inv_stocks（含 qty=0，方便看到"新建但入库失败"的商品）
-    const { data: stocks, error: stErr } = await sb
-      .from("inv_stocks")
-      .select("sku_id, qty")
-      .eq("location_id", loc.id);
-    if (stErr) throw new Error(stErr.message);
+      // 加上"有 link"的 SKU
+      const { data: links } = await sb
+        .from("sku_youzan_links")
+        .select("sku_id")
+        .eq("shop_id", data.shop_id);
 
-    // 加上"有 link"的 SKU
-    const { data: links } = await sb
-      .from("sku_youzan_links")
-      .select("sku_id")
-      .eq("shop_id", data.shop_id);
-
-    // 再加上"本门店曾经动过"的 SKU（movements 里有记录，防止上一步失败留下孤立 SKU）
-    const { data: moves } = await sb
-      .from("inv_stock_movements")
-      .select("sku_id")
-      .eq("location_id", loc.id)
-      .limit(5000);
-
-    const skuIds = new Set<string>();
-    (stocks ?? []).forEach((s) => skuIds.add(s.sku_id));
-    (links ?? []).forEach((l) => skuIds.add(l.sku_id));
-    (moves ?? []).forEach((m) => skuIds.add(m.sku_id));
-    // Vintage 门店：无条件继承总部全局标准商品目录（无限库存，无需入库 / 同步 / 建 link）
-    if ((shop as { store_format?: string } | null)?.store_format === "vintage") {
-      const { data: standardSkus, error: standardErr } = await sb
-        .from("inv_skus")
-        .select("id")
-        .eq("kind", "single")
-        .eq("is_custom_price", false)
-        .eq("inventory_policy", "unlimited")
-        .eq("is_display", true)
-        .eq("status", "active")
+      // 再加上"本门店曾经动过"的 SKU（movements 里有记录，防止上一步失败留下孤立 SKU）
+      const { data: moves } = await sb
+        .from("inv_stock_movements")
+        .select("sku_id")
+        .eq("location_id", loc.id)
         .limit(5000);
-      if (standardErr) throw new Error(standardErr.message);
-      (standardSkus ?? []).forEach((sku) => skuIds.add(sku.id));
-    }
 
-    if (skuIds.size === 0)
-      return { rows: [], location_id: loc.id, store_format: storeFormat };
+      const skuIds = new Set<string>();
+      (stocks ?? []).forEach((s) => skuIds.add(s.sku_id));
+      (links ?? []).forEach((l) => skuIds.add(l.sku_id));
+      (moves ?? []).forEach((m) => skuIds.add(m.sku_id));
+      // Vintage 门店：无条件继承总部全局标准商品目录（无限库存，无需入库 / 同步 / 建 link）
+      if ((shop as { store_format?: string } | null)?.store_format === "vintage") {
+        const { data: standardSkus, error: standardErr } = await sb
+          .from("inv_skus")
+          .select("id")
+          .eq("kind", "single")
+          .eq("is_custom_price", false)
+          .eq("inventory_policy", "unlimited")
+          .eq("is_display", true)
+          .eq("status", "active")
+          .limit(5000);
+        if (standardErr) throw new Error(standardErr.message);
+        (standardSkus ?? []).forEach((sku) => skuIds.add(sku.id));
+      }
 
+      if (skuIds.size === 0) return { rows: [], location_id: loc.id, store_format: storeFormat };
 
-    let q = sb
-      .from("inv_skus")
-      .select("*")
-      .in("id", Array.from(skuIds))
-      .order("created_at", { ascending: false });
-    if (data.search) {
-      const s = `%${data.search}%`;
-      q = q.or(`name.ilike.${s},epc.ilike.${s},sku_code.ilike.${s}`);
-    }
-    const { data: rows, error } = await q;
-    if (error) throw new Error(error.message);
+      let q = sb
+        .from("inv_skus")
+        .select("*")
+        .in("id", Array.from(skuIds))
+        .order("created_at", { ascending: false });
+      if (data.search) {
+        const s = `%${data.search}%`;
+        q = q.or(`name.ilike.${s},epc.ilike.${s},sku_code.ilike.${s}`);
+      }
+      const { data: rows, error } = await q;
+      if (error) throw new Error(error.message);
 
-    const stockMap = new Map((stocks ?? []).map((s) => [s.sku_id, Number(s.qty)]));
-    const patched: ShopSkuRow[] = (rows ?? []).map((r) => {
-      const raw = r as Record<string, unknown>;
-      const bi = raw.bundle_items;
-      return {
-        id: String(raw.id),
-        category: String(raw.category ?? ""),
-        name: String(raw.name ?? ""),
-        sku_code: (raw.sku_code as string | null) ?? null,
-        price_tier: Number(raw.price_tier ?? 0),
-        is_custom_price: Boolean(raw.is_custom_price),
-        inventory_policy: String(raw.inventory_policy ?? "tracked") as "tracked" | "unlimited",
-        kind: String(raw.kind ?? "single"),
-        pack_pieces: (raw.pack_pieces as number | null) ?? null,
-        bundle_items: Array.isArray(bi) ? (bi as Array<{ sku_id: string; qty: number }>) : [],
-        weight_g: (raw.weight_g as number | null) ?? null,
-        image_url: (raw.image_url as string | null) ?? null,
-        image_paths: (raw.image_paths as string[] | null) ?? null,
-        notes: (raw.notes as string | null) ?? null,
-        status: String(raw.status ?? "active"),
-        epc: String(raw.epc ?? ""),
-        stock_qty: stockMap.get(String(raw.id)) ?? 0,
-        created_at: String(raw.created_at ?? ""),
-      };
-    });
+      const stockMap = new Map((stocks ?? []).map((s) => [s.sku_id, Number(s.qty)]));
+      const patched: ShopSkuRow[] = (rows ?? []).map((r) => {
+        const raw = r as Record<string, unknown>;
+        const bi = raw.bundle_items;
+        return {
+          id: String(raw.id),
+          category: String(raw.category ?? ""),
+          name: String(raw.name ?? ""),
+          sku_code: (raw.sku_code as string | null) ?? null,
+          price_tier: Number(raw.price_tier ?? 0),
+          is_custom_price: Boolean(raw.is_custom_price),
+          inventory_policy: String(raw.inventory_policy ?? "tracked") as "tracked" | "unlimited",
+          kind: String(raw.kind ?? "single"),
+          pack_pieces: (raw.pack_pieces as number | null) ?? null,
+          bundle_items: Array.isArray(bi) ? (bi as Array<{ sku_id: string; qty: number }>) : [],
+          weight_g: (raw.weight_g as number | null) ?? null,
+          image_url: (raw.image_url as string | null) ?? null,
+          image_paths: (raw.image_paths as string[] | null) ?? null,
+          notes: (raw.notes as string | null) ?? null,
+          status: String(raw.status ?? "active"),
+          epc: String(raw.epc ?? ""),
+          stock_qty: stockMap.get(String(raw.id)) ?? 0,
+          created_at: String(raw.created_at ?? ""),
+        };
+      });
       return { rows: patched, location_id: loc.id, store_format: storeFormat };
     },
   );
-
 
 // 门店 SKU 行（比 SkuRow 简化：bundle_items 一定是数组，方便 RPC 序列化）
 export type ShopSkuRow = {
@@ -321,10 +320,8 @@ export const listShopLinksForSkus = createServerFn({ method: "POST" })
       .select("sku_id, yz_item_id, status, last_error")
       .eq("shop_id", data.shop_id)
       .in("sku_id", data.sku_ids);
-    const map: Record<
-      string,
-      { yz_item_id: number; status: string; last_error: string | null }
-    > = {};
+    const map: Record<string, { yz_item_id: number; status: string; last_error: string | null }> =
+      {};
     for (const r of rows ?? []) {
       map[r.sku_id] = {
         yz_item_id: Number(r.yz_item_id),
@@ -365,22 +362,20 @@ export const retryBranchListing = createServerFn({ method: "POST" })
         .eq("sku_id", data.sku_id)
         .eq("location_id", location_id)
         .maybeSingle();
-      await supabase
-        .from("youzan_stock_sync_queue")
-        .upsert(
-          {
-            sku_id: data.sku_id,
-            shop_id: data.shop_id,
-            location_id,
-            target_stock: Math.max(0, Number(st?.qty ?? 0)),
-            action: "push_stock",
-            reason: "retry_listing",
-            status: "pending",
-            next_run_at: new Date().toISOString(),
-            last_error: null,
-          } as never,
-          { onConflict: "sku_id,shop_id", ignoreDuplicates: false } as never,
-        );
+      await supabase.from("youzan_stock_sync_queue").upsert(
+        {
+          sku_id: data.sku_id,
+          shop_id: data.shop_id,
+          location_id,
+          target_stock: Math.max(0, Number(st?.qty ?? 0)),
+          action: "push_stock",
+          reason: "retry_listing",
+          status: "pending",
+          next_run_at: new Date().toISOString(),
+          last_error: null,
+        } as never,
+        { onConflict: "sku_id,shop_id", ignoreDuplicates: false } as never,
+      );
       triggerStockWorker({ sku_ids: [data.sku_id] });
     }
     return {
@@ -409,7 +404,8 @@ export const retryFailedBranchListings = createServerFn({ method: "POST" })
       .limit(100);
     if (error) throw new Error(error.message);
     const rows = (failedRows ?? []).filter((row) => {
-      const sku = (row as unknown as { inv_skus?: { kind?: string; is_custom_price?: boolean } }).inv_skus;
+      const sku = (row as unknown as { inv_skus?: { kind?: string; is_custom_price?: boolean } })
+        .inv_skus;
       return sku?.kind === "bundle" || Boolean(sku?.is_custom_price);
     });
 
@@ -452,7 +448,11 @@ export const retryFailedBranchListings = createServerFn({ method: "POST" })
           details.push({ sku_id, ok: true, error: null });
         } else {
           failed += 1;
-          details.push({ sku_id, ok: false, error: r.error ? explainYouzanError(r.error) : "上架失败" });
+          details.push({
+            sku_id,
+            ok: false,
+            error: r.error ? explainYouzanError(r.error) : "上架失败",
+          });
         }
       } catch (e) {
         failed += 1;

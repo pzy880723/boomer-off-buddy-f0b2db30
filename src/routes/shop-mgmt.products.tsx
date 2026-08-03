@@ -5,7 +5,6 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   Plus,
   Search,
-  Tags,
   Boxes,
   Sparkles,
   ChevronDown,
@@ -124,7 +123,9 @@ function ShopProductsPage() {
   const [tab, setTab] = useState<TabKind>("custom");
   const [view, setView] = useState<ViewMode>("list");
   const [openDialog, setOpenDialog] = useState<DialogKind>(null);
-  const [receive, setReceive] = useState<{ sku_id: string; sku_name: string; qty: number } | null>(null);
+  const [receive, setReceive] = useState<{ sku_id: string; sku_name: string; qty: number } | null>(
+    null,
+  );
   const [retryingAll, setRetryingAll] = useState(false);
 
   const rowsQ = useQuery({
@@ -138,13 +139,15 @@ function ShopProductsPage() {
   const rows = (rowsQ.data?.rows ?? []) as ShopSkuRow[];
 
   const linkIdsKey = useMemo(
-    () => Array.from(new Set(rows.map((r) => r.id))).sort().join(","),
+    () =>
+      Array.from(new Set(rows.map((r) => r.id)))
+        .sort()
+        .join(","),
     [rows],
   );
   const linksQ = useQuery({
     queryKey: ["shop-links", activeShopId, linkIdsKey],
-    queryFn: () =>
-      fetchLinks({ data: { shop_id: activeShopId, sku_ids: rows.map((r) => r.id) } }),
+    queryFn: () => fetchLinks({ data: { shop_id: activeShopId, sku_ids: rows.map((r) => r.id) } }),
     enabled: !!activeShopId && rows.length > 0,
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
@@ -164,8 +167,7 @@ function ShopProductsPage() {
   }, [rows]);
 
   const failedCustomBundleCount = useMemo(
-    () =>
-      [...customRows, ...bundleRows].filter((r) => links[r.id]?.status === "error").length,
+    () => [...customRows, ...bundleRows].filter((r) => links[r.id]?.status === "error").length,
     [bundleRows, customRows, links],
   );
 
@@ -225,7 +227,9 @@ function ShopProductsPage() {
         toast.success(`已重推成功 ${r.ok} 个商品`);
       } else {
         const first = r.details.find((x) => !x.ok)?.error;
-        toast.warning(`重推完成：成功 ${r.ok} 个，失败 ${r.failed} 个。${first ? humanizeListingError(first) : ""}`);
+        toast.warning(
+          `重推完成：成功 ${r.ok} 个，失败 ${r.failed} 个。${first ? humanizeListingError(first) : ""}`,
+        );
       }
       refresh();
     } catch (e) {
@@ -254,7 +258,6 @@ function ShopProductsPage() {
         <div className="px-2 py-1.5 text-[11px] text-muted-foreground">
           标准商品由总部统一维护，门店自动可售
         </div>
-
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -264,7 +267,10 @@ function ShopProductsPage() {
     if (!l) return null;
     if (l.status === "linked" && l.yz_item_id) {
       return (
-        <Badge variant="outline" className="gap-1 border-emerald-500/40 text-emerald-700 text-[10px] dark:text-emerald-300">
+        <Badge
+          variant="outline"
+          className="gap-1 border-emerald-500/40 text-emerald-700 text-[10px] dark:text-emerald-300"
+        >
           <CheckCircle2 className="h-2.5 w-2.5" /> 已同步有赞
         </Badge>
       );
@@ -362,7 +368,12 @@ function ShopProductsPage() {
               className="h-9 pl-8 text-xs"
             />
           </div>
-          <ToggleGroup type="single" value={view} onValueChange={(v) => v && setView(v as ViewMode)} size="sm">
+          <ToggleGroup
+            type="single"
+            value={view}
+            onValueChange={(v) => v && setView(v as ViewMode)}
+            size="sm"
+          >
             <ToggleGroupItem value="grid" className="h-8 w-8 p-0">
               <LayoutGrid className="h-3.5 w-3.5" />
             </ToggleGroupItem>
@@ -396,13 +407,16 @@ function ShopProductsPage() {
       <Tabs value={tab} onValueChange={(v) => setTab(v as TabKind)}>
         <TabsList>
           <TabsTrigger value="custom">
-            自定义商品 <span className="ml-1.5 text-xs text-muted-foreground">{customRows.length}</span>
+            自定义商品{" "}
+            <span className="ml-1.5 text-xs text-muted-foreground">{customRows.length}</span>
           </TabsTrigger>
           <TabsTrigger value="bundle">
-            组包商品 <span className="ml-1.5 text-xs text-muted-foreground">{bundleRows.length}</span>
+            组包商品{" "}
+            <span className="ml-1.5 text-xs text-muted-foreground">{bundleRows.length}</span>
           </TabsTrigger>
           <TabsTrigger value="standard">
-            标准商品 <span className="ml-1.5 text-xs text-muted-foreground">{standardGroups.length}</span>
+            标准商品{" "}
+            <span className="ml-1.5 text-xs text-muted-foreground">{standardGroups.length}</span>
           </TabsTrigger>
         </TabsList>
 
@@ -423,7 +437,6 @@ function ShopProductsPage() {
                 </Link>
                 维护。
               </p>
-
             </div>
           </div>
           {standardGroups.length === 0 ? (
@@ -438,21 +451,29 @@ function ShopProductsPage() {
               }
             />
           ) : view === "grid" ? (
-
             <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {standardGroups.map((g) => (
-                <StandardProductCard key={g.key} group={g} actions={groupActions(g)} coverOverride={groupCover(g)} />
+                <StandardProductCard
+                  key={g.key}
+                  group={g}
+                  actions={groupActions(g)}
+                  coverOverride={groupCover(g)}
+                />
               ))}
             </div>
           ) : (
             <Card className="overflow-hidden">
               {standardGroups.map((g) => (
-                <StandardProductRow key={g.key} group={g} actions={groupActions(g)} coverOverride={groupCover(g)} />
+                <StandardProductRow
+                  key={g.key}
+                  group={g}
+                  actions={groupActions(g)}
+                  coverOverride={groupCover(g)}
+                />
               ))}
             </Card>
           )}
         </TabsContent>
-
 
         <TabsContent value="custom" className="mt-4">
           {customRows.length === 0 ? (
@@ -538,7 +559,6 @@ function ShopProductsPage() {
         }}
       />
       {/* 标准商品为总部全局目录，门店端不提供新建入口 */}
-
 
       {receive && activeShop && (
         <ReceiveStockDialog
