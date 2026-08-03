@@ -430,18 +430,17 @@ function ShopProductsPage() {
           </div>
           {standardGroups.length === 0 ? (
             <EmptyState
-              icon={Tags}
-              title="该门店还没有标准商品"
-              description="标准商品由仓库统一新建，进入仓库商品中心创建后会自动同步到本店"
+              icon={AlertCircle}
+              title="标准商品加载异常"
+              description="所有 Vintage 门店都自动拥有总部标准商品目录，这里为空说明数据没有加载成功。"
               action={
-                <Link to="/inventory/skus">
-                  <Button size="sm" variant="outline">
-                    去仓库 · 商品中心 <ArrowRight className="ml-1 h-3 w-3" />
-                  </Button>
-                </Link>
+                <Button size="sm" variant="outline" onClick={() => void rowsQ.refetch()}>
+                  <RefreshCw className="mr-1 h-3 w-3" /> 重新加载
+                </Button>
               }
             />
           ) : view === "grid" ? (
+
             <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {standardGroups.map((g) => (
                 <StandardProductCard key={g.key} group={g} actions={groupActions(g)} coverOverride={groupCover(g)} />
