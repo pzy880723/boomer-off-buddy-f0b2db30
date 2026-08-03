@@ -96,7 +96,7 @@ describe("POS 购物车合并键", () => {
     cart = addScannedProduct(cart, standard({ subcategory_code: "porcelain_eu_cup" }));
     cart = addScannedProduct(cart, standard({ subcategory_code: "porcelain_eu_cup" }));
     assert.equal((cart).length, 1);
-    expect(cart[0].quantity, 2);
+    assert.equal(cart[0].quantity, 2);
   });
 
   test("同 sku 不同二级类目必须分行，null 与非 null 也分行", () => {
