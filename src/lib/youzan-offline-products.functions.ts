@@ -3,6 +3,7 @@ import { z } from "zod";
 import { supabaseAdmin as supabase } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { ensureAccessToken, getHqShop } from "./youzan.functions";
+import { getPublicOrigin, resolvePublicSkuImageUrls } from "./sku-media";
 import {
   buildOfflineSkuReleaseInput,
   buildOfflineProductLookupTerms,
@@ -154,14 +155,15 @@ export async function releaseSkuToOfflineShopsCore(args: {
     throw new Error("部分目标门店不存在、已停用或不是分店");
   }
 
-  const rawImages = Array.from(
-    new Set(
-      [sku.image_url, ...(Array.isArray(sku.image_paths) ? sku.image_paths : [])]
-        .map((value) => String(value ?? "").trim())
-        .filter(Boolean),
-    ),
-  ).slice(0, 5);
-  if (rawImages.length === 0) throw new Error("商品缺少图片，无法发布到有赞门店");
+  // inv_skus.image_paths 存的是私有桶路径（sku-listing/xxx.jpg），不是 URL。
+  // 必须先转成 ERP 公开只读代理地址，有赞才抓得到；
+  // 直接把桶路径丢给素材上传接口就是之前 [160400100] file 参数错误的根因。
+  const rawImages = resolvePublicSkuImageUrls(
+    [sku.image_url, ...(Array.isArray(sku.image_paths) ? sku.image_paths : [])],
+    getPublicOrigin(),
+    5,
+  );
+  if (rawImages.length === 0) throw new Error("商品缺少可对外访问的图片，无法发布到有赞门店");
 
   const hq = await getHqShop();
   const accessToken = await ensureAccessToken(hq);

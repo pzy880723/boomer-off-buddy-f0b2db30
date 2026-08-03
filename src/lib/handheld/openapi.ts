@@ -14,6 +14,8 @@ import {
   AuthRefreshReq,
   AuthRefreshRes,
   AttachImagesReq,
+  ContentGenerateReq,
+  ContentGenerateRes,
   AttachImagesRes,
   LabelTemplatesRes,
   LabelTemplateCreateReq,
@@ -750,6 +752,16 @@ X-Session-Token: <操作员 session token>
           "如果已经存在 (category, price_tier, name) 完全相同的 SKU，会复用并 +1；否则新建。`epcs` 可选，传了就一并绑定到这个 SKU。`auto_push_youzan` 默认 false；true 时会把商品发布到所选门店库位绑定的有赞分店，并登记库存同步任务。仓库库位不会自动发布到任意门店。返回的 `label` 字段供 APP 自渲染打印。",
         requestBody: jsonBody(SmartCreateReq),
         responses: { "200": jsonRes("OK", SmartCreateRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/content/generate-from-sku": {
+      post: {
+        tags: ["AI"],
+        summary: "为自定义唯一件商品生成达人文案并挂到发现",
+        description:
+          "读取该 SKU 的识别结果、详情与多图，调用 Lovable AI Gateway 生成 1 篇文章，写入 `editorial_contents` 并建立 `editorial_content_relations`(entity_type=product)。幂等：同一 SKU 只生成一篇，重复调用返回 reused=true。standard / 无限库存商品会被拒绝。",
+        requestBody: jsonBody(ContentGenerateReq),
+        responses: { "200": jsonRes("OK", ContentGenerateRes), ...ERROR_RESPONSES },
       },
     },
     "/api/public/handheld/items/{id}/sync-status": {

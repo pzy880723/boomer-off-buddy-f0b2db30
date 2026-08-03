@@ -1787,3 +1787,33 @@ export const StorefrontOrderDetailRes = z
     }),
   })
   .meta({ id: "StorefrontOrderDetailResponse" });
+
+// ============================================================
+// 达人文案 / 发现内容（仅自定义唯一件商品）
+// ============================================================
+
+export const ContentGenerateReq = z
+  .object({
+    sku_id: uuidSchema.meta({ description: "自定义（唯一件）商品 SKU，standard/unlimited 会被拒绝" }),
+    publish: z
+      .boolean()
+      .default(false)
+      .meta({ description: "true 直接发布到发现；false 落 pending_review 等人工审核" }),
+    client_op_id: ClientOpId.optional(),
+  })
+  .meta({ id: "ContentGenerateReq" });
+
+export const ContentGenerateRes = okEnvelope(
+  z
+    .object({
+      content_id: uuidSchema,
+      slug: z.string(),
+      status: z.enum(["draft", "pending_review", "published"]),
+      title: z.string(),
+      summary: z.string(),
+      cover_url: z.string().nullable(),
+      related_sku_id: uuidSchema,
+      reused: z.boolean().meta({ description: "true 表示该 SKU 已有文案，本次幂等返回" }),
+    })
+    .meta({ id: "ContentGenerateData" }),
+);

@@ -275,6 +275,24 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
           syncStatus = "unlinked";
         }
 
+        // inv_apply_movement atomically publishes eligible custom items. Read
+        // the resulting listing here so the API can report the final state.
+        let storefrontListingId: string | null = null;
+        let storefrontStatus: "skipped" | "published" | "sold" | "failed" = "skipped";
+        const { data: storefrontListing, error: storefrontError } = await supabaseAdmin
+          .from("commerce_listings")
+          .select("id, status")
+          .eq("sku_id", skuId)
+          .eq("location_id", locationId)
+          .maybeSingle();
+        if (storefrontError) {
+          storefrontStatus = "failed";
+          console.error("[handheld smart-create] 读取市集上架结果失败", storefrontError);
+        } else if (storefrontListing) {
+          storefrontListingId = storefrontListing.id;
+          storefrontStatus = storefrontListing.status === "published" ? "published" : "sold";
+        }
+
         const { data: finalSku } = await supabaseAdmin
           .from("inv_skus")
           .select("stock_qty, barcode, grade")
@@ -314,6 +332,8 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
             condition_grade: conditionGrade,
           }),
           youzan_sync_status: syncStatus,
+          storefront_listing_id: storefrontListingId,
+          storefront_status: storefrontStatus,
         };
         await recordOp({
           deviceId: auth.device.id,

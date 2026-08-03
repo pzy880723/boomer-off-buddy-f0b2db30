@@ -6488,18 +6488,30 @@ export type Database = {
         Args: { p_delta: number; p_sku_id: string }
         Returns: undefined
       }
-      inv_apply_movement: {
-        Args: {
-          p_delta: number
-          p_epc?: string
-          p_location_id: string
-          p_note?: string
-          p_ref_id: string
-          p_ref_type: string
-          p_sku_id: string
-        }
-        Returns: number
-      }
+      inv_apply_movement:
+        | {
+            Args: {
+              p_delta: number
+              p_epc: string
+              p_location_id: string
+              p_note: string
+              p_ref_type: string
+              p_sku_id: string
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              p_delta: number
+              p_epc?: string
+              p_location_id: string
+              p_note?: string
+              p_ref_id: string
+              p_ref_type: string
+              p_sku_id: string
+            }
+            Returns: number
+          }
       inv_apply_stock_delta: {
         Args: { p_delta: number; p_sku_id: string }
         Returns: undefined
