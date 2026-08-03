@@ -18,9 +18,8 @@ const ROOT_CATEGORIES = [
 ] as const;
 
 const PRICE_TIERS = [
-  6.9, 9.9, 15.9, 19.9, 29.9, 39.9, 49.9, 59.9, 69, 79, 89, 99, 129, 159,
-  199, 259, 299, 359, 399, 459, 499, 580, 680, 780, 880, 980, 1080, 1180, 1280,
-  1380, 1580,
+  6.9, 9.9, 15.9, 19.9, 29.9, 39.9, 49.9, 59.9, 69, 79, 89, 99, 129, 159, 199, 259, 299, 359, 399,
+  459, 499, 580, 680, 780, 880, 980, 1080, 1180, 1280, 1380, 1580,
 ] as const;
 
 function standardCatalogMigration(): string {
@@ -62,7 +61,10 @@ test("the catalog migration covers every ERP root category and all 31 price tier
   const sql = standardCatalogMigration();
   for (const category of ROOT_CATEGORIES) assert.match(sql, new RegExp(`'${category}'`));
   for (const price of PRICE_TIERS) {
-    assert.match(sql, new RegExp(`(^|[^0-9.])${String(price).replace(".", "\\.")}([^0-9.]|$)`, "m"));
+    assert.match(
+      sql,
+      new RegExp(`(^|[^0-9.])${String(price).replace(".", "\\.")}([^0-9.]|$)`, "m"),
+    );
   }
   assert.match(sql, /array_length\(v_price_tiers,\s*1\)\s*<>\s*31/i);
 });
@@ -85,4 +87,19 @@ test("shop and POS routes expose unlimited standards without a stock row", () =>
   assert.match(posProducts, /is_unlimited_stock/);
   assert.match(posLookup, /is_unlimited_stock/);
   assert.match(createShop, /store_format:\s*"vintage"/);
+});
+
+test("the handheld global-stock matrix preserves unlimited standards for store views", () => {
+  const globalStock = readFileSync("src/routes/api/public/handheld/global-stock.ts", "utf8");
+
+  assert.match(globalStock, /inventory_policy/);
+  assert.match(globalStock, /is_unlimited_stock/);
+  assert.match(globalStock, /isUnlimitedStock\s*&&\s*isDisplay\s*\?\s*"selling"/);
+});
+
+test("standard Youzan products are distributed only to active Vintage branches", () => {
+  const youzanSync = readFileSync("src/lib/youzan-sync.functions.ts", "utf8");
+
+  assert.match(youzanSync, /store_format/);
+  assert.match(youzanSync, /store_format[^\n]+vintage/);
 });

@@ -40,10 +40,7 @@ export const Route = createFileRoute("/api/public/handheld/global-stock")({
         const categoryFilter = (url.searchParams.get("category") || "").trim() || null;
         const stockState = (url.searchParams.get("stock_state") || "all").toLowerCase();
         const statusFilter = (url.searchParams.get("status") || "all").toLowerCase() as
-          | "selling"
-          | "sold_out"
-          | "in_warehouse"
-          | "all";
+          "selling" | "sold_out" | "in_warehouse" | "all";
         const lowThreshold = Math.max(1, Number(url.searchParams.get("low_threshold") || "5") | 0);
         const page = Math.max(1, Number(url.searchParams.get("page") || "1") | 0);
         const pageSize = Math.min(
@@ -61,15 +58,14 @@ export const Route = createFileRoute("/api/public/handheld/global-stock")({
           if (a.kind !== b.kind) return a.kind === "warehouse" ? -1 : 1;
           return a.name.localeCompare(b.name, "zh-Hans-CN");
         });
-        const primaryWarehouseId =
-          locations.find((l) => l.kind === "warehouse")?.id ?? null;
+        const primaryWarehouseId = locations.find((l) => l.kind === "warehouse")?.id ?? null;
         const shopIds = locations.filter((l) => l.kind === "shop").map((l) => l.id);
 
         // ---- SKUs by type ----
         let skuQ = supabaseAdmin
           .from("inv_skus")
           .select(
-            "id, sku_code, barcode, name, category, price_tier, image_url, image_paths, kind, is_custom_price, is_display, stock_qty, created_at, updated_at",
+            "id, sku_code, barcode, name, category, price_tier, image_url, image_paths, kind, is_custom_price, is_display, inventory_policy, stock_qty, created_at, updated_at",
           )
           .order("updated_at", { ascending: false })
           .limit(3000);
@@ -100,6 +96,7 @@ export const Route = createFileRoute("/api/public/handheld/global-stock")({
           kind: string;
           is_custom_price: boolean;
           is_display: boolean;
+          inventory_policy: "tracked" | "unlimited";
           stock_qty: number;
         }>;
 
@@ -109,7 +106,10 @@ export const Route = createFileRoute("/api/public/handheld/global-stock")({
           const { data: st } = await supabaseAdmin
             .from("inv_stocks")
             .select("sku_id, location_id, qty")
-            .in("sku_id", skus.map((s) => s.id))
+            .in(
+              "sku_id",
+              skus.map((s) => s.id),
+            )
             .in("location_id", shopIds);
           shopStocks = (st ?? []) as typeof shopStocks;
         }
@@ -144,6 +144,7 @@ export const Route = createFileRoute("/api/public/handheld/global-stock")({
           total_qty: number;
           stocks: Record<string, number>;
           is_display: boolean;
+          is_unlimited_stock: boolean;
           listing_status: "selling" | "sold_out" | "in_warehouse";
           status_label: string;
         };
@@ -156,7 +157,9 @@ export const Route = createFileRoute("/api/public/handheld/global-stock")({
           }
           const total = Object.values(stocks).reduce((a, b) => a + b, 0);
           const isDisplay = s.is_display !== false;
-          const ls = deriveListingStatus(isDisplay, total);
+          const isUnlimitedStock = s.inventory_policy === "unlimited";
+          const ls =
+            isUnlimitedStock && isDisplay ? "selling" : deriveListingStatus(isDisplay, total);
           return {
             sku_id: s.id,
             name: s.name,
@@ -173,6 +176,7 @@ export const Route = createFileRoute("/api/public/handheld/global-stock")({
             total_qty: total,
             stocks,
             is_display: isDisplay,
+            is_unlimited_stock: isUnlimitedStock,
             listing_status: ls,
             status_label: statusLabel(ls),
           };
@@ -181,7 +185,8 @@ export const Route = createFileRoute("/api/public/handheld/global-stock")({
         // ---- stock_state + listing_status filters ----
         const filtered = items.filter((it) => {
           if (stockState === "out" && it.total_qty !== 0) return false;
-          if (stockState === "low" && !(it.total_qty > 0 && it.total_qty < lowThreshold)) return false;
+          if (stockState === "low" && !(it.total_qty > 0 && it.total_qty < lowThreshold))
+            return false;
           if (statusFilter !== "all" && it.listing_status !== statusFilter) return false;
           return true;
         });
@@ -191,9 +196,8 @@ export const Route = createFileRoute("/api/public/handheld/global-stock")({
           sku_count: filtered.length,
           total_qty: filtered.reduce((a, b) => a + b.total_qty, 0),
           out_of_stock: filtered.filter((it) => it.total_qty === 0).length,
-          low_stock: filtered.filter(
-            (it) => it.total_qty > 0 && it.total_qty < lowThreshold,
-          ).length,
+          low_stock: filtered.filter((it) => it.total_qty > 0 && it.total_qty < lowThreshold)
+            .length,
         };
 
         const total = filtered.length;
