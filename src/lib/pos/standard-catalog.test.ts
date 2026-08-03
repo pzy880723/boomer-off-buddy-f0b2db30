@@ -82,7 +82,7 @@ describe("标准商品目录契约", () => {
     );
     const game = groups.find((group) => group.category_code === "game_device")!;
     assert.equal((groups).length, 13);
-    assert.equal(game.subcategories.map((sub) => sub.code), [
+    assert.deepEqual(game.subcategories.map((sub) => sub.code), [
       "game_handheld",
       "game_cartridge",
     ]);
