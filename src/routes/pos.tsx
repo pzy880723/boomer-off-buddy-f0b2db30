@@ -1,3 +1,4 @@
+import { fromHeldCartSnapshot, toHeldCartSnapshot } from "@/lib/pos/held-cart";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -146,8 +147,10 @@ type HeldCart = {
     price_snapshot: number;
     ownership_snapshot: LookupProduct["sale_ownership"];
     discount_eligible: boolean;
+    category_code: string | null;
+    category_name_snapshot: string | null;
     subcategory_code: string | null;
-    subcategory_name: string | null;
+    subcategory_name_snapshot: string | null;
   }>;
 };
 type PosOrder = {
@@ -578,8 +581,7 @@ function PosPage() {
         items: cart.map((line) => ({
           sku_id: line.sku_id,
           quantity: line.quantity,
-          subcategory_code: line.subcategory_code ?? null,
-          subcategory_name: line.subcategory_name ?? null,
+          ...toHeldCartSnapshot(line),
         })),
         discount_snapshot: discountPreview ? discount : {},
         benefit_snapshot: customerBenefits ?? {},
@@ -639,8 +641,7 @@ function PosPage() {
         {
           ...product,
           quantity: heldItem.quantity ?? 1,
-          subcategory_code: heldItem.subcategory_code ?? null,
-          subcategory_name: heldItem.subcategory_name ?? null,
+          ...fromHeldCartSnapshot(heldItem, product),
         },
       ];
     });

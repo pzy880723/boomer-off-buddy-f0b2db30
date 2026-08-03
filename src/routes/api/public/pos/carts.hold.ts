@@ -15,8 +15,10 @@ const HoldBody = z.object({
       z.object({
         sku_id: z.string().uuid(),
         quantity: z.number().int().min(1).max(999),
+        category_code: z.string().trim().min(1).max(80).nullable().optional(),
+        category_name_snapshot: z.string().trim().min(1).max(120).nullable().optional(),
         subcategory_code: z.string().trim().min(1).max(80).nullable().optional(),
-        subcategory_name: z.string().trim().min(1).max(80).nullable().optional(),
+        subcategory_name_snapshot: z.string().trim().min(1).max(120).nullable().optional(),
       }),
     )
     .min(1)
@@ -99,8 +101,10 @@ export const Route = createFileRoute("/api/public/pos/carts/hold")({
             sku_id: item.sku_id,
             quantity: item.quantity,
             price_snapshot: Number(sku.price_tier) || 0,
+            category_code: item.category_code ?? null,
+            category_name_snapshot: item.category_name_snapshot ?? null,
             subcategory_code: item.subcategory_code ?? null,
-            subcategory_name: item.subcategory_name ?? null,
+            subcategory_name_snapshot: item.subcategory_name_snapshot ?? null,
             ownership_snapshot: sku.sale_ownership,
             discount_eligible: sku.discount_eligible,
           };
