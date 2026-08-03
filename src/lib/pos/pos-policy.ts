@@ -7,6 +7,12 @@ export type PosScannableProduct = {
   unit_price: number;
   available_qty: number;
   is_unlimited_stock?: boolean;
+  /** 一级类目（标准商品必填，扫码商品沿用 SKU 类目） */
+  category_code?: string | null;
+  category_name?: string | null;
+  /** 二级类目：POS 可选分析字段，允许为空 */
+  subcategory_code?: string | null;
+  subcategory_name?: string | null;
 };
 
 export type PosCartLine = PosScannableProduct & {
@@ -33,11 +39,31 @@ export type PosDiscountLine = {
   discount_eligible: boolean;
 };
 
+/**
+ * 购物车合并键：同 sku_id + 同二级类目才合并；
+ * 同 sku_id 但二级类目不同（含 null 对非 null）必须分行。
+ */
+export function posCartLineKey(product: {
+  sku_id: string;
+  subcategory_code?: string | null;
+}): string {
+  return `${product.sku_id}::${product.subcategory_code ?? ""}`;
+}
+
+/** 展示名：未选二级类目为「欧洲瓷器」，已选为「欧洲瓷器 · 散瓷杯碟」 */
+export function posCartLineLabel(line: {
+  name: string;
+  subcategory_name?: string | null;
+}): string {
+  return line.subcategory_name ? `${line.name} · ${line.subcategory_name}` : line.name;
+}
+
 export function addScannedProduct(
   cart: PosCartLine[],
   product: PosScannableProduct,
 ): PosCartLine[] {
-  const existing = cart.find((line) => line.sku_id === product.sku_id);
+  const key = posCartLineKey(product);
+  const existing = cart.find((line) => posCartLineKey(line) === key);
   if (!existing) {
     if (!product.is_unlimited_stock && product.available_qty < 1) {
       throw new Error("product has no available stock");
@@ -45,13 +71,19 @@ export function addScannedProduct(
     return [...cart, { ...product, quantity: 1 }];
   }
   if (product.product_type === "custom") throw new Error("custom product is already in cart");
-  if (!product.is_unlimited_stock && existing.quantity >= product.available_qty) {
-    throw new Error("quantity exceeds available stock");
+  if (!product.is_unlimited_stock) {
+    const sameSkuQty = cart
+      .filter((line) => line.sku_id === product.sku_id)
+      .reduce((sum, line) => sum + line.quantity, 0);
+    if (sameSkuQty >= product.available_qty) {
+      throw new Error("quantity exceeds available stock");
+    }
   }
   return cart.map((line) =>
-    line.sku_id === product.sku_id ? { ...line, quantity: line.quantity + 1 } : line,
+    posCartLineKey(line) === key ? { ...line, quantity: line.quantity + 1 } : line,
   );
 }
+
 
 function cents(value: number): number {
   return Math.round(value * 100);
