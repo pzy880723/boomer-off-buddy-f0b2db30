@@ -19,14 +19,19 @@ const LEGACY_ROOT_CATEGORIES = [
 ] as const;
 
 const CURRENT_ROOT_CATEGORIES = [
-  "porcelain",
+  "porcelain_jp",
+  "porcelain_eu",
   "toy_model",
   "character_ip_goods",
   "audio_media",
   "digital_appliance",
+  "game_device",
+  "home_goods",
+  "stationery_publication",
   "fashion_wearable",
-  "daily_misc",
+  "fashion_jewelry",
   "art_collectible",
+  "daily_misc",
 ] as const;
 
 const PRICE_TIERS = [
@@ -138,4 +143,36 @@ test("standard Youzan products are distributed only to active Vintage branches",
 
   assert.match(youzanSync, /store_format/);
   assert.match(youzanSync, /store_format[^\n]+vintage/);
+});
+
+test("13 个一级类目 × 31 档 = 403 个标准 SKU 的应用层契约", () => {
+  const helpers = readFileSync("src/lib/inventory.helpers.ts", "utf8");
+  assert.equal(CURRENT_ROOT_CATEGORIES.length, 13);
+  assert.equal(PRICE_TIERS.length, 31);
+  assert.equal(CURRENT_ROOT_CATEGORIES.length * PRICE_TIERS.length, 403);
+  // 旧的游戏机叶子类目不得再出现在应用常量中
+  assert.doesNotMatch(helpers, /digital_game_console/);
+});
+
+test("AI 识别提示词覆盖游戏设备四个叶子类目", () => {
+  const prompt = readFileSync("src/server/product-recognition.server.ts", "utf8");
+  for (const code of [
+    "game_handheld",
+    "game_desktop_console",
+    "game_cartridge",
+    "game_accessory",
+  ]) {
+    assert.match(prompt, new RegExp(code));
+  }
+  assert.match(prompt, /禁止再返回 digital_game_console/);
+});
+
+test("POS 标准目录接口与购物车合并键已落地", () => {
+  const api = readFileSync("src/routes/api/public/pos/standard-catalog.ts", "utf8");
+  const policy = readFileSync("src/lib/pos/pos-policy.ts", "utf8");
+  const pos = readFileSync("src/routes/pos.tsx", "utf8");
+  assert.match(api, /location_id/);
+  assert.match(api, /locationInheritsStandardCatalog/);
+  assert.match(policy, /posCartLineKey/);
+  assert.match(pos, /细分类（可选）/);
 });
