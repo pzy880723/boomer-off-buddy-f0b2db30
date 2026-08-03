@@ -112,7 +112,9 @@ export const listShopSkus = createServerFn({ method: "GET" })
       (standardSkus ?? []).forEach((sku) => skuIds.add(sku.id));
     }
 
-    if (skuIds.size === 0) return { rows: [], location_id: loc.id };
+    if (skuIds.size === 0)
+      return { rows: [], location_id: loc.id, store_format: storeFormat };
+
 
     let q = sb
       .from("inv_skus")
