@@ -112,11 +112,29 @@ export const Route = createFileRoute("/api/public/auth/otp/send")({
         if (insErr) return err(`Insert failed: ${insErr.message}`, 500);
 
         // 发送短信
+        const { deliverStoredOtp } = await import("@/server/otp-delivery.server");
         const { sendOtpSms } = await import("@/server/sms.tencent.server");
-        const sendRes = await sendOtpSms(`+86${phone}`, code, 5);
+        const sendRes = await deliverStoredOtp({
+          send: () => sendOtpSms(`+86${phone}`, code, 5),
+          removeStoredOtp: async () => {
+            const { error: cleanupError } = await supabaseAdmin
+              .from("auth_phone_otp" as never)
+              .delete()
+              .eq("phone" as never, phone)
+              .eq("code_hash" as never, code_hash);
+            if (cleanupError) {
+              console.error("[otp.send] failed OTP cleanup", {
+                database_code: cleanupError.code,
+              });
+            }
+          },
+        });
         if (!sendRes.ok) {
+          console.error("[otp.send] SMS delivery failed", {
+            provider_code: sendRes.code ?? "unknown",
+          });
           return err(sendRes.message || "短信发送失败", 502, {
-            code: "sms_send_failed",
+            code: sendRes.code === "sms_not_configured" ? "sms_not_configured" : "sms_send_failed",
             detail: sendRes.code,
           });
         }
