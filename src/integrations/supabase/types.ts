@@ -400,6 +400,7 @@ export type Database = {
           description: string | null
           epc: string | null
           id: string
+          image_paths: Json
           image_urls: Json
           location_id: string
           price: number
@@ -421,6 +422,7 @@ export type Database = {
           description?: string | null
           epc?: string | null
           id?: string
+          image_paths?: Json
           image_urls?: Json
           location_id: string
           price: number
@@ -442,6 +444,7 @@ export type Database = {
           description?: string | null
           epc?: string | null
           id?: string
+          image_paths?: Json
           image_urls?: Json
           location_id?: string
           price?: number
@@ -6590,6 +6593,15 @@ export type Database = {
           search_rank: number
           sku_id: string
         }[]
+      }
+      sync_handheld_custom_listing: {
+        Args: {
+          p_delta: number
+          p_location_id: string
+          p_ref_type: string
+          p_sku_id: string
+        }
+        Returns: undefined
       }
     }
     Enums: {
