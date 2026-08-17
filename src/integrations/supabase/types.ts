@@ -312,6 +312,130 @@ export type Database = {
           },
         ]
       }
+      commerce_consumption_records: {
+        Row: {
+          benefit_snapshot: Json
+          channel: string
+          coupon_discount_fen: number
+          created_at: string
+          customer_id: string
+          discount_amount_fen: number
+          external_order_id: string | null
+          gross_amount_fen: number
+          id: string
+          idempotency_key: string
+          location_id: string | null
+          occurred_at: string
+          order_id: string | null
+          paid_amount_fen: number
+          points_discount_fen: number
+          status: string
+        }
+        Insert: {
+          benefit_snapshot?: Json
+          channel: string
+          coupon_discount_fen?: number
+          created_at?: string
+          customer_id: string
+          discount_amount_fen?: number
+          external_order_id?: string | null
+          gross_amount_fen?: number
+          id?: string
+          idempotency_key: string
+          location_id?: string | null
+          occurred_at?: string
+          order_id?: string | null
+          paid_amount_fen?: number
+          points_discount_fen?: number
+          status?: string
+        }
+        Update: {
+          benefit_snapshot?: Json
+          channel?: string
+          coupon_discount_fen?: number
+          created_at?: string
+          customer_id?: string
+          discount_amount_fen?: number
+          external_order_id?: string | null
+          gross_amount_fen?: number
+          id?: string
+          idempotency_key?: string
+          location_id?: string | null
+          occurred_at?: string
+          order_id?: string | null
+          paid_amount_fen?: number
+          points_discount_fen?: number
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_consumption_records_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_consumption_records_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_consumption_records_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commerce_coupon_definitions: {
+        Row: {
+          amount_fen: number
+          code: string
+          created_at: string
+          eligible_tiers: string[]
+          id: string
+          is_active: boolean
+          issuance_kind: string
+          metadata: Json
+          minimum_spend_fen: number
+          name: string
+          updated_at: string
+          validity_days: number
+        }
+        Insert: {
+          amount_fen: number
+          code: string
+          created_at?: string
+          eligible_tiers?: string[]
+          id?: string
+          is_active?: boolean
+          issuance_kind: string
+          metadata?: Json
+          minimum_spend_fen?: number
+          name: string
+          updated_at?: string
+          validity_days?: number
+        }
+        Update: {
+          amount_fen?: number
+          code?: string
+          created_at?: string
+          eligible_tiers?: string[]
+          id?: string
+          is_active?: boolean
+          issuance_kind?: string
+          metadata?: Json
+          minimum_spend_fen?: number
+          name?: string
+          updated_at?: string
+          validity_days?: number
+        }
+        Relationships: []
+      }
       commerce_customer_identities: {
         Row: {
           created_at: string
@@ -479,6 +603,262 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      commerce_member_code_sessions: {
+        Row: {
+          code_hash: string
+          created_at: string
+          customer_id: string
+          expires_at: string
+          id: string
+          status: string
+          used_at: string | null
+          used_location_id: string | null
+        }
+        Insert: {
+          code_hash: string
+          created_at?: string
+          customer_id: string
+          expires_at: string
+          id?: string
+          status?: string
+          used_at?: string | null
+          used_location_id?: string | null
+        }
+        Update: {
+          code_hash?: string
+          created_at?: string
+          customer_id?: string
+          expires_at?: string
+          id?: string
+          status?: string
+          used_at?: string | null
+          used_location_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_member_code_sessions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_member_code_sessions_used_location_id_fkey"
+            columns: ["used_location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commerce_membership_entitlements: {
+        Row: {
+          auto_renew: boolean
+          created_at: string
+          customer_id: string
+          expires_at: string | null
+          id: string
+          plan_id: string | null
+          policy_version: number
+          source: string
+          source_order_id: string | null
+          starts_at: string
+          status: string
+          tier_code: string
+          updated_at: string
+        }
+        Insert: {
+          auto_renew?: boolean
+          created_at?: string
+          customer_id: string
+          expires_at?: string | null
+          id?: string
+          plan_id?: string | null
+          policy_version: number
+          source?: string
+          source_order_id?: string | null
+          starts_at: string
+          status?: string
+          tier_code: string
+          updated_at?: string
+        }
+        Update: {
+          auto_renew?: boolean
+          created_at?: string
+          customer_id?: string
+          expires_at?: string | null
+          id?: string
+          plan_id?: string | null
+          policy_version?: number
+          source?: string
+          source_order_id?: string | null
+          starts_at?: string
+          status?: string
+          tier_code?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_membership_entitlements_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_membership_entitlements_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_membership_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_membership_entitlements_source_order_id_fkey"
+            columns: ["source_order_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_membership_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commerce_membership_orders: {
+        Row: {
+          agreement_versions: Json
+          amount_fen: number
+          created_at: string
+          currency: string
+          customer_id: string
+          entitlement_applied_at: string | null
+          id: string
+          idempotency_key: string
+          paid_at: string | null
+          plan_id: string
+          platform: string
+          policy_snapshot: Json
+          provider_payload: Json
+          provider_transaction_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          agreement_versions?: Json
+          amount_fen: number
+          created_at?: string
+          currency?: string
+          customer_id: string
+          entitlement_applied_at?: string | null
+          id?: string
+          idempotency_key: string
+          paid_at?: string | null
+          plan_id: string
+          platform: string
+          policy_snapshot?: Json
+          provider_payload?: Json
+          provider_transaction_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          agreement_versions?: Json
+          amount_fen?: number
+          created_at?: string
+          currency?: string
+          customer_id?: string
+          entitlement_applied_at?: string | null
+          id?: string
+          idempotency_key?: string
+          paid_at?: string | null
+          plan_id?: string
+          platform?: string
+          policy_snapshot?: Json
+          provider_payload?: Json
+          provider_transaction_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_membership_orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_membership_orders_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_membership_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commerce_membership_plans: {
+        Row: {
+          amount_fen: number
+          benefit_rules: Json
+          billing_period: string
+          code: string
+          created_at: string
+          daily_recognition_limit: number
+          display_name: string
+          ends_at: string | null
+          first_period_amount_fen: number | null
+          id: string
+          is_active: boolean
+          official_discount_rate: number
+          points_multiplier: number
+          points_redemption_cap_rate: number
+          policy_version: number
+          renewal_amount_fen: number | null
+          starts_at: string
+          tier_code: string
+          updated_at: string
+        }
+        Insert: {
+          amount_fen?: number
+          benefit_rules?: Json
+          billing_period: string
+          code: string
+          created_at?: string
+          daily_recognition_limit: number
+          display_name: string
+          ends_at?: string | null
+          first_period_amount_fen?: number | null
+          id?: string
+          is_active?: boolean
+          official_discount_rate?: number
+          points_multiplier?: number
+          points_redemption_cap_rate?: number
+          policy_version?: number
+          renewal_amount_fen?: number | null
+          starts_at?: string
+          tier_code: string
+          updated_at?: string
+        }
+        Update: {
+          amount_fen?: number
+          benefit_rules?: Json
+          billing_period?: string
+          code?: string
+          created_at?: string
+          daily_recognition_limit?: number
+          display_name?: string
+          ends_at?: string | null
+          first_period_amount_fen?: number | null
+          id?: string
+          is_active?: boolean
+          official_discount_rate?: number
+          points_multiplier?: number
+          points_redemption_cap_rate?: number
+          policy_version?: number
+          renewal_amount_fen?: number | null
+          starts_at?: string
+          tier_code?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       commerce_order_items: {
         Row: {
@@ -950,6 +1330,145 @@ export type Database = {
             columns: ["payment_profile_id"]
             isOneToOne: false
             referencedRelation: "store_payment_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commerce_points_ledger: {
+        Row: {
+          balance_after: number
+          created_at: string
+          customer_id: string
+          delta: number
+          description: string | null
+          id: string
+          idempotency_key: string
+          metadata: Json
+          source_id: string | null
+          source_type: string
+        }
+        Insert: {
+          balance_after: number
+          created_at?: string
+          customer_id: string
+          delta: number
+          description?: string | null
+          id?: string
+          idempotency_key: string
+          metadata?: Json
+          source_id?: string | null
+          source_type: string
+        }
+        Update: {
+          balance_after?: number
+          created_at?: string
+          customer_id?: string
+          delta?: number
+          description?: string | null
+          id?: string
+          idempotency_key?: string
+          metadata?: Json
+          source_id?: string | null
+          source_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_points_ledger_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commerce_recognition_usage_daily: {
+        Row: {
+          allowance: number
+          customer_id: string
+          policy_version: number
+          tier_code: string
+          updated_at: string
+          usage_date: string
+          used: number
+        }
+        Insert: {
+          allowance: number
+          customer_id: string
+          policy_version: number
+          tier_code: string
+          updated_at?: string
+          usage_date: string
+          used?: number
+        }
+        Update: {
+          allowance?: number
+          customer_id?: string
+          policy_version?: number
+          tier_code?: string
+          updated_at?: string
+          usage_date?: string
+          used?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_recognition_usage_daily_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commerce_recognition_usage_requests: {
+        Row: {
+          authorization_token_hash: string | null
+          consumed_at: string | null
+          customer_id: string
+          entitlement_id: string | null
+          id: string
+          released_at: string | null
+          request_id: string
+          reserved_at: string
+          status: string
+          usage_date: string
+        }
+        Insert: {
+          authorization_token_hash?: string | null
+          consumed_at?: string | null
+          customer_id: string
+          entitlement_id?: string | null
+          id?: string
+          released_at?: string | null
+          request_id: string
+          reserved_at?: string
+          status?: string
+          usage_date: string
+        }
+        Update: {
+          authorization_token_hash?: string | null
+          consumed_at?: string | null
+          customer_id?: string
+          entitlement_id?: string | null
+          id?: string
+          released_at?: string | null
+          request_id?: string
+          reserved_at?: string
+          status?: string
+          usage_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_recognition_usage_requests_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_recognition_usage_requests_entitlement_id_fkey"
+            columns: ["entitlement_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_membership_entitlements"
             referencedColumns: ["id"]
           },
         ]
@@ -4016,12 +4535,17 @@ export type Database = {
           code: string
           created_at: string
           customer_id: string
+          definition_id: string | null
           discount_type: string
           expires_at: string | null
+          external_id: string | null
+          external_provider: string | null
           id: string
+          idempotency_key: string | null
           metadata: Json
           min_spend: number
           name: string
+          source: string
           starts_at: string | null
           status: string
           updated_at: string
@@ -4031,12 +4555,17 @@ export type Database = {
           code: string
           created_at?: string
           customer_id: string
+          definition_id?: string | null
           discount_type: string
           expires_at?: string | null
+          external_id?: string | null
+          external_provider?: string | null
           id?: string
+          idempotency_key?: string | null
           metadata?: Json
           min_spend?: number
           name: string
+          source?: string
           starts_at?: string | null
           status?: string
           updated_at?: string
@@ -4046,12 +4575,17 @@ export type Database = {
           code?: string
           created_at?: string
           customer_id?: string
+          definition_id?: string | null
           discount_type?: string
           expires_at?: string | null
+          external_id?: string | null
+          external_provider?: string | null
           id?: string
+          idempotency_key?: string | null
           metadata?: Json
           min_spend?: number
           name?: string
+          source?: string
           starts_at?: string | null
           status?: string
           updated_at?: string
@@ -4065,12 +4599,22 @@ export type Database = {
             referencedRelation: "commerce_customers"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "pos_customer_coupons_definition_id_fkey"
+            columns: ["definition_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_coupon_definitions"
+            referencedColumns: ["id"]
+          },
         ]
       }
       pos_customer_wallets: {
         Row: {
           customer_id: string
+          entitlement_expires_at: string | null
           member_level: string
+          membership_plan_code: string
+          membership_policy_version: number
           metadata: Json
           points: number
           store_credit: number
@@ -4078,7 +4622,10 @@ export type Database = {
         }
         Insert: {
           customer_id: string
+          entitlement_expires_at?: string | null
           member_level?: string
+          membership_plan_code?: string
+          membership_policy_version?: number
           metadata?: Json
           points?: number
           store_credit?: number
@@ -4086,7 +4633,10 @@ export type Database = {
         }
         Update: {
           customer_id?: string
+          entitlement_expires_at?: string | null
           member_level?: string
+          membership_plan_code?: string
+          membership_policy_version?: number
           metadata?: Json
           points?: number
           store_credit?: number
@@ -6306,6 +6856,14 @@ export type Database = {
         }
       }
       commerce_release_expired_reservations: { Args: never; Returns: number }
+      commerce_reserve_recognition_quota: {
+        Args: {
+          p_customer_id: string
+          p_request_id: string
+          p_usage_date?: string
+        }
+        Returns: Json
+      }
       commerce_transition_after_sale: {
         Args: {
           p_after_sale_id: string
