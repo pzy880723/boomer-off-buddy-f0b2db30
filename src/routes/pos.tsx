@@ -1241,240 +1241,234 @@ function PosPage() {
           </div>
         </section>
 
-        <aside className="flex min-h-0 flex-col rounded-2xl border border-[#e4e7ec] bg-white p-5 shadow-[0_2px_8px_rgba(15,23,42,0.04)]">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold">本单结算</p>
-              <p className="mt-1 text-xs text-[#667085]">库存将在收款成功后扣减</p>
-            </div>
-            <Badge variant="outline" className="rounded-full border-[#d0d5dd] text-[#475467]">
-              {itemCount} 件商品
+        <aside
+          data-pos-checkout-panel
+          className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-2xl border border-[#e4e7ec] bg-white shadow-[0_2px_8px_rgba(15,23,42,0.04)]"
+        >
+          {/* 1. header */}
+          <div className="flex items-center gap-2 border-b border-[#eaecf0] px-4 py-3">
+            <ShoppingBag className="h-4 w-4 shrink-0 text-[#e8343a]" />
+            <p className="text-sm font-semibold">本单结算</p>
+            <Badge
+              variant="outline"
+              className="ml-1 rounded-full border-[#d0d5dd] px-2 py-0 text-[11px] text-[#475467]"
+            >
+              {itemCount} 件
             </Badge>
+            {cart.length > 0 && (
+              <button
+                type="button"
+                className="ml-auto text-xs text-[#667085] hover:text-[#e8343a]"
+                onClick={() => {
+                  setCart([]);
+                  setProductMeta({});
+                  setDiscountPreview(null);
+                }}
+              >
+                清空
+              </button>
+            )}
           </div>
 
-          <div className="mt-4 flex min-h-0 max-h-[36vh] flex-col overflow-hidden rounded-xl bg-[#f9fafb]">
-            <div className="flex items-center border-b border-[#eaecf0] px-3 py-2.5">
-              <ShoppingBag className="mr-2 h-4 w-4 text-[#0a315d]" />
-              <span className="text-sm font-semibold">当前购物车</span>
-              {cart.length > 0 && (
-                <button
-                  type="button"
-                  className="ml-auto text-xs text-[#667085] hover:text-[#e8343a]"
-                  onClick={() => {
-                    setCart([]);
-                    setProductMeta({});
-                    setDiscountPreview(null);
-                  }}
-                >
-                  清空
-                </button>
-              )}
-            </div>
+          {/* 2. 弹性购物车：右栏唯一纵向滚动区 */}
+          <div data-pos-cart-scroll className="min-h-0 overflow-y-auto bg-[#f9fafb] p-2">
             {cart.length === 0 ? (
-              <div className="flex min-h-28 flex-col items-center justify-center p-4 text-center">
+              <div className="flex h-full min-h-32 flex-col items-center justify-center gap-3 p-4 text-center">
                 <ScanLine className="h-6 w-6 text-[#98a2b3]" />
-                <p className="mt-2 text-sm font-medium text-[#475467]">等待扫码或选择商品</p>
+                <p className="text-sm font-medium text-[#475467]">等待扫码或选择商品</p>
+                {saleResult && (
+                  <div className="flex w-full max-w-[280px] items-center gap-2 rounded-xl border border-[#abefc6] bg-[#ecfdf3] px-3 py-2 text-left">
+                    <Check className="h-4 w-4 shrink-0 text-[#067647]" />
+                    <span className="flex-1 truncate text-xs font-semibold text-[#067647]">
+                      上一单已完成
+                    </span>
+                    <button
+                      type="button"
+                      className="inline-flex shrink-0 items-center text-xs font-semibold text-[#067647] underline underline-offset-4"
+                      onClick={() => {
+                        const orderId = String(saleResult.order_id ?? "");
+                        if (orderId) void loadReceipt(orderId);
+                      }}
+                    >
+                      <Printer className="mr-1 h-3.5 w-3.5" />
+                      打印小票
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
-              <div className="min-h-0 overflow-y-auto p-2">
-                {cart.map((line) => {
-                  const meta = productMeta[line.sku_id];
-                  const lineKey = posCartLineKey(line);
-                  return (
-                    <div
-                      key={lineKey}
-                      className="mb-2 rounded-xl bg-white p-3 shadow-[0_1px_2px_rgba(15,23,42,0.05)] last:mb-0"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#f2f4f7]">
-                          {meta?.image_url ? (
-                            <img
-                              src={meta.image_url}
-                              alt=""
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <PackageOpen className="h-5 w-5 text-[#98a2b3]" />
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold">
-                            {posCartLineLabel(line)}
-                          </p>
-                          <p className="mt-1 truncate font-mono text-[11px] text-[#667085]">
-                            {meta?.barcode || meta?.sku_code || line.sku_id}
-                          </p>
-                        </div>
-                        <p className="shrink-0 font-bold tabular-nums text-[#e8343a]">
-                          {money(line.unit_price * line.quantity)}
-                        </p>
-                      </div>
-                      <div className="mt-3 flex items-center justify-between">
-                        <Badge variant="secondary" className="rounded-md text-[10px] font-normal">
+              cart.map((line) => {
+                const meta = productMeta[line.sku_id];
+                const lineKey = posCartLineKey(line);
+                return (
+                  <div
+                    key={lineKey}
+                    className="mb-2 flex min-h-[72px] items-center gap-2.5 rounded-xl bg-white p-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.05)] last:mb-0"
+                  >
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#f2f4f7]">
+                      {meta?.image_url ? (
+                        <img src={meta.image_url} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <PackageOpen className="h-5 w-5 text-[#98a2b3]" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold leading-tight">
+                        {posCartLineLabel(line)}
+                      </p>
+                      <p className="mt-0.5 flex items-center gap-1.5 truncate text-[11px] text-[#667085]">
+                        <span className="shrink-0 rounded bg-[#f2f4f7] px-1 py-px text-[10px] text-[#475467]">
                           {line.product_type === "custom"
                             ? "孤品"
                             : line.product_type === "bundle"
                               ? "组包"
                               : "标准"}
-                        </Badge>
-                        <div className="flex items-center">
-                          <button
-                            type="button"
-                            className="flex h-8 w-8 items-center justify-center rounded-l-lg border border-[#d0d5dd]"
-                            onClick={() => updateQuantity(lineKey, line.quantity - 1)}
-                          >
-                            <Minus className="h-3.5 w-3.5" />
-                          </button>
-                          <span className="flex h-8 w-10 items-center justify-center border-y border-[#d0d5dd] bg-white text-xs font-semibold">
-                            {line.quantity}
-                          </span>
-                          <button
-                            type="button"
-                            className="flex h-8 w-8 items-center justify-center rounded-r-lg border border-[#d0d5dd] disabled:opacity-35"
-                            disabled={
-                              line.product_type === "custom" ||
-                              (!line.is_unlimited_stock && line.quantity >= line.available_qty)
-                            }
-                            onClick={() => updateQuantity(lineKey, line.quantity + 1)}
-                          >
-                            <Plus className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            className="ml-2 flex h-8 w-8 items-center justify-center rounded-lg text-[#98a2b3] hover:bg-[#fff1f2] hover:text-[#e8343a]"
-                            onClick={() => updateQuantity(lineKey, 0)}
-                            aria-label={`删除 ${posCartLineLabel(line)}`}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
+                        </span>
+                        <span className="truncate font-mono">
+                          {meta?.barcode || meta?.sku_code || line.sku_id}
+                        </span>
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <p className="font-bold leading-none tabular-nums text-[#e8343a]">
+                        {money(line.unit_price * line.quantity)}
+                      </p>
+                      <div className="flex items-center">
+                        <button
+                          type="button"
+                          className="flex h-7 w-7 items-center justify-center rounded-l-lg border border-[#d0d5dd]"
+                          onClick={() => updateQuantity(lineKey, line.quantity - 1)}
+                        >
+                          <Minus className="h-3 w-3" />
+                        </button>
+                        <span className="flex h-7 w-8 items-center justify-center border-y border-[#d0d5dd] bg-white text-xs font-semibold tabular-nums">
+                          {line.quantity}
+                        </span>
+                        <button
+                          type="button"
+                          className="flex h-7 w-7 items-center justify-center rounded-r-lg border border-[#d0d5dd] disabled:opacity-35"
+                          disabled={
+                            line.product_type === "custom" ||
+                            (!line.is_unlimited_stock && line.quantity >= line.available_qty)
+                          }
+                          onClick={() => updateQuantity(lineKey, line.quantity + 1)}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </button>
+                        <button
+                          type="button"
+                          className="ml-1.5 flex h-7 w-7 items-center justify-center rounded-lg text-[#98a2b3] hover:bg-[#fff1f2] hover:text-[#e8343a]"
+                          onClick={() => updateQuantity(lineKey, 0)}
+                          aria-label={`删除 ${posCartLineLabel(line)}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
+                  </div>
+                );
+              })
             )}
           </div>
 
-          <button
-            type="button"
-            className="mt-5 flex w-full items-center gap-3 rounded-xl bg-[#eef4fb] p-4 text-left transition hover:bg-[#e5eef9]"
-            onClick={() => setMemberDialog(true)}
+          {/* 3. 固定紧凑结算底栏 */}
+          <div
+            data-pos-settlement-footer
+            className="space-y-2 border-t border-[#eaecf0] bg-white p-3"
           >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-[#0a315d]">
-              <UserRoundSearch className="h-5 w-5" />
-            </div>
-            {selectedCustomer ? (
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-[#0a315d]">
-                  {selectedCustomer.nickname || "BOOMER 会员"}
-                </p>
-                <p className="mt-0.5 text-xs text-[#475467]">
-                  {selectedCustomer.wallet?.member_level ?? "普通会员"} ·{" "}
-                  {selectedCustomer.wallet?.points ?? 0} 积分
-                </p>
-              </div>
-            ) : (
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-[#0a315d]">识别会员</p>
-                <p className="mt-0.5 text-xs text-[#667085]">扫码会员码或输入手机号</p>
-              </div>
-            )}
-            <ChevronDown className="h-4 w-4 -rotate-90 text-[#667085]" />
-          </button>
-
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <Button
-              variant="outline"
-              className="h-11 rounded-xl border-[#d0d5dd]"
-              disabled={cart.length === 0}
-              onClick={() => setDiscountDialog(true)}
+            <button
+              type="button"
+              className="flex h-12 w-full items-center gap-2.5 rounded-xl bg-[#fff1f2] px-3 text-left transition hover:bg-[#ffe4e6]"
+              onClick={() => setMemberDialog(true)}
             >
-              <TicketPercent className="mr-2 h-4 w-4 text-[#e8343a]" />
-              整单优惠
-            </Button>
-            <Button
-              variant="outline"
-              className="h-11 rounded-xl border-[#d0d5dd]"
-              onClick={() => void loadHeldCarts()}
-            >
-              <History className="mr-2 h-4 w-4 text-[#0a315d]" />
-              取单
-            </Button>
-          </div>
-
-          <div className="mt-6 space-y-4 text-sm">
-            <div className="flex justify-between text-[#667085]">
-              <span>商品小计</span>
-              <span className="tabular-nums text-[#344054]">{money(subtotal)}</span>
-            </div>
-            <div className="flex justify-between text-[#667085]">
-              <span>优惠</span>
-              <span className="tabular-nums font-medium text-[#e8343a]">
-                {discountTotal > 0 ? `-${money(discountTotal)}` : money(0)}
-              </span>
-            </div>
-            {discountPreview?.excluded_total ? (
-              <div className="flex justify-between text-xs text-[#98a2b3]">
-                <span>寄售/特殊商品不参与优惠</span>
-                <span>{money(discountPreview.excluded_total)}</span>
-              </div>
-            ) : null}
-          </div>
-          <Separator className="my-5" />
-          <div className="flex items-end justify-between">
-            <span className="text-sm font-medium text-[#475467]">应收金额</span>
-            <span className="text-4xl font-black tracking-[-0.04em] tabular-nums text-[#101828]">
-              {money(total)}
-            </span>
-          </div>
-
-          <div className="mt-auto space-y-3 pt-8">
-            {saleResult && (
-              <div className="rounded-xl border border-[#abefc6] bg-[#ecfdf3] p-4">
-                <div className="flex items-center gap-2 font-semibold text-[#067647]">
-                  <Check className="h-4 w-4" />
-                  上一单已完成
+              <UserRoundSearch className="h-4 w-4 shrink-0 text-[#e8343a]" />
+              {selectedCustomer ? (
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold leading-tight text-[#9f1239]">
+                    {selectedCustomer.nickname || "BOOMER 会员"}
+                  </p>
+                  <p className="truncate text-[11px] leading-tight text-[#b42318]">
+                    {selectedCustomer.wallet?.member_level ?? "普通会员"} ·{" "}
+                    {selectedCustomer.wallet?.points ?? 0} 积分
+                  </p>
                 </div>
-                <p className="mt-1 text-xs text-[#047857]">
-                  订单、支付、库存和收银班次流水已同步。
-                </p>
-                <button
-                  type="button"
-                  className="mt-3 inline-flex items-center text-xs font-semibold text-[#067647] underline underline-offset-4"
-                  onClick={() => {
-                    const orderId = String(saleResult.order_id ?? "");
-                    if (orderId) void loadReceipt(orderId);
-                  }}
-                >
-                  <Printer className="mr-1.5 h-3.5 w-3.5" />
-                  打印小票
-                </button>
-              </div>
-            )}
-            <div className="grid grid-cols-2 gap-2">
+              ) : (
+                <span className="flex-1 text-sm font-semibold text-[#9f1239]">
+                  识别会员
+                  <span className="ml-2 text-[11px] font-normal text-[#b42318]">
+                    扫码会员码或输入手机号
+                  </span>
+                </span>
+              )}
+              <ChevronDown className="h-4 w-4 shrink-0 -rotate-90 text-[#b42318]" />
+            </button>
+
+            <div className="grid grid-cols-4 gap-1.5">
               <Button
                 variant="outline"
-                className="h-12 rounded-xl border-[#d0d5dd]"
+                className="h-10 rounded-lg border-[#d0d5dd] px-1 text-xs"
+                disabled={cart.length === 0}
+                onClick={() => setDiscountDialog(true)}
+              >
+                <TicketPercent className="mr-1 h-3.5 w-3.5 text-[#e8343a]" />
+                优惠
+              </Button>
+              <Button
+                variant="outline"
+                className="h-10 rounded-lg border-[#d0d5dd] px-1 text-xs"
+                onClick={() => void loadHeldCarts()}
+              >
+                <History className="mr-1 h-3.5 w-3.5 text-[#0a315d]" />
+                取单
+              </Button>
+              <Button
+                variant="outline"
+                className="h-10 rounded-lg border-[#d0d5dd] px-1 text-xs"
                 disabled={!activeShift || cart.length === 0}
                 onClick={() => void holdCart()}
               >
-                <PauseCircle className="mr-2 h-4 w-4" />
+                <PauseCircle className="mr-1 h-3.5 w-3.5" />
                 挂单
               </Button>
               <Button
                 variant="outline"
-                className="h-12 rounded-xl border-[#d0d5dd]"
+                className="h-10 rounded-lg border-[#d0d5dd] px-1 text-xs"
                 disabled={!activeShift}
                 onClick={() => {
                   setOrdersDialog(true);
                   void searchOrders();
                 }}
               >
-                <RotateCcw className="mr-2 h-4 w-4" />
-                订单退换
+                <RotateCcw className="mr-1 h-3.5 w-3.5" />
+                退换
               </Button>
             </div>
+
+            <div className="flex items-end justify-between gap-3 rounded-xl bg-[#fff5f5] px-3 py-2">
+              <div className="min-w-0 space-y-0.5 text-[11px] leading-tight text-[#667085]">
+                <p>
+                  小计 <span className="tabular-nums text-[#344054]">{money(subtotal)}</span>
+                </p>
+                <p>
+                  优惠{" "}
+                  <span className="font-medium tabular-nums text-[#e8343a]">
+                    {discountTotal > 0 ? `-${money(discountTotal)}` : money(0)}
+                  </span>
+                </p>
+                {discountPreview?.excluded_total ? (
+                  <p className="text-[#98a2b3]">
+                    寄售/特殊不参与 {money(discountPreview.excluded_total)}
+                  </p>
+                ) : null}
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="text-[11px] leading-tight text-[#b42318]">应收</p>
+                <p className="text-3xl font-black leading-none tracking-[-0.04em] tabular-nums text-[#e8343a]">
+                  {money(total)}
+                </p>
+              </div>
+            </div>
+
             <Button
               className="h-14 w-full rounded-xl bg-[#e8343a] text-base font-semibold hover:bg-[#c92930]"
               disabled={!activeShift || cart.length === 0}
@@ -1485,6 +1479,7 @@ function PosPage() {
             </Button>
           </div>
         </aside>
+
       </main>
 
       <Dialog open={cashDialog} onOpenChange={setCashDialog}>
