@@ -1030,7 +1030,7 @@ function PosPage() {
       </header>
 
       <main className="grid min-h-[calc(100vh-64px)] grid-cols-1 gap-4 p-3 sm:p-4 lg:h-[calc(100vh-64px)] lg:grid-cols-[minmax(0,1fr)_clamp(420px,30vw,500px)] lg:overflow-hidden">
-        <section className="flex min-w-0 flex-col gap-4">
+        <section className="flex min-h-0 min-w-0 flex-col gap-4 lg:overflow-hidden">
           <div className="flex flex-1 flex-col rounded-2xl border border-[#e4e7ec] bg-white p-4 shadow-[0_2px_8px_rgba(15,23,42,0.04)]">
             <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
               <div className="relative flex-1">
