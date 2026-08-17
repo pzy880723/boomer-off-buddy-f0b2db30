@@ -26,6 +26,26 @@ describe("POS UI contract", () => {
     assert.doesNotMatch(source, /挂单功能即将接入/);
   });
 
+  test("keeps the cashier checkout panel in a three-row layout with a single scroll area", () => {
+    const source = readFileSync(new URL("pos.tsx", routesRoot), "utf8");
+    // 右栏三个稳定钩子
+    assert.match(source, /data-pos-checkout-panel/);
+    assert.match(source, /data-pos-cart-scroll/);
+    assert.match(source, /data-pos-settlement-footer/);
+    // header / 弹性购物车 / 固定结算底栏
+    assert.match(source, /grid-rows-\[auto_minmax\(0,1fr\)_auto\]/);
+    // 桌面右栏宽度
+    assert.match(source, /clamp\(420px,30vw,500px\)/);
+    // 优惠 / 取单 / 挂单 / 退换 同一行
+    assert.match(source, /grid-cols-4/);
+    // 购物车不再限制 36vh，滚动交给右栏唯一滚动区
+    assert.doesNotMatch(source, /max-h-\[36vh\]/);
+    // 业务逻辑不得被布局改动带走
+    assert.match(source, /posCartLineKey/);
+    assert.match(source, /posCartLineLabel/);
+    assert.match(source, /loadReceipt/);
+  });
+
   test("registers POS as a full-screen navigation destination", () => {
     const rootSource = readFileSync(new URL("__root.tsx", routesRoot), "utf8");
     const sidebarSource = readFileSync(
