@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import logo from "@/assets/logo-boomeroff.png";
 import { useAuthSession } from "@/hooks/use-auth-session";
 import {
   addScannedProduct,
@@ -54,7 +55,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import type { StandardCatalogGroup } from "@/lib/pos/standard-catalog";
 
 export const Route = createFileRoute("/pos")({
@@ -986,8 +986,8 @@ function PosPage() {
         >
           <ArrowLeft className="h-5 w-5" />
         </Link>
-        <div className="flex items-baseline gap-2 sm:gap-3">
-          <span className="text-xl font-black tracking-[-0.04em] text-[#0a315d]">BOOMER ERP</span>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <img src={logo} alt="BOOMER OFF" className="h-8 w-auto" />
           <span className="hidden text-sm font-medium text-[#667085] sm:inline">门店收银</span>
         </div>
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2 sm:gap-3">
@@ -1029,8 +1029,8 @@ function PosPage() {
         </div>
       </header>
 
-      <main className="grid min-h-[calc(100vh-64px)] grid-cols-1 gap-4 p-3 sm:p-4 lg:h-[calc(100vh-64px)] lg:grid-cols-[minmax(0,1fr)_clamp(420px,30vw,500px)] lg:overflow-hidden">
-        <section className="flex min-h-0 min-w-0 flex-col gap-4 lg:overflow-hidden">
+      <main className="grid min-h-[calc(100vh-64px)] grid-cols-1 gap-3 p-3 sm:p-4 lg:h-[calc(100vh-64px)] lg:grid-cols-[minmax(0,1fr)_clamp(420px,30vw,500px)] lg:overflow-hidden">
+        <section className="flex min-h-0 min-w-0 flex-col gap-3">
           <div className="flex flex-1 flex-col rounded-2xl border border-[#e4e7ec] bg-white p-4 shadow-[0_2px_8px_rgba(15,23,42,0.04)]">
             <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
               <div className="relative flex-1">
@@ -1245,17 +1245,15 @@ function PosPage() {
 
         <aside
           data-pos-checkout-panel
-          className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-2xl border border-[#e4e7ec] bg-white shadow-[0_2px_8px_rgba(15,23,42,0.04)]"
+          className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-2xl border border-[#e4e7ec] bg-white p-4 shadow-[0_2px_8px_rgba(15,23,42,0.04)]"
         >
-          {/* 1. header */}
-          <div className="flex items-center gap-2 border-b border-[#eaecf0] px-4 py-3">
-            <ShoppingBag className="h-4 w-4 shrink-0 text-[#e8343a]" />
-            <p className="text-sm font-semibold">本单结算</p>
-            <Badge
-              variant="outline"
-              className="ml-1 rounded-full border-[#d0d5dd] px-2 py-0 text-[11px] text-[#475467]"
-            >
-              {itemCount} 件
+          <div className="flex items-center justify-between pb-3">
+            <div>
+              <p className="text-sm font-semibold">本单结算</p>
+              <p className="mt-1 text-xs text-[#667085]">库存将在收款成功后扣减</p>
+            </div>
+            <Badge variant="outline" className="rounded-full border-[#d0d5dd] text-[#475467]">
+              {itemCount} 件商品
             </Badge>
             {cart.length > 0 && (
               <button
@@ -1272,10 +1270,45 @@ function PosPage() {
             )}
           </div>
 
-          {/* 2. 弹性购物车：右栏唯一纵向滚动区 */}
-          <div data-pos-cart-scroll className="min-h-0 overflow-y-auto bg-[#f9fafb] p-2">
+          <div
+            data-pos-cart-scroll
+            className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-[#eaecf0] bg-[#f9fafb]"
+          >
+            <div className="flex h-10 shrink-0 items-center border-b border-[#eaecf0] px-3">
+              <ShoppingBag className="mr-2 h-4 w-4 text-[#e60012]" />
+              <span className="text-sm font-semibold">当前购物车</span>
+              {cart.length > 0 && (
+                <button
+                  type="button"
+                  className="ml-auto text-xs text-[#667085] hover:text-[#e8343a]"
+                  onClick={() => {
+                    setCart([]);
+                    setProductMeta({});
+                    setDiscountPreview(null);
+                  }}
+                >
+                  清空
+                </button>
+              )}
+            </div>
             {cart.length === 0 ? (
-              <div className="flex h-full min-h-32 flex-col items-center justify-center gap-3 p-4 text-center">
+              <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-4 text-center">
+                {saleResult ? (
+                  <div className="mb-4 flex items-center gap-2 rounded-full bg-[#ecfdf3] px-3 py-1.5 text-xs font-semibold text-[#067647]">
+                    <Check className="h-3.5 w-3.5" />
+                    <span>上一单已完成</span>
+                    <button
+                      type="button"
+                      className="underline underline-offset-2"
+                      onClick={() => {
+                        const orderId = String(saleResult.order_id ?? "");
+                        if (orderId) void loadReceipt(orderId);
+                      }}
+                    >
+                      打印小票
+                    </button>
+                  </div>
+                ) : null}
                 <ScanLine className="h-6 w-6 text-[#98a2b3]" />
                 <p className="text-sm font-medium text-[#475467]">等待扫码或选择商品</p>
                 {saleResult && (
@@ -1299,116 +1332,113 @@ function PosPage() {
                 )}
               </div>
             ) : (
-              cart.map((line) => {
-                const meta = productMeta[line.sku_id];
-                const lineKey = posCartLineKey(line);
-                return (
-                  <div
-                    key={lineKey}
-                    className="mb-2 flex min-h-[72px] items-center gap-2.5 rounded-xl bg-white p-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.05)] last:mb-0"
-                  >
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#f2f4f7]">
-                      {meta?.image_url ? (
-                        <img src={meta.image_url} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        <PackageOpen className="h-5 w-5 text-[#98a2b3]" />
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold leading-tight">
-                        {posCartLineLabel(line)}
-                      </p>
-                      <p className="mt-0.5 flex items-center gap-1.5 truncate text-[11px] text-[#667085]">
-                        <span className="shrink-0 rounded bg-[#f2f4f7] px-1 py-px text-[10px] text-[#475467]">
+              <div className="min-h-0 flex-1 overflow-y-auto p-2">
+                {cart.map((line) => {
+                  const meta = productMeta[line.sku_id];
+                  const lineKey = posCartLineKey(line);
+                  return (
+                    <div
+                      key={lineKey}
+                      className="mb-1.5 rounded-lg border border-[#eaecf0] bg-white px-3 py-2.5 last:mb-0"
+                    >
+                      <div className="grid grid-cols-[44px_minmax(0,1fr)_auto] items-start gap-2.5">
+                        <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-md bg-[#f2f4f7]">
+                          {meta?.image_url ? (
+                            <img
+                              src={meta.image_url}
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <PackageOpen className="h-4 w-4 text-[#98a2b3]" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold">{posCartLineLabel(line)}</p>
+                          <p className="mt-0.5 truncate font-mono text-[10px] text-[#667085]">
+                            {meta?.barcode || meta?.sku_code || line.sku_id}
+                          </p>
+                        </div>
+                        <p className="font-bold tabular-nums text-[#e8343a]">
+                          {money(line.unit_price * line.quantity)}
+                        </p>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between pl-[54px]">
+                        <Badge
+                          variant="secondary"
+                          className="h-5 rounded px-1.5 text-[10px] font-normal"
+                        >
                           {line.product_type === "custom"
                             ? "孤品"
                             : line.product_type === "bundle"
                               ? "组包"
                               : "标准"}
-                        </span>
-                        <span className="truncate font-mono">
-                          {meta?.barcode || meta?.sku_code || line.sku_id}
-                        </span>
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 flex-col items-end gap-1">
-                      <p className="font-bold leading-none tabular-nums text-[#e8343a]">
-                        {money(line.unit_price * line.quantity)}
-                      </p>
-                      <div className="flex items-center">
-                        <button
-                          type="button"
-                          className="flex h-7 w-7 items-center justify-center rounded-l-lg border border-[#d0d5dd]"
-                          onClick={() => updateQuantity(lineKey, line.quantity - 1)}
-                        >
-                          <Minus className="h-3 w-3" />
-                        </button>
-                        <span className="flex h-7 w-8 items-center justify-center border-y border-[#d0d5dd] bg-white text-xs font-semibold tabular-nums">
-                          {line.quantity}
-                        </span>
-                        <button
-                          type="button"
-                          className="flex h-7 w-7 items-center justify-center rounded-r-lg border border-[#d0d5dd] disabled:opacity-35"
-                          disabled={
-                            line.product_type === "custom" ||
-                            (!line.is_unlimited_stock && line.quantity >= line.available_qty)
-                          }
-                          onClick={() => updateQuantity(lineKey, line.quantity + 1)}
-                        >
-                          <Plus className="h-3 w-3" />
-                        </button>
-                        <button
-                          type="button"
-                          className="ml-1.5 flex h-7 w-7 items-center justify-center rounded-lg text-[#98a2b3] hover:bg-[#fff1f2] hover:text-[#e8343a]"
-                          onClick={() => updateQuantity(lineKey, 0)}
-                          aria-label={`删除 ${posCartLineLabel(line)}`}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        </Badge>
+                        <div className="flex items-center">
+                          <button
+                            type="button"
+                            className="flex h-7 w-7 items-center justify-center rounded-l-md border border-[#d0d5dd]"
+                            onClick={() => updateQuantity(lineKey, line.quantity - 1)}
+                          >
+                            <Minus className="h-3 w-3" />
+                          </button>
+                          <span className="flex h-7 w-9 items-center justify-center border-y border-[#d0d5dd] bg-white text-xs font-semibold">
+                            {line.quantity}
+                          </span>
+                          <button
+                            type="button"
+                            className="flex h-7 w-7 items-center justify-center rounded-r-md border border-[#d0d5dd] disabled:opacity-35"
+                            disabled={
+                              line.product_type === "custom" ||
+                              (!line.is_unlimited_stock && line.quantity >= line.available_qty)
+                            }
+                            onClick={() => updateQuantity(lineKey, line.quantity + 1)}
+                          >
+                            <Plus className="h-3 w-3" />
+                          </button>
+                          <button
+                            type="button"
+                            className="ml-1.5 flex h-7 w-7 items-center justify-center rounded-md text-[#98a2b3] hover:bg-[#fff1f2] hover:text-[#e8343a]"
+                            onClick={() => updateQuantity(lineKey, 0)}
+                            aria-label={`删除 ${posCartLineLabel(line)}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })
+                  );
+                })}
+              </div>
             )}
           </div>
 
-          {/* 3. 固定紧凑结算底栏 */}
-          <div
-            data-pos-settlement-footer
-            className="space-y-2 border-t border-[#eaecf0] bg-white p-3"
-          >
+          <div data-pos-settlement-footer className="space-y-2.5 border-t border-[#eaecf0] pt-3">
             <button
               type="button"
-              className="flex h-12 w-full items-center gap-2.5 rounded-xl bg-[#fff1f2] px-3 text-left transition hover:bg-[#ffe4e6]"
+              className="flex h-12 w-full items-center gap-2.5 rounded-lg bg-[#fff0f1] px-3 text-left transition hover:bg-[#ffe3e6]"
               onClick={() => setMemberDialog(true)}
             >
-              <UserRoundSearch className="h-4 w-4 shrink-0 text-[#e8343a]" />
-              {selectedCustomer ? (
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold leading-tight text-[#9f1239]">
-                    {selectedCustomer.nickname || "BOOMER 会员"}
-                  </p>
-                  <p className="truncate text-[11px] leading-tight text-[#b42318]">
-                    {selectedCustomer.wallet?.member_level ?? "普通会员"} ·{" "}
-                    {selectedCustomer.wallet?.points ?? 0} 积分
-                  </p>
-                </div>
-              ) : (
-                <span className="flex-1 text-sm font-semibold text-[#9f1239]">
-                  识别会员
-                  <span className="ml-2 text-[11px] font-normal text-[#b42318]">
-                    扫码会员码或输入手机号
-                  </span>
-                </span>
-              )}
-              <ChevronDown className="h-4 w-4 shrink-0 -rotate-90 text-[#b42318]" />
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[#e60012]">
+                <UserRoundSearch className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-[#e60012]">
+                  {selectedCustomer?.nickname || "识别会员"}
+                </p>
+                <p className="truncate text-[11px] text-[#667085]">
+                  {selectedCustomer
+                    ? `${selectedCustomer.wallet?.member_level ?? "普通会员"} · ${selectedCustomer.wallet?.points ?? 0} 积分`
+                    : "扫码会员码或输入手机号"}
+                </p>
+              </div>
+              <ChevronDown className="h-4 w-4 -rotate-90 text-[#667085]" />
             </button>
 
             <div className="grid grid-cols-4 gap-1.5">
               <Button
                 variant="outline"
-                className="h-10 rounded-lg border-[#d0d5dd] px-1 text-xs"
+                className="h-10 rounded-lg px-2 text-xs"
                 disabled={cart.length === 0}
                 onClick={() => setDiscountDialog(true)}
               >
@@ -1417,15 +1447,15 @@ function PosPage() {
               </Button>
               <Button
                 variant="outline"
-                className="h-10 rounded-lg border-[#d0d5dd] px-1 text-xs"
+                className="h-10 rounded-lg px-2 text-xs"
                 onClick={() => void loadHeldCarts()}
               >
-                <History className="mr-1 h-3.5 w-3.5 text-[#0a315d]" />
+                <History className="mr-1 h-3.5 w-3.5" />
                 取单
               </Button>
               <Button
                 variant="outline"
-                className="h-10 rounded-lg border-[#d0d5dd] px-1 text-xs"
+                className="h-10 rounded-lg px-2 text-xs"
                 disabled={!activeShift || cart.length === 0}
                 onClick={() => void holdCart()}
               >
@@ -1434,7 +1464,7 @@ function PosPage() {
               </Button>
               <Button
                 variant="outline"
-                className="h-10 rounded-lg border-[#d0d5dd] px-1 text-xs"
+                className="h-10 rounded-lg px-2 text-xs"
                 disabled={!activeShift}
                 onClick={() => {
                   setOrdersDialog(true);
@@ -1446,30 +1476,33 @@ function PosPage() {
               </Button>
             </div>
 
-            <div className="flex items-end justify-between gap-3 rounded-xl bg-[#fff5f5] px-3 py-2">
-              <div className="min-w-0 space-y-0.5 text-[11px] leading-tight text-[#667085]">
-                <p>
-                  小计 <span className="tabular-nums text-[#344054]">{money(subtotal)}</span>
-                </p>
-                <p>
-                  优惠{" "}
-                  <span className="font-medium tabular-nums text-[#e8343a]">
+            <div className="grid grid-cols-[1fr_auto] items-end gap-4 border-t border-[#eaecf0] pt-2.5">
+              <div className="space-y-1 text-xs text-[#667085]">
+                <div className="flex gap-3">
+                  <span>小计</span>
+                  <span className="tabular-nums text-[#344054]">{money(subtotal)}</span>
+                </div>
+                <div className="flex gap-3">
+                  <span>优惠</span>
+                  <span className="tabular-nums font-medium text-[#e8343a]">
                     {discountTotal > 0 ? `-${money(discountTotal)}` : money(0)}
                   </span>
-                </p>
-                {discountPreview?.excluded_total ? (
-                  <p className="text-[#98a2b3]">
-                    寄售/特殊不参与 {money(discountPreview.excluded_total)}
-                  </p>
-                ) : null}
+                </div>
               </div>
-              <div className="shrink-0 text-right">
-                <p className="text-[11px] leading-tight text-[#b42318]">应收</p>
-                <p className="text-3xl font-black leading-none tracking-[-0.04em] tabular-nums text-[#e8343a]">
+              <div className="text-right">
+                <p className="text-[11px] font-medium text-[#667085]">应收金额</p>
+                <p className="text-3xl font-black leading-none tracking-[-0.04em] tabular-nums text-[#101828]">
                   {money(total)}
                 </p>
               </div>
             </div>
+
+            {discountPreview?.excluded_total ? (
+              <div className="flex justify-between text-[11px] text-[#98a2b3]">
+                <span>寄售/特殊商品不参与优惠</span>
+                <span>{money(discountPreview.excluded_total)}</span>
+              </div>
+            ) : null}
 
             <Button
               className="h-14 w-full rounded-xl bg-[#e8343a] text-base font-semibold hover:bg-[#c92930]"

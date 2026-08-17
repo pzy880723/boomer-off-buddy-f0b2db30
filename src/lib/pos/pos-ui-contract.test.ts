@@ -56,4 +56,18 @@ describe("POS UI contract", () => {
     assert.match(sidebarSource, /"\/pos"/);
     assert.match(sidebarSource, /门店收银/);
   });
+
+  test("gives the cart flexible height and keeps settlement controls compact", () => {
+    const source = readFileSync(new URL("pos.tsx", routesRoot), "utf8");
+
+    assert.match(source, /data-pos-checkout-panel/);
+    assert.match(source, /data-pos-cart-scroll/);
+    assert.match(source, /data-pos-settlement-footer/);
+    assert.match(source, /logo-boomeroff\.png/);
+    assert.match(source, /alt="BOOMER OFF"/);
+    assert.match(source, /grid-rows-\[auto_minmax\(0,1fr\)_auto\]/);
+    assert.match(source, /lg:grid-cols-\[minmax\(0,1fr\)_clamp\(420px,30vw,500px\)\]/);
+    assert.match(source, /grid-cols-4/);
+    assert.doesNotMatch(source, /max-h-\[36vh\]/);
+  });
 });
