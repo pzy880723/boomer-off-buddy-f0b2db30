@@ -197,6 +197,13 @@ import { Route as ApiPublicPosPaymentsMicropayRouteImport } from './routes/api/p
 import { Route as ApiPublicPosPaymentsQrOrderRouteImport } from './routes/api/public/pos/payments.qr-order'
 import { Route as ApiPublicPosProductsLookupRouteImport } from './routes/api/public/pos/products.lookup'
 import { Route as ApiPublicPosShiftsOpenRouteImport } from './routes/api/public/pos/shifts.open'
+import { Route as ApiPublicStorefrontMembershipAccountRouteImport } from './routes/api/public/storefront/membership.account'
+import { Route as ApiPublicStorefrontMembershipConsumptionRecordsRouteImport } from './routes/api/public/storefront/membership.consumption-records'
+import { Route as ApiPublicStorefrontMembershipCouponsRouteImport } from './routes/api/public/storefront/membership.coupons'
+import { Route as ApiPublicStorefrontMembershipMemberCodeRouteImport } from './routes/api/public/storefront/membership.member-code'
+import { Route as ApiPublicStorefrontMembershipOrdersRouteImport } from './routes/api/public/storefront/membership.orders'
+import { Route as ApiPublicStorefrontMembershipPlansRouteImport } from './routes/api/public/storefront/membership.plans'
+import { Route as ApiPublicStorefrontMembershipPointsLedgerRouteImport } from './routes/api/public/storefront/membership.points-ledger'
 import { Route as ApiPublicStorefrontOrdersIdRouteImport } from './routes/api/public/storefront/orders.$id'
 import { Route as ApiPublicStorefrontProductsIdRouteImport } from './routes/api/public/storefront/products.$id'
 import { Route as ApiPublicHandheldFulfillmentsIdBindToteRouteImport } from './routes/api/public/handheld/fulfillments.$id.bind-tote'
@@ -219,6 +226,8 @@ import { Route as ApiPublicPosPaymentsIdCloseRouteImport } from './routes/api/pu
 import { Route as ApiPublicPosPaymentsCallbackProviderRouteImport } from './routes/api/public/pos/payments.callback.$provider'
 import { Route as ApiPublicPosSalesIdReceiptRouteImport } from './routes/api/public/pos/sales.$id.receipt'
 import { Route as ApiPublicPosShiftsIdCloseRouteImport } from './routes/api/public/pos/shifts.$id.close'
+import { Route as ApiPublicStorefrontMembershipAppleTransactionsRouteImport } from './routes/api/public/storefront/membership.apple.transactions'
+import { Route as ApiPublicStorefrontMembershipRecognitionQuotaReserveRouteImport } from './routes/api/public/storefront/membership.recognition-quota.reserve'
 import { Route as ApiPublicStorefrontPaymentsCallbackProviderRouteImport } from './routes/api/public/storefront/payments.callback.$provider'
 import { Route as ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteImport } from './routes/api/public/handheld/parcels.items.$itemId.pack-pieces'
 import { Route as ApiPublicPosOrdersIdReturnsPreviewRouteImport } from './routes/api/public/pos/orders.$id.returns.preview'
@@ -1256,6 +1265,48 @@ const ApiPublicPosShiftsOpenRoute = ApiPublicPosShiftsOpenRouteImport.update({
   path: '/api/public/pos/shifts/open',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicStorefrontMembershipAccountRoute =
+  ApiPublicStorefrontMembershipAccountRouteImport.update({
+    id: '/api/public/storefront/membership/account',
+    path: '/api/public/storefront/membership/account',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicStorefrontMembershipConsumptionRecordsRoute =
+  ApiPublicStorefrontMembershipConsumptionRecordsRouteImport.update({
+    id: '/api/public/storefront/membership/consumption-records',
+    path: '/api/public/storefront/membership/consumption-records',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicStorefrontMembershipCouponsRoute =
+  ApiPublicStorefrontMembershipCouponsRouteImport.update({
+    id: '/api/public/storefront/membership/coupons',
+    path: '/api/public/storefront/membership/coupons',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicStorefrontMembershipMemberCodeRoute =
+  ApiPublicStorefrontMembershipMemberCodeRouteImport.update({
+    id: '/api/public/storefront/membership/member-code',
+    path: '/api/public/storefront/membership/member-code',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicStorefrontMembershipOrdersRoute =
+  ApiPublicStorefrontMembershipOrdersRouteImport.update({
+    id: '/api/public/storefront/membership/orders',
+    path: '/api/public/storefront/membership/orders',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicStorefrontMembershipPlansRoute =
+  ApiPublicStorefrontMembershipPlansRouteImport.update({
+    id: '/api/public/storefront/membership/plans',
+    path: '/api/public/storefront/membership/plans',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicStorefrontMembershipPointsLedgerRoute =
+  ApiPublicStorefrontMembershipPointsLedgerRouteImport.update({
+    id: '/api/public/storefront/membership/points-ledger',
+    path: '/api/public/storefront/membership/points-ledger',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicStorefrontOrdersIdRoute =
   ApiPublicStorefrontOrdersIdRouteImport.update({
     id: '/$id',
@@ -1386,6 +1437,18 @@ const ApiPublicPosShiftsIdCloseRoute =
   ApiPublicPosShiftsIdCloseRouteImport.update({
     id: '/api/public/pos/shifts/$id/close',
     path: '/api/public/pos/shifts/$id/close',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicStorefrontMembershipAppleTransactionsRoute =
+  ApiPublicStorefrontMembershipAppleTransactionsRouteImport.update({
+    id: '/api/public/storefront/membership/apple/transactions',
+    path: '/api/public/storefront/membership/apple/transactions',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicStorefrontMembershipRecognitionQuotaReserveRoute =
+  ApiPublicStorefrontMembershipRecognitionQuotaReserveRouteImport.update({
+    id: '/api/public/storefront/membership/recognition-quota/reserve',
+    path: '/api/public/storefront/membership/recognition-quota/reserve',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicStorefrontPaymentsCallbackProviderRoute =
@@ -1608,6 +1671,13 @@ export interface FileRoutesByFullPath {
   '/api/public/pos/payments/qr-order': typeof ApiPublicPosPaymentsQrOrderRoute
   '/api/public/pos/products/lookup': typeof ApiPublicPosProductsLookupRoute
   '/api/public/pos/shifts/open': typeof ApiPublicPosShiftsOpenRoute
+  '/api/public/storefront/membership/account': typeof ApiPublicStorefrontMembershipAccountRoute
+  '/api/public/storefront/membership/consumption-records': typeof ApiPublicStorefrontMembershipConsumptionRecordsRoute
+  '/api/public/storefront/membership/coupons': typeof ApiPublicStorefrontMembershipCouponsRoute
+  '/api/public/storefront/membership/member-code': typeof ApiPublicStorefrontMembershipMemberCodeRoute
+  '/api/public/storefront/membership/orders': typeof ApiPublicStorefrontMembershipOrdersRoute
+  '/api/public/storefront/membership/plans': typeof ApiPublicStorefrontMembershipPlansRoute
+  '/api/public/storefront/membership/points-ledger': typeof ApiPublicStorefrontMembershipPointsLedgerRoute
   '/api/public/storefront/orders/$id': typeof ApiPublicStorefrontOrdersIdRoute
   '/api/public/storefront/products/$id': typeof ApiPublicStorefrontProductsIdRoute
   '/api/public/handheld/fulfillments/$id/bind-tote': typeof ApiPublicHandheldFulfillmentsIdBindToteRoute
@@ -1630,6 +1700,8 @@ export interface FileRoutesByFullPath {
   '/api/public/pos/payments/callback/$provider': typeof ApiPublicPosPaymentsCallbackProviderRoute
   '/api/public/pos/sales/$id/receipt': typeof ApiPublicPosSalesIdReceiptRoute
   '/api/public/pos/shifts/$id/close': typeof ApiPublicPosShiftsIdCloseRoute
+  '/api/public/storefront/membership/apple/transactions': typeof ApiPublicStorefrontMembershipAppleTransactionsRoute
+  '/api/public/storefront/membership/recognition-quota/reserve': typeof ApiPublicStorefrontMembershipRecognitionQuotaReserveRoute
   '/api/public/storefront/payments/callback/$provider': typeof ApiPublicStorefrontPaymentsCallbackProviderRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteWithChildren
   '/api/public/pos/orders/$id/returns/preview': typeof ApiPublicPosOrdersIdReturnsPreviewRoute
@@ -1818,6 +1890,13 @@ export interface FileRoutesByTo {
   '/api/public/pos/payments/qr-order': typeof ApiPublicPosPaymentsQrOrderRoute
   '/api/public/pos/products/lookup': typeof ApiPublicPosProductsLookupRoute
   '/api/public/pos/shifts/open': typeof ApiPublicPosShiftsOpenRoute
+  '/api/public/storefront/membership/account': typeof ApiPublicStorefrontMembershipAccountRoute
+  '/api/public/storefront/membership/consumption-records': typeof ApiPublicStorefrontMembershipConsumptionRecordsRoute
+  '/api/public/storefront/membership/coupons': typeof ApiPublicStorefrontMembershipCouponsRoute
+  '/api/public/storefront/membership/member-code': typeof ApiPublicStorefrontMembershipMemberCodeRoute
+  '/api/public/storefront/membership/orders': typeof ApiPublicStorefrontMembershipOrdersRoute
+  '/api/public/storefront/membership/plans': typeof ApiPublicStorefrontMembershipPlansRoute
+  '/api/public/storefront/membership/points-ledger': typeof ApiPublicStorefrontMembershipPointsLedgerRoute
   '/api/public/storefront/orders/$id': typeof ApiPublicStorefrontOrdersIdRoute
   '/api/public/storefront/products/$id': typeof ApiPublicStorefrontProductsIdRoute
   '/api/public/handheld/fulfillments/$id/bind-tote': typeof ApiPublicHandheldFulfillmentsIdBindToteRoute
@@ -1840,6 +1919,8 @@ export interface FileRoutesByTo {
   '/api/public/pos/payments/callback/$provider': typeof ApiPublicPosPaymentsCallbackProviderRoute
   '/api/public/pos/sales/$id/receipt': typeof ApiPublicPosSalesIdReceiptRoute
   '/api/public/pos/shifts/$id/close': typeof ApiPublicPosShiftsIdCloseRoute
+  '/api/public/storefront/membership/apple/transactions': typeof ApiPublicStorefrontMembershipAppleTransactionsRoute
+  '/api/public/storefront/membership/recognition-quota/reserve': typeof ApiPublicStorefrontMembershipRecognitionQuotaReserveRoute
   '/api/public/storefront/payments/callback/$provider': typeof ApiPublicStorefrontPaymentsCallbackProviderRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteWithChildren
   '/api/public/pos/orders/$id/returns/preview': typeof ApiPublicPosOrdersIdReturnsPreviewRoute
@@ -2036,6 +2117,13 @@ export interface FileRoutesById {
   '/api/public/pos/payments/qr-order': typeof ApiPublicPosPaymentsQrOrderRoute
   '/api/public/pos/products/lookup': typeof ApiPublicPosProductsLookupRoute
   '/api/public/pos/shifts/open': typeof ApiPublicPosShiftsOpenRoute
+  '/api/public/storefront/membership/account': typeof ApiPublicStorefrontMembershipAccountRoute
+  '/api/public/storefront/membership/consumption-records': typeof ApiPublicStorefrontMembershipConsumptionRecordsRoute
+  '/api/public/storefront/membership/coupons': typeof ApiPublicStorefrontMembershipCouponsRoute
+  '/api/public/storefront/membership/member-code': typeof ApiPublicStorefrontMembershipMemberCodeRoute
+  '/api/public/storefront/membership/orders': typeof ApiPublicStorefrontMembershipOrdersRoute
+  '/api/public/storefront/membership/plans': typeof ApiPublicStorefrontMembershipPlansRoute
+  '/api/public/storefront/membership/points-ledger': typeof ApiPublicStorefrontMembershipPointsLedgerRoute
   '/api/public/storefront/orders/$id': typeof ApiPublicStorefrontOrdersIdRoute
   '/api/public/storefront/products/$id': typeof ApiPublicStorefrontProductsIdRoute
   '/api/public/handheld/fulfillments/$id/bind-tote': typeof ApiPublicHandheldFulfillmentsIdBindToteRoute
@@ -2058,6 +2146,8 @@ export interface FileRoutesById {
   '/api/public/pos/payments/callback/$provider': typeof ApiPublicPosPaymentsCallbackProviderRoute
   '/api/public/pos/sales/$id/receipt': typeof ApiPublicPosSalesIdReceiptRoute
   '/api/public/pos/shifts/$id/close': typeof ApiPublicPosShiftsIdCloseRoute
+  '/api/public/storefront/membership/apple/transactions': typeof ApiPublicStorefrontMembershipAppleTransactionsRoute
+  '/api/public/storefront/membership/recognition-quota/reserve': typeof ApiPublicStorefrontMembershipRecognitionQuotaReserveRoute
   '/api/public/storefront/payments/callback/$provider': typeof ApiPublicStorefrontPaymentsCallbackProviderRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteWithChildren
   '/api/public/pos/orders/$id/returns/preview': typeof ApiPublicPosOrdersIdReturnsPreviewRoute
@@ -2255,6 +2345,13 @@ export interface FileRouteTypes {
     | '/api/public/pos/payments/qr-order'
     | '/api/public/pos/products/lookup'
     | '/api/public/pos/shifts/open'
+    | '/api/public/storefront/membership/account'
+    | '/api/public/storefront/membership/consumption-records'
+    | '/api/public/storefront/membership/coupons'
+    | '/api/public/storefront/membership/member-code'
+    | '/api/public/storefront/membership/orders'
+    | '/api/public/storefront/membership/plans'
+    | '/api/public/storefront/membership/points-ledger'
     | '/api/public/storefront/orders/$id'
     | '/api/public/storefront/products/$id'
     | '/api/public/handheld/fulfillments/$id/bind-tote'
@@ -2277,6 +2374,8 @@ export interface FileRouteTypes {
     | '/api/public/pos/payments/callback/$provider'
     | '/api/public/pos/sales/$id/receipt'
     | '/api/public/pos/shifts/$id/close'
+    | '/api/public/storefront/membership/apple/transactions'
+    | '/api/public/storefront/membership/recognition-quota/reserve'
     | '/api/public/storefront/payments/callback/$provider'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces'
     | '/api/public/pos/orders/$id/returns/preview'
@@ -2465,6 +2564,13 @@ export interface FileRouteTypes {
     | '/api/public/pos/payments/qr-order'
     | '/api/public/pos/products/lookup'
     | '/api/public/pos/shifts/open'
+    | '/api/public/storefront/membership/account'
+    | '/api/public/storefront/membership/consumption-records'
+    | '/api/public/storefront/membership/coupons'
+    | '/api/public/storefront/membership/member-code'
+    | '/api/public/storefront/membership/orders'
+    | '/api/public/storefront/membership/plans'
+    | '/api/public/storefront/membership/points-ledger'
     | '/api/public/storefront/orders/$id'
     | '/api/public/storefront/products/$id'
     | '/api/public/handheld/fulfillments/$id/bind-tote'
@@ -2487,6 +2593,8 @@ export interface FileRouteTypes {
     | '/api/public/pos/payments/callback/$provider'
     | '/api/public/pos/sales/$id/receipt'
     | '/api/public/pos/shifts/$id/close'
+    | '/api/public/storefront/membership/apple/transactions'
+    | '/api/public/storefront/membership/recognition-quota/reserve'
     | '/api/public/storefront/payments/callback/$provider'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces'
     | '/api/public/pos/orders/$id/returns/preview'
@@ -2682,6 +2790,13 @@ export interface FileRouteTypes {
     | '/api/public/pos/payments/qr-order'
     | '/api/public/pos/products/lookup'
     | '/api/public/pos/shifts/open'
+    | '/api/public/storefront/membership/account'
+    | '/api/public/storefront/membership/consumption-records'
+    | '/api/public/storefront/membership/coupons'
+    | '/api/public/storefront/membership/member-code'
+    | '/api/public/storefront/membership/orders'
+    | '/api/public/storefront/membership/plans'
+    | '/api/public/storefront/membership/points-ledger'
     | '/api/public/storefront/orders/$id'
     | '/api/public/storefront/products/$id'
     | '/api/public/handheld/fulfillments/$id/bind-tote'
@@ -2704,6 +2819,8 @@ export interface FileRouteTypes {
     | '/api/public/pos/payments/callback/$provider'
     | '/api/public/pos/sales/$id/receipt'
     | '/api/public/pos/shifts/$id/close'
+    | '/api/public/storefront/membership/apple/transactions'
+    | '/api/public/storefront/membership/recognition-quota/reserve'
     | '/api/public/storefront/payments/callback/$provider'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces'
     | '/api/public/pos/orders/$id/returns/preview'
@@ -2839,10 +2956,19 @@ export interface RootRouteChildren {
   ApiPublicPosPaymentsMicropayRoute: typeof ApiPublicPosPaymentsMicropayRoute
   ApiPublicPosPaymentsQrOrderRoute: typeof ApiPublicPosPaymentsQrOrderRoute
   ApiPublicPosShiftsOpenRoute: typeof ApiPublicPosShiftsOpenRoute
+  ApiPublicStorefrontMembershipAccountRoute: typeof ApiPublicStorefrontMembershipAccountRoute
+  ApiPublicStorefrontMembershipConsumptionRecordsRoute: typeof ApiPublicStorefrontMembershipConsumptionRecordsRoute
+  ApiPublicStorefrontMembershipCouponsRoute: typeof ApiPublicStorefrontMembershipCouponsRoute
+  ApiPublicStorefrontMembershipMemberCodeRoute: typeof ApiPublicStorefrontMembershipMemberCodeRoute
+  ApiPublicStorefrontMembershipOrdersRoute: typeof ApiPublicStorefrontMembershipOrdersRoute
+  ApiPublicStorefrontMembershipPlansRoute: typeof ApiPublicStorefrontMembershipPlansRoute
+  ApiPublicStorefrontMembershipPointsLedgerRoute: typeof ApiPublicStorefrontMembershipPointsLedgerRoute
   ApiPublicPosCustomersIdBenefitsRoute: typeof ApiPublicPosCustomersIdBenefitsRoute
   ApiPublicPosOrdersIdReturnsRoute: typeof ApiPublicPosOrdersIdReturnsRouteWithChildren
   ApiPublicPosPaymentsCallbackProviderRoute: typeof ApiPublicPosPaymentsCallbackProviderRoute
   ApiPublicPosShiftsIdCloseRoute: typeof ApiPublicPosShiftsIdCloseRoute
+  ApiPublicStorefrontMembershipAppleTransactionsRoute: typeof ApiPublicStorefrontMembershipAppleTransactionsRoute
+  ApiPublicStorefrontMembershipRecognitionQuotaReserveRoute: typeof ApiPublicStorefrontMembershipRecognitionQuotaReserveRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -4163,6 +4289,55 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicPosShiftsOpenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/storefront/membership/account': {
+      id: '/api/public/storefront/membership/account'
+      path: '/api/public/storefront/membership/account'
+      fullPath: '/api/public/storefront/membership/account'
+      preLoaderRoute: typeof ApiPublicStorefrontMembershipAccountRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/storefront/membership/consumption-records': {
+      id: '/api/public/storefront/membership/consumption-records'
+      path: '/api/public/storefront/membership/consumption-records'
+      fullPath: '/api/public/storefront/membership/consumption-records'
+      preLoaderRoute: typeof ApiPublicStorefrontMembershipConsumptionRecordsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/storefront/membership/coupons': {
+      id: '/api/public/storefront/membership/coupons'
+      path: '/api/public/storefront/membership/coupons'
+      fullPath: '/api/public/storefront/membership/coupons'
+      preLoaderRoute: typeof ApiPublicStorefrontMembershipCouponsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/storefront/membership/member-code': {
+      id: '/api/public/storefront/membership/member-code'
+      path: '/api/public/storefront/membership/member-code'
+      fullPath: '/api/public/storefront/membership/member-code'
+      preLoaderRoute: typeof ApiPublicStorefrontMembershipMemberCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/storefront/membership/orders': {
+      id: '/api/public/storefront/membership/orders'
+      path: '/api/public/storefront/membership/orders'
+      fullPath: '/api/public/storefront/membership/orders'
+      preLoaderRoute: typeof ApiPublicStorefrontMembershipOrdersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/storefront/membership/plans': {
+      id: '/api/public/storefront/membership/plans'
+      path: '/api/public/storefront/membership/plans'
+      fullPath: '/api/public/storefront/membership/plans'
+      preLoaderRoute: typeof ApiPublicStorefrontMembershipPlansRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/storefront/membership/points-ledger': {
+      id: '/api/public/storefront/membership/points-ledger'
+      path: '/api/public/storefront/membership/points-ledger'
+      fullPath: '/api/public/storefront/membership/points-ledger'
+      preLoaderRoute: typeof ApiPublicStorefrontMembershipPointsLedgerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/storefront/orders/$id': {
       id: '/api/public/storefront/orders/$id'
       path: '/$id'
@@ -4315,6 +4490,20 @@ declare module '@tanstack/react-router' {
       path: '/api/public/pos/shifts/$id/close'
       fullPath: '/api/public/pos/shifts/$id/close'
       preLoaderRoute: typeof ApiPublicPosShiftsIdCloseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/storefront/membership/apple/transactions': {
+      id: '/api/public/storefront/membership/apple/transactions'
+      path: '/api/public/storefront/membership/apple/transactions'
+      fullPath: '/api/public/storefront/membership/apple/transactions'
+      preLoaderRoute: typeof ApiPublicStorefrontMembershipAppleTransactionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/storefront/membership/recognition-quota/reserve': {
+      id: '/api/public/storefront/membership/recognition-quota/reserve'
+      path: '/api/public/storefront/membership/recognition-quota/reserve'
+      fullPath: '/api/public/storefront/membership/recognition-quota/reserve'
+      preLoaderRoute: typeof ApiPublicStorefrontMembershipRecognitionQuotaReserveRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/storefront/payments/callback/$provider': {
@@ -5066,12 +5255,30 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicPosPaymentsMicropayRoute: ApiPublicPosPaymentsMicropayRoute,
   ApiPublicPosPaymentsQrOrderRoute: ApiPublicPosPaymentsQrOrderRoute,
   ApiPublicPosShiftsOpenRoute: ApiPublicPosShiftsOpenRoute,
+  ApiPublicStorefrontMembershipAccountRoute:
+    ApiPublicStorefrontMembershipAccountRoute,
+  ApiPublicStorefrontMembershipConsumptionRecordsRoute:
+    ApiPublicStorefrontMembershipConsumptionRecordsRoute,
+  ApiPublicStorefrontMembershipCouponsRoute:
+    ApiPublicStorefrontMembershipCouponsRoute,
+  ApiPublicStorefrontMembershipMemberCodeRoute:
+    ApiPublicStorefrontMembershipMemberCodeRoute,
+  ApiPublicStorefrontMembershipOrdersRoute:
+    ApiPublicStorefrontMembershipOrdersRoute,
+  ApiPublicStorefrontMembershipPlansRoute:
+    ApiPublicStorefrontMembershipPlansRoute,
+  ApiPublicStorefrontMembershipPointsLedgerRoute:
+    ApiPublicStorefrontMembershipPointsLedgerRoute,
   ApiPublicPosCustomersIdBenefitsRoute: ApiPublicPosCustomersIdBenefitsRoute,
   ApiPublicPosOrdersIdReturnsRoute:
     ApiPublicPosOrdersIdReturnsRouteWithChildren,
   ApiPublicPosPaymentsCallbackProviderRoute:
     ApiPublicPosPaymentsCallbackProviderRoute,
   ApiPublicPosShiftsIdCloseRoute: ApiPublicPosShiftsIdCloseRoute,
+  ApiPublicStorefrontMembershipAppleTransactionsRoute:
+    ApiPublicStorefrontMembershipAppleTransactionsRoute,
+  ApiPublicStorefrontMembershipRecognitionQuotaReserveRoute:
+    ApiPublicStorefrontMembershipRecognitionQuotaReserveRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

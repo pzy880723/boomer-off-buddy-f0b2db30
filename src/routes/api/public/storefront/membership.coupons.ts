@@ -1,0 +1,25 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { listMembershipCoupons } from "@/lib/membership/membership-repository.server";
+import {
+  STOREFRONT_CORS,
+  authenticateStorefrontCustomer,
+  storefrontError,
+  storefrontJson,
+} from "@/server/storefront-auth.server";
+
+export const Route = createFileRoute("/api/public/storefront/membership/coupons")({
+  server: {
+    handlers: {
+      OPTIONS: async () => new Response(null, { status: 204, headers: STOREFRONT_CORS }),
+      GET: async ({ request }) => {
+        const auth = await authenticateStorefrontCustomer(request);
+        if (!auth.ok) return auth.response;
+        try {
+          return storefrontJson({ ok: true, data: await listMembershipCoupons(auth.customer.id) });
+        } catch (error) {
+          return storefrontError(error instanceof Error ? error.message : String(error), 500);
+        }
+      },
+    },
+  },
+});
