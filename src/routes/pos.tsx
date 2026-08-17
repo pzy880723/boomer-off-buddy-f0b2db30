@@ -1228,7 +1228,9 @@ function PosPage() {
                               {money(product.unit_price)}
                             </span>
                             <span className="text-[11px] text-[#667085]">
-                              {product.is_unlimited_stock ? "库存不限" : `库存 ${product.available_qty}`}
+                              {product.is_unlimited_stock
+                                ? "库存不限"
+                                : `库存 ${product.available_qty}`}
                             </span>
                           </div>
                         </div>
@@ -1479,7 +1481,6 @@ function PosPage() {
             </Button>
           </div>
         </aside>
-
       </main>
 
       <Dialog open={cashDialog} onOpenChange={setCashDialog}>

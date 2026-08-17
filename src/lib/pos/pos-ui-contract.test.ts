@@ -46,7 +46,6 @@ describe("POS UI contract", () => {
     assert.match(source, /loadReceipt/);
   });
 
-
   test("registers POS as a full-screen navigation destination", () => {
     const rootSource = readFileSync(new URL("__root.tsx", routesRoot), "utf8");
     const sidebarSource = readFileSync(
