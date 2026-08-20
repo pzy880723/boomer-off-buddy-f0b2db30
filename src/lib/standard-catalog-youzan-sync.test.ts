@@ -5,6 +5,7 @@ import test from "node:test";
 import {
   assertStandardCatalogSyncHost,
   buildStandardHqBarcodeFields,
+  buildStandardHqSkuBarcodeFields,
   buildHqSpuLookupParams,
   buildStandardYouzanRemoteIdentity,
   selectHqSpuRemoteIdentity,
@@ -18,6 +19,34 @@ test("standard HQ products persist the ERP barcode as the Youzan scan code", () 
     bar_codes: ["2009876212904"],
   });
   assert.throws(() => buildStandardHqBarcodeFields(""), /收银条码/);
+});
+
+test("standard HQ SKU updates persist the ERP barcode on the existing Youzan SKU", () => {
+  assert.deepEqual(
+    buildStandardHqSkuBarcodeFields({
+      skuId: 390105648,
+      skuCode: "BM507122220383",
+      barcode: " 2009066940334 ",
+      retailPrice: 6.9,
+    }),
+    {
+      sku_id: 390105648,
+      sku_code: "BM507122220383",
+      sku_no: "2009066940334",
+      bar_codes: ["2009066940334"],
+      retail_price: "6.90",
+    },
+  );
+  assert.throws(
+    () =>
+      buildStandardHqSkuBarcodeFields({
+        skuId: 0,
+        skuCode: "",
+        barcode: "2009066940334",
+        retailPrice: 6.9,
+      }),
+    /规格标识/,
+  );
 });
 
 test("standard catalog Youzan sync defaults to a bounded dry run", () => {

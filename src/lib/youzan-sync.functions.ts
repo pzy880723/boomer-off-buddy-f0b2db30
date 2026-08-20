@@ -15,6 +15,7 @@ import { selectTrustedBranchItemIds } from "./youzan-quantity.server";
 import { buildBranchItemShelfRequest } from "./youzan-offline-products.server";
 import {
   buildStandardHqBarcodeFields,
+  buildStandardHqSkuBarcodeFields,
   buildHqSpuLookupParams,
   buildStandardYouzanRemoteIdentity,
   selectHqSpuRemoteIdentity,
@@ -1106,6 +1107,8 @@ async function syncStandardHqMasterFields(args: {
   accessToken: string;
   spuId: number;
   spuCode: string;
+  skuId: number | null;
+  skuCode: string;
   barcode: string;
   name: string;
   categoryId: number;
@@ -1124,6 +1127,14 @@ async function syncStandardHqMasterFields(args: {
       unit: DEFAULT_RETAIL_UNIT,
       category_id: args.categoryId,
       retail_price: Number(args.priceTier).toFixed(2),
+      skus: [
+        buildStandardHqSkuBarcodeFields({
+          skuId: Number(args.skuId ?? 0),
+          skuCode: args.skuCode,
+          barcode: args.barcode,
+          retailPrice: args.priceTier,
+        }),
+      ],
       sell_channel_setting_request: {
         is_partial: 1,
         sell_channel_ids: args.kdtIds,
@@ -1313,6 +1324,8 @@ export async function ensureHqSpuLink(
         accessToken: token,
         spuId: Number(existed.yz_item_id),
         spuCode: remote.spuCode,
+        skuId: remote.skuId,
+        skuCode: remote.skuCode,
         barcode: String((sku as { barcode?: string | null }).barcode ?? ""),
         name: remoteIdentity.name,
         categoryId,
@@ -1420,6 +1433,8 @@ export async function ensureHqSpuLink(
       accessToken: token,
       spuId: newSpuId,
       spuCode: newSpuCode,
+      skuId: newSkuId,
+      skuCode: newSkuCode,
       barcode: String((sku as { barcode?: string | null }).barcode ?? ""),
       name: remoteIdentity.name,
       categoryId,

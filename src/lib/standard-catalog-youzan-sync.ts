@@ -28,6 +28,26 @@ export function buildStandardHqBarcodeFields(barcode: string) {
   };
 }
 
+export function buildStandardHqSkuBarcodeFields(input: {
+  skuId: number;
+  skuCode: string;
+  barcode: string;
+  retailPrice: number | string;
+}) {
+  const skuCode = input.skuCode.trim();
+  if (!Number.isSafeInteger(input.skuId) || input.skuId <= 0 || !skuCode) {
+    throw new Error("有赞总部商品缺少有效规格标识");
+  }
+  const { spu_no: barcode, bar_codes } = buildStandardHqBarcodeFields(input.barcode);
+  return {
+    sku_id: input.skuId,
+    sku_code: skuCode,
+    sku_no: barcode,
+    bar_codes,
+    retail_price: Number(input.retailPrice).toFixed(2),
+  };
+}
+
 export function buildStandardYouzanRemoteIdentity(input: {
   skuId: string;
   skuCode: string;
