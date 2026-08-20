@@ -46,6 +46,7 @@ export function buildHqSpuLookupParams(code: string) {
   return [
     { page_no: 1, page_size: 100, spu_codes: [normalized] },
     { page_no: 1, page_size: 100, sku_codes: [normalized] },
+    { page_no: 1, page_size: 100 },
   ];
 }
 

@@ -1154,7 +1154,7 @@ async function findCreatedHqSpu(token: string, code: string, name: string) {
             (value) => String(value ?? "") === code,
           ),
         )) ||
-      (!code && String(row.product_name ?? row.productName ?? row.name ?? "") === name)
+      String(row.product_name ?? row.productName ?? row.name ?? "") === name
     );
   };
 
@@ -1303,7 +1303,7 @@ export async function ensureHqSpuLink(
       if (!newSpuId) {
         const code = pickCreatedSpuCode(res.payload);
         if (code) {
-          for (const waitMs of [0, 500, 1_000, 2_000]) {
+          for (const waitMs of [0, 1_000, 2_000, 4_000, 8_000]) {
             if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
             const found = await findCreatedHqSpu(token, code, remoteIdentity.name);
             newSpuId = found.spuId;

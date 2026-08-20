@@ -84,6 +84,7 @@ test("HQ SPU lookup uses Youzan's exact code filters instead of scanning page on
   assert.deepEqual(buildHqSpuLookupParams(" 2009876212904 "), [
     { page_no: 1, page_size: 100, spu_codes: ["2009876212904"] },
     { page_no: 1, page_size: 100, sku_codes: ["2009876212904"] },
+    { page_no: 1, page_size: 100 },
   ]);
 });
 
