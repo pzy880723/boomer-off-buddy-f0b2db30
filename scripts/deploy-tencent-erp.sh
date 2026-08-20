@@ -14,8 +14,14 @@ npm install --no-package-lock --ignore-scripts=false
 npm run test:login-hydration
 npm run build
 
-test -f .output/server/wrangler.json
-test -d .output/public
+if [[ ! -f .output/server/wrangler.json && ! -f dist/server/server.js ]]; then
+  echo "Missing ERP server build output" >&2
+  exit 1
+fi
+if [[ ! -d .output/public && ! -d dist/client ]]; then
+  echo "Missing ERP client build output" >&2
+  exit 1
+fi
 
 start_process() {
   local name="$1"
