@@ -14,7 +14,6 @@ import {
 import { selectTrustedBranchItemIds } from "./youzan-quantity.server";
 import { buildBranchItemShelfRequest } from "./youzan-offline-products.server";
 import {
-  buildStandardHqBarcodeFields,
   buildHqSpuLookupParams,
   buildStandardYouzanRemoteIdentity,
   selectHqSpuRemoteIdentity,
@@ -999,7 +998,7 @@ function buildSpuCreateAttempts(sku: {
 }, categoryId: number, kdtIds: number[]): Array<Record<string, unknown>> {
   const priceYuan = Number(sku.price_tier).toFixed(2);
   const barcodeFields = sku.scan_barcode
-    ? buildStandardHqBarcodeFields(sku.scan_barcode)
+    ? { spu_no: sku.scan_barcode, bar_codes: [] as string[] }
     : {};
   const base: Record<string, unknown> = {
     name: sku.name,
@@ -1106,14 +1105,13 @@ async function syncStandardHqMasterFields(args: {
   accessToken: string;
   spuId: number;
   spuCode: string;
-  barcode: string;
   name: string;
   categoryId: number;
   priceTier: string | number;
   kdtIds: number[];
 }) {
-  // Standard catalog rows are non-spec SPUs in HQ. Their POS barcode belongs on the SPU;
-  // branch release writes the same barcode to the store SKU used by the cashier.
+  // The ERP POS barcode belongs only to each branch SKU. Reusing it on the HQ
+  // SPU conflicts with the store barcode across the Youzan chain.
   await callYouzanApiVerbose({
     accessToken: args.accessToken,
     method: "youzan.retail.open.spu.update",
@@ -1122,7 +1120,6 @@ async function syncStandardHqMasterFields(args: {
       spu_id: args.spuId,
       name: args.name,
       spu_code: args.spuCode,
-      ...buildStandardHqBarcodeFields(args.barcode),
       unit: DEFAULT_RETAIL_UNIT,
       category_id: args.categoryId,
       retail_price: Number(args.priceTier).toFixed(2),
@@ -1307,29 +1304,34 @@ export async function ensureHqSpuLink(
     .maybeSingle();
   if (existed?.yz_item_id && Number(existed.yz_item_id) > 0) {
     const remote = await findHqSpuById(token, Number(existed.yz_item_id));
-    if (!remote) {
-      throw new Error(`有赞总部 SPU ${existed.yz_item_id} 不存在或无法读取关系编码`);
+    if (remote) {
+      if (scope === "standard") {
+        await syncStandardHqMasterFields({
+          accessToken: token,
+          spuId: Number(existed.yz_item_id),
+          spuCode: remote.spuCode,
+          name: remoteIdentity.name,
+          categoryId,
+          priceTier: (sku as { price_tier: string | number }).price_tier,
+          kdtIds,
+        });
+      }
+      return {
+        created: false,
+        yz_item_id: Number(existed.yz_item_id),
+        shop_id: hq.id,
+        yz_sku_id: Number(existed.yz_sku_id ?? 0) || null,
+        spu_code: remote.spuCode,
+        sku_code: remote.skuCode,
+      };
     }
-    if (scope === "standard") {
-      await syncStandardHqMasterFields({
-        accessToken: token,
-        spuId: Number(existed.yz_item_id),
-        spuCode: remote.spuCode,
-        barcode: String((sku as { barcode?: string | null }).barcode ?? ""),
-        name: remoteIdentity.name,
-        categoryId,
-        priceTier: (sku as { price_tier: string | number }).price_tier,
-        kdtIds,
-      });
-    }
-    return {
-      created: false,
-      yz_item_id: Number(existed.yz_item_id),
-      shop_id: hq.id,
-      yz_sku_id: Number(existed.yz_sku_id ?? 0) || null,
-      spu_code: remote.spuCode,
-      sku_code: remote.skuCode,
-    };
+    const { error: staleLinkError } = await supabase
+      .from("sku_youzan_links")
+      .delete()
+      .eq("sku_id", sku_id)
+      .eq("shop_id", hq.id)
+      .eq("role", "hq_spu");
+    if (staleLinkError) throw new Error(staleLinkError.message);
   }
   let newSpuId = 0;
   let newSkuId: number | null = null;
@@ -1351,9 +1353,7 @@ export async function ensureHqSpuLink(
   const attempts = buildSpuCreateAttempts(
     {
       sku_code: remoteIdentity.code,
-      scan_barcode: scope === "standard"
-        ? ((sku as { barcode?: string | null }).barcode ?? null)
-        : null,
+      scan_barcode: null,
       name: remoteIdentity.name,
       image_url: finalImage || null,
       notes: (sku as { notes?: string | null }).notes ?? null,
@@ -1422,7 +1422,6 @@ export async function ensureHqSpuLink(
       accessToken: token,
       spuId: newSpuId,
       spuCode: newSpuCode,
-      barcode: String((sku as { barcode?: string | null }).barcode ?? ""),
       name: remoteIdentity.name,
       categoryId,
       priceTier: (sku as { price_tier: string | number }).price_tier,

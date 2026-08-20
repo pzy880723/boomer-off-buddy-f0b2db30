@@ -17,19 +17,6 @@ export type StandardCatalogSyncRequest = {
   target_stock?: unknown;
 };
 
-export function buildStandardHqBarcodeFields(barcode: string) {
-  const normalized = barcode.trim();
-  if (!/^\d{8,32}$/.test(normalized)) {
-    throw new Error("标准商品缺少有效收银条码");
-  }
-  return {
-    spu_no: normalized,
-    // Youzan treats bar_codes as aliases in addition to spu_no. Repeating the
-    // primary barcode there is rejected as "商品更多条码重复".
-    bar_codes: [] as string[],
-  };
-}
-
 export function buildStandardYouzanRemoteIdentity(input: {
   skuId: string;
   skuCode: string;

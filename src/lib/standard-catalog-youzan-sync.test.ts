@@ -4,21 +4,12 @@ import test from "node:test";
 
 import {
   assertStandardCatalogSyncHost,
-  buildStandardHqBarcodeFields,
   buildHqSpuLookupParams,
   buildStandardYouzanRemoteIdentity,
   selectHqSpuRemoteIdentity,
   parseStandardCatalogSyncRequest,
   selectStandardCatalogTargetShops,
 } from "./standard-catalog-youzan-sync";
-
-test("standard HQ products persist the ERP barcode as the Youzan scan code", () => {
-  assert.deepEqual(buildStandardHqBarcodeFields(" 2009876212904 "), {
-    spu_no: "2009876212904",
-    bar_codes: [],
-  });
-  assert.throws(() => buildStandardHqBarcodeFields(""), /收银条码/);
-});
 
 test("standard catalog Youzan sync defaults to a bounded dry run", () => {
   assert.deepEqual(parseStandardCatalogSyncRequest({}), {
@@ -158,6 +149,13 @@ test("standard catalog runner retries transient batch failures without advancing
   assert.match(runner, /STANDARD_SYNC_START_OFFSET/);
   assert.match(runner, /const maxAttempts = 3/);
   assert.match(runner, /if \(batchFailed > 0\) break;\s*offset = nextOffset/);
+});
+
+test("standard catalog keeps POS barcodes on branch SKUs and repairs stale HQ links", () => {
+  const sync = readFileSync("src/lib/youzan-sync.functions.ts", "utf8");
+  assert.match(sync, /scan_barcode: null/);
+  assert.match(sync, /\.delete\(\)[\s\S]*\.eq\("role", "hq_spu"\)/);
+  assert.doesNotMatch(sync, /buildStandardHqBarcodeFields/);
 });
 
 test("new and edited standard products use the all-branch mirror-stock path", () => {
