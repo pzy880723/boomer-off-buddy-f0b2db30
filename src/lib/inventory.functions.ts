@@ -17,6 +17,22 @@ async function autoDistributeInBackground(sku_ids: string[], default_shop_ids: s
     try {
       const { triggerStockWorker } = await import("./youzan-sync.functions");
       const { releaseSkuToOfflineShopsCore } = await import("./youzan-offline-products.functions");
+      const { syncStandardSkuToAllYouzanBranchesCore } =
+        await import("./standard-catalog-youzan.server");
+      const { data: skuKinds } = await supabaseAdmin
+        .from("inv_skus")
+        .select("id, kind, is_custom_price, inventory_policy")
+        .in("id", sku_ids);
+      const standardIds = new Set(
+        (skuKinds ?? [])
+          .filter(
+            (sku) =>
+              sku.kind === "single" &&
+              sku.is_custom_price === false &&
+              sku.inventory_policy === "unlimited",
+          )
+          .map((sku) => String(sku.id)),
+      );
       // 若 default_shop_ids 为空 → 铺给所有 branch 门店
       let targetShopIds = default_shop_ids;
       if (targetShopIds.length === 0) {
@@ -29,10 +45,14 @@ async function autoDistributeInBackground(sku_ids: string[], default_shop_ids: s
       }
       for (const sid of sku_ids) {
         try {
-          await releaseSkuToOfflineShopsCore({
-            sku_id: sid,
-            shop_ids: targetShopIds,
-          });
+          if (standardIds.has(sid)) {
+            await syncStandardSkuToAllYouzanBranchesCore(sid, 9999);
+          } else {
+            await releaseSkuToOfflineShopsCore({
+              sku_id: sid,
+              shop_ids: targetShopIds,
+            });
+          }
         } catch {
           /* 保留错误在 link 里 */
         }
@@ -489,6 +509,7 @@ export const updateStandardProduct = createServerFn({ method: "POST" })
 
     let added = 0;
     let removed = 0;
+    const addedIds: string[] = [];
     if (data.price_tiers && data.price_tiers.length > 0) {
       const wanted = Array.from(new Set(data.price_tiers)).sort((a, b) => a - b);
       const current = new Map(matched.map((r) => [Number(r.price_tier), r]));
@@ -505,6 +526,7 @@ export const updateStandardProduct = createServerFn({ method: "POST" })
           sku_code: sku_code ?? generateSkuCode(category, "single"),
           price_tier: t,
           is_custom_price: false,
+          inventory_policy: "unlimited",
           kind: "single" as const,
           pack_pieces: null,
           bundle_items: [],
@@ -514,9 +536,13 @@ export const updateStandardProduct = createServerFn({ method: "POST" })
           status: "active" as const,
           epc: generateEpc(category, t),
         }));
-        const { error } = await sb.from("inv_skus").insert(inserts as never);
+        const { data: inserted, error } = await sb
+          .from("inv_skus")
+          .insert(inserts as never)
+          .select("id");
         if (error) throw new Error(error.message);
         added = inserts.length;
+        addedIds.push(...(inserted ?? []).map((row) => String(row.id)));
       }
 
       const toRemove = Array.from(current.entries()).filter(([t]) => !wanted.includes(t));
@@ -529,6 +555,7 @@ export const updateStandardProduct = createServerFn({ method: "POST" })
       }
     }
 
+    autoDistributeInBackground([...ids, ...addedIds], []);
     return { ok: true, updated: ids.length, added, removed, categoryMigrated };
   });
 

@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
   assertStandardCatalogSyncHost,
   buildStandardYouzanRemoteIdentity,
-  CITIC_TAIFU_YOUZAN_SHOP_ID,
   parseStandardCatalogSyncRequest,
+  selectStandardCatalogTargetShops,
 } from "./standard-catalog-youzan-sync";
 
 test("standard catalog Youzan sync defaults to a bounded dry run", () => {
@@ -15,7 +16,6 @@ test("standard catalog Youzan sync defaults to a bounded dry run", () => {
     limit: 10,
     offset: 0,
     targetStock: 9999,
-    shopId: CITIC_TAIFU_YOUZAN_SHOP_ID,
   });
 });
 
@@ -64,4 +64,44 @@ test("each standard price tier gets a stable unique Youzan identity", () => {
   assert.equal(low.name, "珠宝首饰 6.9元");
   assert.equal(high.name, "珠宝首饰 1580元");
   assert.ok(low.code.length <= 64);
+});
+
+test("ERP EAN barcode is the remote SKU identity used by Youzan POS", () => {
+  assert.deepEqual(
+    buildStandardYouzanRemoteIdentity({
+      skuId: "11111111-1111-1111-1111-111111111111",
+      skuCode: "SKU-STD-JW",
+      barcode: "2009876212904",
+      name: "珠宝首饰",
+      priceTier: 159,
+    }),
+    { code: "2009876212904", name: "珠宝首饰 159元" },
+  );
+});
+
+test("standard catalog targets every active Youzan branch exactly once", () => {
+  const targets = selectStandardCatalogTargetShops([
+    { id: "hq", shop_name: "总部", kdt_id: 1, role: "hq", status: "active" },
+    { id: "a", shop_name: "A店", kdt_id: 101, role: "branch", status: "active" },
+    { id: "b", shop_name: "B店", kdt_id: "102", role: "branch", status: "active" },
+    { id: "dup", shop_name: "重复授权", kdt_id: 102, role: "branch", status: "active" },
+    { id: "off", shop_name: "停用店", kdt_id: 103, role: "branch", status: "disabled" },
+  ]);
+  assert.deepEqual(targets.map((shop) => shop.id), ["a", "b"]);
+});
+
+test("production batch sync is not hard-coded to one shop and includes barcodes", () => {
+  const route = readFileSync(
+    "src/routes/api/public/hooks/youzan-standard-catalog-sync.ts",
+    "utf8",
+  );
+  assert.match(route, /selectStandardCatalogTargetShops/);
+  assert.match(route, /sku_code, barcode, name/);
+  assert.doesNotMatch(route, /da06cdae-5ec1-4749-8dcb-dc972cfd05c9/);
+});
+
+test("new and edited standard products use the all-branch mirror-stock path", () => {
+  const inventory = readFileSync("src/lib/inventory.functions.ts", "utf8");
+  assert.match(inventory, /syncStandardSkuToAllYouzanBranchesCore\(sid, 9999\)/);
+  assert.match(inventory, /autoDistributeInBackground\(\[\.\.\.ids, \.\.\.addedIds\], \[\]\)/);
 });

@@ -1,6 +1,13 @@
-export const CITIC_TAIFU_YOUZAN_SHOP_ID = "da06cdae-5ec1-4749-8dcb-dc972cfd05c9";
 export const STANDARD_CATALOG_SYNC_CONFIRM = "SYNC_STANDARD_CATALOG";
 export const STANDARD_CATALOG_SYNC_HOST = "erp.boomeroff.com";
+
+export type StandardCatalogTargetShop = {
+  id: string;
+  shop_name: string;
+  kdt_id: number | string;
+  role?: string | null;
+  status?: string | null;
+};
 
 export type StandardCatalogSyncRequest = {
   dry_run?: unknown;
@@ -13,10 +20,16 @@ export type StandardCatalogSyncRequest = {
 export function buildStandardYouzanRemoteIdentity(input: {
   skuId: string;
   skuCode: string;
+  barcode?: string | null;
   name: string;
   priceTier: number | string;
 }) {
   const price = Number(input.priceTier);
+  const barcode = String(input.barcode ?? "").trim();
+  if (/^\d{8,32}$/.test(barcode)) {
+    const displayPrice = Number.isInteger(price) ? String(price) : price.toFixed(1);
+    return { code: barcode, name: `${input.name} ${displayPrice}元` };
+  }
   const priceToken = Math.round(price * 10)
     .toString()
     .padStart(5, "0");
@@ -25,6 +38,19 @@ export function buildStandardYouzanRemoteIdentity(input: {
   const code = `${input.skuCode.slice(0, Math.max(1, 64 - suffix.length))}${suffix}`;
   const displayPrice = Number.isInteger(price) ? String(price) : price.toFixed(1);
   return { code, name: `${input.name} ${displayPrice}元` };
+}
+
+export function selectStandardCatalogTargetShops(
+  shops: StandardCatalogTargetShop[],
+): StandardCatalogTargetShop[] {
+  const seenKdtIds = new Set<number>();
+  return shops.filter((shop) => {
+    const kdtId = Number(shop.kdt_id);
+    if (shop.role !== "branch" || shop.status !== "active") return false;
+    if (!Number.isSafeInteger(kdtId) || kdtId <= 0 || seenKdtIds.has(kdtId)) return false;
+    seenKdtIds.add(kdtId);
+    return true;
+  });
 }
 
 function boundedInteger(value: unknown, fallback: number, min: number, max: number): number {
@@ -45,7 +71,6 @@ export function parseStandardCatalogSyncRequest(body: StandardCatalogSyncRequest
     limit: boundedInteger(body.limit, 10, 1, 20),
     offset: boundedInteger(body.offset, 0, 0, 100_000),
     targetStock: boundedInteger(body.target_stock, 9999, 1, 9999),
-    shopId: CITIC_TAIFU_YOUZAN_SHOP_ID,
   };
 }
 

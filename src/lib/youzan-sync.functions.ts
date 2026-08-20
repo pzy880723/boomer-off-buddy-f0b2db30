@@ -1177,25 +1177,9 @@ export async function ensureHqSpuLink(
   addBranchShopId?: string,
 ): Promise<{ created: boolean; yz_item_id: number; shop_id: string; yz_sku_id?: number | null }> {
   const hq = await getHqShop();
-  // 已有 HQ 绑定则直接返回（不改 sell_channel_ids）
-  const { data: existed } = await supabase
-    .from("sku_youzan_links")
-    .select("yz_item_id, yz_sku_id")
-    .eq("sku_id", sku_id)
-    .eq("shop_id", hq.id)
-    .maybeSingle();
-  if (existed?.yz_item_id && Number(existed.yz_item_id) > 0) {
-    return {
-      created: false,
-      yz_item_id: Number(existed.yz_item_id),
-      shop_id: hq.id,
-      yz_sku_id: Number(existed.yz_sku_id ?? 0) || null,
-    };
-  }
-
   const { data: sku } = await supabase
     .from("inv_skus")
-    .select("id, sku_code, name, category, price_tier, image_url, weight_g, notes, sku_scope")
+    .select("id, sku_code, barcode, name, category, price_tier, image_url, weight_g, notes, sku_scope")
     .eq("id", sku_id)
     .maybeSingle();
   if (!sku) throw new Error("SKU 不存在");
@@ -1207,6 +1191,7 @@ export async function ensureHqSpuLink(
     ? buildStandardYouzanRemoteIdentity({
         skuId: sku.id as string,
         skuCode: sku.sku_code as string,
+        barcode: (sku as { barcode?: string | null }).barcode ?? null,
         name: sku.name as string,
         priceTier: (sku as { price_tier: string | number }).price_tier,
       })
@@ -1217,6 +1202,39 @@ export async function ensureHqSpuLink(
 
 
   const token = await ensureAccessToken(hq);
+  const { data: existed } = await supabase
+    .from("sku_youzan_links")
+    .select("yz_item_id, yz_sku_id")
+    .eq("sku_id", sku_id)
+    .eq("shop_id", hq.id)
+    .maybeSingle();
+  if (existed?.yz_item_id && Number(existed.yz_item_id) > 0) {
+    if (scope === "standard") {
+      await callYouzanApiVerbose({
+        accessToken: token,
+        method: "youzan.retail.open.spu.update",
+        version: "3.0.0",
+        params: {
+          spu_id: Number(existed.yz_item_id),
+          name: remoteIdentity.name,
+          unit: DEFAULT_RETAIL_UNIT,
+          category_id: categoryId,
+          retail_price: Number(sku.price_tier).toFixed(2),
+          sell_channel_setting_request: {
+            is_partial: 1,
+            sell_channel_ids: kdtIds,
+          },
+        },
+        timeoutMs: 20_000,
+      });
+    }
+    return {
+      created: false,
+      yz_item_id: Number(existed.yz_item_id),
+      shop_id: hq.id,
+      yz_sku_id: Number(existed.yz_sku_id ?? 0) || null,
+    };
+  }
   let newSpuId = 0;
   let newSkuId: number | null = null;
   let lastPreview = "";
@@ -1881,11 +1899,20 @@ export async function ensureBranchDistribution(
   // 4. 补齐 spu.update 的必填字段
   const { data: skuRow } = await supabase
     .from("inv_skus")
-    .select("name, price_tier")
+    .select("id, sku_code, barcode, name, price_tier, sku_scope")
     .eq("id", sku_id)
     .maybeSingle();
-  const skuName = String((skuRow as { name?: string } | null)?.name ?? "").trim() || `SPU ${hqSpuId}`;
+  const rawSkuName = String((skuRow as { name?: string } | null)?.name ?? "").trim() || `SPU ${hqSpuId}`;
   const priceTier = Number((skuRow as { price_tier?: number } | null)?.price_tier ?? 0);
+  const skuName = (skuRow as { sku_scope?: string } | null)?.sku_scope === "custom"
+    ? rawSkuName
+    : buildStandardYouzanRemoteIdentity({
+        skuId: String((skuRow as { id?: string } | null)?.id ?? sku_id),
+        skuCode: String((skuRow as { sku_code?: string } | null)?.sku_code ?? "STANDARD"),
+        barcode: (skuRow as { barcode?: string | null } | null)?.barcode ?? null,
+        name: rawSkuName,
+        priceTier,
+      }).name;
   const retailPrice = (priceTier > 0 ? priceTier : 1).toFixed(2);
   const categoryId = await resolveHqRetailProductCategoryId();
 

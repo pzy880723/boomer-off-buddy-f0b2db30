@@ -2,11 +2,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   assertStandardCatalogSyncHost,
   parseStandardCatalogSyncRequest,
+  selectStandardCatalogTargetShops,
 } from "@/lib/standard-catalog-youzan-sync";
 
 type StandardSku = {
   id: string;
   sku_code: string | null;
+  barcode: string | null;
   name: string;
   category: string | null;
   price_tier: number;
@@ -43,27 +45,29 @@ export const Route = createFileRoute("/api/public/hooks/youzan-standard-catalog-
         }
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { data: shop, error: shopError } = await supabaseAdmin
+        const { data: shopRows, error: shopError } = await supabaseAdmin
           .from("youzan_shops")
-          .select("*")
-          .eq("id", options.shopId)
-          .maybeSingle();
-        if (shopError || !shop) {
+          .select("id, shop_name, kdt_id, role, status")
+          .eq("role", "branch")
+          .eq("status", "active")
+          .order("shop_name", { ascending: true });
+        if (shopError) {
           return Response.json(
-            { ok: false, error: shopError?.message ?? "中信泰富有赞门店不存在" },
+            { ok: false, error: shopError.message },
             { status: 400 },
           );
         }
-        if ((shop as { role?: string }).role !== "branch") {
+        const shops = selectStandardCatalogTargetShops(shopRows ?? []);
+        if (shops.length === 0) {
           return Response.json(
-            { ok: false, error: "中信泰富目标店铺不是有赞分店" },
+            { ok: false, error: "没有可同步的启用中有赞分店" },
             { status: 400 },
           );
         }
 
         const { data, error, count } = await supabaseAdmin
           .from("inv_skus")
-          .select("id, sku_code, name, category, price_tier", { count: "exact" })
+          .select("id, sku_code, barcode, name, category, price_tier", { count: "exact" })
           .eq("kind", "single")
           .eq("is_custom_price", false)
           .eq("inventory_policy", "unlimited")
@@ -86,9 +90,11 @@ export const Route = createFileRoute("/api/public/hooks/youzan-standard-catalog-
           has_more: nextOffset < (count ?? skus.length),
         };
         const target = {
-          shop_id: options.shopId,
-          shop_name: (shop as { shop_name?: string }).shop_name ?? "中信泰富",
-          kdt_id: Number((shop as { kdt_id?: number }).kdt_id ?? 0),
+          shops: shops.map((shop) => ({
+            shop_id: shop.id,
+            shop_name: shop.shop_name,
+            kdt_id: Number(shop.kdt_id),
+          })),
           channel: 1,
           target_stock: options.targetStock,
         };
@@ -124,80 +130,46 @@ export const Route = createFileRoute("/api/public/hooks/youzan-standard-catalog-
           });
         }
 
-        const { publishSkuToHqCore, releaseSkuToBranchCore } =
-          await import("@/lib/omnichannel-publish.functions");
-        const { explainYouzanError, pushYouzanQuantityUpdate } =
-          await import("@/lib/youzan.functions");
+        const { syncStandardSkuToYouzanBranchesCore } =
+          await import("@/lib/standard-catalog-youzan.server");
+        const { explainYouzanError } = await import("@/lib/youzan.functions");
         const results: Array<Record<string, unknown>> = [];
 
         for (const sku of skus) {
           try {
-            const hq = await publishSkuToHqCore(sku.id);
-            const branch = await releaseSkuToBranchCore(sku.id, options.shopId);
-            if (!branch.ok || !branch.item_id || !branch.sku_id) {
-              throw new Error(branch.error ?? "分店铺货后未获得真实 item_id/sku_id");
-            }
-            const stock = await pushYouzanQuantityUpdate({
-              branchShop: shop as unknown as Parameters<
-                typeof pushYouzanQuantityUpdate
-              >[0]["branchShop"],
-              itemId: branch.item_id,
-              skuId: branch.sku_id,
-              quantity: options.targetStock,
-              hqSpuIdGuard: branch.hq_spu_id ?? undefined,
-              channel: 1,
+            const synced = await syncStandardSkuToYouzanBranchesCore({
+              skuId: sku.id,
+              shops,
+              targetStock: options.targetStock,
             });
-            const pushedAt = new Date().toISOString();
-            const [listingUpdate, linkUpdate] = await Promise.all([
-              supabaseAdmin
-                .from("sku_channel_listings")
-                .update({
-                  last_stock: options.targetStock,
-                  last_stock_pushed: options.targetStock,
-                  last_pushed_at: pushedAt,
-                  last_error: null,
-                  updated_at: pushedAt,
-                } as never)
-                .eq("sku_id", sku.id)
-                .eq("channel", "youzan_branch_offline")
-                .eq("shop_id", options.shopId),
-              supabaseAdmin
-                .from("sku_youzan_links")
-                .update({
-                  last_pushed_stock: options.targetStock,
-                  last_pushed_at: pushedAt,
-                  last_error: null,
-                  updated_at: pushedAt,
-                } as never)
-                .eq("sku_id", sku.id)
-                .eq("shop_id", options.shopId),
-            ]);
-            if (listingUpdate.error) throw new Error(listingUpdate.error.message);
-            if (linkUpdate.error) throw new Error(linkUpdate.error.message);
             results.push({
               sku_id: sku.id,
               sku_code: sku.sku_code,
+              barcode: sku.barcode,
               name: sku.name,
-              ok: true,
-              hq_created: hq.created,
-              hq_spu_id: hq.spu_id,
-              branch_item_id: branch.item_id,
-              branch_sku_id: branch.sku_id,
-              target_stock: options.targetStock,
-              trace_id: stock.trace_id,
+              ok: synced.ok,
+              hq_created: synced.hq.created,
+              hq_spu_id: synced.hq.spu_id,
+              branches: synced.branches,
             });
           } catch (error) {
             results.push({
               sku_id: sku.id,
               sku_code: sku.sku_code,
+              barcode: sku.barcode,
               name: sku.name,
               ok: false,
+              stage: "hq",
               error: explainYouzanError(error),
             });
           }
         }
 
         const failed = results.filter((item) => item.ok === false).length;
+        const failedBranches = results.reduce((total, item) => {
+          const branches = Array.isArray(item.branches) ? item.branches : [];
+          return total + branches.filter((branch) => branch.ok === false).length;
+        }, 0);
         return Response.json({
           ok: failed === 0,
           dry_run: false,
@@ -205,6 +177,7 @@ export const Route = createFileRoute("/api/public/hooks/youzan-standard-catalog-
           batch,
           succeeded: results.length - failed,
           failed,
+          failed_branches: failedBranches,
           results,
         });
       },
