@@ -1757,13 +1757,19 @@ export async function ensureHqSpu(sku_id: string, addBranchShopId?: string) {
 }
 
 // ============================================================
-// resolveBranchSellChannelId —— 只接受真实查到的 sell_channel_id。
-// 拿不到就失败，禁止再把 kdt_id 当渠道号继续铺货。
+// resolveBranchSellChannelId —— 优先接受真实查到的 sell_channel_id。
+// 连锁零售旧授权不返回渠道号时，以 branch kdt_id 做兼容尝试；只有后续
+// spu.update + 分店反查都成功，ensureBranchDistribution 才会把它落库。
 // ============================================================
 async function resolveBranchSellChannelId(
   hqToken: string,
   branch: { id: string; kdt_id: number; sell_channel_id?: number | null },
-): Promise<{ sellChannelId: number | null; via: "saved" | "chain_probe" | "shop.get" | null; trace: string | null; error?: string }> {
+): Promise<{
+  sellChannelId: number | null;
+  via: "saved" | "chain_probe" | "shop.get" | "branch_kdt_fallback" | null;
+  trace: string | null;
+  error?: string;
+}> {
   const saved = Number(branch.sell_channel_id ?? 0);
   if (Number.isFinite(saved) && saved > 0) {
     return { sellChannelId: saved, via: "saved", trace: null };
@@ -1802,13 +1808,18 @@ async function resolveBranchSellChannelId(
     };
     walk(res.payload);
     if (channelId) return { sellChannelId: channelId, via: "shop.get", trace: res.trace_id };
-    return { sellChannelId: null, via: null, trace: res.trace_id, error: "shop.get 没有返回 sell_channel_id" };
+    return {
+      sellChannelId: branch.kdt_id,
+      via: "branch_kdt_fallback",
+      trace: res.trace_id,
+      error: "shop.get 没有返回 sell_channel_id，按连锁零售兼容规则尝试分店 kdt_id",
+    };
   } catch (e) {
     return {
-      sellChannelId: null,
-      via: null,
+      sellChannelId: branch.kdt_id,
+      via: "branch_kdt_fallback",
       trace: null,
-      error: e instanceof Error ? e.message : String(e),
+      error: `${e instanceof Error ? e.message : String(e)}；按连锁零售兼容规则尝试分店 kdt_id`,
     };
   }
 }
@@ -2030,16 +2041,27 @@ export async function ensureBranchDistribution(
   }
 
   const branchSkuId = probe.sku_id || probe.item_id;
-  await supabase.from("sku_youzan_links").upsert({
-    sku_id,
-    shop_id,
-    yz_item_id: probe.item_id,
-    yz_sku_id: branchSkuId,
-    status: "linked",
-    sync_stock: true,
-    role: "branch_stock",
-    last_error: null,
-  } as never, { onConflict: "sku_id,shop_id" });
+  const confirmedChannelIds = Array.from(new Set(targetChannelIds));
+  const [linkWrite, shopWrite] = await Promise.all([
+    supabase.from("sku_youzan_links").upsert({
+      sku_id,
+      shop_id,
+      yz_item_id: probe.item_id,
+      yz_sku_id: branchSkuId,
+      status: "linked",
+      sync_stock: true,
+      role: "branch_stock",
+      last_error: null,
+    } as never, { onConflict: "sku_id,shop_id" }),
+    supabase.from("youzan_shops").update({
+      sell_channel_id: chan.sellChannelId ?? confirmedChannelIds[0] ?? null,
+      sell_channel_ids: confirmedChannelIds,
+      chain_probe_status: "ok",
+      chain_probe_at: new Date().toISOString(),
+    } as never).eq("id", shop_id),
+  ]);
+  if (linkWrite.error) throw new Error(linkWrite.error.message);
+  if (shopWrite.error) throw new Error(shopWrite.error.message);
 
   return {
     ok: true,

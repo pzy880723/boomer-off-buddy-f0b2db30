@@ -516,7 +516,7 @@ export async function runYouzanShopChainProbe(shopId: string): Promise<YouzanSho
       accessToken: hqToken,
       method: "youzan.shop.chain.descendent.organization.list",
       versions: ["1.0.1", "1.0.0"],
-      params: {},
+      params: { page_num: 1, page_size: 50 },
       timeoutMs: 15_000,
     });
     const chainChannel = chain.payload

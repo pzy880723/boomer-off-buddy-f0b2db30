@@ -105,3 +105,12 @@ test("new and edited standard products use the all-branch mirror-stock path", ()
   assert.match(inventory, /syncStandardSkuToAllYouzanBranchesCore\(sid, 9999\)/);
   assert.match(inventory, /autoDistributeInBackground\(\[\.\.\.ids, \.\.\.addedIds\], \[\]\)/);
 });
+
+test("chain probing sends a valid page and persists kdt fallback only after branch verification", () => {
+  const youzan = readFileSync("src/lib/youzan.functions.ts", "utf8");
+  const sync = readFileSync("src/lib/youzan-sync.functions.ts", "utf8");
+  assert.match(youzan, /params: \{ page_num: 1, page_size: 50 \}/);
+  assert.match(sync, /via: "branch_kdt_fallback"/);
+  assert.match(sync, /const confirmedChannelIds = Array\.from\(new Set\(targetChannelIds\)\)/);
+  assert.match(sync, /chain_probe_status: "ok"/);
+});
