@@ -153,6 +153,13 @@ test("production batch sync is not hard-coded to one shop and includes barcodes"
   assert.doesNotMatch(route, /da06cdae-5ec1-4749-8dcb-dc972cfd05c9/);
 });
 
+test("standard catalog runner retries transient batch failures without advancing the offset", () => {
+  const runner = readFileSync("scripts/sync-standard-catalog-youzan.mjs", "utf8");
+  assert.match(runner, /STANDARD_SYNC_START_OFFSET/);
+  assert.match(runner, /const maxAttempts = 3/);
+  assert.match(runner, /if \(batchFailed > 0\) break;\s*offset = nextOffset/);
+});
+
 test("new and edited standard products use the all-branch mirror-stock path", () => {
   const inventory = readFileSync("src/lib/inventory.functions.ts", "utf8");
   assert.match(inventory, /syncStandardSkuToAllYouzanBranchesCore\(sid, 9999\)/);

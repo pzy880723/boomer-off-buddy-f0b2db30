@@ -10,42 +10,52 @@ if (!key) {
   throw new Error("SUPABASE_SERVICE_ROLE_KEY is required");
 }
 
-let offset = 0;
+let offset = Math.max(0, Number(process.env.STANDARD_SYNC_START_OFFSET ?? 0) || 0);
 let total = Number.POSITIVE_INFINITY;
 let failed = 0;
+const maxAttempts = 3;
 
 while (offset < total) {
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      dry_run: !execute,
-      confirm: execute ? "SYNC_STANDARD_CATALOG" : "",
-      limit: 20,
-      offset,
-      target_stock: 9999,
-    }),
-  });
-  const payload = await response.json();
-  if (!response.ok) {
-    throw new Error(`sync request failed (${response.status}): ${JSON.stringify(payload)}`);
+  let payload;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        dry_run: !execute,
+        confirm: execute ? "SYNC_STANDARD_CATALOG" : "",
+        limit: 20,
+        offset,
+        target_stock: 9999,
+      }),
+    });
+    payload = await response.json();
+    if (!response.ok) {
+      throw new Error(`sync request failed (${response.status}): ${JSON.stringify(payload)}`);
+    }
+    if (Number(payload.failed ?? 0) === 0 || attempt === maxAttempts) break;
+    console.warn(JSON.stringify({ offset, attempt, batch_failed: payload.failed, retrying: true }));
+    await new Promise((resolve) => setTimeout(resolve, attempt * 10_000));
   }
+  if (!payload) throw new Error("standard catalog sync returned no payload");
   total = Number(payload.batch?.total ?? 0);
-  offset = Number(payload.batch?.next_offset ?? total);
-  failed += Number(payload.failed ?? 0);
+  const batchFailed = Number(payload.failed ?? 0);
+  failed += batchFailed;
+  const nextOffset = Number(payload.batch?.next_offset ?? total);
   console.log(
     JSON.stringify({
       dry_run: payload.dry_run,
-      processed: offset,
+      processed: nextOffset,
       total,
-      batch_failed: payload.failed ?? 0,
-      next_offset: offset,
+      batch_failed: batchFailed,
+      next_offset: nextOffset,
     }),
   );
-  if (Number(payload.failed ?? 0) > 0) break;
+  if (batchFailed > 0) break;
+  offset = nextOffset;
   if (!payload.batch?.has_more) break;
 }
 
