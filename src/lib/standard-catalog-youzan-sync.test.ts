@@ -15,7 +15,7 @@ import {
 test("standard HQ products persist the ERP barcode as the Youzan scan code", () => {
   assert.deepEqual(buildStandardHqBarcodeFields(" 2009876212904 "), {
     spu_no: "2009876212904",
-    bar_codes: ["2009876212904"],
+    bar_codes: [],
   });
   assert.throws(() => buildStandardHqBarcodeFields(""), /收银条码/);
 });

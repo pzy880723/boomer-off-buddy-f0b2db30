@@ -24,7 +24,9 @@ export function buildStandardHqBarcodeFields(barcode: string) {
   }
   return {
     spu_no: normalized,
-    bar_codes: [normalized],
+    // Youzan treats bar_codes as aliases in addition to spu_no. Repeating the
+    // primary barcode there is rejected as "商品更多条码重复".
+    bar_codes: [] as string[],
   };
 }
 
