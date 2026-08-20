@@ -1,3 +1,6 @@
+import { buildStandardYouzanRemoteIdentity } from "./standard-catalog-youzan-sync";
+import { resolvePublicSkuImageUrls } from "./sku-media";
+
 export type OfflineProductQueryInput = {
   pageNo?: number;
   pageSize?: number;
@@ -6,6 +9,41 @@ export type OfflineProductQueryInput = {
   nameOrSkuNo?: string;
   itemIds?: number[];
 };
+
+export function buildOfflineSkuIdentity(input: {
+  id: string;
+  skuScope: string | null;
+  skuCode: string;
+  barcode?: string | null;
+  name: string;
+  priceTier: number | string;
+}) {
+  if (input.skuScope === "standard") {
+    return buildStandardYouzanRemoteIdentity({
+      skuId: input.id,
+      skuCode: input.skuCode,
+      barcode: input.barcode,
+      name: input.name,
+      priceTier: input.priceTier,
+    });
+  }
+  return { code: input.skuCode, name: input.name };
+}
+
+export function resolveOfflineReleaseSourceImages(input: {
+  skuScope: string | null;
+  imageUrl?: string | null;
+  imagePaths?: unknown[] | null;
+  publicOrigin: string;
+}) {
+  const images = resolvePublicSkuImageUrls(
+    [input.imageUrl, ...(Array.isArray(input.imagePaths) ? input.imagePaths : [])],
+    input.publicOrigin,
+    5,
+  );
+  if (images.length > 0 || input.skuScope !== "standard") return images;
+  return [`${input.publicOrigin.replace(/\/+$/, "")}/m-icon-512.png`];
+}
 
 export function buildBranchItemShelfRequest(input: {
   itemId: number;
@@ -124,7 +162,7 @@ export function buildOfflineProductLookupTerms(target: {
 export function buildOfflineStockQueueRow(args: {
   skuId: string;
   shopId: string;
-  locationId: string;
+  locationId: string | null;
   targetStock: number;
 }) {
   return {

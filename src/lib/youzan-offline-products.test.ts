@@ -8,9 +8,11 @@ import {
   buildOfflineProductReleaseParams,
   buildOfflineProductLookupTerms,
   buildOfflineChannelListingRow,
+  buildOfflineSkuIdentity,
   findOfflineProductMatch,
   normalizeYouzanProductCode,
   parseOfflineProductRows,
+  resolveOfflineReleaseSourceImages,
 } from "./youzan-offline-products.server";
 
 describe("youzan offline products", () => {
@@ -147,6 +149,41 @@ describe("youzan offline products", () => {
     assert.equal(input.unit, "件");
   });
 
+  test("standard products use the ERP barcode as the Youzan POS scan code", () => {
+    assert.deepEqual(
+      buildOfflineSkuIdentity({
+        id: "11111111-1111-1111-1111-111111111111",
+        skuScope: "standard",
+        skuCode: "SKU-STD-AT",
+        barcode: "2008685091625",
+        name: "古美术",
+        priceTier: 6.9,
+      }),
+      { code: "2008685091625", name: "古美术 6.9元" },
+    );
+  });
+
+  test("standard products without photos use the public BOOMER fallback image", () => {
+    assert.deepEqual(
+      resolveOfflineReleaseSourceImages({
+        skuScope: "standard",
+        imageUrl: null,
+        imagePaths: [],
+        publicOrigin: "https://erp.boomeroff.com",
+      }),
+      ["https://erp.boomeroff.com/m-icon-512.png"],
+    );
+    assert.deepEqual(
+      resolveOfflineReleaseSourceImages({
+        skuScope: "custom",
+        imageUrl: null,
+        imagePaths: [],
+        publicOrigin: "https://erp.boomeroff.com",
+      }),
+      [],
+    );
+  });
+
   test("release lookup preserves the exact ERP code before normalized fallbacks", () => {
     assert.equal(normalizeYouzanProductCode("SKU-JP-260712-C8FG"), "SKUJP260712C8FG");
     assert.deepEqual(
@@ -215,6 +252,17 @@ describe("youzan offline products", () => {
     assert.equal(row.status, "pending");
     assert.equal(row.target_stock, 1);
     assert.equal(row.last_error, null);
+  });
+
+  test("unlimited standard stock keeps the mirror target instead of recalculating local stock", () => {
+    const row = buildOfflineStockQueueRow({
+      skuId: "11111111-1111-1111-1111-111111111111",
+      shopId: "22222222-2222-2222-2222-222222222222",
+      locationId: null,
+      targetStock: 9999,
+    });
+    assert.equal(row.location_id, null);
+    assert.equal(row.target_stock, 9999);
   });
 
   test("offline publication mirrors the real branch ids into the unified channel listing", () => {

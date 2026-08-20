@@ -115,15 +115,16 @@ test("chain probing sends a valid page and persists kdt fallback only after bran
   assert.match(sync, /chain_probe_status: "ok"/);
 });
 
-test("stock push reloads the complete branch authorization record", () => {
+test("standard catalog uses the offline retail-store release path", () => {
   const server = readFileSync("src/lib/standard-catalog-youzan.server.ts", "utf8");
-  assert.match(server, /\.from\("youzan_shops"\)\s*\.select\("\*"\)/);
-  assert.match(server, /branchShop: branchShop/);
+  assert.match(server, /releaseSkuToOfflineShopsCore/);
+  assert.doesNotMatch(server, /releaseSkuToBranchCore/);
+  assert.doesNotMatch(server, /pushYouzanQuantityUpdate/);
 });
 
 test("branch stock failures invalidate stale links and listings", () => {
-  const server = readFileSync("src/lib/standard-catalog-youzan.server.ts", "utf8");
-  assert.match(server, /status: "error",\s*last_error: failure/);
-  assert.match(server, /listing_status: "error",\s*last_error: failure/);
-  assert.match(server, /\.eq\("channel", "youzan_branch_offline"\)/);
+  const server = readFileSync("src/lib/youzan-offline-products.functions.ts", "utf8");
+  assert.match(server, /status: "error",\s*role: "branch_stock"/);
+  assert.match(server, /listing_status: "error"/);
+  assert.match(server, /channel: "youzan_branch_offline"/);
 });

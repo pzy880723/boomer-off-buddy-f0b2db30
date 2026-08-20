@@ -3,8 +3,9 @@ import { z } from "zod";
 import { supabaseAdmin as supabase } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { ensureAccessToken, getHqShop } from "./youzan.functions";
-import { getPublicOrigin, resolvePublicSkuImageUrls } from "./sku-media";
+import { getPublicOrigin } from "./sku-media";
 import {
+  buildOfflineSkuIdentity,
   buildOfflineSkuReleaseInput,
   buildOfflineChannelListingRow,
   buildOfflineProductLookupTerms,
@@ -12,6 +13,7 @@ import {
   findOfflineProductMatch,
   queryYouzanOfflineProducts,
   releaseYouzanOfflineProduct,
+  resolveOfflineReleaseSourceImages,
 } from "./youzan-offline-products.server";
 import {
   ensureAutoYouzanDefaultCategory,
@@ -111,7 +113,8 @@ async function upsertBranchLink(args: {
 }
 
 async function markBranchReleaseError(skuId: string, shopId: string, message: string) {
-  await supabase.from("sku_youzan_links").upsert(
+  const failure = message.slice(0, 400);
+  const { error: linkError } = await supabase.from("sku_youzan_links").upsert(
     {
       sku_id: skuId,
       shop_id: shopId,
@@ -120,16 +123,39 @@ async function markBranchReleaseError(skuId: string, shopId: string, message: st
       status: "error",
       role: "branch_stock",
       sync_stock: false,
-      last_error: message.slice(0, 400),
+      last_error: failure,
     } as never,
     { onConflict: "sku_id,shop_id" },
   );
+  if (linkError) throw new Error(linkError.message);
+
+  const { data: existing, error: existingError } = await supabase
+    .from("sku_channel_listings")
+    .select("id")
+    .eq("sku_id", skuId)
+    .eq("channel", "youzan_branch_offline")
+    .eq("shop_id", shopId)
+    .maybeSingle();
+  if (existingError) throw new Error(existingError.message);
+  const payload = {
+    sku_id: skuId,
+    channel: "youzan_branch_offline",
+    shop_id: shopId,
+    listing_status: "error",
+    last_error: failure,
+    updated_at: new Date().toISOString(),
+  };
+  const listingWrite = existing?.id
+    ? supabase.from("sku_channel_listings").update(payload as never).eq("id", existing.id)
+    : supabase.from("sku_channel_listings").insert(payload as never);
+  const { error: listingError } = await listingWrite;
+  if (listingError) throw new Error(listingError.message);
 }
 
 async function enqueueBranchStock(args: {
   skuId: string;
   shopId: string;
-  locationId: string;
+  locationId: string | null;
   targetStock: number;
 }) {
   const row = buildOfflineStockQueueRow(args);
@@ -160,7 +186,7 @@ export async function releaseSkuToOfflineShopsCore(args: {
     await Promise.all([
       supabase
         .from("inv_skus")
-        .select("id,name,sku_code,price_tier,image_url,image_paths")
+        .select("id,name,sku_code,barcode,price_tier,image_url,image_paths,sku_scope")
         .eq("id", args.sku_id)
         .maybeSingle(),
       supabase
@@ -182,23 +208,36 @@ export async function releaseSkuToOfflineShopsCore(args: {
   // inv_skus.image_paths 存的是私有桶路径（sku-listing/xxx.jpg），不是 URL。
   // 必须先转成 ERP 公开只读代理地址，有赞才抓得到；
   // 直接把桶路径丢给素材上传接口就是之前 [160400100] file 参数错误的根因。
-  const rawImages = resolvePublicSkuImageUrls(
-    [sku.image_url, ...(Array.isArray(sku.image_paths) ? sku.image_paths : [])],
-    getPublicOrigin(),
-    5,
-  );
+  const publicOrigin = getPublicOrigin();
+  const rawImages = resolveOfflineReleaseSourceImages({
+    skuScope: sku.sku_scope,
+    imageUrl: sku.image_url,
+    imagePaths: sku.image_paths,
+    publicOrigin,
+  });
   if (rawImages.length === 0) throw new Error("商品缺少可对外访问的图片，无法发布到有赞门店");
+
+  const remoteIdentity = buildOfflineSkuIdentity({
+    id: sku.id,
+    skuScope: sku.sku_scope,
+    skuCode: String(sku.sku_code ?? ""),
+    barcode: sku.barcode,
+    name: sku.name,
+    priceTier: sku.price_tier,
+  });
 
   const hq = await getHqShop();
   const accessToken = await ensureAccessToken(hq);
   const category = await ensureAutoYouzanDefaultCategory();
   const imageUrls = await Promise.all(
     rawImages.map((url) =>
-      uploadImageToYouzanMaterial(accessToken, url, {
-        shop_id: hq.id,
-        kdt_id: hq.kdt_id,
-        sku_id: args.sku_id,
-      }),
+      url.endsWith("/m-icon-512.png")
+        ? Promise.resolve(url)
+        : uploadImageToYouzanMaterial(accessToken, url, {
+            shop_id: hq.id,
+            kdt_id: hq.kdt_id,
+            sku_id: args.sku_id,
+          }),
     ),
   );
 
@@ -231,8 +270,8 @@ export async function releaseSkuToOfflineShopsCore(args: {
     const remoteExisting = await findExistingOfflineProduct({
       accessToken,
       warehouseCode: branch.warehouse_code,
-      skuCode: String(sku.sku_code ?? ""),
-      name: sku.name,
+      skuCode: remoteIdentity.code,
+      name: remoteIdentity.name,
     });
     if (remoteExisting) {
       const remoteSkuId = remoteExisting.skus[0]?.skuId ?? null;
@@ -248,7 +287,7 @@ export async function releaseSkuToOfflineShopsCore(args: {
       await enqueueBranchStock({
         skuId: args.sku_id,
         shopId: branch.id,
-        locationId: location.id,
+        locationId: args.stock_override === undefined ? location.id : null,
         targetStock: stock,
       });
       results.push({
@@ -267,8 +306,8 @@ export async function releaseSkuToOfflineShopsCore(args: {
         accessToken,
         input: buildOfflineSkuReleaseInput({
           sku: {
-            name: sku.name,
-            skuCode: String(sku.sku_code ?? ""),
+            name: remoteIdentity.name,
+            skuCode: remoteIdentity.code,
             priceYuan: Number(sku.price_tier ?? 0),
             imageUrls,
           },
@@ -290,7 +329,7 @@ export async function releaseSkuToOfflineShopsCore(args: {
       await enqueueBranchStock({
         skuId: args.sku_id,
         shopId: branch.id,
-        locationId: location.id,
+        locationId: args.stock_override === undefined ? location.id : null,
         targetStock: stock,
       });
       results.push({
@@ -308,8 +347,8 @@ export async function releaseSkuToOfflineShopsCore(args: {
         const matched = await findExistingOfflineProduct({
           accessToken,
           warehouseCode: branch.warehouse_code,
-          skuCode: String(sku.sku_code ?? ""),
-          name: sku.name,
+          skuCode: remoteIdentity.code,
+          name: remoteIdentity.name,
         });
         if (matched) {
           recovered = { itemId: matched.itemId, skuId: matched.skus[0]?.skuId ?? null };
@@ -330,7 +369,7 @@ export async function releaseSkuToOfflineShopsCore(args: {
         await enqueueBranchStock({
           skuId: args.sku_id,
           shopId: branch.id,
-          locationId: location.id,
+            locationId: args.stock_override === undefined ? location.id : null,
           targetStock: stock,
         });
         results.push({
@@ -355,7 +394,24 @@ export async function releaseSkuToOfflineShopsCore(args: {
     }
   }
   if (results.some((result) => result.ok)) {
-    await runStockSyncWorkerForSkus([args.sku_id]);
+    const worker = await runStockSyncWorkerForSkus([args.sku_id]);
+    if (worker.failed > 0) {
+      for (const result of results.filter((item) => item.ok)) {
+        const { data: failedTask } = await supabase
+          .from("youzan_stock_sync_queue")
+          .select("last_error")
+          .eq("sku_id", args.sku_id)
+          .eq("shop_id", result.shop_id)
+          .eq("status", "failed")
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (failedTask?.last_error) {
+          result.ok = false;
+          result.error = String(failedTask.last_error);
+        }
+      }
+    }
   }
   return { ok: results.every((result) => result.ok), results };
 }
