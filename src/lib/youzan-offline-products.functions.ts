@@ -10,7 +10,6 @@ import {
   buildOfflineChannelListingRow,
   buildOfflineProductLookupTerms,
   buildOfflineStockQueueRow,
-  canReuseOfflineBranchLink,
   findOfflineProductMatch,
   queryYouzanOfflineProducts,
   releaseYouzanOfflineProduct,
@@ -266,44 +265,8 @@ export async function releaseSkuToOfflineShopsCore(args: {
       stock = Math.max(0, Math.trunc(Number(localStock?.qty ?? 0)));
     }
 
-    const { data: existingBranchLink } = await supabase
-      .from("sku_youzan_links")
-      .select("status,yz_item_id,yz_sku_id")
-      .eq("sku_id", args.sku_id)
-      .eq("shop_id", branch.id)
-      .eq("role", "branch_stock")
-      .maybeSingle();
-    if (existingBranchLink && canReuseOfflineBranchLink(existingBranchLink)) {
-      const itemId = Number(existingBranchLink.yz_item_id);
-      const remoteSkuId = Number(existingBranchLink.yz_sku_id);
-      await upsertBranchLink({
-        skuId: args.sku_id,
-        shopId: branch.id,
-        hqSpuId: hqLink.yz_item_id,
-        itemId,
-        skuIdRemote: remoteSkuId,
-        stock,
-        recovered: true,
-      });
-      await enqueueBranchStock({
-        skuId: args.sku_id,
-        shopId: branch.id,
-        locationId: args.stock_override === undefined ? location.id : null,
-        targetStock: stock,
-      });
-      results.push({
-        shop_id: branch.id,
-        ok: true,
-        item_id: itemId,
-        sku_id: remoteSkuId,
-        recovered: true,
-        error: null,
-      });
-      continue;
-    }
-
-    // Online channel item IDs are not valid for an offline retail-store stock update.
-    // Recover only through offline.spu.query, otherwise create through offline.spu.release.
+    // The live branch query is authoritative. Database links can become stale when Youzan
+    // rewrites an offline item id or a product is recreated in the branch.
     const remoteExisting = await findExistingOfflineProduct({
       accessToken,
       warehouseCode: branch.warehouse_code,
@@ -461,7 +424,7 @@ export const queryOfflineProducts = createServerFn({ method: "POST" })
     z
       .object({
         page_no: z.number().int().positive().default(1),
-        page_size: z.number().int().min(1).max(100).default(20),
+        page_size: z.number().int().min(1).max(50).default(20),
         show_display: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional(),
         warehouse_code: z.string().trim().min(1).optional(),
         name_or_sku_no: z.string().trim().min(1).optional(),

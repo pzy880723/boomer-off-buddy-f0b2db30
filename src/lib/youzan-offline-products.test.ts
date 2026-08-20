@@ -4,7 +4,6 @@ import {
   buildBranchItemShelfRequest,
   buildOfflineSkuReleaseInput,
   buildOfflineStockQueueRow,
-  canReuseOfflineBranchLink,
   buildOfflineProductQueryParams,
   buildOfflineProductReleaseParams,
   buildOfflineProductLookupTerms,
@@ -44,10 +43,11 @@ describe("youzan offline products", () => {
   });
 
   test("query pagination never exceeds the documented 3300 window", () => {
-    assert.throws(() => buildOfflineProductQueryParams({ pageNo: 34, pageSize: 100 }));
-    assert.deepEqual(buildOfflineProductQueryParams({ pageNo: 33, pageSize: 100 }), {
-      page_no: 33,
-      page_size: 100,
+    assert.throws(() => buildOfflineProductQueryParams({ pageNo: 1, pageSize: 51 }));
+    assert.throws(() => buildOfflineProductQueryParams({ pageNo: 67, pageSize: 50 }));
+    assert.deepEqual(buildOfflineProductQueryParams({ pageNo: 66, pageSize: 50 }), {
+      page_no: 66,
+      page_size: 50,
     });
   });
 
@@ -268,18 +268,6 @@ describe("youzan offline products", () => {
     });
     assert.equal(row.location_id, null);
     assert.equal(row.target_stock, 9999);
-  });
-
-  test("a verified branch item is reused instead of being released again", () => {
-    assert.equal(
-      canReuseOfflineBranchLink({ status: "linked", yz_item_id: 5072709609, yz_sku_id: 15078814194 }),
-      true,
-    );
-    assert.equal(
-      canReuseOfflineBranchLink({ status: "error", yz_item_id: 5072709609, yz_sku_id: 15078814194 }),
-      false,
-    );
-    assert.equal(canReuseOfflineBranchLink({ status: "linked", yz_item_id: 0, yz_sku_id: null }), false);
   });
 
   test("offline publication mirrors the real branch ids into the unified channel listing", () => {

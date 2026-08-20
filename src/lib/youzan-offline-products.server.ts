@@ -63,8 +63,8 @@ export function buildOfflineProductQueryParams(input: OfflineProductQueryInput) 
   const pageNo = input.pageNo ?? 1;
   const pageSize = input.pageSize ?? 20;
   if (!Number.isInteger(pageNo) || pageNo < 1) throw new Error("pageNo must be positive");
-  if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100) {
-    throw new Error("pageSize must be between 1 and 100");
+  if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 50) {
+    throw new Error("pageSize must be between 1 and 50");
   }
   if (pageNo * pageSize > 3300) throw new Error("Youzan page_no * page_size cannot exceed 3300");
   return {
@@ -176,18 +176,6 @@ export function buildOfflineStockQueueRow(args: {
     next_run_at: new Date().toISOString(),
     last_error: null,
   };
-}
-
-export function canReuseOfflineBranchLink(link: {
-  status?: string | null;
-  yz_item_id?: number | null;
-  yz_sku_id?: number | null;
-}) {
-  return (
-    link.status === "linked" &&
-    Number(link.yz_item_id ?? 0) > 0 &&
-    Number(link.yz_sku_id ?? 0) > 0
-  );
 }
 
 export function buildOfflineChannelListingRow(args: {
