@@ -120,3 +120,10 @@ test("stock push reloads the complete branch authorization record", () => {
   assert.match(server, /\.from\("youzan_shops"\)\s*\.select\("\*"\)/);
   assert.match(server, /branchShop: branchShop/);
 });
+
+test("branch stock failures invalidate stale links and listings", () => {
+  const server = readFileSync("src/lib/standard-catalog-youzan.server.ts", "utf8");
+  assert.match(server, /status: "error",\s*last_error: failure/);
+  assert.match(server, /listing_status: "error",\s*last_error: failure/);
+  assert.match(server, /\.eq\("channel", "youzan_branch_offline"\)/);
+});

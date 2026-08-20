@@ -96,11 +96,35 @@ export async function syncStandardSkuToYouzanBranchesCore(args: {
         trace_id: stock.trace_id,
       });
     } catch (error) {
+      const failure = explainYouzanError(error).slice(0, 400);
+      const failedAt = new Date().toISOString();
+      await Promise.all([
+        supabase
+          .from("sku_youzan_links")
+          .update({
+            status: "error",
+            sync_stock: false,
+            last_error: failure,
+            updated_at: failedAt,
+          } as never)
+          .eq("sku_id", args.skuId)
+          .eq("shop_id", shop.id),
+        supabase
+          .from("sku_channel_listings")
+          .update({
+            listing_status: "error",
+            last_error: failure,
+            updated_at: failedAt,
+          } as never)
+          .eq("sku_id", args.skuId)
+          .eq("channel", "youzan_branch_offline")
+          .eq("shop_id", shop.id),
+      ]);
       branches.push({
         shop_id: shop.id,
         shop_name: shop.shop_name,
         ok: false,
-        error: explainYouzanError(error),
+        error: failure,
       });
     }
   }
