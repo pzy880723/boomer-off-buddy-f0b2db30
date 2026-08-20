@@ -13,7 +13,10 @@ import {
 } from "./youzan.functions";
 import { selectTrustedBranchItemIds } from "./youzan-quantity.server";
 import { buildBranchItemShelfRequest } from "./youzan-offline-products.server";
-import { buildStandardYouzanRemoteIdentity } from "./standard-catalog-youzan-sync";
+import {
+  buildHqSpuLookupParams,
+  buildStandardYouzanRemoteIdentity,
+} from "./standard-catalog-youzan-sync";
 
 
 
@@ -1138,29 +1141,46 @@ function collectSpuRowsFromPayload(payload: unknown): Array<Record<string, unkno
 }
 
 async function findCreatedHqSpu(token: string, code: string, name: string) {
-  const res = await callYouzanApiVerbose({
-    accessToken: token,
-    method: "youzan.retail.open.spu.query",
-    version: "3.0.0",
-    params: { page_no: 1, page_size: 20 },
-    timeoutMs: 20_000,
-  });
-  const rows = collectSpuRowsFromPayload(res.payload);
-  const matched = rows.find((row) => {
+  const matches = (row: Record<string, unknown>) => {
     const skus = Array.isArray(row.skus) ? (row.skus as Array<Record<string, unknown>>) : [];
     return (
-      (code && String(row.spu_code ?? row.spuCode ?? "") === code) ||
-      String(row.product_name ?? row.productName ?? row.name ?? "") === name ||
-      (code && skus.some((sku) => String(sku.sku_code ?? sku.skuCode ?? "") === code))
+      (code &&
+        [row.spu_code, row.spuCode, row.outer_id, row.outerId].some(
+          (value) => String(value ?? "") === code,
+        )) ||
+      (code &&
+        skus.some((sku) =>
+          [sku.sku_code, sku.skuCode, sku.outer_sku_id, sku.outerSkuId, sku.sku_no].some(
+            (value) => String(value ?? "") === code,
+          ),
+        )) ||
+      (!code && String(row.product_name ?? row.productName ?? row.name ?? "") === name)
     );
-  });
-  if (!matched) return { spuId: 0, skuId: null as number | null };
-  const skus = Array.isArray(matched.skus) ? (matched.skus as Array<Record<string, unknown>>) : [];
-  const skuId = Number(skus[0]?.sku_id ?? skus[0]?.skuId ?? 0) || null;
-  return {
-    spuId: Number(matched.spu_id ?? matched.spuId ?? matched.item_id ?? matched.id ?? 0),
-    skuId,
   };
+
+  for (const params of buildHqSpuLookupParams(code)) {
+    try {
+      const res = await callYouzanApiVerbose({
+        accessToken: token,
+        method: "youzan.retail.open.spu.query",
+        version: "3.0.0",
+        params,
+        timeoutMs: 20_000,
+      });
+      const matched = collectSpuRowsFromPayload(res.payload).find(matches);
+      if (!matched) continue;
+      const skus = Array.isArray(matched.skus)
+        ? (matched.skus as Array<Record<string, unknown>>)
+        : [];
+      return {
+        spuId: Number(matched.spu_id ?? matched.spuId ?? matched.item_id ?? matched.id ?? 0),
+        skuId: Number(skus[0]?.sku_id ?? skus[0]?.skuId ?? 0) || null,
+      };
+    } catch {
+      // Some Youzan tenants do not accept every optional query filter.
+    }
+  }
+  return { spuId: 0, skuId: null as number | null };
 }
 
 /**
@@ -1283,9 +1303,13 @@ export async function ensureHqSpuLink(
       if (!newSpuId) {
         const code = pickCreatedSpuCode(res.payload);
         if (code) {
-          const found = await findCreatedHqSpu(token, code, remoteIdentity.name);
-          newSpuId = found.spuId;
-          newSkuId = found.skuId;
+          for (const waitMs of [0, 500, 1_000, 2_000]) {
+            if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
+            const found = await findCreatedHqSpu(token, code, remoteIdentity.name);
+            newSpuId = found.spuId;
+            newSkuId = found.skuId;
+            if (newSpuId > 0) break;
+          }
         }
       }
       if (newSpuId > 0) break;

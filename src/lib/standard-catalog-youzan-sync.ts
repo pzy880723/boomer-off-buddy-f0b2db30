@@ -40,6 +40,15 @@ export function buildStandardYouzanRemoteIdentity(input: {
   return { code, name: `${input.name} ${displayPrice}元` };
 }
 
+export function buildHqSpuLookupParams(code: string) {
+  const normalized = code.trim();
+  if (!normalized) return [{ page_no: 1, page_size: 100 }];
+  return [
+    { page_no: 1, page_size: 100, spu_codes: [normalized] },
+    { page_no: 1, page_size: 100, sku_codes: [normalized] },
+  ];
+}
+
 export function selectStandardCatalogTargetShops(
   shops: StandardCatalogTargetShop[],
 ): StandardCatalogTargetShop[] {
