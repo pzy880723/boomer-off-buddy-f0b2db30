@@ -147,7 +147,9 @@ test("production batch sync is not hard-coded to one shop and includes barcodes"
 test("standard catalog runner retries transient batch failures without advancing the offset", () => {
   const runner = readFileSync("scripts/sync-standard-catalog-youzan.mjs", "utf8");
   assert.match(runner, /STANDARD_SYNC_START_OFFSET/);
+  assert.match(runner, /STANDARD_SYNC_BATCH_SIZE \?\? 10/);
   assert.match(runner, /const maxAttempts = 3/);
+  assert.match(runner, /const text = await response\.text\(\)/);
   assert.match(runner, /if \(batchFailed > 0\) break;\s*offset = nextOffset/);
 });
 
