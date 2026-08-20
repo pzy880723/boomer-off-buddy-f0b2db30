@@ -42,8 +42,15 @@ export async function syncStandardSkuToYouzanBranchesCore(args: {
       if (!branch.ok || !branch.item_id || !branch.sku_id) {
         throw new Error(branch.error ?? "分店铺货后未获得真实 item_id/sku_id");
       }
+      const { data: branchShop, error: branchShopError } = await supabase
+        .from("youzan_shops")
+        .select("*")
+        .eq("id", shop.id)
+        .maybeSingle();
+      if (branchShopError) throw new Error(branchShopError.message);
+      if (!branchShop) throw new Error("有赞分店授权记录不存在");
       const stock = await pushYouzanQuantityUpdate({
-        branchShop: shop as unknown as Parameters<
+        branchShop: branchShop as unknown as Parameters<
           typeof pushYouzanQuantityUpdate
         >[0]["branchShop"],
         itemId: branch.item_id,

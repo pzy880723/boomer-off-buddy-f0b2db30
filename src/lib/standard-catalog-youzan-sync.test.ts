@@ -114,3 +114,9 @@ test("chain probing sends a valid page and persists kdt fallback only after bran
   assert.match(sync, /const confirmedChannelIds = Array\.from\(new Set\(targetChannelIds\)\)/);
   assert.match(sync, /chain_probe_status: "ok"/);
 });
+
+test("stock push reloads the complete branch authorization record", () => {
+  const server = readFileSync("src/lib/standard-catalog-youzan.server.ts", "utf8");
+  assert.match(server, /\.from\("youzan_shops"\)\s*\.select\("\*"\)/);
+  assert.match(server, /branchShop: branchShop/);
+});
