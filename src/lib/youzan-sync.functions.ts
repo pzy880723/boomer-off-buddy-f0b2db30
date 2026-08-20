@@ -1224,6 +1224,25 @@ async function findHqSpuById(
   spuId: number,
   forceRefresh = false,
 ): Promise<HqSpuRemoteIdentity | null> {
+  if (forceRefresh) {
+    for (let pageNo = 1; pageNo <= 100; pageNo += 1) {
+      const res = await callYouzanApiVerbose({
+        accessToken: token,
+        method: "youzan.retail.open.spu.query",
+        version: "3.0.0",
+        params: { page_no: pageNo, page_size: 20 },
+        timeoutMs: 20_000,
+      });
+      const rows = collectSpuRowsFromPayload(res.payload);
+      const matched = selectHqSpuRemoteIdentity(rows, { spuId });
+      if (matched) {
+        hqSpuIdentityCache?.byId.set(matched.spuId, matched);
+        return matched;
+      }
+      if (rows.length < 20) break;
+    }
+    return null;
+  }
   if (!forceRefresh && hqSpuIdentityCache?.expiresAt && hqSpuIdentityCache.expiresAt > Date.now()) {
     return hqSpuIdentityCache.byId.get(spuId) ?? null;
   }

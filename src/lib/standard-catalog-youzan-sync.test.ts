@@ -158,6 +158,11 @@ test("standard catalog keeps POS barcodes on branch SKUs and repairs stale HQ li
   assert.doesNotMatch(sync, /buildStandardHqBarcodeFields/);
 });
 
+test("new HQ products stop lookup as soon as the created SPU is found", () => {
+  const sync = readFileSync("src/lib/youzan-sync.functions.ts", "utf8");
+  assert.match(sync, /if \(forceRefresh\)[\s\S]*if \(matched\)[\s\S]*return matched/);
+});
+
 test("new and edited standard products use the all-branch mirror-stock path", () => {
   const inventory = readFileSync("src/lib/inventory.functions.ts", "utf8");
   assert.match(inventory, /syncStandardSkuToAllYouzanBranchesCore\(sid, 9999\)/);
