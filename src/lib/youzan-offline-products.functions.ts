@@ -44,7 +44,6 @@ async function findExistingOfflineProduct(args: {
   };
 
   for (const lookupTerm of buildOfflineProductLookupTerms(args)) {
-    const rows = [];
     for (const displayStatus of [1, 2, 0] as const) {
       const queried = await queryYouzanOfflineProducts({
         accessToken: args.accessToken,
@@ -56,13 +55,9 @@ async function findExistingOfflineProduct(args: {
           nameOrSkuNo: lookupTerm,
         },
       });
-      rows.push(...queried.rows);
+      const matched = findOfflineProductMatch(queried.rows, target);
+      if (matched) return matched;
     }
-    const uniqueRows = Array.from(
-      new Map(rows.map((row) => [row.itemId, row])).values(),
-    );
-    const matched = findOfflineProductMatch(uniqueRows, target);
-    if (matched) return matched;
   }
   return null;
 }

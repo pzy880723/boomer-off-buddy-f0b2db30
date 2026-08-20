@@ -197,5 +197,9 @@ test("branch stock failures invalidate stale links and listings", () => {
 test("existing branch links are revalidated against the live Youzan catalog", () => {
   const server = readFileSync("src/lib/youzan-offline-products.functions.ts", "utf8");
   assert.match(server, /const remoteExisting = await findExistingOfflineProduct/);
+  assert.match(
+    server,
+    /for \(const displayStatus[\s\S]*findOfflineProductMatch\(queried\.rows, target\)[\s\S]*if \(matched\) return matched/,
+  );
   assert.doesNotMatch(server, /canReuseOfflineBranchLink\(existingBranchLink\)/);
 });
