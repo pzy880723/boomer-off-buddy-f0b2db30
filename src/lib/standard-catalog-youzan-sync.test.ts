@@ -82,9 +82,9 @@ test("ERP EAN barcode is the remote SKU identity used by Youzan POS", () => {
 
 test("HQ SPU lookup uses Youzan's exact code filters instead of scanning page one", () => {
   assert.deepEqual(buildHqSpuLookupParams(" 2009876212904 "), [
-    { page_no: 1, page_size: 100, spu_codes: ["2009876212904"] },
-    { page_no: 1, page_size: 100, sku_codes: ["2009876212904"] },
-    { page_no: 1, page_size: 100 },
+    { page_no: 1, page_size: 20, spu_codes: ["2009876212904"] },
+    { page_no: 1, page_size: 20, sku_codes: ["2009876212904"] },
+    { page_no: 1, page_size: 20 },
   ]);
 });
 

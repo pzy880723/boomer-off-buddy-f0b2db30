@@ -42,11 +42,11 @@ export function buildStandardYouzanRemoteIdentity(input: {
 
 export function buildHqSpuLookupParams(code: string) {
   const normalized = code.trim();
-  if (!normalized) return [{ page_no: 1, page_size: 100 }];
+  if (!normalized) return [{ page_no: 1, page_size: 20 }];
   return [
-    { page_no: 1, page_size: 100, spu_codes: [normalized] },
-    { page_no: 1, page_size: 100, sku_codes: [normalized] },
-    { page_no: 1, page_size: 100 },
+    { page_no: 1, page_size: 20, spu_codes: [normalized] },
+    { page_no: 1, page_size: 20, sku_codes: [normalized] },
+    { page_no: 1, page_size: 20 },
   ];
 }
 
