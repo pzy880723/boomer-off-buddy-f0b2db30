@@ -6,6 +6,7 @@ import {
   assertStandardCatalogSyncHost,
   buildHqSpuLookupParams,
   buildStandardYouzanRemoteIdentity,
+  selectHqSpuRemoteIdentity,
   parseStandardCatalogSyncRequest,
   selectStandardCatalogTargetShops,
 } from "./standard-catalog-youzan-sync";
@@ -86,6 +87,40 @@ test("HQ SPU lookup uses Youzan's exact code filters instead of scanning page on
     { page_no: 1, page_size: 20, sku_codes: ["2009876212904"] },
     { page_no: 1, page_size: 20 },
   ]);
+});
+
+test("HQ lookup never falls back to a same-name SPU when an exact code was requested", () => {
+  const rows = [
+    {
+      spu_id: 5071222203,
+      spu_code: "BM507122220383",
+      product_name: "古美术 9.9元",
+      skus: [{ sku_id: 390105648, sku_code: "BM507122220383" }],
+    },
+    {
+      spu_id: 6232299828,
+      spu_code: "2008525174570",
+      product_name: "古美术 9.9元",
+      skus: [{ sku_id: 528876422, sku_code: "2008525174570" }],
+    },
+  ];
+
+  assert.equal(
+    selectHqSpuRemoteIdentity(rows, {
+      code: "2009066940334",
+      name: "古美术 9.9元",
+    }),
+    null,
+  );
+  assert.deepEqual(
+    selectHqSpuRemoteIdentity(rows, { spuId: 5071222203 }),
+    {
+      spuId: 5071222203,
+      spuCode: "BM507122220383",
+      skuId: 390105648,
+      skuCode: "BM507122220383",
+    },
+  );
 });
 
 test("standard catalog targets every active Youzan branch exactly once", () => {

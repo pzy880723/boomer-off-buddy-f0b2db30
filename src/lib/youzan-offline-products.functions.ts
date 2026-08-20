@@ -244,8 +244,8 @@ export async function releaseSkuToOfflineShopsCore(args: {
 
   const results: OfflineReleaseResult[] = [];
   for (const branch of branches) {
-    // offline.spu.release only publishes an existing HQ product to a branch.
-    // Keep the HQ and branch product codes identical so barcode lookups remain stable.
+    // offline.spu.release publishes an existing HQ product to a branch.
+    // Relation fields use Youzan's HQ codes; sku_no keeps the ERP barcode for POS scanning.
     const hqLink = await ensureHqSpuLink(args.sku_id, branch.id);
     const { data: location } = await supabase
       .from("inv_locations")
@@ -344,7 +344,9 @@ export async function releaseSkuToOfflineShopsCore(args: {
         input: buildOfflineSkuReleaseInput({
           sku: {
             name: remoteIdentity.name,
-            skuCode: remoteIdentity.code,
+            scanCode: remoteIdentity.code,
+            hqSpuCode: hqLink.spu_code,
+            hqSkuCode: hqLink.sku_code,
             priceYuan: Number(sku.price_tier ?? 0),
             imageUrls,
           },

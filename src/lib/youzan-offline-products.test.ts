@@ -130,11 +130,13 @@ describe("youzan offline products", () => {
     assert.equal(params.stocks[0].max_retail_price, "1");
   });
 
-  test("ERP SKU keeps the same stable code in HQ and branch release payloads", () => {
+  test("branch release uses HQ relation codes while preserving the ERP POS barcode", () => {
     const input = buildOfflineSkuReleaseInput({
       sku: {
         name: "昭和小钵",
-        skuCode: "SKU-JP-001",
+        scanCode: "2009876212904",
+        hqSpuCode: "BM507122220383",
+        hqSkuCode: "BM507122220383",
         priceYuan: 168,
         imageUrls: ["https://img.yzcdn.cn/a.webp"],
       },
@@ -144,9 +146,11 @@ describe("youzan offline products", () => {
     });
 
     assert.deepEqual(input.saleUpKdtIds, [233, 666]);
-    assert.equal(input.spuCode, "SKU-JP-001");
-    assert.equal(input.skuCenterCode, "SKU-JP-001");
-    assert.equal(input.stock.skuNo, "SKU-JP-001");
+    assert.equal(input.spuCode, "BM507122220383");
+    assert.equal(input.skuCenterCode, "BM507122220383");
+    assert.equal(input.stock.skuNo, "2009876212904");
+    assert.equal(input.stock.relatedSpuCode, "BM507122220383");
+    assert.equal(input.stock.relatedSkuCode, "BM507122220383");
     assert.equal(input.unit, "件");
   });
 

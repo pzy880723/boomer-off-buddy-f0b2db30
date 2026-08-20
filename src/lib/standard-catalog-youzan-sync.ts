@@ -50,6 +50,70 @@ export function buildHqSpuLookupParams(code: string) {
   ];
 }
 
+export type HqSpuRemoteIdentity = {
+  spuId: number;
+  spuCode: string;
+  skuId: number | null;
+  skuCode: string;
+};
+
+export function selectHqSpuRemoteIdentity(
+  rows: Array<Record<string, unknown>>,
+  target: { spuId?: number; code?: string; name?: string },
+): HqSpuRemoteIdentity | null {
+  const spuId = Number(target.spuId ?? 0);
+  const code = String(target.code ?? "").trim();
+  const name = String(target.name ?? "").trim();
+  const matchesCode = (row: Record<string, unknown>) => {
+    const skus = Array.isArray(row.skus)
+      ? (row.skus as Array<Record<string, unknown>>)
+      : [];
+    return (
+      [row.spu_code, row.spuCode, row.outer_id, row.outerId].some(
+        (value) => String(value ?? "") === code,
+      ) ||
+      skus.some((sku) =>
+        [sku.sku_code, sku.skuCode, sku.outer_sku_id, sku.outerSkuId, sku.sku_no].some(
+          (value) => String(value ?? "") === code,
+        ),
+      )
+    );
+  };
+  const matched = spuId > 0
+    ? rows.find((row) => Number(row.spu_id ?? row.spuId ?? row.item_id ?? row.id ?? 0) === spuId)
+    : code
+      ? rows.find(matchesCode)
+      : rows.find(
+          (row) => String(row.product_name ?? row.productName ?? row.name ?? "").trim() === name,
+        );
+  if (!matched) return null;
+
+  const skus = Array.isArray(matched.skus)
+    ? (matched.skus as Array<Record<string, unknown>>)
+    : [];
+  const remoteSpuId = Number(
+    matched.spu_id ?? matched.spuId ?? matched.item_id ?? matched.id ?? 0,
+  );
+  const remoteSpuCode = String(
+    matched.spu_code ?? matched.spuCode ?? matched.outer_id ?? matched.outerId ?? "",
+  ).trim();
+  const remoteSkuId = Number(skus[0]?.sku_id ?? skus[0]?.skuId ?? 0) || null;
+  const remoteSkuCode = String(
+    skus[0]?.sku_code ??
+      skus[0]?.skuCode ??
+      skus[0]?.outer_sku_id ??
+      skus[0]?.outerSkuId ??
+      remoteSpuCode,
+  ).trim();
+  if (!remoteSpuId || !remoteSpuCode || !remoteSkuCode) return null;
+  return {
+    spuId: remoteSpuId,
+    spuCode: remoteSpuCode,
+    skuId: remoteSkuId,
+    skuCode: remoteSkuCode,
+  };
+}
+
 export function selectStandardCatalogTargetShops(
   shops: StandardCatalogTargetShop[],
 ): StandardCatalogTargetShop[] {

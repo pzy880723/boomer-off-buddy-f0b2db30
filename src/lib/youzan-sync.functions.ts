@@ -16,6 +16,8 @@ import { buildBranchItemShelfRequest } from "./youzan-offline-products.server";
 import {
   buildHqSpuLookupParams,
   buildStandardYouzanRemoteIdentity,
+  selectHqSpuRemoteIdentity,
+  type HqSpuRemoteIdentity,
 } from "./standard-catalog-youzan-sync";
 
 
@@ -1141,23 +1143,6 @@ function collectSpuRowsFromPayload(payload: unknown): Array<Record<string, unkno
 }
 
 async function findCreatedHqSpu(token: string, code: string, name: string) {
-  const matches = (row: Record<string, unknown>) => {
-    const skus = Array.isArray(row.skus) ? (row.skus as Array<Record<string, unknown>>) : [];
-    return (
-      (code &&
-        [row.spu_code, row.spuCode, row.outer_id, row.outerId].some(
-          (value) => String(value ?? "") === code,
-        )) ||
-      (code &&
-        skus.some((sku) =>
-          [sku.sku_code, sku.skuCode, sku.outer_sku_id, sku.outerSkuId, sku.sku_no].some(
-            (value) => String(value ?? "") === code,
-          ),
-        )) ||
-      String(row.product_name ?? row.productName ?? row.name ?? "") === name
-    );
-  };
-
   for (const params of buildHqSpuLookupParams(code)) {
     try {
       const res = await callYouzanApiVerbose({
@@ -1167,20 +1152,51 @@ async function findCreatedHqSpu(token: string, code: string, name: string) {
         params,
         timeoutMs: 20_000,
       });
-      const matched = collectSpuRowsFromPayload(res.payload).find(matches);
-      if (!matched) continue;
-      const skus = Array.isArray(matched.skus)
-        ? (matched.skus as Array<Record<string, unknown>>)
-        : [];
-      return {
-        spuId: Number(matched.spu_id ?? matched.spuId ?? matched.item_id ?? matched.id ?? 0),
-        skuId: Number(skus[0]?.sku_id ?? skus[0]?.skuId ?? 0) || null,
-      };
+      const matched = selectHqSpuRemoteIdentity(collectSpuRowsFromPayload(res.payload), {
+        code,
+        name,
+      });
+      if (matched) return matched;
     } catch {
       // Some Youzan tenants do not accept every optional query filter.
     }
   }
-  return { spuId: 0, skuId: null as number | null };
+  return { spuId: 0, spuCode: "", skuId: null as number | null, skuCode: "" };
+}
+
+let hqSpuIdentityCache:
+  | { expiresAt: number; byId: Map<number, HqSpuRemoteIdentity> }
+  | null = null;
+
+async function findHqSpuById(
+  token: string,
+  spuId: number,
+  forceRefresh = false,
+): Promise<HqSpuRemoteIdentity | null> {
+  if (!forceRefresh && hqSpuIdentityCache?.expiresAt && hqSpuIdentityCache.expiresAt > Date.now()) {
+    return hqSpuIdentityCache.byId.get(spuId) ?? null;
+  }
+
+  const byId = new Map<number, HqSpuRemoteIdentity>();
+  for (let pageNo = 1; pageNo <= 100; pageNo += 1) {
+    const res = await callYouzanApiVerbose({
+      accessToken: token,
+      method: "youzan.retail.open.spu.query",
+      version: "3.0.0",
+      params: { page_no: pageNo, page_size: 20 },
+      timeoutMs: 20_000,
+    });
+    const rows = collectSpuRowsFromPayload(res.payload);
+    for (const row of rows) {
+      const identity = selectHqSpuRemoteIdentity([row], {
+        spuId: Number(row.spu_id ?? row.spuId ?? row.item_id ?? row.id ?? 0),
+      });
+      if (identity) byId.set(identity.spuId, identity);
+    }
+    if (rows.length < 20) break;
+  }
+  hqSpuIdentityCache = { expiresAt: Date.now() + 5 * 60_000, byId };
+  return byId.get(spuId) ?? null;
 }
 
 /**
@@ -1195,7 +1211,14 @@ async function findCreatedHqSpu(token: string, code: string, name: string) {
 export async function ensureHqSpuLink(
   sku_id: string,
   addBranchShopId?: string,
-): Promise<{ created: boolean; yz_item_id: number; shop_id: string; yz_sku_id?: number | null }> {
+): Promise<{
+  created: boolean;
+  yz_item_id: number;
+  shop_id: string;
+  yz_sku_id?: number | null;
+  spu_code: string;
+  sku_code: string;
+}> {
   const hq = await getHqShop();
   const { data: sku } = await supabase
     .from("inv_skus")
@@ -1248,15 +1271,23 @@ export async function ensureHqSpuLink(
         timeoutMs: 20_000,
       });
     }
+    const remote = await findHqSpuById(token, Number(existed.yz_item_id));
+    if (!remote) {
+      throw new Error(`有赞总部 SPU ${existed.yz_item_id} 不存在或无法读取关系编码`);
+    }
     return {
       created: false,
       yz_item_id: Number(existed.yz_item_id),
       shop_id: hq.id,
       yz_sku_id: Number(existed.yz_sku_id ?? 0) || null,
+      spu_code: remote.spuCode,
+      sku_code: remote.skuCode,
     };
   }
   let newSpuId = 0;
   let newSkuId: number | null = null;
+  let newSpuCode = "";
+  let newSkuCode = "";
   let lastPreview = "";
   let lastError = "";
   // 2026-07 audit rule 8：不要直接把 ERP 外链图片塞给 spu.create，
@@ -1288,6 +1319,8 @@ export async function ensureHqSpuLink(
   if (existingRemote.spuId > 0) {
     newSpuId = existingRemote.spuId;
     newSkuId = existingRemote.skuId;
+    newSpuCode = existingRemote.spuCode;
+    newSkuCode = existingRemote.skuCode;
   }
   for (const params of newSpuId > 0 ? [] : attempts) {
     try {
@@ -1308,6 +1341,8 @@ export async function ensureHqSpuLink(
             const found = await findCreatedHqSpu(token, code, remoteIdentity.name);
             newSpuId = found.spuId;
             newSkuId = found.skuId;
+            newSpuCode = found.spuCode;
+            newSkuCode = found.skuCode;
             if (newSpuId > 0) break;
           }
         }
@@ -1321,6 +1356,15 @@ export async function ensureHqSpuLink(
   }
   if (!newSpuId) {
     throw new Error(lastError || `spu.create 未返回 spu_id：${lastPreview.slice(0, 200)}`);
+  }
+  if (!newSpuCode || !newSkuCode) {
+    const remote = await findHqSpuById(token, newSpuId, true);
+    newSpuCode = remote?.spuCode ?? "";
+    newSkuCode = remote?.skuCode ?? "";
+    newSkuId = remote?.skuId ?? newSkuId;
+  }
+  if (!newSpuCode || !newSkuCode) {
+    throw new Error(`有赞总部 SPU ${newSpuId} 已创建，但无法读取关系编码`);
   }
 
   await supabase.from("sku_youzan_links").upsert(
@@ -1361,7 +1405,14 @@ export async function ensureHqSpuLink(
     }
   }
 
-  return { created: true, yz_item_id: newSpuId, yz_sku_id: newSkuId, shop_id: hq.id };
+  return {
+    created: true,
+    yz_item_id: newSpuId,
+    yz_sku_id: newSkuId,
+    shop_id: hq.id,
+    spu_code: newSpuCode,
+    sku_code: newSkuCode,
+  };
 }
 
 /**

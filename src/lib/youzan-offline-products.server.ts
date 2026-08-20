@@ -235,7 +235,9 @@ export type OfflineProductReleaseInput = {
 export function buildOfflineSkuReleaseInput(args: {
   sku: {
     name: string;
-    skuCode: string;
+    scanCode: string;
+    hqSpuCode: string;
+    hqSkuCode: string;
     priceYuan: number;
     imageUrls: string[];
   };
@@ -243,11 +245,14 @@ export function buildOfflineSkuReleaseInput(args: {
   branchKdtIds: number[];
   stock: number;
 }): OfflineProductReleaseInput {
-  const skuCode = args.sku.skuCode.trim();
+  const scanCode = args.sku.scanCode.trim();
+  const hqSpuCode = args.sku.hqSpuCode.trim();
+  const hqSkuCode = args.sku.hqSkuCode.trim();
   const branchKdtIds = Array.from(
     new Set(args.branchKdtIds.filter((id) => Number.isInteger(id) && id > 0)),
   );
-  if (!skuCode) throw new Error("SKU 缺少 sku_code，无法发布到有赞门店");
+  if (!scanCode) throw new Error("SKU 缺少收银条码，无法发布到有赞门店");
+  if (!hqSpuCode || !hqSkuCode) throw new Error("SKU 缺少有赞总部关系编码，无法发布到门店");
   if (branchKdtIds.length === 0) throw new Error("没有可发布的有赞分店");
   return {
     title: args.sku.name.trim(),
@@ -255,14 +260,14 @@ export function buildOfflineSkuReleaseInput(args: {
     unit: "件",
     priceYuan: args.sku.priceYuan,
     imageUrls: args.sku.imageUrls,
-    spuCode: skuCode,
-    skuCenterCode: skuCode,
+    spuCode: hqSpuCode,
+    skuCenterCode: hqSkuCode,
     saleUpKdtIds: branchKdtIds,
     saleDownKdtIds: [],
     stock: {
-      skuNo: skuCode,
-      relatedSpuCode: skuCode,
-      relatedSkuCode: skuCode,
+      skuNo: scanCode,
+      relatedSpuCode: hqSpuCode,
+      relatedSkuCode: hqSkuCode,
       sellStockCount: Math.max(0, Math.trunc(args.stock)),
     },
   };
