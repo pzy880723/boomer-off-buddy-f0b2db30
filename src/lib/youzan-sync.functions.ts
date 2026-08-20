@@ -14,6 +14,7 @@ import {
 import { selectTrustedBranchItemIds } from "./youzan-quantity.server";
 import { buildBranchItemShelfRequest } from "./youzan-offline-products.server";
 import {
+  buildStandardHqBarcodeFields,
   buildHqSpuLookupParams,
   buildStandardYouzanRemoteIdentity,
   selectHqSpuRemoteIdentity,
@@ -966,6 +967,7 @@ async function collectSellChannelKdtIds(
 function buildSpuSkuArray(sku: {
   id: string;
   sku_code: string;
+  scan_barcode?: string | null;
   name: string;
   price_tier: string | number;
   weight_g?: number | null;
@@ -973,6 +975,12 @@ function buildSpuSkuArray(sku: {
   const priceCents = Math.round(Number(sku.price_tier) * 100);
   const item: Record<string, unknown> = {
     outer_sku_id: sku.sku_code,
+    ...(sku.scan_barcode
+      ? {
+          sku_no: sku.scan_barcode,
+          bar_codes: [sku.scan_barcode],
+        }
+      : {}),
     price: priceCents,
     stock_num: 0,
   };
@@ -982,6 +990,7 @@ function buildSpuSkuArray(sku: {
 
 function buildSpuCreateAttempts(sku: {
   sku_code: string;
+  scan_barcode?: string | null;
   name: string;
   image_url?: string | null;
   notes?: string | null;
@@ -989,6 +998,9 @@ function buildSpuCreateAttempts(sku: {
   weight_g?: number | null;
 }, categoryId: number, kdtIds: number[]): Array<Record<string, unknown>> {
   const priceYuan = Number(sku.price_tier).toFixed(2);
+  const barcodeFields = sku.scan_barcode
+    ? buildStandardHqBarcodeFields(sku.scan_barcode)
+    : {};
   const base: Record<string, unknown> = {
     name: sku.name,
     unit: DEFAULT_RETAIL_UNIT,
@@ -997,7 +1009,7 @@ function buildSpuCreateAttempts(sku: {
     category_id: categoryId,
     offline_create: true,
     is_up_offline: true,
-
+    ...barcodeFields,
     retail_price: priceYuan,
   };
 
@@ -1016,7 +1028,12 @@ function buildSpuCreateAttempts(sku: {
 
   const skuListItem: Record<string, unknown> = {
     outer_sku_id: sku.sku_code,
-    sku_no: sku.sku_code,
+    ...(sku.scan_barcode
+      ? {
+          sku_no: sku.scan_barcode,
+          bar_codes: [sku.scan_barcode],
+        }
+      : { sku_no: sku.sku_code }),
     sku_code: sku.sku_code,
     price: priceYuan,
     retail_price: priceYuan,
@@ -1042,6 +1059,7 @@ function buildSpuCreateAttempts(sku: {
       name: sku.name,
       unit: DEFAULT_RETAIL_UNIT,
       outer_id: sku.sku_code,
+      ...barcodeFields,
       category_id: categoryId,
       offline_create: true, is_up_offline: true,
       retail_price: priceYuan,
@@ -1053,6 +1071,7 @@ function buildSpuCreateAttempts(sku: {
       name: sku.name,
       unit: DEFAULT_RETAIL_UNIT,
       outer_id: sku.sku_code,
+      ...barcodeFields,
       category_id: categoryId,
       offline_create: true, is_up_offline: true,
       ...(kdtIds.length > 0 ? { sell_channel_ids: kdtIds } : {}),
@@ -1062,6 +1081,7 @@ function buildSpuCreateAttempts(sku: {
     {
       name: sku.name,
       outer_id: sku.sku_code,
+      ...barcodeFields,
       category_id: categoryId,
       unit: DEFAULT_RETAIL_UNIT,
       offline_create: true, is_up_offline: true,
@@ -1073,12 +1093,44 @@ function buildSpuCreateAttempts(sku: {
       name: sku.name,
       unit: DEFAULT_RETAIL_UNIT,
       outer_id: sku.sku_code,
+      ...barcodeFields,
       category_id: categoryId,
       retail_price: priceYuan,
       ...(kdtIds.length > 0 ? { display_on_kdt_ids: kdtIds } : {}),
       ...imageFields,
     },
   ];
+}
+
+async function syncStandardHqMasterFields(args: {
+  accessToken: string;
+  spuId: number;
+  spuCode: string;
+  barcode: string;
+  name: string;
+  categoryId: number;
+  priceTier: string | number;
+  kdtIds: number[];
+}) {
+  await callYouzanApiVerbose({
+    accessToken: args.accessToken,
+    method: "youzan.retail.open.spu.update",
+    version: "3.0.0",
+    params: {
+      spu_id: args.spuId,
+      name: args.name,
+      spu_code: args.spuCode,
+      ...buildStandardHqBarcodeFields(args.barcode),
+      unit: DEFAULT_RETAIL_UNIT,
+      category_id: args.categoryId,
+      retail_price: Number(args.priceTier).toFixed(2),
+      sell_channel_setting_request: {
+        is_partial: 1,
+        sell_channel_ids: args.kdtIds,
+      },
+    },
+    timeoutMs: 20_000,
+  });
 }
 
 function pickCreatedSpuId(payload: unknown) {
@@ -1252,28 +1304,21 @@ export async function ensureHqSpuLink(
     .eq("shop_id", hq.id)
     .maybeSingle();
   if (existed?.yz_item_id && Number(existed.yz_item_id) > 0) {
-    if (scope === "standard") {
-      await callYouzanApiVerbose({
-        accessToken: token,
-        method: "youzan.retail.open.spu.update",
-        version: "3.0.0",
-        params: {
-          spu_id: Number(existed.yz_item_id),
-          name: remoteIdentity.name,
-          unit: DEFAULT_RETAIL_UNIT,
-          category_id: categoryId,
-          retail_price: Number(sku.price_tier).toFixed(2),
-          sell_channel_setting_request: {
-            is_partial: 1,
-            sell_channel_ids: kdtIds,
-          },
-        },
-        timeoutMs: 20_000,
-      });
-    }
     const remote = await findHqSpuById(token, Number(existed.yz_item_id));
     if (!remote) {
       throw new Error(`有赞总部 SPU ${existed.yz_item_id} 不存在或无法读取关系编码`);
+    }
+    if (scope === "standard") {
+      await syncStandardHqMasterFields({
+        accessToken: token,
+        spuId: Number(existed.yz_item_id),
+        spuCode: remote.spuCode,
+        barcode: String((sku as { barcode?: string | null }).barcode ?? ""),
+        name: remoteIdentity.name,
+        categoryId,
+        priceTier: (sku as { price_tier: string | number }).price_tier,
+        kdtIds,
+      });
     }
     return {
       created: false,
@@ -1304,6 +1349,9 @@ export async function ensureHqSpuLink(
   const attempts = buildSpuCreateAttempts(
     {
       sku_code: remoteIdentity.code,
+      scan_barcode: scope === "standard"
+        ? ((sku as { barcode?: string | null }).barcode ?? null)
+        : null,
       name: remoteIdentity.name,
       image_url: finalImage || null,
       notes: (sku as { notes?: string | null }).notes ?? null,
@@ -1365,6 +1413,19 @@ export async function ensureHqSpuLink(
   }
   if (!newSpuCode || !newSkuCode) {
     throw new Error(`有赞总部 SPU ${newSpuId} 已创建，但无法读取关系编码`);
+  }
+
+  if (scope === "standard") {
+    await syncStandardHqMasterFields({
+      accessToken: token,
+      spuId: newSpuId,
+      spuCode: newSpuCode,
+      barcode: String((sku as { barcode?: string | null }).barcode ?? ""),
+      name: remoteIdentity.name,
+      categoryId,
+      priceTier: (sku as { price_tier: string | number }).price_tier,
+      kdtIds,
+    });
   }
 
   await supabase.from("sku_youzan_links").upsert(

@@ -4,12 +4,21 @@ import test from "node:test";
 
 import {
   assertStandardCatalogSyncHost,
+  buildStandardHqBarcodeFields,
   buildHqSpuLookupParams,
   buildStandardYouzanRemoteIdentity,
   selectHqSpuRemoteIdentity,
   parseStandardCatalogSyncRequest,
   selectStandardCatalogTargetShops,
 } from "./standard-catalog-youzan-sync";
+
+test("standard HQ products persist the ERP barcode as the Youzan scan code", () => {
+  assert.deepEqual(buildStandardHqBarcodeFields(" 2009876212904 "), {
+    spu_no: "2009876212904",
+    bar_codes: ["2009876212904"],
+  });
+  assert.throws(() => buildStandardHqBarcodeFields(""), /收银条码/);
+});
 
 test("standard catalog Youzan sync defaults to a bounded dry run", () => {
   assert.deepEqual(parseStandardCatalogSyncRequest({}), {

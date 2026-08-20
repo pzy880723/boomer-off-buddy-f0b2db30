@@ -17,6 +17,17 @@ export type StandardCatalogSyncRequest = {
   target_stock?: unknown;
 };
 
+export function buildStandardHqBarcodeFields(barcode: string) {
+  const normalized = barcode.trim();
+  if (!/^\d{8,32}$/.test(normalized)) {
+    throw new Error("标准商品缺少有效收银条码");
+  }
+  return {
+    spu_no: normalized,
+    bar_codes: [normalized],
+  };
+}
+
 export function buildStandardYouzanRemoteIdentity(input: {
   skuId: string;
   skuCode: string;
