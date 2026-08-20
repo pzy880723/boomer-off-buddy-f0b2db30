@@ -4,6 +4,7 @@ import {
   buildBranchItemShelfRequest,
   buildOfflineSkuReleaseInput,
   buildOfflineStockQueueRow,
+  canReuseOfflineBranchLink,
   buildOfflineProductQueryParams,
   buildOfflineProductReleaseParams,
   buildOfflineProductLookupTerms,
@@ -263,6 +264,18 @@ describe("youzan offline products", () => {
     });
     assert.equal(row.location_id, null);
     assert.equal(row.target_stock, 9999);
+  });
+
+  test("a verified branch item is reused instead of being released again", () => {
+    assert.equal(
+      canReuseOfflineBranchLink({ status: "linked", yz_item_id: 5072709609, yz_sku_id: 15078814194 }),
+      true,
+    );
+    assert.equal(
+      canReuseOfflineBranchLink({ status: "error", yz_item_id: 5072709609, yz_sku_id: 15078814194 }),
+      false,
+    );
+    assert.equal(canReuseOfflineBranchLink({ status: "linked", yz_item_id: 0, yz_sku_id: null }), false);
   });
 
   test("offline publication mirrors the real branch ids into the unified channel listing", () => {

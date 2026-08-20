@@ -10,6 +10,7 @@ import {
   buildOfflineChannelListingRow,
   buildOfflineProductLookupTerms,
   buildOfflineStockQueueRow,
+  canReuseOfflineBranchLink,
   findOfflineProductMatch,
   queryYouzanOfflineProducts,
   releaseYouzanOfflineProduct,
@@ -263,6 +264,42 @@ export async function releaseSkuToOfflineShopsCore(args: {
         .eq("location_id", location.id)
         .maybeSingle();
       stock = Math.max(0, Math.trunc(Number(localStock?.qty ?? 0)));
+    }
+
+    const { data: existingBranchLink } = await supabase
+      .from("sku_youzan_links")
+      .select("status,yz_item_id,yz_sku_id")
+      .eq("sku_id", args.sku_id)
+      .eq("shop_id", branch.id)
+      .eq("role", "branch_stock")
+      .maybeSingle();
+    if (existingBranchLink && canReuseOfflineBranchLink(existingBranchLink)) {
+      const itemId = Number(existingBranchLink.yz_item_id);
+      const remoteSkuId = Number(existingBranchLink.yz_sku_id);
+      await upsertBranchLink({
+        skuId: args.sku_id,
+        shopId: branch.id,
+        hqSpuId: hqLink.yz_item_id,
+        itemId,
+        skuIdRemote: remoteSkuId,
+        stock,
+        recovered: true,
+      });
+      await enqueueBranchStock({
+        skuId: args.sku_id,
+        shopId: branch.id,
+        locationId: args.stock_override === undefined ? location.id : null,
+        targetStock: stock,
+      });
+      results.push({
+        shop_id: branch.id,
+        ok: true,
+        item_id: itemId,
+        sku_id: remoteSkuId,
+        recovered: true,
+        error: null,
+      });
+      continue;
     }
 
     // Online channel item IDs are not valid for an offline retail-store stock update.

@@ -178,6 +178,18 @@ export function buildOfflineStockQueueRow(args: {
   };
 }
 
+export function canReuseOfflineBranchLink(link: {
+  status?: string | null;
+  yz_item_id?: number | null;
+  yz_sku_id?: number | null;
+}) {
+  return (
+    link.status === "linked" &&
+    Number(link.yz_item_id ?? 0) > 0 &&
+    Number(link.yz_sku_id ?? 0) > 0
+  );
+}
+
 export function buildOfflineChannelListingRow(args: {
   skuId: string;
   shopId: string;
