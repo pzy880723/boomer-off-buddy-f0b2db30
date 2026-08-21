@@ -652,6 +652,53 @@ export type Database = {
           },
         ]
       }
+      commerce_membership_admin_audit_logs: {
+        Row: {
+          action: string
+          after_value: Json
+          before_value: Json
+          created_at: string
+          customer_id: string
+          id: string
+          idempotency_key: string
+          operator_id: string
+          reason: string
+          reference: string | null
+        }
+        Insert: {
+          action: string
+          after_value?: Json
+          before_value?: Json
+          created_at?: string
+          customer_id: string
+          id?: string
+          idempotency_key: string
+          operator_id: string
+          reason: string
+          reference?: string | null
+        }
+        Update: {
+          action?: string
+          after_value?: Json
+          before_value?: Json
+          created_at?: string
+          customer_id?: string
+          id?: string
+          idempotency_key?: string
+          operator_id?: string
+          reason?: string
+          reference?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_membership_admin_audit_logs_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commerce_membership_entitlements: {
         Row: {
           auto_renew: boolean
@@ -6620,6 +6667,18 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      commerce_admin_adjust_membership: {
+        Args: {
+          p_action: string
+          p_customer_id: string
+          p_idempotency_key: string
+          p_operator_id: string
+          p_payload: Json
+          p_reason: string
+          p_reference: string
+        }
+        Returns: Json
       }
       commerce_capture_payment_allocation: {
         Args: {
