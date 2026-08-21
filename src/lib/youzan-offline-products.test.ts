@@ -189,6 +189,18 @@ describe("youzan offline products", () => {
     );
   });
 
+  test("release images ignore non-string JSON values", () => {
+    assert.deepEqual(
+      resolveOfflineReleaseSourceImages({
+        skuScope: "standard",
+        imageUrl: null,
+        imagePaths: [{ path: "invalid" }, 7, "sku-listing/valid.jpg"],
+        publicOrigin: "https://erp.boomeroff.com",
+      }),
+      ["https://erp.boomeroff.com/api/public/media/sku/sku-listing/valid.jpg"],
+    );
+  });
+
   test("release lookup preserves the exact ERP code before normalized fallbacks", () => {
     assert.equal(normalizeYouzanProductCode("SKU-JP-260712-C8FG"), "SKUJP260712C8FG");
     assert.deepEqual(

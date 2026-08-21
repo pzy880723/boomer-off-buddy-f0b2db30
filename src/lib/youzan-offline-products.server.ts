@@ -37,7 +37,12 @@ export function resolveOfflineReleaseSourceImages(input: {
   publicOrigin: string;
 }) {
   const images = resolvePublicSkuImageUrls(
-    [input.imageUrl, ...(Array.isArray(input.imagePaths) ? input.imagePaths : [])],
+    [
+      input.imageUrl,
+      ...(Array.isArray(input.imagePaths)
+        ? input.imagePaths.filter((value): value is string => typeof value === "string")
+        : []),
+    ],
     input.publicOrigin,
     5,
   );

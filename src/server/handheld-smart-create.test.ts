@@ -121,17 +121,17 @@ describe("handheld AI classification contract", () => {
     assert.match(openapi, /items\/\{id\}\/sync-youzan/);
   });
 
-  test("branch publication creates HQ first and recovers real branch item IDs", () => {
+  test("branch publication creates HQ first and persists authoritative branch item IDs", () => {
     const publisher = readFileSync(
       "src/lib/youzan-offline-products.functions.ts",
       "utf8",
     );
 
     assert.match(publisher, /ensureHqSpuLink\(args\.sku_id, branch\.id\)/);
-    assert.match(publisher, /probeBranchRealIds/);
-    assert.match(publisher, /hqSpuId:\s*hqProduct\.yz_item_id/);
-    assert.match(publisher, /ensureBranchProduct\(args\.sku_id, branch\.id\)/);
-    assert.match(publisher, /select\("yz_sku_id"\)/);
+    assert.match(publisher, /findExistingOfflineProduct/);
+    assert.match(publisher, /upsertBranchLink/);
+    assert.match(publisher, /hqSpuId:\s*hqLink\.yz_item_id/);
+    assert.match(publisher, /itemId:\s*remoteExisting\.itemId/);
     assert.match(publisher, /await runStockSyncWorkerForSkus\(\[args\.sku_id\]\)/);
   });
 });
