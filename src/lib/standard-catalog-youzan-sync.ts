@@ -79,6 +79,20 @@ export function groupStandardCatalogSkus(rows: StandardCatalogSku[]): StandardCa
   return Array.from(groups.values());
 }
 
+export type YouzanRetailCategory = { id: number; name: string };
+
+export function selectValidYouzanRetailCategory(
+  categories: YouzanRetailCategory[],
+  storedId: number,
+): YouzanRetailCategory | null {
+  return (
+    categories.find((category) => category.id === storedId) ??
+    categories.find((category) => category.name === "未分类") ??
+    categories[0] ??
+    null
+  );
+}
+
 function requireStandardBarcode(sku: StandardCatalogSku): string {
   const barcode = String(sku.barcode ?? "").trim();
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(barcode)) {

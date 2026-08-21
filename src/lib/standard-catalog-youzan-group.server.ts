@@ -4,6 +4,7 @@ import {
   buildStandardGroupOfflineReleaseParams,
   buildStandardGroupSpuCreateParams,
   groupStandardCatalogSkus,
+  selectValidYouzanRetailCategory,
   type StandardCatalogGroup,
   type StandardCatalogSku,
   type StandardCatalogTargetShop,
@@ -22,7 +23,6 @@ import {
   callYouzanApiVerbose,
 } from "./youzan.functions";
 import {
-  ensureAutoYouzanDefaultCategory,
   runStockSyncWorkerForSkus,
   uploadImageToYouzanMaterial,
 } from "./youzan-sync.functions";
@@ -128,6 +128,60 @@ function pickCreatedSkuIds(payload: unknown): number[] {
   return Array.isArray(data.sku_ids)
     ? data.sku_ids.map(Number).filter((id) => Number.isFinite(id) && id > 0)
     : [];
+}
+
+function collectRetailCategories(payload: unknown) {
+  const categories: Array<{ id: number; name: string }> = [];
+  const seen = new Set<number>();
+  const walk = (value: unknown) => {
+    if (!value || typeof value !== "object") return;
+    if (Array.isArray(value)) {
+      value.forEach(walk);
+      return;
+    }
+    const row = value as Record<string, unknown>;
+    const id = Number(row.category_id ?? 0);
+    const name = String(row.name ?? row.category_name ?? "").trim();
+    if (id > 0 && name && !seen.has(id)) {
+      seen.add(id);
+      categories.push({ id, name });
+    }
+    Object.values(row).forEach(walk);
+  };
+  walk(payload);
+  return categories;
+}
+
+async function resolveLiveRetailCategory(accessToken: string) {
+  const result = await callYouzanApiVerbose({
+    accessToken,
+    method: "youzan.retail.open.category.query",
+    version: "3.0.0",
+    params: {},
+    timeoutMs: 20_000,
+  });
+  const categories = collectRetailCategories(result.payload);
+  const { data: setting, error } = await supabase
+    .from("app_settings")
+    .select("value")
+    .eq("key", "youzan_hq_default_category_id")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  const value = (setting as { value?: unknown } | null)?.value;
+  const storedId = Number(
+    typeof value === "object" && value ? (value as { id?: unknown }).id : value,
+  );
+  const category = selectValidYouzanRetailCategory(categories, storedId);
+  if (!category) throw new Error("有赞没有返回可用的零售商品类目");
+  if (category.id !== storedId) {
+    const { error: saveError } = await supabase.from("app_settings").upsert({
+      key: "youzan_hq_default_category_id",
+      value: { id: category.id, name: category.name, source: "retail.open.category.query" },
+      updated_at: new Date().toISOString(),
+    } as never);
+    if (saveError) throw new Error(saveError.message);
+  }
+  return category;
 }
 
 async function loadStandardGroupContainingSku(skuId: string) {
@@ -424,9 +478,9 @@ export async function syncStandardGroupContainingSkuCore(args: {
     imagePaths: imageSource?.image_paths,
     publicOrigin,
   });
-  const category = await ensureAutoYouzanDefaultCategory();
   const hq = await getHqShop();
   const accessToken = await ensureAccessToken(hq);
+  const category = await resolveLiveRetailCategory(accessToken);
   const imageUrls = await Promise.all(
     rawImages.map((url) =>
       url.endsWith("/m-icon-512.png")

@@ -11,6 +11,7 @@ import {
   groupStandardCatalogSkus,
   selectHqSpuRemoteIdentity,
   parseStandardCatalogSyncRequest,
+  selectValidYouzanRetailCategory,
   selectStandardCatalogTargetShops,
 } from "./standard-catalog-youzan-sync";
 
@@ -109,6 +110,16 @@ test("Youzan branch payload releases one item with every price SKU", () => {
     "2000000000099",
     "2000000000198",
   ]);
+});
+
+test("standard sync replaces a stale stored category with Youzan's live uncategorized category", () => {
+  const categories = [
+    { id: 90747747, name: "未分类" },
+    { id: 148583127, name: "动漫玩具" },
+  ];
+
+  assert.deepEqual(selectValidYouzanRetailCategory(categories, 12345), categories[0]);
+  assert.deepEqual(selectValidYouzanRetailCategory(categories, 148583127), categories[1]);
 });
 
 test("standard catalog Youzan sync defaults to a bounded dry run", () => {
