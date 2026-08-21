@@ -104,6 +104,7 @@ test("Youzan branch payload releases one item with every price SKU", () => {
   });
 
   assert.equal(payload.title, "玩具模型");
+  assert.equal(payload.sku_center_code, "SKU-STD-TOY-P0000690");
   assert.equal(payload.stocks.length, 3);
   assert.deepEqual(payload.stocks.map((stock) => stock.sku_no), [
     "2000000000069",

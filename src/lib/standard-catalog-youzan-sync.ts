@@ -171,6 +171,10 @@ export function buildStandardGroupOfflineReleaseParams(args: {
 }) {
   const pictures = args.imageUrls.map((url) => ({ url }));
   const minPriceFen = String(Math.round(Number(args.group.skus[0]?.price_tier ?? 0) * 100));
+  const firstSkuCode = buildGroupedSkuCode(
+    args.group.code,
+    Number(args.group.skus[0]?.price_tier ?? 0),
+  );
   return {
     join_level_discount: 1,
     measurement: 0,
@@ -181,7 +185,7 @@ export function buildStandardGroupOfflineReleaseParams(args: {
     title: args.group.name,
     picture: JSON.stringify(pictures),
     spu_code: args.hqSpuCode,
-    sku_center_code: args.hqSpuCode,
+    sku_center_code: firstSkuCode,
     sub_kdt_status_param: {
       sale_up_kdt_ids: Array.from(new Set(args.branchKdtIds)),
       sale_down_kdt_ids: [],
