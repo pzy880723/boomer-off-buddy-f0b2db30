@@ -9,6 +9,7 @@ import {
   buildHqSpuLookupParams,
   buildStandardYouzanRemoteIdentity,
   groupStandardCatalogSkus,
+  selectExactStandardBranchGroup,
   selectHqSpuRemoteIdentity,
   parseStandardCatalogSyncRequest,
   selectValidYouzanRetailCategory,
@@ -116,6 +117,31 @@ test("Youzan branch payload releases one item with every price SKU", () => {
     "SKU-STD-TOY-P0000990",
     "SKU-STD-TOY-P0001990",
   ]);
+});
+
+test("standard sync ignores partially-created branch products with an extra empty SKU", () => {
+  const malformed = {
+    itemId: 1,
+    skus: [
+      { skuNo: null },
+      { skuNo: "2000000000069" },
+      { skuNo: "2000000000099" },
+      { skuNo: "2000000000198" },
+    ],
+  };
+  const exact = {
+    itemId: 2,
+    skus: [
+      { skuNo: "2000000000198" },
+      { skuNo: "2000000000069" },
+      { skuNo: "2000000000099" },
+    ],
+  };
+
+  assert.equal(
+    selectExactStandardBranchGroup([malformed, exact], groupedToySkus)?.itemId,
+    2,
+  );
 });
 
 test("standard sync replaces a stale stored category with Youzan's live uncategorized category", () => {

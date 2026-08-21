@@ -4,6 +4,7 @@ import {
   buildStandardGroupOfflineReleaseParams,
   buildStandardGroupSpuCreateParams,
   groupStandardCatalogSkus,
+  selectExactStandardBranchGroup,
   selectValidYouzanRetailCategory,
   type StandardCatalogGroup,
   type StandardCatalogSku,
@@ -343,7 +344,10 @@ async function findBranchGroup(args: {
         itemIds: [args.itemId],
       },
     });
-    const exact = queried.rows.find((row) => row.itemId === args.itemId);
+    const exact = selectExactStandardBranchGroup(
+      queried.rows.filter((row) => row.itemId === args.itemId),
+      args.group.skus,
+    );
     if (exact) return exact;
   }
   for (const term of [args.group.code, args.group.name]) {
@@ -358,10 +362,13 @@ async function findBranchGroup(args: {
           nameOrSkuNo: term,
         },
       });
-      const matched = findOfflineProductMatch(queried.rows, {
-        skuCode: args.group.code,
-        name: args.group.name,
-      });
+      const matchedRows = queried.rows.filter((row) =>
+        findOfflineProductMatch([row], {
+          skuCode: args.group.code,
+          name: args.group.name,
+        })
+      );
+      const matched = selectExactStandardBranchGroup(matchedRows, args.group.skus);
       if (matched) return matched;
     }
   }

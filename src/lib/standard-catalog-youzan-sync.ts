@@ -58,6 +58,20 @@ export type StandardCatalogGroup = {
   skus: StandardCatalogSku[];
 };
 
+export function selectExactStandardBranchGroup<
+  T extends { skus: Array<{ skuNo: string | null }> },
+>(rows: T[], skus: Array<{ barcode?: string | null }>): T | null {
+  const expected = skus.map((sku) => String(sku.barcode ?? "").trim());
+  if (expected.some((barcode) => !barcode)) return null;
+  const expectedSet = new Set(expected);
+  return rows.find((row) => {
+    if (row.skus.length !== expected.length) return false;
+    const actual = row.skus.map((sku) => String(sku.skuNo ?? "").trim());
+    return actual.every((barcode) => barcode && expectedSet.has(barcode)) &&
+      new Set(actual).size === expectedSet.size;
+  }) ?? null;
+}
+
 export function groupStandardCatalogSkus(rows: StandardCatalogSku[]): StandardCatalogGroup[] {
   const groups = new Map<string, StandardCatalogGroup>();
   for (const row of rows) {
