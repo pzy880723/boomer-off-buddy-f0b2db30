@@ -25,7 +25,7 @@ import {
   callYouzanApiVerbose,
 } from "./youzan.functions";
 import {
-  runStockSyncWorkerForSkus,
+  runStockSyncWorkerForTasks,
   uploadImageToYouzanMaterialRecord,
   type YouzanMaterialImage,
 } from "./youzan-sync.functions";
@@ -432,6 +432,7 @@ async function upsertBranchRecords(args: {
   remoteSkuIds: number[];
   stock: number;
 }) {
+  const queueTaskIds: string[] = [];
   const skuIds = args.group.skus.map((sku) => sku.id);
   const { data: existingListings, error: listingReadError } = await supabase
     .from("sku_channel_listings")
@@ -493,11 +494,18 @@ async function upsertBranchRecords(args: {
       .maybeSingle();
     if (queueReadError) throw new Error(queueReadError.message);
     const queueWrite = existingQueue?.id
-      ? supabase.from("youzan_stock_sync_queue").update(queueRow as never).eq("id", existingQueue.id)
-      : supabase.from("youzan_stock_sync_queue").insert(queueRow as never);
-    const { error: queueError } = await queueWrite;
+      ? supabase
+          .from("youzan_stock_sync_queue")
+          .update(queueRow as never)
+          .eq("id", existingQueue.id)
+          .select("id")
+          .single()
+      : supabase.from("youzan_stock_sync_queue").insert(queueRow as never).select("id").single();
+    const { data: writtenQueue, error: queueError } = await queueWrite;
     if (queueError) throw new Error(queueError.message);
+    queueTaskIds.push(writtenQueue.id);
   }
+  return queueTaskIds;
 }
 
 function mapBranchSkuIds(
@@ -599,6 +607,7 @@ export async function syncStandardGroupContainingSkuCore(args: {
   }
 
   const branches = [];
+  const queueTaskIds: string[] = [];
   for (const shop of args.shops) {
     try {
       let remote = existingBranches.get(shop.id) ?? null;
@@ -624,14 +633,14 @@ export async function syncStandardGroupContainingSkuCore(args: {
       }
       const itemId = remote.itemId;
       const remoteSkuIds = mapBranchSkuIds(group, remote.skus, []);
-      await upsertBranchRecords({
+      queueTaskIds.push(...await upsertBranchRecords({
         group,
         shopId: shop.id,
         hqSpuId: groupedHq.remote.spuId,
         itemId,
         remoteSkuIds,
         stock: args.targetStock,
-      });
+      }));
 
       branches.push({
         shop_id: shop.id,
@@ -652,10 +661,11 @@ export async function syncStandardGroupContainingSkuCore(args: {
   }
 
   if (branches.some((branch) => branch.ok)) {
-    const worker = await runStockSyncWorkerForSkus(
-      group.skus.map((sku) => sku.id),
-      buildStandardStockWorkerLimit(group.skus.length, args.shops.length),
-    );
+    const expectedTaskCount = buildStandardStockWorkerLimit(group.skus.length, args.shops.length);
+    if (queueTaskIds.length !== expectedTaskCount) {
+      throw new Error(`有赞库存任务不完整：应为 ${expectedTaskCount} 条，实际 ${queueTaskIds.length} 条`);
+    }
+    const worker = await runStockSyncWorkerForTasks(queueTaskIds);
     if (worker.failed > 0) throw new Error(`有赞库存同步失败 ${worker.failed} 条`);
 
     for (const shop of args.shops) {

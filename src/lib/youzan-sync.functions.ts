@@ -1710,6 +1710,7 @@ const BACKOFF_SEC = [30, 5 * 60, 30 * 60, 2 * 60 * 60, 6 * 60 * 60];
 
 async function runStockSyncWorkerCore(opts: {
   sku_ids?: string[];
+  task_ids?: string[];
   limit?: number;
 }): Promise<{ processed: number; ok: number; failed: number }> {
   const limit = opts.limit ?? 20;
@@ -1721,6 +1722,7 @@ async function runStockSyncWorkerCore(opts: {
     .order("created_at", { ascending: true })
     .limit(limit);
   if (opts.sku_ids?.length) q = q.in("sku_id", opts.sku_ids);
+  if (opts.task_ids?.length) q = q.in("id", opts.task_ids);
   const { data: tasks, error } = await q;
   if (error) throw new Error(error.message);
 
@@ -1878,6 +1880,13 @@ export async function runStockSyncWorkerForCron() {
 // Request-scoped variant for flows that must not return before Youzan stock is durable.
 export async function runStockSyncWorkerForSkus(skuIds: string[], limit = Math.max(5, skuIds.length)) {
   return runStockSyncWorkerCore({ sku_ids: skuIds, limit: Math.min(200, Math.max(5, limit)) });
+}
+
+export async function runStockSyncWorkerForTasks(taskIds: string[]) {
+  return runStockSyncWorkerCore({
+    task_ids: taskIds,
+    limit: Math.min(200, Math.max(5, taskIds.length)),
+  });
 }
 
 // ============================================================
