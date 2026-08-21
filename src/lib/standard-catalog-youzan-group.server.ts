@@ -38,10 +38,6 @@ type HqGroup = {
   skus: Array<{ skuId: number; skuCode: string; skuNo: string }>;
 };
 
-type BranchShop = StandardCatalogTargetShop & {
-  warehouse_code?: string | null;
-};
-
 type BranchGroup = {
   itemId: number;
   skus: Array<{ skuId: number; skuNo: string | null }>;
@@ -543,18 +539,8 @@ export async function syncStandardGroupContainingSkuCore(args: {
   }
 
   const branches = [];
-  for (const shopValue of args.shops) {
-    const shop = shopValue as BranchShop;
+  for (const shop of args.shops) {
     try {
-      const previousLinks = await supabase
-        .from("sku_youzan_links")
-        .select("yz_item_id")
-        .in("sku_id", group.skus.map((sku) => sku.id))
-        .eq("shop_id", shop.id);
-      if (previousLinks.error) throw new Error(previousLinks.error.message);
-      const previousItemIds = Array.from(
-        new Set((previousLinks.data ?? []).map((row) => Number(row.yz_item_id)).filter((id) => id > 0)),
-      );
       let remote = existingBranches.get(shop.id) ?? null;
       for (const waitMs of [0, 1_000, 2_000, 4_000]) {
         if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
@@ -581,16 +567,6 @@ export async function syncStandardGroupContainingSkuCore(args: {
         stock: args.targetStock,
       });
 
-      const superseded = previousItemIds.filter((oldId) => oldId !== itemId);
-      for (const oldItemId of superseded) {
-        await callYouzanApiVerbose({
-          accessToken: groupedHq.accessToken,
-          method: "youzan.item.update.delisting",
-          version: "3.0.1",
-          params: { item_id: oldItemId },
-          timeoutMs: 20_000,
-        });
-      }
       branches.push({
         shop_id: shop.id,
         shop_name: shop.shop_name,
@@ -598,7 +574,6 @@ export async function syncStandardGroupContainingSkuCore(args: {
         branch_item_id: itemId,
         sku_count: remoteSkuIds.length,
         target_stock: args.targetStock,
-        superseded_items_delisted: superseded.length,
       });
     } catch (error) {
       branches.push({

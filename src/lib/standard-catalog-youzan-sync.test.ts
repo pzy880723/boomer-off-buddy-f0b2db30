@@ -367,6 +367,7 @@ test("grouped standard sync publishes the HQ item instead of recreating branch p
   assert.match(server, /youzan\.item\.channel\.publish/);
   assert.doesNotMatch(server, /youzan\.retail\.open\.offline\.spu\.release/);
   assert.doesNotMatch(server, /youzan\.retail\.open\.offline\.spu\.update/);
+  assert.doesNotMatch(server, /youzan\.item\.update\.delisting/);
 });
 
 test("branch stock failures invalidate stale links and listings", () => {
