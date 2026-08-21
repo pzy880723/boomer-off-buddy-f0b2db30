@@ -6,7 +6,11 @@ import {
   assertStandardCatalogSyncHost,
   buildStandardChannelPublishParams,
   buildStandardItemImageUpdateParams,
+  buildStandardGroupedSkuCode,
   buildStandardStockWorkerLimit,
+  buildStandardWarehouseStockAdjustItems,
+  buildStandardWarehouseStockAdjustParams,
+  buildStandardWarehouseStockQueryParams,
   buildStandardGroupOfflineReleaseParams,
   buildStandardGroupSpuCreateParams,
   buildHqSpuLookupParams,
@@ -62,7 +66,10 @@ test("standard price tiers group into one Youzan product", () => {
 
   assert.equal(groups.length, 2);
   assert.equal(groups[0].name, "玩具模型");
-  assert.deepEqual(groups[0].skus.map((sku) => sku.price_tier), [6.9, 9.9, 19.9]);
+  assert.deepEqual(
+    groups[0].skus.map((sku) => sku.price_tier),
+    [6.9, 9.9, 19.9],
+  );
 });
 
 test("Youzan HQ payload keeps the product name and represents prices as SKU specs", () => {
@@ -78,21 +85,22 @@ test("Youzan HQ payload keeps the product name and represents prices as SKU spec
   assert.equal(payload.spu_code, "SKU-STD-TOY");
   assert.equal(payload.retail_price, "6.90");
   assert.equal(payload.skus.length, 3);
-  assert.deepEqual(payload.skus.map((sku) => sku.specs), [
-    [{ name: "价格", value: "6.9元" }],
-    [{ name: "价格", value: "9.9元" }],
-    [{ name: "价格", value: "19.9元" }],
-  ]);
-  assert.deepEqual(payload.skus.map((sku) => sku.sku_no), [
-    "2000000000069",
-    "2000000000099",
-    "2000000000198",
-  ]);
-  assert.deepEqual(payload.skus.map((sku) => sku.sku_code), [
-    "SKU-STD-TOY-P0000690",
-    "SKU-STD-TOY-P0000990",
-    "SKU-STD-TOY-P0001990",
-  ]);
+  assert.deepEqual(
+    payload.skus.map((sku) => sku.specs),
+    [
+      [{ name: "价格", value: "6.9元" }],
+      [{ name: "价格", value: "9.9元" }],
+      [{ name: "价格", value: "19.9元" }],
+    ],
+  );
+  assert.deepEqual(
+    payload.skus.map((sku) => sku.sku_no),
+    ["2000000000069", "2000000000099", "2000000000198"],
+  );
+  assert.deepEqual(
+    payload.skus.map((sku) => sku.sku_code),
+    ["SKU-STD-TOY-P0000690", "SKU-STD-TOY-P0000990", "SKU-STD-TOY-P0001990"],
+  );
   assert.doesNotMatch(payload.name, /元|6\.9/);
   assert.equal(JSON.parse(payload.spec_define_tuple).length, 1);
 });
@@ -111,16 +119,14 @@ test("Youzan branch payload releases one item with every price SKU", () => {
   assert.equal(payload.title, "玩具模型");
   assert.equal(payload.sku_center_code, "SKU-STD-TOY-P0000690");
   assert.equal(payload.stocks.length, 3);
-  assert.deepEqual(payload.stocks.map((stock) => stock.sku_no), [
-    "2000000000069",
-    "2000000000099",
-    "2000000000198",
-  ]);
-  assert.deepEqual(payload.stocks.map((stock) => stock.related_sku_code), [
-    "SKU-STD-TOY-P0000690",
-    "SKU-STD-TOY-P0000990",
-    "SKU-STD-TOY-P0001990",
-  ]);
+  assert.deepEqual(
+    payload.stocks.map((stock) => stock.sku_no),
+    ["2000000000069", "2000000000099", "2000000000198"],
+  );
+  assert.deepEqual(
+    payload.stocks.map((stock) => stock.related_sku_code),
+    ["SKU-STD-TOY-P0000690", "SKU-STD-TOY-P0000990", "SKU-STD-TOY-P0001990"],
+  );
 });
 
 test("standard prices are sorted numerically before every Youzan payload is built", () => {
@@ -130,7 +136,10 @@ test("standard prices are sorted numerically before every Youzan payload is buil
     { ...groupedToySkus[2], price_tier: 9.9 },
   ])[0];
 
-  assert.deepEqual(group.skus.map((sku) => sku.price_tier), [9.9, 19.9, 109]);
+  assert.deepEqual(
+    group.skus.map((sku) => sku.price_tier),
+    [9.9, 19.9, 109],
+  );
   assert.deepEqual(
     buildStandardGroupSpuCreateParams({
       group,
@@ -162,6 +171,57 @@ test("standard stock worker consumes every SKU and branch task", () => {
   assert.equal(buildStandardStockWorkerLimit(31, 10), 200);
 });
 
+test("standard warehouse stock sync uses Youzan SKU codes and writes only deltas", () => {
+  const skuCodes = [
+    buildStandardGroupedSkuCode("SKU-STD-TOY", 6.9),
+    buildStandardGroupedSkuCode("SKU-STD-TOY", 9.9),
+    buildStandardGroupedSkuCode("SKU-STD-TOY", 19.9),
+  ];
+  assert.deepEqual(buildStandardWarehouseStockQueryParams("MD00002", skuCodes), {
+    warehouse_code: "MD00002",
+    sku_codes: skuCodes,
+  });
+  const items = buildStandardWarehouseStockAdjustItems({
+    skuCodes,
+    currentStocks: new Map([
+      [skuCodes[0], 0],
+      [skuCodes[1], 9999],
+      [skuCodes[2], 12],
+    ]),
+    targetStock: 9999,
+  });
+  assert.deepEqual(items, [
+    { sku_code: skuCodes[0], quantity: "9999" },
+    { sku_code: skuCodes[2], quantity: "9987" },
+  ]);
+  assert.deepEqual(
+    buildStandardWarehouseStockAdjustParams({
+      warehouseCode: "MD00002",
+      sourceOrderNo: "BS202608220001",
+      createTime: "2026-08-22 10:00:00",
+      items,
+    }),
+    {
+      retail_source: "BOOMER_ERP",
+      source_order_no: "BS202608220001",
+      create_time: "2026-08-22 10:00:00",
+      warehouse_code: "MD00002",
+      remark: "BOOMER ERP standard catalog stock sync",
+      order_items: items,
+    },
+  );
+  assert.throws(
+    () =>
+      buildStandardWarehouseStockAdjustParams({
+        warehouseCode: "MD00002",
+        sourceOrderNo: "X".repeat(33),
+        createTime: "2026-08-22 10:00:00",
+        items,
+      }),
+    /32/,
+  );
+});
+
 test("channel publishing waits for Youzan asynchronous completion errors", () => {
   assert.equal(
     isRecoverableStandardChannelPublishError(new Error("[122001001] 商品不存在!")),
@@ -188,17 +248,10 @@ test("standard sync ignores partially-created branch products with an extra empt
   };
   const exact = {
     itemId: 2,
-    skus: [
-      { skuNo: "2000000000198" },
-      { skuNo: "2000000000069" },
-      { skuNo: "2000000000099" },
-    ],
+    skus: [{ skuNo: "2000000000198" }, { skuNo: "2000000000069" }, { skuNo: "2000000000099" }],
   };
 
-  assert.equal(
-    selectExactStandardBranchGroup([malformed, exact], groupedToySkus)?.itemId,
-    2,
-  );
+  assert.equal(selectExactStandardBranchGroup([malformed, exact], groupedToySkus)?.itemId, 2);
 });
 
 test("standard sync replaces a stale stored category with Youzan's live uncategorized category", () => {
@@ -312,15 +365,12 @@ test("HQ lookup never falls back to a same-name SPU when an exact code was reque
     }),
     null,
   );
-  assert.deepEqual(
-    selectHqSpuRemoteIdentity(rows, { spuId: 5071222203 }),
-    {
-      spuId: 5071222203,
-      spuCode: "BM507122220383",
-      skuId: 390105648,
-      skuCode: "BM507122220383",
-    },
-  );
+  assert.deepEqual(selectHqSpuRemoteIdentity(rows, { spuId: 5071222203 }), {
+    spuId: 5071222203,
+    spuCode: "BM507122220383",
+    skuId: 390105648,
+    skuCode: "BM507122220383",
+  });
 });
 
 test("standard catalog targets every active Youzan branch exactly once", () => {
@@ -331,14 +381,14 @@ test("standard catalog targets every active Youzan branch exactly once", () => {
     { id: "dup", shop_name: "重复授权", kdt_id: 102, role: "branch", status: "active" },
     { id: "off", shop_name: "停用店", kdt_id: 103, role: "branch", status: "disabled" },
   ]);
-  assert.deepEqual(targets.map((shop) => shop.id), ["a", "b"]);
+  assert.deepEqual(
+    targets.map((shop) => shop.id),
+    ["a", "b"],
+  );
 });
 
 test("production batch sync is not hard-coded to one shop and includes barcodes", () => {
-  const route = readFileSync(
-    "src/routes/api/public/hooks/youzan-standard-catalog-sync.ts",
-    "utf8",
-  );
+  const route = readFileSync("src/routes/api/public/hooks/youzan-standard-catalog-sync.ts", "utf8");
   assert.match(route, /selectStandardCatalogTargetShops/);
   assert.match(route, /groupStandardCatalogSkus/);
   assert.match(route, /group\.skus\[0\]\.id/);

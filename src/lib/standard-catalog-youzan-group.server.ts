@@ -3,7 +3,11 @@ import {
   buildStandardChannelPublishParams,
   buildHqSpuLookupParams,
   buildStandardItemImageUpdateParams,
+  buildStandardGroupedSkuCode,
   buildStandardStockWorkerLimit,
+  buildStandardWarehouseStockAdjustItems,
+  buildStandardWarehouseStockAdjustParams,
+  buildStandardWarehouseStockQueryParams,
   buildStandardGroupSpuCreateParams,
   groupStandardCatalogSkus,
   isRecoverableStandardChannelPublishError,
@@ -19,11 +23,7 @@ import {
   resolveOfflineReleaseSourceImages,
 } from "./youzan-offline-products.server";
 import { getPublicOrigin } from "./sku-media";
-import {
-  ensureAccessToken,
-  getHqShop,
-  callYouzanApiVerbose,
-} from "./youzan.functions";
+import { ensureAccessToken, getHqShop, callYouzanApiVerbose } from "./youzan.functions";
 import {
   runStockSyncWorkerForTasks,
   uploadImageToYouzanMaterialRecord,
@@ -49,6 +49,107 @@ type BranchGroup = {
   imageUrls: string[];
   stockValues: number[];
 };
+
+const YOUZAN_WAREHOUSE_STOCK_BATCH_SIZE = 20;
+
+function chunkValues<T>(values: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size));
+  }
+  return chunks;
+}
+
+function formatChinaDateTime(date = new Date()) {
+  return new Date(date.getTime() + 8 * 60 * 60 * 1_000)
+    .toISOString()
+    .slice(0, 19)
+    .replace("T", " ");
+}
+
+function createYouzanStockOrderNo() {
+  return `BS${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+}
+
+async function queryYouzanWarehouseStocks(args: {
+  accessToken: string;
+  warehouseCode: string;
+  skuCodes: string[];
+}) {
+  const stocks = new Map<string, number>();
+  for (const skuCodes of chunkValues(args.skuCodes, YOUZAN_WAREHOUSE_STOCK_BATCH_SIZE)) {
+    const result = await callYouzanApiVerbose({
+      accessToken: args.accessToken,
+      method: "youzan.retail.open.query.warehousestock",
+      version: "1.0.0",
+      params: buildStandardWarehouseStockQueryParams(args.warehouseCode, skuCodes),
+      timeoutMs: 20_000,
+    });
+    const rows = Array.isArray(result.payload)
+      ? (result.payload as Array<Record<string, unknown>>)
+      : [];
+    for (const row of rows) {
+      const skuCode = String(row.sku_code ?? "").trim();
+      if (skuCode) stocks.set(skuCode, Number(row.stock_num ?? 0));
+    }
+    const missing = skuCodes.filter((skuCode) => !stocks.has(skuCode));
+    if (missing.length > 0) {
+      throw new Error(`有赞仓库 ${args.warehouseCode} 未返回 SKU：${missing.join(",")}`);
+    }
+  }
+  return stocks;
+}
+
+async function syncYouzanWarehouseStocks(args: {
+  accessToken: string;
+  warehouseCode: string;
+  group: StandardCatalogGroup;
+  targetStock: number;
+}) {
+  const skuCodes = args.group.skus.map((sku) =>
+    buildStandardGroupedSkuCode(args.group.code, Number(sku.price_tier)),
+  );
+  for (const batchSkuCodes of chunkValues(skuCodes, YOUZAN_WAREHOUSE_STOCK_BATCH_SIZE)) {
+    const currentStocks = await queryYouzanWarehouseStocks({
+      accessToken: args.accessToken,
+      warehouseCode: args.warehouseCode,
+      skuCodes: batchSkuCodes,
+    });
+    const items = buildStandardWarehouseStockAdjustItems({
+      skuCodes: batchSkuCodes,
+      currentStocks,
+      targetStock: args.targetStock,
+    });
+    if (items.length === 0) continue;
+    await callYouzanApiVerbose({
+      accessToken: args.accessToken,
+      method: "youzan.retail.open.stock.adjust",
+      version: "3.0.0",
+      params: buildStandardWarehouseStockAdjustParams({
+        warehouseCode: args.warehouseCode,
+        sourceOrderNo: createYouzanStockOrderNo(),
+        createTime: formatChinaDateTime(),
+        items,
+      }),
+      timeoutMs: 30_000,
+    });
+  }
+
+  let verified = new Map<string, number>();
+  for (const waitMs of [0, 1_000, 2_000, 4_000, 8_000]) {
+    if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
+    verified = await queryYouzanWarehouseStocks({
+      accessToken: args.accessToken,
+      warehouseCode: args.warehouseCode,
+      skuCodes,
+    });
+    if (skuCodes.every((skuCode) => verified.get(skuCode) === args.targetStock)) return;
+  }
+  const actual = Array.from(new Set(skuCodes.map((skuCode) => verified.get(skuCode) ?? "missing")));
+  throw new Error(
+    `有赞仓库 ${args.warehouseCode} 实物库存未生效：应为 ${args.targetStock}，实际 ${actual.join(",")}`,
+  );
+}
 
 function branchHasMaterialImage(branch: BranchGroup, image: YouzanMaterialImage) {
   if (branch.imageIds.includes(image.imageId)) return true;
@@ -88,9 +189,7 @@ function collectSpuRows(payload: unknown): Array<Record<string, unknown>> {
 
 function normalizeHqGroup(row: Record<string, unknown>): HqGroup | null {
   const spuId = Number(row.spu_id ?? row.spuId ?? row.item_id ?? row.itemId ?? row.id ?? 0);
-  const spuCode = String(
-    row.spu_code ?? row.spuCode ?? row.outer_id ?? row.outerId ?? "",
-  ).trim();
+  const spuCode = String(row.spu_code ?? row.spuCode ?? row.outer_id ?? row.outerId ?? "").trim();
   if (!spuId || !spuCode) return null;
   const rawSkus = Array.isArray(row.skus ?? row.sku_list ?? row.skuList)
     ? ((row.skus ?? row.sku_list ?? row.skuList) as Array<Record<string, unknown>>)
@@ -101,13 +200,15 @@ function normalizeHqGroup(row: Record<string, unknown>): HqGroup | null {
     skus: rawSkus.flatMap((sku) => {
       const skuId = Number(sku.sku_id ?? sku.skuId ?? sku.id ?? 0);
       if (!skuId) return [];
-      return [{
-        skuId,
-        skuCode: String(
-          sku.sku_code ?? sku.skuCode ?? sku.outer_sku_id ?? sku.outerSkuId ?? "",
-        ).trim(),
-        skuNo: String(sku.sku_no ?? sku.skuNo ?? "").trim(),
-      }];
+      return [
+        {
+          skuId,
+          skuCode: String(
+            sku.sku_code ?? sku.skuCode ?? sku.outer_sku_id ?? sku.outerSkuId ?? "",
+          ).trim(),
+          skuNo: String(sku.sku_no ?? sku.skuNo ?? "").trim(),
+        },
+      ];
     }),
   };
 }
@@ -259,23 +360,22 @@ function mapHqSkuIds(group: StandardCatalogGroup, remote: HqGroup) {
   });
 }
 
-async function upsertHqLinks(
-  group: StandardCatalogGroup,
-  hqShopId: string,
-  remote: HqGroup,
-) {
+async function upsertHqLinks(group: StandardCatalogGroup, hqShopId: string, remote: HqGroup) {
   const mapped = mapHqSkuIds(group, remote);
   for (const { sku, skuId } of mapped) {
-    const { error } = await supabase.from("sku_youzan_links").upsert({
-      sku_id: sku.id,
-      shop_id: hqShopId,
-      yz_item_id: remote.spuId,
-      yz_sku_id: skuId,
-      status: "linked",
-      role: "hq_spu",
-      sync_stock: false,
-      last_error: null,
-    } as never, { onConflict: "sku_id,shop_id" });
+    const { error } = await supabase.from("sku_youzan_links").upsert(
+      {
+        sku_id: sku.id,
+        shop_id: hqShopId,
+        yz_item_id: remote.spuId,
+        yz_sku_id: skuId,
+        status: "linked",
+        role: "hq_spu",
+        sync_stock: false,
+        last_error: null,
+      } as never,
+      { onConflict: "sku_id,shop_id" },
+    );
     if (error) throw new Error(error.message);
   }
 }
@@ -307,7 +407,12 @@ async function ensureGroupedHqSpu(args: {
       if (remote && (!createdId || remote.spuId === createdId)) break;
     }
   } else {
-    const { offline_create: _offline, is_up_offline: _up, sell_channel_ids: _channels, ...fields } = payload;
+    const {
+      offline_create: _offline,
+      is_up_offline: _up,
+      sell_channel_ids: _channels,
+      ...fields
+    } = payload;
     await callYouzanApiVerbose({
       accessToken,
       method: "youzan.retail.open.spu.update",
@@ -353,31 +458,37 @@ async function findBranchGroup(args: {
       },
       timeoutMs: 20_000,
     });
-    const detail = result.payload && typeof result.payload === "object"
-      ? result.payload as Record<string, unknown>
-      : {};
+    const detail =
+      result.payload && typeof result.payload === "object"
+        ? (result.payload as Record<string, unknown>)
+        : {};
     const itemId = Number(detail.channel_item_id ?? detail.item_id ?? 0);
     const rawSkus = Array.isArray(detail.skus)
-      ? detail.skus as Array<Record<string, unknown>>
+      ? (detail.skus as Array<Record<string, unknown>>)
       : [];
-    const media = detail.media && typeof detail.media === "object"
-      ? detail.media as Record<string, unknown>
-      : {};
+    const media =
+      detail.media && typeof detail.media === "object"
+        ? (detail.media as Record<string, unknown>)
+        : {};
     const images = Array.isArray(media.images)
-      ? media.images as Array<Record<string, unknown>>
+      ? (media.images as Array<Record<string, unknown>>)
       : [];
     const row: BranchGroup = {
       itemId,
       imageIds: images.map((image) => Number(image.image_id ?? 0)).filter((id) => id > 0),
       imageUrls: images.map((image) => String(image.url ?? "").trim()).filter(Boolean),
-      stockValues: rawSkus.map((sku) => Number(sku.stock_num_str ?? Number(sku.stock_num ?? 0) / 1000)),
+      stockValues: rawSkus.map((sku) =>
+        Number(sku.stock_num_str ?? Number(sku.stock_num ?? 0) / 1000),
+      ),
       skus: rawSkus.flatMap((sku) => {
         const skuId = Number(sku.channel_sku_id ?? sku.sku_id ?? 0);
         if (!skuId) return [];
-        return [{
-          skuId,
-          skuNo: String(sku.sku_barcode ?? sku.sku_no ?? "").trim() || null,
-        }];
+        return [
+          {
+            skuId,
+            skuNo: String(sku.sku_barcode ?? sku.sku_no ?? "").trim() || null,
+          },
+        ];
       }),
     };
     return itemId && selectExactStandardBranchGroup([row], args.group.skus) ? row : null;
@@ -389,11 +500,7 @@ async function findBranchGroup(args: {
   }
 }
 
-async function resolveRootItemId(args: {
-  accessToken: string;
-  hqKdtId: number;
-  itemCode: string;
-}) {
+async function resolveRootItemId(args: { accessToken: string; hqKdtId: number; itemCode: string }) {
   let lastError: unknown;
   for (const waitMs of [0, 1_000, 2_000, 4_000, 8_000, 16_000]) {
     if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
@@ -446,16 +553,19 @@ async function upsertBranchRecords(args: {
   for (const [index, sku] of args.group.skus.entries()) {
     const remoteSkuId = args.remoteSkuIds[index];
     if (!remoteSkuId) throw new Error(`有赞分店未返回价格档 ${sku.price_tier} 的 SKU ID`);
-    const { error: linkError } = await supabase.from("sku_youzan_links").upsert({
-      sku_id: sku.id,
-      shop_id: args.shopId,
-      yz_item_id: args.itemId,
-      yz_sku_id: remoteSkuId,
-      status: "linked",
-      role: "branch_stock",
-      sync_stock: true,
-      last_error: null,
-    } as never, { onConflict: "sku_id,shop_id" });
+    const { error: linkError } = await supabase.from("sku_youzan_links").upsert(
+      {
+        sku_id: sku.id,
+        shop_id: args.shopId,
+        yz_item_id: args.itemId,
+        yz_sku_id: remoteSkuId,
+        status: "linked",
+        role: "branch_stock",
+        sync_stock: true,
+        last_error: null,
+      } as never,
+      { onConflict: "sku_id,shop_id" },
+    );
     if (linkError) throw new Error(linkError.message);
 
     const listing = {
@@ -473,7 +583,10 @@ async function upsertBranchRecords(args: {
     };
     const listingId = listingIds.get(sku.id);
     const listingWrite = listingId
-      ? supabase.from("sku_channel_listings").update(listing as never).eq("id", listingId)
+      ? supabase
+          .from("sku_channel_listings")
+          .update(listing as never)
+          .eq("id", listingId)
       : supabase.from("sku_channel_listings").insert(listing as never);
     const { error: listingError } = await listingWrite;
     if (listingError) throw new Error(listingError.message);
@@ -500,7 +613,11 @@ async function upsertBranchRecords(args: {
           .eq("id", existingQueue.id)
           .select("id")
           .single()
-      : supabase.from("youzan_stock_sync_queue").insert(queueRow as never).select("id").single();
+      : supabase
+          .from("youzan_stock_sync_queue")
+          .insert(queueRow as never)
+          .select("id")
+          .single();
     const { data: writtenQueue, error: queueError } = await queueWrite;
     if (queueError) throw new Error(queueError.message);
     queueTaskIds.push(writtenQueue.id);
@@ -516,11 +633,12 @@ function mapBranchSkuIds(
   const byBarcode = new Map(
     remoteSkus.filter((sku) => sku.skuNo).map((sku) => [String(sku.skuNo), sku.skuId]),
   );
-  const positional = remoteSkus.length === group.skus.length
-    ? remoteSkus.map((sku) => sku.skuId)
-    : returnedSkuIds.length === group.skus.length
-      ? returnedSkuIds
-      : [];
+  const positional =
+    remoteSkus.length === group.skus.length
+      ? remoteSkus.map((sku) => sku.skuId)
+      : returnedSkuIds.length === group.skus.length
+        ? returnedSkuIds
+        : [];
   return group.skus.map((sku, index) => {
     const remoteSkuId = byBarcode.get(String(sku.barcode ?? "")) ?? positional[index] ?? 0;
     if (!remoteSkuId) throw new Error(`有赞分店未返回价格档 ${sku.price_tier} 的 SKU ID`);
@@ -535,7 +653,8 @@ export async function syncStandardGroupContainingSkuCore(args: {
 }) {
   const { group, sourceRows } = await loadStandardGroupContainingSku(args.skuId);
   const publicOrigin = getPublicOrigin();
-  const imageSource = sourceRows.find((row) => row.image_url || row.image_paths?.length) ?? sourceRows[0];
+  const imageSource =
+    sourceRows.find((row) => row.image_url || row.image_paths?.length) ?? sourceRows[0];
   const rawImages = resolveOfflineReleaseSourceImages({
     skuScope: "standard",
     imageUrl: imageSource?.image_url,
@@ -581,11 +700,14 @@ export async function syncStandardGroupContainingSkuCore(args: {
   }
   const existingBranches = new Map<string, BranchGroup | null>();
   for (const shop of args.shops) {
-    existingBranches.set(shop.id, await findBranchGroup({
-      accessToken: groupedHq.accessToken,
-      kdtId: Number(shop.kdt_id),
-      group,
-    }));
+    existingBranches.set(
+      shop.id,
+      await findBranchGroup({
+        accessToken: groupedHq.accessToken,
+        kdtId: Number(shop.kdt_id),
+        group,
+      }),
+    );
   }
   if (
     imageMaterials.length > 0 ||
@@ -621,7 +743,8 @@ export async function syncStandardGroupContainingSkuCore(args: {
         if (
           remote?.skus.length === group.skus.length &&
           (!imageMaterials[0] || branchHasMaterialImage(remote, imageMaterials[0]))
-        ) break;
+        )
+          break;
       }
       if (!remote || remote.skus.length !== group.skus.length) {
         throw new Error(
@@ -633,14 +756,16 @@ export async function syncStandardGroupContainingSkuCore(args: {
       }
       const itemId = remote.itemId;
       const remoteSkuIds = mapBranchSkuIds(group, remote.skus, []);
-      queueTaskIds.push(...await upsertBranchRecords({
-        group,
-        shopId: shop.id,
-        hqSpuId: groupedHq.remote.spuId,
-        itemId,
-        remoteSkuIds,
-        stock: args.targetStock,
-      }));
+      queueTaskIds.push(
+        ...(await upsertBranchRecords({
+          group,
+          shopId: shop.id,
+          hqSpuId: groupedHq.remote.spuId,
+          itemId,
+          remoteSkuIds,
+          stock: args.targetStock,
+        })),
+      );
 
       branches.push({
         shop_id: shop.id,
@@ -663,10 +788,23 @@ export async function syncStandardGroupContainingSkuCore(args: {
   if (branches.some((branch) => branch.ok)) {
     const expectedTaskCount = buildStandardStockWorkerLimit(group.skus.length, args.shops.length);
     if (queueTaskIds.length !== expectedTaskCount) {
-      throw new Error(`有赞库存任务不完整：应为 ${expectedTaskCount} 条，实际 ${queueTaskIds.length} 条`);
+      throw new Error(
+        `有赞库存任务不完整：应为 ${expectedTaskCount} 条，实际 ${queueTaskIds.length} 条`,
+      );
     }
     const worker = await runStockSyncWorkerForTasks(queueTaskIds);
     if (worker.failed > 0) throw new Error(`有赞库存同步失败 ${worker.failed} 条`);
+
+    for (const shop of args.shops) {
+      const warehouseCode = String(shop.warehouse_code ?? "").trim();
+      if (!warehouseCode) continue;
+      await syncYouzanWarehouseStocks({
+        accessToken: groupedHq.accessToken,
+        warehouseCode,
+        group,
+        targetStock: args.targetStock,
+      });
+    }
 
     for (const shop of args.shops) {
       let verified: BranchGroup | null = null;

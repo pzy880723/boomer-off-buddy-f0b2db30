@@ -58,18 +58,23 @@ export type StandardCatalogGroup = {
   skus: StandardCatalogSku[];
 };
 
-export function selectExactStandardBranchGroup<
-  T extends { skus: Array<{ skuNo: string | null }> },
->(rows: T[], skus: Array<{ barcode?: string | null }>): T | null {
+export function selectExactStandardBranchGroup<T extends { skus: Array<{ skuNo: string | null }> }>(
+  rows: T[],
+  skus: Array<{ barcode?: string | null }>,
+): T | null {
   const expected = skus.map((sku) => String(sku.barcode ?? "").trim());
   if (expected.some((barcode) => !barcode)) return null;
   const expectedSet = new Set(expected);
-  return rows.find((row) => {
-    if (row.skus.length !== expected.length) return false;
-    const actual = row.skus.map((sku) => String(sku.skuNo ?? "").trim());
-    return actual.every((barcode) => barcode && expectedSet.has(barcode)) &&
-      new Set(actual).size === expectedSet.size;
-  }) ?? null;
+  return (
+    rows.find((row) => {
+      if (row.skus.length !== expected.length) return false;
+      const actual = row.skus.map((sku) => String(sku.skuNo ?? "").trim());
+      return (
+        actual.every((barcode) => barcode && expectedSet.has(barcode)) &&
+        new Set(actual).size === expectedSet.size
+      );
+    }) ?? null
+  );
 }
 
 export function groupStandardCatalogSkus(rows: StandardCatalogSku[]): StandardCatalogGroup[] {
@@ -147,9 +152,47 @@ function formatPriceSpec(price: number): string {
   return `${Number.isInteger(price) ? price : price.toFixed(1)}元`;
 }
 
-function buildGroupedSkuCode(groupCode: string, price: number): string {
-  const suffix = `-P${Math.round(price * 100).toString().padStart(7, "0")}`;
+export function buildStandardGroupedSkuCode(groupCode: string, price: number): string {
+  const suffix = `-P${Math.round(price * 100)
+    .toString()
+    .padStart(7, "0")}`;
   return `${groupCode.slice(0, Math.max(1, 64 - suffix.length))}${suffix}`;
+}
+
+export function buildStandardWarehouseStockQueryParams(warehouseCode: string, skuCodes: string[]) {
+  return {
+    warehouse_code: warehouseCode,
+    sku_codes: skuCodes,
+  };
+}
+
+export function buildStandardWarehouseStockAdjustItems(args: {
+  skuCodes: string[];
+  currentStocks: Map<string, number>;
+  targetStock: number;
+}) {
+  return args.skuCodes.flatMap((skuCode) => {
+    const current = Number(args.currentStocks.get(skuCode) ?? 0);
+    const delta = Math.trunc(args.targetStock) - Math.trunc(current);
+    return delta === 0 ? [] : [{ sku_code: skuCode, quantity: String(delta) }];
+  });
+}
+
+export function buildStandardWarehouseStockAdjustParams(args: {
+  warehouseCode: string;
+  sourceOrderNo: string;
+  createTime: string;
+  items: Array<{ sku_code: string; quantity: string }>;
+}) {
+  if (args.sourceOrderNo.length > 32) throw new Error("有赞库存调整单号不能超过 32 位");
+  return {
+    retail_source: "BOOMER_ERP",
+    source_order_no: args.sourceOrderNo,
+    create_time: args.createTime,
+    warehouse_code: args.warehouseCode,
+    remark: "BOOMER ERP standard catalog stock sync",
+    order_items: args.items,
+  };
 }
 
 export function buildStandardGroupSpuCreateParams(args: {
@@ -165,7 +208,7 @@ export function buildStandardGroupSpuCreateParams(args: {
   const skus = args.group.skus.map((sku) => {
     const barcode = requireStandardBarcode(sku);
     const price = Number(sku.price_tier).toFixed(2);
-    const skuCode = buildGroupedSkuCode(args.group.code, Number(sku.price_tier));
+    const skuCode = buildStandardGroupedSkuCode(args.group.code, Number(sku.price_tier));
     return {
       sku_no: barcode,
       sku_code: skuCode,
@@ -213,7 +256,7 @@ export function buildStandardGroupOfflineReleaseParams(args: {
 }) {
   const pictures = args.imageUrls.map((url) => ({ url }));
   const minPriceFen = String(Math.round(Number(args.group.skus[0]?.price_tier ?? 0) * 100));
-  const firstSkuCode = buildGroupedSkuCode(
+  const firstSkuCode = buildStandardGroupedSkuCode(
     args.group.code,
     Number(args.group.skus[0]?.price_tier ?? 0),
   );
@@ -240,7 +283,7 @@ export function buildStandardGroupOfflineReleaseParams(args: {
     stocks: args.group.skus.map((sku) => {
       const barcode = requireStandardBarcode(sku);
       const priceFen = String(Math.round(Number(sku.price_tier) * 100));
-      const skuCode = buildGroupedSkuCode(args.group.code, Number(sku.price_tier));
+      const skuCode = buildStandardGroupedSkuCode(args.group.code, Number(sku.price_tier));
       return {
         price: priceFen,
         cost_price: "0",
@@ -281,9 +324,7 @@ export function selectHqSpuRemoteIdentity(
   const code = String(target.code ?? "").trim();
   const name = String(target.name ?? "").trim();
   const matchesCode = (row: Record<string, unknown>) => {
-    const skus = Array.isArray(row.skus)
-      ? (row.skus as Array<Record<string, unknown>>)
-      : [];
+    const skus = Array.isArray(row.skus) ? (row.skus as Array<Record<string, unknown>>) : [];
     return (
       [row.spu_code, row.spuCode, row.outer_id, row.outerId].some(
         (value) => String(value ?? "") === code,
@@ -295,21 +336,18 @@ export function selectHqSpuRemoteIdentity(
       )
     );
   };
-  const matched = spuId > 0
-    ? rows.find((row) => Number(row.spu_id ?? row.spuId ?? row.item_id ?? row.id ?? 0) === spuId)
-    : code
-      ? rows.find(matchesCode)
-      : rows.find(
-          (row) => String(row.product_name ?? row.productName ?? row.name ?? "").trim() === name,
-        );
+  const matched =
+    spuId > 0
+      ? rows.find((row) => Number(row.spu_id ?? row.spuId ?? row.item_id ?? row.id ?? 0) === spuId)
+      : code
+        ? rows.find(matchesCode)
+        : rows.find(
+            (row) => String(row.product_name ?? row.productName ?? row.name ?? "").trim() === name,
+          );
   if (!matched) return null;
 
-  const skus = Array.isArray(matched.skus)
-    ? (matched.skus as Array<Record<string, unknown>>)
-    : [];
-  const remoteSpuId = Number(
-    matched.spu_id ?? matched.spuId ?? matched.item_id ?? matched.id ?? 0,
-  );
+  const skus = Array.isArray(matched.skus) ? (matched.skus as Array<Record<string, unknown>>) : [];
+  const remoteSpuId = Number(matched.spu_id ?? matched.spuId ?? matched.item_id ?? matched.id ?? 0);
   const remoteSpuCode = String(
     matched.spu_code ?? matched.spuCode ?? matched.outer_id ?? matched.outerId ?? "",
   ).trim();
