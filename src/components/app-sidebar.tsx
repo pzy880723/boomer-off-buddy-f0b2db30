@@ -34,6 +34,7 @@ import {
   Newspaper,
   LibraryBig,
   WalletCards,
+  UserRoundCog,
   type LucideIcon,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks/use-auth-session";
@@ -87,6 +88,7 @@ type NavTo =
   | "/orders/dispatch"
   | "/orders/wholesale"
   | "/operations/content"
+  | "/operations/members"
   | "/operations/official-knowledge"
   | "/knowledge"
   | "/settings"
@@ -163,6 +165,7 @@ const groups: NavGroup[] = [
   {
     label: "运营",
     items: [
+      { title: "会员管理", url: "/operations/members", icon: UserRoundCog },
       { title: "资讯管理", url: "/operations/content", icon: Newspaper },
       { title: "官方知识", url: "/operations/official-knowledge", icon: LibraryBig },
       { title: "内部知识库", url: "/knowledge", icon: BookOpen },
