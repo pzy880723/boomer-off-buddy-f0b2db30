@@ -4,6 +4,7 @@ import test from "node:test";
 
 import {
   assertStandardCatalogSyncHost,
+  buildStandardChannelPublishParams,
   buildStandardGroupOfflineReleaseParams,
   buildStandardGroupSpuCreateParams,
   buildHqSpuLookupParams,
@@ -117,6 +118,33 @@ test("Youzan branch payload releases one item with every price SKU", () => {
     "SKU-STD-TOY-P0000990",
     "SKU-STD-TOY-P0001990",
   ]);
+});
+
+test("standard prices are sorted numerically before every Youzan payload is built", () => {
+  const group = groupStandardCatalogSkus([
+    { ...groupedToySkus[0], price_tier: 109 },
+    { ...groupedToySkus[1], price_tier: 19.9 },
+    { ...groupedToySkus[2], price_tier: 9.9 },
+  ])[0];
+
+  assert.deepEqual(group.skus.map((sku) => sku.price_tier), [9.9, 19.9, 109]);
+  assert.deepEqual(
+    buildStandardGroupSpuCreateParams({
+      group,
+      categoryId: 123,
+      kdtIds: [456],
+    }).skus.map((sku) => sku.retail_price),
+    ["9.90", "19.90", "109.00"],
+  );
+});
+
+test("grouped standard products publish the existing HQ item to store channel", () => {
+  assert.deepEqual(buildStandardChannelPublishParams(6235775735), {
+    item_id: 6235775735,
+    channel: 1,
+    operate_type: 1,
+    display: 1,
+  });
 });
 
 test("standard sync ignores partially-created branch products with an extra empty SKU", () => {
@@ -331,6 +359,14 @@ test("standard catalog uses the offline retail-store release path", () => {
   assert.match(server, /syncStandardGroupContainingSkuCore/);
   assert.doesNotMatch(server, /releaseSkuToBranchCore/);
   assert.doesNotMatch(server, /pushYouzanQuantityUpdate/);
+});
+
+test("grouped standard sync publishes the HQ item instead of recreating branch products", () => {
+  const server = readFileSync("src/lib/standard-catalog-youzan-group.server.ts", "utf8");
+  assert.match(server, /youzan\.item\.base\.get/);
+  assert.match(server, /youzan\.item\.channel\.publish/);
+  assert.doesNotMatch(server, /youzan\.retail\.open\.offline\.spu\.release/);
+  assert.doesNotMatch(server, /youzan\.retail\.open\.offline\.spu\.update/);
 });
 
 test("branch stock failures invalidate stale links and listings", () => {

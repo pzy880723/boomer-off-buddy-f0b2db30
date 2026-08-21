@@ -1,7 +1,7 @@
 import { supabaseAdmin as supabase } from "@/integrations/supabase/client.server";
 import {
+  buildStandardChannelPublishParams,
   buildHqSpuLookupParams,
-  buildStandardGroupOfflineReleaseParams,
   buildStandardGroupSpuCreateParams,
   groupStandardCatalogSkus,
   selectExactStandardBranchGroup,
@@ -13,8 +13,6 @@ import {
 import {
   buildOfflineChannelListingRow,
   buildOfflineStockQueueRow,
-  findOfflineProductMatch,
-  queryYouzanOfflineProducts,
   resolveOfflineReleaseSourceImages,
 } from "./youzan-offline-products.server";
 import { getPublicOrigin } from "./sku-media";
@@ -42,6 +40,11 @@ type HqGroup = {
 
 type BranchShop = StandardCatalogTargetShop & {
   warehouse_code?: string | null;
+};
+
+type BranchGroup = {
+  itemId: number;
+  skus: Array<{ skuId: number; skuNo: string | null }>;
 };
 
 function collectSpuRows(payload: unknown): Array<Record<string, unknown>> {
@@ -118,17 +121,6 @@ function pickCreatedId(payload: unknown): number {
     return 0;
   };
   return walk(payload);
-}
-
-function pickCreatedSkuIds(payload: unknown): number[] {
-  if (!payload || typeof payload !== "object") return [];
-  const object = payload as Record<string, unknown>;
-  const data = object.data && typeof object.data === "object"
-    ? (object.data as Record<string, unknown>)
-    : object;
-  return Array.isArray(data.sku_ids)
-    ? data.sku_ids.map(Number).filter((id) => Number.isFinite(id) && id > 0)
-    : [];
 }
 
 function collectRetailCategories(payload: unknown) {
@@ -329,50 +321,71 @@ async function ensureGroupedHqSpu(args: {
 
 async function findBranchGroup(args: {
   accessToken: string;
-  warehouseCode: string | null;
+  kdtId: number;
   group: StandardCatalogGroup;
-  itemId?: number;
-}) {
-  if (!args.warehouseCode) throw new Error("有赞分店缺少 warehouse_code");
-  if (args.itemId) {
-    const queried = await queryYouzanOfflineProducts({
+}): Promise<BranchGroup | null> {
+  try {
+    const result = await callYouzanApiVerbose({
       accessToken: args.accessToken,
-      input: {
-        pageNo: 1,
-        pageSize: 20,
-        warehouseCode: args.warehouseCode,
-        itemIds: [args.itemId],
-      },
-    });
-    const exact = selectExactStandardBranchGroup(
-      queried.rows.filter((row) => row.itemId === args.itemId),
-      args.group.skus,
-    );
-    if (exact) return exact;
-  }
-  for (const term of [args.group.code, args.group.name]) {
-    for (const displayStatus of [1, 2, 0] as const) {
-      const queried = await queryYouzanOfflineProducts({
-        accessToken: args.accessToken,
-        input: {
-          pageNo: 1,
-          pageSize: 20,
-          displayStatus,
-          warehouseCode: args.warehouseCode,
-          nameOrSkuNo: term,
+      method: "youzan.item.itemdetail.get",
+      version: "1.0.0",
+      params: {
+        request: {
+          kdt_id: args.kdtId,
+          item_code: args.group.code,
+          channel: 1,
         },
-      });
-      const matchedRows = queried.rows.filter((row) =>
-        findOfflineProductMatch([row], {
-          skuCode: args.group.code,
-          name: args.group.name,
-        })
-      );
-      const matched = selectExactStandardBranchGroup(matchedRows, args.group.skus);
-      if (matched) return matched;
+      },
+      timeoutMs: 20_000,
+    });
+    const detail = result.payload && typeof result.payload === "object"
+      ? result.payload as Record<string, unknown>
+      : {};
+    const itemId = Number(detail.channel_item_id ?? detail.item_id ?? 0);
+    const rawSkus = Array.isArray(detail.skus)
+      ? detail.skus as Array<Record<string, unknown>>
+      : [];
+    const row: BranchGroup = {
+      itemId,
+      skus: rawSkus.flatMap((sku) => {
+        const skuId = Number(sku.channel_sku_id ?? sku.sku_id ?? 0);
+        if (!skuId) return [];
+        return [{
+          skuId,
+          skuNo: String(sku.sku_barcode ?? sku.sku_no ?? "").trim() || null,
+        }];
+      }),
+    };
+    return itemId && selectExactStandardBranchGroup([row], args.group.skus) ? row : null;
+  } catch (error) {
+    if (/商品不存在|not found/i.test(error instanceof Error ? error.message : String(error))) {
+      return null;
     }
+    throw error;
   }
-  return null;
+}
+
+async function resolveRootItemId(args: {
+  accessToken: string;
+  hqKdtId: number;
+  itemCode: string;
+}) {
+  const result = await callYouzanApiVerbose({
+    accessToken: args.accessToken,
+    method: "youzan.item.base.get",
+    version: "1.0.0",
+    params: {
+      request: {
+        kdt_id: args.hqKdtId,
+        item_code: args.itemCode,
+        channel: 0,
+      },
+    },
+    timeoutMs: 20_000,
+  });
+  const itemId = pickCreatedId(result.payload);
+  if (!itemId) throw new Error(`有赞商品库未返回 ${args.itemCode} 的根商品 ID`);
+  return itemId;
 }
 
 async function upsertBranchRecords(args: {
@@ -506,6 +519,29 @@ export async function syncStandardGroupContainingSkuCore(args: {
     imageUrl: imageUrls[0] ?? `${publicOrigin}/m-icon-512.png`,
   });
 
+  const rootItemId = await resolveRootItemId({
+    accessToken: groupedHq.accessToken,
+    hqKdtId: Number(groupedHq.hq.kdt_id),
+    itemCode: group.code,
+  });
+  const existingBranches = new Map<string, BranchGroup | null>();
+  for (const shop of args.shops) {
+    existingBranches.set(shop.id, await findBranchGroup({
+      accessToken: groupedHq.accessToken,
+      kdtId: Number(shop.kdt_id),
+      group,
+    }));
+  }
+  if (Array.from(existingBranches.values()).some((remote) => !remote)) {
+    await callYouzanApiVerbose({
+      accessToken: groupedHq.accessToken,
+      method: "youzan.item.channel.publish",
+      version: "2.0.0",
+      params: buildStandardChannelPublishParams(rootItemId),
+      timeoutMs: 30_000,
+    });
+  }
+
   const branches = [];
   for (const shopValue of args.shops) {
     const shop = shopValue as BranchShop;
@@ -519,47 +555,13 @@ export async function syncStandardGroupContainingSkuCore(args: {
       const previousItemIds = Array.from(
         new Set((previousLinks.data ?? []).map((row) => Number(row.yz_item_id)).filter((id) => id > 0)),
       );
-      let remote = await findBranchGroup({
-        accessToken: groupedHq.accessToken,
-        warehouseCode: shop.warehouse_code ?? null,
-        group,
-      });
-      const payload = buildStandardGroupOfflineReleaseParams({
-        group,
-        categoryId: category.id,
-        branchKdtIds: [Number(shop.kdt_id)],
-        imageUrls,
-        hqSpuCode: groupedHq.remote.spuCode,
-        stock: args.targetStock,
-      });
-      let itemId = remote?.itemId ?? 0;
-      let returnedSkuIds: number[] = [];
-      if (remote) {
-        await callYouzanApiVerbose({
-          accessToken: groupedHq.accessToken,
-          method: "youzan.retail.open.offline.spu.update",
-          version: "3.0.0",
-          params: { item_id: itemId, ...payload },
-          timeoutMs: 30_000,
-        });
-      } else {
-        const result = await callYouzanApiVerbose({
-          accessToken: groupedHq.accessToken,
-          method: "youzan.retail.open.offline.spu.release",
-          version: "3.0.0",
-          params: payload,
-          timeoutMs: 30_000,
-        });
-        itemId = pickCreatedId(result.payload);
-        returnedSkuIds = pickCreatedSkuIds(result.payload);
-      }
+      let remote = existingBranches.get(shop.id) ?? null;
       for (const waitMs of [0, 1_000, 2_000, 4_000]) {
         if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
         remote = await findBranchGroup({
           accessToken: groupedHq.accessToken,
-          warehouseCode: shop.warehouse_code ?? null,
+          kdtId: Number(shop.kdt_id),
           group,
-          itemId,
         });
         if (remote?.skus.length === group.skus.length) break;
       }
@@ -568,8 +570,8 @@ export async function syncStandardGroupContainingSkuCore(args: {
           `有赞分店商品 ${group.name} 规格数不一致：应有 ${group.skus.length}，实际 ${remote?.skus.length ?? 0}`,
         );
       }
-      itemId = remote.itemId;
-      const remoteSkuIds = mapBranchSkuIds(group, remote.skus, returnedSkuIds);
+      const itemId = remote.itemId;
+      const remoteSkuIds = mapBranchSkuIds(group, remote.skus, []);
       await upsertBranchRecords({
         group,
         shopId: shop.id,

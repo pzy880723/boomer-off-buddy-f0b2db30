@@ -93,6 +93,15 @@ export function groupStandardCatalogSkus(rows: StandardCatalogSku[]): StandardCa
   return Array.from(groups.values());
 }
 
+export function buildStandardChannelPublishParams(itemId: number) {
+  return {
+    item_id: itemId,
+    channel: 1,
+    operate_type: 1,
+    display: 1,
+  };
+}
+
 export type YouzanRetailCategory = { id: number; name: string };
 
 export function selectValidYouzanRetailCategory(
