@@ -5,6 +5,7 @@ export type StandardCatalogTargetShop = {
   id: string;
   shop_name: string;
   kdt_id: number | string;
+  warehouse_code?: string | null;
   role?: string | null;
   status?: string | null;
 };
@@ -38,6 +39,154 @@ export function buildStandardYouzanRemoteIdentity(input: {
   const code = `${input.skuCode.slice(0, Math.max(1, 64 - suffix.length))}${suffix}`;
   const displayPrice = Number.isInteger(price) ? String(price) : price.toFixed(1);
   return { code, name: `${input.name} ${displayPrice}元` };
+}
+
+export type StandardCatalogSku = {
+  id: string;
+  sku_code: string | null;
+  barcode: string | null;
+  name: string;
+  category: string | null;
+  price_tier: number;
+};
+
+export type StandardCatalogGroup = {
+  key: string;
+  code: string;
+  name: string;
+  category: string | null;
+  skus: StandardCatalogSku[];
+};
+
+export function groupStandardCatalogSkus(rows: StandardCatalogSku[]): StandardCatalogGroup[] {
+  const groups = new Map<string, StandardCatalogGroup>();
+  for (const row of rows) {
+    const code = String(row.sku_code ?? "").trim();
+    const key = code || `${row.category ?? ""}|${row.name.trim()}`;
+    const group = groups.get(key) ?? {
+      key,
+      code: code || key,
+      name: row.name.trim(),
+      category: row.category,
+      skus: [],
+    };
+    group.skus.push(row);
+    groups.set(key, group);
+  }
+  for (const group of groups.values()) {
+    group.skus.sort((a, b) => Number(a.price_tier) - Number(b.price_tier));
+  }
+  return Array.from(groups.values());
+}
+
+function requireStandardBarcode(sku: StandardCatalogSku): string {
+  const barcode = String(sku.barcode ?? "").trim();
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(barcode)) {
+    throw new Error(`${sku.name} ${sku.price_tier} 缺少有效收银条码`);
+  }
+  return barcode;
+}
+
+function formatPriceSpec(price: number): string {
+  return `${Number.isInteger(price) ? price : price.toFixed(1)}元`;
+}
+
+export function buildStandardGroupSpuCreateParams(args: {
+  group: StandardCatalogGroup;
+  categoryId: number;
+  kdtIds: number[];
+  imageUrl?: string | null;
+}) {
+  const values = args.group.skus.map((sku, index) => ({
+    v: formatPriceSpec(Number(sku.price_tier)),
+    vId: index + 1,
+  }));
+  const skus = args.group.skus.map((sku) => {
+    const barcode = requireStandardBarcode(sku);
+    const price = Number(sku.price_tier).toFixed(2);
+    return {
+      sku_no: barcode,
+      sku_code: barcode,
+      outer_sku_id: barcode,
+      retail_price: price,
+      standard_price: price,
+      specs: [{ name: "价格", value: formatPriceSpec(Number(sku.price_tier)) }],
+    };
+  });
+  const minPrice = Number(args.group.skus[0]?.price_tier ?? 0).toFixed(2);
+  return {
+    name: args.group.name,
+    unit: "件",
+    outer_id: args.group.code,
+    spu_code: args.group.code,
+    category_id: args.categoryId,
+    offline_create: true,
+    is_up_offline: true,
+    retail_price: minPrice,
+    ...(args.kdtIds.length > 0 ? { sell_channel_ids: args.kdtIds } : {}),
+    ...(args.imageUrl
+      ? {
+          pic_url: args.imageUrl,
+          spu_pic_list: [args.imageUrl],
+          spu_img_list: [{ img_url: args.imageUrl }],
+        }
+      : {}),
+    skus,
+    spec_define_tuple: JSON.stringify([
+      {
+        key: { k: "价格", kId: 1 },
+        values,
+      },
+    ]),
+  };
+}
+
+export function buildStandardGroupOfflineReleaseParams(args: {
+  group: StandardCatalogGroup;
+  categoryId: number;
+  branchKdtIds: number[];
+  imageUrls: string[];
+  hqSpuCode: string;
+  stock: number;
+}) {
+  const pictures = args.imageUrls.map((url) => ({ url }));
+  const minPriceFen = String(Math.round(Number(args.group.skus[0]?.price_tier ?? 0) * 100));
+  return {
+    join_level_discount: 1,
+    measurement: 0,
+    category_id: args.categoryId,
+    unit: "件",
+    sell_type: 1,
+    price: minPriceFen,
+    title: args.group.name,
+    picture: JSON.stringify(pictures),
+    spu_code: args.hqSpuCode,
+    sku_center_code: args.hqSpuCode,
+    sub_kdt_status_param: {
+      sale_up_kdt_ids: Array.from(new Set(args.branchKdtIds)),
+      sale_down_kdt_ids: [],
+    },
+    all_batch_operate: -1,
+    name: args.group.name,
+    display: 1,
+    retail_price: minPriceFen,
+    photo_url: JSON.stringify(pictures),
+    stocks: args.group.skus.map((sku) => {
+      const barcode = requireStandardBarcode(sku);
+      const priceFen = String(Math.round(Number(sku.price_tier) * 100));
+      return {
+        price: priceFen,
+        cost_price: "0",
+        sell_stock_count: String(Math.max(0, Math.trunc(args.stock))),
+        sku_no: barcode,
+        related_spu_code: args.hqSpuCode,
+        related_sku_code: barcode,
+        is_sell: 1,
+        min_retail_price: priceFen,
+        max_retail_price: priceFen,
+      };
+    }),
+  };
 }
 
 export function buildHqSpuLookupParams(code: string) {

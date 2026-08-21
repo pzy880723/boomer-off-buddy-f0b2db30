@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import {
   assertStandardCatalogSyncHost,
+  groupStandardCatalogSkus,
   parseStandardCatalogSyncRequest,
   selectStandardCatalogTargetShops,
 } from "@/lib/standard-catalog-youzan-sync";
@@ -47,7 +48,7 @@ export const Route = createFileRoute("/api/public/hooks/youzan-standard-catalog-
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { data: shopRows, error: shopError } = await supabaseAdmin
           .from("youzan_shops")
-          .select("id, shop_name, kdt_id, role, status")
+          .select("id, shop_name, kdt_id, warehouse_code, role, status")
           .eq("role", "branch")
           .eq("status", "active")
           .order("shop_name", { ascending: true });
@@ -65,29 +66,31 @@ export const Route = createFileRoute("/api/public/hooks/youzan-standard-catalog-
           );
         }
 
-        const { data, error, count } = await supabaseAdmin
+        const { data, error } = await supabaseAdmin
           .from("inv_skus")
-          .select("id, sku_code, barcode, name, category, price_tier", { count: "exact" })
+          .select("id, sku_code, barcode, name, category, price_tier")
           .eq("kind", "single")
           .eq("is_custom_price", false)
           .eq("inventory_policy", "unlimited")
           .eq("is_display", true)
           .order("category", { ascending: true })
-          .order("price_tier", { ascending: true })
-          .range(options.offset, options.offset + options.limit - 1);
+          .order("name", { ascending: true })
+          .order("price_tier", { ascending: true });
         if (error) {
           return Response.json({ ok: false, error: error.message }, { status: 500 });
         }
 
-        const skus = (data ?? []) as StandardSku[];
-        const nextOffset = options.offset + skus.length;
+        const allGroups = groupStandardCatalogSkus((data ?? []) as StandardSku[]);
+        const groups = allGroups.slice(options.offset, options.offset + options.limit);
+        const skus = groups.flatMap((group) => group.skus);
+        const nextOffset = options.offset + groups.length;
         const batch = {
-          total: count ?? skus.length,
+          total: allGroups.length,
           offset: options.offset,
           limit: options.limit,
-          processed: skus.length,
+          processed: groups.length,
           next_offset: nextOffset,
-          has_more: nextOffset < (count ?? skus.length),
+          has_more: nextOffset < allGroups.length,
         };
         const target = {
           shops: shops.map((shop) => ({
@@ -121,10 +124,18 @@ export const Route = createFileRoute("/api/public/hooks/youzan-standard-catalog-
             dry_run: true,
             target,
             batch,
-            items: skus.map((sku) => ({
-              ...sku,
-              links: (links ?? []).filter((link) => link.sku_id === sku.id),
-              listings: (listings ?? []).filter((listing) => listing.sku_id === sku.id),
+            items: groups.map((group) => ({
+              group_key: group.key,
+              sku_code: group.code,
+              name: group.name,
+              category: group.category,
+              sku_count: group.skus.length,
+              price_tiers: group.skus.map((sku) => sku.price_tier),
+              skus: group.skus.map((sku) => ({
+                ...sku,
+                links: (links ?? []).filter((link) => link.sku_id === sku.id),
+                listings: (listings ?? []).filter((listing) => listing.sku_id === sku.id),
+              })),
             })),
             note: "ERP 为无限库存；有赞使用有限镜像库存，默认每次全量覆盖为 9999。",
           });
@@ -135,18 +146,19 @@ export const Route = createFileRoute("/api/public/hooks/youzan-standard-catalog-
         const { explainYouzanError } = await import("@/lib/youzan.functions");
         const results: Array<Record<string, unknown>> = [];
 
-        for (const sku of skus) {
+        for (const group of groups) {
           try {
             const synced = await syncStandardSkuToYouzanBranchesCore({
-              skuId: sku.id,
+              skuId: group.skus[0].id,
               shops,
               targetStock: options.targetStock,
             });
             results.push({
-              sku_id: sku.id,
-              sku_code: sku.sku_code,
-              barcode: sku.barcode,
-              name: sku.name,
+              group_key: group.key,
+              sku_code: group.code,
+              name: group.name,
+              sku_count: group.skus.length,
+              price_tiers: group.skus.map((sku) => sku.price_tier),
               ok: synced.ok,
               hq_created: synced.hq.created,
               hq_spu_id: synced.hq.spu_id,
@@ -154,10 +166,11 @@ export const Route = createFileRoute("/api/public/hooks/youzan-standard-catalog-
             });
           } catch (error) {
             results.push({
-              sku_id: sku.id,
-              sku_code: sku.sku_code,
-              barcode: sku.barcode,
-              name: sku.name,
+              group_key: group.key,
+              sku_code: group.code,
+              name: group.name,
+              sku_count: group.skus.length,
+              price_tiers: group.skus.map((sku) => sku.price_tier),
               ok: false,
               stage: "hq",
               error: explainYouzanError(error),

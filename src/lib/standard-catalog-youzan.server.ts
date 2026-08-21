@@ -1,10 +1,9 @@
 import { supabaseAdmin as supabase } from "@/integrations/supabase/client.server";
-import { publishSkuToHqCore } from "./omnichannel-publish.functions";
 import {
   selectStandardCatalogTargetShops,
   type StandardCatalogTargetShop,
 } from "./standard-catalog-youzan-sync";
-import { releaseSkuToOfflineShopsCore } from "./youzan-offline-products.functions";
+import { syncStandardGroupContainingSkuCore } from "./standard-catalog-youzan-group.server";
 
 export type StandardCatalogBranchResult = {
   shop_id: string;
@@ -33,28 +32,7 @@ export async function syncStandardSkuToYouzanBranchesCore(args: {
   shops: StandardCatalogTargetShop[];
   targetStock: number;
 }) {
-  const hq = await publishSkuToHqCore(args.skuId);
-  const released = await releaseSkuToOfflineShopsCore({
-    sku_id: args.skuId,
-    shop_ids: args.shops.map((shop) => shop.id),
-    stock_override: args.targetStock,
-  });
-  const shopNames = new Map(args.shops.map((shop) => [shop.id, shop.shop_name]));
-  const branches: StandardCatalogBranchResult[] = released.results.map((branch) => ({
-    shop_id: branch.shop_id,
-    shop_name: shopNames.get(branch.shop_id) ?? branch.shop_id,
-    ok: branch.ok,
-    ...(branch.item_id ? { branch_item_id: branch.item_id } : {}),
-    ...(branch.sku_id ? { branch_sku_id: branch.sku_id } : {}),
-    ...(branch.ok ? { target_stock: args.targetStock } : {}),
-    ...(branch.error ? { error: branch.error } : {}),
-  }));
-
-  return {
-    ok: released.ok && branches.every((branch) => branch.ok),
-    hq,
-    branches,
-  };
+  return syncStandardGroupContainingSkuCore(args);
 }
 
 export async function syncStandardSkuToAllYouzanBranchesCore(

@@ -4,12 +4,112 @@ import test from "node:test";
 
 import {
   assertStandardCatalogSyncHost,
+  buildStandardGroupOfflineReleaseParams,
+  buildStandardGroupSpuCreateParams,
   buildHqSpuLookupParams,
   buildStandardYouzanRemoteIdentity,
+  groupStandardCatalogSkus,
   selectHqSpuRemoteIdentity,
   parseStandardCatalogSyncRequest,
   selectStandardCatalogTargetShops,
 } from "./standard-catalog-youzan-sync";
+
+const groupedToySkus = [
+  {
+    id: "33333333-3333-3333-3333-333333333333",
+    sku_code: "SKU-STD-TOY",
+    barcode: "2000000000198",
+    name: "玩具模型",
+    category: "toy_model",
+    price_tier: 19.9,
+  },
+  {
+    id: "11111111-1111-1111-1111-111111111111",
+    sku_code: "SKU-STD-TOY",
+    barcode: "2000000000069",
+    name: "玩具模型",
+    category: "toy_model",
+    price_tier: 6.9,
+  },
+  {
+    id: "22222222-2222-2222-2222-222222222222",
+    sku_code: "SKU-STD-TOY",
+    barcode: "2000000000099",
+    name: "玩具模型",
+    category: "toy_model",
+    price_tier: 9.9,
+  },
+];
+
+test("standard price tiers group into one Youzan product", () => {
+  const groups = groupStandardCatalogSkus([
+    ...groupedToySkus,
+    {
+      ...groupedToySkus[0],
+      id: "44444444-4444-4444-4444-444444444444",
+      sku_code: "SKU-STD-HOME",
+      barcode: "2000000001066",
+      name: "家居杂货",
+      category: "home_goods",
+    },
+  ]);
+
+  assert.equal(groups.length, 2);
+  assert.equal(groups[0].name, "玩具模型");
+  assert.deepEqual(groups[0].skus.map((sku) => sku.price_tier), [6.9, 9.9, 19.9]);
+});
+
+test("Youzan HQ payload keeps the product name and represents prices as SKU specs", () => {
+  const group = groupStandardCatalogSkus(groupedToySkus)[0];
+  const payload = buildStandardGroupSpuCreateParams({
+    group,
+    categoryId: 123,
+    kdtIds: [456],
+    imageUrl: "https://img.yzcdn.cn/toy.png",
+  });
+
+  assert.equal(payload.name, "玩具模型");
+  assert.equal(payload.spu_code, "SKU-STD-TOY");
+  assert.equal(payload.retail_price, "6.90");
+  assert.equal(payload.skus.length, 3);
+  assert.deepEqual(payload.skus.map((sku) => sku.specs), [
+    [{ name: "价格", value: "6.9元" }],
+    [{ name: "价格", value: "9.9元" }],
+    [{ name: "价格", value: "19.9元" }],
+  ]);
+  assert.deepEqual(payload.skus.map((sku) => sku.sku_no), [
+    "2000000000069",
+    "2000000000099",
+    "2000000000198",
+  ]);
+  assert.doesNotMatch(payload.name, /元|6\.9/);
+  assert.equal(JSON.parse(payload.spec_define_tuple).length, 1);
+});
+
+test("Youzan branch payload releases one item with every price SKU", () => {
+  const group = groupStandardCatalogSkus(groupedToySkus)[0];
+  const payload = buildStandardGroupOfflineReleaseParams({
+    group,
+    categoryId: 123,
+    branchKdtIds: [456],
+    imageUrls: ["https://img.yzcdn.cn/toy.png"],
+    hqSpuCode: "SKU-STD-TOY",
+    stock: 9999,
+  });
+
+  assert.equal(payload.title, "玩具模型");
+  assert.equal(payload.stocks.length, 3);
+  assert.deepEqual(payload.stocks.map((stock) => stock.sku_no), [
+    "2000000000069",
+    "2000000000099",
+    "2000000000198",
+  ]);
+  assert.deepEqual(payload.stocks.map((stock) => stock.related_sku_code), [
+    "2000000000069",
+    "2000000000099",
+    "2000000000198",
+  ]);
+});
 
 test("standard catalog Youzan sync defaults to a bounded dry run", () => {
   assert.deepEqual(parseStandardCatalogSyncRequest({}), {
@@ -140,7 +240,10 @@ test("production batch sync is not hard-coded to one shop and includes barcodes"
     "utf8",
   );
   assert.match(route, /selectStandardCatalogTargetShops/);
+  assert.match(route, /groupStandardCatalogSkus/);
+  assert.match(route, /group\.skus\[0\]\.id/);
   assert.match(route, /sku_code, barcode, name/);
+  assert.doesNotMatch(route, /for \(const sku of skus\)/);
   assert.doesNotMatch(route, /da06cdae-5ec1-4749-8dcb-dc972cfd05c9/);
 });
 
@@ -182,7 +285,7 @@ test("chain probing sends a valid page and persists kdt fallback only after bran
 
 test("standard catalog uses the offline retail-store release path", () => {
   const server = readFileSync("src/lib/standard-catalog-youzan.server.ts", "utf8");
-  assert.match(server, /releaseSkuToOfflineShopsCore/);
+  assert.match(server, /syncStandardGroupContainingSkuCore/);
   assert.doesNotMatch(server, /releaseSkuToBranchCore/);
   assert.doesNotMatch(server, /pushYouzanQuantityUpdate/);
 });
