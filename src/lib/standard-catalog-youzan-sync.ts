@@ -105,6 +105,11 @@ function formatPriceSpec(price: number): string {
   return `${Number.isInteger(price) ? price : price.toFixed(1)}元`;
 }
 
+function buildGroupedSkuCode(groupCode: string, price: number): string {
+  const suffix = `-P${Math.round(price * 100).toString().padStart(7, "0")}`;
+  return `${groupCode.slice(0, Math.max(1, 64 - suffix.length))}${suffix}`;
+}
+
 export function buildStandardGroupSpuCreateParams(args: {
   group: StandardCatalogGroup;
   categoryId: number;
@@ -118,10 +123,11 @@ export function buildStandardGroupSpuCreateParams(args: {
   const skus = args.group.skus.map((sku) => {
     const barcode = requireStandardBarcode(sku);
     const price = Number(sku.price_tier).toFixed(2);
+    const skuCode = buildGroupedSkuCode(args.group.code, Number(sku.price_tier));
     return {
       sku_no: barcode,
-      sku_code: barcode,
-      outer_sku_id: barcode,
+      sku_code: skuCode,
+      outer_sku_id: skuCode,
       retail_price: price,
       standard_price: price,
       specs: [{ name: "价格", value: formatPriceSpec(Number(sku.price_tier)) }],
@@ -188,13 +194,14 @@ export function buildStandardGroupOfflineReleaseParams(args: {
     stocks: args.group.skus.map((sku) => {
       const barcode = requireStandardBarcode(sku);
       const priceFen = String(Math.round(Number(sku.price_tier) * 100));
+      const skuCode = buildGroupedSkuCode(args.group.code, Number(sku.price_tier));
       return {
         price: priceFen,
         cost_price: "0",
         sell_stock_count: String(Math.max(0, Math.trunc(args.stock))),
         sku_no: barcode,
         related_spu_code: args.hqSpuCode,
-        related_sku_code: barcode,
+        related_sku_code: skuCode,
         is_sell: 1,
         min_retail_price: priceFen,
         max_retail_price: priceFen,

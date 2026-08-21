@@ -83,6 +83,11 @@ test("Youzan HQ payload keeps the product name and represents prices as SKU spec
     "2000000000099",
     "2000000000198",
   ]);
+  assert.deepEqual(payload.skus.map((sku) => sku.sku_code), [
+    "SKU-STD-TOY-P0000690",
+    "SKU-STD-TOY-P0000990",
+    "SKU-STD-TOY-P0001990",
+  ]);
   assert.doesNotMatch(payload.name, /元|6\.9/);
   assert.equal(JSON.parse(payload.spec_define_tuple).length, 1);
 });
@@ -106,9 +111,9 @@ test("Youzan branch payload releases one item with every price SKU", () => {
     "2000000000198",
   ]);
   assert.deepEqual(payload.stocks.map((stock) => stock.related_sku_code), [
-    "2000000000069",
-    "2000000000099",
-    "2000000000198",
+    "SKU-STD-TOY-P0000690",
+    "SKU-STD-TOY-P0000990",
+    "SKU-STD-TOY-P0001990",
   ]);
 });
 
