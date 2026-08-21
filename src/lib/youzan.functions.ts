@@ -255,32 +255,9 @@ async function callYouzanApi(opts: {
 }
 
 /** 返回 payload + trace_id + 原始响应前 400 字，方便排查；自带 20s 超时 */
-export async function callYouzanApiVerbose(opts: {
-  accessToken: string;
-  method: string;
-  version: string;
-  params?: Record<string, unknown>;
-  timeoutMs?: number;
-}): Promise<{ payload: unknown; trace_id: string | null; preview: string }> {
-  const url = `${YZ_GW_URL}/${opts.method}/${opts.version}?access_token=${encodeURIComponent(opts.accessToken)}`;
-  const ctl = new AbortController();
-  const tmo = setTimeout(() => ctl.abort(), opts.timeoutMs ?? 20_000);
-  let res: Response;
-  try {
-    res = await youzanFetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(opts.params ?? {}),
-      signal: ctl.signal,
-    });
-  } catch (e) {
-    clearTimeout(tmo);
-    const msg = e instanceof Error && e.name === "AbortError"
-      ? `请求超时 (${opts.method})`
-      : `网络错误：${e instanceof Error ? e.message : String(e)}`;
-    throw new Error(msg);
-  }
-  clearTimeout(tmo);
+async function parseYouzanVerboseResponse(
+  res: Response,
+): Promise<{ payload: unknown; trace_id: string | null; preview: string }> {
   const text = await res.text();
   let json: unknown;
   try {
@@ -312,6 +289,63 @@ export async function callYouzanApiVerbose(opts: {
     throw new Error(formatYouzanIpError(`[${j.code ?? "?"}] ${j.message ?? "调用失败"}${trace ? ` trace=${trace}` : ""}`));
   }
   return { payload: j.response ?? j.data ?? json, trace_id: trace, preview };
+}
+
+export async function callYouzanApiVerbose(opts: {
+  accessToken: string;
+  method: string;
+  version: string;
+  params?: Record<string, unknown>;
+  timeoutMs?: number;
+}): Promise<{ payload: unknown; trace_id: string | null; preview: string }> {
+  const url = `${YZ_GW_URL}/${opts.method}/${opts.version}?access_token=${encodeURIComponent(opts.accessToken)}`;
+  const ctl = new AbortController();
+  const tmo = setTimeout(() => ctl.abort(), opts.timeoutMs ?? 20_000);
+  let res: Response;
+  try {
+    res = await youzanFetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(opts.params ?? {}),
+      signal: ctl.signal,
+    });
+  } catch (e) {
+    clearTimeout(tmo);
+    const msg = e instanceof Error && e.name === "AbortError"
+      ? `请求超时 (${opts.method})`
+      : `网络错误：${e instanceof Error ? e.message : String(e)}`;
+    throw new Error(msg);
+  }
+  clearTimeout(tmo);
+  return parseYouzanVerboseResponse(res);
+}
+
+export async function callYouzanMultipartApiVerbose(opts: {
+  accessToken: string;
+  method: string;
+  version: string;
+  formData: FormData;
+  timeoutMs?: number;
+}): Promise<{ payload: unknown; trace_id: string | null; preview: string }> {
+  const url = `${YZ_GW_URL}/${opts.method}/${opts.version}?access_token=${encodeURIComponent(opts.accessToken)}`;
+  const ctl = new AbortController();
+  const tmo = setTimeout(() => ctl.abort(), opts.timeoutMs ?? 20_000);
+  let res: Response;
+  try {
+    res = await youzanFetch(url, {
+      method: "POST",
+      body: opts.formData,
+      signal: ctl.signal,
+    });
+  } catch (e) {
+    clearTimeout(tmo);
+    const msg = e instanceof Error && e.name === "AbortError"
+      ? `请求超时 (${opts.method})`
+      : `网络错误：${e instanceof Error ? e.message : String(e)}`;
+    throw new Error(msg);
+  }
+  clearTimeout(tmo);
+  return parseYouzanVerboseResponse(res);
 }
 
 /**

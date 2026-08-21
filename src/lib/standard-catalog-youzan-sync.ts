@@ -102,6 +102,15 @@ export function buildStandardChannelPublishParams(itemId: number) {
   };
 }
 
+export function buildStandardItemImageUpdateParams(itemId: number, imageIds: number[]) {
+  return {
+    item_id: itemId,
+    media: {
+      image_ids: Array.from(new Set(imageIds.filter((id) => Number.isFinite(id) && id > 0))),
+    },
+  };
+}
+
 export function isRecoverableStandardChannelPublishError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   return /商品不存在|已发布到指定渠道/i.test(message);

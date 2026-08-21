@@ -5,6 +5,7 @@ import test from "node:test";
 import {
   assertStandardCatalogSyncHost,
   buildStandardChannelPublishParams,
+  buildStandardItemImageUpdateParams,
   buildStandardGroupOfflineReleaseParams,
   buildStandardGroupSpuCreateParams,
   buildHqSpuLookupParams,
@@ -145,6 +146,13 @@ test("grouped standard products publish the existing HQ item to store channel", 
     channel: 1,
     operate_type: 1,
     display: 1,
+  });
+});
+
+test("standard product images update through the common item media contract", () => {
+  assert.deepEqual(buildStandardItemImageUpdateParams(6235775735, [1580494287, 1580494287]), {
+    item_id: 6235775735,
+    media: { image_ids: [1580494287] },
   });
 });
 
@@ -379,6 +387,8 @@ test("standard catalog uses the offline retail-store release path", () => {
 test("grouped standard sync publishes the HQ item instead of recreating branch products", () => {
   const server = readFileSync("src/lib/standard-catalog-youzan-group.server.ts", "utf8");
   assert.match(server, /youzan\.item\.base\.get/);
+  assert.match(server, /youzan\.item\.common\.update/);
+  assert.match(server, /imageIds/);
   assert.match(server, /youzan\.item\.channel\.publish/);
   assert.doesNotMatch(server, /youzan\.retail\.open\.offline\.spu\.release/);
   assert.doesNotMatch(server, /youzan\.retail\.open\.offline\.spu\.update/);

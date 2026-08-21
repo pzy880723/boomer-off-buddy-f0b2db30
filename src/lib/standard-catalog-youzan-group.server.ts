@@ -2,6 +2,7 @@ import { supabaseAdmin as supabase } from "@/integrations/supabase/client.server
 import {
   buildStandardChannelPublishParams,
   buildHqSpuLookupParams,
+  buildStandardItemImageUpdateParams,
   buildStandardGroupSpuCreateParams,
   groupStandardCatalogSkus,
   isRecoverableStandardChannelPublishError,
@@ -24,7 +25,8 @@ import {
 } from "./youzan.functions";
 import {
   runStockSyncWorkerForSkus,
-  uploadImageToYouzanMaterial,
+  uploadImageToYouzanMaterialRecord,
+  type YouzanMaterialImage,
 } from "./youzan-sync.functions";
 
 type SourceStandardSku = StandardCatalogSku & {
@@ -42,7 +44,21 @@ type HqGroup = {
 type BranchGroup = {
   itemId: number;
   skus: Array<{ skuId: number; skuNo: string | null }>;
+  imageIds: number[];
+  imageUrls: string[];
 };
+
+function branchHasMaterialImage(branch: BranchGroup, image: YouzanMaterialImage) {
+  if (branch.imageIds.includes(image.imageId)) return true;
+  const expectedPath = new URL(image.imageUrl).pathname;
+  return branch.imageUrls.some((url) => {
+    try {
+      return new URL(url).pathname === expectedPath;
+    } catch {
+      return false;
+    }
+  });
+}
 
 function collectSpuRows(payload: unknown): Array<Record<string, unknown>> {
   const rows: Array<Record<string, unknown>> = [];
@@ -342,8 +358,16 @@ async function findBranchGroup(args: {
     const rawSkus = Array.isArray(detail.skus)
       ? detail.skus as Array<Record<string, unknown>>
       : [];
+    const media = detail.media && typeof detail.media === "object"
+      ? detail.media as Record<string, unknown>
+      : {};
+    const images = Array.isArray(media.images)
+      ? media.images as Array<Record<string, unknown>>
+      : [];
     const row: BranchGroup = {
       itemId,
+      imageIds: images.map((image) => Number(image.image_id ?? 0)).filter((id) => id > 0),
+      imageUrls: images.map((image) => String(image.url ?? "").trim()).filter(Boolean),
       skus: rawSkus.flatMap((sku) => {
         const skuId = Number(sku.channel_sku_id ?? sku.sku_id ?? 0);
         if (!skuId) return [];
@@ -510,17 +534,16 @@ export async function syncStandardGroupContainingSkuCore(args: {
   const hq = await getHqShop();
   const accessToken = await ensureAccessToken(hq);
   const category = await resolveLiveRetailCategory(accessToken);
-  const imageUrls = await Promise.all(
+  const imageMaterials = await Promise.all(
     rawImages.map((url) =>
-      url.endsWith("/m-icon-512.png")
-        ? Promise.resolve(url)
-        : uploadImageToYouzanMaterial(accessToken, url, {
-            shop_id: String(hq.id),
-            kdt_id: Number(hq.kdt_id),
-            sku_id: group.skus[0].id,
-          }),
+      uploadImageToYouzanMaterialRecord(accessToken, url, {
+        shop_id: String(hq.id),
+        kdt_id: Number(hq.kdt_id),
+        sku_id: group.skus[0].id,
+      }),
     ),
   );
+  const imageUrls = imageMaterials.map((image) => image.imageUrl);
   const groupedHq = await ensureGroupedHqSpu({
     group,
     categoryId: category.id,
@@ -533,6 +556,18 @@ export async function syncStandardGroupContainingSkuCore(args: {
     hqKdtId: Number(groupedHq.hq.kdt_id),
     itemCode: group.code,
   });
+  if (imageMaterials.length > 0) {
+    await callYouzanApiVerbose({
+      accessToken: groupedHq.accessToken,
+      method: "youzan.item.common.update",
+      version: "1.0.0",
+      params: buildStandardItemImageUpdateParams(
+        rootItemId,
+        imageMaterials.map((image) => image.imageId),
+      ),
+      timeoutMs: 30_000,
+    });
+  }
   const existingBranches = new Map<string, BranchGroup | null>();
   for (const shop of args.shops) {
     existingBranches.set(shop.id, await findBranchGroup({
@@ -541,7 +576,10 @@ export async function syncStandardGroupContainingSkuCore(args: {
       group,
     }));
   }
-  if (Array.from(existingBranches.values()).some((remote) => !remote)) {
+  if (
+    imageMaterials.length > 0 ||
+    Array.from(existingBranches.values()).some((remote) => !remote)
+  ) {
     try {
       await callYouzanApiVerbose({
         accessToken: groupedHq.accessToken,
@@ -568,12 +606,18 @@ export async function syncStandardGroupContainingSkuCore(args: {
           kdtId: Number(shop.kdt_id),
           group,
         });
-        if (remote?.skus.length === group.skus.length) break;
+        if (
+          remote?.skus.length === group.skus.length &&
+          (!imageMaterials[0] || branchHasMaterialImage(remote, imageMaterials[0]))
+        ) break;
       }
       if (!remote || remote.skus.length !== group.skus.length) {
         throw new Error(
           `有赞分店商品 ${group.name} 规格数不一致：应有 ${group.skus.length}，实际 ${remote?.skus.length ?? 0}`,
         );
+      }
+      if (imageMaterials[0] && !branchHasMaterialImage(remote, imageMaterials[0])) {
+        throw new Error(`有赞分店商品 ${group.name} 主图未刷新`);
       }
       const itemId = remote.itemId;
       const remoteSkuIds = mapBranchSkuIds(group, remote.skus, []);

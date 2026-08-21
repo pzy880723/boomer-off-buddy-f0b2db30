@@ -4,6 +4,7 @@ import { supabaseAdmin as supabase } from "@/integrations/supabase/client.server
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   callYouzanApiVerbose,
+  callYouzanMultipartApiVerbose,
   callYouzanApiWithVersionFallback,
   ensureAccessToken,
   explainYouzanError,
@@ -779,83 +780,46 @@ async function resolveHqCategoryId(_sku?: unknown): Promise<number> {
   return DEFAULT_RETAIL_PRODUCT_CATEGORY_ID;
 }
 
-/**
- * uploadImageToYouzanMaterial —— 把 ERP 外链图片上传到有赞素材库，
- * 返回有赞侧 CDN URL；失败时 fire-and-forget，返回原始 URL。
- * 对应 youzan.materials.storage.platform.img.upload/3.0.0
- */
-export async function uploadImageToYouzanMaterial(
+export type YouzanMaterialImage = {
+  imageId: number;
+  imageUrl: string;
+};
+
+/** 把 ERP 图片以文件方式上传到有赞素材库，并保留商品媒体更新所需的 image_id。 */
+export async function uploadImageToYouzanMaterialRecord(
   token: string,
   url: string,
   ctx?: { shop_id?: string | null; kdt_id?: number | null; sku_id?: string | null },
-): Promise<string> {
-  if (!url) return url;
-  // 已经是有赞域名的图片就不用再传一次
-  if (/(?:yzcdn|youzan|qbox|qiniucdn)\./i.test(url)) return url;
+): Promise<YouzanMaterialImage> {
+  if (!url) throw new Error("素材上传缺少图片 URL");
   try {
-    const res = await callYouzanApiVerbose({
+    const source = await fetch(url);
+    if (!source.ok) throw new Error(`拉取 ERP 图片失败：HTTP ${source.status}`);
+    const bytes = await source.arrayBuffer();
+    if (bytes.byteLength === 0) throw new Error("ERP 图片内容为空");
+    if (bytes.byteLength > 3 * 1024 * 1024) throw new Error("ERP 图片超过有赞 3MB 限制");
+    const mimeType = source.headers.get("content-type")?.split(";")[0] || "image/jpeg";
+    const pathname = new URL(url).pathname;
+    const filename = decodeURIComponent(pathname.split("/").pop() || "product.jpg");
+    const formData = new FormData();
+    formData.append("image", new Blob([bytes], { type: mimeType }), filename);
+    const res = await callYouzanMultipartApiVerbose({
       accessToken: token,
       method: "youzan.materials.storage.platform.img.upload",
       version: "3.0.0",
-      // 2026-07 audit：去掉 image_type（分类上传字段，非必填），
-      // 只传 image_url 即可让有赞抓取外链回落到 yzcdn。
-      params: { image_url: url },
+      formData,
       timeoutMs: 20_000,
     });
     const payload = res.payload as Record<string, unknown> | null;
-    const walk = (v: unknown): string => {
-      if (!v) return "";
-      if (typeof v === "string") {
-        return /^https?:\/\//i.test(v) && /(?:yzcdn|youzan|qbox|qiniucdn)\./i.test(v) ? v : "";
-      }
-      if (Array.isArray(v)) {
-        for (const item of v) {
-          const s = walk(item);
-          if (s) return s;
-        }
-        return "";
-      }
-      if (typeof v === "object") {
-        for (const key of [
-          "url",
-          "img_url",
-          "image_url",
-          "cdn_url",
-          "attachment_url",
-          "content",
-          "data",
-        ]) {
-          const s = walk((v as Record<string, unknown>)[key]);
-          if (s) return s;
-        }
-        for (const child of Object.values(v as Record<string, unknown>)) {
-          const s = walk(child);
-          if (s) return s;
-        }
-      }
-      return "";
-    };
-    const cdn = walk(payload);
-    if (!cdn) {
-      // 上传成功但没解析出 CDN URL —— 记一条 error，方便排查白名单/域名问题。
-      try {
-        await supabase.from("youzan_sync_logs").insert({
-          shop_id: ctx?.shop_id ?? null,
-          kdt_id: ctx?.kdt_id ?? null,
-          action: "materials_upload",
-          status: "error",
-          message: `materials 上传返回无 CDN URL；继续用外链 ${url}`,
-          error: `sku_id=${ctx?.sku_id ?? "-"} preview=${res.preview.slice(0, 400)}`,
-          finished_at: new Date().toISOString(),
-        } as never);
-      } catch {
-        // ignore
-      }
+    const imageId = Number(payload?.image_id ?? 0);
+    const imageUrl = String(payload?.image_url ?? "").trim();
+    if (!imageId || !/^https?:\/\//i.test(imageUrl)) {
+      throw new Error(`素材上传未返回 image_id/image_url：${res.preview.slice(0, 240)}`);
     }
-    return cdn || url;
+    return { imageId, imageUrl };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.warn("[youzan] materials 上传失败，继续用外链：", msg);
+    console.warn("[youzan] materials 文件上传失败：", msg);
     try {
       await supabase.from("youzan_sync_logs").insert({
         shop_id: ctx?.shop_id ?? null,
@@ -869,6 +833,19 @@ export async function uploadImageToYouzanMaterial(
     } catch {
       // ignore
     }
+    throw e;
+  }
+}
+
+/** 兼容既有调用方：返回上传后的有赞 CDN URL。 */
+export async function uploadImageToYouzanMaterial(
+  token: string,
+  url: string,
+  ctx?: { shop_id?: string | null; kdt_id?: number | null; sku_id?: string | null },
+): Promise<string> {
+  try {
+    return (await uploadImageToYouzanMaterialRecord(token, url, ctx)).imageUrl;
+  } catch {
     return url;
   }
 }
