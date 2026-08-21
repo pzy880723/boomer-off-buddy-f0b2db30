@@ -102,6 +102,11 @@ export function buildStandardChannelPublishParams(itemId: number) {
   };
 }
 
+export function isRecoverableStandardChannelPublishError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /商品不存在|已发布到指定渠道/i.test(message);
+}
+
 export type YouzanRetailCategory = { id: number; name: string };
 
 export function selectValidYouzanRetailCategory(

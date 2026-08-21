@@ -4,6 +4,7 @@ import {
   buildHqSpuLookupParams,
   buildStandardGroupSpuCreateParams,
   groupStandardCatalogSkus,
+  isRecoverableStandardChannelPublishError,
   selectExactStandardBranchGroup,
   selectValidYouzanRetailCategory,
   type StandardCatalogGroup,
@@ -529,20 +530,26 @@ export async function syncStandardGroupContainingSkuCore(args: {
     }));
   }
   if (Array.from(existingBranches.values()).some((remote) => !remote)) {
-    await callYouzanApiVerbose({
-      accessToken: groupedHq.accessToken,
-      method: "youzan.item.channel.publish",
-      version: "2.0.0",
-      params: buildStandardChannelPublishParams(rootItemId),
-      timeoutMs: 30_000,
-    });
+    try {
+      await callYouzanApiVerbose({
+        accessToken: groupedHq.accessToken,
+        method: "youzan.item.channel.publish",
+        version: "2.0.0",
+        params: buildStandardChannelPublishParams(rootItemId),
+        timeoutMs: 30_000,
+      });
+    } catch (error) {
+      // Youzan may finish publishing asynchronously while returning either of these errors.
+      // The branch-detail polling below is the source of truth.
+      if (!isRecoverableStandardChannelPublishError(error)) throw error;
+    }
   }
 
   const branches = [];
   for (const shop of args.shops) {
     try {
       let remote = existingBranches.get(shop.id) ?? null;
-      for (const waitMs of [0, 1_000, 2_000, 4_000]) {
+      for (const waitMs of [0, 1_000, 2_000, 4_000, 8_000, 16_000]) {
         if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
         remote = await findBranchGroup({
           accessToken: groupedHq.accessToken,

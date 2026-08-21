@@ -10,6 +10,7 @@ import {
   buildHqSpuLookupParams,
   buildStandardYouzanRemoteIdentity,
   groupStandardCatalogSkus,
+  isRecoverableStandardChannelPublishError,
   selectExactStandardBranchGroup,
   selectHqSpuRemoteIdentity,
   parseStandardCatalogSyncRequest,
@@ -145,6 +146,20 @@ test("grouped standard products publish the existing HQ item to store channel", 
     operate_type: 1,
     display: 1,
   });
+});
+
+test("channel publishing waits for Youzan asynchronous completion errors", () => {
+  assert.equal(
+    isRecoverableStandardChannelPublishError(new Error("[122001001] 商品不存在!")),
+    true,
+  );
+  assert.equal(
+    isRecoverableStandardChannelPublishError(
+      new Error("[301002564] 商品已发布到指定渠道，无需再次发布"),
+    ),
+    true,
+  );
+  assert.equal(isRecoverableStandardChannelPublishError(new Error("参数错误")), false);
 });
 
 test("standard sync ignores partially-created branch products with an extra empty SKU", () => {
