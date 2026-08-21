@@ -6,6 +6,7 @@ import {
   assertStandardCatalogSyncHost,
   buildStandardChannelPublishParams,
   buildStandardItemImageUpdateParams,
+  buildStandardStockWorkerLimit,
   buildStandardGroupOfflineReleaseParams,
   buildStandardGroupSpuCreateParams,
   buildHqSpuLookupParams,
@@ -154,6 +155,11 @@ test("standard product images update through the common item media contract", ()
     item_id: 6235775735,
     media: { image_ids: [1580494287] },
   });
+});
+
+test("standard stock worker consumes every SKU and branch task", () => {
+  assert.equal(buildStandardStockWorkerLimit(31, 2), 62);
+  assert.equal(buildStandardStockWorkerLimit(31, 10), 200);
 });
 
 test("channel publishing waits for Youzan asynchronous completion errors", () => {

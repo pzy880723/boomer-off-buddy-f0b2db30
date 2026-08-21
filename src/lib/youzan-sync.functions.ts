@@ -1876,8 +1876,8 @@ export async function runStockSyncWorkerForCron() {
 }
 
 // Request-scoped variant for flows that must not return before Youzan stock is durable.
-export async function runStockSyncWorkerForSkus(skuIds: string[]) {
-  return runStockSyncWorkerCore({ sku_ids: skuIds, limit: Math.max(5, skuIds.length) });
+export async function runStockSyncWorkerForSkus(skuIds: string[], limit = Math.max(5, skuIds.length)) {
+  return runStockSyncWorkerCore({ sku_ids: skuIds, limit: Math.min(200, Math.max(5, limit)) });
 }
 
 // ============================================================

@@ -3,6 +3,7 @@ import {
   buildStandardChannelPublishParams,
   buildHqSpuLookupParams,
   buildStandardItemImageUpdateParams,
+  buildStandardStockWorkerLimit,
   buildStandardGroupSpuCreateParams,
   groupStandardCatalogSkus,
   isRecoverableStandardChannelPublishError,
@@ -46,6 +47,7 @@ type BranchGroup = {
   skus: Array<{ skuId: number; skuNo: string | null }>;
   imageIds: number[];
   imageUrls: string[];
+  stockValues: number[];
 };
 
 function branchHasMaterialImage(branch: BranchGroup, image: YouzanMaterialImage) {
@@ -368,6 +370,7 @@ async function findBranchGroup(args: {
       itemId,
       imageIds: images.map((image) => Number(image.image_id ?? 0)).filter((id) => id > 0),
       imageUrls: images.map((image) => String(image.url ?? "").trim()).filter(Boolean),
+      stockValues: rawSkus.map((sku) => Number(sku.stock_num_str ?? Number(sku.stock_num ?? 0) / 1000)),
       skus: rawSkus.flatMap((sku) => {
         const skuId = Number(sku.channel_sku_id ?? sku.sku_id ?? 0);
         if (!skuId) return [];
@@ -649,8 +652,42 @@ export async function syncStandardGroupContainingSkuCore(args: {
   }
 
   if (branches.some((branch) => branch.ok)) {
-    const worker = await runStockSyncWorkerForSkus(group.skus.map((sku) => sku.id));
+    const worker = await runStockSyncWorkerForSkus(
+      group.skus.map((sku) => sku.id),
+      buildStandardStockWorkerLimit(group.skus.length, args.shops.length),
+    );
     if (worker.failed > 0) throw new Error(`有赞库存同步失败 ${worker.failed} 条`);
+
+    for (const shop of args.shops) {
+      let verified: BranchGroup | null = null;
+      for (const waitMs of [0, 1_000, 2_000, 4_000, 8_000]) {
+        if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
+        verified = await findBranchGroup({
+          accessToken: groupedHq.accessToken,
+          kdtId: Number(shop.kdt_id),
+          group,
+        });
+        if (
+          verified &&
+          verified.stockValues.length === group.skus.length &&
+          verified.stockValues.every((stock) => stock === args.targetStock)
+        ) {
+          break;
+        }
+      }
+      if (
+        !verified ||
+        verified.stockValues.length !== group.skus.length ||
+        verified.stockValues.some((stock) => stock !== args.targetStock)
+      ) {
+        const actual = verified?.stockValues.length
+          ? Array.from(new Set(verified.stockValues)).join(",")
+          : "missing";
+        throw new Error(
+          `有赞分店 ${shop.shop_name} 库存未生效：应为 ${args.targetStock}，实际 ${actual}`,
+        );
+      }
+    }
   }
   return {
     ok: branches.every((branch) => branch.ok),

@@ -111,6 +111,11 @@ export function buildStandardItemImageUpdateParams(itemId: number, imageIds: num
   };
 }
 
+export function buildStandardStockWorkerLimit(skuCount: number, shopCount: number) {
+  const requested = Math.ceil(Math.max(0, skuCount) * Math.max(0, shopCount));
+  return Math.min(200, Math.max(5, requested));
+}
+
 export function isRecoverableStandardChannelPublishError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   return /商品不存在|已发布到指定渠道/i.test(message);
