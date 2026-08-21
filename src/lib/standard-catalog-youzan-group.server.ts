@@ -367,22 +367,34 @@ async function resolveRootItemId(args: {
   hqKdtId: number;
   itemCode: string;
 }) {
-  const result = await callYouzanApiVerbose({
-    accessToken: args.accessToken,
-    method: "youzan.item.base.get",
-    version: "1.0.0",
-    params: {
-      request: {
-        kdt_id: args.hqKdtId,
-        item_code: args.itemCode,
-        channel: 0,
-      },
-    },
-    timeoutMs: 20_000,
-  });
-  const itemId = pickCreatedId(result.payload);
-  if (!itemId) throw new Error(`有赞商品库未返回 ${args.itemCode} 的根商品 ID`);
-  return itemId;
+  let lastError: unknown;
+  for (const waitMs of [0, 1_000, 2_000, 4_000, 8_000, 16_000]) {
+    if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
+    try {
+      const result = await callYouzanApiVerbose({
+        accessToken: args.accessToken,
+        method: "youzan.item.base.get",
+        version: "1.0.0",
+        params: {
+          request: {
+            kdt_id: args.hqKdtId,
+            item_code: args.itemCode,
+            channel: 0,
+          },
+        },
+        timeoutMs: 20_000,
+      });
+      const itemId = pickCreatedId(result.payload);
+      if (itemId) return itemId;
+      lastError = new Error(`有赞商品库未返回 ${args.itemCode} 的根商品 ID`);
+    } catch (error) {
+      if (!/商品不存在|not found/i.test(error instanceof Error ? error.message : String(error))) {
+        throw error;
+      }
+      lastError = error;
+    }
+  }
+  throw lastError ?? new Error(`有赞商品库未返回 ${args.itemCode} 的根商品 ID`);
 }
 
 async function upsertBranchRecords(args: {
