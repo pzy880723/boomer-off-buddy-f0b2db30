@@ -59,8 +59,8 @@ test("group relation update overwrites at most ten products per call", () => {
     groupIds: [88],
   });
   assert.equal(params.kdt_id, "153242272");
-  assert.deepEqual(JSON.parse(params.item_ids), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-  assert.deepEqual(JSON.parse(params.group_ids), [88]);
+  assert.deepEqual(params.item_ids, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  assert.deepEqual(params.group_ids, [88]);
   assert.equal(params.operate_type, 3);
   assert.equal(params.channel, 1);
 

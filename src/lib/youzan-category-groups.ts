@@ -142,8 +142,10 @@ export function buildGroupRelationUpdateParams(args: {
   return {
     kdt_id: String(args.kdtId),
     channel: args.channel,
-    item_ids: JSON.stringify(args.itemIds.slice(0, 10)),
-    group_ids: JSON.stringify(args.groupIds.slice(0, 10)),
+    // The current Youzan gateway accepts list fields only as JSON arrays.
+    // Sending the stringified form shown in their curl sample returns gw 5001.
+    item_ids: args.itemIds.slice(0, 10),
+    group_ids: args.groupIds.slice(0, 10),
     operate_type: 3,
   };
 }
