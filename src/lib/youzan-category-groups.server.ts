@@ -331,17 +331,21 @@ export async function syncErpCategoriesToYouzanGroups(args: {
       const updates: Array<Record<string, unknown>> = [];
       for (const assignment of assignments) {
         for (const itemIds of chunkYouzanItemIds(assignment.itemIds)) {
-          const before = await callYouzanApiVerbose({
-            accessToken,
-            method: "youzan.item.itemgroup.get",
-            version: "1.0.0",
-            params: buildGroupRelationQueryParams(Number(hq.kdt_id), channel, itemIds),
-            timeoutMs: 20_000,
-          });
+          const before = [];
+          for (const itemId of itemIds) {
+            const response = await callYouzanApiVerbose({
+              accessToken,
+              method: "youzan.item.itemgroup.get",
+              version: "1.0.0",
+              params: buildGroupRelationQueryParams(Number(hq.kdt_id), channel, itemId),
+              timeoutMs: 20_000,
+            });
+            before.push({ item_id: itemId, payload: response.payload });
+          }
           relationSnapshots.push({
             category_code: assignment.categoryCode,
             item_ids: itemIds,
-            payload: before.payload,
+            items: before,
           });
           if (args.dryRun) {
             updates.push({
@@ -365,18 +369,22 @@ export async function syncErpCategoriesToYouzanGroups(args: {
             }),
             timeoutMs: 20_000,
           });
-          const after = await callYouzanApiVerbose({
-            accessToken,
-            method: "youzan.item.itemgroup.get",
-            version: "1.0.0",
-            params: buildGroupRelationQueryParams(Number(hq.kdt_id), channel, itemIds),
-            timeoutMs: 20_000,
-          });
-          const verifiedGroupIds = collectRelationGroupIds(after.payload);
-          if (!verifiedGroupIds.includes(assignment.groupId)) {
-            throw new Error(
-              `分组覆盖后校验失败：${assignment.categoryCode} item=${itemIds.join(",")} group=${assignment.groupId}`,
-            );
+          const verifiedGroupsByItem: Record<string, number[]> = {};
+          for (const itemId of itemIds) {
+            const after = await callYouzanApiVerbose({
+              accessToken,
+              method: "youzan.item.itemgroup.get",
+              version: "1.0.0",
+              params: buildGroupRelationQueryParams(Number(hq.kdt_id), channel, itemId),
+              timeoutMs: 20_000,
+            });
+            const verifiedGroupIds = collectRelationGroupIds(after.payload);
+            if (!verifiedGroupIds.includes(assignment.groupId)) {
+              throw new Error(
+                `分组覆盖后校验失败：${assignment.categoryCode} item=${itemId} group=${assignment.groupId}`,
+              );
+            }
+            verifiedGroupsByItem[String(itemId)] = verifiedGroupIds;
           }
           updates.push({
             category_code: assignment.categoryCode,
@@ -384,7 +392,7 @@ export async function syncErpCategoriesToYouzanGroups(args: {
             group_ids: [assignment.groupId],
             operate_type: 3,
             applied: true,
-            verified_group_ids: verifiedGroupIds,
+            verified_groups_by_item: verifiedGroupsByItem,
           });
         }
       }

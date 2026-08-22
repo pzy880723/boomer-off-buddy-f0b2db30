@@ -71,7 +71,7 @@ export function selectPublicCategoryTree(
 
 export function buildGroupSearchParams(kdtId: number, channel: 0 | 1, pageNo: number) {
   return {
-    request: JSON.stringify({ kdt_id: kdtId, channel, page_no: pageNo }),
+    request: { kdt_id: kdtId, channel, page_no: pageNo },
   };
 }
 
@@ -82,7 +82,7 @@ export function buildGroupChildrenParams(
   pageNo: number,
 ) {
   return {
-    request: JSON.stringify({ kdt_id: kdtId, channel, group_id: groupId, page_no: pageNo }),
+    request: { kdt_id: kdtId, channel, group_id: groupId, page_no: pageNo },
   };
 }
 
@@ -96,22 +96,22 @@ export function buildGroupCreateParams(args: {
     kdt_id: args.kdtId,
     channel: args.channel,
     title: args.title,
+    parent_group_id: args.parentGroupId ?? 0,
   };
-  if (args.parentGroupId) request.parent_group_id = args.parentGroupId;
-  return { request: JSON.stringify(request) };
+  return { request };
 }
 
 export function buildGroupRelationQueryParams(
   kdtId: number,
   channel: 0 | 1,
-  itemIds: number[],
+  itemId: number,
 ) {
   return {
-    request: JSON.stringify({
+    request: {
       kdt_id: kdtId,
       channel,
-      item_ids: itemIds.slice(0, 10),
-    }),
+      item_id: itemId,
+    },
   };
 }
 
@@ -122,13 +122,11 @@ export function buildGroupRelationUpdateParams(args: {
   groupIds: number[];
 }) {
   return {
-    request: JSON.stringify({
-      kdt_id: args.kdtId,
-      channel: args.channel,
-      item_ids: args.itemIds.slice(0, 10),
-      group_ids: args.groupIds.slice(0, 10),
-      operate_type: 3,
-    }),
+    kdt_id: String(args.kdtId),
+    channel: args.channel,
+    item_ids: JSON.stringify(args.itemIds.slice(0, 10)),
+    group_ids: JSON.stringify(args.groupIds.slice(0, 10)),
+    operate_type: 3,
   };
 }
 

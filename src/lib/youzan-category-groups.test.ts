@@ -35,12 +35,12 @@ test("category code filter keeps the selected root and descendants", () => {
 });
 
 test("Youzan group APIs use the documented request wrapper", () => {
-  assert.deepEqual(JSON.parse(String(buildGroupSearchParams(153242272, 1, 2).request)), {
+  assert.deepEqual(buildGroupSearchParams(153242272, 1, 2).request, {
     kdt_id: 153242272,
     channel: 1,
     page_no: 2,
   });
-  assert.deepEqual(JSON.parse(String(buildGroupCreateParams({ kdtId: 153242272, channel: 1, title: "毛绒玩具", parentGroupId: 99 }).request)), {
+  assert.deepEqual(buildGroupCreateParams({ kdtId: 153242272, channel: 1, title: "毛绒玩具", parentGroupId: 99 }).request, {
     kdt_id: 153242272,
     channel: 1,
     title: "毛绒玩具",
@@ -55,14 +55,14 @@ test("group relation update overwrites at most ten products per call", () => {
     itemIds: Array.from({ length: 12 }, (_, index) => index + 1),
     groupIds: [88],
   });
-  const request = JSON.parse(String(params.request));
-  assert.deepEqual(request.item_ids, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-  assert.deepEqual(request.group_ids, [88]);
-  assert.equal(request.operate_type, 3);
-  assert.equal(request.channel, 1);
+  assert.equal(params.kdt_id, "153242272");
+  assert.deepEqual(JSON.parse(params.item_ids), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  assert.deepEqual(JSON.parse(params.group_ids), [88]);
+  assert.equal(params.operate_type, 3);
+  assert.equal(params.channel, 1);
 
-  const query = JSON.parse(String(buildGroupRelationQueryParams(153242272, 1, [1, 2]).request));
-  assert.deepEqual(query.item_ids, [1, 2]);
+  const query = buildGroupRelationQueryParams(153242272, 1, 1).request;
+  assert.deepEqual(query, { kdt_id: 153242272, channel: 1, item_id: 1 });
 });
 
 test("product assignments deduplicate shared HQ item IDs and skip workflow categories", () => {
