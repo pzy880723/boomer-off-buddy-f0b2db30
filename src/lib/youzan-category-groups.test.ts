@@ -181,5 +181,7 @@ test("group sync resolves HQ online item ids and never uses branch credentials",
   assert.match(source, /buildGroupRelationQueryParams\(Number\(hq\.kdt_id\)/);
   assert.match(source, /buildGroupRelationUpdateParams\(\{[\s\S]*kdtId: Number\(hq\.kdt_id\)/);
   assert.match(source, /hq_shop_id: hq\.id/);
+  assert.match(source, /args\.channel === 1/);
+  assert.match(source, /skipped_products: productResolution\.skipped/);
   assert.doesNotMatch(source, /ensureAccessToken\(shop\)/);
 });

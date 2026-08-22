@@ -273,6 +273,7 @@ async function resolveHqProductLinks(args: {
   seeds: HqProductSeed[];
 }) {
   const links: ProductLink[] = [];
+  const skipped: Array<Record<string, unknown>> = [];
   for (const seed of args.seeds) {
     let matched: YouzanBaseItem | null = null;
     for (const itemCode of seed.item_codes.slice(0, 3)) {
@@ -311,6 +312,15 @@ async function resolveHqProductLinks(args: {
       matched = selectUniqueHqItem(rows, seed);
     }
     if (!matched) {
+      if (args.channel === 1) {
+        skipped.push({
+          category_code: seed.category_code,
+          stored_item_id: seed.stored_item_id,
+          title: seed.name,
+          reason: "not_published_to_store_channel",
+        });
+        continue;
+      }
       throw new Error(
         `有赞总部未找到 ERP 商品：channel=${args.channel} ${seed.category_code}/${seed.name}`,
       );
@@ -324,7 +334,7 @@ async function resolveHqProductLinks(args: {
       item_code: matched.item_code,
     });
   }
-  return links;
+  return { links, skipped };
 }
 
 async function createAuditRun(input: Record<string, unknown>) {
@@ -371,12 +381,13 @@ export async function syncErpCategoriesToYouzanGroups(args: {
   const channelResults: Array<Record<string, unknown>> = [];
   try {
     for (const channel of args.channels) {
-      const productLinks = await resolveHqProductLinks({
+      const productResolution = await resolveHqProductLinks({
         accessToken,
         hqKdtId: Number(hq.kdt_id),
         channel,
         seeds: selectedProductSeeds,
       });
+      const productLinks = productResolution.links;
       const relationSnapshots: Array<Record<string, unknown>> = [];
       for (const link of productLinks) {
         const response = await callYouzanApiVerbose({
@@ -524,6 +535,7 @@ export async function syncErpCategoriesToYouzanGroups(args: {
       channelResults.push({
         channel,
         resolved_products: productLinks,
+        skipped_products: productResolution.skipped,
         remote_groups_before: remoteGroups,
         planned_creates: creates,
         resolved_groups: resolvedGroups,
