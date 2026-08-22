@@ -154,9 +154,11 @@ export function buildProductGroupAssignments(args: {
   });
 }
 
-export function selectProductLinksForCategories(args: {
+export function selectProductLinksForCategories<
+  T extends { category_code: string; item_id: number },
+>(args: {
   categories: PublicCategory[];
-  productLinks: Array<{ category_code: string; item_id: number }>;
+  productLinks: T[];
   maxItems: number;
 }) {
   const allowedCodes = new Set(args.categories.map((category) => category.code));

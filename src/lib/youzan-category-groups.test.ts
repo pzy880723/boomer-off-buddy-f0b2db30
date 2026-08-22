@@ -66,7 +66,7 @@ test("group relation update overwrites at most ten products per call", () => {
   assert.deepEqual(query, { kdt_id: 153242272, channel: 1, item_id: 1 });
 });
 
-test("product assignments deduplicate shared HQ item IDs and skip workflow categories", () => {
+test("product assignments deduplicate shared item IDs and skip workflow categories", () => {
   const tree = selectPublicCategoryTree(categories);
   const assignments = buildProductGroupAssignments({
     categories: tree,
@@ -137,4 +137,9 @@ test("group sync uses branch sale item ids instead of retail HQ spu ids", () => 
   assert.match(source, /\.neq\("shop_id", hqShopId\)/);
   assert.match(source, /\.eq\("role", "branch_stock"\)/);
   assert.match(source, /\.eq\("status", "linked"\)/);
+  assert.match(source, /ensureAccessToken\(shop\)/);
+  assert.match(source, /buildGroupRelationQueryParams\(Number\(shop\.kdt_id\)/);
+  assert.match(source, /buildGroupRelationUpdateParams\(\{[\s\S]*kdtId: Number\(shop\.kdt_id\)/);
+  assert.match(source, /hq_shop_id: shop\.id/);
+  assert.doesNotMatch(source, /ensureAccessToken\(hq\)/);
 });
