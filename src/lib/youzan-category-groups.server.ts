@@ -7,6 +7,7 @@ import {
   buildGroupSearchParams,
   buildProductGroupAssignments,
   chunkYouzanItemIds,
+  selectProductLinksForCategories,
   selectPublicCategoryTree,
   type ErpCategoryRow,
   type PublicCategory,
@@ -233,7 +234,11 @@ export async function syncErpCategoriesToYouzanGroups(args: {
   const hq = await getHqShop();
   const accessToken = await ensureAccessToken(hq);
   const source = await loadSourceData(hq.id, args.categoryCodes);
-  const selectedProductLinks = source.productLinks.slice(0, args.maxItems);
+  const selectedProductLinks = selectProductLinksForCategories({
+    categories: source.categories,
+    productLinks: source.productLinks,
+    maxItems: args.maxItems,
+  });
   const runId = await createAuditRun({
     status: "running",
     dry_run: args.dryRun,

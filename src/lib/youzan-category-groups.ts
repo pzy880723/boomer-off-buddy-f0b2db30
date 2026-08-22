@@ -154,6 +154,17 @@ export function buildProductGroupAssignments(args: {
   });
 }
 
+export function selectProductLinksForCategories(args: {
+  categories: PublicCategory[];
+  productLinks: Array<{ category_code: string; item_id: number }>;
+  maxItems: number;
+}) {
+  const allowedCodes = new Set(args.categories.map((category) => category.code));
+  return args.productLinks
+    .filter((link) => allowedCodes.has(link.category_code))
+    .slice(0, args.maxItems);
+}
+
 export function parseCategoryGroupSyncRequest(body: CategoryGroupSyncRequest) {
   const dryRun = body.dry_run !== false;
   const confirm = typeof body.confirm === "string" ? body.confirm : "";

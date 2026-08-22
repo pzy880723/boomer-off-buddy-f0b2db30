@@ -11,6 +11,7 @@ import {
   buildGroupSearchParams,
   buildProductGroupAssignments,
   parseCategoryGroupSyncRequest,
+  selectProductLinksForCategories,
   selectPublicCategoryTree,
 } from "./youzan-category-groups.ts";
 
@@ -84,6 +85,20 @@ test("product assignments deduplicate shared HQ item IDs and skip workflow categ
     { categoryCode: "toy_model", groupId: 81, itemIds: [1001] },
     { categoryCode: "toy_plush", groupId: 82, itemIds: [1002] },
   ]);
+});
+
+test("category canary filters product links before applying its item limit", () => {
+  const tree = selectPublicCategoryTree(categories, ["toy_model"]);
+  const selected = selectProductLinksForCategories({
+    categories: tree,
+    productLinks: [
+      { category_code: "daily_misc", item_id: 2001 },
+      { category_code: "toy_model", item_id: 1001 },
+      { category_code: "toy_plush", item_id: 1002 },
+    ],
+    maxItems: 1,
+  });
+  assert.deepEqual(selected, [{ category_code: "toy_model", item_id: 1001 }]);
 });
 
 test("formal sync needs confirmation and Tencent production host", () => {
