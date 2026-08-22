@@ -13,6 +13,24 @@ export type ErpCategoryRow = {
 
 export type PublicCategory = ErpCategoryRow & { depth: number };
 
+export type HqProductSeed = {
+  category_code: string;
+  stored_item_id: number;
+  name: string;
+  item_codes: string[];
+  barcodes: string[];
+};
+
+export type YouzanBaseItem = {
+  item_id: number;
+  channel_item_id: number | null;
+  kdt_id: number | null;
+  root_kdt_id: number | null;
+  title: string;
+  item_code: string;
+  item_barcode: string;
+};
+
 type CategoryGroupSyncRequest = {
   dry_run?: unknown;
   confirm?: unknown;
@@ -128,6 +146,44 @@ export function buildGroupRelationUpdateParams(args: {
     group_ids: JSON.stringify(args.groupIds.slice(0, 10)),
     operate_type: 3,
   };
+}
+
+export function buildHqItemSearchParams(args: {
+  kdtId: number;
+  channel: 0 | 1;
+  itemCode?: string;
+  title?: string;
+}) {
+  return {
+    kdt_id: args.kdtId,
+    channel: args.channel,
+    is_displays: [0, 1],
+    page_no: 1,
+    page_size: 50,
+    ...(args.itemCode ? { item_codes: [args.itemCode] } : {}),
+    ...(args.title ? { title: args.title } : {}),
+  };
+}
+
+export function selectUniqueHqItem(
+  rows: YouzanBaseItem[],
+  seed: HqProductSeed,
+): YouzanBaseItem | null {
+  const allowedCodes = new Set(seed.item_codes.map((value) => value.trim()).filter(Boolean));
+  const exactCode = rows.filter((row) => allowedCodes.has(row.item_code));
+  const candidates = exactCode.length > 0
+    ? exactCode
+    : rows.filter((row) => row.title.trim() === seed.name.trim());
+  const uniqueByItemId = new Map(
+    candidates.filter((row) => row.item_id > 0).map((row) => [row.item_id, row]),
+  );
+  if (uniqueByItemId.size === 0) return null;
+  if (uniqueByItemId.size > 1) {
+    throw new Error(
+      `有赞总部商品匹配不唯一：${seed.category_code}/${seed.name} -> ${Array.from(uniqueByItemId.keys()).join(",")}`,
+    );
+  }
+  return Array.from(uniqueByItemId.values())[0];
 }
 
 export function buildProductGroupAssignments(args: {

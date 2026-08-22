@@ -5,12 +5,14 @@ import {
   buildGroupRelationQueryParams,
   buildGroupRelationUpdateParams,
   buildGroupSearchParams,
+  buildHqItemSearchParams,
   buildProductGroupAssignments,
   chunkYouzanItemIds,
-  selectProductLinksForCategories,
   selectPublicCategoryTree,
+  selectUniqueHqItem,
   type ErpCategoryRow,
-  type PublicCategory,
+  type HqProductSeed,
+  type YouzanBaseItem,
 } from "./youzan-category-groups";
 import { callYouzanApiVerbose, ensureAccessToken, getHqShop } from "./youzan.functions";
 
@@ -23,19 +25,10 @@ type RemoteGroup = {
 type ProductLink = {
   category_code: string;
   item_id: number;
-  shop_id: string;
-};
-
-type TargetShop = {
-  id: string;
-  kdt_id: number;
-  shop_name: string;
-  role: "branch";
-  parent_kdt_id: number | null;
-  status: string;
-  access_token: string | null;
-  refresh_token: string | null;
-  token_expires_at: string | null;
+  stored_item_id: number;
+  channel_item_id: number | null;
+  title: string;
+  item_code: string;
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -133,6 +126,37 @@ function collectRelationGroupIds(payload: unknown): number[] {
   return Array.from(ids).sort((a, b) => a - b);
 }
 
+function collectBaseSearchItems(payload: unknown): YouzanBaseItem[] {
+  const items = new Map<number, YouzanBaseItem>();
+  const visited = new Set<unknown>();
+  const walk = (value: unknown, depth = 0) => {
+    if (!value || depth > 7 || visited.has(value)) return;
+    if (typeof value === "object") visited.add(value);
+    if (Array.isArray(value)) {
+      for (const child of value) walk(child, depth + 1);
+      return;
+    }
+    const record = asRecord(value);
+    if (!record) return;
+    const itemId = positiveInteger(record.item_id ?? record.itemId);
+    const title = firstString(record, ["title", "name"]);
+    if (itemId && title) {
+      items.set(itemId, {
+        item_id: itemId,
+        channel_item_id: positiveInteger(record.channel_item_id ?? record.channelItemId),
+        kdt_id: positiveInteger(record.kdt_id ?? record.kdtId),
+        root_kdt_id: positiveInteger(record.root_kdt_id ?? record.rootKdtId),
+        title,
+        item_code: firstString(record, ["item_code", "itemCode", "outer_id", "outerId"]),
+        item_barcode: firstString(record, ["item_barcode", "itemBarcode"]),
+      });
+    }
+    for (const child of Object.values(record)) walk(child, depth + 1);
+  };
+  walk(payload);
+  return Array.from(items.values());
+}
+
 async function listRemoteGroups(args: {
   accessToken: string;
   kdtId: number;
@@ -183,64 +207,124 @@ function findMatchingRemoteGroup(
 }
 
 async function loadSourceData(hqShopId: string, requestedRootCodes: string[]) {
-  const [
-    { data: categoryRows, error: categoryError },
-    { data: skuRows, error: skuError },
-    { data: shopRows, error: shopError },
-  ] =
+  const [{ data: categoryRows, error: categoryError }, { data: skuRows, error: skuError }] =
     await Promise.all([
       supabase
         .from("inv_categories")
         .select("id, code, name, parent_id, sort_order, is_active, kind")
         .order("sort_order", { ascending: true }),
-      supabase.from("inv_skus").select("id, category"),
-      supabase
-        .from("youzan_shops")
-        .select(
-          "id, kdt_id, shop_name, role, parent_kdt_id, status, access_token, refresh_token, token_expires_at",
-        )
-        .eq("role", "branch")
-        .eq("status", "active")
-        .order("shop_name", { ascending: true }),
+      supabase.from("inv_skus").select("id, category, name, sku_code, barcode"),
     ]);
   if (categoryError) throw new Error(categoryError.message);
   if (skuError) throw new Error(skuError.message);
-  if (shopError) throw new Error(shopError.message);
 
   const categories = selectPublicCategoryTree(
     (categoryRows ?? []) as ErpCategoryRow[],
     requestedRootCodes,
   );
   const skuIds = (skuRows ?? []).map((sku) => sku.id);
-  const shops = (shopRows ?? []) as TargetShop[];
-  const shopIds = shops.map((shop) => shop.id);
-  const links: Array<{ sku_id: string; shop_id: string; yz_item_id: number | null }> = [];
+  const links: Array<{ sku_id: string; yz_item_id: number | null }> = [];
   for (let offset = 0; offset < skuIds.length; offset += 500) {
-    if (shopIds.length === 0) break;
     const { data, error } = await supabase
       .from("sku_youzan_links")
-      .select("sku_id, shop_id, yz_item_id")
-      .neq("shop_id", hqShopId)
-      .in("shop_id", shopIds)
-      .eq("role", "branch_stock")
+      .select("sku_id, yz_item_id")
+      .eq("shop_id", hqShopId)
+      .eq("role", "hq_spu")
       .eq("status", "linked")
       .in("sku_id", skuIds.slice(offset, offset + 500));
     if (error) throw new Error(error.message);
-    links.push(
-      ...((data ?? []) as Array<{ sku_id: string; shop_id: string; yz_item_id: number | null }>),
-    );
+    links.push(...((data ?? []) as Array<{ sku_id: string; yz_item_id: number | null }>));
   }
-  const categoryBySkuId = new Map(
-    (skuRows ?? []).map((sku) => [sku.id, String(sku.category ?? "")]),
+  const skuById = new Map((skuRows ?? []).map((sku) => [sku.id, sku]));
+  const seedsByStoredItemId = new Map<number, HqProductSeed>();
+  for (const link of links) {
+    const storedItemId = positiveInteger(link.yz_item_id);
+    const sku = skuById.get(link.sku_id);
+    const categoryCode = String(sku?.category ?? "").trim();
+    if (!storedItemId || !sku || !categoryCode) continue;
+    const existing = seedsByStoredItemId.get(storedItemId);
+    if (existing && existing.category_code !== categoryCode) {
+      throw new Error(`同一个有赞总部商品 ${storedItemId} 被绑定到多个 ERP 分类`);
+    }
+    const seed = existing ?? {
+      category_code: categoryCode,
+      stored_item_id: storedItemId,
+      name: String(sku.name ?? "").trim(),
+      item_codes: [],
+      barcodes: [],
+    };
+    const itemCode = String(sku.sku_code ?? "").trim();
+    const barcode = String(sku.barcode ?? "").trim();
+    if (itemCode && !seed.item_codes.includes(itemCode)) seed.item_codes.push(itemCode);
+    if (barcode && !seed.barcodes.includes(barcode)) seed.barcodes.push(barcode);
+    seedsByStoredItemId.set(storedItemId, seed);
+  }
+  const allowedCodes = new Set(categories.map((category) => category.code));
+  const productSeeds = Array.from(seedsByStoredItemId.values()).filter((seed) =>
+    allowedCodes.has(seed.category_code),
   );
-  const productLinks: ProductLink[] = links.flatMap((link) => {
-    const itemId = positiveInteger(link.yz_item_id);
-    const categoryCode = categoryBySkuId.get(link.sku_id) ?? "";
-    return itemId && categoryCode
-      ? [{ category_code: categoryCode, item_id: itemId, shop_id: link.shop_id }]
-      : [];
-  });
-  return { categories, productLinks, shops };
+  return { categories, productSeeds };
+}
+
+async function resolveHqProductLinks(args: {
+  accessToken: string;
+  hqKdtId: number;
+  channel: 0 | 1;
+  seeds: HqProductSeed[];
+}) {
+  const links: ProductLink[] = [];
+  for (const seed of args.seeds) {
+    let matched: YouzanBaseItem | null = null;
+    for (const itemCode of seed.item_codes.slice(0, 3)) {
+      const response = await callYouzanApiVerbose({
+        accessToken: args.accessToken,
+        method: "youzan.item.base.search",
+        version: "1.0.0",
+        params: buildHqItemSearchParams({
+          kdtId: args.hqKdtId,
+          channel: args.channel,
+          itemCode,
+        }),
+        timeoutMs: 20_000,
+      });
+      const rows = collectBaseSearchItems(response.payload).filter(
+        (row) => !row.root_kdt_id || row.root_kdt_id === args.hqKdtId,
+      );
+      matched = selectUniqueHqItem(rows, seed);
+      if (matched) break;
+    }
+    if (!matched) {
+      const response = await callYouzanApiVerbose({
+        accessToken: args.accessToken,
+        method: "youzan.item.base.search",
+        version: "1.0.0",
+        params: buildHqItemSearchParams({
+          kdtId: args.hqKdtId,
+          channel: args.channel,
+          title: seed.name,
+        }),
+        timeoutMs: 20_000,
+      });
+      const rows = collectBaseSearchItems(response.payload).filter(
+        (row) => !row.root_kdt_id || row.root_kdt_id === args.hqKdtId,
+      );
+      matched = selectUniqueHqItem(rows, seed);
+    }
+    if (!matched) {
+      throw new Error(
+        `有赞总部未找到 ERP 商品：channel=${args.channel} ${seed.category_code}/${seed.name}`,
+      );
+    }
+    links.push({
+      category_code: seed.category_code,
+      item_id: matched.item_id,
+      stored_item_id: seed.stored_item_id,
+      channel_item_id: matched.channel_item_id,
+      title: matched.title,
+      item_code: matched.item_code,
+    });
+  }
+  return links;
 }
 
 async function createAuditRun(input: Record<string, unknown>) {
@@ -268,15 +352,9 @@ export async function syncErpCategoriesToYouzanGroups(args: {
   maxItems: number;
 }) {
   const hq = await getHqShop();
+  const accessToken = await ensureAccessToken(hq);
   const source = await loadSourceData(hq.id, args.categoryCodes);
-  const selectedProductLinks = selectProductLinksForCategories({
-    categories: source.categories,
-    productLinks: source.productLinks,
-    maxItems: args.maxItems,
-  });
-  const targetShops = source.shops.filter((shop) =>
-    selectedProductLinks.some((link) => link.shop_id === shop.id),
-  );
+  const selectedProductSeeds = source.productSeeds.slice(0, args.maxItems);
   const runId = await createAuditRun({
     status: "running",
     dry_run: args.dryRun,
@@ -286,180 +364,171 @@ export async function syncErpCategoriesToYouzanGroups(args: {
     category_codes: args.categoryCodes,
     source_snapshot: {
       categories: source.categories,
-      product_links: selectedProductLinks,
-      shops: targetShops.map((shop) => ({
-        id: shop.id,
-        kdt_id: Number(shop.kdt_id),
-        shop_name: shop.shop_name,
-      })),
+      product_seeds: selectedProductSeeds,
     },
   });
 
-  const shopResults: Array<Record<string, unknown>> = [];
+  const channelResults: Array<Record<string, unknown>> = [];
   try {
-    for (const shop of targetShops) {
-      const accessToken = await ensureAccessToken(shop);
-      const shopProductLinks = selectedProductLinks.filter((link) => link.shop_id === shop.id);
-      const channelResults: Array<Record<string, unknown>> = [];
-      for (const channel of args.channels) {
-        const remoteGroups = await listRemoteGroups({
+    for (const channel of args.channels) {
+      const productLinks = await resolveHqProductLinks({
+        accessToken,
+        hqKdtId: Number(hq.kdt_id),
+        channel,
+        seeds: selectedProductSeeds,
+      });
+      const relationSnapshots: Array<Record<string, unknown>> = [];
+      for (const link of productLinks) {
+        const response = await callYouzanApiVerbose({
           accessToken,
-          kdtId: Number(shop.kdt_id),
-          channel,
+          method: "youzan.item.itemgroup.get",
+          version: "1.0.0",
+          params: buildGroupRelationQueryParams(Number(hq.kdt_id), channel, link.item_id),
+          timeoutMs: 20_000,
         });
-        const groupIdsByCategoryCode = new Map<string, number>();
-        const creates: Array<Record<string, unknown>> = [];
-        const resolvedGroups: Array<Record<string, unknown>> = [];
+        relationSnapshots.push({
+          category_code: link.category_code,
+          item_id: link.item_id,
+          previous_group_ids: collectRelationGroupIds(response.payload),
+        });
+      }
 
-        for (const category of source.categories) {
-          const parentGroupId = category.parent_id
-            ? groupIdsByCategoryCode.get(
-                source.categories.find((candidate) => candidate.id === category.parent_id)?.code ?? "",
-              ) ?? null
-            : null;
-          let remote = findMatchingRemoteGroup(remoteGroups, category.name, parentGroupId);
-          let created = false;
-          if (!remote && !args.dryRun) {
-            const response = await callYouzanApiVerbose({
-              accessToken,
-              method: "youzan.item.group.create",
-              version: "1.0.0",
-              params: buildGroupCreateParams({
-                kdtId: Number(shop.kdt_id),
-                channel,
-                title: category.name,
-                parentGroupId,
-              }),
-              timeoutMs: 20_000,
-            });
-            const groupId = extractCreatedGroupId(response.payload);
-            if (!groupId) throw new Error(`有赞创建分组 ${category.name} 成功但未返回 group_id`);
-            remote = { id: groupId, title: category.name, parentId: parentGroupId };
-            remoteGroups.push(remote);
-            created = true;
-          }
-          if (!remote) {
-            creates.push({
-              category_code: category.code,
+      const remoteGroups = await listRemoteGroups({
+        accessToken,
+        kdtId: Number(hq.kdt_id),
+        channel,
+      });
+      const groupIdsByCategoryCode = new Map<string, number>();
+      const creates: Array<Record<string, unknown>> = [];
+      const resolvedGroups: Array<Record<string, unknown>> = [];
+      for (const category of source.categories) {
+        const parentGroupId = category.parent_id
+          ? groupIdsByCategoryCode.get(
+              source.categories.find((candidate) => candidate.id === category.parent_id)?.code ?? "",
+            ) ?? null
+          : null;
+        let remote = findMatchingRemoteGroup(remoteGroups, category.name, parentGroupId);
+        let created = false;
+        if (!remote && !args.dryRun) {
+          const response = await callYouzanApiVerbose({
+            accessToken,
+            method: "youzan.item.group.create",
+            version: "1.0.0",
+            params: buildGroupCreateParams({
+              kdtId: Number(hq.kdt_id),
+              channel,
               title: category.name,
-              parent_category_id: category.parent_id,
-            });
-            continue;
-          }
-          groupIdsByCategoryCode.set(category.code, remote.id);
-          resolvedGroups.push({
-            category_id: category.id,
+              parentGroupId,
+            }),
+            timeoutMs: 20_000,
+          });
+          const groupId = extractCreatedGroupId(response.payload);
+          if (!groupId) throw new Error(`有赞创建分组 ${category.name} 成功但未返回 group_id`);
+          remote = { id: groupId, title: category.name, parentId: parentGroupId };
+          remoteGroups.push(remote);
+          created = true;
+        }
+        if (!remote) {
+          creates.push({
             category_code: category.code,
             title: category.name,
-            group_id: remote.id,
-            parent_group_id: parentGroupId,
-            created,
+            parent_category_id: category.parent_id,
           });
-          if (!args.dryRun) {
-            const { error } = await (supabase as any).from("youzan_category_group_links").upsert(
-              {
-                category_id: category.id,
-                hq_shop_id: shop.id,
-                channel,
-                youzan_group_id: remote.id,
-                parent_youzan_group_id: parentGroupId,
-                group_name: category.name,
-                status: "active",
-                synced_at: new Date().toISOString(),
-                last_error: null,
-              },
-              { onConflict: "category_id,hq_shop_id,channel" },
-            );
-            if (error) throw new Error(error.message);
-          }
+          continue;
         }
-
-        const assignments = buildProductGroupAssignments({
-          categories: source.categories,
-          productLinks: shopProductLinks,
-          groupIdsByCategoryCode,
+        groupIdsByCategoryCode.set(category.code, remote.id);
+        resolvedGroups.push({
+          category_id: category.id,
+          category_code: category.code,
+          title: category.name,
+          group_id: remote.id,
+          parent_group_id: parentGroupId,
+          created,
         });
-        const relationSnapshots: Array<Record<string, unknown>> = [];
-        const updates: Array<Record<string, unknown>> = [];
-        for (const assignment of assignments) {
-          for (const itemIds of chunkYouzanItemIds(assignment.itemIds)) {
-            const before = [];
-            for (const itemId of itemIds) {
-              const response = await callYouzanApiVerbose({
-                accessToken,
-                method: "youzan.item.itemgroup.get",
-                version: "1.0.0",
-                params: buildGroupRelationQueryParams(Number(shop.kdt_id), channel, itemId),
-                timeoutMs: 20_000,
-              });
-              before.push({ item_id: itemId, payload: response.payload });
-            }
-            relationSnapshots.push({
-              category_code: assignment.categoryCode,
-              item_ids: itemIds,
-              items: before,
-            });
-            if (args.dryRun) {
-              updates.push({
-                category_code: assignment.categoryCode,
-                item_ids: itemIds,
-                group_ids: [assignment.groupId],
-                operate_type: 3,
-                applied: false,
-              });
-              continue;
-            }
-            await callYouzanApiVerbose({
-              accessToken,
-              method: "youzan.item.itemgroup.update",
-              version: "1.0.0",
-              params: buildGroupRelationUpdateParams({
-                kdtId: Number(shop.kdt_id),
-                channel,
-                itemIds,
-                groupIds: [assignment.groupId],
-              }),
-              timeoutMs: 20_000,
-            });
-            const verifiedGroupsByItem: Record<string, number[]> = {};
-            for (const itemId of itemIds) {
-              const after = await callYouzanApiVerbose({
-                accessToken,
-                method: "youzan.item.itemgroup.get",
-                version: "1.0.0",
-                params: buildGroupRelationQueryParams(Number(shop.kdt_id), channel, itemId),
-                timeoutMs: 20_000,
-              });
-              const verifiedGroupIds = collectRelationGroupIds(after.payload);
-              if (!verifiedGroupIds.includes(assignment.groupId)) {
-                throw new Error(
-                  `分组覆盖后校验失败：${assignment.categoryCode} shop=${shop.shop_name} item=${itemId} group=${assignment.groupId}`,
-                );
-              }
-              verifiedGroupsByItem[String(itemId)] = verifiedGroupIds;
-            }
+        if (!args.dryRun) {
+          const { error } = await (supabase as any).from("youzan_category_group_links").upsert(
+            {
+              category_id: category.id,
+              hq_shop_id: hq.id,
+              channel,
+              youzan_group_id: remote.id,
+              parent_youzan_group_id: parentGroupId,
+              group_name: category.name,
+              status: "active",
+              synced_at: new Date().toISOString(),
+              last_error: null,
+            },
+            { onConflict: "category_id,hq_shop_id,channel" },
+          );
+          if (error) throw new Error(error.message);
+        }
+      }
+
+      const assignments = buildProductGroupAssignments({
+        categories: source.categories,
+        productLinks,
+        groupIdsByCategoryCode,
+      });
+      const updates: Array<Record<string, unknown>> = [];
+      for (const assignment of assignments) {
+        for (const itemIds of chunkYouzanItemIds(assignment.itemIds)) {
+          if (args.dryRun) {
             updates.push({
               category_code: assignment.categoryCode,
               item_ids: itemIds,
               group_ids: [assignment.groupId],
               operate_type: 3,
-              applied: true,
-              verified_groups_by_item: verifiedGroupsByItem,
+              applied: false,
             });
+            continue;
           }
+          await callYouzanApiVerbose({
+            accessToken,
+            method: "youzan.item.itemgroup.update",
+            version: "1.0.0",
+            params: buildGroupRelationUpdateParams({
+              kdtId: Number(hq.kdt_id),
+              channel,
+              itemIds,
+              groupIds: [assignment.groupId],
+            }),
+            timeoutMs: 20_000,
+          });
+          const verifiedGroupsByItem: Record<string, number[]> = {};
+          for (const itemId of itemIds) {
+            const after = await callYouzanApiVerbose({
+              accessToken,
+              method: "youzan.item.itemgroup.get",
+              version: "1.0.0",
+              params: buildGroupRelationQueryParams(Number(hq.kdt_id), channel, itemId),
+              timeoutMs: 20_000,
+            });
+            const verifiedGroupIds = collectRelationGroupIds(after.payload);
+            if (!verifiedGroupIds.includes(assignment.groupId)) {
+              throw new Error(
+                `分组覆盖后校验失败：${assignment.categoryCode} item=${itemId} group=${assignment.groupId}`,
+              );
+            }
+            verifiedGroupsByItem[String(itemId)] = verifiedGroupIds;
+          }
+          updates.push({
+            category_code: assignment.categoryCode,
+            item_ids: itemIds,
+            group_ids: [assignment.groupId],
+            operate_type: 3,
+            applied: true,
+            verified_groups_by_item: verifiedGroupsByItem,
+          });
         }
-        channelResults.push({
-          channel,
-          remote_groups_before: remoteGroups,
-          planned_creates: creates,
-          resolved_groups: resolvedGroups,
-          relation_snapshots: relationSnapshots,
-          updates,
-        });
       }
-      shopResults.push({
-        shop: { id: shop.id, kdt_id: Number(shop.kdt_id), shop_name: shop.shop_name },
-        channels: channelResults,
+      channelResults.push({
+        channel,
+        resolved_products: productLinks,
+        remote_groups_before: remoteGroups,
+        planned_creates: creates,
+        resolved_groups: resolvedGroups,
+        relation_snapshots: relationSnapshots,
+        updates,
       });
     }
 
@@ -467,10 +536,9 @@ export async function syncErpCategoriesToYouzanGroups(args: {
       run_id: runId,
       dry_run: args.dryRun,
       hq: { id: hq.id, kdt_id: Number(hq.kdt_id), shop_name: hq.shop_name },
-      shop_count: targetShops.length,
       category_count: source.categories.length,
-      product_count: new Set(selectedProductLinks.map((link) => link.item_id)).size,
-      shops: shopResults,
+      product_count: selectedProductSeeds.length,
+      channels: channelResults,
       safeguards: {
         excludes_workflow_categories: true,
         overwrites_group_relation_only: true,
@@ -488,7 +556,7 @@ export async function syncErpCategoriesToYouzanGroups(args: {
     await updateAuditRun(runId, {
       status: "failed",
       error: error instanceof Error ? error.message : String(error),
-      result: { shops: shopResults },
+      result: { channels: channelResults },
       completed_at: new Date().toISOString(),
     });
     throw error;

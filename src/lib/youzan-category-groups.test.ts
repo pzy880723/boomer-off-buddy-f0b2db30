@@ -9,10 +9,12 @@ import {
   buildGroupRelationQueryParams,
   buildGroupRelationUpdateParams,
   buildGroupSearchParams,
+  buildHqItemSearchParams,
   buildProductGroupAssignments,
   parseCategoryGroupSyncRequest,
   selectProductLinksForCategories,
   selectPublicCategoryTree,
+  selectUniqueHqItem,
 } from "./youzan-category-groups.ts";
 
 const categories = [
@@ -64,6 +66,43 @@ test("group relation update overwrites at most ten products per call", () => {
 
   const query = buildGroupRelationQueryParams(153242272, 1, 1).request;
   assert.deepEqual(query, { kdt_id: 153242272, channel: 1, item_id: 1 });
+});
+
+test("HQ product search uses the documented base-search filters", () => {
+  assert.deepEqual(
+    buildHqItemSearchParams({
+      kdtId: 153242272,
+      channel: 1,
+      itemCode: "SKU-TY-260524-QUXU",
+    }),
+    {
+      kdt_id: 153242272,
+      channel: 1,
+      is_displays: [0, 1],
+      page_no: 1,
+      page_size: 50,
+      item_codes: ["SKU-TY-260524-QUXU"],
+    },
+  );
+});
+
+test("HQ product matching prefers ERP item code and rejects ambiguity", () => {
+  const seed = {
+    category_code: "toy_model",
+    stored_item_id: 5070816493,
+    name: "玩具模型",
+    item_codes: ["SKU-TY-260524-QUXU"],
+    barcodes: ["6900000000001"],
+  };
+  const rows = [
+    { item_id: 11, channel_item_id: 101, kdt_id: 1, root_kdt_id: 1, title: "玩具模型", item_code: "OTHER", item_barcode: "" },
+    { item_id: 12, channel_item_id: 102, kdt_id: 1, root_kdt_id: 1, title: "玩具模型", item_code: "SKU-TY-260524-QUXU", item_barcode: "" },
+  ];
+  assert.equal(selectUniqueHqItem(rows, seed)?.item_id, 12);
+  assert.throws(
+    () => selectUniqueHqItem(rows.map((row) => ({ ...row, item_code: "OTHER" })), seed),
+    /匹配不唯一/,
+  );
 });
 
 test("product assignments deduplicate shared item IDs and skip workflow categories", () => {
@@ -129,17 +168,18 @@ test("migration stores group mappings separately from Youzan retail categories",
   assert.doesNotMatch(sql, /UPDATE\s+public\.inv_categories[\s\S]*youzan_hq_category_id/i);
 });
 
-test("group sync uses branch sale item ids instead of retail HQ spu ids", () => {
+test("group sync resolves HQ online item ids and never uses branch credentials", () => {
   const source = readFileSync(
     new URL("./youzan-category-groups.server.ts", import.meta.url),
     "utf8",
   );
-  assert.match(source, /\.neq\("shop_id", hqShopId\)/);
-  assert.match(source, /\.eq\("role", "branch_stock"\)/);
+  assert.match(source, /\.eq\("shop_id", hqShopId\)/);
+  assert.match(source, /\.eq\("role", "hq_spu"\)/);
   assert.match(source, /\.eq\("status", "linked"\)/);
-  assert.match(source, /ensureAccessToken\(shop\)/);
-  assert.match(source, /buildGroupRelationQueryParams\(Number\(shop\.kdt_id\)/);
-  assert.match(source, /buildGroupRelationUpdateParams\(\{[\s\S]*kdtId: Number\(shop\.kdt_id\)/);
-  assert.match(source, /hq_shop_id: shop\.id/);
-  assert.doesNotMatch(source, /ensureAccessToken\(hq\)/);
+  assert.match(source, /youzan\.item\.base\.search/);
+  assert.match(source, /ensureAccessToken\(hq\)/);
+  assert.match(source, /buildGroupRelationQueryParams\(Number\(hq\.kdt_id\)/);
+  assert.match(source, /buildGroupRelationUpdateParams\(\{[\s\S]*kdtId: Number\(hq\.kdt_id\)/);
+  assert.match(source, /hq_shop_id: hq\.id/);
+  assert.doesNotMatch(source, /ensureAccessToken\(shop\)/);
 });
