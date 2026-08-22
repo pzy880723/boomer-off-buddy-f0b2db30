@@ -1,0 +1,192 @@
+export const CATEGORY_GROUP_SYNC_CONFIRM = "SYNC_ERP_CATEGORIES_TO_YOUZAN_GROUPS";
+export const CATEGORY_GROUP_SYNC_HOST = "erp.boomeroff.com";
+
+export type ErpCategoryRow = {
+  id: string;
+  code: string;
+  name: string;
+  parent_id: string | null;
+  sort_order: number;
+  is_active: boolean;
+  kind: string | null;
+};
+
+export type PublicCategory = ErpCategoryRow & { depth: number };
+
+type CategoryGroupSyncRequest = {
+  dry_run?: unknown;
+  confirm?: unknown;
+  channels?: unknown;
+  category_codes?: unknown;
+  max_items?: unknown;
+};
+
+function safePositiveInteger(value: unknown): number | null {
+  const number = Number(value);
+  return Number.isSafeInteger(number) && number > 0 ? number : null;
+}
+
+function uniqueStrings(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return Array.from(
+    new Set(value.map((item) => String(item ?? "").trim()).filter(Boolean)),
+  );
+}
+
+export function selectPublicCategoryTree(
+  rows: ErpCategoryRow[],
+  requestedRootCodes: string[] = [],
+): PublicCategory[] {
+  const candidates = rows.filter(
+    (row) =>
+      row.is_active &&
+      row.kind === "category" &&
+      Number.isFinite(row.sort_order) &&
+      row.sort_order < 9_000,
+  );
+  const byParent = new Map<string | null, ErpCategoryRow[]>();
+  for (const row of candidates) {
+    const siblings = byParent.get(row.parent_id) ?? [];
+    siblings.push(row);
+    byParent.set(row.parent_id, siblings);
+  }
+  for (const siblings of byParent.values()) {
+    siblings.sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name, "zh-CN"));
+  }
+
+  const requested = new Set(requestedRootCodes);
+  const roots = (byParent.get(null) ?? []).filter(
+    (root) => requested.size === 0 || requested.has(root.code),
+  );
+  const selected: PublicCategory[] = [];
+  const walk = (category: ErpCategoryRow, depth: number) => {
+    selected.push({ ...category, depth });
+    for (const child of byParent.get(category.id) ?? []) walk(child, depth + 1);
+  };
+  for (const root of roots) walk(root, 0);
+  return selected.sort(
+    (a, b) => a.depth - b.depth || a.sort_order - b.sort_order || a.name.localeCompare(b.name, "zh-CN"),
+  );
+}
+
+export function buildGroupSearchParams(kdtId: number, channel: 0 | 1, pageNo: number) {
+  return {
+    request: JSON.stringify({ kdt_id: kdtId, channel, page_no: pageNo }),
+  };
+}
+
+export function buildGroupChildrenParams(
+  kdtId: number,
+  channel: 0 | 1,
+  groupId: number,
+  pageNo: number,
+) {
+  return {
+    request: JSON.stringify({ kdt_id: kdtId, channel, group_id: groupId, page_no: pageNo }),
+  };
+}
+
+export function buildGroupCreateParams(args: {
+  kdtId: number;
+  channel: 0 | 1;
+  title: string;
+  parentGroupId?: number | null;
+}) {
+  const request: Record<string, unknown> = {
+    kdt_id: args.kdtId,
+    channel: args.channel,
+    title: args.title,
+  };
+  if (args.parentGroupId) request.parent_group_id = args.parentGroupId;
+  return { request: JSON.stringify(request) };
+}
+
+export function buildGroupRelationQueryParams(
+  kdtId: number,
+  channel: 0 | 1,
+  itemIds: number[],
+) {
+  return {
+    request: JSON.stringify({
+      kdt_id: kdtId,
+      channel,
+      item_ids: itemIds.slice(0, 10),
+    }),
+  };
+}
+
+export function buildGroupRelationUpdateParams(args: {
+  kdtId: number;
+  channel: 0 | 1;
+  itemIds: number[];
+  groupIds: number[];
+}) {
+  return {
+    request: JSON.stringify({
+      kdt_id: args.kdtId,
+      channel: args.channel,
+      item_ids: args.itemIds.slice(0, 10),
+      group_ids: args.groupIds.slice(0, 10),
+      operate_type: 3,
+    }),
+  };
+}
+
+export function buildProductGroupAssignments(args: {
+  categories: PublicCategory[];
+  productLinks: Array<{ category_code: string | null; item_id: number | string | null }>;
+  groupIdsByCategoryCode: Map<string, number>;
+}) {
+  const allowedCodes = new Set(args.categories.map((category) => category.code));
+  const itemIdsByCode = new Map<string, Set<number>>();
+  for (const link of args.productLinks) {
+    const code = String(link.category_code ?? "").trim();
+    const itemId = safePositiveInteger(link.item_id);
+    if (!allowedCodes.has(code) || !itemId) continue;
+    const itemIds = itemIdsByCode.get(code) ?? new Set<number>();
+    itemIds.add(itemId);
+    itemIdsByCode.set(code, itemIds);
+  }
+  return args.categories.flatMap((category) => {
+    const groupId = args.groupIdsByCategoryCode.get(category.code);
+    const itemIds = Array.from(itemIdsByCode.get(category.code) ?? []).sort((a, b) => a - b);
+    return groupId && itemIds.length > 0
+      ? [{ categoryCode: category.code, groupId, itemIds }]
+      : [];
+  });
+}
+
+export function parseCategoryGroupSyncRequest(body: CategoryGroupSyncRequest) {
+  const dryRun = body.dry_run !== false;
+  const confirm = typeof body.confirm === "string" ? body.confirm : "";
+  if (!dryRun && confirm !== CATEGORY_GROUP_SYNC_CONFIRM) {
+    throw new Error(`正式同步必须传 confirm=${CATEGORY_GROUP_SYNC_CONFIRM}`);
+  }
+  const requestedChannels = Array.isArray(body.channels)
+    ? body.channels.map(Number).filter((channel): channel is 0 | 1 => channel === 0 || channel === 1)
+    : [0, 1];
+  const channels = Array.from(new Set(requestedChannels)).sort() as Array<0 | 1>;
+  if (channels.length === 0) throw new Error("channels 只能包含 0 或 1");
+  const maxItems = Math.min(10_000, Math.max(1, Number(body.max_items) || 10_000));
+  return {
+    dryRun,
+    confirm,
+    channels,
+    categoryCodes: uniqueStrings(body.category_codes),
+    maxItems: Math.floor(maxItems),
+  };
+}
+
+export function assertCategoryGroupSyncHost(hostname: string, dryRun: boolean): void {
+  if (!dryRun && hostname !== CATEGORY_GROUP_SYNC_HOST) {
+    throw new Error(`正式同步只能从腾讯固定出口 ${CATEGORY_GROUP_SYNC_HOST} 执行`);
+  }
+}
+
+export function chunkYouzanItemIds(itemIds: number[], size = 10): number[][] {
+  const chunks: number[][] = [];
+  for (let index = 0; index < itemIds.length; index += size) {
+    chunks.push(itemIds.slice(index, index + size));
+  }
+  return chunks;
+}
