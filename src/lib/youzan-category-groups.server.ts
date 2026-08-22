@@ -191,7 +191,9 @@ async function loadSourceData(hqShopId: string, requestedRootCodes: string[]) {
     const { data, error } = await supabase
       .from("sku_youzan_links")
       .select("sku_id, yz_item_id")
-      .eq("shop_id", hqShopId)
+      .neq("shop_id", hqShopId)
+      .eq("role", "branch_stock")
+      .eq("status", "linked")
       .in("sku_id", skuIds.slice(offset, offset + 500));
     if (error) throw new Error(error.message);
     links.push(...((data ?? []) as Array<{ sku_id: string; yz_item_id: number | null }>));

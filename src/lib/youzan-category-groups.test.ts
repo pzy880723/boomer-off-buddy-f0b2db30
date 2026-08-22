@@ -128,3 +128,13 @@ test("migration stores group mappings separately from Youzan retail categories",
   assert.match(sql, /UNIQUE \(category_id, hq_shop_id, channel\)/);
   assert.doesNotMatch(sql, /UPDATE\s+public\.inv_categories[\s\S]*youzan_hq_category_id/i);
 });
+
+test("group sync uses branch sale item ids instead of retail HQ spu ids", () => {
+  const source = readFileSync(
+    new URL("./youzan-category-groups.server.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(source, /\.neq\("shop_id", hqShopId\)/);
+  assert.match(source, /\.eq\("role", "branch_stock"\)/);
+  assert.match(source, /\.eq\("status", "linked"\)/);
+});
