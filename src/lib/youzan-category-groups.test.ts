@@ -185,3 +185,24 @@ test("group sync resolves HQ online item ids and never uses branch credentials",
   assert.match(source, /skipped_products: productResolution\.skipped/);
   assert.doesNotMatch(source, /ensureAccessToken\(shop\)/);
 });
+
+test("new handheld custom products inherit their ERP category group after publication", () => {
+  const server = readFileSync(
+    new URL("./youzan-category-groups.server.ts", import.meta.url),
+    "utf8",
+  );
+  const smartCreate = readFileSync(
+    new URL("../routes/api/public/handheld/items.smart-create.ts", import.meta.url),
+    "utf8",
+  );
+  const retry = readFileSync(
+    new URL("../routes/api/public/handheld/items.$id.sync-youzan.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(server, /export async function assignSkuToYouzanCategoryGroups/);
+  assert.match(server, /youzan_category_group_links/);
+  assert.match(server, /youzan\.item\.itemgroup\.update/);
+  assert.match(server, /youzan\.item\.itemgroup\.get/);
+  assert.match(smartCreate, /assignSkuToYouzanCategoryGroups\(skuId\)/);
+  assert.match(retry, /assignSkuToYouzanCategoryGroups\(params\.id\)/);
+});

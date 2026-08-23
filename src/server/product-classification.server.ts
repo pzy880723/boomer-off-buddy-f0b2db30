@@ -6,6 +6,10 @@ import type {
 } from "@/lib/product-classification";
 import { activeLeafCategories } from "@/lib/product-classification";
 import type { BrandCandidate, FacetTerm } from "@/lib/product-taxonomy";
+import {
+  resolveFacetSelection,
+  type FacetSelectionCandidate,
+} from "@/lib/product-facet-selection";
 
 export async function loadActiveProductCategories(): Promise<CategoryNode[]> {
   const { data, error } = await supabaseAdmin
@@ -24,6 +28,56 @@ export async function assertActiveLeafCategory(code: string): Promise<void> {
   if (!allowed.has(code)) {
     throw new Error("请选择当前启用的二级商品分类");
   }
+}
+
+export async function resolveManualProductFacets(input: {
+  categoryCode: string;
+  facetCodes?: string[];
+  legacyTags?: string[];
+}): Promise<FacetSelectionCandidate[]> {
+  const [categories, facetResult] = await Promise.all([
+    loadActiveProductCategories(),
+    supabaseAdmin
+      .from("inv_facets" as never)
+      .select("id, code, name, category_codes")
+      .eq("is_active", true)
+      .order("dimension", { ascending: true })
+      .order("sort_order", { ascending: true }),
+  ]);
+  if (facetResult.error) throw new Error(`加载商品标签库失败：${facetResult.error.message}`);
+  return resolveFacetSelection({
+    categoryCode: input.categoryCode,
+    categories,
+    facets: (facetResult.data ?? []) as unknown as FacetSelectionCandidate[],
+    facetCodes: input.facetCodes,
+    legacyTags: input.legacyTags,
+  });
+}
+
+export async function replaceManualProductFacets(input: {
+  skuId: string;
+  facets: FacetSelectionCandidate[];
+  createdBy?: string | null;
+}): Promise<void> {
+  const remove = await supabaseAdmin
+    .from("inv_sku_facets" as never)
+    .delete()
+    .eq("sku_id", input.skuId)
+    .eq("source", "manual");
+  if (remove.error) throw new Error(`清理 SKU 旧手工标签失败：${remove.error.message}`);
+  if (input.facets.length === 0) return;
+
+  const rows = input.facets.map((facet) => ({
+    sku_id: input.skuId,
+    facet_id: facet.id,
+    source: "manual",
+    confidence: 1,
+    created_by: input.createdBy ?? null,
+  }));
+  const saved = await supabaseAdmin
+    .from("inv_sku_facets" as never)
+    .upsert(rows as never, { onConflict: "sku_id,facet_id" });
+  if (saved.error) throw new Error(`保存 SKU 手工标签失败：${saved.error.message}`);
 }
 
 export async function loadActiveProductFacets(): Promise<FacetTerm[]> {

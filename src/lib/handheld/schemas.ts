@@ -625,6 +625,8 @@ export const AiRecognizeRes = okEnvelope(
     condition_grade: z.enum(["N", "S", "A", "B", "C", "J"]).nullable(),
     description: z.string().nullable(),
     keywords: z.array(z.string()),
+    facet_codes: z.array(z.string()).meta({ description: "AI 命中的 ERP 标签 code" }),
+    tags: z.array(z.string()).meta({ description: "AI 命中的 ERP 标签中文名" }),
     suggested_price_cny: z.number().nullable(),
     confidence: z
       .number()
@@ -782,6 +784,16 @@ export const SmartCreateReq = z
     location_id: uuidSchema.optional().meta({ description: "默认用当前设备库位" }),
     name: z.string().min(1).max(120),
     category: ProductCategoryCode,
+    facet_codes: z
+      .array(z.string().trim().min(1).max(80))
+      .max(20)
+      .optional()
+      .meta({ description: "ERP 商品标签 code；仅接受当前启用且适用于所选分类的标签" }),
+    tags: z
+      .array(z.string().trim().min(1).max(80))
+      .max(20)
+      .optional()
+      .meta({ description: "兼容旧 APP 的标签名称数组；新版请传 facet_codes" }),
     price_tier: z.number().positive().max(9999.9),
     is_custom_price: z.boolean().default(false),
     grade: z.enum(["N", "S", "A", "B", "C", "J"]).nullable().optional(),
@@ -1013,6 +1025,16 @@ export const SkuDetailRes = okEnvelope(
     epc: z.string(),
     name: z.string(),
     category: z.string(),
+    facet_codes: z.array(z.string()).default([]),
+    tags: z.array(z.string()).default([]),
+    facets: z.array(
+      z.object({
+        code: z.string(),
+        name: z.string(),
+        dimension: z.string(),
+        source: z.string(),
+      }),
+    ).default([]),
     price_tier: z.number(),
     is_custom_price: z.boolean(),
     condition_grade: z.enum(["N", "S", "A", "B", "C", "J"]).nullable(),

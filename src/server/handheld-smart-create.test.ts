@@ -99,6 +99,15 @@ describe("handheld AI classification contract", () => {
     assert.match(classification, /inv_sku_facets/);
   });
 
+  test("smart-create validates and persists manually selected ERP facets", () => {
+    for (const field of ["facet_codes", "tags"]) {
+      assert.match(schemas, new RegExp(field), `schema missing ${field}`);
+    }
+    assert.match(smartCreate, /resolveManualProductFacets/);
+    assert.match(smartCreate, /replaceManualProductFacets/);
+    assert.match(classification, /source:\s*"manual"/);
+  });
+
   test("smart-create records a movement reference required by the production RPC", () => {
     assert.match(smartCreate, /p_ref_id:\s*skuId/);
   });

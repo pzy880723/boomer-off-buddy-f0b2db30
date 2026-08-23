@@ -4513,6 +4513,20 @@
                             "type": "string"
                           }
                         },
+                        "facet_codes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "AI 命中的 ERP 标签 code"
+                        },
+                        "tags": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "AI 命中的 ERP 标签中文名"
+                        },
                         "suggested_price_cny": {
                           "anyOf": [
                             {
@@ -4666,6 +4680,8 @@
                         "condition_grade",
                         "description",
                         "keywords",
+                        "facet_codes",
+                        "tags",
                         "suggested_price_cny",
                         "confidence",
                         "alternative_categories",
@@ -7265,6 +7281,48 @@
                         "category": {
                           "type": "string"
                         },
+                        "facet_codes": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "tags": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "facets": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "dimension": {
+                                "type": "string"
+                              },
+                              "source": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "code",
+                              "name",
+                              "dimension",
+                              "source"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
                         "price_tier": {
                           "type": "number"
                         },
@@ -7447,6 +7505,9 @@
                         "epc",
                         "name",
                         "category",
+                        "facet_codes",
+                        "tags",
+                        "facets",
                         "price_tier",
                         "is_custom_price",
                         "condition_grade",
@@ -13254,6 +13315,26 @@
             "minLength": 1,
             "maxLength": 64,
             "description": "ERP 当前启用的二级商品分类 code"
+          },
+          "facet_codes": {
+            "description": "ERP 商品标签 code；仅接受当前启用且适用于所选分类的标签",
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          },
+          "tags": {
+            "description": "兼容旧 APP 的标签名称数组；新版请传 facet_codes",
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
           },
           "price_tier": {
             "type": "number",

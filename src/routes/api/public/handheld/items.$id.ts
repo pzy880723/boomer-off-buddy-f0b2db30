@@ -23,12 +23,23 @@ export const Route = createFileRoute("/api/public/handheld/items/$id")({
         if (error) return errCode("internal_error", error.message);
         if (!sku) return errCode("not_found", "SKU not found");
 
-        const { data: stocks } = await supabaseAdmin
-          .from("inv_stocks")
-          .select(
-            "qty, location:inv_locations!location_id(id, name, kind)",
-          )
-          .eq("sku_id", params.id);
+        const [{ data: stocks }, { data: facetLinks, error: facetError }] = await Promise.all([
+          supabaseAdmin
+            .from("inv_stocks")
+            .select("qty, location:inv_locations!location_id(id, name, kind)")
+            .eq("sku_id", params.id),
+          supabaseAdmin
+            .from("inv_sku_facets" as never)
+            .select("source, facet:inv_facets(code, name, dimension)")
+            .eq("sku_id", params.id),
+        ]);
+        if (facetError) return errCode("internal_error", facetError.message);
+        const facets = ((facetLinks ?? []) as unknown as Array<{
+          source: string;
+          facet: { code: string; name: string; dimension: string } | null;
+        }>)
+          .filter((row) => row.facet)
+          .map((row) => ({ ...row.facet!, source: row.source }));
 
         const stockList = (stocks ?? [])
           .map((r: any) => {
@@ -67,6 +78,9 @@ export const Route = createFileRoute("/api/public/handheld/items/$id")({
           epc: sku.epc,
           name: sku.name,
           category: sku.category,
+          facet_codes: facets.map((facet) => facet.code),
+          tags: facets.map((facet) => facet.name),
+          facets,
           price_tier: sku.price_tier,
           is_custom_price: sku.is_custom_price,
           condition_grade: (sku.grade as any) ?? null,

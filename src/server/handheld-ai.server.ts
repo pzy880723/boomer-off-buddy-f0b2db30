@@ -86,6 +86,8 @@ export async function aiRecognizeItem(input: {
     category: out.category_code,
     brand: out.attributes.brand,
     era: out.attributes.era,
+    facet_codes: out.facets.map((facet) => facet.code),
+    tags: out.facets.map((facet) => facet.name),
     alternatives: out.alternative_categories.map((item) => ({
       name: item.reason ?? item.category_code,
       category: item.category_code,

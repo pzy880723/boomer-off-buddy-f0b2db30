@@ -18,6 +18,8 @@ import {
 import {
   assertActiveLeafCategory,
   attachProductClassificationAuditToSku,
+  replaceManualProductFacets,
+  resolveManualProductFacets,
 } from "@/server/product-classification.server";
 
 const SKU_IMAGE_BUCKETS = new Set(["sku-raw", "sku-listing"]);
@@ -84,6 +86,18 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
           await assertActiveLeafCategory(body.category);
         } catch (e) {
           return err((e as Error).message, 422, { code: "validation_error" });
+        }
+        let manualFacets: Awaited<ReturnType<typeof resolveManualProductFacets>> | null = null;
+        if (body.facet_codes !== undefined || body.tags !== undefined) {
+          try {
+            manualFacets = await resolveManualProductFacets({
+              categoryCode: body.category,
+              facetCodes: body.facet_codes,
+              legacyTags: body.tags,
+            });
+          } catch (e) {
+            return err((e as Error).message, 422, { code: "validation_error" });
+          }
         }
         // 幂等回放
         const replay = await replayIfPresent({
@@ -221,6 +235,17 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
             return err(`Link AI classification failed: ${(e as Error).message}`, 500);
           }
         }
+        if (manualFacets) {
+          try {
+            await replaceManualProductFacets({
+              skuId,
+              facets: manualFacets,
+              createdBy: session?.user_id ?? null,
+            });
+          } catch (e) {
+            return err(`Save product tags failed: ${(e as Error).message}`, 500);
+          }
+        }
 
         // Bind extra EPCs (if APP scanned labels already)
         let boundCount = 0;
@@ -266,7 +291,14 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
               sku_id: skuId,
               shop_ids: [releaseShopId],
             });
-            syncStatus = release.ok ? "queued" : "hq_failed";
+            if (release.ok) {
+              const { assignSkuToYouzanCategoryGroups } =
+                await import("@/lib/youzan-category-groups.server");
+              await assignSkuToYouzanCategoryGroups(skuId);
+              syncStatus = "queued";
+            } else {
+              syncStatus = "hq_failed";
+            }
           } catch (e) {
             console.error("[handheld smart-create] 门店自动上架失败", e);
             syncStatus = "hq_failed";

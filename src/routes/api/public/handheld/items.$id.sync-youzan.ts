@@ -16,6 +16,7 @@ import {
   replayIfPresent,
 } from "@/server/handheld-idempotency.server";
 import { releaseSkuToOfflineShopsCore } from "@/lib/youzan-offline-products.functions";
+import { assignSkuToYouzanCategoryGroups } from "@/lib/youzan-category-groups.server";
 
 export const Route = createFileRoute("/api/public/handheld/items/$id/sync-youzan")({
   server: {
@@ -86,6 +87,7 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/sync-youzan
           sku_id: params.id,
           shop_ids: [location.shop_id],
         });
+        if (release.ok) await assignSkuToYouzanCategoryGroups(params.id);
         const responseData = {
           sku_id: params.id,
           location_id: location.id,

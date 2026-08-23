@@ -575,6 +575,103 @@ export async function syncErpCategoriesToYouzanGroups(args: {
   }
 }
 
+export async function assignSkuToYouzanCategoryGroups(skuId: string) {
+  const hq = await getHqShop();
+  const accessToken = await ensureAccessToken(hq);
+  const [{ data: sku, error: skuError }, { data: hqLink, error: linkError }] =
+    await Promise.all([
+      supabase
+        .from("inv_skus")
+        .select("id, category, name, sku_code, barcode")
+        .eq("id", skuId)
+        .maybeSingle(),
+      supabase
+        .from("sku_youzan_links")
+        .select("yz_item_id")
+        .eq("sku_id", skuId)
+        .eq("shop_id", hq.id)
+        .eq("role", "hq_spu")
+        .eq("status", "linked")
+        .maybeSingle(),
+    ]);
+  if (skuError) throw new Error(skuError.message);
+  if (linkError) throw new Error(linkError.message);
+  if (!sku) throw new Error("SKU 不存在");
+  const categoryCode = String(sku.category ?? "").trim();
+  if (!categoryCode) throw new Error("商品未选择 ERP 分类");
+  const storedItemId = positiveInteger(hqLink?.yz_item_id);
+  if (!storedItemId) throw new Error("商品尚未建立有赞总部商品关联");
+
+  const { data: category, error: categoryError } = await supabase
+    .from("inv_categories")
+    .select("id, code, name, is_active, kind")
+    .eq("code", categoryCode)
+    .eq("is_active", true)
+    .eq("kind", "category")
+    .maybeSingle();
+  if (categoryError) throw new Error(categoryError.message);
+  if (!category) throw new Error(`ERP 分类不存在或已停用：${categoryCode}`);
+
+  const { data: mappings, error: mappingError } = await (supabase as any)
+    .from("youzan_category_group_links")
+    .select("channel, youzan_group_id")
+    .eq("category_id", category.id)
+    .eq("hq_shop_id", hq.id)
+    .eq("status", "active")
+    .in("channel", [0, 1]);
+  if (mappingError) throw new Error(mappingError.message);
+  if (!mappings?.length) {
+    throw new Error(`ERP 分类尚未同步到有赞商品分组：${category.name}`);
+  }
+
+  const seed: HqProductSeed = {
+    category_code: categoryCode,
+    stored_item_id: storedItemId,
+    name: String(sku.name ?? "").trim(),
+    item_codes: [String(sku.sku_code ?? "").trim()].filter(Boolean),
+    barcodes: [String(sku.barcode ?? "").trim()].filter(Boolean),
+  };
+  const results: Array<{ channel: 0 | 1; item_id: number; group_id: number }> = [];
+  for (const mapping of mappings as Array<{ channel: 0 | 1; youzan_group_id: number }>) {
+    const groupId = positiveInteger(mapping.youzan_group_id);
+    if (!groupId) continue;
+    const resolved = await resolveHqProductLinks({
+      accessToken,
+      hqKdtId: Number(hq.kdt_id),
+      channel: mapping.channel,
+      seeds: [seed],
+    });
+    const item = resolved.links[0];
+    if (!item) {
+      throw new Error(`有赞渠道 ${mapping.channel} 未找到刚发布的商品 ${sku.name}`);
+    }
+    await callYouzanApiVerbose({
+      accessToken,
+      method: "youzan.item.itemgroup.update",
+      version: "1.0.0",
+      params: buildGroupRelationUpdateParams({
+        kdtId: Number(hq.kdt_id),
+        channel: mapping.channel,
+        itemIds: [item.item_id],
+        groupIds: [groupId],
+      }),
+      timeoutMs: 20_000,
+    });
+    const verified = await callYouzanApiVerbose({
+      accessToken,
+      method: "youzan.item.itemgroup.get",
+      version: "1.0.0",
+      params: buildGroupRelationQueryParams(Number(hq.kdt_id), mapping.channel, item.item_id),
+      timeoutMs: 20_000,
+    });
+    if (!collectRelationGroupIds(verified.payload).includes(groupId)) {
+      throw new Error(`有赞商品分组写入后校验失败：channel=${mapping.channel}`);
+    }
+    results.push({ channel: mapping.channel, item_id: item.item_id, group_id: groupId });
+  }
+  return { sku_id: skuId, category_code: categoryCode, results };
+}
+
 export const categoryGroupServerInternals = {
   collectRemoteGroups,
   collectRelationGroupIds,
