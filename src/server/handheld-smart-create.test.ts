@@ -137,10 +137,10 @@ describe("handheld AI classification contract", () => {
     );
 
     assert.match(publisher, /ensureHqSpuLink\(args\.sku_id, branch\.id\)/);
-    assert.match(publisher, /probeBranchRealIds/);
-    assert.match(publisher, /hqSpuId:\s*hqProduct\.yz_item_id/);
-    assert.match(publisher, /ensureBranchProduct\(args\.sku_id, branch\.id\)/);
-    assert.match(publisher, /select\("yz_sku_id"\)/);
+    assert.match(publisher, /findExistingOfflineProduct/);
+    assert.match(publisher, /queryYouzanOfflineProducts/);
+    assert.match(publisher, /hqSpuId:\s*hqLink\.yz_item_id/);
+    assert.match(publisher, /remoteExisting\.itemId/);
     assert.match(publisher, /await runStockSyncWorkerForSkus\(\[args\.sku_id\]\)/);
   });
 });
