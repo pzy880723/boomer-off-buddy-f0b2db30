@@ -77,8 +77,8 @@ BEGIN
     true,
     'unlimited',
     ARRAY[]::uuid[],
-    'manual',
-    'confirmed'
+    'legacy',
+    'legacy'
   FROM unnest(v_price_tiers) AS tier(price)
   ON CONFLICT (category, price_tier, name) WHERE (is_custom_price = false) DO UPDATE
   SET sku_code = excluded.sku_code,
@@ -88,8 +88,8 @@ BEGIN
       is_display = true,
       inventory_policy = 'unlimited',
       image_paths = excluded.image_paths,
-      category_source = 'manual',
-      classification_status = 'confirmed',
+      category_source = 'legacy',
+      classification_status = 'legacy',
       updated_at = now();
 
   IF (
