@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -6240,6 +6240,119 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      youzan_category_group_links: {
+        Row: {
+          category_id: string
+          channel: number
+          created_at: string
+          group_name: string
+          hq_shop_id: string
+          id: string
+          last_error: string | null
+          parent_youzan_group_id: number | null
+          status: string
+          synced_at: string
+          updated_at: string
+          youzan_group_id: number
+        }
+        Insert: {
+          category_id: string
+          channel: number
+          created_at?: string
+          group_name: string
+          hq_shop_id: string
+          id?: string
+          last_error?: string | null
+          parent_youzan_group_id?: number | null
+          status?: string
+          synced_at?: string
+          updated_at?: string
+          youzan_group_id: number
+        }
+        Update: {
+          category_id?: string
+          channel?: number
+          created_at?: string
+          group_name?: string
+          hq_shop_id?: string
+          id?: string
+          last_error?: string | null
+          parent_youzan_group_id?: number | null
+          status?: string
+          synced_at?: string
+          updated_at?: string
+          youzan_group_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "youzan_category_group_links_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "inv_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "youzan_category_group_links_hq_shop_id_fkey"
+            columns: ["hq_shop_id"]
+            isOneToOne: false
+            referencedRelation: "youzan_shops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      youzan_category_group_sync_runs: {
+        Row: {
+          category_codes: string[]
+          channels: number[]
+          completed_at: string | null
+          dry_run: boolean
+          error: string | null
+          hq_kdt_id: number | null
+          hq_shop_id: string | null
+          id: string
+          result: Json
+          source_snapshot: Json
+          started_at: string
+          status: string
+        }
+        Insert: {
+          category_codes?: string[]
+          channels?: number[]
+          completed_at?: string | null
+          dry_run?: boolean
+          error?: string | null
+          hq_kdt_id?: number | null
+          hq_shop_id?: string | null
+          id?: string
+          result?: Json
+          source_snapshot?: Json
+          started_at?: string
+          status: string
+        }
+        Update: {
+          category_codes?: string[]
+          channels?: number[]
+          completed_at?: string | null
+          dry_run?: boolean
+          error?: string | null
+          hq_kdt_id?: number | null
+          hq_shop_id?: string | null
+          id?: string
+          result?: Json
+          source_snapshot?: Json
+          started_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "youzan_category_group_sync_runs_hq_shop_id_fkey"
+            columns: ["hq_shop_id"]
+            isOneToOne: false
+            referencedRelation: "youzan_shops"
             referencedColumns: ["id"]
           },
         ]
