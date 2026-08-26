@@ -1,13 +1,14 @@
 // 中古杂货库存模块常量与工具函数（client-safe）
 
 /**
- * 13 个业务一级类目。一级类目同时是标准商品名称。
+ * 14 个业务一级类目。一级类目同时是标准商品名称。
  * 「待归类 / AI低置信度 / 新品类候选 / 合规待审」是后台系统兜底类目，
  * 不生成标准商品、不在 POS 展示，因此不在这里列出。
  */
 export const INV_CATEGORIES = [
   { value: "porcelain_jp", label: "日本瓷器", code: "JP" },
   { value: "porcelain_eu", label: "欧洲瓷器", code: "EU" },
+  { value: "porcelain_cartoon", label: "卡通瓷器", code: "CP" },
   { value: "toy_model", label: "玩具模型", code: "TY" },
   { value: "character_ip_goods", label: "角色周边", code: "AN" },
   { value: "audio_media", label: "唱片影音", code: "MD" },
@@ -164,4 +165,3 @@ export function groupStandardSkus(rows: SkuRow[]): StandardProductGroup[] {
   }
   return Array.from(groups.values()).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
-

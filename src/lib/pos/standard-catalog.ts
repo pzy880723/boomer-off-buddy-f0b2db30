@@ -1,4 +1,4 @@
-// POS 标准商品目录（13 个一级类目 x 31 个价格档）的纯逻辑，
+// POS 标准商品目录（14 个一级类目 x 31 个价格档）的纯逻辑，
 // 由 /api/public/pos/standard-catalog 与回归测试共用。
 
 import { INV_CATEGORIES, PRICE_TIERS } from "@/lib/inventory.helpers";
@@ -43,7 +43,7 @@ export function isSystemFallbackCategory(code: string): boolean {
 
 /**
  * 组装 POS 标准商品目录。
- * - 只输出 13 个业务一级类目，顺序固定
+ * - 只输出 14 个业务一级类目，顺序固定
  * - 永不输出系统兜底类目
  * - 二级类目只作为 POS 订单的可选分析字段，不参与 SKU 组合
  */

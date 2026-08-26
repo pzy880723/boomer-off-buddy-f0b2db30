@@ -21,6 +21,7 @@ const LEGACY_ROOT_CATEGORIES = [
 const CURRENT_ROOT_CATEGORIES = [
   "porcelain_jp",
   "porcelain_eu",
+  "porcelain_cartoon",
   "toy_model",
   "character_ip_goods",
   "audio_media",
@@ -145,11 +146,11 @@ test("standard Youzan products are distributed only to active Vintage branches",
   assert.match(youzanSync, /store_format[^\n]+vintage/);
 });
 
-test("13 个一级类目 × 31 档 = 403 个标准 SKU 的应用层契约", () => {
+test("14 个一级类目 × 31 档 = 434 个标准 SKU 的应用层契约", () => {
   const helpers = readFileSync("src/lib/inventory.helpers.ts", "utf8");
-  assert.equal(CURRENT_ROOT_CATEGORIES.length, 13);
+  assert.equal(CURRENT_ROOT_CATEGORIES.length, 14);
   assert.equal(PRICE_TIERS.length, 31);
-  assert.equal(CURRENT_ROOT_CATEGORIES.length * PRICE_TIERS.length, 403);
+  assert.equal(CURRENT_ROOT_CATEGORIES.length * PRICE_TIERS.length, 434);
   // 旧的游戏机叶子类目不得再出现在应用常量中
   assert.doesNotMatch(helpers, /digital_game_console/);
 });

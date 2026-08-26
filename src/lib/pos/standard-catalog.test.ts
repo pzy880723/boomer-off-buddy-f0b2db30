@@ -33,13 +33,14 @@ function standard(overrides: Partial<PosScannableProduct> = {}): PosScannablePro
 }
 
 describe("标准商品目录契约", () => {
-  test("13 个业务一级类目 + 31 个价格档", () => {
-    assert.equal((INV_CATEGORIES).length, 13);
+  test("14 个业务一级类目 + 31 个价格档", () => {
+    assert.equal((INV_CATEGORIES).length, 14);
     assert.equal((PRICE_TIERS).length, 31);
-    assert.equal((STANDARD_CATEGORY_CODES).length, 13);
+    assert.equal((STANDARD_CATEGORY_CODES).length, 14);
     assert.equal(STANDARD_PRICE_TIERS[0], 6.9);
     assert.equal(STANDARD_PRICE_TIERS.at(-1), 1580);
     assert.ok(STANDARD_CATEGORY_CODES.includes("game_device"));
+    assert.ok(STANDARD_CATEGORY_CODES.includes("porcelain_cartoon"));
   });
 
   test("系统兜底类目永不进入 POS", () => {
@@ -81,7 +82,7 @@ describe("标准商品目录契约", () => {
       ],
     );
     const game = groups.find((group) => group.category_code === "game_device")!;
-    assert.equal((groups).length, 13);
+    assert.equal((groups).length, 14);
     assert.deepEqual(game.subcategories.map((sub) => sub.code), [
       "game_handheld",
       "game_cartridge",
