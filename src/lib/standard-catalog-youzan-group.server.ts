@@ -11,6 +11,7 @@ import {
   buildStandardGroupSpuCreateParams,
   groupStandardCatalogSkus,
   isRecoverableStandardChannelPublishError,
+  isRetryableStandardItemImageUpdateError,
   selectExactStandardBranchGroup,
   selectValidYouzanRetailCategory,
   type StandardCatalogGroup,
@@ -687,16 +688,24 @@ export async function syncStandardGroupContainingSkuCore(args: {
     itemCode: group.code,
   });
   if (imageMaterials.length > 0) {
-    await callYouzanApiVerbose({
-      accessToken: groupedHq.accessToken,
-      method: "youzan.item.common.update",
-      version: "1.0.0",
-      params: buildStandardItemImageUpdateParams(
-        rootItemId,
-        imageMaterials.map((image) => image.imageId),
-      ),
-      timeoutMs: 30_000,
-    });
+    for (const [attempt, waitMs] of [0, 1_000, 2_000, 4_000].entries()) {
+      if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
+      try {
+        await callYouzanApiVerbose({
+          accessToken: groupedHq.accessToken,
+          method: "youzan.item.common.update",
+          version: "1.0.0",
+          params: buildStandardItemImageUpdateParams(
+            rootItemId,
+            imageMaterials.map((image) => image.imageId),
+          ),
+          timeoutMs: 30_000,
+        });
+        break;
+      } catch (error) {
+        if (attempt === 3 || !isRetryableStandardItemImageUpdateError(error)) throw error;
+      }
+    }
   }
   const existingBranches = new Map<string, BranchGroup | null>();
   for (const shop of args.shops) {
