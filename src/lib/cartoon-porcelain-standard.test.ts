@@ -24,5 +24,8 @@ test("卡通瓷器迁移保持一个商品组、无限库存和统一主图", ()
   assert.match(migration, /'SKU-STD-CP'/);
   assert.match(migration, /'unlimited'/);
   assert.match(migration, /SKU-STD-CP\.jpg/);
-  assert.match(migration, /ON CONFLICT \(category, price_tier, name\)/);
+  assert.match(
+    migration,
+    /ON CONFLICT \(category, price_tier, name\) WHERE \(is_custom_price = false\)/,
+  );
 });

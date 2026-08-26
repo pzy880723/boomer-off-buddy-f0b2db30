@@ -80,7 +80,7 @@ BEGIN
     'manual',
     'confirmed'
   FROM unnest(v_price_tiers) AS tier(price)
-  ON CONFLICT (category, price_tier, name) DO UPDATE
+  ON CONFLICT (category, price_tier, name) WHERE (is_custom_price = false) DO UPDATE
   SET sku_code = excluded.sku_code,
       is_custom_price = false,
       kind = 'single',
