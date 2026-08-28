@@ -192,7 +192,7 @@ test("standard stock worker consumes every SKU and branch task", () => {
   assert.equal(buildStandardStockWorkerLimit(32, 10), 200);
 });
 
-test("standard warehouse stock sync uses Youzan SKU codes and writes only deltas", () => {
+test("standard warehouse stock sync uses Youzan SKU codes and writes absolute targets", () => {
   const skuCodes = [
     buildStandardGroupedSkuCode("SKU-STD-TOY", 6.9),
     buildStandardGroupedSkuCode("SKU-STD-TOY", 9.9),
@@ -213,7 +213,7 @@ test("standard warehouse stock sync uses Youzan SKU codes and writes only deltas
   });
   assert.deepEqual(items, [
     { sku_code: skuCodes[0], quantity: "9999" },
-    { sku_code: skuCodes[2], quantity: "9987" },
+    { sku_code: skuCodes[2], quantity: "9999" },
   ]);
   assert.deepEqual(
     buildStandardWarehouseStockAdjustParams({

@@ -185,8 +185,8 @@ export function buildStandardWarehouseStockAdjustItems(args: {
 }) {
   return args.skuCodes.flatMap((skuCode) => {
     const current = Number(args.currentStocks.get(skuCode) ?? 0);
-    const delta = Math.trunc(args.targetStock) - Math.trunc(current);
-    return delta === 0 ? [] : [{ sku_code: skuCode, quantity: String(delta) }];
+    const target = Math.trunc(args.targetStock);
+    return Math.trunc(current) === target ? [] : [{ sku_code: skuCode, quantity: String(target) }];
   });
 }
 
