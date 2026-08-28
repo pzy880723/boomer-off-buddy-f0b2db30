@@ -33,11 +33,12 @@ function standard(overrides: Partial<PosScannableProduct> = {}): PosScannablePro
 }
 
 describe("标准商品目录契约", () => {
-  test("14 个业务一级类目 + 31 个价格档", () => {
+  test("14 个业务一级类目 + 32 个价格档", () => {
     assert.equal((INV_CATEGORIES).length, 14);
-    assert.equal((PRICE_TIERS).length, 31);
+    assert.equal((PRICE_TIERS).length, 32);
     assert.equal((STANDARD_CATEGORY_CODES).length, 14);
     assert.equal(STANDARD_PRICE_TIERS[0], 6.9);
+    assert.deepEqual(STANDARD_PRICE_TIERS.slice(1, 4), [9.9, 12.9, 15.9]);
     assert.equal(STANDARD_PRICE_TIERS.at(-1), 1580);
     assert.ok(STANDARD_CATEGORY_CODES.includes("game_device"));
     assert.ok(STANDARD_CATEGORY_CODES.includes("porcelain_cartoon"));

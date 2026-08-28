@@ -1,4 +1,4 @@
-// POS 标准商品目录（14 个一级类目 x 31 个价格档）的纯逻辑，
+// POS 标准商品目录（14 个一级类目 x 32 个价格档）的纯逻辑，
 // 由 /api/public/pos/standard-catalog 与回归测试共用。
 
 import { INV_CATEGORIES, PRICE_TIERS } from "@/lib/inventory.helpers";

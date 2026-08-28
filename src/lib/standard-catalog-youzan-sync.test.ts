@@ -50,6 +50,14 @@ const groupedToySkus = [
     category: "toy_model",
     price_tier: 9.9,
   },
+  {
+    id: "44444444-4444-4444-4444-444444444444",
+    sku_code: "SKU-STD-TOY",
+    barcode: "2000000000129",
+    name: "玩具模型",
+    category: "toy_model",
+    price_tier: 12.9,
+  },
 ];
 
 test("standard price tiers group into one Youzan product", () => {
@@ -57,7 +65,7 @@ test("standard price tiers group into one Youzan product", () => {
     ...groupedToySkus,
     {
       ...groupedToySkus[0],
-      id: "44444444-4444-4444-4444-444444444444",
+      id: "55555555-5555-5555-5555-555555555555",
       sku_code: "SKU-STD-HOME",
       barcode: "2000000001066",
       name: "家居杂货",
@@ -69,7 +77,7 @@ test("standard price tiers group into one Youzan product", () => {
   assert.equal(groups[0].name, "玩具模型");
   assert.deepEqual(
     groups[0].skus.map((sku) => sku.price_tier),
-    [6.9, 9.9, 19.9],
+    [6.9, 9.9, 12.9, 19.9],
   );
 });
 
@@ -85,22 +93,28 @@ test("Youzan HQ payload keeps the product name and represents prices as SKU spec
   assert.equal(payload.name, "玩具模型");
   assert.equal(payload.spu_code, "SKU-STD-TOY");
   assert.equal(payload.retail_price, "6.90");
-  assert.equal(payload.skus.length, 3);
+  assert.equal(payload.skus.length, 4);
   assert.deepEqual(
     payload.skus.map((sku) => sku.specs),
     [
       [{ name: "价格", value: "6.9元" }],
       [{ name: "价格", value: "9.9元" }],
+      [{ name: "价格", value: "12.9元" }],
       [{ name: "价格", value: "19.9元" }],
     ],
   );
   assert.deepEqual(
     payload.skus.map((sku) => sku.sku_no),
-    ["2000000000069", "2000000000099", "2000000000198"],
+    ["2000000000069", "2000000000099", "2000000000129", "2000000000198"],
   );
   assert.deepEqual(
     payload.skus.map((sku) => sku.sku_code),
-    ["SKU-STD-TOY-P0000690", "SKU-STD-TOY-P0000990", "SKU-STD-TOY-P0001990"],
+    [
+      "SKU-STD-TOY-P0000690",
+      "SKU-STD-TOY-P0000990",
+      "SKU-STD-TOY-P0001290",
+      "SKU-STD-TOY-P0001990",
+    ],
   );
   assert.doesNotMatch(payload.name, /元|6\.9/);
   assert.equal(JSON.parse(payload.spec_define_tuple).length, 1);
@@ -119,14 +133,19 @@ test("Youzan branch payload releases one item with every price SKU", () => {
 
   assert.equal(payload.title, "玩具模型");
   assert.equal(payload.sku_center_code, "SKU-STD-TOY-P0000690");
-  assert.equal(payload.stocks.length, 3);
+  assert.equal(payload.stocks.length, 4);
   assert.deepEqual(
     payload.stocks.map((stock) => stock.sku_no),
-    ["2000000000069", "2000000000099", "2000000000198"],
+    ["2000000000069", "2000000000099", "2000000000129", "2000000000198"],
   );
   assert.deepEqual(
     payload.stocks.map((stock) => stock.related_sku_code),
-    ["SKU-STD-TOY-P0000690", "SKU-STD-TOY-P0000990", "SKU-STD-TOY-P0001990"],
+    [
+      "SKU-STD-TOY-P0000690",
+      "SKU-STD-TOY-P0000990",
+      "SKU-STD-TOY-P0001290",
+      "SKU-STD-TOY-P0001990",
+    ],
   );
 });
 
@@ -168,8 +187,8 @@ test("standard product images update through the common item media contract", ()
 });
 
 test("standard stock worker consumes every SKU and branch task", () => {
-  assert.equal(buildStandardStockWorkerLimit(31, 2), 62);
-  assert.equal(buildStandardStockWorkerLimit(31, 10), 200);
+  assert.equal(buildStandardStockWorkerLimit(32, 2), 64);
+  assert.equal(buildStandardStockWorkerLimit(32, 10), 200);
 });
 
 test("standard warehouse stock sync uses Youzan SKU codes and writes only deltas", () => {
@@ -250,12 +269,18 @@ test("standard sync ignores partially-created branch products with an extra empt
       { skuNo: null },
       { skuNo: "2000000000069" },
       { skuNo: "2000000000099" },
+      { skuNo: "2000000000129" },
       { skuNo: "2000000000198" },
     ],
   };
   const exact = {
     itemId: 2,
-    skus: [{ skuNo: "2000000000198" }, { skuNo: "2000000000069" }, { skuNo: "2000000000099" }],
+    skus: [
+      { skuNo: "2000000000198" },
+      { skuNo: "2000000000069" },
+      { skuNo: "2000000000129" },
+      { skuNo: "2000000000099" },
+    ],
   };
 
   assert.equal(selectExactStandardBranchGroup([malformed, exact], groupedToySkus)?.itemId, 2);

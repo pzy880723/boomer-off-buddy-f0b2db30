@@ -1,9 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { PRICE_TIERS } from "@/lib/inventory.helpers";
 
 const KEY = "inv_price_tiers";
-const DEFAULTS = [6.9, 9.9, 15.9, 19.9, 29.9, 39.9, 49.9];
+const DEFAULTS = [...PRICE_TIERS];
 
 function normalize(tiers: number[]): number[] {
   const set = new Set<number>();
@@ -91,4 +92,3 @@ export const ensureYouzanDefaultCategoryId = createServerFn({ method: "POST" })
     const result = await ensureAutoYouzanDefaultCategory();
     return { id: result.id, name: "ERP自动同步", created: result.created, auto: true };
   });
-

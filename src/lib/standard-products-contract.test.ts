@@ -36,7 +36,7 @@ const CURRENT_ROOT_CATEGORIES = [
 ] as const;
 
 const PRICE_TIERS = [
-  6.9, 9.9, 15.9, 19.9, 29.9, 39.9, 49.9, 59.9, 69, 79, 89, 99, 129, 159, 199, 259, 299, 359, 399,
+  6.9, 9.9, 12.9, 15.9, 19.9, 29.9, 39.9, 49.9, 59.9, 69, 79, 89, 99, 129, 159, 199, 259, 299, 359, 399,
   459, 499, 580, 680, 780, 880, 980, 1080, 1180, 1280, 1380, 1580,
 ] as const;
 
@@ -45,6 +45,14 @@ function standardCatalogMigration(): string {
     name.includes("vintage_standard_product_catalog"),
   );
   assert.ok(filename, "standard-product migration must exist");
+  return readFileSync(`supabase/migrations/${filename}`, "utf8");
+}
+
+function standardPriceTierUpgradeMigration(): string {
+  const filename = readdirSync("supabase/migrations").find((name) =>
+    name.includes("add_standard_price_12_9"),
+  );
+  assert.ok(filename, "12.9 standard-price migration must exist");
   return readFileSync(`supabase/migrations/${filename}`, "utf8");
 }
 
@@ -83,15 +91,16 @@ function categoryCleanupMigration(): string {
   return readFileSync(`supabase/migrations/${filename}`, "utf8");
 }
 
-test("the catalog migration covers all 31 price tiers", () => {
-  const sql = standardCatalogMigration();
+test("the current catalog upgrade covers all 32 price tiers", () => {
+  const sql = standardPriceTierUpgradeMigration();
   for (const price of PRICE_TIERS) {
     assert.match(
       sql,
       new RegExp(`(^|[^0-9.])${String(price).replace(".", "\\.")}([^0-9.]|$)`, "m"),
     );
   }
-  assert.match(sql, /array_length\(v_price_tiers,\s*1\)\s*<>\s*31/i);
+  assert.match(sql, /tier_count\s*<>\s*32/i);
+  assert.match(sql, /price_tier\s*=\s*12\.9/i);
 });
 
 test("legacy root categories are remapped and permanently deleted, never re-inserted", () => {
@@ -146,11 +155,11 @@ test("standard Youzan products are distributed only to active Vintage branches",
   assert.match(youzanSync, /store_format[^\n]+vintage/);
 });
 
-test("14 个一级类目 × 31 档 = 434 个标准 SKU 的应用层契约", () => {
+test("14 个一级类目 × 32 档 = 448 个标准 SKU 的应用层契约", () => {
   const helpers = readFileSync("src/lib/inventory.helpers.ts", "utf8");
   assert.equal(CURRENT_ROOT_CATEGORIES.length, 14);
-  assert.equal(PRICE_TIERS.length, 31);
-  assert.equal(CURRENT_ROOT_CATEGORIES.length * PRICE_TIERS.length, 434);
+  assert.equal(PRICE_TIERS.length, 32);
+  assert.equal(CURRENT_ROOT_CATEGORIES.length * PRICE_TIERS.length, 448);
   // 旧的游戏机叶子类目不得再出现在应用常量中
   assert.doesNotMatch(helpers, /digital_game_console/);
 });
