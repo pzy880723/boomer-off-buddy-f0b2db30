@@ -131,6 +131,13 @@ export function isRetryableStandardItemImageUpdateError(error: unknown) {
   return /商品不存在|not found/i.test(message);
 }
 
+export function isRetryableYouzanMaterialUploadError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /请求超时|远程服务调用异常|timeout|network|fetch failed|ECONNRESET|ETIMEDOUT/i.test(
+    message,
+  );
+}
+
 export type YouzanRetailCategory = { id: number; name: string };
 
 export function selectValidYouzanRetailCategory(

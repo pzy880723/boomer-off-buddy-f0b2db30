@@ -18,6 +18,7 @@ import {
   groupStandardCatalogSkus,
   isRecoverableStandardChannelPublishError,
   isRetryableStandardItemImageUpdateError,
+  isRetryableYouzanMaterialUploadError,
   selectExactStandardBranchGroup,
   selectHqSpuRemoteIdentity,
   parseStandardCatalogSyncRequest,
@@ -260,6 +261,20 @@ test("standard image updates retry only while the new root item is propagating",
   assert.equal(isRetryableStandardItemImageUpdateError(new Error("[122001001] 商品不存在!")), true);
   assert.equal(isRetryableStandardItemImageUpdateError(new Error("item not found")), true);
   assert.equal(isRetryableStandardItemImageUpdateError(new Error("invalid image")), false);
+});
+
+test("standard material uploads retry transient Youzan timeouts", () => {
+  assert.equal(
+    isRetryableYouzanMaterialUploadError(
+      new Error("请求超时 (youzan.materials.storage.platform.img.upload)"),
+    ),
+    true,
+  );
+  assert.equal(
+    isRetryableYouzanMaterialUploadError(new Error("远程服务调用异常 trace=yz7-123")),
+    true,
+  );
+  assert.equal(isRetryableYouzanMaterialUploadError(new Error("图片超过 3MB 限制")), false);
 });
 
 test("standard sync ignores partially-created branch products with an extra empty SKU", () => {

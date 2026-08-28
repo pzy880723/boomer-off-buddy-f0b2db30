@@ -17,6 +17,7 @@ import { buildBranchItemShelfRequest } from "./youzan-offline-products.server";
 import {
   buildHqSpuLookupParams,
   buildStandardYouzanRemoteIdentity,
+  isRetryableYouzanMaterialUploadError,
   selectHqSpuRemoteIdentity,
   type HqSpuRemoteIdentity,
 } from "./standard-catalog-youzan-sync";
@@ -793,30 +794,38 @@ export async function uploadImageToYouzanMaterialRecord(
 ): Promise<YouzanMaterialImage> {
   if (!url) throw new Error("素材上传缺少图片 URL");
   try {
-    const source = await fetch(url);
-    if (!source.ok) throw new Error(`拉取 ERP 图片失败：HTTP ${source.status}`);
-    const bytes = await source.arrayBuffer();
-    if (bytes.byteLength === 0) throw new Error("ERP 图片内容为空");
-    if (bytes.byteLength > 3 * 1024 * 1024) throw new Error("ERP 图片超过有赞 3MB 限制");
-    const mimeType = source.headers.get("content-type")?.split(";")[0] || "image/jpeg";
-    const pathname = new URL(url).pathname;
-    const filename = decodeURIComponent(pathname.split("/").pop() || "product.jpg");
-    const formData = new FormData();
-    formData.append("image", new Blob([bytes], { type: mimeType }), filename);
-    const res = await callYouzanMultipartApiVerbose({
-      accessToken: token,
-      method: "youzan.materials.storage.platform.img.upload",
-      version: "3.0.0",
-      formData,
-      timeoutMs: 20_000,
-    });
-    const payload = res.payload as Record<string, unknown> | null;
-    const imageId = Number(payload?.image_id ?? 0);
-    const imageUrl = String(payload?.image_url ?? "").trim();
-    if (!imageId || !/^https?:\/\//i.test(imageUrl)) {
-      throw new Error(`素材上传未返回 image_id/image_url：${res.preview.slice(0, 240)}`);
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const source = await fetch(url);
+        if (!source.ok) throw new Error(`拉取 ERP 图片失败：HTTP ${source.status}`);
+        const bytes = await source.arrayBuffer();
+        if (bytes.byteLength === 0) throw new Error("ERP 图片内容为空");
+        if (bytes.byteLength > 3 * 1024 * 1024) throw new Error("ERP 图片超过有赞 3MB 限制");
+        const mimeType = source.headers.get("content-type")?.split(";")[0] || "image/jpeg";
+        const pathname = new URL(url).pathname;
+        const filename = decodeURIComponent(pathname.split("/").pop() || "product.jpg");
+        const formData = new FormData();
+        formData.append("image", new Blob([bytes], { type: mimeType }), filename);
+        const res = await callYouzanMultipartApiVerbose({
+          accessToken: token,
+          method: "youzan.materials.storage.platform.img.upload",
+          version: "3.0.0",
+          formData,
+          timeoutMs: 20_000,
+        });
+        const payload = res.payload as Record<string, unknown> | null;
+        const imageId = Number(payload?.image_id ?? 0);
+        const imageUrl = String(payload?.image_url ?? "").trim();
+        if (!imageId || !/^https?:\/\//i.test(imageUrl)) {
+          throw new Error(`素材上传未返回 image_id/image_url：${res.preview.slice(0, 240)}`);
+        }
+        return { imageId, imageUrl };
+      } catch (error) {
+        if (attempt === 2 || !isRetryableYouzanMaterialUploadError(error)) throw error;
+        await new Promise((resolve) => setTimeout(resolve, attempt === 0 ? 1_000 : 3_000));
+      }
     }
-    return { imageId, imageUrl };
+    throw new Error("有赞素材上传重试耗尽");
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.warn("[youzan] materials 文件上传失败：", msg);

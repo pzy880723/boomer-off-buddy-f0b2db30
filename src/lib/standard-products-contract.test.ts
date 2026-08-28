@@ -101,6 +101,9 @@ test("the current catalog upgrade covers all 32 price tiers", () => {
   }
   assert.match(sql, /tier_count\s*<>\s*32/i);
   assert.match(sql, /price_tier\s*=\s*12\.9/i);
+  assert.match(sql, /template\.status/i);
+  assert.match(sql, /template\.is_display/i);
+  assert.doesNotMatch(sql, /'active',\s*true,\s*'unlimited'/i);
 });
 
 test("legacy root categories are remapped and permanently deleted, never re-inserted", () => {
