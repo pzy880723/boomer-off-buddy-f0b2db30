@@ -106,31 +106,32 @@ async function loadScopedLocations(
   | { ok: false; response: Response }
 > {
   const session = await resolveSessionUser(request);
-  let isHq = false;
-  let allowedIds: string[] | null = null;
-  if (session) {
-    const roles = await loadUserRoles(session.user_id);
-    isHq = roles.includes("super_admin") || roles.includes("hq_operator");
-    if (!isHq) {
-      const { data: perms } = await supabaseAdmin
-        .from("user_location_perms" as never)
-        .select("location_id")
-        .eq("user_id", session.user_id);
-      allowedIds = ((perms as { location_id: string }[] | null) ?? []).map(
-        (p) => p.location_id,
-      );
-    }
-  }
-  let locQ = supabaseAdmin
+  const locationsQuery = supabaseAdmin
     .from("inv_locations")
     .select("id, name, kind, shop_id, is_active")
     .eq("is_active", true);
-  if (allowedIds) {
-    if (allowedIds.length === 0) return { ok: true, locations: [], isHq, allowedIds };
-    locQ = locQ.in("id", allowedIds);
+  if (!session) {
+    const { data } = await locationsQuery;
+    return { ok: true, locations: (data ?? []) as LocRow[], isHq: false, allowedIds: null };
   }
-  const { data } = await locQ;
-  return { ok: true, locations: (data ?? []) as LocRow[], isHq, allowedIds };
+
+  const [roles, { data: perms }, { data: locationRows }] = await Promise.all([
+    loadUserRoles(session.user_id),
+    supabaseAdmin
+      .from("user_location_perms" as never)
+      .select("location_id")
+      .eq("user_id", session.user_id),
+    locationsQuery,
+  ]);
+  const isHq = roles.includes("super_admin") || roles.includes("hq_operator");
+  const allowedIds = isHq
+    ? null
+    : ((perms as { location_id: string }[] | null) ?? []).map((p) => p.location_id);
+  const allowedSet = allowedIds ? new Set(allowedIds) : null;
+  const locations = ((locationRows ?? []) as LocRow[]).filter(
+    (location) => !allowedSet || allowedSet.has(location.id),
+  );
+  return { ok: true, locations, isHq, allowedIds };
 }
 
 async function buildItems(skus: SkuRow[], locations: LocRow[]): Promise<ProductItem[]> {
@@ -149,6 +150,13 @@ async function buildItems(skus: SkuRow[], locations: LocRow[]): Promise<ProductI
     shopStocks = (st ?? []) as typeof shopStocks;
   }
 
+  const shopStocksBySku = new Map<string, typeof shopStocks>();
+  for (const row of shopStocks) {
+    const rows = shopStocksBySku.get(row.sku_id) ?? [];
+    rows.push(row);
+    shopStocksBySku.set(row.sku_id, rows);
+  }
+
   return skus.map((s) => {
     const stocks: StockRow[] = [];
     if (primaryWarehouseId) {
@@ -160,8 +168,7 @@ async function buildItems(skus: SkuRow[], locations: LocRow[]): Promise<ProductI
         stock_qty: Number(s.stock_qty) || 0,
       });
     }
-    for (const r of shopStocks) {
-      if (r.sku_id !== s.id) continue;
+    for (const r of shopStocksBySku.get(s.id) ?? []) {
       const loc = locById.get(r.location_id);
       if (!loc) continue;
       stocks.push({
@@ -215,7 +222,10 @@ export const Route = createFileRoute("/api/public/handheld/products")({
     handlers: {
       OPTIONS: async () => new Response(null, { status: 204, headers: HANDHELD_CORS }),
       GET: async ({ request }) => {
-        const auth = await authenticateDevice(request);
+        const [auth, scoped] = await Promise.all([
+          authenticateDevice(request),
+          loadScopedLocations(request),
+        ]);
         if (!auth.ok) return auth.response;
 
         const url = new URL(request.url);
@@ -239,7 +249,6 @@ export const Route = createFileRoute("/api/public/handheld/products")({
 
         const EMPTY_COUNTS = { custom: 0, bundle: 0, standard: 0, all: 0 };
 
-        const scoped = await loadScopedLocations(request);
         if (!("locations" in scoped)) return scoped.response;
         let locations = scoped.locations;
 
