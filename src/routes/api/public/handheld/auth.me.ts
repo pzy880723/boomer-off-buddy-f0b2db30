@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { HANDHELD_CORS, authenticateDevice, resolveSessionUser, ok } from "@/server/handheld-auth.server";
+import { HANDHELD_CORS, authenticateDevice, err, resolveSessionUser, ok } from "@/server/handheld-auth.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 export const Route = createFileRoute("/api/public/handheld/auth/me")({
@@ -10,6 +10,12 @@ export const Route = createFileRoute("/api/public/handheld/auth/me")({
         const auth = await authenticateDevice(request);
         if (!auth.ok) return auth.response;
         const session = await resolveSessionUser(request);
+        const hasSessionCredential = Boolean(
+          request.headers.get("authorization") || request.headers.get("x-session-token"),
+        );
+        if (hasSessionCredential && !session) {
+          return err("Invalid session token", 401, { code: "unauthorized" });
+        }
         let user = null as null | {
           user_id: string;
           email: string | null;

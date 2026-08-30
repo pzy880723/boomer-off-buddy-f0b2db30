@@ -139,10 +139,11 @@ export async function resolveSessionUser(request: Request): Promise<{
   user_id: string;
   email: string | null;
 } | null> {
+  const authorization = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
   const raw =
+    authorization ||
     request.headers.get("x-session-token") ||
     request.headers.get("X-Session-Token") ||
-    (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "") ||
     null;
   if (!raw) return null;
   const { data, error } = await supabaseAdmin.auth.getUser(raw);
@@ -252,5 +253,4 @@ export async function userCanAccessLocation(
     .maybeSingle();
   return !!data;
 }
-
 
