@@ -1033,7 +1033,7 @@ X-Session-Token: <操作员 session token>
         tags: ["日本小包"],
         summary: "AI 标题分析整包件数（super_admin 独占，v1.7）",
         description:
-          "服务端从 DB 读该 item 的中/日文标题，调 Lovable AI Gateway（gemini-3-flash-preview）返回件数、置信度、推理、单位。命中 `rate_limited / ai_credits_exhausted` 时按 429/402 返回。",
+          "服务端从 DB 读该 item 的中/日文标题，调 Lovable AI Gateway（gemini-2.5-flash）返回件数、置信度、推理、单位。命中 `rate_limited / ai_credits_exhausted` 时按 429/402 返回。",
         requestParams: { path: z.object({ itemId: z.string().uuid() }) },
         responses: { "200": jsonRes("OK", ParcelEstimateRes), ...ERROR_RESPONSES },
       },

@@ -64,10 +64,10 @@ export const Route = createFileRoute(
             headers: { "Lovable-API-Key": apiKey, "X-Lovable-AIG-SDK": "vercel-ai-sdk" },
           });
           const { output } = await generateText({
-            model: gateway("google/gemini-3-flash-preview"),
+            model: gateway("google/gemini-2.5-flash"),
             output: Output.object({ schema: ResultSchema }),
+            system: TITLE_SYSTEM,
             messages: [
-              { role: "system", content: TITLE_SYSTEM },
               { role: "user", content: `商品标题：${text}` },
             ],
           });

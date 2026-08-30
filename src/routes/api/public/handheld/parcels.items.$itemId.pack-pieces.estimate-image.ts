@@ -66,8 +66,8 @@ export const Route = createFileRoute(
           const { output } = await generateText({
             model: gateway("google/gemini-2.5-flash"),
             output: Output.object({ schema: ResultSchema }),
+            system: IMAGE_SYSTEM,
             messages: [
-              { role: "system", content: IMAGE_SYSTEM },
               {
                 role: "user",
                 content: [
