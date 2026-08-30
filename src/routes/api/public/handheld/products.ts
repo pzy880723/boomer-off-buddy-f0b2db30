@@ -16,6 +16,10 @@ import {
   statusLabel,
   type ListingStatus,
 } from "@/lib/handheld/listing-status";
+import {
+  collectUniqueProductImagePaths,
+  mergeSignedProductImages,
+} from "@/lib/handheld-product-images";
 
 type ProductType = "standard" | "custom" | "bundle";
 
@@ -145,27 +149,6 @@ async function buildItems(skus: SkuRow[], locations: LocRow[]): Promise<ProductI
     shopStocks = (st ?? []) as typeof shopStocks;
   }
 
-  // Batch-sign all visible image paths so list/detail/lookup stay consistent.
-  const { signSkuImagePaths } = await import("@/lib/sku-image-resolver.server");
-  const allPaths: string[] = [];
-  const allIdx: { skuId: string; path: string }[] = [];
-  skus.forEach((s, i) => {
-    for (const p of s.image_paths ?? []) {
-      if (!p) continue;
-      allPaths.push(p);
-      allIdx.push({ skuId: s.id, path: p });
-    }
-  });
-  const signed = await signSkuImagePaths(allPaths);
-  const imagesBySkuId = new Map<string, { storage_path: string; read_url: string }[]>();
-  allIdx.forEach((entry, k) => {
-    const url = signed[k];
-    if (!url) return;
-    const list = imagesBySkuId.get(entry.skuId) ?? [];
-    list.push({ storage_path: entry.path, read_url: url });
-    imagesBySkuId.set(entry.skuId, list);
-  });
-
   return skus.map((s) => {
     const stocks: StockRow[] = [];
     if (primaryWarehouseId) {
@@ -194,9 +177,7 @@ async function buildItems(skus: SkuRow[], locations: LocRow[]): Promise<ProductI
       ? "selling"
       : deriveListingStatus(s.is_display !== false, total);
     const imagePaths = (s.image_paths ?? []) as string[];
-    const images = imagesBySkuId.get(s.id) ?? [];
     const cover =
-      images[0]?.read_url ??
       (s.image_url && /^https?:\/\//i.test(s.image_url) && !s.image_url.includes("token=")
         ? s.image_url
         : null);
@@ -213,7 +194,7 @@ async function buildItems(skus: SkuRow[], locations: LocRow[]): Promise<ProductI
       condition_grade: (s.grade as ProductItem["condition_grade"]) ?? null,
       image_url: cover,
       image_paths: imagePaths,
-      images,
+      images: [],
       notes: s.notes,
       is_unlimited_stock: isUnlimitedStock,
       total_stock_qty: total,
@@ -252,7 +233,7 @@ export const Route = createFileRoute("/api/public/handheld/products")({
         const sort = (url.searchParams.get("sort") || "").toLowerCase();
         const page = Math.max(1, Number(url.searchParams.get("page") || "1") | 0);
         const pageSize = Math.min(
-          200,
+          500,
           Math.max(1, Number(url.searchParams.get("page_size") || "50") | 0),
         );
 
@@ -355,6 +336,23 @@ export const Route = createFileRoute("/api/public/handheld/products")({
           skuQ = skuQ.in("id", visibleIds);
         }
 
+        const countKindPairs: [ProductType, { kind: string; is_custom_price?: boolean }][] = [
+          ["custom", { kind: "single", is_custom_price: true }],
+          ["bundle", { kind: "bundle" }],
+          ["standard", { kind: "single", is_custom_price: false }],
+        ];
+        const countResultsPromise = Promise.all(
+          countKindPairs.map(async ([, cond]) => {
+            let cq = supabaseAdmin.from("inv_skus").select("id", { count: "exact", head: true });
+            cq = cq.eq("kind", cond.kind);
+            if (typeof cond.is_custom_price === "boolean")
+              cq = cq.eq("is_custom_price", cond.is_custom_price);
+            cq = applyCommonFilters(cq);
+            const { count } = await cq;
+            return count ?? 0;
+          }),
+        );
+
         const { data: skuRows, error: skuErr } = await skuQ;
         if (skuErr) return err(skuErr.message, 500);
         const skus = (skuRows ?? []) as SkuRow[];
@@ -367,22 +365,7 @@ export const Route = createFileRoute("/api/public/handheld/products")({
 
         // ---- counts (q/category-affected, type-independent) ----
         // Query in parallel with items, per-type head-counts.
-        const countKindPairs: [ProductType, { kind: string; is_custom_price?: boolean }][] = [
-          ["custom", { kind: "single", is_custom_price: true }],
-          ["bundle", { kind: "bundle" }],
-          ["standard", { kind: "single", is_custom_price: false }],
-        ];
-        const countResults = await Promise.all(
-          countKindPairs.map(async ([, cond]) => {
-            let cq = supabaseAdmin.from("inv_skus").select("id", { count: "exact", head: true });
-            cq = cq.eq("kind", cond.kind);
-            if (typeof cond.is_custom_price === "boolean")
-              cq = cq.eq("is_custom_price", cond.is_custom_price);
-            cq = applyCommonFilters(cq);
-            const { count } = await cq;
-            return count ?? 0;
-          }),
-        );
+        const countResults = await countResultsPromise;
         const counts = {
           custom: countResults[0],
           bundle: countResults[1],
@@ -417,8 +400,17 @@ export const Route = createFileRoute("/api/public/handheld/products")({
         const total = items.length;
         const from = (page - 1) * pageSize;
         const paged = items.slice(from, from + pageSize);
+        const uniquePaths = collectUniqueProductImagePaths(paged);
+        const { signSkuImagePaths } = await import("@/lib/sku-image-resolver.server");
+        const signedURLs = await signSkuImagePaths(uniquePaths);
+        const signedByPath = new Map<string, string>();
+        uniquePaths.forEach((path, index) => {
+          const signedURL = signedURLs[index];
+          if (signedURL) signedByPath.set(path, signedURL);
+        });
+        const responseItems = mergeSignedProductImages(paged, signedByPath);
 
-        return ok({ items: paged, total, page, page_size: pageSize, counts });
+        return ok({ items: responseItems, total, page, page_size: pageSize, counts });
       },
     },
   },
