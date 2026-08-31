@@ -49,6 +49,13 @@
 
 ## 结论
 
-上一版的 B1（v1 失效）、B3（时间戳）、以及第 6/8 条建议均已解决。**当前唯一阻断项是 B1：v2 未强制 `allocation_snapshot` 含 `store_allocations` 键，导致按主体的唯一性保护可被绕过。** 修掉这一处后即可执行；B4（幂等）为工程卫生建议。
+上一版的 B1（v1 失效）、B3（时间戳）、以及第 6/8 条建议均已在之前修订中解决；本轮 final 版又闭合了最后一项——v2 对 `store_allocations` 的强制校验。**当前不存在任何阻断执行的 SQL/schema 问题。**
+
+剩余的只是非阻断的工程建议（仍可后续改进，不影响本次执行）：
+- 部分 `CREATE TABLE/INDEX/ADD CONSTRAINT` 仍无 `IF NOT EXISTS`，部分失败后无法原地重跑，但单事务执行失败会整体回滚，风险可控；
+- `platform_commission_rules` 仍无"同 scope 时间区间不重叠"保护，建议后续加部分唯一索引；
+- `commerce_settlement_ledger` 暂无统一写入入口 RPC，建议下一阶段收口；
+- `location_ids jsonb` 在 v2 的 `jsonb_to_recordset` 里声明但未使用；
+- 建议补一个本迁移的契约测试，断言 `store_allocations` 校验与总额校验文本。
 
 再次确认：本轮未执行 migration、未写数据库、未发布、未修改任何生产代码。
