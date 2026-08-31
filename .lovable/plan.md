@@ -1,6 +1,8 @@
-# 只读复核：20260831220000_marketplace_payment_foundation.sql（修订版）
+# 只读复核：20260831220000_marketplace_payment_foundation-final.sql（最终版）
 
 本轮**未执行任何写操作**：未运行 migration、未 DDL/DML、未发布、未改任何生产代码。结论来自与上一版 SQL 的逐行 diff、全文静态阅读，以及对生产库的只读查询（information_schema / pg_proc / pg_constraint）。
+
+**结论先行：本轮无阻断项，可以执行。** 上一轮唯一的阻断项 B1 已在 final 版闭合，且修复方式正确、无语法问题。
 
 ## 1) v1 过渡期是否仍可写 — 是，已修好
 
@@ -20,7 +22,7 @@
 - **子单总额校验**（第 495–501 行）：`sum(amount_fen) = round(payments.amount*100)`，覆盖了 1 分差场景，正确。
 - **normalized profile relation**：`commerce_payment_suborder_profiles` 建表 + 存量回填 + v2 内 `FOREACH` 写入全部 contributing profiles，并先校验这些 profile 全部属于同一 active 主体且 `wechat_sub_mchid` 一致，正确。
 
-**阻断项 B1（唯一一项）**：v2 只校验 `allocation_snapshot` 是 object，**没有要求它包含 `store_allocations` 键**。一旦调用方传入不含该键的快照，这条 v2 子单就不在 partial unique index 覆盖范围内，"同一 payment 同一主体只能有一条子单"的保护被静默绕过，且明细表里也失去门店维度依据。修法二选一：在 v2 里加 `IF NOT (v_suborder.allocation_snapshot ? 'store_allocations') THEN RAISE EXCEPTION`，或把索引谓词简化为只看 `amount_fen IS NOT NULL`（v1 恒为 NULL，同样能区分两代）。建议前者。
+**B1 已修复（验证通过）**：final 版在 v2 中新增了四重校验——`allocation_snapshot` 必须是 object、必须含 `store_allocations` 键、该键必须是数组、数组长度必须等于 `payment_profile_ids` 的元素个数；并额外用 `jsonb_array_elements` 逐条核对快照里的每个 `payment_profile_id` 确实出现在 `payment_profile_ids` 中（count(DISTINCT) 与长度相等才放行）。由此保证了：凡是 v2 写入的子单必然命中 partial unique index 的谓词，`commerce_payment_suborders_v2_payment_subject_unique` 的保护无法被绕过；且快照与明细表的门店维度完全一致。`?`、`->`、`jsonb_array_elements`、`jsonb_typeof`、`cardinality` 均为合法 IMMUTABLE 用法，PL/pgSQL 语法无问题。`RAISE EXCEPTION` 消息 `subject suborder requires matching store allocations` 结构完整。
 
 ## 3) 时间戳
 
@@ -47,6 +49,13 @@
 
 ## 结论
 
-上一版的 B1（v1 失效）、B3（时间戳）、以及第 6/8 条建议均已解决。**当前唯一阻断项是 B1：v2 未强制 `allocation_snapshot` 含 `store_allocations` 键，导致按主体的唯一性保护可被绕过。** 修掉这一处后即可执行；B4（幂等）为工程卫生建议。
+上一版的 B1（v1 失效）、B3（时间戳）、以及第 6/8 条建议均已在之前修订中解决；本轮 final 版又闭合了最后一项——v2 对 `store_allocations` 的强制校验。**当前不存在任何阻断执行的 SQL/schema 问题。**
+
+剩余的只是非阻断的工程建议（仍可后续改进，不影响本次执行）：
+- 部分 `CREATE TABLE/INDEX/ADD CONSTRAINT` 仍无 `IF NOT EXISTS`，部分失败后无法原地重跑，但单事务执行失败会整体回滚，风险可控；
+- `platform_commission_rules` 仍无"同 scope 时间区间不重叠"保护，建议后续加部分唯一索引；
+- `commerce_settlement_ledger` 暂无统一写入入口 RPC，建议下一阶段收口；
+- `location_ids jsonb` 在 v2 的 `jsonb_to_recordset` 里声明但未使用；
+- 建议补一个本迁移的契约测试，断言 `store_allocations` 校验与总额校验文本。
 
 再次确认：本轮未执行 migration、未写数据库、未发布、未修改任何生产代码。
