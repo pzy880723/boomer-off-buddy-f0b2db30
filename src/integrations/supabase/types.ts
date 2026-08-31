@@ -3036,6 +3036,71 @@ export type Database = {
         }
         Relationships: []
       }
+      inv_listing_image_jobs: {
+        Row: {
+          attempts: number
+          completed_at: string | null
+          created_at: string
+          id: string
+          last_error: string | null
+          locked_at: string | null
+          locked_by: string | null
+          next_run_at: string
+          sku_id: string
+          source_bucket: string
+          source_index: number
+          source_path: string
+          status: string
+          target_bucket: string
+          target_path: string | null
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          locked_at?: string | null
+          locked_by?: string | null
+          next_run_at?: string
+          sku_id: string
+          source_bucket: string
+          source_index?: number
+          source_path: string
+          status?: string
+          target_bucket?: string
+          target_path?: string | null
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          locked_at?: string | null
+          locked_by?: string | null
+          next_run_at?: string
+          sku_id?: string
+          source_bucket?: string
+          source_index?: number
+          source_path?: string
+          status?: string
+          target_bucket?: string
+          target_path?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inv_listing_image_jobs_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inv_locations: {
         Row: {
           created_at: string
@@ -3096,6 +3161,8 @@ export type Database = {
           facet_predictions: Json
           id: string
           image_count: number
+          ip_candidate_text: string | null
+          ip_id: string | null
           model: string
           normalized_result: Json
           predicted_category_code: string | null
@@ -3127,6 +3194,8 @@ export type Database = {
           facet_predictions?: Json
           id?: string
           image_count?: number
+          ip_candidate_text?: string | null
+          ip_id?: string | null
           model: string
           normalized_result?: Json
           predicted_category_code?: string | null
@@ -3158,6 +3227,8 @@ export type Database = {
           facet_predictions?: Json
           id?: string
           image_count?: number
+          ip_candidate_text?: string | null
+          ip_id?: string | null
           model?: string
           normalized_result?: Json
           predicted_category_code?: string | null
@@ -3175,6 +3246,13 @@ export type Database = {
           {
             foreignKeyName: "inv_sku_classifications_brand_id_fkey"
             columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "inv_brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inv_sku_classifications_ip_id_fkey"
+            columns: ["ip_id"]
             isOneToOne: false
             referencedRelation: "inv_brands"
             referencedColumns: ["id"]
@@ -3251,9 +3329,13 @@ export type Database = {
           grade: string | null
           id: string
           image_paths: string[]
+          image_processing_status: string
+          image_processing_updated_at: string | null
           image_url: string | null
           inventory_policy: string
           inventory_version: number
+          ip_candidate_text: string | null
+          ip_id: string | null
           is_custom_price: boolean
           is_display: boolean
           keywords: string[]
@@ -3293,9 +3375,13 @@ export type Database = {
           grade?: string | null
           id?: string
           image_paths?: string[]
+          image_processing_status?: string
+          image_processing_updated_at?: string | null
           image_url?: string | null
           inventory_policy?: string
           inventory_version?: number
+          ip_candidate_text?: string | null
+          ip_id?: string | null
           is_custom_price?: boolean
           is_display?: boolean
           keywords?: string[]
@@ -3335,9 +3421,13 @@ export type Database = {
           grade?: string | null
           id?: string
           image_paths?: string[]
+          image_processing_status?: string
+          image_processing_updated_at?: string | null
           image_url?: string | null
           inventory_policy?: string
           inventory_version?: number
+          ip_candidate_text?: string | null
+          ip_id?: string | null
           is_custom_price?: boolean
           is_display?: boolean
           keywords?: string[]
@@ -3361,6 +3451,13 @@ export type Database = {
           {
             foreignKeyName: "inv_skus_brand_id_fkey"
             columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "inv_brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inv_skus_ip_id_fkey"
+            columns: ["ip_id"]
             isOneToOne: false
             referencedRelation: "inv_brands"
             referencedColumns: ["id"]
