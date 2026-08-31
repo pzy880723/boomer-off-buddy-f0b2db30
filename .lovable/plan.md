@@ -1,73 +1,54 @@
-# Additive Migration 设计审查（只读，未改代码/未写库/未发布）
+# 只读审查：20260831120000_marketplace_payment_foundation.sql
 
-核对基准：Lovable Cloud 生产 schema 实查 + `supabase/migrations/20260801135327_*.sql`。
-现存行数：payment_subjects 0、commerce_payment_suborders 0、commerce_payments 1、commerce_orders 1、commerce_order_items 2、store_payment_profiles 3（3 条 subject_id 均为 NULL）、commerce_customers 1。
-8 张拟新增表在生产库均不存在（0 冲突）；`commerce_capture_payment_allocation` 当前只有 1 个重载。
+本轮**未执行任何写操作**：没有运行 migration、没有 INSERT/UPDATE/DELETE、没有 DDL、没有发布、没有修改任何生产代码。全部结论来自对生产 schema 的只读查询（information_schema / pg_constraint / count）与对附件 SQL 全文（491 行）的静态阅读。
 
-## 1) 与生产 schema 的冲突
+## 核对到的生产事实
 
-| 设计项 | 生产现状 | 冲突 |
-|---|---|---|
-| subject_type 四值 | `CHECK (subject_type IN ('enterprise','individual_business'))` | 必须先 `DROP CONSTRAINT payment_subjects_subject_type_check` 再重建；纯 ADD COLUMN 不够 |
-| 个人主体统一信用代码可 null | `unified_social_credit_code text NOT NULL UNIQUE` | 双重冲突：NOT NULL 要 DROP，UNIQUE 是表约束（`payment_subjects_unified_social_credit_code_key`），需换成 `CREATE UNIQUE INDEX ... WHERE unified_social_credit_code IS NOT NULL` |
-| `owner_customer_id` | `commerce_customers` 存在（1 行） | 无冲突；建议 FK `ON DELETE RESTRICT`，避免删除消费者时丢失资金归属 |
-| suborders `UNIQUE(payment_id, settlement_subject_id)` | 已有 `UNIQUE (payment_id, payment_profile_id)` | 不冲突但语义打架：旧键会阻止同一主体下多门店合并成一张子单。必须在同一迁移 DROP 旧键 |
-| `payment_profile_ids uuid[]` | `payment_profile_id uuid NOT NULL REFERENCES store_payment_profiles(id)` | 旧列 NOT NULL 未放开时，新写入路径若只填数组会直接 NOT NULL 违例 |
-| bigint fen 列 | 现有 `line_amount/order_adjustment/amount numeric(12,2)` | 同一事实两套精度并存，需明确唯一真源 |
-| 新表 8 张 | 均不存在 | 无冲突 |
-| 替换 RPC | 1 个重载，SECURITY DEFINER | 若新签名参数不同会产生**第二个重载**而不是替换，旧调用方仍走旧函数 |
-| RLS/权限 | 现有支付表模式是 ENABLE RLS + REVOKE PUBLIC,anon,authenticated + GRANT service_role | 设计一致，无冲突 |
+- 约束名全部命中：`payment_subjects_subject_type_check`、`payment_subjects_unified_social_credit_code_key`、`commerce_payment_suborders_payment_id_payment_profile_id_key` 均存在且拼写一致 → `DROP CONSTRAINT` 全部有效。
+- `commerce_customers`、`inv_locations`、`commerce_orders`、`commerce_payments`、`commerce_refunds`、`store_payment_profiles` 均存在；`tg_set_updated_at()` 存在 → 5 处 CREATE TRIGGER 可用。
+- 行数：payment_subjects 0、commerce_payment_suborders 0、commerce_payments 1、commerce_order_items 2、store_payment_profiles 3（subject_id 全为 NULL）、commerce_customers 1。
+- 9 张新表在生产库均不存在 → 无命名冲突。
+- `commerce_capture_payment_allocation` 目前只有 1 个重载；v2 是**不同函数名**，不会产生重载歧义。
 
-## 2) 会破坏现有数据 / 现有代码的点
+## 一、阻断项（必须先处理）
 
-数据层面破坏面≈0（关键表 0 行），真正的破坏在**代码契约**：
+**B1. v1 RPC 会在本迁移落地后立即失效，而生产代码仍在调用它。**
+`src/routes/api/public/storefront/payments.ts:258` 调用的是 `commerce_capture_payment_allocation`（v1）。本迁移把 `line_amount_fen / order_adjustment_fen / amount_fen` 设为 NOT NULL，v1 的 INSERT 不写这三列 → 下一次真实下单支付会 23502 not-null violation 直接 500。同时 v1 按 profile 拆单，新 `UNIQUE(payment_id, settlement_subject_id)` 会让"同主体多门店"撞 23505。
+→ 结论：v1/v2 在**函数层面**可安全并存，但在**数据层面不能并存**。必须二选一：(a) 同批把 payments.ts 切到 v2 再应用迁移；或 (b) 在本迁移内同时 `CREATE OR REPLACE` v1，让它也写 fen 列并按 subject 归并（作为过渡兼容层）。目前 SQL 两者都没做。
 
-1. `payment_profile_id` 若立即 DROP 或改可空，`src/routes/api/public/storefront/payments.ts`（第 247 行写入 `payment_profile_id`）与 `src/server/pos-payment.server.ts` 的 `resolveStoreMerchant` 仍按“门店=结算单位”工作，会在支付编排处 500。
-2. `src/lib/payments/store-payment-plan.ts` + 其测试断言的是 per-profile 子单结构（`paymentProfileId` 必填、按门店拆单）。改唯一键但不改这层，跨门店同主体订单会在新唯一键上撞 23505。
-3. `src/lib/payments/store-payment-contract.test.ts` 断言迁移文件里 `location_id uuid NOT NULL UNIQUE`、`payment_code text NOT NULL UNIQUE` 等文本，新迁移改动这些定义会让契约测试红。
-4. `unified_social_credit_code` 从 NOT NULL 放开后，`src/lib/store-payments.functions.ts` 的 zod `min(15)` 仍强制必填，个人卖家路径会被前置校验挡住（本阶段不改 UI 可接受，但要记录为已知缺口）。
-5. `ensure_store_payment_profile` 触发器持续为每个 active shop 自动建 profile 且 subject_id 为 NULL（现有 3 条即是）。主体模型下 profile 不再是结算单位，触发器语义需要在注释/文档中降级为“门店收单身份”，否则后续容易被再次误当分账维度。
-6. numeric 与 bigint fen 双写：只要没有校验触发器或生成列，两者迟早漂移，且分账/回退按分计算时会出现 1 分差。
+**B2. `commerce_payment_suborder_profiles` 只有 v2 会写，v1 不写。**
+若 B1 选择保留 v1 过渡，v1 产生的子单在明细表里没有任何行，后续对账/分账按 profiles 关联时会静默丢门店维度。回填语句（第 156–163 行）只覆盖迁移时刻的存量（当前 0 行），不覆盖后续 v1 写入。
 
-## 3) 建议修改
+**B3. 迁移文件时间戳早于已应用迁移。**
+仓库里已有 `20260831190000_handheld_async_listing_images.sql` 与 `20260831213000_hello_kitty_specific_ip.sql`，均晚于 `20260831120000`。插入一个更早时间戳的迁移会让本地文件顺序与实际应用顺序不一致，重建环境（reset/replay）时本文件会在那两个之前执行——本文件不依赖它们，实际可跑通，但顺序假设已破坏。建议改名为一个当前最大时间戳之后的值。
 
-**主体域**
-- `subject_type`：DROP 旧 CHECK → 新 CHECK 四值；同时加 `onboarding_mode text NOT NULL DEFAULT 'hq_managed' CHECK (IN ('hq_managed','seller_self_service'))`。
-- 统一信用代码：`DROP NOT NULL` + `DROP CONSTRAINT ..._unified_social_credit_code_key` + 部分唯一索引；迁移里先 `NULLIF(btrim(x),'')` 归一防空串。
-- 增加**触发器式**完整性校验（不要用 CHECK，涉及跨列与状态时序）：
-  - enterprise / individual_business 必须有统一信用代码；
-  - micro_merchant / personal_seller 必须有身份要素 + 同名结算银行卡 + 已签协议版本与时间；
-  - `provider_application_status='active'` 前置要求 `seller_qualification_status='approved'`；
-  - `onboarding_mode='seller_self_service'` 时 `owner_customer_id NOT NULL`。
-- 明确禁止个人 OpenID 收款：不建 openid 收款字段，并在 `payment_subjects` 上加 COMMENT 说明；provider 层只接受 sub_mchid。
-- `marketplace_seller_subjects` 与 `payment_subjects` 的边界要写清楚：建议它只承载“卖家店铺/招商关系”，主体资金要素仍单一真源在 `payment_subjects`，避免 sub_mchid 出现两处。
+**B4. 迁移不可重跑。**
+9 处 `CREATE TABLE`（无 IF NOT EXISTS）、5 处 `CREATE TRIGGER`、6 处 `CREATE INDEX`（部分无 IF NOT EXISTS）、4 处 `ADD CONSTRAINT`（无存在性保护）在任何一次部分失败后重跑都会报 42P07/42710/42710。第 4–32 行反而用了 IF NOT EXISTS，风格不一致。建议全文统一：`ADD CONSTRAINT` 前先 `DROP CONSTRAINT IF EXISTS`，`CREATE TABLE/INDEX` 加 `IF NOT EXISTS`，`CREATE TRIGGER` 前 `DROP TRIGGER IF EXISTS`。
 
-**子单与金额**
-- 唯一键切换按顺序：ADD 新列 → 回填（当前 0 行）→ `ALTER COLUMN payment_profile_id DROP NOT NULL` → `DROP CONSTRAINT commerce_payment_suborders_payment_id_payment_profile_id_key` → `ADD CONSTRAINT ... UNIQUE (payment_id, settlement_subject_id)`。旧列保留一个版本周期，便于回滚。
-- 金额建议**以 bigint fen 为唯一真源**，numeric 列改为生成列或加一致性触发器（`amount = amount_fen/100.0`），不要两边各自写。
-- 子单补：`sub_mchid_snapshot text NOT NULL`、`commission_snapshot jsonb`、`platform_fee_fen bigint`、`seller_amount_fen bigint`、`shipping_fee_fen bigint`（佣金不对运费计提，需要单列才能算得清）、`settlement_state`、`settlement_eligible_at`。
-- `payment_profile_ids uuid[]`：数组无法建 FK，建议加校验触发器确认每个元素存在且属于同一 subject；或改为 `commerce_payment_suborder_profiles` 明细子表（更利于对账 join 与索引）。索引用 GIN。
+## 二、非阻断建议
 
-**佣金与放行**
-- `platform_commission_rules` 用 `rate_bps int` + scope('platform_default','subject','location') + `effective_from/to`，加部分唯一索引防止同 scope 时间重叠；订单支付时整体冻结进快照（policy_id、rate_bps、base_fen、fee_fen）。
-- 放行时钟（确认收货 + 7 天观察期）建议落在子单上（`confirmed_at`、`settlement_eligible_at`），`commerce_risk_holds` 只做“阻断原因”表，避免状态双源。
+1. **触发器 EXECUTE 撤销（第 488–490 行）无实际影响也无害**：Postgres 只在 `CREATE TRIGGER` 时检查函数 EXECUTE 权限，触发时不再检查。保留即可，但别以为它增加了防护。
+2. **`validate_marketplace_payment_subject` 未加 SECURITY DEFINER**：触发器以调用者权限执行，函数体只读 NEW，无跨表查询，安全。保持现状即可。
+3. **CHECK 的 IMMUTABLE 合规性 OK**：`commerce_payment_suborders_decimal_fen_match` 用的 `round(numeric)` 与 `::bigint` 都是 immutable，不会触发 Postgres 的"CHECK 必须 immutable"报错，也不会影响 restore。
+4. **v2 没有校验子单金额之和 = 母支付金额**。这是收付通拆单最容易出错的地方（1 分差）。建议在循环后加 `SELECT sum(amount_fen) ... = (SELECT round(amount*100) FROM commerce_payments WHERE id=p_payment_id)` 的断言。
+5. **v2 没有校验运费不计佣**：迁移里 `commerce_settlement_ledger.shipping_amount_fen` 单列已具备条件，但 v2 与 rule 之间没有任何写入衔接（ledger 由谁写未定义）。建议明确 ledger 的唯一写入入口（一个 RPC），否则会出现应用层直写导致快照不可信。
+6. **`commerce_reconciliation_items` 的 `UNIQUE (reconciliation_run_id, provider_transaction_id, provider_reference)` 在含 NULL 时不去重**（Postgres 默认 NULLS DISTINCT）。若允许两列为 NULL，同一异常会重复入库。建议 `UNIQUE NULLS NOT DISTINCT` 或给两列设 `''` 默认。
+7. **`platform_commission_rules` 缺少"同 scope 时间区间不重叠"的保护**。`UNIQUE(rule_code, version)` 挡不住两条 active 的 platform 默认规则同时生效。建议加 `EXCLUDE USING gist` 或部分唯一索引（scope_type='platform' AND status='active' 且 effective_to IS NULL 时唯一）。
+8. **主体扩展缺少个人/小微的身份要素列**：先前设计里的证件类型/号码哈希、同名结算银行卡、银行名称都没进 SQL，而触发器只校验 owner + 协议。`personal_seller` 目前可以在没有任何身份/银行信息的情况下被置为 `provider_application_status='active'`。建议补列并纳入触发器。
+9. **"禁止个人 OpenID 收款"没有 schema 级表达**。建议至少在 `payment_subjects` 上加 COMMENT 明示，并确保 provider 层只接受 `wechat_sub_mchid`。
+10. **前端校验会挡住个人主体**：`src/lib/store-payments.functions.ts` 的 zod 仍要求 `unified_social_credit_code` 长度 ≥15。数据库放开后，HQ 后台仍无法录入个人/小微主体（本阶段不改 UI 可接受，记为已知缺口）。
+11. **`src/lib/payments/store-payment-contract.test.ts` 断言的是旧迁移文本**，本迁移不改那个文件所以测试仍绿；但它无法覆盖新结构，建议为本迁移新增一个契约测试（参考 `src/lib/commerce/schema-contract.test.ts`）。
+12. **`commerce_payments.payment_profile_id` 在多主体时被置 NULL（第 473–477 行）**：`src/server/pos-payment.server.ts` 与后台读取处未做 NULL 分支审计，建议在切换 v2 的同批一起检查。
+13. `location_ids jsonb` 在 v2 的 `jsonb_to_recordset` 里声明但从未使用，可删，或写进 allocation_snapshot 以免信息丢失。
 
-**RPC**
-- 不要在旧函数上做 `CREATE OR REPLACE` 改语义，也不要新增不同参数的同名重载（会产生歧义调用）。建议新建 `commerce_capture_payment_allocation_v2(...)`，代码切换后再 `DROP FUNCTION` 旧版。
-- v2 校验点：所有 contributing profile 的 `subject_id` 相同且该 subject `erp_verification_status='approved' AND provider_application_status='active' AND wechat_sub_mchid IS NOT NULL`；子单金额之和（fen）严格等于母支付金额；allocation_snapshot 内含 per-location 明细、佣金快照、sub_mchid。
-- 权限：`REVOKE EXECUTE ON FUNCTION ... FROM PUBLIC, anon, authenticated`（必须显式列出 anon/authenticated，仅 REVOKE PUBLIC 清不掉显式授权——会员 RPC 已踩过这个坑）+ `GRANT EXECUTE TO service_role`。
+## 三、事务安全性
 
-**权限模式**：所有新资金表照抄现有支付表模式（ENABLE RLS、0 policy、REVOKE PUBLIC/anon/authenticated、GRANT ALL TO service_role）。第三方卖家自助读取自己主体的 policy 留到有 UI 阶段再加。
+全文均为事务性 DDL/DML（无 `CREATE INDEX CONCURRENTLY`、无 `VACUUM`、无 `ALTER SYSTEM`），可在单事务内执行，失败整体回滚。锁方面 `ALTER TABLE payment_subjects / commerce_payment_suborders` 取 ACCESS EXCLUSIVE，当前两表 0 行、无并发交易，锁时间可忽略。历史数据兼容性：两处 UPDATE（第 24–25 行、第 125–128 行）作用于 0 行，`SET NOT NULL` 不会失败；`commerce_payments` 的 1 行、`commerce_order_items` 的 2 行不受本迁移任何约束影响。
 
-## 4) 能否在单事务内安全执行
+## 四、结论
 
-可以，但建议**拆成多个 migration 文件、每个文件内部是一个事务**：
+SQL 语法本身无错，约束名与外键目标与生产完全对得上，RLS/REVOKE/GRANT 模式与既有支付表一致且正确（9 张新表全部 ENABLE RLS + 0 policy + service_role only），v2 与 v1 作为两个独立函数名可以共存、无重载歧义、权限收口正确（显式 REVOKE 了 anon/authenticated）。
 
-- 可安全同事务执行：DROP/ADD CHECK、DROP NOT NULL、DROP 表约束 + CREATE UNIQUE INDEX（非 CONCURRENTLY）、ADD COLUMN、CREATE TABLE、CREATE INDEX、GRANT/REVOKE、CREATE FUNCTION。Postgres DDL 全部事务性，失败自动回滚。
-- 不能放进事务：`CREATE INDEX CONCURRENTLY`（本轮数据量下不需要）。
-- 需要注意的锁：`ALTER TABLE payment_subjects/commerce_payment_suborders` 取 ACCESS EXCLUSIVE 锁；当前 0 行、无并发交易，锁时间可忽略；上线真实交易后再改就必须走双写迁移。
-- 建议顺序（各自独立文件，便于逐步回滚）：M1 主体扩展 → M2 佣金规则 → M3 子单结构与唯一键切换 → M4 结算/分账/回退/对账/风控六表 → M5 RPC v2 → M6 权限收口。每步配一个 schema 契约测试（参考 `src/lib/commerce/schema-contract.test.ts` 的写法）在应用前跑通。
+**唯一真正的阻断是 B1**：迁移一旦落地，仍在被生产代码调用的 v1 会因新的 NOT NULL fen 列和新唯一键而失效。必须与 `payments.ts` 的 v2 切换同批发布，或在本迁移内同时升级 v1 为兼容实现。B3/B4 是工程卫生问题，建议一并修掉再执行。
 
-**结论**：设计整体与生产 schema 兼容，唯一必须显式处理的三处是 subject_type CHECK、统一信用代码 NOT NULL+UNIQUE、以及子单旧唯一键与 `payment_profile_id NOT NULL`；数据破坏风险≈0（关键表空表），真正风险在代码契约层，schema 与 `payments.ts` / `pos-payment.server.ts` / `store-payment-plan.ts` 必须同批切换。
-
-本轮未编辑任何文件（除本审查文档）、未执行迁移或数据写入、未发布、未触碰有赞与腾讯生产。
+再次确认：本轮未执行 migration、未写数据库、未发布、未修改任何生产代码。
