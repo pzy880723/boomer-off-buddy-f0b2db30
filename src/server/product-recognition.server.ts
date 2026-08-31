@@ -245,7 +245,7 @@ ${input.facetPrompt || "（当前标签库为空，返回空数组）"}
 品牌只能参考下面品牌库。请在 attributes.brand 返回图片中识别到的原文；未匹配时保留原文，禁止创造品牌记录：
 ${input.brandPrompt || "（当前品牌库为空）"}
 
-IP/角色/系列只能优先匹配下面 IP 库。请把识别到的角色或版权系列写入 ip_name；不确定时返回 null，禁止猜测：
+IP/角色/系列只能优先匹配下面 IP 库。ip_name 必须返回图片中可确认的最具体角色，而不是母品牌或版权公司。例如能确认 Hello Kitty 时返回 "Hello Kitty"，不能只返回其母品牌 "三丽鸥 (Sanrio)"；不确定时返回 null，禁止猜测：
 ${input.ipPrompt || "（当前 IP 库为空）"}
 
 attribute_confidence 返回逐字段置信度对象，例如 brand、era、origin_country、material、craft、object_type。

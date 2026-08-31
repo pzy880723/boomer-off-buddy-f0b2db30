@@ -186,6 +186,15 @@ export const ProductStockSchema = z
   })
   .meta({ id: "ProductStock" });
 
+export const ImageProcessingStatusSchema = z.enum([
+  "idle",
+  "queued",
+  "processing",
+  "succeeded",
+  "partial_failed",
+  "retryable_failed",
+]);
+
 export const ProductItemSchema = z
   .object({
     id: uuidSchema,
@@ -210,6 +219,9 @@ export const ProductItemSchema = z
         }),
       )
       .default([]),
+    image_processing_status: ImageProcessingStatusSchema.default("idle").meta({
+      description: "原图已入库后的后台主图修整状态；APP 不应阻塞上架等待该状态完成",
+    }),
     notes: z.string().nullable(),
     is_unlimited_stock: z.boolean().default(false).meta({
       description: "true 时标准商品不跟踪物理库存，所有 Vintage 门店持续可售",
@@ -1083,6 +1095,9 @@ export const SkuDetailRes = okEnvelope(
         }),
       )
       .meta({ description: "image_paths 顺序签名后的结果；第 0 张是主图" }),
+    image_processing_status: ImageProcessingStatusSchema.default("idle").meta({
+      description: "后台主图修整状态；queued/processing/retryable_failed 时 APP 显示正在修图",
+    }),
     notes: z.string().nullable(),
     weight_g: z.number().nullable(),
     stock_qty: z

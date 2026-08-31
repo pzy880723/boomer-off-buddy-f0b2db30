@@ -16,7 +16,7 @@ export const Route = createFileRoute("/api/public/handheld/items/$id")({
         const { data: sku, error } = await supabaseAdmin
           .from("inv_skus")
           .select(
-            "id, sku_code, barcode, epc, name, category, price_tier, is_custom_price, grade, image_url, image_paths, notes, weight_g, stock_qty, status, is_display, created_at, updated_at",
+            "id, sku_code, barcode, epc, name, category, price_tier, is_custom_price, grade, image_url, image_paths, image_processing_status, notes, weight_g, stock_qty, status, is_display, created_at, updated_at",
           )
           .eq("id", params.id)
           .maybeSingle();
@@ -88,6 +88,8 @@ export const Route = createFileRoute("/api/public/handheld/items/$id")({
           image_url: coverUrl,
           image_paths: imagePaths,
           images,
+          image_processing_status:
+            (sku as { image_processing_status?: string | null }).image_processing_status ?? "idle",
           notes: sku.notes,
           weight_g: sku.weight_g,
           stock_qty: sku.stock_qty,

@@ -44,6 +44,7 @@ export type ProductItem = {
   image_url: string | null;
   image_paths: string[];
   images: { storage_path: string; read_url: string }[];
+  image_processing_status: string;
   notes: string | null;
   is_unlimited_stock: boolean;
   total_stock_qty: number;
@@ -68,6 +69,7 @@ type SkuRow = {
   grade: string | null;
   image_url: string | null;
   image_paths: string[] | null;
+  image_processing_status: string | null;
   notes: string | null;
   status: string;
   is_display: boolean;
@@ -87,7 +89,7 @@ type LocRow = {
 };
 
 const SKU_COLS =
-  "id, sku_code, barcode, epc, name, category, price_tier, grade, image_url, image_paths, notes, status, is_display, kind, is_custom_price, inventory_policy, stock_qty, created_at, updated_at";
+  "id, sku_code, barcode, epc, name, category, price_tier, grade, image_url, image_paths, image_processing_status, notes, status, is_display, kind, is_custom_price, inventory_policy, stock_qty, created_at, updated_at";
 
 function classifyType(r: { kind: string; is_custom_price: boolean }): ProductType {
   if (r.kind === "bundle") return "bundle";
@@ -202,6 +204,7 @@ async function buildItems(skus: SkuRow[], locations: LocRow[]): Promise<ProductI
       image_url: cover,
       image_paths: imagePaths,
       images: [],
+      image_processing_status: s.image_processing_status ?? "idle",
       notes: s.notes,
       is_unlimited_stock: isUnlimitedStock,
       total_stock_qty: total,
