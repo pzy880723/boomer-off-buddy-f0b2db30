@@ -1,85 +1,73 @@
-# 平台收付通交易/分账模型 · 方案审查（只读）
+# Additive Migration 设计审查（只读，未改代码/未写库/未发布）
 
-本轮未修改任何代码、未执行迁移、未发布。以下结论基于对 Lovable Cloud 实际 schema 的只读查询与现有迁移 `20260801121530_store_payment_subjects.sql`、`20260801135327_*.sql` 的阅读。
+核对基准：Lovable Cloud 生产 schema 实查 + `supabase/migrations/20260801135327_*.sql`。
+现存行数：payment_subjects 0、commerce_payment_suborders 0、commerce_payments 1、commerce_orders 1、commerce_order_items 2、store_payment_profiles 3（3 条 subject_id 均为 NULL）、commerce_customers 1。
+8 张拟新增表在生产库均不存在（0 冲突）；`commerce_capture_payment_allocation` 当前只有 1 个重载。
 
-## 现状核验（机器可核对）
+## 1) 与生产 schema 的冲突
 
-行数（当前）：payment_subjects 0、store_payment_profiles 3、commerce_payment_suborders 0、commerce_payments 1、commerce_refunds 0、commerce_orders 1、commerce_order_items 2、commerce_after_sales 0、pos_payment_attempts 0。
+| 设计项 | 生产现状 | 冲突 |
+|---|---|---|
+| subject_type 四值 | `CHECK (subject_type IN ('enterprise','individual_business'))` | 必须先 `DROP CONSTRAINT payment_subjects_subject_type_check` 再重建；纯 ADD COLUMN 不够 |
+| 个人主体统一信用代码可 null | `unified_social_credit_code text NOT NULL UNIQUE` | 双重冲突：NOT NULL 要 DROP，UNIQUE 是表约束（`payment_subjects_unified_social_credit_code_key`），需换成 `CREATE UNIQUE INDEX ... WHERE unified_social_credit_code IS NOT NULL` |
+| `owner_customer_id` | `commerce_customers` 存在（1 行） | 无冲突；建议 FK `ON DELETE RESTRICT`，避免删除消费者时丢失资金归属 |
+| suborders `UNIQUE(payment_id, settlement_subject_id)` | 已有 `UNIQUE (payment_id, payment_profile_id)` | 不冲突但语义打架：旧键会阻止同一主体下多门店合并成一张子单。必须在同一迁移 DROP 旧键 |
+| `payment_profile_ids uuid[]` | `payment_profile_id uuid NOT NULL REFERENCES store_payment_profiles(id)` | 旧列 NOT NULL 未放开时，新写入路径若只填数组会直接 NOT NULL 违例 |
+| bigint fen 列 | 现有 `line_amount/order_adjustment/amount numeric(12,2)` | 同一事实两套精度并存，需明确唯一真源 |
+| 新表 8 张 | 均不存在 | 无冲突 |
+| 替换 RPC | 1 个重载，SECURITY DEFINER | 若新签名参数不同会产生**第二个重载**而不是替换，旧调用方仍走旧函数 |
+| RLS/权限 | 现有支付表模式是 ENABLE RLS + REVOKE PUBLIC,anon,authenticated + GRANT service_role | 设计一致，无冲突 |
 
-关键既有结构：
-- `payment_subjects`：`subject_type CHECK IN ('enterprise','individual_business')`；`unified_social_credit_code NOT NULL UNIQUE`；`wechat_sub_mchid UNIQUE`；有 erp_verification_status / provider_application_status 两组状态。
-- `store_payment_profiles`：`location_id UNIQUE`、`subject_id` 可空（多门店可指向同一 subject，模型上已支持共享主体）。
-- `commerce_payment_suborders`：`UNIQUE (payment_id, payment_profile_id)`，`payment_profile_id NOT NULL`，同时有 `settlement_subject_id NOT NULL`。
-- `commerce_order_items`：已有 `settlement_subject_id` + `settlement_snapshot`。
-- RPC `commerce_capture_payment_allocation(uuid,uuid,jsonb,jsonb)`（SECURITY DEFINER）写入 item 快照与子单。
-- 上述支付类表均已 ENABLE RLS，且 REVOKE anon/authenticated、仅 GRANT service_role。
+## 2) 会破坏现有数据 / 现有代码的点
 
-## A. 与目标模型的差距
+数据层面破坏面≈0（关键表 0 行），真正的破坏在**代码契约**：
 
-1. **主体类型不足**：CHECK 只允许 enterprise / individual_business，缺 micro_merchant、personal_seller。
-2. **主体字段偏企业化**：`unified_social_credit_code NOT NULL UNIQUE` 对小微/个人卖家不成立；缺自然人身份要素（证件类型/号码哈希、结算银行卡同名校验、法人 vs 本人）、缺 owner_user_id（自助进件归属）、缺 subject_scope（自营 / 第三方卖家）。
-3. **子单分组维度错误**：唯一键是 `(payment_id, payment_profile_id)`，即按门店分组；目标要求按 `settlement_subject_id / sub_mchid` 分组，门店分配只留在快照。共享主体的多门店会被错误拆成多张子单。
-4. **无佣金/费率模型**：没有平台佣金默认费率表、门店/卖家覆盖表，也没有订单级不可变费率快照（按分冻结、运费不计提）。
-5. **无分账（profit sharing）域**：缺分账单、分账明细（平台服务费 / 卖家应得）、解冻记录、分账回退记录、provider 请求与查询状态。
-6. **无资金放行时钟**：订单/子单上没有 confirm_received_at、after_sale_window_ends_at、settlement_eligible_at、hold/freeze 状态，无法表达“确认收货 + 7 天观察期且无售后/风控冻结”。
-7. **退款与分账未打通**：`commerce_refunds` 无 suborder_id、无 `pre_share` / `post_share` 分支，无“先分账回退再退款”的编排状态与幂等键。
-8. **禁止个人 OpenID 收款** 没有 schema 级约束（当前无字段承载，也无显式禁止注释/校验）。
-9. **卖家资格准入缺失**：无资格声明、协议签署版本/时间、平台审核流水（`payment_subject_applications` 只覆盖“向 provider 进件”，不覆盖“平台侧资格审核”）。
-10. **provider 骨架缺失**：仅有微信收单方向（pos-payment-provider.server.ts），没有分账/解冻/回退/查询接口抽象。
+1. `payment_profile_id` 若立即 DROP 或改可空，`src/routes/api/public/storefront/payments.ts`（第 247 行写入 `payment_profile_id`）与 `src/server/pos-payment.server.ts` 的 `resolveStoreMerchant` 仍按“门店=结算单位”工作，会在支付编排处 500。
+2. `src/lib/payments/store-payment-plan.ts` + 其测试断言的是 per-profile 子单结构（`paymentProfileId` 必填、按门店拆单）。改唯一键但不改这层，跨门店同主体订单会在新唯一键上撞 23505。
+3. `src/lib/payments/store-payment-contract.test.ts` 断言迁移文件里 `location_id uuid NOT NULL UNIQUE`、`payment_code text NOT NULL UNIQUE` 等文本，新迁移改动这些定义会让契约测试红。
+4. `unified_social_credit_code` 从 NOT NULL 放开后，`src/lib/store-payments.functions.ts` 的 zod `min(15)` 仍强制必填，个人卖家路径会被前置校验挡住（本阶段不改 UI 可接受，但要记录为已知缺口）。
+5. `ensure_store_payment_profile` 触发器持续为每个 active shop 自动建 profile 且 subject_id 为 NULL（现有 3 条即是）。主体模型下 profile 不再是结算单位，触发器语义需要在注释/文档中降级为“门店收单身份”，否则后续容易被再次误当分账维度。
+6. numeric 与 bigint fen 双写：只要没有校验触发器或生成列，两者迟早漂移，且分账/回退按分计算时会出现 1 分差。
 
-## B. 推荐的表 / 约束 / 索引 / RLS / RPC
+## 3) 建议修改
 
-### 主体域（改造现有表）
-- `payment_subjects` 扩展：`subject_type` CHECK 加 micro_merchant、personal_seller；`unified_social_credit_code` 改为可空并把 UNIQUE 换成 `WHERE ... IS NOT NULL` 的部分唯一索引；新增 `subject_scope text ('self_operated','third_party')`、`owner_user_id uuid`、`id_doc_type`、`id_doc_number_hash`、`id_doc_last4`、`settlement_bank_account_name`、`settlement_bank_account_last4`、`settlement_bank_name`、`qualification_status`、`agreement_version`、`agreement_signed_at`、`platform_review_status/note/reviewed_by/reviewed_at`、`risk_hold boolean`。
-- 触发器式校验（不用 CHECK 跨行）：enterprise/individual_business 必须有统一社会信用代码；micro_merchant/personal_seller 必须有身份要素 + 同名银行卡 + 已签协议；provider_application_status 只有在 platform_review_status='approved' 时才可置 active。
-- 新表 `payment_subject_qualifications`（资格声明与协议留痕，一主体多版本）。
+**主体域**
+- `subject_type`：DROP 旧 CHECK → 新 CHECK 四值；同时加 `onboarding_mode text NOT NULL DEFAULT 'hq_managed' CHECK (IN ('hq_managed','seller_self_service'))`。
+- 统一信用代码：`DROP NOT NULL` + `DROP CONSTRAINT ..._unified_social_credit_code_key` + 部分唯一索引；迁移里先 `NULLIF(btrim(x),'')` 归一防空串。
+- 增加**触发器式**完整性校验（不要用 CHECK，涉及跨列与状态时序）：
+  - enterprise / individual_business 必须有统一信用代码；
+  - micro_merchant / personal_seller 必须有身份要素 + 同名结算银行卡 + 已签协议版本与时间；
+  - `provider_application_status='active'` 前置要求 `seller_qualification_status='approved'`；
+  - `onboarding_mode='seller_self_service'` 时 `owner_customer_id NOT NULL`。
+- 明确禁止个人 OpenID 收款：不建 openid 收款字段，并在 `payment_subjects` 上加 COMMENT 说明；provider 层只接受 sub_mchid。
+- `marketplace_seller_subjects` 与 `payment_subjects` 的边界要写清楚：建议它只承载“卖家店铺/招商关系”，主体资金要素仍单一真源在 `payment_subjects`，避免 sub_mchid 出现两处。
 
-### 交易与分组
-- `commerce_payment_suborders`：`payment_profile_id` 放开为可空（保留为“主门店”参考），唯一键改为 `UNIQUE (payment_id, settlement_subject_id)`；新增 `sub_mchid_snapshot text NOT NULL`、`commission_snapshot jsonb`、`platform_fee_amount numeric(12,2)`、`seller_amount numeric(12,2)`、`shipping_fee_amount numeric(12,2)`、`settlement_state text ('holding','eligible','sharing','shared','reversed')`、`settlement_eligible_at timestamptz`、`hold_reason text`。
-- `allocation_snapshot` 里保留 per-location 明细（immutable）。
-- 索引：`(settlement_subject_id, settlement_state)`、`(settlement_state, settlement_eligible_at)`、`(order_id)`。
+**子单与金额**
+- 唯一键切换按顺序：ADD 新列 → 回填（当前 0 行）→ `ALTER COLUMN payment_profile_id DROP NOT NULL` → `DROP CONSTRAINT commerce_payment_suborders_payment_id_payment_profile_id_key` → `ADD CONSTRAINT ... UNIQUE (payment_id, settlement_subject_id)`。旧列保留一个版本周期，便于回滚。
+- 金额建议**以 bigint fen 为唯一真源**，numeric 列改为生成列或加一致性触发器（`amount = amount_fen/100.0`），不要两边各自写。
+- 子单补：`sub_mchid_snapshot text NOT NULL`、`commission_snapshot jsonb`、`platform_fee_fen bigint`、`seller_amount_fen bigint`、`shipping_fee_fen bigint`（佣金不对运费计提，需要单列才能算得清）、`settlement_state`、`settlement_eligible_at`。
+- `payment_profile_ids uuid[]`：数组无法建 FK，建议加校验触发器确认每个元素存在且属于同一 subject；或改为 `commerce_payment_suborder_profiles` 明细子表（更利于对账 join 与索引）。索引用 GIN。
 
-### 佣金
-- `commerce_commission_policies`：scope('platform_default','subject','location')、scope_id、category_code 可空、rate_bps int、min/max、effective_from/to、priority；部分唯一索引防重叠默认。
-- 佣金以 **bps + 分（integer cents）** 计算并四舍五入到分，运费单列且不计提；订单支付时整体冻结进 `commission_snapshot`（含 policy_id、rate_bps、base_cents、fee_cents）。
+**佣金与放行**
+- `platform_commission_rules` 用 `rate_bps int` + scope('platform_default','subject','location') + `effective_from/to`，加部分唯一索引防止同 scope 时间重叠；订单支付时整体冻结进快照（policy_id、rate_bps、base_fen、fee_fen）。
+- 放行时钟（确认收货 + 7 天观察期）建议落在子单上（`confirmed_at`、`settlement_eligible_at`），`commerce_risk_holds` 只做“阻断原因”表，避免状态双源。
 
-### 分账域（新表）
-- `commerce_profit_share_orders`：suborder_id、provider、out_order_no UNIQUE、status(pending/processing/succeeded/failed/reversed)、amount、finished_at、provider_order_id、idempotency_key UNIQUE、last_error。
-- `commerce_profit_share_receivers`：分账接收方明细（platform / seller）、类型、金额、描述、结果。
-- `commerce_profit_share_unfreeze`：解冻剩余资金记录。
-- `commerce_profit_share_reversals`：回退单（退款前置），带 out_return_no UNIQUE + 幂等键。
-- `commerce_settlement_events`：所有 provider 回调/查询结果的 append-only 审计（含 signature_verified）。
-- `commerce_refunds` 扩展：`suborder_id`、`refund_mode ('pre_share','post_share')`、`reversal_id`、`platform_fee_refund_amount`。
+**RPC**
+- 不要在旧函数上做 `CREATE OR REPLACE` 改语义，也不要新增不同参数的同名重载（会产生歧义调用）。建议新建 `commerce_capture_payment_allocation_v2(...)`，代码切换后再 `DROP FUNCTION` 旧版。
+- v2 校验点：所有 contributing profile 的 `subject_id` 相同且该 subject `erp_verification_status='approved' AND provider_application_status='active' AND wechat_sub_mchid IS NOT NULL`；子单金额之和（fen）严格等于母支付金额；allocation_snapshot 内含 per-location 明细、佣金快照、sub_mchid。
+- 权限：`REVOKE EXECUTE ON FUNCTION ... FROM PUBLIC, anon, authenticated`（必须显式列出 anon/authenticated，仅 REVOKE PUBLIC 清不掉显式授权——会员 RPC 已踩过这个坑）+ `GRANT EXECUTE TO service_role`。
 
-### RLS / 授权
-- 所有新表：ENABLE RLS + `REVOKE ALL FROM PUBLIC, anon, authenticated` + `GRANT ALL TO service_role`（与现有支付表一致，0 policy = 仅服务端可达）。
-- 第三方卖家自助进件将来需要读自己主体时，再单独加 `owner_user_id = auth.uid()` 的 SELECT policy，并为 authenticated 加最小 GRANT；本阶段不加。
-- 新 RPC 一律 SECURITY DEFINER + `REVOKE EXECUTE FROM PUBLIC, anon, authenticated`（沿用会员 RPC 已踩过的坑：默认 REVOKE PUBLIC 不会清掉 anon/authenticated 的显式授权，必须显式 REVOKE 两个角色）。
-- RPC 骨架：`commerce_capture_payment_allocation_v2`（按主体分组 + 佣金快照）、`commerce_mark_suborder_settlement_eligible`、`commerce_open_profit_share`、`commerce_reverse_profit_share`，全部幂等键驱动。
+**权限模式**：所有新资金表照抄现有支付表模式（ENABLE RLS、0 policy、REVOKE PUBLIC/anon/authenticated、GRANT ALL TO service_role）。第三方卖家自助读取自己主体的 policy 留到有 UI 阶段再加。
 
-## C. 迁移顺序（平滑升级 + 可回滚）
+## 4) 能否在单事务内安全执行
 
-当前 `payment_subjects` 与 `commerce_payment_suborders` 都是 **0 行**，是做结构改造的最佳窗口。
+可以，但建议**拆成多个 migration 文件、每个文件内部是一个事务**：
 
-1. **M1 主体扩展（加法）**：放宽 subject_type CHECK、统一社会信用代码改可空 + 部分唯一索引、新增自然人/资格/风控列、建 `payment_subject_qualifications`。回滚：删列/删表、恢复 CHECK 与 UNIQUE（0 行时无损）。
-2. **M2 佣金策略表 + 平台默认费率 seed**。回滚：DROP TABLE。
-3. **M3 子单分组改造**：新增列 → 回填（本阶段无数据）→ `payment_profile_id` 改可空 → 换唯一键为 `(payment_id, settlement_subject_id)`。回滚：换回旧唯一键、置回 NOT NULL。
-4. **M4 分账域四张表 + settlement_events + refunds 扩展列**。回滚：DROP/DROP COLUMN。
-5. **M5 RPC v2 与状态机函数**（旧 `commerce_capture_payment_allocation` 保留不动，新逻辑走 v2，代码切换后再择期废弃）。回滚：DROP FUNCTION v2。
-6. **M6 权限收口**：所有新对象 REVOKE anon/authenticated、GRANT service_role，并对新 RPC 显式 REVOKE。
+- 可安全同事务执行：DROP/ADD CHECK、DROP NOT NULL、DROP 表约束 + CREATE UNIQUE INDEX（非 CONCURRENTLY）、ADD COLUMN、CREATE TABLE、CREATE INDEX、GRANT/REVOKE、CREATE FUNCTION。Postgres DDL 全部事务性，失败自动回滚。
+- 不能放进事务：`CREATE INDEX CONCURRENTLY`（本轮数据量下不需要）。
+- 需要注意的锁：`ALTER TABLE payment_subjects/commerce_payment_suborders` 取 ACCESS EXCLUSIVE 锁；当前 0 行、无并发交易，锁时间可忽略；上线真实交易后再改就必须走双写迁移。
+- 建议顺序（各自独立文件，便于逐步回滚）：M1 主体扩展 → M2 佣金规则 → M3 子单结构与唯一键切换 → M4 结算/分账/回退/对账/风控六表 → M5 RPC v2 → M6 权限收口。每步配一个 schema 契约测试（参考 `src/lib/commerce/schema-contract.test.ts` 的写法）在应用前跑通。
 
-每步单独一个 migration 文件、幂等写法（IF NOT EXISTS / DROP CONSTRAINT IF EXISTS），并配套一个 schema 契约测试（比照 `src/lib/pos/pos-workflows-schema-contract.test.ts` 的写法）在应用前本地跑通。
+**结论**：设计整体与生产 schema 兼容，唯一必须显式处理的三处是 subject_type CHECK、统一信用代码 NOT NULL+UNIQUE、以及子单旧唯一键与 `payment_profile_id NOT NULL`；数据破坏风险≈0（关键表空表），真正风险在代码契约层，schema 与 `payments.ts` / `pos-payment.server.ts` / `store-payment-plan.ts` 必须同批切换。
 
-## D. 兼容性与数据风险
-
-1. **子单唯一键变更是最大破坏点**：共享主体的多门店订单在新键下会合并成一张子单，若已有历史行会冲突。现在 0 行，风险≈0；一旦上线真实交易就必须走“新表 + 双写”而不是原地改键。
-2. **`payment_profile_id` 由 NOT NULL 改可空**：现有读路径（`src/routes/api/public/storefront/payments.ts` 第 247 行、`src/server/pos-payment.server.ts` 的 `resolveStoreMerchant`）假定它必填，改 schema 而不同步改代码会在支付编排处 500；必须与代码切换同批发布。
-3. **`unified_social_credit_code` UNIQUE → 部分唯一索引**：若历史上存在空串而非 NULL，会误判重复；迁移里应先 `NULLIF(trim(x),'')` 归一（当前 0 行，无实际影响）。
-4. **`ensure_store_payment_profile` 触发器**会为每个 active shop 自动建 profile 且默认 `subject_id IS NULL`；主体共享模型下 profile 不再是结算单位，需明确 profile 只承载“门店收单身份/展示”，避免继续被当成分账维度。现有 3 行 profile 均需人工挂主体后才可收款。
-5. **金额精度**：现有列是 `numeric(12,2)`，而佣金要求“按分冻结”。建议快照里用整数分（cents）字段并与 numeric 列做一致性校验触发器，避免两套精度漂移。
-6. **RPC 权限默认值**：新建 SECURITY DEFINER 函数默认对 PUBLIC 可执行，必须显式 REVOKE（此前会员 RPC 已出现过该缺口）。
-7. **不引入的东西**：本阶段不建个人卖家自助入口、不动 UI、不接真实微信分账 API、不改有赞相关任何表。
-
-## 技术备注
-- 涉及文件：`supabase/migrations/20260801121530_store_payment_subjects.sql`、`20260801135327_*.sql`、`src/routes/api/public/storefront/payments.ts`、`src/server/pos-payment.server.ts`、`src/lib/store-payments.functions.ts`。
-- provider 骨架建议放 `src/server/payment-share-provider.server.ts`（纯接口 + 未实现桩），领域计算放 `src/lib/settlement/`（纯函数、可单测：佣金分摊、运费剔除、按分取整、放行时钟）。
+本轮未编辑任何文件（除本审查文档）、未执行迁移或数据写入、未发布、未触碰有赞与腾讯生产。
