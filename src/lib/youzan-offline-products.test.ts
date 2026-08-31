@@ -202,7 +202,9 @@ describe("youzan offline products", () => {
     });
 
     assert.equal(params.spu_no, "2003660812004");
-    assert.deepEqual(params.bar_codes, ["2003660812004"]);
+    // The primary barcode must not also appear in "more barcodes". Youzan
+    // rejects that payload as 商品更多条码重复.
+    assert.deepEqual(params.bar_codes, []);
     assert.deepEqual(params.sell_channel_setting_request, {
       is_partial: 0,
       sell_channel_ids: [187395218],

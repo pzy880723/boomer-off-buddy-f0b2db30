@@ -326,7 +326,9 @@ export function buildCustomHqChannelUpdateParams(input: {
     name: input.name.trim(),
     spu_code: input.spuCode.trim(),
     spu_no: barcode,
-    bar_codes: [barcode],
+    // `spu_no` is the primary scan barcode. Repeating it in `bar_codes`
+    // makes Youzan reject the update as 商品更多条码重复.
+    bar_codes: [],
     unit: "件",
     category_id: input.categoryId,
     retail_price: input.priceYuan.toFixed(2),
