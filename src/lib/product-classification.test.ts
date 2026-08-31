@@ -97,6 +97,15 @@ const brands: BrandCandidate[] = [
   },
 ];
 
+const ips: BrandCandidate[] = [
+  {
+    id: "ip-hello-kitty",
+    name: "Hello Kitty",
+    name_original: null,
+    aliases: ["凯蒂猫", "Kitty"],
+  },
+];
+
 describe("product classification policy", () => {
   test("only exposes active leaves whose parent is active", () => {
     assert.deepEqual(
@@ -259,5 +268,42 @@ describe("product classification policy", () => {
     assert.equal(result.brand_id, null);
     assert.equal(result.brand_candidate_text, "Unknown Toy Works");
     assert.equal(result.brand_match_status, "review_required");
+  });
+
+  test("matches an IP independently from the product brand", () => {
+    const result = normalizeProductRecognition(
+      {
+        category_code: "toy_character_figure",
+        confidence: 0.94,
+        name: "Hello Kitty 陶瓷摆件",
+        attributes: { brand: "Sanrio" },
+        ip_name: "凯蒂猫",
+      },
+      categories,
+      { facets, brands, ips },
+    );
+
+    assert.equal(result.ip_id, "ip-hello-kitty");
+    assert.equal(result.ip_name, "Hello Kitty");
+    assert.equal(result.ip_match_status, "matched");
+    assert.equal(result.brand_id, null);
+  });
+
+  test("keeps an unknown IP as a review candidate instead of inventing an active record", () => {
+    const result = normalizeProductRecognition(
+      {
+        category_code: "toy_character_figure",
+        confidence: 0.91,
+        name: "未知角色挂件",
+        ip_name: "Moon Bunny",
+      },
+      categories,
+      { facets, brands, ips },
+    );
+
+    assert.equal(result.ip_id, null);
+    assert.equal(result.ip_name, "Moon Bunny");
+    assert.equal(result.ip_match_status, "review_required");
+    assert.deepEqual(result.ip_suggestions, []);
   });
 });

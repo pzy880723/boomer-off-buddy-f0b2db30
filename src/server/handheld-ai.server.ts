@@ -85,6 +85,9 @@ export async function aiRecognizeItem(input: {
     // 兼容旧版手持 App；新版应读取 category_code / attributes。
     category: out.category_code,
     brand: out.attributes.brand,
+    ip_name: out.ip_name,
+    ip_match_status: out.ip_match_status,
+    ip_suggestions: out.ip_suggestions,
     era: out.attributes.era,
     facet_codes: out.facets.map((facet) => facet.code),
     tags: out.facets.map((facet) => facet.name),

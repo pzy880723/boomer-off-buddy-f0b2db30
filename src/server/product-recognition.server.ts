@@ -38,6 +38,8 @@ export type ProductRecognitionAuditInput = {
   warning: string | null;
   brand_id: string | null;
   brand_candidate_text: string | null;
+  ip_id: string | null;
+  ip_candidate_text: string | null;
   facet_predictions: NormalizedProductRecognition["facets"];
   unmatched_facets: NormalizedProductRecognition["unmatched_facets"];
   attribute_confidence: NormalizedProductRecognition["attribute_confidence"];
@@ -49,12 +51,14 @@ export type ProductRecognitionDeps = {
   loadCategories: () => Promise<CategoryNode[]>;
   loadFacets?: () => Promise<FacetTerm[]>;
   loadBrands?: () => Promise<BrandCandidate[]>;
+  loadIps?: () => Promise<BrandCandidate[]>;
   callModel: (input: {
     images: string[];
     hint?: string | null;
     taxonomyPrompt: string;
     facetPrompt: string;
     brandPrompt: string;
+    ipPrompt: string;
   }) => Promise<{ model: string; raw: RawProductRecognition }>;
   saveAudit: (input: ProductRecognitionAuditInput) => Promise<{ id: string }>;
   sleep?: (milliseconds: number) => Promise<void>;
@@ -123,15 +127,17 @@ export async function runProductRecognition(
   if (images.length === 0) throw new Error("至少需要一张商品照片");
 
   const categories = await deps.loadCategories();
-  const [facets, brands] = await Promise.all([
+  const [facets, brands, ips] = await Promise.all([
     deps.loadFacets?.() ?? Promise.resolve([]),
     deps.loadBrands?.() ?? Promise.resolve([]),
+    deps.loadIps?.() ?? Promise.resolve([]),
   ]);
   const taxonomyPrompt = formatTaxonomyForPrompt(categories);
   if (!taxonomyPrompt) throw new Error("ERP 分类树没有可用于识别的二级分类");
-  const version = taxonomyVersion(categories, facets, brands);
+  const version = taxonomyVersion(categories, facets, [...brands, ...ips]);
   const facetPrompt = formatFacetsForPrompt(facets);
   const brandPrompt = formatBrandsForPrompt(brands);
+  const ipPrompt = formatBrandsForPrompt(ips);
   const wait = deps.sleep ?? sleep;
 
   let model = DEFAULT_PRODUCT_RECOGNITION_MODEL;
@@ -145,6 +151,7 @@ export async function runProductRecognition(
         taxonomyPrompt,
         facetPrompt,
         brandPrompt,
+        ipPrompt,
       });
       model = response.model;
       raw = response.raw;
@@ -162,7 +169,7 @@ export async function runProductRecognition(
     name: "未命名中古商品",
     warning: `AI 识别暂时不可用：${lastError?.message ?? "未知错误"}`,
   };
-  const normalized = normalizeProductRecognition(modelResult, categories, { facets, brands });
+  const normalized = normalizeProductRecognition(modelResult, categories, { facets, brands, ips });
   const status = failed ? "failed" : auditStatus(normalized);
   const saved = await deps.saveAudit({
     source: input.source,
@@ -182,6 +189,8 @@ export async function runProductRecognition(
     warning: normalized.warning,
     brand_id: normalized.brand_id,
     brand_candidate_text: normalized.brand_candidate_text,
+    ip_id: normalized.ip_id,
+    ip_candidate_text: normalized.ip_match_status === "review_required" ? normalized.ip_name : null,
     facet_predictions: normalized.facets,
     unmatched_facets: normalized.unmatched_facets,
     attribute_confidence: normalized.attribute_confidence,
@@ -218,6 +227,7 @@ async function callLovableProductModel(input: {
   taxonomyPrompt: string;
   facetPrompt: string;
   brandPrompt: string;
+  ipPrompt: string;
 }): Promise<{ model: string; raw: RawProductRecognition }> {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
@@ -227,13 +237,16 @@ async function callLovableProductModel(input: {
 你必须从下面 ERP 当前启用的二级分类中选择且只选择一个 category_code，禁止创造新分类：
 ${input.taxonomyPrompt}
 
-返回字段：category_code、confidence(0~1)、alternative_categories(最多3个)、name、attributes、facet_predictions、attribute_confidence、clarification_requests、condition_grade、description、keywords、suggested_price_cny、compliance_flags、evidence、warning。
+返回字段：category_code、confidence(0~1)、alternative_categories(最多3个)、name、ip_name、attributes、facet_predictions、attribute_confidence、clarification_requests、condition_grade、description、keywords、suggested_price_cny、compliance_flags、evidence、warning。
 attributes 必须包含 brand、maker、origin_region、origin_country、era、material(数组)、craft(数组)、object_type、colors(数组)、dimensions、functional_status、missing_parts(数组)。
 facet_predictions 必须是数组，每项包含 dimension、value、confidence；只能使用下面标签库中已有的名称或别名，不能创造正式标签：
 ${input.facetPrompt || "（当前标签库为空，返回空数组）"}
 
 品牌只能参考下面品牌库。请在 attributes.brand 返回图片中识别到的原文；未匹配时保留原文，禁止创造品牌记录：
 ${input.brandPrompt || "（当前品牌库为空）"}
+
+IP/角色/系列只能优先匹配下面 IP 库。请把识别到的角色或版权系列写入 ip_name；不确定时返回 null，禁止猜测：
+${input.ipPrompt || "（当前 IP 库为空）"}
 
 attribute_confidence 返回逐字段置信度对象，例如 brand、era、origin_country、material、craft、object_type。
 clarification_requests 返回需要店员补拍或确认的问题数组，每项包含 field、question、reason；无需追问时返回空数组。
@@ -292,6 +305,10 @@ export async function recognizeProductFromImages(
     loadBrands: async () => {
       const { loadActiveProductBrands } = await import("./product-classification.server");
       return loadActiveProductBrands();
+    },
+    loadIps: async () => {
+      const { loadActiveProductIps } = await import("./product-classification.server");
+      return loadActiveProductIps();
     },
     callModel: callLovableProductModel,
     saveAudit: persistProductClassificationAudit,

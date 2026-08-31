@@ -620,6 +620,15 @@ export const AiRecognizeRes = okEnvelope(
       description: "兼容旧 APP；等同 category_code",
     }),
     brand: z.string().nullable(),
+    ip_name: z.string().nullable().meta({ description: "角色/IP 名称，如 Hello Kitty" }),
+    ip_match_status: z.enum(["empty", "matched", "review_required"]),
+    ip_suggestions: z.array(
+      z.object({
+        id: uuidSchema,
+        name: z.string(),
+        score: z.number().min(0).max(1),
+      }),
+    ),
     era: z.string().nullable().meta({ description: "年代，如 1970s" }),
     attributes: ProductRecognitionAttributesSchema,
     condition_grade: z.enum(["N", "S", "A", "B", "C", "J"]).nullable(),
@@ -794,6 +803,12 @@ export const SmartCreateReq = z
       .max(20)
       .optional()
       .meta({ description: "兼容旧 APP 的标签名称数组；新版请传 facet_codes" }),
+    brand: z.string().trim().max(120).nullable().optional(),
+    ip_name: z.string().trim().max(120).nullable().optional(),
+    ip_confirmed: z
+      .boolean()
+      .default(false)
+      .meta({ description: "IP 未匹配时，店员确认后才允许创建待审核 IP" }),
     price_tier: z.number().positive().max(9999.9),
     is_custom_price: z.boolean().default(false),
     grade: z.enum(["N", "S", "A", "B", "C", "J"]).nullable().optional(),
@@ -875,6 +890,17 @@ export const SmartCreateRes = okEnvelope(
       "hq_created",
       "hq_failed",
     ]),
+    image_processing: z.object({
+      status: z.enum([
+        "idle",
+        "queued",
+        "processing",
+        "succeeded",
+        "partial_failed",
+        "retryable_failed",
+      ]),
+      queued: z.number().int().nonnegative(),
+    }),
   }),
 );
 

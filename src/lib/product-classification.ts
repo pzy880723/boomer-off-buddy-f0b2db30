@@ -41,6 +41,7 @@ export type RawProductRecognition = {
   name?: string | null;
   attributes?: Partial<ProductRecognitionAttributes> | null;
   brand?: string | null;
+  ip_name?: string | null;
   maker?: string | null;
   origin_region?: string | null;
   origin_country?: string | null;
@@ -71,6 +72,7 @@ export type RawProductRecognition = {
 export type ProductTaxonomyContext = {
   facets: FacetTerm[];
   brands: BrandCandidate[];
+  ips: BrandCandidate[];
 };
 
 export type NormalizedProductRecognition = {
@@ -96,6 +98,10 @@ export type NormalizedProductRecognition = {
   brand_candidate_text: string | null;
   brand_match_status: "empty" | "matched" | "review_required";
   brand_suggestions: Array<{ id: string; name: string; score: number }>;
+  ip_id: string | null;
+  ip_name: string | null;
+  ip_match_status: "empty" | "matched" | "review_required";
+  ip_suggestions: Array<{ id: string; name: string; score: number }>;
   facets: NormalizedFacetMatch[];
   unmatched_facets: FacetPrediction[];
   attribute_confidence: Record<string, number>;
@@ -198,7 +204,7 @@ function isPorcelain(raw: RawProductRecognition, predictedCode: string | null): 
 export function normalizeProductRecognition(
   raw: RawProductRecognition,
   categories: CategoryNode[],
-  taxonomy: ProductTaxonomyContext = { facets: [], brands: [] },
+  taxonomy: ProductTaxonomyContext = { facets: [], brands: [], ips: [] },
 ): NormalizedProductRecognition {
   const leaves = activeLeafCategories(categories);
   if (leaves.length === 0) throw new Error("ERP 分类树没有启用的二级分类");
@@ -238,6 +244,7 @@ export function normalizeProductRecognition(
   const nested = raw.attributes ?? {};
   const normalizedFacets = normalizeFacetPredictions(raw.facet_predictions ?? [], taxonomy.facets);
   const brand = matchBrandCandidate(nested.brand ?? raw.brand, taxonomy.brands);
+  const ip = matchBrandCandidate(raw.ip_name, taxonomy.ips);
   const alternatives = (raw.alternative_categories ?? [])
     .map((item) => {
       const code = cleanString(item.category_code);
@@ -288,6 +295,14 @@ export function normalizeProductRecognition(
     brand_candidate_text: brand.candidate_text,
     brand_match_status: brand.status,
     brand_suggestions: brand.suggestions.map((item) => ({
+      id: item.brand.id,
+      name: item.brand.name,
+      score: Math.round(item.score * 1000) / 1000,
+    })),
+    ip_id: ip.match?.id ?? null,
+    ip_name: ip.match?.name ?? ip.candidate_text,
+    ip_match_status: ip.status,
+    ip_suggestions: ip.suggestions.map((item) => ({
       id: item.brand.id,
       name: item.brand.name,
       score: Math.round(item.score * 1000) / 1000,

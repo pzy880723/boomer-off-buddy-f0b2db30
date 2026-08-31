@@ -114,6 +114,7 @@ import { Route as ApiPublicHandheldTransfersRouteImport } from './routes/api/pub
 import { Route as ApiPublicHooksChainProbeVerifyRouteImport } from './routes/api/public/hooks/chain-probe-verify'
 import { Route as ApiPublicHooksChannelSyncWorkerRouteImport } from './routes/api/public/hooks/channel-sync-worker'
 import { Route as ApiPublicHooksCommerceReleaseExpiredRouteImport } from './routes/api/public/hooks/commerce-release-expired'
+import { Route as ApiPublicHooksListingImageWorkerRouteImport } from './routes/api/public/hooks/listing-image-worker'
 import { Route as ApiPublicHooksTestPublishWithStockRouteImport } from './routes/api/public/hooks/test-publish-with-stock'
 import { Route as ApiPublicHooksYouzanCategoryGroupsSyncRouteImport } from './routes/api/public/hooks/youzan-category-groups-sync'
 import { Route as ApiPublicHooksYouzanCleanupRouteImport } from './routes/api/public/hooks/youzan-cleanup'
@@ -783,6 +784,12 @@ const ApiPublicHooksCommerceReleaseExpiredRoute =
   ApiPublicHooksCommerceReleaseExpiredRouteImport.update({
     id: '/api/public/hooks/commerce-release-expired',
     path: '/api/public/hooks/commerce-release-expired',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksListingImageWorkerRoute =
+  ApiPublicHooksListingImageWorkerRouteImport.update({
+    id: '/api/public/hooks/listing-image-worker',
+    path: '/api/public/hooks/listing-image-worker',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicHooksTestPublishWithStockRoute =
@@ -1595,6 +1602,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/chain-probe-verify': typeof ApiPublicHooksChainProbeVerifyRoute
   '/api/public/hooks/channel-sync-worker': typeof ApiPublicHooksChannelSyncWorkerRoute
   '/api/public/hooks/commerce-release-expired': typeof ApiPublicHooksCommerceReleaseExpiredRoute
+  '/api/public/hooks/listing-image-worker': typeof ApiPublicHooksListingImageWorkerRoute
   '/api/public/hooks/test-publish-with-stock': typeof ApiPublicHooksTestPublishWithStockRoute
   '/api/public/hooks/youzan-category-groups-sync': typeof ApiPublicHooksYouzanCategoryGroupsSyncRoute
   '/api/public/hooks/youzan-cleanup': typeof ApiPublicHooksYouzanCleanupRoute
@@ -1815,6 +1823,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/chain-probe-verify': typeof ApiPublicHooksChainProbeVerifyRoute
   '/api/public/hooks/channel-sync-worker': typeof ApiPublicHooksChannelSyncWorkerRoute
   '/api/public/hooks/commerce-release-expired': typeof ApiPublicHooksCommerceReleaseExpiredRoute
+  '/api/public/hooks/listing-image-worker': typeof ApiPublicHooksListingImageWorkerRoute
   '/api/public/hooks/test-publish-with-stock': typeof ApiPublicHooksTestPublishWithStockRoute
   '/api/public/hooks/youzan-category-groups-sync': typeof ApiPublicHooksYouzanCategoryGroupsSyncRoute
   '/api/public/hooks/youzan-cleanup': typeof ApiPublicHooksYouzanCleanupRoute
@@ -2043,6 +2052,7 @@ export interface FileRoutesById {
   '/api/public/hooks/chain-probe-verify': typeof ApiPublicHooksChainProbeVerifyRoute
   '/api/public/hooks/channel-sync-worker': typeof ApiPublicHooksChannelSyncWorkerRoute
   '/api/public/hooks/commerce-release-expired': typeof ApiPublicHooksCommerceReleaseExpiredRoute
+  '/api/public/hooks/listing-image-worker': typeof ApiPublicHooksListingImageWorkerRoute
   '/api/public/hooks/test-publish-with-stock': typeof ApiPublicHooksTestPublishWithStockRoute
   '/api/public/hooks/youzan-category-groups-sync': typeof ApiPublicHooksYouzanCategoryGroupsSyncRoute
   '/api/public/hooks/youzan-cleanup': typeof ApiPublicHooksYouzanCleanupRoute
@@ -2272,6 +2282,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/chain-probe-verify'
     | '/api/public/hooks/channel-sync-worker'
     | '/api/public/hooks/commerce-release-expired'
+    | '/api/public/hooks/listing-image-worker'
     | '/api/public/hooks/test-publish-with-stock'
     | '/api/public/hooks/youzan-category-groups-sync'
     | '/api/public/hooks/youzan-cleanup'
@@ -2492,6 +2503,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/chain-probe-verify'
     | '/api/public/hooks/channel-sync-worker'
     | '/api/public/hooks/commerce-release-expired'
+    | '/api/public/hooks/listing-image-worker'
     | '/api/public/hooks/test-publish-with-stock'
     | '/api/public/hooks/youzan-category-groups-sync'
     | '/api/public/hooks/youzan-cleanup'
@@ -2719,6 +2731,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/chain-probe-verify'
     | '/api/public/hooks/channel-sync-worker'
     | '/api/public/hooks/commerce-release-expired'
+    | '/api/public/hooks/listing-image-worker'
     | '/api/public/hooks/test-publish-with-stock'
     | '/api/public/hooks/youzan-category-groups-sync'
     | '/api/public/hooks/youzan-cleanup'
@@ -2900,6 +2913,7 @@ export interface RootRouteChildren {
   ApiPublicHooksChainProbeVerifyRoute: typeof ApiPublicHooksChainProbeVerifyRoute
   ApiPublicHooksChannelSyncWorkerRoute: typeof ApiPublicHooksChannelSyncWorkerRoute
   ApiPublicHooksCommerceReleaseExpiredRoute: typeof ApiPublicHooksCommerceReleaseExpiredRoute
+  ApiPublicHooksListingImageWorkerRoute: typeof ApiPublicHooksListingImageWorkerRoute
   ApiPublicHooksTestPublishWithStockRoute: typeof ApiPublicHooksTestPublishWithStockRoute
   ApiPublicHooksYouzanCategoryGroupsSyncRoute: typeof ApiPublicHooksYouzanCategoryGroupsSyncRoute
   ApiPublicHooksYouzanCleanupRoute: typeof ApiPublicHooksYouzanCleanupRoute
@@ -3720,6 +3734,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/hooks/commerce-release-expired'
       fullPath: '/api/public/hooks/commerce-release-expired'
       preLoaderRoute: typeof ApiPublicHooksCommerceReleaseExpiredRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/listing-image-worker': {
+      id: '/api/public/hooks/listing-image-worker'
+      path: '/api/public/hooks/listing-image-worker'
+      fullPath: '/api/public/hooks/listing-image-worker'
+      preLoaderRoute: typeof ApiPublicHooksListingImageWorkerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/test-publish-with-stock': {
@@ -5191,6 +5212,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksChannelSyncWorkerRoute: ApiPublicHooksChannelSyncWorkerRoute,
   ApiPublicHooksCommerceReleaseExpiredRoute:
     ApiPublicHooksCommerceReleaseExpiredRoute,
+  ApiPublicHooksListingImageWorkerRoute: ApiPublicHooksListingImageWorkerRoute,
   ApiPublicHooksTestPublishWithStockRoute:
     ApiPublicHooksTestPublishWithStockRoute,
   ApiPublicHooksYouzanCategoryGroupsSyncRoute:

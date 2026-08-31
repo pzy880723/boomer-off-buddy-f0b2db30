@@ -99,6 +99,48 @@ describe("handheld AI classification contract", () => {
     assert.match(classification, /inv_sku_facets/);
   });
 
+  test("smart-create accepts raw images and queues non-blocking listing image jobs", () => {
+    const migration = readFileSync(
+      "supabase/migrations/20260831190000_handheld_async_listing_images.sql",
+      "utf8",
+    );
+    const worker = readFileSync("src/server/handheld-listing-image-jobs.server.ts", "utf8");
+    const workerRoute = readFileSync(
+      "src/routes/api/public/hooks/listing-image-worker.ts",
+      "utf8",
+    );
+
+    assert.match(schemas, /image_processing/);
+    assert.match(smartCreate, /enqueueListingImageJobs/);
+    assert.match(smartCreate, /triggerListingImageWorker/);
+    assert.match(migration, /create table if not exists public\.inv_listing_image_jobs/i);
+    assert.match(migration, /unique\s*\(sku_id, source_bucket, source_path\)/i);
+    assert.match(worker, /sku-raw/);
+    assert.match(worker, /sku-listing/);
+    assert.match(worker, /processing/);
+    assert.match(worker, /retryable_failed/);
+    assert.match(worker, /\.select\("id"\)\s*\.maybeSingle\(\)/);
+    assert.match(workerRoute, /runListingImageWorker/);
+    assert.match(workerRoute, /LISTING_IMAGE_WORKER_TOKEN/);
+    assert.doesNotMatch(workerRoute, /SUPABASE_(?:PUBLISHABLE|ANON)_KEY/);
+  });
+
+  test("IP recognition is separate from brands and requires confirmation before creating a candidate", () => {
+    const migration = readFileSync(
+      "supabase/migrations/20260831190000_handheld_async_listing_images.sql",
+      "utf8",
+    );
+
+    for (const field of ["ip_name", "ip_match_status", "ip_suggestions", "ip_confirmed"]) {
+      assert.match(schemas, new RegExp(field), `schema missing ${field}`);
+    }
+    assert.match(classification, /loadActiveProductIps/);
+    assert.match(classification, /resolveOrCreateConfirmedIp/);
+    assert.match(classification, /entity_type/);
+    assert.match(smartCreate, /resolveOrCreateConfirmedIp/);
+    assert.match(migration, /add column if not exists ip_id uuid/i);
+  });
+
   test("smart-create validates and persists manually selected ERP facets", () => {
     for (const field of ["facet_codes", "tags"]) {
       assert.match(schemas, new RegExp(field), `schema missing ${field}`);
@@ -131,10 +173,7 @@ describe("handheld AI classification contract", () => {
   });
 
   test("branch publication creates HQ first and recovers real branch item IDs", () => {
-    const publisher = readFileSync(
-      "src/lib/youzan-offline-products.functions.ts",
-      "utf8",
-    );
+    const publisher = readFileSync("src/lib/youzan-offline-products.functions.ts", "utf8");
 
     assert.match(publisher, /ensureHqSpuLink\(args\.sku_id, branch\.id\)/);
     assert.match(publisher, /findExistingOfflineProduct/);

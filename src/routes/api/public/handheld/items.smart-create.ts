@@ -19,8 +19,13 @@ import {
   assertActiveLeafCategory,
   attachProductClassificationAuditToSku,
   replaceManualProductFacets,
+  resolveOrCreateConfirmedIp,
   resolveManualProductFacets,
 } from "@/server/product-classification.server";
+import {
+  enqueueListingImageJobs,
+  triggerListingImageWorker,
+} from "@/server/handheld-listing-image-jobs.server";
 
 const SKU_IMAGE_BUCKETS = new Set(["sku-raw", "sku-listing"]);
 
@@ -98,6 +103,15 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
           } catch (e) {
             return err((e as Error).message, 422, { code: "validation_error" });
           }
+        }
+        let resolvedIp: Awaited<ReturnType<typeof resolveOrCreateConfirmedIp>>;
+        try {
+          resolvedIp = await resolveOrCreateConfirmedIp({
+            name: body.ip_name,
+            confirmed: body.ip_confirmed,
+          });
+        } catch (e) {
+          return err((e as Error).message, 422, { code: "ip_confirmation_required" });
         }
         // 幂等回放
         const replay = await replayIfPresent({
@@ -213,6 +227,8 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
                 : "legacy",
               ai_suggested_price: body.ai_suggested_price ?? null,
               recognition_request_id: body.recognition_request_id ?? null,
+              ip_id: resolvedIp.id,
+              ip_candidate_text: resolvedIp.status === "review" ? resolvedIp.name : null,
               stock_qty: 0,
               status: "active",
             } as never)
@@ -245,6 +261,32 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
           } catch (e) {
             return err(`Save product tags failed: ${(e as Error).message}`, 500);
           }
+        }
+        if (resolvedIp.id || resolvedIp.name) {
+          const ipUpdate = await supabaseAdmin
+            .from("inv_skus")
+            .update({
+              ip_id: resolvedIp.id,
+              ip_candidate_text: resolvedIp.status === "review" ? resolvedIp.name : null,
+              updated_at: new Date().toISOString(),
+            } as never)
+            .eq("id", skuId);
+          if (ipUpdate.error) return err(`Save IP failed: ${ipUpdate.error.message}`, 500);
+        }
+
+        let imageProcessing: {
+          status:
+            "idle" | "queued" | "processing" | "succeeded" | "partial_failed" | "retryable_failed";
+          queued: number;
+        } = { status: "idle", queued: 0 };
+        try {
+          imageProcessing = await enqueueListingImageJobs({
+            skuId,
+            images: body.image_storage_paths ?? [],
+          });
+        } catch (e) {
+          console.error("[handheld smart-create] 创建图片优化任务失败", e);
+          imageProcessing = { status: "retryable_failed", queued: 0 };
         }
 
         // Bind extra EPCs (if APP scanned labels already)
@@ -364,6 +406,7 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
             condition_grade: conditionGrade,
           }),
           youzan_sync_status: syncStatus,
+          image_processing: imageProcessing,
           storefront_listing_id: storefrontListingId,
           storefront_status: storefrontStatus,
         };
@@ -374,6 +417,7 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
           status: 200,
           body: { ok: true, data: responseBody },
         });
+        if (imageProcessing.queued > 0) triggerListingImageWorker(imageProcessing.queued);
         return ok(responseBody);
       },
     },

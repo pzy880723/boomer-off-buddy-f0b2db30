@@ -5,11 +5,8 @@ import type {
   RawProductRecognition,
 } from "@/lib/product-classification";
 import { activeLeafCategories } from "@/lib/product-classification";
-import type { BrandCandidate, FacetTerm } from "@/lib/product-taxonomy";
-import {
-  resolveFacetSelection,
-  type FacetSelectionCandidate,
-} from "@/lib/product-facet-selection";
+import { normalizeLookupText, type BrandCandidate, type FacetTerm } from "@/lib/product-taxonomy";
+import { resolveFacetSelection, type FacetSelectionCandidate } from "@/lib/product-facet-selection";
 
 export async function loadActiveProductCategories(): Promise<CategoryNode[]> {
   const { data, error } = await supabaseAdmin
@@ -96,9 +93,75 @@ export async function loadActiveProductBrands(): Promise<BrandCandidate[]> {
     .from("inv_brands" as never)
     .select("id, name, name_original, aliases")
     .eq("status", "active")
+    .eq("entity_type", "brand")
     .order("name", { ascending: true });
   if (error) throw new Error(`加载品牌库失败：${error.message}`);
   return (data ?? []) as unknown as BrandCandidate[];
+}
+
+export async function loadActiveProductIps(): Promise<BrandCandidate[]> {
+  const { data, error } = await supabaseAdmin
+    .from("inv_brands" as never)
+    .select("id, name, name_original, aliases")
+    .eq("status", "active")
+    .eq("entity_type", "ip")
+    .order("name", { ascending: true });
+  if (error) throw new Error(`加载 IP 库失败：${error.message}`);
+  return (data ?? []) as unknown as BrandCandidate[];
+}
+
+export async function resolveOrCreateConfirmedIp(input: {
+  name?: string | null;
+  confirmed: boolean;
+}): Promise<{ id: string | null; name: string | null; status: "empty" | "matched" | "review" }> {
+  const name = input.name?.trim() ?? "";
+  if (!name) return { id: null, name: null, status: "empty" };
+  const normalized = normalizeLookupText(name);
+  const ips = await loadActiveProductIps();
+  const exact = ips.find((ip) =>
+    [ip.name, ip.name_original, ...ip.aliases].some(
+      (candidate) => normalizeLookupText(candidate) === normalized,
+    ),
+  );
+  if (exact) return { id: exact.id, name: exact.name, status: "matched" };
+  if (!input.confirmed) throw new Error("IP 未确认，请选择已有 IP 或确认新建");
+
+  const existing = await supabaseAdmin
+    .from("inv_brands" as never)
+    .select("id, name, status, entity_type")
+    .eq("normalized_name", normalized)
+    .maybeSingle();
+  if (existing.error) throw new Error(`检查 IP 候选失败：${existing.error.message}`);
+  if (existing.data) {
+    const row = existing.data as unknown as {
+      id: string;
+      name: string;
+      status: string;
+      entity_type: string;
+    };
+    if (row.entity_type !== "ip") {
+      return { id: null, name, status: "review" };
+    }
+    return { id: row.id, name: row.name, status: row.status === "active" ? "matched" : "review" };
+  }
+
+  const created = await supabaseAdmin
+    .from("inv_brands" as never)
+    .insert({
+      name,
+      normalized_name: normalized,
+      aliases: [],
+      entity_type: "ip",
+      status: "review",
+      notes: "由手持 APP 识别并经店员确认创建，待总部审核",
+    } as never)
+    .select("id, name")
+    .single();
+  if (created.error || !created.data) {
+    throw new Error(`创建 IP 候选失败：${created.error?.message ?? "no row"}`);
+  }
+  const row = created.data as unknown as { id: string; name: string };
+  return { id: row.id, name: row.name, status: "review" };
 }
 
 export async function attachProductClassificationAuditToSku(input: {
@@ -173,6 +236,8 @@ export type PersistClassificationAuditInput = {
   warning: string | null;
   brand_id: string | null;
   brand_candidate_text: string | null;
+  ip_id: string | null;
+  ip_candidate_text: string | null;
   facet_predictions: NormalizedProductRecognition["facets"];
   unmatched_facets: NormalizedProductRecognition["unmatched_facets"];
   attribute_confidence: NormalizedProductRecognition["attribute_confidence"];
@@ -232,6 +297,9 @@ async function applyRecognitionMetadataToSku(
         recognition.brand_match_status === "review_required"
           ? recognition.brand_candidate_text
           : null,
+      ip_id: recognition.ip_id,
+      ip_candidate_text:
+        recognition.ip_match_status === "review_required" ? recognition.ip_name : null,
       keywords: recognition.keywords,
       attribute_confidence: recognition.attribute_confidence,
       clarification_requests: recognition.clarification_requests,
