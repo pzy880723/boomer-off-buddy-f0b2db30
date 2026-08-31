@@ -1,6 +1,8 @@
-# 只读复核：20260831220000_marketplace_payment_foundation.sql（修订版）
+# 只读复核：20260831220000_marketplace_payment_foundation-final.sql（最终版）
 
 本轮**未执行任何写操作**：未运行 migration、未 DDL/DML、未发布、未改任何生产代码。结论来自与上一版 SQL 的逐行 diff、全文静态阅读，以及对生产库的只读查询（information_schema / pg_proc / pg_constraint）。
+
+**结论先行：本轮无阻断项，可以执行。** 上一轮唯一的阻断项 B1 已在 final 版闭合，且修复方式正确、无语法问题。
 
 ## 1) v1 过渡期是否仍可写 — 是，已修好
 
