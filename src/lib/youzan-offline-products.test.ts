@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
   buildBranchItemShelfRequest,
+  buildCancelBranchChannelParams,
   buildOfflineSkuReleaseInput,
   buildOfflineStockQueueRow,
   buildOfflineProductQueryParams,
@@ -15,9 +16,44 @@ import {
   normalizeYouzanProductCode,
   parseOfflineProductRows,
   resolveOfflineReleaseSourceImages,
+  isYouzanProductNotFoundError,
+  selectNonTargetBranches,
 } from "./youzan-offline-products.server";
 
 describe("youzan offline products", () => {
+  test("custom products cancel the door channel on every non-target branch", () => {
+    assert.deepEqual(
+      buildCancelBranchChannelParams({
+        branchKdtId: 178113306,
+        hqItemId: 6286795598,
+      }),
+      {
+        request: JSON.stringify({
+          kdt_id: 178113306,
+          item_ids: [6286795598],
+          channel: 1,
+        }),
+      },
+    );
+
+    assert.deepEqual(
+      selectNonTargetBranches(
+        [
+          { id: "wenzhou", kdt_id: 178113306 },
+          { id: "shanghai", kdt_id: 187395218 },
+        ],
+        ["shanghai"],
+      ),
+      [{ id: "wenzhou", kdt_id: 178113306 }],
+    );
+  });
+
+  test("a stale branch item falls back to release only for product-not-found errors", () => {
+    assert.equal(isYouzanProductNotFoundError("[122001001] 商品不存在!"), true);
+    assert.equal(isYouzanProductNotFoundError("[121001008] 商品不存在"), true);
+    assert.equal(isYouzanProductNotFoundError("请求超时"), false);
+  });
+
   test("branch shelf changes use the branch item listing API contract", () => {
     assert.deepEqual(
       buildBranchItemShelfRequest({

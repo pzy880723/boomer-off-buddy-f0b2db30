@@ -56,6 +56,34 @@ export function buildBranchItemShelfRequest(input: { itemId: number; online: boo
   };
 }
 
+export function buildCancelBranchChannelParams(input: { branchKdtId: number; hqItemId: number }) {
+  if (!Number.isInteger(input.branchKdtId) || input.branchKdtId <= 0) {
+    throw new Error("Youzan branch kdt id is required");
+  }
+  if (!Number.isInteger(input.hqItemId) || input.hqItemId <= 0) {
+    throw new Error("Youzan HQ item id is required");
+  }
+  return {
+    request: JSON.stringify({
+      kdt_id: input.branchKdtId,
+      item_ids: [input.hqItemId],
+      channel: 1,
+    }),
+  };
+}
+
+export function selectNonTargetBranches<T extends { id: string }>(
+  branches: T[],
+  targetShopIds: string[],
+) {
+  const targets = new Set(targetShopIds);
+  return branches.filter((branch) => !targets.has(branch.id));
+}
+
+export function isYouzanProductNotFoundError(message: string) {
+  return /\[(?:121001008|122001001)\]|商品不存在/i.test(message);
+}
+
 export function buildOfflineProductQueryParams(input: OfflineProductQueryInput) {
   const pageNo = input.pageNo ?? 1;
   const pageSize = input.pageSize ?? 20;
@@ -403,6 +431,22 @@ export async function updateYouzanOfflineProduct(args: {
     method: "youzan.retail.open.offline.spu.update",
     version: "3.0.0",
     params: buildOfflineProductUpdateParams(args.input, args.itemId),
+    timeoutMs: 30_000,
+  });
+  return { traceId: result.trace_id };
+}
+
+export async function cancelYouzanBranchOfflineChannel(args: {
+  accessToken: string;
+  branchKdtId: number;
+  hqItemId: number;
+}): Promise<{ traceId: string | null }> {
+  const { callYouzanApiVerbose } = await import("./youzan.functions");
+  const result = await callYouzanApiVerbose({
+    accessToken: args.accessToken,
+    method: "youzan.item.channel.cancel.publish",
+    version: "1.0.0",
+    params: buildCancelBranchChannelParams(args),
     timeoutMs: 30_000,
   });
   return { traceId: result.trace_id };

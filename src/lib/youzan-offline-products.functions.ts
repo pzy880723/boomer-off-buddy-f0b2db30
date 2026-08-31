@@ -10,10 +10,13 @@ import {
   buildOfflineChannelListingRow,
   buildOfflineProductLookupTerms,
   buildOfflineStockQueueRow,
+  cancelYouzanBranchOfflineChannel,
   findOfflineProductMatch,
+  isYouzanProductNotFoundError,
   queryYouzanOfflineProducts,
   releaseYouzanOfflineProduct,
   resolveOfflineReleaseSourceImages,
+  selectNonTargetBranches,
   updateYouzanOfflineProduct,
 } from "./youzan-offline-products.server";
 import {
@@ -179,6 +182,47 @@ async function enqueueBranchStock(args: {
   if (error) throw new Error(error.message);
 }
 
+async function markBranchChannelRemoved(skuId: string, shopId: string) {
+  const now = new Date().toISOString();
+  const [linkWrite, listingWrite, queueWrite] = await Promise.all([
+    supabase
+      .from("sku_youzan_links")
+      .update({
+        status: "unlinked",
+        sync_stock: false,
+        last_error: null,
+      } as never)
+      .eq("sku_id", skuId)
+      .eq("shop_id", shopId)
+      .eq("role", "branch_stock"),
+    supabase
+      .from("sku_channel_listings")
+      .update({
+        listing_status: "unpublished",
+        last_stock: 0,
+        last_error: null,
+        last_verified_at: now,
+        updated_at: now,
+      } as never)
+      .eq("sku_id", skuId)
+      .eq("channel", "youzan_branch_offline")
+      .eq("shop_id", shopId),
+    supabase
+      .from("youzan_stock_sync_queue")
+      .update({
+        status: "done",
+        target_stock: 0,
+        reason: "custom_channel_removed",
+        last_error: null,
+      } as never)
+      .eq("sku_id", skuId)
+      .eq("shop_id", shopId),
+  ]);
+  for (const write of [linkWrite, listingWrite, queueWrite]) {
+    if (write.error) throw new Error(write.error.message);
+  }
+}
+
 export async function releaseSkuToOfflineShopsCore(args: {
   sku_id: string;
   shop_ids: string[];
@@ -188,16 +232,16 @@ export async function releaseSkuToOfflineShopsCore(args: {
   if (shopIds.length === 0) return { ok: true, results: [] };
 
   const [{ data: sku, error: skuError }, { data: shops, error: shopsError }] = await Promise.all([
-      supabase
-        .from("inv_skus")
-        .select("id,name,sku_code,barcode,price_tier,image_url,image_paths,sku_scope")
-        .eq("id", args.sku_id)
-        .maybeSingle(),
-      supabase
-        .from("youzan_shops")
-        .select("id,kdt_id,role,status,warehouse_code,access_token,refresh_token,token_expires_at")
-        .in("id", shopIds),
-    ]);
+    supabase
+      .from("inv_skus")
+      .select("id,name,sku_code,barcode,price_tier,image_url,image_paths,sku_scope")
+      .eq("id", args.sku_id)
+      .maybeSingle(),
+    supabase
+      .from("youzan_shops")
+      .select("id,kdt_id,role,status,warehouse_code,access_token,refresh_token,token_expires_at")
+      .in("id", shopIds),
+  ]);
   if (skuError) throw new Error(skuError.message);
   if (shopsError) throw new Error(shopsError.message);
   if (!sku) throw new Error("SKU 不存在");
@@ -207,6 +251,17 @@ export async function releaseSkuToOfflineShopsCore(args: {
   );
   if (branches.length !== shopIds.length) {
     throw new Error("部分目标门店不存在、已停用或不是分店");
+  }
+  const isCustom = sku.sku_scope === "custom";
+  let allActiveBranches = branches;
+  if (isCustom) {
+    const { data, error } = await supabase
+      .from("youzan_shops")
+      .select("id,kdt_id,role,status,warehouse_code")
+      .eq("role", "branch")
+      .eq("status", "active");
+    if (error) throw new Error(error.message);
+    allActiveBranches = data ?? [];
   }
 
   // inv_skus.image_paths 存的是私有桶路径（sku-listing/xxx.jpg），不是 URL。
@@ -248,10 +303,11 @@ export async function releaseSkuToOfflineShopsCore(args: {
   );
 
   const results: OfflineReleaseResult[] = [];
+  const customHqLink = isCustom ? await ensureHqSpuLink(args.sku_id, branches[0]?.id) : null;
   for (const branch of branches) {
     // offline.spu.release publishes an existing HQ product to a branch.
     // Relation fields use Youzan's HQ codes; sku_no keeps the ERP barcode for POS scanning.
-    const hqLink = await ensureHqSpuLink(args.sku_id, branch.id);
+    const hqLink = customHqLink ?? (await ensureHqSpuLink(args.sku_id, branch.id));
     const { data: location } = await supabase
       .from("inv_locations")
       .select("id")
@@ -294,35 +350,42 @@ export async function releaseSkuToOfflineShopsCore(args: {
     });
     if (remoteExisting) {
       const remoteSkuId = remoteExisting.skus[0]?.skuId ?? null;
-      await updateYouzanOfflineProduct({
-        accessToken,
-        itemId: remoteExisting.itemId,
-        input: releaseInput,
-      });
-      await upsertBranchLink({
-        skuId: args.sku_id,
-        shopId: branch.id,
-        hqSpuId: hqLink.yz_item_id,
-        itemId: remoteExisting.itemId,
-        skuIdRemote: remoteSkuId,
-        stock,
-        recovered: true,
-      });
-      await enqueueBranchStock({
-        skuId: args.sku_id,
-        shopId: branch.id,
-        locationId: args.stock_override === undefined ? location.id : null,
-        targetStock: stock,
-      });
-      results.push({
-        shop_id: branch.id,
-        ok: true,
-        item_id: remoteExisting.itemId,
-        sku_id: remoteSkuId,
-        recovered: true,
-        error: null,
-      });
-      continue;
+      try {
+        await updateYouzanOfflineProduct({
+          accessToken,
+          itemId: remoteExisting.itemId,
+          input: releaseInput,
+        });
+        await upsertBranchLink({
+          skuId: args.sku_id,
+          shopId: branch.id,
+          hqSpuId: hqLink.yz_item_id,
+          itemId: remoteExisting.itemId,
+          skuIdRemote: remoteSkuId,
+          stock,
+          recovered: true,
+        });
+        await enqueueBranchStock({
+          skuId: args.sku_id,
+          shopId: branch.id,
+          locationId: args.stock_override === undefined ? location.id : null,
+          targetStock: stock,
+        });
+        results.push({
+          shop_id: branch.id,
+          ok: true,
+          item_id: remoteExisting.itemId,
+          sku_id: remoteSkuId,
+          recovered: true,
+          error: null,
+        });
+        continue;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!isYouzanProductNotFoundError(message)) throw error;
+        // The branch query can briefly return a deleted item. Release it again
+        // instead of aborting the whole custom-product correction.
+      }
     }
 
     try {
@@ -383,7 +446,7 @@ export async function releaseSkuToOfflineShopsCore(args: {
         await enqueueBranchStock({
           skuId: args.sku_id,
           shopId: branch.id,
-            locationId: args.stock_override === undefined ? location.id : null,
+          locationId: args.stock_override === undefined ? location.id : null,
           targetStock: stock,
         });
         results.push({
@@ -403,6 +466,32 @@ export async function releaseSkuToOfflineShopsCore(args: {
           sku_id: null,
           recovered: false,
           error: message,
+        });
+      }
+    }
+  }
+  if (isCustom && customHqLink && results.length > 0 && results.every((result) => result.ok)) {
+    for (const branch of selectNonTargetBranches(allActiveBranches, shopIds)) {
+      try {
+        await cancelYouzanBranchOfflineChannel({
+          accessToken,
+          branchKdtId: Number(branch.kdt_id),
+          hqItemId: customHqLink.yz_item_id,
+        });
+        await markBranchChannelRemoved(args.sku_id, branch.id);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (isYouzanProductNotFoundError(message)) {
+          await markBranchChannelRemoved(args.sku_id, branch.id);
+          continue;
+        }
+        results.push({
+          shop_id: branch.id,
+          ok: false,
+          item_id: null,
+          sku_id: null,
+          recovered: false,
+          error: `撤销非库存门店渠道失败：${message}`,
         });
       }
     }
