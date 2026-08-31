@@ -15,6 +15,7 @@ import {
   findOfflineProductMatch,
   normalizeYouzanProductCode,
   parseOfflineProductRows,
+  pickYouzanHqItemId,
   resolveOfflineReleaseSourceImages,
   isYouzanProductNotFoundError,
   selectNonTargetBranches,
@@ -28,11 +29,11 @@ describe("youzan offline products", () => {
         hqItemId: 6286795598,
       }),
       {
-        request: JSON.stringify({
+        request: {
           kdt_id: 178113306,
           item_ids: [6286795598],
           channel: 1,
-        }),
+        },
       },
     );
 
@@ -41,10 +42,22 @@ describe("youzan offline products", () => {
         [
           { id: "wenzhou", kdt_id: 178113306 },
           { id: "shanghai", kdt_id: 187395218 },
+          { id: "legacy", kdt_id: null },
         ],
         ["shanghai"],
       ),
       [{ id: "wenzhou", kdt_id: 178113306 }],
+    );
+  });
+
+  test("channel cancellation resolves the HQ product-library item id, not the SPU id", () => {
+    assert.equal(
+      pickYouzanHqItemId({
+        id: 6287276396,
+        spu_id: 6286795598,
+        skus: [{ sku_id: 530787765 }],
+      }),
+      6287276396,
     );
   });
 

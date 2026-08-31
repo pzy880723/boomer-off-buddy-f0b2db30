@@ -64,20 +64,50 @@ export function buildCancelBranchChannelParams(input: { branchKdtId: number; hqI
     throw new Error("Youzan HQ item id is required");
   }
   return {
-    request: JSON.stringify({
+    request: {
       kdt_id: input.branchKdtId,
       item_ids: [input.hqItemId],
       channel: 1,
-    }),
+    },
   };
 }
 
-export function selectNonTargetBranches<T extends { id: string }>(
+export function selectNonTargetBranches<T extends { id: string; kdt_id?: string | number | null }>(
   branches: T[],
   targetShopIds: string[],
 ) {
   const targets = new Set(targetShopIds);
-  return branches.filter((branch) => !targets.has(branch.id));
+  return branches.filter((branch) => {
+    const kdtId = Number(branch.kdt_id ?? 0);
+    return !targets.has(branch.id) && Number.isInteger(kdtId) && kdtId > 0;
+  });
+}
+
+export function pickYouzanHqItemId(payload: unknown): number | null {
+  const seen = new Set<unknown>();
+  const keys = ["item_id", "itemId", "channel_item_id", "channelItemId", "id"];
+  const walk = (value: unknown, depth = 0): number | null => {
+    if (!value || typeof value !== "object" || depth > 6 || seen.has(value)) return null;
+    seen.add(value);
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const found = walk(item, depth + 1);
+        if (found) return found;
+      }
+      return null;
+    }
+    const row = value as Record<string, unknown>;
+    for (const key of keys) {
+      const id = Number(row[key] ?? 0);
+      if (Number.isInteger(id) && id > 0) return id;
+    }
+    for (const child of Object.values(row)) {
+      const found = walk(child, depth + 1);
+      if (found) return found;
+    }
+    return null;
+  };
+  return walk(payload);
 }
 
 export function isYouzanProductNotFoundError(message: string) {
@@ -450,4 +480,32 @@ export async function cancelYouzanBranchOfflineChannel(args: {
     timeoutMs: 30_000,
   });
   return { traceId: result.trace_id };
+}
+
+export async function resolveYouzanHqItemId(args: {
+  accessToken: string;
+  hqKdtId: number;
+  itemCode: string;
+}): Promise<{ itemId: number; traceId: string | null }> {
+  if (!Number.isInteger(args.hqKdtId) || args.hqKdtId <= 0) {
+    throw new Error("Youzan HQ kdt id is required");
+  }
+  if (!args.itemCode.trim()) throw new Error("Youzan HQ item code is required");
+  const { callYouzanApiVerbose } = await import("./youzan.functions");
+  const result = await callYouzanApiVerbose({
+    accessToken: args.accessToken,
+    method: "youzan.item.base.get",
+    version: "1.0.0",
+    params: {
+      request: {
+        kdt_id: args.hqKdtId,
+        item_code: args.itemCode.trim(),
+        channel: 0,
+      },
+    },
+    timeoutMs: 30_000,
+  });
+  const itemId = pickYouzanHqItemId(result.payload);
+  if (!itemId) throw new Error(`Youzan HQ item id not found for ${args.itemCode}`);
+  return { itemId, traceId: result.trace_id };
 }

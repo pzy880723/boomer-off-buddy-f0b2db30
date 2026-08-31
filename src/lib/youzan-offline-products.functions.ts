@@ -16,6 +16,7 @@ import {
   queryYouzanOfflineProducts,
   releaseYouzanOfflineProduct,
   resolveOfflineReleaseSourceImages,
+  resolveYouzanHqItemId,
   selectNonTargetBranches,
   updateYouzanOfflineProduct,
 } from "./youzan-offline-products.server";
@@ -471,12 +472,17 @@ export async function releaseSkuToOfflineShopsCore(args: {
     }
   }
   if (isCustom && customHqLink && results.length > 0 && results.every((result) => result.ok)) {
+    const hqItem = await resolveYouzanHqItemId({
+      accessToken,
+      hqKdtId: Number(hq.kdt_id),
+      itemCode: String(sku.sku_code ?? ""),
+    });
     for (const branch of selectNonTargetBranches(allActiveBranches, shopIds)) {
       try {
         await cancelYouzanBranchOfflineChannel({
           accessToken,
           branchKdtId: Number(branch.kdt_id),
-          hqItemId: customHqLink.yz_item_id,
+          hqItemId: hqItem.itemId,
         });
         await markBranchChannelRemoved(args.sku_id, branch.id);
       } catch (error) {
