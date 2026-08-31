@@ -6,6 +6,8 @@ import {
   buildOfflineStockQueueRow,
   buildOfflineProductQueryParams,
   buildOfflineProductReleaseParams,
+  buildOfflineProductUpdateParams,
+  buildCustomHqChannelUpdateParams,
   buildOfflineProductLookupTerms,
   buildOfflineChannelListingRow,
   buildOfflineSkuIdentity,
@@ -152,6 +154,59 @@ describe("youzan offline products", () => {
     assert.equal(input.stock.relatedSpuCode, "BM507122220383");
     assert.equal(input.stock.relatedSkuCode, "BM507122220383");
     assert.equal(input.unit, "件");
+  });
+
+  test("existing branch repair overwrites the generated barcode and refreshes product images", () => {
+    const params = buildOfflineProductUpdateParams(
+      {
+        title: "三丽鸥 Hello Kitty 和服樱花 毛绒公仔挂件",
+        categoryId: 345202,
+        unit: "件",
+        priceYuan: 45,
+        imageUrls: ["https://img.yzcdn.cn/front.webp", "https://img.yzcdn.cn/side.webp"],
+        spuCode: "BM507122220383",
+        skuCenterCode: "BM507122220383",
+        saleUpKdtIds: [187395218],
+        saleDownKdtIds: [],
+        stock: {
+          skuNo: "2003660812004",
+          relatedSpuCode: "BM507122220383",
+          relatedSkuCode: "BM507122220383",
+          sellStockCount: 1,
+        },
+      },
+      5129515612,
+    );
+
+    assert.equal(params.item_id, 5129515612);
+    assert.equal(params.stocks[0].sku_no, "2003660812004");
+    assert.equal(
+      params.picture,
+      JSON.stringify([
+        { url: "https://img.yzcdn.cn/front.webp" },
+        { url: "https://img.yzcdn.cn/side.webp" },
+      ]),
+    );
+  });
+
+  test("custom HQ channel repair replaces stale branch channels instead of appending", () => {
+    const params = buildCustomHqChannelUpdateParams({
+      spuId: 6286795598,
+      name: "三丽鸥 Hello Kitty 和服樱花 毛绒公仔挂件",
+      spuCode: "BM507122220383",
+      barcode: "2003660812004",
+      categoryId: 345202,
+      priceYuan: 45,
+      kdtIds: [187395218, 187395218],
+      imageUrl: "https://img.yzcdn.cn/front.webp",
+    });
+
+    assert.equal(params.spu_no, "2003660812004");
+    assert.deepEqual(params.bar_codes, ["2003660812004"]);
+    assert.deepEqual(params.sell_channel_setting_request, {
+      is_partial: 0,
+      sell_channel_ids: [187395218],
+    });
   });
 
   test("standard products use the ERP barcode as the Youzan POS scan code", () => {

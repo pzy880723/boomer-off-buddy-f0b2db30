@@ -14,6 +14,7 @@ import {
   queryYouzanOfflineProducts,
   releaseYouzanOfflineProduct,
   resolveOfflineReleaseSourceImages,
+  updateYouzanOfflineProduct,
 } from "./youzan-offline-products.server";
 import {
   ensureAutoYouzanDefaultCategory,
@@ -101,7 +102,10 @@ async function upsertBranchLink(args: {
     updated_at: new Date().toISOString(),
   };
   const write = existing?.id
-    ? supabase.from("sku_channel_listings").update(payload as never).eq("id", existing.id)
+    ? supabase
+        .from("sku_channel_listings")
+        .update(payload as never)
+        .eq("id", existing.id)
     : supabase.from("sku_channel_listings").insert(payload as never);
   const { error: listingError } = await write;
   if (listingError) throw new Error(listingError.message);
@@ -141,7 +145,10 @@ async function markBranchReleaseError(skuId: string, shopId: string, message: st
     updated_at: new Date().toISOString(),
   };
   const listingWrite = existing?.id
-    ? supabase.from("sku_channel_listings").update(payload as never).eq("id", existing.id)
+    ? supabase
+        .from("sku_channel_listings")
+        .update(payload as never)
+        .eq("id", existing.id)
     : supabase.from("sku_channel_listings").insert(payload as never);
   const { error: listingError } = await listingWrite;
   if (listingError) throw new Error(listingError.message);
@@ -163,7 +170,10 @@ async function enqueueBranchStock(args: {
     .limit(1)
     .maybeSingle();
   const query = existing?.id
-    ? supabase.from("youzan_stock_sync_queue").update(row as never).eq("id", existing.id)
+    ? supabase
+        .from("youzan_stock_sync_queue")
+        .update(row as never)
+        .eq("id", existing.id)
     : supabase.from("youzan_stock_sync_queue").insert(row as never);
   const { error } = await query;
   if (error) throw new Error(error.message);
@@ -177,8 +187,7 @@ export async function releaseSkuToOfflineShopsCore(args: {
   const shopIds = Array.from(new Set(args.shop_ids));
   if (shopIds.length === 0) return { ok: true, results: [] };
 
-  const [{ data: sku, error: skuError }, { data: shops, error: shopsError }] =
-    await Promise.all([
+  const [{ data: sku, error: skuError }, { data: shops, error: shopsError }] = await Promise.all([
       supabase
         .from("inv_skus")
         .select("id,name,sku_code,barcode,price_tier,image_url,image_paths,sku_scope")
@@ -220,6 +229,8 @@ export async function releaseSkuToOfflineShopsCore(args: {
     name: sku.name,
     priceTier: sku.price_tier,
   });
+  const posBarcode = String(sku.barcode ?? "").trim();
+  if (!posBarcode) throw new Error("SKU 缺少 ERP 条码，无法同步有赞收银条码");
 
   const hq = await getHqShop();
   const accessToken = await ensureAccessToken(hq);
@@ -259,6 +270,19 @@ export async function releaseSkuToOfflineShopsCore(args: {
         .maybeSingle();
       stock = Math.max(0, Math.trunc(Number(localStock?.qty ?? 0)));
     }
+    const releaseInput = buildOfflineSkuReleaseInput({
+      sku: {
+        name: remoteIdentity.name,
+        scanCode: posBarcode,
+        hqSpuCode: hqLink.spu_code,
+        hqSkuCode: hqLink.sku_code,
+        priceYuan: Number(sku.price_tier ?? 0),
+        imageUrls,
+      },
+      categoryId: category.id,
+      branchKdtIds: [Number(branch.kdt_id)],
+      stock,
+    });
 
     // The live branch query is authoritative. Database links can become stale when Youzan
     // rewrites an offline item id or a product is recreated in the branch.
@@ -270,6 +294,11 @@ export async function releaseSkuToOfflineShopsCore(args: {
     });
     if (remoteExisting) {
       const remoteSkuId = remoteExisting.skus[0]?.skuId ?? null;
+      await updateYouzanOfflineProduct({
+        accessToken,
+        itemId: remoteExisting.itemId,
+        input: releaseInput,
+      });
       await upsertBranchLink({
         skuId: args.sku_id,
         shopId: branch.id,
@@ -299,19 +328,7 @@ export async function releaseSkuToOfflineShopsCore(args: {
     try {
       const released = await releaseYouzanOfflineProduct({
         accessToken,
-        input: buildOfflineSkuReleaseInput({
-          sku: {
-            name: remoteIdentity.name,
-            scanCode: remoteIdentity.code,
-            hqSpuCode: hqLink.spu_code,
-            hqSkuCode: hqLink.sku_code,
-            priceYuan: Number(sku.price_tier ?? 0),
-            imageUrls,
-          },
-          categoryId: category.id,
-          branchKdtIds: [Number(branch.kdt_id)],
-          stock,
-        }),
+        input: releaseInput,
       });
       const remoteSkuId = released.skuIds[0] ?? null;
       await upsertBranchLink({

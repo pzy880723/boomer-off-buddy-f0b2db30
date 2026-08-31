@@ -45,10 +45,7 @@ export function resolveOfflineReleaseSourceImages(input: {
   return [`${input.publicOrigin.replace(/\/+$/, "")}/m-icon-512.png`];
 }
 
-export function buildBranchItemShelfRequest(input: {
-  itemId: number;
-  online: boolean;
-}) {
+export function buildBranchItemShelfRequest(input: { itemId: number; online: boolean }) {
   if (!Number.isInteger(input.itemId) || input.itemId <= 0) {
     throw new Error("Youzan branch item id is required");
   }
@@ -130,12 +127,10 @@ export function findOfflineProductMatch(
   const normalizedSkuCode = normalizeYouzanProductCode(skuCode);
   const codesMatch = (value: string | null) =>
     Boolean(
-      value &&
-        (value === skuCode || normalizeYouzanProductCode(value) === normalizedSkuCode),
+      value && (value === skuCode || normalizeYouzanProductCode(value) === normalizedSkuCode),
     );
   const exactCode = rows.find(
-    (row) =>
-      codesMatch(row.spuNo) || row.skus.some((remoteSku) => codesMatch(remoteSku.skuNo)),
+    (row) => codesMatch(row.spuNo) || row.skus.some((remoteSku) => codesMatch(remoteSku.skuNo)),
   );
   if (exactCode) return exactCode;
 
@@ -147,10 +142,7 @@ export function normalizeYouzanProductCode(value: string) {
   return value.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
 }
 
-export function buildOfflineProductLookupTerms(target: {
-  skuCode: string;
-  name: string;
-}) {
+export function buildOfflineProductLookupTerms(target: { skuCode: string; name: string }) {
   const rawSkuCode = target.skuCode.trim();
   return Array.from(
     new Set(
@@ -306,6 +298,57 @@ export function buildOfflineProductReleaseParams(input: OfflineProductReleaseInp
   };
 }
 
+export function buildOfflineProductUpdateParams(input: OfflineProductReleaseInput, itemId: number) {
+  if (!Number.isInteger(itemId) || itemId <= 0) {
+    throw new Error("Youzan branch item id is required");
+  }
+  return {
+    item_id: itemId,
+    ...buildOfflineProductReleaseParams(input),
+  };
+}
+
+export function buildCustomHqChannelUpdateParams(input: {
+  spuId: number;
+  name: string;
+  spuCode: string;
+  barcode: string;
+  categoryId: number;
+  priceYuan: number;
+  kdtIds: number[];
+  imageUrl?: string | null;
+}) {
+  const barcode = input.barcode.trim();
+  if (!barcode) throw new Error("SKU 缺少 ERP 条码，无法同步有赞收银条码");
+  const kdtIds = Array.from(new Set(input.kdtIds.filter((id) => Number.isInteger(id) && id > 0)));
+  const params: Record<string, unknown> = {
+    spu_id: input.spuId,
+    name: input.name.trim(),
+    spu_code: input.spuCode.trim(),
+    spu_no: barcode,
+    bar_codes: [barcode],
+    unit: "件",
+    category_id: input.categoryId,
+    retail_price: input.priceYuan.toFixed(2),
+    sell_channel_setting_request: {
+      // Custom products are unique pieces. Replace the full channel set so a
+      // stale branch can never continue selling the same physical item.
+      is_partial: 0,
+      sell_channel_ids: kdtIds,
+    },
+  };
+  if (input.imageUrl) {
+    params.pic_url = input.imageUrl;
+    params.spu_pic_list = [input.imageUrl];
+    params.spu_img_list = [{ img_url: input.imageUrl }];
+  }
+  return params as typeof params & {
+    spu_no: string;
+    bar_codes: string[];
+    sell_channel_setting_request: { is_partial: 0; sell_channel_ids: number[] };
+  };
+}
+
 export async function queryYouzanOfflineProducts(args: {
   accessToken: string;
   input: OfflineProductQueryInput;
@@ -345,4 +388,20 @@ export async function releaseYouzanOfflineProduct(args: {
     : [];
   if (!itemId) throw new Error("Youzan release succeeded without item_id");
   return { itemId, skuIds, traceId: result.trace_id };
+}
+
+export async function updateYouzanOfflineProduct(args: {
+  accessToken: string;
+  itemId: number;
+  input: OfflineProductReleaseInput;
+}): Promise<{ traceId: string | null }> {
+  const { callYouzanApiVerbose } = await import("./youzan.functions");
+  const result = await callYouzanApiVerbose({
+    accessToken: args.accessToken,
+    method: "youzan.retail.open.offline.spu.update",
+    version: "3.0.0",
+    params: buildOfflineProductUpdateParams(args.input, args.itemId),
+    timeoutMs: 30_000,
+  });
+  return { traceId: result.trace_id };
 }
