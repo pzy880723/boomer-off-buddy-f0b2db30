@@ -22,7 +22,7 @@
 - **子单总额校验**（第 495–501 行）：`sum(amount_fen) = round(payments.amount*100)`，覆盖了 1 分差场景，正确。
 - **normalized profile relation**：`commerce_payment_suborder_profiles` 建表 + 存量回填 + v2 内 `FOREACH` 写入全部 contributing profiles，并先校验这些 profile 全部属于同一 active 主体且 `wechat_sub_mchid` 一致，正确。
 
-**阻断项 B1（唯一一项）**：v2 只校验 `allocation_snapshot` 是 object，**没有要求它包含 `store_allocations` 键**。一旦调用方传入不含该键的快照，这条 v2 子单就不在 partial unique index 覆盖范围内，"同一 payment 同一主体只能有一条子单"的保护被静默绕过，且明细表里也失去门店维度依据。修法二选一：在 v2 里加 `IF NOT (v_suborder.allocation_snapshot ? 'store_allocations') THEN RAISE EXCEPTION`，或把索引谓词简化为只看 `amount_fen IS NOT NULL`（v1 恒为 NULL，同样能区分两代）。建议前者。
+**B1 已修复（验证通过）**：final 版在 v2 中新增了四重校验——`allocation_snapshot` 必须是 object、必须含 `store_allocations` 键、该键必须是数组、数组长度必须等于 `payment_profile_ids` 的元素个数；并额外用 `jsonb_array_elements` 逐条核对快照里的每个 `payment_profile_id` 确实出现在 `payment_profile_ids` 中（count(DISTINCT) 与长度相等才放行）。由此保证了：凡是 v2 写入的子单必然命中 partial unique index 的谓词，`commerce_payment_suborders_v2_payment_subject_unique` 的保护无法被绕过；且快照与明细表的门店维度完全一致。`?`、`->`、`jsonb_array_elements`、`jsonb_typeof`、`cardinality` 均为合法 IMMUTABLE 用法，PL/pgSQL 语法无问题。`RAISE EXCEPTION` 消息 `subject suborder requires matching store allocations` 结构完整。
 
 ## 3) 时间戳
 
