@@ -5,9 +5,9 @@ export const Route = createFileRoute("/api/public/hooks/listing-image-worker")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const workerToken = request.headers.get("x-worker-token") ?? "";
-        const expected = process.env.LISTING_IMAGE_WORKER_TOKEN ?? "";
-        if (!expected || workerToken !== expected) {
+        const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+        const authorization = request.headers.get("authorization") ?? "";
+        if (!serviceRoleKey || authorization !== `Bearer ${serviceRoleKey}`) {
           return Response.json({ ok: false, code: "unauthorized" }, { status: 401 });
         }
         let limit = 2;

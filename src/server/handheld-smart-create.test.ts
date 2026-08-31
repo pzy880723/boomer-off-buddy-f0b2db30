@@ -121,7 +121,8 @@ describe("handheld AI classification contract", () => {
     assert.match(worker, /retryable_failed/);
     assert.match(worker, /\.select\("id"\)\s*\.maybeSingle\(\)/);
     assert.match(workerRoute, /runListingImageWorker/);
-    assert.match(workerRoute, /LISTING_IMAGE_WORKER_TOKEN/);
+    assert.match(workerRoute, /SUPABASE_SERVICE_ROLE_KEY/);
+    assert.match(workerRoute, /Bearer \$\{serviceRoleKey\}/);
     assert.doesNotMatch(workerRoute, /SUPABASE_(?:PUBLISHABLE|ANON)_KEY/);
   });
 
