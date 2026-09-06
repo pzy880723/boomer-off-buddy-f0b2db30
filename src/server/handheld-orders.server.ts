@@ -99,11 +99,7 @@ export function buildAddressSummary(raw: unknown): string | null {
     }
     return "";
   };
-  const region = [
-    pick("province", "state"),
-    pick("city"),
-    pick("district", "county", "area"),
-  ]
+  const region = [pick("province", "state"), pick("city"), pick("district", "county", "area")]
     .filter(Boolean)
     .join("");
   const detail = pick("detail", "address", "street", "address_detail");
@@ -339,9 +335,7 @@ export async function listOrders(input: {
         if (ids.length === 0) return { items: [], total: 0 };
         query = query.in("id", ids);
       } else {
-        query = query
-          .eq("payment_status", "paid")
-          .in("order_status", ["confirmed", "processing"]);
+        query = query.eq("payment_status", "paid").in("order_status", ["confirmed", "processing"]);
         const ids = Array.from(shipped);
         if (ids.length > 0) query = query.not("id", "in", `(${ids.join(",")})`);
       }
@@ -436,9 +430,7 @@ type RawFulfillmentRow = {
   }> | null;
 };
 
-async function shortageStatusByItem(
-  fulfillmentIds: string[],
-): Promise<Map<string, string>> {
+async function shortageStatusByItem(fulfillmentIds: string[]): Promise<Map<string, string>> {
   const map = new Map<string, string>();
   if (fulfillmentIds.length === 0) return map;
   const { data } = await supabaseAdmin
@@ -446,7 +438,7 @@ async function shortageStatusByItem(
     .select("fulfillment_item_id, status, created_at")
     .in("fulfillment_id", fulfillmentIds)
     .order("created_at", { ascending: true });
-  for (const row of ((data as { fulfillment_item_id: string; status: string }[] | null) ?? [])) {
+  for (const row of (data as { fulfillment_item_id: string; status: string }[] | null) ?? []) {
     map.set(row.fulfillment_item_id, row.status);
   }
   return map;
@@ -533,8 +525,7 @@ export async function listFulfillmentsPaged(input: {
           0,
         ),
       ),
-      delivery_method:
-        row.order?.fulfillment_method ?? row.order?.courier_service_code ?? null,
+      delivery_method: row.order?.fulfillment_method ?? row.order?.courier_service_code ?? null,
       items: rowItems.map((it) => ({
         id: it.id,
         expected_qty: it.expected_qty,

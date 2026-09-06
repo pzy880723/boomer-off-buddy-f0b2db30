@@ -102,4 +102,3 @@ export const Route = createFileRoute("/api/public/handheld/fulfillments")({
     },
   },
 });
-

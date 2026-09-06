@@ -72,23 +72,43 @@ describe("订单列表契约", () => {
 
   test("订单状态派生与实付金额规则", () => {
     assert.equal(
-      deriveOrderStatus({ payment_status: "unpaid", order_status: "pending_payment", has_handed_over: false }),
+      deriveOrderStatus({
+        payment_status: "unpaid",
+        order_status: "pending_payment",
+        has_handed_over: false,
+      }),
       "unpaid",
     );
     assert.equal(
-      deriveOrderStatus({ payment_status: "paid", order_status: "processing", has_handed_over: false }),
+      deriveOrderStatus({
+        payment_status: "paid",
+        order_status: "processing",
+        has_handed_over: false,
+      }),
       "pending",
     );
     assert.equal(
-      deriveOrderStatus({ payment_status: "paid", order_status: "processing", has_handed_over: true }),
+      deriveOrderStatus({
+        payment_status: "paid",
+        order_status: "processing",
+        has_handed_over: true,
+      }),
       "shipped",
     );
     assert.equal(
-      deriveOrderStatus({ payment_status: "paid", order_status: "after_sale", has_handed_over: true }),
+      deriveOrderStatus({
+        payment_status: "paid",
+        order_status: "after_sale",
+        has_handed_over: true,
+      }),
       "after_sales",
     );
     assert.equal(
-      deriveOrderStatus({ payment_status: "unpaid", order_status: "cancelled", has_handed_over: false }),
+      deriveOrderStatus({
+        payment_status: "unpaid",
+        order_status: "cancelled",
+        has_handed_over: false,
+      }),
       "cancelled",
     );
     assert.equal(orderStatusLabel("shipped"), "已发出");
