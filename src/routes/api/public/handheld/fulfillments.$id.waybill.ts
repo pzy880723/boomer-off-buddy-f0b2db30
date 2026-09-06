@@ -3,12 +3,11 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   HANDHELD_CORS,
   authenticateDevice,
-  requireLocation,
   resolveSessionUser,
   ok,
   err,
 } from "@/server/handheld-auth.server";
-import { requireStaffAtDeviceLocation } from "@/server/handheld-fulfillment.server";
+import { authorizeFulfillment } from "@/server/handheld-fulfillment-access.server";
 
 /**
  * 面单能力：当前没有对接任何真实快递商户账号，因此只暴露能力状态。
