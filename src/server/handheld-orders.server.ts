@@ -518,8 +518,9 @@ export const FULFILLMENT_STATUS_FILTERS: FulfillmentStatusFilter[] = [
 const FULFILLMENT_LIST_SELECT =
   "id, code, order_id, location_id, status, priority, claimed_device_id, claimed_at, created_at, " +
   "location:inv_locations!location_id(name), " +
-  "order:commerce_orders!order_id(order_no, courier_provider, courier_service_code, fulfillment_method, customer_note), " +
-  "items:fulfillment_items(id, expected_qty, picked_qty, order_item:commerce_order_items!order_item_id(title_snapshot, unit_price, image_snapshot), sku:inv_skus!sku_id(name, barcode, image_url, sku_code))";
+  "order:commerce_orders!order_id(order_no, order_status, courier_provider, courier_service_code, fulfillment_method, customer_note), " +
+  "items:fulfillment_items(id, expected_qty, picked_qty, order_item:commerce_order_items!order_item_id(title_snapshot, unit_price, image_snapshot), sku:inv_skus!sku_id(name, barcode, image_url, image_paths, sku_code))";
+
 
 type RawFulfillmentRow = {
   id: string;
