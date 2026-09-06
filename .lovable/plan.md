@@ -1,64 +1,52 @@
-# 只读核验：iOS 拍照上架识别链路（2026-09-06）
+# ERP APP 首页操作迁移 + 统一消息：现状审计与最小可实施边界
 
-本轮**未执行任何写操作**：未改代码/配置、未跑迁移、未写数据库、未碰有赞/库存、未新建商品、未部署腾讯。不输出任何 signed URL、token、密钥或消费者资料。
+只读审计完成。当前代码提交 `0d48ae9d877ab01953b7d817e502a1e1136d5088`，最新已应用迁移 `20260831213000_hello_kitty_specific_ip.sql`（异步图片任务表来自 `20260831190000_handheld_async_listing_images.sql`）。未修改任何代码、数据库或有赞数据。
 
-## 4) 当前最新 commit
+## 1. 手持消息（notifications）
 
-`c0fc04df760ae62965451dbeaf35cfd0b4b1a24a`（Sun Sep 6 10:14:00 2026 UTC，"Work in progress"）。
+现有表 `inv_handheld_notifications` 字段：`id, device_id, location_id, kind, title, payload, ts`。
 
-## 1) 模型、环境覆盖、重试/超时、耗时统计
+- 路由：`GET /api/public/handheld/notifications`、`GET .../notifications/since`、`POST .../notifications/read-all`。
+- 过滤：只按“设备 + 库位 + 全局”在应用层过滤（`notifications.ts:23-27`、`notifications.since.ts:36-40`），**没有按员工（user_id/角色）过滤**。
+- 已读：`notifications.read-all.ts` 只是回一个时间戳，**数据库没有任何已读状态**（文件头注释自述）。
+- 缺失：按人分发、单条已读、未读计数、消息分类（履约/缺货/客服/系统）、消息与业务对象（订单/履约/会话）的关联字段。
 
-**文件**：`src/server/product-recognition.server.ts`
+## 2. 商城履约（commerce fulfillment）
 
-- 默认模型（第 12 行）：`google/gemini-2.5-pro`。
-- 环境覆盖（第 234 行）：`process.env.PRODUCT_RECOGNITION_MODEL || DEFAULT_...`。当前 Lovable 环境中 **`PRODUCT_RECOGNITION_MODEL` = UNSET**（未配置，因此实际走默认 2.5-pro）；`LOVABLE_API_KEY` = SET（值未读取、未输出）。
-- 重试（第 146–163 行）：最多 3 次，失败间隔 `200ms × attempt`（200ms / 400ms），三次全败后**不抛错**，而是落一条 `category_code='ai_low_confidence'`、`status='failed'` 的兜底审计记录。
-- **超时：没有任何超时/AbortSignal**。第 264 行的 `fetch` 裸调用，无 `AbortController`、无 `signal`、非流式（`response_format: json_object` 一次性返回）。上游卡住时只能等平台请求超时。
-- **耗时无法从数据库统计**：`inv_sku_classifications`（31 列）没有任何 duration/latency/started_at 字段，只有 `created_at`。要按次统计耗时目前只能看网关日志。
+已存在表：`fulfillments`、`fulfillment_items`、`fulfillment_scans`、`fulfillment_exceptions`、`packages`、`package_evidence`、`shipments`、`shipment_events`、`print_events`、`warehouse_totes`。
 
-**网关实测耗时（可核验证据，均为 chat_completions / 200）**：
+已存在 API：`fulfillments` 列表、详情、`claim`、`bind-tote`、`pick-scan`、`pick-complete`。
 
-| log_id | 时间(UTC) | 模型 | 耗时 | tokens in/out |
-|---|---|---|---|---|
-| 01a0762f-ce1d-7d73-95b1-abae53fbf5c8 | 2026-09-06 10:07:59 | google/gemini-2.5-pro | **39,711 ms** | 12385 / 4216 |
-| 01a07603-1c48-753e-b5c4-d613a0d3cca6 | 2026-09-06 09:19:04 | google/gemini-2.5-pro | **33,785 ms** | 12385 / 3026 |
+已存在 RPC：`fulfillment_claim_task`、`fulfillment_bind_tote`、`fulfillment_pick_scan`、`fulfillment_complete_pick`。
 
-对比同期其它调用：gemini-3-flash-preview 0.9–4.0 s、gemini-2.5-flash 1.5–3.5 s。
+- `fulfillment_pick_scan` 支持 EPC/条码/SKU 码匹配、错货拦截（`wrong_item`）、`client_op_id` 幂等。
+- `fulfillment_complete_pick` 要求所有行 `picked_qty = expected_qty`，**只要有一行缺货就无法完成，且没有缺货申报/客户确认路径**。
+- `fulfillment_exceptions` 表结构存在（kind/status/evidence/resolution），但**没有任何 API 写入或读取它**。
+- 出票：`fulfillments.code` 存在，但**没有“已付款自动按履约门店建单并出票”的触发器或队列**，也没有拣货小票内容接口；`src/server/handheld-print.server.ts` 只有 SKU 价签 payload，没有订单二维码/行项目/库位。
+- 扫订单码进订单：**没有** order-code 解析路由（`pos/resolve-code.ts` 只服务收银）。
+- 面单：`shipments`（tracking_no/label_payload/status）和 `print_events` 表存在，但**没有申请面单、保存快递单号、置为“待取件”的 API 或状态机**；`order-policy.ts` 的状态机也只到 `handed_over`。
 
-近 14 天 `inv_sku_classifications` 共 6 条，全部 `source='handheld'`。
+## 3. 客服 / 客户双向沟通
 
-## 2) recognize-item 契约与年代 prompt 约束
+数据库中**不存在任何会话、消息、参与者或客户确认表**（无 conversation/session/message/agent 表）。storefront 只有商品、订单、支付、会员相关路由。
 
-**路由**：`src/routes/api/public/handheld/ai.recognize-item.ts` → `POST /api/public/handheld/ai/recognize-item`
-先 `authenticateDevice(request)`（需 `X-Device-Token`），再 `AiRecognizeReq.parse`，失败 400 `validation_error`；识别异常统一 502 `AI recognition failed: …`。
+因此：门店与总部客服共同接待、不独占领取、客户端确认缺货，**全部为 0，需要新建领域模型**。
 
-**请求体**（`src/lib/handheld/schemas.ts:588–622`，四种图片来源可混用，合并后统一截断到 6 张）：
+## 4. 异步主图 worker
 
-- `images: [{ image_url? , image_base64? }]`，`min(1).max(6)` — **Codex 计划用的 inline base64 6 角度完全在契约内**，无需改后端。
-- `image_urls: string[]` 1–6；`image_storage_paths: [{bucket:'sku-raw'|'sku-listing', storage_path}]` 1–6（服务端自动签名，签名有效期 1h，见 `handheld-ai.server.ts:36`）；以及旧版单图 `image_url` / `image_base64`。
-- `primary_index` 0–5：把该下标挪到第 0 位当主图（`handheld-ai.server.ts:71–75`）。
-- `hint?: string`。
+- 队列表 `inv_listing_image_jobs`（sku_id + source_bucket + source_path 唯一），worker 路由 `POST /api/public/hooks/listing-image-worker`，每分钟 cron 已注册。
+- 只处理 `sku-raw` 桶入队的图，成功后把 `image_paths` 中的原图路径替换成 `sku-listing/...`，并维护 `inv_skus.image_processing_status`。
+- 图片指令（`handheld-ai.server.ts:102-107`）只要求正方形、浅灰底、校正曝光，并**严禁改文字与瑕疵** —— 也就是说**当前不会清除价签**，与新需求冲突。
+- worker 成功后**没有任何有赞/商城同步触发**（文件内无 `channel_sync_outbox` 写入），主图清洁完成不会自动推送渠道。
+- 对外主图与内部原图**没有区分字段**（只有一个 `image_paths` 数组，处理完就地替换）。
 
-`image_base64` 允许裸 base64 或 `data:` 前缀，服务端在 `toDataUrl` 里补 `data:image/jpeg;base64,`（第 16–19 行）。**没有大小上限校验**，1280px JPEG 完全可行；6 张原图直传则会明显放大请求体。
+## 最小可实施边界（建议分四个独立批次）
 
-**年代/描述相关 prompt 约束**（`product-recognition.server.ts:236–258`）：
+1. **统一消息 v1**：给 `inv_handheld_notifications` 增加 `user_id`、`audience`、`topic`、`ref_type/ref_id`，新增 `handheld_notification_reads`（notification_id + user_id）；改造三个现有路由做员工+门店过滤，新增单条已读与未读计数。不动履约与客服。
+2. **订单出票与拣货闭环**：已付款订单按 `sale_location_id`/库存所在门店生成 `fulfillments`（服务端函数或 RPC，不做前端触发）；新增订单二维码解析路由、拣货小票 payload（订单号+二维码+标题/条码/数量/价格/库位）、`shortage` 申报写 `fulfillment_exceptions`；`fulfillment_complete_pick` 增加“存在未确认缺货则拒绝完成”的分支。
+3. **面单与待取件**：新增申请面单 API 写 `shipments`（provider/tracking_no/label_payload）、`print_events` 记录，履约状态从 `packed` → `handover_ready`（对外文案“待取件”），不改 `handed_over` 语义，避免与现有 `order-policy` 冲突。
+4. **客户会话（共享接待）**：新建 `support_conversations` + `support_messages` + `support_participants`（门店与 HQ 客服可同时在场，无独占 claim）、以及 `shortage_confirmations`（客户显式确认才解除履约阻塞）；storefront 侧新增读写会话与确认接口。
 
-- `attributes` 必须含 `era`（与 brand/maker/origin_region/origin_country/material/craft/object_type/colors/dimensions/functional_status/missing_parts 同级）；`attribute_confidence` 需给出 `era` 的逐字段置信度。
-- 全局约束："只根据图片可见证据判断，不确定字段返回 null 或空数组"——即年代不确定必须返回 null，禁止猜测。
-- 描述限制：品名中文 ≤40 字，描述 ≤160 字。
-- 另有强约束：瓷器产地不可确认必须回 `ai_low_confidence`；IP 必须给最具体角色而非母品牌；品牌/标签只能取库内条目，禁止创造。
-- **没有**对 era 取值格式（如"昭和/1970s/年代区间"）的枚举约束，这一项目前是自由文本。
+图片方面单独一条：把“清除外加价签、保留商品本体文字与真实瑕疵”写进图片指令，并在 `inv_skus` 上区分内部原图与对外主图（例如新增 `listing_image_paths`），只有清洁通过的版本才进入渠道同步，并在 worker 成功后写 `channel_sync_outbox`。
 
-## 3) 为什么慢 — 证据与位置
-
-1. **模型选型是主因**：默认 `google/gemini-2.5-pro`（第 12 行，且 `PRODUCT_RECOGNITION_MODEL` 未配置覆盖）。同一网关上 flash 系列 1–4 s，pro 实测 34–40 s，差一个数量级。
-2. **系统 prompt 极大**：每次调用都把全量分类树 + 标签库 + 品牌库 + IP 库拼进 system（第 130–140、236–258 行）。当前库存规模：分类 122 条、标签 23 条、品牌/IP 合计 187 条。网关日志显示输入 token 稳定在 **12,385**，其中绝大部分是这段常量 prompt，而不是图片。且它没有任何缓存（每次 `loadCategories/Facets/Brands/Ips` 重新查库再重新拼串）。
-3. **输出也长**：3,026–4,216 output tokens（要求返回十几个字段 + evidence + clarification_requests），生成阶段本身就要几十秒。
-4. **非流式 + 无超时**：第 264 行一次性 `fetch`，客户端在完整 JSON 返回前拿不到任何反馈；卡住时也没有主动超时，只能等平台层断开。
-5. **重试会放大**：失败重试最多 3 次（第 146 行），每次都是一次完整的 30s+ 调用，最坏情况约 100 s 后才落兜底记录。
-
-**可选优化方向（本轮不改）**：配置 `PRODUCT_RECOGNITION_MODEL` 指向 flash 系列即可立刻把主链路从 ~35 s 降到个位数秒；把分类/标签/品牌库 prompt 做进程内缓存 + 裁剪；给 fetch 加显式超时并改流式；把 `inv_sku_classifications` 补一列耗时以便长期统计。
-
-## 安全声明
-
-本轮仅做只读核验：未修改任何代码、配置或数据库；未调用有赞、未改库存、未创建商品、未发布腾讯生产。报告中未包含任何 signed URL、token、密钥值或消费者个人资料。
+请确认这四个批次的优先级与第一批范围，我再按你的具体实现要求落地。
