@@ -13,7 +13,6 @@ import {
   orderStatusLabel,
   orderStatusLabelFor,
   pickImageUrl,
-
   toAmount,
 } from "@/server/handheld-orders.server";
 
@@ -191,7 +190,10 @@ describe("订单列表契约", () => {
     // 签名快照（含 token）不可信，无当前签名时不返回过期链接
     assert.equal(pickImageUrl({ signed: null, snapshot: "https://old?token=expired" }), null);
     // 非签名快照可直接用
-    assert.equal(pickImageUrl({ signed: null, snapshot: "https://cdn/plain.jpg" }), "https://cdn/plain.jpg");
+    assert.equal(
+      pickImageUrl({ signed: null, snapshot: "https://cdn/plain.jpg" }),
+      "https://cdn/plain.jpg",
+    );
     // 废弃 image_url 仅作最后回退
     assert.equal(
       pickImageUrl({ signed: null, snapshot: null, legacy: "https://legacy/a.jpg" }),
@@ -200,4 +202,3 @@ describe("订单列表契约", () => {
     assert.equal(pickImageUrl({ signed: null, snapshot: null, legacy: null }), null);
   });
 });
-

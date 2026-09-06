@@ -200,7 +200,6 @@ async function signPaths(paths: string[]): Promise<Map<string, string>> {
   return map;
 }
 
-
 type RawOrderRow = {
   id: string;
   order_no: string;
@@ -230,7 +229,6 @@ type RawOrderRow = {
       image_url: string | null;
       image_paths: string[] | null;
     } | null;
-
   }> | null;
   fulfillments: Array<{
     id: string;
@@ -286,7 +284,11 @@ function shapeOrder(
   detail: boolean,
   ctx: {
     signed: Map<string, string>;
-    derived?: { derived_status: DerivedOrderStatus; fulfillment_count: number; handed_over_count: number };
+    derived?: {
+      derived_status: DerivedOrderStatus;
+      fulfillment_count: number;
+      handed_over_count: number;
+    };
     canWrite?: boolean;
   },
 ) {
@@ -491,7 +493,6 @@ export async function getOrderDetail(orderId: string, options?: { canWrite?: boo
   });
 }
 
-
 /* ------------------------- 履约分页列表 ------------------------- */
 
 export type FulfillmentStatusFilter =
@@ -520,7 +521,6 @@ const FULFILLMENT_LIST_SELECT =
   "location:inv_locations!location_id(name), " +
   "order:commerce_orders!order_id(order_no, order_status, courier_provider, courier_service_code, fulfillment_method, customer_note), " +
   "items:fulfillment_items(id, expected_qty, picked_qty, order_item:commerce_order_items!order_item_id(title_snapshot, unit_price, image_snapshot), sku:inv_skus!sku_id(name, barcode, image_url, image_paths, sku_code))";
-
 
 type RawFulfillmentRow = {
   id: string;
@@ -557,7 +557,6 @@ type RawFulfillmentRow = {
       image_paths: string[] | null;
       sku_code: string | null;
     } | null;
-
   }> | null;
 };
 
@@ -653,7 +652,8 @@ export async function listFulfillmentsPaged(input: {
         item_count: rowItems.reduce((sum, it) => sum + Number(it.expected_qty ?? 0), 0),
         goods_amount: toAmount(
           rowItems.reduce(
-            (sum, it) => sum + Number(it.order_item?.unit_price ?? 0) * Number(it.expected_qty ?? 0),
+            (sum, it) =>
+              sum + Number(it.order_item?.unit_price ?? 0) * Number(it.expected_qty ?? 0),
             0,
           ),
         ),
@@ -685,4 +685,3 @@ export async function listFulfillmentsPaged(input: {
   });
   return { items, total };
 }
-
