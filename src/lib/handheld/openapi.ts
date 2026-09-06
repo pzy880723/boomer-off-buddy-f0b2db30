@@ -946,7 +946,7 @@ X-Session-Token: <操作员 session token>
         tags: ["履约"],
         summary: "履约任务列表（v1.12 新增分页契约）",
         description:
-          "默认仍返回旧版数组。`?format=items` 返回 `{items,total,page,page_size,scope}`，支持 `page`、`page_size`、`q`(履约单号/订单号)、`status`(all|pending_customer|allocated|picking|picked|handover_ready|handed_over|cancelled)。`scope=all` 仅 HQ 角色可用，其余固定为设备当前授权库位，禁止跨店。契约差异：fulfillments 表无 `cancelled` 状态，该筛选返回空集；`pending_customer` 由待客户确认的缺货记录推导。",
+          "默认仍返回旧版数组。`?format=items` 返回 `{items,total,page,page_size,scope}`，支持 `page`、`page_size`、`q`(履约单号/订单号/商品标题/条码)、`status`(all|pending_customer|allocated|picking|picked|handover_ready|handed_over|cancelled)。`scope=all` 仅 HQ 角色可用，其余固定为设备当前授权库位，禁止跨店。筛选、计数、分页全部在数据库函数 `handheld_search_fulfillment_ids` 内完成，`total` 为过滤后全量精确计数。契约差异：fulfillments 表本身没有 `cancelled` 状态，`status=cancelled` 返回父订单已取消/关闭的子单，并置 `order_cancelled=true`、`actionable=false`（客户端必须禁用一切操作）。`pending_customer` 由待客户确认的缺货记录推导，行内另有 `has_pending_customer`。`items[].location_label` 表示货架/储位，当前库位表没有货架字段，因此恒为 null，不会用库位名或 SKU 码冒充货架；库位名单独在 `location_name`。图片优先返回 `inv_skus.image_paths` 的新签名 URL，签名快照可能过期时回退到当前图。",
         responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
       },
     },
@@ -955,7 +955,7 @@ X-Session-Token: <操作员 session token>
         tags: ["订单"],
         summary: "父订单只读列表（v1.12，仅 HQ）",
         description:
-          "需要 X-Device-Token + 有效员工 session，且角色为 super_admin / hq_operator，否则 403 `hq_required`。query: `q`、`status`(all|pending|unpaid|after_sales|shipped|completed|cancelled)、`page`、`page_size`(默认 20，上限 100)、`location_id`(可选，需授权)。服务端过滤 + 分页，`total` 为过滤后全量计数。金额单位元，`paid_amount` 仅已支付订单返回真实实付，未支付为 0。",
+          "需要 X-Device-Token + 有效员工 session，且角色为 super_admin / hq_operator，否则 403 `hq_required`。query: `q`(订单号/商品标题/商品条码)、`status`(all|pending|unpaid|after_sales|shipped|completed|cancelled)、`page`、`page_size`(默认 20，上限 100)、`location_id`(可选，需授权)。筛选、计数、分页在数据库函数 `handheld_search_order_ids` 内完成，`total` 为过滤后全量精确计数。状态派生与筛选使用同一套规则：只有全部子单都已交接才是 `shipped`；部分交接仍归入 `pending`，并返回 `partially_handed_over=true`、`status_label=部分履约`（保证不漏备货）；退款/售后优先于完成态。行内附 `fulfillment_count`、`handed_over_count`。金额单位元，`paid_amount` 仅已支付订单返回真实实付，未支付为 0。",
         responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
       },
     },
@@ -964,7 +964,8 @@ X-Session-Token: <操作员 session token>
         tags: ["订单"],
         summary: "父订单只读详情（v1.12，仅 HQ）",
         description:
-          "在列表字段基础上追加 `recipient_name`(脱敏)、`recipient_phone`(脱敏)、`address_summary`、`customer_note`、`delivery_method`，`fulfillments[].items[]` 含行级明细。",
+          "在列表字段基础上追加 `workflow_version`、`capabilities`(can_write / can_operate_fulfillment / supports_fulfillment_cancel=false)、`recipient_name`(脱敏)、`recipient_phone`(脱敏)、`address_summary`、`customer_note`、`delivery_method`，`fulfillments[].items[]` 含行级明细。`capabilities.can_write` 表示当前 HQ 账号具备跨店写授权；订单取消时为 false。详情还会读取售后记录，存在未终结售后时状态优先为 `after_sales`。",
+
         responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
       },
     },

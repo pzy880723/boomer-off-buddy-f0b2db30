@@ -119,18 +119,43 @@ export function toAmount(value: unknown): number {
 
 export type DerivedOrderStatus = Exclude<OrderStatusFilter, "all">;
 
+/**
+ * 只有「全部有效子单都已交接」才算 shipped；部分交接仍属待履约（标签「部分履约」），
+ * 否则会漏备货。退款/售后优先于完成态。
+ * 与数据库函数 handheld_search_order_ids 内的 CASE 保持同一套规则。
+ */
 export function deriveOrderStatus(input: {
   payment_status: string | null;
   order_status: string | null;
-  has_handed_over: boolean;
+  fulfillment_count: number;
+  handed_over_count: number;
+  has_active_after_sale?: boolean;
 }): DerivedOrderStatus {
   const order = input.order_status ?? "";
+  const payment = input.payment_status ?? "";
   if (order === "cancelled" || order === "closed") return "cancelled";
-  if (order === "after_sale") return "after_sales";
+  if (
+    order === "after_sale" ||
+    input.has_active_after_sale === true ||
+    ["refunding", "refunded", "partial_refunded"].includes(payment)
+  ) {
+    return "after_sales";
+  }
   if (order === "completed") return "completed";
-  if (input.payment_status !== "paid") return "unpaid";
-  if (input.has_handed_over) return "shipped";
+  if (payment !== "paid") return "unpaid";
+  if (input.fulfillment_count > 0 && input.handed_over_count === input.fulfillment_count) {
+    return "shipped";
+  }
   return "pending";
+}
+
+/** 部分交接时展示「部分履约」，筛选仍归入 pending，保证不漏备货。 */
+export function orderStatusLabelFor(
+  status: DerivedOrderStatus,
+  counts: { fulfillment_count: number; handed_over_count: number },
+): string {
+  if (status === "pending" && counts.handed_over_count > 0) return "部分履约";
+  return ORDER_STATUS_LABELS[status];
 }
 
 export function orderStatusLabel(status: DerivedOrderStatus): string {
@@ -142,30 +167,38 @@ export async function isHqUser(userId: string): Promise<boolean> {
   return roles.includes("super_admin") || roles.includes("hq_operator");
 }
 
-async function orderIdsWithHandedOverFulfillment(): Promise<Set<string>> {
-  const { data } = await supabaseAdmin
-    .from("fulfillments" as never)
-    .select("order_id")
-    .eq("status", "handed_over")
-    .limit(10000);
-  return new Set(((data as { order_id: string }[] | null) ?? []).map((r) => r.order_id));
-}
-
-async function orderIdsAtLocation(locationId: string): Promise<string[]> {
-  const { data } = await supabaseAdmin
-    .from("fulfillments" as never)
-    .select("order_id")
-    .eq("location_id", locationId)
-    .limit(10000);
-  return Array.from(
-    new Set(((data as { order_id: string }[] | null) ?? []).map((r) => r.order_id)),
-  );
+/** 图片：优先当前 image_paths 的新签名 URL；快照签名可能已过期时回退到当前图。 */
+export function pickImageUrl(input: {
+  signed?: string | null;
+  snapshot?: string | null;
+  legacy?: string | null;
+}): string | null {
+  if (input.signed) return input.signed;
+  const snap = input.snapshot ?? "";
+  if (snap && !/token=/i.test(snap)) return snap;
+  const legacy = input.legacy ?? "";
+  if (legacy && /^https?:\/\//i.test(legacy) && !/token=/i.test(legacy)) return legacy;
+  return null;
 }
 
 const ORDER_SELECT =
   "id, order_no, payment_status, order_status, created_at, source_channel, subtotal, shipping_fee, discount_total, total_amount, recipient_name, recipient_phone, shipping_address, customer_note, paid_at, fulfillment_method, " +
-  "items:commerce_order_items(id, title_snapshot, image_snapshot, unit_price, quantity, line_total, sku:inv_skus!sku_id(barcode, image_url)), " +
-  "fulfillments:fulfillments(id, code, location_id, status, created_at, location:inv_locations!location_id(name), items:fulfillment_items(id, expected_qty, picked_qty, order_item:commerce_order_items!order_item_id(id, title_snapshot, image_snapshot, unit_price, quantity), sku:inv_skus!sku_id(name, barcode, image_url)))";
+  "items:commerce_order_items(id, title_snapshot, image_snapshot, unit_price, quantity, line_total, sku:inv_skus!sku_id(barcode, image_url, image_paths)), " +
+  "fulfillments:fulfillments(id, code, location_id, status, created_at, location:inv_locations!location_id(name), items:fulfillment_items(id, expected_qty, picked_qty, order_item:commerce_order_items!order_item_id(id, title_snapshot, image_snapshot, unit_price, quantity), sku:inv_skus!sku_id(name, barcode, image_url, image_paths)))";
+
+/** 批量签名 sku 图片路径 */
+async function signPaths(paths: string[]): Promise<Map<string, string>> {
+  const unique = [...new Set(paths.filter(Boolean))];
+  const map = new Map<string, string>();
+  if (unique.length === 0) return map;
+  const { signSkuImagePaths } = await import("@/lib/sku-image-resolver.server");
+  const signed = await signSkuImagePaths(unique);
+  unique.forEach((path, index) => {
+    const url = signed[index];
+    if (url) map.set(path, url);
+  });
+  return map;
+}
 
 type RawOrderRow = {
   id: string;
@@ -191,7 +224,11 @@ type RawOrderRow = {
     unit_price: number | null;
     quantity: number | null;
     line_total: number | null;
-    sku: { barcode: string | null; image_url: string | null } | null;
+    sku: {
+      barcode: string | null;
+      image_url: string | null;
+      image_paths: string[] | null;
+    } | null;
   }> | null;
   fulfillments: Array<{
     id: string;
@@ -211,27 +248,79 @@ type RawOrderRow = {
         unit_price: number | null;
         quantity: number | null;
       } | null;
-      sku: { name: string | null; barcode: string | null; image_url: string | null } | null;
+      sku: {
+        name: string | null;
+        barcode: string | null;
+        image_url: string | null;
+        image_paths: string[] | null;
+      } | null;
     }> | null;
   }> | null;
 };
 
-function shapeOrder(row: RawOrderRow, detail: boolean) {
+function collectOrderImagePaths(rows: RawOrderRow[]): string[] {
+  const paths: string[] = [];
+  for (const row of rows) {
+    for (const item of row.items ?? []) paths.push(...(item.sku?.image_paths ?? []));
+    for (const f of row.fulfillments ?? []) {
+      for (const it of f.items ?? []) paths.push(...(it.sku?.image_paths ?? []));
+    }
+  }
+  return paths;
+}
+
+function firstSigned(paths: string[] | null | undefined, signed: Map<string, string>) {
+  for (const path of paths ?? []) {
+    const url = signed.get(path);
+    if (url) return url;
+  }
+  return null;
+}
+
+export const ORDER_WORKFLOW_VERSION = "fulfillment-2026-09";
+
+function shapeOrder(
+  row: RawOrderRow,
+  detail: boolean,
+  ctx: {
+    signed: Map<string, string>;
+    derived?: {
+      derived_status: DerivedOrderStatus;
+      fulfillment_count: number;
+      handed_over_count: number;
+    };
+    canWrite?: boolean;
+  },
+) {
+  const signed = ctx.signed;
   const items = (row.items ?? []).map((item) => ({
     id: item.id,
     title: item.title_snapshot ?? "商品",
     barcode: item.sku?.barcode ?? null,
-    image_url: item.image_snapshot ?? item.sku?.image_url ?? null,
+    image_url: pickImageUrl({
+      signed: firstSigned(item.sku?.image_paths, signed),
+      snapshot: item.image_snapshot,
+      legacy: item.sku?.image_url,
+    }),
     quantity: item.quantity ?? 0,
     unit_price: toAmount(item.unit_price),
   }));
-  const hasHandedOver = (row.fulfillments ?? []).some((f) => f.status === "handed_over");
-  const status = deriveOrderStatus({
-    payment_status: row.payment_status,
-    order_status: row.order_status,
-    has_handed_over: hasHandedOver,
-  });
-  const fulfillments = (row.fulfillments ?? []).map((f) => {
+  const rowFulfillments = row.fulfillments ?? [];
+  const counts = ctx.derived ?? {
+    derived_status: null as unknown as DerivedOrderStatus,
+    fulfillment_count: rowFulfillments.length,
+    handed_over_count: rowFulfillments.filter((f) => f.status === "handed_over").length,
+  };
+  const status =
+    ctx.derived?.derived_status ??
+    deriveOrderStatus({
+      payment_status: row.payment_status,
+      order_status: row.order_status,
+      fulfillment_count: counts.fulfillment_count,
+      handed_over_count: counts.handed_over_count,
+    });
+  const orderCancelled = status === "cancelled";
+  const fulfillments = rowFulfillments.map((f) => {
     const fItems = f.items ?? [];
     const goods = fItems.reduce(
       (sum, it) => sum + Number(it.order_item?.unit_price ?? 0) * Number(it.expected_qty ?? 0),
@@ -243,7 +332,11 @@ function shapeOrder(row: RawOrderRow, detail: boolean) {
       location_id: f.location_id,
       location_name: f.location?.name ?? null,
       status: f.status,
-      status_label: FULFILLMENT_STATUS_LABELS[f.status] ?? f.status,
+      status_label: orderCancelled
+        ? "订单已取消"
+        : (FULFILLMENT_STATUS_LABELS[f.status] ?? f.status),
+      order_cancelled: orderCancelled,
+      actionable: !orderCancelled,
       item_count: fItems.reduce((sum, it) => sum + Number(it.expected_qty ?? 0), 0),
       goods_amount: toAmount(goods),
     };
@@ -256,7 +349,11 @@ function shapeOrder(row: RawOrderRow, detail: boolean) {
         picked_qty: it.picked_qty,
         title: it.order_item?.title_snapshot ?? it.sku?.name ?? "商品",
         barcode: it.sku?.barcode ?? null,
-        image_url: it.order_item?.image_snapshot ?? it.sku?.image_url ?? null,
+        image_url: pickImageUrl({
+          signed: firstSigned(it.sku?.image_paths, signed),
+          snapshot: it.order_item?.image_snapshot,
+          legacy: it.sku?.image_url,
+        }),
         unit_price: toAmount(it.order_item?.unit_price),
       })),
     };
@@ -266,7 +363,10 @@ function shapeOrder(row: RawOrderRow, detail: boolean) {
     id: row.id,
     order_no: row.order_no,
     status,
-    status_label: orderStatusLabel(status),
+    status_label: orderStatusLabelFor(status, counts),
+    fulfillment_count: counts.fulfillment_count,
+    handed_over_count: counts.handed_over_count,
+    partially_handed_over: status === "pending" && counts.handed_over_count > 0,
     created_at: row.created_at,
     source: row.source_channel ?? null,
     customer_name: maskName(row.recipient_name),
@@ -282,6 +382,13 @@ function shapeOrder(row: RawOrderRow, detail: boolean) {
   if (!detail) return shaped;
   return {
     ...shaped,
+    workflow_version: ORDER_WORKFLOW_VERSION,
+    capabilities: {
+      // HQ 拥有跨店写授权；门店员工只读父订单，写操作仍走履约接口的库位校验。
+      can_write: ctx.canWrite === true && !orderCancelled,
+      can_operate_fulfillment: !orderCancelled,
+      supports_fulfillment_cancel: false,
+    },
     recipient_name: maskName(row.recipient_name),
     recipient_phone: maskPhone(row.recipient_phone),
     address_summary: buildAddressSummary(row.shipping_address),
@@ -291,6 +398,14 @@ function shapeOrder(row: RawOrderRow, detail: boolean) {
   };
 }
 
+type OrderSearchRow = {
+  order_id: string;
+  derived_status: DerivedOrderStatus;
+  fulfillment_count: number;
+  handed_over_count: number;
+  total_count: number;
+};
+
 export async function listOrders(input: {
   q: string | null;
   status: OrderStatusFilter;
@@ -298,63 +413,50 @@ export async function listOrders(input: {
   pageSize: number;
   locationId: string | null;
 }) {
-  let query = supabaseAdmin
+  // 筛选/计数/分页全部在数据库内完成（handheld_search_order_ids），
+  // 避免有限 ID 列表 + 大 in 造成的假 total。
+  const { data: searchData, error: searchError } = await supabaseAdmin.rpc(
+    "handheld_search_order_ids" as never,
+    {
+      p_q: input.q,
+      p_status: input.status,
+      p_location_id: input.locationId,
+      p_limit: input.pageSize,
+      p_offset: (input.page - 1) * input.pageSize,
+    } as never,
+  );
+  if (searchError) throw new Error(searchError.message);
+  const search = (searchData as unknown as OrderSearchRow[] | null) ?? [];
+  const total = search.length ? Number(search[0].total_count) : 0;
+  if (search.length === 0) return { items: [], total };
+
+  const ids = search.map((r) => r.order_id);
+  const { data, error } = await supabaseAdmin
     .from("commerce_orders" as never)
-    .select(ORDER_SELECT, { count: "exact" });
-
-  if (input.q) {
-    const like = `%${input.q.replace(/[%,]/g, "")}%`;
-    query = query.or(`order_no.ilike.${like},recipient_name.ilike.${like}`);
-  }
-  if (input.locationId) {
-    const ids = await orderIdsAtLocation(input.locationId);
-    if (ids.length === 0) {
-      return { items: [], total: 0 };
-    }
-    query = query.in("id", ids);
-  }
-
-  switch (input.status) {
-    case "cancelled":
-      query = query.in("order_status", ["cancelled", "closed"]);
-      break;
-    case "after_sales":
-      query = query.eq("order_status", "after_sale");
-      break;
-    case "completed":
-      query = query.eq("order_status", "completed");
-      break;
-    case "unpaid":
-      query = query.neq("payment_status", "paid").not("order_status", "in", "(cancelled,closed)");
-      break;
-    case "shipped":
-    case "pending": {
-      const shipped = await orderIdsWithHandedOverFulfillment();
-      if (input.status === "shipped") {
-        const ids = Array.from(shipped);
-        if (ids.length === 0) return { items: [], total: 0 };
-        query = query.in("id", ids);
-      } else {
-        query = query.eq("payment_status", "paid").in("order_status", ["confirmed", "processing"]);
-        const ids = Array.from(shipped);
-        if (ids.length > 0) query = query.not("id", "in", `(${ids.join(",")})`);
-      }
-      break;
-    }
-    default:
-      break;
-  }
-
-  const from = (input.page - 1) * input.pageSize;
-  const { data, count, error } = await query
-    .order("created_at", { ascending: false })
-    .range(from, from + input.pageSize - 1);
+    .select(ORDER_SELECT)
+    .in("id", ids);
   if (error) throw new Error(error.message);
   const rows = (data as unknown as RawOrderRow[] | null) ?? [];
-  return { items: rows.map((row) => shapeOrder(row, false)), total: count ?? rows.length };
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  const signed = await signPaths(collectOrderImagePaths(rows));
+  const items = search.flatMap((meta) => {
+    const row = byId.get(meta.order_id);
+    if (!row) return [];
+    return [
+      shapeOrder(row, false, {
+        signed,
+        derived: {
+          derived_status: meta.derived_status,
+          fulfillment_count: Number(meta.fulfillment_count ?? 0),
+          handed_over_count: Number(meta.handed_over_count ?? 0),
+        },
+      }),
+    ];
+  });
+  return { items, total };
 }
 
-export async function getOrderDetail(orderId: string) {
+export async function getOrderDetail(orderId: string, options?: { canWrite?: boolean }) {
   const { data, error } = await supabaseAdmin
     .from("commerce_orders" as never)
     .select(ORDER_SELECT)
@@ -362,7 +464,33 @@ export async function getOrderDetail(orderId: string) {
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) return null;
-  return shapeOrder(data as unknown as RawOrderRow, true);
+  const row = data as unknown as RawOrderRow;
+  const signed = await signPaths(collectOrderImagePaths([row]));
+  const { data: afterSales } = await supabaseAdmin
+    .from("commerce_after_sales" as never)
+    .select("id, status")
+    .eq("order_id", orderId)
+    .limit(50);
+  const hasActiveAfterSale = ((afterSales as { status: string }[] | null) ?? []).some(
+    (r) => !["rejected", "closed", "cancelled"].includes(r.status),
+  );
+  const fulfillments = row.fulfillments ?? [];
+  const derivedStatus = deriveOrderStatus({
+    payment_status: row.payment_status,
+    order_status: row.order_status,
+    fulfillment_count: fulfillments.length,
+    handed_over_count: fulfillments.filter((f) => f.status === "handed_over").length,
+    has_active_after_sale: hasActiveAfterSale,
+  });
+  return shapeOrder(row, true, {
+    signed,
+    derived: {
+      derived_status: derivedStatus,
+      fulfillment_count: fulfillments.length,
+      handed_over_count: fulfillments.filter((f) => f.status === "handed_over").length,
+    },
+    canWrite: options?.canWrite,
+  });
 }
 
 /* ------------------------- 履约分页列表 ------------------------- */
@@ -391,8 +519,8 @@ export const FULFILLMENT_STATUS_FILTERS: FulfillmentStatusFilter[] = [
 const FULFILLMENT_LIST_SELECT =
   "id, code, order_id, location_id, status, priority, claimed_device_id, claimed_at, created_at, " +
   "location:inv_locations!location_id(name), " +
-  "order:commerce_orders!order_id(order_no, courier_provider, courier_service_code, fulfillment_method, customer_note), " +
-  "items:fulfillment_items(id, expected_qty, picked_qty, order_item:commerce_order_items!order_item_id(title_snapshot, unit_price, image_snapshot), sku:inv_skus!sku_id(name, barcode, image_url, sku_code))";
+  "order:commerce_orders!order_id(order_no, order_status, courier_provider, courier_service_code, fulfillment_method, customer_note), " +
+  "items:fulfillment_items(id, expected_qty, picked_qty, order_item:commerce_order_items!order_item_id(title_snapshot, unit_price, image_snapshot), sku:inv_skus!sku_id(name, barcode, image_url, image_paths, sku_code))";
 
 type RawFulfillmentRow = {
   id: string;
@@ -407,6 +535,7 @@ type RawFulfillmentRow = {
   location: { name: string } | null;
   order: {
     order_no: string;
+    order_status: string | null;
     courier_provider: string | null;
     courier_service_code: string | null;
     fulfillment_method: string | null;
@@ -425,6 +554,7 @@ type RawFulfillmentRow = {
       name: string | null;
       barcode: string | null;
       image_url: string | null;
+      image_paths: string[] | null;
       sku_code: string | null;
     } | null;
   }> | null;
@@ -444,6 +574,13 @@ async function shortageStatusByItem(fulfillmentIds: string[]): Promise<Map<strin
   return map;
 }
 
+type FulfillmentSearchRow = {
+  fulfillment_id: string;
+  order_cancelled: boolean;
+  has_pending_customer: boolean;
+  total_count: number;
+};
+
 export async function listFulfillmentsPaged(input: {
   status: FulfillmentStatusFilter;
   q: string | null;
@@ -451,100 +588,100 @@ export async function listFulfillmentsPaged(input: {
   pageSize: number;
   locationIds: string[] | null; // null = 全部（仅 HQ scope=all）
 }) {
-  let query = supabaseAdmin
+  if (input.locationIds && input.locationIds.length === 0) return { items: [], total: 0 };
+
+  // 数据库内筛选 + 计数 + 分页，避免预拉 ID 列表被截断导致 total 虚假。
+  const { data: searchData, error: searchError } = await supabaseAdmin.rpc(
+    "handheld_search_fulfillment_ids" as never,
+    {
+      p_q: input.q,
+      p_status: input.status,
+      p_location_ids: input.locationIds,
+      p_limit: input.pageSize,
+      p_offset: (input.page - 1) * input.pageSize,
+    } as never,
+  );
+  if (searchError) throw new Error(searchError.message);
+  const search = (searchData as unknown as FulfillmentSearchRow[] | null) ?? [];
+  const total = search.length ? Number(search[0].total_count) : 0;
+  if (search.length === 0) return { items: [], total };
+
+  const ids = search.map((r) => r.fulfillment_id);
+  const { data, error } = await supabaseAdmin
     .from("fulfillments" as never)
-    .select(FULFILLMENT_LIST_SELECT, { count: "exact" });
-
-  if (input.locationIds) {
-    if (input.locationIds.length === 0) return { items: [], total: 0 };
-    query = query.in("location_id", input.locationIds);
-  }
-
-  if (input.status === "cancelled") {
-    // 契约差异：fulfillments 表没有 cancelled 状态，返回空集而不是伪造数据。
-    return { items: [], total: 0 };
-  }
-  if (input.status === "pending_customer") {
-    const { data } = await supabaseAdmin
-      .from("fulfillment_shortages" as never)
-      .select("fulfillment_id")
-      .eq("status", "pending_customer")
-      .limit(10000);
-    const ids = Array.from(
-      new Set(((data as { fulfillment_id: string }[] | null) ?? []).map((r) => r.fulfillment_id)),
-    );
-    if (ids.length === 0) return { items: [], total: 0 };
-    query = query.in("id", ids);
-  } else if (input.status !== "all") {
-    query = query.eq("status", input.status);
-  }
-
-  if (input.q) {
-    const like = `%${input.q.replace(/[%,]/g, "")}%`;
-    const { data } = await supabaseAdmin
-      .from("commerce_orders" as never)
-      .select("id")
-      .ilike("order_no", like)
-      .limit(10000);
-    const orderIds = ((data as { id: string }[] | null) ?? []).map((r) => r.id);
-    const orderClause = orderIds.length ? `,order_id.in.(${orderIds.join(",")})` : "";
-    query = query.or(`code.ilike.${like}${orderClause}`);
-  }
-
-  const from = (input.page - 1) * input.pageSize;
-  const { data, count, error } = await query
-    .order("priority", { ascending: false })
-    .order("created_at", { ascending: true })
-    .range(from, from + input.pageSize - 1);
+    .select(FULFILLMENT_LIST_SELECT)
+    .in("id", ids);
   if (error) throw new Error(error.message);
   const rows = (data as unknown as RawFulfillmentRow[] | null) ?? [];
-  const shortages = await shortageStatusByItem(rows.map((r) => r.id));
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  const shortages = await shortageStatusByItem(ids);
+  const signed = await signPaths(
+    rows.flatMap((row) => (row.items ?? []).flatMap((it) => it.sku?.image_paths ?? [])),
+  );
 
-  const items = rows.map((row) => {
+  const items = search.flatMap((meta) => {
+    const row = byId.get(meta.fulfillment_id);
+    if (!row) return [];
     const rowItems = row.items ?? [];
-    return {
-      // 旧字段保留
-      id: row.id,
-      code: row.code,
-      order_id: row.order_id,
-      location_id: row.location_id,
-      status: row.status,
-      priority: row.priority,
-      claimed_device_id: row.claimed_device_id,
-      claimed_at: row.claimed_at,
-      created_at: row.created_at,
-      order: row.order,
-      // 新增字段
-      location_name: row.location?.name ?? null,
-      order_no: row.order?.order_no ?? null,
-      status_label: FULFILLMENT_STATUS_LABELS[row.status] ?? row.status,
-      item_count: rowItems.reduce((sum, it) => sum + Number(it.expected_qty ?? 0), 0),
-      goods_amount: toAmount(
-        rowItems.reduce(
-          (sum, it) => sum + Number(it.order_item?.unit_price ?? 0) * Number(it.expected_qty ?? 0),
-          0,
+    const orderCancelled =
+      meta.order_cancelled === true ||
+      ["cancelled", "closed"].includes(row.order?.order_status ?? "");
+    return [
+      {
+        // 旧字段保留
+        id: row.id,
+        code: row.code,
+        order_id: row.order_id,
+        location_id: row.location_id,
+        status: row.status,
+        priority: row.priority,
+        claimed_device_id: row.claimed_device_id,
+        claimed_at: row.claimed_at,
+        created_at: row.created_at,
+        order: row.order,
+        // 新增字段
+        location_name: row.location?.name ?? null,
+        order_no: row.order?.order_no ?? null,
+        status_label: orderCancelled
+          ? "订单已取消"
+          : (FULFILLMENT_STATUS_LABELS[row.status] ?? row.status),
+        // 履约表本身没有 cancelled 状态：由父订单取消推导，并禁止一切操作。
+        order_cancelled: orderCancelled,
+        actionable: !orderCancelled,
+        has_pending_customer: meta.has_pending_customer === true,
+        item_count: rowItems.reduce((sum, it) => sum + Number(it.expected_qty ?? 0), 0),
+        goods_amount: toAmount(
+          rowItems.reduce(
+            (sum, it) =>
+              sum + Number(it.order_item?.unit_price ?? 0) * Number(it.expected_qty ?? 0),
+            0,
+          ),
         ),
-      ),
-      delivery_method: row.order?.fulfillment_method ?? row.order?.courier_service_code ?? null,
-      items: rowItems.map((it) => ({
-        id: it.id,
-        expected_qty: it.expected_qty,
-        picked_qty: it.picked_qty,
-        location_label: row.location?.name
-          ? `${row.location.name}${it.sku?.sku_code ? ` · ${it.sku.sku_code}` : ""}`
-          : null,
-        shortage_status: shortages.get(it.id) ?? null,
-        sku: {
-          name: it.sku?.name ?? null,
-          barcode: it.sku?.barcode ?? null,
-          image_url: it.sku?.image_url ?? it.order_item?.image_snapshot ?? null,
-        },
-        order_item: {
-          title_snapshot: it.order_item?.title_snapshot ?? null,
-          unit_price: toAmount(it.order_item?.unit_price),
-        },
-      })),
-    };
+        delivery_method: row.order?.fulfillment_method ?? row.order?.courier_service_code ?? null,
+        items: rowItems.map((it) => ({
+          id: it.id,
+          expected_qty: it.expected_qty,
+          picked_qty: it.picked_qty,
+          // 地点 ≠ 架位：库位表当前没有货架/储位字段，缺架位时为 null，绝不用 SKU 码冒充货架。
+          location_label: null,
+          shortage_status: shortages.get(it.id) ?? null,
+          sku: {
+            name: it.sku?.name ?? null,
+            barcode: it.sku?.barcode ?? null,
+            sku_code: it.sku?.sku_code ?? null,
+            image_url: pickImageUrl({
+              signed: firstSigned(it.sku?.image_paths, signed),
+              snapshot: it.order_item?.image_snapshot,
+              legacy: it.sku?.image_url,
+            }),
+          },
+          order_item: {
+            title_snapshot: it.order_item?.title_snapshot ?? null,
+            unit_price: toAmount(it.order_item?.unit_price),
+          },
+        })),
+      },
+    ];
   });
-  return { items, total: count ?? items.length };
+  return { items, total };
 }

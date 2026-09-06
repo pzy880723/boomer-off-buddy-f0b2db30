@@ -20,12 +20,15 @@ export const Route = createFileRoute("/api/public/handheld/orders/$id")({
         if (!auth.ok) return auth.response;
         const session = await resolveSessionUser(request);
         if (!session) return err("Employee session required", 401, { code: "session_required" });
-        if (!(await isHqUser(session.user_id))) {
+        const isHq = await isHqUser(session.user_id);
+        if (!isHq) {
           return err("Headquarters role required", 403, { code: "hq_required" });
         }
         if (!UUID_RE.test(params.id)) return err("Invalid order id", 400);
         try {
-          const order = await getOrderDetail(params.id);
+          // HQ 具备跨店写授权（capabilities.can_write），门店员工无法到达此路由。
+          const order = await getOrderDetail(params.id, { canWrite: isHq });
+
           if (!order) return err("Order not found", 404);
           return ok(order);
         } catch (error) {

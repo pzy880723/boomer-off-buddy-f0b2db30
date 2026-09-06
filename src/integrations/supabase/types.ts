@@ -7722,6 +7722,37 @@ export type Database = {
       gen_commerce_order_no: { Args: never; Returns: string }
       gen_ean13: { Args: never; Returns: string }
       gen_stock_transfer_code: { Args: never; Returns: string }
+      handheld_search_fulfillment_ids: {
+        Args: {
+          p_limit?: number
+          p_location_ids?: string[]
+          p_offset?: number
+          p_q?: string
+          p_status?: string
+        }
+        Returns: {
+          fulfillment_id: string
+          has_pending_customer: boolean
+          order_cancelled: boolean
+          total_count: number
+        }[]
+      }
+      handheld_search_order_ids: {
+        Args: {
+          p_limit?: number
+          p_location_id?: string
+          p_offset?: number
+          p_q?: string
+          p_status?: string
+        }
+        Returns: {
+          derived_status: string
+          fulfillment_count: number
+          handed_over_count: number
+          order_id: string
+          total_count: number
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
