@@ -293,7 +293,7 @@ const document: ZodOpenApiObject = {
   openapi: "3.1.0",
   info: {
     title: "Boomer Off — Public API",
-    version: "1.12.0",
+    version: "1.13.0",
     description: `
 本文档覆盖：
 
@@ -946,7 +946,7 @@ X-Session-Token: <操作员 session token>
         tags: ["履约"],
         summary: "履约任务列表（v1.12 新增分页契约）",
         description:
-          "默认仍返回旧版数组。`?format=items` 返回 `{items,total,page,page_size,scope}`，支持 `page`、`page_size`、`q`(履约单号/订单号/商品标题/条码)、`status`(all|pending_customer|allocated|picking|picked|handover_ready|handed_over|cancelled)。`scope=all` 仅 HQ 角色可用，其余固定为设备当前授权库位，禁止跨店。筛选、计数、分页全部在数据库函数 `handheld_search_fulfillment_ids` 内完成，`total` 为过滤后全量精确计数。契约差异：fulfillments 表本身没有 `cancelled` 状态，`status=cancelled` 返回父订单已取消/关闭的子单，并置 `order_cancelled=true`、`actionable=false`（客户端必须禁用一切操作）。`pending_customer` 由待客户确认的缺货记录推导，行内另有 `has_pending_customer`。`items[].location_label` 表示货架/储位，当前库位表没有货架字段，因此恒为 null，不会用库位名或 SKU 码冒充货架；库位名单独在 `location_name`。图片优先返回 `inv_skus.image_paths` 的新签名 URL，签名快照可能过期时回退到当前图。",
+          "默认仍返回旧版数组。`?format=items` 返回 `{items,total,page,page_size,scope}`，支持 `page`、`page_size`、`q`(履约单号/订单号/商品标题/条码)、`status`(all|pending_customer|allocated|picking|picked|handover_ready|handed_over|cancelled)。`scope=all` 仅 HQ 角色可用，其余固定为设备当前授权库位，禁止跨店。筛选、计数、分页全部在数据库函数 `handheld_search_fulfillment_ids` 内完成，`total` 为过滤后全量精确计数。契约差异：fulfillments 表本身没有 `cancelled` 状态，`status=cancelled` 返回父订单已取消/关闭的子单，并置 `order_cancelled=true`、`actionable=false`（客户端必须禁用一切操作）。`pending_customer` 由待客户确认的缺货记录推导，行内另有 `has_pending_customer`。v1.13 新增 `location_id` 参数：普通员工只能传设备当前授权库位（否则 403 `location_forbidden`），HQ 传入需对该库位有授权，返回 `scope="location:<id>"`；HQ `scope=all` 且未传 `location_id` 时返回 `scope="all"`。`items[].location_label` 表示货架/储位，当前库位表没有货架字段，因此恒为 null，不会用库位名或 SKU 码冒充货架；库位名单独在 `location_name`。图片优先返回 `inv_skus.image_paths` 的新签名 URL，签名快照可能过期时回退到当前图。",
         responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
       },
     },
@@ -966,6 +966,15 @@ X-Session-Token: <操作员 session token>
         description:
           "在列表字段基础上追加 `workflow_version`、`capabilities`(can_write / can_operate_fulfillment / supports_fulfillment_cancel=false)、`recipient_name`(脱敏)、`recipient_phone`(脱敏)、`address_summary`、`customer_note`、`delivery_method`，`fulfillments[].items[]` 含行级明细。`capabilities.can_write` 表示当前 HQ 账号具备跨店写授权；订单取消时为 false。详情还会读取售后记录，存在未终结售后时状态优先为 `after_sales`。",
 
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/fulfillments/{id}": {
+      get: {
+        tags: ["履约"],
+        summary: "履约子单详情（v1.13 原生契约）",
+        description:
+          "响应新增：`workflow_version`=**数字 1**（不是字符串）、`scope`、`can_write`(服务端真实判定，非 UI 声明) 与 `write_blocked_reason`、`can_complete_pick`(服务端真实判定) 与 `complete_pick_blocked_reasons`(order_cancelled | shortage_pending_customer | refund_pending | lines_unpicked | status_<状态>)、`unpicked_line_count`、`pending_customer_count`、`refund_pending_count`、`waybill_available`=false（未接入真实快递商户，恒 false）。`items[]` 每行附 `shortage_status` 与 `shortage_refund_state`。权限：普通员工严格限设备当前绑定库位；HQ 按目标子单 `location_id` 授权，不依赖 HQ 设备绑定库位；父订单 cancelled/closed 时 `can_write=false`（读仍可）。",
         responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
       },
     },
