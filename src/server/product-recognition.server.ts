@@ -96,6 +96,8 @@ export type ProductRecognitionDeps = {
     facetPrompt: string;
     brandPrompt: string;
     ipPrompt: string;
+    source: ProductRecognitionSource;
+    timeoutMs: number | null;
   }) => Promise<{ model: string; raw: RawProductRecognition }>;
   saveAudit: (input: ProductRecognitionAuditInput) => Promise<{ id: string }>;
   sleep?: (milliseconds: number) => Promise<void>;
