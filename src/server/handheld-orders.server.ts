@@ -119,18 +119,43 @@ export function toAmount(value: unknown): number {
 
 export type DerivedOrderStatus = Exclude<OrderStatusFilter, "all">;
 
+/**
+ * 只有「全部有效子单都已交接」才算 shipped；部分交接仍属待履约（标签「部分履约」），
+ * 否则会漏备货。退款/售后优先于完成态。
+ * 与数据库函数 handheld_search_order_ids 内的 CASE 保持同一套规则。
+ */
 export function deriveOrderStatus(input: {
   payment_status: string | null;
   order_status: string | null;
-  has_handed_over: boolean;
+  fulfillment_count: number;
+  handed_over_count: number;
+  has_active_after_sale?: boolean;
 }): DerivedOrderStatus {
   const order = input.order_status ?? "";
+  const payment = input.payment_status ?? "";
   if (order === "cancelled" || order === "closed") return "cancelled";
-  if (order === "after_sale") return "after_sales";
+  if (
+    order === "after_sale" ||
+    input.has_active_after_sale === true ||
+    ["refunding", "refunded", "partial_refunded"].includes(payment)
+  ) {
+    return "after_sales";
+  }
   if (order === "completed") return "completed";
-  if (input.payment_status !== "paid") return "unpaid";
-  if (input.has_handed_over) return "shipped";
+  if (payment !== "paid") return "unpaid";
+  if (input.fulfillment_count > 0 && input.handed_over_count === input.fulfillment_count) {
+    return "shipped";
+  }
   return "pending";
+}
+
+/** 部分交接时展示「部分履约」，筛选仍归入 pending，保证不漏备货。 */
+export function orderStatusLabelFor(
+  status: DerivedOrderStatus,
+  counts: { fulfillment_count: number; handed_over_count: number },
+): string {
+  if (status === "pending" && counts.handed_over_count > 0) return "部分履约";
+  return ORDER_STATUS_LABELS[status];
 }
 
 export function orderStatusLabel(status: DerivedOrderStatus): string {
@@ -142,30 +167,39 @@ export async function isHqUser(userId: string): Promise<boolean> {
   return roles.includes("super_admin") || roles.includes("hq_operator");
 }
 
-async function orderIdsWithHandedOverFulfillment(): Promise<Set<string>> {
-  const { data } = await supabaseAdmin
-    .from("fulfillments" as never)
-    .select("order_id")
-    .eq("status", "handed_over")
-    .limit(10000);
-  return new Set(((data as { order_id: string }[] | null) ?? []).map((r) => r.order_id));
-}
-
-async function orderIdsAtLocation(locationId: string): Promise<string[]> {
-  const { data } = await supabaseAdmin
-    .from("fulfillments" as never)
-    .select("order_id")
-    .eq("location_id", locationId)
-    .limit(10000);
-  return Array.from(
-    new Set(((data as { order_id: string }[] | null) ?? []).map((r) => r.order_id)),
-  );
+/** 图片：优先当前 image_paths 的新签名 URL；快照签名可能已过期时回退到当前图。 */
+export function pickImageUrl(input: {
+  signed?: string | null;
+  snapshot?: string | null;
+  legacy?: string | null;
+}): string | null {
+  if (input.signed) return input.signed;
+  const snap = input.snapshot ?? "";
+  if (snap && !/token=/i.test(snap)) return snap;
+  const legacy = input.legacy ?? "";
+  if (legacy && /^https?:\/\//i.test(legacy) && !/token=/i.test(legacy)) return legacy;
+  return null;
 }
 
 const ORDER_SELECT =
   "id, order_no, payment_status, order_status, created_at, source_channel, subtotal, shipping_fee, discount_total, total_amount, recipient_name, recipient_phone, shipping_address, customer_note, paid_at, fulfillment_method, " +
-  "items:commerce_order_items(id, title_snapshot, image_snapshot, unit_price, quantity, line_total, sku:inv_skus!sku_id(barcode, image_url)), " +
-  "fulfillments:fulfillments(id, code, location_id, status, created_at, location:inv_locations!location_id(name), items:fulfillment_items(id, expected_qty, picked_qty, order_item:commerce_order_items!order_item_id(id, title_snapshot, image_snapshot, unit_price, quantity), sku:inv_skus!sku_id(name, barcode, image_url)))";
+  "items:commerce_order_items(id, title_snapshot, image_snapshot, unit_price, quantity, line_total, sku:inv_skus!sku_id(barcode, image_url, image_paths)), " +
+  "fulfillments:fulfillments(id, code, location_id, status, created_at, location:inv_locations!location_id(name), items:fulfillment_items(id, expected_qty, picked_qty, order_item:commerce_order_items!order_item_id(id, title_snapshot, image_snapshot, unit_price, quantity), sku:inv_skus!sku_id(name, barcode, image_url, image_paths)))";
+
+/** 批量签名 sku 图片路径 */
+async function signPaths(paths: string[]): Promise<Map<string, string>> {
+  const unique = [...new Set(paths.filter(Boolean))];
+  const map = new Map<string, string>();
+  if (unique.length === 0) return map;
+  const { signSkuImagePaths } = await import("@/lib/sku-image-resolver.server");
+  const signed = await signSkuImagePaths(unique);
+  unique.forEach((path, index) => {
+    const url = signed[index];
+    if (url) map.set(path, url);
+  });
+  return map;
+}
+
 
 type RawOrderRow = {
   id: string;
