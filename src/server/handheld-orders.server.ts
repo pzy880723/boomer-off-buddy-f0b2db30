@@ -604,8 +604,10 @@ export async function listFulfillmentsPaged(input: {
     } as never,
   );
   if (searchError) throw new Error(searchError.message);
-  const search = (searchData as unknown as FulfillmentSearchRow[] | null) ?? [];
-  const total = search.length ? Number(search[0].total_count) : 0;
+  const raw = (searchData as unknown as FulfillmentSearchRow[] | null) ?? [];
+  // 越界空页时数据库返回一条仅含 total 的占位行（fulfillment_id 为 null）。
+  const total = raw.length ? Number(raw[0].total_count ?? 0) : 0;
+  const search = raw.filter((r) => r.fulfillment_id != null);
   if (search.length === 0) return { items: [], total };
 
   const ids = search.map((r) => r.fulfillment_id);
