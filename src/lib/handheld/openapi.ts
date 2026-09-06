@@ -283,6 +283,8 @@ const PosPaymentAttemptRes = z.object({
 
 
 const jsonBody = (schema: z.ZodType) => ({ content: { "application/json": { schema } } });
+/** v1.11 新增接口的通用响应外壳（详细字段见各接口 description）。 */
+const AnyOkRes = z.object({ ok: z.literal(true), data: z.unknown() });
 const jsonRes = (description: string, schema: z.ZodType) => ({
   description,
   content: { "application/json": { schema } },
