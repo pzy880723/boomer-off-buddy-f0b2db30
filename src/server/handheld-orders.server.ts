@@ -250,27 +250,75 @@ type RawOrderRow = {
         unit_price: number | null;
         quantity: number | null;
       } | null;
-      sku: { name: string | null; barcode: string | null; image_url: string | null } | null;
+      sku: {
+        name: string | null;
+        barcode: string | null;
+        image_url: string | null;
+        image_paths: string[] | null;
+      } | null;
     }> | null;
   }> | null;
 };
 
-function shapeOrder(row: RawOrderRow, detail: boolean) {
+function collectOrderImagePaths(rows: RawOrderRow[]): string[] {
+  const paths: string[] = [];
+  for (const row of rows) {
+    for (const item of row.items ?? []) paths.push(...(item.sku?.image_paths ?? []));
+    for (const f of row.fulfillments ?? []) {
+      for (const it of f.items ?? []) paths.push(...(it.sku?.image_paths ?? []));
+    }
+  }
+  return paths;
+}
+
+function firstSigned(paths: string[] | null | undefined, signed: Map<string, string>) {
+  for (const path of paths ?? []) {
+    const url = signed.get(path);
+    if (url) return url;
+  }
+  return null;
+}
+
+export const ORDER_WORKFLOW_VERSION = "fulfillment-2026-09";
+
+function shapeOrder(
+  row: RawOrderRow,
+  detail: boolean,
+  ctx: {
+    signed: Map<string, string>;
+    derived?: { derived_status: DerivedOrderStatus; fulfillment_count: number; handed_over_count: number };
+    canWrite?: boolean;
+  },
+) {
+  const signed = ctx.signed;
   const items = (row.items ?? []).map((item) => ({
     id: item.id,
     title: item.title_snapshot ?? "商品",
     barcode: item.sku?.barcode ?? null,
-    image_url: item.image_snapshot ?? item.sku?.image_url ?? null,
+    image_url: pickImageUrl({
+      signed: firstSigned(item.sku?.image_paths, signed),
+      snapshot: item.image_snapshot,
+      legacy: item.sku?.image_url,
+    }),
     quantity: item.quantity ?? 0,
     unit_price: toAmount(item.unit_price),
   }));
-  const hasHandedOver = (row.fulfillments ?? []).some((f) => f.status === "handed_over");
-  const status = deriveOrderStatus({
-    payment_status: row.payment_status,
-    order_status: row.order_status,
-    has_handed_over: hasHandedOver,
-  });
-  const fulfillments = (row.fulfillments ?? []).map((f) => {
+  const rowFulfillments = row.fulfillments ?? [];
+  const counts = ctx.derived ?? {
+    derived_status: null as unknown as DerivedOrderStatus,
+    fulfillment_count: rowFulfillments.length,
+    handed_over_count: rowFulfillments.filter((f) => f.status === "handed_over").length,
+  };
+  const status =
+    ctx.derived?.derived_status ??
+    deriveOrderStatus({
+      payment_status: row.payment_status,
+      order_status: row.order_status,
+      fulfillment_count: counts.fulfillment_count,
+      handed_over_count: counts.handed_over_count,
+    });
+  const orderCancelled = status === "cancelled";
+  const fulfillments = rowFulfillments.map((f) => {
     const fItems = f.items ?? [];
     const goods = fItems.reduce(
       (sum, it) => sum + Number(it.order_item?.unit_price ?? 0) * Number(it.expected_qty ?? 0),
@@ -282,7 +330,11 @@ function shapeOrder(row: RawOrderRow, detail: boolean) {
       location_id: f.location_id,
       location_name: f.location?.name ?? null,
       status: f.status,
-      status_label: FULFILLMENT_STATUS_LABELS[f.status] ?? f.status,
+      status_label: orderCancelled
+        ? "订单已取消"
+        : (FULFILLMENT_STATUS_LABELS[f.status] ?? f.status),
+      order_cancelled: orderCancelled,
+      actionable: !orderCancelled,
       item_count: fItems.reduce((sum, it) => sum + Number(it.expected_qty ?? 0), 0),
       goods_amount: toAmount(goods),
     };
@@ -295,7 +347,11 @@ function shapeOrder(row: RawOrderRow, detail: boolean) {
         picked_qty: it.picked_qty,
         title: it.order_item?.title_snapshot ?? it.sku?.name ?? "商品",
         barcode: it.sku?.barcode ?? null,
-        image_url: it.order_item?.image_snapshot ?? it.sku?.image_url ?? null,
+        image_url: pickImageUrl({
+          signed: firstSigned(it.sku?.image_paths, signed),
+          snapshot: it.order_item?.image_snapshot,
+          legacy: it.sku?.image_url,
+        }),
         unit_price: toAmount(it.order_item?.unit_price),
       })),
     };
@@ -305,7 +361,10 @@ function shapeOrder(row: RawOrderRow, detail: boolean) {
     id: row.id,
     order_no: row.order_no,
     status,
-    status_label: orderStatusLabel(status),
+    status_label: orderStatusLabelFor(status, counts),
+    fulfillment_count: counts.fulfillment_count,
+    handed_over_count: counts.handed_over_count,
+    partially_handed_over: status === "pending" && counts.handed_over_count > 0,
     created_at: row.created_at,
     source: row.source_channel ?? null,
     customer_name: maskName(row.recipient_name),
@@ -321,6 +380,13 @@ function shapeOrder(row: RawOrderRow, detail: boolean) {
   if (!detail) return shaped;
   return {
     ...shaped,
+    workflow_version: ORDER_WORKFLOW_VERSION,
+    capabilities: {
+      // HQ 拥有跨店写授权；门店员工只读父订单，写操作仍走履约接口的库位校验。
+      can_write: ctx.canWrite === true && !orderCancelled,
+      can_operate_fulfillment: !orderCancelled,
+      supports_fulfillment_cancel: false,
+    },
     recipient_name: maskName(row.recipient_name),
     recipient_phone: maskPhone(row.recipient_phone),
     address_summary: buildAddressSummary(row.shipping_address),
@@ -330,6 +396,14 @@ function shapeOrder(row: RawOrderRow, detail: boolean) {
   };
 }
 
+type OrderSearchRow = {
+  order_id: string;
+  derived_status: DerivedOrderStatus;
+  fulfillment_count: number;
+  handed_over_count: number;
+  total_count: number;
+};
+
 export async function listOrders(input: {
   q: string | null;
   status: OrderStatusFilter;
@@ -337,63 +411,50 @@ export async function listOrders(input: {
   pageSize: number;
   locationId: string | null;
 }) {
-  let query = supabaseAdmin
+  // 筛选/计数/分页全部在数据库内完成（handheld_search_order_ids），
+  // 避免有限 ID 列表 + 大 in 造成的假 total。
+  const { data: searchData, error: searchError } = await supabaseAdmin.rpc(
+    "handheld_search_order_ids" as never,
+    {
+      p_q: input.q,
+      p_status: input.status,
+      p_location_id: input.locationId,
+      p_limit: input.pageSize,
+      p_offset: (input.page - 1) * input.pageSize,
+    } as never,
+  );
+  if (searchError) throw new Error(searchError.message);
+  const search = (searchData as unknown as OrderSearchRow[] | null) ?? [];
+  const total = search.length ? Number(search[0].total_count) : 0;
+  if (search.length === 0) return { items: [], total };
+
+  const ids = search.map((r) => r.order_id);
+  const { data, error } = await supabaseAdmin
     .from("commerce_orders" as never)
-    .select(ORDER_SELECT, { count: "exact" });
-
-  if (input.q) {
-    const like = `%${input.q.replace(/[%,]/g, "")}%`;
-    query = query.or(`order_no.ilike.${like},recipient_name.ilike.${like}`);
-  }
-  if (input.locationId) {
-    const ids = await orderIdsAtLocation(input.locationId);
-    if (ids.length === 0) {
-      return { items: [], total: 0 };
-    }
-    query = query.in("id", ids);
-  }
-
-  switch (input.status) {
-    case "cancelled":
-      query = query.in("order_status", ["cancelled", "closed"]);
-      break;
-    case "after_sales":
-      query = query.eq("order_status", "after_sale");
-      break;
-    case "completed":
-      query = query.eq("order_status", "completed");
-      break;
-    case "unpaid":
-      query = query.neq("payment_status", "paid").not("order_status", "in", "(cancelled,closed)");
-      break;
-    case "shipped":
-    case "pending": {
-      const shipped = await orderIdsWithHandedOverFulfillment();
-      if (input.status === "shipped") {
-        const ids = Array.from(shipped);
-        if (ids.length === 0) return { items: [], total: 0 };
-        query = query.in("id", ids);
-      } else {
-        query = query.eq("payment_status", "paid").in("order_status", ["confirmed", "processing"]);
-        const ids = Array.from(shipped);
-        if (ids.length > 0) query = query.not("id", "in", `(${ids.join(",")})`);
-      }
-      break;
-    }
-    default:
-      break;
-  }
-
-  const from = (input.page - 1) * input.pageSize;
-  const { data, count, error } = await query
-    .order("created_at", { ascending: false })
-    .range(from, from + input.pageSize - 1);
+    .select(ORDER_SELECT)
+    .in("id", ids);
   if (error) throw new Error(error.message);
   const rows = (data as unknown as RawOrderRow[] | null) ?? [];
-  return { items: rows.map((row) => shapeOrder(row, false)), total: count ?? rows.length };
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  const signed = await signPaths(collectOrderImagePaths(rows));
+  const items = search.flatMap((meta) => {
+    const row = byId.get(meta.order_id);
+    if (!row) return [];
+    return [
+      shapeOrder(row, false, {
+        signed,
+        derived: {
+          derived_status: meta.derived_status,
+          fulfillment_count: Number(meta.fulfillment_count ?? 0),
+          handed_over_count: Number(meta.handed_over_count ?? 0),
+        },
+      }),
+    ];
+  });
+  return { items, total };
 }
 
-export async function getOrderDetail(orderId: string) {
+export async function getOrderDetail(orderId: string, options?: { canWrite?: boolean }) {
   const { data, error } = await supabaseAdmin
     .from("commerce_orders" as never)
     .select(ORDER_SELECT)
@@ -401,8 +462,35 @@ export async function getOrderDetail(orderId: string) {
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) return null;
-  return shapeOrder(data as unknown as RawOrderRow, true);
+  const row = data as unknown as RawOrderRow;
+  const signed = await signPaths(collectOrderImagePaths([row]));
+  const { data: afterSales } = await supabaseAdmin
+    .from("commerce_after_sales" as never)
+    .select("id, status")
+    .eq("order_id", orderId)
+    .limit(50);
+  const hasActiveAfterSale = ((afterSales as { status: string }[] | null) ?? []).some(
+    (r) => !["rejected", "closed", "cancelled"].includes(r.status),
+  );
+  const fulfillments = row.fulfillments ?? [];
+  const derivedStatus = deriveOrderStatus({
+    payment_status: row.payment_status,
+    order_status: row.order_status,
+    fulfillment_count: fulfillments.length,
+    handed_over_count: fulfillments.filter((f) => f.status === "handed_over").length,
+    has_active_after_sale: hasActiveAfterSale,
+  });
+  return shapeOrder(row, true, {
+    signed,
+    derived: {
+      derived_status: derivedStatus,
+      fulfillment_count: fulfillments.length,
+      handed_over_count: fulfillments.filter((f) => f.status === "handed_over").length,
+    },
+    canWrite: options?.canWrite,
+  });
 }
+
 
 /* ------------------------- 履约分页列表 ------------------------- */
 
