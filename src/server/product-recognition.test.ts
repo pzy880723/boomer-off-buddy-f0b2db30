@@ -1,13 +1,23 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
+import { AiRecognizeReq } from "../lib/handheld/schemas";
 import type { CategoryNode } from "../lib/product-classification";
 import type { BrandCandidate, FacetTerm } from "../lib/product-taxonomy";
 import {
+  buildEraInstruction,
+  DEFAULT_HANDHELD_PRODUCT_RECOGNITION_MODEL,
+  DEFAULT_PRODUCT_RECOGNITION_MODEL,
+  HANDHELD_RECOGNITION_MAX_ATTEMPTS,
+  HANDHELD_RECOGNITION_TIMEOUT_MS,
+  isRecognitionTimeoutError,
+  recognitionAttemptPolicy,
+  resolveProductRecognitionModel,
   runProductRecognition,
   type ProductRecognitionAuditInput,
   type ProductRecognitionDeps,
 } from "./product-recognition.server";
+
 
 const categories: CategoryNode[] = [
   { id: "root-p", code: "porcelain", name: "瓷器", parent_id: null, is_active: true },
