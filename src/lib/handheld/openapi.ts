@@ -941,7 +941,26 @@ X-Session-Token: <操作员 session token>
         responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
       },
     },
+    "/api/public/handheld/orders": {
+      get: {
+        tags: ["订单"],
+        summary: "父订单只读列表（v1.12，仅 HQ）",
+        description:
+          "需要 X-Device-Token + 有效员工 session，且角色为 super_admin / hq_operator，否则 403 `hq_required`。query: `q`、`status`(all|pending|unpaid|after_sales|shipped|completed|cancelled)、`page`、`page_size`(默认 20，上限 100)、`location_id`(可选，需授权)。服务端过滤 + 分页，`total` 为过滤后全量计数。金额单位元，`paid_amount` 仅已支付订单返回真实实付，未支付为 0。",
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/orders/{id}": {
+      get: {
+        tags: ["订单"],
+        summary: "父订单只读详情（v1.12，仅 HQ）",
+        description:
+          "在列表字段基础上追加 `recipient_name`(脱敏)、`recipient_phone`(脱敏)、`address_summary`、`customer_note`、`delivery_method`，`fulfillments[].items[]` 含行级明细。",
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+    },
     "/api/public/handheld/fulfillments/resolve": {
+
       get: {
         tags: ["履约"],
         summary: "扫码解析履约单（v1.11）",
