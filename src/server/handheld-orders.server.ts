@@ -225,7 +225,12 @@ type RawOrderRow = {
     unit_price: number | null;
     quantity: number | null;
     line_total: number | null;
-    sku: { barcode: string | null; image_url: string | null } | null;
+    sku: {
+      barcode: string | null;
+      image_url: string | null;
+      image_paths: string[] | null;
+    } | null;
+
   }> | null;
   fulfillments: Array<{
     id: string;
