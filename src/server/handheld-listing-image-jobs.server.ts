@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { aiPrepareListingImage } from "@/server/handheld-ai.server";
+import { ListingImageReviewRequiredError } from "./listing-image-policy";
 
 type ImageRef = {
   bucket: "sku-raw" | "sku-listing";
@@ -160,7 +161,9 @@ async function processJob(job: JobRow, workerId: string): Promise<boolean> {
       .eq("id", job.id);
   } catch (error) {
     const attempts = job.attempts + 1;
-    const permanent = attempts >= BACKOFF_SECONDS.length + 1;
+    // Unsafe/uncertain edits need review, not another paid attempt at inventing the hidden area.
+    const permanent =
+      error instanceof ListingImageReviewRequiredError || attempts >= BACKOFF_SECONDS.length + 1;
     const delay = BACKOFF_SECONDS[Math.min(attempts - 1, BACKOFF_SECONDS.length - 1)];
     await supabaseAdmin
       .from("inv_listing_image_jobs" as never)

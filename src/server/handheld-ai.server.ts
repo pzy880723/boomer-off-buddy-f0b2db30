@@ -2,7 +2,18 @@
 // 识别共用 ERP 动态分类核心；gemini-3.1-flash-image 仅负责上架图修整。
 // 走 Lovable AI Gateway，无需单独 key。
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { recognizeProductFromImages } from "@/server/product-recognition.server";
+import {
+  DEFAULT_HANDHELD_PRODUCT_RECOGNITION_MODEL,
+  HANDHELD_RECOGNITION_TIMEOUT_MS,
+  recognizeProductFromImages,
+} from "@/server/product-recognition.server";
+import {
+  assertListingImageNotRefused,
+  assertListingImageReview,
+  parseListingImageDataUrl,
+  SYSTEM_LISTING_IMAGE,
+  SYSTEM_LISTING_IMAGE_REVIEW,
+} from "./listing-image-policy";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1";
 
@@ -99,14 +110,7 @@ export async function aiRecognizeItem(input: {
   };
 }
 
-const SYSTEM_LISTING_IMAGE = `把这张中古杂货实物图修整成上架主图：
-- 输出必须是 1:1 正方形（1024x1024），主体居中裁切、四周留白均匀
-- 背景统一为干净浅灰底
-- 校正角度，修正白平衡和曝光
-- 严禁改 logo、文字、瑕疵、颜色、配件数量
-- 严禁添加任何文字、水印、贴纸`;
-
-/** Returns base64 PNG (no data: prefix). */
+/** Returns a reviewed image as base64 (no data: prefix), or throws before upload. */
 export async function aiPrepareListingImage(input: {
   image_url?: string;
   image_base64?: string;
@@ -121,13 +125,13 @@ export async function aiPrepareListingImage(input: {
   const body = {
     model: "google/gemini-3.1-flash-image",
     messages: [
+      { role: "system", content: SYSTEM_LISTING_IMAGE },
       {
         role: "user",
         content: [
           {
             type: "text",
-            text:
-              SYSTEM_LISTING_IMAGE + (input.instruction ? `\n额外要求：${input.instruction}` : ""),
+            text: input.instruction || "Prepare this product angle under the listing-image policy.",
           },
           { type: "image_url", image_url: { url: dataUrl } },
         ],
@@ -138,6 +142,7 @@ export async function aiPrepareListingImage(input: {
 
   const res = await fetch(`${GATEWAY}/chat/completions`, {
     method: "POST",
+    signal: AbortSignal.timeout(120_000),
     headers: {
       Authorization: `Bearer ${getKey()}`,
       "Content-Type": "application/json",
@@ -150,14 +155,52 @@ export async function aiPrepareListingImage(input: {
     throw new Error(`AI gateway ${res.status}: ${t.slice(0, 300)}`);
   }
   const j = await res.json();
+  assertListingImageNotRefused(
+    j?.choices?.[0]?.message?.content,
+    j?.choices?.[0]?.message?.refusal,
+    j?.choices?.[0]?.finish_reason,
+  );
   // OpenRouter image response shape: choices[0].message.images[0].image_url.url (data: URL)
-  const url: string | undefined =
+  const url: unknown =
     j?.choices?.[0]?.message?.images?.[0]?.image_url?.url ??
     j?.choices?.[0]?.message?.content?.[0]?.image_url?.url;
-  if (!url || !url.startsWith("data:")) {
-    throw new Error("AI gateway did not return an image");
+  const prepared = parseListingImageDataUrl(url);
+  // One bounded comparison per candidate; no upload or raw-image replacement before it passes.
+  const review = await fetch(`${GATEWAY}/chat/completions`, {
+    method: "POST",
+    signal: AbortSignal.timeout(HANDHELD_RECOGNITION_TIMEOUT_MS),
+    headers: {
+      Authorization: `Bearer ${getKey()}`,
+      "Content-Type": "application/json",
+      "X-Lovable-AIG-SDK": "vercel-ai-sdk",
+    },
+    body: JSON.stringify({
+      model: DEFAULT_HANDHELD_PRODUCT_RECOGNITION_MODEL,
+      max_tokens: 2048,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: SYSTEM_LISTING_IMAGE_REVIEW },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Compare image 1 (original) with image 2 (edited candidate)." },
+            { type: "image_url", image_url: { url: dataUrl } },
+            { type: "image_url", image_url: { url } },
+          ],
+        },
+      ],
+    }),
+  });
+  if (!review.ok) {
+    const detail = await review.text().catch(() => "");
+    throw new Error(`AI image QA gateway ${review.status}: ${detail.slice(0, 300)}`);
   }
-  const m = url.match(/^data:([^;]+);base64,(.+)$/);
-  if (!m) throw new Error("Unsupported image data URL");
-  return { mime: m[1], b64: m[2] };
+  const reviewed = await review.json();
+  assertListingImageNotRefused(
+    reviewed?.choices?.[0]?.message?.content,
+    reviewed?.choices?.[0]?.message?.refusal,
+    reviewed?.choices?.[0]?.finish_reason,
+  );
+  assertListingImageReview(reviewed?.choices?.[0]?.message?.content);
+  return prepared;
 }
