@@ -19,8 +19,7 @@ export const BLOCKING_ORDER_STATUSES = ["cancelled", "closed"] as const;
 export type AccessMode = "read" | "write";
 
 export type AccessDecision =
-  | { ok: true; scope: string }
-  | { ok: false; code: string; status: number; message: string };
+  { ok: true; scope: string } | { ok: false; code: string; status: number; message: string };
 
 /**
  * 纯函数：给定角色/库位/订单状态，判定是否允许访问目标子单。
@@ -75,6 +74,7 @@ export function evaluateFulfillmentAccess(input: {
 
 export type ShortageRow = {
   fulfillment_item_id: string;
+  quantity: number;
   status: string;
   refund_state: string | null;
 };
@@ -82,8 +82,10 @@ export type ShortageRow = {
 export type PickGuardInput = {
   fulfillmentStatus: string;
   orderCancelled: boolean;
-  items: Array<{ id: string; expected_qty: number; picked_qty: number }>;
-  shortages: ShortageRow[];
+  items: Array<{ id: string; expected_qty: number; picked_qty: number }> | null;
+  shortages: ShortageRow[] | null;
+  itemQueryError?: unknown;
+  shortageQueryError?: unknown;
 };
 
 export type PickGuard = {
@@ -98,22 +100,33 @@ export type PickGuard = {
 export function computePickGuard(input: PickGuardInput): PickGuard {
   const reasons: string[] = [];
   if (input.orderCancelled) reasons.push("order_cancelled");
+  if (input.itemQueryError || input.items === null) reasons.push("items_load_failed");
+  if (input.shortageQueryError || input.shortages === null) reasons.push("shortages_load_failed");
+  const items = input.items ?? [];
+  const shortages = (input.shortages ?? []).filter((s) => s.status !== "withdrawn");
+  if (items.length === 0) reasons.push("items_empty");
 
-  const pendingCustomer = input.shortages.filter((s) => s.status === "pending_customer").length;
+  const pendingCustomer = shortages.filter((s) => s.status === "pending_customer").length;
   if (pendingCustomer > 0) reasons.push("shortage_pending_customer");
 
-  const refundPending = input.shortages.filter((s) => s.refund_state === "refund_pending").length;
+  const refundPending = shortages.filter((s) => s.refund_state === "refund_pending").length;
   if (refundPending > 0) reasons.push("refund_pending");
 
-  // 缺货已被客户确认取消的行不再要求拣满。
-  const acceptedItemIds = new Set(
-    input.shortages
-      .filter((s) => s.status === "customer_accepted")
-      .map((s) => s.fulfillment_item_id),
-  );
-  const unpicked = input.items.filter(
-    (it) =>
-      Number(it.picked_qty ?? 0) < Number(it.expected_qty ?? 0) && !acceptedItemIds.has(it.id),
+  // Only customer-confirmed, refund-cleared quantities reduce the work on a line.
+  const approvedQuantities = new Map<string, number>();
+  for (const shortage of shortages) {
+    if (
+      shortage.status === "customer_accepted" &&
+      (shortage.refund_state === "refund_completed" || shortage.refund_state === "not_required")
+    ) {
+      approvedQuantities.set(
+        shortage.fulfillment_item_id,
+        (approvedQuantities.get(shortage.fulfillment_item_id) ?? 0) + shortage.quantity,
+      );
+    }
+  }
+  const unpicked = items.filter(
+    (it) => it.picked_qty < Math.max(0, it.expected_qty - (approvedQuantities.get(it.id) ?? 0)),
   ).length;
   if (unpicked > 0) reasons.push("lines_unpicked");
 
@@ -226,26 +239,24 @@ export async function loadPickGuard(context: FulfillmentContext): Promise<{
   guard: PickGuard;
   shortageByItem: Map<string, { status: string; refund_state: string | null }>;
 }> {
-  const [{ data: itemRows }, { data: shortageRows }] = await Promise.all([
+  const [
+    { data: itemRows, error: itemQueryError },
+    { data: shortageRows, error: shortageQueryError },
+  ] = await Promise.all([
     supabaseAdmin
       .from("fulfillment_items" as never)
       .select("id, expected_qty, picked_qty")
       .eq("fulfillment_id", context.id),
     supabaseAdmin
       .from("fulfillment_shortages" as never)
-      .select("fulfillment_item_id, status, refund_state, created_at")
+      .select("fulfillment_item_id, quantity, status, refund_state, created_at")
       .eq("fulfillment_id", context.id)
       .order("created_at", { ascending: true }),
   ]);
-  const items =
-    (itemRows as unknown as Array<{
-      id: string;
-      expected_qty: number;
-      picked_qty: number;
-    }> | null) ?? [];
-  const shortages = (shortageRows as unknown as ShortageRow[] | null) ?? [];
+  const items = itemRows as unknown as PickGuardInput["items"];
+  const shortages = shortageRows as unknown as PickGuardInput["shortages"];
   const shortageByItem = new Map<string, { status: string; refund_state: string | null }>();
-  for (const row of shortages) {
+  for (const row of shortageQueryError ? [] : (shortages ?? [])) {
     shortageByItem.set(row.fulfillment_item_id, {
       status: row.status,
       refund_state: row.refund_state ?? null,
@@ -258,6 +269,8 @@ export async function loadPickGuard(context: FulfillmentContext): Promise<{
     ),
     items,
     shortages,
+    itemQueryError,
+    shortageQueryError,
   });
   return { guard, shortageByItem };
 }

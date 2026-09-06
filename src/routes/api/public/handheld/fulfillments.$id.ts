@@ -13,6 +13,8 @@ import {
   evaluateFulfillmentAccess,
   loadPickGuard,
 } from "@/server/handheld-fulfillment-access.server";
+import { signSkuImagePaths } from "@/lib/sku-image-resolver.server";
+import { pickImageUrl } from "@/server/handheld-orders.server";
 
 export const Route = createFileRoute("/api/public/handheld/fulfillments/$id")({
   server: {
@@ -34,7 +36,7 @@ export const Route = createFileRoute("/api/public/handheld/fulfillments/$id")({
         const { data, error } = await supabaseAdmin
           .from("fulfillments" as never)
           .select(
-            "*, order:commerce_orders!order_id(order_no, order_status, payment_status, recipient_name, recipient_phone, shipping_address, courier_provider, courier_service_code, customer_note), location:inv_locations!location_id(id,name,kind), tote:warehouse_totes!tote_id(id,code,status), items:fulfillment_items(*, order_item:commerce_order_items!order_item_id(title_snapshot,image_snapshot,condition_snapshot,unit_price), sku:inv_skus!sku_id(sku_code,barcode,name,image_url))",
+            "*, order:commerce_orders!order_id(order_no, order_status, payment_status, recipient_name, recipient_phone, shipping_address, courier_provider, courier_service_code, customer_note), location:inv_locations!location_id(id,name,kind), tote:warehouse_totes!tote_id(id,code,status), items:fulfillment_items(*, order_item:commerce_order_items!order_item_id(title_snapshot,image_snapshot,condition_snapshot,unit_price), sku:inv_skus!sku_id(sku_code,barcode,name,image_url,image_paths))",
           )
           .eq("id", params.id)
           .maybeSingle();
@@ -50,16 +52,35 @@ export const Route = createFileRoute("/api/public/handheld/fulfillments/$id")({
           userAllowedAtFulfillmentLocation: true,
           orderStatus: access.fulfillment.order_status,
         });
-        const { guard, shortageByItem } = await loadPickGuard(access.fulfillment);
+        const pickState = await loadPickGuard(access.fulfillment).catch(() => null);
+        if (!pickState)
+          return err("Order status is temporarily unavailable. Please retry.", 503, {
+            code: "order_status_unavailable",
+          });
+        const { guard, shortageByItem } = pickState;
 
         const row = data as unknown as {
-          items?: Array<{ id: string }> | null;
+          items?: Array<{
+            id: string;
+            sku?: { image_paths?: string[] | null; image_url?: string | null } | null;
+            order_item?: { image_snapshot?: string | null } | null;
+          }> | null;
           [key: string]: unknown;
         };
+        const paths = [
+          ...new Set((row.items ?? []).flatMap((item) => item.sku?.image_paths ?? [])),
+        ];
+        const urls = await signSkuImagePaths(paths).catch(() => paths.map(() => null));
+        const signed = new Map(paths.map((path, index) => [path, urls[index]]));
         const items = (row.items ?? []).map((item) => {
           const shortage = shortageByItem.get(item.id);
           return {
             ...item,
+            image_url: pickImageUrl({
+              signed: (item.sku?.image_paths ?? []).map((path) => signed.get(path)).find(Boolean),
+              snapshot: item.order_item?.image_snapshot,
+              legacy: item.sku?.image_url,
+            }),
             shortage_status: shortage?.status ?? null,
             shortage_refund_state: shortage?.refund_state ?? null,
           };

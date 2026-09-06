@@ -26,7 +26,12 @@ export const Route = createFileRoute("/api/public/handheld/fulfillments/$id/pick
         if (!access.ok) return access.response;
 
         // 服务端真实判定：pending_customer 缺货、refund_pending 退款、未拣完一律阻止。
-        const { guard } = await loadPickGuard(access.fulfillment);
+        const pickState = await loadPickGuard(access.fulfillment).catch(() => null);
+        if (!pickState)
+          return err("Order status is temporarily unavailable. Please retry.", 503, {
+            code: "order_status_unavailable",
+          });
+        const { guard } = pickState;
         if (!guard.can_complete_pick) {
           return err("Pick cannot be completed yet", 409, {
             code: "pick_blocked",
