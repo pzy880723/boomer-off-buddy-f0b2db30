@@ -100,6 +100,17 @@ function depsFor(
 }
 
 describe("shared product recognition core", () => {
+  test("handheld description retains an era range or explicitly leaves the era unconfirmed", async () => {
+    for (const era of [null, "约1980-1990年代"]) {
+      const result = await runProductRecognition({ images: ["front"], source: "handheld" }, depsFor(async () => ({
+        model: "test-vision", raw: { category_code: "toy_character_figure", confidence: 0.9,
+          name: "角色玩偶", description: "角色玩偶挂件。", attributes: { era } },
+      }), []));
+      assert.ok(result.description?.includes(era ?? "年代待确认"));
+      assert.equal(result.attributes.era, era);
+    }
+  });
+
   test("gateway uses bounded Flash only for handheld and preserves ERP model overrides", async () => {
     const previousFetch = globalThis.fetch;
     const saved = { key: process.env.LOVABLE_API_KEY, model: process.env.PRODUCT_RECOGNITION_MODEL,

@@ -212,6 +212,13 @@ export async function runProductRecognition(
     warning: `AI 识别暂时不可用：${lastError?.message ?? "未知错误"}`,
   };
   const normalized = normalizeProductRecognition(modelResult, categories, { facets, brands, ips });
+  if (input.source === "handheld" && !failed && normalized.description) {
+    const era = normalized.attributes.era || "年代待确认";
+    if (!normalized.description.includes(era)) {
+      normalized.description = [normalized.description.replace(/[。；;]+$/u, ""), era]
+        .filter(Boolean).join("；") + "。";
+    }
+  }
   const status = failed ? "failed" : auditStatus(normalized);
   const saved = await deps.saveAudit({
     source: input.source,
