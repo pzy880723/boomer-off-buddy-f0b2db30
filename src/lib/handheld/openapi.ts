@@ -293,7 +293,7 @@ const document: ZodOpenApiObject = {
   openapi: "3.1.0",
   info: {
     title: "Boomer Off — Public API",
-    version: "1.11.0",
+    version: "1.12.0",
     description: `
 本文档覆盖：
 
@@ -938,6 +938,33 @@ X-Session-Token: <操作员 session token>
         summary: "发送客服消息（v1.11）",
         description:
           "body: `{ body, internal:false, client_op_id }`。`client_op_id` 唯一，重试返回同一条消息且 `replayed:true`。",
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/fulfillments": {
+      get: {
+        tags: ["履约"],
+        summary: "履约任务列表（v1.12 新增分页契约）",
+        description:
+          "默认仍返回旧版数组。`?format=items` 返回 `{items,total,page,page_size,scope}`，支持 `page`、`page_size`、`q`(履约单号/订单号)、`status`(all|pending_customer|allocated|picking|picked|handover_ready|handed_over|cancelled)。`scope=all` 仅 HQ 角色可用，其余固定为设备当前授权库位，禁止跨店。契约差异：fulfillments 表无 `cancelled` 状态，该筛选返回空集；`pending_customer` 由待客户确认的缺货记录推导。",
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/orders": {
+      get: {
+        tags: ["订单"],
+        summary: "父订单只读列表（v1.12，仅 HQ）",
+        description:
+          "需要 X-Device-Token + 有效员工 session，且角色为 super_admin / hq_operator，否则 403 `hq_required`。query: `q`、`status`(all|pending|unpaid|after_sales|shipped|completed|cancelled)、`page`、`page_size`(默认 20，上限 100)、`location_id`(可选，需授权)。服务端过滤 + 分页，`total` 为过滤后全量计数。金额单位元，`paid_amount` 仅已支付订单返回真实实付，未支付为 0。",
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/orders/{id}": {
+      get: {
+        tags: ["订单"],
+        summary: "父订单只读详情（v1.12，仅 HQ）",
+        description:
+          "在列表字段基础上追加 `recipient_name`(脱敏)、`recipient_phone`(脱敏)、`address_summary`、`customer_note`、`delivery_method`，`fulfillments[].items[]` 含行级明细。",
         responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
       },
     },

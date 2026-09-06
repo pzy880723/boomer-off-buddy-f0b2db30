@@ -9,6 +9,14 @@ import {
   err,
 } from "@/server/handheld-auth.server";
 import { requireStaffAtDeviceLocation } from "@/server/handheld-fulfillment.server";
+import {
+  FULFILLMENT_STATUS_FILTERS,
+  clampPage,
+  clampPageSize,
+  isHqUser,
+  listFulfillmentsPaged,
+  type FulfillmentStatusFilter,
+} from "@/server/handheld-orders.server";
 
 const FULFILLMENT_STATUSES = new Set([
   "unallocated",
@@ -35,6 +43,41 @@ export const Route = createFileRoute("/api/public/handheld/fulfillments")({
         const staff = await requireStaffAtDeviceLocation(auth.device, session);
         if (!staff.ok) return staff.response;
         const url = new URL(request.url);
+
+        // 新版分页契约：?format=items
+        if (url.searchParams.get("format") === "items") {
+          const statusRaw = (url.searchParams.get("status") ?? "all") as FulfillmentStatusFilter;
+          if (!FULFILLMENT_STATUS_FILTERS.includes(statusRaw)) {
+            return err("Invalid status filter", 400, { code: "invalid_status" });
+          }
+          const wantsAll = url.searchParams.get("scope") === "all";
+          const hq = wantsAll ? await isHqUser(staff.userId) : false;
+          if (wantsAll && !hq) {
+            return err("Headquarters role required for scope=all", 403, { code: "hq_required" });
+          }
+          const page = clampPage(url.searchParams.get("page"));
+          const pageSize = clampPageSize(url.searchParams.get("page_size"));
+          const q = (url.searchParams.get("q") ?? "").trim() || null;
+          try {
+            const result = await listFulfillmentsPaged({
+              status: statusRaw,
+              q,
+              page,
+              pageSize,
+              locationIds: hq ? null : [staff.locationId],
+            });
+            return ok({
+              items: result.items,
+              total: result.total,
+              page,
+              page_size: pageSize,
+              scope: hq ? "all" : `location:${staff.locationId}`,
+            });
+          } catch (error) {
+            return err(error instanceof Error ? error.message : String(error), 500);
+          }
+        }
+
         const statuses = (
           url.searchParams.get("status") ||
           "allocated,picking,picked,packing,packed,handover_ready,exception"
@@ -54,12 +97,7 @@ export const Route = createFileRoute("/api/public/handheld/fulfillments")({
           .order("created_at", { ascending: true })
           .limit(100);
         if (error) return err(error.message, 500);
-        const rows = data ?? [];
-        // 兼容：默认仍返回数组；移动端可用 ?format=items 拿到 { items, scope }
-        if (url.searchParams.get("format") === "items") {
-          return ok({ items: rows, scope: `location:${staff.locationId}` });
-        }
-        return ok(rows);
+        return ok(data ?? []);
       },
     },
   },
