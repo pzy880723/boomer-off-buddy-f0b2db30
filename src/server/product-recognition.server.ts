@@ -165,8 +165,9 @@ export async function runProductRecognition(
   const images = input.images.filter(Boolean).slice(0, 8);
   if (images.length === 0) throw new Error("至少需要一张商品照片");
 
-  const categories = await deps.loadCategories();
-  const [facets, brands, ips] = await Promise.all([
+  // 分类/标签/品牌/IP 四个来源独立并行读取；分类仍是必需项，不做任何裁剪或删除。
+  const [categories, facets, brands, ips] = await Promise.all([
+    deps.loadCategories(),
     deps.loadFacets?.() ?? Promise.resolve([]),
     deps.loadBrands?.() ?? Promise.resolve([]),
     deps.loadIps?.() ?? Promise.resolve([]),
@@ -178,11 +179,12 @@ export async function runProductRecognition(
   const brandPrompt = formatBrandsForPrompt(brands);
   const ipPrompt = formatBrandsForPrompt(ips);
   const wait = deps.sleep ?? sleep;
+  const { maxAttempts, timeoutMs } = recognitionAttemptPolicy(input.source);
 
-  let model = DEFAULT_PRODUCT_RECOGNITION_MODEL;
+  let model = resolveProductRecognitionModel(input.source);
   let raw: RawProductRecognition | null = null;
   let lastError: Error | null = null;
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
       const response = await deps.callModel({
         images,
@@ -191,15 +193,20 @@ export async function runProductRecognition(
         facetPrompt,
         brandPrompt,
         ipPrompt,
+        source: input.source,
+        timeoutMs,
       });
       model = response.model;
       raw = response.raw;
       break;
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
-      if (attempt < 3) await wait(200 * attempt);
+      // 超时不再重复重试：再来一轮只会让店员多等一个超时窗口。
+      if (isRecognitionTimeoutError(lastError)) break;
+      if (attempt < maxAttempts) await wait(200 * attempt);
     }
   }
+
 
   const failed = raw === null;
   const modelResult: RawProductRecognition = raw ?? {
