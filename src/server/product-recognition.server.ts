@@ -10,8 +10,45 @@ import type { BrandCandidate, FacetTerm } from "../lib/product-taxonomy";
 
 export const PRODUCT_RECOGNITION_PROMPT_VERSION = "boomer-product-v2";
 export const DEFAULT_PRODUCT_RECOGNITION_MODEL = "google/gemini-2.5-pro";
+export const DEFAULT_HANDHELD_PRODUCT_RECOGNITION_MODEL = "google/gemini-2.5-flash";
+export const HANDHELD_RECOGNITION_TIMEOUT_MS = 25_000;
+export const HANDHELD_RECOGNITION_MAX_ATTEMPTS = 2;
+export const HANDHELD_RECOGNITION_MAX_TOKENS = 1400;
 
 export type ProductRecognitionSource = "erp" | "handheld" | "migration";
+
+/**
+ * 手持端（iOS 拍照上架）走 flash 默认模型 + 独立环境变量覆盖；
+ * ERP / migration 仍保持原 Pro 模型与 PRODUCT_RECOGNITION_MODEL。
+ */
+export function resolveProductRecognitionModel(
+  source: ProductRecognitionSource,
+  env: Record<string, string | undefined> = process.env,
+): string {
+  if (source === "handheld") {
+    return (
+      env.HANDHELD_PRODUCT_RECOGNITION_MODEL || DEFAULT_HANDHELD_PRODUCT_RECOGNITION_MODEL
+    );
+  }
+  return env.PRODUCT_RECOGNITION_MODEL || DEFAULT_PRODUCT_RECOGNITION_MODEL;
+}
+
+export function recognitionAttemptPolicy(source: ProductRecognitionSource): {
+  maxAttempts: number;
+  timeoutMs: number | null;
+} {
+  return source === "handheld"
+    ? { maxAttempts: HANDHELD_RECOGNITION_MAX_ATTEMPTS, timeoutMs: HANDHELD_RECOGNITION_TIMEOUT_MS }
+    : { maxAttempts: 3, timeoutMs: null };
+}
+
+export function isRecognitionTimeoutError(error: unknown): boolean {
+  if (!error) return false;
+  const name = (error as { name?: string }).name ?? "";
+  const message = error instanceof Error ? error.message : String(error);
+  return name === "AbortError" || name === "TimeoutError" || /timed? ?out|aborted/i.test(message);
+}
+
 
 export type ProductRecognitionInput = {
   images: string[];
