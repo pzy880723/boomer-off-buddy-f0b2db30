@@ -4,12 +4,11 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   HANDHELD_CORS,
   authenticateDevice,
-  requireLocation,
   resolveSessionUser,
   ok,
   err,
 } from "@/server/handheld-auth.server";
-import { requireStaffAtDeviceLocation } from "@/server/handheld-fulfillment.server";
+import { authorizeFulfillment } from "@/server/handheld-fulfillment-access.server";
 
 const Body = z.object({
   fulfillment_item_id: z.string().uuid(),
@@ -28,11 +27,14 @@ export const Route = createFileRoute("/api/public/handheld/fulfillments/$id/shor
       POST: async ({ request, params }) => {
         const auth = await authenticateDevice(request);
         if (!auth.ok) return auth.response;
-        const location = requireLocation(auth.device);
-        if (!location.ok) return location.response;
         const session = await resolveSessionUser(request);
-        const staff = await requireStaffAtDeviceLocation(auth.device, session);
-        if (!staff.ok) return staff.response;
+        const access = await authorizeFulfillment({
+          device: auth.device,
+          session,
+          fulfillmentId: params.id,
+          mode: "write",
+        });
+        if (!access.ok) return access.response;
         let body: z.infer<typeof Body>;
         try {
           body = Body.parse(await request.json());
@@ -40,14 +42,7 @@ export const Route = createFileRoute("/api/public/handheld/fulfillments/$id/shor
           return err(`Invalid body: ${String(error)}`, 400, { code: "validation_error" });
         }
 
-        const { data: fulfillment } = await supabaseAdmin
-          .from("fulfillments" as never)
-          .select("id, order_id, location_id")
-          .eq("id", params.id)
-          .eq("location_id", staff.locationId)
-          .maybeSingle();
-        if (!fulfillment) return err("Fulfillment not found", 404, { code: "not_found" });
-        const row = fulfillment as unknown as { id: string; order_id: string };
+        const row = { id: access.fulfillment.id, order_id: access.fulfillment.order_id };
 
         const { data: item } = await supabaseAdmin
           .from("fulfillment_items" as never)
@@ -74,7 +69,7 @@ export const Route = createFileRoute("/api/public/handheld/fulfillments/$id/shor
             kind: "shortage",
             description: body.reason,
             status: "open",
-            reported_by: staff.userId,
+            reported_by: access.userId,
           } as never)
           .select("id")
           .maybeSingle();
@@ -91,7 +86,7 @@ export const Route = createFileRoute("/api/public/handheld/fulfillments/$id/shor
             status: "pending_customer",
             // 已付款订单缺货必须走真实退款流程，先冻结为待退款
             refund_state: "refund_pending",
-            reported_by: staff.userId,
+            reported_by: access.userId,
             device_id: auth.device.id,
             client_op_id: body.client_op_id,
           } as never)

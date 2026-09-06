@@ -5,6 +5,7 @@ import {
   authenticateDevice,
   requireLocation,
   resolveSessionUser,
+  userCanAccessLocation,
   ok,
   err,
 } from "@/server/handheld-auth.server";
@@ -17,6 +18,8 @@ import {
   listFulfillmentsPaged,
   type FulfillmentStatusFilter,
 } from "@/server/handheld-orders.server";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const FULFILLMENT_STATUSES = new Set([
   "unallocated",
@@ -51,10 +54,31 @@ export const Route = createFileRoute("/api/public/handheld/fulfillments")({
             return err("Invalid status filter", 400, { code: "invalid_status" });
           }
           const wantsAll = url.searchParams.get("scope") === "all";
-          const hq = wantsAll ? await isHqUser(staff.userId) : false;
+          const locationParam = url.searchParams.get("location_id");
+          const hq = await isHqUser(staff.userId);
           if (wantsAll && !hq) {
             return err("Headquarters role required for scope=all", 403, { code: "hq_required" });
           }
+          // 普通员工传入非当前授权 location_id 一律 403；HQ 必须对该 location 有授权。
+          let scopedLocation: string | null = null;
+          if (locationParam) {
+            if (!UUID_RE.test(locationParam)) {
+              return err("Invalid location_id", 400, { code: "validation_error" });
+            }
+            if (!hq) {
+              if (locationParam !== staff.locationId) {
+                return err("You do not have permission to operate this location", 403, {
+                  code: "location_forbidden",
+                });
+              }
+            } else if (!(await userCanAccessLocation(staff.userId, locationParam))) {
+              return err("You do not have permission to operate this location", 403, {
+                code: "location_forbidden",
+              });
+            }
+            scopedLocation = locationParam;
+          }
+          const unfilteredHq = hq && wantsAll && !scopedLocation;
           const page = clampPage(url.searchParams.get("page"));
           const pageSize = clampPageSize(url.searchParams.get("page_size"));
           const q = (url.searchParams.get("q") ?? "").trim() || null;
@@ -64,14 +88,14 @@ export const Route = createFileRoute("/api/public/handheld/fulfillments")({
               q,
               page,
               pageSize,
-              locationIds: hq ? null : [staff.locationId],
+              locationIds: unfilteredHq ? null : [scopedLocation ?? staff.locationId],
             });
             return ok({
               items: result.items,
               total: result.total,
               page,
               page_size: pageSize,
-              scope: hq ? "all" : `location:${staff.locationId}`,
+              scope: unfilteredHq ? "all" : `location:${scopedLocation ?? staff.locationId}`,
             });
           } catch (error) {
             return err(error instanceof Error ? error.message : String(error), 500);
