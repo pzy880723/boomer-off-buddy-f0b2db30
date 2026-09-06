@@ -310,7 +310,8 @@ clarification_requests 返回需要店员补拍或确认的问题数组，每项
 瓷器：能确认日本产地时选日本瓷器下的 active 叶子，能确认欧洲产地时选欧洲瓷器下的 active 叶子；产地无法确认时必须返回 ai_low_confidence，并在 warning 中写明需人工核对产地，禁止猜测产地，也禁止返回 porcelain_origin_unknown（该类目已停用）。古美术不收瓷器。
 游戏设备：Switch Lite 等掌上主机选 game_handheld；PS5、Xbox 等桌面主机选 game_desktop_console；实体游戏卡带/卡匣选 game_cartridge；手柄、底座、保护壳等选 game_accessory。禁止再返回 digital_game_console。
 疑似受监管文物、违禁品或无法安全销售的物品，将风险写入 compliance_flags。
-suggested_price_cny 只是人民币参考价，没有依据时返回 null。`;
+suggested_price_cny 只是人民币参考价，没有依据时返回 null。
+${buildEraInstruction(input.source)}`;
   const userContent = [
     {
       type: "text",
@@ -318,22 +319,40 @@ suggested_price_cny 只是人民币参考价，没有依据时返回 null。`;
     },
     ...input.images.map((url) => ({ type: "image_url", image_url: { url } })),
   ];
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "X-Lovable-AIG-SDK": "vercel-ai-sdk",
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: userContent },
-      ],
-      response_format: { type: "json_object" },
-    }),
-  });
+  const controller = input.timeoutMs ? new AbortController() : null;
+  const timer =
+    controller && input.timeoutMs
+      ? setTimeout(() => controller.abort(new Error("AI recognition timed out")), input.timeoutMs)
+      : null;
+  let response: Response;
+  try {
+    response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "X-Lovable-AIG-SDK": "vercel-ai-sdk",
+      },
+      signal: controller?.signal,
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: userContent },
+        ],
+        response_format: { type: "json_object" },
+        ...(input.source === "handheld" ? { max_tokens: HANDHELD_RECOGNITION_MAX_TOKENS } : {}),
+      }),
+    });
+  } catch (error) {
+    if (controller?.signal.aborted) {
+      throw new Error(`AI recognition timed out after ${input.timeoutMs}ms`);
+    }
+    throw error;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
     throw new Error(`AI gateway ${response.status}: ${detail.slice(0, 300)}`);
