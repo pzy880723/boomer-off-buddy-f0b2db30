@@ -75,7 +75,8 @@ describe("订单列表契约", () => {
       deriveOrderStatus({
         payment_status: "unpaid",
         order_status: "pending_payment",
-        has_handed_over: false,
+        fulfillment_count: 0,
+        handed_over_count: 0,
       }),
       "unpaid",
     );
@@ -83,7 +84,8 @@ describe("订单列表契约", () => {
       deriveOrderStatus({
         payment_status: "paid",
         order_status: "processing",
-        has_handed_over: false,
+        fulfillment_count: 2,
+        handed_over_count: 0,
       }),
       "pending",
     );
@@ -91,7 +93,8 @@ describe("订单列表契约", () => {
       deriveOrderStatus({
         payment_status: "paid",
         order_status: "processing",
-        has_handed_over: true,
+        fulfillment_count: 2,
+        handed_over_count: 2,
       }),
       "shipped",
     );
@@ -99,7 +102,8 @@ describe("订单列表契约", () => {
       deriveOrderStatus({
         payment_status: "paid",
         order_status: "after_sale",
-        has_handed_over: true,
+        fulfillment_count: 1,
+        handed_over_count: 1,
       }),
       "after_sales",
     );
@@ -107,7 +111,8 @@ describe("订单列表契约", () => {
       deriveOrderStatus({
         payment_status: "unpaid",
         order_status: "cancelled",
-        has_handed_over: false,
+        fulfillment_count: 0,
+        handed_over_count: 0,
       }),
       "cancelled",
     );
@@ -115,4 +120,81 @@ describe("订单列表契约", () => {
     assert.equal(toAmount("12.905"), 12.9);
     assert.equal(toAmount(null), 0);
   });
+
+  test("跨两店：一店已交接、一店拣货中 → 仍是待履约（部分履约），不能算已发出", () => {
+    const input = {
+      payment_status: "paid",
+      order_status: "processing",
+      fulfillment_count: 2,
+      handed_over_count: 1,
+    };
+    const status = deriveOrderStatus(input);
+    assert.equal(status, "pending");
+    assert.equal(
+      orderStatusLabelFor(status, {
+        fulfillment_count: input.fulfillment_count,
+        handed_over_count: input.handed_over_count,
+      }),
+      "部分履约",
+    );
+    // pending 筛选必须包含它，否则会漏备货
+    assert.ok(["all", "pending"].includes("pending"));
+    // 全部交接后才是已发出
+    assert.equal(deriveOrderStatus({ ...input, handed_over_count: 2 }), "shipped");
+    // 无子单的已付款订单仍是待履约
+    assert.equal(
+      deriveOrderStatus({ ...input, fulfillment_count: 0, handed_over_count: 0 }),
+      "pending",
+    );
+  });
+
+  test("退款/售后优先于完成态", () => {
+    assert.equal(
+      deriveOrderStatus({
+        payment_status: "refunding",
+        order_status: "completed",
+        fulfillment_count: 1,
+        handed_over_count: 1,
+      }),
+      "after_sales",
+    );
+    assert.equal(
+      deriveOrderStatus({
+        payment_status: "paid",
+        order_status: "completed",
+        fulfillment_count: 1,
+        handed_over_count: 1,
+        has_active_after_sale: true,
+      }),
+      "after_sales",
+    );
+    // 已取消仍最高优先
+    assert.equal(
+      deriveOrderStatus({
+        payment_status: "refunded",
+        order_status: "cancelled",
+        fulfillment_count: 1,
+        handed_over_count: 0,
+      }),
+      "cancelled",
+    );
+  });
+
+  test("图片优先当前签名 URL，过期快照回退当前图", () => {
+    assert.equal(
+      pickImageUrl({ signed: "https://cdn/x?token=new", snapshot: "https://old?token=expired" }),
+      "https://cdn/x?token=new",
+    );
+    // 签名快照（含 token）不可信，无当前签名时不返回过期链接
+    assert.equal(pickImageUrl({ signed: null, snapshot: "https://old?token=expired" }), null);
+    // 非签名快照可直接用
+    assert.equal(pickImageUrl({ signed: null, snapshot: "https://cdn/plain.jpg" }), "https://cdn/plain.jpg");
+    // 废弃 image_url 仅作最后回退
+    assert.equal(
+      pickImageUrl({ signed: null, snapshot: null, legacy: "https://legacy/a.jpg" }),
+      "https://legacy/a.jpg",
+    );
+    assert.equal(pickImageUrl({ signed: null, snapshot: null, legacy: null }), null);
+  });
 });
+
