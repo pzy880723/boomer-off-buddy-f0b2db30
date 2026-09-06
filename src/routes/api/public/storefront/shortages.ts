@@ -18,7 +18,7 @@ export const Route = createFileRoute("/api/public/storefront/shortages")({
           .select("id, order_no")
           .eq("customer_id", auth.customer.id)
           .limit(200);
-        const orderRows = ((orders as { id: string; order_no: string }[] | null) ?? []);
+        const orderRows = (orders as { id: string; order_no: string }[] | null) ?? [];
         if (orderRows.length === 0) return storefrontJson({ ok: true, data: { items: [] } });
         const { data } = await supabaseAdmin
           .from("fulfillment_shortages" as never)

@@ -95,10 +95,7 @@ async function decorate(rows: RawRow[], scope: NotificationScope): Promise<Notif
     supabaseAdmin
       .from("inv_locations")
       .select("id,name")
-      .in(
-        "id",
-        [...new Set(rows.map((row) => row.location_id).filter(Boolean))] as string[],
-      ),
+      .in("id", [...new Set(rows.map((row) => row.location_id).filter(Boolean))] as string[]),
   ]);
   const readSet = new Set(
     ((reads as { notification_id: string }[] | null) ?? []).map((row) => row.notification_id),

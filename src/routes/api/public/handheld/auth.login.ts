@@ -31,11 +31,9 @@ export const Route = createFileRoute("/api/public/handheld/auth/login")({
             .eq("id", auth.device.id);
         }
 
-        const sb = createClient(
-          process.env.SUPABASE_URL!,
-          process.env.SUPABASE_PUBLISHABLE_KEY!,
-          { auth: { persistSession: false, autoRefreshToken: false } },
-        );
+        const sb = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_PUBLISHABLE_KEY!, {
+          auth: { persistSession: false, autoRefreshToken: false },
+        });
         const { data, error } = await sb.auth.signInWithPassword({
           email: body.email,
           password: body.password,

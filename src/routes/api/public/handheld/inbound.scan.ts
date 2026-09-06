@@ -36,7 +36,10 @@ export const Route = createFileRoute("/api/public/handheld/inbound/scan")({
           .select("epc, sku_id, status, current_location_id")
           .in("epc", epcs);
 
-        const existMap = new Map<string, { sku_id: string | null; status: string; current_location_id: string | null }>();
+        const existMap = new Map<
+          string,
+          { sku_id: string | null; status: string; current_location_id: string | null }
+        >();
         (existing ?? []).forEach((r: any) => existMap.set(r.epc, r));
 
         const accepted: { epc: string; sku_id: string }[] = [];
@@ -87,17 +90,15 @@ export const Route = createFileRoute("/api/public/handheld/inbound/scan")({
 
         // Unclaimed queue (upsert and bump hits)
         for (const epc of unclaimed) {
-          await supabaseAdmin
-            .from("inv_unclaimed_epcs")
-            .upsert(
-              {
-                epc,
-                last_seen_location_id: locationId,
-                last_seen_at: new Date().toISOString(),
-                hits: 1,
-              },
-              { onConflict: "epc" }
-            );
+          await supabaseAdmin.from("inv_unclaimed_epcs").upsert(
+            {
+              epc,
+              last_seen_location_id: locationId,
+              last_seen_at: new Date().toISOString(),
+              hits: 1,
+            },
+            { onConflict: "epc" },
+          );
         }
 
         // 触发有赞库存推送（HQ / 该库位对应门店）
@@ -109,7 +110,6 @@ export const Route = createFileRoute("/api/public/handheld/inbound/scan")({
             // 静默：cron worker 会兜底
           }
         }
-
 
         return ok({
           accepted_count: accepted.length,

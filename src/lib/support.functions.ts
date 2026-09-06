@@ -4,9 +4,8 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 export const listSupportConversationsFn = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { resolveSupportAccess, listStaffConversations } = await import(
-      "@/server/support.server"
-    );
+    const { resolveSupportAccess, listStaffConversations } =
+      await import("@/server/support.server");
     const access = await resolveSupportAccess(context.userId);
     const page = await listStaffConversations({ access, limit: 50 });
     return {
@@ -30,12 +29,8 @@ export const getSupportConversationFn = createServerFn({ method: "GET" })
 export const sendSupportMessageFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
-    (input: {
-      conversationId: string;
-      body: string;
-      internal: boolean;
-      clientOpId: string;
-    }) => input,
+    (input: { conversationId: string; body: string; internal: boolean; clientOpId: string }) =>
+      input,
   )
   .handler(async ({ data, context }) => {
     const { resolveSupportAccess, postStaffMessage } = await import("@/server/support.server");

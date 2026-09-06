@@ -276,7 +276,12 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
 
         let imageProcessing: {
           status:
-            "idle" | "queued" | "processing" | "succeeded" | "partial_failed" | "retryable_failed";
+            | "idle"
+            | "queued"
+            | "processing"
+            | "succeeded"
+            | "partial_failed"
+            | "retryable_failed";
           queued: number;
         } = { status: "idle", queued: 0 };
         try {
@@ -375,7 +380,13 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
 
         const barcode = finalSku?.barcode ?? null;
         const conditionGrade = (finalSku?.grade ?? body.grade ?? null) as
-          "N" | "S" | "A" | "B" | "C" | "J" | null;
+          | "N"
+          | "S"
+          | "A"
+          | "B"
+          | "C"
+          | "J"
+          | null;
 
         const locationStockQty = Number(mv.data ?? finalSku?.stock_qty ?? 0);
         const responseBody = {

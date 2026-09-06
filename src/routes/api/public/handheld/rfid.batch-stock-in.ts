@@ -66,7 +66,10 @@ export const Route = createFileRoute("/api/public/handheld/rfid/batch-stock-in")
             }));
             const { error: upErr, count } = await supabaseAdmin
               .from("inv_unclaimed_epcs" as never)
-              .upsert(rows as never, { onConflict: "epc", ignoreDuplicates: true, count: "exact" } as never);
+              .upsert(
+                rows as never,
+                { onConflict: "epc", ignoreDuplicates: true, count: "exact" } as never,
+              );
             if (upErr) return err(`unclaimed upsert failed: ${upErr.message}`, 500);
             queued = count ?? toQueue.length;
           }

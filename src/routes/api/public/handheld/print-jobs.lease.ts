@@ -47,14 +47,15 @@ export const Route = createFileRoute("/api/public/handheld/print-jobs/lease")({
           } as never,
         );
         if (error) return err(error.message, 500);
-        const jobs = (data as unknown as Array<{
-          id: string;
-          fulfillment_id: string;
-          ticket_type: string;
-          status: string;
-          lease_expires_at: string | null;
-          attempts: number;
-        }>) ?? [];
+        const jobs =
+          (data as unknown as Array<{
+            id: string;
+            fulfillment_id: string;
+            ticket_type: string;
+            status: string;
+            lease_expires_at: string | null;
+            attempts: number;
+          }>) ?? [];
         const items = await Promise.all(
           jobs.map(async (job) => {
             let ticket = null;

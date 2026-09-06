@@ -1,5 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { HANDHELD_CORS, authenticateDevice, err, resolveSessionUser, ok } from "@/server/handheld-auth.server";
+import {
+  HANDHELD_CORS,
+  authenticateDevice,
+  err,
+  resolveSessionUser,
+  ok,
+} from "@/server/handheld-auth.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 export const Route = createFileRoute("/api/public/handheld/auth/me")({

@@ -281,7 +281,6 @@ const PosPaymentAttemptRes = z.object({
   }),
 });
 
-
 const jsonBody = (schema: z.ZodType) => ({ content: { "application/json": { schema } } });
 /** v1.11 新增接口的通用响应外壳（详细字段见各接口 description）。 */
 const AnyOkRes = z.object({ ok: z.literal(true), data: z.unknown() });
@@ -362,8 +361,7 @@ X-Session-Token: <操作员 session token>
         type: "http",
         scheme: "bearer",
         bearerFormat: "JWT",
-        description:
-          "腾讯云消费者身份服务签发的 RS256 JWT。ERP 使用 CONSUMER_AUTH_JWKS_URL 验签。",
+        description: "腾讯云消费者身份服务签发的 RS256 JWT。ERP 使用 CONSUMER_AUTH_JWKS_URL 验签。",
       },
     },
   },
@@ -956,8 +954,7 @@ X-Session-Token: <操作员 session token>
       get: {
         tags: ["履约"],
         summary: "拣货小票内容（v1.11）",
-        description:
-          "仅已付款订单可出票；返回订单二维码内容、商品标题/条码/数量/单价/库位。",
+        description: "仅已付款订单可出票；返回订单二维码内容、商品标题/条码/数量/单价/库位。",
         responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
       },
     },
@@ -974,8 +971,7 @@ X-Session-Token: <操作员 session token>
       get: {
         tags: ["履约"],
         summary: "面单能力状态（v1.11）",
-        description:
-          "未配置快递商户时返回 `carrier_not_configured`，不会返回任何伪造运单号。",
+        description: "未配置快递商户时返回 `carrier_not_configured`，不会返回任何伪造运单号。",
         responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
       },
       post: {
@@ -1231,7 +1227,6 @@ X-Session-Token: <操作员 session token>
       },
     },
   },
-
 };
 
 let cached: ReturnType<typeof createDocument> | null = null;

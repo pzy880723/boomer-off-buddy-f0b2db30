@@ -20,9 +20,7 @@ function carrierCapability() {
     capability: configured ? "ready" : "carrier_not_configured",
     provider: configured ? process.env["COURIER_PROVIDER_CODE"] : null,
     can_print_waybill: configured,
-    message: configured
-      ? "面单服务已配置"
-      : "尚未配置快递商户与电子面单账号，无法申请真实面单",
+    message: configured ? "面单服务已配置" : "尚未配置快递商户与电子面单账号，无法申请真实面单",
   };
 }
 

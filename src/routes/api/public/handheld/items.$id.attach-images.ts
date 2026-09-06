@@ -5,7 +5,10 @@ import { AttachImagesReq } from "@/lib/handheld/schemas";
 
 const SKU_IMAGE_BUCKETS = new Set(["sku-raw", "sku-listing"]);
 
-function normalizeBucketPath(bucket: "sku-raw" | "sku-listing", storagePath: string): string | null {
+function normalizeBucketPath(
+  bucket: "sku-raw" | "sku-listing",
+  storagePath: string,
+): string | null {
   const clean = storagePath.trim().replace(/^\/+/, "");
   if (!clean) return null;
   if (clean.startsWith(`${bucket}/`)) return clean;
@@ -78,13 +81,17 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/attach-imag
 
         const seen = new Set<string>();
         const merged: string[] = [];
-        for (const p of [...(((sku as { image_paths?: string[] | null }).image_paths ?? []) as string[]), ...incomingPaths]) {
+        for (const p of [
+          ...(((sku as { image_paths?: string[] | null }).image_paths ?? []) as string[]),
+          ...incomingPaths,
+        ]) {
           if (!p || seen.has(p)) continue;
           seen.add(p);
           merged.push(p);
         }
 
-        const stableHttp = merged.find((p) => /^https?:\/\//i.test(p) && !p.includes("token=")) ?? null;
+        const stableHttp =
+          merged.find((p) => /^https?:\/\//i.test(p) && !p.includes("token=")) ?? null;
         const { error: upErr } = await supabaseAdmin
           .from("inv_skus")
           .update({

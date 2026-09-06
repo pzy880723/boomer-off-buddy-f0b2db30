@@ -71,7 +71,9 @@ export const Route = createFileRoute("/api/public/handheld/products/lookup")({
           const { data } = await supabaseAdmin
             .from("inv_skus")
             .select(SKU_COLS)
-            .or(`sku_code.ilike.${like},name.ilike.${like},barcode.ilike.${like},category.ilike.${like}`)
+            .or(
+              `sku_code.ilike.${like},name.ilike.${like},barcode.ilike.${like},category.ilike.${like}`,
+            )
             .order("updated_at", { ascending: false })
             .limit(1)
             .maybeSingle();

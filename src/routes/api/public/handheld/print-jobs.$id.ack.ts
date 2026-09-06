@@ -41,7 +41,11 @@ export const Route = createFileRoute("/api/public/handheld/print-jobs/$id/ack")(
           .eq("location_id", staff.locationId)
           .maybeSingle();
         if (!job) return err("Print job not found", 404, { code: "not_found" });
-        const row = job as unknown as { id: string; status: string; lease_device_id: string | null };
+        const row = job as unknown as {
+          id: string;
+          status: string;
+          lease_device_id: string | null;
+        };
         if (row.lease_device_id && row.lease_device_id !== auth.device.id) {
           return err("Print job leased by another device", 409, { code: "lease_conflict" });
         }

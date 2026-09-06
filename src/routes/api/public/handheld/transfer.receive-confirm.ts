@@ -88,7 +88,6 @@ export const Route = createFileRoute("/api/public/handheld/transfer/receive-conf
           } catch {}
         }
 
-
         return ok({ transfer_id: body.transfer_id, received: scanned?.length ?? 0 });
       },
     },

@@ -41,15 +41,18 @@ export const Route = createFileRoute("/api/public/handheld/parcels/items/$itemId
 
         const patch = {
           pack_pieces: pack_pieces && pack_pieces > 0 ? pack_pieces : null,
-          pack_pieces_source: pack_pieces && pack_pieces > 0 ? (pack_pieces_source ?? "manual") : null,
-          pack_unit_note: pack_pieces && pack_pieces > 0 ? (pack_unit_note?.trim() || "个") : null,
+          pack_pieces_source:
+            pack_pieces && pack_pieces > 0 ? (pack_pieces_source ?? "manual") : null,
+          pack_unit_note: pack_pieces && pack_pieces > 0 ? pack_unit_note?.trim() || "个" : null,
         };
 
         const { data: row, error } = await supabaseAdmin
           .from("japan_parcel_items")
           .update(patch)
           .eq("id", itemId)
-          .select("id, parent_id, item_total_jpy, unit_price_jpy, quantity, weight_g, tariff_rate, pack_pieces, pack_pieces_source, pack_unit_note")
+          .select(
+            "id, parent_id, item_total_jpy, unit_price_jpy, quantity, weight_g, tariff_rate, pack_pieces, pack_pieces_source, pack_unit_note",
+          )
           .maybeSingle();
         if (error) return errCode("internal_error", error.message);
         if (!row) return errCode("not_found", "Parcel item not found");
@@ -66,17 +69,27 @@ export const Route = createFileRoute("/api/public/handheld/parcels/items/$itemId
               .maybeSingle(),
             supabaseAdmin
               .from("japan_parcel_items")
-              .select("id, parent_id, item_total_jpy, unit_price_jpy, quantity, weight_g, tariff_rate")
+              .select(
+                "id, parent_id, item_total_jpy, unit_price_jpy, quantity, weight_g, tariff_rate",
+              )
               .eq("parent_id", row.parent_id),
           ]);
           if (pRes.data) {
             const m = computeParcelItemLanded(
-              { intl_total_jpy: pRes.data.intl_total_jpy ?? null, intl_exchange_rate: pRes.data.intl_exchange_rate ?? null },
+              {
+                intl_total_jpy: pRes.data.intl_total_jpy ?? null,
+                intl_exchange_rate: pRes.data.intl_exchange_rate ?? null,
+              },
               sibRes.data ?? [],
             );
             const l = m.get(row.id);
-            const piece = computePiecePrice(l?.itemJpy ?? row.item_total_jpy ?? null, l?.landedCny ?? null, row.pack_pieces ?? null);
-            piece_price_cny = piece.pieceCny == null ? null : Math.round(piece.pieceCny * 100) / 100;
+            const piece = computePiecePrice(
+              l?.itemJpy ?? row.item_total_jpy ?? null,
+              l?.landedCny ?? null,
+              row.pack_pieces ?? null,
+            );
+            piece_price_cny =
+              piece.pieceCny == null ? null : Math.round(piece.pieceCny * 100) / 100;
             piece_price_jpy = piece.pieceJpy == null ? null : Math.round(piece.pieceJpy);
           }
         }

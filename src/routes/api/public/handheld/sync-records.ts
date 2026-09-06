@@ -15,7 +15,9 @@ export const Route = createFileRoute("/api/public/handheld/sync-records")({
 
         let qb = supabaseAdmin
           .from("youzan_stock_sync_queue")
-          .select("id, sku_id, target_stock, reason, status, attempts, last_error, created_at, updated_at")
+          .select(
+            "id, sku_id, target_stock, reason, status, attempts, last_error, created_at, updated_at",
+          )
           .order("created_at", { ascending: false })
           .limit(limit);
         if (status) qb = qb.eq("status", status);

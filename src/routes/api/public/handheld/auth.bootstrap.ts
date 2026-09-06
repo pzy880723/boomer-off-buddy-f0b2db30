@@ -1,6 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
-import { HANDHELD_CORS, ok, err, loadVisibleLocationsForDevice } from "@/server/handheld-auth.server";
+import {
+  HANDHELD_CORS,
+  ok,
+  err,
+  loadVisibleLocationsForDevice,
+} from "@/server/handheld-auth.server";
 import { BootstrapReq } from "@/lib/handheld/schemas";
 import { phoneToEmail, PHONE_REGEX } from "@/lib/auth-config";
 
@@ -32,11 +37,9 @@ export const Route = createFileRoute("/api/public/handheld/auth/bootstrap")({
         }
 
         // 1. Verify ERP credentials
-        const sb = createClient(
-          process.env.SUPABASE_URL!,
-          process.env.SUPABASE_PUBLISHABLE_KEY!,
-          { auth: { persistSession: false, autoRefreshToken: false } },
-        );
+        const sb = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_PUBLISHABLE_KEY!, {
+          auth: { persistSession: false, autoRefreshToken: false },
+        });
         // 统一走 phoneToEmail 伪邮箱方案，避免依赖 Supabase 原生 phone provider。
         let email: string;
         if (body.email) {
@@ -96,20 +99,18 @@ export const Route = createFileRoute("/api/public/handheld/auth/bootstrap")({
             const code = genDeviceCode();
             const { data: ins, error: insErr } = await supabaseAdmin
               .from("inv_handheld_devices" as never)
-              .insert(
-                {
-                  device_code: code,
-                  label,
-                  token: deviceToken,
-                  is_active: true,
-                  owner_user_id: user.id,
-                  install_id: body.install_id,
-                  capabilities: body.capabilities ?? {},
-                  app_version: body.app_version ?? null,
-                  os_version: body.os_version ?? null,
-                  last_seen_at: nowIso,
-                } as never,
-              )
+              .insert({
+                device_code: code,
+                label,
+                token: deviceToken,
+                is_active: true,
+                owner_user_id: user.id,
+                install_id: body.install_id,
+                capabilities: body.capabilities ?? {},
+                app_version: body.app_version ?? null,
+                os_version: body.os_version ?? null,
+                last_seen_at: nowIso,
+              } as never)
               .select("id")
               .maybeSingle();
             if (ins && !insErr) {
@@ -138,9 +139,11 @@ export const Route = createFileRoute("/api/public/handheld/auth/bootstrap")({
           .eq("id", deviceId)
           .maybeSingle();
 
-        const loc = (deviceRow as any)?.location as
-          | { id: string; kind: "warehouse" | "shop"; name: string }
-          | null;
+        const loc = (deviceRow as any)?.location as {
+          id: string;
+          kind: "warehouse" | "shop";
+          name: string;
+        } | null;
 
         const cap = ((deviceRow as any)?.capabilities as Record<string, unknown> | undefined) ?? {};
         const device_capabilities = {
@@ -198,4 +201,3 @@ export const Route = createFileRoute("/api/public/handheld/auth/bootstrap")({
     },
   },
 });
-

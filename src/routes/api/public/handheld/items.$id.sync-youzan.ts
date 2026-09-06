@@ -10,11 +10,7 @@ import {
 } from "@/server/handheld-auth.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { SyncYouzanReq } from "@/lib/handheld/schemas";
-import {
-  jsonReplay,
-  recordOp,
-  replayIfPresent,
-} from "@/server/handheld-idempotency.server";
+import { jsonReplay, recordOp, replayIfPresent } from "@/server/handheld-idempotency.server";
 import { releaseSkuToOfflineShopsCore } from "@/lib/youzan-offline-products.functions";
 import { assignSkuToYouzanCategoryGroups } from "@/lib/youzan-category-groups.server";
 

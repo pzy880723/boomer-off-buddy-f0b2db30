@@ -55,7 +55,8 @@ export const Route = createFileRoute("/api/public/handheld/fulfillments/$id/shor
           .eq("id", body.fulfillment_item_id)
           .eq("fulfillment_id", params.id)
           .maybeSingle();
-        if (!item) return err("Line does not belong to this fulfillment", 409, { code: "line_mismatch" });
+        if (!item)
+          return err("Line does not belong to this fulfillment", 409, { code: "line_mismatch" });
 
         const existing = await supabaseAdmin
           .from("fulfillment_shortages" as never)

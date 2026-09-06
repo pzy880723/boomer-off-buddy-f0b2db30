@@ -1,10 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { buildVisibilityFilter, describeScope } from "@/server/handheld-notifications.server";
-import {
-  FULFILLMENT_QR_PREFIX,
-  parseFulfillmentCode,
-} from "@/server/handheld-fulfillment.server";
+import { FULFILLMENT_QR_PREFIX, parseFulfillmentCode } from "@/server/handheld-fulfillment.server";
 import { staffCanAccessConversation, type SupportAccess } from "@/server/support.server";
 
 const hqAccess: SupportAccess = {

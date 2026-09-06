@@ -41,8 +41,7 @@ export async function resolveUserDisplayName(userId: string): Promise<string> {
   if (cached) return cached;
   const { data } = await supabaseAdmin.auth.admin.getUserById(userId);
   const meta = (data?.user?.user_metadata ?? {}) as { name?: string; full_name?: string };
-  const name =
-    meta.name || meta.full_name || data?.user?.email?.split("@")[0] || userId.slice(-6);
+  const name = meta.name || meta.full_name || data?.user?.email?.split("@")[0] || userId.slice(-6);
   nameCache.set(userId, name);
   return name;
 }
@@ -55,8 +54,9 @@ export async function resolveSupportAccess(userId: string): Promise<SupportAcces
     .eq("user_id", userId)
     .eq("is_active", true);
   const agentRows =
-    ((agents as { scope: string; location_id: string | null; display_name: string | null }[] | null) ??
-      []);
+    (agents as
+      | { scope: string; location_id: string | null; display_name: string | null }[]
+      | null) ?? [];
   const isHqAgent =
     roles.includes("super_admin") ||
     roles.includes("hq_operator") ||
@@ -71,7 +71,9 @@ export async function resolveSupportAccess(userId: string): Promise<SupportAcces
     locationIds = [
       ...new Set([
         ...((perms as { location_id: string }[] | null) ?? []).map((row) => row.location_id),
-        ...agentRows.map((row) => row.location_id).filter(Boolean as unknown as (v: unknown) => v is string),
+        ...agentRows
+          .map((row) => row.location_id)
+          .filter(Boolean as unknown as (v: unknown) => v is string),
       ]),
     ];
   }
@@ -147,20 +149,27 @@ async function hydrate(
     ((locations as { id: string; name: string }[] | null) ?? []).map((r) => [r.id, r.name]),
   );
   const customerNames = new Map(
-    ((customers as { id: string; nickname: string | null; phone?: string | null }[] | null) ?? []).map(
-      (r) => [r.id, r.nickname || (r.phone ? `${r.phone.slice(0, 3)}****${r.phone.slice(-2)}` : "顾客")],
-    ),
-  );
-  const lastReads = new Map(
-    ((myRows as { conversation_id: string; last_read_at: string | null }[] | null) ?? []).map((r) => [
-      r.conversation_id,
-      r.last_read_at,
+    (
+      (customers as { id: string; nickname: string | null; phone?: string | null }[] | null) ?? []
+    ).map((r) => [
+      r.id,
+      r.nickname || (r.phone ? `${r.phone.slice(0, 3)}****${r.phone.slice(-2)}` : "顾客"),
     ]),
   );
+  const lastReads = new Map(
+    ((myRows as { conversation_id: string; last_read_at: string | null }[] | null) ?? []).map(
+      (r) => [r.conversation_id, r.last_read_at],
+    ),
+  );
   const participantRows =
-    ((participants as
-      | { conversation_id: string; user_id: string; participant_role: string; display_name: string | null }[]
-      | null) ?? []);
+    (participants as
+      | {
+          conversation_id: string;
+          user_id: string;
+          participant_role: string;
+          display_name: string | null;
+        }[]
+      | null) ?? [];
   const participantNames = new Map<string, string>();
   await Promise.all(
     [...new Set(participantRows.map((r) => r.user_id))].map(async (userId) => {

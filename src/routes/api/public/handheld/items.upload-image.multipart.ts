@@ -16,9 +16,10 @@ export const Route = createFileRoute("/api/public/handheld/items/upload-image/mu
         const form = await request.formData();
         const file = form.get("file");
         if (!(file instanceof Blob)) return err("Missing 'file' field", 400);
-        const up = await supabaseAdmin.storage
-          .from(bucket)
-          .upload(path, file, { upsert: false, contentType: file.type || "application/octet-stream" });
+        const up = await supabaseAdmin.storage.from(bucket).upload(path, file, {
+          upsert: false,
+          contentType: file.type || "application/octet-stream",
+        });
         if (up.error) return err(up.error.message, 500);
         return ok({ storage_path: path, bucket });
       },

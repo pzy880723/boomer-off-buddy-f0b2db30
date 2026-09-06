@@ -11,10 +11,16 @@ export async function requireStaffAtDeviceLocation(
   session: { user_id: string } | null,
 ): Promise<{ ok: true; userId: string; locationId: string } | { ok: false; response: Response }> {
   if (!device.location_id) {
-    return { ok: false, response: err("Device has no bound location", 400, { code: "no_location" }) };
+    return {
+      ok: false,
+      response: err("Device has no bound location", 400, { code: "no_location" }),
+    };
   }
   if (!session) {
-    return { ok: false, response: err("Employee session required", 401, { code: "session_required" }) };
+    return {
+      ok: false,
+      response: err("Employee session required", 401, { code: "session_required" }),
+    };
   }
   const allowed = await userCanAccessLocation(session.user_id, device.location_id);
   if (!allowed) {
@@ -131,7 +137,9 @@ export async function buildFulfillmentTicket(input: {
         barcode: item.sku?.barcode ?? item.sku?.sku_code ?? null,
         quantity: item.expected_qty,
         unit_price: item.order_item?.unit_price ?? null,
-        location: locationName ? `${locationName}${item.sku?.sku_code ? ` · ${item.sku.sku_code}` : ""}` : null,
+        location: locationName
+          ? `${locationName}${item.sku?.sku_code ? ` · ${item.sku.sku_code}` : ""}`
+          : null,
       })),
       customer_note: row.order.customer_note ?? null,
       paid_at: row.order.paid_at ?? null,

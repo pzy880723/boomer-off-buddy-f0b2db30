@@ -93,7 +93,6 @@ export const Route = createFileRoute("/api/public/handheld/transfer/ship-confirm
           } catch {}
         }
 
-
         return ok({ transfer_id: body.transfer_id, shipped: scanned?.length ?? 0 });
       },
     },

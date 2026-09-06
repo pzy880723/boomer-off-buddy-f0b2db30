@@ -16,7 +16,7 @@ export const Route = createFileRoute("/api/public/handheld/sku/by-epc")({
         const { data: epcRow } = await supabaseAdmin
           .from("inv_epcs")
           .select(
-            "epc, status, sku_id, current_location_id, sku:inv_skus(id, sku_code, name, category, price_tier, stock_qty), location:inv_locations!current_location_id(id, name, kind)"
+            "epc, status, sku_id, current_location_id, sku:inv_skus(id, sku_code, name, category, price_tier, stock_qty), location:inv_locations!current_location_id(id, name, kind)",
           )
           .eq("epc", epc)
           .maybeSingle();

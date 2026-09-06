@@ -34,10 +34,12 @@ export const Route = createFileRoute("/api/public/handheld/items/$id")({
             .eq("sku_id", params.id),
         ]);
         if (facetError) return errCode("internal_error", facetError.message);
-        const facets = ((facetLinks ?? []) as unknown as Array<{
-          source: string;
-          facet: { code: string; name: string; dimension: string } | null;
-        }>)
+        const facets = (
+          (facetLinks ?? []) as unknown as Array<{
+            source: string;
+            facet: { code: string; name: string; dimension: string } | null;
+          }>
+        )
           .filter((row) => row.facet)
           .map((row) => ({ ...row.facet!, source: row.source }));
 
@@ -54,7 +56,8 @@ export const Route = createFileRoute("/api/public/handheld/items/$id")({
           })
           .filter(Boolean);
 
-        const imagePaths = ((sku as { image_paths?: string[] | null }).image_paths ?? []) as string[];
+        const imagePaths = ((sku as { image_paths?: string[] | null }).image_paths ??
+          []) as string[];
         const { signSkuImagePaths } = await import("@/lib/sku-image-resolver.server");
         const signedList = await signSkuImagePaths(imagePaths);
         const images = imagePaths
@@ -65,7 +68,6 @@ export const Route = createFileRoute("/api/public/handheld/items/$id")({
           (sku.image_url && /^https?:\/\//i.test(sku.image_url) && !sku.image_url.includes("token=")
             ? sku.image_url
             : null);
-
 
         const totalQty = stockList.reduce((sum, r) => sum + (Number(r?.qty) || 0), 0);
         const isDisplay = (sku as { is_display?: boolean }).is_display !== false;
