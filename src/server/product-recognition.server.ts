@@ -267,6 +267,13 @@ function parseGatewayJson(content: unknown): RawProductRecognition {
   }
 }
 
+export function buildEraInstruction(source: ProductRecognitionSource): string {
+  const shared = `年代规则：attributes.era 只能来自图片可见证据（底款、生产标记、包装印刷、型号）。有证据但不精确时可给大致年代范围，例如"约1980-1990年代"；完全没有证据时 era 返回 null，并在 description 中写"年代待确认"。禁止把版权年 (©/Copyright 年份) 当作生产年，禁止凭风格猜测年代。`;
+  if (source !== "handheld") return shared;
+  return `${shared}
+手持端输出请精简：description 控制在 20-30 字的一句话介绍，可包含有证据的大致年代范围；evidence 最多 3 条、keywords 最多 5 个、alternative_categories 最多 2 个、clarification_requests 最多 2 条。不要输出任何多余解释。`;
+}
+
 async function callLovableProductModel(input: {
   images: string[];
   hint?: string | null;
@@ -274,11 +281,14 @@ async function callLovableProductModel(input: {
   facetPrompt: string;
   brandPrompt: string;
   ipPrompt: string;
+  source: ProductRecognitionSource;
+  timeoutMs: number | null;
 }): Promise<{ model: string; raw: RawProductRecognition }> {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
-  const model = process.env.PRODUCT_RECOGNITION_MODEL || DEFAULT_PRODUCT_RECOGNITION_MODEL;
+  const model = resolveProductRecognitionModel(input.source);
   const system = `你是 BOOMER-OFF 中古杂货商品识别引擎。只输出 JSON，不要 markdown。
+
 
 你必须从下面 ERP 当前启用的二级分类中选择且只选择一个 category_code，禁止创造新分类：
 ${input.taxonomyPrompt}
