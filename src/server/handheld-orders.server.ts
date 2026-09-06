@@ -535,6 +535,7 @@ type RawFulfillmentRow = {
   location: { name: string } | null;
   order: {
     order_no: string;
+    order_status: string | null;
     courier_provider: string | null;
     courier_service_code: string | null;
     fulfillment_method: string | null;
@@ -553,8 +554,10 @@ type RawFulfillmentRow = {
       name: string | null;
       barcode: string | null;
       image_url: string | null;
+      image_paths: string[] | null;
       sku_code: string | null;
     } | null;
+
   }> | null;
 };
 
