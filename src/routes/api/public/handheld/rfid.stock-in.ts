@@ -25,10 +25,12 @@ export const Route = createFileRoute("/api/public/handheld/rfid/stock-in")({
           .from("inv_epcs")
           .select("epc, sku_id")
           .in("epc", epcs);
-        const alreadyBound = (bound ?? []).filter((b) => b.sku_id).map((b) => ({
-          epc: b.epc as string,
-          sku_id: b.sku_id as string,
-        }));
+        const alreadyBound = (bound ?? [])
+          .filter((b) => b.sku_id)
+          .map((b) => ({
+            epc: b.epc as string,
+            sku_id: b.sku_id as string,
+          }));
         const boundSet = new Set(alreadyBound.map((b) => b.epc));
         const fresh = epcs.filter((e) => !boundSet.has(e));
 
@@ -36,17 +38,15 @@ export const Route = createFileRoute("/api/public/handheld/rfid/stock-in")({
         if (fresh.length > 0) {
           const nowIso = new Date().toISOString();
           for (const epc of fresh) {
-            const { error } = await supabaseAdmin
-              .from("inv_unclaimed_epcs")
-              .upsert(
-                {
-                  epc,
-                  last_seen_location_id: auth.device.location_id,
-                  last_seen_at: nowIso,
-                  hits: 1,
-                },
-                { onConflict: "epc" },
-              );
+            const { error } = await supabaseAdmin.from("inv_unclaimed_epcs").upsert(
+              {
+                epc,
+                last_seen_location_id: auth.device.location_id,
+                last_seen_at: nowIso,
+                hits: 1,
+              },
+              { onConflict: "epc" },
+            );
             if (!error) queued++;
           }
         }

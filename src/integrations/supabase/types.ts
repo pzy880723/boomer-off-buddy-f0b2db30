@@ -2235,6 +2235,92 @@ export type Database = {
           },
         ]
       }
+      fulfillment_shortages: {
+        Row: {
+          client_op_id: string | null
+          created_at: string
+          customer_responded_at: string | null
+          customer_response_note: string | null
+          device_id: string | null
+          exception_id: string | null
+          fulfillment_id: string
+          fulfillment_item_id: string
+          id: string
+          order_id: string | null
+          quantity: number
+          reason: string | null
+          refund_state: string
+          reported_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          client_op_id?: string | null
+          created_at?: string
+          customer_responded_at?: string | null
+          customer_response_note?: string | null
+          device_id?: string | null
+          exception_id?: string | null
+          fulfillment_id: string
+          fulfillment_item_id: string
+          id?: string
+          order_id?: string | null
+          quantity: number
+          reason?: string | null
+          refund_state?: string
+          reported_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          client_op_id?: string | null
+          created_at?: string
+          customer_responded_at?: string | null
+          customer_response_note?: string | null
+          device_id?: string | null
+          exception_id?: string | null
+          fulfillment_id?: string
+          fulfillment_item_id?: string
+          id?: string
+          order_id?: string | null
+          quantity?: number
+          reason?: string | null
+          refund_state?: string
+          reported_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fulfillment_shortages_exception_id_fkey"
+            columns: ["exception_id"]
+            isOneToOne: false
+            referencedRelation: "fulfillment_exceptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fulfillment_shortages_fulfillment_id_fkey"
+            columns: ["fulfillment_id"]
+            isOneToOne: false
+            referencedRelation: "fulfillments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fulfillment_shortages_fulfillment_item_id_fkey"
+            columns: ["fulfillment_item_id"]
+            isOneToOne: false
+            referencedRelation: "fulfillment_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fulfillment_shortages_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fulfillments: {
         Row: {
           claimed_at: string | null
@@ -2320,6 +2406,38 @@ export type Database = {
             columns: ["tote_id"]
             isOneToOne: false
             referencedRelation: "warehouse_totes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      handheld_notification_reads: {
+        Row: {
+          created_at: string
+          id: string
+          notification_id: string
+          read_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notification_id: string
+          read_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notification_id?: string
+          read_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "handheld_notification_reads_notification_id_fkey"
+            columns: ["notification_id"]
+            isOneToOne: false
+            referencedRelation: "inv_handheld_notifications"
             referencedColumns: ["id"]
           },
         ]
@@ -2758,31 +2876,46 @@ export type Database = {
       }
       inv_handheld_notifications: {
         Row: {
+          action_status: string | null
+          audience: string
           device_id: string | null
           id: string
           kind: string
           location_id: string | null
           payload: Json
+          ref_id: string | null
+          ref_type: string | null
           title: string | null
           ts: string
+          user_id: string | null
         }
         Insert: {
+          action_status?: string | null
+          audience?: string
           device_id?: string | null
           id?: string
           kind: string
           location_id?: string | null
           payload?: Json
+          ref_id?: string | null
+          ref_type?: string | null
           title?: string | null
           ts?: string
+          user_id?: string | null
         }
         Update: {
+          action_status?: string | null
+          audience?: string
           device_id?: string | null
           id?: string
           kind?: string
           location_id?: string | null
           payload?: Json
+          ref_id?: string | null
+          ref_type?: string | null
           title?: string | null
           ts?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -5478,6 +5611,82 @@ export type Database = {
           },
         ]
       }
+      print_jobs: {
+        Row: {
+          acked_at: string | null
+          attempts: number
+          created_at: string
+          fulfillment_id: string
+          id: string
+          last_error: string | null
+          lease_device_id: string | null
+          lease_expires_at: string | null
+          leased_at: string | null
+          location_id: string | null
+          order_id: string | null
+          payload: Json
+          status: string
+          ticket_type: string
+          updated_at: string
+        }
+        Insert: {
+          acked_at?: string | null
+          attempts?: number
+          created_at?: string
+          fulfillment_id: string
+          id?: string
+          last_error?: string | null
+          lease_device_id?: string | null
+          lease_expires_at?: string | null
+          leased_at?: string | null
+          location_id?: string | null
+          order_id?: string | null
+          payload?: Json
+          status?: string
+          ticket_type: string
+          updated_at?: string
+        }
+        Update: {
+          acked_at?: string | null
+          attempts?: number
+          created_at?: string
+          fulfillment_id?: string
+          id?: string
+          last_error?: string | null
+          lease_device_id?: string | null
+          lease_expires_at?: string | null
+          leased_at?: string | null
+          location_id?: string | null
+          order_id?: string | null
+          payload?: Json
+          status?: string
+          ticket_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "print_jobs_fulfillment_id_fkey"
+            columns: ["fulfillment_id"]
+            isOneToOne: false
+            referencedRelation: "fulfillments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "print_jobs_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "print_jobs_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       return_inspections: {
         Row: {
           channel_restore_status: string
@@ -6245,6 +6454,203 @@ export type Database = {
             columns: ["subject_id"]
             isOneToOne: false
             referencedRelation: "payment_subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_agents: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          id: string
+          is_active: boolean
+          location_id: string | null
+          scope: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          is_active?: boolean
+          location_id?: string | null
+          scope?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          is_active?: boolean
+          location_id?: string | null
+          scope?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_agents_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_conversations: {
+        Row: {
+          created_at: string
+          customer_id: string | null
+          id: string
+          last_message_at: string | null
+          last_message_preview: string | null
+          location_id: string | null
+          order_id: string | null
+          status: string
+          title: string | null
+          topic: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id?: string | null
+          id?: string
+          last_message_at?: string | null
+          last_message_preview?: string | null
+          location_id?: string | null
+          order_id?: string | null
+          status?: string
+          title?: string | null
+          topic?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string | null
+          id?: string
+          last_message_at?: string | null
+          last_message_preview?: string | null
+          location_id?: string | null
+          order_id?: string | null
+          status?: string
+          title?: string | null
+          topic?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_conversations_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_conversations_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_conversations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_messages: {
+        Row: {
+          body: string
+          client_op_id: string | null
+          conversation_id: string
+          created_at: string
+          id: string
+          internal: boolean
+          sender_customer_id: string | null
+          sender_name: string
+          sender_type: string
+          sender_user_id: string | null
+        }
+        Insert: {
+          body: string
+          client_op_id?: string | null
+          conversation_id: string
+          created_at?: string
+          id?: string
+          internal?: boolean
+          sender_customer_id?: string | null
+          sender_name: string
+          sender_type: string
+          sender_user_id?: string | null
+        }
+        Update: {
+          body?: string
+          client_op_id?: string | null
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          internal?: boolean
+          sender_customer_id?: string | null
+          sender_name?: string
+          sender_type?: string
+          sender_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "support_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_messages_sender_customer_id_fkey"
+            columns: ["sender_customer_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_participants: {
+        Row: {
+          conversation_id: string
+          display_name: string | null
+          id: string
+          joined_at: string
+          last_read_at: string | null
+          participant_role: string
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          display_name?: string | null
+          id?: string
+          joined_at?: string
+          last_read_at?: string | null
+          participant_role?: string
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          display_name?: string | null
+          id?: string
+          joined_at?: string
+          last_read_at?: string | null
+          participant_role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_participants_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "support_conversations"
             referencedColumns: ["id"]
           },
         ]
@@ -7288,17 +7694,30 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      fulfillment_pick_scan: {
-        Args: {
-          p_client_op_id?: string
-          p_code: string
-          p_device_id: string
-          p_fulfillment_id: string
-          p_location_id: string
-          p_operator_id?: string
-        }
-        Returns: Json
-      }
+      fulfillment_pick_scan:
+        | {
+            Args: {
+              p_client_op_id?: string
+              p_code: string
+              p_device_id: string
+              p_fulfillment_id: string
+              p_location_id: string
+              p_operator_id?: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_client_op_id: string
+              p_code: string
+              p_device_id: string
+              p_fulfillment_id: string
+              p_fulfillment_item_id: string
+              p_location_id: string
+              p_operator_id: string
+            }
+            Returns: Json
+          }
       gen_commerce_after_sale_no: { Args: never; Returns: string }
       gen_commerce_order_no: { Args: never; Returns: string }
       gen_ean13: { Args: never; Returns: string }
@@ -7394,6 +7813,37 @@ export type Database = {
           p_type: string
         }
         Returns: Json
+      }
+      print_jobs_lease: {
+        Args: {
+          p_device_id: string
+          p_lease_seconds?: number
+          p_limit?: number
+          p_location_id: string
+        }
+        Returns: {
+          acked_at: string | null
+          attempts: number
+          created_at: string
+          fulfillment_id: string
+          id: string
+          last_error: string | null
+          lease_device_id: string | null
+          lease_expires_at: string | null
+          leased_at: string | null
+          location_id: string | null
+          order_id: string | null
+          payload: Json
+          status: string
+          ticket_type: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "print_jobs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       restore_after_return_inspection: {
         Args: {

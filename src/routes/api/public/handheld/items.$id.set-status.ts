@@ -67,22 +67,20 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/set-status"
           .eq("sku_id", params.id);
         if (links && links.length > 0) {
           for (const l of links as Array<{ shop_id: string }>) {
-            await supabaseAdmin
-              .from("youzan_stock_sync_queue")
-              .upsert(
-                {
-                  sku_id: params.id,
-                  shop_id: l.shop_id,
-                  action: "push_is_display",
-                  target_is_display: body.is_display,
-                  target_stock: totalQty,
-                  reason: "handheld_set_status",
-                  status: "pending",
-                  next_run_at: new Date().toISOString(),
-                  last_error: null,
-                } as never,
-                { onConflict: "sku_id,shop_id" },
-              );
+            await supabaseAdmin.from("youzan_stock_sync_queue").upsert(
+              {
+                sku_id: params.id,
+                shop_id: l.shop_id,
+                action: "push_is_display",
+                target_is_display: body.is_display,
+                target_stock: totalQty,
+                reason: "handheld_set_status",
+                status: "pending",
+                next_run_at: new Date().toISOString(),
+                last_error: null,
+              } as never,
+              { onConflict: "sku_id,shop_id" },
+            );
           }
         }
 

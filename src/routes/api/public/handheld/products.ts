@@ -147,7 +147,10 @@ async function buildItems(skus: SkuRow[], locations: LocRow[]): Promise<ProductI
     const { data: st } = await supabaseAdmin
       .from("inv_stocks")
       .select("sku_id, location_id, qty")
-      .in("sku_id", skus.map((s) => s.id))
+      .in(
+        "sku_id",
+        skus.map((s) => s.id),
+      )
       .in("location_id", shopIds);
     shopStocks = (st ?? []) as typeof shopStocks;
   }
@@ -182,14 +185,15 @@ async function buildItems(skus: SkuRow[], locations: LocRow[]): Promise<ProductI
     }
     const total = stocks.reduce((sum, r) => sum + r.stock_qty, 0);
     const isUnlimitedStock = s.inventory_policy === "unlimited";
-    const listingStatus = isUnlimitedStock && s.is_display !== false
-      ? "selling"
-      : deriveListingStatus(s.is_display !== false, total);
+    const listingStatus =
+      isUnlimitedStock && s.is_display !== false
+        ? "selling"
+        : deriveListingStatus(s.is_display !== false, total);
     const imagePaths = (s.image_paths ?? []) as string[];
     const cover =
-      (s.image_url && /^https?:\/\//i.test(s.image_url) && !s.image_url.includes("token=")
+      s.image_url && /^https?:\/\//i.test(s.image_url) && !s.image_url.includes("token=")
         ? s.image_url
-        : null);
+        : null;
     return {
       id: s.id,
       product_type: classifyType(s),
@@ -213,7 +217,7 @@ async function buildItems(skus: SkuRow[], locations: LocRow[]): Promise<ProductI
       is_display: s.is_display !== false,
       listing_status: listingStatus,
       status_label: statusLabel(listingStatus),
-      can_restock: !isUnlimitedStock && (s.is_display !== false) && total === 0,
+      can_restock: !isUnlimitedStock && s.is_display !== false && total === 0,
       created_at: s.created_at,
       updated_at: s.updated_at,
     };
@@ -371,9 +375,10 @@ export const Route = createFileRoute("/api/public/handheld/products")({
 
         let items = await buildItems(skus, locations);
         // Post-filter for qty-dependent listing_status buckets
-        if (statusFilter === "selling") items = items.filter((it) => it.listing_status === "selling");
-        else if (statusFilter === "sold_out") items = items.filter((it) => it.listing_status === "sold_out");
-
+        if (statusFilter === "selling")
+          items = items.filter((it) => it.listing_status === "selling");
+        else if (statusFilter === "sold_out")
+          items = items.filter((it) => it.listing_status === "sold_out");
 
         // ---- counts (q/category-affected, type-independent) ----
         // Query in parallel with items, per-type head-counts.
@@ -390,10 +395,8 @@ export const Route = createFileRoute("/api/public/handheld/products")({
           (b.updated_at || "").localeCompare(a.updated_at || "");
         const cmpCreated = (a: ProductItem, b: ProductItem, dir: 1 | -1) =>
           dir * (a.created_at || "").localeCompare(b.created_at || "");
-        const cmpPrice = (a: ProductItem, b: ProductItem, dir: 1 | -1) =>
-          dir * (a.price - b.price);
-        const cmpStock = (a: ProductItem, b: ProductItem) =>
-          b.total_stock_qty - a.total_stock_qty;
+        const cmpPrice = (a: ProductItem, b: ProductItem, dir: 1 | -1) => dir * (a.price - b.price);
+        const cmpStock = (a: ProductItem, b: ProductItem) => b.total_stock_qty - a.total_stock_qty;
 
         if (sort === "created_desc") items.sort((a, b) => cmpCreated(a, b, -1));
         else if (sort === "created_asc") items.sort((a, b) => cmpCreated(a, b, 1));

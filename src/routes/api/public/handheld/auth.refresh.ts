@@ -19,11 +19,9 @@ export const Route = createFileRoute("/api/public/handheld/auth/refresh")({
           return errCode("invalid_body", undefined, { detail: String(e) });
         }
 
-        const sb = createClient(
-          process.env.SUPABASE_URL!,
-          process.env.SUPABASE_PUBLISHABLE_KEY!,
-          { auth: { persistSession: false, autoRefreshToken: false } },
-        );
+        const sb = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_PUBLISHABLE_KEY!, {
+          auth: { persistSession: false, autoRefreshToken: false },
+        });
         const { data, error } = await sb.auth.refreshSession({
           refresh_token: body.refresh_token,
         });

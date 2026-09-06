@@ -45,4 +45,3 @@ export const Route = createFileRoute("/api/public/handheld/rfid/$epc")({
     },
   },
 });
-

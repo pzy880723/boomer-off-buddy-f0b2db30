@@ -4,9 +4,11 @@ import {
   HANDHELD_CORS,
   authenticateDevice,
   requireLocation,
+  resolveSessionUser,
   ok,
   err,
 } from "@/server/handheld-auth.server";
+import { requireStaffAtDeviceLocation } from "@/server/handheld-fulfillment.server";
 
 const FULFILLMENT_STATUSES = new Set([
   "unallocated",
@@ -29,6 +31,9 @@ export const Route = createFileRoute("/api/public/handheld/fulfillments")({
         if (!auth.ok) return auth.response;
         const location = requireLocation(auth.device);
         if (!location.ok) return location.response;
+        const session = await resolveSessionUser(request);
+        const staff = await requireStaffAtDeviceLocation(auth.device, session);
+        if (!staff.ok) return staff.response;
         const url = new URL(request.url);
         const statuses = (
           url.searchParams.get("status") ||
@@ -43,13 +48,18 @@ export const Route = createFileRoute("/api/public/handheld/fulfillments")({
           .select(
             "id, code, order_id, location_id, status, priority, claimed_device_id, claimed_at, created_at, order:commerce_orders!order_id(order_no, courier_provider, courier_service_code, customer_note), items:fulfillment_items(id, picked_qty, expected_qty)",
           )
-          .eq("location_id", auth.device.location_id!)
+          .eq("location_id", staff.locationId)
           .in("status", statuses)
           .order("priority", { ascending: false })
           .order("created_at", { ascending: true })
           .limit(100);
         if (error) return err(error.message, 500);
-        return ok(data ?? []);
+        const rows = data ?? [];
+        // 兼容：默认仍返回数组；移动端可用 ?format=items 拿到 { items, scope }
+        if (url.searchParams.get("format") === "items") {
+          return ok({ items: rows, scope: `location:${staff.locationId}` });
+        }
+        return ok(rows);
       },
     },
   },

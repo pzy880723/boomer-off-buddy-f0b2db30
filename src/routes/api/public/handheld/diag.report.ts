@@ -1,5 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { HANDHELD_CORS, authenticateDevice, ok, err, resolveSessionUser } from "@/server/handheld-auth.server";
+import {
+  HANDHELD_CORS,
+  authenticateDevice,
+  ok,
+  err,
+  resolveSessionUser,
+} from "@/server/handheld-auth.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { DiagReportReq } from "@/lib/handheld/schemas";
 

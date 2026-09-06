@@ -10,9 +10,7 @@ export const Route = createFileRoute("/api/public/handheld/auth/logout")({
         const auth = await authenticateDevice(request);
         if (!auth.ok) return auth.response;
         const token =
-          request.headers.get("x-session-token") ||
-          request.headers.get("X-Session-Token") ||
-          "";
+          request.headers.get("x-session-token") || request.headers.get("X-Session-Token") || "";
         if (token) {
           const sb = createClient(
             process.env.SUPABASE_URL!,

@@ -39,18 +39,16 @@ export const Route = createFileRoute("/api/public/handheld/items/bind-rfid")({
           });
         }
 
-        const up = await supabaseAdmin
-          .from("inv_epcs")
-          .upsert(
-            {
-              epc: body.epc,
-              sku_id: body.sku_id,
-              status: "in_stock",
-              current_location_id: locationId,
-              last_seen_at: new Date().toISOString(),
-            },
-            { onConflict: "epc" },
-          );
+        const up = await supabaseAdmin.from("inv_epcs").upsert(
+          {
+            epc: body.epc,
+            sku_id: body.sku_id,
+            status: "in_stock",
+            current_location_id: locationId,
+            last_seen_at: new Date().toISOString(),
+          },
+          { onConflict: "epc" },
+        );
         if (up.error) return errCode("internal_error", up.error.message);
 
         await supabaseAdmin.from("inv_unclaimed_epcs").delete().eq("epc", body.epc);

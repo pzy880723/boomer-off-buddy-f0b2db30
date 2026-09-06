@@ -19,7 +19,8 @@ export const Route = createFileRoute("/api/public/handheld/items/sign-read-url")
         const signed = await supabaseAdmin.storage
           .from(body.bucket)
           .createSignedUrl(body.storage_path, body.expires_in);
-        if (signed.error) return err(signed.error.message, signed.error.message.includes("not found") ? 404 : 500);
+        if (signed.error)
+          return err(signed.error.message, signed.error.message.includes("not found") ? 404 : 500);
         return ok({
           storage_path: body.storage_path,
           read_url: signed.data.signedUrl,

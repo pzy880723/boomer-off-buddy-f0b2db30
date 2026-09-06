@@ -38,10 +38,14 @@ export const Route = createFileRoute("/api/public/handheld/rfid/transfer-locatio
           );
         }
         if (auth.device.location_kind !== "warehouse" && to !== auth.device.location_id) {
-          return errCode("unauthorized_location", "Cannot relocate to a location other than current device", {
-            device_location_id: auth.device.location_id,
-            to_location_id: to,
-          });
+          return errCode(
+            "unauthorized_location",
+            "Cannot relocate to a location other than current device",
+            {
+              device_location_id: auth.device.location_id,
+              to_location_id: to,
+            },
+          );
         }
 
         if (from) {
@@ -81,11 +85,12 @@ export const Route = createFileRoute("/api/public/handheld/rfid/transfer-locatio
             const { triggerStockWorker } = await import("@/lib/youzan-sync.functions");
             triggerStockWorker({ sku_ids: [e.sku_id] });
           }
-        } catch { /* noop */ }
+        } catch {
+          /* noop */
+        }
 
         return ok({ epc: body.epc, from_location_id: from, to_location_id: to });
       },
     },
   },
 });
-

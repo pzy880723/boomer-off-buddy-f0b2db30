@@ -239,7 +239,7 @@ describe("product classification policy", () => {
         ],
       },
       categories,
-      { facets, brands },
+      { facets, brands, ips: [] },
     );
 
     assert.equal(result.brand_id, "brand-wedgwood");
@@ -262,7 +262,7 @@ describe("product classification policy", () => {
         attributes: { brand: "Unknown Toy Works" },
       },
       categories,
-      { facets, brands },
+      { facets, brands, ips: [] },
     );
 
     assert.equal(result.brand_id, null);

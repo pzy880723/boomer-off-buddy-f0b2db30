@@ -37,7 +37,9 @@ export const Route = createFileRoute("/api/public/handheld/label-templates")({
         const url = new URL(request.url);
         const rawType = url.searchParams.get("print_type");
         const printType =
-          rawType === "label" || rawType === "receipt" ? (rawType as "label" | "receipt") : undefined;
+          rawType === "label" || rawType === "receipt"
+            ? (rawType as "label" | "receipt")
+            : undefined;
         try {
           const items = await listTemplates(printType);
           const labelDefault = items.find(

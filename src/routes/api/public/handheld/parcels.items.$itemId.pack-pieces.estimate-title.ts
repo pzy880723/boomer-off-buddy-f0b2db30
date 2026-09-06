@@ -67,9 +67,7 @@ export const Route = createFileRoute(
             model: gateway("google/gemini-2.5-flash"),
             output: Output.object({ schema: ResultSchema }),
             system: TITLE_SYSTEM,
-            messages: [
-              { role: "user", content: `商品标题：${text}` },
-            ],
+            messages: [{ role: "user", content: `商品标题：${text}` }],
           });
           return ok({
             pieces: output.pieces ?? null,

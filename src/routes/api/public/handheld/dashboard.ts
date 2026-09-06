@@ -8,6 +8,7 @@ import {
   err,
 } from "@/server/handheld-auth.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { countUnread, resolveNotificationScope } from "@/server/handheld-notifications.server";
 
 type DashboardTask = {
   id: string;
@@ -241,11 +242,16 @@ export const Route = createFileRoute("/api/public/handheld/dashboard")({
             }));
         }
 
-        // ---- 4. unread notifications for this device ----
-        const { count: unreadCount } = await supabaseAdmin
-          .from("inv_handheld_notifications" as never)
-          .select("id", { count: "exact", head: true })
-          .eq("device_id", auth.device.id);
+        // ---- 4. unread notifications（与消息中心同一口径：本人 + 本设备 + 授权库位 + 广播）----
+        let unreadCount = 0;
+        if (session) {
+          const notificationScope = await resolveNotificationScope({
+            userId: session.user_id,
+            deviceId: auth.device.id,
+            deviceLocationId: auth.device.location_id,
+          });
+          unreadCount = await countUnread(notificationScope);
+        }
 
         return ok({
           stats: {

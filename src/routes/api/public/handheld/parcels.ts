@@ -29,7 +29,8 @@ async function requireSuperAdmin(request: Request) {
   const auth = await authenticateDevice(request);
   if (!auth.ok) return { ok: false as const, response: auth.response };
   const user = await resolveSessionUser(request);
-  if (!user) return { ok: false as const, response: errCode("unauthorized", "Missing session token") };
+  if (!user)
+    return { ok: false as const, response: errCode("unauthorized", "Missing session token") };
   const roles = await loadUserRoles(user.user_id);
   if (!roles.includes("super_admin")) {
     return { ok: false as const, response: errCode("unauthorized_role", "super_admin required") };
@@ -66,7 +67,10 @@ export const Route = createFileRoute("/api/public/handheld/parcels")({
         const { bucket, mode, q, limit, offset } = parsed.data;
         const from = offset;
         const to = offset + limit - 1;
-        const statuses = bucket === "pending" ? (PENDING as unknown as string[]) : (RECEIVED as unknown as string[]);
+        const statuses =
+          bucket === "pending"
+            ? (PENDING as unknown as string[])
+            : (RECEIVED as unknown as string[]);
 
         // ---------- item 模式 ----------
         if (mode === "item") {
@@ -79,7 +83,11 @@ export const Route = createFileRoute("/api/public/handheld/parcels")({
             .in("japan_parcels.status", statuses)
             .range(from, to)
             .order("pay_at", { ascending: false, nullsFirst: false })
-            .order("created_at", { referencedTable: "japan_parcels", ascending: false, nullsFirst: false })
+            .order("created_at", {
+              referencedTable: "japan_parcels",
+              ascending: false,
+              nullsFirst: false,
+            })
             .order("position", { ascending: true });
           if (q) {
             const s = `%${q}%`;
@@ -91,7 +99,22 @@ export const Route = createFileRoute("/api/public/handheld/parcels")({
           if (error) return errCode("internal_error", error.message);
 
           const items = (rows ?? []).map((r) => {
-            const p = (r as { japan_parcels?: { id: string; source_order_no: string | null; tracking_no: string | null; status: string; received_at: string | null; is_problem: boolean; intl_pay_at: string | null; created_at: string; system_code: string | null; created_by: string | null } }).japan_parcels;
+            const p = (
+              r as {
+                japan_parcels?: {
+                  id: string;
+                  source_order_no: string | null;
+                  tracking_no: string | null;
+                  status: string;
+                  received_at: string | null;
+                  is_problem: boolean;
+                  intl_pay_at: string | null;
+                  created_at: string;
+                  system_code: string | null;
+                  created_by: string | null;
+                };
+              }
+            ).japan_parcels;
             return {
               id: r.id,
               parent_id: r.parent_id,
@@ -139,7 +162,9 @@ export const Route = createFileRoute("/api/public/handheld/parcels")({
           });
 
           // 附加 landed_cny + 拆件价格
-          const parentIds = Array.from(new Set(items.map((i) => i.parent_id).filter(Boolean) as string[]));
+          const parentIds = Array.from(
+            new Set(items.map((i) => i.parent_id).filter(Boolean) as string[]),
+          );
           if (parentIds.length > 0) {
             const [parcelsRes, siblingsRes] = await Promise.all([
               supabaseAdmin
@@ -148,14 +173,32 @@ export const Route = createFileRoute("/api/public/handheld/parcels")({
                 .in("id", parentIds),
               supabaseAdmin
                 .from("japan_parcel_items")
-                .select("id, parent_id, item_total_jpy, unit_price_jpy, quantity, weight_g, tariff_rate")
+                .select(
+                  "id, parent_id, item_total_jpy, unit_price_jpy, quantity, weight_g, tariff_rate",
+                )
                 .in("parent_id", parentIds),
             ]);
-            const parcelMap = new Map<string, { intl_total_jpy: number | null; intl_exchange_rate: number | null }>();
+            const parcelMap = new Map<
+              string,
+              { intl_total_jpy: number | null; intl_exchange_rate: number | null }
+            >();
             (parcelsRes.data ?? []).forEach((p) =>
-              parcelMap.set(p.id, { intl_total_jpy: p.intl_total_jpy ?? null, intl_exchange_rate: p.intl_exchange_rate ?? null }),
+              parcelMap.set(p.id, {
+                intl_total_jpy: p.intl_total_jpy ?? null,
+                intl_exchange_rate: p.intl_exchange_rate ?? null,
+              }),
             );
-            const sibsByParent = new Map<string, Array<{ id: string; item_total_jpy: number | null; unit_price_jpy: number | null; quantity: number | null; weight_g: number | null; tariff_rate: number | null }>>();
+            const sibsByParent = new Map<
+              string,
+              Array<{
+                id: string;
+                item_total_jpy: number | null;
+                unit_price_jpy: number | null;
+                quantity: number | null;
+                weight_g: number | null;
+                tariff_rate: number | null;
+              }>
+            >();
             (siblingsRes.data ?? []).forEach((s) => {
               const k = s.parent_id as string;
               const arr = sibsByParent.get(k) ?? [];
@@ -177,7 +220,11 @@ export const Route = createFileRoute("/api/public/handheld/parcels")({
             items.forEach((it) => {
               const landed = landedById.get(it.id) ?? null;
               it.landed_cny = round2(landed);
-              const piece = computePiecePrice(jpyById.get(it.id) ?? it.item_total_jpy, landed, it.pack_pieces && it.pack_pieces > 0 ? it.pack_pieces : null);
+              const piece = computePiecePrice(
+                jpyById.get(it.id) ?? it.item_total_jpy,
+                landed,
+                it.pack_pieces && it.pack_pieces > 0 ? it.pack_pieces : null,
+              );
               it.piece_price_cny = round2(piece.pieceCny);
               it.piece_price_jpy = piece.pieceJpy == null ? null : Math.round(piece.pieceJpy);
             });
@@ -215,7 +262,20 @@ export const Route = createFileRoute("/api/public/handheld/parcels")({
         if (error) return errCode("internal_error", error.message);
 
         const mapped = (rows ?? []).map((r) => {
-          const children = (((r as { japan_parcel_items?: Array<{ item_title: string | null; item_title_cn: string | null; item_image_url: string | null; item_total_cny: number | null; quantity: number | null; position: number | null }> }).japan_parcel_items) ?? [])
+          const children = (
+            (
+              r as {
+                japan_parcel_items?: Array<{
+                  item_title: string | null;
+                  item_title_cn: string | null;
+                  item_image_url: string | null;
+                  item_total_cny: number | null;
+                  quantity: number | null;
+                  position: number | null;
+                }>;
+              }
+            ).japan_parcel_items ?? []
+          )
             .slice()
             .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
           const first = children[0];
@@ -223,13 +283,15 @@ export const Route = createFileRoute("/api/public/handheld/parcels")({
             ? first.item_title_cn || first.item_title || null
             : r.item_title_cn || r.item_title || null;
           const firstImage =
-            r.item_image_url ||
-            children.find((c) => c.item_image_url)?.item_image_url ||
-            null;
+            r.item_image_url || children.find((c) => c.item_image_url)?.item_image_url || null;
           const itemsTotalCny = children.reduce((s, c) => s + (Number(c.item_total_cny) || 0), 0);
           const totalQty = children.reduce((s, c) => s + (Number(c.quantity) || 0), 0);
           const baseTotal =
-            r.grand_total_cny != null ? Number(r.grand_total_cny) : itemsTotalCny > 0 ? itemsTotalCny : null;
+            r.grand_total_cny != null
+              ? Number(r.grand_total_cny)
+              : itemsTotalCny > 0
+                ? itemsTotalCny
+                : null;
           const avg = baseTotal != null && totalQty > 0 ? baseTotal / totalQty : null;
           return {
             id: r.id,

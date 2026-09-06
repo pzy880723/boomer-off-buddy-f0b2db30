@@ -258,7 +258,7 @@ export async function releaseSkuToOfflineShopsCore(args: {
   if (isCustom) {
     const { data, error } = await supabase
       .from("youzan_shops")
-      .select("id,kdt_id,role,status,warehouse_code")
+      .select("id,kdt_id,role,status,warehouse_code,access_token,refresh_token,token_expires_at")
       .eq("role", "branch")
       .eq("status", "active");
     if (error) throw new Error(error.message);

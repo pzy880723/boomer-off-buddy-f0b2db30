@@ -48,7 +48,10 @@ export const Route = createFileRoute("/api/public/handheld/parcels/$id")({
 
         const list = items ?? [];
         const landedMap = computeParcelItemLanded(
-          { intl_total_jpy: row.intl_total_jpy ?? null, intl_exchange_rate: row.intl_exchange_rate ?? null },
+          {
+            intl_total_jpy: row.intl_total_jpy ?? null,
+            intl_exchange_rate: row.intl_exchange_rate ?? null,
+          },
           list.map((it) => ({
             id: it.id,
             item_total_jpy: it.item_total_jpy ?? null,
@@ -127,18 +130,14 @@ export const Route = createFileRoute("/api/public/handheld/parcels/$id")({
         const intlCny = rate > 0 && intlJpy != null ? round2(intlJpy * rate) : null;
         const tariffCny = rate > 0 ? round2(tariffJpy * rate) : null;
         const totalCny =
-          rate > 0
-            ? round2((itemsCny ?? 0) + (intlCny ?? 0) + (tariffCny ?? 0))
-            : null;
+          rate > 0 ? round2((itemsCny ?? 0) + (intlCny ?? 0) + (tariffCny ?? 0)) : null;
 
         const first = list[0];
         const first_item_name = first
           ? first.item_title_cn || first.item_title || null
           : row.item_title_cn || row.item_title || null;
         const first_image =
-          row.item_image_url ||
-          list.find((c) => c.item_image_url)?.item_image_url ||
-          null;
+          row.item_image_url || list.find((c) => c.item_image_url)?.item_image_url || null;
 
         return ok({
           parcel: {

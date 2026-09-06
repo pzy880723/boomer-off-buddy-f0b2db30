@@ -1,5 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { HANDHELD_CORS, authenticateDevice, requireLocation, ok, err } from "@/server/handheld-auth.server";
+import {
+  HANDHELD_CORS,
+  authenticateDevice,
+  requireLocation,
+  ok,
+  err,
+} from "@/server/handheld-auth.server";
 import { getTransfer, recordScan } from "@/server/handheld-transfer.server";
 
 export const Route = createFileRoute("/api/public/handheld/transfers/$id/scan")({

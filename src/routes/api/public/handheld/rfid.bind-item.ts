@@ -39,18 +39,16 @@ export const Route = createFileRoute("/api/public/handheld/rfid/bind-item")({
           });
         }
 
-        const up = await supabaseAdmin
-          .from("inv_epcs")
-          .upsert(
-            {
-              epc: body.epc,
-              sku_id: body.sku_id,
-              status: "in_stock",
-              current_location_id: locationId,
-              last_seen_at: new Date().toISOString(),
-            },
-            { onConflict: "epc" },
-          );
+        const up = await supabaseAdmin.from("inv_epcs").upsert(
+          {
+            epc: body.epc,
+            sku_id: body.sku_id,
+            status: "in_stock",
+            current_location_id: locationId,
+            last_seen_at: new Date().toISOString(),
+          },
+          { onConflict: "epc" },
+        );
         if (up.error) return errCode("internal_error", up.error.message);
 
         await supabaseAdmin.from("inv_unclaimed_epcs").delete().eq("epc", body.epc);
@@ -70,7 +68,9 @@ export const Route = createFileRoute("/api/public/handheld/rfid/bind-item")({
           try {
             const { triggerStockWorker } = await import("@/lib/youzan-sync.functions");
             triggerStockWorker({ sku_ids: [body.sku_id] });
-          } catch { /* noop */ }
+          } catch {
+            /* noop */
+          }
         }
 
         return ok({
@@ -83,4 +83,3 @@ export const Route = createFileRoute("/api/public/handheld/rfid/bind-item")({
     },
   },
 });
-
