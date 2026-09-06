@@ -30,11 +30,14 @@ export const Route = createFileRoute("/api/public/handheld/fulfillments/$id/wayb
       GET: async ({ request, params }) => {
         const auth = await authenticateDevice(request);
         if (!auth.ok) return auth.response;
-        const location = requireLocation(auth.device);
-        if (!location.ok) return location.response;
         const session = await resolveSessionUser(request);
-        const staff = await requireStaffAtDeviceLocation(auth.device, session);
-        if (!staff.ok) return staff.response;
+        const access = await authorizeFulfillment({
+          device: auth.device,
+          session,
+          fulfillmentId: params.id,
+          mode: "read",
+        });
+        if (!access.ok) return access.response;
         const { data } = await supabaseAdmin
           .from("shipments" as never)
           .select("id, provider, tracking_no, status, created_at")
@@ -42,22 +45,35 @@ export const Route = createFileRoute("/api/public/handheld/fulfillments/$id/wayb
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
-        return ok({ ...carrierCapability(), shipment: data ?? null });
+        return ok({
+          ...carrierCapability(),
+          waybill_available: false,
+          scope: access.scope,
+          shipment: data ?? null,
+        });
       },
-      POST: async ({ request }) => {
+      POST: async ({ request, params }) => {
         const auth = await authenticateDevice(request);
         if (!auth.ok) return auth.response;
-        const location = requireLocation(auth.device);
-        if (!location.ok) return location.response;
         const session = await resolveSessionUser(request);
-        const staff = await requireStaffAtDeviceLocation(auth.device, session);
-        if (!staff.ok) return staff.response;
+        const access = await authorizeFulfillment({
+          device: auth.device,
+          session,
+          fulfillmentId: params.id,
+          mode: "write",
+        });
+        if (!access.ok) return access.response;
         const capability = carrierCapability();
         if (!capability.can_print_waybill) {
-          return err(capability.message, 409, { code: "carrier_not_configured", ...capability });
+          return err(capability.message, 409, {
+            code: "carrier_not_configured",
+            waybill_available: false,
+            ...capability,
+          });
         }
         return err("Waybill provider integration not implemented yet", 501, {
           code: "carrier_not_implemented",
+          waybill_available: false,
         });
       },
     },
