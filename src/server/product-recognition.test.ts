@@ -18,7 +18,6 @@ import {
   type ProductRecognitionDeps,
 } from "./product-recognition.server";
 
-
 const categories: CategoryNode[] = [
   { id: "root-p", code: "porcelain", name: "瓷器", parent_id: null, is_active: true },
   {
@@ -229,7 +228,10 @@ describe("handheld recognition performance policy", () => {
 
   test("erp and migration keep the pro model and PRODUCT_RECOGNITION_MODEL", () => {
     assert.equal(resolveProductRecognitionModel("erp", {}), DEFAULT_PRODUCT_RECOGNITION_MODEL);
-    assert.equal(resolveProductRecognitionModel("migration", {}), DEFAULT_PRODUCT_RECOGNITION_MODEL);
+    assert.equal(
+      resolveProductRecognitionModel("migration", {}),
+      DEFAULT_PRODUCT_RECOGNITION_MODEL,
+    );
     assert.equal(
       resolveProductRecognitionModel("erp", {
         PRODUCT_RECOGNITION_MODEL: "custom/pro",
@@ -322,8 +324,9 @@ describe("handheld recognition performance policy", () => {
     assert.equal(parsed.images?.length, 6);
     assert.equal(parsed.primary_index, 2);
     assert.throws(() =>
-      AiRecognizeReq.parse({ images: [...images, { image_base64: "data:image/jpeg;base64,img6" }] }),
+      AiRecognizeReq.parse({
+        images: [...images, { image_base64: "data:image/jpeg;base64,img6" }],
+      }),
     );
   });
 });
-

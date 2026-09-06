@@ -26,9 +26,7 @@ export function resolveProductRecognitionModel(
   env: Record<string, string | undefined> = process.env,
 ): string {
   if (source === "handheld") {
-    return (
-      env.HANDHELD_PRODUCT_RECOGNITION_MODEL || DEFAULT_HANDHELD_PRODUCT_RECOGNITION_MODEL
-    );
+    return env.HANDHELD_PRODUCT_RECOGNITION_MODEL || DEFAULT_HANDHELD_PRODUCT_RECOGNITION_MODEL;
   }
   return env.PRODUCT_RECOGNITION_MODEL || DEFAULT_PRODUCT_RECOGNITION_MODEL;
 }
@@ -48,7 +46,6 @@ export function isRecognitionTimeoutError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return name === "AbortError" || name === "TimeoutError" || /timed? ?out|aborted/i.test(message);
 }
-
 
 export type ProductRecognitionInput = {
   images: string[];
@@ -206,7 +203,6 @@ export async function runProductRecognition(
       if (attempt < maxAttempts) await wait(200 * attempt);
     }
   }
-
 
   const failed = raw === null;
   const modelResult: RawProductRecognition = raw ?? {
