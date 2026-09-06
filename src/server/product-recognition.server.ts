@@ -10,9 +10,42 @@ import type { BrandCandidate, FacetTerm } from "../lib/product-taxonomy";
 
 export const PRODUCT_RECOGNITION_PROMPT_VERSION = "boomer-product-v3-fast-handheld";
 export const DEFAULT_PRODUCT_RECOGNITION_MODEL = "google/gemini-2.5-pro";
-export const DEFAULT_HANDHELD_RECOGNITION_MODEL = "google/gemini-2.5-flash";
+export const DEFAULT_HANDHELD_PRODUCT_RECOGNITION_MODEL = "google/gemini-2.5-flash";
+export const HANDHELD_RECOGNITION_TIMEOUT_MS = 25_000;
+export const HANDHELD_RECOGNITION_MAX_ATTEMPTS = 2;
+export const HANDHELD_RECOGNITION_MAX_TOKENS = 4096;
 
 export type ProductRecognitionSource = "erp" | "handheld" | "migration";
+
+/**
+ * 手持端（iOS 拍照上架）走 flash 默认模型 + 独立环境变量覆盖；
+ * ERP / migration 仍保持原 Pro 模型与 PRODUCT_RECOGNITION_MODEL。
+ */
+export function resolveProductRecognitionModel(
+  source: ProductRecognitionSource,
+  env: Record<string, string | undefined> = process.env,
+): string {
+  if (source === "handheld") {
+    return env.HANDHELD_PRODUCT_RECOGNITION_MODEL || DEFAULT_HANDHELD_PRODUCT_RECOGNITION_MODEL;
+  }
+  return env.PRODUCT_RECOGNITION_MODEL || DEFAULT_PRODUCT_RECOGNITION_MODEL;
+}
+
+export function recognitionAttemptPolicy(source: ProductRecognitionSource): {
+  maxAttempts: number;
+  timeoutMs: number | null;
+} {
+  return source === "handheld"
+    ? { maxAttempts: HANDHELD_RECOGNITION_MAX_ATTEMPTS, timeoutMs: HANDHELD_RECOGNITION_TIMEOUT_MS }
+    : { maxAttempts: 3, timeoutMs: null };
+}
+
+export function isRecognitionTimeoutError(error: unknown): boolean {
+  if (!error) return false;
+  const name = (error as { name?: string }).name ?? "";
+  const message = error instanceof Error ? error.message : String(error);
+  return name === "AbortError" || name === "TimeoutError" || /timed? ?out|aborted/i.test(message);
+}
 
 export type ProductRecognitionInput = {
   images: string[];
@@ -54,13 +87,14 @@ export type ProductRecognitionDeps = {
   loadBrands?: () => Promise<BrandCandidate[]>;
   loadIps?: () => Promise<BrandCandidate[]>;
   callModel: (input: {
-    source: ProductRecognitionSource;
     images: string[];
     hint?: string | null;
     taxonomyPrompt: string;
     facetPrompt: string;
     brandPrompt: string;
     ipPrompt: string;
+    source: ProductRecognitionSource;
+    timeoutMs: number | null;
   }) => Promise<{ model: string; raw: RawProductRecognition }>;
   saveAudit: (input: ProductRecognitionAuditInput) => Promise<{ id: string }>;
   sleep?: (milliseconds: number) => Promise<void>;
@@ -128,6 +162,7 @@ export async function runProductRecognition(
   const images = input.images.filter(Boolean).slice(0, 8);
   if (images.length === 0) throw new Error("至少需要一张商品照片");
 
+  // 分类/标签/品牌/IP 四个来源独立并行读取；分类仍是必需项，不做任何裁剪或删除。
   const [categories, facets, brands, ips] = await Promise.all([
     deps.loadCategories(),
     deps.loadFacets?.() ?? Promise.resolve([]),
@@ -141,28 +176,30 @@ export async function runProductRecognition(
   const brandPrompt = formatBrandsForPrompt(brands);
   const ipPrompt = formatBrandsForPrompt(ips);
   const wait = deps.sleep ?? sleep;
+  const { maxAttempts, timeoutMs } = recognitionAttemptPolicy(input.source);
 
-  let model = input.source === "handheld" ? DEFAULT_HANDHELD_RECOGNITION_MODEL : DEFAULT_PRODUCT_RECOGNITION_MODEL;
+  let model = resolveProductRecognitionModel(input.source);
   let raw: RawProductRecognition | null = null;
   let lastError: Error | null = null;
-  const maxAttempts = input.source === "handheld" ? 2 : 3;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
       const response = await deps.callModel({
-        source: input.source,
         images,
         hint: input.hint,
         taxonomyPrompt,
         facetPrompt,
         brandPrompt,
         ipPrompt,
+        source: input.source,
+        timeoutMs,
       });
       model = response.model;
       raw = response.raw;
       break;
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
-      if (input.source === "handheld" && ["TimeoutError", "AbortError"].includes(lastError.name)) break;
+      // 超时不再重复重试：再来一轮只会让店员多等一个超时窗口。
+      if (input.source === "handheld" && isRecognitionTimeoutError(lastError)) break;
       if (attempt < maxAttempts) await wait(200 * attempt);
     }
   }
@@ -226,22 +263,29 @@ function parseGatewayJson(content: unknown): RawProductRecognition {
   }
 }
 
+export function buildEraInstruction(source: ProductRecognitionSource): string {
+  const shared = `年代规则：attributes.era 只能来自图片可见证据（底款、生产标记、包装印刷、型号）。有证据但不精确时可给大致年代范围，例如"约1980-1990年代"；完全没有证据时 era 返回 null，并在 description 中写"年代待确认"。禁止把版权年 (©/Copyright 年份) 当作生产年，禁止凭风格猜测年代。`;
+  if (source !== "handheld") return shared;
+  return `${shared}
+手持端输出请精简：description 控制在 20-30 字的一句话介绍，可包含有证据的大致年代范围；evidence 最多 3 条、keywords 最多 5 个、alternative_categories 最多 2 个、clarification_requests 最多 2 条。不要输出任何多余解释。`;
+}
+
 export async function callLovableProductModel(input: {
-  source: ProductRecognitionSource;
   images: string[];
   hint?: string | null;
   taxonomyPrompt: string;
   facetPrompt: string;
   brandPrompt: string;
   ipPrompt: string;
+  source: ProductRecognitionSource;
+  timeoutMs?: number | null;
 }): Promise<{ model: string; raw: RawProductRecognition }> {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
   const handheld = input.source === "handheld";
-  const model = handheld
-    ? process.env.HANDHELD_PRODUCT_RECOGNITION_MODEL || DEFAULT_HANDHELD_RECOGNITION_MODEL
-    : process.env.PRODUCT_RECOGNITION_MODEL || DEFAULT_PRODUCT_RECOGNITION_MODEL;
+  const model = resolveProductRecognitionModel(input.source);
   const system = `你是 BOOMER-OFF 中古杂货商品识别引擎。只输出 JSON，不要 markdown。
+
 
 你必须从下面 ERP 当前启用的二级分类中选择且只选择一个 category_code，禁止创造新分类：
 ${input.taxonomyPrompt}
@@ -259,12 +303,12 @@ ${input.ipPrompt || "（当前 IP 库为空）"}
 
 attribute_confidence 返回逐字段置信度对象，例如 brand、era、origin_country、material、craft、object_type。
 clarification_requests 返回需要店员补拍或确认的问题数组，每项包含 field、question、reason；无需追问时返回空数组。
-品名使用中文，不超过40字；${handheld ? "描述约20至30字，概括物件类型、可见特点和有证据的年代范围。evidence最多3条简短证据，clarification_requests最多2项。" : "描述不超过160字。"}只根据图片可见证据判断，不确定字段返回 null 或空数组。
-年代有证据但无法精确到年份时，era可以写“约1980至1990年代”等大致范围，并在介绍中注明“约”；没有年代证据时era返回null，介绍可写“年代待确认”。版权年份/IP诞生年份不能作为该实物生产年份，禁止编造稀有度、真伪和收藏升值承诺。
+品名使用中文，不超过40字；描述不超过160字。只根据图片可见证据判断，不确定字段返回 null 或空数组。禁止编造稀有度、真伪和收藏升值承诺。
 瓷器：能确认日本产地时选日本瓷器下的 active 叶子，能确认欧洲产地时选欧洲瓷器下的 active 叶子；产地无法确认时必须返回 ai_low_confidence，并在 warning 中写明需人工核对产地，禁止猜测产地，也禁止返回 porcelain_origin_unknown（该类目已停用）。古美术不收瓷器。
 游戏设备：Switch Lite 等掌上主机选 game_handheld；PS5、Xbox 等桌面主机选 game_desktop_console；实体游戏卡带/卡匣选 game_cartridge；手柄、底座、保护壳等选 game_accessory。禁止再返回 digital_game_console。
 疑似受监管文物、违禁品或无法安全销售的物品，将风险写入 compliance_flags。
-suggested_price_cny 只是人民币参考价，没有依据时返回 null。`;
+suggested_price_cny 只是人民币参考价，没有依据时返回 null。
+${buildEraInstruction(input.source)}`;
   const userContent = [
     {
       type: "text",
@@ -274,7 +318,7 @@ suggested_price_cny 只是人民币参考价，没有依据时返回 null。`;
   ];
   const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
-    ...(handheld ? { signal: AbortSignal.timeout(25_000) } : {}),
+    ...(handheld ? { signal: AbortSignal.timeout(input.timeoutMs ?? HANDHELD_RECOGNITION_TIMEOUT_MS) } : {}),
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
@@ -282,7 +326,7 @@ suggested_price_cny 只是人民币参考价，没有依据时返回 null。`;
     },
     body: JSON.stringify({
       model,
-      ...(handheld ? { max_tokens: 4096 } : {}),
+      ...(handheld ? { max_tokens: HANDHELD_RECOGNITION_MAX_TOKENS } : {}),
       messages: [
         { role: "system", content: system },
         { role: "user", content: userContent },

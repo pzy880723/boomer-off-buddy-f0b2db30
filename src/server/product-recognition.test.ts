@@ -1,9 +1,18 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
+import { AiRecognizeReq } from "../lib/handheld/schemas";
 import type { CategoryNode } from "../lib/product-classification";
 import type { BrandCandidate, FacetTerm } from "../lib/product-taxonomy";
 import {
+  buildEraInstruction,
+  DEFAULT_HANDHELD_PRODUCT_RECOGNITION_MODEL,
+  DEFAULT_PRODUCT_RECOGNITION_MODEL,
+  HANDHELD_RECOGNITION_MAX_ATTEMPTS,
+  HANDHELD_RECOGNITION_TIMEOUT_MS,
+  isRecognitionTimeoutError,
+  recognitionAttemptPolicy,
+  resolveProductRecognitionModel,
   runProductRecognition,
   callLovableProductModel,
   type ProductRecognitionAuditInput,
@@ -113,8 +122,8 @@ describe("shared product recognition core", () => {
       assert.equal(requests[1].signal, undefined);
       const body = JSON.parse(requests[0].body as string);
       assert.equal(body.max_tokens, 4096);
-      assert.match(body.messages[0].content, /20至30字/);
-      assert.match(body.messages[0].content, /版权年份\/IP诞生年份不能/);
+      assert.match(body.messages[0].content, /20-30 字/);
+      assert.match(body.messages[0].content, /禁止把版权年/);
       assert.match(body.messages[0].content, /Hello Kitty/);
       assert.equal(body.messages[1].content.length, 3);
     } finally {
@@ -261,5 +270,125 @@ describe("shared product recognition core", () => {
     assert.equal(result.category_code, "ai_low_confidence");
     assert.match(result.warning ?? "", /gateway unavailable/);
     assert.equal(audits[0].status, "failed");
+  });
+});
+
+describe("handheld recognition performance policy", () => {
+  test("handheld defaults to flash and honours its own env override", () => {
+    assert.equal(
+      resolveProductRecognitionModel("handheld", {}),
+      DEFAULT_HANDHELD_PRODUCT_RECOGNITION_MODEL,
+    );
+    assert.equal(
+      resolveProductRecognitionModel("handheld", {
+        HANDHELD_PRODUCT_RECOGNITION_MODEL: "google/gemini-3-flash-preview",
+        PRODUCT_RECOGNITION_MODEL: "google/gemini-2.5-pro",
+      }),
+      "google/gemini-3-flash-preview",
+    );
+  });
+
+  test("erp and migration keep the pro model and PRODUCT_RECOGNITION_MODEL", () => {
+    assert.equal(resolveProductRecognitionModel("erp", {}), DEFAULT_PRODUCT_RECOGNITION_MODEL);
+    assert.equal(
+      resolveProductRecognitionModel("migration", {}),
+      DEFAULT_PRODUCT_RECOGNITION_MODEL,
+    );
+    assert.equal(
+      resolveProductRecognitionModel("erp", {
+        PRODUCT_RECOGNITION_MODEL: "custom/pro",
+        HANDHELD_PRODUCT_RECOGNITION_MODEL: "custom/flash",
+      }),
+      "custom/pro",
+    );
+  });
+
+  test("attempt policy is bounded for handheld only", () => {
+    assert.deepEqual(recognitionAttemptPolicy("handheld"), {
+      maxAttempts: HANDHELD_RECOGNITION_MAX_ATTEMPTS,
+      timeoutMs: HANDHELD_RECOGNITION_TIMEOUT_MS,
+    });
+    assert.equal(HANDHELD_RECOGNITION_MAX_ATTEMPTS, 2);
+    assert.equal(HANDHELD_RECOGNITION_TIMEOUT_MS, 25_000);
+    assert.deepEqual(recognitionAttemptPolicy("erp"), { maxAttempts: 3, timeoutMs: null });
+  });
+
+  test("handheld call payload carries source and timeout, erp does not time out", async () => {
+    const audits: ProductRecognitionAuditInput[] = [];
+    const seen: Array<{ source: string; timeoutMs: number | null }> = [];
+    const raw = { category_code: "toy_character_figure", confidence: 0.9, name: "软胶怪兽" };
+    for (const source of ["handheld", "erp"] as const) {
+      await runProductRecognition(
+        { images: ["data:image/jpeg;base64,abc"], source },
+        depsFor(async (call) => {
+          seen.push({ source: call.source, timeoutMs: call.timeoutMs });
+          return { model: resolveProductRecognitionModel(call.source, {}), raw };
+        }, audits),
+      );
+    }
+    assert.deepEqual(seen, [
+      { source: "handheld", timeoutMs: HANDHELD_RECOGNITION_TIMEOUT_MS },
+      { source: "erp", timeoutMs: null },
+    ]);
+    assert.equal(audits[0].model, DEFAULT_HANDHELD_PRODUCT_RECOGNITION_MODEL);
+    assert.equal(audits[1].model, DEFAULT_PRODUCT_RECOGNITION_MODEL);
+  });
+
+  test("handheld retries at most twice on ordinary gateway errors", async () => {
+    const audits: ProductRecognitionAuditInput[] = [];
+    let attempts = 0;
+    const result = await runProductRecognition(
+      { images: ["data:image/jpeg;base64,abc"], source: "handheld" },
+      depsFor(async () => {
+        attempts += 1;
+        throw new Error("gateway unavailable");
+      }, audits),
+    );
+    assert.equal(attempts, HANDHELD_RECOGNITION_MAX_ATTEMPTS);
+    assert.equal(result.category_code, "ai_low_confidence");
+    assert.equal(audits[0].status, "failed");
+  });
+
+  test("a timeout is never retried", async () => {
+    const audits: ProductRecognitionAuditInput[] = [];
+    let attempts = 0;
+    const result = await runProductRecognition(
+      { images: ["data:image/jpeg;base64,abc"], source: "handheld" },
+      depsFor(async () => {
+        attempts += 1;
+        throw new Error("AI recognition timed out after 25000ms");
+      }, audits),
+    );
+    assert.equal(attempts, 1);
+    assert.match(result.warning ?? "", /timed out/);
+    assert.equal(audits[0].status, "failed");
+    assert.ok(isRecognitionTimeoutError(Object.assign(new Error("x"), { name: "AbortError" })));
+    assert.equal(isRecognitionTimeoutError(new Error("gateway unavailable")), false);
+  });
+
+  test("handheld era/description instruction allows evidenced ranges and bans copyright years", () => {
+    const handheld = buildEraInstruction("handheld");
+    assert.match(handheld, /约1980-1990年代/);
+    assert.match(handheld, /没有证据时 era 返回 null/);
+    assert.match(handheld, /年代待确认/);
+    assert.match(handheld, /禁止把版权年/);
+    assert.match(handheld, /20-30 字/);
+    const erp = buildEraInstruction("erp");
+    assert.match(erp, /禁止把版权年/);
+    assert.equal(/20-30 字/.test(erp), false);
+  });
+
+  test("recognize-item accepts six inline base64 images", () => {
+    const images = Array.from({ length: 6 }, (_, index) => ({
+      image_base64: `data:image/jpeg;base64,img${index}`,
+    }));
+    const parsed = AiRecognizeReq.parse({ images, primary_index: 2 });
+    assert.equal(parsed.images?.length, 6);
+    assert.equal(parsed.primary_index, 2);
+    assert.throws(() =>
+      AiRecognizeReq.parse({
+        images: [...images, { image_base64: "data:image/jpeg;base64,img6" }],
+      }),
+    );
   });
 });
