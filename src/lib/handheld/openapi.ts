@@ -908,6 +908,138 @@ X-Session-Token: <操作员 session token>
         responses: { "200": jsonRes("OK", NotificationsSinceRes), ...ERROR_RESPONSES },
       },
     },
+    "/api/public/handheld/notifications/{id}/read": {
+      post: {
+        tags: ["通知"],
+        summary: "标记单条消息已读（v1.11，按人持久化、幂等）",
+        description:
+          "需要设备 token + 员工 session。只对当前员工、且该消息在其可见范围内时生效；重复调用返回同一 `read_at`。",
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/support/conversations": {
+      get: {
+        tags: ["客服"],
+        summary: "客服会话列表（v1.11）",
+        description:
+          "门店员工按授权库位、总部客服可见全部会话；共享接待，无独占领取。返回 `data.items[]`，含 `unread_count` 与 `participants`。",
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/support/conversations/{id}": {
+      get: {
+        tags: ["客服"],
+        summary: "会话详情与消息（v1.11）",
+        description: "员工可见 `internal:true` 的内部备注；顾客端接口永不下发内部备注。",
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+      post: {
+        tags: ["客服"],
+        summary: "发送客服消息（v1.11）",
+        description:
+          "body: `{ body, internal:false, client_op_id }`。`client_op_id` 唯一，重试返回同一条消息且 `replayed:true`。",
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/fulfillments/resolve": {
+      get: {
+        tags: ["履约"],
+        summary: "扫码解析履约单（v1.11）",
+        description:
+          "`?code=` 只接受 `boomer-erp:fulfillment:<UUID>` 或真实履约单号，任意 URL 一律 404，禁止扫码跳转外部地址。",
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/fulfillments/{id}/ticket": {
+      get: {
+        tags: ["履约"],
+        summary: "拣货小票内容（v1.11）",
+        description:
+          "仅已付款订单可出票；返回订单二维码内容、商品标题/条码/数量/单价/库位。",
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/fulfillments/{id}/shortage": {
+      post: {
+        tags: ["履约"],
+        summary: "缺货申报（v1.11）",
+        description:
+          "body: `{ fulfillment_item_id, quantity, reason, client_op_id }`。建立异常 + 待顾客确认记录，`refund_state=refund_pending`；未获顾客确认前完成拣货会被拒绝。",
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/fulfillments/{id}/waybill": {
+      get: {
+        tags: ["履约"],
+        summary: "面单能力状态（v1.11）",
+        description:
+          "未配置快递商户时返回 `carrier_not_configured`，不会返回任何伪造运单号。",
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+      post: {
+        tags: ["履约"],
+        summary: "申请面单（v1.11，未接入 provider）",
+        description: "当前返回 `carrier_not_configured` 或 `carrier_not_implemented`。",
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/print-jobs/lease": {
+      post: {
+        tags: ["打印"],
+        summary: "领取打印任务（v1.11）",
+        description:
+          "同门店多台设备互斥租约，避免重复打印；返回 `pick_ticket` 的完整小票内容。租约不等于已打印。",
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/print-jobs/{id}/ack": {
+      post: {
+        tags: ["打印"],
+        summary: "打印回执（v1.11）",
+        description: "`status: acked | failed | unknown`；未收到 acked 不得视为已物理打印。",
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/storefront/support/conversations": {
+      get: {
+        tags: ["商城"],
+        summary: "顾客会话列表（v1.11）",
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+      post: {
+        tags: ["商城"],
+        summary: "顾客发起/复用咨询会话（v1.11）",
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/storefront/support/conversations/{id}": {
+      get: {
+        tags: ["商城"],
+        summary: "顾客会话详情（v1.11，不含内部备注）",
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+      post: {
+        tags: ["商城"],
+        summary: "顾客发送消息（v1.11）",
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/storefront/shortages": {
+      get: {
+        tags: ["商城"],
+        summary: "顾客待确认缺货列表（v1.11）",
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/storefront/shortages/{id}/respond": {
+      post: {
+        tags: ["商城"],
+        summary: "顾客确认缺货（v1.11）",
+        description:
+          "`action: accept | cancel`，只能本人确认，员工不能代替；不会改动订单金额，也不会把退款标记为已完成。",
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+    },
     "/api/public/handheld/diag/report": {
       post: {
         tags: ["诊断"],
