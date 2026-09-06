@@ -1,6 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { HANDHELD_CORS, authenticateDevice, ok, err } from "@/server/handheld-auth.server";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import {
+  HANDHELD_CORS,
+  authenticateDevice,
+  resolveSessionUser,
+  ok,
+  err,
+} from "@/server/handheld-auth.server";
+import {
+  describeScope,
+  listNotificationsSince,
+  resolveNotificationScope,
+} from "@/server/handheld-notifications.server";
 import { NotificationsSinceQuery } from "@/lib/handheld/schemas";
 
 export const Route = createFileRoute("/api/public/handheld/notifications/since")({
@@ -10,6 +20,8 @@ export const Route = createFileRoute("/api/public/handheld/notifications/since")
       GET: async ({ request }) => {
         const auth = await authenticateDevice(request);
         if (!auth.ok) return auth.response;
+        const session = await resolveSessionUser(request);
+        if (!session) return err("Employee session required", 401, { code: "session_required" });
 
         const url = new URL(request.url);
         let q: ReturnType<typeof NotificationsSinceQuery.parse>;
@@ -22,35 +34,17 @@ export const Route = createFileRoute("/api/public/handheld/notifications/since")
           return err("Invalid query", 400, { code: "validation_error", detail: String(e) });
         }
 
-        let qb = supabaseAdmin
-          .from("inv_handheld_notifications" as never)
-          .select("id, kind, title, payload, ts, device_id, location_id")
-          .order("ts", { ascending: true })
-          .limit(q.limit);
-        if (q.ts) qb = qb.gt("ts", q.ts);
-
-        const { data, error } = await qb;
-        if (error) return err(`query failed: ${error.message}`, 500);
-
-        // 过滤：只下发给本设备 / 本库位 / 全局（device_id+location_id 都为 null）
-        const items = ((data as any[]) ?? []).filter((r) => {
-          if (r.device_id && r.device_id !== auth.device.id) return false;
-          if (r.location_id && r.location_id !== auth.device.location_id) return false;
-          return true;
+        const scope = await resolveNotificationScope({
+          userId: session.user_id,
+          deviceId: auth.device.id,
+          deviceLocationId: auth.device.location_id,
         });
-
-        const lastTs = items.length > 0 ? items[items.length - 1].ts : q.ts ?? new Date().toISOString();
-
-        return ok({
-          items: items.map((r) => ({
-            id: r.id,
-            kind: r.kind,
-            title: r.title ?? null,
-            payload: r.payload ?? {},
-            ts: r.ts,
-          })),
-          server_ts: lastTs,
-        });
+        try {
+          const page = await listNotificationsSince({ scope, since: q.ts, limit: q.limit });
+          return ok({ ...page, scope: describeScope(scope) });
+        } catch (error) {
+          return err(error instanceof Error ? error.message : String(error), 500);
+        }
       },
     },
   },

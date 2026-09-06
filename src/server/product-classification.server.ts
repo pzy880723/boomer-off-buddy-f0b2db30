@@ -145,7 +145,7 @@ export async function resolveOrCreateConfirmedIp(input: {
     return { id: row.id, name: row.name, status: row.status === "active" ? "matched" : "review" };
   }
 
-  const created = await supabaseAdmin
+  const created = (await supabaseAdmin
     .from("inv_brands" as never)
     .insert({
       name,
@@ -156,7 +156,7 @@ export async function resolveOrCreateConfirmedIp(input: {
       notes: "由手持 APP 识别并经店员确认创建，待总部审核",
     } as never)
     .select("id, name")
-    .single();
+    .single()) as { data: { id: string; name: string } | null; error: { message: string } | null };
   if (created.error || !created.data) {
     throw new Error(`创建 IP 候选失败：${created.error?.message ?? "no row"}`);
   }

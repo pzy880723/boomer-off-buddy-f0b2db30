@@ -8,15 +8,15 @@ import {
 } from "@/server/handheld-auth.server";
 import {
   countUnread,
-  markAllNotificationsRead,
+  markNotificationRead,
   resolveNotificationScope,
 } from "@/server/handheld-notifications.server";
 
-export const Route = createFileRoute("/api/public/handheld/notifications/read-all")({
+export const Route = createFileRoute("/api/public/handheld/notifications/$id/read")({
   server: {
     handlers: {
       OPTIONS: async () => new Response(null, { status: 204, headers: HANDHELD_CORS }),
-      POST: async ({ request }) => {
+      POST: async ({ request, params }) => {
         const auth = await authenticateDevice(request);
         if (!auth.ok) return auth.response;
         const session = await resolveSessionUser(request);
@@ -27,7 +27,8 @@ export const Route = createFileRoute("/api/public/handheld/notifications/read-al
           deviceLocationId: auth.device.location_id,
         });
         try {
-          const result = await markAllNotificationsRead(scope);
+          const result = await markNotificationRead(scope, params.id);
+          if (!result) return err("Notification not found", 404, { code: "not_found" });
           return ok({ ...result, unread_count: await countUnread(scope) });
         } catch (error) {
           return err(error instanceof Error ? error.message : String(error), 500);

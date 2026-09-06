@@ -6,7 +6,12 @@ import {
 } from "./handheld-product-images.ts";
 
 test("only signs unique image paths from the current page", () => {
-  const page = [
+  const page: Array<{
+    id: string;
+    image_paths: string[];
+    image_url?: string | null;
+    images?: { storage_path: string; read_url: string }[];
+  }> = [
     { id: "sku-1", image_paths: ["sku-listing/shared.jpg", "sku-listing/side.jpg"] },
     { id: "sku-2", image_paths: ["sku-listing/shared.jpg"] },
   ];
@@ -18,7 +23,12 @@ test("only signs unique image paths from the current page", () => {
 });
 
 test("maps signed URLs back to every SKU while preserving image order", () => {
-  const page = [
+  const page: Array<{
+    id: string;
+    image_paths: string[];
+    image_url?: string | null;
+    images?: { storage_path: string; read_url: string }[];
+  }> = [
     { id: "sku-1", image_paths: ["sku-listing/shared.jpg", "sku-listing/side.jpg"] },
     { id: "sku-2", image_paths: ["sku-listing/shared.jpg"] },
   ];
