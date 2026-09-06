@@ -991,7 +991,8 @@ X-Session-Token: <操作员 session token>
       get: {
         tags: ["履约"],
         summary: "拣货小票内容（v1.11）",
-        description: "仅已付款订单可出票；返回订单二维码内容、商品标题/条码/数量/单价/库位。",
+        description:
+          "仅已付款订单可出票；返回订单二维码内容、商品标题/条码/数量/单价/库位与 `scope`。v1.13：按目标子单 `location_id` 授权（HQ 不依赖设备绑定库位），父订单 cancelled/closed 返回 409 `order_cancelled`。",
         responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
       },
     },
@@ -1000,7 +1001,7 @@ X-Session-Token: <操作员 session token>
         tags: ["履约"],
         summary: "缺货申报（v1.11）",
         description:
-          "body: `{ fulfillment_item_id, quantity, reason, client_op_id }`。建立异常 + 待顾客确认记录，`refund_state=refund_pending`；未获顾客确认前完成拣货会被拒绝。",
+          "body: `{ fulfillment_item_id, quantity, reason, client_op_id }`。建立异常 + 待顾客确认记录，`refund_state=refund_pending`；未获顾客确认前完成拣货会被服务端拒绝（409 `pick_blocked`，含 `blocked_reasons`）。v1.13：按目标子单 `location_id` 授权，父订单 cancelled/closed 返回 409 `order_cancelled`。",
         responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
       },
     },
@@ -1008,13 +1009,15 @@ X-Session-Token: <操作员 session token>
       get: {
         tags: ["履约"],
         summary: "面单能力状态（v1.11）",
-        description: "未配置快递商户时返回 `carrier_not_configured`，不会返回任何伪造运单号。",
+        description:
+          "未配置快递商户时返回 `carrier_not_configured`，不会返回任何伪造运单号；响应恒含 `waybill_available:false`。",
         responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
       },
       post: {
         tags: ["履约"],
         summary: "申请面单（v1.11，未接入 provider）",
-        description: "当前返回 `carrier_not_configured` 或 `carrier_not_implemented`。",
+        description:
+          "当前返回 `carrier_not_configured` 或 `carrier_not_implemented`，均带 `waybill_available:false`；同样按目标子单库位授权且订单取消/关闭禁止写。",
         responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
       },
     },
