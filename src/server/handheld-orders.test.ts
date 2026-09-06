@@ -150,7 +150,19 @@ describe("订单列表契约", () => {
     );
   });
 
-  test("退款/售后优先于完成态", () => {
+  test("退款/售后优先于完成态（使用数据库真实退款枚举）", () => {
+    for (const payment of ["refund_pending", "partially_refunded", "refunded"]) {
+      assert.equal(
+        deriveOrderStatus({
+          payment_status: payment,
+          order_status: "completed",
+          fulfillment_count: 1,
+          handed_over_count: 1,
+        }),
+        "after_sales",
+      );
+    }
+    // 旧的错误枚举不应再被当作退款
     assert.equal(
       deriveOrderStatus({
         payment_status: "refunding",
@@ -158,7 +170,7 @@ describe("订单列表契约", () => {
         fulfillment_count: 1,
         handed_over_count: 1,
       }),
-      "after_sales",
+      "completed",
     );
     assert.equal(
       deriveOrderStatus({
