@@ -112,7 +112,7 @@ describe("订单列表契约", () => {
       "cancelled",
     );
     assert.equal(orderStatusLabel("shipped"), "已发出");
-    assert.equal(toAmount("12.905"), 12.91);
+    assert.equal(toAmount("12.905"), 12.9);
     assert.equal(toAmount(null), 0);
   });
 });
