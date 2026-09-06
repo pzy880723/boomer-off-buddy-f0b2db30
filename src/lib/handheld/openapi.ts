@@ -951,7 +951,6 @@ X-Session-Token: <操作员 session token>
       },
     },
     "/api/public/handheld/orders": {
-
       get: {
         tags: ["订单"],
         summary: "父订单只读列表（v1.12，仅 HQ）",
@@ -970,7 +969,6 @@ X-Session-Token: <操作员 session token>
       },
     },
     "/api/public/handheld/fulfillments/resolve": {
-
       get: {
         tags: ["履约"],
         summary: "扫码解析履约单（v1.11）",
