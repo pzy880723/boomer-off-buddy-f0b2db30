@@ -95,9 +95,7 @@ describe("computePickGuard（服务端真实判定）", () => {
       fulfillmentStatus: "picking",
       orderCancelled: false,
       items,
-      shortages: [
-        { fulfillment_item_id: "i2", status: "pending_customer", refund_state: null },
-      ],
+      shortages: [{ fulfillment_item_id: "i2", status: "pending_customer", refund_state: null }],
     });
     assert.equal(g.can_complete_pick, false);
     assert.ok(g.blocked_reasons.includes("shortage_pending_customer"));

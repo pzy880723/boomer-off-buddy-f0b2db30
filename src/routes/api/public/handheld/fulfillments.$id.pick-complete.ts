@@ -7,10 +7,7 @@ import {
   ok,
   err,
 } from "@/server/handheld-auth.server";
-import {
-  authorizeFulfillment,
-  loadPickGuard,
-} from "@/server/handheld-fulfillment-access.server";
+import { authorizeFulfillment, loadPickGuard } from "@/server/handheld-fulfillment-access.server";
 
 export const Route = createFileRoute("/api/public/handheld/fulfillments/$id/pick-complete")({
   server: {

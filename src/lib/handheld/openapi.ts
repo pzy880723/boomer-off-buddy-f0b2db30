@@ -987,6 +987,24 @@ X-Session-Token: <操作员 session token>
         responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
       },
     },
+    "/api/public/handheld/fulfillments/{id}/pick-scan": {
+      post: {
+        tags: ["履约"],
+        summary: "逐行扫码拣货（v1.13 授权收敛）",
+        description:
+          "body: `{ code, client_op_id, fulfillment_item_id? }`。按目标子单 `location_id` 授权：普通员工必须是设备当前绑定库位，HQ 只需对该库位有授权；父订单 cancelled/closed 返回 409 `order_cancelled`。",
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/fulfillments/{id}/pick-complete": {
+      post: {
+        tags: ["履约"],
+        summary: "完成拣货（v1.13 服务端真实判定）",
+        description:
+          "先做与详情同一套 `can_complete_pick` 判定，不通过返回 409 `pick_blocked` 与 `blocked_reasons`（order_cancelled / shortage_pending_customer / refund_pending / lines_unpicked / status_<状态>），通过后才调用数据库 RPC。授权规则同 pick-scan。",
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+    },
     "/api/public/handheld/fulfillments/{id}/ticket": {
       get: {
         tags: ["履约"],

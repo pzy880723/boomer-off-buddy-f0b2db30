@@ -58,7 +58,9 @@ export function evaluateFulfillmentAccess(input: {
 
   if (
     mode === "write" &&
-    BLOCKING_ORDER_STATUSES.includes((input.orderStatus ?? "") as (typeof BLOCKING_ORDER_STATUSES)[number])
+    BLOCKING_ORDER_STATUSES.includes(
+      (input.orderStatus ?? "") as (typeof BLOCKING_ORDER_STATUSES)[number],
+    )
   ) {
     return {
       ok: false,
@@ -105,7 +107,9 @@ export function computePickGuard(input: PickGuardInput): PickGuard {
 
   // 缺货已被客户确认取消的行不再要求拣满。
   const acceptedItemIds = new Set(
-    input.shortages.filter((s) => s.status === "customer_accepted").map((s) => s.fulfillment_item_id),
+    input.shortages
+      .filter((s) => s.status === "customer_accepted")
+      .map((s) => s.fulfillment_item_id),
   );
   const unpicked = input.items.filter(
     (it) =>
@@ -140,7 +144,9 @@ export async function loadFulfillmentContext(
 ): Promise<FulfillmentContext | null> {
   const { data } = await supabaseAdmin
     .from("fulfillments" as never)
-    .select("id, location_id, status, order_id, order:commerce_orders!order_id(order_status, payment_status)")
+    .select(
+      "id, location_id, status, order_id, order:commerce_orders!order_id(order_status, payment_status)",
+    )
     .eq("id", fulfillmentId)
     .maybeSingle();
   if (!data) return null;
@@ -232,8 +238,11 @@ export async function loadPickGuard(context: FulfillmentContext): Promise<{
       .order("created_at", { ascending: true }),
   ]);
   const items =
-    (itemRows as unknown as Array<{ id: string; expected_qty: number; picked_qty: number }> | null) ??
-    [];
+    (itemRows as unknown as Array<{
+      id: string;
+      expected_qty: number;
+      picked_qty: number;
+    }> | null) ?? [];
   const shortages = (shortageRows as unknown as ShortageRow[] | null) ?? [];
   const shortageByItem = new Map<string, { status: string; refund_state: string | null }>();
   for (const row of shortages) {
