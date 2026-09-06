@@ -137,7 +137,7 @@ export function deriveOrderStatus(input: {
   if (
     order === "after_sale" ||
     input.has_active_after_sale === true ||
-    ["refunding", "refunded", "partial_refunded"].includes(payment)
+    ["refund_pending", "partially_refunded", "refunded"].includes(payment)
   ) {
     return "after_sales";
   }
