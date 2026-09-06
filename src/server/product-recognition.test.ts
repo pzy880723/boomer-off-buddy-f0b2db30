@@ -5,6 +5,7 @@ import type { CategoryNode } from "../lib/product-classification";
 import type { BrandCandidate, FacetTerm } from "../lib/product-taxonomy";
 import {
   runProductRecognition,
+  callLovableProductModel,
   type ProductRecognitionAuditInput,
   type ProductRecognitionDeps,
 } from "./product-recognition.server";
@@ -90,6 +91,67 @@ function depsFor(
 }
 
 describe("shared product recognition core", () => {
+  test("gateway uses bounded Flash only for handheld and preserves ERP model overrides", async () => {
+    const previousFetch = globalThis.fetch;
+    const saved = { key: process.env.LOVABLE_API_KEY, model: process.env.PRODUCT_RECOGNITION_MODEL,
+      handheld: process.env.HANDHELD_PRODUCT_RECOGNITION_MODEL };
+    process.env.LOVABLE_API_KEY = "test-not-a-secret";
+    process.env.PRODUCT_RECOGNITION_MODEL = "erp-custom-model";
+    delete process.env.HANDHELD_PRODUCT_RECOGNITION_MODEL;
+    const requests: RequestInit[] = [];
+    globalThis.fetch = async (_url, init) => {
+      requests.push(init!);
+      return Response.json({ choices: [{ message: { content: '{"name":"测试商品"}' } }] });
+    };
+    try {
+      const args = { images: ["front", "back"], taxonomyPrompt: "toy", facetPrompt: "", brandPrompt: "", ipPrompt: "Hello Kitty" };
+      const handheld = await callLovableProductModel({ ...args, source: "handheld" });
+      const erp = await callLovableProductModel({ ...args, source: "erp" });
+      assert.equal(handheld.model, "google/gemini-2.5-flash");
+      assert.equal(erp.model, "erp-custom-model");
+      assert.ok(requests[0].signal instanceof AbortSignal);
+      assert.equal(requests[1].signal, undefined);
+      const body = JSON.parse(requests[0].body as string);
+      assert.equal(body.max_tokens, 4096);
+      assert.match(body.messages[0].content, /20至30字/);
+      assert.match(body.messages[0].content, /版权年份\/IP诞生年份不能/);
+      assert.match(body.messages[0].content, /Hello Kitty/);
+      assert.equal(body.messages[1].content.length, 3);
+    } finally {
+      globalThis.fetch = previousFetch;
+      for (const [key, value] of Object.entries({ LOVABLE_API_KEY: saved.key, PRODUCT_RECOGNITION_MODEL: saved.model,
+        HANDHELD_PRODUCT_RECOGNITION_MODEL: saved.handheld })) {
+        if (value === undefined) delete process.env[key]; else process.env[key] = value;
+      }
+    }
+  });
+
+  test("handheld stops after a timeout instead of repeating a slow request", async () => {
+    let attempts = 0;
+    const audits: ProductRecognitionAuditInput[] = [];
+    const result = await runProductRecognition(
+      { images: ["data:image/jpeg;base64,abc"], source: "handheld" },
+      depsFor(async () => {
+        attempts++;
+        throw new DOMException("recognition timed out", "TimeoutError");
+      }, audits),
+    );
+    assert.equal(attempts, 1);
+    assert.equal(result.status, "fallback");
+  });
+
+  test("handheld retries at most once and forwards the source and every angle", async () => {
+    let attempts = 0;
+    const images = ["front", "back", "side", "detail", "label", "damage"];
+    await runProductRecognition({ images, source: "handheld" }, depsFor(async (input) => {
+      attempts++;
+      assert.equal(input.source, "handheld");
+      assert.deepEqual(input.images, images);
+      throw new Error("temporary gateway error");
+    }, []));
+    assert.equal(attempts, 2);
+  });
+
   test("recognizes European porcelain against the live taxonomy and persists an audit", async () => {
     const audits: ProductRecognitionAuditInput[] = [];
     const result = await runProductRecognition(

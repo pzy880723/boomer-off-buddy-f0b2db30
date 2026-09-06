@@ -8,8 +8,9 @@ import {
 } from "../lib/product-classification";
 import type { BrandCandidate, FacetTerm } from "../lib/product-taxonomy";
 
-export const PRODUCT_RECOGNITION_PROMPT_VERSION = "boomer-product-v2";
+export const PRODUCT_RECOGNITION_PROMPT_VERSION = "boomer-product-v3-fast-handheld";
 export const DEFAULT_PRODUCT_RECOGNITION_MODEL = "google/gemini-2.5-pro";
+export const DEFAULT_HANDHELD_RECOGNITION_MODEL = "google/gemini-2.5-flash";
 
 export type ProductRecognitionSource = "erp" | "handheld" | "migration";
 
@@ -53,6 +54,7 @@ export type ProductRecognitionDeps = {
   loadBrands?: () => Promise<BrandCandidate[]>;
   loadIps?: () => Promise<BrandCandidate[]>;
   callModel: (input: {
+    source: ProductRecognitionSource;
     images: string[];
     hint?: string | null;
     taxonomyPrompt: string;
@@ -126,8 +128,8 @@ export async function runProductRecognition(
   const images = input.images.filter(Boolean).slice(0, 8);
   if (images.length === 0) throw new Error("至少需要一张商品照片");
 
-  const categories = await deps.loadCategories();
-  const [facets, brands, ips] = await Promise.all([
+  const [categories, facets, brands, ips] = await Promise.all([
+    deps.loadCategories(),
     deps.loadFacets?.() ?? Promise.resolve([]),
     deps.loadBrands?.() ?? Promise.resolve([]),
     deps.loadIps?.() ?? Promise.resolve([]),
@@ -140,12 +142,14 @@ export async function runProductRecognition(
   const ipPrompt = formatBrandsForPrompt(ips);
   const wait = deps.sleep ?? sleep;
 
-  let model = DEFAULT_PRODUCT_RECOGNITION_MODEL;
+  let model = input.source === "handheld" ? DEFAULT_HANDHELD_RECOGNITION_MODEL : DEFAULT_PRODUCT_RECOGNITION_MODEL;
   let raw: RawProductRecognition | null = null;
   let lastError: Error | null = null;
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
+  const maxAttempts = input.source === "handheld" ? 2 : 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
       const response = await deps.callModel({
+        source: input.source,
         images,
         hint: input.hint,
         taxonomyPrompt,
@@ -158,7 +162,8 @@ export async function runProductRecognition(
       break;
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
-      if (attempt < 3) await wait(200 * attempt);
+      if (input.source === "handheld" && ["TimeoutError", "AbortError"].includes(lastError.name)) break;
+      if (attempt < maxAttempts) await wait(200 * attempt);
     }
   }
 
@@ -221,7 +226,8 @@ function parseGatewayJson(content: unknown): RawProductRecognition {
   }
 }
 
-async function callLovableProductModel(input: {
+export async function callLovableProductModel(input: {
+  source: ProductRecognitionSource;
   images: string[];
   hint?: string | null;
   taxonomyPrompt: string;
@@ -231,7 +237,10 @@ async function callLovableProductModel(input: {
 }): Promise<{ model: string; raw: RawProductRecognition }> {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
-  const model = process.env.PRODUCT_RECOGNITION_MODEL || DEFAULT_PRODUCT_RECOGNITION_MODEL;
+  const handheld = input.source === "handheld";
+  const model = handheld
+    ? process.env.HANDHELD_PRODUCT_RECOGNITION_MODEL || DEFAULT_HANDHELD_RECOGNITION_MODEL
+    : process.env.PRODUCT_RECOGNITION_MODEL || DEFAULT_PRODUCT_RECOGNITION_MODEL;
   const system = `你是 BOOMER-OFF 中古杂货商品识别引擎。只输出 JSON，不要 markdown。
 
 你必须从下面 ERP 当前启用的二级分类中选择且只选择一个 category_code，禁止创造新分类：
@@ -250,7 +259,8 @@ ${input.ipPrompt || "（当前 IP 库为空）"}
 
 attribute_confidence 返回逐字段置信度对象，例如 brand、era、origin_country、material、craft、object_type。
 clarification_requests 返回需要店员补拍或确认的问题数组，每项包含 field、question、reason；无需追问时返回空数组。
-品名使用中文，不超过40字；描述不超过160字。只根据图片可见证据判断，不确定字段返回 null 或空数组。
+品名使用中文，不超过40字；${handheld ? "描述约20至30字，概括物件类型、可见特点和有证据的年代范围。evidence最多3条简短证据，clarification_requests最多2项。" : "描述不超过160字。"}只根据图片可见证据判断，不确定字段返回 null 或空数组。
+年代有证据但无法精确到年份时，era可以写“约1980至1990年代”等大致范围，并在介绍中注明“约”；没有年代证据时era返回null，介绍可写“年代待确认”。版权年份/IP诞生年份不能作为该实物生产年份，禁止编造稀有度、真伪和收藏升值承诺。
 瓷器：能确认日本产地时选日本瓷器下的 active 叶子，能确认欧洲产地时选欧洲瓷器下的 active 叶子；产地无法确认时必须返回 ai_low_confidence，并在 warning 中写明需人工核对产地，禁止猜测产地，也禁止返回 porcelain_origin_unknown（该类目已停用）。古美术不收瓷器。
 游戏设备：Switch Lite 等掌上主机选 game_handheld；PS5、Xbox 等桌面主机选 game_desktop_console；实体游戏卡带/卡匣选 game_cartridge；手柄、底座、保护壳等选 game_accessory。禁止再返回 digital_game_console。
 疑似受监管文物、违禁品或无法安全销售的物品，将风险写入 compliance_flags。
@@ -264,6 +274,7 @@ suggested_price_cny 只是人民币参考价，没有依据时返回 null。`;
   ];
   const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
+    ...(handheld ? { signal: AbortSignal.timeout(25_000) } : {}),
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
@@ -271,6 +282,7 @@ suggested_price_cny 只是人民币参考价，没有依据时返回 null。`;
     },
     body: JSON.stringify({
       model,
+      ...(handheld ? { max_tokens: 4096 } : {}),
       messages: [
         { role: "system", content: system },
         { role: "user", content: userContent },
