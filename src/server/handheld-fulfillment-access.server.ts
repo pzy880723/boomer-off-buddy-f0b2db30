@@ -103,11 +103,6 @@ export function computePickGuard(input: PickGuardInput): PickGuard {
   const refundPending = input.shortages.filter((s) => s.refund_state === "refund_pending").length;
   if (refundPending > 0) reasons.push("refund_pending");
 
-  const shortageItemIds = new Set(
-    input.shortages
-      .filter((s) => s.status !== "cancelled" && s.status !== "rejected")
-      .map((s) => s.fulfillment_item_id),
-  );
   // 缺货已被客户确认取消的行不再要求拣满。
   const acceptedItemIds = new Set(
     input.shortages.filter((s) => s.status === "customer_accepted").map((s) => s.fulfillment_item_id),
@@ -128,8 +123,6 @@ export function computePickGuard(input: PickGuardInput): PickGuard {
     unpicked_line_count: unpicked,
     pending_customer_count: pendingCustomer,
     refund_pending_count: refundPending,
-    // shortageItemIds 仅用于内部推导，不外泄
-    ...(shortageItemIds.size >= 0 ? {} : {}),
   };
 }
 
