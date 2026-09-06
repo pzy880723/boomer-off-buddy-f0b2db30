@@ -1,61 +1,64 @@
-# 只读复核：20260831220000_marketplace_payment_foundation-final.sql（最终版）
+# 只读核验：iOS 拍照上架识别链路（2026-09-06）
 
-本轮**未执行任何写操作**：未运行 migration、未 DDL/DML、未发布、未改任何生产代码。结论来自与上一版 SQL 的逐行 diff、全文静态阅读，以及对生产库的只读查询（information_schema / pg_proc / pg_constraint）。
+本轮**未执行任何写操作**：未改代码/配置、未跑迁移、未写数据库、未碰有赞/库存、未新建商品、未部署腾讯。不输出任何 signed URL、token、密钥或消费者资料。
 
-**结论先行：本轮无阻断项，可以执行。** 上一轮唯一的阻断项 B1 已在 final 版闭合，且修复方式正确、无语法问题。
+## 4) 当前最新 commit
 
-## 1) v1 过渡期是否仍可写 — 是，已修好
+`c0fc04df760ae62965451dbeaf35cfd0b4b1a24a`（Sun Sep 6 10:14:00 2026 UTC，"Work in progress"）。
 
-修订版删除了会打断 v1 的三处：不再 `DROP` 旧唯一键 `commerce_payment_suborders_payment_id_payment_profile_id_key`、不再把 `payment_profile_id` 改为可空、不再对三个 fen 列 `SET NOT NULL`。
+## 1) 模型、环境覆盖、重试/超时、耗时统计
 
-只读核对生产列定义：`payment_profile_id NOT NULL`、`allocation_snapshot jsonb NOT NULL DEFAULT '{}'`。因此 v1 的 INSERT：
+**文件**：`src/server/product-recognition.server.ts`
 
-- 三个 fen 列留 NULL → `line_amount_fen >= 0`、`amount_fen >= 0`、`decimal_fen_match` 三个 CHECK 在 NULL 下求值为 NULL，Postgres 视为通过；
-- `allocation_snapshot` 取默认 `'{}'`，不含 `store_allocations` 键 → 落在新 partial unique index 的谓词之外，不会与 v2 的按主体唯一冲突。
+- 默认模型（第 12 行）：`google/gemini-2.5-pro`。
+- 环境覆盖（第 234 行）：`process.env.PRODUCT_RECOGNITION_MODEL || DEFAULT_...`。当前 Lovable 环境中 **`PRODUCT_RECOGNITION_MODEL` = UNSET**（未配置，因此实际走默认 2.5-pro）；`LOVABLE_API_KEY` = SET（值未读取、未输出）。
+- 重试（第 146–163 行）：最多 3 次，失败间隔 `200ms × attempt`（200ms / 400ms），三次全败后**不抛错**，而是落一条 `category_code='ai_low_confidence'`、`status='failed'` 的兜底审计记录。
+- **超时：没有任何超时/AbortSignal**。第 264 行的 `fetch` 裸调用，无 `AbortController`、无 `signal`、非流式（`response_format: json_object` 一次性返回）。上游卡住时只能等平台请求超时。
+- **耗时无法从数据库统计**：`inv_sku_classifications`（31 列）没有任何 duration/latency/started_at 字段，只有 `created_at`。要按次统计耗时目前只能看网关日志。
 
-结论：v1 与 v2 可真正并存，`payments.ts:258` 无需同批改动。
+**网关实测耗时（可核验证据，均为 chat_completions / 200）**：
 
-## 2) v2 的四项校验
+| log_id | 时间(UTC) | 模型 | 耗时 | tokens in/out |
+|---|---|---|---|---|
+| 01a0762f-ce1d-7d73-95b1-abae53fbf5c8 | 2026-09-06 10:07:59 | google/gemini-2.5-pro | **39,711 ms** | 12385 / 4216 |
+| 01a07603-1c48-753e-b5c4-d613a0d3cca6 | 2026-09-06 09:19:04 | google/gemini-2.5-pro | **33,785 ms** | 12385 / 3026 |
 
-- **partial unique**（第 151–153 行）：谓词 `amount_fen IS NOT NULL AND allocation_snapshot ? 'store_allocations'`。`jsonb_exists` 与 `round` 均为 IMMUTABLE（已查 pg_proc，provolatile='i'），索引谓词合法。
-- **fen 校验**：v2 显式拒绝三个 fen 为 NULL，并逐条断言 `fen = round(decimal*100)`，与表级 `decimal_fen_match` 双保险，正确。
-- **子单总额校验**（第 495–501 行）：`sum(amount_fen) = round(payments.amount*100)`，覆盖了 1 分差场景，正确。
-- **normalized profile relation**：`commerce_payment_suborder_profiles` 建表 + 存量回填 + v2 内 `FOREACH` 写入全部 contributing profiles，并先校验这些 profile 全部属于同一 active 主体且 `wechat_sub_mchid` 一致，正确。
+对比同期其它调用：gemini-3-flash-preview 0.9–4.0 s、gemini-2.5-flash 1.5–3.5 s。
 
-**B1 已修复（验证通过）**：final 版在 v2 中新增了四重校验——`allocation_snapshot` 必须是 object、必须含 `store_allocations` 键、该键必须是数组、数组长度必须等于 `payment_profile_ids` 的元素个数；并额外用 `jsonb_array_elements` 逐条核对快照里的每个 `payment_profile_id` 确实出现在 `payment_profile_ids` 中（count(DISTINCT) 与长度相等才放行）。由此保证了：凡是 v2 写入的子单必然命中 partial unique index 的谓词，`commerce_payment_suborders_v2_payment_subject_unique` 的保护无法被绕过；且快照与明细表的门店维度完全一致。`?`、`->`、`jsonb_array_elements`、`jsonb_typeof`、`cardinality` 均为合法 IMMUTABLE 用法，PL/pgSQL 语法无问题。`RAISE EXCEPTION` 消息 `subject suborder requires matching store allocations` 结构完整。
+近 14 天 `inv_sku_classifications` 共 6 条，全部 `source='handheld'`。
 
-## 3) 时间戳
+## 2) recognize-item 契约与年代 prompt 约束
 
-生产仓库当前最大迁移为 `20260831213000_hello_kitty_specific_ip.sql`；新文件 `20260831220000` 严格晚于它，顺序正确。上一版的 B3 已解决。
+**路由**：`src/routes/api/public/handheld/ai.recognize-item.ts` → `POST /api/public/handheld/ai/recognize-item`
+先 `authenticateDevice(request)`（需 `X-Device-Token`），再 `AiRecognizeReq.parse`，失败 400 `validation_error`；识别异常统一 502 `AI recognition failed: …`。
 
-## 4) 个人/小微身份及同名结算约束
+**请求体**（`src/lib/handheld/schemas.ts:588–622`，四种图片来源可混用，合并后统一截断到 6 张）：
 
-新增 `identity_verification_reference`、`settlement_account_verified_at` 两列；触发器新增第四段：`provider_application_status='active'` 且 `subject_type IN ('micro_merchant','personal_seller')` 时，强制 `seller_qualification_status='approved'` + 身份核验引用非空 + 结算账户核验时间非空。加上原有的自助进件（owner + 协议版本 + 接受时间）校验，个人/小微不可能在零身份信息下被置为 active。上一版第 8 条缺口已闭合。
+- `images: [{ image_url? , image_base64? }]`，`min(1).max(6)` — **Codex 计划用的 inline base64 6 角度完全在契约内**，无需改后端。
+- `image_urls: string[]` 1–6；`image_storage_paths: [{bucket:'sku-raw'|'sku-listing', storage_path}]` 1–6（服务端自动签名，签名有效期 1h，见 `handheld-ai.server.ts:36`）；以及旧版单图 `image_url` / `image_base64`。
+- `primary_index` 0–5：把该下标挪到第 0 位当主图（`handheld-ai.server.ts:71–75`）。
+- `hint?: string`。
 
-同名收款：新增 `COMMENT ON COLUMN payment_subjects.wechat_sub_mchid` 明示"禁止用消费者 OpenID 作为收款方"。这是文档级表达，非强制约束——真正的执行点仍在 provider 层（只接受 `wechat_sub_mchid`）。可接受，记为已知非 schema 级约束。
+`image_base64` 允许裸 base64 或 `data:` 前缀，服务端在 `toDataUrl` 里补 `data:image/jpeg;base64,`（第 16–19 行）。**没有大小上限校验**，1280px JPEG 完全可行；6 张原图直传则会明显放大请求体。
 
-## 5) 其余 SQL/schema 问题
+**年代/描述相关 prompt 约束**（`product-recognition.server.ts:236–258`）：
 
-**非阻断（建议但不影响本次执行）**
+- `attributes` 必须含 `era`（与 brand/maker/origin_region/origin_country/material/craft/object_type/colors/dimensions/functional_status/missing_parts 同级）；`attribute_confidence` 需给出 `era` 的逐字段置信度。
+- 全局约束："只根据图片可见证据判断，不确定字段返回 null 或空数组"——即年代不确定必须返回 null，禁止猜测。
+- 描述限制：品名中文 ≤40 字，描述 ≤160 字。
+- 另有强约束：瓷器产地不可确认必须回 `ai_low_confidence`；IP 必须给最具体角色而非母品牌；品牌/标签只能取库内条目，禁止创造。
+- **没有**对 era 取值格式（如"昭和/1970s/年代区间"）的枚举约束，这一项目前是自由文本。
 
-1. **仍不可重跑**：第 81/97/155/177/215/240/260/276/297 行 9 处 `CREATE TABLE`、第 128/174/209/212/236/312 行 6 处 `CREATE INDEX`、第 142–144 行 3 处 `ADD CONSTRAINT`、第 151 与 290 行两处新唯一索引均无 `IF NOT EXISTS` / 前置 DROP。首跑没问题（9 张表在生产均不存在，三个约束名也不存在），部分失败后重跑会报 42P07/42710。若走单事务（本文件全部为事务性 DDL，无 CONCURRENTLY），失败整体回滚，风险可控。
-2. **`?` 操作符**：第 153 行在部分 SQL 客户端/驱动里 `?` 会被当作参数占位符。经 migration 工具/psql 执行没问题，但若日后经 JS 驱动重放需注意，可改写为 `jsonb_exists(allocation_snapshot, 'store_allocations')` 规避。
-3. **对账去重已修好**：改成 `coalesce(...,'')` 的表达式唯一索引 + `CHECK (provider_transaction_id IS NOT NULL OR provider_reference IS NOT NULL)`，NULLS DISTINCT 问题已解决。
-4. **`platform_commission_rules` 仍无"同 scope 时间区间不重叠"保护**：`UNIQUE(rule_code, version)` 挡不住两条 platform 默认规则同时 active。建议加部分唯一索引或 `EXCLUDE USING gist`。
-5. **ledger 写入入口未定义**：`commerce_settlement_ledger` 目前没有任何 RPC 写它，若应用层直写会让快照不可信。建议下一阶段用单一 RPC 收口。
-6. **`location_ids jsonb`** 在 v2 的 `jsonb_to_recordset` 里声明但未使用，可删或并入 allocation_snapshot。
-7. **前端仍挡个人主体**：`src/lib/store-payments.functions.ts` 的 zod 仍要求统一社会信用代码 ≥15 位，本阶段不改 UI，记为已知缺口。
-8. 建议为本迁移新增一个契约测试（参考 `src/lib/commerce/schema-contract.test.ts`），断言 partial unique 谓词、fen 校验与总额校验文本。
+## 3) 为什么慢 — 证据与位置
 
-## 结论
+1. **模型选型是主因**：默认 `google/gemini-2.5-pro`（第 12 行，且 `PRODUCT_RECOGNITION_MODEL` 未配置覆盖）。同一网关上 flash 系列 1–4 s，pro 实测 34–40 s，差一个数量级。
+2. **系统 prompt 极大**：每次调用都把全量分类树 + 标签库 + 品牌库 + IP 库拼进 system（第 130–140、236–258 行）。当前库存规模：分类 122 条、标签 23 条、品牌/IP 合计 187 条。网关日志显示输入 token 稳定在 **12,385**，其中绝大部分是这段常量 prompt，而不是图片。且它没有任何缓存（每次 `loadCategories/Facets/Brands/Ips` 重新查库再重新拼串）。
+3. **输出也长**：3,026–4,216 output tokens（要求返回十几个字段 + evidence + clarification_requests），生成阶段本身就要几十秒。
+4. **非流式 + 无超时**：第 264 行一次性 `fetch`，客户端在完整 JSON 返回前拿不到任何反馈；卡住时也没有主动超时，只能等平台层断开。
+5. **重试会放大**：失败重试最多 3 次（第 146 行），每次都是一次完整的 30s+ 调用，最坏情况约 100 s 后才落兜底记录。
 
-上一版的 B1（v1 失效）、B3（时间戳）、以及第 6/8 条建议均已在之前修订中解决；本轮 final 版又闭合了最后一项——v2 对 `store_allocations` 的强制校验。**当前不存在任何阻断执行的 SQL/schema 问题。**
+**可选优化方向（本轮不改）**：配置 `PRODUCT_RECOGNITION_MODEL` 指向 flash 系列即可立刻把主链路从 ~35 s 降到个位数秒；把分类/标签/品牌库 prompt 做进程内缓存 + 裁剪；给 fetch 加显式超时并改流式；把 `inv_sku_classifications` 补一列耗时以便长期统计。
 
-剩余的只是非阻断的工程建议（仍可后续改进，不影响本次执行）：
-- 部分 `CREATE TABLE/INDEX/ADD CONSTRAINT` 仍无 `IF NOT EXISTS`，部分失败后无法原地重跑，但单事务执行失败会整体回滚，风险可控；
-- `platform_commission_rules` 仍无"同 scope 时间区间不重叠"保护，建议后续加部分唯一索引；
-- `commerce_settlement_ledger` 暂无统一写入入口 RPC，建议下一阶段收口；
-- `location_ids jsonb` 在 v2 的 `jsonb_to_recordset` 里声明但未使用；
-- 建议补一个本迁移的契约测试，断言 `store_allocations` 校验与总额校验文本。
+## 安全声明
 
-再次确认：本轮未执行 migration、未写数据库、未发布、未修改任何生产代码。
+本轮仅做只读核验：未修改任何代码、配置或数据库；未调用有赞、未改库存、未创建商品、未发布腾讯生产。报告中未包含任何 signed URL、token、密钥值或消费者个人资料。
