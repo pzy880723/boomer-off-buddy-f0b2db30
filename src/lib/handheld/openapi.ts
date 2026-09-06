@@ -941,7 +941,17 @@ X-Session-Token: <操作员 session token>
         responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
       },
     },
+    "/api/public/handheld/fulfillments": {
+      get: {
+        tags: ["履约"],
+        summary: "履约任务列表（v1.12 新增分页契约）",
+        description:
+          "默认仍返回旧版数组。`?format=items` 返回 `{items,total,page,page_size,scope}`，支持 `page`、`page_size`、`q`(履约单号/订单号)、`status`(all|pending_customer|allocated|picking|picked|handover_ready|handed_over|cancelled)。`scope=all` 仅 HQ 角色可用，其余固定为设备当前授权库位，禁止跨店。契约差异：fulfillments 表无 `cancelled` 状态，该筛选返回空集；`pending_customer` 由待客户确认的缺货记录推导。",
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+    },
     "/api/public/handheld/orders": {
+
       get: {
         tags: ["订单"],
         summary: "父订单只读列表（v1.12，仅 HQ）",
