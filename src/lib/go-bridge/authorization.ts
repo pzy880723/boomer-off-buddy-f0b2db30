@@ -2,14 +2,14 @@
  * GO ← ERP 授权刷新通道（纯逻辑，可单测，不访问数据库 / 不解析 token）。
  *
  * 铁律：
- *  - 这是「授权刷新」通道：不能因为 GO 旧 scope / 租约过期 / 休息 / 已撤销镜像而挡住刷新，
- *    否则 GO 永远拿不到新授权（scope_stale 死循环）。
- *  - 唯一可信身份来自 GO 无参 RPC 返回的 erp_user_id；不接受任何客户端传入的 ERP ID，
- *    也绝不按姓名 / 手机号关联。
+ *  - 这是「授权刷新」通道：不能因为 GO 旧 scope / 租约过期 / 休息 / 已撤销镜像而挡住刷新。
+ *  - 唯一可信身份来自 GO 无参 RPC 返回的 erp_user_id；不接受客户端传入的 ERP ID。
  *  - HQ 无需门店授权：显式 HQ 角色即使 shops 为空仍是 HQ。
- *  - 员工缺任意有效映射 → 明确 unconfigured，不静默丢权限。
- *  - 停用 / 撤销 → 返回可信 revoked 状态（供 GO 写墓碑），不是只 403 让旧镜像留存。
- *  - scope_version 由数据库快照给出（单调、同份授权稳定），绝不用客户端时间 / 随机值。
+ *  - 员工只要缺任意一个门店映射 → 安全阻断整份 scope（不下发部分授权），
+ *    payload 里 permissions/shops 一律为空，active=false，status=unconfigured。
+ *  - 停用 / 撤销 → 返回可信 revoked 墓碑。
+ *  - scope_version 由数据库持久快照（payload hash + 单调整数）给出。
+ *  - 权限键必须是 GO 真实动作键（ERP 是唯一真源，但键名与 GO 对齐）。
  */
 
 export type AuthorizationStatus = "ok" | "unconfigured" | "revoked" | "no_erp_account";
@@ -27,11 +27,11 @@ export type AuthorizationFacts = {
   deleted: boolean;
   roles: string[];
   location_ids: string[];
-  /** go_identity_links 中该 GO 账号的状态；无记录为 null（不构成阻断） */
+  /** 固定 GO 项目 + 当前已核验 go_user_id 下的绑定状态；无记录为 null */
   identity_status: string | null;
-  /** 全量 active 门店映射目录（ERP 唯一真源） */
+  /** 本人授权门店的显式 active 映射（数据库已按项目/kind/active 过滤） */
   shop_links: AuthorizationShop[];
-  /** 数据库快照版本（毫秒级单调整数） */
+  /** 数据库持久版本（同 payload 稳定，payload 变化才递增） */
   version: number;
   generated_at: string;
 };
@@ -52,24 +52,115 @@ export type AuthorizationSnapshot = {
 
 const HQ_ROLES = new Set(["super_admin", "hq_operator"]);
 
-/** 角色 → 动作权限（ERP 是唯一真源，GO 只镜像） */
+/**
+ * 权限模型版本：权限映射代码一改就必须 +1，
+ * 数据库据此把它算进快照 payload，从而让版本单调递增（避免同 version 不同权限）。
+ */
+export const PERMISSION_MODEL_REV = 2;
+
+const STAFF_PERMISSIONS = [
+  "community.post",
+  "knowledge.official.read",
+  "knowledge.personal.write",
+  "price.write",
+  "product.create",
+  "product.edit",
+  "recognition.use",
+  "schedule.view_self",
+  "schedule.view_shop",
+  "shop.kb.read",
+  "voucher.redeem",
+];
+
+const MANAGER_PERMISSIONS = [
+  ...STAFF_PERMISSIONS,
+  "community.moderate",
+  "correction.review",
+  "dayoff.write",
+  "history.read_all",
+  "knowledge.official.write",
+  "product.delete",
+  "schedule.ai",
+  "schedule.clear",
+  "schedule.write",
+  "shift.write",
+  "shop.kb.category",
+  "shop.kb.write",
+  "shop.read",
+  "staff.read",
+  "staff.write",
+  "user.read",
+  "voucher.manage",
+];
+
+const SUPER_ADMIN_PERMISSIONS = [
+  "community.moderate",
+  "community.post",
+  "correction.review",
+  "dayoff.write",
+  "history.read_all",
+  "holiday.write",
+  "knowledge.official.read",
+  "knowledge.official.write",
+  "knowledge.personal.write",
+  "price.write",
+  "product.create",
+  "product.delete",
+  "product.edit",
+  "recognition.use",
+  "role.manage",
+  "schedule.ai",
+  "schedule.clear",
+  "schedule.view_self",
+  "schedule.view_shop",
+  "schedule.write",
+  "settings.ai",
+  "settings.recognition",
+  "shift.write",
+  "shop.kb.category",
+  "shop.kb.read",
+  "shop.kb.write",
+  "shop.read",
+  "shop.write",
+  "staff.read",
+  "staff.write",
+  "user.create",
+  "user.read",
+  "user.reset_password",
+  "user.suspend",
+  "user.update_role",
+  "voucher.manage",
+  "voucher.redeem",
+];
+
+/** 总部运营：知识库 / 拍照识别 / 全局排班与门店读取，绝不冒充 super_admin */
+const HQ_OPERATOR_PERMISSIONS = [
+  "history.read_all",
+  "knowledge.official.read",
+  "knowledge.official.write",
+  "knowledge.personal.write",
+  "recognition.use",
+  "schedule.view_self",
+  "schedule.view_shop",
+  "shop.kb.read",
+  "shop.read",
+  "staff.read",
+];
+
+const WAREHOUSE_PERMISSIONS = [
+  "knowledge.official.read",
+  "knowledge.personal.write",
+  "recognition.use",
+  "schedule.view_self",
+];
+
+/** ERP 角色 → GO 真实动作权限键 */
 const ROLE_PERMISSIONS: Record<string, string[]> = {
-  super_admin: [
-    "view_all_stores",
-    "view_store_reports",
-    "manage_store_targets",
-    "record_offline_sales",
-    "manage_users",
-  ],
-  hq_operator: [
-    "view_all_stores",
-    "view_store_reports",
-    "manage_store_targets",
-    "record_offline_sales",
-  ],
-  store_manager: ["view_own_store", "view_store_reports", "record_offline_sales"],
-  store_staff: ["view_own_store", "record_offline_sales"],
-  warehouse_staff: ["view_own_store"],
+  super_admin: SUPER_ADMIN_PERMISSIONS,
+  hq_operator: HQ_OPERATOR_PERMISSIONS,
+  store_manager: MANAGER_PERMISSIONS,
+  store_staff: STAFF_PERMISSIONS,
+  warehouse_staff: WAREHOUSE_PERMISSIONS,
 };
 
 export function permissionsForRoles(roles: string[]): string[] {
@@ -79,68 +170,42 @@ export function permissionsForRoles(roles: string[]): string[] {
 }
 
 export function buildAuthorizationSnapshot(facts: AuthorizationFacts): AuthorizationSnapshot {
-  const reasons: string[] = [];
   const base = {
     erp_user_id: facts.erp_user_id,
     scope_version: facts.version,
     updated_at: facts.generated_at,
   };
+  const blocked = (status: AuthorizationStatus, reasons: string[], revoked: boolean) => ({
+    ...base,
+    active: false,
+    revoked,
+    status,
+    roles: [] as string[],
+    permissions: [] as string[],
+    is_hq: false,
+    shops: [] as AuthorizationShop[],
+    reasons,
+  });
 
   // 1) 没有真实 ERP 账号 → 一律不授予任何权限
-  if (!facts.account_exists) {
-    return {
-      ...base,
-      active: false,
-      revoked: true,
-      status: "no_erp_account",
-      roles: [],
-      permissions: [],
-      is_hq: false,
-      shops: [],
-      reasons: ["erp_account_missing"],
-    };
-  }
+  if (!facts.account_exists) return blocked("no_erp_account", ["erp_account_missing"], true);
 
   // 2) 停用 / 删除 / 显式撤销绑定 → 可信 revoked 墓碑
   const revokedReasons: string[] = [];
   if (facts.banned) revokedReasons.push("erp_account_disabled");
   if (facts.deleted) revokedReasons.push("erp_account_deleted");
   if (facts.identity_status === "revoked") revokedReasons.push("identity_revoked");
-  if (revokedReasons.length > 0) {
-    return {
-      ...base,
-      active: false,
-      revoked: true,
-      status: "revoked",
-      roles: [],
-      permissions: [],
-      is_hq: false,
-      shops: [],
-      reasons: revokedReasons,
-    };
-  }
+  if (revokedReasons.length > 0) return blocked("revoked", revokedReasons, true);
 
   const roles = [...facts.roles].sort();
-  if (roles.length === 0) {
-    return {
-      ...base,
-      active: false,
-      revoked: false,
-      status: "unconfigured",
-      roles: [],
-      permissions: [],
-      is_hq: false,
-      shops: [],
-      reasons: ["no_erp_role"],
-    };
-  }
+  if (roles.length === 0) return blocked("unconfigured", ["no_erp_role"], false);
 
   const isHq = roles.some((r) => HQ_ROLES.has(r));
   const permissions = permissionsForRoles(roles);
 
   // 3) HQ：无需门店授权，目录可为空仍是 HQ
   if (isHq) {
-    if (facts.shop_links.length === 0) reasons.push("shop_directory_empty");
+    const reasons = facts.shop_links.length === 0 ? ["shop_directory_empty"] : [];
     return {
       ...base,
       active: true,
@@ -154,36 +219,35 @@ export function buildAuthorizationSnapshot(facts: AuthorizationFacts): Authoriza
     };
   }
 
-  // 4) 员工：只下发本人授权门店的既有可信映射
+  // 4) 员工：映射必须完整，否则安全阻断整份 scope（绝不下发部分授权）
   const byLocation = new Map(facts.shop_links.map((s) => [s.erp_location_id, s]));
-  const shops: AuthorizationShop[] = [];
-  const unmapped: string[] = [];
-  for (const locationId of facts.location_ids) {
-    const mapped = byLocation.get(locationId);
-    if (mapped) shops.push(mapped);
-    else unmapped.push(locationId);
-  }
-  shops.sort((a, b) => a.go_shop_id.localeCompare(b.go_shop_id));
+  const unmapped = facts.location_ids.filter((id) => !byLocation.has(id));
 
   if (facts.location_ids.length === 0) {
-    reasons.push("no_location_permission");
+    return blocked("unconfigured", ["no_location_permission"], false);
   }
   if (unmapped.length > 0) {
-    reasons.push("shop_mapping_unconfigured");
-    for (const id of unmapped) reasons.push(`unmapped_location:${id}`);
+    return blocked(
+      "unconfigured",
+      ["shop_mapping_unconfigured", ...unmapped.map((id) => `unmapped_location:${id}`)],
+      false,
+    );
   }
-  const unconfigured = facts.location_ids.length === 0 || unmapped.length > 0;
+
+  const shops = facts.location_ids
+    .map((id) => byLocation.get(id)!)
+    .sort((a, b) => a.go_shop_id.localeCompare(b.go_shop_id));
 
   return {
     ...base,
     active: true,
     revoked: false,
-    status: unconfigured ? "unconfigured" : "ok",
+    status: "ok",
     roles,
     permissions,
     is_hq: false,
     shops,
-    reasons,
+    reasons: [],
   };
 }
 
@@ -193,11 +257,14 @@ export const RECEIPT_MAX_AGE_MS = 60_000;
 /** 允许的时钟前偏（GO 时钟略快时不误杀） */
 const RECEIPT_MAX_SKEW_MS = 5_000;
 
+/** GO 真实镜像状态键（applied 是 apply 动作的结果码，不是镜像状态） */
+export type GoLinkStatus = "active" | "revoked";
+
 export type GoReceipt = {
   goUserId: string;
   erpUserId: string;
   scopeVersion: number;
-  linkStatus: string;
+  linkStatus: GoLinkStatus;
   syncedAt: string;
 };
 
@@ -223,6 +290,11 @@ function str(v: unknown): string | null {
   return t.length > 0 ? t : null;
 }
 
+/** 当前 ERP 快照期望 GO 镜像成为什么状态 */
+export function expectedLinkStatus(snapshot: AuthorizationSnapshot): GoLinkStatus {
+  return snapshot.revoked ? "revoked" : "active";
+}
+
 /**
  * 消费 GO 无参 RPC `erp_scope_sync_receipt_v1()` 的可信回执。
  * 只信 GO 侧镜像，不信客户端传来的 id / ok。
@@ -233,6 +305,7 @@ export function parseGoReceiptPayload(
     expectedGoUserId: string;
     expectedErpUserId: string;
     currentVersion: number;
+    expectedLinkStatus: GoLinkStatus;
     now: Date;
   },
 ): GoReceipt {
@@ -265,9 +338,16 @@ export function parseGoReceiptPayload(
   }
 
   const linkStatus = str(root["link_status"]);
-  if (!linkStatus) throw new GoReceiptError("receipt_status_invalid", "回执状态缺失", 400);
-  if (linkStatus !== "applied" && linkStatus !== "revoked") {
-    throw new GoReceiptError("receipt_not_applied", `GO 尚未应用该授权（${linkStatus}）`, 409);
+  if (linkStatus !== "active" && linkStatus !== "revoked") {
+    throw new GoReceiptError("receipt_status_invalid", `回执镜像状态无效（${linkStatus}）`, 400);
+  }
+  // 同 version 但状态不符（例如 revoked 回执确认 active 授权）必须拒绝
+  if (linkStatus !== opts.expectedLinkStatus) {
+    throw new GoReceiptError(
+      "receipt_status_mismatch",
+      `GO 镜像状态（${linkStatus}）与 ERP 当前授权（${opts.expectedLinkStatus}）不一致`,
+      409,
+    );
   }
 
   const syncedAt = str(root["scope_synced_at"]);
@@ -280,11 +360,5 @@ export function parseGoReceiptPayload(
     throw new GoReceiptError("receipt_expired", "回执已过期（超过 60 秒），请重试", 409);
   }
 
-  return {
-    goUserId,
-    erpUserId,
-    scopeVersion: versionRaw,
-    linkStatus,
-    syncedAt,
-  };
+  return { goUserId, erpUserId, scopeVersion: versionRaw, linkStatus, syncedAt };
 }

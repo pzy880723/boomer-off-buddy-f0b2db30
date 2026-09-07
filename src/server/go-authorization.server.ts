@@ -15,11 +15,14 @@ import { GO_PROJECT_REF, GO_SUPABASE_ORIGIN } from "@/lib/go-bridge/constants";
 import { GoScopeError } from "@/lib/go-bridge/scope";
 import {
   buildAuthorizationSnapshot,
+  expectedLinkStatus,
   parseGoReceiptPayload,
   GoReceiptError,
+  PERMISSION_MODEL_REV,
   type AuthorizationFacts,
   type AuthorizationSnapshot,
 } from "@/lib/go-bridge/authorization";
+
 
 export { GoReceiptError };
 
@@ -49,21 +52,55 @@ function goEnvironment(): GoEnv | null {
   return { url: origin, publishableKey, projectRef: GO_PROJECT_REF };
 }
 
+/** GO 调用超时（含完整 body 读取），避免长挂 */
+export const GO_FETCH_TIMEOUT_MS = 8_000;
+
 function goClient(env: GoEnv, userToken?: string): SupabaseClient {
   const key = env.publishableKey;
   return createClient(env.url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
     global: {
-      fetch: (input, init) => {
+      fetch: async (input, init) => {
+        const url = new URL(typeof input === "string" ? input : (input as Request).url);
+        // 固定 origin：绝不把用户 token 发到别处
+        if (url.origin !== GO_SUPABASE_ORIGIN) {
+          throw new GoScopeError("go_origin_invalid", "GO 请求地址不合法", 502);
+        }
         const headers = new Headers(init?.headers);
         headers.set("apikey", key);
+        headers.set("cache-control", "no-store");
         if (userToken) headers.set("Authorization", `Bearer ${userToken}`);
         else if (key.startsWith("sb_")) headers.delete("Authorization");
-        return fetch(input as RequestInfo, { ...init, headers });
+
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), GO_FETCH_TIMEOUT_MS);
+        try {
+          const res = await fetch(url.toString(), {
+            ...init,
+            headers,
+            // 禁止重定向：避免 token 被跟随到其它地址
+            redirect: "manual",
+            cache: "no-store",
+            signal: controller.signal,
+          });
+          if (res.status >= 300 && res.status < 400) {
+            throw new GoScopeError("go_redirect_blocked", "GO 返回了重定向，已阻断", 502);
+          }
+          // 完整读取 body 后再放行，超时窗口覆盖 body
+          const body = await res.text();
+          return new Response(body, {
+            status: res.status,
+            statusText: res.statusText,
+            headers: res.headers,
+          });
+        } finally {
+          clearTimeout(timer);
+        }
       },
     },
   });
 }
+
 
 function bearerToken(request: Request): string | null {
   const raw = request.headers.get("authorization") || "";
