@@ -8457,6 +8457,14 @@ export type Database = {
       gen_commerce_order_no: { Args: never; Returns: string }
       gen_ean13: { Args: never; Returns: string }
       gen_stock_transfer_code: { Args: never; Returns: string }
+      go_authorization_ack: {
+        Args: { p_erp_user_id: string; p_version: number }
+        Returns: number
+      }
+      go_authorization_snapshot: {
+        Args: { p_erp_user_id: string }
+        Returns: Json
+      }
       go_scope_enqueue_sync: {
         Args: {
           p_change_kind: string
