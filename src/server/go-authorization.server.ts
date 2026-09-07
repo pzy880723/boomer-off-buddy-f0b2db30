@@ -236,13 +236,18 @@ export async function confirmAuthorizationReceipt(
 
   const result = (ack ?? {}) as { ok?: boolean; code?: string; confirmed?: number };
   if (result.ok !== true) {
-    // 事务内复核失败（版本已被新授权顶掉）→ 不确认任何事件，让 GO 重新拉取
+    // 同一把锁下复核失败（版本或授权事实已变）→ 不确认任何事件，让 GO 重新拉取
+    const stale =
+      result.code === "version_stale" ||
+      result.code === "authorization_changed" ||
+      result.code === "receipt_status_mismatch";
     throw new GoScopeError(
-      result.code === "version_stale" ? "receipt_version_stale" : "authorization_ack_failed",
+      stale ? "receipt_version_stale" : "authorization_ack_failed",
       "ERP 授权已更新，请重新拉取后再回执",
       409,
     );
   }
+
 
   return {
     snapshot,
