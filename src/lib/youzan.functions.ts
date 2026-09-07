@@ -1971,6 +1971,7 @@ async function runOrdersSyncForShop(
       : attempts;
     let nextPage: number | null = null;
     let usedLabel: string | null = null;
+    let apiCallSucceeded = false;
 
     for (const m of (runnable.length > 0 ? runnable : attempts)) {
       let attemptReturned = 0;
@@ -2150,6 +2151,8 @@ async function runOrdersSyncForShop(
           }
         }
         const dropTxt = attemptDropped > 0 ? ` 丢弃 ${attemptDropped}` : "";
+        // 这个接口版本本身跑通了（哪怕 0 单）：真空窗口 ≠ 调用失败
+        apiCallSucceeded = true;
         attemptMsgs.push(`${m.label}: 返回 ${attemptReturned} 入库 ${attemptUpserted}${dropTxt}`);
       } catch (e) {
         const errMsg = e instanceof Error ? e.message : String(e);
@@ -2161,6 +2164,9 @@ async function runOrdersSyncForShop(
     }
 
     const status = totalReturned > 0 ? (totalUpserted > 0 ? "ok" : "empty") : "empty";
+    // 所有接口版本都抛错时，绝不能把窗口当成"跑完了"
+    if (!apiCallSucceeded) nextPage = slice?.startPage ?? nextPage ?? 1;
+    else if (totalReturned === 0) nextPage = null;
     let msg = `订单同步 入库 ${totalUpserted} / 返回 ${totalReturned}（${fmt(startDate)} ~ ${fmt(endDate)}）｜库存扣减 ${saleProcessed}（幂等 ${saleIdempotent}）未匹配 ${saleUnmatched} 失败 ${saleFailed}｜${attemptMsgs.join(" / ")}`;
     if (totalReturned === 0 && lastPreview) {
       msg += `｜末次响应: ${lastPreview}`;
@@ -2186,7 +2192,7 @@ async function runOrdersSyncForShop(
         .eq("id", log.id);
     }
     return {
-      ok: status !== "empty",
+      ok: apiCallSucceeded,
       count: totalUpserted,
       message: msg,
       next_page: nextPage,

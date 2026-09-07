@@ -10,6 +10,7 @@
  *     写回 next_page；跑完标记 done，出错标 error 并自动重试（attempts < 20）。
  */
 import { runOrdersSyncSlice } from "@/lib/youzan.functions";
+import { buildFixedWindows, classifySliceOutcome } from "@/lib/youzan-sync/cursor";
 
 type CursorRow = {
   id: string;
@@ -33,35 +34,27 @@ async function admin() {
   /* eslint-enable @typescript-eslint/no-explicit-any */
 }
 
-/** 按天切窗口，避免单窗口页数过多；返回登记的窗口数 */
+/** 固定窗口登记（幂等：同一天多次入队生成完全相同的窗口） */
 export async function enqueueOrderSyncWindows(opts: {
   days?: number;
   shop_id?: string;
   windowHours?: number;
+  now?: Date;
 }): Promise<{ shops: number; windows: number }> {
   const sb = await admin();
-  const days = Math.max(1, Math.min(opts.days ?? 30, 180));
-  const windowHours = Math.max(6, Math.min(opts.windowHours ?? 24, 72));
 
   let q = sb.from("youzan_shops").select("id,role,status").eq("status", "active");
   if (opts.shop_id) q = q.eq("id", opts.shop_id);
   const { data: shops, error } = await q;
   if (error) throw new Error(error.message);
 
-  const rows: Record<string, unknown>[] = [];
-  const end = Date.now();
-  const spanMs = windowHours * 3_600_000;
-  for (const shop of (shops ?? []) as { id: string }[]) {
-    for (let cursor = end - days * 86_400_000; cursor < end; cursor += spanMs) {
-      rows.push({
-        shop_id: shop.id,
-        window_start: new Date(cursor).toISOString(),
-        window_end: new Date(Math.min(cursor + spanMs, end)).toISOString(),
-        status: "pending",
-        next_page: 1,
-      });
-    }
-  }
+  const rows = buildFixedWindows({
+    shopIds: ((shops ?? []) as { id: string }[]).map((s) => s.id),
+    now: opts.now ?? new Date(),
+    days: opts.days ?? 30,
+    windowHours: opts.windowHours ?? 24,
+  }).map((w) => ({ ...w, status: "pending", next_page: 1 }));
+
   if (rows.length > 0) {
     const { error: upsertError } = await sb
       .from("youzan_order_sync_cursors")
@@ -87,6 +80,25 @@ export async function runOrderSyncSliceOnce(opts: {
   const cursor = (Array.isArray(claimed) ? claimed[0] : claimed) as CursorRow | null;
   if (!cursor?.id) return { claimed: false, reason: "idle" };
 
+  // 领取时 DB 不再自增 attempts；连续失败次数由 classifySliceOutcome 决定
+  const previousAttempts = Number(cursor.attempts ?? 0);
+
+  const advance = async (outcome: ReturnType<typeof classifySliceOutcome>, upserted: number) => {
+    const { data: applied, error: rpcError } = await sb.rpc("youzan_advance_order_sync_cursor", {
+      p_cursor_id: cursor.id,
+      p_worker_id: opts.workerId,
+      p_status: outcome.status,
+      p_next_page: outcome.next_page,
+      p_method_label: outcome.method_label,
+      p_upserted: upserted,
+      p_attempts: outcome.attempts,
+      p_error: outcome.reason ? outcome.reason.slice(0, 2000) : null,
+    });
+    if (rpcError) throw new Error(`cursor_advance_failed: ${rpcError.message}`);
+    // 租约已被别的 worker 接管 → 本次结果作废，不能覆盖
+    return applied === true;
+  };
+
   try {
     const result = await runOrdersSyncSlice({
       shop_id: cursor.shop_id,
@@ -97,43 +109,50 @@ export async function runOrderSyncSliceOnce(opts: {
       methodLabel: cursor.method_label,
     });
 
-    const done = result.next_page === null;
-    await sb
-      .from("youzan_order_sync_cursors")
-      .update({
-        status: done ? "done" : "pending",
-        next_page: result.next_page ?? cursor.next_page,
-        method_label: result.method_label ?? cursor.method_label,
-        total_upserted: (cursor.total_upserted ?? 0) + result.count,
-        last_error: null,
-        lease_owner: null,
-        lease_expires_at: null,
-        last_progress_at: new Date().toISOString(),
-      })
-      .eq("id", cursor.id);
+    const outcome = classifySliceOutcome(result, {
+      startPage: cursor.next_page,
+      previousAttempts,
+    });
+    const applied = await advance(
+      outcome,
+      outcome.status === "error" || outcome.status === "failed" ? 0 : result.count,
+    );
 
     return {
       claimed: true,
+      applied,
       cursor_id: cursor.id,
       shop_id: cursor.shop_id,
       window: [cursor.window_start, cursor.window_end],
       upserted: result.count,
-      next_page: result.next_page,
-      done,
-      message: result.message.slice(0, 600),
+      next_page: outcome.next_page,
+      status: outcome.status,
+      done: outcome.status === "done",
+      empty: outcome.empty,
+      message: (outcome.reason ?? result.message).slice(0, 600),
     };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    await sb
-      .from("youzan_order_sync_cursors")
-      .update({
-        status: "error",
-        last_error: message.slice(0, 2000),
-        lease_owner: null,
-        lease_expires_at: null,
-      })
-      .eq("id", cursor.id);
-    return { claimed: true, cursor_id: cursor.id, done: false, error: message.slice(0, 600) };
+    if (message.startsWith("cursor_advance_failed")) throw e;
+    const outcome = classifySliceOutcome(
+      {
+        ok: false,
+        count: 0,
+        message,
+        next_page: cursor.next_page,
+        method_label: cursor.method_label,
+      },
+      { startPage: cursor.next_page, previousAttempts },
+    );
+    const applied = await advance(outcome, 0);
+    return {
+      claimed: true,
+      applied,
+      cursor_id: cursor.id,
+      status: outcome.status,
+      done: false,
+      error: message.slice(0, 600),
+    };
   }
 }
 
