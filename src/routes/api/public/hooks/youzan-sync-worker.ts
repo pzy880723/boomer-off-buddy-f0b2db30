@@ -1,22 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { runShopSyncCore } from "@/lib/youzan.functions";
+import { requireYouzanSyncService } from "@/server/youzan-sync-auth.server";
 
 // ============================================================
 // 单店单动作的后台同步入口（被 syncAllShops 用 fetch fire-and-forget）
-// 这里走 /api/public/* 前缀绕过 published 站点鉴权；本身不接受
-// 用户上传数据，只是触发后端读写，不需要签名。
+// public 路径不代表匿名访问：任何读写前必须验证后台服务凭据。
 // ============================================================
 export const Route = createFileRoute("/api/public/hooks/youzan-sync-worker")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const apikey = request.headers.get("apikey");
-        if (
-          process.env.SUPABASE_PUBLISHABLE_KEY &&
-          apikey !== process.env.SUPABASE_PUBLISHABLE_KEY
-        ) {
-          return new Response("unauthorized", { status: 401 });
-        }
+        const denied = requireYouzanSyncService(request);
+        if (denied) return denied;
         let body: { shop_id?: string; action?: string; days?: number };
         try {
           body = (await request.json()) as typeof body;

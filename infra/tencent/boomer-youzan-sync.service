@@ -1,0 +1,16 @@
+# Template only: installing/starting requires the documented cron cutover.
+[Unit]
+Description=BOOMER bounded Youzan synchronization
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/var/www/boomer-erp/current
+EnvironmentFile=/var/www/boomer-erp/shared/.env
+ExecStart=/usr/bin/node /var/www/boomer-erp/current/scripts/run-youzan-sync.mjs
+TimeoutStartSec=600
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true

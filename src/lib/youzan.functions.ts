@@ -1,8 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequestUrl } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { supabaseAdmin as supabase } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { assertYouzanSyncOperator, dispatchYouzanSyncWorker } from "@/server/youzan-sync-auth.server";
 import { yzStatusText } from "./youzan-status";
 import { getYouzanOutboundStatus, youzanFetch } from "./youzan-http";
 import { buildYouzanQuantityUpdateParams } from "./youzan-quantity.server";
@@ -207,30 +207,6 @@ function getYouzanSyncActions(shop: Pick<ShopRow, "role">): Array<"items" | "ord
   // 分店轮询门店成交，总部轮询网店成交；成交扣减统一走幂等 commit_sale。
   return ["items", "orders"];
 }
-
-function dispatchYouzanSyncWorker(opts: {
-  origin: string;
-  shop_id: string;
-  action: "items" | "orders";
-  days?: number;
-}) {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  const apikey = process.env.SUPABASE_PUBLISHABLE_KEY;
-  if (apikey) headers.apikey = apikey;
-
-  void fetch(`${opts.origin}/api/public/hooks/youzan-sync-worker`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      shop_id: opts.shop_id,
-      action: opts.action,
-      days: opts.days,
-    }),
-  }).catch((e) => {
-    console.error("[youzan sync dispatch]", opts.shop_id, opts.action, e);
-  });
-}
-
 
 async function getShopOr404(idOrKdt: { shop_id?: string; kdt_id?: number }) {
   let q = supabase.from("youzan_shops").select("*").limit(1);
@@ -1598,10 +1574,12 @@ async function runItemsSyncForShop(
 }
 
 export const syncYouzanItems = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z.object({ shop_id: z.string().uuid() }).parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertYouzanSyncOperator(context.userId);
     await reapStaleSyncLogs();
     const shop = await getShopOr404({ shop_id: data.shop_id });
     return runItemsSyncForShop(shop);
@@ -2297,6 +2275,7 @@ export async function runShopSyncCore(opts: {
 
 
 export const syncYouzanOrders = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -2306,7 +2285,8 @@ export const syncYouzanOrders = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertYouzanSyncOperator(context.userId);
     await reapStaleSyncLogs();
     const shop = await getShopOr404({ shop_id: data.shop_id });
     const endDate = data.end ? new Date(data.end) : new Date();
@@ -2325,12 +2305,14 @@ export const syncYouzanOrders = createServerFn({ method: "POST" })
 // 前端通过轮询 youzan_sync_logs 拿到进度。
 // ============================================================
 export const syncAllShops = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z
       .object({ days: z.number().int().min(1).max(180).default(60) })
       .parse(input ?? {}),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertYouzanSyncOperator(context.userId);
     await reapStaleSyncLogs();
     const { data: shopsRaw, error } = await supabase
       .from("youzan_shops")
@@ -2341,12 +2323,10 @@ export const syncAllShops = createServerFn({ method: "POST" })
 
     // 改为派发到独立 worker route：主请求快速返回，实际进度通过
     // youzan_sync_logs 轮询观察；订单只同步分店，总部不再派发 orders。
-    const origin = new URL(getRequestUrl()).origin;
     let dispatched = 0;
     for (const shop of shops) {
       for (const action of getYouzanSyncActions(shop)) {
         dispatchYouzanSyncWorker({
-          origin,
           shop_id: shop.id,
           action,
           days: data.days,

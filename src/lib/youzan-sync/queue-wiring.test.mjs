@@ -47,15 +47,19 @@ test('worker uses fixed scan_end and fenced batch callback, never reports open s
 });
 
 const cronSource=readFileSync(new URL('../../routes/api/public/hooks/youzan-sync.ts',import.meta.url),'utf8');
+const authSource=readFileSync(new URL('../../server/youzan-sync-auth.server.ts',import.meta.url),'utf8');
 function cron({error,slice={claimed:false}}={}){
+  const env={SUPABASE_SERVICE_ROLE_KEY:'local-queue-fixture-service-key'};
+  const requireYouzanSyncService=vm.runInNewContext(`${stripTypeScriptTypes(authSource.replace(/^import[^\n]*\n/gm,'').replaceAll('export ',''))}\nrequireYouzanSyncService`,{process:{env},Response});
   const code=cronSource.slice(cronSource.indexOf('// 定时同步')).replaceAll('export ','');
   const route=vm.runInNewContext(`${stripTypeScriptTypes(code)}\nRoute`,{
-    createFileRoute:()=>o=>o,Response,URL,Date,JSON,console:{error(){}},crypto,process:{env:{}},fetch:async()=>{},
+    createFileRoute:()=>o=>o,Response,URL,Date,JSON,console:{error(){}},crypto,process:{env},fetch:async()=>{},
+    requireYouzanSyncService,dispatchYouzanSyncWorker:()=>{},
     supabaseAdmin:{from:()=>({select:()=>({eq:async()=>({data:[]})})})},
     enqueueOrderSyncWindows:async()=>{if(error)throw error;return {windows:0};},
     runOrderSyncSliceOnce:async()=>slice,
   });
-  return route.server.handlers.POST({request:new Request('https://example.test/api/public/hooks/youzan-sync',{method:'POST',body:'{}'})});
+  return route.server.handlers.POST({request:new Request('https://example.test/api/public/hooks/youzan-sync',{method:'POST',headers:{authorization:`Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`},body:'{}'})});
 }
 test('cron throws queue failure into non-success HTTP response',async()=>{
   const response=await cron({error:Error('db_failure')});

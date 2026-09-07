@@ -1,0 +1,12 @@
+# Template only: do not enable alongside the headerless pg_cron job.
+[Unit]
+Description=Run bounded Youzan synchronization without overlapping runner processes
+
+[Timer]
+OnBootSec=120
+OnUnitInactiveSec=30min
+AccuracySec=10
+Unit=boomer-youzan-sync.service
+
+[Install]
+WantedBy=timers.target
