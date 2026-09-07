@@ -101,6 +101,8 @@ import { Route as PurchaseJapanParcelImportRouteImport } from './routes/purchase
 import { Route as PurchaseJapanParcelNewRouteImport } from './routes/purchase.japan-parcel.new'
 import { Route as ApiPublicContentIdRouteImport } from './routes/api/public/content/$id'
 import { Route as ApiPublicContentFeedRouteImport } from './routes/api/public/content/feed'
+import { Route as ApiPublicGoDailySummaryRouteImport } from './routes/api/public/go/daily-summary'
+import { Route as ApiPublicGoSessionRouteImport } from './routes/api/public/go/session'
 import { Route as ApiPublicHandheldDashboardRouteImport } from './routes/api/public/handheld/dashboard'
 import { Route as ApiPublicHandheldFulfillmentsRouteImport } from './routes/api/public/handheld/fulfillments'
 import { Route as ApiPublicHandheldGlobalStockRouteImport } from './routes/api/public/handheld/global-stock'
@@ -124,6 +126,7 @@ import { Route as ApiPublicHooksYouzanCleanupRouteImport } from './routes/api/pu
 import { Route as ApiPublicHooksYouzanDistributionProbeRouteImport } from './routes/api/public/hooks/youzan-distribution-probe'
 import { Route as ApiPublicHooksYouzanFixChannelRouteImport } from './routes/api/public/hooks/youzan-fix-channel'
 import { Route as ApiPublicHooksYouzanMessageRouteImport } from './routes/api/public/hooks/youzan-message'
+import { Route as ApiPublicHooksYouzanOrderSyncRouteImport } from './routes/api/public/hooks/youzan-order-sync'
 import { Route as ApiPublicHooksYouzanReconcileRouteImport } from './routes/api/public/hooks/youzan-reconcile'
 import { Route as ApiPublicHooksYouzanRelistRouteImport } from './routes/api/public/hooks/youzan-relist'
 import { Route as ApiPublicHooksYouzanStandardCatalogSyncRouteImport } from './routes/api/public/hooks/youzan-standard-catalog-sync'
@@ -725,6 +728,16 @@ const ApiPublicContentFeedRoute = ApiPublicContentFeedRouteImport.update({
   path: '/api/public/content/feed',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicGoDailySummaryRoute = ApiPublicGoDailySummaryRouteImport.update({
+  id: '/api/public/go/daily-summary',
+  path: '/api/public/go/daily-summary',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicGoSessionRoute = ApiPublicGoSessionRouteImport.update({
+  id: '/api/public/go/session',
+  path: '/api/public/go/session',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicHandheldDashboardRoute =
   ApiPublicHandheldDashboardRouteImport.update({
     id: '/api/public/handheld/dashboard',
@@ -860,6 +873,12 @@ const ApiPublicHooksYouzanMessageRoute =
   ApiPublicHooksYouzanMessageRouteImport.update({
     id: '/api/public/hooks/youzan-message',
     path: '/api/public/hooks/youzan-message',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksYouzanOrderSyncRoute =
+  ApiPublicHooksYouzanOrderSyncRouteImport.update({
+    id: '/api/public/hooks/youzan-order-sync',
+    path: '/api/public/hooks/youzan-order-sync',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicHooksYouzanReconcileRoute =
@@ -1719,6 +1738,8 @@ export interface FileRoutesByFullPath {
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
   '/api/public/content/$id': typeof ApiPublicContentIdRouteWithChildren
   '/api/public/content/feed': typeof ApiPublicContentFeedRoute
+  '/api/public/go/daily-summary': typeof ApiPublicGoDailySummaryRoute
+  '/api/public/go/session': typeof ApiPublicGoSessionRoute
   '/api/public/handheld/dashboard': typeof ApiPublicHandheldDashboardRoute
   '/api/public/handheld/fulfillments': typeof ApiPublicHandheldFulfillmentsRouteWithChildren
   '/api/public/handheld/global-stock': typeof ApiPublicHandheldGlobalStockRoute
@@ -1742,6 +1763,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/youzan-distribution-probe': typeof ApiPublicHooksYouzanDistributionProbeRoute
   '/api/public/hooks/youzan-fix-channel': typeof ApiPublicHooksYouzanFixChannelRoute
   '/api/public/hooks/youzan-message': typeof ApiPublicHooksYouzanMessageRoute
+  '/api/public/hooks/youzan-order-sync': typeof ApiPublicHooksYouzanOrderSyncRoute
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
   '/api/public/hooks/youzan-relist': typeof ApiPublicHooksYouzanRelistRoute
   '/api/public/hooks/youzan-standard-catalog-sync': typeof ApiPublicHooksYouzanStandardCatalogSyncRoute
@@ -1959,6 +1981,8 @@ export interface FileRoutesByTo {
   '/purchase/japan-parcel': typeof PurchaseJapanParcelIndexRoute
   '/api/public/content/$id': typeof ApiPublicContentIdRouteWithChildren
   '/api/public/content/feed': typeof ApiPublicContentFeedRoute
+  '/api/public/go/daily-summary': typeof ApiPublicGoDailySummaryRoute
+  '/api/public/go/session': typeof ApiPublicGoSessionRoute
   '/api/public/handheld/dashboard': typeof ApiPublicHandheldDashboardRoute
   '/api/public/handheld/fulfillments': typeof ApiPublicHandheldFulfillmentsRouteWithChildren
   '/api/public/handheld/global-stock': typeof ApiPublicHandheldGlobalStockRoute
@@ -1982,6 +2006,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/youzan-distribution-probe': typeof ApiPublicHooksYouzanDistributionProbeRoute
   '/api/public/hooks/youzan-fix-channel': typeof ApiPublicHooksYouzanFixChannelRoute
   '/api/public/hooks/youzan-message': typeof ApiPublicHooksYouzanMessageRoute
+  '/api/public/hooks/youzan-order-sync': typeof ApiPublicHooksYouzanOrderSyncRoute
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
   '/api/public/hooks/youzan-relist': typeof ApiPublicHooksYouzanRelistRoute
   '/api/public/hooks/youzan-standard-catalog-sync': typeof ApiPublicHooksYouzanStandardCatalogSyncRoute
@@ -2207,6 +2232,8 @@ export interface FileRoutesById {
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
   '/api/public/content/$id': typeof ApiPublicContentIdRouteWithChildren
   '/api/public/content/feed': typeof ApiPublicContentFeedRoute
+  '/api/public/go/daily-summary': typeof ApiPublicGoDailySummaryRoute
+  '/api/public/go/session': typeof ApiPublicGoSessionRoute
   '/api/public/handheld/dashboard': typeof ApiPublicHandheldDashboardRoute
   '/api/public/handheld/fulfillments': typeof ApiPublicHandheldFulfillmentsRouteWithChildren
   '/api/public/handheld/global-stock': typeof ApiPublicHandheldGlobalStockRoute
@@ -2230,6 +2257,7 @@ export interface FileRoutesById {
   '/api/public/hooks/youzan-distribution-probe': typeof ApiPublicHooksYouzanDistributionProbeRoute
   '/api/public/hooks/youzan-fix-channel': typeof ApiPublicHooksYouzanFixChannelRoute
   '/api/public/hooks/youzan-message': typeof ApiPublicHooksYouzanMessageRoute
+  '/api/public/hooks/youzan-order-sync': typeof ApiPublicHooksYouzanOrderSyncRoute
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
   '/api/public/hooks/youzan-relist': typeof ApiPublicHooksYouzanRelistRoute
   '/api/public/hooks/youzan-standard-catalog-sync': typeof ApiPublicHooksYouzanStandardCatalogSyncRoute
@@ -2456,6 +2484,8 @@ export interface FileRouteTypes {
     | '/purchase/japan-parcel/'
     | '/api/public/content/$id'
     | '/api/public/content/feed'
+    | '/api/public/go/daily-summary'
+    | '/api/public/go/session'
     | '/api/public/handheld/dashboard'
     | '/api/public/handheld/fulfillments'
     | '/api/public/handheld/global-stock'
@@ -2479,6 +2509,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-distribution-probe'
     | '/api/public/hooks/youzan-fix-channel'
     | '/api/public/hooks/youzan-message'
+    | '/api/public/hooks/youzan-order-sync'
     | '/api/public/hooks/youzan-reconcile'
     | '/api/public/hooks/youzan-relist'
     | '/api/public/hooks/youzan-standard-catalog-sync'
@@ -2696,6 +2727,8 @@ export interface FileRouteTypes {
     | '/purchase/japan-parcel'
     | '/api/public/content/$id'
     | '/api/public/content/feed'
+    | '/api/public/go/daily-summary'
+    | '/api/public/go/session'
     | '/api/public/handheld/dashboard'
     | '/api/public/handheld/fulfillments'
     | '/api/public/handheld/global-stock'
@@ -2719,6 +2752,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-distribution-probe'
     | '/api/public/hooks/youzan-fix-channel'
     | '/api/public/hooks/youzan-message'
+    | '/api/public/hooks/youzan-order-sync'
     | '/api/public/hooks/youzan-reconcile'
     | '/api/public/hooks/youzan-relist'
     | '/api/public/hooks/youzan-standard-catalog-sync'
@@ -2943,6 +2977,8 @@ export interface FileRouteTypes {
     | '/purchase/japan-parcel/'
     | '/api/public/content/$id'
     | '/api/public/content/feed'
+    | '/api/public/go/daily-summary'
+    | '/api/public/go/session'
     | '/api/public/handheld/dashboard'
     | '/api/public/handheld/fulfillments'
     | '/api/public/handheld/global-stock'
@@ -2966,6 +3002,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-distribution-probe'
     | '/api/public/hooks/youzan-fix-channel'
     | '/api/public/hooks/youzan-message'
+    | '/api/public/hooks/youzan-order-sync'
     | '/api/public/hooks/youzan-reconcile'
     | '/api/public/hooks/youzan-relist'
     | '/api/public/hooks/youzan-standard-catalog-sync'
@@ -3143,6 +3180,8 @@ export interface RootRouteChildren {
   InventoryStocktakesIndexRoute: typeof InventoryStocktakesIndexRoute
   ApiPublicContentIdRoute: typeof ApiPublicContentIdRouteWithChildren
   ApiPublicContentFeedRoute: typeof ApiPublicContentFeedRoute
+  ApiPublicGoDailySummaryRoute: typeof ApiPublicGoDailySummaryRoute
+  ApiPublicGoSessionRoute: typeof ApiPublicGoSessionRoute
   ApiPublicHandheldDashboardRoute: typeof ApiPublicHandheldDashboardRoute
   ApiPublicHandheldFulfillmentsRoute: typeof ApiPublicHandheldFulfillmentsRouteWithChildren
   ApiPublicHandheldGlobalStockRoute: typeof ApiPublicHandheldGlobalStockRoute
@@ -3166,6 +3205,7 @@ export interface RootRouteChildren {
   ApiPublicHooksYouzanDistributionProbeRoute: typeof ApiPublicHooksYouzanDistributionProbeRoute
   ApiPublicHooksYouzanFixChannelRoute: typeof ApiPublicHooksYouzanFixChannelRoute
   ApiPublicHooksYouzanMessageRoute: typeof ApiPublicHooksYouzanMessageRoute
+  ApiPublicHooksYouzanOrderSyncRoute: typeof ApiPublicHooksYouzanOrderSyncRoute
   ApiPublicHooksYouzanReconcileRoute: typeof ApiPublicHooksYouzanReconcileRoute
   ApiPublicHooksYouzanRelistRoute: typeof ApiPublicHooksYouzanRelistRoute
   ApiPublicHooksYouzanStandardCatalogSyncRoute: typeof ApiPublicHooksYouzanStandardCatalogSyncRoute
@@ -3898,6 +3938,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicContentFeedRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/go/daily-summary': {
+      id: '/api/public/go/daily-summary'
+      path: '/api/public/go/daily-summary'
+      fullPath: '/api/public/go/daily-summary'
+      preLoaderRoute: typeof ApiPublicGoDailySummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/go/session': {
+      id: '/api/public/go/session'
+      path: '/api/public/go/session'
+      fullPath: '/api/public/go/session'
+      preLoaderRoute: typeof ApiPublicGoSessionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/handheld/dashboard': {
       id: '/api/public/handheld/dashboard'
       path: '/api/public/handheld/dashboard'
@@ -4057,6 +4111,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/hooks/youzan-message'
       fullPath: '/api/public/hooks/youzan-message'
       preLoaderRoute: typeof ApiPublicHooksYouzanMessageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/youzan-order-sync': {
+      id: '/api/public/hooks/youzan-order-sync'
+      path: '/api/public/hooks/youzan-order-sync'
+      fullPath: '/api/public/hooks/youzan-order-sync'
+      preLoaderRoute: typeof ApiPublicHooksYouzanOrderSyncRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/youzan-reconcile': {
@@ -5656,6 +5717,8 @@ const rootRouteChildren: RootRouteChildren = {
   InventoryStocktakesIndexRoute: InventoryStocktakesIndexRoute,
   ApiPublicContentIdRoute: ApiPublicContentIdRouteWithChildren,
   ApiPublicContentFeedRoute: ApiPublicContentFeedRoute,
+  ApiPublicGoDailySummaryRoute: ApiPublicGoDailySummaryRoute,
+  ApiPublicGoSessionRoute: ApiPublicGoSessionRoute,
   ApiPublicHandheldDashboardRoute: ApiPublicHandheldDashboardRoute,
   ApiPublicHandheldFulfillmentsRoute:
     ApiPublicHandheldFulfillmentsRouteWithChildren,
@@ -5686,6 +5749,7 @@ const rootRouteChildren: RootRouteChildren = {
     ApiPublicHooksYouzanDistributionProbeRoute,
   ApiPublicHooksYouzanFixChannelRoute: ApiPublicHooksYouzanFixChannelRoute,
   ApiPublicHooksYouzanMessageRoute: ApiPublicHooksYouzanMessageRoute,
+  ApiPublicHooksYouzanOrderSyncRoute: ApiPublicHooksYouzanOrderSyncRoute,
   ApiPublicHooksYouzanReconcileRoute: ApiPublicHooksYouzanReconcileRoute,
   ApiPublicHooksYouzanRelistRoute: ApiPublicHooksYouzanRelistRoute,
   ApiPublicHooksYouzanStandardCatalogSyncRoute:

@@ -1858,11 +1858,22 @@ export function enrichOrderFields(
 // Branch  → 优先 youzan.trades.sold.get（通用交易接口，offline_id=分店 kdt_id）
 //           兜底再试 retail.trade.order.search / retail.trade.search
 // ============================================================
+export type OrdersSliceResult = {
+  ok: boolean;
+  count: number;
+  message: string;
+  /** 本次切片停止时的下一页；null 表示该窗口已经拉完 */
+  next_page: number | null;
+  /** 本次切片实际生效的接口版本标签，供下次续跑复用，避免重复试版本 */
+  method_label: string | null;
+};
+
 async function runOrdersSyncForShop(
   shop: ShopRow,
   startDate: Date,
   endDate: Date,
-): Promise<{ ok: boolean; count: number; message: string }> {
+  slice?: { startPage?: number; maxPages?: number; methodLabel?: string | null },
+): Promise<OrdersSliceResult> {
   const fmt = (d: Date) => {
     const pad = (n: number) => String(n).padStart(2, "0");
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
@@ -1952,11 +1963,21 @@ async function runOrdersSyncForShop(
     let sampleRaw = "";
     let sampleMapped = "";
 
-    for (const m of attempts) {
+    const startPage = Math.max(1, slice?.startPage ?? 1);
+    const maxPages = Math.max(1, slice?.maxPages ?? 500);
+    const wantedLabel = slice?.methodLabel ?? null;
+    const runnable = wantedLabel
+      ? attempts.filter((a) => a.label === wantedLabel)
+      : attempts;
+    let nextPage: number | null = null;
+    let usedLabel: string | null = null;
+
+    for (const m of (runnable.length > 0 ? runnable : attempts)) {
       let attemptReturned = 0;
       let attemptUpserted = 0;
       let attemptDropped = 0;
-      let page = 1;
+      let page = startPage;
+      let pagesThisSlice = 0;
       try {
         for (;;) {
           const params: Record<string, unknown> = m.buildParams(page);
@@ -2112,9 +2133,21 @@ async function runOrdersSyncForShop(
               }
             }
           }
-          if (trades.length < pageSize) break;
+          usedLabel = m.label;
+          pagesThisSlice += 1;
+          if (trades.length < pageSize) {
+            nextPage = null;
+            break;
+          }
           page += 1;
-          if (page > 500) break;
+          if (pagesThisSlice >= maxPages) {
+            nextPage = page;
+            break;
+          }
+          if (page > 500) {
+            nextPage = null;
+            break;
+          }
         }
         const dropTxt = attemptDropped > 0 ? ` 丢弃 ${attemptDropped}` : "";
         attemptMsgs.push(`${m.label}: 返回 ${attemptReturned} 入库 ${attemptUpserted}${dropTxt}`);
@@ -2152,7 +2185,13 @@ async function runOrdersSyncForShop(
         } as never)
         .eq("id", log.id);
     }
-    return { ok: status !== "empty", count: totalUpserted, message: msg };
+    return {
+      ok: status !== "empty",
+      count: totalUpserted,
+      message: msg,
+      next_page: nextPage,
+      method_label: usedLabel,
+    };
   } catch (err) {
     let msg = `${err instanceof Error ? err.message : String(err)}｜${attemptMsgs.join(" / ")}`;
     if (lastPreview) msg += `｜末次响应: ${lastPreview}`;
@@ -2169,8 +2208,34 @@ async function runOrdersSyncForShop(
         } as never)
         .eq("id", log.id);
     }
-    return { ok: false, count: totalUpserted, message: msg };
+    return {
+      ok: false,
+      count: totalUpserted,
+      message: msg,
+      next_page: slice?.startPage ?? 1,
+      method_label: slice?.methodLabel ?? null,
+    };
   }
+}
+
+/**
+ * 有界切片订单同步：一次只拉 maxPages 页，返回 next_page 供游标续跑。
+ * 供 /api/public/hooks/youzan-order-sync 的租约 worker 调用。
+ */
+export async function runOrdersSyncSlice(opts: {
+  shop_id: string;
+  start: Date;
+  end: Date;
+  startPage?: number;
+  maxPages?: number;
+  methodLabel?: string | null;
+}): Promise<OrdersSliceResult> {
+  const shop = await getShopOr404({ shop_id: opts.shop_id });
+  return runOrdersSyncForShop(shop, opts.start, opts.end, {
+    startPage: opts.startPage ?? 1,
+    maxPages: opts.maxPages ?? 3,
+    methodLabel: opts.methodLabel ?? null,
+  });
 }
 
 // ============================================================
