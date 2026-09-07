@@ -188,6 +188,8 @@ import { Route as ApiPublicHandheldSkuSearchRouteImport } from './routes/api/pub
 import { Route as ApiPublicHandheldStocktakeOpenRouteImport } from './routes/api/public/handheld/stocktake.open'
 import { Route as ApiPublicHandheldStocktakeScanRouteImport } from './routes/api/public/handheld/stocktake.scan'
 import { Route as ApiPublicHandheldStocktakeSubmitRouteImport } from './routes/api/public/handheld/stocktake.submit'
+import { Route as ApiPublicHandheldStoreDailySummaryRouteImport } from './routes/api/public/handheld/store.daily-summary'
+import { Route as ApiPublicHandheldStoreOfflineSalesRouteImport } from './routes/api/public/handheld/store.offline-sales'
 import { Route as ApiPublicHandheldSupportConversationsRouteImport } from './routes/api/public/handheld/support.conversations'
 import { Route as ApiPublicHandheldTransferReceiveConfirmRouteImport } from './routes/api/public/handheld/transfer.receive-confirm'
 import { Route as ApiPublicHandheldTransferReceiveScanRouteImport } from './routes/api/public/handheld/transfer.receive-scan'
@@ -1233,6 +1235,18 @@ const ApiPublicHandheldStocktakeSubmitRoute =
     path: '/api/public/handheld/stocktake/submit',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHandheldStoreDailySummaryRoute =
+  ApiPublicHandheldStoreDailySummaryRouteImport.update({
+    id: '/api/public/handheld/store/daily-summary',
+    path: '/api/public/handheld/store/daily-summary',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldStoreOfflineSalesRoute =
+  ApiPublicHandheldStoreOfflineSalesRouteImport.update({
+    id: '/api/public/handheld/store/offline-sales',
+    path: '/api/public/handheld/store/offline-sales',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHandheldSupportConversationsRoute =
   ApiPublicHandheldSupportConversationsRouteImport.update({
     id: '/api/public/handheld/support/conversations',
@@ -1786,6 +1800,8 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/stocktake/open': typeof ApiPublicHandheldStocktakeOpenRoute
   '/api/public/handheld/stocktake/scan': typeof ApiPublicHandheldStocktakeScanRoute
   '/api/public/handheld/stocktake/submit': typeof ApiPublicHandheldStocktakeSubmitRoute
+  '/api/public/handheld/store/daily-summary': typeof ApiPublicHandheldStoreDailySummaryRoute
+  '/api/public/handheld/store/offline-sales': typeof ApiPublicHandheldStoreOfflineSalesRoute
   '/api/public/handheld/support/conversations': typeof ApiPublicHandheldSupportConversationsRouteWithChildren
   '/api/public/handheld/transfer/receive-confirm': typeof ApiPublicHandheldTransferReceiveConfirmRoute
   '/api/public/handheld/transfer/receive-scan': typeof ApiPublicHandheldTransferReceiveScanRoute
@@ -2023,6 +2039,8 @@ export interface FileRoutesByTo {
   '/api/public/handheld/stocktake/open': typeof ApiPublicHandheldStocktakeOpenRoute
   '/api/public/handheld/stocktake/scan': typeof ApiPublicHandheldStocktakeScanRoute
   '/api/public/handheld/stocktake/submit': typeof ApiPublicHandheldStocktakeSubmitRoute
+  '/api/public/handheld/store/daily-summary': typeof ApiPublicHandheldStoreDailySummaryRoute
+  '/api/public/handheld/store/offline-sales': typeof ApiPublicHandheldStoreOfflineSalesRoute
   '/api/public/handheld/support/conversations': typeof ApiPublicHandheldSupportConversationsRouteWithChildren
   '/api/public/handheld/transfer/receive-confirm': typeof ApiPublicHandheldTransferReceiveConfirmRoute
   '/api/public/handheld/transfer/receive-scan': typeof ApiPublicHandheldTransferReceiveScanRoute
@@ -2268,6 +2286,8 @@ export interface FileRoutesById {
   '/api/public/handheld/stocktake/open': typeof ApiPublicHandheldStocktakeOpenRoute
   '/api/public/handheld/stocktake/scan': typeof ApiPublicHandheldStocktakeScanRoute
   '/api/public/handheld/stocktake/submit': typeof ApiPublicHandheldStocktakeSubmitRoute
+  '/api/public/handheld/store/daily-summary': typeof ApiPublicHandheldStoreDailySummaryRoute
+  '/api/public/handheld/store/offline-sales': typeof ApiPublicHandheldStoreOfflineSalesRoute
   '/api/public/handheld/support/conversations': typeof ApiPublicHandheldSupportConversationsRouteWithChildren
   '/api/public/handheld/transfer/receive-confirm': typeof ApiPublicHandheldTransferReceiveConfirmRoute
   '/api/public/handheld/transfer/receive-scan': typeof ApiPublicHandheldTransferReceiveScanRoute
@@ -2514,6 +2534,8 @@ export interface FileRouteTypes {
     | '/api/public/handheld/stocktake/open'
     | '/api/public/handheld/stocktake/scan'
     | '/api/public/handheld/stocktake/submit'
+    | '/api/public/handheld/store/daily-summary'
+    | '/api/public/handheld/store/offline-sales'
     | '/api/public/handheld/support/conversations'
     | '/api/public/handheld/transfer/receive-confirm'
     | '/api/public/handheld/transfer/receive-scan'
@@ -2751,6 +2773,8 @@ export interface FileRouteTypes {
     | '/api/public/handheld/stocktake/open'
     | '/api/public/handheld/stocktake/scan'
     | '/api/public/handheld/stocktake/submit'
+    | '/api/public/handheld/store/daily-summary'
+    | '/api/public/handheld/store/offline-sales'
     | '/api/public/handheld/support/conversations'
     | '/api/public/handheld/transfer/receive-confirm'
     | '/api/public/handheld/transfer/receive-scan'
@@ -2995,6 +3019,8 @@ export interface FileRouteTypes {
     | '/api/public/handheld/stocktake/open'
     | '/api/public/handheld/stocktake/scan'
     | '/api/public/handheld/stocktake/submit'
+    | '/api/public/handheld/store/daily-summary'
+    | '/api/public/handheld/store/offline-sales'
     | '/api/public/handheld/support/conversations'
     | '/api/public/handheld/transfer/receive-confirm'
     | '/api/public/handheld/transfer/receive-scan'
@@ -3179,6 +3205,8 @@ export interface RootRouteChildren {
   ApiPublicHandheldStocktakeOpenRoute: typeof ApiPublicHandheldStocktakeOpenRoute
   ApiPublicHandheldStocktakeScanRoute: typeof ApiPublicHandheldStocktakeScanRoute
   ApiPublicHandheldStocktakeSubmitRoute: typeof ApiPublicHandheldStocktakeSubmitRoute
+  ApiPublicHandheldStoreDailySummaryRoute: typeof ApiPublicHandheldStoreDailySummaryRoute
+  ApiPublicHandheldStoreOfflineSalesRoute: typeof ApiPublicHandheldStoreOfflineSalesRoute
   ApiPublicHandheldSupportConversationsRoute: typeof ApiPublicHandheldSupportConversationsRouteWithChildren
   ApiPublicHandheldTransferReceiveConfirmRoute: typeof ApiPublicHandheldTransferReceiveConfirmRoute
   ApiPublicHandheldTransferReceiveScanRoute: typeof ApiPublicHandheldTransferReceiveScanRoute
@@ -4467,6 +4495,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldStocktakeSubmitRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/handheld/store/daily-summary': {
+      id: '/api/public/handheld/store/daily-summary'
+      path: '/api/public/handheld/store/daily-summary'
+      fullPath: '/api/public/handheld/store/daily-summary'
+      preLoaderRoute: typeof ApiPublicHandheldStoreDailySummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/store/offline-sales': {
+      id: '/api/public/handheld/store/offline-sales'
+      path: '/api/public/handheld/store/offline-sales'
+      fullPath: '/api/public/handheld/store/offline-sales'
+      preLoaderRoute: typeof ApiPublicHandheldStoreOfflineSalesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/handheld/support/conversations': {
       id: '/api/public/handheld/support/conversations'
       path: '/api/public/handheld/support/conversations'
@@ -5685,6 +5727,10 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHandheldStocktakeOpenRoute: ApiPublicHandheldStocktakeOpenRoute,
   ApiPublicHandheldStocktakeScanRoute: ApiPublicHandheldStocktakeScanRoute,
   ApiPublicHandheldStocktakeSubmitRoute: ApiPublicHandheldStocktakeSubmitRoute,
+  ApiPublicHandheldStoreDailySummaryRoute:
+    ApiPublicHandheldStoreDailySummaryRoute,
+  ApiPublicHandheldStoreOfflineSalesRoute:
+    ApiPublicHandheldStoreOfflineSalesRoute,
   ApiPublicHandheldSupportConversationsRoute:
     ApiPublicHandheldSupportConversationsRouteWithChildren,
   ApiPublicHandheldTransferReceiveConfirmRoute:
