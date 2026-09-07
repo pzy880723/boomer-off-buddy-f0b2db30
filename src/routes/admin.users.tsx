@@ -100,10 +100,32 @@ function AdminUsersContent() {
   const deleteFn = useServerFn(deleteUserFn);
   const updateNameFn = useServerFn(updateUserNameFn);
 
+  const fetchScopes = useServerFn(listUserScopesFn);
+  const saveRoles = useServerFn(setUserRolesFn);
+  const saveLocations = useServerFn(setUserLocationsFn);
+
   const list = useQuery({
     queryKey: ["admin-users"],
     queryFn: () => fetchList(),
   });
+
+  const scopes = useQuery({
+    queryKey: ["admin-user-scopes"],
+    queryFn: () => fetchScopes(),
+  });
+
+  const scopeMut = useMutation({
+    mutationFn: async (vars: { userId: string; roles: string[]; locationIds: string[] }) => {
+      await saveRoles({ data: { userId: vars.userId, roles: vars.roles } });
+      await saveLocations({ data: { userId: vars.userId, locationIds: vars.locationIds } });
+    },
+    onSuccess: () => {
+      toast.success("角色与门店范围已更新");
+      qc.invalidateQueries({ queryKey: ["admin-user-scopes"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "保存失败"),
+  });
+
 
   const createMut = useMutation({
     mutationFn: (vars: { phone: string; password: string; name: string }) => createFn({ data: vars }),
