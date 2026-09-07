@@ -1,4 +1,14 @@
+# 状态更新（2026-09-07 16:40 UTC）
+
+- **仪表盘后端/API 与迁移**：已由 Codex 在 `main@22550c0` 合并并继续开发；数据库 RPC 已存在，UI 完整实现位于 `codex/sales-dashboard-v1@7396e9e`，正在腾讯云候选验证。
+- **Lovable 侧此前新增的销售仪表盘代码保留**，但新页面将调用 `operational-dashboard.functions/server`；Lovable 不再修改仪表盘页面、路由或执行任何迁移。
+- **此前两个开发请求已 superseded**：不再继续销售仪表盘后端实现与 GO 排班/身份方案的实施；发布由 Codex 负责。
+- 本文件其余部分保留为上一轮已完成的 ERP 全模块只读审计记录，结论仍然有效。
+
+---
+
 # ERP 全模块只读审计（Lovable 侧证据补充）
+
 
 本轮**严格只读**：未编辑代码、未执行 migration、未修改数据、未 Publish。**腾讯生产 erp.boomeroff.com 完全未改动**，本报告全部基于 Lovable 内嵌数据库与当前仓库。
 分级：`[缺陷]` = 已确认；`[风险]` = 推断需复核；`[建议]` = 产品层面。
