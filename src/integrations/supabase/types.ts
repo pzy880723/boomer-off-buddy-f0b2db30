@@ -8435,6 +8435,17 @@ export type Database = {
           sku_id: string
         }[]
       }
+      set_user_scope_atomic: {
+        Args: {
+          p_actor_id: string
+          p_actor_role: string
+          p_location_ids: string[]
+          p_reason?: string
+          p_roles: string[]
+          p_target_user_id: string
+        }
+        Returns: Json
+      }
       sync_handheld_custom_listing: {
         Args: {
           p_delta: number
@@ -8443,6 +8454,19 @@ export type Database = {
           p_sku_id: string
         }
         Returns: undefined
+      }
+      youzan_advance_order_sync_cursor: {
+        Args: {
+          p_attempts: number
+          p_cursor_id: string
+          p_error: string
+          p_method_label: string
+          p_next_page: number
+          p_status: string
+          p_upserted: number
+          p_worker_id: string
+        }
+        Returns: boolean
       }
       youzan_claim_order_sync_cursor: {
         Args: { p_lease_seconds?: number; p_worker_id: string }
@@ -8462,12 +8486,12 @@ export type Database = {
           updated_at: string
           window_end: string
           window_start: string
-        }
+        }[]
         SetofOptions: {
           from: "*"
           to: "youzan_order_sync_cursors"
-          isOneToOne: true
-          isSetofReturn: false
+          isOneToOne: false
+          isSetofReturn: true
         }
       }
     }

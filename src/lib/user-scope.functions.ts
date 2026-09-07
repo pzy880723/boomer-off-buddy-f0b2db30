@@ -11,6 +11,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { assertScopeAdmin, assertTargetWritable } from "@/lib/user-scope/guards";
 
 const ROLES = [
   "super_admin",
@@ -27,26 +28,85 @@ type AuthedContext = {
   userId: string;
 };
 
-async function assertHqAdmin(context: AuthedContext) {
+/** 只读：HQ 角色即可查看范围配置 */
+async function assertHqReader(context: AuthedContext) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabaseAdmin as unknown as { from: (t: string) => any };
-  const { data } = await sb.from("user_roles").select("role").eq("user_id", context.userId);
+  const { data, error } = await sb.from("user_roles").select("role").eq("user_id", context.userId);
+  if (error) throw new Error(error.message);
   const roles = ((data as { role: string }[] | null) ?? []).map((r) => r.role);
   if (!roles.some((r) => (HQ_ROLES as string[]).includes(r))) {
-    throw new Error("无权操作：仅总部管理员可配置角色与门店范围");
+    throw new Error("无权操作：仅总部管理员可查看角色与门店范围");
   }
-  return {
-    actorId: context.userId,
-    actorRole: roles.includes("super_admin") ? "super_admin" : "hq_operator",
+  return { actorId: context.userId, roles };
+}
+
+/** 写操作：只有 super_admin；hq_operator 只能看不能授权 */
+async function assertScopeWriter(context: AuthedContext) {
+  const { roles, actorId } = await assertHqReader(context);
+  assertScopeAdmin(roles);
+  return { actorId, actorRole: "super_admin" as const };
+}
+
+/** 目标账号必须可写（未停用 / 未删除） */
+async function assertTargetAccountWritable(userId: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId);
+  if (error || !data?.user) throw new Error("目标账号不存在");
+  const u = data.user as unknown as Record<string, unknown>;
+  assertTargetWritable(
+    {
+      banned_until: (u["banned_until"] as string | null) ?? null,
+      deleted_at: (u["deleted_at"] as string | null) ?? null,
+    },
+    new Date(),
+  );
+}
+
+/** 角色 + 门店 + 审计单事务写入 */
+async function applyScopeAtomic(input: {
+  actorId: string;
+  actorRole: string;
+  targetUserId: string;
+  roles: string[];
+  locationIds: string[];
+  reason?: string | undefined;
+}) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+  const sb = supabaseAdmin as unknown as {
+    rpc: (
+      fn: string,
+      args: Record<string, unknown>,
+    ) => Promise<{ data: unknown; error: { message: string } | null }>;
   };
+  const { data, error } = await sb.rpc("set_user_scope_atomic", {
+    p_actor_id: input.actorId,
+    p_actor_role: input.actorRole,
+    p_target_user_id: input.targetUserId,
+    p_roles: input.roles,
+    p_location_ids: input.locationIds,
+    p_reason: input.reason ?? null,
+  });
+  if (error) throw new Error(scopeErrorMessage(error.message));
+  return (data ?? {}) as { ok: boolean; changed: boolean };
+}
+
+function scopeErrorMessage(raw: string): string {
+  if (raw.includes("not_super_admin")) return "无权操作：仅超级管理员可配置角色与门店范围";
+  if (raw.includes("self_escalation")) return "不能给自己授予超级管理员";
+  if (raw.includes("self_demotion")) return "不能撤销自己的超级管理员角色";
+  if (raw.includes("last_super_admin")) return "系统必须至少保留一个超级管理员";
+  if (raw.includes("invalid_locations")) return "门店不存在或已停用";
+  return raw;
 }
 
 /** 列出所有用户的角色与门店范围（供用户管理页展示） */
 export const listUserScopesFn = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await assertHqAdmin(context as unknown as AuthedContext);
+    await assertHqReader(context as unknown as AuthedContext);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabaseAdmin as unknown as { from: (t: string) => any };
@@ -115,56 +175,37 @@ export const setUserRolesFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => setRolesSchema.parse(i))
   .handler(async ({ data, context }) => {
-    const actor = await assertHqAdmin(context as unknown as AuthedContext);
+    const actor = await assertScopeWriter(context as unknown as AuthedContext);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabaseAdmin as unknown as { from: (t: string) => any };
 
-    const { data: beforeRows } = await sb
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", data.userId);
+    await assertTargetAccountWritable(data.userId);
+
+    const [{ data: beforeRows }, { data: locRows }] = await Promise.all([
+      sb.from("user_roles").select("role").eq("user_id", data.userId),
+      sb.from("user_location_perms").select("location_id").eq("user_id", data.userId),
+    ]);
     const before = ((beforeRows as { role: string }[] | null) ?? []).map((r) => r.role).sort();
     const after = [...new Set(data.roles)].sort();
-
-    if (
-      data.userId === actor.actorId &&
-      !after.includes("super_admin") &&
-      before.includes("super_admin")
-    ) {
-      throw new Error("不能撤销自己的超级管理员角色");
-    }
+    const keepLocations = ((locRows as { location_id: string }[] | null) ?? []).map(
+      (r) => r.location_id,
+    );
 
     const toAdd = after.filter((r) => !before.includes(r));
     const toRemove = before.filter((r) => !(after as string[]).includes(r));
 
-    if (toRemove.length > 0) {
-      const { error } = await sb
-        .from("user_roles")
-        .delete()
-        .eq("user_id", data.userId)
-        .in("role", toRemove);
-      if (error) throw new Error(error.message);
-    }
-    if (toAdd.length > 0) {
-      const { error } = await sb.from("user_roles").upsert(
-        toAdd.map((role) => ({ user_id: data.userId, role })),
-        { onConflict: "user_id,role" },
-      );
-      if (error) throw new Error(error.message);
-    }
+    // 角色变更 + 门店保持 + 审计：同一事务，要么全成要么全回滚
+    const result = await applyScopeAtomic({
+      actorId: actor.actorId,
+      actorRole: actor.actorRole,
+      targetUserId: data.userId,
+      roles: after,
+      locationIds: keepLocations,
+      reason: data.reason,
+    });
+    void result;
 
-    if (toAdd.length > 0 || toRemove.length > 0) {
-      await sb.from("user_scope_audit_logs").insert({
-        target_user_id: data.userId,
-        action: toAdd.length > 0 ? "grant_role" : "revoke_role",
-        before_snapshot: { roles: before },
-        after_snapshot: { roles: after, added: toAdd, removed: toRemove },
-        reason: data.reason ?? null,
-        actor_id: actor.actorId,
-        actor_role: actor.actorRole,
-      });
-    }
     return {
       ok: true,
       roles: after,
@@ -185,62 +226,36 @@ export const setUserLocationsFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => setLocationsSchema.parse(i))
   .handler(async ({ data, context }) => {
-    const actor = await assertHqAdmin(context as unknown as AuthedContext);
+    const actor = await assertScopeWriter(context as unknown as AuthedContext);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabaseAdmin as unknown as { from: (t: string) => any };
 
-    const wanted = [...new Set(data.locationIds)];
-    if (wanted.length > 0) {
-      const { data: valid } = await sb
-        .from("inv_locations")
-        .select("id")
-        .in("id", wanted)
-        .eq("is_active", true);
-      const validIds = new Set(((valid as { id: string }[] | null) ?? []).map((r) => r.id));
-      const invalid = wanted.filter((id) => !validIds.has(id));
-      if (invalid.length > 0) throw new Error(`门店不存在或已停用：${invalid.join(", ")}`);
-    }
+    await assertTargetAccountWritable(data.userId);
 
-    const { data: beforeRows } = await sb
-      .from("user_location_perms")
-      .select("location_id")
-      .eq("user_id", data.userId);
+    const wanted = [...new Set(data.locationIds)];
+    const [{ data: beforeRows }, { data: roleRows }] = await Promise.all([
+      sb.from("user_location_perms").select("location_id").eq("user_id", data.userId),
+      sb.from("user_roles").select("role").eq("user_id", data.userId),
+    ]);
     const before = ((beforeRows as { location_id: string }[] | null) ?? [])
       .map((r) => r.location_id)
       .sort();
     const after = [...wanted].sort();
+    const keepRoles = ((roleRows as { role: string }[] | null) ?? []).map((r) => r.role);
 
     const toAdd = after.filter((id) => !before.includes(id));
     const toRemove = before.filter((id) => !after.includes(id));
 
-    if (toRemove.length > 0) {
-      const { error } = await sb
-        .from("user_location_perms")
-        .delete()
-        .eq("user_id", data.userId)
-        .in("location_id", toRemove);
-      if (error) throw new Error(error.message);
-    }
-    if (toAdd.length > 0) {
-      const { error } = await sb.from("user_location_perms").upsert(
-        toAdd.map((location_id) => ({ user_id: data.userId, location_id })),
-        { onConflict: "user_id,location_id" },
-      );
-      if (error) throw new Error(error.message);
-    }
+    await applyScopeAtomic({
+      actorId: actor.actorId,
+      actorRole: actor.actorRole,
+      targetUserId: data.userId,
+      roles: keepRoles,
+      locationIds: after,
+      reason: data.reason,
+    });
 
-    if (toAdd.length > 0 || toRemove.length > 0) {
-      await sb.from("user_scope_audit_logs").insert({
-        target_user_id: data.userId,
-        action: toAdd.length > 0 ? "grant_location" : "revoke_location",
-        before_snapshot: { location_ids: before },
-        after_snapshot: { location_ids: after, added: toAdd, removed: toRemove },
-        reason: data.reason ?? null,
-        actor_id: actor.actorId,
-        actor_role: actor.actorRole,
-      });
-    }
     return {
       ok: true,
       location_ids: after,
@@ -263,7 +278,7 @@ export const setGoIdentityLinkFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => goIdentitySchema.parse(i))
   .handler(async ({ data, context }) => {
-    const actor = await assertHqAdmin(context as unknown as AuthedContext);
+    const actor = await assertScopeWriter(context as unknown as AuthedContext);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabaseAdmin as unknown as { from: (t: string) => any };
@@ -291,7 +306,7 @@ export const setGoIdentityLinkFn = createServerFn({ method: "POST" })
       .single();
     if (error) throw new Error(error.message);
 
-    await sb.from("user_scope_audit_logs").insert({
+    const { error: auditError } = await sb.from("user_scope_audit_logs").insert({
       target_user_id: data.erpUserId,
       action: data.status === "approved" ? "approve_go_identity" : "revoke_go_identity",
       before_snapshot: before ?? null,
@@ -300,6 +315,7 @@ export const setGoIdentityLinkFn = createServerFn({ method: "POST" })
       actor_id: actor.actorId,
       actor_role: actor.actorRole,
     });
+    if (auditError) throw new Error(auditError.message);
     return { ok: true, link: after };
   });
 
@@ -316,7 +332,7 @@ export const setGoShopLinkFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => goShopSchema.parse(i))
   .handler(async ({ data, context }) => {
-    const actor = await assertHqAdmin(context as unknown as AuthedContext);
+    const actor = await assertScopeWriter(context as unknown as AuthedContext);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabaseAdmin as unknown as { from: (t: string) => any };
@@ -354,7 +370,7 @@ export const setGoShopLinkFn = createServerFn({ method: "POST" })
       .single();
     if (error) throw new Error(error.message);
 
-    await sb.from("user_scope_audit_logs").insert({
+    const { error: auditError } = await sb.from("user_scope_audit_logs").insert({
       target_user_id: actor.actorId,
       action: data.status === "active" ? "link_go_shop" : "unlink_go_shop",
       location_id: data.locationId,
@@ -364,13 +380,14 @@ export const setGoShopLinkFn = createServerFn({ method: "POST" })
       actor_id: actor.actorId,
       actor_role: actor.actorRole,
     });
+    if (auditError) throw new Error(auditError.message);
     return { ok: true, link: after };
   });
 
 export const listGoShopLinksFn = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await assertHqAdmin(context as unknown as AuthedContext);
+    await assertHqReader(context as unknown as AuthedContext);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabaseAdmin as unknown as { from: (t: string) => any };

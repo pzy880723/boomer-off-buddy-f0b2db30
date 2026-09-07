@@ -38,7 +38,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useAuthSession } from "@/hooks/use-auth-session";
-import { isSuperAdminPhone, PHONE_REGEX, SUPER_ADMIN_PHONES, resolveUserPhone } from "@/lib/auth-config";
+import {
+  isSuperAdminPhone,
+  PHONE_REGEX,
+  SUPER_ADMIN_PHONES,
+  resolveUserPhone,
+} from "@/lib/auth-config";
 import {
   listUsersFn,
   createUserFn,
@@ -50,6 +55,8 @@ import {
   listUserScopesFn,
   setUserLocationsFn,
   setUserRolesFn,
+  listGoShopLinksFn,
+  setGoShopLinkFn,
 } from "@/lib/user-scope.functions";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -123,17 +130,17 @@ function AdminUsersContent() {
       toast.success("角色与门店范围已更新");
       qc.invalidateQueries({ queryKey: ["admin-user-scopes"] });
     },
-    onError: (e: unknown) =>
-      toast.error(e instanceof Error ? e.message : "保存失败"),
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "保存失败"),
   });
 
-
   const createMut = useMutation({
-    mutationFn: (vars: { phone: string; password: string; name: string }) => createFn({ data: vars }),
+    mutationFn: (vars: { phone: string; password: string; name: string }) =>
+      createFn({ data: vars }),
     onSuccess: () => {
       toast.success("账号已创建");
       qc.invalidateQueries({ queryKey: ["admin-users"] });
     },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onError: (e: any) => toast.error(e?.message ?? "创建失败"),
   });
 
@@ -143,6 +150,7 @@ function AdminUsersContent() {
       toast.success("密码已重置，用户下次登录需修改");
       qc.invalidateQueries({ queryKey: ["admin-users"] });
     },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onError: (e: any) => toast.error(e?.message ?? "重置失败"),
   });
 
@@ -152,6 +160,7 @@ function AdminUsersContent() {
       toast.success("账号已删除");
       qc.invalidateQueries({ queryKey: ["admin-users"] });
     },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onError: (e: any) => toast.error(e?.message ?? "删除失败"),
   });
 
@@ -161,6 +170,7 @@ function AdminUsersContent() {
       toast.success("姓名已更新");
       qc.invalidateQueries({ queryKey: ["admin-users"] });
     },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onError: (e: any) => toast.error(e?.message ?? "更新失败"),
   });
 
@@ -224,7 +234,9 @@ function AdminUsersContent() {
                       </TableCell>
                       <TableCell className="text-xs">
                         {scope?.is_hq ? (
-                          <Badge variant="outline" className="text-primary">总部（可看全部门店）</Badge>
+                          <Badge variant="outline" className="text-primary">
+                            总部（可看全部门店）
+                          </Badge>
                         ) : (scope?.location_ids.length ?? 0) > 0 ? (
                           <span className="text-muted-foreground">
                             {scope?.location_ids.length} 个门店权限
@@ -291,7 +303,10 @@ function AdminUsersContent() {
                 })}
                 {(list.data ?? []).length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
+                    <TableCell
+                      colSpan={8}
+                      className="py-10 text-center text-sm text-muted-foreground"
+                    >
                       暂无账号
                     </TableCell>
                   </TableRow>
@@ -302,14 +317,156 @@ function AdminUsersContent() {
         </CardContent>
       </Card>
 
+      <GoShopMappingCard locations={scopes.data?.locations ?? []} />
+
       <p className="text-xs text-muted-foreground">
-        超级管理员（写死在代码中）：{SUPER_ADMIN_PHONES.join("、")}。如需调整请联系开发修改 <code>src/lib/auth-config.ts</code>。
+        超级管理员（写死在代码中）：{SUPER_ADMIN_PHONES.join("、")}。如需调整请联系开发修改{" "}
+        <code>src/lib/auth-config.ts</code>。
       </p>
     </div>
   );
 }
 
-function CreateUserDialog({ onSubmit }: { onSubmit: (v: { phone: string; password: string; name: string }) => Promise<unknown> }) {
+type GoShopLink = {
+  id: string;
+  go_project_ref: string;
+  go_shop_id: string;
+  location_id: string;
+  status: string;
+  updated_at: string;
+};
+
+/** BOOMER GO 门店 ↔ ERP 门店映射：没有 active 记录，GO 店员端拿不到任何数据 */
+function GoShopMappingCard({
+  locations,
+}: {
+  locations: { id: string; name: string; kind: string }[];
+}) {
+  const qc = useQueryClient();
+  const fetchLinks = useServerFn(listGoShopLinksFn);
+  const saveLink = useServerFn(setGoShopLinkFn);
+  const [projectRef, setProjectRef] = useState("narqwgwpqglathwtyevz");
+  const [goShopId, setGoShopId] = useState("");
+  const [locationId, setLocationId] = useState("");
+
+  const links = useQuery({ queryKey: ["go-shop-links"], queryFn: () => fetchLinks() });
+  const mut = useMutation({
+    mutationFn: (v: { goShopId: string; locationId: string; status: "active" | "revoked" }) =>
+      saveLink({
+        data: {
+          goProjectRef: projectRef.trim(),
+          goShopId: v.goShopId,
+          locationId: v.locationId,
+          status: v.status,
+        },
+      }),
+    onSuccess: () => {
+      toast.success("门店映射已更新");
+      setGoShopId("");
+      void qc.invalidateQueries({ queryKey: ["go-shop-links"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const shops = locations.filter((l) => l.kind === "shop");
+  const nameOf = (id: string) => locations.find((l) => l.id === id)?.name ?? id;
+
+  return (
+    <Card>
+      <CardContent className="space-y-4 py-5">
+        <div>
+          <h2 className="text-sm font-semibold">BOOMER GO 门店映射</h2>
+          <p className="text-xs text-muted-foreground">
+            把 GO 侧门店对应到 ERP 门店。没有启用中的映射时，该门店店员在 GO 上看不到任何业绩数据。
+          </p>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-[1fr_1fr_1fr_auto]">
+          <Input
+            value={projectRef}
+            onChange={(e) => setProjectRef(e.target.value)}
+            placeholder="GO 项目标识"
+          />
+          <Input
+            value={goShopId}
+            onChange={(e) => setGoShopId(e.target.value)}
+            placeholder="GO 门店 ID"
+          />
+          <select
+            className="h-9 rounded-md border bg-background px-3 text-sm"
+            value={locationId}
+            onChange={(e) => setLocationId(e.target.value)}
+          >
+            <option value="">选择 ERP 门店</option>
+            {shops.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+          <Button
+            disabled={!goShopId.trim() || !locationId || mut.isPending}
+            onClick={() => mut.mutate({ goShopId: goShopId.trim(), locationId, status: "active" })}
+          >
+            {mut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            保存映射
+          </Button>
+        </div>
+
+        {links.isLoading ? (
+          <div className="py-6 text-center text-sm text-muted-foreground">加载中…</div>
+        ) : (links.data ?? []).length === 0 ? (
+          <div className="py-6 text-center text-sm text-muted-foreground">尚未配置任何门店映射</div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>GO 门店 ID</TableHead>
+                <TableHead>ERP 门店</TableHead>
+                <TableHead>状态</TableHead>
+                <TableHead className="text-right">操作</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {((links.data ?? []) as GoShopLink[]).map((link) => (
+                <TableRow key={link.id}>
+                  <TableCell className="font-mono text-xs">{link.go_shop_id}</TableCell>
+                  <TableCell>{nameOf(link.location_id)}</TableCell>
+                  <TableCell>
+                    <Badge variant={link.status === "active" ? "default" : "secondary"}>
+                      {link.status === "active" ? "启用中" : "已停用"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={mut.isPending}
+                      onClick={() =>
+                        mut.mutate({
+                          goShopId: link.go_shop_id,
+                          locationId: link.location_id,
+                          status: link.status === "active" ? "revoked" : "active",
+                        })
+                      }
+                    >
+                      {link.status === "active" ? "停用" : "启用"}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function CreateUserDialog({
+  onSubmit,
+}: {
+  onSubmit: (v: { phone: string; password: string; name: string }) => Promise<unknown>;
+}) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -451,7 +608,8 @@ function ResetPasswordButton({
         <DialogHeader>
           <DialogTitle>重置密码</DialogTitle>
           <DialogDescription>
-            为 <span className="font-medium">{label}</span> 设置新密码，对方下次登录时会被要求再次修改。
+            为 <span className="font-medium">{label}</span>{" "}
+            设置新密码，对方下次登录时会被要求再次修改。
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
@@ -482,7 +640,13 @@ function ResetPasswordButton({
   );
 }
 
-function DeleteUserButton({ label, onConfirm }: { label: string; onConfirm: () => Promise<unknown> }) {
+function DeleteUserButton({
+  label,
+  onConfirm,
+}: {
+  label: string;
+  onConfirm: () => Promise<unknown>;
+}) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   return (
