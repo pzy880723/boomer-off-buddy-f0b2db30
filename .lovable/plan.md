@@ -1,52 +1,68 @@
-# ERP APP 首页操作迁移 + 统一消息：现状审计与最小可实施边界
+# BOOMER GO 店员首页（销售目标 / 补录 / 排班 / Banner / 培训）— 现状核对与最小实施方案
 
-只读审计完成。当前代码提交 `0d48ae9d877ab01953b7d817e502a1e1136d5088`，最新已应用迁移 `20260831213000_hello_kitty_specific_ip.sql`（异步图片任务表来自 `20260831190000_handheld_async_listing_images.sql`）。未修改任何代码、数据库或有赞数据。
+当前 commit：`f23aa5513ae68cfa2fa6015f4a9036d80c0a2dc4`（2026-09-07T14:12:07+08:00）。
+本轮仅做只读调查，未改代码、未写数据、未执行迁移、**腾讯生产 erp.boomeroff.com 未部署本轮任何内容**。
 
-## 1. 手持消息（notifications）
+## 1. 有赞销售数据：已有什么
 
-现有表 `inv_handheld_notifications` 字段：`id, device_id, location_id, kind, title, payload, ts`。
+有的：
+- `youzan_orders`（1948 行，1947 行有 `pay_time`）：字段含 `shop_id`、`kdt_id`、`tid`、`status`、`status_text`、`pay_type`、`payment`、`total_fee`、`post_fee`、`item_count`、`pay_time`、`created_time`、`raw`；唯一键 `(kdt_id, tid)` 用于 upsert 去重。
+- 店铺映射：`youzan_shops`（4 家：HQ 1 + 分店 3）→ `inv_locations.shop_id`，4 个库位全部已映射。
+- 自动同步：pg_cron 作业 1 `youzan-sync-30min`（每 30 分钟）POST `/api/public/hooks/youzan-sync`，body `{"days":3}`。
+- 现成口径参考：`src/lib/youzan-stats.functions.ts`（`getYouzanSummary` / `getShopSalesBreakdown`），按 `pay_time >= 本月1日`、金额取 `payment ?? total_fee` 累加，**未按 status 过滤**。
 
-- 路由：`GET /api/public/handheld/notifications`、`GET .../notifications/since`、`POST .../notifications/read-all`。
-- 过滤：只按“设备 + 库位 + 全局”在应用层过滤（`notifications.ts:23-27`、`notifications.since.ts:36-40`），**没有按员工（user_id/角色）过滤**。
-- 已读：`notifications.read-all.ts` 只是回一个时间戳，**数据库没有任何已读状态**（文件头注释自述）。
-- 缺失：按人分发、单条已读、未读计数、消息分类（履约/缺货/客服/系统）、消息与业务对象（订单/履约/会话）的关联字段。
+缺口（必须在本轮补齐才能作为门店目标进度口径）：
+- **没有净销售口径**：状态分布 `TRADE_SUCCESS` 1914 / `TRADE_CLOSED` 34，现有汇总把关闭单也算进去；`post_fee`（运费）也未剔除。
+- **没有退款数据表**：无有赞退款/售后落库（`commerce_refunds` 行数 0，且属于自营商城域，不是有赞域）；退款只能靠 `status` 粗判，`status ilike '%refund%'` 命中 0 行。
+- **数据新鲜度存疑**：`youzan_orders` 最近 `pay_time` = 2026-08-29，最近 `inserted_at` = 2026-08-29；仅中信泰富店有订单，新天地店/温州店 0 单。上线前需确认是真实无成交还是同步中断。
+- **没有面向 GO 的销售接口**：`/api/public/handheld/*` 无任何销售额/营业额端点；`dashboard.ts` 只返回库存数、调拨/盘点/拣货任务与未读通知。现有 youzan-stats 是 ERP Web 的 serverFn，GO 无法安全调用。
 
-## 2. 商城履约（commerce fulfillment）
+## 2. 月目标 / 线下补录 / 防重复 / 审计
 
-已存在表：`fulfillments`、`fulfillment_items`、`fulfillment_scans`、`fulfillment_exceptions`、`packages`、`package_evidence`、`shipments`、`shipment_events`、`print_events`、`warehouse_totes`。
+全部不存在。数据库 `public` schema 中没有任何 `%target%`、`%banner%`、`%train%`、`%quiz%`、`%exam%`、`%schedul%`、`%shift%`（除 `pos_shifts`）命名的表；`app_settings` 只有 3 行全局键值，不适合承载按门店按月的目标。
+线下收款侧现有的只有 POS 域：`pos_shifts`（2 行）、`pos_receipts`（1 行）、`pos_payment_attempts`、`pos_cash_movements`——是收银机流水，不是"门店手填补录账本"，且几乎无真实数据。
+因此：门店月目标、线下补录、防重复、修改审计**都需要新迁移**。
 
-已存在 API：`fulfillments` 列表、详情、`claim`、`bind-tote`、`pick-scan`、`pick-complete`。
+## 3. 排班 / Banner / 培训测试
 
-已存在 RPC：`fulfillment_claim_task`、`fulfillment_bind_tote`、`fulfillment_pick_scan`、`fulfillment_complete_pick`。
+ERP 侧无任何表、接口或配置：`pos_shifts` 是收银班次（开/关钱箱、现金差异），语义上不能当排班表用。Banner 与培训测试题库在 ERP 无对应实体。若 GO 原库（客户端本地/旧后端）已有这三块数据，需要 Codex 提供其现有字段与来源，才能决定"ERP 托管配置"还是"GO 自持、ERP 只读透传"。**这是本轮唯一的外部依赖项**。
 
-- `fulfillment_pick_scan` 支持 EPC/条码/SKU 码匹配、错货拦截（`wrong_item`）、`client_op_id` 幂等。
-- `fulfillment_complete_pick` 要求所有行 `picked_qty = expected_qty`，**只要有一行缺货就无法完成，且没有缺货申报/客户确认路径**。
-- `fulfillment_exceptions` 表结构存在（kind/status/evidence/resolution），但**没有任何 API 写入或读取它**。
-- 出票：`fulfillments.code` 存在，但**没有“已付款自动按履约门店建单并出票”的触发器或队列**，也没有拣货小票内容接口；`src/server/handheld-print.server.ts` 只有 SKU 价签 payload，没有订单二维码/行项目/库位。
-- 扫订单码进订单：**没有** order-code 解析路由（`pos/resolve-code.ts` 只服务收银）。
-- 面单：`shipments`（tracking_no/label_payload/status）和 `print_events` 表存在，但**没有申请面单、保存快递单号、置为“待取件”的 API 或状态机**；`order-policy.ts` 的状态机也只到 `handed_over`。
+## 4. 建议的最小实施边界
 
-## 3. 客服 / 客户双向沟通
+### 新增表（一份 additive 迁移，可回滚）
+- `store_sales_targets(location_id, period_month, target_amount, note, created_by, updated_by, timestamps)`，唯一键 `(location_id, period_month)`。
+- `store_offline_sales_entries`：门店手填补录。字段含 `location_id`、`business_date`、`channel`（`cash` / `pos_card` / `wechat_direct` / `alipay_direct` / `other`，**明确排除有赞渠道**）、`amount`、`order_count`、`note`、`client_op_id`（幂等）、`created_by`、`status`（`active` / `voided`）。唯一键 `(location_id, business_date, channel, client_op_id)` 防重复提交。
+- `store_offline_sales_audit`：每次新增/修改/作废写一条前后值快照 + 操作人 + 时间。
+- 三张表 RLS 开启 + `GRANT` 给 `authenticated` / `service_role`（GO 走设备+session 服务端 admin 客户端读写，Web 侧按角色）。
 
-数据库中**不存在任何会话、消息、参与者或客户确认表**（无 conversation/session/message/agent 表）。storefront 只有商品、订单、支付、会员相关路由。
+### 不重复计算的口径（写进代码注释与 OpenAPI）
+```text
+门店月销售额 = 有赞净销售 + 线下补录净额
+有赞净销售 = SUM(payment) WHERE shop→location 命中且 pay_time 在月内
+             AND status = 'TRADE_SUCCESS'   (排除 TRADE_CLOSED)
+             - SUM(post_fee)                (运费不计业绩)
+线下补录净额 = SUM(amount) WHERE status='active' 且 channel ∈ 线下枚举
+             (channel 枚举不含 youzan/wechat_youzan，杜绝与有赞重复)
+```
+有赞侧退款目前无数据源，接口返回 `refund_source: "unavailable"`，不做静默估算。
 
-因此：门店与总部客服共同接待、不独占领取、客户端确认缺货，**全部为 0，需要新建领域模型**。
+### 新增 GO 接口（最小契约，全部在 `/api/public/handheld/*`，沿用 `X-Device-Token` + `X-Session-Token`）
+- `GET /handheld/store/sales-summary?location_id=&month=` → `{ target_amount, achieved_amount, progress_pct, youzan_amount, offline_amount, order_count, youzan_last_sync_at, refund_source }`
+- `GET /handheld/store/offline-sales?location_id=&date_from=&date_to=`（列表 + 分页）
+- `POST /handheld/store/offline-sales`（`client_op_id` 幂等；写审计）
+- `PATCH /handheld/store/offline-sales/{id}`、`POST .../void`（写审计，不物理删除）
+- `GET /handheld/store/home-config?location_id=` → `{ banners[], schedule[], training_tasks[] }`（第一版可只返回 ERP 已托管部分，其余为空数组，等 GO 原库字段确认后填充）
 
-## 4. 异步主图 worker
+### 权限边界
+- 普通店员：严格限定"设备当前绑定库位"，只能读本店目标、读写本店线下补录；不能改目标。
+- `store_manager`：本店目标可读、补录可作废。
+- `super_admin` / `hq_operator`：可跨店读、可写目标、可查审计；跨店必须显式传 `location_id` 并通过 `userCanAccessLocation` 校验。
+- 复用现有 `src/server/handheld-fulfillment-access.server.ts` 的授权范式，避免另起一套。
 
-- 队列表 `inv_listing_image_jobs`（sku_id + source_bucket + source_path 唯一），worker 路由 `POST /api/public/hooks/listing-image-worker`，每分钟 cron 已注册。
-- 只处理 `sku-raw` 桶入队的图，成功后把 `image_paths` 中的原图路径替换成 `sku-listing/...`，并维护 `inv_skus.image_processing_status`。
-- 图片指令（`handheld-ai.server.ts:102-107`）只要求正方形、浅灰底、校正曝光，并**严禁改文字与瑕疵** —— 也就是说**当前不会清除价签**，与新需求冲突。
-- worker 成功后**没有任何有赞/商城同步触发**（文件内无 `channel_sync_outbox` 写入），主图清洁完成不会自动推送渠道。
-- 对外主图与内部原图**没有区分字段**（只有一个 `image_paths` 数组，处理完就地替换）。
+### 尚缺的前置条件
+1. GO 原库中排班 / Banner / 培训测试的现有结构与归属（Codex 提供）。
+2. 确认有赞订单同步是否中断（最近成交停在 2026-08-29），否则销售进度会长期偏低。
+3. 有赞退款数据源：是否新增退款拉取任务（本轮建议不做，接口先如实标注不可用）。
+4. 月目标的录入入口归属：ERP Web 还是 GO 店长端。
 
-## 最小可实施边界（建议分四个独立批次）
-
-1. **统一消息 v1**：给 `inv_handheld_notifications` 增加 `user_id`、`audience`、`topic`、`ref_type/ref_id`，新增 `handheld_notification_reads`（notification_id + user_id）；改造三个现有路由做员工+门店过滤，新增单条已读与未读计数。不动履约与客服。
-2. **订单出票与拣货闭环**：已付款订单按 `sale_location_id`/库存所在门店生成 `fulfillments`（服务端函数或 RPC，不做前端触发）；新增订单二维码解析路由、拣货小票 payload（订单号+二维码+标题/条码/数量/价格/库位）、`shortage` 申报写 `fulfillment_exceptions`；`fulfillment_complete_pick` 增加“存在未确认缺货则拒绝完成”的分支。
-3. **面单与待取件**：新增申请面单 API 写 `shipments`（provider/tracking_no/label_payload）、`print_events` 记录，履约状态从 `packed` → `handover_ready`（对外文案“待取件”），不改 `handed_over` 语义，避免与现有 `order-policy` 冲突。
-4. **客户会话（共享接待）**：新建 `support_conversations` + `support_messages` + `support_participants`（门店与 HQ 客服可同时在场，无独占 claim）、以及 `shortage_confirmations`（客户显式确认才解除履约阻塞）；storefront 侧新增读写会话与确认接口。
-
-图片方面单独一条：把“清除外加价签、保留商品本体文字与真实瑕疵”写进图片指令，并在 `inv_skus` 上区分内部原图与对外主图（例如新增 `listing_image_paths`），只有清洁通过的版本才进入渠道同步，并在 worker 成功后写 `channel_sync_outbox`。
-
-请确认这四个批次的优先级与第一批范围，我再按你的具体实现要求落地。
+需要迁移：**是**（3 张新表 + RLS + GRANT）。本轮不涉及有赞写操作、不涉及腾讯部署。
