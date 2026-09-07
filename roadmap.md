@@ -26,6 +26,6 @@
 - [ ] 有赞退款数据源接入（当前一律 incomplete）
 
 ## 销售仪表盘后端（2026-09-07）
-- [ ] sales_dashboard_report 聚合 RPC（净销售/渠道/趋势/待办，Asia/Shanghai）
-- [ ] src/lib/sales-dashboard.functions.ts + 授权（HQ 全部/单店，店员限授权门店）
-- [ ] 契约测试（区间解析、AOV、warning 不造 0）
+- [x] sales_dashboard_report 聚合 RPC（净销售/渠道/趋势/待办，Asia/Shanghai）
+- [x] src/lib/sales-dashboard.functions.ts + 授权（HQ 全部/单店，店员限授权门店）
+- [x] 契约测试（区间解析、AOV、warning 不造 0）
