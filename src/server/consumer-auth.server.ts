@@ -4,6 +4,8 @@ export type ConsumerIdentity = {
   subject: string;
   phone: string | null;
   wechatOpenId: string | null;
+  wechatMiniOpenId: string | null;
+  wechatMiniAppId: string | null;
   wechatUnionId: string | null;
   nickname: string | null;
   avatarUrl: string | null;
@@ -24,6 +26,8 @@ type JwtPayload = {
   nbf?: number;
   phone?: string;
   wechat_openid?: string;
+  wechat_mini_openid?: string;
+  wechat_mini_appid?: string;
   wechat_unionid?: string;
   nickname?: string;
   avatar_url?: string;
@@ -78,10 +82,18 @@ export async function verifyConsumerJwt(
   const providers = (payload.providers ?? []).filter(
     (provider): provider is "phone" | "wechat" => provider === "phone" || provider === "wechat",
   );
+  // A mini-program OpenID is meaningful only with its verified originating AppID.
+  // Older tokens remain valid for browsing, but cannot authorize ordinary payment.
+  const hasMiniIdentity = typeof payload.wechat_mini_openid === "string"
+    && /^[A-Za-z0-9_-]+$/.test(payload.wechat_mini_openid)
+    && typeof payload.wechat_mini_appid === "string"
+    && /^[A-Za-z0-9_-]+$/.test(payload.wechat_mini_appid);
   return {
     subject: payload.sub,
     phone: payload.phone ?? null,
     wechatOpenId: payload.wechat_openid ?? null,
+    wechatMiniOpenId: hasMiniIdentity ? payload.wechat_mini_openid! : null,
+    wechatMiniAppId: hasMiniIdentity ? payload.wechat_mini_appid! : null,
     wechatUnionId: payload.wechat_unionid ?? null,
     nickname: payload.nickname ?? null,
     avatarUrl: payload.avatar_url ?? null,

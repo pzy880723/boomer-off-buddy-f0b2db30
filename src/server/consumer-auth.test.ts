@@ -38,6 +38,9 @@ describe("Tencent consumer JWT verification", () => {
       iat: now,
       phone: "13800001111",
       providers: ["phone", "wechat"],
+      wechat_openid: "app-openid",
+      wechat_mini_openid: "mini-openid",
+      wechat_mini_appid: "wx-mini",
     });
 
     const identity = await verifyConsumerJwt(token, {
@@ -49,6 +52,9 @@ describe("Tencent consumer JWT verification", () => {
     assert.equal(identity.subject, "consumer-001");
     assert.equal(identity.phone, "13800001111");
     assert.deepEqual(identity.providers, ["phone", "wechat"]);
+    assert.equal(identity.wechatMiniOpenId, "mini-openid");
+    assert.equal(identity.wechatMiniAppId, "wx-mini");
+    assert.equal(identity.wechatOpenId, "app-openid");
   });
 
   test("rejects a token from another issuer", async () => {
@@ -69,6 +75,29 @@ describe("Tencent consumer JWT verification", () => {
       }),
       /issuer/i,
     );
+  });
+
+  test("never treats an APP OpenID or incomplete mini-program claims as a payment identity", async () => {
+    const { issue, jwks } = fixture();
+    for (const claims of [
+      {},
+      { wechat_mini_openid: "mini-openid" },
+      { wechat_mini_appid: "wx-mini" },
+      { wechat_mini_openid: "", wechat_mini_appid: "wx-mini" },
+      { wechat_mini_openid: 42, wechat_mini_appid: "wx-mini" },
+      { wechat_mini_openid: "mini-openid", wechat_mini_appid: ["wx-mini"] },
+    ]) {
+      const identity = await verifyConsumerJwt(issue({
+        iss: "https://auth.boomeroff.com", aud: "boomer-off-consumer",
+        sub: "consumer-001", exp: Math.floor(Date.now() / 1000) + 300,
+        wechat_openid: "app-openid", ...claims,
+      }), {
+        issuer: "https://auth.boomeroff.com", audience: "boomer-off-consumer", jwks: async () => jwks,
+      });
+      assert.equal(identity.wechatMiniOpenId, null);
+      assert.equal(identity.wechatMiniAppId, null);
+      assert.equal(identity.wechatOpenId, "app-openid");
+    }
   });
 
   test("rejects an expired token", async () => {

@@ -65,6 +65,7 @@ export const Route = createFileRoute("/api/public/storefront/payments/callback/$
           .select("id,order_id,amount,status,provider_transaction_id")
           .eq("provider", params.provider)
           .eq("provider_transaction_id", event.transaction_id)
+          .eq("payment_channel", "legacy")
           .maybeSingle();
         if (paymentError) return storefrontError(paymentError.message, 500);
         if (!payment) return storefrontError("Payment not found", 404);

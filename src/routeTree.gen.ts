@@ -99,6 +99,7 @@ import { Route as PurchaseJapanParcelIdRouteImport } from './routes/purchase.jap
 import { Route as PurchaseJapanParcelAccountsRouteImport } from './routes/purchase.japan-parcel.accounts'
 import { Route as PurchaseJapanParcelImportRouteImport } from './routes/purchase.japan-parcel.import'
 import { Route as PurchaseJapanParcelNewRouteImport } from './routes/purchase.japan-parcel.new'
+import { Route as ApiInternalPaymentsReconcileRouteImport } from './routes/api/internal/payments.reconcile'
 import { Route as ApiPublicContentIdRouteImport } from './routes/api/public/content/$id'
 import { Route as ApiPublicContentFeedRouteImport } from './routes/api/public/content/feed'
 import { Route as ApiPublicHandheldDashboardRouteImport } from './routes/api/public/handheld/dashboard'
@@ -217,6 +218,9 @@ import { Route as ApiPublicStorefrontMembershipOrdersRouteImport } from './route
 import { Route as ApiPublicStorefrontMembershipPlansRouteImport } from './routes/api/public/storefront/membership.plans'
 import { Route as ApiPublicStorefrontMembershipPointsLedgerRouteImport } from './routes/api/public/storefront/membership.points-ledger'
 import { Route as ApiPublicStorefrontOrdersIdRouteImport } from './routes/api/public/storefront/orders.$id'
+import { Route as ApiPublicStorefrontPaymentsReconcileRouteImport } from './routes/api/public/storefront/payments.reconcile'
+import { Route as ApiPublicStorefrontPaymentsRefundRouteImport } from './routes/api/public/storefront/payments.refund'
+import { Route as ApiPublicStorefrontPaymentsWechatNotifyRouteImport } from './routes/api/public/storefront/payments.wechat-notify'
 import { Route as ApiPublicStorefrontProductsIdRouteImport } from './routes/api/public/storefront/products.$id'
 import { Route as ApiPublicStorefrontSupportConversationsRouteImport } from './routes/api/public/storefront/support.conversations'
 import { Route as ApiPublicHandheldFulfillmentsIdBindToteRouteImport } from './routes/api/public/handheld/fulfillments.$id.bind-tote'
@@ -715,6 +719,12 @@ const PurchaseJapanParcelNewRoute = PurchaseJapanParcelNewRouteImport.update({
   path: '/new',
   getParentRoute: () => PurchaseJapanParcelRoute,
 } as any)
+const ApiInternalPaymentsReconcileRoute =
+  ApiInternalPaymentsReconcileRouteImport.update({
+    id: '/api/internal/payments/reconcile',
+    path: '/api/internal/payments/reconcile',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicContentIdRoute = ApiPublicContentIdRouteImport.update({
   id: '/api/public/content/$id',
   path: '/api/public/content/$id',
@@ -1403,6 +1413,24 @@ const ApiPublicStorefrontOrdersIdRoute =
     path: '/$id',
     getParentRoute: () => ApiPublicStorefrontOrdersRoute,
   } as any)
+const ApiPublicStorefrontPaymentsReconcileRoute =
+  ApiPublicStorefrontPaymentsReconcileRouteImport.update({
+    id: '/reconcile',
+    path: '/reconcile',
+    getParentRoute: () => ApiPublicStorefrontPaymentsRoute,
+  } as any)
+const ApiPublicStorefrontPaymentsRefundRoute =
+  ApiPublicStorefrontPaymentsRefundRouteImport.update({
+    id: '/refund',
+    path: '/refund',
+    getParentRoute: () => ApiPublicStorefrontPaymentsRoute,
+  } as any)
+const ApiPublicStorefrontPaymentsWechatNotifyRoute =
+  ApiPublicStorefrontPaymentsWechatNotifyRouteImport.update({
+    id: '/wechat-notify',
+    path: '/wechat-notify',
+    getParentRoute: () => ApiPublicStorefrontPaymentsRoute,
+  } as any)
 const ApiPublicStorefrontProductsIdRoute =
   ApiPublicStorefrontProductsIdRouteImport.update({
     id: '/$id',
@@ -1717,6 +1745,7 @@ export interface FileRoutesByFullPath {
   '/purchase/domestic-bulk/': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic/': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
+  '/api/internal/payments/reconcile': typeof ApiInternalPaymentsReconcileRoute
   '/api/public/content/$id': typeof ApiPublicContentIdRouteWithChildren
   '/api/public/content/feed': typeof ApiPublicContentFeedRoute
   '/api/public/handheld/dashboard': typeof ApiPublicHandheldDashboardRoute
@@ -1835,6 +1864,9 @@ export interface FileRoutesByFullPath {
   '/api/public/storefront/membership/plans': typeof ApiPublicStorefrontMembershipPlansRoute
   '/api/public/storefront/membership/points-ledger': typeof ApiPublicStorefrontMembershipPointsLedgerRoute
   '/api/public/storefront/orders/$id': typeof ApiPublicStorefrontOrdersIdRoute
+  '/api/public/storefront/payments/reconcile': typeof ApiPublicStorefrontPaymentsReconcileRoute
+  '/api/public/storefront/payments/refund': typeof ApiPublicStorefrontPaymentsRefundRoute
+  '/api/public/storefront/payments/wechat-notify': typeof ApiPublicStorefrontPaymentsWechatNotifyRoute
   '/api/public/storefront/products/$id': typeof ApiPublicStorefrontProductsIdRoute
   '/api/public/storefront/support/conversations': typeof ApiPublicStorefrontSupportConversationsRouteWithChildren
   '/api/public/handheld/fulfillments/$id/bind-tote': typeof ApiPublicHandheldFulfillmentsIdBindToteRoute
@@ -1957,6 +1989,7 @@ export interface FileRoutesByTo {
   '/purchase/domestic-bulk': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel': typeof PurchaseJapanParcelIndexRoute
+  '/api/internal/payments/reconcile': typeof ApiInternalPaymentsReconcileRoute
   '/api/public/content/$id': typeof ApiPublicContentIdRouteWithChildren
   '/api/public/content/feed': typeof ApiPublicContentFeedRoute
   '/api/public/handheld/dashboard': typeof ApiPublicHandheldDashboardRoute
@@ -2075,6 +2108,9 @@ export interface FileRoutesByTo {
   '/api/public/storefront/membership/plans': typeof ApiPublicStorefrontMembershipPlansRoute
   '/api/public/storefront/membership/points-ledger': typeof ApiPublicStorefrontMembershipPointsLedgerRoute
   '/api/public/storefront/orders/$id': typeof ApiPublicStorefrontOrdersIdRoute
+  '/api/public/storefront/payments/reconcile': typeof ApiPublicStorefrontPaymentsReconcileRoute
+  '/api/public/storefront/payments/refund': typeof ApiPublicStorefrontPaymentsRefundRoute
+  '/api/public/storefront/payments/wechat-notify': typeof ApiPublicStorefrontPaymentsWechatNotifyRoute
   '/api/public/storefront/products/$id': typeof ApiPublicStorefrontProductsIdRoute
   '/api/public/storefront/support/conversations': typeof ApiPublicStorefrontSupportConversationsRouteWithChildren
   '/api/public/handheld/fulfillments/$id/bind-tote': typeof ApiPublicHandheldFulfillmentsIdBindToteRoute
@@ -2205,6 +2241,7 @@ export interface FileRoutesById {
   '/purchase/domestic-bulk/': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic/': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
+  '/api/internal/payments/reconcile': typeof ApiInternalPaymentsReconcileRoute
   '/api/public/content/$id': typeof ApiPublicContentIdRouteWithChildren
   '/api/public/content/feed': typeof ApiPublicContentFeedRoute
   '/api/public/handheld/dashboard': typeof ApiPublicHandheldDashboardRoute
@@ -2323,6 +2360,9 @@ export interface FileRoutesById {
   '/api/public/storefront/membership/plans': typeof ApiPublicStorefrontMembershipPlansRoute
   '/api/public/storefront/membership/points-ledger': typeof ApiPublicStorefrontMembershipPointsLedgerRoute
   '/api/public/storefront/orders/$id': typeof ApiPublicStorefrontOrdersIdRoute
+  '/api/public/storefront/payments/reconcile': typeof ApiPublicStorefrontPaymentsReconcileRoute
+  '/api/public/storefront/payments/refund': typeof ApiPublicStorefrontPaymentsRefundRoute
+  '/api/public/storefront/payments/wechat-notify': typeof ApiPublicStorefrontPaymentsWechatNotifyRoute
   '/api/public/storefront/products/$id': typeof ApiPublicStorefrontProductsIdRoute
   '/api/public/storefront/support/conversations': typeof ApiPublicStorefrontSupportConversationsRouteWithChildren
   '/api/public/handheld/fulfillments/$id/bind-tote': typeof ApiPublicHandheldFulfillmentsIdBindToteRoute
@@ -2454,6 +2494,7 @@ export interface FileRouteTypes {
     | '/purchase/domestic-bulk/'
     | '/purchase/domestic/'
     | '/purchase/japan-parcel/'
+    | '/api/internal/payments/reconcile'
     | '/api/public/content/$id'
     | '/api/public/content/feed'
     | '/api/public/handheld/dashboard'
@@ -2572,6 +2613,9 @@ export interface FileRouteTypes {
     | '/api/public/storefront/membership/plans'
     | '/api/public/storefront/membership/points-ledger'
     | '/api/public/storefront/orders/$id'
+    | '/api/public/storefront/payments/reconcile'
+    | '/api/public/storefront/payments/refund'
+    | '/api/public/storefront/payments/wechat-notify'
     | '/api/public/storefront/products/$id'
     | '/api/public/storefront/support/conversations'
     | '/api/public/handheld/fulfillments/$id/bind-tote'
@@ -2694,6 +2738,7 @@ export interface FileRouteTypes {
     | '/purchase/domestic-bulk'
     | '/purchase/domestic'
     | '/purchase/japan-parcel'
+    | '/api/internal/payments/reconcile'
     | '/api/public/content/$id'
     | '/api/public/content/feed'
     | '/api/public/handheld/dashboard'
@@ -2812,6 +2857,9 @@ export interface FileRouteTypes {
     | '/api/public/storefront/membership/plans'
     | '/api/public/storefront/membership/points-ledger'
     | '/api/public/storefront/orders/$id'
+    | '/api/public/storefront/payments/reconcile'
+    | '/api/public/storefront/payments/refund'
+    | '/api/public/storefront/payments/wechat-notify'
     | '/api/public/storefront/products/$id'
     | '/api/public/storefront/support/conversations'
     | '/api/public/handheld/fulfillments/$id/bind-tote'
@@ -2941,6 +2989,7 @@ export interface FileRouteTypes {
     | '/purchase/domestic-bulk/'
     | '/purchase/domestic/'
     | '/purchase/japan-parcel/'
+    | '/api/internal/payments/reconcile'
     | '/api/public/content/$id'
     | '/api/public/content/feed'
     | '/api/public/handheld/dashboard'
@@ -3059,6 +3108,9 @@ export interface FileRouteTypes {
     | '/api/public/storefront/membership/plans'
     | '/api/public/storefront/membership/points-ledger'
     | '/api/public/storefront/orders/$id'
+    | '/api/public/storefront/payments/reconcile'
+    | '/api/public/storefront/payments/refund'
+    | '/api/public/storefront/payments/wechat-notify'
     | '/api/public/storefront/products/$id'
     | '/api/public/storefront/support/conversations'
     | '/api/public/handheld/fulfillments/$id/bind-tote'
@@ -3141,6 +3193,7 @@ export interface RootRouteChildren {
   ApiPublicOfficialKnowledgeRoute: typeof ApiPublicOfficialKnowledgeRouteWithChildren
   InventoryStocktakesIdRoute: typeof InventoryStocktakesIdRoute
   InventoryStocktakesIndexRoute: typeof InventoryStocktakesIndexRoute
+  ApiInternalPaymentsReconcileRoute: typeof ApiInternalPaymentsReconcileRoute
   ApiPublicContentIdRoute: typeof ApiPublicContentIdRouteWithChildren
   ApiPublicContentFeedRoute: typeof ApiPublicContentFeedRoute
   ApiPublicHandheldDashboardRoute: typeof ApiPublicHandheldDashboardRoute
@@ -3883,6 +3936,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/purchase/japan-parcel/new'
       preLoaderRoute: typeof PurchaseJapanParcelNewRouteImport
       parentRoute: typeof PurchaseJapanParcelRoute
+    }
+    '/api/internal/payments/reconcile': {
+      id: '/api/internal/payments/reconcile'
+      path: '/api/internal/payments/reconcile'
+      fullPath: '/api/internal/payments/reconcile'
+      preLoaderRoute: typeof ApiInternalPaymentsReconcileRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/public/content/$id': {
       id: '/api/public/content/$id'
@@ -4710,6 +4770,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicStorefrontOrdersIdRouteImport
       parentRoute: typeof ApiPublicStorefrontOrdersRoute
     }
+    '/api/public/storefront/payments/reconcile': {
+      id: '/api/public/storefront/payments/reconcile'
+      path: '/reconcile'
+      fullPath: '/api/public/storefront/payments/reconcile'
+      preLoaderRoute: typeof ApiPublicStorefrontPaymentsReconcileRouteImport
+      parentRoute: typeof ApiPublicStorefrontPaymentsRoute
+    }
+    '/api/public/storefront/payments/refund': {
+      id: '/api/public/storefront/payments/refund'
+      path: '/refund'
+      fullPath: '/api/public/storefront/payments/refund'
+      preLoaderRoute: typeof ApiPublicStorefrontPaymentsRefundRouteImport
+      parentRoute: typeof ApiPublicStorefrontPaymentsRoute
+    }
+    '/api/public/storefront/payments/wechat-notify': {
+      id: '/api/public/storefront/payments/wechat-notify'
+      path: '/wechat-notify'
+      fullPath: '/api/public/storefront/payments/wechat-notify'
+      preLoaderRoute: typeof ApiPublicStorefrontPaymentsWechatNotifyRouteImport
+      parentRoute: typeof ApiPublicStorefrontPaymentsRoute
+    }
     '/api/public/storefront/products/$id': {
       id: '/api/public/storefront/products/$id'
       path: '/$id'
@@ -5456,11 +5537,20 @@ const ApiPublicStorefrontOrdersRouteWithChildren =
   )
 
 interface ApiPublicStorefrontPaymentsRouteChildren {
+  ApiPublicStorefrontPaymentsReconcileRoute: typeof ApiPublicStorefrontPaymentsReconcileRoute
+  ApiPublicStorefrontPaymentsRefundRoute: typeof ApiPublicStorefrontPaymentsRefundRoute
+  ApiPublicStorefrontPaymentsWechatNotifyRoute: typeof ApiPublicStorefrontPaymentsWechatNotifyRoute
   ApiPublicStorefrontPaymentsCallbackProviderRoute: typeof ApiPublicStorefrontPaymentsCallbackProviderRoute
 }
 
 const ApiPublicStorefrontPaymentsRouteChildren: ApiPublicStorefrontPaymentsRouteChildren =
   {
+    ApiPublicStorefrontPaymentsReconcileRoute:
+      ApiPublicStorefrontPaymentsReconcileRoute,
+    ApiPublicStorefrontPaymentsRefundRoute:
+      ApiPublicStorefrontPaymentsRefundRoute,
+    ApiPublicStorefrontPaymentsWechatNotifyRoute:
+      ApiPublicStorefrontPaymentsWechatNotifyRoute,
     ApiPublicStorefrontPaymentsCallbackProviderRoute:
       ApiPublicStorefrontPaymentsCallbackProviderRoute,
   }
@@ -5654,6 +5744,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicOfficialKnowledgeRoute: ApiPublicOfficialKnowledgeRouteWithChildren,
   InventoryStocktakesIdRoute: InventoryStocktakesIdRoute,
   InventoryStocktakesIndexRoute: InventoryStocktakesIndexRoute,
+  ApiInternalPaymentsReconcileRoute: ApiInternalPaymentsReconcileRoute,
   ApiPublicContentIdRoute: ApiPublicContentIdRouteWithChildren,
   ApiPublicContentFeedRoute: ApiPublicContentFeedRoute,
   ApiPublicHandheldDashboardRoute: ApiPublicHandheldDashboardRoute,
