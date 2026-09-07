@@ -16,7 +16,7 @@ tar -xzf "/tmp/boomer-ordinary-source-$sha.tgz" -C "$release" --exclude=.env --e
 tar -xzf "/tmp/boomer-ordinary-output-$sha.tgz" -C "$release" --exclude=.env --exclude='._*'
 ln -s "$base/shared/.env" "$release/.env"
 ln -s "$old/node_modules" "$release/node_modules"
-[[ -f "$release/.output/server/wrangler.json" ]] || exit 5
+node -e 'const fs=require("fs"),p=process.argv[1];if(JSON.parse(fs.readFileSync(p+"/.output/nitro.json","utf8")).preset!=="node-server"||!fs.existsSync(p+"/.output/server/index.mjs"))throw Error("Expected reviewed Node production artifact")' "$release"
 
 check_health() {
   local port="$1" code ready=0
@@ -35,6 +35,7 @@ check_health() {
   code="$(curl -sS --max-time 20 -X POST -H 'Content-Type: application/json' -d '{}' -o /dev/null -w '%{http_code}' "http://127.0.0.1:$port/api/public/storefront/payments/wechat-notify")"
   [[ "$code" == 503 ]] || return 1
   node "$release/scripts/check-login-hydration.mjs" "http://127.0.0.1:$port"
+  node "$release/scripts/check-ordinary-payment-http.mjs" "http://127.0.0.1:$port"
 }
 
 rollback_needed=0

@@ -1,0 +1,11 @@
+[Unit]
+Description=Reconcile BOOMER ordinary payments without overlapping runs
+
+[Timer]
+OnBootSec=60
+OnUnitInactiveSec=60
+AccuracySec=10
+Unit=boomer-ordinary-reconcile.service
+
+[Install]
+WantedBy=timers.target

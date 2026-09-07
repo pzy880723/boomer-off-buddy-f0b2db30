@@ -48,11 +48,17 @@ Never copy these bindings into VITE variables, frontend bundles, Git, Lovable ch
 
 Baseline 02e7ae9 differs from running 7396e9 only in `.lovable/plan.md`; do not merge unreviewed GO main changes.
 ERP runs under **root PM2** on Tencent Cloud. The ubuntu PM2 process with the same name is stopped and is not production.
+Production artifacts must be built with `npm run build:tencent` (`NITRO_PRESET=node-server vite build`).
+The launcher checks `.output/nitro.json` before using Node with `NODE_ENV=production`, `HOST/NITRO_HOST=127.0.0.1`, and the requested `PORT/NITRO_PORT`.
+The previous workerd fallback remains for rollback artifacts. A pre-existing Wrangler dev proxy failure was reproduced on both old and new builds with rejected request bodies; do not use it for the new production release.
 Coordinate port 3006 with the GO task before deploying. Keep previous release and environment backup.
 Apply the reviewed additive migration atomically, including schema migration history and PostgREST schema reload.
 Run `scripts/deploy-ordinary-payment.sh` as root with exact reviewed commit and expected previous release.
 It probes a candidate on 3006 before swapping 3005 and restores the previous process/symlink on failed checks.
 Public HTTPS and database read-back are required in addition to the local candidate tests.
+`check-ordinary-payment-http.mjs` repeats 60 rejected-body requests, then checks SSR login and its static asset.
+Install the reviewed `infra/tencent/boomer-ordinary-reconcile.service` and `.timer` only after the internal route is verified.
+The timer runs 60 seconds after each completed run, so long reconciliation runs cannot overlap; failures remain visible in systemd.
 
 ## Rollback
 

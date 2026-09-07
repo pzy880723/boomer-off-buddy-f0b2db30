@@ -1,0 +1,16 @@
+[Unit]
+Description=BOOMER ordinary payment reconciliation
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/var/www/boomer-erp/current
+EnvironmentFile=/var/www/boomer-erp/shared/.env
+ExecStart=/usr/bin/node /var/www/boomer-erp/current/scripts/reconcile-ordinary-payments.mjs
+TimeoutStartSec=180
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+

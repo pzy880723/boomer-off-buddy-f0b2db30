@@ -13,8 +13,14 @@ fi
 LEGACY_WRANGLER_CONFIG="$APP_DIR/.output/server/wrangler.json"
 DIST_SERVER_ENTRY="$APP_DIR/dist/server/server.js"
 DIST_ASSETS_DIR="$APP_DIR/dist/client"
+NODE_SERVER_ENTRY="$APP_DIR/.output/server/index.mjs"
+NITRO_METADATA="$APP_DIR/.output/nitro.json"
+IS_NODE_SERVER=0
+if [[ -f "$NODE_SERVER_ENTRY" && -f "$NITRO_METADATA" ]] && node -e 'const fs=require("fs");process.exit(JSON.parse(fs.readFileSync(process.argv[1],"utf8")).preset==="node-server"?0:1)' "$NITRO_METADATA"; then
+  IS_NODE_SERVER=1
+fi
 
-if [[ ! -f "$LEGACY_WRANGLER_CONFIG" && ! -f "$DIST_SERVER_ENTRY" ]]; then
+if [[ "$IS_NODE_SERVER" != 1 && ! -f "$LEGACY_WRANGLER_CONFIG" && ! -f "$DIST_SERVER_ENTRY" ]]; then
   echo "Missing ERP build output. Run npm run build before starting ERP." >&2
   exit 1
 fi
@@ -24,6 +30,10 @@ source "$APP_DIR/.env"
 set +a
 
 cd "$APP_DIR"
+if [[ "$IS_NODE_SERVER" == 1 ]]; then
+  export NODE_ENV=production HOST="$BIND_HOST" PORT="$BIND_PORT" NITRO_HOST="$BIND_HOST" NITRO_PORT="$BIND_PORT"
+  exec node "$NODE_SERVER_ENTRY"
+fi
 if [[ -f "$DIST_SERVER_ENTRY" ]]; then
   exec "$APP_DIR/node_modules/.bin/wrangler" dev "$DIST_SERVER_ENTRY" \
     --env-file "$APP_DIR/.env" \
