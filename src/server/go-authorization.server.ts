@@ -156,11 +156,21 @@ export async function authenticateGoIdentity(request: Request): Promise<GoIdenti
   return { goUserId, erpUserId, token, env };
 }
 
-/** 数据库内一致性快照 → 授权契约 */
-export async function loadAuthorizationSnapshot(erpUserId: string): Promise<AuthorizationSnapshot> {
+/**
+ * 数据库内一致性快照 → 授权契约。
+ * 版本来自持久快照表（payload hash + 单调整数），并发旧读取不会拿到更高版本。
+ */
+export async function loadAuthorizationSnapshot(
+  erpUserId: string,
+  goUserId: string,
+): Promise<AuthorizationSnapshot> {
   const { data, error } = await supabaseAdmin.rpc(
     "go_authorization_snapshot" as never,
-    { p_erp_user_id: erpUserId } as never,
+    {
+      p_erp_user_id: erpUserId,
+      p_go_user_id: goUserId,
+      p_permission_rev: PERMISSION_MODEL_REV,
+    } as never,
   );
   if (error) throw new GoScopeError("authorization_unavailable", "授权快照暂不可用", 503);
   const facts = data as unknown as AuthorizationFacts | null;
@@ -181,7 +191,7 @@ export async function confirmAuthorizationReceipt(
   identity: GoIdentity,
   now = new Date(),
 ): Promise<{ snapshot: AuthorizationSnapshot; confirmed: number; receipt_status: string }> {
-  const snapshot = await loadAuthorizationSnapshot(identity.erpUserId);
+  const snapshot = await loadAuthorizationSnapshot(identity.erpUserId, identity.goUserId);
 
   const { data: raw, error } = await goClient(identity.env, identity.token).rpc(GO_RECEIPT_RPC);
   if (error) throw new GoScopeError("go_receipt_unavailable", "GO 回执服务暂时不可用", 503);
@@ -190,21 +200,33 @@ export async function confirmAuthorizationReceipt(
     expectedGoUserId: identity.goUserId,
     expectedErpUserId: identity.erpUserId,
     currentVersion: snapshot.scope_version,
+    expectedLinkStatus: expectedLinkStatus(snapshot),
     now,
   });
 
-  const { data: confirmed, error: ackErr } = await supabaseAdmin.rpc(
+  const { data: ack, error: ackErr } = await supabaseAdmin.rpc(
     "go_authorization_ack" as never,
     { p_erp_user_id: identity.erpUserId, p_version: receipt.scopeVersion } as never,
   );
   if (ackErr) throw new GoScopeError("authorization_ack_failed", "授权回执写入失败", 503);
 
+  const result = (ack ?? {}) as { ok?: boolean; code?: string; confirmed?: number };
+  if (result.ok !== true) {
+    // 事务内复核失败（版本已被新授权顶掉）→ 不确认任何事件，让 GO 重新拉取
+    throw new GoScopeError(
+      result.code === "version_stale" ? "receipt_version_stale" : "authorization_ack_failed",
+      "ERP 授权已更新，请重新拉取后再回执",
+      409,
+    );
+  }
+
   return {
     snapshot,
-    confirmed: Number(confirmed) || 0,
+    confirmed: Number(result.confirmed) || 0,
     receipt_status: receipt.linkStatus,
   };
 }
+
 
 export const GO_AUTHZ_CORS = {
   "Access-Control-Allow-Origin": "*",
