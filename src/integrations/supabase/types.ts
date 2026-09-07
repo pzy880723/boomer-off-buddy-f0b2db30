@@ -2459,6 +2459,8 @@ export type Database = {
           last_pulled_at: string
           payload: Json
           payload_hash: string
+          permission_rev: number | null
+          pulled_outbox: Json
           updated_at: string
           version: number
         }
@@ -2471,6 +2473,8 @@ export type Database = {
           last_pulled_at?: string
           payload: Json
           payload_hash: string
+          permission_rev?: number | null
+          pulled_outbox?: Json
           updated_at?: string
           version?: number
         }
@@ -2483,6 +2487,8 @@ export type Database = {
           last_pulled_at?: string
           payload?: Json
           payload_hash?: string
+          permission_rev?: number | null
+          pulled_outbox?: Json
           updated_at?: string
           version?: number
         }
@@ -8497,7 +8503,19 @@ export type Database = {
       gen_ean13: { Args: never; Returns: string }
       gen_stock_transfer_code: { Args: never; Returns: string }
       go_authorization_ack: {
-        Args: { p_erp_user_id: string; p_version: number }
+        Args: {
+          p_erp_user_id: string
+          p_link_status: string
+          p_version: number
+        }
+        Returns: Json
+      }
+      go_authorization_facts: {
+        Args: {
+          p_erp_user_id: string
+          p_go_user_id: string
+          p_permission_rev: number
+        }
         Returns: Json
       }
       go_authorization_snapshot: {
