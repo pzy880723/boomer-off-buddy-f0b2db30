@@ -12,7 +12,13 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const ROLES = ["super_admin", "hq_operator", "store_manager", "store_staff", "warehouse_staff"] as const;
+const ROLES = [
+  "super_admin",
+  "hq_operator",
+  "store_manager",
+  "store_staff",
+  "warehouse_staff",
+] as const;
 export type ScopeRole = (typeof ROLES)[number];
 export const HQ_ROLES: ScopeRole[] = ["super_admin", "hq_operator"];
 
@@ -23,16 +29,17 @@ type AuthedContext = {
 
 async function assertHqAdmin(context: AuthedContext) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sb = supabaseAdmin as unknown as { from: (t: string) => any };
-  const { data } = await sb.from("user_roles")
-    .select("role")
-    .eq("user_id", context.userId);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sb = supabaseAdmin as unknown as { from: (t: string) => any };
+  const { data } = await sb.from("user_roles").select("role").eq("user_id", context.userId);
   const roles = ((data as { role: string }[] | null) ?? []).map((r) => r.role);
   if (!roles.some((r) => (HQ_ROLES as string[]).includes(r))) {
     throw new Error("无权操作：仅总部管理员可配置角色与门店范围");
   }
-  return { actorId: context.userId, actorRole: roles.includes("super_admin") ? "super_admin" : "hq_operator" };
+  return {
+    actorId: context.userId,
+    actorRole: roles.includes("super_admin") ? "super_admin" : "hq_operator",
+  };
 }
 
 /** 列出所有用户的角色与门店范围（供用户管理页展示） */
@@ -48,21 +55,25 @@ export const listUserScopesFn = createServerFn({ method: "GET" })
       await Promise.all([
         sb.from("user_roles").select("user_id, role"),
         sb.from("user_location_perms").select("user_id, location_id"),
-        sb.from("inv_locations")
-          .select("id, name, kind, is_active")
-          .eq("is_active", true),
-        sb.from("go_identity_links")
-          .select("erp_user_id, go_user_id, status, location_id"),
+        sb.from("inv_locations").select("id, name, kind, is_active").eq("is_active", true),
+        sb.from("go_identity_links").select("erp_user_id, go_user_id, status, location_id"),
       ]);
 
     const roleRows = (roles as { user_id: string; role: string }[] | null) ?? [];
     const permRows = (perms as { user_id: string; location_id: string }[] | null) ?? [];
     const goRows =
-      (goLinks as { erp_user_id: string | null; go_user_id: string; status: string }[] | null) ?? [];
+      (goLinks as { erp_user_id: string | null; go_user_id: string; status: string }[] | null) ??
+      [];
 
     const byUser = new Map<
       string,
-      { user_id: string; roles: string[]; location_ids: string[]; is_hq: boolean; go_status: string | null }
+      {
+        user_id: string;
+        roles: string[];
+        location_ids: string[];
+        is_hq: boolean;
+        go_status: string | null;
+      }
     >();
     const ensure = (userId: string) => {
       let row = byUser.get(userId);
@@ -81,10 +92,14 @@ export const listUserScopesFn = createServerFn({ method: "GET" })
 
     return {
       users: [...byUser.values()],
-      locations:
-        ((locations as { id: string; name: string; kind: string }[] | null) ?? []).sort((a, b) =>
-          a.kind === b.kind ? a.name.localeCompare(b.name, "zh-Hans-CN") : a.kind === "warehouse" ? -1 : 1,
-        ),
+      locations: ((locations as { id: string; name: string; kind: string }[] | null) ?? []).sort(
+        (a, b) =>
+          a.kind === b.kind
+            ? a.name.localeCompare(b.name, "zh-Hans-CN")
+            : a.kind === "warehouse"
+              ? -1
+              : 1,
+      ),
       roles: ROLES,
     };
   });
@@ -105,13 +120,18 @@ export const setUserRolesFn = createServerFn({ method: "POST" })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabaseAdmin as unknown as { from: (t: string) => any };
 
-    const { data: beforeRows } = await sb.from("user_roles")
+    const { data: beforeRows } = await sb
+      .from("user_roles")
       .select("role")
       .eq("user_id", data.userId);
     const before = ((beforeRows as { role: string }[] | null) ?? []).map((r) => r.role).sort();
     const after = [...new Set(data.roles)].sort();
 
-    if (data.userId === actor.actorId && !after.includes("super_admin") && before.includes("super_admin")) {
+    if (
+      data.userId === actor.actorId &&
+      !after.includes("super_admin") &&
+      before.includes("super_admin")
+    ) {
       throw new Error("不能撤销自己的超级管理员角色");
     }
 
@@ -119,18 +139,18 @@ export const setUserRolesFn = createServerFn({ method: "POST" })
     const toRemove = before.filter((r) => !(after as string[]).includes(r));
 
     if (toRemove.length > 0) {
-      const { error } = await sb.from("user_roles")
+      const { error } = await sb
+        .from("user_roles")
         .delete()
         .eq("user_id", data.userId)
         .in("role", toRemove);
       if (error) throw new Error(error.message);
     }
     if (toAdd.length > 0) {
-      const { error } = await sb.from("user_roles")
-        .upsert(
-          toAdd.map((role) => ({ user_id: data.userId, role })),
-          { onConflict: "user_id,role" },
-        );
+      const { error } = await sb.from("user_roles").upsert(
+        toAdd.map((role) => ({ user_id: data.userId, role })),
+        { onConflict: "user_id,role" },
+      );
       if (error) throw new Error(error.message);
     }
 
@@ -145,7 +165,13 @@ export const setUserRolesFn = createServerFn({ method: "POST" })
         actor_role: actor.actorRole,
       });
     }
-    return { ok: true, roles: after, added: toAdd, removed: toRemove, changed: toAdd.length + toRemove.length > 0 };
+    return {
+      ok: true,
+      roles: after,
+      added: toAdd,
+      removed: toRemove,
+      changed: toAdd.length + toRemove.length > 0,
+    };
   });
 
 const setLocationsSchema = z.object({
@@ -166,7 +192,8 @@ export const setUserLocationsFn = createServerFn({ method: "POST" })
 
     const wanted = [...new Set(data.locationIds)];
     if (wanted.length > 0) {
-      const { data: valid } = await sb.from("inv_locations")
+      const { data: valid } = await sb
+        .from("inv_locations")
         .select("id")
         .in("id", wanted)
         .eq("is_active", true);
@@ -175,28 +202,31 @@ export const setUserLocationsFn = createServerFn({ method: "POST" })
       if (invalid.length > 0) throw new Error(`门店不存在或已停用：${invalid.join(", ")}`);
     }
 
-    const { data: beforeRows } = await sb.from("user_location_perms")
+    const { data: beforeRows } = await sb
+      .from("user_location_perms")
       .select("location_id")
       .eq("user_id", data.userId);
-    const before = ((beforeRows as { location_id: string }[] | null) ?? []).map((r) => r.location_id).sort();
+    const before = ((beforeRows as { location_id: string }[] | null) ?? [])
+      .map((r) => r.location_id)
+      .sort();
     const after = [...wanted].sort();
 
     const toAdd = after.filter((id) => !before.includes(id));
     const toRemove = before.filter((id) => !after.includes(id));
 
     if (toRemove.length > 0) {
-      const { error } = await sb.from("user_location_perms")
+      const { error } = await sb
+        .from("user_location_perms")
         .delete()
         .eq("user_id", data.userId)
         .in("location_id", toRemove);
       if (error) throw new Error(error.message);
     }
     if (toAdd.length > 0) {
-      const { error } = await sb.from("user_location_perms")
-        .upsert(
-          toAdd.map((location_id) => ({ user_id: data.userId, location_id })),
-          { onConflict: "user_id,location_id" },
-        );
+      const { error } = await sb.from("user_location_perms").upsert(
+        toAdd.map((location_id) => ({ user_id: data.userId, location_id })),
+        { onConflict: "user_id,location_id" },
+      );
       if (error) throw new Error(error.message);
     }
 
@@ -211,7 +241,13 @@ export const setUserLocationsFn = createServerFn({ method: "POST" })
         actor_role: actor.actorRole,
       });
     }
-    return { ok: true, location_ids: after, added: toAdd, removed: toRemove, changed: toAdd.length + toRemove.length > 0 };
+    return {
+      ok: true,
+      location_ids: after,
+      added: toAdd,
+      removed: toRemove,
+      changed: toAdd.length + toRemove.length > 0,
+    };
   });
 
 const goIdentitySchema = z.object({
@@ -232,7 +268,8 @@ export const setGoIdentityLinkFn = createServerFn({ method: "POST" })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabaseAdmin as unknown as { from: (t: string) => any };
 
-    const { data: before } = await sb.from("go_identity_links")
+    const { data: before } = await sb
+      .from("go_identity_links")
       .select("*")
       .eq("go_project_ref", data.goProjectRef)
       .eq("go_user_id", data.goUserId)
@@ -247,7 +284,8 @@ export const setGoIdentityLinkFn = createServerFn({ method: "POST" })
       approved_at: data.status === "approved" ? new Date().toISOString() : null,
       revoked_at: data.status === "revoked" ? new Date().toISOString() : null,
     };
-    const { data: after, error } = await sb.from("go_identity_links")
+    const { data: after, error } = await sb
+      .from("go_identity_links")
       .upsert(payload, { onConflict: "go_project_ref,go_user_id" })
       .select("*")
       .single();
@@ -283,7 +321,8 @@ export const setGoShopLinkFn = createServerFn({ method: "POST" })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabaseAdmin as unknown as { from: (t: string) => any };
 
-    const { data: loc } = await sb.from("inv_locations")
+    const { data: loc } = await sb
+      .from("inv_locations")
       .select("id, kind, is_active")
       .eq("id", data.locationId)
       .maybeSingle();
@@ -291,13 +330,15 @@ export const setGoShopLinkFn = createServerFn({ method: "POST" })
     if (!location || !location.is_active) throw new Error("门店不存在或已停用");
     if (location.kind !== "shop") throw new Error("只能映射到门店，不能映射到仓库");
 
-    const { data: before } = await sb.from("go_shop_location_links")
+    const { data: before } = await sb
+      .from("go_shop_location_links")
       .select("*")
       .eq("go_project_ref", data.goProjectRef)
       .eq("go_shop_id", data.goShopId)
       .maybeSingle();
 
-    const { data: after, error } = await sb.from("go_shop_location_links")
+    const { data: after, error } = await sb
+      .from("go_shop_location_links")
       .upsert(
         {
           go_project_ref: data.goProjectRef,
@@ -333,14 +374,15 @@ export const listGoShopLinksFn = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabaseAdmin as unknown as { from: (t: string) => any };
-    const { data } = await sb.from("go_shop_location_links")
+    const { data } = await sb
+      .from("go_shop_location_links")
       .select("id, go_project_ref, go_shop_id, location_id, status, updated_at");
-    return ((data ?? []) as {
+    return (data ?? []) as {
       id: string;
       go_project_ref: string;
       go_shop_id: string;
       location_id: string;
       status: string;
       updated_at: string;
-    }[]);
+    }[];
   });

@@ -39,7 +39,8 @@ type GoEnv = {
 export function goEnvironment(): GoEnv | null {
   const url = process.env["GO_SUPABASE_URL"]?.trim();
   const publishableKey =
-    process.env["GO_SUPABASE_PUBLISHABLE_KEY"]?.trim() || process.env["GO_SUPABASE_ANON_KEY"]?.trim();
+    process.env["GO_SUPABASE_PUBLISHABLE_KEY"]?.trim() ||
+    process.env["GO_SUPABASE_ANON_KEY"]?.trim();
   const serviceKey = process.env["GO_SUPABASE_SERVICE_ROLE_KEY"]?.trim();
   const projectRef = process.env["GO_PROJECT_REF"]?.trim();
   if (!url || !publishableKey || !serviceKey || !projectRef) return null;
@@ -202,7 +203,8 @@ export async function authenticateGoActor(request: Request, now = new Date()): P
   const erpUserId = erpLink.erp_user_id;
 
   // 4) ERP 账号状态（停用 / 删除即拒绝）
-  const { data: erpUser, error: erpUserErr } = await supabaseAdmin.auth.admin.getUserById(erpUserId);
+  const { data: erpUser, error: erpUserErr } =
+    await supabaseAdmin.auth.admin.getUserById(erpUserId);
   if (erpUserErr || !erpUser?.user) {
     throw new GoScopeError("erp_account_missing", "ERP 账号不存在", 403);
   }
@@ -325,8 +327,7 @@ export async function loadGoDailySummary(params: {
         target_fen: s.target_fen,
         actual_fen: actual,
         gap_fen: gapFen(s.target_fen, actual),
-        order_count:
-          actual == null ? null : s.youzan.order_count + s.offline.order_count,
+        order_count: actual == null ? null : s.youzan.order_count + s.offline.order_count,
         completeness: {
           complete,
           // 本地没有有赞退款数据源 → 只能是已付款毛额口径

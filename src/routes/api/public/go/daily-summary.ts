@@ -21,7 +21,10 @@ export const Route = createFileRoute("/api/public/go/daily-summary")({
           const url = new URL(request.url);
           const date = url.searchParams.get("date") ?? shanghaiToday();
           if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-            return goJson({ ok: false, code: "invalid_date", error: "date 必须是 yyyy-mm-dd" }, 400);
+            return goJson(
+              { ok: false, code: "invalid_date", error: "date 必须是 yyyy-mm-dd" },
+              400,
+            );
           }
           const actor = await authenticateGoActor(request);
           const scope = scopeForActor(actor, url.searchParams.get("location_id"));

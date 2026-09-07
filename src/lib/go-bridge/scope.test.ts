@@ -51,7 +51,8 @@ describe("resolveGoScope", () => {
 
   test("员工没有门店不会被当成 HQ", () => {
     assert.throws(
-      () => resolveGoScope({ isHq: false, scheduleState: "no_schedule", hqLocationIds: HQ_LOCATIONS }),
+      () =>
+        resolveGoScope({ isHq: false, scheduleState: "no_schedule", hqLocationIds: HQ_LOCATIONS }),
       (e: GoScopeError) => e.code === "no_schedule_today" && e.status === 403,
     );
   });

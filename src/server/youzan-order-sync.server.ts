@@ -24,8 +24,11 @@ type CursorRow = {
 
 async function admin() {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return supabaseAdmin as unknown as { from: (t: string) => any; rpc: (fn: string, args: Record<string, unknown>) => any };
+
+  return supabaseAdmin as unknown as {
+    from: (t: string) => any;
+    rpc: (fn: string, args: Record<string, unknown>) => any;
+  };
 }
 
 /** 按天切窗口，避免单窗口页数过多；返回登记的窗口数 */
@@ -135,11 +138,9 @@ export async function runOrderSyncSliceOnce(opts: {
 /** 同步进度概览（HQ 页面/验收用） */
 export async function orderSyncProgress(): Promise<Record<string, number>> {
   const sb = await admin();
-  const { data } = await sb
-    .from("youzan_order_sync_cursors")
-    .select("status");
+  const { data } = await sb.from("youzan_order_sync_cursors").select("status");
   const counts: Record<string, number> = { pending: 0, running: 0, done: 0, error: 0 };
-  for (const row of ((data ?? []) as { status: string }[])) {
+  for (const row of (data ?? []) as { status: string }[]) {
     counts[row.status] = (counts[row.status] ?? 0) + 1;
   }
   return counts;
