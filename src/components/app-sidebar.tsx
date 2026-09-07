@@ -34,6 +34,7 @@ import {
   Newspaper,
   LibraryBig,
   WalletCards,
+  Target,
   type LucideIcon,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks/use-auth-session";
