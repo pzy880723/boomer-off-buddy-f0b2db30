@@ -104,7 +104,9 @@ export async function loadDailySummary(params: {
     .eq("location_id", params.locationId)
     .eq("business_date", date)
     .eq("status", "active");
-  const offline = ((offlineRows ?? []) as { amount_fen: number; order_count: number }[]).reduce(
+  const offline = ((offlineRows ?? []) as { amount_fen: number; order_count: number }[]).reduce<
+    { amount_fen: number; entry_count: number; order_count: number }
+  >(
     (acc, r) => ({
       amount_fen: acc.amount_fen + Number(r.amount_fen || 0),
       entry_count: acc.entry_count + 1,
