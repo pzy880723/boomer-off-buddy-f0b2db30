@@ -290,7 +290,7 @@ function AdminUsersContent() {
                 })}
                 {(list.data ?? []).length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
                       暂无账号
                     </TableCell>
                   </TableRow>
