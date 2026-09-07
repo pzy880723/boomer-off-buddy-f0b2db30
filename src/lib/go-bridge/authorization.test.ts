@@ -283,7 +283,10 @@ describe("parseGoReceiptPayload", () => {
   });
 
   it("空 payload → 不可用", () => {
-    assert.throws(() => parse(null), (e: GoReceiptError) => e.code === "receipt_unavailable");
+    assert.throws(
+      () => parse(null),
+      (e: GoReceiptError) => e.code === "receipt_unavailable",
+    );
   });
 });
 

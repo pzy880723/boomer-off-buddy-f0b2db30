@@ -23,7 +23,6 @@ import {
   type AuthorizationSnapshot,
 } from "@/lib/go-bridge/authorization";
 
-
 export { GoReceiptError };
 
 /** GO 侧无参可信身份/范围函数 */
@@ -100,7 +99,6 @@ function goClient(env: GoEnv, userToken?: string): SupabaseClient {
     },
   });
 }
-
 
 function bearerToken(request: Request): string | null {
   const raw = request.headers.get("authorization") || "";
@@ -226,7 +224,6 @@ export async function confirmAuthorizationReceipt(
     receipt_status: receipt.linkStatus,
   };
 }
-
 
 export const GO_AUTHZ_CORS = {
   "Access-Control-Allow-Origin": "*",
