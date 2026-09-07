@@ -7516,12 +7516,16 @@ export type Database = {
           attempts: number
           created_at: string
           id: string
+          last_completed_at: string | null
+          last_completed_scan_end: string | null
           last_error: string | null
           last_progress_at: string | null
           lease_expires_at: string | null
           lease_owner: string | null
           method_label: string | null
           next_page: number
+          next_run_at: string
+          scan_end: string | null
           shop_id: string
           status: string
           total_upserted: number
@@ -7533,12 +7537,16 @@ export type Database = {
           attempts?: number
           created_at?: string
           id?: string
+          last_completed_at?: string | null
+          last_completed_scan_end?: string | null
           last_error?: string | null
           last_progress_at?: string | null
           lease_expires_at?: string | null
           lease_owner?: string | null
           method_label?: string | null
           next_page?: number
+          next_run_at?: string
+          scan_end?: string | null
           shop_id: string
           status?: string
           total_upserted?: number
@@ -7550,12 +7558,16 @@ export type Database = {
           attempts?: number
           created_at?: string
           id?: string
+          last_completed_at?: string | null
+          last_completed_scan_end?: string | null
           last_error?: string | null
           last_progress_at?: string | null
           lease_expires_at?: string | null
           lease_owner?: string | null
           method_label?: string | null
           next_page?: number
+          next_run_at?: string
+          scan_end?: string | null
           shop_id?: string
           status?: string
           total_upserted?: number
@@ -7596,6 +7608,7 @@ export type Database = {
           receiver_tel: string | null
           shop_id: string
           sku_count: number | null
+          source_updated_at: string | null
           status: string | null
           status_text: string | null
           tid: string
@@ -7624,6 +7637,7 @@ export type Database = {
           receiver_tel?: string | null
           shop_id: string
           sku_count?: number | null
+          source_updated_at?: string | null
           status?: string | null
           status_text?: string | null
           tid: string
@@ -7652,6 +7666,7 @@ export type Database = {
           receiver_tel?: string | null
           shop_id?: string
           sku_count?: number | null
+          source_updated_at?: string | null
           status?: string | null
           status_text?: string | null
           tid?: string
@@ -8779,12 +8794,16 @@ export type Database = {
           attempts: number
           created_at: string
           id: string
+          last_completed_at: string | null
+          last_completed_scan_end: string | null
           last_error: string | null
           last_progress_at: string | null
           lease_expires_at: string | null
           lease_owner: string | null
           method_label: string | null
           next_page: number
+          next_run_at: string
+          scan_end: string | null
           shop_id: string
           status: string
           total_upserted: number
@@ -8799,6 +8818,15 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      youzan_commit_order_sync_batch: {
+        Args: { p_cursor_id: string; p_rows: Json; p_worker_id: string }
+        Returns: Json
+      }
+      youzan_enqueue_order_sync_windows: {
+        Args: { p_windows: Json }
+        Returns: number
+      }
+      youzan_order_raw_updated_at: { Args: { p_raw: Json }; Returns: string }
     }
     Enums: {
       app_role:
