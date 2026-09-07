@@ -198,6 +198,7 @@ function AdminUsersContent() {
               <TableBody>
                 {(list.data ?? []).map((u) => {
                   const isSA = isSuperAdminPhone(u.phone);
+                  const scope = (scopes.data?.users ?? []).find((s) => s.user_id === u.id);
                   return (
                     <TableRow key={u.id}>
                       <TableCell className="font-medium">
