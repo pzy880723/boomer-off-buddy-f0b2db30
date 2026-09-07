@@ -102,6 +102,7 @@ import { Route as PurchaseJapanParcelNewRouteImport } from './routes/purchase.ja
 import { Route as ApiPublicContentIdRouteImport } from './routes/api/public/content/$id'
 import { Route as ApiPublicContentFeedRouteImport } from './routes/api/public/content/feed'
 import { Route as ApiPublicGoDailySummaryRouteImport } from './routes/api/public/go/daily-summary'
+import { Route as ApiPublicGoScopeSyncRouteImport } from './routes/api/public/go/scope-sync'
 import { Route as ApiPublicGoSessionRouteImport } from './routes/api/public/go/session'
 import { Route as ApiPublicHandheldDashboardRouteImport } from './routes/api/public/handheld/dashboard'
 import { Route as ApiPublicHandheldFulfillmentsRouteImport } from './routes/api/public/handheld/fulfillments'
@@ -731,6 +732,11 @@ const ApiPublicContentFeedRoute = ApiPublicContentFeedRouteImport.update({
 const ApiPublicGoDailySummaryRoute = ApiPublicGoDailySummaryRouteImport.update({
   id: '/api/public/go/daily-summary',
   path: '/api/public/go/daily-summary',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicGoScopeSyncRoute = ApiPublicGoScopeSyncRouteImport.update({
+  id: '/api/public/go/scope-sync',
+  path: '/api/public/go/scope-sync',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicGoSessionRoute = ApiPublicGoSessionRouteImport.update({
@@ -1739,6 +1745,7 @@ export interface FileRoutesByFullPath {
   '/api/public/content/$id': typeof ApiPublicContentIdRouteWithChildren
   '/api/public/content/feed': typeof ApiPublicContentFeedRoute
   '/api/public/go/daily-summary': typeof ApiPublicGoDailySummaryRoute
+  '/api/public/go/scope-sync': typeof ApiPublicGoScopeSyncRoute
   '/api/public/go/session': typeof ApiPublicGoSessionRoute
   '/api/public/handheld/dashboard': typeof ApiPublicHandheldDashboardRoute
   '/api/public/handheld/fulfillments': typeof ApiPublicHandheldFulfillmentsRouteWithChildren
@@ -1982,6 +1989,7 @@ export interface FileRoutesByTo {
   '/api/public/content/$id': typeof ApiPublicContentIdRouteWithChildren
   '/api/public/content/feed': typeof ApiPublicContentFeedRoute
   '/api/public/go/daily-summary': typeof ApiPublicGoDailySummaryRoute
+  '/api/public/go/scope-sync': typeof ApiPublicGoScopeSyncRoute
   '/api/public/go/session': typeof ApiPublicGoSessionRoute
   '/api/public/handheld/dashboard': typeof ApiPublicHandheldDashboardRoute
   '/api/public/handheld/fulfillments': typeof ApiPublicHandheldFulfillmentsRouteWithChildren
@@ -2233,6 +2241,7 @@ export interface FileRoutesById {
   '/api/public/content/$id': typeof ApiPublicContentIdRouteWithChildren
   '/api/public/content/feed': typeof ApiPublicContentFeedRoute
   '/api/public/go/daily-summary': typeof ApiPublicGoDailySummaryRoute
+  '/api/public/go/scope-sync': typeof ApiPublicGoScopeSyncRoute
   '/api/public/go/session': typeof ApiPublicGoSessionRoute
   '/api/public/handheld/dashboard': typeof ApiPublicHandheldDashboardRoute
   '/api/public/handheld/fulfillments': typeof ApiPublicHandheldFulfillmentsRouteWithChildren
@@ -2485,6 +2494,7 @@ export interface FileRouteTypes {
     | '/api/public/content/$id'
     | '/api/public/content/feed'
     | '/api/public/go/daily-summary'
+    | '/api/public/go/scope-sync'
     | '/api/public/go/session'
     | '/api/public/handheld/dashboard'
     | '/api/public/handheld/fulfillments'
@@ -2728,6 +2738,7 @@ export interface FileRouteTypes {
     | '/api/public/content/$id'
     | '/api/public/content/feed'
     | '/api/public/go/daily-summary'
+    | '/api/public/go/scope-sync'
     | '/api/public/go/session'
     | '/api/public/handheld/dashboard'
     | '/api/public/handheld/fulfillments'
@@ -2978,6 +2989,7 @@ export interface FileRouteTypes {
     | '/api/public/content/$id'
     | '/api/public/content/feed'
     | '/api/public/go/daily-summary'
+    | '/api/public/go/scope-sync'
     | '/api/public/go/session'
     | '/api/public/handheld/dashboard'
     | '/api/public/handheld/fulfillments'
@@ -3181,6 +3193,7 @@ export interface RootRouteChildren {
   ApiPublicContentIdRoute: typeof ApiPublicContentIdRouteWithChildren
   ApiPublicContentFeedRoute: typeof ApiPublicContentFeedRoute
   ApiPublicGoDailySummaryRoute: typeof ApiPublicGoDailySummaryRoute
+  ApiPublicGoScopeSyncRoute: typeof ApiPublicGoScopeSyncRoute
   ApiPublicGoSessionRoute: typeof ApiPublicGoSessionRoute
   ApiPublicHandheldDashboardRoute: typeof ApiPublicHandheldDashboardRoute
   ApiPublicHandheldFulfillmentsRoute: typeof ApiPublicHandheldFulfillmentsRouteWithChildren
@@ -3943,6 +3956,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/go/daily-summary'
       fullPath: '/api/public/go/daily-summary'
       preLoaderRoute: typeof ApiPublicGoDailySummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/go/scope-sync': {
+      id: '/api/public/go/scope-sync'
+      path: '/api/public/go/scope-sync'
+      fullPath: '/api/public/go/scope-sync'
+      preLoaderRoute: typeof ApiPublicGoScopeSyncRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/go/session': {
@@ -5718,6 +5738,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicContentIdRoute: ApiPublicContentIdRouteWithChildren,
   ApiPublicContentFeedRoute: ApiPublicContentFeedRoute,
   ApiPublicGoDailySummaryRoute: ApiPublicGoDailySummaryRoute,
+  ApiPublicGoScopeSyncRoute: ApiPublicGoScopeSyncRoute,
   ApiPublicGoSessionRoute: ApiPublicGoSessionRoute,
   ApiPublicHandheldDashboardRoute: ApiPublicHandheldDashboardRoute,
   ApiPublicHandheldFulfillmentsRoute:

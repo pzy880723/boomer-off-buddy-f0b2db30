@@ -1045,6 +1045,7 @@ export type Database = {
           order_no: string
           order_status: string
           paid_at: string | null
+          payment_route: Json | null
           payment_status: string
           pos_shift_id: string | null
           provider_transaction_id: string | null
@@ -1083,6 +1084,7 @@ export type Database = {
           order_no?: string
           order_status?: string
           paid_at?: string | null
+          payment_route?: Json | null
           payment_status?: string
           pos_shift_id?: string | null
           provider_transaction_id?: string | null
@@ -1121,6 +1123,7 @@ export type Database = {
           order_no?: string
           order_status?: string
           paid_at?: string | null
+          payment_route?: Json | null
           payment_status?: string
           pos_shift_id?: string | null
           provider_transaction_id?: string | null
@@ -1316,11 +1319,18 @@ export type Database = {
           failure_message: string | null
           id: string
           idempotency_key: string
+          lease_expires_at: string | null
+          lease_token: string | null
+          merchant_order_no: string | null
           merchant_snapshot: Json
           order_id: string
+          ordinary_checked_at: string | null
           paid_at: string | null
+          payer_openid: string | null
+          payment_channel: string
           payment_payload: Json
           payment_profile_id: string | null
+          prepay_id: string | null
           provider: string
           provider_transaction_id: string | null
           status: string
@@ -1335,11 +1345,18 @@ export type Database = {
           failure_message?: string | null
           id?: string
           idempotency_key: string
+          lease_expires_at?: string | null
+          lease_token?: string | null
+          merchant_order_no?: string | null
           merchant_snapshot?: Json
           order_id: string
+          ordinary_checked_at?: string | null
           paid_at?: string | null
+          payer_openid?: string | null
+          payment_channel?: string
           payment_payload?: Json
           payment_profile_id?: string | null
+          prepay_id?: string | null
           provider: string
           provider_transaction_id?: string | null
           status?: string
@@ -1354,11 +1371,18 @@ export type Database = {
           failure_message?: string | null
           id?: string
           idempotency_key?: string
+          lease_expires_at?: string | null
+          lease_token?: string | null
+          merchant_order_no?: string | null
           merchant_snapshot?: Json
           order_id?: string
+          ordinary_checked_at?: string | null
           paid_at?: string | null
+          payer_openid?: string | null
+          payment_channel?: string
           payment_payload?: Json
           payment_profile_id?: string | null
+          prepay_id?: string | null
           provider?: string
           provider_transaction_id?: string | null
           status?: string
@@ -1528,7 +1552,11 @@ export type Database = {
           failure_message: string | null
           id: string
           idempotency_key: string
+          lease_expires_at: string | null
+          lease_token: string | null
+          merchant_refund_no: string | null
           order_id: string
+          ordinary_checked_at: string | null
           payment_id: string
           provider: string
           provider_refund_id: string | null
@@ -1536,6 +1564,7 @@ export type Database = {
           refunded_at: string | null
           requested_at: string
           requested_by: string | null
+          route_snapshot: Json | null
           status: string
           updated_at: string
         }
@@ -1546,7 +1575,11 @@ export type Database = {
           failure_message?: string | null
           id?: string
           idempotency_key: string
+          lease_expires_at?: string | null
+          lease_token?: string | null
+          merchant_refund_no?: string | null
           order_id: string
+          ordinary_checked_at?: string | null
           payment_id: string
           provider: string
           provider_refund_id?: string | null
@@ -1554,6 +1587,7 @@ export type Database = {
           refunded_at?: string | null
           requested_at?: string
           requested_by?: string | null
+          route_snapshot?: Json | null
           status?: string
           updated_at?: string
         }
@@ -1564,7 +1598,11 @@ export type Database = {
           failure_message?: string | null
           id?: string
           idempotency_key?: string
+          lease_expires_at?: string | null
+          lease_token?: string | null
+          merchant_refund_no?: string | null
           order_id?: string
+          ordinary_checked_at?: string | null
           payment_id?: string
           provider?: string
           provider_refund_id?: string | null
@@ -1572,6 +1610,7 @@ export type Database = {
           refunded_at?: string | null
           requested_at?: string
           requested_by?: string | null
+          route_snapshot?: Json | null
           status?: string
           updated_at?: string
         }
@@ -2468,6 +2507,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      go_scope_sync_outbox: {
+        Row: {
+          attempts: number
+          change_kind: string
+          created_at: string
+          go_project_ref: string
+          id: string
+          last_error: string | null
+          next_attempt_at: string
+          payload: Json
+          status: string
+          subject_key: string
+          subject_type: string
+          synced_at: string | null
+          target_user_id: string | null
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          attempts?: number
+          change_kind: string
+          created_at?: string
+          go_project_ref: string
+          id?: string
+          last_error?: string | null
+          next_attempt_at?: string
+          payload?: Json
+          status?: string
+          subject_key: string
+          subject_type: string
+          synced_at?: string | null
+          target_user_id?: string | null
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          attempts?: number
+          change_kind?: string
+          created_at?: string
+          go_project_ref?: string
+          id?: string
+          last_error?: string | null
+          next_attempt_at?: string
+          payload?: Json
+          status?: string
+          subject_key?: string
+          subject_type?: string
+          synced_at?: string | null
+          target_user_id?: string | null
+          updated_at?: string
+          version?: number
+        }
+        Relationships: []
       }
       go_shop_location_links: {
         Row: {
@@ -7818,6 +7911,11 @@ export type Database = {
         }
         Returns: Json
       }
+      commerce_apply_ordinary_payment: {
+        Args: { p_event: Json }
+        Returns: Json
+      }
+      commerce_apply_ordinary_refund: { Args: { p_event: Json }; Returns: Json }
       commerce_capture_payment_allocation: {
         Args: {
           p_item_snapshots: Json
@@ -7826,6 +7924,10 @@ export type Database = {
           p_suborders: Json
         }
         Returns: undefined
+      }
+      commerce_close_ordinary_payment: {
+        Args: { p_close_evidence: Json; p_payment_id: string }
+        Returns: Json
       }
       commerce_create_after_sale: {
         Args: {
@@ -7911,6 +8013,7 @@ export type Database = {
           order_no: string
           order_status: string
           paid_at: string | null
+          payment_route: Json | null
           payment_status: string
           pos_shift_id: string | null
           provider_transaction_id: string | null
@@ -7971,6 +8074,7 @@ export type Database = {
           order_no: string
           order_status: string
           paid_at: string | null
+          payment_route: Json | null
           payment_status: string
           pos_shift_id: string | null
           provider_transaction_id: string | null
@@ -7992,6 +8096,26 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      commerce_create_ordinary_order: {
+        Args: {
+          p_app_id: string
+          p_courier_provider: string
+          p_courier_service_code: string
+          p_courier_service_name: string
+          p_customer_id: string
+          p_customer_note: string
+          p_idempotency_key: string
+          p_items: Json
+          p_merchant_id: string
+          p_owned_location_ids: string[]
+          p_quote_snapshot: Json
+          p_recipient_name: string
+          p_recipient_phone: string
+          p_shipping_address: Json
+          p_shipping_fee: number
+        }
+        Returns: Json
       }
       commerce_listing_availability: {
         Args: { p_listing_ids: string[] }
@@ -8030,6 +8154,7 @@ export type Database = {
           order_no: string
           order_status: string
           paid_at: string | null
+          payment_route: Json | null
           payment_status: string
           pos_shift_id: string | null
           provider_transaction_id: string | null
@@ -8051,6 +8176,94 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      commerce_mark_ordinary_order_paid: {
+        Args: {
+          p_order_id: string
+          p_paid_at: string
+          p_provider_transaction_id: string
+        }
+        Returns: {
+          authorization_id: string | null
+          benefit_snapshot: Json
+          cancelled_at: string | null
+          completed_at: string | null
+          courier_provider: string | null
+          courier_quote_snapshot: Json | null
+          courier_service_code: string | null
+          courier_service_name: string | null
+          created_at: string
+          currency: string
+          customer_id: string | null
+          customer_note: string | null
+          discount_snapshot: Json
+          discount_total: number
+          fulfillment_method: string
+          id: string
+          idempotency_key: string
+          metadata: Json
+          operator_id: string | null
+          order_no: string
+          order_status: string
+          paid_at: string | null
+          payment_route: Json | null
+          payment_status: string
+          pos_shift_id: string | null
+          provider_transaction_id: string | null
+          recipient_name: string | null
+          recipient_phone: string | null
+          reservation_expires_at: string
+          sale_location_id: string | null
+          shipping_address: Json | null
+          shipping_fee: number
+          source_channel: string
+          subtotal: number
+          total_amount: number
+          updated_at: string
+          user_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "commerce_orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      commerce_prepare_ordinary_payment: {
+        Args: {
+          p_customer_id: string
+          p_idempotency_key: string
+          p_openid: string
+          p_order_id: string
+        }
+        Returns: Json
+      }
+      commerce_prepare_ordinary_refund: {
+        Args: {
+          p_after_sale_id: string
+          p_idempotency_key: string
+          p_operator_id: string
+          p_payment_id: string
+        }
+        Returns: Json
+      }
+      commerce_record_ordinary_prepay: {
+        Args: {
+          p_expires_at: string
+          p_lease_token: string
+          p_payment_id: string
+          p_payment_payload: Json
+          p_prepay_id: string
+        }
+        Returns: Json
+      }
+      commerce_record_ordinary_refund: {
+        Args: {
+          p_lease_token: string
+          p_provider_refund_id: string
+          p_refund_id: string
+        }
+        Returns: Json
       }
       commerce_release_expired_reservations: { Args: never; Returns: number }
       commerce_reserve_recognition_quota: {
@@ -8244,6 +8457,17 @@ export type Database = {
       gen_commerce_order_no: { Args: never; Returns: string }
       gen_ean13: { Args: never; Returns: string }
       gen_stock_transfer_code: { Args: never; Returns: string }
+      go_scope_enqueue_sync: {
+        Args: {
+          p_change_kind: string
+          p_go_project_ref: string
+          p_payload?: Json
+          p_subject_key: string
+          p_subject_type: string
+          p_target_user_id?: string
+        }
+        Returns: string
+      }
       handheld_search_fulfillment_ids: {
         Args: {
           p_limit?: number
@@ -8442,6 +8666,18 @@ export type Database = {
           p_location_ids: string[]
           p_reason?: string
           p_roles: string[]
+          p_target_user_id: string
+        }
+        Returns: Json
+      }
+      set_user_scope_atomic_v2: {
+        Args: {
+          p_actor_id: string
+          p_actor_role: string
+          p_go_project_ref?: string
+          p_location_ids?: string[]
+          p_reason?: string
+          p_roles?: string[]
           p_target_user_id: string
         }
         Returns: Json
