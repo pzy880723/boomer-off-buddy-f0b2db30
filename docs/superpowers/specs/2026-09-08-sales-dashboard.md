@@ -1,0 +1,13 @@
+# Sales Dashboard V1
+
+User approved the sales-first dashboard on 2026-09-08. Scope: web dashboard only; keep navigation and native app unchanged.
+
+Layout: existing light ERP theme, restrained borders/shadows. Header contains store scope and refresh. Date presets (today/yesterday/month/custom) precede four KPI cards: net sales, paid orders, sold units, average order value. Six current-action counts link to existing operational pages. Common actions precede a seven-day sales trend. No mock business data in production. Existing purchase pages remain accessible; the homepage is no longer a procurement report.
+
+Desktop: four metric columns and six compact task cells. Tablet/mobile: two metric columns, wrapped date controls, stacked chart. Use existing typeface/tokens. Native date inputs must have labels; skeleton/error/empty/partial/stale/no-access states are explicit. Refresh preserves same-scope values with a loading indicator; changing scope must not display previous-scope data.
+
+All ranges use Asia/Shanghai dates, inclusive end date, <=93 days. Net sales subtract successful refunds; source normalization must avoid counting a Youzan order again via an ERP mirror. If net sales cannot be verified, show unavailable/pending and separately label known paid amount; never silently present gross as net. Backend owns scope authorization and aggregation. Tasks are current operational work, independent of selected sales dates.
+
+Implementation update: Lovable queue is user-paused with unrelated pending work. Codex notified Lovable that its dashboard request is superseded and implemented the read-only server functions directly against existing tables; no migration required. Do not resume unrelated queue items. Existing Youzan rows are authoritative for that channel; ERP Youzan mirrors are excluded. Exact POS order-number correlation prevents a second count from channel records. Multi-store paid amounts use order-line weights and integer-cent allocation; unresolved partial refund ownership is explicitly unknown. Amounts include shipping; refunds reduce the original paid-date cohort. Sold units are paid units, not net returns.
+
+Verification: run unit/contract tests, typecheck/build, desktop/mobile component screenshots and protected endpoint checks before Tencent release. A read-only script verifies actual historical totals and scoped task queries without creating users or orders. Retain previous release and verify public assets. This feature does not fix the unrelated full-ERP audit backlog.

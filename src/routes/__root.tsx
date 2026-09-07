@@ -282,15 +282,19 @@ function RootComponent() {
                       <Command className="h-2.5 w-2.5" />K
                     </kbd>
                   </button>
-                  <div className="hidden items-center gap-1.5 rounded-md border border-success/20 bg-success/10 px-2 py-1 text-xs text-success lg:flex">
-                    <CheckCircle2 className="h-3 w-3" />
-                    数据已同步 · 2 分钟前
-                  </div>
+                  {pathname !== "/dashboard" && (
+                    <div className="hidden items-center gap-1.5 rounded-md border border-success/20 bg-success/10 px-2 py-1 text-xs text-success lg:flex">
+                      <CheckCircle2 className="h-3 w-3" />
+                      数据已同步 · 2 分钟前
+                    </div>
+                  )}
                   <Button variant="ghost" size="icon" className="relative h-9 w-9">
                     <Bell className="h-4 w-4" />
-                    <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-primary-foreground">
-                      5
-                    </span>
+                    {pathname !== "/dashboard" && (
+                      <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-primary-foreground">
+                        5
+                      </span>
+                    )}
                   </Button>
                   <UserMenu />
                 </div>
