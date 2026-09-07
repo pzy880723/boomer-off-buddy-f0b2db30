@@ -22,10 +22,12 @@ import {
 } from "@/lib/go-bridge/scope";
 import { maskName, maskPhone } from "@/lib/go-bridge/scope";
 import {
-  normalizeGoVerifyPayload,
+  parseGoVerifyPayload,
   resolveErpStoreLocation,
   type GoShopMapping,
 } from "@/lib/go-bridge/verify-scope";
+import { buildShopDirectory, type GoShopDirectoryEntry } from "@/lib/go-bridge/shops";
+import { assertGoScopeSynced, type GoSyncRow } from "@/lib/go-bridge/sync-state";
 import { buildGoDailySummary, type GoStoreInput } from "@/lib/go-bridge/daily-contract";
 import { shanghaiToday, shanghaiDayWindow } from "@/lib/store-targets/sales-window";
 
@@ -33,7 +35,9 @@ export { GoScopeError };
 
 /** 固定 GO issuer —— 只认这个项目签发的 token */
 export const GO_PROJECT_REF = "narqwgwpqglathwtyevz";
-/** GO 侧提供的可信范围函数 */
+/** 固定完整 origin —— 必须整体相等，不能用 includes 子串判断 */
+export const GO_SUPABASE_ORIGIN = `https://${GO_PROJECT_REF}.supabase.co`;
+/** GO 侧提供的可信范围函数（无参数） */
 export const GO_SCOPE_RPC = "erp_verify_current_scope_v1";
 
 type GoEnv = { url: string; publishableKey: string; projectRef: string };
@@ -44,9 +48,15 @@ export function goEnvironment(): GoEnv | null {
     process.env["GO_SUPABASE_PUBLISHABLE_KEY"]?.trim() ||
     process.env["GO_SUPABASE_ANON_KEY"]?.trim();
   if (!url || !publishableKey) return null;
-  // issuer 必须是固定的 GO 项目，配错了宁可不服务
-  if (!url.includes(GO_PROJECT_REF)) return null;
-  return { url, publishableKey, projectRef: GO_PROJECT_REF };
+  // issuer 必须是固定 GO 项目的完整 origin，配错了宁可不服务
+  let origin: string;
+  try {
+    origin = new URL(url).origin;
+  } catch {
+    return null;
+  }
+  if (origin !== GO_SUPABASE_ORIGIN) return null;
+  return { url: origin, publishableKey, projectRef: GO_PROJECT_REF };
 }
 
 function goClient(env: GoEnv, userToken?: string): SupabaseClient {
@@ -85,6 +95,8 @@ export type GoActor = {
   /** HQ 可浏览的全部真实门店；员工为空数组 */
   hq_locations: { id: string; name: string }[];
   permitted_location_ids: string[];
+  /** 跨项目门店编号契约：只含显式 active 映射 */
+  shops: GoShopDirectoryEntry[];
   reasons: string[];
 };
 
@@ -136,15 +148,16 @@ export async function authenticateGoActor(request: Request, now = new Date()): P
 
   const today = shanghaiToday(now);
 
-  // 2) 以用户本人 token 调 GO 的可信范围函数（不需要 GO service key）
+  // 2) 以用户本人 token 调 GO 的可信范围函数（**无参数**，传参会 PGRST202）
   const asUser = goClient(env, token);
-  const { data: scopeRaw, error: scopeErr } = await asUser.rpc(GO_SCOPE_RPC, {
-    p_work_date: today,
-  });
+  const { data: scopeRaw, error: scopeErr } = await asUser.rpc(GO_SCOPE_RPC);
   if (scopeErr) {
     throw new GoScopeError("go_scope_unavailable", "GO 身份/排班服务暂时不可用", 503);
   }
-  const verified = normalizeGoVerifyPayload(scopeRaw, today);
+  const verified = parseGoVerifyPayload(scopeRaw, {
+    expectedDate: today,
+    expectedGoUserId: goUserId,
+  });
   const erpUserId = verified.erpUserId;
 
   // 3) ERP 侧只做否决：显式 revoked 优先拒绝；不一致也拒绝；没有记录则复用 GO 可信映射
@@ -191,24 +204,51 @@ export async function authenticateGoActor(request: Request, now = new Date()): P
   // HQ 由 ERP 显式角色判定，不由 GO 的 scope 决定，也不由"没有门店"反推
   const isHq = roles.some((r) => HQ_ROLES.has(r));
 
+  // 5.1) 撤销类变更未同步到 GO 前一律 fail closed
+  const { data: syncRows, error: syncErr } = await sb()
+    .from("go_scope_sync_outbox")
+    .select("subject_type, subject_key, change_kind, status, attempts")
+    .eq("go_project_ref", env.projectRef)
+    .eq("target_user_id", erpUserId)
+    .neq("status", "synced");
+  if (syncErr) throw new GoScopeError("scope_sync_unavailable", "权限同步状态不可用", 503);
+  assertGoScopeSynced((syncRows ?? []) as GoSyncRow[]);
+
+  // 5.2) ERP 实时角色与 GO 上下文不一致 → 明确「上下文过期，请刷新」，不悄悄降级
+  if (isHq !== (verified.scope === "hq")) {
+    throw new GoScopeError("go_scope_stale", "GO 范围上下文已过期，请刷新后重试", 409);
+  }
+
   const allShops = await loadRealShops();
   const permitted = await loadPermittedLocationIds(erpUserId);
+
+  const { data: linkRows, error: linksErr } = await sb()
+    .from("go_shop_location_links")
+    .select("go_shop_id, location_id, status")
+    .eq("go_project_ref", env.projectRef);
+  if (linksErr) throw new GoScopeError("shop_mapping_unavailable", "门店映射暂不可用", 503);
+  const links = (linkRows ?? []) as {
+    go_shop_id: string;
+    location_id: string;
+    status: string;
+  }[];
+  const shops = buildShopDirectory({ links, activeShops: allShops });
 
   let scheduleState: ScheduleState = "scheduled";
   let todayLocationId: string | null = null;
   if (!isHq) {
     scheduleState = verified.scheduleState;
-    if (scheduleState === "scheduled" && verified.goShopId) {
-      const { data: linkRow, error: linkErr } = await sb()
-        .from("go_shop_location_links")
-        .select("location_id, status")
-        .eq("go_project_ref", env.projectRef)
-        .eq("go_shop_id", verified.goShopId)
-        .maybeSingle();
-      if (linkErr) throw new GoScopeError("shop_mapping_unavailable", "门店映射暂不可用", 503);
+    const goShopId = verified.effectiveShop?.id ?? null;
+    if (scheduleState === "scheduled" && goShopId) {
+      const mapped = links.find((l) => l.go_shop_id === goShopId) ?? null;
       todayLocationId = resolveErpStoreLocation({
-        goShopId: verified.goShopId,
-        mapping: linkRow as GoShopMapping,
+        goShopId,
+        mapping: mapped
+          ? ({
+              location_id: mapped.location_id,
+              status: mapped.status,
+            } satisfies NonNullable<GoShopMapping>)
+          : null,
         activeShopIds: allShops.map((l) => l.id),
         permittedLocationIds: permitted,
       });
@@ -231,6 +271,7 @@ export async function authenticateGoActor(request: Request, now = new Date()): P
       : null,
     hq_locations: isHq ? allShops : [],
     permitted_location_ids: permitted,
+    shops,
     reasons,
   };
 }
@@ -252,6 +293,8 @@ export function goSessionPayload(actor: GoActor) {
     schedule_state: actor.schedule_state,
     today_location: actor.today_location,
     visible_locations: visible,
+    /** 跨项目门店编号契约：go_shop_id ↔ erp_location_id ↔ name */
+    shops: actor.shops,
     reasons: actor.reasons,
   };
 }

@@ -249,6 +249,22 @@ function AdminUsersContent() {
                             {scope.roles.map((r) => ROLE_LABELS[r] ?? r).join("、")}
                           </div>
                         ) : null}
+                        {scope && scope.go_sync_status !== "synced" ? (
+                          <div className="mt-1">
+                            <Badge
+                              variant="outline"
+                              className={
+                                scope.go_sync_status === "failed"
+                                  ? "text-destructive"
+                                  : "text-amber-600"
+                              }
+                            >
+                              {scope.go_sync_status === "failed"
+                                ? `同步失败（已重试 ${scope.go_sync_attempts} 次）`
+                                : "待同步到店员端"}
+                            </Badge>
+                          </div>
+                        ) : null}
                       </TableCell>
                       <TableCell>
                         {u.must_change_password ? (

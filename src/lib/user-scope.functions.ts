@@ -12,6 +12,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertScopeAdmin, assertTargetWritable } from "@/lib/user-scope/guards";
+import { GO_PROJECT_REF } from "@/lib/go-bridge/constants";
+import { summarizeSyncRows, type GoSyncRow } from "@/lib/go-bridge/sync-state";
 
 const ROLES = [
   "super_admin",
@@ -64,13 +66,17 @@ async function assertTargetAccountWritable(userId: string) {
   );
 }
 
-/** 角色 + 门店 + 审计单事务写入 */
+/**
+ * 角色 + 门店 + 审计 + GO 待同步登记，单事务写入。
+ * roles / locationIds 传 null 表示「本维度保持数据库现值」，
+ * 这样只改角色不会覆盖并发修改的门店，反之亦然。
+ */
 async function applyScopeAtomic(input: {
   actorId: string;
   actorRole: string;
   targetUserId: string;
-  roles: string[];
-  locationIds: string[];
+  roles: string[] | null;
+  locationIds: string[] | null;
   reason?: string | undefined;
 }) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -81,16 +87,50 @@ async function applyScopeAtomic(input: {
       args: Record<string, unknown>,
     ) => Promise<{ data: unknown; error: { message: string } | null }>;
   };
-  const { data, error } = await sb.rpc("set_user_scope_atomic", {
+  const { data, error } = await sb.rpc("set_user_scope_atomic_v2", {
     p_actor_id: input.actorId,
     p_actor_role: input.actorRole,
     p_target_user_id: input.targetUserId,
     p_roles: input.roles,
     p_location_ids: input.locationIds,
     p_reason: input.reason ?? null,
+    p_go_project_ref: GO_PROJECT_REF,
   });
   if (error) throw new Error(scopeErrorMessage(error.message));
-  return (data ?? {}) as { ok: boolean; changed: boolean };
+  return (data ?? {}) as {
+    ok: boolean;
+    changed: boolean;
+    roles: string[];
+    location_ids: string[];
+    sync_status: "pending" | "synced";
+  };
+}
+
+/** 登记一条待同步到 GO 的授权变更（幂等）；失败要报错，不能假称已生效 */
+async function enqueueGoSync(input: {
+  subjectType: "identity" | "shop_link" | "user_scope";
+  subjectKey: string;
+  changeKind: "update" | "revoke";
+  targetUserId: string | null;
+  payload: Record<string, unknown>;
+}): Promise<"pending"> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const sb = supabaseAdmin as unknown as {
+    rpc: (
+      fn: string,
+      args: Record<string, unknown>,
+    ) => Promise<{ data: unknown; error: { message: string } | null }>;
+  };
+  const { error } = await sb.rpc("go_scope_enqueue_sync", {
+    p_go_project_ref: GO_PROJECT_REF,
+    p_subject_type: input.subjectType,
+    p_subject_key: input.subjectKey,
+    p_change_kind: input.changeKind,
+    p_payload: input.payload,
+    p_target_user_id: input.targetUserId,
+  });
+  if (error) throw new Error(`授权变更未能登记同步，请重试：${error.message}`);
+  return "pending";
 }
 
 function scopeErrorMessage(raw: string): string {
@@ -111,19 +151,40 @@ export const listUserScopesFn = createServerFn({ method: "GET" })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabaseAdmin as unknown as { from: (t: string) => any };
 
-    const [{ data: roles }, { data: perms }, { data: locations }, { data: goLinks }] =
-      await Promise.all([
-        sb.from("user_roles").select("user_id, role"),
-        sb.from("user_location_perms").select("user_id, location_id"),
-        sb.from("inv_locations").select("id, name, kind, is_active").eq("is_active", true),
-        sb.from("go_identity_links").select("erp_user_id, go_user_id, status, location_id"),
-      ]);
+    // 每一次读取都检查 error：读失败必须报错，绝不能吞成"这个用户没有角色/没有门店"
+    const [rolesRes, permsRes, locationsRes, goLinksRes, syncRes] = await Promise.all([
+      sb.from("user_roles").select("user_id, role"),
+      sb.from("user_location_perms").select("user_id, location_id"),
+      sb.from("inv_locations").select("id, name, kind, is_active").eq("is_active", true),
+      sb.from("go_identity_links").select("erp_user_id, go_user_id, status"),
+      sb
+        .from("go_scope_sync_outbox")
+        .select("subject_type, subject_key, target_user_id, change_kind, status, attempts")
+        .eq("go_project_ref", GO_PROJECT_REF),
+    ]);
+    for (const res of [rolesRes, permsRes, locationsRes, goLinksRes, syncRes] as {
+      error: { message: string } | null;
+    }[]) {
+      if (res.error) throw new Error(`读取角色/门店范围失败：${res.error.message}`);
+    }
 
-    const roleRows = (roles as { user_id: string; role: string }[] | null) ?? [];
-    const permRows = (perms as { user_id: string; location_id: string }[] | null) ?? [];
+    const roleRows = (rolesRes.data as { user_id: string; role: string }[] | null) ?? [];
+    const permRows = (permsRes.data as { user_id: string; location_id: string }[] | null) ?? [];
     const goRows =
-      (goLinks as { erp_user_id: string | null; go_user_id: string; status: string }[] | null) ??
-      [];
+      (goLinksRes.data as
+        | { erp_user_id: string | null; go_user_id: string; status: string }[]
+        | null) ?? [];
+    const syncRows =
+      (syncRes.data as
+        | {
+            subject_type: GoSyncRow["subject_type"];
+            subject_key: string;
+            target_user_id: string | null;
+            change_kind: GoSyncRow["change_kind"];
+            status: GoSyncRow["status"];
+            attempts: number;
+          }[]
+        | null) ?? [];
 
     const byUser = new Map<
       string,
@@ -133,12 +194,22 @@ export const listUserScopesFn = createServerFn({ method: "GET" })
         location_ids: string[];
         is_hq: boolean;
         go_status: string | null;
+        go_sync_status: "pending" | "synced" | "failed";
+        go_sync_attempts: number;
       }
     >();
     const ensure = (userId: string) => {
       let row = byUser.get(userId);
       if (!row) {
-        row = { user_id: userId, roles: [], location_ids: [], is_hq: false, go_status: null };
+        row = {
+          user_id: userId,
+          roles: [],
+          location_ids: [],
+          is_hq: false,
+          go_status: null,
+          go_sync_status: "synced",
+          go_sync_attempts: 0,
+        };
         byUser.set(userId, row);
       }
       return row;
@@ -146,19 +217,38 @@ export const listUserScopesFn = createServerFn({ method: "GET" })
     for (const r of roleRows) ensure(r.user_id).roles.push(r.role);
     for (const p of permRows) ensure(p.user_id).location_ids.push(p.location_id);
     for (const g of goRows) if (g.erp_user_id) ensure(g.erp_user_id).go_status = g.status;
+    const syncByUser = new Map<string, GoSyncRow[]>();
+    for (const s of syncRows) {
+      if (!s.target_user_id) continue;
+      const list = syncByUser.get(s.target_user_id) ?? [];
+      list.push({
+        subject_type: s.subject_type,
+        subject_key: s.subject_key,
+        change_kind: s.change_kind,
+        status: s.status,
+        attempts: s.attempts,
+      });
+      syncByUser.set(s.target_user_id, list);
+    }
+    for (const [userId, list] of syncByUser) {
+      const row = ensure(userId);
+      row.go_sync_status = summarizeSyncRows(list).overall;
+      row.go_sync_attempts = list.reduce((m, r) => Math.max(m, r.attempts), 0);
+    }
     for (const row of byUser.values()) {
       row.is_hq = row.roles.some((r) => (HQ_ROLES as string[]).includes(r));
     }
 
     return {
       users: [...byUser.values()],
-      locations: ((locations as { id: string; name: string; kind: string }[] | null) ?? []).sort(
-        (a, b) =>
-          a.kind === b.kind
-            ? a.name.localeCompare(b.name, "zh-Hans-CN")
-            : a.kind === "warehouse"
-              ? -1
-              : 1,
+      locations: (
+        (locationsRes.data as { id: string; name: string; kind: string }[] | null) ?? []
+      ).sort((a, b) =>
+        a.kind === b.kind
+          ? a.name.localeCompare(b.name, "zh-Hans-CN")
+          : a.kind === "warehouse"
+            ? -1
+            : 1,
       ),
       roles: ROLES,
     };
@@ -182,36 +272,31 @@ export const setUserRolesFn = createServerFn({ method: "POST" })
 
     await assertTargetAccountWritable(data.userId);
 
-    const [{ data: beforeRows }, { data: locRows }] = await Promise.all([
-      sb.from("user_roles").select("role").eq("user_id", data.userId),
-      sb.from("user_location_perms").select("location_id").eq("user_id", data.userId),
-    ]);
-    const before = ((beforeRows as { role: string }[] | null) ?? []).map((r) => r.role).sort();
+    const beforeRes = await sb.from("user_roles").select("role").eq("user_id", data.userId);
+    if (beforeRes.error) throw new Error(`读取当前角色失败：${beforeRes.error.message}`);
+    const before = ((beforeRes.data as { role: string }[] | null) ?? []).map((r) => r.role).sort();
     const after = [...new Set(data.roles)].sort();
-    const keepLocations = ((locRows as { location_id: string }[] | null) ?? []).map(
-      (r) => r.location_id,
-    );
 
     const toAdd = after.filter((r) => !before.includes(r));
     const toRemove = before.filter((r) => !(after as string[]).includes(r));
 
-    // 角色变更 + 门店保持 + 审计：同一事务，要么全成要么全回滚
+    // 只提交角色维度：门店由数据库内部保持现值，避免并发编辑互相覆盖
     const result = await applyScopeAtomic({
       actorId: actor.actorId,
       actorRole: actor.actorRole,
       targetUserId: data.userId,
       roles: after,
-      locationIds: keepLocations,
+      locationIds: null,
       reason: data.reason,
     });
-    void result;
 
     return {
       ok: true,
-      roles: after,
+      roles: result.roles ?? after,
       added: toAdd,
       removed: toRemove,
-      changed: toAdd.length + toRemove.length > 0,
+      changed: Boolean(result.changed),
+      sync_status: result.sync_status ?? "synced",
     };
   });
 
@@ -234,34 +319,36 @@ export const setUserLocationsFn = createServerFn({ method: "POST" })
     await assertTargetAccountWritable(data.userId);
 
     const wanted = [...new Set(data.locationIds)];
-    const [{ data: beforeRows }, { data: roleRows }] = await Promise.all([
-      sb.from("user_location_perms").select("location_id").eq("user_id", data.userId),
-      sb.from("user_roles").select("role").eq("user_id", data.userId),
-    ]);
-    const before = ((beforeRows as { location_id: string }[] | null) ?? [])
+    const beforeRes = await sb
+      .from("user_location_perms")
+      .select("location_id")
+      .eq("user_id", data.userId);
+    if (beforeRes.error) throw new Error(`读取当前门店范围失败：${beforeRes.error.message}`);
+    const before = ((beforeRes.data as { location_id: string }[] | null) ?? [])
       .map((r) => r.location_id)
       .sort();
     const after = [...wanted].sort();
-    const keepRoles = ((roleRows as { role: string }[] | null) ?? []).map((r) => r.role);
 
     const toAdd = after.filter((id) => !before.includes(id));
     const toRemove = before.filter((id) => !after.includes(id));
 
-    await applyScopeAtomic({
+    // 只提交门店维度：角色由数据库内部保持现值
+    const result = await applyScopeAtomic({
       actorId: actor.actorId,
       actorRole: actor.actorRole,
       targetUserId: data.userId,
-      roles: keepRoles,
+      roles: null,
       locationIds: after,
       reason: data.reason,
     });
 
     return {
       ok: true,
-      location_ids: after,
+      location_ids: result.location_ids ?? after,
       added: toAdd,
       removed: toRemove,
-      changed: toAdd.length + toRemove.length > 0,
+      changed: Boolean(result.changed),
+      sync_status: result.sync_status ?? "synced",
     };
   });
 
@@ -283,12 +370,14 @@ export const setGoIdentityLinkFn = createServerFn({ method: "POST" })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabaseAdmin as unknown as { from: (t: string) => any };
 
-    const { data: before } = await sb
+    const beforeRes = await sb
       .from("go_identity_links")
       .select("*")
       .eq("go_project_ref", data.goProjectRef)
       .eq("go_user_id", data.goUserId)
       .maybeSingle();
+    if (beforeRes.error) throw new Error(`读取现有绑定失败：${beforeRes.error.message}`);
+    const before = beforeRes.data;
 
     const payload = {
       go_project_ref: data.goProjectRef,
@@ -316,7 +405,16 @@ export const setGoIdentityLinkFn = createServerFn({ method: "POST" })
       actor_role: actor.actorRole,
     });
     if (auditError) throw new Error(auditError.message);
-    return { ok: true, link: after };
+
+    // 身份绑定变更必须同步回 GO；撤销在同步成功前 fail closed
+    const syncStatus = await enqueueGoSync({
+      subjectType: "identity",
+      subjectKey: `${data.goProjectRef}:${data.goUserId}`,
+      changeKind: data.status === "revoked" ? "revoke" : "update",
+      targetUserId: data.erpUserId,
+      payload: { go_user_id: data.goUserId, status: data.status },
+    });
+    return { ok: true, link: after, sync_status: syncStatus };
   });
 
 const goShopSchema = z.object({
@@ -337,21 +435,24 @@ export const setGoShopLinkFn = createServerFn({ method: "POST" })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabaseAdmin as unknown as { from: (t: string) => any };
 
-    const { data: loc } = await sb
+    const locRes = await sb
       .from("inv_locations")
       .select("id, kind, is_active")
       .eq("id", data.locationId)
       .maybeSingle();
-    const location = loc as { kind: string; is_active: boolean } | null;
+    if (locRes.error) throw new Error(`读取门店失败：${locRes.error.message}`);
+    const location = locRes.data as { kind: string; is_active: boolean } | null;
     if (!location || !location.is_active) throw new Error("门店不存在或已停用");
     if (location.kind !== "shop") throw new Error("只能映射到门店，不能映射到仓库");
 
-    const { data: before } = await sb
+    const beforeRes = await sb
       .from("go_shop_location_links")
       .select("*")
       .eq("go_project_ref", data.goProjectRef)
       .eq("go_shop_id", data.goShopId)
       .maybeSingle();
+    if (beforeRes.error) throw new Error(`读取现有门店映射失败：${beforeRes.error.message}`);
+    const before = beforeRes.data;
 
     const { data: after, error } = await sb
       .from("go_shop_location_links")
@@ -381,7 +482,19 @@ export const setGoShopLinkFn = createServerFn({ method: "POST" })
       actor_role: actor.actorRole,
     });
     if (auditError) throw new Error(auditError.message);
-    return { ok: true, link: after };
+
+    const syncStatus = await enqueueGoSync({
+      subjectType: "shop_link",
+      subjectKey: `${data.goProjectRef}:${data.goShopId}`,
+      changeKind: data.status === "revoked" ? "revoke" : "update",
+      targetUserId: null,
+      payload: {
+        go_shop_id: data.goShopId,
+        erp_location_id: data.locationId,
+        status: data.status,
+      },
+    });
+    return { ok: true, link: after, sync_status: syncStatus };
   });
 
 export const listGoShopLinksFn = createServerFn({ method: "GET" })
@@ -391,9 +504,10 @@ export const listGoShopLinksFn = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabaseAdmin as unknown as { from: (t: string) => any };
-    const { data } = await sb
+    const { data, error } = await sb
       .from("go_shop_location_links")
       .select("id, go_project_ref, go_shop_id, location_id, status, updated_at");
+    if (error) throw new Error(`读取门店映射失败：${error.message}`);
     return (data ?? []) as {
       id: string;
       go_project_ref: string;
