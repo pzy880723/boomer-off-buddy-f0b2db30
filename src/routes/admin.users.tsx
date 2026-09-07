@@ -603,3 +603,111 @@ function EditNameButton({
     </Dialog>
   );
 }
+
+function ScopeButton({
+  label,
+  roles,
+  locationIds,
+  locations,
+  onSubmit,
+}: {
+  label: string;
+  roles: string[];
+  locationIds: string[];
+  locations: { id: string; name: string; kind: string }[];
+  onSubmit: (roles: string[], locationIds: string[]) => Promise<unknown>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pickedRoles, setPickedRoles] = useState<string[]>(roles);
+  const [pickedLocations, setPickedLocations] = useState<string[]>(locationIds);
+  const [saving, setSaving] = useState(false);
+
+  const isHq = pickedRoles.some((r) => HQ_ROLE_KEYS.includes(r));
+
+  const toggle = (list: string[], value: string) =>
+    list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) {
+          setPickedRoles(roles);
+          setPickedLocations(locationIds);
+        }
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="icon" title="设置角色与门店范围">
+          <ShieldCheck className="h-4 w-4" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>角色与门店范围</DialogTitle>
+          <DialogDescription>{label}</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div>
+            <Label className="text-xs text-muted-foreground">角色</Label>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {Object.entries(ROLE_LABELS).map(([key, text]) => (
+                <Button
+                  key={key}
+                  type="button"
+                  size="sm"
+                  variant={pickedRoles.includes(key) ? "default" : "outline"}
+                  onClick={() => setPickedRoles((prev) => toggle(prev, key))}
+                >
+                  {text}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <Label className="text-xs text-muted-foreground">
+              可访问门店{isHq ? "（总部角色本身即可浏览全部门店）" : ""}
+            </Label>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {locations.map((loc) => (
+                <Button
+                  key={loc.id}
+                  type="button"
+                  size="sm"
+                  variant={pickedLocations.includes(loc.id) ? "default" : "outline"}
+                  onClick={() => setPickedLocations((prev) => toggle(prev, loc.id))}
+                >
+                  {loc.name}
+                </Button>
+              ))}
+              {locations.length === 0 && (
+                <span className="text-sm text-muted-foreground">暂无可选门店</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button
+            disabled={saving}
+            onClick={async () => {
+              setSaving(true);
+              try {
+                await onSubmit(pickedRoles, pickedLocations);
+                setOpen(false);
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            保存
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
