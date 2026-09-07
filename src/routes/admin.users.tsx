@@ -221,6 +221,22 @@ function AdminUsersContent() {
                           <Badge variant="secondary">普通用户</Badge>
                         )}
                       </TableCell>
+                      <TableCell className="text-xs">
+                        {scope?.is_hq ? (
+                          <Badge variant="outline" className="text-primary">总部（可看全部门店）</Badge>
+                        ) : (scope?.location_ids.length ?? 0) > 0 ? (
+                          <span className="text-muted-foreground">
+                            {scope?.location_ids.length} 个门店权限
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">未设置</span>
+                        )}
+                        {scope?.roles.length ? (
+                          <div className="mt-1 text-muted-foreground">
+                            {scope.roles.map((r) => ROLE_LABELS[r] ?? r).join("、")}
+                          </div>
+                        ) : null}
+                      </TableCell>
                       <TableCell>
                         {u.must_change_password ? (
                           <Badge variant="outline" className="text-amber-600">
