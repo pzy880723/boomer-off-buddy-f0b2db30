@@ -28,6 +28,7 @@ export type ActorContext = {
 
 const db = () =>
   supabaseAdmin as unknown as {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     from: (t: string) => any;
   };
 
@@ -181,6 +182,7 @@ export async function publishMonthlyPlan(input: PublishPlanInput, actor: ActorCo
     .gte("target_date", periodMonth)
     .lte("target_date", `${input.month}-31`);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const existingDays: ExistingDay[] = ((existingDayRows ?? []) as any[]).map((r) => ({
     date: r.target_date,
     target_amount_fen: Number(r.target_amount_fen),
@@ -208,8 +210,11 @@ export async function publishMonthlyPlan(input: PublishPlanInput, actor: ActorCo
     .eq("period_month", periodMonth)
     .order("version", { ascending: false });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const prevPublished = ((prevPlans ?? []) as any[]).find((p) => p.status === "published") ?? null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const nextVersion = ((prevPlans ?? []) as any[])[0]?.version
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ? Number((prevPlans as any[])[0].version) + 1
     : 1;
 

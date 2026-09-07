@@ -133,6 +133,7 @@ function TargetsPage() {
   });
 
   const totalFen = useMemo(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     () => (plan.data?.days ?? []).reduce((s: number, d: any) => s + Number(d.target_amount_fen), 0),
     [plan.data],
   );
@@ -155,6 +156,7 @@ function TargetsPage() {
               <SelectValue placeholder="选择门店" />
             </SelectTrigger>
             <SelectContent>
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               {(locations.data ?? []).map((l: any) => (
                 <SelectItem key={l.id} value={l.id}>
                   {l.name}
@@ -273,6 +275,7 @@ function TargetsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               {(plan.data?.days ?? []).map((d: any) => (
                 <DayRow
                   key={d.target_date}
@@ -301,6 +304,7 @@ function TargetsPage() {
           <CardTitle className="text-base">最近变更记录</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           {(audit.data ?? []).map((a: any) => (
             <div key={a.id} className="text-sm">
               <span className="text-muted-foreground">

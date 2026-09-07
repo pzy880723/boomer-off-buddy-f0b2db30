@@ -7,6 +7,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 const monthSchema = z.string().regex(/^\d{4}-\d{2}$/, "月份格式 yyyy-mm");
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "日期格式 yyyy-mm-dd");
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function requireHq(context: { supabase: any; userId: string }) {
   const { data } = await context.supabase
     .from("user_roles")
