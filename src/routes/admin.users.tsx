@@ -258,6 +258,15 @@ function AdminUsersContent() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
+                          <ScopeButton
+                            label={u.name ?? u.phone ?? u.email ?? ""}
+                            roles={scope?.roles ?? []}
+                            locationIds={scope?.location_ids ?? []}
+                            locations={scopes.data?.locations ?? []}
+                            onSubmit={(roles, locationIds) =>
+                              scopeMut.mutateAsync({ userId: u.id, roles, locationIds })
+                            }
+                          />
                           <EditNameButton
                             currentName={u.name}
                             label={u.phone ?? u.email ?? ""}
