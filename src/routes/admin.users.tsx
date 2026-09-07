@@ -188,6 +188,7 @@ function AdminUsersContent() {
                   <TableHead>姓名</TableHead>
                   <TableHead>手机号 / 邮箱</TableHead>
                   <TableHead>角色</TableHead>
+                  <TableHead>范围</TableHead>
                   <TableHead>状态</TableHead>
                   <TableHead>创建时间</TableHead>
                   <TableHead>最近登录</TableHead>
