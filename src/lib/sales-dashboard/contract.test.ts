@@ -91,6 +91,7 @@ describe("金额与警告", () => {
     assert.equal(w.length, 1);
     assert.equal(w[0].scope, "channel");
     assert.match(w[0].code, /youzan/);
+    assert.match(w[0].message, /未扣除退款/);
   });
 
   test("同步水位落后判定 stale", () => {

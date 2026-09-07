@@ -120,7 +120,7 @@ export function refundWarnings(channels: ChannelRefundState[]): DashboardWarning
     .filter((c) => c.refundSource === "unavailable")
     .map((c) => ({
       code: `refund_source_unavailable:${c.key}`,
-      message: `渠道 ${c.key} 没有可用的退款数据源，净销售不可用（未按 0 处理）`,
+      message: `渠道 ${c.key} 没有可用的退款数据源，其净销售为「未扣除退款」口径，请勿视为已扣退款的准确值`,
       scope: "channel" as const,
     }));
 }
