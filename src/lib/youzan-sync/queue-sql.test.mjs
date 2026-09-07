@@ -8,7 +8,7 @@ const runtime = process.env.QUEUE_PGLITE_MODULE;
 if (!runtime) throw Error('Set QUEUE_PGLITE_MODULE to a locally installed @electric-sql/pglite/dist/index.js');
 const { PGlite } = await import(pathToFileURL(runtime).href);
 const db = new PGlite();
-const migration = readFileSync(new URL('../../../supabase/migrations/20260907180726_youzan_queue_hardening.sql', import.meta.url), 'utf8');
+const migration = readFileSync(new URL('../../../supabase/migrations/20260907191142_7d0f83df-f771-49f6-a846-10100a7b4151.sql', import.meta.url), 'utf8');
 const shop = '00000000-0000-0000-0000-000000000001';
 const cursor = '00000000-0000-0000-0000-000000000002';
 before(async () => {
