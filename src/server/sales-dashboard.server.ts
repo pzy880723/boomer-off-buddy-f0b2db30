@@ -37,7 +37,11 @@ export type DashboardTodo = {
 
 export type SalesDashboardResult = {
   range: ResolvedRange;
-  scope: { mode: "all" | "single"; location_id: string | null; locations: { id: string; name: string }[] };
+  scope: {
+    mode: "all" | "single";
+    location_id: string | null;
+    locations: { id: string; name: string }[];
+  };
   metrics: {
     net_sales_fen: number | null;
     order_count: number | null;
@@ -46,7 +50,12 @@ export type SalesDashboardResult = {
   };
   channels: DashboardChannel[];
   trend: { date: string; net_sales_fen: number | null; order_count: number | null }[];
-  sources: { key: ChannelKey; last_synced_at: string | null; watermark: string | null; stale: boolean }[];
+  sources: {
+    key: ChannelKey;
+    last_synced_at: string | null;
+    watermark: string | null;
+    stale: boolean;
+  }[];
   todo: DashboardTodo | null;
   warnings: DashboardWarning[];
   generated_at: string;
@@ -122,20 +131,25 @@ export async function loadSalesDashboard(params: {
     report = data as unknown as RpcReport;
   }
 
-  const channels: DashboardChannel[] = (["pos", "storefront", "youzan"] as ChannelKey[]).map((key) => {
-    const raw = report ? (report[key] as RpcChannel) : null;
-    const refundSource: "available" | "unavailable" = key === "youzan" ? "unavailable" : "available";
-    return {
-      key,
-      label: CHANNEL_LABELS[key],
-      // 有赞没有退款数据源：净销售不可断言，返回 null
-      net_sales_fen: raw && refundSource === "available" ? num(raw.net_sales_fen) : null,
-      order_count: raw ? num(raw.order_count) : null,
-      refund_fen: raw && refundSource === "available" ? num(raw.refund_fen) : null,
-      refund_source: refundSource,
-    };
-  });
-  warnings.push(...refundWarnings(channels.map((c) => ({ key: c.key, refundSource: c.refund_source }))));
+  const channels: DashboardChannel[] = (["pos", "storefront", "youzan"] as ChannelKey[]).map(
+    (key) => {
+      const raw = report ? (report[key] as RpcChannel) : null;
+      const refundSource: "available" | "unavailable" =
+        key === "youzan" ? "unavailable" : "available";
+      return {
+        key,
+        label: CHANNEL_LABELS[key],
+        // 有赞没有退款数据源：净销售不可断言，返回 null
+        net_sales_fen: raw && refundSource === "available" ? num(raw.net_sales_fen) : null,
+        order_count: raw ? num(raw.order_count) : null,
+        refund_fen: raw && refundSource === "available" ? num(raw.refund_fen) : null,
+        refund_source: refundSource,
+      };
+    },
+  );
+  warnings.push(
+    ...refundWarnings(channels.map((c) => ({ key: c.key, refundSource: c.refund_source }))),
+  );
 
   const netSales = sumMoney(channels.map((c) => c.net_sales_fen));
   const orderCount = channels.some((c) => c.order_count == null)

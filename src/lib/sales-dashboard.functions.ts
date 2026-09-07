@@ -38,9 +38,9 @@ export const getSalesDashboard = createServerFn({ method: "GET" })
       .eq("is_active", true)
       .order("name");
     if (locError) throw new Error(`读取门店失败：${locError.message}`);
-    const locations = ((locationRows as
-      | { id: string; name: string; shop_id: string | null }[]
-      | null) ?? []).map((l) => ({ id: l.id, name: l.name, shop_id: l.shop_id ?? null }));
+    const locations = (
+      (locationRows as { id: string; name: string; shop_id: string | null }[] | null) ?? []
+    ).map((l) => ({ id: l.id, name: l.name, shop_id: l.shop_id ?? null }));
 
     let allowedLocationIds: string[];
     if (isHq) {
@@ -51,7 +51,9 @@ export const getSalesDashboard = createServerFn({ method: "GET" })
         .select("location_id")
         .eq("user_id", context.userId);
       if (permError) throw new Error(`读取门店权限失败：${permError.message}`);
-      allowedLocationIds = ((perms as { location_id: string }[] | null) ?? []).map((p) => p.location_id);
+      allowedLocationIds = ((perms as { location_id: string }[] | null) ?? []).map(
+        (p) => p.location_id,
+      );
     }
 
     const scope = resolveLocationScope({

@@ -34,15 +34,22 @@ describe("resolveRange", () => {
   });
 
   test("custom 超过 93 天被拒绝", () => {
-    assert.throws(() => resolveRange({ range: "custom", start: "2026-01-01", end: "2026-12-31" }, NOW), /93/);
+    assert.throws(
+      () => resolveRange({ range: "custom", start: "2026-01-01", end: "2026-12-31" }, NOW),
+      /93/,
+    );
     const ok = resolveRange({ range: "custom", start: "2026-06-01", end: "2026-08-01" }, NOW);
     assert.equal(ok.days, 62);
     assert.ok(ok.days <= MAX_CUSTOM_RANGE_DAYS);
   });
 
   test("非法日期与倒序区间被拒绝", () => {
-    assert.throws(() => resolveRange({ range: "custom", start: "2026-02-30", end: "2026-03-01" }, NOW));
-    assert.throws(() => resolveRange({ range: "custom", start: "2026-03-05", end: "2026-03-01" }, NOW));
+    assert.throws(() =>
+      resolveRange({ range: "custom", start: "2026-02-30", end: "2026-03-01" }, NOW),
+    );
+    assert.throws(() =>
+      resolveRange({ range: "custom", start: "2026-03-05", end: "2026-03-01" }, NOW),
+    );
     assert.throws(() => resolveRange({ range: "custom", start: "2026-03-01" }, NOW));
   });
 });
@@ -130,7 +137,11 @@ describe("门店范围授权", () => {
   });
 
   test("普通账号单店自动锁定该店", () => {
-    const s = resolveLocationScope({ requested: undefined, isHq: false, allowedLocationIds: ["loc-a"] });
+    const s = resolveLocationScope({
+      requested: undefined,
+      isHq: false,
+      allowedLocationIds: ["loc-a"],
+    });
     assert.equal(s.mode, "single");
     assert.equal(s.locationId, "loc-a");
     assert.equal(s.includeUnassigned, false);

@@ -82,7 +82,13 @@ export function resolveRange(
 
   parseDate(start);
   parseDate(end);
-  return { key: input.range, start, end, days: daysBetweenInclusive(start, end), timezone: "Asia/Shanghai" };
+  return {
+    key: input.range,
+    start,
+    end,
+    days: daysBetweenInclusive(start, end),
+    timezone: "Asia/Shanghai",
+  };
 }
 
 /** 趋势窗口：固定 7 天，止于所选结束日期 */
@@ -99,7 +105,10 @@ export function sumMoney(values: Array<number | null>): number | null {
   return values.reduce<number>((s, v) => s + (v as number), 0);
 }
 
-export function avgOrderValueFen(netSalesFen: number | null, orderCount: number | null): number | null {
+export function avgOrderValueFen(
+  netSalesFen: number | null,
+  orderCount: number | null,
+): number | null {
   if (netSalesFen == null || orderCount == null || orderCount <= 0) return null;
   return Math.round(netSalesFen / orderCount);
 }
@@ -154,7 +163,12 @@ export function resolveLocationScope(input: LocationScopeInput): LocationScope {
   const requested = input.requested;
   if (!requested || requested === "all") {
     if (input.isHq) {
-      return { mode: "all", locationId: null, locationIds: input.allowedLocationIds, includeUnassigned: true };
+      return {
+        mode: "all",
+        locationId: null,
+        locationIds: input.allowedLocationIds,
+        includeUnassigned: true,
+      };
     }
     if (input.allowedLocationIds.length === 0) throw new Error("当前账号没有被授权任何门店");
     if (input.allowedLocationIds.length === 1) {
@@ -165,10 +179,20 @@ export function resolveLocationScope(input: LocationScopeInput): LocationScope {
         includeUnassigned: false,
       };
     }
-    return { mode: "all", locationId: null, locationIds: input.allowedLocationIds, includeUnassigned: false };
+    return {
+      mode: "all",
+      locationId: null,
+      locationIds: input.allowedLocationIds,
+      includeUnassigned: false,
+    };
   }
   if (!input.isHq && !input.allowedLocationIds.includes(requested)) {
     throw new Error("无权查看该门店数据");
   }
-  return { mode: "single", locationId: requested, locationIds: [requested], includeUnassigned: false };
+  return {
+    mode: "single",
+    locationId: requested,
+    locationIds: [requested],
+    includeUnassigned: false,
+  };
 }
