@@ -56,7 +56,7 @@ union all select 'narqwgwpqglathwtyevz', 'go-u-approved', hq_approved, 'approved
 union all select 'narqwgwpqglathwtyevz', 'go-u-revoked', hq_revoked, 'revoked' from t_ids;
 
 -- 员工部分映射：把 loc2 的门店映射停用
-update go_shop_location_links set status = 'inactive'
+update go_shop_location_links set status = 'revoked'
  where go_shop_id = 'go-fixture-2';
 
 insert into t_expect
