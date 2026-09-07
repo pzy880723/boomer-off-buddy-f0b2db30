@@ -123,7 +123,8 @@ function AdminUsersContent() {
       toast.success("角色与门店范围已更新");
       qc.invalidateQueries({ queryKey: ["admin-user-scopes"] });
     },
-    onError: (e: any) => toast.error(e?.message ?? "保存失败"),
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "保存失败"),
   });
 
 
