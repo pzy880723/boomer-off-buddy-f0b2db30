@@ -59,6 +59,7 @@ import { Route as ShopMgmtOnlineRouteImport } from './routes/shop-mgmt.online'
 import { Route as ShopMgmtPaymentsRouteImport } from './routes/shop-mgmt.payments'
 import { Route as ShopMgmtProductsRouteImport } from './routes/shop-mgmt.products'
 import { Route as ShopMgmtShopsRouteImport } from './routes/shop-mgmt.shops'
+import { Route as ShopMgmtTargetsRouteImport } from './routes/shop-mgmt.targets'
 import { Route as StoreIndexRouteImport } from './routes/store.index'
 import { Route as StoreIncomingRouteImport } from './routes/store.incoming'
 import { Route as StoreInventoryRouteImport } from './routes/store.inventory'
@@ -504,6 +505,11 @@ const ShopMgmtProductsRoute = ShopMgmtProductsRouteImport.update({
 const ShopMgmtShopsRoute = ShopMgmtShopsRouteImport.update({
   id: '/shops',
   path: '/shops',
+  getParentRoute: () => ShopMgmtRoute,
+} as any)
+const ShopMgmtTargetsRoute = ShopMgmtTargetsRouteImport.update({
+  id: '/targets',
+  path: '/targets',
   getParentRoute: () => ShopMgmtRoute,
 } as any)
 const StoreIndexRoute = StoreIndexRouteImport.update({
@@ -1670,6 +1676,7 @@ export interface FileRoutesByFullPath {
   '/shop-mgmt/payments': typeof ShopMgmtPaymentsRoute
   '/shop-mgmt/products': typeof ShopMgmtProductsRoute
   '/shop-mgmt/shops': typeof ShopMgmtShopsRoute
+  '/shop-mgmt/targets': typeof ShopMgmtTargetsRoute
   '/store/incoming': typeof StoreIncomingRoute
   '/store/inventory': typeof StoreInventoryRoute
   '/store/scan': typeof StoreScanRoute
@@ -1909,6 +1916,7 @@ export interface FileRoutesByTo {
   '/shop-mgmt/payments': typeof ShopMgmtPaymentsRoute
   '/shop-mgmt/products': typeof ShopMgmtProductsRoute
   '/shop-mgmt/shops': typeof ShopMgmtShopsRoute
+  '/shop-mgmt/targets': typeof ShopMgmtTargetsRoute
   '/store/incoming': typeof StoreIncomingRoute
   '/store/inventory': typeof StoreInventoryRoute
   '/store/scan': typeof StoreScanRoute
@@ -2156,6 +2164,7 @@ export interface FileRoutesById {
   '/shop-mgmt/payments': typeof ShopMgmtPaymentsRoute
   '/shop-mgmt/products': typeof ShopMgmtProductsRoute
   '/shop-mgmt/shops': typeof ShopMgmtShopsRoute
+  '/shop-mgmt/targets': typeof ShopMgmtTargetsRoute
   '/store/incoming': typeof StoreIncomingRoute
   '/store/inventory': typeof StoreInventoryRoute
   '/store/scan': typeof StoreScanRoute
@@ -2404,6 +2413,7 @@ export interface FileRouteTypes {
     | '/shop-mgmt/payments'
     | '/shop-mgmt/products'
     | '/shop-mgmt/shops'
+    | '/shop-mgmt/targets'
     | '/store/incoming'
     | '/store/inventory'
     | '/store/scan'
@@ -2643,6 +2653,7 @@ export interface FileRouteTypes {
     | '/shop-mgmt/payments'
     | '/shop-mgmt/products'
     | '/shop-mgmt/shops'
+    | '/shop-mgmt/targets'
     | '/store/incoming'
     | '/store/inventory'
     | '/store/scan'
@@ -2889,6 +2900,7 @@ export interface FileRouteTypes {
     | '/shop-mgmt/payments'
     | '/shop-mgmt/products'
     | '/shop-mgmt/shops'
+    | '/shop-mgmt/targets'
     | '/store/incoming'
     | '/store/inventory'
     | '/store/scan'
@@ -3590,6 +3602,13 @@ declare module '@tanstack/react-router' {
       path: '/shops'
       fullPath: '/shop-mgmt/shops'
       preLoaderRoute: typeof ShopMgmtShopsRouteImport
+      parentRoute: typeof ShopMgmtRoute
+    }
+    '/shop-mgmt/targets': {
+      id: '/shop-mgmt/targets'
+      path: '/targets'
+      fullPath: '/shop-mgmt/targets'
+      preLoaderRoute: typeof ShopMgmtTargetsRouteImport
       parentRoute: typeof ShopMgmtRoute
     }
     '/store/': {
@@ -5007,6 +5026,7 @@ interface ShopMgmtRouteChildren {
   ShopMgmtPaymentsRoute: typeof ShopMgmtPaymentsRoute
   ShopMgmtProductsRoute: typeof ShopMgmtProductsRoute
   ShopMgmtShopsRoute: typeof ShopMgmtShopsRoute
+  ShopMgmtTargetsRoute: typeof ShopMgmtTargetsRoute
 }
 
 const ShopMgmtRouteChildren: ShopMgmtRouteChildren = {
@@ -5016,6 +5036,7 @@ const ShopMgmtRouteChildren: ShopMgmtRouteChildren = {
   ShopMgmtPaymentsRoute: ShopMgmtPaymentsRoute,
   ShopMgmtProductsRoute: ShopMgmtProductsRoute,
   ShopMgmtShopsRoute: ShopMgmtShopsRoute,
+  ShopMgmtTargetsRoute: ShopMgmtTargetsRoute,
 }
 
 const ShopMgmtRouteWithChildren = ShopMgmtRoute._addFileChildren(
