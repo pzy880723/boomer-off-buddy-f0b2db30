@@ -3,6 +3,7 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { normalizeCourierChoice } from "@/lib/commerce/order-policy";
 import { normalizeStorefrontOrderItems } from "@/lib/commerce/storefront-order-request";
+import { ordinaryPaymentPolicy } from "@/server/ordinary-payment-config";
 import {
   STOREFRONT_CORS,
   authenticateStorefrontCustomer,
@@ -77,10 +78,18 @@ export const Route = createFileRoute("/api/public/storefront/orders")({
         } catch (error) {
           return storefrontError(error instanceof Error ? error.message : String(error), 422);
         }
+        let paymentPolicy;
+        try { paymentPolicy = ordinaryPaymentPolicy(process.env); }
+        catch { return storefrontError("支付配置暂不可用", 503); }
+        const ordinary = paymentPolicy.mode === "ordinary_wechat";
         const { data, error } = await supabaseAdmin.rpc(
-          "commerce_create_order_v2" as never,
+          (ordinary ? "commerce_create_ordinary_order" : "commerce_create_order_v2") as never,
           {
-            p_user_id: auth.customer.id,
+            ...(paymentPolicy.mode === "ordinary_wechat" ? {
+              p_customer_id: auth.customer.id,
+              p_merchant_id: paymentPolicy.merchantId, p_app_id: paymentPolicy.appId,
+              p_owned_location_ids: paymentPolicy.ownedLocationIds,
+            } : { p_user_id: auth.customer.id }),
             p_idempotency_key: idempotencyKey,
             p_items: items,
             p_recipient_name: body.recipient_name,
