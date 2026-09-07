@@ -54,10 +54,11 @@ export const Route = createFileRoute("/api/public/hooks/youzan-sync")({
         // 订单：登记固定窗口 + 推进有界切片
         let windows = 0;
         const sliceResults: Record<string, unknown>[] = [];
+        let queueError: string | null = null;
         try {
           const enqueued = await enqueueOrderSyncWindows({ days });
           windows = enqueued.windows;
-          const workerId = `cron-${Date.now()}`;
+          const workerId = `cron-${crypto.randomUUID()}`;
           for (let i = 0; i < slices; i += 1) {
             const r = await runOrderSyncSliceOnce({ workerId, maxPages: 2, leaseSeconds: 120 });
             sliceResults.push(r);
@@ -65,18 +66,22 @@ export const Route = createFileRoute("/api/public/hooks/youzan-sync")({
           }
         } catch (e) {
           console.error("[cron youzan-sync orders]", e);
+          queueError = "order_queue_failed";
         }
 
+        const failed = sliceResults.some((r) => r.claimed === true &&
+          (r.applied === false || r.status === "error" || r.status === "failed"));
         return new Response(
           JSON.stringify({
-            ok: true,
+            ok: queueError === null && !failed,
+            order_error: queueError,
             dispatched,
             days,
             shopCount: shops?.length ?? 0,
             order_windows: windows,
             order_slices: sliceResults,
           }),
-          { headers: { "Content-Type": "application/json" } },
+          { status: queueError ? 500 : failed ? 207 : 200, headers: { "Content-Type": "application/json" } },
         );
       },
     },

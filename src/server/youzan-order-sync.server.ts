@@ -17,6 +17,7 @@ type CursorRow = {
   shop_id: string;
   window_start: string;
   window_end: string;
+  scan_end: string;
   next_page: number;
   method_label: string | null;
   total_upserted: number;
@@ -34,7 +35,7 @@ async function admin() {
   /* eslint-enable @typescript-eslint/no-explicit-any */
 }
 
-/** 固定窗口登记（幂等：同一天多次入队生成完全相同的窗口） */
+/** 固定窗口登记；DB 原子重开已完成的回溯窗口，不干扰正在分页的扫描。 */
 export async function enqueueOrderSyncWindows(opts: {
   days?: number;
   shop_id?: string;
@@ -53,12 +54,10 @@ export async function enqueueOrderSyncWindows(opts: {
     now: opts.now ?? new Date(),
     days: opts.days ?? 30,
     windowHours: opts.windowHours ?? 24,
-  }).map((w) => ({ ...w, status: "pending", next_page: 1 }));
+  });
 
   if (rows.length > 0) {
-    const { error: upsertError } = await sb
-      .from("youzan_order_sync_cursors")
-      .upsert(rows, { onConflict: "shop_id,window_start,window_end", ignoreDuplicates: true });
+    const { error: upsertError } = await sb.rpc("youzan_enqueue_order_sync_windows", { p_windows: rows });
     if (upsertError) throw new Error(upsertError.message);
   }
   return { shops: (shops ?? []).length, windows: rows.length };
@@ -71,9 +70,11 @@ export async function runOrderSyncSliceOnce(opts: {
   leaseSeconds?: number;
 }): Promise<Record<string, unknown>> {
   const sb = await admin();
+  // Unique per claim, even when one cron request runs several slices (no ABA).
+  const leaseOwner = `${opts.workerId}/${crypto.randomUUID()}`;
   const leaseSeconds = Math.max(30, Math.min(opts.leaseSeconds ?? 120, 600));
   const { data: claimed, error } = await sb.rpc("youzan_claim_order_sync_cursor", {
-    p_worker_id: opts.workerId,
+    p_worker_id: leaseOwner,
     p_lease_seconds: leaseSeconds,
   });
   if (error) throw new Error(error.message);
@@ -86,7 +87,7 @@ export async function runOrderSyncSliceOnce(opts: {
   const advance = async (outcome: ReturnType<typeof classifySliceOutcome>, upserted: number) => {
     const { data: applied, error: rpcError } = await sb.rpc("youzan_advance_order_sync_cursor", {
       p_cursor_id: cursor.id,
-      p_worker_id: opts.workerId,
+      p_worker_id: leaseOwner,
       p_status: outcome.status,
       p_next_page: outcome.next_page,
       p_method_label: outcome.method_label,
@@ -100,13 +101,28 @@ export async function runOrderSyncSliceOnce(opts: {
   };
 
   try {
+    if (!cursor.scan_end || !Number.isFinite(Date.parse(cursor.scan_end))) {
+      throw new Error("missing_scan_end: queue migration required");
+    }
     const result = await runOrdersSyncSlice({
       shop_id: cursor.shop_id,
       start: new Date(cursor.window_start),
-      end: new Date(cursor.window_end),
+      end: new Date(cursor.scan_end),
       startPage: cursor.next_page,
       maxPages: Math.max(1, Math.min(opts.maxPages ?? 3, 10)),
       methodLabel: cursor.method_label,
+      commitRows: async (rows) => {
+        const { data, error: commitError } = await sb.rpc("youzan_commit_order_sync_batch", {
+          p_cursor_id: cursor.id,
+          p_worker_id: leaseOwner,
+          p_rows: rows,
+        });
+        if (commitError) throw new Error(`order_batch_failed: ${commitError.message}`);
+        if (!Array.isArray(data) || data.some((key) => typeof key !== "string")) {
+          throw new Error("invalid_order_batch_receipt");
+        }
+        return data as string[];
+      },
     });
 
     const outcome = classifySliceOutcome(result, {
@@ -118,6 +134,8 @@ export async function runOrderSyncSliceOnce(opts: {
       outcome.status === "error" || outcome.status === "failed" ? 0 : result.count,
     );
 
+    const scanComplete = applied && outcome.status === "done";
+    const windowComplete = scanComplete && Date.parse(cursor.scan_end) >= Date.parse(cursor.window_end);
     return {
       claimed: true,
       applied,
@@ -125,9 +143,11 @@ export async function runOrderSyncSliceOnce(opts: {
       shop_id: cursor.shop_id,
       window: [cursor.window_start, cursor.window_end],
       upserted: result.count,
-      next_page: outcome.next_page,
-      status: outcome.status,
-      done: outcome.status === "done",
+      next_page: scanComplete && !windowComplete ? 1 : outcome.next_page,
+      status: !applied ? "lease_lost" : scanComplete && !windowComplete ? "pending" : outcome.status,
+      done: windowComplete,
+      scan_complete: scanComplete,
+      scanned_through: scanComplete ? cursor.scan_end : null,
       empty: outcome.empty,
       message: (outcome.reason ?? result.message).slice(0, 600),
     };

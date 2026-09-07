@@ -258,6 +258,7 @@ async function callYouzanApi(opts: {
 async function parseYouzanVerboseResponse(
   res: Response,
 ): Promise<{ payload: unknown; trace_id: string | null; preview: string }> {
+  if (!res.ok) throw new Error(`Youzan HTTP ${res.status}`);
   const text = await res.text();
   let json: unknown;
   try {
@@ -1610,9 +1611,10 @@ export const syncYouzanItems = createServerFn({ method: "POST" })
 // ============================================================
 // 内部：从有赞零售返回结构里挖出订单/交易列表
 // ============================================================
-function pickTradeRows(raw: unknown): Array<Record<string, unknown>> {
+function pickTradeRows(raw: unknown, strict = false): Array<Record<string, unknown>> {
   const visited = new Set<unknown>();
   const arrays: Array<Array<Record<string, unknown>>> = [];
+  let foundList = false;
   const keys = [
     "orders",
     "order_list",
@@ -1630,6 +1632,10 @@ function pickTradeRows(raw: unknown): Array<Record<string, unknown>> {
     if (typeof node !== "object") return;
     visited.add(node);
     if (Array.isArray(node)) {
+      foundList = true;
+      if (strict && node.some((row) => !row || typeof row !== "object" || Array.isArray(row))) {
+        throw new Error("invalid_order_list");
+      }
       if (node.length && typeof node[0] === "object") {
         arrays.push(node as Array<Record<string, unknown>>);
       }
@@ -1642,6 +1648,7 @@ function pickTradeRows(raw: unknown): Array<Record<string, unknown>> {
     }
   };
   visit(raw);
+  if (strict && !foundList) throw new Error("missing_order_list");
   if (arrays.length === 0) return [];
   arrays.sort((a, b) => b.length - a.length);
   return arrays[0];
@@ -1868,13 +1875,24 @@ export type OrdersSliceResult = {
   method_label: string | null;
 };
 
+type OrderSliceOptions = {
+  startPage?: number;
+  maxPages?: number;
+  methodLabel?: string | null;
+  /** Queue-only: validates lease and commits rows atomically before inventory work. */
+  commitRows?: (rows: Record<string, unknown>[]) => Promise<string[]>;
+};
+
 async function runOrdersSyncForShop(
   shop: ShopRow,
   startDate: Date,
   endDate: Date,
-  slice?: { startPage?: number; maxPages?: number; methodLabel?: string | null },
+  slice?: OrderSliceOptions,
 ): Promise<OrdersSliceResult> {
   const fmt = (d: Date) => {
+    if (slice?.commitRows) {
+      return new Date(d.getTime() + 8 * 3_600_000).toISOString().slice(0, 19).replace("T", " ");
+    }
     const pad = (n: number) => String(n).padStart(2, "0");
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
   };
@@ -1990,7 +2008,7 @@ async function runOrdersSyncForShop(
           });
           lastPreview = r.preview;
           lastTrace = r.trace_id;
-          const trades = pickTradeRows(r.payload);
+          const trades = pickTradeRows(r.payload, !!slice?.commitRows);
           attemptReturned += trades.length;
           if (trades.length === 0) break;
 
@@ -2018,6 +2036,7 @@ async function runOrdersSyncForShop(
                 "orderId",
               ]);
               if (!tid) {
+                if (slice?.commitRows) throw new Error("missing_order_id");
                 attemptDropped += 1;
                 return null;
               }
@@ -2080,6 +2099,9 @@ async function runOrdersSyncForShop(
               // 件数：优先用子单累加（更准），否则回退到 num 字段
               const finalNum = enriched.item_count ?? (num || null);
               const row = {
+                ...(slice?.commitRows ? {
+                  source_updated_at: parseYzTime(pickStr(n, ["modified", "update_time", "updateTime", "updated_at", "updatedAt"])),
+                } : {}),
                 shop_id: targetShop.id,
                 kdt_id: targetShop.kdt_id,
                 tid,
@@ -2111,12 +2133,19 @@ async function runOrdersSyncForShop(
           const rows = mapped.map((entry) => entry.row);
 
           if (rows.length > 0) {
-            const { error } = await supabase
-              .from("youzan_orders")
-              .upsert(rows as never, { onConflict: "kdt_id,tid" });
-            if (error) throw new Error(error.message);
-            attemptUpserted += rows.length;
+            let accepted: Set<string> | null = null;
+            if (slice?.commitRows) {
+              accepted = new Set(await slice.commitRows(rows));
+              attemptUpserted += accepted.size;
+            } else {
+              const { error } = await supabase
+                .from("youzan_orders")
+                .upsert(rows as never, { onConflict: "kdt_id,tid" });
+              if (error) throw new Error(error.message);
+              attemptUpserted += rows.length;
+            }
             for (const entry of mapped) {
+              if (accepted && !accepted.has(`${entry.row.kdt_id}:${entry.row.tid}`)) continue;
               if (!isYouzanSaleStatus(entry.status)) continue;
               try {
                 const saleResult = await processYouzanSale({
@@ -2145,7 +2174,7 @@ async function runOrdersSyncForShop(
             nextPage = page;
             break;
           }
-          if (page > 500) {
+          if (page > 500 && !slice?.commitRows) {
             nextPage = null;
             break;
           }
@@ -2157,13 +2186,16 @@ async function runOrdersSyncForShop(
       } catch (e) {
         const errMsg = e instanceof Error ? e.message : String(e);
         attemptMsgs.push(`${m.label}: ${errMsg}`);
+        // A nonempty attempt owns this slice. Earlier empty-version success must
+        // never conceal its failed read/commit or advance past missing orders.
+        if (attemptReturned > 0) apiCallSucceeded = false;
       }
       totalReturned += attemptReturned;
       totalUpserted += attemptUpserted;
       if (attemptReturned > 0) break;
     }
 
-    const status = totalReturned > 0 ? (totalUpserted > 0 ? "ok" : "empty") : "empty";
+    const status = !apiCallSucceeded ? "error" : totalUpserted > 0 ? "ok" : "empty";
     // 所有接口版本都抛错时，绝不能把窗口当成"跑完了"
     if (!apiCallSucceeded) nextPage = slice?.startPage ?? nextPage ?? 1;
     else if (totalReturned === 0) nextPage = null;
@@ -2186,7 +2218,7 @@ async function runOrdersSyncForShop(
           count_in: totalUpserted,
           count_out: totalReturned,
           message: msg,
-          error: null,
+          error: apiCallSucceeded ? null : msg.slice(0, 4000),
           finished_at: new Date().toISOString(),
         } as never)
         .eq("id", log.id);
@@ -2235,12 +2267,14 @@ export async function runOrdersSyncSlice(opts: {
   startPage?: number;
   maxPages?: number;
   methodLabel?: string | null;
+  commitRows: NonNullable<OrderSliceOptions["commitRows"]>;
 }): Promise<OrdersSliceResult> {
   const shop = await getShopOr404({ shop_id: opts.shop_id });
   return runOrdersSyncForShop(shop, opts.start, opts.end, {
     startPage: opts.startPage ?? 1,
     maxPages: opts.maxPages ?? 3,
     methodLabel: opts.methodLabel ?? null,
+    commitRows: opts.commitRows,
   });
 }
 
