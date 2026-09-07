@@ -10,9 +10,14 @@ const clean = code => stripTypeScriptTypes(code.replace(/^import[\s\S]*?;\n/gm, 
 const secret = 'local-test-only-service-key';
 const publicKey = 'local-test-only-public-key';
 
-function harness({ env = { SUPABASE_SERVICE_ROLE_KEY: secret, SUPABASE_PUBLISHABLE_KEY: publicKey }, roles = [], roleError = null } = {}) {
-  const effects = { db: 0, dispatch: [], runs: 0, reaps: 0, roleUsers: [] };
-  const sb = { from(table) {
+function harness({ env = { SUPABASE_SERVICE_ROLE_KEY: secret, SUPABASE_PUBLISHABLE_KEY: publicKey }, roles = [], roleError = null,
+  account = { id: 'actor', banned_until: null, deleted_at: null }, accountError = null, accountThrows = false } = {}) {
+  const effects = { db: 0, dispatch: [], runs: 0, reaps: 0, roleUsers: [], accountUsers: [] };
+  const sb = { auth: { admin: { getUserById: async userId => {
+    effects.accountUsers.push(userId);
+    if (accountThrows) throw new Error('auth service unavailable');
+    return { data: { user: account }, error: accountError };
+  } } }, from(table) {
     if (table === 'user_roles') return { select: () => ({ eq: async (_column, userId) => {
       effects.roleUsers.push(userId);
       return { data: roles.map(role => ({ role })), error: roleError };
@@ -117,11 +122,15 @@ for (const name of ['syncYouzanItems', 'syncYouzanOrders', 'syncAllShops']) {
     assert.equal(h.effects.reaps, 0);
     assert.equal(h.effects.runs, 0);
     assert.equal(h.effects.dispatch.length, 0);
-    if (!userId) assert.equal(h.effects.roleUsers.length, 0);
+    if (!userId) {
+      assert.equal(h.effects.roleUsers.length, 0);
+      assert.equal(h.effects.accountUsers.length, 0);
+    }
   });
   for (const role of ['super_admin', 'hq_operator']) test(`${name}: ERP ${role} remains allowed`, async () => {
     const h = manual(name, { roles: [role] });
     const result = await h.invoke();
+    assert.deepEqual(h.effects.accountUsers, ['actor']);
     assert.deepEqual(h.effects.roleUsers, ['actor']);
     if (name === 'syncAllShops') {
       assert.equal(result.shopCount, 1);
@@ -132,5 +141,28 @@ for (const name of ['syncYouzanItems', 'syncYouzanOrders', 'syncAllShops']) {
         assert.equal(init.redirect, 'error');
       }
     } else assert.equal(result.ok, true);
+  });
+  for (const [label, options, status] of [
+    ['banned HQ with still-valid JWT', { account: { id: 'actor', banned_until: '2999-01-01T00:00:00Z', deleted_at: null } }, 403],
+    ['deleted HQ with retained roles', { account: { id: 'actor', banned_until: null, deleted_at: '2026-01-01T00:00:00Z' } }, 403],
+    ['missing current account', { account: null }, 403],
+    ['account lookup failure', { accountError: { message: 'auth unavailable' } }, 503],
+    ['account lookup transport failure', { accountThrows: true }, 503],
+  ]) test(`${name}: ${label} cannot use retained HQ role`, async () => {
+    const h = manual(name, { roles: ['super_admin'], ...options });
+    await assert.rejects(h.invoke(), e => e.status === status);
+    assert.deepEqual(h.effects.accountUsers, ['actor']);
+    assert.equal(h.effects.roleUsers.length, 0);
+    assert.equal(h.effects.db, 0);
+    assert.equal(h.effects.reaps, 0);
+    assert.equal(h.effects.runs, 0);
+    assert.equal(h.effects.dispatch.length, 0);
+  });
+  test(`${name}: expired ban permits current active HQ`, async () => {
+    const h = manual(name, { roles: ['hq_operator'], account: { id: 'actor', banned_until: '2000-01-01T00:00:00Z', deleted_at: null } });
+    await h.invoke();
+    assert.deepEqual(h.effects.accountUsers, ['actor']);
+    assert.deepEqual(h.effects.roleUsers, ['actor']);
+    assert.equal(h.effects.reaps, 1);
   });
 }

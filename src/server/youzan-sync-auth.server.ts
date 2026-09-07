@@ -14,6 +14,16 @@ export function requireYouzanSyncService(request: Request): Response | null {
 
 export async function assertYouzanSyncOperator(userId: string) {
   if (!userId) throw new Response("Unauthorized", { status: 401 });
+  // Local JWT claims can outlive a ban/deletion; recheck the current ERP Auth account.
+  const { data: account, error: accountError } = await supabaseAdmin.auth.admin
+    .getUserById(userId)
+    .catch(() => { throw new Response("Sync account unavailable", { status: 503 }); });
+  if (accountError) throw new Response("Sync account unavailable", { status: 503 });
+  if (!account?.user) throw new Response("ERP account unavailable", { status: 403 });
+  const current = account.user as unknown as { banned_until?: string | null; deleted_at?: string | null };
+  if (current.deleted_at || (current.banned_until && new Date(current.banned_until).getTime() > Date.now())) {
+    throw new Response("ERP 账号已停用", { status: 403 });
+  }
   const { data, error } = await supabaseAdmin
     .from("user_roles")
     .select("role")
