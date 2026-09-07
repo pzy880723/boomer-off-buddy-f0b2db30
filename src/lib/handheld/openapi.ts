@@ -293,7 +293,7 @@ const document: ZodOpenApiObject = {
   openapi: "3.1.0",
   info: {
     title: "Boomer Off — Public API",
-    version: "1.14.0",
+    version: "1.15.0",
     description: `
 本文档覆盖：
 
@@ -851,10 +851,14 @@ X-Session-Token: <操作员 session token>
       get: {
         tags: ["商品"],
         summary: "SKU 详情（含 barcode / condition_grade / 多库位库存）",
-        description: "必须携带员工会话。scope/location_id 与商品列表一致；门店仅返回本库位有归属的商品，scope=all 仅限总部角色。stocks、stock_qty、total_stock_qty 和状态均按所选范围计算，并返回已保存的品牌、具体 IP 与年代。",
+        description:
+          "必须携带员工会话。scope/location_id 与商品列表一致；门店仅返回本库位有归属的商品，scope=all 仅限总部角色。stocks、stock_qty、total_stock_qty 和状态均按所选范围计算，并返回已保存的品牌、具体 IP 与年代。",
         requestParams: {
           path: z.object({ id: z.string().uuid() }),
-          query: z.object({ scope: ProductsQuery.shape.scope, location_id: ProductsQuery.shape.location_id }),
+          query: z.object({
+            scope: ProductsQuery.shape.scope,
+            location_id: ProductsQuery.shape.location_id,
+          }),
         },
         responses: { "200": jsonRes("OK", SkuDetailRes), ...ERROR_RESPONSES },
       },
@@ -942,6 +946,31 @@ X-Session-Token: <操作员 session token>
         summary: "发送客服消息（v1.11）",
         description:
           "body: `{ body, internal:false, client_op_id }`。`client_op_id` 唯一，重试返回同一条消息且 `replayed:true`。",
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/store/daily-summary": {
+      get: {
+        tags: ["门店经营"],
+        summary: "门店当日目标 / 实绩 / 差额（v1.15 新增）",
+        description:
+          "日期为 Asia/Shanghai 自然日，默认今天，可传 `date=yyyy-mm-dd`、`location_id`。金额一律整数分。返回 `target_fen`、`achieved_fen`、`gap_fen`、`progress_pct`，以及 `youzan`（`performance_fen` = 已付款毛额 - 运费）与 `offline`（线下补录）两部分明细。\n\n口径警告：有赞侧无退款数据源，且订单同步可能滞后，因此 `completeness.complete=false` 时 **不得** 把 `achieved_fen` 当作净销售展示；`completeness.reasons` 可能包含 `youzan_sync_stale`、`youzan_never_synced`、`refund_data_unavailable`、`location_not_bound_to_youzan_shop`。已付款判定不是白名单 `TRADE_SUCCESS`，而是「有 pay_time 且状态不在未付款/已关闭集合」，避免漏掉待发货订单。\n\n权限：普通员工固定为设备当前绑定库位；传入其它 `location_id` 需要 `X-Session-Token` 且对该库位有授权，否则 403 `location_forbidden`。",
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/store/offline-sales": {
+      get: {
+        tags: ["门店经营"],
+        summary: "线下补录列表（v1.15 新增）",
+        description:
+          "参数 `location_id`、`date_from`、`date_to`（默认今天）、`limit`(≤200)、`offset`、`include_voided`。返回 `{items,total,limit,offset}`，默认只含 `status=active`。",
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+      post: {
+        tags: ["门店经营"],
+        summary: "新增线下补录（v1.15 新增）",
+        description:
+          "仅用于 **未进入有赞** 的现金 / 刷卡 / 微信等收款。必须带 `X-Session-Token`。请求体：`business_date`(yyyy-mm-dd)、`channel`(cash|pos_card|wechat_qr|alipay_qr|bank_transfer|other)、`amount_fen`(非零整数分)、`order_count`、`evidence_type`(pos_receipt|payment_screenshot|bank_slip|handwritten_slip|manual_declaration)、`evidence_ref`/`evidence_url`（除 manual_declaration 外必填其一）、`youzan_exclusion_basis`(device_not_youzan|operator_declared|reconciled_against_youzan|unverified)、`youzan_excluded_tids`、`note`、`client_op_id`(必填，幂等)。\n\n重复提交同一 `client_op_id` 返回原记录并置 `replayed=true`，同时写一条 `replay_idempotent` 审计。注意：渠道枚举本身不能证明与有赞不重复，重复排除由 `evidence_*` 与 `youzan_exclusion_basis` 承担，`unverified` 属于低可信来源，对账时应单独复核。",
         responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
       },
     },
