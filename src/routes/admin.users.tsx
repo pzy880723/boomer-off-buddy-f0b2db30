@@ -46,6 +46,20 @@ import {
   deleteUserFn,
   updateUserNameFn,
 } from "@/lib/admin-users.functions";
+import {
+  listUserScopesFn,
+  setUserLocationsFn,
+  setUserRolesFn,
+} from "@/lib/user-scope.functions";
+
+const ROLE_LABELS: Record<string, string> = {
+  super_admin: "超级管理员",
+  hq_operator: "总部运营",
+  store_manager: "店长",
+  store_staff: "店员",
+  warehouse_staff: "仓库",
+};
+const HQ_ROLE_KEYS = ["super_admin", "hq_operator"];
 
 export const Route = createFileRoute("/admin/users")({
   head: () => ({ meta: [{ title: "账号管理 · BOOMER OFF" }] }),
