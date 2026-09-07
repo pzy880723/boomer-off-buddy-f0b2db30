@@ -1,72 +1,55 @@
-# GO 首页与身份/排班范围 —— 只读审计结论 + 最小实施方案
+# ERP 全模块只读审计（Lovable 侧证据补充）
 
-当前代码版本：`e283a421c7ad9be9c9c77912e2cb6c54c0e8fecc`（2026-09-07 10:44 UTC）。
-以下全部为只读核查；未改代码、未改角色、未跑迁移、未部署腾讯（预览环境 ≠ erp.boomeroff.com）。
+本轮**严格只读**：未编辑代码、未执行 migration、未修改数据、未 Publish。**腾讯生产 erp.boomeroff.com 完全未改动**，本报告全部基于 Lovable 内嵌数据库与当前仓库。
+分级：`[缺陷]` = 已确认；`[风险]` = 推断需复核；`[建议]` = 产品层面。
 
-用户已确认的关键约束（本轮纳入，不做其他排班形态）：
-- **同一员工同一天只在一家店**，无同日跨店/分段班。GO `shift_schedules` 保留 `UNIQUE(work_date, user_id)`，不新增多班表、不做当天切店、不做分段迁移。
-- 员工有效门店 = 按 Asia/Shanghai 当日唯一排班解析出的单店；跨店只发生在不同日期。
-- 无排班 / 休息（off）/ 排班读取失败 三种状态分开返回，任何情况下不得回退固定 `staff_profile.shop_id` 伪装成今日工作店。
+## 1. 当前版本
+- commit `618f776724d7912a443c511456b1d1818b81bc83`（2026-09-07 10:57 UTC）。
+- 上一轮审计基线为 `e283a421…`，其后仅有本项目内的目标/汇总相关自动提交。
 
-## 一、现状证据（只读 SQL / 文件）
+## 2. 迁移一致性
+- 仓库 `supabase/migrations/` 末尾 5 个：`20260906205250…`、`20260906205457…`、`20260906205748_fulfillment_complete_pick_safety.sql`、`20260907102650…`、`20260907104254…`。
+- **无法直接核对已应用版本表**：`select … from supabase_migrations.schema_migrations` 返回 `ERROR: permission denied for schema supabase_migrations`（只读角色权限受限）。`[风险]` 仓库与库的迁移一致性本轮**未能证明**，只能间接从对象存在性推断（上一轮已确认 09-07 两份目标相关迁移的对象都在库里）。要精确核对需用后台迁移工具而非只读连接。
 
-角色与门店
-- `user_roles`：只有 `super_admin` 4 人，没有 `hq_operator` / `store_manager` / `store_staff` 任何一行。
-- `user_location_perms`：0 行。目前"门店范围"在 ERP 里没有数据，所有人都是全局总部。
-- `inv_locations`（active）：中信泰富店、新天地店、温州朔门古港店（3 家均已映射有赞 `shop_id`）+ 总部仓库。
-- 结论：与你说的"总部账号没有门店"一致，但反向"门店账号"也一个都还没建。
+## 3. 安全面（仅元数据，未读取任何密钥或客户资料）
+- `public` 表 **123 张**，**RLS 关闭 0 张**。
+- `[缺陷] RLS 已启用但零策略：53 张`，等于对 Data API 完全锁死（服务端 service_role 仍可用）。清单包含整条商城/支付/POS/履约链：`commerce_orders/order_items/payments/payment_suborders/payment_events/refunds/after_sales/listings/customers/customer_identities/membership_*/points_ledger/consumption_records/recognition_usage_*/coupon_definitions/member_code_sessions`、`fulfillments/fulfillment_items/fulfillment_scans/fulfillment_exceptions`、`pos_*`（14 张）、`shipments/shipment_events/packages/package_evidence/warehouse_totes`、`inventory_reservations(_lines)`、`payment_subjects/payment_subject_applications/store_payment_profiles`、`inv_listing_image_jobs`、`youzan_category_group_links/sync_runs`、`aigc_sso_tickets`、`editorial_content_user_actions`、`print_events`。
+  - 影响：这些模块**只能走服务端 service_role**，任何"前端直连读写"的实现都会静默失败；同时也说明这些域尚未做过面向角色的权限设计。
+- `[风险] 宽泛 `USING (true)` 的写策略 40 条`，覆盖 `inv_skus / inv_stocks / inv_stock_movements / inv_epcs / inv_locations / inv_inbound_* / inv_label_batches / stocktakes / stocktake_lines / stocktake_scans / stock_transfer_lines / stock_transfer_epcs / japan_parcels(_items) / domestic_orders / domestic_bulk_* / sku_youzan_links / youzan_stock_sync_queue / app_settings / org_addresses`。
+  - 缓解事实：`pg_policy.polroles` 中**没有任何一条包含 `anon`**，且 `information_schema.role_table_grants` 显示 `anon` 与 `authenticated` 在 public 下的 INSERT/UPDATE/DELETE 授权数为 **0 行**。所以不是"匿名可写"，而是"**任何已登录 ERP 用户在库层面不受门店/角色约束**"，实际约束目前只存在于应用层。
+- SECURITY DEFINER 函数共 **47 个**；其中 `anon` 仍可 EXECUTE 的 6 个：`inv_apply_movement`、`sync_handheld_custom_listing`，以及 4 个触发器函数（`tg_editorial_content_action_count`、`tg_editorial_content_comment_count`、`tg_editorial_content_engagement_init`、`tg_fulfillment_enqueue_pick_ticket`）。
+  - `[缺陷]` `inv_apply_movement` 对 anon 可执行 = **匿名可直接改库存**（触发器函数被直接调用一般会失败，风险低；这两个不是）。这是本轮最高优先级的单点。
 
-GO 身份桥接
-- `go_identity_links` 已建（`go_project_ref, go_user_id, go_phone_hash, erp_user_id, location_id, erp_role, status, approved_by/at, revoked_at`），**0 行**。
-- 只有表，没有接入代码：仓库里没有任何读写它的服务端逻辑，也没有 GO JWT 校验端点。
-- 可复用的验签实现已存在：`src/server/consumer-auth.server.ts`（RS256 + JWKS + issuer/audience，含缓存），测试在 `src/server/consumer-auth.test.ts`；目前只服务消费者端身份服务。
-- 现有 handheld 全部接口走 `X-Device-Token`(+可选 `X-Session-Token`)（`src/server/handheld-auth.server.ts`）；GO 的 Supabase JWT 现在**无法**调用任何 handheld 接口。
+## 4. 模块清单与实现程度（不以"有页面"判定闭环）
+- **纯示例数据、无后端**（`[缺陷]` 明确未实现）：`src/routes/purchase.japan-bulk.tsx`、`src/routes/shop-mgmt.franchisees.tsx`、`src/routes/knowledge.tsx`、`src/routes/inventory.batches.tsx` —— 四者均 `import … from "@/lib/mock-data"`，按钮多为 `toast.info("功能开发中")`（japan-bulk 3 处）。即：日本大宗采购、加盟商/开店、运营知识库、批次管理**没有业务闭环**。
+- **有后端但库内近乎无数据**（`[风险]` 未经真实业务验证）：`commerce_orders=1`、`commerce_payments=1`、`fulfillments=0`、`stock_transfers=0`、`stocktakes=1`、`pos_shifts=2`、`support_conversations=0`、`editorial_contents=2`。网店订单分店履约、客服协作、调拨、POS 会员优惠、支付分账退款对账全部处于"代码在、真实流水近乎为零"的状态。
+- **支付分账/对账**：`payment_subjects/applications/store_payment_profiles` 存在但零策略；`commerce_refunds` **0 行**，`youzan_orders` 无退款金额列 → `[缺陷]` **退款与对账口径在数据层就不成立**，任何"净销售/已对账"表述都不可交付。
+- **有赞队列**：`youzan_stock_sync_queue` done 904 / failed 4；`channel_sync_outbox` succeeded 2；`inv_listing_image_jobs` succeeded 5；`print_jobs` 0 行。
+- **有赞订单同步**：`[缺陷]` `max(pay_time)=2026-08-29`，近 24h `orders` error 83 / `items` error 162，错误恒为「上次同步进程中断或超时（自动重置）—— 可能是 Worker 单次请求超时，请改用后台同步」。自 8/29 起无新订单入库。
+- **系统权限**：`[缺陷]` `user_roles` 只有 `super_admin` 4 行，`user_location_perms` **0 行** —— 四级角色模型（hq_operator/store_manager/store_staff）**在数据层从未启用**，`/admin/users` 页面存在不等于权限体系生效。
+- **商品标准/自定义/组包、库存调拨盘点、采购（日本小包/国内小包/国内大宗）、POS 基础收银**：有真实表与真实数据，属已落地部分。
 
-排班 / 员工资料
-- ERP 库里 `shift_schedules`、`staff_profiles`、`shop_kb_entries`、`notifications` 均不存在（只读核查为 NULL）。排班权威源在 GO 原库，ERP 侧零数据、零结构。
-- `go_identity_links.location_id` 是单个 location；按你的新约束（当日单店），员工身份映射仍保留一个"常驻/默认门店"字段只是可选信息，**当日有效门店一律由 GO 当日唯一排班决定**，不用它兜底。
+## 5. 一致性抽查（仅数量）
+- `sku_youzan_links` 孤立映射（指向不存在 SKU）：**0**。
+- `inv_stocks.qty < 0`：**0**。
+- 失败队列合计：有赞库存 4 条 failed；其余队列无 failed。
+- `[风险]` 未抽查：`fulfillment_items` 与 `commerce_order_items` 数量对齐、`inv_epcs` 与 `inv_stocks` 交叉一致性（样本量太小，结论无意义）。
 
-有赞同步与金额口径
-- `youzan_orders`：1948 单，`max(pay_time) = 2026-08-29 08:27:38+00`；30 天内仅 08-26~08-29 有数据 → **自 8/29 起再无新订单入库**。
-- 近 24 小时同步日志：`orders` error 83 次、`items` error 162 次，错误文本统一为「上次同步进程中断或超时（自动重置）—— 可能是 Worker 单次请求超时，请改用后台同步」；另有 `running` 残留（orders 2、items 4）。定时任务在跑，但每次都超时自重置。
-- `commerce_refunds` = 0；`youzan_orders` 无退款金额列（有 `payment,total_fee,post_fee,pay_time,status,status_text`）。**没有任何退款源**。
-- 金额口径只能是 `payment ?? total_fee` 减 `post_fee` 的"已付毛额"，且必须携带 `incomplete` 标记（同步滞后 + 退款源缺失），不能对 GO 显示"净销售"，更不能静默显示 0。
+## 6. 测试与权限覆盖缺口
+- 测试文件 36 个、含 `test(` 的文件 130 个，集中在 handheld（fulfillment/orders/products/print/smart-create）、识别、目标分配、consumer-auth。
+- `[缺陷]` 覆盖缺口：**没有任何 RLS/策略级的负向权限测试**（无"店员不能读他店数据"的库层断言）；POS 支付、分账、退款对账、有赞同步 worker、ERP Web 路由均无自动化测试。
+- `[缺陷]` 权限缺口：应用层已有 `userCanAccessLocation` 等判断，但库层 40 条 `true` 策略使其成为**唯一防线**；一旦有任何路径直接用用户 JWT 访问表，门店隔离即失效。
 
-手持日汇总现状
-- `src/routes/api/public/handheld/store.daily-summary.ts`：设备令牌必需；默认设备绑定 location；传不同的 `location_id` 需 session 且 `userCanAccessLocation` 通过。**只支持单店，没有 HQ 全店总览**，也没有"按当日排班判定门店"。
-- `src/server/store-targets.server.ts` 的 `loadDailySummary({locationId, date})` 同样单店。
+## 7. 建议的重构优先级（`[建议]`，待你确认后再谈实施）
+1. 收回 `anon` 对 `inv_apply_movement` / `sync_handheld_custom_listing` 的 EXECUTE。
+2. 落地角色数据：建 `hq_operator/store_manager/store_staff` 行 + `user_location_perms`，否则任何门店范围功能（含 GO 首页）都无处落脚。
+3. 把 40 条 `true` 策略逐域改写为 `has_role() OR location ∈ user_location_perms`，并补库层负向测试。
+4. 修有赞同步（改后台分页 + lease 超时），在恢复前所有汇总必须显式 `incomplete`。
+5. 对四个 mock 页面明确取舍：要么排期实现，要么在导航中标注未开放，避免被当作已有能力。
 
-## 二、待确认的设计（确认后再实施；视觉稿另定）
+---
 
-1) 角色与范围
-- `user_roles` 表示身份（`super_admin/hq_operator/store_manager/store_staff`），`user_location_perms` 表示可访问门店集合；总部角色不写 location 行，即"总部无门店"。
-- 派生 `scope`：`hq`（全部门店）/ `store`（固定单店）/ `scheduled`（跨店员工，门店由 GO 当日唯一排班决定）。
-
-2) 排班权威源（按你确认的约束定稿）
-- 权威留在 GO，ERP **不建** `shift_schedules`、不迁移、不清空；GO 侧保留 `UNIQUE(work_date, user_id)`。
-- ERP 只接受"当日在岗门店"的**单值**输入，并由 ERP 向 GO 校验，不信任客户端传参：GO 服务端签发的 JWT 带 `shift_location`（当日 GO shop 标识，单值），或 ERP 反调 GO 只读端点换取。二选一，需你确认。
-- 解析结果只有三种，且互斥：`{ state:'scheduled', location }` / `{ state:'off' }` / `{ state:'unavailable' }`；任何情况下都**不**回退 `staff_profile.shop_id`。
-
-3) `go_identity_links` 补丁迁移（新增，不改旧迁移）
-- 增加 `erp_scope`（`hq`/`store`/`scheduled`）与 `default_location_id`（仅 store 时用）；增加 `(go_project_ref, go_user_id)` 唯一约束与 approved 生效的读取路径。
-- 注意：这是迁移动作，必须等本方案确认后才提交。
-
-4) 接口契约（脱敏，全部只读）
-- `POST /api/public/go/session`：入参 GO JWT（Bearer）。JWKS 验签 + issuer/audience，查 `go_identity_links` 且 `status='approved'`，返回 `{ scope, home_location?, shift:{ state:'scheduled'|'off'|'unavailable', location? } }`。未登记或 pending → 403 `identity_not_linked`，绝不降级 anon。
-- `GET /api/public/go/store/daily-summary?date=&location_id=`
-  - `scope=hq`：不传 `location_id` → `{ scope:'all', totals:{...}, by_location:[{location_id,name,target_fen,actual_fen,diff_fen,completeness}] }`；传 → 单店。
-  - `scope=store|scheduled`：只允许 `shift.state='scheduled'` 的那一家店；越权或 off/unavailable → 403/409。
-  - 每店与总计都带 `completeness:{ sales_synced_through, refund_source:'unavailable', incomplete, reasons:[...] }`。
-- `GET /api/public/go/shifts/today`：HQ 返回全部门店当日排班；员工只返回本人当日那一条（或 off/unavailable）。数据从 GO 权威源读，ERP 不落库。
-- handheld `store/daily-summary` 保持单店语义不变，**另加** `scope=all`（仅 HQ 角色可用，非 HQ 直接 403），不放宽任何员工权限。
-
-5) 有赞同步修复（最小方案）
-- orders/items 从"单次请求跑完"改后台分页任务：每次 cron 只推进有限页并把游标写回 `youzan_shops`，避免 Worker 超时；`running` 残留改为按 lease 超时判定。
-- 同步恢复前，GO 首页显示"数据截至 2026-08-29 + 同步异常"，不显示 0。
-
-## 三、待部署 / 未解决项
-- 腾讯生产 `erp.boomeroff.com` 未部署本轮任何内容；预览 ≠ 线上。
-- GO JWT 的 issuer/audience/JWKS URL，以及 GO 是否愿意在 token 内下发当日 `shift_location` —— 需你确认。
-- 退款源仍缺失，任何"净销售"口径都无法交付。
-- ERP 目前没有门店级账号；需先建 `hq_operator/store_manager/store_staff` 角色行与 `user_location_perms`（作为独立步骤，本轮未做）。
-- 视觉稿待确认后再发实施任务，由你直接下达。
+## 附：上一轮 GO 排班/身份方案（等你确认，尚未实施）
+- 已确认约束：同一员工同一天只在一家店；GO `shift_schedules` 保留 `UNIQUE(work_date,user_id)`；不建多班表、不做当天切店/分段迁移；员工当日门店按 Asia/Shanghai 唯一排班解析；无排班 / 休息 / 读取失败三态分开，**不回退 `staff_profile.shop_id`**；总部显式 HQ、可看全部门店，ERP 统一配置。
+- 待确认项：GO JWT 的 issuer/audience/JWKS URL；当日门店由 token 下发还是 ERP 反调 GO 只读端点；`go_identity_links` 增补 `erp_scope`/唯一约束的补丁迁移；handheld `daily-summary` 增 `scope=all`（仅 HQ）。
+- 视觉稿与实施任务由你直接下达。
