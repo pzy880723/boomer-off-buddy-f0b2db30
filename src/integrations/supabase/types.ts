@@ -8255,6 +8255,17 @@ export type Database = {
         }
         Returns: Json
       }
+      sales_dashboard_report: {
+        Args: {
+          p_end: string
+          p_include_unassigned: boolean
+          p_location_ids: string[]
+          p_shop_ids: string[]
+          p_start: string
+          p_trend_start: string
+        }
+        Returns: Json
+      }
       sales_sku_available_qty: {
         Args: { p_location_id: string; p_sku_id: string }
         Returns: number
