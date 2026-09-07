@@ -139,8 +139,9 @@ export async function loadSalesDashboard(params: {
       return {
         key,
         label: CHANNEL_LABELS[key],
-        // 有赞没有退款数据源：净销售不可断言，返回 null
-        net_sales_fen: raw && refundSource === "available" ? num(raw.net_sales_fen) : null,
+        // 有赞没有退款数据源：net 只能是「未扣退款」的口径，用 refund_source + warning 明示
+        gross_fen: raw ? num(raw.gross_fen) : null,
+        net_sales_fen: raw ? num(raw.net_sales_fen) : null,
         order_count: raw ? num(raw.order_count) : null,
         refund_fen: raw && refundSource === "available" ? num(raw.refund_fen) : null,
         refund_source: refundSource,
