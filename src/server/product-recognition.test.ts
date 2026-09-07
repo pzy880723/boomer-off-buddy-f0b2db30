@@ -100,6 +100,39 @@ function depsFor(
 }
 
 describe("shared product recognition core", () => {
+  test("audits and returns the existing Sanrio parent while keeping Hello Kitty separate", async () => {
+    const audits: ProductRecognitionAuditInput[] = [];
+    const sanrio = {
+      id: "existing-sanrio-parent", name: "三丽鸥 (Sanrio)", name_original: "Sanrio", aliases: ["三丽鸥"],
+    };
+    const helloKitty = {
+      id: "existing-hello-kitty", name: "Hello Kitty", name_original: "ハローキティ", aliases: ["凯蒂猫"],
+    };
+    const raw = {
+      category_code: "toy_character_figure", confidence: 0.94, name: "Hello Kitty 挂件",
+      ip_name: "凯蒂猫", attributes: { brand: null },
+    };
+    let brandPrompt = "";
+    const result = await runProductRecognition({ images: ["front"], source: "handheld" }, {
+      ...depsFor(async (call) => {
+        brandPrompt = call.brandPrompt;
+        return { model: "test-vision", raw };
+      }, audits),
+      loadIps: async () => [sanrio, helloKitty],
+    });
+    assert.equal(result.attributes.brand, sanrio.name);
+    assert.equal(result.brand_id, sanrio.id);
+    assert.equal(result.ip_name, helloKitty.name);
+    assert.equal(result.ip_id, helloKitty.id);
+    assert.match(brandPrompt, /existing-sanrio-parent/);
+    assert.doesNotMatch(brandPrompt, /existing-hello-kitty/);
+    assert.equal(audits[0].attributes.brand, sanrio.name);
+    assert.equal(audits[0].brand_id, sanrio.id);
+    assert.equal(audits[0].normalized_result.ip_id, helloKitty.id);
+    assert.deepEqual(audits[0].raw_result, raw);
+    assert.equal(raw.attributes.brand, null);
+  });
+
   test("handheld description retains an era range or explicitly leaves the era unconfirmed", async () => {
     for (const era of [null, "约1980-1990年代"]) {
       const result = await runProductRecognition({ images: ["front"], source: "handheld" }, depsFor(async () => ({
@@ -136,6 +169,10 @@ describe("shared product recognition core", () => {
       assert.match(body.messages[0].content, /20-30 字/);
       assert.match(body.messages[0].content, /禁止把版权年/);
       assert.match(body.messages[0].content, /Hello Kitty/);
+      assert.match(body.messages[0].content, /attributes\.brand[^\n]*三丽鸥/);
+      assert.match(body.messages[0].content, /联名[^\n]*保留/);
+      assert.match(body.messages[0].content, /店员明确[^\n]*品牌[^\n]*优先/);
+      assert.match(body.messages[0].content, /ip_name[^\n]*置信度/);
       assert.equal(body.messages[1].content.length, 3);
     } finally {
       globalThis.fetch = previousFetch;

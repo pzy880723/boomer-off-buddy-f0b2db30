@@ -8,10 +8,12 @@ describe("handheld fast listing contract", () => {
   test("product list and detail expose persisted background image processing state", () => {
     const schemas = read("./handheld/schemas.ts");
     const productsRoute = read("../routes/api/public/handheld/products.ts");
+    const productsService = read("../server/handheld-products.server.ts");
     const detailRoute = read("../routes/api/public/handheld/items.$id.ts");
 
     assert.match(schemas, /image_processing_status/);
-    assert.match(productsRoute, /image_processing_status/);
+    assert.match(productsRoute, /handheld-products.server/);
+    assert.match(productsService, /image_processing_status/);
     assert.match(detailRoute, /image_processing_status/);
   });
 

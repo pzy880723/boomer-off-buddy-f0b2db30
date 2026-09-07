@@ -293,7 +293,7 @@ const document: ZodOpenApiObject = {
   openapi: "3.1.0",
   info: {
     title: "Boomer Off — Public API",
-    version: "1.13.0",
+    version: "1.14.0",
     description: `
 本文档覆盖：
 
@@ -568,7 +568,7 @@ X-Session-Token: <操作员 session token>
         tags: ["商品"],
         summary: "商品总账列表（含多库位库存与图片）",
         description:
-          "APP 商品页用。支持 q/type/scope/location_id/category/has_image/sort/page/page_size。默认排序 custom → bundle → standard 再按 updated_at 倒序；也支持 sort=created_desc/created_asc/price_desc/price_asc/stock_desc。响应包含 counts（各 type 角标，受 q/category 影响但不受 type 影响）和 items[].editable（standard 恒为 false）。",
+          "必须携带设备及员工会话。默认按设备当前库位；明确传 location_id 时按该库位筛选，即使总部账号也不绕过。scope=all 仅总部角色可用，查看总部及所有门店；authorized 是 current_location 的兼容别名。售罄/下架也要求真实库位关联，标准商品保留 Vintage 门店公共价格组。响应 scope 为 location:<id> 或 all，stocks 返回实际库位名称和 stock_qty。counts 与当前范围及 q/category/status/has_image 一致、不受 type 影响。支持排序和分页，standard 的 editable 恒为 false。",
         requestParams: { query: ProductsQuery },
         responses: { "200": jsonRes("OK", ProductsRes), ...ERROR_RESPONSES },
       },
@@ -588,7 +588,7 @@ X-Session-Token: <操作员 session token>
         tags: ["商品"],
         summary: "扫码或关键词查商品详情",
         description:
-          "优先用 code 匹配 barcode / sku_code / EPC / QR JSON；兼容 q 关键词，返回第一条命中商品。返回结构与 /products.items[] 同构。",
+          "员工会话及库位隔离规则与 /products 一致。优先用 code 匹配 barcode / sku_code / EPC / QR JSON；兼容 q 关键词，仅返回当前授权范围内商品。返回结构与 /products.items[] 同构，并增加实际 scope。",
         requestParams: { query: ProductLookupQuery },
         responses: { "200": jsonRes("OK", ProductLookupRes), ...ERROR_RESPONSES },
       },
@@ -851,7 +851,11 @@ X-Session-Token: <操作员 session token>
       get: {
         tags: ["商品"],
         summary: "SKU 详情（含 barcode / condition_grade / 多库位库存）",
-        requestParams: { path: z.object({ id: z.string().uuid() }) },
+        description: "必须携带员工会话。scope/location_id 与商品列表一致；门店仅返回本库位有归属的商品，scope=all 仅限总部角色。stocks、stock_qty、total_stock_qty 和状态均按所选范围计算，并返回已保存的品牌、具体 IP 与年代。",
+        requestParams: {
+          path: z.object({ id: z.string().uuid() }),
+          query: z.object({ scope: ProductsQuery.shape.scope, location_id: ProductsQuery.shape.location_id }),
+        },
         responses: { "200": jsonRes("OK", SkuDetailRes), ...ERROR_RESPONSES },
       },
     },

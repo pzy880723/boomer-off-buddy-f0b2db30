@@ -1,5 +1,6 @@
 import {
   activeLeafCategories,
+  findSanrioBrandCandidate,
   formatTaxonomyForPrompt,
   normalizeProductRecognition,
   type CategoryNode,
@@ -8,7 +9,7 @@ import {
 } from "../lib/product-classification";
 import type { BrandCandidate, FacetTerm } from "../lib/product-taxonomy";
 
-export const PRODUCT_RECOGNITION_PROMPT_VERSION = "boomer-product-v3-fast-handheld";
+export const PRODUCT_RECOGNITION_PROMPT_VERSION = "boomer-product-v4-recognition-brand";
 export const DEFAULT_PRODUCT_RECOGNITION_MODEL = "google/gemini-2.5-pro";
 export const DEFAULT_HANDHELD_PRODUCT_RECOGNITION_MODEL = "google/gemini-2.5-flash";
 export const HANDHELD_RECOGNITION_TIMEOUT_MS = 25_000;
@@ -173,7 +174,10 @@ export async function runProductRecognition(
   if (!taxonomyPrompt) throw new Error("ERP 分类树没有可用于识别的二级分类");
   const version = taxonomyVersion(categories, facets, [...brands, ...ips]);
   const facetPrompt = formatFacetsForPrompt(facets);
-  const brandPrompt = formatBrandsForPrompt(brands);
+  const sanrio = findSanrioBrandCandidate(brands, ips);
+  const brandPrompt = formatBrandsForPrompt(
+    sanrio && !brands.some((brand) => brand.id === sanrio.id) ? [...brands, sanrio] : brands,
+  );
   const ipPrompt = formatBrandsForPrompt(ips);
   const wait = deps.sleep ?? sleep;
   const { maxAttempts, timeoutMs } = recognitionAttemptPolicy(input.source);
@@ -308,7 +312,9 @@ ${input.brandPrompt || "（当前品牌库为空）"}
 IP/角色/系列只能优先匹配下面 IP 库。ip_name 必须返回图片中可确认的最具体角色，而不是母品牌或版权公司。例如能确认 Hello Kitty 时返回 "Hello Kitty"，不能只返回其母品牌 "三丽鸥 (Sanrio)"；不确定时返回 null，禁止猜测：
 ${input.ipPrompt || "（当前 IP 库为空）"}
 
-attribute_confidence 返回逐字段置信度对象，例如 brand、era、origin_country、material、craft、object_type。
+明确识别为 Hello Kitty 且没有其他明确商品品牌时，attributes.brand 填品牌库中已有的三丽鸥 (Sanrio) 规范名称，同时 ip_name 仍为 "Hello Kitty"；品牌库没有三丽鸥记录时不要创造记录。角色无法确认时不能据此补品牌。
+联名或授权制造商品有其他明确品牌时保留该品牌，不得仅因出现 Hello Kitty 图案改成三丽鸥；maker 与品牌、角色分开。店员明确指定的品牌优先保留，不要用角色归属覆盖。
+attribute_confidence 返回逐字段置信度对象，例如 brand、ip_name、era、origin_country、material、craft、object_type；ip_name 必须给出角色识别置信度，不要用类目置信度代替。
 clarification_requests 返回需要店员补拍或确认的问题数组，每项包含 field、question、reason；无需追问时返回空数组。
 品名使用中文，不超过40字；描述不超过160字。只根据图片可见证据判断，不确定字段返回 null 或空数组。禁止编造稀有度、真伪和收藏升值承诺。
 瓷器：能确认日本产地时选日本瓷器下的 active 叶子，能确认欧洲产地时选欧洲瓷器下的 active 叶子；产地无法确认时必须返回 ai_low_confidence，并在 warning 中写明需人工核对产地，禁止猜测产地，也禁止返回 porcelain_origin_unknown（该类目已停用）。古美术不收瓷器。

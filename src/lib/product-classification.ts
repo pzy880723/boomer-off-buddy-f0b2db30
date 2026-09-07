@@ -1,5 +1,6 @@
 import {
   matchBrandCandidate,
+  normalizeLookupText,
   normalizeFacetPredictions,
   type BrandCandidate,
   type FacetPrediction,
@@ -201,6 +202,20 @@ function isPorcelain(raw: RawProductRecognition, predictedCode: string | null): 
   );
 }
 
+export function findSanrioBrandCandidate(
+  brands: BrandCandidate[],
+  ips: BrandCandidate[],
+): BrandCandidate | null {
+  // The existing taxonomy also stores Sanrio as a parent IP. Reuse its identity.
+  for (const candidates of [brands, ips]) {
+    for (const name of ["三丽鸥 (Sanrio)", "Sanrio", "三丽鸥"]) {
+      const match = matchBrandCandidate(name, candidates).match;
+      if (match) return match;
+    }
+  }
+  return null;
+}
+
 export function normalizeProductRecognition(
   raw: RawProductRecognition,
   categories: CategoryNode[],
@@ -243,8 +258,25 @@ export function normalizeProductRecognition(
 
   const nested = raw.attributes ?? {};
   const normalizedFacets = normalizeFacetPredictions(raw.facet_predictions ?? [], taxonomy.facets);
-  const brand = matchBrandCandidate(nested.brand ?? raw.brand, taxonomy.brands);
   const ip = matchBrandCandidate(raw.ip_name, taxonomy.ips);
+  const sanrio = findSanrioBrandCandidate(taxonomy.brands, taxonomy.ips);
+  const clarificationRequests = cleanClarificationRequests(raw.clarification_requests);
+  const ipConfidence = raw.attribute_confidence?.ip_name === undefined
+    ? confidence
+    : cleanConfidence(raw.attribute_confidence.ip_name);
+  let brandText = cleanString(nested.brand) ?? cleanString(raw.brand);
+  if (
+    !brandText &&
+    normalizeLookupText(ip.match?.name) === "hellokitty" &&
+    ipConfidence !== null && ipConfidence >= AUTO_CLASSIFY_THRESHOLD &&
+    !clarificationRequests.some(({ field }) => field === "brand" || field === "ip_name")
+  ) {
+    brandText = sanrio?.name ?? null;
+  }
+  const brand = matchBrandCandidate(brandText, [
+    ...taxonomy.brands,
+    ...(sanrio ? [sanrio] : []),
+  ]);
   const alternatives = (raw.alternative_categories ?? [])
     .map((item) => {
       const code = cleanString(item.category_code);
@@ -266,7 +298,7 @@ export function normalizeProductRecognition(
     alternative_categories: alternatives,
     name: cleanString(raw.name) ?? "未命名中古商品",
     attributes: {
-      brand: cleanString(nested.brand ?? raw.brand),
+      brand: brandText,
       maker: cleanString(nested.maker ?? raw.maker),
       origin_region: cleanString(nested.origin_region ?? raw.origin_region),
       origin_country: cleanString(nested.origin_country ?? raw.origin_country),
@@ -310,6 +342,6 @@ export function normalizeProductRecognition(
     facets: normalizedFacets.matches,
     unmatched_facets: normalizedFacets.unmatched,
     attribute_confidence: cleanConfidenceMap(raw.attribute_confidence),
-    clarification_requests: cleanClarificationRequests(raw.clarification_requests),
+    clarification_requests: clarificationRequests,
   };
 }

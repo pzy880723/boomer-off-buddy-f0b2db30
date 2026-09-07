@@ -6,6 +6,7 @@ import {
   formatTaxonomyForPrompt,
   normalizeProductRecognition,
   type CategoryNode,
+  type RawProductRecognition,
 } from "./product-classification";
 import type { BrandCandidate, FacetTerm } from "./product-taxonomy";
 
@@ -105,6 +106,117 @@ const ips: BrandCandidate[] = [
     aliases: ["凯蒂猫", "Kitty"],
   },
 ];
+
+// Sanrio is a parent IP in the existing taxonomy, not a new brand identity.
+const sanrio: BrandCandidate = {
+  id: "existing-sanrio-parent",
+  name: "三丽鸥 (Sanrio)",
+  name_original: "Sanrio",
+  aliases: ["三丽鸥"],
+};
+const kittyTaxonomy = { facets, brands, ips: [...ips, sanrio] };
+const kittyRecognition: RawProductRecognition = {
+  category_code: "toy_character_figure",
+  confidence: 0.94,
+  name: "Hello Kitty 挂件",
+  ip_name: "Hello Kitty",
+};
+
+describe("bounded Hello Kitty recognition brand", () => {
+  for (const ipName of ["Hello Kitty", "hello kitty", "凯蒂猫", "Kitty"]) {
+    test(`fills the existing Sanrio brand for the exact character alias ${ipName}`, () => {
+      const raw = { ...kittyRecognition, ip_name: ipName, attributes: { brand: null } };
+      const result = normalizeProductRecognition(raw, categories, kittyTaxonomy);
+      assert.equal(result.attributes.brand, sanrio.name);
+      assert.equal(result.brand_id, sanrio.id);
+      assert.equal(result.brand_match_status, "matched");
+      assert.equal(result.brand_candidate_text, sanrio.name);
+      assert.equal(result.ip_id, "ip-hello-kitty");
+      assert.equal(result.ip_name, "Hello Kitty");
+      assert.equal(raw.attributes.brand, null);
+    });
+  }
+
+  test("uses the canonical row supplied by the taxonomy, including name-only parent rows", () => {
+    for (const name of ["三丽鸥 (Sanrio)", "三丽鸥", "Sanrio"]) {
+      const parent = { ...sanrio, id: `loaded-${name}`, name, name_original: null, aliases: [] };
+      const result = normalizeProductRecognition(kittyRecognition, categories, {
+        facets, brands: [...brands, parent], ips,
+      });
+      assert.equal(result.brand_id, parent.id);
+      assert.equal(result.attributes.brand, parent.name);
+    }
+  });
+
+  test("matches explicit Sanrio text to the parent IP without replacing the character", () => {
+    const result = normalizeProductRecognition({
+      ...kittyRecognition, attributes: { brand: "Sanrio" },
+    }, categories, kittyTaxonomy);
+    assert.equal(result.brand_id, sanrio.id);
+    assert.equal(result.attributes.brand, "Sanrio");
+    assert.equal(result.ip_id, "ip-hello-kitty");
+  });
+
+  test("preserves explicit conflicting brands, including a top-level brand beside blank nested text", () => {
+    for (const raw of [
+      { attributes: { brand: "Wedgwood" } },
+      { attributes: { brand: "Unknown Collaboration" } },
+      { brand: "Wedgwood" },
+      { brand: "Wedgwood", attributes: { brand: "  " } },
+    ]) {
+      const expected = raw.attributes?.brand.trim() || raw.brand;
+      const result = normalizeProductRecognition({ ...kittyRecognition, ...raw }, categories, kittyTaxonomy);
+      assert.equal(result.attributes.brand, expected);
+      assert.equal(result.brand_id, expected === "Wedgwood" ? "brand-wedgwood" : null);
+      assert.equal(result.ip_name, "Hello Kitty");
+    }
+  });
+
+  test("does not infer from a title, a fuzzy character, another character, or the parent IP alone", () => {
+    for (const ip_name of [null, "Hello Kity", "Hello Kitty x Other Character", "三丽鸥", "My Melody"]) {
+      const result = normalizeProductRecognition({ ...kittyRecognition, ip_name }, categories, kittyTaxonomy);
+      assert.equal(result.attributes.brand, null);
+      assert.equal(result.brand_id, null);
+    }
+  });
+
+  test("does not infer from low or missing confidence or unresolved brand/character questions", () => {
+    const uncertain: Partial<RawProductRecognition>[] = [
+      { confidence: 0.4 },
+      { confidence: null },
+      { attribute_confidence: { ip_name: 0.3 } },
+      { attribute_confidence: { ip_name: null } },
+      { clarification_requests: [{ field: "ip_name", question: "Confirm character?" }] },
+      { clarification_requests: [{ field: "brand", question: "Confirm collaboration brand?" }] },
+    ];
+    for (const raw of uncertain) {
+      const result = normalizeProductRecognition({ ...kittyRecognition, ...raw }, categories, kittyTaxonomy);
+      assert.equal(result.attributes.brand, null);
+      assert.equal(result.brand_id, null);
+    }
+  });
+
+  test("can use confident character evidence even when the category is uncertain", () => {
+    const result = normalizeProductRecognition({
+      ...kittyRecognition, confidence: 0.5, attribute_confidence: { ip_name: 0.96 },
+      clarification_requests: [{ field: "era", question: "Confirm era?" }],
+    }, categories, kittyTaxonomy);
+    assert.equal(result.status, "fallback");
+    assert.equal(result.brand_id, sanrio.id);
+  });
+
+  test("never invents parent or character identities when taxonomy rows are absent", () => {
+    for (const taxonomy of [
+      { facets, brands, ips },
+      { facets, brands, ips: [sanrio] },
+      { facets, brands, ips: [{ ...sanrio, aliases: ["Hello Kitty"] }] },
+    ]) {
+      const result = normalizeProductRecognition(kittyRecognition, categories, taxonomy);
+      assert.equal(result.attributes.brand, null);
+      assert.equal(result.brand_id, null);
+    }
+  });
+});
 
 describe("product classification policy", () => {
   test("only exposes active leaves whose parent is active", () => {

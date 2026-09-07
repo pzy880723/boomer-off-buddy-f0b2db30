@@ -256,18 +256,21 @@ export const ProductsQuery = z
     q: z.string().optional(),
     type: z.enum(["standard", "custom", "bundle", "all"]).default("all"),
     status: ListingStatusFilter,
-    scope: z.enum(["authorized", "current_location"]).default("authorized"),
-    location_id: uuidSchema.optional(),
+    scope: z.enum(["authorized", "current_location", "all"]).default("current_location").meta({
+      description: "current_location 为当前库位；all 仅总部角色可用，包含总部及所有门店；authorized 为旧客户端兼容值",
+    }),
+    location_id: uuidSchema.optional().meta({ description: "明确选择的 ERP 库位，总部账号选择门店时也按该库位筛选" }),
     category: z.string().optional().meta({ description: "分类精确匹配" }),
     has_image: z.enum(["0", "1"]).optional().meta({ description: "仅 custom 生效" }),
     sort: ProductSortSchema.optional(),
     page: z.coerce.number().int().min(1).default(1),
-    page_size: z.coerce.number().int().min(1).max(200).default(50),
+    page_size: z.coerce.number().int().min(1).max(500).default(50),
   })
   .meta({ id: "ProductsQuery" });
 
 export const ProductsRes = okEnvelope(
   z.object({
+    scope: z.string().meta({ description: "实际返回范围：location:<库位ID> 或 all；APP 应与发起请求的范围校验一致" }),
     items: z.array(ProductItemSchema),
     total: z.number().int(),
     page: z.number().int(),
@@ -279,18 +282,20 @@ export const ProductsRes = okEnvelope(
         standard: z.number().int(),
         all: z.number().int(),
       })
-      .meta({ description: "各 type 的角标计数（受 q/category 过滤影响，不受 type 影响）" }),
+      .meta({ description: "当前库位范围内各 type 的角标计数（受 q/category/status/has_image 过滤影响，不受 type 影响）" }),
   }),
 );
 
 export const ProductLookupQuery = z
   .object({
+    scope: ProductsQuery.shape.scope,
+    location_id: ProductsQuery.shape.location_id,
     code: z.string().optional().meta({ description: "barcode / sku_code / EPC / QR JSON" }),
     q: z.string().optional().meta({ description: "兼容 APP 测试；无 code 时按关键字返回第一条" }),
   })
   .meta({ id: "ProductLookupQuery" });
 
-export const ProductLookupRes = okEnvelope(ProductItemSchema);
+export const ProductLookupRes = okEnvelope(ProductItemSchema.extend({ scope: z.string() }));
 
 // ============================================================
 // 2.5 全局库存视图 global-stock（总仓账号专用）
@@ -815,7 +820,9 @@ export const SmartCreateReq = z
       .max(20)
       .optional()
       .meta({ description: "兼容旧 APP 的标签名称数组；新版请传 facet_codes" }),
-    brand: z.string().trim().max(120).nullable().optional(),
+    brand: z.string().trim().max(120).nullable().optional().meta({
+      description: "店员确认的品牌优先于识别结果；省略保留识别品牌，null 或空串清空。匹配既有品牌库，不自动新建品牌。",
+    }),
     ip_name: z.string().trim().max(120).nullable().optional(),
     ip_confirmed: z
       .boolean()
@@ -1057,12 +1064,20 @@ export const AuthMeRes = okEnvelope(
 
 export const SkuDetailRes = okEnvelope(
   z.object({
+    scope: z.string().meta({ description: "实际授权查询范围：location:<库位ID> 或 all" }),
     id: uuidSchema,
+    product_type: z.enum(["standard", "custom", "bundle"]),
+    editable: z.boolean(),
+    is_unlimited_stock: z.boolean(),
     sku_code: z.string().nullable(),
     barcode: z.string().nullable(),
     epc: z.string(),
     name: z.string(),
     category: z.string(),
+    brand: z.string().nullable(),
+    era: z.string().nullable(),
+    ip_name: z.string().nullable(),
+    attributes: z.record(z.string(), z.unknown()),
     facet_codes: z.array(z.string()).default([]),
     tags: z.array(z.string()).default([]),
     facets: z.array(
@@ -1103,8 +1118,8 @@ export const SkuDetailRes = okEnvelope(
     stock_qty: z
       .number()
       .int()
-      .meta({ description: "warehouse 仓库累计（inv_skus.stock_qty），兼容旧 APP" }),
-    total_stock_qty: z.number().int().meta({ description: "所有 location 累加库存" }),
+      .meta({ description: "当前授权查询范围内的库存，不能包含其他门店库存" }),
+    total_stock_qty: z.number().int().meta({ description: "当前查询范围内的 location 累加库存；scope=all 时为全库位总和" }),
     status: z.string(),
     is_display: z.boolean(),
     listing_status: z.enum(["selling", "sold_out", "in_warehouse"]),

@@ -13,6 +13,7 @@ import { buildPrintPayload } from "@/server/handheld-print.server";
 import { replayIfPresent, recordOp, jsonReplay } from "@/server/handheld-idempotency.server";
 import {
   getSmartCreateReleaseTarget,
+  persistSmartCreateBrand,
   shouldReuseSmartCreateSku,
 } from "@/server/handheld-smart-create.server";
 import {
@@ -250,6 +251,12 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
           } catch (e) {
             return err(`Link AI classification failed: ${(e as Error).message}`, 500);
           }
+        }
+        // The confirmed draft brand takes precedence over the attached recognition audit.
+        try {
+          await persistSmartCreateBrand({ skuId, brand: body.brand });
+        } catch (e) {
+          return err(`Save product brand failed: ${(e as Error).message}`, 500);
         }
         if (manualFacets) {
           try {
