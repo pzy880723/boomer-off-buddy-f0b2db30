@@ -76,6 +76,7 @@ type NavTo =
   | "/shop-mgmt/online"
   | "/shop-mgmt/franchisees"
   | "/shop-mgmt/payments"
+  | "/shop-mgmt/targets"
   | "/product-categories"
   | "/product-brands"
   | "/product-facets"
@@ -136,6 +137,7 @@ const groups: NavGroup[] = [
       { title: "门店列表", url: "/shop-mgmt/shops", icon: Building2 },
       { title: "门店支付", url: "/shop-mgmt/payments", icon: WalletCards },
       { title: "加盟商管理", url: "/shop-mgmt/franchisees", icon: Users },
+      { title: "销售目标", url: "/shop-mgmt/targets", icon: Target },
     ],
     icon: Store,
   },
