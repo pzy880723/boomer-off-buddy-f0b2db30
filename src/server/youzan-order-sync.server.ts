@@ -25,10 +25,12 @@ type CursorRow = {
 async function admin() {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+  /* eslint-disable @typescript-eslint/no-explicit-any */
   return supabaseAdmin as unknown as {
     from: (t: string) => any;
     rpc: (fn: string, args: Record<string, unknown>) => any;
   };
+  /* eslint-enable @typescript-eslint/no-explicit-any */
 }
 
 /** 按天切窗口，避免单窗口页数过多；返回登记的窗口数 */
