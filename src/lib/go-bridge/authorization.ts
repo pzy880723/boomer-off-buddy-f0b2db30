@@ -292,9 +292,14 @@ function str(v: unknown): string | null {
   return t.length > 0 ? t : null;
 }
 
-/** 当前 ERP 快照期望 GO 镜像成为什么状态 */
+/**
+ * 当前 ERP 快照期望 GO 镜像成为什么状态。
+ * 只有真正下发了可用授权（active=true）才期望 active；墓碑与任何
+ * unconfigured 阻断（无角色 / 无门店 / 映射不完整）一律期望 revoked，
+ * 与 SQL go_authorization_facts.expected_link_status 完全一致。
+ */
 export function expectedLinkStatus(snapshot: AuthorizationSnapshot): GoLinkStatus {
-  return snapshot.revoked ? "revoked" : "active";
+  return snapshot.active ? "active" : "revoked";
 }
 
 /**
