@@ -96,7 +96,7 @@ export function trendWindow(end: string): { start: string; dates: string[] } {
 /** 缺失即 null，绝不退化成 0 */
 export function sumMoney(values: Array<number | null>): number | null {
   if (values.some((v) => v == null)) return null;
-  return values.reduce((s, v) => s + (v as number), 0);
+  return values.reduce<number>((s, v) => s + (v as number), 0);
 }
 
 export function avgOrderValueFen(netSalesFen: number | null, orderCount: number | null): number | null {
