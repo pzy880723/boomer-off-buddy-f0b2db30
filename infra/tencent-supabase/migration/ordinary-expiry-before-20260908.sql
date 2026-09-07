@@ -23,4 +23,3 @@ BEGIN
   SELECT count(*) INTO v_count FROM closed;
   RETURN v_count;
 END; $function$
-
