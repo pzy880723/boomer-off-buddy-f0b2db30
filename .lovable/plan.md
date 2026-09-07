@@ -1,68 +1,66 @@
-# BOOMER GO 店员首页（销售目标 / 补录 / 排班 / Banner / 培训）— 现状核对与最小实施方案
+# GO 首页与身份/排班范围 —— 只读审计结论 + 最小实施方案
 
-当前 commit：`f23aa5513ae68cfa2fa6015f4a9036d80c0a2dc4`（2026-09-07T14:12:07+08:00）。
-本轮仅做只读调查，未改代码、未写数据、未执行迁移、**腾讯生产 erp.boomeroff.com 未部署本轮任何内容**。
+当前代码版本：`e283a421c7ad9be9c9c77912e2cb6c54c0e8fecc`（2026-09-07 10:44 UTC）。
+以下全部为只读核查；未改代码、未改角色、未跑迁移、未部署腾讯（预览环境 ≠ erp.boomeroff.com）。
 
-## 1. 有赞销售数据：已有什么
+## 一、现状证据（只读 SQL / 文件）
 
-有的：
-- `youzan_orders`（1948 行，1947 行有 `pay_time`）：字段含 `shop_id`、`kdt_id`、`tid`、`status`、`status_text`、`pay_type`、`payment`、`total_fee`、`post_fee`、`item_count`、`pay_time`、`created_time`、`raw`；唯一键 `(kdt_id, tid)` 用于 upsert 去重。
-- 店铺映射：`youzan_shops`（4 家：HQ 1 + 分店 3）→ `inv_locations.shop_id`，4 个库位全部已映射。
-- 自动同步：pg_cron 作业 1 `youzan-sync-30min`（每 30 分钟）POST `/api/public/hooks/youzan-sync`，body `{"days":3}`。
-- 现成口径参考：`src/lib/youzan-stats.functions.ts`（`getYouzanSummary` / `getShopSalesBreakdown`），按 `pay_time >= 本月1日`、金额取 `payment ?? total_fee` 累加，**未按 status 过滤**。
+角色与门店
+- `user_roles`：只有 `super_admin` 4 人，没有 `hq_operator` / `store_manager` / `store_staff` 任何一行。
+- `user_location_perms`：0 行。也就是说目前"门店范围"在 ERP 里完全没有数据，所有人都是全局总部。
+- `inv_locations`（active）：中信泰富店、新天地店、温州朔门古港店（3 家均已映射有赞 `shop_id`）+ 总部仓库。
+- 结论：用户说的"总部账号没有门店"与库里一致，但反过来"门店账号"也一个都还没建。
 
-缺口（必须在本轮补齐才能作为门店目标进度口径）：
-- **没有净销售口径**：状态分布 `TRADE_SUCCESS` 1914 / `TRADE_CLOSED` 34，现有汇总把关闭单也算进去；`post_fee`（运费）也未剔除。
-- **没有退款数据表**：无有赞退款/售后落库（`commerce_refunds` 行数 0，且属于自营商城域，不是有赞域）；退款只能靠 `status` 粗判，`status ilike '%refund%'` 命中 0 行。
-- **数据新鲜度存疑**：`youzan_orders` 最近 `pay_time` = 2026-08-29，最近 `inserted_at` = 2026-08-29；仅中信泰富店有订单，新天地店/温州店 0 单。上线前需确认是真实无成交还是同步中断。
-- **没有面向 GO 的销售接口**：`/api/public/handheld/*` 无任何销售额/营业额端点；`dashboard.ts` 只返回库存数、调拨/盘点/拣货任务与未读通知。现有 youzan-stats 是 ERP Web 的 serverFn，GO 无法安全调用。
+GO 身份桥接
+- `go_identity_links` 已建（`go_project_ref, go_user_id, go_phone_hash, erp_user_id, location_id, erp_role, status, approved_by/at, revoked_at`），**0 行**，默认 pending。
+- 只有表，没有接入代码：仓库里没有任何读写 `go_identity_links` 的服务端逻辑，也没有 GO JWT 校验端点。
+- 可复用的验签实现已存在：`src/server/consumer-auth.server.ts`（RS256 + JWKS + issuer/audience 校验，含缓存），`src/server/consumer-auth.test.ts` 有测试。这是接 GO JWT 最省事的模板，但目前它只服务消费者端身份服务。
+- 现有 handheld 全部接口走 `X-Device-Token`(+可选 `X-Session-Token`)，见 `src/server/handheld-auth.server.ts`；GO 的 Supabase JWT 现在**无法**调用任何 handheld 接口。
 
-## 2. 月目标 / 线下补录 / 防重复 / 审计
+排班 / 员工资料
+- ERP 库里 `shift_schedules`、`staff_profiles`、`shop_kb_entries`、`notifications` 均为 `NULL`（不存在）。排班权威源在 GO 原库，ERP 侧零数据、零结构。
+- `go_identity_links.location_id` 是**单个** location，无法表达"跨店员工按当日排班换店"，这是本轮设计要改的点。
 
-全部不存在。数据库 `public` schema 中没有任何 `%target%`、`%banner%`、`%train%`、`%quiz%`、`%exam%`、`%schedul%`、`%shift%`（除 `pos_shifts`）命名的表；`app_settings` 只有 3 行全局键值，不适合承载按门店按月的目标。
-线下收款侧现有的只有 POS 域：`pos_shifts`（2 行）、`pos_receipts`（1 行）、`pos_payment_attempts`、`pos_cash_movements`——是收银机流水，不是"门店手填补录账本"，且几乎无真实数据。
-因此：门店月目标、线下补录、防重复、修改审计**都需要新迁移**。
+有赞同步与金额口径
+- `youzan_orders`：1948 单，`max(pay_time) = 2026-08-29 08:27:38+00`，30 天内仅 08-26~08-29 有数据 → **自 8/29 起再无新订单入库**。
+- 近 24 小时同步日志：`orders` error 83 次、`items` error 162 次，错误文本统一为「上次同步进程中断或超时（自动重置）—— 可能是 Worker 单次请求超时，请改用后台同步」；另有 `running` 残留行（orders 2、items 4）。定时任务在跑，但每次都超时自重置。
+- `commerce_refunds` = 0；`youzan_orders` 无退款金额列（有 `payment,total_fee,post_fee,pay_time,status,status_text`）。**没有任何退款源**。
+- 因此金额口径只能是：`payment ?? total_fee` 减 `post_fee` 的"已付毛额"，且必须携带 `incomplete` 标记（同步滞后 + 退款源缺失），不能对 GO 显示为"净销售"，更不能静默显示 0。
 
-## 3. 排班 / Banner / 培训测试
+手持日汇总现状
+- `src/routes/api/public/handheld/store.daily-summary.ts`：设备令牌必需；默认取设备绑定 location；传 `location_id` 且与设备不同则要求 session 且 `userCanAccessLocation` 通过。**只支持单店，没有 HQ 全店总览**，且没有"按当日排班判定门店"的概念。
+- `src/server/store-targets.server.ts` 的 `loadDailySummary({locationId, date})` 也是单店。
 
-ERP 侧无任何表、接口或配置：`pos_shifts` 是收银班次（开/关钱箱、现金差异），语义上不能当排班表用。Banner 与培训测试题库在 ERP 无对应实体。若 GO 原库（客户端本地/旧后端）已有这三块数据，需要 Codex 提供其现有字段与来源，才能决定"ERP 托管配置"还是"GO 自持、ERP 只读透传"。**这是本轮唯一的外部依赖项**。
+## 二、待确认的设计（确认后再实施）
 
-## 4. 建议的最小实施边界
+1) 角色与范围
+- 用 `user_roles`（`super_admin/hq_operator/store_manager/store_staff`）表示身份，用 `user_location_perms` 表示"可访问门店集合"；总部角色不写任何 location 行，即"总部无门店"。
+- 新增只读派生概念 `scope`：`all`（HQ）/ `store`（单店）/ `scheduled`（跨店员工，按当日排班解析）。
 
-### 新增表（一份 additive 迁移，可回滚）
-- `store_sales_targets(location_id, period_month, target_amount, note, created_by, updated_by, timestamps)`，唯一键 `(location_id, period_month)`。
-- `store_offline_sales_entries`：门店手填补录。字段含 `location_id`、`business_date`、`channel`（`cash` / `pos_card` / `wechat_direct` / `alipay_direct` / `other`，**明确排除有赞渠道**）、`amount`、`order_count`、`note`、`client_op_id`（幂等）、`created_by`、`status`（`active` / `voided`）。唯一键 `(location_id, business_date, channel, client_op_id)` 防重复提交。
-- `store_offline_sales_audit`：每次新增/修改/作废写一条前后值快照 + 操作人 + 时间。
-- 三张表 RLS 开启 + `GRANT` 给 `authenticated` / `service_role`（GO 走设备+session 服务端 admin 客户端读写，Web 侧按角色）。
+2) 排班权威源
+- 排班权威留在 GO，ERP **不建** `shift_schedules`、不迁移、不清空。
+- ERP 只接受一个"当日在岗门店集合"的输入，并且必须由 ERP 自己向 GO 校验，不信任客户端传参：由 GO 服务端签发的 JWT 里带 `shift_locations`（当日班次门店的 GO shop 标识数组），或 ERP 反向调用 GO 一个只读端点换取。二者选一，需要你确认哪种更好落地。
+- 数据结构支持"一天多班/多店"：解析结果是数组，不是单值。
 
-### 不重复计算的口径（写进代码注释与 OpenAPI）
-```text
-门店月销售额 = 有赞净销售 + 线下补录净额
-有赞净销售 = SUM(payment) WHERE shop→location 命中且 pay_time 在月内
-             AND status = 'TRADE_SUCCESS'   (排除 TRADE_CLOSED)
-             - SUM(post_fee)                (运费不计业绩)
-线下补录净额 = SUM(amount) WHERE status='active' 且 channel ∈ 线下枚举
-             (channel 枚举不含 youzan/wechat_youzan，杜绝与有赞重复)
-```
-有赞侧退款目前无数据源，接口返回 `refund_source: "unavailable"`，不做静默估算。
+3) `go_identity_links` 需要的调整（新增补丁迁移，不改旧迁移）
+- `location_id` 单值 → 增加 `erp_scope`（`hq`/`store`/`scheduled`）与 `default_location_id`；跨店员工不预置固定门店。
+- 增加 `(go_project_ref, go_user_id)` 唯一约束与 `approved` 才生效的读取路径。
 
-### 新增 GO 接口（最小契约，全部在 `/api/public/handheld/*`，沿用 `X-Device-Token` + `X-Session-Token`）
-- `GET /handheld/store/sales-summary?location_id=&month=` → `{ target_amount, achieved_amount, progress_pct, youzan_amount, offline_amount, order_count, youzan_last_sync_at, refund_source }`
-- `GET /handheld/store/offline-sales?location_id=&date_from=&date_to=`（列表 + 分页）
-- `POST /handheld/store/offline-sales`（`client_op_id` 幂等；写审计）
-- `PATCH /handheld/store/offline-sales/{id}`、`POST .../void`（写审计，不物理删除）
-- `GET /handheld/store/home-config?location_id=` → `{ banners[], schedule[], training_tasks[] }`（第一版可只返回 ERP 已托管部分，其余为空数组，等 GO 原库字段确认后填充）
+4) 接口契约（脱敏，全部只读）
+- `POST /api/public/go/session`：入参 GO JWT（Authorization: Bearer）。ERP 用 JWKS 验签 + issuer/audience 校验，查 `go_identity_links` 且 `status='approved'`，返回 `{ scope, locations:[{id,name}], today_shift_locations:[...] }`。未登记或 pending → 403 `identity_not_linked`，绝不降级为 anon。
+- `GET /api/public/go/store/daily-summary?date=&location_id=`
+  - `scope=hq`：不传 `location_id` → 返回 `{ scope:'all', totals:{...}, by_location:[{location_id,name,target_fen,actual_fen,diff_fen,completeness}] }`；传 → 单店。
+  - `scope=store|scheduled`：忽略客户端传入的越权 `location_id`，只允许当日排班解析出的门店集合；越权返回 403。
+  - 每个门店与总计都带 `completeness:{ sales_synced_through, refund_source:'unavailable', incomplete:true/false, reasons:[...] }`。
+- `GET /api/public/go/shifts/today`：HQ 返回全部门店当日排班；员工只返回本人。数据从 GO 权威源读，ERP 不落库。
+- handheld 侧 `store/daily-summary` 保持单店语义不变，**另加** `scope=all`（仅 HQ 角色可用，非 HQ 请求该参数直接 403），不放宽任何员工权限。
 
-### 权限边界
-- 普通店员：严格限定"设备当前绑定库位"，只能读本店目标、读写本店线下补录；不能改目标。
-- `store_manager`：本店目标可读、补录可作废。
-- `super_admin` / `hq_operator`：可跨店读、可写目标、可查审计；跨店必须显式传 `location_id` 并通过 `userCanAccessLocation` 校验。
-- 复用现有 `src/server/handheld-fulfillment-access.server.ts` 的授权范式，避免另起一套。
+5) 有赞同步修复（最小方案）
+- 把 orders/items 同步从"单次请求跑完"改成后台分页任务：每次 cron 只推进有限页、把游标写回 `youzan_shops`，避免 Worker 超时；并清理 `running` 残留行的自重置逻辑，改为按 lease 超时判定。
+- 在同步真正恢复前，GO 首页必须显示"数据截至 2026-08-29 + 同步异常"，不显示 0。
 
-### 尚缺的前置条件
-1. GO 原库中排班 / Banner / 培训测试的现有结构与归属（Codex 提供）。
-2. 确认有赞订单同步是否中断（最近成交停在 2026-08-29），否则销售进度会长期偏低。
-3. 有赞退款数据源：是否新增退款拉取任务（本轮建议不做，接口先如实标注不可用）。
-4. 月目标的录入入口归属：ERP Web 还是 GO 店长端。
-
-需要迁移：**是**（3 张新表 + RLS + GRANT）。本轮不涉及有赞写操作、不涉及腾讯部署。
+## 三、待部署 / 未解决项
+- 腾讯生产 `erp.boomeroff.com` 未部署本轮任何内容；预览不等于线上。
+- GO JWT 的 issuer/audience/JWKS URL 与 GO 侧是否愿意在 token 内下发当日班次门店 —— 需要你确认。
+- 退款源仍缺失，任何"净销售"口径都无法交付。
+- ERP 目前无门店级账号，需要先建 `hq_operator/store_manager/store_staff` 角色行与 `user_location_perms`（本轮未做，等你确认后作为独立步骤）。
