@@ -20,6 +20,7 @@ import {
 export type DashboardChannel = {
   key: ChannelKey;
   label: string;
+  gross_fen: number | null;
   net_sales_fen: number | null;
   order_count: number | null;
   refund_fen: number | null;
