@@ -1,17 +1,15 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
-import {
-  allocateMonthlyTarget,
-  isoWeekday,
-  monthDates,
-  splitByWeightFen,
-} from "./allocation";
+import { allocateMonthlyTarget, isoWeekday, monthDates, splitByWeightFen } from "./allocation";
 
 describe("splitByWeightFen", () => {
   test("整数分精确拆分，合计恒等于总额", () => {
     const parts = splitByWeightFen(100_001, [1, 1, 1]);
-    assert.equal(parts.reduce((a, b) => a + b, 0), 100_001);
+    assert.equal(
+      parts.reduce((a, b) => a + b, 0),
+      100_001,
+    );
     assert.deepEqual(parts, [33_334, 33_334, 33_333]);
   });
 

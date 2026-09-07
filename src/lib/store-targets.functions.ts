@@ -156,7 +156,12 @@ export const getStoreDailySummary = createServerFn({ method: "GET" })
 export const listTargetAuditLogs = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { location_id: string; limit?: number }) =>
-    z.object({ location_id: z.string().uuid(), limit: z.number().int().min(1).max(100).optional() }).parse(input),
+    z
+      .object({
+        location_id: z.string().uuid(),
+        limit: z.number().int().min(1).max(100).optional(),
+      })
+      .parse(input),
   )
   .handler(async ({ data, context }) => {
     await requireHq(context);

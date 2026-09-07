@@ -41,19 +41,37 @@ async function resolveLocation(request: Request, requested: string | null) {
 
   if (requested && requested !== auth.device.location_id) {
     if (!session) {
-      return { ok: false as const, response: err("Cross-location access requires a session", 401, { code: "session_required" }) };
+      return {
+        ok: false as const,
+        response: err("Cross-location access requires a session", 401, {
+          code: "session_required",
+        }),
+      };
     }
     if (!(await userCanAccessLocation(session.user_id, requested))) {
-      return { ok: false as const, response: err("You do not have permission to operate this location", 403, { code: "location_forbidden" }) };
+      return {
+        ok: false as const,
+        response: err("You do not have permission to operate this location", 403, {
+          code: "location_forbidden",
+        }),
+      };
     }
     locationId = requested;
   } else if (session && locationId) {
     if (!(await userCanAccessLocation(session.user_id, locationId))) {
-      return { ok: false as const, response: err("You do not have permission to operate this location", 403, { code: "location_forbidden" }) };
+      return {
+        ok: false as const,
+        response: err("You do not have permission to operate this location", 403, {
+          code: "location_forbidden",
+        }),
+      };
     }
   }
   if (!locationId) {
-    return { ok: false as const, response: err("Device has no bound location", 400, { code: "location_required" }) };
+    return {
+      ok: false as const,
+      response: err("Device has no bound location", 400, { code: "location_required" }),
+    };
   }
   return { ok: true as const, locationId, session };
 }
@@ -108,12 +126,28 @@ export const Route = createFileRoute("/api/public/handheld/store/offline-sales")
         const businessDate = String(body["business_date"] ?? shanghaiToday());
         const clientOpId = String(body["client_op_id"] ?? "");
 
-        if (!CHANNELS.includes(channel)) return err(`channel must be one of ${CHANNELS.join(",")}`, 400, { code: "invalid_channel" });
-        if (!EVIDENCE.includes(evidenceType)) return err(`evidence_type must be one of ${EVIDENCE.join(",")}`, 400, { code: "invalid_evidence_type" });
-        if (!EXCLUSION.includes(exclusion)) return err(`youzan_exclusion_basis must be one of ${EXCLUSION.join(",")}`, 400, { code: "invalid_exclusion_basis" });
-        if (!Number.isInteger(amountFen) || amountFen === 0) return err("amount_fen must be a non-zero integer (fen)", 400, { code: "invalid_amount" });
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(businessDate)) return err("business_date must be yyyy-mm-dd", 400, { code: "invalid_date" });
-        if (!clientOpId) return err("client_op_id is required for idempotency", 400, { code: "client_op_id_required" });
+        if (!CHANNELS.includes(channel))
+          return err(`channel must be one of ${CHANNELS.join(",")}`, 400, {
+            code: "invalid_channel",
+          });
+        if (!EVIDENCE.includes(evidenceType))
+          return err(`evidence_type must be one of ${EVIDENCE.join(",")}`, 400, {
+            code: "invalid_evidence_type",
+          });
+        if (!EXCLUSION.includes(exclusion))
+          return err(`youzan_exclusion_basis must be one of ${EXCLUSION.join(",")}`, 400, {
+            code: "invalid_exclusion_basis",
+          });
+        if (!Number.isInteger(amountFen) || amountFen === 0)
+          return err("amount_fen must be a non-zero integer (fen)", 400, {
+            code: "invalid_amount",
+          });
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(businessDate))
+          return err("business_date must be yyyy-mm-dd", 400, { code: "invalid_date" });
+        if (!clientOpId)
+          return err("client_op_id is required for idempotency", 400, {
+            code: "client_op_id_required",
+          });
 
         const roles = await loadUserRoles(resolved.session.user_id);
         const input: OfflineEntryInput = {

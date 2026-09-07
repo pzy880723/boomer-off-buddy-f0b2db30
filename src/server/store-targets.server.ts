@@ -26,9 +26,10 @@ export type ActorContext = {
   actorRole: string | null;
 };
 
-const db = () => supabaseAdmin as unknown as {
-  from: (t: string) => any;
-};
+const db = () =>
+  supabaseAdmin as unknown as {
+    from: (t: string) => any;
+  };
 
 // ---------------------------------------------------------------- 日销售汇总
 
@@ -104,9 +105,11 @@ export async function loadDailySummary(params: {
     .eq("location_id", params.locationId)
     .eq("business_date", date)
     .eq("status", "active");
-  const offline = ((offlineRows ?? []) as { amount_fen: number; order_count: number }[]).reduce<
-    { amount_fen: number; entry_count: number; order_count: number }
-  >(
+  const offline = ((offlineRows ?? []) as { amount_fen: number; order_count: number }[]).reduce<{
+    amount_fen: number;
+    entry_count: number;
+    order_count: number;
+  }>(
     (acc, r) => ({
       amount_fen: acc.amount_fen + Number(r.amount_fen || 0),
       entry_count: acc.entry_count + 1,
@@ -198,13 +201,17 @@ export async function publishMonthlyPlan(input: PublishPlanInput, actor: ActorCo
   // 版本号：同门店同月递增
   const { data: prevPlans } = await db()
     .from("store_monthly_target_plans")
-    .select("id, version, status, target_amount_fen, weekday_weights, date_weight_overrides, closed_dates")
+    .select(
+      "id, version, status, target_amount_fen, weekday_weights, date_weight_overrides, closed_dates",
+    )
     .eq("location_id", input.locationId)
     .eq("period_month", periodMonth)
     .order("version", { ascending: false });
 
   const prevPublished = ((prevPlans ?? []) as any[]).find((p) => p.status === "published") ?? null;
-  const nextVersion = ((prevPlans ?? []) as any[])[0]?.version ? Number((prevPlans as any[])[0].version) + 1 : 1;
+  const nextVersion = ((prevPlans ?? []) as any[])[0]?.version
+    ? Number((prevPlans as any[])[0].version) + 1
+    : 1;
 
   if (prevPublished) {
     await db()
@@ -254,27 +261,29 @@ export async function publishMonthlyPlan(input: PublishPlanInput, actor: ActorCo
     if (upErr) throw new Error(upErr.message);
   }
 
-  await db().from("store_target_audit_logs").insert({
-    entity_type: "monthly_plan",
-    entity_id: plan.id,
-    location_id: input.locationId,
-    period_month: periodMonth,
-    action: "publish",
-    before_snapshot: prevPublished ?? null,
-    after_snapshot: {
-      plan,
-      allocation_summary: {
-        frozen_fen: allocation.frozen_fen,
-        distributable_fen: allocation.distributable_fen,
-        total_fen: allocation.total_fen,
-        warnings: allocation.warnings,
-        written_days: writable.length,
+  await db()
+    .from("store_target_audit_logs")
+    .insert({
+      entity_type: "monthly_plan",
+      entity_id: plan.id,
+      location_id: input.locationId,
+      period_month: periodMonth,
+      action: "publish",
+      before_snapshot: prevPublished ?? null,
+      after_snapshot: {
+        plan,
+        allocation_summary: {
+          frozen_fen: allocation.frozen_fen,
+          distributable_fen: allocation.distributable_fen,
+          total_fen: allocation.total_fen,
+          warnings: allocation.warnings,
+          written_days: writable.length,
+        },
       },
-    },
-    reason: input.reason ?? null,
-    actor_id: actor.actorId,
-    actor_role: actor.actorRole,
-  });
+      reason: input.reason ?? null,
+      actor_id: actor.actorId,
+      actor_role: actor.actorRole,
+    });
 
   return { plan, allocation, written_days: writable.length };
 }
@@ -321,18 +330,20 @@ export async function overrideDailyTarget(
     .single();
   if (error) throw new Error(error.message);
 
-  await db().from("store_target_audit_logs").insert({
-    entity_type: "daily_target",
-    entity_id: after.id,
-    location_id: input.locationId,
-    target_date: input.date,
-    action: "daily_override",
-    before_snapshot: before ?? null,
-    after_snapshot: after,
-    reason: input.reason ?? null,
-    actor_id: actor.actorId,
-    actor_role: actor.actorRole,
-  });
+  await db()
+    .from("store_target_audit_logs")
+    .insert({
+      entity_type: "daily_target",
+      entity_id: after.id,
+      location_id: input.locationId,
+      target_date: input.date,
+      action: "daily_override",
+      before_snapshot: before ?? null,
+      after_snapshot: after,
+      reason: input.reason ?? null,
+      actor_id: actor.actorId,
+      actor_role: actor.actorRole,
+    });
   return after;
 }
 

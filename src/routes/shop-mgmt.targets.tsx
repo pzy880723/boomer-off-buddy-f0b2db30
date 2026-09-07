@@ -142,7 +142,8 @@ function TargetsPage() {
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold">门店销售目标</h1>
         <p className="text-muted-foreground text-sm">
-          月目标只是拆解依据，店员端首页展示的是「今日目标 / 今日实绩 / 差额」。已过去的日期与手工锁定日不会被重新拆分覆盖。
+          月目标只是拆解依据，店员端首页展示的是「今日目标 / 今日实绩 /
+          差额」。已过去的日期与手工锁定日不会被重新拆分覆盖。
         </p>
       </header>
 
@@ -150,22 +151,33 @@ function TargetsPage() {
         <div className="space-y-1">
           <Label>门店</Label>
           <Select value={activeLocation} onValueChange={setLocationId}>
-            <SelectTrigger className="w-56"><SelectValue placeholder="选择门店" /></SelectTrigger>
+            <SelectTrigger className="w-56">
+              <SelectValue placeholder="选择门店" />
+            </SelectTrigger>
             <SelectContent>
               {(locations.data ?? []).map((l: any) => (
-                <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+                <SelectItem key={l.id} value={l.id}>
+                  {l.name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
         <div className="space-y-1">
           <Label>月份</Label>
-          <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="w-40" />
+          <Input
+            type="month"
+            value={month}
+            onChange={(e) => setMonth(e.target.value)}
+            className="w-40"
+          />
         </div>
       </div>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">今日进度（{today}，中国时间）</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">今日进度（{today}，中国时间）</CardTitle>
+        </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-4">
           <Stat label="今日目标" value={yuan(summary.data?.target_fen ?? null)} />
           <Stat label="今日实绩" value={yuan(summary.data?.achieved_fen ?? null)} />
@@ -191,18 +203,32 @@ function TargetsPage() {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">发布本月目标</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">发布本月目标</CardTitle>
+        </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-1">
               <Label>月目标（元）</Label>
-              <Input value={monthlyYuan} onChange={(e) => setMonthlyYuan(e.target.value)} placeholder="例如 300000" className="w-40" />
+              <Input
+                value={monthlyYuan}
+                onChange={(e) => setMonthlyYuan(e.target.value)}
+                placeholder="例如 300000"
+                className="w-40"
+              />
             </div>
             <div className="space-y-1 grow">
               <Label>发布原因 / 备注</Label>
-              <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="记录到审计日志" />
+              <Input
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="记录到审计日志"
+              />
             </div>
-            <Button disabled={!activeLocation || publish.isPending} onClick={() => publish.mutate()}>
+            <Button
+              disabled={!activeLocation || publish.isPending}
+              onClick={() => publish.mutate()}
+            >
               {publish.isPending ? "发布中…" : "发布并拆分到每日"}
             </Button>
           </div>
@@ -223,8 +249,8 @@ function TargetsPage() {
           </div>
           {plan.data?.plan ? (
             <p className="text-muted-foreground text-sm">
-              当前生效版本 v{plan.data.plan.version}，月目标 {yuan(Number(plan.data.plan.target_amount_fen))}，
-              已拆分日目标合计 {yuan(totalFen)}。
+              当前生效版本 v{plan.data.plan.version}，月目标{" "}
+              {yuan(Number(plan.data.plan.target_amount_fen))}， 已拆分日目标合计 {yuan(totalFen)}。
             </p>
           ) : (
             <p className="text-muted-foreground text-sm">本月尚未发布目标。</p>
@@ -233,7 +259,9 @@ function TargetsPage() {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">每日目标</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">每日目标</CardTitle>
+        </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
@@ -269,11 +297,15 @@ function TargetsPage() {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">最近变更记录</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">最近变更记录</CardTitle>
+        </CardHeader>
         <CardContent className="space-y-2">
           {(audit.data ?? []).map((a: any) => (
             <div key={a.id} className="text-sm">
-              <span className="text-muted-foreground">{new Date(a.created_at).toLocaleString("zh-CN")}</span>{" "}
+              <span className="text-muted-foreground">
+                {new Date(a.created_at).toLocaleString("zh-CN")}
+              </span>{" "}
               · {a.action} · {a.target_date ?? a.period_month} {a.reason ? `· ${a.reason}` : ""}
             </div>
           ))}
@@ -323,7 +355,9 @@ function DayRow({
       <TableCell>
         <div className="flex items-center gap-2">
           <Input value={value} onChange={(e) => setValue(e.target.value)} className="w-28" />
-          <Button size="sm" variant="outline" onClick={() => onSave(value)}>保存</Button>
+          <Button size="sm" variant="outline" onClick={() => onSave(value)}>
+            保存
+          </Button>
         </div>
       </TableCell>
     </TableRow>

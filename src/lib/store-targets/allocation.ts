@@ -125,7 +125,7 @@ export function splitByWeightFen(totalFen: number, weights: number[]): number[] 
   }
   let leftover = totalFen - used;
   // 余数大者优先；完全相同则日期靠前优先（i 升序，稳定）
-  remainders.sort((a, b) => (b.frac - a.frac) || (a.i - b.i));
+  remainders.sort((a, b) => b.frac - a.frac || a.i - b.i);
   let k = 0;
   while (leftover > 0 && remainders.length > 0) {
     const target = remainders[k % remainders.length];
@@ -229,7 +229,10 @@ export function allocateMonthlyTarget(input: AllocationInput): AllocationResult 
     warnings.push(`可分配日期权重合计为 0，剩余 ${distributable} 分未分配。`);
   }
 
-  const amounts = splitByWeightFen(distributable, openForAlloc.map((d) => d.weight));
+  const amounts = splitByWeightFen(
+    distributable,
+    openForAlloc.map((d) => d.weight),
+  );
   const allocated: AllocatedDay[] = openForAlloc.map((d, i) => ({
     date: d.date,
     weekday: isoWeekday(d.date),

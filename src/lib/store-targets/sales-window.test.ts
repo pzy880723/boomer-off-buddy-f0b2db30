@@ -53,7 +53,13 @@ describe("isYouzanPaidOrder", () => {
 
   test("没有付款时间一律不计入", () => {
     assert.equal(
-      isYouzanPaidOrder({ status: "TRADE_SUCCESS", pay_time: null, payment: 100, total_fee: 100, post_fee: 0 }),
+      isYouzanPaidOrder({
+        status: "TRADE_SUCCESS",
+        pay_time: null,
+        payment: 100,
+        total_fee: 100,
+        post_fee: 0,
+      }),
       false,
     );
   });
@@ -116,7 +122,11 @@ describe("evaluateCompleteness", () => {
 
 describe("computeDailyProgress", () => {
   test("今日目标 / 实绩 / 差额", () => {
-    const p = computeDailyProgress({ targetFen: 100_000, youzanPerformanceFen: 60_000, offlineFen: 15_000 });
+    const p = computeDailyProgress({
+      targetFen: 100_000,
+      youzanPerformanceFen: 60_000,
+      offlineFen: 15_000,
+    });
     assert.deepEqual(p, {
       target_fen: 100_000,
       achieved_fen: 75_000,
