@@ -2449,6 +2449,45 @@ export type Database = {
           },
         ]
       }
+      go_authorization_snapshots: {
+        Row: {
+          computed_at: string
+          created_at: string
+          erp_user_id: string
+          go_project_ref: string
+          go_user_id: string | null
+          last_pulled_at: string
+          payload: Json
+          payload_hash: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          computed_at?: string
+          created_at?: string
+          erp_user_id: string
+          go_project_ref: string
+          go_user_id?: string | null
+          last_pulled_at?: string
+          payload: Json
+          payload_hash: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          computed_at?: string
+          created_at?: string
+          erp_user_id?: string
+          go_project_ref?: string
+          go_user_id?: string | null
+          last_pulled_at?: string
+          payload?: Json
+          payload_hash?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: []
+      }
       go_identity_links: {
         Row: {
           approved_at: string | null
@@ -8459,10 +8498,14 @@ export type Database = {
       gen_stock_transfer_code: { Args: never; Returns: string }
       go_authorization_ack: {
         Args: { p_erp_user_id: string; p_version: number }
-        Returns: number
+        Returns: Json
       }
       go_authorization_snapshot: {
-        Args: { p_erp_user_id: string }
+        Args: {
+          p_erp_user_id: string
+          p_go_user_id: string
+          p_permission_rev: number
+        }
         Returns: Json
       }
       go_scope_enqueue_sync: {
