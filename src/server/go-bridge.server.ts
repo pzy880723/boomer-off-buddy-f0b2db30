@@ -14,6 +14,7 @@
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { createTrustedGoFetch } from "@/server/trusted-go-fetch.server";
 import {
   GoScopeError,
   resolveGoScope,
@@ -65,13 +66,7 @@ function goClient(env: GoEnv, userToken?: string): SupabaseClient {
   return createClient(env.url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
     global: {
-      fetch: (input, init) => {
-        const headers = new Headers(init?.headers);
-        headers.set("apikey", key);
-        if (userToken) headers.set("Authorization", `Bearer ${userToken}`);
-        else if (key.startsWith("sb_")) headers.delete("Authorization");
-        return fetch(input as RequestInfo, { ...init, headers });
-      },
+      fetch: createTrustedGoFetch(key, userToken),
     },
   });
 }
@@ -484,7 +479,7 @@ export const GO_CORS = {
 export function goJson(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json", ...GO_CORS },
+    headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...GO_CORS },
   });
 }
 
