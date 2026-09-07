@@ -24,6 +24,25 @@ const input = {
   youzan: [],
   hasYouzan: false,
 };
+test("POS returns reduce only the owning store; ambiguous duplicate ledgers stay unknown", () => {
+  const sale = {
+    ...order,
+    pos_returns: [{ status: "completed", location_id: "b", refund_total: 5 }],
+  };
+  assert.equal(aggregateSales({ ...input, commerce: [sale] }).metrics.netSalesFen, 2500);
+  assert.equal(
+    aggregateSales({ ...input, all: false, locationIds: ["a"], commerce: [sale] }).metrics
+      .netSalesFen,
+    1000,
+  );
+  assert.equal(
+    aggregateSales({
+      ...input,
+      commerce: [{ ...sale, refunds: [{ amount: 5, status: "succeeded", after_sale: null }] }],
+    }).metrics.netSalesFen,
+    null,
+  );
+});
 test("paid totals, units and successful refunds use cents", () => {
   const result = aggregateSales({
     ...input,

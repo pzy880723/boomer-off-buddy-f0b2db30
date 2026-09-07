@@ -82,7 +82,7 @@ export async function loadSalesDashboard(
       let query = db
         .from("commerce_orders")
         .select(
-          `id,order_no,source_channel,paid_at,payment_status,order_status,currency,total_amount,items:commerce_order_items(id,location_id,quantity,line_total),refunds:commerce_refunds(amount,status,after_sale:commerce_after_sales!after_sale_id(order_item_id))${all ? "" : ",scope_items:commerce_order_items!inner(location_id)"}`,
+          `id,order_no,source_channel,paid_at,payment_status,order_status,currency,total_amount,items:commerce_order_items(id,location_id,quantity,line_total),refunds:commerce_refunds(amount,status,after_sale:commerce_after_sales!after_sale_id(order_item_id)),pos_returns(status,location_id,refund_total)${all ? "" : ",scope_items:commerce_order_items!inner(location_id)"}`,
         )
         .in("source_channel", ["pos", "storefront", "manual"])
         .gte("paid_at", start)

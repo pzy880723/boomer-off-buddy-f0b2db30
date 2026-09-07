@@ -16,6 +16,7 @@ export type CommerceSale = {
     status: string;
     after_sale: { order_item_id: string | null } | null;
   }>;
+  pos_returns?: Array<{ status: string; location_id: string; refund_total: number }>;
 };
 export type YouzanSale = {
   tid: string;
@@ -106,8 +107,24 @@ export function aggregateSales(input: {
       : input.locationIds.reduce((sum, id) => sum + (shares.get(id) ?? 0), 0);
     let refund: number | null = 0;
     const succeeded = order.refunds.filter((row) => row.status === "succeeded");
+    const posReturns = (order.pos_returns ?? []).filter((row) =>
+      ["completed", "refunded"].includes(row.status),
+    );
     const totalRefund = succeeded.reduce((sum, row) => sum + toFen(row.amount), 0);
-    if (["partially_refunded", "refunded"].includes(order.payment_status) && !succeeded.length) {
+    if (posReturns.length && succeeded.length) {
+      refund = null;
+      warnings.add("部分收银订单同时存在两类退款记录，需核对是否重复，净额暂不合计。");
+    } else if (posReturns.length) {
+      refund = posReturns.reduce(
+        (sum, row) =>
+          sum +
+          (input.all || input.locationIds.includes(row.location_id) ? toFen(row.refund_total) : 0),
+        0,
+      );
+    } else if (
+      ["partially_refunded", "refunded"].includes(order.payment_status) &&
+      !succeeded.length
+    ) {
       refund = null;
       warnings.add("部分订单标为已退款，但缺少成功退款流水，净额待核对。");
     } else if (input.all) refund = totalRefund;
