@@ -14,3 +14,13 @@
 - [x] D 打印任务队列：自动出票、设备互斥租约、ack/failed/unknown
 - [ ] E 面单：仅能力状态 carrier_not_configured，待真实快递商户资质后接入
 - [x] OpenAPI v1.11 + 契约测试 + 事务内数据库回归
+
+## 门店日目标 / 线下补录（2026-09-07）
+- [x] 迁移：store_monthly_target_plans / store_daily_targets / store_target_audit_logs / store_offline_sales_entries / store_offline_sales_audit_logs / go_identity_links（含 GRANT + RLS）
+- [x] 月目标→日目标拆分算法（整数分、精确合计、周末/单日权重、过期与锁定日不重算、未达标不摊余）+ 24 项单测
+- [x] 日汇总口径（Asia/Shanghai、已付款毛额-运费、incomplete 原因）
+- [x] handheld API：/store/daily-summary、/store/offline-sales（GET/POST 幂等）；OpenAPI 1.15.0
+- [x] ERP 后台 /shop-mgmt/targets 配置页（HQ 可写，店员只读）
+- [ ] GO(bef32724) Supabase JWT ↔ ERP 身份/门店桥接：仅落 go_identity_links 登记表，验签与换票未实现
+- [ ] 有赞订单同步中断修复（Worker 超时自动重置，自 08-29 无新订单）
+- [ ] 有赞退款数据源接入（当前一律 incomplete）
