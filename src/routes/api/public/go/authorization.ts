@@ -17,7 +17,7 @@ export const Route = createFileRoute("/api/public/go/authorization")({
       GET: async ({ request }) => {
         try {
           const identity = await authenticateGoIdentity(request);
-          const snapshot = await loadAuthorizationSnapshot(identity.erpUserId);
+          const snapshot = await loadAuthorizationSnapshot(identity.erpUserId, identity.goUserId);
           return authzJson({ ok: true, data: snapshot });
         } catch (e) {
           return authzError(e);
