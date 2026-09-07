@@ -76,7 +76,10 @@ async function applyScopeAtomic(input: {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
   const sb = supabaseAdmin as unknown as {
-    rpc: (fn: string, args: Record<string, unknown>) => any;
+    rpc: (
+      fn: string,
+      args: Record<string, unknown>,
+    ) => Promise<{ data: unknown; error: { message: string } | null }>;
   };
   const { data, error } = await sb.rpc("set_user_scope_atomic", {
     p_actor_id: input.actorId,

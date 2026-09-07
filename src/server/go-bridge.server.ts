@@ -91,7 +91,11 @@ export type GoActor = {
 const HQ_ROLES = new Set(["super_admin", "hq_operator"]);
 
 const sb = () =>
-  supabaseAdmin as unknown as { from: (t: string) => any; auth: typeof supabaseAdmin.auth };
+  supabaseAdmin as unknown as {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    from: (t: string) => any;
+    auth: typeof supabaseAdmin.auth;
+  };
 
 /** 全部真实门店（kind=shop 且启用），仓库不计入 */
 async function loadRealShops(): Promise<{ id: string; name: string }[]> {

@@ -140,6 +140,7 @@ function AdminUsersContent() {
       toast.success("账号已创建");
       qc.invalidateQueries({ queryKey: ["admin-users"] });
     },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onError: (e: any) => toast.error(e?.message ?? "创建失败"),
   });
 
@@ -149,6 +150,7 @@ function AdminUsersContent() {
       toast.success("密码已重置，用户下次登录需修改");
       qc.invalidateQueries({ queryKey: ["admin-users"] });
     },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onError: (e: any) => toast.error(e?.message ?? "重置失败"),
   });
 
@@ -158,6 +160,7 @@ function AdminUsersContent() {
       toast.success("账号已删除");
       qc.invalidateQueries({ queryKey: ["admin-users"] });
     },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onError: (e: any) => toast.error(e?.message ?? "删除失败"),
   });
 
@@ -167,6 +170,7 @@ function AdminUsersContent() {
       toast.success("姓名已更新");
       qc.invalidateQueries({ queryKey: ["admin-users"] });
     },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onError: (e: any) => toast.error(e?.message ?? "更新失败"),
   });
 
