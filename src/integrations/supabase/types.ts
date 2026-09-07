@@ -2410,6 +2410,65 @@ export type Database = {
           },
         ]
       }
+      go_identity_links: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          erp_role: string | null
+          erp_user_id: string | null
+          go_phone_hash: string | null
+          go_project_ref: string
+          go_user_id: string
+          id: string
+          location_id: string | null
+          note: string | null
+          revoked_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          erp_role?: string | null
+          erp_user_id?: string | null
+          go_phone_hash?: string | null
+          go_project_ref: string
+          go_user_id: string
+          id?: string
+          location_id?: string | null
+          note?: string | null
+          revoked_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          erp_role?: string | null
+          erp_user_id?: string | null
+          go_phone_hash?: string | null
+          go_project_ref?: string
+          go_user_id?: string
+          id?: string
+          location_id?: string | null
+          note?: string | null
+          revoked_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "go_identity_links_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       handheld_notification_reads: {
         Row: {
           created_at: string
@@ -6401,6 +6460,270 @@ export type Database = {
           },
         ]
       }
+      store_daily_targets: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_locked: boolean
+          location_id: string
+          note: string | null
+          plan_id: string | null
+          plan_version: number | null
+          source: string
+          target_amount_fen: number
+          target_date: string
+          updated_at: string
+          updated_by: string | null
+          weight: number | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_locked?: boolean
+          location_id: string
+          note?: string | null
+          plan_id?: string | null
+          plan_version?: number | null
+          source?: string
+          target_amount_fen: number
+          target_date: string
+          updated_at?: string
+          updated_by?: string | null
+          weight?: number | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_locked?: boolean
+          location_id?: string
+          note?: string | null
+          plan_id?: string | null
+          plan_version?: number | null
+          source?: string
+          target_amount_fen?: number
+          target_date?: string
+          updated_at?: string
+          updated_by?: string | null
+          weight?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_daily_targets_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_daily_targets_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "store_monthly_target_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      store_monthly_target_plans: {
+        Row: {
+          closed_dates: Json
+          created_at: string
+          created_by: string | null
+          date_weight_overrides: Json
+          id: string
+          location_id: string
+          note: string | null
+          period_month: string
+          published_at: string | null
+          status: string
+          target_amount_fen: number
+          updated_at: string
+          updated_by: string | null
+          version: number
+          weekday_weights: Json
+        }
+        Insert: {
+          closed_dates?: Json
+          created_at?: string
+          created_by?: string | null
+          date_weight_overrides?: Json
+          id?: string
+          location_id: string
+          note?: string | null
+          period_month: string
+          published_at?: string | null
+          status?: string
+          target_amount_fen: number
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+          weekday_weights?: Json
+        }
+        Update: {
+          closed_dates?: Json
+          created_at?: string
+          created_by?: string | null
+          date_weight_overrides?: Json
+          id?: string
+          location_id?: string
+          note?: string | null
+          period_month?: string
+          published_at?: string | null
+          status?: string
+          target_amount_fen?: number
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+          weekday_weights?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_monthly_target_plans_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      store_offline_sales_audit_logs: {
+        Row: {
+          action: string
+          actor_id: string | null
+          actor_role: string | null
+          after_snapshot: Json | null
+          before_snapshot: Json | null
+          business_date: string | null
+          client_op_id: string | null
+          created_at: string
+          entry_id: string | null
+          id: string
+          location_id: string | null
+          reason: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          actor_role?: string | null
+          after_snapshot?: Json | null
+          before_snapshot?: Json | null
+          business_date?: string | null
+          client_op_id?: string | null
+          created_at?: string
+          entry_id?: string | null
+          id?: string
+          location_id?: string | null
+          reason?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          actor_role?: string | null
+          after_snapshot?: Json | null
+          before_snapshot?: Json | null
+          business_date?: string | null
+          client_op_id?: string | null
+          created_at?: string
+          entry_id?: string | null
+          id?: string
+          location_id?: string | null
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_offline_sales_audit_logs_entry_id_fkey"
+            columns: ["entry_id"]
+            isOneToOne: false
+            referencedRelation: "store_offline_sales_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      store_offline_sales_entries: {
+        Row: {
+          amount_fen: number
+          business_date: string
+          channel: string
+          client_op_id: string
+          created_at: string
+          created_by: string | null
+          evidence_ref: string | null
+          evidence_type: string
+          evidence_url: string | null
+          id: string
+          location_id: string
+          note: string | null
+          occurred_at: string | null
+          order_count: number
+          status: string
+          updated_at: string
+          updated_by: string | null
+          void_reason: string | null
+          voided_at: string | null
+          voided_by: string | null
+          youzan_excluded_tids: string[]
+          youzan_exclusion_basis: string
+        }
+        Insert: {
+          amount_fen: number
+          business_date: string
+          channel: string
+          client_op_id: string
+          created_at?: string
+          created_by?: string | null
+          evidence_ref?: string | null
+          evidence_type: string
+          evidence_url?: string | null
+          id?: string
+          location_id: string
+          note?: string | null
+          occurred_at?: string | null
+          order_count?: number
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
+          youzan_excluded_tids?: string[]
+          youzan_exclusion_basis?: string
+        }
+        Update: {
+          amount_fen?: number
+          business_date?: string
+          channel?: string
+          client_op_id?: string
+          created_at?: string
+          created_by?: string | null
+          evidence_ref?: string | null
+          evidence_type?: string
+          evidence_url?: string | null
+          id?: string
+          location_id?: string
+          note?: string | null
+          occurred_at?: string | null
+          order_count?: number
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
+          youzan_excluded_tids?: string[]
+          youzan_exclusion_basis?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_offline_sales_entries_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       store_payment_profiles: {
         Row: {
           channel: string
@@ -6457,6 +6780,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      store_target_audit_logs: {
+        Row: {
+          action: string
+          actor_id: string | null
+          actor_role: string | null
+          after_snapshot: Json | null
+          before_snapshot: Json | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          location_id: string | null
+          period_month: string | null
+          reason: string | null
+          target_date: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          actor_role?: string | null
+          after_snapshot?: Json | null
+          before_snapshot?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          location_id?: string | null
+          period_month?: string | null
+          reason?: string | null
+          target_date?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          actor_role?: string | null
+          after_snapshot?: Json | null
+          before_snapshot?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          location_id?: string | null
+          period_month?: string | null
+          reason?: string | null
+          target_date?: string | null
+        }
+        Relationships: []
       }
       support_agents: {
         Row: {

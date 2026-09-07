@@ -59,6 +59,7 @@ import { Route as ShopMgmtOnlineRouteImport } from './routes/shop-mgmt.online'
 import { Route as ShopMgmtPaymentsRouteImport } from './routes/shop-mgmt.payments'
 import { Route as ShopMgmtProductsRouteImport } from './routes/shop-mgmt.products'
 import { Route as ShopMgmtShopsRouteImport } from './routes/shop-mgmt.shops'
+import { Route as ShopMgmtTargetsRouteImport } from './routes/shop-mgmt.targets'
 import { Route as StoreIndexRouteImport } from './routes/store.index'
 import { Route as StoreIncomingRouteImport } from './routes/store.incoming'
 import { Route as StoreInventoryRouteImport } from './routes/store.inventory'
@@ -188,6 +189,8 @@ import { Route as ApiPublicHandheldSkuSearchRouteImport } from './routes/api/pub
 import { Route as ApiPublicHandheldStocktakeOpenRouteImport } from './routes/api/public/handheld/stocktake.open'
 import { Route as ApiPublicHandheldStocktakeScanRouteImport } from './routes/api/public/handheld/stocktake.scan'
 import { Route as ApiPublicHandheldStocktakeSubmitRouteImport } from './routes/api/public/handheld/stocktake.submit'
+import { Route as ApiPublicHandheldStoreDailySummaryRouteImport } from './routes/api/public/handheld/store.daily-summary'
+import { Route as ApiPublicHandheldStoreOfflineSalesRouteImport } from './routes/api/public/handheld/store.offline-sales'
 import { Route as ApiPublicHandheldSupportConversationsRouteImport } from './routes/api/public/handheld/support.conversations'
 import { Route as ApiPublicHandheldTransferReceiveConfirmRouteImport } from './routes/api/public/handheld/transfer.receive-confirm'
 import { Route as ApiPublicHandheldTransferReceiveScanRouteImport } from './routes/api/public/handheld/transfer.receive-scan'
@@ -502,6 +505,11 @@ const ShopMgmtProductsRoute = ShopMgmtProductsRouteImport.update({
 const ShopMgmtShopsRoute = ShopMgmtShopsRouteImport.update({
   id: '/shops',
   path: '/shops',
+  getParentRoute: () => ShopMgmtRoute,
+} as any)
+const ShopMgmtTargetsRoute = ShopMgmtTargetsRouteImport.update({
+  id: '/targets',
+  path: '/targets',
   getParentRoute: () => ShopMgmtRoute,
 } as any)
 const StoreIndexRoute = StoreIndexRouteImport.update({
@@ -1233,6 +1241,18 @@ const ApiPublicHandheldStocktakeSubmitRoute =
     path: '/api/public/handheld/stocktake/submit',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHandheldStoreDailySummaryRoute =
+  ApiPublicHandheldStoreDailySummaryRouteImport.update({
+    id: '/api/public/handheld/store/daily-summary',
+    path: '/api/public/handheld/store/daily-summary',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldStoreOfflineSalesRoute =
+  ApiPublicHandheldStoreOfflineSalesRouteImport.update({
+    id: '/api/public/handheld/store/offline-sales',
+    path: '/api/public/handheld/store/offline-sales',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHandheldSupportConversationsRoute =
   ApiPublicHandheldSupportConversationsRouteImport.update({
     id: '/api/public/handheld/support/conversations',
@@ -1656,6 +1676,7 @@ export interface FileRoutesByFullPath {
   '/shop-mgmt/payments': typeof ShopMgmtPaymentsRoute
   '/shop-mgmt/products': typeof ShopMgmtProductsRoute
   '/shop-mgmt/shops': typeof ShopMgmtShopsRoute
+  '/shop-mgmt/targets': typeof ShopMgmtTargetsRoute
   '/store/incoming': typeof StoreIncomingRoute
   '/store/inventory': typeof StoreInventoryRoute
   '/store/scan': typeof StoreScanRoute
@@ -1786,6 +1807,8 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/stocktake/open': typeof ApiPublicHandheldStocktakeOpenRoute
   '/api/public/handheld/stocktake/scan': typeof ApiPublicHandheldStocktakeScanRoute
   '/api/public/handheld/stocktake/submit': typeof ApiPublicHandheldStocktakeSubmitRoute
+  '/api/public/handheld/store/daily-summary': typeof ApiPublicHandheldStoreDailySummaryRoute
+  '/api/public/handheld/store/offline-sales': typeof ApiPublicHandheldStoreOfflineSalesRoute
   '/api/public/handheld/support/conversations': typeof ApiPublicHandheldSupportConversationsRouteWithChildren
   '/api/public/handheld/transfer/receive-confirm': typeof ApiPublicHandheldTransferReceiveConfirmRoute
   '/api/public/handheld/transfer/receive-scan': typeof ApiPublicHandheldTransferReceiveScanRoute
@@ -1893,6 +1916,7 @@ export interface FileRoutesByTo {
   '/shop-mgmt/payments': typeof ShopMgmtPaymentsRoute
   '/shop-mgmt/products': typeof ShopMgmtProductsRoute
   '/shop-mgmt/shops': typeof ShopMgmtShopsRoute
+  '/shop-mgmt/targets': typeof ShopMgmtTargetsRoute
   '/store/incoming': typeof StoreIncomingRoute
   '/store/inventory': typeof StoreInventoryRoute
   '/store/scan': typeof StoreScanRoute
@@ -2023,6 +2047,8 @@ export interface FileRoutesByTo {
   '/api/public/handheld/stocktake/open': typeof ApiPublicHandheldStocktakeOpenRoute
   '/api/public/handheld/stocktake/scan': typeof ApiPublicHandheldStocktakeScanRoute
   '/api/public/handheld/stocktake/submit': typeof ApiPublicHandheldStocktakeSubmitRoute
+  '/api/public/handheld/store/daily-summary': typeof ApiPublicHandheldStoreDailySummaryRoute
+  '/api/public/handheld/store/offline-sales': typeof ApiPublicHandheldStoreOfflineSalesRoute
   '/api/public/handheld/support/conversations': typeof ApiPublicHandheldSupportConversationsRouteWithChildren
   '/api/public/handheld/transfer/receive-confirm': typeof ApiPublicHandheldTransferReceiveConfirmRoute
   '/api/public/handheld/transfer/receive-scan': typeof ApiPublicHandheldTransferReceiveScanRoute
@@ -2138,6 +2164,7 @@ export interface FileRoutesById {
   '/shop-mgmt/payments': typeof ShopMgmtPaymentsRoute
   '/shop-mgmt/products': typeof ShopMgmtProductsRoute
   '/shop-mgmt/shops': typeof ShopMgmtShopsRoute
+  '/shop-mgmt/targets': typeof ShopMgmtTargetsRoute
   '/store/incoming': typeof StoreIncomingRoute
   '/store/inventory': typeof StoreInventoryRoute
   '/store/scan': typeof StoreScanRoute
@@ -2268,6 +2295,8 @@ export interface FileRoutesById {
   '/api/public/handheld/stocktake/open': typeof ApiPublicHandheldStocktakeOpenRoute
   '/api/public/handheld/stocktake/scan': typeof ApiPublicHandheldStocktakeScanRoute
   '/api/public/handheld/stocktake/submit': typeof ApiPublicHandheldStocktakeSubmitRoute
+  '/api/public/handheld/store/daily-summary': typeof ApiPublicHandheldStoreDailySummaryRoute
+  '/api/public/handheld/store/offline-sales': typeof ApiPublicHandheldStoreOfflineSalesRoute
   '/api/public/handheld/support/conversations': typeof ApiPublicHandheldSupportConversationsRouteWithChildren
   '/api/public/handheld/transfer/receive-confirm': typeof ApiPublicHandheldTransferReceiveConfirmRoute
   '/api/public/handheld/transfer/receive-scan': typeof ApiPublicHandheldTransferReceiveScanRoute
@@ -2384,6 +2413,7 @@ export interface FileRouteTypes {
     | '/shop-mgmt/payments'
     | '/shop-mgmt/products'
     | '/shop-mgmt/shops'
+    | '/shop-mgmt/targets'
     | '/store/incoming'
     | '/store/inventory'
     | '/store/scan'
@@ -2514,6 +2544,8 @@ export interface FileRouteTypes {
     | '/api/public/handheld/stocktake/open'
     | '/api/public/handheld/stocktake/scan'
     | '/api/public/handheld/stocktake/submit'
+    | '/api/public/handheld/store/daily-summary'
+    | '/api/public/handheld/store/offline-sales'
     | '/api/public/handheld/support/conversations'
     | '/api/public/handheld/transfer/receive-confirm'
     | '/api/public/handheld/transfer/receive-scan'
@@ -2621,6 +2653,7 @@ export interface FileRouteTypes {
     | '/shop-mgmt/payments'
     | '/shop-mgmt/products'
     | '/shop-mgmt/shops'
+    | '/shop-mgmt/targets'
     | '/store/incoming'
     | '/store/inventory'
     | '/store/scan'
@@ -2751,6 +2784,8 @@ export interface FileRouteTypes {
     | '/api/public/handheld/stocktake/open'
     | '/api/public/handheld/stocktake/scan'
     | '/api/public/handheld/stocktake/submit'
+    | '/api/public/handheld/store/daily-summary'
+    | '/api/public/handheld/store/offline-sales'
     | '/api/public/handheld/support/conversations'
     | '/api/public/handheld/transfer/receive-confirm'
     | '/api/public/handheld/transfer/receive-scan'
@@ -2865,6 +2900,7 @@ export interface FileRouteTypes {
     | '/shop-mgmt/payments'
     | '/shop-mgmt/products'
     | '/shop-mgmt/shops'
+    | '/shop-mgmt/targets'
     | '/store/incoming'
     | '/store/inventory'
     | '/store/scan'
@@ -2995,6 +3031,8 @@ export interface FileRouteTypes {
     | '/api/public/handheld/stocktake/open'
     | '/api/public/handheld/stocktake/scan'
     | '/api/public/handheld/stocktake/submit'
+    | '/api/public/handheld/store/daily-summary'
+    | '/api/public/handheld/store/offline-sales'
     | '/api/public/handheld/support/conversations'
     | '/api/public/handheld/transfer/receive-confirm'
     | '/api/public/handheld/transfer/receive-scan'
@@ -3179,6 +3217,8 @@ export interface RootRouteChildren {
   ApiPublicHandheldStocktakeOpenRoute: typeof ApiPublicHandheldStocktakeOpenRoute
   ApiPublicHandheldStocktakeScanRoute: typeof ApiPublicHandheldStocktakeScanRoute
   ApiPublicHandheldStocktakeSubmitRoute: typeof ApiPublicHandheldStocktakeSubmitRoute
+  ApiPublicHandheldStoreDailySummaryRoute: typeof ApiPublicHandheldStoreDailySummaryRoute
+  ApiPublicHandheldStoreOfflineSalesRoute: typeof ApiPublicHandheldStoreOfflineSalesRoute
   ApiPublicHandheldSupportConversationsRoute: typeof ApiPublicHandheldSupportConversationsRouteWithChildren
   ApiPublicHandheldTransferReceiveConfirmRoute: typeof ApiPublicHandheldTransferReceiveConfirmRoute
   ApiPublicHandheldTransferReceiveScanRoute: typeof ApiPublicHandheldTransferReceiveScanRoute
@@ -3562,6 +3602,13 @@ declare module '@tanstack/react-router' {
       path: '/shops'
       fullPath: '/shop-mgmt/shops'
       preLoaderRoute: typeof ShopMgmtShopsRouteImport
+      parentRoute: typeof ShopMgmtRoute
+    }
+    '/shop-mgmt/targets': {
+      id: '/shop-mgmt/targets'
+      path: '/targets'
+      fullPath: '/shop-mgmt/targets'
+      preLoaderRoute: typeof ShopMgmtTargetsRouteImport
       parentRoute: typeof ShopMgmtRoute
     }
     '/store/': {
@@ -4467,6 +4514,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldStocktakeSubmitRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/handheld/store/daily-summary': {
+      id: '/api/public/handheld/store/daily-summary'
+      path: '/api/public/handheld/store/daily-summary'
+      fullPath: '/api/public/handheld/store/daily-summary'
+      preLoaderRoute: typeof ApiPublicHandheldStoreDailySummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/store/offline-sales': {
+      id: '/api/public/handheld/store/offline-sales'
+      path: '/api/public/handheld/store/offline-sales'
+      fullPath: '/api/public/handheld/store/offline-sales'
+      preLoaderRoute: typeof ApiPublicHandheldStoreOfflineSalesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/handheld/support/conversations': {
       id: '/api/public/handheld/support/conversations'
       path: '/api/public/handheld/support/conversations'
@@ -4965,6 +5026,7 @@ interface ShopMgmtRouteChildren {
   ShopMgmtPaymentsRoute: typeof ShopMgmtPaymentsRoute
   ShopMgmtProductsRoute: typeof ShopMgmtProductsRoute
   ShopMgmtShopsRoute: typeof ShopMgmtShopsRoute
+  ShopMgmtTargetsRoute: typeof ShopMgmtTargetsRoute
 }
 
 const ShopMgmtRouteChildren: ShopMgmtRouteChildren = {
@@ -4974,6 +5036,7 @@ const ShopMgmtRouteChildren: ShopMgmtRouteChildren = {
   ShopMgmtPaymentsRoute: ShopMgmtPaymentsRoute,
   ShopMgmtProductsRoute: ShopMgmtProductsRoute,
   ShopMgmtShopsRoute: ShopMgmtShopsRoute,
+  ShopMgmtTargetsRoute: ShopMgmtTargetsRoute,
 }
 
 const ShopMgmtRouteWithChildren = ShopMgmtRoute._addFileChildren(
@@ -5685,6 +5748,10 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHandheldStocktakeOpenRoute: ApiPublicHandheldStocktakeOpenRoute,
   ApiPublicHandheldStocktakeScanRoute: ApiPublicHandheldStocktakeScanRoute,
   ApiPublicHandheldStocktakeSubmitRoute: ApiPublicHandheldStocktakeSubmitRoute,
+  ApiPublicHandheldStoreDailySummaryRoute:
+    ApiPublicHandheldStoreDailySummaryRoute,
+  ApiPublicHandheldStoreOfflineSalesRoute:
+    ApiPublicHandheldStoreOfflineSalesRoute,
   ApiPublicHandheldSupportConversationsRoute:
     ApiPublicHandheldSupportConversationsRouteWithChildren,
   ApiPublicHandheldTransferReceiveConfirmRoute:
