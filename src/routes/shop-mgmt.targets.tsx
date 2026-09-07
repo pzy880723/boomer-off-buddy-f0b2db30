@@ -56,6 +56,22 @@ export const Route = createFileRoute("/shop-mgmt/targets")({
 const yuan = (fen: number | null | undefined) =>
   fen == null ? "—" : `¥${(fen / 100).toLocaleString("zh-CN", { minimumFractionDigits: 2 })}`;
 
+type DayTargetRow = {
+  target_date: string;
+  target_amount_fen: number | string;
+  source: string;
+  is_locked: boolean;
+};
+
+type AuditRow = {
+  id: string;
+  action: string;
+  period_month: string | null;
+  target_date: string | null;
+  reason: string | null;
+  created_at: string;
+};
+
 const WEEKDAY_LABELS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
 
 function TargetsPage() {
@@ -133,8 +149,11 @@ function TargetsPage() {
   });
 
   const totalFen = useMemo(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    () => (plan.data?.days ?? []).reduce((s: number, d: any) => s + Number(d.target_amount_fen), 0),
+    () =>
+      (plan.data?.days ?? []).reduce(
+        (s: number, d: DayTargetRow) => s + Number(d.target_amount_fen),
+        0,
+      ),
     [plan.data],
   );
 
@@ -156,8 +175,7 @@ function TargetsPage() {
               <SelectValue placeholder="选择门店" />
             </SelectTrigger>
             <SelectContent>
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              {(locations.data ?? []).map((l: any) => (
+              {(locations.data ?? []).map((l: { id: string; name: string }) => (
                 <SelectItem key={l.id} value={l.id}>
                   {l.name}
                 </SelectItem>
@@ -275,8 +293,7 @@ function TargetsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              {(plan.data?.days ?? []).map((d: any) => (
+              {(plan.data?.days ?? []).map((d: DayTargetRow) => (
                 <DayRow
                   key={d.target_date}
                   date={d.target_date}
@@ -304,8 +321,7 @@ function TargetsPage() {
           <CardTitle className="text-base">最近变更记录</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          {(audit.data ?? []).map((a: any) => (
+          {(audit.data ?? []).map((a: AuditRow) => (
             <div key={a.id} className="text-sm">
               <span className="text-muted-foreground">
                 {new Date(a.created_at).toLocaleString("zh-CN")}

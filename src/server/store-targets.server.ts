@@ -212,11 +212,10 @@ export async function publishMonthlyPlan(input: PublishPlanInput, actor: ActorCo
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const prevPublished = ((prevPlans ?? []) as any[]).find((p) => p.status === "published") ?? null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const nextVersion = ((prevPlans ?? []) as any[])[0]?.version
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ? Number((prevPlans as any[])[0].version) + 1
-    : 1;
+  const latestVersion = Number(
+    (((prevPlans ?? []) as { version?: number }[])[0]?.version ?? 0) || 0,
+  );
+  const nextVersion = latestVersion + 1;
 
   if (prevPublished) {
     await db()
