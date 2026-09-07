@@ -19,6 +19,8 @@ function okStore(over: Partial<Extract<GoStoreInput, { status: "ok" }>> = {}): G
     youzan_bound: true,
     youzan_synced_through: `${DATE}T23:59:59.000Z`,
     day_covered_by_sync: true,
+    has_current_day_snapshot: true,
+    source_fresh: true,
     has_refund_source: true,
     offline_entry_count: 1,
     ...over,
@@ -44,12 +46,39 @@ describe("buildGoDailySummary", () => {
     const out = buildGoDailySummary({
       date: DATE,
       scope: { mode: "single", locationIds: [A], todayLocationId: A },
-      stores: [okStore({ youzan_fen: 0, offline_fen: 0, day_covered_by_sync: false })],
+      stores: [okStore({ youzan_fen: 0, offline_fen: 0, day_covered_by_sync: false,
+        has_current_day_snapshot: false, source_fresh: false })],
       generatedAt: "2026-09-07T10:00:00.000Z",
     });
     assert.equal(out.stores[0].actual_fen, null);
     assert.equal(out.stores[0].completeness.complete, false);
     assert.ok(out.stores[0].completeness.reasons.includes("sync_window_not_covered"));
+  });
+
+  it("accepts a proved zero as of an open-day snapshot without claiming full-day coverage", () => {
+    const out = buildGoDailySummary({
+      date: DATE,
+      scope: { mode: "single", locationIds: [A], todayLocationId: A },
+      stores: [okStore({ youzan_fen: 0, offline_fen: 0, day_covered_by_sync: false,
+        has_current_day_snapshot: true, source_fresh: true, has_refund_source: false })],
+      generatedAt: "2026-09-07T10:00:00.000Z",
+    });
+    assert.equal(out.totals.actual_fen, 0);
+    assert.equal(out.stores[0].completeness.source_fresh, true);
+    assert.equal(out.stores[0].completeness.day_covered_by_sync, false);
+    assert.equal(out.completeness.complete, false);
+  });
+
+  it("a stale proved snapshot keeps its value but cannot show achievement", () => {
+    const out = buildGoDailySummary({
+      date: DATE,
+      scope: { mode: "single", locationIds: [A], todayLocationId: A },
+      stores: [okStore({ source_fresh: false })],
+      generatedAt: "2026-09-07T10:00:00.000Z",
+    });
+    assert.equal(out.totals.actual_fen, 100000);
+    assert.equal(out.completeness.complete, false);
+    assert.ok(out.completeness.reasons.includes("youzan_snapshot_stale"));
   });
 
   it("marks incomplete whenever a refund source is missing (paid gross only)", () => {

@@ -31,6 +31,8 @@ export type GoStoreInput =
       youzan_synced_through: string | null;
       /** 该业务日是否被成功完成的同步窗口完整覆盖 */
       day_covered_by_sync: boolean;
+      has_current_day_snapshot: boolean;
+      source_fresh: boolean;
       has_refund_source: boolean;
       offline_entry_count: number | null;
     };
@@ -54,6 +56,7 @@ export type GoStoreOut = {
     reasons: string[];
     youzan_synced_through: string | null;
     day_covered_by_sync: boolean;
+    source_fresh: boolean;
   };
 };
 
@@ -89,6 +92,7 @@ function buildStore(input: GoStoreInput): GoStoreOut {
         reasons: [input.code, ...(input.message ? [input.message] : [])],
         youzan_synced_through: null,
         day_covered_by_sync: false,
+        source_fresh: false,
       },
     };
   }
@@ -104,8 +108,11 @@ function buildStore(input: GoStoreInput): GoStoreOut {
     reasons.push("refund_source_unavailable");
     complete = false;
   }
-  if (!input.day_covered_by_sync) {
+  if (!input.has_current_day_snapshot) {
     reasons.push("sync_window_not_covered");
+    complete = false;
+  } else if (!input.source_fresh) {
+    reasons.push("youzan_snapshot_stale");
     complete = false;
   }
 
@@ -113,7 +120,7 @@ function buildStore(input: GoStoreInput): GoStoreOut {
   const offline = input.offline_fen;
 
   // 当天没有被成功同步窗口覆盖，而有赞侧又一分钱都没有 → 没有证据，不能报 0
-  const noYouzanEvidence = !input.day_covered_by_sync && (youzan == null || youzan === 0);
+  const noYouzanEvidence = !input.has_current_day_snapshot && (youzan == null || youzan === 0);
   const actual =
     youzan == null || offline == null
       ? null
@@ -146,6 +153,7 @@ function buildStore(input: GoStoreInput): GoStoreOut {
       reasons,
       youzan_synced_through: input.youzan_synced_through,
       day_covered_by_sync: input.day_covered_by_sync,
+      source_fresh: input.source_fresh,
     },
   };
 }

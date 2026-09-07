@@ -29,6 +29,7 @@ import {
 import { buildShopDirectory, type GoShopDirectoryEntry } from "@/lib/go-bridge/shops";
 import { assertGoScopeSynced, type GoSyncRow } from "@/lib/go-bridge/sync-state";
 import { buildGoDailySummary, type GoStoreInput } from "@/lib/go-bridge/daily-contract";
+import { completedSyncCoverage, type CompletedScan } from "@/lib/go-bridge/sync-coverage";
 import { shanghaiToday, shanghaiDayWindow } from "@/lib/store-targets/sales-window";
 
 export { GoScopeError };
@@ -320,33 +321,24 @@ class SourceError extends Error {
   }
 }
 
-/** 该业务日是否被"已完成"的同步窗口完整覆盖（单页 ok 不能冒充整日） */
-async function dayCoveredBySync(shopId: string, startUtc: string, endUtc: string) {
+/** Only complete scans prove coverage, including the previous pass of an open window. */
+async function loadSyncCoverage(shopId: string, startUtc: string, endUtc: string, now: Date) {
   const { data, error } = await sb()
     .from("youzan_order_sync_cursors")
-    .select("window_start, window_end, status")
+    .select("window_start, window_end, last_completed_scan_end, last_completed_at")
     .eq("shop_id", shopId)
-    .eq("status", "done")
+    .not("last_completed_scan_end", "is", null)
     .lt("window_start", endUtc)
     .gt("window_end", startUtc);
   if (error) throw new SourceError("sync_cursor_read_failed", error.message);
-  const rows = ((data ?? []) as { window_start: string; window_end: string }[])
-    .map((r) => [new Date(r.window_start).getTime(), new Date(r.window_end).getTime()] as const)
-    .sort((a, b) => a[0] - b[0]);
-  let cursor = new Date(startUtc).getTime();
-  const end = new Date(endUtc).getTime();
-  for (const [s, e] of rows) {
-    if (s > cursor) break;
-    if (e > cursor) cursor = e;
-    if (cursor >= end) return true;
-  }
-  return cursor >= end;
+  return completedSyncCoverage({ rows: (data ?? []) as CompletedScan[], startUtc, endUtc, now });
 }
 
 async function loadStoreFacts(params: {
   locationId: string;
   name: string;
   date: string;
+  now: Date;
 }): Promise<GoStoreInput> {
   const { startUtc, endUtc } = shanghaiDayWindow(params.date);
   try {
@@ -362,6 +354,8 @@ async function loadStoreFacts(params: {
     let youzanOrders: number | null = 0;
     let syncedThrough: string | null = null;
     let covered = false;
+    let hasSnapshot = false;
+    let sourceFresh = false;
 
     if (shopId) {
       const { data: rows, error: ordErr } = await sb()
@@ -380,17 +374,11 @@ async function loadStoreFacts(params: {
       );
       youzanOrders = paid.length;
 
-      const { data: syncRows, error: syncErr } = await sb()
-        .from("youzan_sync_logs")
-        .select("finished_at")
-        .eq("shop_id", shopId)
-        .eq("action", "orders")
-        .eq("status", "ok")
-        .order("finished_at", { ascending: false })
-        .limit(1);
-      if (syncErr) throw new SourceError("sync_log_read_failed", syncErr.message);
-      syncedThrough = (syncRows?.[0]?.finished_at as string | undefined) ?? null;
-      covered = await dayCoveredBySync(shopId, startUtc, endUtc);
+      const coverage = await loadSyncCoverage(shopId, startUtc, endUtc, params.now);
+      syncedThrough = coverage.syncedThrough;
+      covered = coverage.wholeDayCovered;
+      hasSnapshot = coverage.hasSnapshot;
+      sourceFresh = coverage.fresh;
     }
 
     const { data: offlineRows, error: offErr } = await sb()
@@ -435,6 +423,8 @@ async function loadStoreFacts(params: {
       youzan_bound: Boolean(shopId),
       youzan_synced_through: syncedThrough,
       day_covered_by_sync: covered,
+      has_current_day_snapshot: hasSnapshot,
+      source_fresh: sourceFresh,
       // 本地暂无有赞退款数据源 → 只能是已付款毛额口径
       has_refund_source: false,
       offline_entry_count: offline.entry_count,
@@ -469,6 +459,7 @@ export async function loadGoDailySummary(params: {
         locationId,
         name: names.get(locationId) ?? "未知门店",
         date: params.date,
+        now,
       }),
     );
   }
