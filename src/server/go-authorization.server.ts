@@ -233,7 +233,6 @@ export async function confirmAuthorizationReceipt(
   );
   if (ackErr) throw new GoScopeError("authorization_ack_failed", "授权回执写入失败", 503);
 
-
   const result = (ack ?? {}) as { ok?: boolean; code?: string; confirmed?: number };
   if (result.ok !== true) {
     // 同一把锁下复核失败（版本或授权事实已变）→ 不确认任何事件，让 GO 重新拉取
@@ -247,7 +246,6 @@ export async function confirmAuthorizationReceipt(
       409,
     );
   }
-
 
   return {
     snapshot,
