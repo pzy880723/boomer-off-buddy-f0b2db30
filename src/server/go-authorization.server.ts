@@ -184,12 +184,33 @@ export async function loadAuthorizationSnapshot(
   });
 }
 
+/** 只读取上一次真实下发的快照（不刷新 last_pulled_at / pulled_outbox，回执不算一次拉取） */
+async function readStoredSnapshot(erpUserId: string): Promise<AuthorizationSnapshot> {
+  const { data, error } = await supabaseAdmin
+    .from("go_authorization_snapshots")
+    .select("payload, version")
+    .eq("erp_user_id", erpUserId)
+    .maybeSingle();
+  if (error) throw new GoScopeError("authorization_unavailable", "授权快照暂不可用", 503);
+  if (!data) {
+    throw new GoScopeError("authorization_not_pulled", "尚未拉取过授权快照，请先拉取", 409);
+  }
+  const facts = (data.payload ?? {}) as unknown as AuthorizationFacts;
+  return buildAuthorizationSnapshot({
+    ...facts,
+    roles: Array.isArray(facts.roles) ? facts.roles : [],
+    location_ids: Array.isArray(facts.location_ids) ? facts.location_ids : [],
+    shop_links: Array.isArray(facts.shop_links) ? facts.shop_links : [],
+    version: Number(data.version) || 0,
+  });
+}
+
 /** 读取 GO 侧可信镜像回执并确认该用户的 outbox（不信客户端 id / ok） */
 export async function confirmAuthorizationReceipt(
   identity: GoIdentity,
   now = new Date(),
 ): Promise<{ snapshot: AuthorizationSnapshot; confirmed: number; receipt_status: string }> {
-  const snapshot = await loadAuthorizationSnapshot(identity.erpUserId, identity.goUserId);
+  const snapshot = await readStoredSnapshot(identity.erpUserId);
 
   const { data: raw, error } = await goClient(identity.env, identity.token).rpc(GO_RECEIPT_RPC);
   if (error) throw new GoScopeError("go_receipt_unavailable", "GO 回执服务暂时不可用", 503);
@@ -204,9 +225,14 @@ export async function confirmAuthorizationReceipt(
 
   const { data: ack, error: ackErr } = await supabaseAdmin.rpc(
     "go_authorization_ack" as never,
-    { p_erp_user_id: identity.erpUserId, p_version: receipt.scopeVersion } as never,
+    {
+      p_erp_user_id: identity.erpUserId,
+      p_version: receipt.scopeVersion,
+      p_link_status: receipt.linkStatus,
+    } as never,
   );
   if (ackErr) throw new GoScopeError("authorization_ack_failed", "授权回执写入失败", 503);
+
 
   const result = (ack ?? {}) as { ok?: boolean; code?: string; confirmed?: number };
   if (result.ok !== true) {
