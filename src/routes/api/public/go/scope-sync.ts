@@ -6,7 +6,7 @@ import { nextRetryAt } from "@/lib/go-bridge/sync-state";
  * GO ← ERP 授权同步通道（service-role bearer 调用）。
  *
  * action = "pull"  拉取待同步的角色/门店/身份/映射变更 + 完整门店编号目录
- * action = "ack"   回执：GO 已应用（ok=true）或失败（ok=false + error）
+ * action = "ack"   回执：必须携带 pull 时的 version；旧代次或重复成功计入 skipped。
  *
  * 契约：ERP 是授权唯一真源；GO 收到 revoke 必须立刻生效，
  * ERP 在收到 ack 之前对该用户 fail closed。
@@ -14,7 +14,7 @@ import { nextRetryAt } from "@/lib/go-bridge/sync-state";
 type Body = {
   action?: "pull" | "ack";
   limit?: number;
-  results?: { id: string; ok: boolean; error?: string }[];
+  results?: { id: string; version: number; ok: boolean; error?: string }[];
 };
 
 type OutboxRow = {
@@ -57,40 +57,69 @@ export const Route = createFileRoute("/api/public/go/scope-sync")({
             if (results.length === 0) {
               return Response.json({ ok: false, code: "empty_ack" }, { status: 400 });
             }
+            // Validate the entire batch before its first write. Never guess the
+            // current generation for an old client that omitted the pull version.
+            if (results.some((r) => !r || !Number.isSafeInteger(r.version) || r.version <= 0)) {
+              return Response.json({ ok: false, code: "invalid_ack_version" }, { status: 400 });
+            }
             let synced = 0;
             let failed = 0;
+            let skipped = 0;
             for (const r of results) {
               if (r.ok) {
-                const { error } = await sb
+                const { data, error } = await sb
                   .from("go_scope_sync_outbox")
                   .update({ status: "synced", synced_at: nowIso, last_error: null })
                   .eq("id", r.id)
-                  .eq("go_project_ref", GO_PROJECT_REF);
+                  .eq("go_project_ref", GO_PROJECT_REF)
+                  .eq("version", r.version)
+                  .neq("status", "synced")
+                  .select("id");
                 if (error) throw new Error(error.message);
-                synced += 1;
+                if (data?.length) synced += data.length;
+                else skipped += 1;
               } else {
-                const cur = await sb
-                  .from("go_scope_sync_outbox")
-                  .select("attempts")
-                  .eq("id", r.id)
-                  .maybeSingle();
-                if (cur.error) throw new Error(cur.error.message);
-                const attempts = ((cur.data as { attempts: number } | null)?.attempts ?? 0) + 1;
-                const { error } = await sb
-                  .from("go_scope_sync_outbox")
-                  .update({
-                    status: "failed",
-                    attempts,
-                    last_error: (r.error ?? "unknown").slice(0, 500),
-                    next_attempt_at: nextRetryAt(attempts, new Date()),
-                  })
-                  .eq("id", r.id)
-                  .eq("go_project_ref", GO_PROJECT_REF);
-                if (error) throw new Error(error.message);
-                failed += 1;
+                let updated = false;
+                // CAS the attempts counter as well as the event generation.
+                // A collision retries from fresh data; never overwrite success.
+                for (let retry = 0; retry < 3; retry += 1) {
+                  const cur = await sb
+                    .from("go_scope_sync_outbox")
+                    .select("attempts")
+                    .eq("id", r.id)
+                    .eq("go_project_ref", GO_PROJECT_REF)
+                    .eq("version", r.version)
+                    .neq("status", "synced")
+                    .maybeSingle();
+                  if (cur.error) throw new Error(cur.error.message);
+                  if (!cur.data) break;
+                  const previousAttempts = (cur.data as { attempts: number }).attempts;
+                  const attempts = previousAttempts + 1;
+                  const { data, error } = await sb
+                    .from("go_scope_sync_outbox")
+                    .update({
+                      status: "failed",
+                      attempts,
+                      last_error: (r.error ?? "unknown").slice(0, 500),
+                      next_attempt_at: nextRetryAt(attempts, new Date()),
+                    })
+                    .eq("id", r.id)
+                    .eq("go_project_ref", GO_PROJECT_REF)
+                    .eq("version", r.version)
+                    .neq("status", "synced")
+                    .eq("attempts", previousAttempts)
+                    .select("id");
+                  if (error) throw new Error(error.message);
+                  if (data?.length) {
+                    failed += data.length;
+                    updated = true;
+                    break;
+                  }
+                }
+                if (!updated) skipped += 1;
               }
             }
-            return Response.json({ ok: true, synced, failed });
+            return Response.json({ ok: true, synced, failed, skipped });
           }
 
           // 默认 pull
