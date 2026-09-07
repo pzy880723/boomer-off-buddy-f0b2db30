@@ -27,7 +27,7 @@ export type AuthorizationFacts = {
   deleted: boolean;
   roles: string[];
   location_ids: string[];
-  /** 固定 GO 项目 + 当前已核验 go_user_id 下的绑定状态；无记录为 null */
+  /** 固定 GO 项目 + 当前已核验 go_user_id 下的绑定状态（pending|approved|rejected|revoked）；无记录为 null */
   identity_status: string | null;
   /** 本人授权门店的显式 active 映射（数据库已按项目/kind/active 过滤） */
   shop_links: AuthorizationShop[];
@@ -194,7 +194,9 @@ export function buildAuthorizationSnapshot(facts: AuthorizationFacts): Authoriza
   const revokedReasons: string[] = [];
   if (facts.banned) revokedReasons.push("erp_account_disabled");
   if (facts.deleted) revokedReasons.push("erp_account_deleted");
+  // go_identity_links.status 真实取值：pending | approved | rejected | revoked
   if (facts.identity_status === "revoked") revokedReasons.push("identity_revoked");
+  if (facts.identity_status === "rejected") revokedReasons.push("identity_rejected");
   if (revokedReasons.length > 0) return blocked("revoked", revokedReasons, true);
 
   const roles = [...facts.roles].sort();

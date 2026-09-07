@@ -29,7 +29,7 @@ function facts(over: Partial<AuthorizationFacts> = {}): AuthorizationFacts {
     deleted: false,
     roles: ["store_staff"],
     location_ids: [SHOP.erp_location_id],
-    identity_status: "active",
+    identity_status: "approved",
     shop_links: [SHOP],
     version: 7,
     generated_at: "2026-09-07T10:00:00.000Z",
@@ -165,6 +165,7 @@ describe("buildAuthorizationSnapshot", () => {
       [{ banned: true }, "erp_account_disabled"],
       [{ deleted: true }, "erp_account_deleted"],
       [{ identity_status: "revoked" }, "identity_revoked"],
+      [{ identity_status: "rejected" }, "identity_rejected"],
     ] as const) {
       const snap = buildAuthorizationSnapshot(facts(over));
       assert.equal(snap.status, "revoked");
