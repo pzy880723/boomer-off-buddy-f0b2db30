@@ -2469,6 +2469,53 @@ export type Database = {
           },
         ]
       }
+      go_shop_location_links: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          go_project_ref: string
+          go_shop_id: string
+          id: string
+          location_id: string
+          note: string | null
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          go_project_ref: string
+          go_shop_id: string
+          id?: string
+          location_id: string
+          note?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          go_project_ref?: string
+          go_shop_id?: string
+          id?: string
+          location_id?: string
+          note?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "go_shop_location_links_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       handheld_notification_reads: {
         Row: {
           created_at: string
@@ -7073,6 +7120,48 @@ export type Database = {
         }
         Relationships: []
       }
+      user_scope_audit_logs: {
+        Row: {
+          action: string
+          actor_id: string | null
+          actor_role: string | null
+          after_snapshot: Json | null
+          before_snapshot: Json | null
+          created_at: string
+          id: string
+          location_id: string | null
+          reason: string | null
+          role: string | null
+          target_user_id: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          actor_role?: string | null
+          after_snapshot?: Json | null
+          before_snapshot?: Json | null
+          created_at?: string
+          id?: string
+          location_id?: string | null
+          reason?: string | null
+          role?: string | null
+          target_user_id: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          actor_role?: string | null
+          after_snapshot?: Json | null
+          before_snapshot?: Json | null
+          created_at?: string
+          id?: string
+          location_id?: string | null
+          reason?: string | null
+          role?: string | null
+          target_user_id?: string
+        }
+        Relationships: []
+      }
       warehouse_totes: {
         Row: {
           code: string
@@ -7277,6 +7366,68 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "youzan_items_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "youzan_shops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      youzan_order_sync_cursors: {
+        Row: {
+          attempts: number
+          created_at: string
+          id: string
+          last_error: string | null
+          last_progress_at: string | null
+          lease_expires_at: string | null
+          lease_owner: string | null
+          method_label: string | null
+          next_page: number
+          shop_id: string
+          status: string
+          total_upserted: number
+          updated_at: string
+          window_end: string
+          window_start: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          last_progress_at?: string | null
+          lease_expires_at?: string | null
+          lease_owner?: string | null
+          method_label?: string | null
+          next_page?: number
+          shop_id: string
+          status?: string
+          total_upserted?: number
+          updated_at?: string
+          window_end: string
+          window_start: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          last_progress_at?: string | null
+          lease_expires_at?: string | null
+          lease_owner?: string | null
+          method_label?: string | null
+          next_page?: number
+          shop_id?: string
+          status?: string
+          total_upserted?: number
+          updated_at?: string
+          window_end?: string
+          window_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "youzan_order_sync_cursors_shop_id_fkey"
             columns: ["shop_id"]
             isOneToOne: false
             referencedRelation: "youzan_shops"
@@ -8292,6 +8443,32 @@ export type Database = {
           p_sku_id: string
         }
         Returns: undefined
+      }
+      youzan_claim_order_sync_cursor: {
+        Args: { p_lease_seconds?: number; p_worker_id: string }
+        Returns: {
+          attempts: number
+          created_at: string
+          id: string
+          last_error: string | null
+          last_progress_at: string | null
+          lease_expires_at: string | null
+          lease_owner: string | null
+          method_label: string | null
+          next_page: number
+          shop_id: string
+          status: string
+          total_upserted: number
+          updated_at: string
+          window_end: string
+          window_start: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "youzan_order_sync_cursors"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
     }
     Enums: {

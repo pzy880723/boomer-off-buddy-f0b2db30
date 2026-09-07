@@ -46,6 +46,20 @@ import {
   deleteUserFn,
   updateUserNameFn,
 } from "@/lib/admin-users.functions";
+import {
+  listUserScopesFn,
+  setUserLocationsFn,
+  setUserRolesFn,
+} from "@/lib/user-scope.functions";
+
+const ROLE_LABELS: Record<string, string> = {
+  super_admin: "超级管理员",
+  hq_operator: "总部运营",
+  store_manager: "店长",
+  store_staff: "店员",
+  warehouse_staff: "仓库",
+};
+const HQ_ROLE_KEYS = ["super_admin", "hq_operator"];
 
 export const Route = createFileRoute("/admin/users")({
   head: () => ({ meta: [{ title: "账号管理 · BOOMER OFF" }] }),
@@ -86,10 +100,33 @@ function AdminUsersContent() {
   const deleteFn = useServerFn(deleteUserFn);
   const updateNameFn = useServerFn(updateUserNameFn);
 
+  const fetchScopes = useServerFn(listUserScopesFn);
+  const saveRoles = useServerFn(setUserRolesFn);
+  const saveLocations = useServerFn(setUserLocationsFn);
+
   const list = useQuery({
     queryKey: ["admin-users"],
     queryFn: () => fetchList(),
   });
+
+  const scopes = useQuery({
+    queryKey: ["admin-user-scopes"],
+    queryFn: () => fetchScopes(),
+  });
+
+  const scopeMut = useMutation({
+    mutationFn: async (vars: { userId: string; roles: string[]; locationIds: string[] }) => {
+      await saveRoles({ data: { userId: vars.userId, roles: vars.roles } });
+      await saveLocations({ data: { userId: vars.userId, locationIds: vars.locationIds } });
+    },
+    onSuccess: () => {
+      toast.success("角色与门店范围已更新");
+      qc.invalidateQueries({ queryKey: ["admin-user-scopes"] });
+    },
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "保存失败"),
+  });
+
 
   const createMut = useMutation({
     mutationFn: (vars: { phone: string; password: string; name: string }) => createFn({ data: vars }),
@@ -152,6 +189,7 @@ function AdminUsersContent() {
                   <TableHead>姓名</TableHead>
                   <TableHead>手机号 / 邮箱</TableHead>
                   <TableHead>角色</TableHead>
+                  <TableHead>范围</TableHead>
                   <TableHead>状态</TableHead>
                   <TableHead>创建时间</TableHead>
                   <TableHead>最近登录</TableHead>
@@ -161,6 +199,7 @@ function AdminUsersContent() {
               <TableBody>
                 {(list.data ?? []).map((u) => {
                   const isSA = isSuperAdminPhone(u.phone);
+                  const scope = (scopes.data?.users ?? []).find((s) => s.user_id === u.id);
                   return (
                     <TableRow key={u.id}>
                       <TableCell className="font-medium">
@@ -183,6 +222,22 @@ function AdminUsersContent() {
                           <Badge variant="secondary">普通用户</Badge>
                         )}
                       </TableCell>
+                      <TableCell className="text-xs">
+                        {scope?.is_hq ? (
+                          <Badge variant="outline" className="text-primary">总部（可看全部门店）</Badge>
+                        ) : (scope?.location_ids.length ?? 0) > 0 ? (
+                          <span className="text-muted-foreground">
+                            {scope?.location_ids.length} 个门店权限
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">未设置</span>
+                        )}
+                        {scope?.roles.length ? (
+                          <div className="mt-1 text-muted-foreground">
+                            {scope.roles.map((r) => ROLE_LABELS[r] ?? r).join("、")}
+                          </div>
+                        ) : null}
+                      </TableCell>
                       <TableCell>
                         {u.must_change_password ? (
                           <Badge variant="outline" className="text-amber-600">
@@ -204,6 +259,15 @@ function AdminUsersContent() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
+                          <ScopeButton
+                            label={u.name ?? u.phone ?? u.email ?? ""}
+                            roles={scope?.roles ?? []}
+                            locationIds={scope?.location_ids ?? []}
+                            locations={scopes.data?.locations ?? []}
+                            onSubmit={(roles, locationIds) =>
+                              scopeMut.mutateAsync({ userId: u.id, roles, locationIds })
+                            }
+                          />
                           <EditNameButton
                             currentName={u.name}
                             label={u.phone ?? u.email ?? ""}
@@ -227,7 +291,7 @@ function AdminUsersContent() {
                 })}
                 {(list.data ?? []).length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
                       暂无账号
                     </TableCell>
                   </TableRow>
@@ -536,6 +600,114 @@ function EditNameButton({
             </Button>
           </DialogFooter>
         </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ScopeButton({
+  label,
+  roles,
+  locationIds,
+  locations,
+  onSubmit,
+}: {
+  label: string;
+  roles: string[];
+  locationIds: string[];
+  locations: { id: string; name: string; kind: string }[];
+  onSubmit: (roles: string[], locationIds: string[]) => Promise<unknown>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pickedRoles, setPickedRoles] = useState<string[]>(roles);
+  const [pickedLocations, setPickedLocations] = useState<string[]>(locationIds);
+  const [saving, setSaving] = useState(false);
+
+  const isHq = pickedRoles.some((r) => HQ_ROLE_KEYS.includes(r));
+
+  const toggle = (list: string[], value: string) =>
+    list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) {
+          setPickedRoles(roles);
+          setPickedLocations(locationIds);
+        }
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="icon" title="设置角色与门店范围">
+          <ShieldCheck className="h-4 w-4" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>角色与门店范围</DialogTitle>
+          <DialogDescription>{label}</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div>
+            <Label className="text-xs text-muted-foreground">角色</Label>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {Object.entries(ROLE_LABELS).map(([key, text]) => (
+                <Button
+                  key={key}
+                  type="button"
+                  size="sm"
+                  variant={pickedRoles.includes(key) ? "default" : "outline"}
+                  onClick={() => setPickedRoles((prev) => toggle(prev, key))}
+                >
+                  {text}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <Label className="text-xs text-muted-foreground">
+              可访问门店{isHq ? "（总部角色本身即可浏览全部门店）" : ""}
+            </Label>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {locations.map((loc) => (
+                <Button
+                  key={loc.id}
+                  type="button"
+                  size="sm"
+                  variant={pickedLocations.includes(loc.id) ? "default" : "outline"}
+                  onClick={() => setPickedLocations((prev) => toggle(prev, loc.id))}
+                >
+                  {loc.name}
+                </Button>
+              ))}
+              {locations.length === 0 && (
+                <span className="text-sm text-muted-foreground">暂无可选门店</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button
+            disabled={saving}
+            onClick={async () => {
+              setSaving(true);
+              try {
+                await onSubmit(pickedRoles, pickedLocations);
+                setOpen(false);
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            保存
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
