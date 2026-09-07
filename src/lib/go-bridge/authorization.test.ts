@@ -298,4 +298,43 @@ describe("expectedLinkStatus", () => {
       "revoked",
     );
   });
+
+  // 与 SQL go_authorization_facts.expected_link_status 一一对照的用例表。
+  const HQ = { roles: ["hq_operator"], location_ids: [], shop_links: [SHOP, SHOP2] };
+  const cases: Array<[string, Partial<AuthorizationFacts>, "active" | "revoked"]> = [
+    ["HQ 无本地 identity 行（复用 GO 可信绑定）", { ...HQ, identity_status: null }, "active"],
+    ["HQ identity=pending", { ...HQ, identity_status: "pending" }, "active"],
+    ["HQ identity=approved", { ...HQ, identity_status: "approved" }, "active"],
+    ["HQ 显式 revoked", { ...HQ, identity_status: "revoked" }, "revoked"],
+    ["HQ 显式 rejected", { ...HQ, identity_status: "rejected" }, "revoked"],
+    ["HQ 账号停用", { ...HQ, banned: true }, "revoked"],
+    ["HQ 账号删除", { ...HQ, deleted: true }, "revoked"],
+    ["账号不存在", { account_exists: false }, "revoked"],
+    ["无任何角色", { roles: [] }, "revoked"],
+    ["员工无门店授权", { roles: ["store_staff"], location_ids: [], shop_links: [] }, "revoked"],
+    [
+      "员工部分映射",
+      {
+        roles: ["store_staff"],
+        location_ids: [SHOP.erp_location_id, SHOP2.erp_location_id],
+        shop_links: [SHOP],
+      },
+      "revoked",
+    ],
+    [
+      "员工完整映射",
+      {
+        roles: ["store_staff"],
+        location_ids: [SHOP.erp_location_id, SHOP2.erp_location_id],
+        shop_links: [SHOP, SHOP2],
+      },
+      "active",
+    ],
+  ];
+
+  for (const [name, over, want] of cases) {
+    it(`${name} → ${want}`, () => {
+      assert.equal(expectedLinkStatus(buildAuthorizationSnapshot(facts(over))), want);
+    });
+  }
 });
