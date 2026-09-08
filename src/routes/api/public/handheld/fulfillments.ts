@@ -10,6 +10,7 @@ import {
   err,
 } from "@/server/handheld-auth.server";
 import { requireStaffAtDeviceLocation } from "@/server/handheld-fulfillment.server";
+import { resolveFulfillmentListScope } from "@/server/handheld-fulfillment-access.server";
 import {
   FULFILLMENT_STATUS_FILTERS,
   clampPage,
