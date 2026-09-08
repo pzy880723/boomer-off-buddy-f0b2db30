@@ -76,7 +76,6 @@ export const Route = createFileRoute("/api/public/handheld/fulfillments")({
         const effectiveLocation = decision.locationId ?? staff.locationId;
         const scope = decision.scope;
 
-
         // 新版分页契约：?format=items
         if (url.searchParams.get("format") === "items") {
           if (!FULFILLMENT_STATUS_FILTERS.includes(statusRaw)) {
@@ -128,7 +127,6 @@ export const Route = createFileRoute("/api/public/handheld/fulfillments")({
           .limit(100);
         if (error) return err(error.message, 500);
         return ok(data ?? []);
-
       },
     },
   },

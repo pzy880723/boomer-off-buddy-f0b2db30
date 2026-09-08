@@ -19,7 +19,8 @@ export const BLOCKING_ORDER_STATUSES = ["cancelled", "closed"] as const;
 export type AccessMode = "read" | "write";
 
 export type AccessDecision =
-  { ok: true; scope: string } | { ok: false; code: string; status: number; message: string };
+  | { ok: true; scope: string }
+  | { ok: false; code: string; status: number; message: string };
 
 /**
  * 纯函数：给定角色/库位/订单状态，判定是否允许访问目标子单。
