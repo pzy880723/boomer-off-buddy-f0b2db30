@@ -44,9 +44,10 @@ export async function signSkuImagePaths(paths: readonly string[]): Promise<(stri
 
   await Promise.all(
     Array.from(slotsByBucket.entries()).map(async ([bucket, slots]) => {
-      const { data, error } = await supabaseAdmin.storage
-        .from(bucket)
-        .createSignedUrls(slots.map((s) => s.path), SIGNED_TTL);
+      const { data, error } = await supabaseAdmin.storage.from(bucket).createSignedUrls(
+        slots.map((s) => s.path),
+        SIGNED_TTL,
+      );
       if (error || !data) return;
       data.forEach((row, i) => {
         const slot = slots[i];
@@ -67,8 +68,64 @@ export async function signSkuCover(
     const signed = await signSkuImagePaths([imagePaths[0]]);
     if (signed[0]) return signed[0];
   }
-  if (fallbackImageUrl && /^https?:\/\//i.test(fallbackImageUrl) && !fallbackImageUrl.includes("token=")) {
+  if (
+    fallbackImageUrl &&
+    /^https?:\/\//i.test(fallbackImageUrl) &&
+    !fallbackImageUrl.includes("token=")
+  ) {
     return fallbackImageUrl;
   }
   return null;
+}
+
+export const THUMBNAIL_TRANSFORM = { width: 480, resize: "contain", quality: 75 } as const;
+const THUMBNAIL_CONCURRENCY = 4;
+
+/**
+ * 缩略图签名：storage-js 的 createSignedUrls 批量接口不支持 transform（只支持 download/cacheNonce），
+ * 因此按“去重后的路径”逐个调用 createSignedUrl(path, ttl, { transform })，并发上限 4。
+ * 只对私桶路径生效；外链 / 未知前缀 / 签名失败一律返回 null，由调用方回退原图。
+ */
+export async function signSkuThumbnailPaths(
+  paths: readonly string[],
+  transform: {
+    width: number;
+    resize?: "cover" | "contain" | "fill";
+    quality?: number;
+  } = THUMBNAIL_TRANSFORM,
+): Promise<(string | null)[]> {
+  if (!paths || paths.length === 0) return [];
+  const out: (string | null)[] = new Array(paths.length).fill(null);
+  const unique = new Map<string, { bucket: string; path: string; idxs: number[] }>();
+  paths.forEach((raw, idx) => {
+    const s = String(raw ?? "").trim();
+    const slash = s.indexOf("/");
+    if (!s || /^https?:\/\//i.test(s) || s.startsWith("data:") || slash <= 0) return;
+    const bucket = s.slice(0, slash);
+    const path = s.slice(slash + 1);
+    if (!PRIVATE_BUCKETS.has(bucket) || !path) return;
+    const entry = unique.get(s) ?? { bucket, path, idxs: [] };
+    entry.idxs.push(idx);
+    unique.set(s, entry);
+  });
+  const jobs = Array.from(unique.values());
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < jobs.length) {
+      const job = jobs[cursor++];
+      try {
+        const { data, error } = await supabaseAdmin.storage
+          .from(job.bucket)
+          .createSignedUrl(job.path, SIGNED_TTL, { transform });
+        if (error || !data?.signedUrl) continue;
+        for (const i of job.idxs) out[i] = data.signedUrl;
+      } catch {
+        // 保持 null → 调用方回退原图
+      }
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(THUMBNAIL_CONCURRENCY, jobs.length) }, () => worker()),
+  );
+  return out;
 }

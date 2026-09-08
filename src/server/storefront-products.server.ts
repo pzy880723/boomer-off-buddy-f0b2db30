@@ -1,5 +1,5 @@
 import { supabaseAdmin } from "../integrations/supabase/client.server";
-import { signSkuImagePaths } from "../lib/sku-image-resolver.server";
+import { signSkuImagePaths, signSkuThumbnailPaths } from "../lib/sku-image-resolver.server";
 
 export type StorefrontProductQuery = {
   q: string | null;
@@ -29,15 +29,96 @@ export type StorefrontListing = {
   location: { id: string; name: string; kind: string } | null;
 };
 
+export type ImageSigner = (paths: readonly string[]) => Promise<(string | null)[]>;
+
 export async function resolveStorefrontListingImages(
   listing: StorefrontListing,
-  signer: (paths: readonly string[]) => Promise<(string | null)[]> = signSkuImagePaths,
+  signer: ImageSigner = signSkuImagePaths,
 ): Promise<StorefrontListing> {
   const paths = (listing.image_paths ?? []).filter(Boolean);
   if (paths.length === 0) return listing;
   const signed = (await signer(paths)).filter((url): url is string => Boolean(url));
   if (signed.length === 0) return listing;
   return { ...listing, cover_url: signed[0], image_urls: signed };
+}
+
+/**
+ * 跨 listing 一次性签名：把所有 listing 的 image_paths 拍平后只调一次 signer
+ * （signer 内部按桶分组 → 每桶一次 createSignedUrls），再按偏移切回各自 listing。
+ */
+export async function resolveStorefrontListingsImagesBatch(
+  listings: StorefrontListing[],
+  signer: ImageSigner = signSkuImagePaths,
+): Promise<StorefrontListing[]> {
+  const flat: string[] = [];
+  const spans = listings.map((listing) => {
+    const paths = (listing.image_paths ?? []).filter(Boolean);
+    const start = flat.length;
+    flat.push(...paths);
+    return { start, end: flat.length };
+  });
+  if (flat.length === 0) return listings;
+  const signedAll = await signer(flat);
+  return listings.map((listing, i) => {
+    const signed = signedAll
+      .slice(spans[i].start, spans[i].end)
+      .filter((url): url is string => Boolean(url));
+    if (signed.length === 0) return listing;
+    return { ...listing, cover_url: signed[0], image_urls: signed };
+  });
+}
+
+export type StorefrontProduct = ReturnType<typeof buildStorefrontProduct>;
+
+/**
+ * 只对“当前页”的商品签名：原图桶级批量 + 可选 480px 缩略图。
+ * - image_url / image_urls 契约不变（原图签名）
+ * - thumbnail_url 为新增可选字段；缩略图签名失败回退原图 URL
+ */
+export async function signStorefrontProductImages(
+  products: StorefrontProduct[],
+  listingsById: Map<string, StorefrontListing>,
+  options: { thumbnail?: boolean; signer?: ImageSigner; thumbnailSigner?: ImageSigner } = {},
+): Promise<StorefrontProduct[]> {
+  const signer = options.signer ?? signSkuImagePaths;
+  const thumbnailSigner = options.thumbnailSigner ?? signSkuThumbnailPaths;
+  const pageListings = products.map(
+    (product) =>
+      listingsById.get(product.id) ?? {
+        id: product.id,
+        sku_id: product.sku_id,
+        location_id: null,
+        title: product.name,
+        description: null,
+        cover_url: product.image_url,
+        image_urls: product.image_urls,
+        image_paths: [],
+        price: product.price,
+        compare_at_price: null,
+        condition_grade: null,
+        product_type: product.product_type,
+        published_at: null,
+        location: null,
+      },
+  );
+  const resolved = await resolveStorefrontListingsImagesBatch(pageListings, signer);
+  const coverPaths = resolved.map((listing) => (listing.image_paths ?? []).find(Boolean) ?? "");
+  let thumbs: (string | null)[] = [];
+  if (options.thumbnail) {
+    try {
+      thumbs = await thumbnailSigner(coverPaths);
+    } catch {
+      thumbs = [];
+    }
+  }
+  return products.map((product, i) => {
+    const listing = resolved[i];
+    const image_url = listing.cover_url ?? product.image_url;
+    const image_urls = listing.image_urls ?? product.image_urls;
+    const base = { ...product, image_url, image_urls };
+    if (!options.thumbnail) return base;
+    return { ...base, thumbnail_url: thumbs[i] ?? image_url };
+  });
 }
 
 type StorefrontSku = {
@@ -138,8 +219,18 @@ export function buildStorefrontProduct(input: {
   };
 }
 
-export async function enrichStorefrontListings(listings: StorefrontListing[]) {
-  listings = await Promise.all(listings.map((listing) => resolveStorefrontListingImages(listing)));
+/**
+ * 元数据富化（分类/品牌/facets/可售库存）。
+ * signImages=true（默认，详情页沿用）：桶级批量签名原图；
+ * signImages=false：不做任何签名，留给调用方在筛选/分页之后对当前页调用 signStorefrontProductImages。
+ */
+export async function enrichStorefrontListings(
+  listings: StorefrontListing[],
+  options: { signImages?: boolean } = {},
+) {
+  if (options.signImages !== false) {
+    listings = await resolveStorefrontListingsImagesBatch(listings);
+  }
   const skuIds = [...new Set(listings.map((listing) => listing.sku_id).filter(Boolean))];
   if (skuIds.length === 0) return [];
 
