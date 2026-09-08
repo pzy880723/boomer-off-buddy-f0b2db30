@@ -21,11 +21,13 @@ export const Route = createFileRoute("/api/public/storefront/shops")({
           .eq("status", "active");
         if (error) return storefrontJson({ ok: false, error: error.message }, { status: 500 });
 
-        const rows = ((data ?? []) as unknown as Array<
-          Omit<ShopSourceRow, "location"> & {
-            location: ShopSourceRow["location"] | ShopSourceRow["location"][] | null;
-          }
-        >).map((row) => ({
+        const rows = (
+          (data ?? []) as unknown as Array<
+            Omit<ShopSourceRow, "location"> & {
+              location: ShopSourceRow["location"] | ShopSourceRow["location"][] | null;
+            }
+          >
+        ).map((row) => ({
           ...row,
           location: Array.isArray(row.location) ? (row.location[0] ?? null) : row.location,
         })) as ShopSourceRow[];

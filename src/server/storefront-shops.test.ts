@@ -80,9 +80,24 @@ describe("buildPublicShops", () => {
     const asked: string[] = [];
     const out = await buildPublicShops(
       [
-        row({ id: "s1", shop_name: "A店", image_url: null, location: { id: "l1", name: "A", kind: "shop", is_active: true } }),
-        row({ id: "s2", shop_name: "B店", image_url: "shops/b.jpg", location: { id: "l2", name: "B", kind: "shop", is_active: true } }),
-        row({ id: "s3", shop_name: "仓库", image_url: "shops/c.jpg", location: { id: "l3", name: "仓库", kind: "warehouse", is_active: true } }),
+        row({
+          id: "s1",
+          shop_name: "A店",
+          image_url: null,
+          location: { id: "l1", name: "A", kind: "shop", is_active: true },
+        }),
+        row({
+          id: "s2",
+          shop_name: "B店",
+          image_url: "shops/b.jpg",
+          location: { id: "l2", name: "B", kind: "shop", is_active: true },
+        }),
+        row({
+          id: "s3",
+          shop_name: "仓库",
+          image_url: "shops/c.jpg",
+          location: { id: "l3", name: "仓库", kind: "warehouse", is_active: true },
+        }),
       ],
       async (paths) => {
         asked.push(...paths);
