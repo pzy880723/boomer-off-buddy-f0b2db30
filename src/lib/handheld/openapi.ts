@@ -928,9 +928,20 @@ X-Session-Token: <操作员 session token>
     "/api/public/handheld/support/conversations": {
       get: {
         tags: ["客服"],
-        summary: "客服会话列表（v1.11）",
+        summary: "客服会话列表（v1.16）",
         description:
-          "门店员工按授权库位、总部客服可见全部会话；共享接待，无独占领取。返回 `data.items[]`，含 `unread_count` 与 `participants`。",
+          "门店员工按授权库位、总部客服可见全部会话；共享接待，无独占领取。返回 `data.items[]`，含 `unread_count` 与 `participants`。查询参数 `location_id` 可选：HQ 不传=全部授权门店(`scope=hq_all_conversations`)，传入即按该门店过滤(`scope=hq_single_location`)；分店员工必须传本店，传非授权门店返回 403 `forbidden_location`，不传时仍被服务端限制在授权门店内(`scope=assigned_locations`)。授权一律由服务端强制，不信任客户端声明。",
+        parameters: [
+          {
+            name: "location_id",
+            in: "query",
+            required: false,
+            schema: { type: "string", format: "uuid" },
+          },
+          { name: "status", in: "query", required: false, schema: { type: "string" } },
+          { name: "limit", in: "query", required: false, schema: { type: "integer" } },
+          { name: "cursor", in: "query", required: false, schema: { type: "string" } },
+        ],
         responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
       },
     },
