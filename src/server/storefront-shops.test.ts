@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import assert from "node:assert/strict";
+import { describe, test } from "node:test";
 import {
   buildPublicShops,
   isPublicShopRow,
@@ -18,41 +19,41 @@ const row = (over: Partial<ShopSourceRow> = {}): ShopSourceRow => ({
 });
 
 describe("parseCityFromAddress", () => {
-  it("解析直辖市", () => {
-    expect(parseCityFromAddress("上海市静安区 南京西路 1168 号")).toBe("上海市");
+  test("解析直辖市", () => {
+    assert.equal(parseCityFromAddress("上海市静安区 南京西路 1168 号"), "上海市");
   });
-  it("解析省+市", () => {
-    expect(parseCityFromAddress("浙江省温州市鹿城区朔门古港")).toBe("温州市");
+  test("解析省+市", () => {
+    assert.equal(parseCityFromAddress("浙江省温州市鹿城区朔门古港"), "温州市");
   });
-  it("无法确定时返回 null，不编造", () => {
-    expect(parseCityFromAddress("朔门古港 3 号铺")).toBeNull();
-    expect(parseCityFromAddress(null)).toBeNull();
-    expect(parseCityFromAddress("   ")).toBeNull();
+  test("无法确定时返回 null，不编造", () => {
+    assert.equal(parseCityFromAddress("朔门古港 3 号铺")).toBeNull();
+    assert.equal(parseCityFromAddress(null), null);
+    assert.equal(parseCityFromAddress("   "), null);
   });
 });
 
 describe("过滤规则", () => {
-  it("只保留 active 门店 + active 的 kind=shop 库位", () => {
-    expect(isPublicShopRow(row())).toBe(true);
-    expect(isPublicShopRow(row({ status: "disabled" }))).toBe(false);
-    expect(
+  test("只保留 active 门店 + active 的 kind=shop 库位", () => {
+    assert.equal(isPublicShopRow(row()), true);
+    assert.equal(isPublicShopRow(row({ status: "disabled" })), false);
+    assert.equal(
       isPublicShopRow(row({ location: { id: "l", name: "x", kind: "shop", is_active: false } })),
-    ).toBe(false);
-    expect(
+    , false);
+    assert.equal(
       isPublicShopRow(
         row({ location: { id: "l", name: "总部仓库", kind: "warehouse", is_active: true } }),
       ),
-    ).toBe(false);
-    expect(isPublicShopRow(row({ location: null }))).toBe(false);
+    , false);
+    assert.equal(isPublicShopRow(row({ location: null })), false);
   });
 });
 
 describe("字段白名单", () => {
-  it("id 为 location_id，且不含 manager/phone/token 等字段", () => {
+  test("id 为 location_id，且不含 manager/phone/token 等字段", () => {
     const out = toPublicShop(row(), null) as Record<string, unknown>;
-    expect(out.id).toBe("loc-1");
-    expect(out.shop_id).toBe("shop-1");
-    expect(Object.keys(out).sort()).toEqual(
+    assert.equal(out.id, "loc-1");
+    assert.equal(out.shop_id, "shop-1");
+    assert.equal(Object.keys(out).sort()).toEqual(
       [
         "address",
         "business_hours",
@@ -65,14 +66,14 @@ describe("字段白名单", () => {
         "shop_id",
       ].sort(),
     );
-    expect(out.business_hours).toBeNull();
-    expect(out.latitude).toBeNull();
-    expect(out.longitude).toBeNull();
+    assert.deepEqual(out.business_hours, null);
+    assert.equal(out.latitude, null);
+    assert.equal(out.longitude, null);
   });
 });
 
 describe("buildPublicShops", () => {
-  it("只对有图门店签名，且签名结果按门店对齐", async () => {
+  test("只对有图门店签名，且签名结果按门店对齐", async () => {
     const asked: string[] = [];
     const out = await buildPublicShops(
       [
@@ -85,20 +86,20 @@ describe("buildPublicShops", () => {
         return paths.map((p) => `signed:${p}`);
       },
     );
-    expect(asked).toEqual(["shops/b.jpg"]);
-    expect(out.map((s) => s.id)).toEqual(["l1", "l2"]);
-    expect(out.find((s) => s.id === "l1")?.image_url).toBeNull();
-    expect(out.find((s) => s.id === "l2")?.image_url).toBe("signed:shops/b.jpg");
+    assert.equal(asked, ["shops/b.jpg"]);
+    assert.deepEqual(out.map((s) => s.id), ["l1", "l2"]);
+    assert.equal((out.find((s) => s.id === "l1")?.image_url, null);
+    assert.equal(out.find((s) => s.id === "l2")?.image_url, "signed:shops/b.jpg");
   });
 
-  it("签名失败或抛错时降级为 null，仍返回门店", async () => {
+  test("签名失败或抛错时降级为 null，仍返回门店", async () => {
     const failing = await buildPublicShops([row()], async () => {
       throw new Error("storage down");
     });
-    expect(failing).toHaveLength(1);
-    expect(failing[0].image_url).toBeNull();
+    expect(failing).length, 1);
+    expect(failing[0].image_url, null);
 
     const nulled = await buildPublicShops([row()], async (paths) => paths.map(() => null));
-    expect(nulled[0].image_url).toBeNull();
+    assert.equal(nulled[0].image_url, null);
   });
 });
