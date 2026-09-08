@@ -76,9 +76,16 @@ export const Route = createFileRoute("/api/public/storefront/payments")({
           total_amount: number;
           currency: string;
           reservation_expires_at: string;
-          payment_route: { mode?: string } | null;
+          payment_route: { mode?: string; merchant_id?: string; app_id?: string } | null;
         };
-        if (orderRow.payment_route?.mode === "ordinary_wechat") {
+        // 通道以下单时固化的 payment_route 为准；切换全局默认模式只影响新订单。
+        let orderChannel;
+        try { orderChannel = resolveOrderChannel(orderRow); }
+        catch (error) {
+          const code = error instanceof PaymentRouteError ? error.code : "payment_route_unknown";
+          return storefrontError("Unsupported historical payment route", 409, code);
+        }
+        if (orderChannel === "ordinary_wechat") {
           try {
             const data = await startOrdinaryPayment(ordinaryPaymentRuntime(), {
               orderId: orderRow.id, customerId: auth.customer.id, idempotencyKey,
@@ -92,7 +99,7 @@ export const Route = createFileRoute("/api/public/storefront/payments")({
               code === "mini_login_required" ? 401 : 503, code === "mini_login_required" ? code : "payment_processing");
           }
         }
-        if (orderRow.payment_route?.mode) return storefrontError("Unsupported historical payment route", 409);
+
         if (orderRow.payment_status === "paid") {
           return storefrontError("Order is already paid", 409, "already_paid");
         }
