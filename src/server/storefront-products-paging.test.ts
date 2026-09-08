@@ -177,6 +177,24 @@ describe("storefront list paging + page-only image signing", () => {
     assert.doesNotMatch(detailRoute, /signImages: false/);
   });
 
+  test("hidden / non-active SKUs are excluded during enrichment, before total and paging", () => {
+    const server = readFileSync(
+      new URL("./storefront-products.server.ts", import.meta.url),
+      "utf8",
+    );
+    const enrichIdx = server.indexOf("export async function enrichStorefrontListings");
+    const body = server.slice(enrichIdx);
+    assert.match(
+      body,
+      /\.from\("inv_skus"\)[\s\S]*?\.eq\("status", "active"\)[\s\S]*?\.eq\("is_display", true\)[\s\S]*?\.in\("id", skuIds\)/,
+    );
+    // 路由里 total 在 enrich 之后才计算，因此被过滤掉的 SKU 不会计入 total
+    assert.ok(
+      listRoute.indexOf("enrichStorefrontListings(") <
+        listRoute.indexOf("const total = availableProducts.length"),
+    );
+  });
+
   test("only taxonomy gets a public cache header; products stay uncached", () => {
     assert.match(taxonomyRoute, /Cache-Control[^\n]*public[^\n]*s-maxage=300/);
     assert.doesNotMatch(listRoute, /Cache-Control/);
