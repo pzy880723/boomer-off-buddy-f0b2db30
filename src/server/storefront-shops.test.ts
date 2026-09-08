@@ -26,7 +26,7 @@ describe("parseCityFromAddress", () => {
     assert.equal(parseCityFromAddress("浙江省温州市鹿城区朔门古港"), "温州市");
   });
   test("无法确定时返回 null，不编造", () => {
-    assert.equal(parseCityFromAddress("朔门古港 3 号铺")).toBeNull();
+    assert.equal(parseCityFromAddress("朔门古港 3 号铺"), null);
     assert.equal(parseCityFromAddress(null), null);
     assert.equal(parseCityFromAddress("   "), null);
   });
