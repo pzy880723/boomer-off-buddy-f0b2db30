@@ -112,13 +112,16 @@ function buildStore(input: GoStoreInput): GoStoreOut {
       completeness: {
         complete: false,
         kind: "paid_gross",
+        refunds_complete: false,
         reasons: [input.code, ...(input.message ? [input.message] : [])],
         youzan_synced_through: null,
         day_covered_by_sync: false,
         source_fresh: false,
       },
+      freshness: { synced_through: null, day_covered_by_sync: false, fresh: false },
     };
   }
+
 
   const reasons: string[] = [];
   let complete = true;
