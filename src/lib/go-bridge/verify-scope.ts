@@ -81,10 +81,20 @@ export function parseGoVerifyPayload(
     throw new GoScopeError("go_identity_mismatch", "GO 身份与访问令牌不一致", 403);
   }
 
-  const erpUserId = str(root["erp_user_id"]);
-  if (root["is_erp_user"] !== true || !erpUserId || !UUID_RE.test(erpUserId)) {
+  if (root["is_erp_user"] !== true) {
     throw new GoScopeError("go_identity_not_linked", "该 GO 账号尚未绑定 ERP 账号", 403);
   }
+  // erp_user_id 是唯一可信的 ERP 身份来源（GO erp_user_links.aigc_user_id = auth.uid()）。
+  // 缺失/非 UUID 一律 fail closed：绝不退回 email / 手机号 / user_metadata 猜 ID。
+  const erpUserId = str(root["erp_user_id"]);
+  if (!erpUserId || !UUID_RE.test(erpUserId)) {
+    throw new GoScopeError(
+      "go_erp_user_id_unavailable",
+      "GO 尚未返回可信的 ERP 用户 ID，无法确认权限",
+      503,
+    );
+  }
+
 
   const scopeCtx = obj(root["scope_context"]);
   const shopCtx = obj(root["shop_context"]);
