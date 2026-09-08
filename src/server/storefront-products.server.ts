@@ -235,9 +235,12 @@ export async function enrichStorefrontListings(
   if (skuIds.length === 0) return [];
 
   const [skuResult, facetResult, availabilityResult] = await Promise.all([
+    // 与腾讯分支 525acd6 对齐：隐藏 / 非 active SKU 不进入公开商品（在 total/分页计算之前排除）
     supabaseAdmin
       .from("inv_skus")
       .select("id, category, brand_id, keywords, stock_qty")
+      .eq("status", "active")
+      .eq("is_display", true)
       .in("id", skuIds),
     supabaseAdmin
       .from("inv_sku_facets" as never)
