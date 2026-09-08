@@ -95,7 +95,10 @@ export const Route = createFileRoute("/api/public/handheld/fulfillments/$id")({
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
-        const shipmentRow = shipment as { provider?: string | null; tracking_no?: string | null } | null;
+        const shipmentRow = shipment as {
+          provider?: string | null;
+          tracking_no?: string | null;
+        } | null;
 
         return ok({
           ...row,
@@ -115,7 +118,6 @@ export const Route = createFileRoute("/api/public/handheld/fulfillments/$id")({
           tracking_no: shipmentRow?.tracking_no ?? null,
           carrier_provider: shipmentRow?.provider ?? null,
         });
-
       },
     },
   },
