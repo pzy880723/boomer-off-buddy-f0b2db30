@@ -50,33 +50,31 @@ export const Route = createFileRoute("/api/public/handheld/fulfillments")({
         const statusRaw = (url.searchParams.get("status") ?? "all") as FulfillmentStatusFilter;
         const wantsAll = url.searchParams.get("scope") === "all";
         const locationParam = url.searchParams.get("location_id");
-        const hq = await isHqUser(staff.userId);
-        if (wantsAll && !hq) {
-          return err("Headquarters role required for scope=all", 403, { code: "hq_required" });
+        if (locationParam && !UUID_RE.test(locationParam)) {
+          return err("Invalid location_id", 400, { code: "validation_error" });
         }
+        const hq = await isHqUser(staff.userId);
         // 普通员工只能是设备当前授权库位；HQ 必须对该 location 有授权。
         // 任何不匹配都必须 403，绝不静默返回另一个 scope 的数据。
-        let scopedLocation: string | null = null;
-        if (locationParam) {
-          if (!UUID_RE.test(locationParam)) {
-            return err("Invalid location_id", 400, { code: "validation_error" });
-          }
-          if (!hq) {
-            if (locationParam !== staff.locationId) {
-              return err("You do not have permission to operate this location", 403, {
+        const decision = resolveFulfillmentListScope({
+          isHq: hq,
+          wantsAll,
+          deviceLocationId: staff.locationId,
+          requestedLocationId: locationParam,
+          hqCanAccessRequested:
+            hq && locationParam ? await userCanAccessLocation(staff.userId, locationParam) : true,
+        });
+        if (!decision.ok) {
+          return decision.code === "hq_required"
+            ? err("Headquarters role required for scope=all", 403, { code: "hq_required" })
+            : err("You do not have permission to operate this location", 403, {
                 code: "location_forbidden",
               });
-            }
-          } else if (!(await userCanAccessLocation(staff.userId, locationParam))) {
-            return err("You do not have permission to operate this location", 403, {
-              code: "location_forbidden",
-            });
-          }
-          scopedLocation = locationParam;
         }
-        const unfilteredHq = hq && wantsAll && !scopedLocation;
-        const effectiveLocation = scopedLocation ?? staff.locationId;
-        const scope = unfilteredHq ? "all" : `location:${effectiveLocation}`;
+        const unfilteredHq = decision.locationId === null;
+        const effectiveLocation = decision.locationId ?? staff.locationId;
+        const scope = decision.scope;
+
 
         // 新版分页契约：?format=items
         if (url.searchParams.get("format") === "items") {
