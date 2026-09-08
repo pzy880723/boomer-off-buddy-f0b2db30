@@ -83,8 +83,22 @@ export const Route = createFileRoute("/api/public/handheld/fulfillments/$id")({
             }),
             shortage_status: shortage?.status ?? null,
             shortage_refund_state: shortage?.refund_state ?? null,
+            // 未维护货架位：明确为空，绝不用 SKU 编码冒充库位标签。
+            location_label: null,
           };
         });
+
+        const { data: shipment } = await supabaseAdmin
+          .from("shipments" as never)
+          .select("id, provider, tracking_no, status, created_at")
+          .eq("fulfillment_id", params.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const shipmentRow = shipment as {
+          provider?: string | null;
+          tracking_no?: string | null;
+        } | null;
 
         return ok({
           ...row,
@@ -100,6 +114,9 @@ export const Route = createFileRoute("/api/public/handheld/fulfillments/$id")({
           refund_pending_count: guard.refund_pending_count,
           // 尚未对接真实快递商户与电子面单账号，能力恒为 false，不返回伪造运单号。
           waybill_available: false,
+          // 真实运单号；没有已登记发货记录时为 null，不编造。
+          tracking_no: shipmentRow?.tracking_no ?? null,
+          carrier_provider: shipmentRow?.provider ?? null,
         });
       },
     },
