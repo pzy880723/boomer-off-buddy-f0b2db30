@@ -242,7 +242,7 @@ export function buildGoDailySummary(params: {
     stores,
     completeness: { complete, kind, refunds_complete: refundsComplete, reasons: [...reasons] },
     freshness: {
-      synced_through: syncedThrough ?? null,
+      synced_through: syncedUnknown ? null : syncedThrough,
       day_covered_by_sync: dayCovered,
       fresh,
     },
