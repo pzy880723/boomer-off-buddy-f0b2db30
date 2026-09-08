@@ -159,6 +159,7 @@ import { Route as ApiPublicContentIdBookmarkRouteImport } from './routes/api/pub
 import { Route as ApiPublicContentIdCommentsRouteImport } from './routes/api/public/content/$id.comments'
 import { Route as ApiPublicContentIdLikeRouteImport } from './routes/api/public/content/$id.like'
 import { Route as ApiPublicContentIdShareRouteImport } from './routes/api/public/content/$id.share'
+import { Route as ApiPublicGoStoreDailySalesRouteImport } from './routes/api/public/go/store/daily-sales'
 import { Route as ApiPublicHandheldAiPrepareListingImageRouteImport } from './routes/api/public/handheld/ai.prepare-listing-image'
 import { Route as ApiPublicHandheldAiRecognizeItemRouteImport } from './routes/api/public/handheld/ai.recognize-item'
 import { Route as ApiPublicHandheldAuthBootstrapRouteImport } from './routes/api/public/handheld/auth.bootstrap'
@@ -1069,6 +1070,12 @@ const ApiPublicContentIdShareRoute = ApiPublicContentIdShareRouteImport.update({
   path: '/share',
   getParentRoute: () => ApiPublicContentIdRoute,
 } as any)
+const ApiPublicGoStoreDailySalesRoute =
+  ApiPublicGoStoreDailySalesRouteImport.update({
+    id: '/api/public/go/store/daily-sales',
+    path: '/api/public/go/store/daily-sales',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHandheldAiPrepareListingImageRoute =
   ApiPublicHandheldAiPrepareListingImageRouteImport.update({
     id: '/api/public/handheld/ai/prepare-listing-image',
@@ -1844,6 +1851,7 @@ export interface FileRoutesByFullPath {
   '/api/public/content/$id/comments': typeof ApiPublicContentIdCommentsRoute
   '/api/public/content/$id/like': typeof ApiPublicContentIdLikeRoute
   '/api/public/content/$id/share': typeof ApiPublicContentIdShareRoute
+  '/api/public/go/store/daily-sales': typeof ApiPublicGoStoreDailySalesRoute
   '/api/public/handheld/ai/prepare-listing-image': typeof ApiPublicHandheldAiPrepareListingImageRoute
   '/api/public/handheld/ai/recognize-item': typeof ApiPublicHandheldAiRecognizeItemRoute
   '/api/public/handheld/auth/bootstrap': typeof ApiPublicHandheldAuthBootstrapRoute
@@ -2094,6 +2102,7 @@ export interface FileRoutesByTo {
   '/api/public/content/$id/comments': typeof ApiPublicContentIdCommentsRoute
   '/api/public/content/$id/like': typeof ApiPublicContentIdLikeRoute
   '/api/public/content/$id/share': typeof ApiPublicContentIdShareRoute
+  '/api/public/go/store/daily-sales': typeof ApiPublicGoStoreDailySalesRoute
   '/api/public/handheld/ai/prepare-listing-image': typeof ApiPublicHandheldAiPrepareListingImageRoute
   '/api/public/handheld/ai/recognize-item': typeof ApiPublicHandheldAiRecognizeItemRoute
   '/api/public/handheld/auth/bootstrap': typeof ApiPublicHandheldAuthBootstrapRoute
@@ -2352,6 +2361,7 @@ export interface FileRoutesById {
   '/api/public/content/$id/comments': typeof ApiPublicContentIdCommentsRoute
   '/api/public/content/$id/like': typeof ApiPublicContentIdLikeRoute
   '/api/public/content/$id/share': typeof ApiPublicContentIdShareRoute
+  '/api/public/go/store/daily-sales': typeof ApiPublicGoStoreDailySalesRoute
   '/api/public/handheld/ai/prepare-listing-image': typeof ApiPublicHandheldAiPrepareListingImageRoute
   '/api/public/handheld/ai/recognize-item': typeof ApiPublicHandheldAiRecognizeItemRoute
   '/api/public/handheld/auth/bootstrap': typeof ApiPublicHandheldAuthBootstrapRoute
@@ -2611,6 +2621,7 @@ export interface FileRouteTypes {
     | '/api/public/content/$id/comments'
     | '/api/public/content/$id/like'
     | '/api/public/content/$id/share'
+    | '/api/public/go/store/daily-sales'
     | '/api/public/handheld/ai/prepare-listing-image'
     | '/api/public/handheld/ai/recognize-item'
     | '/api/public/handheld/auth/bootstrap'
@@ -2861,6 +2872,7 @@ export interface FileRouteTypes {
     | '/api/public/content/$id/comments'
     | '/api/public/content/$id/like'
     | '/api/public/content/$id/share'
+    | '/api/public/go/store/daily-sales'
     | '/api/public/handheld/ai/prepare-listing-image'
     | '/api/public/handheld/ai/recognize-item'
     | '/api/public/handheld/auth/bootstrap'
@@ -3118,6 +3130,7 @@ export interface FileRouteTypes {
     | '/api/public/content/$id/comments'
     | '/api/public/content/$id/like'
     | '/api/public/content/$id/share'
+    | '/api/public/go/store/daily-sales'
     | '/api/public/handheld/ai/prepare-listing-image'
     | '/api/public/handheld/ai/recognize-item'
     | '/api/public/handheld/auth/bootstrap'
@@ -3323,6 +3336,7 @@ export interface RootRouteChildren {
   ApiPublicStorefrontTaxonomyRoute: typeof ApiPublicStorefrontTaxonomyRoute
   ApiPublicAuthOtpSendRoute: typeof ApiPublicAuthOtpSendRoute
   ApiPublicAuthOtpVerifyRoute: typeof ApiPublicAuthOtpVerifyRoute
+  ApiPublicGoStoreDailySalesRoute: typeof ApiPublicGoStoreDailySalesRoute
   ApiPublicHandheldAiPrepareListingImageRoute: typeof ApiPublicHandheldAiPrepareListingImageRoute
   ApiPublicHandheldAiRecognizeItemRoute: typeof ApiPublicHandheldAiRecognizeItemRoute
   ApiPublicHandheldAuthBootstrapRoute: typeof ApiPublicHandheldAuthBootstrapRoute
@@ -4437,6 +4451,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/public/content/$id/share'
       preLoaderRoute: typeof ApiPublicContentIdShareRouteImport
       parentRoute: typeof ApiPublicContentIdRoute
+    }
+    '/api/public/go/store/daily-sales': {
+      id: '/api/public/go/store/daily-sales'
+      path: '/api/public/go/store/daily-sales'
+      fullPath: '/api/public/go/store/daily-sales'
+      preLoaderRoute: typeof ApiPublicGoStoreDailySalesRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/public/handheld/ai/prepare-listing-image': {
       id: '/api/public/handheld/ai/prepare-listing-image'
@@ -5933,6 +5954,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicStorefrontTaxonomyRoute: ApiPublicStorefrontTaxonomyRoute,
   ApiPublicAuthOtpSendRoute: ApiPublicAuthOtpSendRoute,
   ApiPublicAuthOtpVerifyRoute: ApiPublicAuthOtpVerifyRoute,
+  ApiPublicGoStoreDailySalesRoute: ApiPublicGoStoreDailySalesRoute,
   ApiPublicHandheldAiPrepareListingImageRoute:
     ApiPublicHandheldAiPrepareListingImageRoute,
   ApiPublicHandheldAiRecognizeItemRoute: ApiPublicHandheldAiRecognizeItemRoute,
