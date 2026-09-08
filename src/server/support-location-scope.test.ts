@@ -1,9 +1,6 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
-import {
-  resolveConversationLocationFilter,
-  type SupportAccess,
-} from "@/server/support.server";
+import { resolveConversationLocationFilter, type SupportAccess } from "@/server/support.server";
 
 const hq: SupportAccess = {
   user_id: "u-hq",
