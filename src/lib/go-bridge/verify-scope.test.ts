@@ -104,7 +104,6 @@ describe("parseGoVerifyPayload (real nested contract)", () => {
     );
   });
 
-
   it("refuses an unconfigured scope instead of silently treating it as no-schedule", () => {
     expectError(
       () => parseGoVerifyPayload(payload({ scope: "unconfigured", status: "unconfigured" }), opts),

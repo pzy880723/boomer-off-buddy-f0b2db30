@@ -95,7 +95,6 @@ export function parseGoVerifyPayload(
     );
   }
 
-
   const scopeCtx = obj(root["scope_context"]);
   const shopCtx = obj(root["shop_context"]);
   if (!scopeCtx || !shopCtx) unavailable("context");
