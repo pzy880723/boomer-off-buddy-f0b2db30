@@ -293,7 +293,7 @@ const document: ZodOpenApiObject = {
   openapi: "3.1.0",
   info: {
     title: "Boomer Off — Public API",
-    version: "1.15.0",
+    version: "1.16.0",
     description: `
 本文档覆盖：
 
