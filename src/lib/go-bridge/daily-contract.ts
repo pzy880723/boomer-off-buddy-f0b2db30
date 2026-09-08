@@ -52,11 +52,21 @@ export type GoStoreOut = {
   };
   completeness: {
     complete: boolean;
+    /** actual_fen 的口径：net=已扣退款净额；paid_gross=已付款毛额（无退款源时只能是它） */
     kind: "paid_gross" | "net";
+    /** 退款数据源是否可用；false 时 kind 必为 paid_gross 且 complete=false */
+    refunds_complete: boolean;
     reasons: string[];
     youzan_synced_through: string | null;
     day_covered_by_sync: boolean;
     source_fresh: boolean;
+  };
+  /** 同步时效水位：与 generated_at（响应生成时间）严格区分 */
+  freshness: {
+    /** 有赞订单同步真实覆盖到的时间点（ISO），未知为 null。绝不等于 generated_at */
+    synced_through: string | null;
+    day_covered_by_sync: boolean;
+    fresh: boolean;
   };
 };
 
@@ -71,7 +81,19 @@ export type GoDailySummary = {
     store_count: number;
   };
   stores: GoStoreOut[];
-  completeness: { complete: boolean; kind: "paid_gross" | "net"; reasons: string[] };
+  completeness: {
+    complete: boolean;
+    kind: "paid_gross" | "net";
+    refunds_complete: boolean;
+    reasons: string[];
+  };
+  /** 范围内所有门店取最保守值；synced_through 为最早水位，任一未知即 null */
+  freshness: {
+    synced_through: string | null;
+    day_covered_by_sync: boolean;
+    fresh: boolean;
+  };
+  /** 仅是本次响应的生成时间，不代表任何同步水位 */
   generated_at: string;
 };
 
@@ -89,11 +111,13 @@ function buildStore(input: GoStoreInput): GoStoreOut {
       completeness: {
         complete: false,
         kind: "paid_gross",
+        refunds_complete: false,
         reasons: [input.code, ...(input.message ? [input.message] : [])],
         youzan_synced_through: null,
         day_covered_by_sync: false,
         source_fresh: false,
       },
+      freshness: { synced_through: null, day_covered_by_sync: false, fresh: false },
     };
   }
 
@@ -150,10 +174,16 @@ function buildStore(input: GoStoreInput): GoStoreOut {
       complete,
       // 本地没有有赞退款数据源，只要缺退款源就只能是已付款毛额口径
       kind: input.has_refund_source ? "net" : "paid_gross",
+      refunds_complete: input.has_refund_source,
       reasons,
       youzan_synced_through: input.youzan_synced_through,
       day_covered_by_sync: input.day_covered_by_sync,
       source_fresh: input.source_fresh,
+    },
+    freshness: {
+      synced_through: input.youzan_synced_through,
+      day_covered_by_sync: input.day_covered_by_sync,
+      fresh: input.source_fresh,
     },
   };
 }
@@ -172,11 +202,24 @@ export function buildGoDailySummary(params: {
   const reasons = new Set<string>();
   let complete = stores.length > 0;
   let kind: "paid_gross" | "net" = "net";
+  let refundsComplete = stores.length > 0;
+  let dayCovered = stores.length > 0;
+  let fresh = stores.length > 0;
+  let syncedThrough: string | null = null;
+  let syncedUnknown = false;
   for (const s of stores) {
     if (!s.completeness.complete) complete = false;
     if (s.completeness.kind === "paid_gross") kind = "paid_gross";
+    if (!s.completeness.refunds_complete) refundsComplete = false;
+    if (!s.freshness.day_covered_by_sync) dayCovered = false;
+    if (!s.freshness.fresh) fresh = false;
+    // 最保守水位：任一门店未知即整体未知，否则取最早
+    const t = s.freshness.synced_through;
+    if (t == null) syncedUnknown = true;
+    else if (syncedThrough === null || t < syncedThrough) syncedThrough = t;
     for (const r of s.completeness.reasons) reasons.add(r);
   }
+
   if (stores.length === 0) reasons.add("no_locations_in_scope");
 
   return {
@@ -194,7 +237,12 @@ export function buildGoDailySummary(params: {
       store_count: stores.length,
     },
     stores,
-    completeness: { complete, kind, reasons: [...reasons] },
+    completeness: { complete, kind, refunds_complete: refundsComplete, reasons: [...reasons] },
+    freshness: {
+      synced_through: syncedUnknown ? null : syncedThrough,
+      day_covered_by_sync: dayCovered,
+      fresh,
+    },
     generated_at: params.generatedAt,
   };
 }

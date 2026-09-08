@@ -46,8 +46,15 @@ describe("buildGoDailySummary", () => {
     const out = buildGoDailySummary({
       date: DATE,
       scope: { mode: "single", locationIds: [A], todayLocationId: A },
-      stores: [okStore({ youzan_fen: 0, offline_fen: 0, day_covered_by_sync: false,
-        has_current_day_snapshot: false, source_fresh: false })],
+      stores: [
+        okStore({
+          youzan_fen: 0,
+          offline_fen: 0,
+          day_covered_by_sync: false,
+          has_current_day_snapshot: false,
+          source_fresh: false,
+        }),
+      ],
       generatedAt: "2026-09-07T10:00:00.000Z",
     });
     assert.equal(out.stores[0].actual_fen, null);
@@ -59,8 +66,16 @@ describe("buildGoDailySummary", () => {
     const out = buildGoDailySummary({
       date: DATE,
       scope: { mode: "single", locationIds: [A], todayLocationId: A },
-      stores: [okStore({ youzan_fen: 0, offline_fen: 0, day_covered_by_sync: false,
-        has_current_day_snapshot: true, source_fresh: true, has_refund_source: false })],
+      stores: [
+        okStore({
+          youzan_fen: 0,
+          offline_fen: 0,
+          day_covered_by_sync: false,
+          has_current_day_snapshot: true,
+          source_fresh: true,
+          has_refund_source: false,
+        }),
+      ],
       generatedAt: "2026-09-07T10:00:00.000Z",
     });
     assert.equal(out.totals.actual_fen, 0);
@@ -122,5 +137,54 @@ describe("buildGoDailySummary", () => {
     });
     assert.equal(out.totals.actual_fen, null);
     assert.equal(out.totals.gap_fen, null);
+  });
+});
+
+describe("freshness and refund semantics are explicit", () => {
+  it("exposes per-store refunds_complete + freshness, and never uses generated_at as watermark", () => {
+    const out = buildGoDailySummary({
+      date: DATE,
+      scope: { mode: "single", locationIds: [A], todayLocationId: A },
+      stores: [
+        okStore({ has_refund_source: false, youzan_synced_through: `${DATE}T09:00:00.000Z` }),
+      ],
+      generatedAt: "2026-09-07T10:00:00.000Z",
+    });
+    const s = out.stores[0];
+    assert.equal(s.completeness.refunds_complete, false);
+    assert.equal(s.completeness.kind, "paid_gross");
+    assert.equal(s.completeness.complete, false);
+    assert.equal(s.freshness.synced_through, `${DATE}T09:00:00.000Z`);
+    assert.equal(out.freshness.synced_through, `${DATE}T09:00:00.000Z`);
+    assert.notEqual(out.freshness.synced_through, out.generated_at);
+    assert.equal(out.completeness.refunds_complete, false);
+  });
+
+  it("totals take the most conservative watermark across stores", () => {
+    const out = buildGoDailySummary({
+      date: DATE,
+      scope: { mode: "hq_all", locationIds: [A, B], todayLocationId: null },
+      stores: [
+        okStore({ youzan_synced_through: `${DATE}T12:00:00.000Z` }),
+        okStore({ location_id: B, name: "B 店", youzan_synced_through: `${DATE}T08:00:00.000Z` }),
+      ],
+      generatedAt: "2026-09-07T13:00:00.000Z",
+    });
+    assert.equal(out.freshness.synced_through, `${DATE}T08:00:00.000Z`);
+  });
+
+  it("an unknown store watermark makes the scope watermark unknown", () => {
+    const out = buildGoDailySummary({
+      date: DATE,
+      scope: { mode: "hq_all", locationIds: [A, B], todayLocationId: null },
+      stores: [
+        okStore({ youzan_synced_through: `${DATE}T12:00:00.000Z` }),
+        { status: "error", location_id: B, name: "B 店", code: "youzan_read_failed" },
+      ],
+      generatedAt: "2026-09-07T13:00:00.000Z",
+    });
+    assert.equal(out.freshness.synced_through, null);
+    assert.equal(out.freshness.fresh, false);
+    assert.equal(out.freshness.day_covered_by_sync, false);
   });
 });
