@@ -52,11 +52,21 @@ export type GoStoreOut = {
   };
   completeness: {
     complete: boolean;
+    /** actual_fen 的口径：net=已扣退款净额；paid_gross=已付款毛额（无退款源时只能是它） */
     kind: "paid_gross" | "net";
+    /** 退款数据源是否可用；false 时 kind 必为 paid_gross 且 complete=false */
+    refunds_complete: boolean;
     reasons: string[];
     youzan_synced_through: string | null;
     day_covered_by_sync: boolean;
     source_fresh: boolean;
+  };
+  /** 同步时效水位：与 generated_at（响应生成时间）严格区分 */
+  freshness: {
+    /** 有赞订单同步真实覆盖到的时间点（ISO），未知为 null。绝不等于 generated_at */
+    synced_through: string | null;
+    day_covered_by_sync: boolean;
+    fresh: boolean;
   };
 };
 
@@ -71,9 +81,22 @@ export type GoDailySummary = {
     store_count: number;
   };
   stores: GoStoreOut[];
-  completeness: { complete: boolean; kind: "paid_gross" | "net"; reasons: string[] };
+  completeness: {
+    complete: boolean;
+    kind: "paid_gross" | "net";
+    refunds_complete: boolean;
+    reasons: string[];
+  };
+  /** 范围内所有门店取最保守值；synced_through 为最早水位，任一未知即 null */
+  freshness: {
+    synced_through: string | null;
+    day_covered_by_sync: boolean;
+    fresh: boolean;
+  };
+  /** 仅是本次响应的生成时间，不代表任何同步水位 */
   generated_at: string;
 };
+
 
 function buildStore(input: GoStoreInput): GoStoreOut {
   if (input.status === "error") {
