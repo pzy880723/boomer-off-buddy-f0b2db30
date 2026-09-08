@@ -7083,6 +7083,8 @@ export type Database = {
       }
       support_conversations: {
         Row: {
+          context: Json | null
+          context_key: string | null
           created_at: string
           customer_id: string | null
           id: string
@@ -7096,6 +7098,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          context?: Json | null
+          context_key?: string | null
           created_at?: string
           customer_id?: string | null
           id?: string
@@ -7109,6 +7113,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          context?: Json | null
+          context_key?: string | null
           created_at?: string
           customer_id?: string | null
           id?: string
@@ -7141,6 +7147,39 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "commerce_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_customer_reads: {
+        Row: {
+          conversation_id: string
+          customer_id: string
+          last_read_at: string
+        }
+        Insert: {
+          conversation_id: string
+          customer_id: string
+          last_read_at: string
+        }
+        Update: {
+          conversation_id?: string
+          customer_id?: string
+          last_read_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_customer_reads_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "support_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_customer_reads_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_customers"
             referencedColumns: ["id"]
           },
         ]
@@ -8800,6 +8839,18 @@ export type Database = {
           p_target_user_id: string
         }
         Returns: Json
+      }
+      support_customer_conversation_list: {
+        Args: { p_customer_id: string }
+        Returns: Json
+      }
+      support_customer_mark_read: {
+        Args: {
+          p_conversation_id: string
+          p_customer_id: string
+          p_last_read_at: string
+        }
+        Returns: undefined
       }
       sync_handheld_custom_listing: {
         Args: {
