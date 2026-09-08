@@ -10,6 +10,8 @@ import {
 import { storefrontPaymentGatewayConfig } from "@/server/storefront-payment.server";
 import { ordinaryPaymentRuntime } from "@/server/ordinary-payment.server";
 import { startOrdinaryPayment } from "@/server/ordinary-payment-flow";
+import { PaymentRouteError, resolveOrderChannel } from "@/server/payment-route";
+
 import {
   StorePaymentNotReadyError,
   buildStorePaymentPlan,
@@ -42,7 +44,8 @@ export const Route = createFileRoute("/api/public/storefront/payments")({
         const auth = await authenticateStorefrontCustomer(request);
         if (!auth.ok) return auth.response;
         const idempotencyKey = request.headers.get("idempotency-key")?.trim();
-        if (!idempotencyKey || idempotencyKey.length > 200) return storefrontError("Invalid Idempotency-Key", 400);
+        if (!idempotencyKey || idempotencyKey.length > 200)
+          return storefrontError("Invalid Idempotency-Key", 400);
 
         let body: z.infer<typeof CreatePaymentBody>;
         try {
@@ -76,23 +79,39 @@ export const Route = createFileRoute("/api/public/storefront/payments")({
           total_amount: number;
           currency: string;
           reservation_expires_at: string;
-          payment_route: { mode?: string } | null;
+          payment_route: { mode?: string; merchant_id?: string; app_id?: string } | null;
         };
-        if (orderRow.payment_route?.mode === "ordinary_wechat") {
+        // 通道以下单时固化的 payment_route 为准；切换全局默认模式只影响新订单。
+        let orderChannel;
+        try {
+          orderChannel = resolveOrderChannel(orderRow);
+        } catch (error) {
+          const code = error instanceof PaymentRouteError ? error.code : "payment_route_unknown";
+          return storefrontError("Unsupported historical payment route", 409, code);
+        }
+        if (orderChannel === "ordinary_wechat") {
           try {
             const data = await startOrdinaryPayment(ordinaryPaymentRuntime(), {
-              orderId: orderRow.id, customerId: auth.customer.id, idempotencyKey,
+              orderId: orderRow.id,
+              customerId: auth.customer.id,
+              idempotencyKey,
               platform: body.client_context.platform,
-              miniOpenId: auth.customer.wechatMiniOpenId, miniAppId: auth.customer.wechatMiniAppId,
+              miniOpenId: auth.customer.wechatMiniOpenId,
+              miniAppId: auth.customer.wechatMiniAppId,
             });
             return storefrontJson({ ok: true, data });
           } catch (error) {
             const code = (error as { code?: string }).code;
-            return storefrontError(code === "mini_login_required" ? "请重新登录小程序后支付" : "支付状态确认中，请稍后查询订单",
-              code === "mini_login_required" ? 401 : 503, code === "mini_login_required" ? code : "payment_processing");
+            return storefrontError(
+              code === "mini_login_required"
+                ? "请重新登录小程序后支付"
+                : "支付状态确认中，请稍后查询订单",
+              code === "mini_login_required" ? 401 : 503,
+              code === "mini_login_required" ? code : "payment_processing",
+            );
           }
         }
-        if (orderRow.payment_route?.mode) return storefrontError("Unsupported historical payment route", 409);
+
         if (orderRow.payment_status === "paid") {
           return storefrontError("Order is already paid", 409, "already_paid");
         }
@@ -117,7 +136,8 @@ export const Route = createFileRoute("/api/public/storefront/payments")({
             expires_at: string | null;
             [key: string]: unknown;
           };
-          if (replayRow.order_id !== orderRow.id) return storefrontError("Idempotency key belongs to a different order", 409);
+          if (replayRow.order_id !== orderRow.id)
+            return storefrontError("Idempotency key belongs to a different order", 409);
           const { payment_payload, expires_at, ...payment } = replayRow;
           return storefrontJson({
             ok: true,
