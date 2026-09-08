@@ -205,9 +205,24 @@ export function buildGoDailySummary(params: {
   const reasons = new Set<string>();
   let complete = stores.length > 0;
   let kind: "paid_gross" | "net" = "net";
+  let refundsComplete = stores.length > 0;
+  let dayCovered = stores.length > 0;
+  let fresh = stores.length > 0;
+  let syncedThrough: string | null | undefined = undefined;
   for (const s of stores) {
     if (!s.completeness.complete) complete = false;
     if (s.completeness.kind === "paid_gross") kind = "paid_gross";
+    if (!s.completeness.refunds_complete) refundsComplete = false;
+    if (!s.freshness.day_covered_by_sync) dayCovered = false;
+    if (!s.freshness.fresh) fresh = false;
+    // 最保守水位：任一门店未知即整体未知，否则取最早
+    if (s.freshness.synced_through == null) syncedThrough = null;
+    else if (syncedThrough !== null) {
+      syncedThrough =
+        syncedThrough === undefined || s.freshness.synced_through < syncedThrough
+          ? s.freshness.synced_through
+          : syncedThrough;
+    }
     for (const r of s.completeness.reasons) reasons.add(r);
   }
   if (stores.length === 0) reasons.add("no_locations_in_scope");
@@ -227,7 +242,14 @@ export function buildGoDailySummary(params: {
       store_count: stores.length,
     },
     stores,
-    completeness: { complete, kind, reasons: [...reasons] },
+    completeness: { complete, kind, refunds_complete: refundsComplete, reasons: [...reasons] },
+    freshness: {
+      synced_through: syncedThrough ?? null,
+      day_covered_by_sync: dayCovered,
+      fresh,
+    },
     generated_at: params.generatedAt,
+  };
+
   };
 }
