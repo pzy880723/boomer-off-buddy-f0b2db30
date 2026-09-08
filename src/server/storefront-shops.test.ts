@@ -96,8 +96,8 @@ describe("buildPublicShops", () => {
     const failing = await buildPublicShops([row()], async () => {
       throw new Error("storage down");
     });
-    expect(failing).length, 1);
-    expect(failing[0].image_url, null);
+    assert.equal(failing.length, 1);
+    assert.equal(failing[0].image_url, null);
 
     const nulled = await buildPublicShops([row()], async (paths) => paths.map(() => null));
     assert.equal(nulled[0].image_url, null);
