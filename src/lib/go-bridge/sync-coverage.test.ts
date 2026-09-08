@@ -63,6 +63,7 @@ describe("completed update-window coverage", () => {
       row(start, "not-a-date"),
       { ...row(start, now), window_end: start },
       { ...row(start, now), last_completed_at: "2026-09-07T17:00:00.000Z" },
-    ]) assert.equal(coverage([bad]).hasSnapshot, false);
+    ])
+      assert.equal(coverage([bad]).hasSnapshot, false);
   });
 });

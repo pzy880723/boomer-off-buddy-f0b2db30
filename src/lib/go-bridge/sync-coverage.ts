@@ -17,23 +17,35 @@ export function completedSyncCoverage(input: {
   const start = Date.parse(input.startUtc);
   const end = Date.parse(input.endUtc);
   const now = input.now.getTime();
-  const intervals = input.rows.flatMap((row) => {
-    const from = Date.parse(row.window_start);
-    const windowEnd = Date.parse(row.window_end);
-    const through = Date.parse(row.last_completed_scan_end ?? "");
-    const completed = Date.parse(row.last_completed_at ?? "");
-    if (![from, windowEnd, through, completed].every(Number.isFinite) ||
-        through <= from || through > windowEnd || through > now ||
-        completed < through || completed > now) return [];
-    return [[from, through] as const];
-  }).sort((a, b) => a[0] - b[0]);
+  const intervals = input.rows
+    .flatMap((row) => {
+      const from = Date.parse(row.window_start);
+      const windowEnd = Date.parse(row.window_end);
+      const through = Date.parse(row.last_completed_scan_end ?? "");
+      const completed = Date.parse(row.last_completed_at ?? "");
+      if (
+        ![from, windowEnd, through, completed].every(Number.isFinite) ||
+        through <= from ||
+        through > windowEnd ||
+        through > now ||
+        completed < through ||
+        completed > now
+      )
+        return [];
+      return [[from, through] as const];
+    })
+    .sort((a, b) => a[0] - b[0]);
   let through = start;
   for (const [from, to] of intervals) {
     if (from > through) break;
     through = Math.max(through, Math.min(to, end));
   }
-  const hasSnapshot = Number.isFinite(start) && Number.isFinite(end) &&
-    end > start && now >= start && through > start;
+  const hasSnapshot =
+    Number.isFinite(start) &&
+    Number.isFinite(end) &&
+    end > start &&
+    now >= start &&
+    through > start;
   const wholeDayCovered = hasSnapshot && now >= end && through >= end;
   return {
     syncedThrough: hasSnapshot ? new Date(through).toISOString() : null,

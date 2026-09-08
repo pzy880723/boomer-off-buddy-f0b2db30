@@ -80,16 +80,27 @@ describe("parseGoVerifyPayload (real nested contract)", () => {
     );
   });
 
-  it("refuses a non-uuid or absent erp_user_id, and is_erp_user=false", () => {
-    expectError(
-      () => parseGoVerifyPayload(payload({ erp_user_id: "nope" }), opts),
-      "go_identity_not_linked",
-      403,
-    );
+  it("separates 'not an ERP user' from 'GO has not returned erp_user_id yet'", () => {
     expectError(
       () => parseGoVerifyPayload(payload({ is_erp_user: false }), opts),
       "go_identity_not_linked",
       403,
+    );
+    // GO 补丁未部署 / 字段缺失：fail closed，且不得回退 email 或 metadata 猜 ID
+    expectError(
+      () => parseGoVerifyPayload(payload({ erp_user_id: undefined }), opts),
+      "go_erp_user_id_unavailable",
+      503,
+    );
+    expectError(
+      () => parseGoVerifyPayload(payload({ erp_user_id: "nope" }), opts),
+      "go_erp_user_id_unavailable",
+      503,
+    );
+    expectError(
+      () => parseGoVerifyPayload(payload({ erp_user_id: "staff@example.com" }), opts),
+      "go_erp_user_id_unavailable",
+      503,
     );
   });
 
