@@ -250,6 +250,5 @@ export function buildGoDailySummary(params: {
     },
     generated_at: params.generatedAt,
   };
-
-  };
 }
+
