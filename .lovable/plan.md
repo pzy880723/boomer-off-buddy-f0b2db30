@@ -1,61 +1,84 @@
-# 公共商品列表 / 图片 / taxonomy 只读性能核查结论
+# 门店清单只读核查结果 + 最小门店接口建议
 
-HEAD：`af224b5`（本轮未改代码、未迁移、未改配置、未发布；腾讯 erp.boomeroff.com 生产未部署任何改动）。
+未改任何代码、未迁移、未发布。腾讯线上 3ca4497 不受影响。
 
-## 一、图片签名是否 N+1 —— 是，且在分页之前对全量签名
+## 1. 门店数据现状（真实表）
 
-- `src/server/storefront-products.server.ts:142`：`enrichStorefrontListings` 对每个 listing 调 `resolveStorefrontListingImages`，每次内部调 `signSkuImagePaths` → `createSignedUrls`（`src/lib/sku-image-resolver.server.ts:45-56`）。每个 listing 各自发一次 Storage 签名请求（并发，但请求数 = listing 数）。
-- `src/routes/api/public/storefront/products.ts:66-72`：先对最多 500 条 listing 全部富化（含签名），再 `filter(stock>0)`、再 `slice` 分页。图片签名和 facets/brand 查询都发生在切页之前。
-- 只读计时（沙箱 → 嵌入存储）：跨 listing 桶级一次 `createSignedUrls(8 paths)` 299ms；逐条 10 次串行 2408ms。可以按请求把所有 listing 的 path 合并后，按桶各调一次（`signSkuImagePaths` 本身已支持多路径按桶分组，只是调用方逐条喂）。
+权威表是 `youzan_shops`（门店主档）+ `inv_locations`（商品/库存所挂的 location，`kind='shop'`，通过 `shop_id` 一一对应）。
 
-## 二、嵌入存储是否支持签名图片变换 —— 支持（只读实测）
+现有可用字段：
 
-对一张已发布 listing 首图（`sku-listing` 桶 PNG）用 service role 生成 60 秒签名 URL 并 GET（未输出 URL/secret）：
+| 需求字段 | 真实字段 | 现状 |
+| --- | --- | --- |
+| 门店 id（商品筛选用） | `inv_locations.id` | 4 家门店 location 全有 |
+| 门店 id（主档） | `youzan_shops.id` / `kdt_id` | 全有 |
+| name | `youzan_shops.shop_name` / `inv_locations.name` | 全有 |
+| city | 无独立字段 | 缺，只能从 address 文本推断 |
+| address | `youzan_shops.address` | 4 家中 2 家有 |
+| 门头照片 | `youzan_shops.image_url`（私有桶 `shop-images` 的对象路径，非 URL） | 仅 1 家有 |
+| 营业时间 | 无字段 | 完全缺失 |
+| latitude / longitude | 无字段 | 完全缺失 |
+| 其他 | `manager`、`phone`、`area_sqm`、`opened_at`、`ownership`、`status`、`store_format` | phone/manager 属联系人信息，不宜对外 |
 
-| 请求 | 状态 | 类型 | 字节 |
-|---|---|---|---|
-| 原图签名 | 200 | image/png | 1,261,449 |
-| `transform:{width:480,resize:contain,quality:75}` 签名 | 200 | image/png | 279,013 |
+门店实况（非敏感）：
 
-- 原图未改、桶未公开；变换只发生在读取侧。响应 `cache-control` 为空（对象上传时未设 cacheControl；`storage.objects` 元数据统计：sku-listing 44 个对象、25 个 >1MB、24 个 PNG、7 个 no-cache；sku-raw 26 个对象、26 个 no-cache、最大 2.0MB）。
-- 注意：变换保留 PNG 格式（未自动转 webp，需客户端 `Accept: image/webp` 或 `format` 选项再验证）；480px PNG 仍约 279KB，若要更小需上传侧生成 JPEG/WebP 副本（属后续实施项）。
+- BOOMER OFF vintage — status active，但对应 location `is_active=false`，有 address，无门头图，上架商品 0
+- BOOMER OFF vintage（中信泰富店）— active，有 address，有门头图，已发布商品 4
+- 新天地店 — active，无 address，无门头图，上架 0
+- 温州朔门古港店 — active，无 address、无门头图，上架 0
+- 另有「总部仓库」location（`kind` 非门店/无 shop 主档语义），不应出现在对客门店列表
 
-## 三、列表与 taxonomy 的串行查库
+结论：目前只有 1 家门店具备完整对客展示素材；“定位最近优先”所需经纬度在库里根本不存在，必须先补数据。
 
-`GET /api/public/storefront/products` 实际链路（只读计时）：
-1. `search_inv_skus(limit 500)` — 898ms，返回 500 个 SKU（`products.ts:17-27`；按 SKU 搜索，而当前 published listing 只有 4 条）。
-2. `commerce_listings … in(500 sku_ids)` — 421ms（`products.ts:45-54`）。
-3. 逐 listing 签名（第一节）。
-4. 并行：`inv_skus` / `inv_sku_facets` / `commerce_listing_availability`（758ms）（`storefront-products.server.ts:146-161`）。
-5. 再串行：categories+brands（171-184 行）→ 再串行 parent categories（197-202 行）。
+## 2. 已有公开接口
 
-共 5 段串行 RTT + 逐条签名，与本机 1.4–2.4s TTFB 吻合。
+`src/routes/api/public/` 下没有任何门店清单接口（`youzan_shops` 未在任何 public 路由中被读取）。
 
-`GET /api/public/storefront/taxonomy`（`taxonomy.ts:13-33`）：三张表并行各 ~270-290ms（96 类 / 187 品牌 / 23 facet），单次 RTT 约 0.3s + 边缘冷启动，与 ~0.9s 吻合；主要开销是每次请求都重取全量品牌（含 aliases）。
+商品接口已支持按门店筛选：
 
-## 四、public 缓存边界（当前状态 + 安全边界）
+- `GET /api/public/storefront/products`
+  - `parseStorefrontProductQuery`（`src/server/storefront-products.server.ts:178`）已解析 `location_id`
+  - `src/routes/api/public/storefront/products.ts:54`：`if (query.location_id) db = db.eq("location_id", query.location_id)`
+  - 传的是 `inv_locations.id`，不是 `youzan_shops.id`
+  - 响应：`{ ok, data: [...], pagination: { page, page_size, total }, filters }`，每条商品含 `location: { id, name, kind }`
+- `GET /api/public/storefront/products/:id` 同样返回 `location`
 
-当前：`storefrontJson`（`src/server/storefront-auth.server.ts:11-20`）不设任何 `Cache-Control`；products / taxonomy 响应都无缓存头。`/api/public/media/sku/$`（`src/routes/api/public/media/sku/$.ts:32`）已是 `public, max-age=86400, immutable` 的代理，但它每次在服务端下载整张原图再转发，且无尺寸参数。
+所以底部弹窗选门店后按门店筛商品，后端已经可用，前端只需带上 `location_id`；“最近优先”后端无支持。
 
-可安全缓存（内容不含实时价格/库存/身份）：
-- taxonomy：`public, s-maxage=300, stale-while-revalidate=600`。
-- 图片字节（缩略图代理或签名 URL 目标）：长 TTL，路径即内容键。
+## 3. 最小只读门店接口建议（先不实施）
 
-不得缓存/必须 `no-store`：
-- products 列表与详情中的 `price / compare_at_price / available_qty / stock`（`storefront-products.server.ts:128-134`）、`commerce_listing_availability` 结果；orders / payments / membership / shortages / support 全部路由。若要缓存列表，只能缓存"去价格库存的静态快照"，价格库存由客户端另请求实时接口，或响应明确标注 `snapshot_at` 且不得当成实时。
+`GET /api/public/storefront/shops`
 
-## 五、后续实施项（本轮均未实施）
+```json
+{
+  "ok": true,
+  "data": [
+    {
+      "id": "<inv_locations.id 用于商品筛选>",
+      "shop_id": "<youzan_shops.id>",
+      "name": "BOOMER OFF vintage（中信泰富店）",
+      "city": null,
+      "address": "…",
+      "image_url": "<短期签名后的门头图，或 null>",
+      "business_hours": null,
+      "latitude": null,
+      "longitude": null,
+      "product_count": 4
+    }
+  ]
+}
+```
 
-1. `products.ts`：先按 published listing 分页，再签名当前页；`enrichStorefrontListings` 改为收集本页全部 `image_paths` 一次调用 `signSkuImagePaths`（桶级批量）。
-2. 列表封面使用 `createSignedUrls(..., { transform: { width: 480 } })` 或让 `/api/public/media/sku/$` 接受 `w=` 并走 Storage render 端点，保持原图不动、桶不公开；补 `Cache-Control`。
-3. `search_inv_skus` 改为限定在 published listing 的 SKU 内或增加 listing 侧索引，避免 500 行无效搜索；categories/parent 合并为一次查询。
-4. taxonomy 加 `s-maxage`；storefrontJson 默认 `no-store`，仅白名单路由覆盖为 public。
-5. 上传侧为 sku-listing 设置 `cacheControl` 并生成 JPEG/WebP 列表副本。
-6. 补测试：`storefront-products.test.ts` 增加"N 个 listing 只触发 1 次/桶签名"和"分页 total 与本页签名数一致"的断言。
+要点：
+- 只返回 `youzan_shops.status='active'` 且对应 `inv_locations.is_active=true`、`kind='shop'` 的门店，排除仓库
+- 不返回 `phone`、`manager`、token 等任何敏感字段
+- 门头图走短期签名，私桶保持不公开；无图返回 null
+- `city`/`business_hours`/`latitude`/`longitude` 先按 null 占位，保持契约稳定
 
-## 六、证据与边界
+## 4. 需要补的数据（实施前置）
 
-- 只读 SQL：`commerce_listings` published 4 条 / sold 1 条；storage 对象大小统计如上。
-- 只读探测脚本在 /tmp 运行后已删除；未打印签名 URL、token 或密钥。
-- 现有测试 `src/server/storefront-products.test.ts` 未覆盖签名调用次数。
-- 未修改任何文件（除本计划）、未迁移、未发布，腾讯生产保持原版本。
+要做“定位最近优先 + 门头图 + 营业时间”，需要一次向后兼容的加列迁移：`city`、`business_hours`(jsonb 或 text)、`latitude`、`longitude`，并由后台补齐 3 家缺 address/图片的门店资料。这属于后续任务，本轮不做。
+
+## 5. 边界
+
+不覆盖普通微信支付与图片性能改动；本计划不含任何迁移或发布动作。
