@@ -208,7 +208,8 @@ export function buildGoDailySummary(params: {
   let refundsComplete = stores.length > 0;
   let dayCovered = stores.length > 0;
   let fresh = stores.length > 0;
-  let syncedThrough: string | null | undefined = undefined;
+  let syncedThrough: string | null = null;
+  let syncedUnknown = false;
   for (const s of stores) {
     if (!s.completeness.complete) complete = false;
     if (s.completeness.kind === "paid_gross") kind = "paid_gross";
@@ -216,15 +217,12 @@ export function buildGoDailySummary(params: {
     if (!s.freshness.day_covered_by_sync) dayCovered = false;
     if (!s.freshness.fresh) fresh = false;
     // 最保守水位：任一门店未知即整体未知，否则取最早
-    if (s.freshness.synced_through == null) syncedThrough = null;
-    else if (syncedThrough !== null) {
-      syncedThrough =
-        syncedThrough === undefined || s.freshness.synced_through < syncedThrough
-          ? s.freshness.synced_through
-          : syncedThrough;
-    }
+    const t = s.freshness.synced_through;
+    if (t == null) syncedUnknown = true;
+    else if (syncedThrough === null || t < syncedThrough) syncedThrough = t;
     for (const r of s.completeness.reasons) reasons.add(r);
   }
+
   if (stores.length === 0) reasons.add("no_locations_in_scope");
 
   return {
