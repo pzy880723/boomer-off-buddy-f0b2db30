@@ -19,7 +19,8 @@ export const BLOCKING_ORDER_STATUSES = ["cancelled", "closed"] as const;
 export type AccessMode = "read" | "write";
 
 export type AccessDecision =
-  { ok: true; scope: string } | { ok: false; code: string; status: number; message: string };
+  | { ok: true; scope: string }
+  | { ok: false; code: string; status: number; message: string };
 
 /**
  * 纯函数：给定角色/库位/订单状态，判定是否允许访问目标子单。
@@ -273,4 +274,38 @@ export async function loadPickGuard(context: FulfillmentContext): Promise<{
     shortageQueryError,
   });
   return { guard, shortageByItem };
+}
+
+/**
+ * 履约列表 scope 判定（纯函数，便于契约测试）。
+ * - HQ 传 location_id（且已授权）→ location:<id>
+ * - HQ 未筛选且 scope=all → all
+ * - 普通员工恒为设备当前授权库位；传入不匹配的 location_id 必须 403，不静默降级。
+ */
+export function resolveFulfillmentListScope(input: {
+  isHq: boolean;
+  wantsAll: boolean;
+  deviceLocationId: string;
+  requestedLocationId: string | null;
+  hqCanAccessRequested?: boolean;
+}):
+  | { ok: true; scope: string; locationId: string | null }
+  | { ok: false; code: "hq_required" | "location_forbidden" } {
+  if (input.wantsAll && !input.isHq) return { ok: false, code: "hq_required" };
+  const requested = input.requestedLocationId;
+  if (requested) {
+    if (!input.isHq && requested !== input.deviceLocationId) {
+      return { ok: false, code: "location_forbidden" };
+    }
+    if (input.isHq && input.hqCanAccessRequested === false) {
+      return { ok: false, code: "location_forbidden" };
+    }
+    return { ok: true, scope: `location:${requested}`, locationId: requested };
+  }
+  if (input.isHq && input.wantsAll) return { ok: true, scope: "all", locationId: null };
+  return {
+    ok: true,
+    scope: `location:${input.deviceLocationId}`,
+    locationId: input.deviceLocationId,
+  };
 }
