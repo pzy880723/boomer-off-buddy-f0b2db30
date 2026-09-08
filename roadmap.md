@@ -30,4 +30,4 @@
 - [x] src/lib/sales-dashboard.functions.ts + 授权（HQ 全部/单店，店员限授权门店）
 - [x] 契约测试（区间解析、AOV、warning 不造 0）
 
-- [ ] 公共商品列表性能补丁：分页后签名、桶级批量、thumbnail_url、taxonomy 5min 缓存 + 单测（不发布腾讯）
+- [x] 公共商品列表性能补丁：分页后签名、桶级批量、thumbnail_url、taxonomy 5min 缓存 + 单测（不发布腾讯）
