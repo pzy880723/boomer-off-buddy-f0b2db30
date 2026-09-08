@@ -31,3 +31,5 @@
 - [x] 契约测试（区间解析、AOV、warning 不造 0）
 
 - [x] 公共商品列表性能补丁：分页后签名、桶级批量、thumbnail_url、taxonomy 5min 缓存 + 单测（不发布腾讯）
+
+- [x] 公开门店清单只读接口 GET /api/public/storefront/shops（字段白名单、私桶短期签名、缺图容错；hours/coords 暂 null）

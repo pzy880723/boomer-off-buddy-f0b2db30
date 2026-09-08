@@ -151,6 +151,7 @@ import { Route as ApiPublicSsoAigcTicketRouteImport } from './routes/api/public/
 import { Route as ApiPublicStorefrontOrdersRouteImport } from './routes/api/public/storefront/orders'
 import { Route as ApiPublicStorefrontPaymentsRouteImport } from './routes/api/public/storefront/payments'
 import { Route as ApiPublicStorefrontProductsRouteImport } from './routes/api/public/storefront/products'
+import { Route as ApiPublicStorefrontShopsRouteImport } from './routes/api/public/storefront/shops'
 import { Route as ApiPublicStorefrontShortagesRouteImport } from './routes/api/public/storefront/shortages'
 import { Route as ApiPublicStorefrontTaxonomyRouteImport } from './routes/api/public/storefront/taxonomy'
 import { Route as ApiPublicAuthOtpSendRouteImport } from './routes/api/public/auth/otp.send'
@@ -1027,6 +1028,12 @@ const ApiPublicStorefrontProductsRoute =
     path: '/api/public/storefront/products',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicStorefrontShopsRoute =
+  ApiPublicStorefrontShopsRouteImport.update({
+    id: '/api/public/storefront/shops',
+    path: '/api/public/storefront/shops',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicStorefrontShortagesRoute =
   ApiPublicStorefrontShortagesRouteImport.update({
     id: '/api/public/storefront/shortages',
@@ -1850,6 +1857,7 @@ export interface FileRoutesByFullPath {
   '/api/public/storefront/orders': typeof ApiPublicStorefrontOrdersRouteWithChildren
   '/api/public/storefront/payments': typeof ApiPublicStorefrontPaymentsRouteWithChildren
   '/api/public/storefront/products': typeof ApiPublicStorefrontProductsRouteWithChildren
+  '/api/public/storefront/shops': typeof ApiPublicStorefrontShopsRoute
   '/api/public/storefront/shortages': typeof ApiPublicStorefrontShortagesRouteWithChildren
   '/api/public/storefront/taxonomy': typeof ApiPublicStorefrontTaxonomyRoute
   '/api/public/auth/otp/send': typeof ApiPublicAuthOtpSendRoute
@@ -2102,6 +2110,7 @@ export interface FileRoutesByTo {
   '/api/public/storefront/orders': typeof ApiPublicStorefrontOrdersRouteWithChildren
   '/api/public/storefront/payments': typeof ApiPublicStorefrontPaymentsRouteWithChildren
   '/api/public/storefront/products': typeof ApiPublicStorefrontProductsRouteWithChildren
+  '/api/public/storefront/shops': typeof ApiPublicStorefrontShopsRoute
   '/api/public/storefront/shortages': typeof ApiPublicStorefrontShortagesRouteWithChildren
   '/api/public/storefront/taxonomy': typeof ApiPublicStorefrontTaxonomyRoute
   '/api/public/auth/otp/send': typeof ApiPublicAuthOtpSendRoute
@@ -2362,6 +2371,7 @@ export interface FileRoutesById {
   '/api/public/storefront/orders': typeof ApiPublicStorefrontOrdersRouteWithChildren
   '/api/public/storefront/payments': typeof ApiPublicStorefrontPaymentsRouteWithChildren
   '/api/public/storefront/products': typeof ApiPublicStorefrontProductsRouteWithChildren
+  '/api/public/storefront/shops': typeof ApiPublicStorefrontShopsRoute
   '/api/public/storefront/shortages': typeof ApiPublicStorefrontShortagesRouteWithChildren
   '/api/public/storefront/taxonomy': typeof ApiPublicStorefrontTaxonomyRoute
   '/api/public/auth/otp/send': typeof ApiPublicAuthOtpSendRoute
@@ -2623,6 +2633,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/orders'
     | '/api/public/storefront/payments'
     | '/api/public/storefront/products'
+    | '/api/public/storefront/shops'
     | '/api/public/storefront/shortages'
     | '/api/public/storefront/taxonomy'
     | '/api/public/auth/otp/send'
@@ -2875,6 +2886,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/orders'
     | '/api/public/storefront/payments'
     | '/api/public/storefront/products'
+    | '/api/public/storefront/shops'
     | '/api/public/storefront/shortages'
     | '/api/public/storefront/taxonomy'
     | '/api/public/auth/otp/send'
@@ -3134,6 +3146,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/orders'
     | '/api/public/storefront/payments'
     | '/api/public/storefront/products'
+    | '/api/public/storefront/shops'
     | '/api/public/storefront/shortages'
     | '/api/public/storefront/taxonomy'
     | '/api/public/auth/otp/send'
@@ -3345,6 +3358,7 @@ export interface RootRouteChildren {
   ApiPublicStorefrontOrdersRoute: typeof ApiPublicStorefrontOrdersRouteWithChildren
   ApiPublicStorefrontPaymentsRoute: typeof ApiPublicStorefrontPaymentsRouteWithChildren
   ApiPublicStorefrontProductsRoute: typeof ApiPublicStorefrontProductsRouteWithChildren
+  ApiPublicStorefrontShopsRoute: typeof ApiPublicStorefrontShopsRoute
   ApiPublicStorefrontShortagesRoute: typeof ApiPublicStorefrontShortagesRouteWithChildren
   ApiPublicStorefrontTaxonomyRoute: typeof ApiPublicStorefrontTaxonomyRoute
   ApiPublicAuthOtpSendRoute: typeof ApiPublicAuthOtpSendRoute
@@ -4407,6 +4421,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/storefront/products'
       fullPath: '/api/public/storefront/products'
       preLoaderRoute: typeof ApiPublicStorefrontProductsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/storefront/shops': {
+      id: '/api/public/storefront/shops'
+      path: '/api/public/storefront/shops'
+      fullPath: '/api/public/storefront/shops'
+      preLoaderRoute: typeof ApiPublicStorefrontShopsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/storefront/shortages': {
@@ -5972,6 +5993,7 @@ const rootRouteChildren: RootRouteChildren = {
     ApiPublicStorefrontPaymentsRouteWithChildren,
   ApiPublicStorefrontProductsRoute:
     ApiPublicStorefrontProductsRouteWithChildren,
+  ApiPublicStorefrontShopsRoute: ApiPublicStorefrontShopsRoute,
   ApiPublicStorefrontShortagesRoute:
     ApiPublicStorefrontShortagesRouteWithChildren,
   ApiPublicStorefrontTaxonomyRoute: ApiPublicStorefrontTaxonomyRoute,
