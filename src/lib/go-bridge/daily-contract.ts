@@ -176,13 +176,20 @@ function buildStore(input: GoStoreInput): GoStoreOut {
       complete,
       // 本地没有有赞退款数据源，只要缺退款源就只能是已付款毛额口径
       kind: input.has_refund_source ? "net" : "paid_gross",
+      refunds_complete: input.has_refund_source,
       reasons,
       youzan_synced_through: input.youzan_synced_through,
       day_covered_by_sync: input.day_covered_by_sync,
       source_fresh: input.source_fresh,
     },
+    freshness: {
+      synced_through: input.youzan_synced_through,
+      day_covered_by_sync: input.day_covered_by_sync,
+      fresh: input.source_fresh,
+    },
   };
 }
+
 
 export function buildGoDailySummary(params: {
   date: string;
