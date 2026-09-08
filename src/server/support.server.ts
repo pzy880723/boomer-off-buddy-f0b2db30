@@ -213,11 +213,27 @@ async function hydrate(
   }));
 }
 
+/**
+ * 服务端强制授权：HQ 不传 location_id 表示"全部授权门店"，传了必须是真实门店；
+ * 分店员工必须传本店，且只能是自己被授权的门店，否则 forbidden。
+ */
+export function resolveConversationLocationFilter(
+  access: SupportAccess,
+  locationId: string | null | undefined,
+): { ok: true; location_id: string | null } | { ok: false; code: "forbidden_location" } {
+  const wanted = locationId?.trim() ? locationId.trim() : null;
+  if (access.is_hq_agent) return { ok: true, location_id: wanted };
+  if (!wanted) return { ok: true, location_id: null }; // 退化为全部授权门店，仍受授权过滤
+  if (!access.location_ids.includes(wanted)) return { ok: false, code: "forbidden_location" };
+  return { ok: true, location_id: wanted };
+}
+
 export async function listStaffConversations(input: {
   access: SupportAccess;
   status?: string | null;
   limit?: number;
   cursor?: string | null;
+  location_id?: string | null;
 }): Promise<{ items: SupportConversationSummary[]; next_cursor: string | null }> {
   const limit = Math.min(Math.max(input.limit ?? 30, 1), 100);
   if (!input.access.is_hq_agent && input.access.location_ids.length === 0) {
@@ -231,6 +247,7 @@ export async function listStaffConversations(input: {
     .order("updated_at", { ascending: false })
     .limit(limit + 1);
   if (!input.access.is_hq_agent) query = query.in("location_id", input.access.location_ids);
+  if (input.location_id) query = query.eq("location_id", input.location_id);
   if (input.status) query = query.eq("status", input.status);
   if (input.cursor) query = query.lt("updated_at", input.cursor);
   const { data, error } = await query;
