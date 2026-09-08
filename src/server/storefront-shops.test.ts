@@ -38,12 +38,14 @@ describe("过滤规则", () => {
     assert.equal(isPublicShopRow(row({ status: "disabled" })), false);
     assert.equal(
       isPublicShopRow(row({ location: { id: "l", name: "x", kind: "shop", is_active: false } })),
-    , false);
+      false,
+    );
     assert.equal(
       isPublicShopRow(
         row({ location: { id: "l", name: "总部仓库", kind: "warehouse", is_active: true } }),
       ),
-    , false);
+      false,
+    );
     assert.equal(isPublicShopRow(row({ location: null })), false);
   });
 });
@@ -53,7 +55,8 @@ describe("字段白名单", () => {
     const out = toPublicShop(row(), null) as Record<string, unknown>;
     assert.equal(out.id, "loc-1");
     assert.equal(out.shop_id, "shop-1");
-    assert.equal(Object.keys(out).sort()).toEqual(
+    assert.deepEqual(
+      Object.keys(out).sort(),
       [
         "address",
         "business_hours",
@@ -86,9 +89,12 @@ describe("buildPublicShops", () => {
         return paths.map((p) => `signed:${p}`);
       },
     );
-    assert.equal(asked, ["shops/b.jpg"]);
-    assert.deepEqual(out.map((s) => s.id), ["l1", "l2"]);
-    assert.equal((out.find((s) => s.id === "l1")?.image_url, null);
+    assert.deepEqual(asked, ["shops/b.jpg"]);
+    assert.deepEqual(
+      out.map((s) => s.id),
+      ["l1", "l2"],
+    );
+    assert.equal(out.find((s) => s.id === "l1")?.image_url, null);
     assert.equal(out.find((s) => s.id === "l2")?.image_url, "signed:shops/b.jpg");
   });
 
