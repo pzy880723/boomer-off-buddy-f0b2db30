@@ -146,7 +146,7 @@ describe("freshness and refund semantics are explicit", () => {
   it("totals take the most conservative watermark across stores", () => {
     const out = buildGoDailySummary({
       date: DATE,
-      scope: { mode: "all", locationIds: [A, B], todayLocationId: null },
+      scope: { mode: "hq_all", locationIds: [A, B], todayLocationId: null },
       stores: [
         okStore({ youzan_synced_through: `${DATE}T12:00:00.000Z` }),
         okStore({ location_id: B, name: "B 店", youzan_synced_through: `${DATE}T08:00:00.000Z` }),
@@ -159,7 +159,7 @@ describe("freshness and refund semantics are explicit", () => {
   it("an unknown store watermark makes the scope watermark unknown", () => {
     const out = buildGoDailySummary({
       date: DATE,
-      scope: { mode: "all", locationIds: [A, B], todayLocationId: null },
+      scope: { mode: "hq_all", locationIds: [A, B], todayLocationId: null },
       stores: [
         okStore({ youzan_synced_through: `${DATE}T12:00:00.000Z` }),
         { status: "error", location_id: B, name: "B 店", code: "youzan_read_failed" },
