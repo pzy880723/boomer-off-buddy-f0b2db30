@@ -97,7 +97,6 @@ export type GoDailySummary = {
   generated_at: string;
 };
 
-
 function buildStore(input: GoStoreInput): GoStoreOut {
   if (input.status === "error") {
     return {
@@ -121,7 +120,6 @@ function buildStore(input: GoStoreInput): GoStoreOut {
       freshness: { synced_through: null, day_covered_by_sync: false, fresh: false },
     };
   }
-
 
   const reasons: string[] = [];
   let complete = true;
@@ -190,7 +188,6 @@ function buildStore(input: GoStoreInput): GoStoreOut {
   };
 }
 
-
 export function buildGoDailySummary(params: {
   date: string;
   scope: { mode: GoScopeMode; locationIds: string[]; todayLocationId: string | null };
@@ -249,4 +246,3 @@ export function buildGoDailySummary(params: {
     generated_at: params.generatedAt,
   };
 }
-

@@ -46,8 +46,15 @@ describe("buildGoDailySummary", () => {
     const out = buildGoDailySummary({
       date: DATE,
       scope: { mode: "single", locationIds: [A], todayLocationId: A },
-      stores: [okStore({ youzan_fen: 0, offline_fen: 0, day_covered_by_sync: false,
-        has_current_day_snapshot: false, source_fresh: false })],
+      stores: [
+        okStore({
+          youzan_fen: 0,
+          offline_fen: 0,
+          day_covered_by_sync: false,
+          has_current_day_snapshot: false,
+          source_fresh: false,
+        }),
+      ],
       generatedAt: "2026-09-07T10:00:00.000Z",
     });
     assert.equal(out.stores[0].actual_fen, null);
@@ -59,8 +66,16 @@ describe("buildGoDailySummary", () => {
     const out = buildGoDailySummary({
       date: DATE,
       scope: { mode: "single", locationIds: [A], todayLocationId: A },
-      stores: [okStore({ youzan_fen: 0, offline_fen: 0, day_covered_by_sync: false,
-        has_current_day_snapshot: true, source_fresh: true, has_refund_source: false })],
+      stores: [
+        okStore({
+          youzan_fen: 0,
+          offline_fen: 0,
+          day_covered_by_sync: false,
+          has_current_day_snapshot: true,
+          source_fresh: true,
+          has_refund_source: false,
+        }),
+      ],
       generatedAt: "2026-09-07T10:00:00.000Z",
     });
     assert.equal(out.totals.actual_fen, 0);
@@ -130,7 +145,9 @@ describe("freshness and refund semantics are explicit", () => {
     const out = buildGoDailySummary({
       date: DATE,
       scope: { mode: "single", locationIds: [A], todayLocationId: A },
-      stores: [okStore({ has_refund_source: false, youzan_synced_through: `${DATE}T09:00:00.000Z` })],
+      stores: [
+        okStore({ has_refund_source: false, youzan_synced_through: `${DATE}T09:00:00.000Z` }),
+      ],
       generatedAt: "2026-09-07T10:00:00.000Z",
     });
     const s = out.stores[0];
