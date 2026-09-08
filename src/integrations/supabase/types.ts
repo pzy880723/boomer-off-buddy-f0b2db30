@@ -2864,6 +2864,7 @@ export type Database = {
           kind: string
           name: string
           parent_id: string | null
+          shipping_fragile: boolean
           sort_order: number
           updated_at: string
           youzan_hq_category_id: number | null
@@ -2878,6 +2879,7 @@ export type Database = {
           kind?: string
           name: string
           parent_id?: string | null
+          shipping_fragile?: boolean
           sort_order?: number
           updated_at?: string
           youzan_hq_category_id?: number | null
@@ -2892,6 +2894,7 @@ export type Database = {
           kind?: string
           name?: string
           parent_id?: string | null
+          shipping_fragile?: boolean
           sort_order?: number
           updated_at?: string
           youzan_hq_category_id?: number | null
@@ -5063,9 +5066,12 @@ export type Database = {
           external_provider: string | null
           id: string
           idempotency_key: string | null
+          location_id: string | null
           metadata: Json
           min_spend: number
           name: string
+          reserved_order_id: string | null
+          scope: string
           source: string
           starts_at: string | null
           status: string
@@ -5083,9 +5089,12 @@ export type Database = {
           external_provider?: string | null
           id?: string
           idempotency_key?: string | null
+          location_id?: string | null
           metadata?: Json
           min_spend?: number
           name: string
+          reserved_order_id?: string | null
+          scope?: string
           source?: string
           starts_at?: string | null
           status?: string
@@ -5103,9 +5112,12 @@ export type Database = {
           external_provider?: string | null
           id?: string
           idempotency_key?: string | null
+          location_id?: string | null
           metadata?: Json
           min_spend?: number
           name?: string
+          reserved_order_id?: string | null
+          scope?: string
           source?: string
           starts_at?: string | null
           status?: string
@@ -5125,6 +5137,20 @@ export type Database = {
             columns: ["definition_id"]
             isOneToOne: false
             referencedRelation: "commerce_coupon_definitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_customer_coupons_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_customer_coupons_reserved_order_id_fkey"
+            columns: ["reserved_order_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_orders"
             referencedColumns: ["id"]
           },
         ]
@@ -8307,6 +8333,11 @@ export type Database = {
         }
         Returns: Json
       }
+      commerce_quote_checkout: {
+        Args: { p_coupon_id: string; p_customer_id: string; p_items: Json }
+        Returns: Json
+      }
+      commerce_quote_store_shipping: { Args: { p_items: Json }; Returns: Json }
       commerce_record_ordinary_prepay: {
         Args: {
           p_expires_at: string
@@ -8332,6 +8363,10 @@ export type Database = {
           p_request_id: string
           p_usage_date?: string
         }
+        Returns: Json
+      }
+      commerce_storefront_coupon_options: {
+        Args: { p_customer_id: string; p_items: Json }
         Returns: Json
       }
       commerce_transition_after_sale: {
