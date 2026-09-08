@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { aiPrepareListingImage } from "@/server/handheld-ai.server";
+import { applyListingImageReplacement } from "@/lib/commerce/listing-image-sync";
 
 type ImageRef = {
   bucket: "sku-raw" | "sku-listing";
