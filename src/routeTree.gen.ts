@@ -225,6 +225,7 @@ import { Route as ApiPublicStorefrontMembershipOrdersRouteImport } from './route
 import { Route as ApiPublicStorefrontMembershipPlansRouteImport } from './routes/api/public/storefront/membership.plans'
 import { Route as ApiPublicStorefrontMembershipPointsLedgerRouteImport } from './routes/api/public/storefront/membership.points-ledger'
 import { Route as ApiPublicStorefrontOrdersIdRouteImport } from './routes/api/public/storefront/orders.$id'
+import { Route as ApiPublicStorefrontPaymentsOrdinaryEventRouteImport } from './routes/api/public/storefront/payments.ordinary-event'
 import { Route as ApiPublicStorefrontPaymentsReconcileRouteImport } from './routes/api/public/storefront/payments.reconcile'
 import { Route as ApiPublicStorefrontPaymentsRefundRouteImport } from './routes/api/public/storefront/payments.refund'
 import { Route as ApiPublicStorefrontPaymentsWechatNotifyRouteImport } from './routes/api/public/storefront/payments.wechat-notify'
@@ -1459,6 +1460,12 @@ const ApiPublicStorefrontOrdersIdRoute =
     path: '/$id',
     getParentRoute: () => ApiPublicStorefrontOrdersRoute,
   } as any)
+const ApiPublicStorefrontPaymentsOrdinaryEventRoute =
+  ApiPublicStorefrontPaymentsOrdinaryEventRouteImport.update({
+    id: '/ordinary-event',
+    path: '/ordinary-event',
+    getParentRoute: () => ApiPublicStorefrontPaymentsRoute,
+  } as any)
 const ApiPublicStorefrontPaymentsReconcileRoute =
   ApiPublicStorefrontPaymentsReconcileRouteImport.update({
     id: '/reconcile',
@@ -1917,6 +1924,7 @@ export interface FileRoutesByFullPath {
   '/api/public/storefront/membership/plans': typeof ApiPublicStorefrontMembershipPlansRoute
   '/api/public/storefront/membership/points-ledger': typeof ApiPublicStorefrontMembershipPointsLedgerRoute
   '/api/public/storefront/orders/$id': typeof ApiPublicStorefrontOrdersIdRoute
+  '/api/public/storefront/payments/ordinary-event': typeof ApiPublicStorefrontPaymentsOrdinaryEventRoute
   '/api/public/storefront/payments/reconcile': typeof ApiPublicStorefrontPaymentsReconcileRoute
   '/api/public/storefront/payments/refund': typeof ApiPublicStorefrontPaymentsRefundRoute
   '/api/public/storefront/payments/wechat-notify': typeof ApiPublicStorefrontPaymentsWechatNotifyRoute
@@ -2168,6 +2176,7 @@ export interface FileRoutesByTo {
   '/api/public/storefront/membership/plans': typeof ApiPublicStorefrontMembershipPlansRoute
   '/api/public/storefront/membership/points-ledger': typeof ApiPublicStorefrontMembershipPointsLedgerRoute
   '/api/public/storefront/orders/$id': typeof ApiPublicStorefrontOrdersIdRoute
+  '/api/public/storefront/payments/ordinary-event': typeof ApiPublicStorefrontPaymentsOrdinaryEventRoute
   '/api/public/storefront/payments/reconcile': typeof ApiPublicStorefrontPaymentsReconcileRoute
   '/api/public/storefront/payments/refund': typeof ApiPublicStorefrontPaymentsRefundRoute
   '/api/public/storefront/payments/wechat-notify': typeof ApiPublicStorefrontPaymentsWechatNotifyRoute
@@ -2427,6 +2436,7 @@ export interface FileRoutesById {
   '/api/public/storefront/membership/plans': typeof ApiPublicStorefrontMembershipPlansRoute
   '/api/public/storefront/membership/points-ledger': typeof ApiPublicStorefrontMembershipPointsLedgerRoute
   '/api/public/storefront/orders/$id': typeof ApiPublicStorefrontOrdersIdRoute
+  '/api/public/storefront/payments/ordinary-event': typeof ApiPublicStorefrontPaymentsOrdinaryEventRoute
   '/api/public/storefront/payments/reconcile': typeof ApiPublicStorefrontPaymentsReconcileRoute
   '/api/public/storefront/payments/refund': typeof ApiPublicStorefrontPaymentsRefundRoute
   '/api/public/storefront/payments/wechat-notify': typeof ApiPublicStorefrontPaymentsWechatNotifyRoute
@@ -2687,6 +2697,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/membership/plans'
     | '/api/public/storefront/membership/points-ledger'
     | '/api/public/storefront/orders/$id'
+    | '/api/public/storefront/payments/ordinary-event'
     | '/api/public/storefront/payments/reconcile'
     | '/api/public/storefront/payments/refund'
     | '/api/public/storefront/payments/wechat-notify'
@@ -2938,6 +2949,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/membership/plans'
     | '/api/public/storefront/membership/points-ledger'
     | '/api/public/storefront/orders/$id'
+    | '/api/public/storefront/payments/ordinary-event'
     | '/api/public/storefront/payments/reconcile'
     | '/api/public/storefront/payments/refund'
     | '/api/public/storefront/payments/wechat-notify'
@@ -3196,6 +3208,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/membership/plans'
     | '/api/public/storefront/membership/points-ledger'
     | '/api/public/storefront/orders/$id'
+    | '/api/public/storefront/payments/ordinary-event'
     | '/api/public/storefront/payments/reconcile'
     | '/api/public/storefront/payments/refund'
     | '/api/public/storefront/payments/wechat-notify'
@@ -4914,6 +4927,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicStorefrontOrdersIdRouteImport
       parentRoute: typeof ApiPublicStorefrontOrdersRoute
     }
+    '/api/public/storefront/payments/ordinary-event': {
+      id: '/api/public/storefront/payments/ordinary-event'
+      path: '/ordinary-event'
+      fullPath: '/api/public/storefront/payments/ordinary-event'
+      preLoaderRoute: typeof ApiPublicStorefrontPaymentsOrdinaryEventRouteImport
+      parentRoute: typeof ApiPublicStorefrontPaymentsRoute
+    }
     '/api/public/storefront/payments/reconcile': {
       id: '/api/public/storefront/payments/reconcile'
       path: '/reconcile'
@@ -5681,6 +5701,7 @@ const ApiPublicStorefrontOrdersRouteWithChildren =
   )
 
 interface ApiPublicStorefrontPaymentsRouteChildren {
+  ApiPublicStorefrontPaymentsOrdinaryEventRoute: typeof ApiPublicStorefrontPaymentsOrdinaryEventRoute
   ApiPublicStorefrontPaymentsReconcileRoute: typeof ApiPublicStorefrontPaymentsReconcileRoute
   ApiPublicStorefrontPaymentsRefundRoute: typeof ApiPublicStorefrontPaymentsRefundRoute
   ApiPublicStorefrontPaymentsWechatNotifyRoute: typeof ApiPublicStorefrontPaymentsWechatNotifyRoute
@@ -5689,6 +5710,8 @@ interface ApiPublicStorefrontPaymentsRouteChildren {
 
 const ApiPublicStorefrontPaymentsRouteChildren: ApiPublicStorefrontPaymentsRouteChildren =
   {
+    ApiPublicStorefrontPaymentsOrdinaryEventRoute:
+      ApiPublicStorefrontPaymentsOrdinaryEventRoute,
     ApiPublicStorefrontPaymentsReconcileRoute:
       ApiPublicStorefrontPaymentsReconcileRoute,
     ApiPublicStorefrontPaymentsRefundRoute:
