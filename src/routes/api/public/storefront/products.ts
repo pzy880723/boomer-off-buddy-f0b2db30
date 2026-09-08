@@ -4,6 +4,7 @@ import { STOREFRONT_CORS, storefrontJson } from "@/server/storefront-auth.server
 import {
   enrichStorefrontListings,
   parseStorefrontProductQuery,
+  signStorefrontProductImages,
   type StorefrontListing,
 } from "@/server/storefront-products.server";
 
@@ -64,12 +65,17 @@ export const Route = createFileRoute("/api/public/storefront/products")({
           return String(right.published_at ?? "").localeCompare(String(left.published_at ?? ""));
         });
         try {
-          const availableProducts = (await enrichStorefrontListings(listings)).filter(
-            (product) => product.stock > 0,
-          );
+          // 先富化元数据 + 可售库存（不签名）→ 过滤已售 → 计算 total → 切页 → 只对本页签名
+          const availableProducts = (
+            await enrichStorefrontListings(listings, { signImages: false })
+          ).filter((product) => product.stock > 0);
           const total = availableProducts.length;
           const start = (query.page - 1) * query.page_size;
-          const products = availableProducts.slice(start, start + query.page_size);
+          const pageProducts = availableProducts.slice(start, start + query.page_size);
+          const listingsById = new Map(listings.map((listing) => [listing.id, listing]));
+          const products = await signStorefrontProductImages(pageProducts, listingsById, {
+            thumbnail: true,
+          });
           return storefrontJson({
             ok: true,
             data: products,
