@@ -1,93 +1,56 @@
-# 全量迁移腾讯云：只读导出可行性核查
+# 迁移前只读核对（不改代码/数据库/定时任务/密钥，未触发有赞或支付写入）
 
-本轮只读。未修改源库、未冻结业务、未发布、未删除、未切换，未回传任何客户明细、凭据、哈希或签名链接。
+## 1. 源项目当前版本与差异
 
-## 1. 实例事实
+- 源项目 HEAD：`d2a8e671f6fcb27b3edf34da41749fd6412ebc30`（工作区干净，无未提交改动）。
+- **`1e7a4ee` 在本项目 git 中不存在**（`fatal: Not a valid object name`）。那是腾讯工作树的提交号，两边历史不同源，不能直接做祖先比较。可对齐的锚点是 `2652b16`（storefront shops 只读接口），它是本项目 HEAD 的祖先。
+- 最近 6 次触碰 `src/` 或 `supabase/` 的提交：`2652b16`、`cc3b198`、`2ca80e4`、`77fd798`、`07e14fc`、`b02b92f`。`2652b16` 之后的提交只改了 `.lovable/plan.md`（`d2a8e67`、`ffb0a0a`、`ed40219`、`2e9f4a2`、`a7a4a24`、`590fd3a`、`b6c5323`、`0fab562`），**没有新的源码或迁移改动**。
+- 数据库迁移：仓库 `supabase/migrations` 155 个文件；库内 `supabase_migrations.schema_migrations` 140 条，最新 8 条为 `20260908081317`、`20260908070711`、`20260908002040`、`20260908000950`、`20260907231644`、`20260907230036`、`20260907191142`、`20260907190625`。最后一条 `20260908081317` 即客服顾客上下文只读迁移，**此后无新迁移**。
 
-- 项目 ref：`sxddfcoiaboqcmeviykl`（`supabase/config.toml` 同值），Lovable Cloud 托管。
-- PostgreSQL 17.6，数据库总大小 321 MB，连接池区域 `ap-northeast-1`（东京）。
-- 平台迁移记录 140 条（`supabase_migrations.schema_migrations`），仓库 `supabase/migrations` 155 个文件。
+## 2. 线上后台任务：cron 定义 + 路由 + 鉴权变量名（仅名称）
 
-## 2. 对象与行数清单
+| cron job | 调度 | active | 目标 URL 主机 | 路由文件 | 鉴权 |
+|---|---|---|---|---|---|
+| `youzan-sync-30min` | `*/30 * * * *` | false | `project--…lovable.app` | `src/routes/api/public/hooks/youzan-sync.ts` | 无头部凭据（已停用） |
+| `youzan-stock-worker-tick` | `* * * * *` | true | `project--…lovable.app` | `src/routes/api/public/hooks/youzan-stock-worker.ts:9` | 请求头 `apikey` == `SUPABASE_PUBLISHABLE_KEY` |
+| `channel-sync-worker-tick` | `* * * * *` | true | `project--…lovable.app` | `src/routes/api/public/hooks/channel-sync-worker.ts:56-58` | 请求头 `apikey` == `SUPABASE_PUBLISHABLE_KEY`，回退 `SUPABASE_ANON_KEY` |
+| `commerce-release-expired-every-minute` | `* * * * *` | true | `project--…lovable.app` | `src/routes/api/public/hooks/commerce-release-expired.ts` | **无鉴权**，处理器直接调用 RPC |
+| `listing-image-worker-every-minute` | `* * * * *` | true | `erp.boomeroff.com` | `src/routes/api/public/hooks/listing-image-worker.ts:8-11` | `Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>`，cron 侧从 vault 取密文 |
 
-| schema | 表数 | 说明 |
-|---|---|---|
-| public | 129 | 业务全量，活跃行合计 12,535 |
-| auth | 23 | 用户 4、identities 5、sessions 21、refresh_tokens 639、MFA 0 |
-| storage | 8 | buckets 6、objects 1,211 |
-| cron | 2 | job 5、job_run_details 282,303（全部 succeeded，最早 2026-07-02，最新 2026-09-09） |
-| net | 2 | `http_request_queue` 在途 0 条、`_http_response` 1,440 条（滚动窗口） |
-| vault | 1 | secrets 1 条（只计数，未读取） |
-| realtime | 1 | 无应用侧订阅 |
-| supabase_migrations | 1 | 140 条 |
+需要注意的两处不一致（只报告，不改）：
+- `channel-sync-worker-tick` 的 cron 命令**没有发送 `apikey` 头**，而路由端要求匹配，缺失即 401。该 job 当前处于持续 401 的状态。
+- `commerce-release-expired` 是唯一无鉴权的公开写入型 hook（触发预留释放）。迁移到腾讯后建议加同款 `apikey` 校验，属于新工作，本轮未实施。
+- 5 条 cron 里 4 条仍指向 Lovable 域名，只有 listing-image-worker 已指向 `erp.boomeroff.com`。
 
-public 其他对象：函数 84（SECURITY DEFINER 69）、非内部触发器 66、RLS 策略 147、129 张表全部启用 RLS、0 视图。扩展 8 个：pg_cron、pg_net、pg_stat_statements、pg_trgm、pgcrypto、supabase_vault、uuid-ossp、plpgsql。
+## 3. 除 Lovable AI 网关外仍需迁移的运行时依赖
 
-行数最多的表（前 10）：youzan_sync_logs 3,679、youzan_orders 2,026、sku_youzan_links 1,360、sku_channel_listings 1,303、japan_parcel_items 1,100、youzan_stock_sync_queue 909、inv_skus 528、japan_parcels 292、inventory_sale_events 201、inv_brands 187。非商城业务表（日本包裹、国内采购、meruki、有赞、手持、客服、POS、会员、门店目标）都在这 129 张内，不会漏。
-
-消费者身份：`commerce_customers` 2 行，独立于 auth.users 的 4 个员工账号；消费者 JWT 由外部签发方（`CONSUMER_AUTH_ISSUER/JWKS_URL`）负责，源库不存密码。
-
-## 3. Storage（含实际字节）
-
-| 桶 | 权限 | 对象数 | 字节 |
+| 依赖 | 代表文件 | 配置变量名（无值） | 可独立 Node/Nitro 运行 |
 |---|---|---|---|
-| parcel-item-images | 公开 | 1,139 | 910 MB |
-| sku-listing | 私有 | 44 | 33 MB |
-| sku-raw | 私有 | 26 | 21 MB |
-| shop-images | 私有 | 2 | 353 kB |
-| domestic-order-screenshots | 私有 | 0 | 0 |
-| domestic-bulk-attachments | 私有 | 0 | 0 |
+| Supabase 主库/Storage/Auth | `src/integrations/supabase/client.ts`、`client.server.ts` | `SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY`、`SUPABASE_ANON_KEY`、`SUPABASE_SERVICE_ROLE_KEY`、`SUPABASE_SECRET_KEYS`、`VITE_SUPABASE_*` | 是，指向腾讯自建实例即可 |
+| 有赞固定出口代理 | `src/lib/youzan-http.ts`、`src/lib/youzan.functions.ts` | `YOUZAN_PROXY_URL`、`YOUZAN_PROXY_TOKEN`、`YOUZAN_PROXY_OUTBOUND_IP`、`YOUZAN_CLIENT_ID`、`YOUZAN_CLIENT_SECRET` | 是（已在腾讯，保持不变） |
+| 普通微信支付网关 | `src/server/ordinary-gateway-config.ts`、`wechat-ordinary-client.ts`、`payment-route.ts` | `WECHAT_PAY_MCHID`、`WECHAT_PAY_APPID`、`WECHAT_PAY_SERIAL_NO`、`WECHAT_PAY_PRIVATE_KEY`、`WECHAT_PAY_APIV3_KEY`、`WECHAT_PAY_PLATFORM_PUBLIC_KEY`、`WECHAT_PAY_NOTIFY_URL`、`WECHAT_ORDINARY_RECONCILE_TOKEN` | 是（已在腾讯，保持不变） |
+| 分账/门店收单网关 | `src/server/storefront-payment.server.ts` | `STOREFRONT_PAYMENT_MODE`、`STOREFRONT_PAYMENT_GATEWAY_URL`、`STOREFRONT_PAYMENT_GATEWAY_TOKEN`、`STOREFRONT_PAYMENT_WEBHOOK_SECRET` | 是 |
+| 支付宝（代码存在） | 支付相关 server 模块 | `ALIPAY_APP_ID`、`ALIPAY_GATEWAY_URL`、`ALIPAY_NOTIFY_URL`、`ALIPAY_PRIVATE_KEY`、`ALIPAY_PUBLIC_KEY` | 是 |
+| 腾讯云短信 OTP | `src/server/sms.tencent.server.ts` | `TENCENTCLOUD_SECRET_ID`、`TENCENTCLOUD_SECRET_KEY`、`TENCENT_SMS_SDK_APP_ID`、`TENCENT_SMS_SIGN_NAME`、`TENCENT_SMS_TEMPLATE_ID` | 是 |
+| 消费者身份（外部 JWKS） | `src/server/consumer-auth.server.ts` | `CONSUMER_AUTH_ISSUER`、`CONSUMER_AUTH_JWKS_URL`、`CONSUMER_AUTH_AUDIENCE` | 是，签发方在 `auth.boomeroff.com` |
+| GO 员工端桥接 | `src/server/go-bridge.server.ts`、`trusted-go-fetch.server.ts` | `GO_SUPABASE_URL`、`GO_SUPABASE_PUBLISHABLE_KEY`、`GO_SUPABASE_ANON_KEY` | 是 |
+| AIGC SSO | `src/routes/api/...` + `aigc_sso_tickets` | `ERP_AIGC_SSO_SECRET`、`AIGC_PUBLIC_URL` | 是 |
+| Firecrawl 抓取 | 抓取相关 functions | `FIRECRAWL_API_KEY` | 是，外部 SaaS |
+| meruki 凭据加解密 | meruki 相关 server | `MERUKI_ENC_KEY` | 是 |
+| 站点自身域名/回调基址 | `src/lib/sku-media.ts:39`、`src/lib/handheld/openapi.ts:336-338` | `PUBLIC_APP_ORIGIN`、`PUBLIC_SITE_URL`、`ERP_BASE_URL`、`ERP_PORT`、`HOST`、`PORT` | 是 |
+| 同步脚本触发地址 | `scripts/sync-*.mjs` | `ERP_STANDARD_CATALOG_SYNC_URL`、`ERP_CATEGORY_GROUP_SYNC_URL`、`STANDARD_SYNC_BATCH_SIZE`、`STANDARD_SYNC_START_OFFSET`、`CATEGORY_GROUP_*` | 是 |
 
-合计 1,211 对象、约 965 MB。`storage.objects` 只是元数据，**对象本体必须另走 Storage API 拉取**：服务端用 service_role key 逐路径 `download`（或按前缀 `list` 后批量下载），落到腾讯 COS，再用对象数 + 逐对象字节数和 SHA256 对账。本项目 `SUPABASE_SERVICE_ROLE_KEY` 在服务端环境中存在（仅确认存在，未读值），可由运行在你方环境的脚本使用；Lovable 侧不提供 S3 迁移凭证。
+**仍硬编码 Lovable 域名的位置**（迁移时需改，属新工作）：`src/lib/sku-media.ts:39`（公共图片基址默认 `boomer-off-buddy.lovable.app`）、`src/lib/handheld/openapi.ts:336-338`（OpenAPI servers）、`src/components/youzan/message-push-panel.tsx:26`（消息推送回调展示地址）。
+**AI 网关**（不在本节但一并记录）：`ai.gateway.lovable.dev` 出现在 `src/server/product-recognition.server.ts:332`、`handheld-ai.server.ts:7`、`handheld-editorial.server.ts:4`、`src/lib/ai.functions.ts`、`recognize.functions.ts`、`meruki-parse.functions.ts`、`translate.functions.ts`、`tariff.functions.ts`、`domestic-recognize.functions.ts`、`sku-image.functions.ts`、`pack-pieces.functions.ts`、`mobile.functions.ts`，变量 `LOVABLE_API_KEY`。
 
-## 4. Edge Functions
+## 4. 构建是否必须调用 Lovable 服务
 
-**仓库未发现**：函数目录不存在，`supabase/config.toml` 只有 `project_id`，无函数配置块；应用后端逻辑都在 TanStack server routes / server functions，随代码仓库走。
+- 构建脚本：`package.json` 中 `build` = `vite build`，`build:tencent` = `NITRO_PRESET=node-server vite build`。启动脚本 `scripts/run-tencent-erp.sh` 已支持 `node-server` 预设，直接 `node .output/server/index.mjs`，不需要 Cloudflare/wrangler。
+- 唯一 Lovable 相关构建件是 npm 包 `@lovable.dev/vite-tanstack-config@2.13.1`（`vite.config.ts` 唯一导入，devDependency）。可验证依据：`https://registry.npmjs.org/@lovable.dev/vite-tanstack-config` 返回 HTTP 200，即公有 npm 上可获取；本地 `node_modules/@lovable.dev/vite-tanstack-config/package.json` 版本 `2.13.1`。
+- 结论：**构建不需要调用 Lovable 平台 API/服务**，只需要能从公有 npm 拉到这个配置包（或在离线环境预置 `node_modules` / 私有 registry 镜像）。该包会内置 componentTagger（仅 dev）与 cloudflare 插件（仅 build），用 `NITRO_PRESET=node-server` 时走 Nitro Node 输出。
+- 未验证：该包在纯离线内网环境的完整构建结果（我没有跑构建，本轮只读）。
 
-但"仓库没有"不能证明平台从未部署过。**平台侧已部署函数清单待 Codex 在控制台核实**（含历史部署但已从仓库删除的函数）。在核实前不下"没有 Edge Function"的结论。
+## 5. 状态小结
 
-## 5. cron / 队列 / vault 的导出方式
-
-- cron 5 条（定义可从 `cron.job` 读出，SQL 文本已核对）：4 条通过 `pg_net` 回调 Lovable 托管域名（有赞同步已停用、有赞库存 worker、渠道同步 worker、预留过期释放），1 条已指向 `erp.boomeroff.com`。腾讯侧按新域名重建 job 定义。
-- `cron.job_run_details` 282,303 行（全部 succeeded，2026-07-02 起）属于全量范围：**先归档导出到腾讯冷存储，再从运行库退出**，不直接丢弃；按行数 + 时间区间对账。
-- 队列：业务队列都是 public 表（`youzan_stock_sync_queue` 909、`channel_sync_outbox`、`go_scope_sync_outbox`、`print_jobs` 等），随 public 数据一起走。
-- `pg_net`：当前在途请求 **0** 条、`_http_response` 1,440 条。切换前需再次确认在途为 0 并逐条对账，确保没有已发出未落账的 worker 回调，而不是默认忽略。
-- vault：1 条 secret（listing-image worker 用）。**vault 密文不能跨实例还原**（加密密钥属于实例），必须在腾讯侧重新写入，值由你方持有。
-
-## 6. 关键结论：一致性全量出口（按通道区分，不要一概而论）
-
-不同通道权限不同，必须分开说：
-
-| 通道 | 实测角色/权限 | 能否读 auth | 能否产出一致性 dump |
-|---|---|---|---|
-| 我这边的沙箱 `psql` | `sandbox_exec`，受限只读 | 否，`permission denied for schema auth` | 否 |
-| 平台 query_database（Codex 侧实测） | `postgres`，可统计 `auth.users` | 是 | 待核实（能否 `COPY`/落盘/流出外部存储未验证） |
-| 官方 Export data 入口 | 未验证 | 待核实 | 待核实 |
-
-所以结论只能是：**沙箱不能 pg_dump ≠ 所有通道都读不到 Auth**。既然 `postgres` 角色在平台 SQL 通道可用，Auth 表与 `auth.users.encrypted_password` 很可能可以按表读出；但"能读"与"能生成带 roles/GRANT 的一致性时间点 dump 并直接流向腾讯"是两件事，后者未验证。
-
-**Cloud → Advanced settings → Export data 的实际产物待核实**：是否包含完整 schema DDL、`auth` 密码哈希、数据库 roles/GRANT，还是仅表数据 CSV，我没有验证证据，不作断言。同样待核实的还有是否存在可直接 `psql -f` 导入腾讯的官方格式（`roles.sql` / `schema.sql` / `data.sql` 或 `.dump`）。这几项由 Codex 直接在控制台核实。
-
-- SUPABASE_SERVICE_ROLE_KEY 与数据库超级用户口令对我不可得，我不伪造占位值；Storage 对象本体需你方环境的脚本用 service_role key 拉取。
-- 若官方入口不含 roles / auth 哈希，则需向平台申请限时只读连接串（供 `supabase db dump --role-only / --schema / --data`），凭据走私密渠道直达腾讯主机，不进聊天与 Git。`docs/tencent-data-platform-migration.md` 第 99-118 行已备好该请求文本。
-
-## 7. 阻塞项（尚未完成，绝不可称已迁移）
-
-1. Export data 入口的实际内容与格式——**未核实**（Codex 控制台核实中）。
-2. 平台 `postgres` 通道能否产出一致性、可导入的全量 dump（含 roles/GRANT）——**未核实**。
-3. auth 密码哈希是否可导出——**未确认**；若不可导出，4 个员工账号需重设密码。
-4. 平台侧已部署 Edge Functions 清单——**未核实**（仓库内未发现）。
-5. Storage 965 MB / 1,211 对象本体未复制 → 需脚本拉取到 COS 并按字节数 + 校验和对账。
-6. `cron.job_run_details` 282,303 行历史日志的归档导出未执行。
-7. `pg_net` 切换前的在途/已发未落账对账未执行（当前在途 0）。
-8. vault 1 条 secret 需在腾讯侧重建（密文不能跨实例还原）。
-9. 4 条 cron 仍指向 Lovable 域名，切换时改指并停用源库对应 job，避免双跑重复推库存。
-10. AI 能力（商品识别、截图识别、翻译、上架图修整）100% 走 `ai.gateway.lovable.dev`，Lovable 停服即中断，腾讯侧尚无替代实现——这是"完全无运行影响"目标最大的剩余缺口。
-11. `infra/tencent-supabase/README.md` 口径落后（记录 106 迁移 / 92 表，现为 140 平台迁移 / 129 表 / 1,211 对象），脚本目录缺 Auth、Storage 对象、vault、cron 重指向四类。
-
-**保持不变（不因搬库更换）**：有赞固定出口代理、现有腾讯支付回调地址与商户配置。切换只需确认回调仍写入新主库，不动出口 IP 白名单与回调域。
-
-## 8. 无法核实的事项
-
-- Lovable 平台侧备份频率、保留期、跨区冗余、停服时数据取出时效——无证据，不当作已备份。
-- 平台托管层自身是否有日志/埋点外传，代码内看不到。
+- 未同步到腾讯的代码/迁移：**无**（`2652b16` 之后只有计划文档改动，数据库最新迁移 `20260908081317` 已在你方备份范围内）。
+- 未实施项（供 Codex 部署时处理）：`channel-sync-worker` 的 cron 缺 `apikey` 头、`commerce-release-expired` 无鉴权、3 处硬编码 Lovable 域名、AI 网关替代方案。
