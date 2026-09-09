@@ -15,8 +15,8 @@
 | public | 129 | 业务全量，活跃行合计 12,535 |
 | auth | 23 | 用户 4、identities 5、sessions 21、refresh_tokens 639、MFA 0 |
 | storage | 8 | buckets 6、objects 1,211 |
-| cron | 2 | job 5、job_run_details 282,291 |
-| net | 2 | pg_net 队列 |
+| cron | 2 | job 5、job_run_details 282,303（全部 succeeded，最早 2026-07-02，最新 2026-09-09） |
+| net | 2 | `http_request_queue` 在途 0 条、`_http_response` 1,440 条（滚动窗口） |
 | vault | 1 | secrets 1 条（只计数，未读取） |
 | realtime | 1 | 无应用侧订阅 |
 | supabase_migrations | 1 | 140 条 |
