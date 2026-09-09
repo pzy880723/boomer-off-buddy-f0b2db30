@@ -42,12 +42,16 @@ public 其他对象：函数 84（SECURITY DEFINER 69）、非内部触发器 66
 
 ## 4. Edge Functions
 
-`supabase/functions` 目录不存在，`supabase/config.toml` 只有 `project_id`，没有任何函数配置块。**本项目没有已部署的 Edge Function**，全部后端逻辑在应用侧（TanStack server routes / server functions），随代码仓库走，无平台侧未导出函数。
+**仓库未发现**：函数目录不存在，`supabase/config.toml` 只有 `project_id`，无函数配置块；应用后端逻辑都在 TanStack server routes / server functions，随代码仓库走。
+
+但"仓库没有"不能证明平台从未部署过。**平台侧已部署函数清单待 Codex 在控制台核实**（含历史部署但已从仓库删除的函数）。在核实前不下"没有 Edge Function"的结论。
 
 ## 5. cron / 队列 / vault 的导出方式
 
-- cron 5 条（定义可从 `cron.job` 读出，SQL 文本已核对）：4 条通过 `pg_net` 回调 Lovable 托管域名（有赞同步已停用、有赞库存 worker、渠道同步 worker、预留过期释放），1 条已指向 `erp.boomeroff.com`。迁移做法是在腾讯侧按新域名重建，不建议整表搬运；`cron.job_run_details` 28 万行是历史日志，建议不迁。
-- 队列：业务队列都是 public 表（`youzan_stock_sync_queue` 909、`channel_sync_outbox`、`go_scope_sync_outbox`、`print_jobs` 等），随 public 数据一起走。`net.http_request_queue` 是运行时表，不迁。
+- cron 5 条（定义可从 `cron.job` 读出，SQL 文本已核对）：4 条通过 `pg_net` 回调 Lovable 托管域名（有赞同步已停用、有赞库存 worker、渠道同步 worker、预留过期释放），1 条已指向 `erp.boomeroff.com`。腾讯侧按新域名重建 job 定义。
+- `cron.job_run_details` 282,303 行（全部 succeeded，2026-07-02 起）属于全量范围：**先归档导出到腾讯冷存储，再从运行库退出**，不直接丢弃；按行数 + 时间区间对账。
+- 队列：业务队列都是 public 表（`youzan_stock_sync_queue` 909、`channel_sync_outbox`、`go_scope_sync_outbox`、`print_jobs` 等），随 public 数据一起走。
+- `pg_net`：当前在途请求 **0** 条、`_http_response` 1,440 条。切换前需再次确认在途为 0 并逐条对账，确保没有已发出未落账的 worker 回调，而不是默认忽略。
 - vault：1 条 secret（listing-image worker 用）。**vault 密文不能跨实例还原**（加密密钥属于实例），必须在腾讯侧重新写入，值由你方持有。
 
 ## 6. 关键结论：一致性 pg_dump 全量出口
