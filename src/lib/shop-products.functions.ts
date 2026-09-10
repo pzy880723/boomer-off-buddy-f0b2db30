@@ -19,11 +19,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { ensureBranchListing, triggerStockWorker } from "./youzan-sync.functions";
 import { releaseSkuToOfflineShopsCore } from "./youzan-offline-products.functions";
 import { explainYouzanError } from "./youzan.functions";
-import {
-  GLOBAL_STANDARD_SKU_FILTER,
-  inheritsGlobalStandardCatalog,
-  resolveShopVisibleSkuIds,
-} from "./shop-standard-catalog";
+import { loadShopSkuIdSources } from "./shop-sku-sources";
 
 // ---------- 内部工具 ----------
 
@@ -73,59 +69,15 @@ export const listShopSkus = createServerFn({ method: "GET" })
       store_format: string | null;
     }> => {
       const sb = context.supabase;
-      const [{ data: loc }, { data: shop }] = await Promise.all([
-        sb.from("inv_locations").select("id, name").eq("shop_id", data.shop_id).maybeSingle(),
-        sb.from("youzan_shops").select("store_format").eq("id", data.shop_id).maybeSingle(),
-      ]);
-      const storeFormat = (shop as { store_format?: string } | null)?.store_format ?? null;
-      if (!loc) return { rows: [], location_id: null, store_format: storeFormat };
-
-      // 取该门店所有 inv_stocks（含 qty=0，方便看到"新建但入库失败"的商品）
-      const { data: stocks, error: stErr } = await sb
-        .from("inv_stocks")
-        .select("sku_id, qty")
-        .eq("location_id", loc.id);
-      if (stErr) throw new Error(stErr.message);
-
-      // 加上"有 link"的 SKU
-      const { data: links } = await sb
-        .from("sku_youzan_links")
-        .select("sku_id")
-        .eq("shop_id", data.shop_id);
-
-      // 再加上"本门店曾经动过"的 SKU（movements 里有记录，防止上一步失败留下孤立 SKU）
-      const { data: moves } = await sb
-        .from("inv_stock_movements")
-        .select("sku_id")
-        .eq("location_id", loc.id)
-        .limit(5000);
-
-      // Vintage 门店：无条件继承总部全局标准商品目录（无限库存，无需入库 / 同步 / 建 link）
-      let globalStandardSkuIds: string[] = [];
-      if (inheritsGlobalStandardCatalog(storeFormat)) {
-        const { data: standardSkus, error: standardErr } = await sb
-          .from("inv_skus")
-          .select("id")
-          .eq("kind", GLOBAL_STANDARD_SKU_FILTER.kind)
-          .eq("is_custom_price", GLOBAL_STANDARD_SKU_FILTER.is_custom_price)
-          .eq("inventory_policy", GLOBAL_STANDARD_SKU_FILTER.inventory_policy)
-          .eq("is_display", GLOBAL_STANDARD_SKU_FILTER.is_display)
-          .eq("status", GLOBAL_STANDARD_SKU_FILTER.status)
-          .limit(5000);
-        if (standardErr) throw new Error(standardErr.message);
-        globalStandardSkuIds = (standardSkus ?? []).map((sku) => String(sku.id));
-      }
-
-      const skuIds = resolveShopVisibleSkuIds({
-        storeFormat,
-        stockSkuIds: (stocks ?? []).map((s) => String(s.sku_id)),
-        linkSkuIds: (links ?? []).map((l) => String(l.sku_id)),
-        movementSkuIds: (moves ?? []).map((m) => String(m.sku_id)),
-        globalStandardSkuIds,
-      });
-
-      if (skuIds.length === 0) return { rows: [], location_id: loc.id, store_format: storeFormat };
-
+      // 四张表的读取错误全部显式抛出（原实现只解构 data，401 会被伪装成 0 件）
+      const {
+        location_id,
+        store_format: storeFormat,
+        stocks,
+        skuIds,
+      } = await loadShopSkuIdSources(sb, data.shop_id);
+      if (!location_id) return { rows: [], location_id: null, store_format: storeFormat };
+      if (skuIds.length === 0) return { rows: [], location_id, store_format: storeFormat };
 
       let q = sb
         .from("inv_skus")
@@ -139,7 +91,7 @@ export const listShopSkus = createServerFn({ method: "GET" })
       const { data: rows, error } = await q;
       if (error) throw new Error(error.message);
 
-      const stockMap = new Map((stocks ?? []).map((s) => [s.sku_id, Number(s.qty)]));
+      const stockMap = new Map(stocks.map((s) => [String(s.sku_id), Number(s.qty)]));
       const patched: ShopSkuRow[] = (rows ?? []).map((r) => {
         const raw = r as Record<string, unknown>;
         const bi = raw.bundle_items;
@@ -164,7 +116,7 @@ export const listShopSkus = createServerFn({ method: "GET" })
           created_at: String(raw.created_at ?? ""),
         };
       });
-      return { rows: patched, location_id: loc.id, store_format: storeFormat };
+      return { rows: patched, location_id, store_format: storeFormat };
     },
   );
 
