@@ -70,12 +70,14 @@ export const listShopSkus = createServerFn({ method: "GET" })
     }> => {
       const sb = context.supabase;
       // 四张表的读取错误全部显式抛出（原实现只解构 data，401 会被伪装成 0 件）
-      const { location_id, store_format: storeFormat, stocks, skuIds } =
-        await loadShopSkuIdSources(sb, data.shop_id);
+      const {
+        location_id,
+        store_format: storeFormat,
+        stocks,
+        skuIds,
+      } = await loadShopSkuIdSources(sb, data.shop_id);
       if (!location_id) return { rows: [], location_id: null, store_format: storeFormat };
       if (skuIds.length === 0) return { rows: [], location_id, store_format: storeFormat };
-
-
 
       let q = sb
         .from("inv_skus")

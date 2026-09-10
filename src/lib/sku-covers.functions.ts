@@ -13,9 +13,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 export const signSkuCovers = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z
-      .object({ sku_ids: z.array(z.string().uuid()).min(0).max(500) })
-      .parse(input),
+    z.object({ sku_ids: z.array(z.string().uuid()).min(0).max(500) }).parse(input),
   )
   .handler(async ({ data, context }) => {
     if (data.sku_ids.length === 0) return { covers: {} as Record<string, string | null> };

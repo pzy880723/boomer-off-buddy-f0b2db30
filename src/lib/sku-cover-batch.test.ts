@@ -43,11 +43,7 @@ test("跨多个私桶时仍只调用一次 signer，由 signer 内部按桶分�
   const covers = await buildSkuCovers(rows, signer);
 
   assert.equal(calls.length, 1);
-  assert.deepEqual(calls[0], [
-    "sku-listing/a.jpg",
-    "sku-raw/b.jpg",
-    "parcel-item-images/c.jpg",
-  ]);
+  assert.deepEqual(calls[0], ["sku-listing/a.jpg", "sku-raw/b.jpg", "parcel-item-images/c.jpg"]);
   assert.equal(covers["c"], "https://signed.test/parcel-item-images/c.jpg");
 });
 
