@@ -1,57 +1,55 @@
-# /shop-mgmt/products 显示 0 件（414 Request-URI Too Large）· 只读核对与修复建议
+# 旧存储域名 `sxddfcoiaboqcmeviykl.supabase.co` 残留媒体链接 · 只读核查
 
-只读核对，未编辑任何文件、未改数据库、未发布、未触碰腾讯生产。
+只读执行。未编辑源码、未改数据库、未生成或执行迁移、未发布、未发起有赞同步。不返回隐私数据、签名 URL 或密钥。
 
-## 1. 现状核对
+## 1. 该域名确属本项目历史媒体来源
 
-- 当前提交：`e0434d397042e53713f71dd975cd91d26b9743b2`；该函数最后一次改动提交 `6f37a03`。
-- 文件：`src/lib/shop-products.functions.ts`，`listShopSkus` 第 130-139 行确认与你描述一致：
+`.env` 中 `SUPABASE_URL=https://sxddfcoiaboqcmeviykl.supabase.co`，即本项目当前内嵌数据库/存储的域名。`parcel-item-images` 桶 `public=true`，所以历史上直接把 `/storage/v1/object/public/parcel-item-images/...` 的绝对 URL 落库是可行且被采用的做法。你给的 `test2`（`ee2e611e-…`）就是这一类：`image_paths={}`，`image_url` 为该桶的公开绝对地址。
 
-```
-sb.from("inv_skus").select("*").in("id", skuIds).order("created_at", { ascending: false })
-```
+桶可见性（只读确认）：
 
-`skuIds` 来自 `resolveShopVisibleSkuIds`（`src/lib/shop-standard-catalog.ts:34`），Vintage 门店会并入**全部全局标准商品**。
-
-- 规模实测（只读查询 `inv_skus`）：符合全局标准商品条件（`kind=single`、`is_custom_price=false`、`inventory_policy=unlimited`、`is_display=true`、`status=active`）的有 **448 条**，SKU 总数 528。448 个 UUID 拼进 `in.(...)` 查询串约 17 KB，加上门店自有 SKU 会更长，超出 Kong/nginx 默认请求行上限 → 内部 414。
-- 为什么外层仍 200：第 139-140 行只在 `error` 非空时抛错。PostgREST 返回的 414 是 HTML 响应体，supabase-js 解析后往往给出 `data: []` 而 `error` 为空（或错误未被识别），于是 `rows` 为空数组，`patched` 为空，serverFn 正常返回 200 + 0 行。**这是静默数据丢失，不只是显示问题。**
-- 同文件同类隐患（本次不在修复范围但建议一并加固）：第 91-101 行 `sku_youzan_links` / `inv_stock_movements` 查询用 `.limit(5000)`，返回条数大时后续 `skuIds` 更长；第 333 行 `listShopLinksForSkus` 的 `.in("sku_id", data.sku_ids)` 入参上限 1000，同样可能超长。
-
-## 2. 最小修复方案（应用层有界分批，推荐）
-
-不改数据库、不加 RPC、不动权限。把第 130-139 行的单次 `in()` 改为按固定批次并发查询后合并：
-
-1. 新增一个纯函数 `chunkIds(ids: string[], size = 100): string[][]`，放在 `src/lib/shop-standard-catalog.ts` 或新建 `src/lib/chunk-ids.ts`，便于单测。批大小 100 时 URL 约 4 KB，安全余量足够。
-2. `listShopSkus` 中对每个批次执行同样的 `select("*").in("id", batch)`，**搜索条件 `.or(name.ilike/epc.ilike/sku_code.ilike)` 必须原样加到每一个批次上**，否则会放大结果。
-3. 并发上界建议 4（`for` 循环切片 + `Promise.all`），避免一次打出 5 个以上并发连接。
-4. 任一批次 `error` 非空立即抛错——绝不允许再出现"部分失败静默返回空"。
-5. 合并所有批次结果后，**在应用层统一按 `created_at` 降序排序**（`new Date(b.created_at) - new Date(a.created_at)`，相同时间用 `id` 兜底保证稳定），因为分批后数据库排序只在批内有效。
-6. 不加任何 `limit` 截断：`skuIds` 有多少就返回多少行，`stock_qty` 映射逻辑（第 142-166 行）保持不变。
-
-### 必须保留的语义
-
-| 语义 | 要求 |
+| 桶 | public |
 |---|---|
-| 门店作用域 | `skuIds` 仍完全由 `resolveShopVisibleSkuIds` 决定（库存 / link / 流水 / Vintage 全局标准商品），不得改变集合 |
-| 权限 | 继续用 `context.supabase`（RLS 以登录用户身份），**不得换成 `supabaseAdmin`** |
-| 搜索 | `data.search` 的三字段 ilike 逐批施加，语义与现在完全一致 |
-| 排序 | 最终结果 `created_at` 降序，与现在一致 |
-| 条数 | 返回全部匹配行，不截断、不去重丢失、不减少 SKU |
-| 返回结构 | `{ rows, location_id, store_format }` 三字段不变 |
+| `parcel-item-images` | **true** |
+| `sku-raw` / `sku-listing` / `shop-images` / `domestic-order-screenshots` / `domestic-bulk-attachments` / `database_export_09_09_26` | false |
 
-### 备选方案（不推荐本轮做）
+只有 public 桶的绝对 URL 会以裸链形式长期留在数据里；私桶一律存 `bucket/path` 相对引用，运行时签名，因此不含域名。
 
-改成服务端 RPC 一次性按门店条件筛选（避免传 ID 列表）语义更干净，但要新增 SECURITY DEFINER 函数并重新论证权限边界，属于扩大改动面。当前没有现成合适的 RPC：`search_inv_skus` 是商城公开检索用，不带门店作用域，套用会改变可见集合。
+## 2. 按表/字段的残留计数（全库扫描 22 个媒体类字段）
 
-## 3. 测试建议
+| 表.字段 | 命中旧域名行数 | 说明 |
+|---|---|---|
+| `japan_parcel_items.item_image_url` | **1,090** | 最大来源，日本小包裹子订单商品图 |
+| `inv_skus.image_url` | **67** | 全部为 `/object/public/parcel-item-images/`，0 条签名 URL |
+| `inv_skus.image_paths`（数组元素） | **65 个元素** | 数组里混进了完整旧 URL，而非 `bucket/path` |
+| `commerce_order_items.image_snapshot` | **1** | 下单时的图片快照，属历史订单凭证 |
+| 其余 18 个字段（`commerce_listings.cover_url/image_urls/image_paths`、`commerce_customers.avatar_url`、`domestic_orders.item_image_url/screenshot_urls`、`domestic_bulk_orders.attachment_urls`、`japan_parcel_items.arrival_photo_urls`、`japan_parcels.item_image_url`、`inv_brands.logo_url`、`editorial_contents.cover_url/video_url`、`official_knowledge_entries.cover_url`、`youzan_items.pic_url`、`youzan_orders.first_item_image`、`youzan_shops.image_url`、`store_offline_sales_entries.evidence_url`、`commerce_after_sales.evidence_urls`、`inv_sku_classifications.evidence`、`meruki_raw_captures.source_url`） | **0** | 干净 |
 
-1. **纯函数单测**（`src/lib/chunk-ids.test.ts`）：0 个、1 个、100 个、101 个、448 个 ID 的切分结果；批数与总数守恒，无重复无丢失。
-2. **排序单测**：把两个批次的乱序结果合并后断言 `created_at` 严格降序，且时间相同时顺序稳定。
-3. **回归断言**（可用现有 `shop-standard-catalog.test.ts` 的风格）：Vintage 门店 448 全局标准 + 若干门店自有 SKU 时，`resolveShopVisibleSkuIds` 输出条数与最终 `rows.length` 相等。
-4. **错误传播测**：模拟其中一个批次返回 error，断言整体抛错而不是返回空数组。
-5. **候选副本人工复验**：用已登录的门店账号打开 `/shop-mgmt/products`，确认条数等于该门店应见 SKU 数；搜索关键词后条数下降但不为 0；观察内部网关日志不再出现 414。
-6. 可选加固：在 `listShopSkus` 里对 `rows` 为空但 `skuIds` 非空的情况打一条服务端警告日志，未来同类静默失败能第一时间被发现。
+`inv_skus` 结构分布（528 行）：`image_url` 为空 461 行、非空 67 行且**全部**是旧域名（其它域名 0 条）；`image_paths` 非空 525 行，其中元素 466 个是正常的 `sku-listing/...` 相对路径，65 个是旧域名绝对 URL。67 行里 65 行同时有 paths、2 行只有 `image_url`。
 
-## 4. 未改动声明
+### 来源规则（可据此判断哪些必须改写）
 
-未编辑源码、未运行迁移、未改数据库或调度器、未发布、未触碰腾讯生产，也未触发支付、库存写入或有赞同步。修复由你方在腾讯候选副本实现并复验。
+1. **公开桶绝对 URL**（`.../object/public/<bucket>/<path>`）：只在 `parcel-item-images` 出现，是硬编码域名，Lovable 关停即失效 → **必须改写**。
+2. **私桶相对引用**（`sku-listing/...` 等）：不含域名，切换到腾讯后由新实例签名，**无需改写**。
+3. **签名 URL 落库**：全库 `inv_skus.image_url` 中 0 条，无此历史包袱。
+
+## 3. `sku-image-resolver.server.ts` 确实是旧地址被保留的原因
+
+- `signSkuImagePaths`（`src/lib/sku-image-resolver.server.ts:31-34`）：遇到 `^https?://` 直接 `out[idx] = s` 原样返回，不做任何域名判断——所以混在 `image_paths` 里的那 65 个旧 URL 会原封不动送到前端。
+- `signSkuCover`（同文件 71-78 行）：`image_paths` 签不出结果时，回退 `fallbackImageUrl`，条件只有"是 http 且不含 `token=`"——旧公开 URL 正好满足，于是 67 行的 `image_url` 全部照原样输出。
+- `signSkuThumbnailPaths`（100-106 行）：对 http 值直接跳过，返回 null，调用方回退原图 → 仍是旧域名。
+- `src/lib/sku-media.ts:47-51` 的 `buildPublicSkuMediaUrl` 同样对 http 外链原样返回（只挡带 `token=` 的）。
+
+结论：**不是缓存、不是前端问题，是数据里存了绝对 URL + 解析层对 http 外链一律透传**。两处都要动才彻底。
+
+## 4. 建议（仅建议，不实施）
+
+1. **数据侧改写**（腾讯候选副本上做，一次性）：把 `inv_skus.image_url`、`inv_skus.image_paths` 元素、`japan_parcel_items.item_image_url` 中 `https://sxddfcoiaboqcmeviykl.supabase.co/storage/v1/object/public/` 前缀替换为腾讯实例的同路径前缀；对象已确认在腾讯恢复库存在（35134 bytes, image/webp），路径不变即可命中。
+2. **更优做法**：把 `image_paths` 里那 65 个绝对 URL 归一成 `parcel-item-images/<path>` 相对引用，交给解析层统一处理，从此不再有域名硬编码。`image_url` 也可同样归一，但要先确认所有读取方都能吃相对引用。
+3. **`commerce_order_items.image_snapshot` 那 1 条**是历史订单快照，属凭证性质，建议只改写域名、不改结构，保留可追溯性。
+4. **代码侧加固**（防复发）：在 `signSkuImagePaths` / `signSkuCover` 的 http 分支加一个"已知旧域名"判断——命中则解析出桶和路径按私桶/公桶重新生成当前实例地址，而不是透传。同时把 `sku-media.ts:39` 硬编码的 `boomer-off-buddy.lovable.app` 兜底 origin 一并换掉。
+5. **验收**：改写后按上表逐字段重跑同样的计数查询，四个非零字段应全部归零；再用原账号页面复验 `test2` 图片实际请求域名。
+
+## 5. 未改动声明
+
+未编辑任何源码或数据、未生成或执行迁移、未批准此前任何计划、未发起有赞同步、未发布、未触碰腾讯生产。
