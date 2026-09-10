@@ -1,79 +1,107 @@
-# 封面签名 502/500 与 listShopSkus 吞错 · 只读诊断
+# 腾讯切换前只读盘点（旧生产 Lovable/Supabase 现状）
 
-只读执行。**没有任何写操作**：未修改代码、数据库、权限、调度器，未发布，未发起有赞同步。
+只读执行：未修改代码/SQL/配置/secret，未创建导出文件，未停任何 cron/队列/worker，未发布，未调用任何第三方写入/支付/退款，**未向腾讯生产写入或部署**。
+证据分三类：【实查】= 本轮数据库查询或文件读取结果；【代码推断】= 读源码得出；【未知】= 本轮无法核实。
 
-## 1. 签名调用量：448 个并行 POST，异常静默变 null
+## 1. 版本水位【实查】
 
-### 调用量推导
+- 当前 commit：`933e0bb337c8fb58fbfd2cc764c3745599d759ae`，工作区干净。
+- 仓库迁移文件 155 个，最后一个文件：`20260908081317_3b921feb-3d29-4792-aea4-d644e5375605.sql`。
+- 数据库已应用最新版本：`20260908081317`（前序 `20260908070711` / `20260908002040`）。文件与库最新版本一致。
 
-- `src/hooks/use-sku-covers.ts:16-22`：前端把整页 SKU id 一次性去重排序后传入，无分片。
-- `src/lib/sku-covers.functions.ts:17`：入参上限 `max(500)`，448 个全部通过。
-- `src/lib/sku-covers.functions.ts:31-36`：`Promise.all((rows ?? []).map(async (r) => …))` —— **对每一行 SKU 各调一次 `signSkuCover`，无并发上限、无去重**。
-- `src/lib/sku-image-resolver.server.ts:68`：`signSkuCover` 只取首图，调用 `signSkuImagePaths([imagePaths[0]])`，即**每次只传 1 个路径**。
-- `src/lib/sku-image-resolver.server.ts:45-50`：`signSkuImagePaths` 按桶分组后对每桶发一次 `createSignedUrls`。由于上一步每次只有 1 个路径，批量能力完全失效 → **1 个 SKU = 1 次 `POST /storage/v1/object/sign`**。
+## 2. 内嵌数据库当前调度与队列【实查】
 
-结论：448 个标准 SKU → **448 个几乎同时发出的签名请求**，而实际只有约 14 张不同的私桶图片，**约 434 次是纯重复**。这与 nginx 近 5000 条日志里 24×502 + 4×500 的形态吻合：瞬时并发压垮上游，少量请求被网关截断。
+cron（凭据已剥离，仅给 hostname + 路径，未输出原始 command/headers）：
 
-### 异常如何变成 null（三处静默点）
+| jobid | 名称 | schedule | active | 目标 hostname | 路径 |
+|---|---|---|---|---|---|
+| 1 | youzan-sync-30min | `*/30 * * * *` | false | project--2158bffa…lovable.app | /api/public/hooks/youzan-sync |
+| 2 | youzan-stock-worker-tick | `* * * * *` | true | project--2158bffa…lovable.app | /api/public/hooks/youzan-stock-worker |
+| 3 | channel-sync-worker-tick | `* * * * *` | true | project--2158bffa…lovable.app | /api/public/hooks/channel-sync-worker |
+| 4 | commerce-release-expired-every-minute | `* * * * *` | true | project--2158bffa…lovable.app | /api/public/hooks/commerce-release-expired |
+| 5 | listing-image-worker-every-minute | `* * * * *` | true | erp.boomeroff.com | /api/public/hooks/listing-image-worker |
 
-| 位置 | 行为 |
-|---|---|
-| `sku-image-resolver.server.ts:51` | `if (error || !data) return;` —— 签名失败直接 return，该批次所有槽位保持 `null`，**不抛错、不记日志** |
-| `sku-image-resolver.server.ts:24` | `out` 预填 `null`，任何未被覆盖的槽位天然是 `null` |
-| `sku-image-resolver.server.ts:69-78` | 首图签不出来时回退 `fallbackImageUrl`；标准 SKU 若 `image_url` 为空（本库 528 行中 461 行为空），回退也拿不到东西 → 最终 `null` |
+队列积压（按状态计数）：
 
-所以 502/500 不会冒泡成错误，只会表现为"部分封面为 null"——和你观察到的现象一致。同一会话另一门店 449 SKU 通过、448 门店部分 null，正是并发抖动而非权限问题。
+- `youzan_stock_sync_queue`：done 904，failed 5，**无 pending/running 行**。
+- `youzan_order_sync_cursors`：done 8，failed 16。
+- `channel_sync_outbox`：succeeded 2。
+- `inv_listing_image_jobs`：succeeded 5。
+- `go_scope_sync_outbox`、`print_jobs`：0 行。
 
-## 2. 现成可复用的按桶去重批量 helper
+近 48 小时出站 HTTP 结果：200 × 1080、401 × 360（401 集中在需要 apikey 的那条 worker 路由；**说明该 worker 实际业务未执行**）。scheduler 记 succeeded 只代表请求入队，不代表业务成功。
 
-**有，且就在同一文件里**：`signSkuThumbnailPaths`（`src/lib/sku-image-resolver.server.ts:89-131`）已经实现了完整模式：
+## 3. 回调入口与幂等键【代码推断，路径与 hostname 实查】
 
-- 第 99-110 行：`unique` Map 以完整 `bucket/path` 字符串为键做**路径级去重**，同一张图的多个下标记在 `idxs` 里；
-- 第 111-128 行：固定大小 worker 池，`THUMBNAIL_CONCURRENCY = 4`（第 82 行），`cursor` 递增取任务；
-- 第 121 行：一次签名结果回填到所有相同路径的下标。
+支付/退款通知（hostname 均为当前 ERP 部署域，未读任何 secret 值）：
 
-`signSkuImagePaths`（第 22-60 行）则已有**按桶批量**能力（第 47-50 行 `createSignedUrls` 一次传整桶路径数组），只是被 `signSkuCover` 每次传 1 个路径的用法废掉了。
+- `/api/public/storefront/payments/wechat-notify` — `src/routes/api/public/storefront/payments.wechat-notify.ts`
+- `/api/public/storefront/payments/callback/$provider` — 同目录 `payments.callback.$provider.ts`
+- `/api/public/pos/payments/callback/$provider` — `src/routes/api/public/pos/payments.callback.$provider.ts`
 
-### 最小复用方案（不新增权限、不改优先级、不改 TTL）
+幂等/唯一键位置：
 
-在 `signSkuCovers`（`src/lib/sku-covers.functions.ts:31-36`）把"逐 SKU 串行签名"换成"一次批量签名"：
+- 普通微信收款/退款：`src/server/ordinary-payment-notifications.ts:18,26` 以 `out_trade_no ↔ merchant_order_no`、`out_refund_no ↔ merchant_refund_no` 双向核对后再入账；查单/关单/退款路由收敛在 `src/server/ordinary-payment.server.ts`（`commerce_payments.merchant_order_no`、`commerce_refunds.merchant_refund_no`）。
+- POS 支付：`src/server/pos-payment.server.ts:251,271,302,346` — `client_op_id` 与 attempt 一一对应，`out_trade_no` 唯一定位，回调重放不重复扣款/重复销售。
+- 有赞/库存/渠道同步：`src/lib/youzan-sync.functions.ts:530,1510,2128,2237,2293,2324,2407` 与 `src/lib/youzan-offline-products.functions.ts:90,131` 全部 `onConflict: "sku_id,shop_id"`；分类分组 `src/lib/youzan-category-groups.server.ts:472` 用 `category_id,hq_shop_id,channel`；销售提交幂等在 `src/lib/youzan-sale.server.ts`（`commit_sale` 返回 `idempotent`）。
+- 历史普通收款/分账兼容点：`src/server/ordinary-payment.server.ts:36-49`（历史普通订单继续用原商户查单/退款，与新单模式解耦）；`src/server/payment-route.ts`、`src/server/ordinary-payment-config.ts` 保留旧分账通道配置。
 
-1. 先按现有优先级规则算出每个 SKU 的**候选首图**：`image_paths[0]`，取不到则留空（优先级、`image_url` 回退规则完全不变）。
-2. 把这批候选路径**去重**后组成一个数组，**只调一次** `signSkuImagePaths(uniquePaths)` —— 它内部按桶一次 `createSignedUrls`，448 个请求塌缩成**每桶 1 个**。TTL 仍是文件第 18 行的 `SIGNED_TTL = 24h`，不动。
-3. 按路径把签名结果回填到各 SKU；签不出来的再走原有 `image_url` 回退逻辑（http 外链、`data:` 原样返回的行为保持不变，见第 31-34 行）。
-4. 若担心单次路径数过多导致 URL/请求体过大，参照 `signSkuThumbnailPaths` 的做法加一个批大小（如每批 200 路径）+ 并发 4 的 worker 池，而不是无上界并行。
+## 4. 以 2026-09-09T03:57:41Z 为基准的增量【实查】
 
-这样改只动 `sku-covers.functions.ts` 的组装方式，`sku-image-resolver.server.ts` 可以完全不改（如需可观测性，再在第 51 行加一行 `console.warn(bucket, error.message)`，不改变返回契约）。
+| 对象 | 当前总数 | 该时刻后新增 | 该时刻后更新 |
+|---|---|---|---|
+| auth.users | 4 | 0 | 1 |
+| user_roles | 4 | 0 | **缺可靠水位**（无 updated_at） |
+| commerce_orders | 2 | 1 | 1 |
+| commerce_order_items | 3 | 1 | **缺可靠水位**（无 updated_at） |
+| commerce_payments | 2 | 1 | 1 |
+| commerce_refunds | 0 | 0 | 0 |
+| commerce_customers | 2 | 0 | 1 |
+| commerce_membership_orders | 1 | 0 | 0 |
+| commerce_membership_entitlements | 0 | 0 | 0 |
+| inv_skus | 528 | 0 | 0 |
+| inv_stocks | 8 | **缺可靠水位**（无 created_at） | 0 |
+| inv_stock_movements | 13 | 0 | **缺可靠水位**（无 updated_at） |
+| storage.objects | 1214 | 3 | 3 |
 
-### 建议顺带加的可观测性（不改契约）
+未输出任何具体用户/交易记录。注意：`storage.objects` 从此前盘点的 1211 增至 1214，说明**导出时刻之后旧生产仍有写入**，最终切换必须再做一次增量。
 
-第 51 行现在完全静默。建议记录桶名、失败路径数、错误码，让下次 502 能在服务端日志直接看到，而不是靠 nginx 日志反推。
+## 5. 仍依赖 Lovable/外部运行时的函数【实查代码位置】
 
-## 3. `listShopSkus` 里被吞掉的读错误与最小显式传播方案
+Lovable AI Gateway（`https://ai.gateway.lovable.dev` + `LOVABLE_API_KEY`）：
 
-文件 `src/lib/shop-products.functions.ts`（本仓库当前版本；腾讯侧已含 414 分批修复，吞错点相同）：
+- `src/lib/translate.functions.ts:24-28`
+- `src/lib/tariff.functions.ts:38-43`
+- `src/lib/meruki-parse.functions.ts:170-175`
+- `src/lib/domestic-recognize.functions.ts:8-12`
+- `src/lib/mobile.functions.ts:338-353`
+- `src/lib/sku-image.functions.ts:13-16`
+- `src/server/handheld-ai.server.ts:7-11`
+- `src/server/handheld-editorial.server.ts:4,88`
+- `src/lib/recognize.functions.ts`、`src/server/product-recognition.server.ts`（同一 gateway 路径）
 
-| 行号 | 查询 | 现状 |
-|---|---|---|
-| **76-79** | `inv_locations` + `youzan_shops` 并行读 | **两个 `error` 都没有解构**，只取了 `data` |
-| **81** | `if (!loc) return { rows: [], location_id: null, … }` | **这就是你说的 401 变空列表的确切位置**：`inv_locations` 读 401 时 `loc` 为 null，函数原样返回空 rows 且 HTTP 200 |
-| 84-88 | `inv_stocks` | ✅ 已检查 `stErr` 并抛错 |
-| **91-94** | `sku_youzan_links` | **error 未解构**，失败时 `links` 为 null → `?? []` → 该来源的 SKU 静默丢失 |
-| **97-101** | `inv_stock_movements` | **error 未解构**，同上静默丢失 |
-| 106-115 | 全局标准商品 | ✅ 已检查 `standardErr` |
-| 139-140 | 主查询 `inv_skus` | ✅ 已检查 `error` |
+抓取：`src/lib/sku-image.functions.ts:53`（`api.firecrawl.dev/v2/search`）。
 
-**危害分级**：76/81 行导致整页 0 件（你已复现）；91/97 行更隐蔽——不会报错，只会让列表**少几个 SKU**，肉眼很难发现，正是这次三家店对照能通过、换账号就出问题的那类问题。
+硬编码 Lovable/Supabase 域名（切换后会继续指向旧域）：
+`src/lib/sku-media.ts`、`src/lib/handheld/openapi.ts`、`src/components/youzan/message-push-panel.tsx`、`src/lib/go-bridge/constants.ts`、`src/routes/__root.tsx`；数据侧历史旧域名残留在 `inv_skus.image_url` / `image_paths`、`japan_parcel_items.item_image_url`、`commerce_order_items.image_snapshot`（此前盘点结论，本轮未复查）。
 
-### 最小显式错误传播方案
+**cron job 1-4 的目标 hostname 仍是 Lovable 预览域**，这是最强的运行时耦合点。
 
-1. 第 76-79 行改成同时解构 error：`const [{ data: loc, error: locErr }, { data: shop, error: shopErr }] = await Promise.all([...])`，随后 `if (locErr) throw new Error(locErr.message)`、`if (shopErr) throw new Error(shopErr.message)`。
-2. 第 81 行的 `!loc` 分支**只保留"确实没有映射库位"这一种语义**——错误已在上一步抛出，此时返回空列表是真实业务状态。
-3. 第 91-94、97-101 行各加 `error` 解构与抛错，与第 88 行 `stErr` 的写法保持一致。
-4. 不改返回结构 `{ rows, location_id, store_format }`，不改门店作用域集合，不加权限，不引入新查询。
+## 6. 建议的最终切换顺序（仅建议，本轮不执行）
 
-改完后，401 会以明确错误呈现在页面上（而不是"0 件"），你排查 401 根因时也能直接看到是哪张表被拒——**401 的具体原因由你诊断，本轮不做任何猜测**。
+1. 冻结外部触发：先停 cron job 2/3/4/5 与腾讯侧 systemd timer，确认 `net._http_response` 无新增。
+2. 排空队列：确认 `youzan_stock_sync_queue`、`channel_sync_outbox`、`inv_listing_image_jobs` 无 pending/running；先处理现存 5 + 16 条 failed，决定重放还是作废。
+3. 进入**停写窗口**（需要你确认时长与时段）：旧生产切只读，三端停止下单/收款。
+4. 最终增量：数据库增量 + Storage 增量（当前已知至少 3 个新对象），逐表比对第 4 节口径。
+5. 单写者切换：ERP/消费者端/小程序配置指向腾讯，旧生产保持只读至少 30 天。
+6. 回调改指：支付/退款通知与有赞回调的 notify URL 改到腾讯域，验证幂等键在新库仍唯一。
+7. 三端真实登录 + 一笔小额真实支付 + 一笔退款验收，通过后再恢复写入。
 
-## 4. 未改动声明
+必须由你明确确认后才执行的项：停写窗口时间、cron/timer 停用、notify URL 变更、真实支付/退款验收、旧生产转只读。
 
-本轮全部为只读读取（`src/lib/sku-covers.functions.ts`、`src/lib/sku-image-resolver.server.ts`、`src/lib/shop-products.functions.ts`、`src/hooks/use-sku-covers.ts`）。未修改代码、数据库、权限或配置，未发布，未触发有赞同步或任何写操作。
+## 7. 未知项
+
+- 三端真实登录/支付、最终增量、单写者、生产切换均未验收（与你的判断一致）。
+- 平台侧是否存在仓库外的 Edge Functions / Realtime 订阅，本轮无法从代码证明。
+- 腾讯侧 systemd 单元（有赞同步、普通支付对账）当前启用状态未查（不在本嵌入库内）。
+- `user_roles`、`commerce_order_items`、`inv_stock_movements`、`inv_stocks` 缺少对应时间列，**无可靠增量水位**，切换前需靠全量哈希比对而非时间过滤。
