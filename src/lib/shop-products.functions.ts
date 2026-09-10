@@ -89,7 +89,7 @@ export const listShopSkus = createServerFn({ method: "GET" })
       const { data: rows, error } = await q;
       if (error) throw new Error(error.message);
 
-      const stockMap = new Map((stocks ?? []).map((s) => [s.sku_id, Number(s.qty)]));
+      const stockMap = new Map(stocks.map((s) => [String(s.sku_id), Number(s.qty)]));
       const patched: ShopSkuRow[] = (rows ?? []).map((r) => {
         const raw = r as Record<string, unknown>;
         const bi = raw.bundle_items;
@@ -114,7 +114,7 @@ export const listShopSkus = createServerFn({ method: "GET" })
           created_at: String(raw.created_at ?? ""),
         };
       });
-      return { rows: patched, location_id: loc.id, store_format: storeFormat };
+      return { rows: patched, location_id, store_format: storeFormat };
     },
   );
 
