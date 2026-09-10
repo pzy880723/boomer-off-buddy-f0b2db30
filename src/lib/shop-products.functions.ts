@@ -19,11 +19,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { ensureBranchListing, triggerStockWorker } from "./youzan-sync.functions";
 import { releaseSkuToOfflineShopsCore } from "./youzan-offline-products.functions";
 import { explainYouzanError } from "./youzan.functions";
-import {
-  GLOBAL_STANDARD_SKU_FILTER,
-  inheritsGlobalStandardCatalog,
-  resolveShopVisibleSkuIds,
-} from "./shop-standard-catalog";
+import { loadShopSkuIdSources } from "./shop-sku-sources";
 
 // ---------- 内部工具 ----------
 
