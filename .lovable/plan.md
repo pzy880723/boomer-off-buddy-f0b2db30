@@ -1,77 +1,57 @@
-# 腾讯全量迁移 · 剩余依赖只读审计
+# /shop-mgmt/products 显示 0 件（414 Request-URI Too Large）· 只读核对与修复建议
 
-只读执行。未改代码、数据库、调度器或生产配置；未触发有赞/支付/短信/AI 业务调用。以下均为当前源码与嵌入数据库的实测事实。
+只读核对，未编辑任何文件、未改数据库、未发布、未触碰腾讯生产。
 
-## 1. 当前 Git SHA
+## 1. 现状核对
 
-`5f3284ac6101cbb3da4557080cf04c93ab3a4faa`，工作区干净（`git status --porcelain` 无输出）。
+- 当前提交：`e0434d397042e53713f71dd975cd91d26b9743b2`；该函数最后一次改动提交 `6f37a03`。
+- 文件：`src/lib/shop-products.functions.ts`，`listShopSkus` 第 130-139 行确认与你描述一致：
 
-## 2. cron job 实测状态（仅 host+path，未输出 headers/token）
+```
+sb.from("inv_skus").select("*").in("id", skuIds).order("created_at", { ascending: false })
+```
 
-| jobid | name | schedule | active | host | path | 最近一次入队 | 状态 |
-|---|---|---|---|---|---|---|---|
-| 1 | youzan-sync-30min | `*/30 * * * *` | false | `project--2158bffa-…lovable.app` | `/api/public/hooks/youzan-sync` | 2026-09-07 19:00Z | succeeded（已停用） |
-| 2 | youzan-stock-worker-tick | `* * * * *` | true | `project--2158bffa-…lovable.app` | `/api/public/hooks/youzan-stock-worker` | 2026-09-10 06:57Z | succeeded |
-| 3 | channel-sync-worker-tick | `* * * * *` | true | `project--2158bffa-…lovable.app` | `/api/public/hooks/channel-sync-worker` | 2026-09-10 06:57Z | succeeded |
-| 4 | commerce-release-expired-every-minute | `* * * * *` | true | `project--2158bffa-…lovable.app` | `/api/public/hooks/commerce-release-expired` | 2026-09-10 06:57Z | succeeded |
-| 5 | listing-image-worker-every-minute | `* * * * *` | true | `erp.boomeroff.com` | `/api/public/hooks/listing-image-worker` | 2026-09-10 06:57Z | succeeded |
+`skuIds` 来自 `resolveShopVisibleSkuIds`（`src/lib/shop-standard-catalog.ts:34`），Vintage 门店会并入**全部全局标准商品**。
 
-注意：`cron.job_run_details.status = succeeded` 只表示 `net.http_post` 成功入队，**不代表 HTTP 成功**。实际 HTTP 结果在 `net._http_response`（滚动窗口 1,440 条）：**200 共 1,080 条，401 共 360 条**，恰好等于 4 个活跃 job 中 1 个持续失败的比例。对应的是 `channel-sync-worker-tick`：cron 命令未发送鉴权头，而路由 `src/routes/api/public/hooks/channel-sync-worker.ts:55-64` 要求请求头 `apikey` 匹配 `SUPABASE_PUBLISHABLE_KEY`（回退 `SUPABASE_ANON_KEY`），缺失即 401。该任务实际上长期未生效，只报告不修改。
+- 规模实测（只读查询 `inv_skus`）：符合全局标准商品条件（`kind=single`、`is_custom_price=false`、`inventory_policy=unlimited`、`is_display=true`、`status=active`）的有 **448 条**，SKU 总数 528。448 个 UUID 拼进 `in.(...)` 查询串约 17 KB，加上门店自有 SKU 会更长，超出 Kong/nginx 默认请求行上限 → 内部 414。
+- 为什么外层仍 200：第 139-140 行只在 `error` 非空时抛错。PostgREST 返回的 414 是 HTML 响应体，supabase-js 解析后往往给出 `data: []` 而 `error` 为空（或错误未被识别），于是 `rows` 为空数组，`patched` 为空，serverFn 正常返回 200 + 0 行。**这是静默数据丢失，不只是显示问题。**
+- 同文件同类隐患（本次不在修复范围但建议一并加固）：第 91-101 行 `sku_youzan_links` / `inv_stock_movements` 查询用 `.limit(5000)`，返回条数大时后续 `skuIds` 更长；第 333 行 `listShopLinksForSkus` 的 `.in("sku_id", data.sku_ids)` 入参上限 1000，同样可能超长。
 
-`commerce-release-expired`（`src/routes/api/public/hooks/commerce-release-expired.ts`）无任何鉴权，是唯一可匿名触发的写入型 hook。
+## 2. 最小修复方案（应用层有界分批，推荐）
 
-## 3. Edge Functions 与 Realtime
+不改数据库、不加 RPC、不动权限。把第 130-139 行的单次 `in()` 改为按固定批次并发查询后合并：
 
-- **Edge Functions：仓库内为零**。`supabase/` 下只有 `config.toml`、`migrations`、`tests`，无 `functions` 目录；`config.toml` 仅一行 `project_id`，无函数配置块。平台侧是否残留历史部署函数需 Codex 在控制台核实，本轮无法从代码侧证明。
-- **Realtime 订阅：源码中零调用**。`rg "\.channel\(|removeChannel|realtime" src` 无匹配。客服等实时性需求走请求/轮询，不依赖 Realtime 服务。
+1. 新增一个纯函数 `chunkIds(ids: string[], size = 100): string[][]`，放在 `src/lib/shop-standard-catalog.ts` 或新建 `src/lib/chunk-ids.ts`，便于单测。批大小 100 时 URL 约 4 KB，安全余量足够。
+2. `listShopSkus` 中对每个批次执行同样的 `select("*").in("id", batch)`，**搜索条件 `.or(name.ilike/epc.ilike/sku_code.ilike)` 必须原样加到每一个批次上**，否则会放大结果。
+3. 并发上界建议 4（`for` 循环切片 + `Promise.all`），避免一次打出 5 个以上并发连接。
+4. 任一批次 `error` 非空立即抛错——绝不允许再出现"部分失败静默返回空"。
+5. 合并所有批次结果后，**在应用层统一按 `created_at` 降序排序**（`new Date(b.created_at) - new Date(a.created_at)`，相同时间用 `id` 兜底保证稳定），因为分批后数据库排序只在批内有效。
+6. 不加任何 `limit` 截断：`skuIds` 有多少就返回多少行，`stock_qty` 映射逻辑（第 142-166 行）保持不变。
 
-## 4. 队列 / worker / 租约 与触发入口归属
+### 必须保留的语义
 
-| 队列或 worker | 触发入口 | 执行方 | 当前数据状态 |
-|---|---|---|---|
-| 有赞库存同步队列 `youzan_stock_sync_queue` | cron#2 → `youzan-stock-worker.ts` → `runStockSyncWorkerForCron`（`src/lib/youzan-sync.functions.ts`） | **Lovable 托管域** | done 904、failed 5 |
-| 渠道同步 outbox `channel_sync_outbox` + `claim_channel_sync_tasks` 租约 | cron#3 → `channel-sync-worker.ts` | **Lovable 托管域，且因 401 实际未执行** | succeeded 2 |
-| 预留过期释放 `commerce_release_expired_reservations` | cron#4 → `commerce-release-expired.ts` | **Lovable 托管域** | 无独立队列表 |
-| 上架图任务 `inv_listing_image_jobs` | cron#5 → `listing-image-worker.ts` → `runListingImageWorker`（`src/server/handheld-listing-image-jobs.server.ts`） | **腾讯 `erp.boomeroff.com`** | succeeded 5 |
-| 有赞订单同步游标 `youzan_order_sync_cursors`（含租约 `youzan_claim_order_sync_cursor`） | cron#1（已停用）→ `youzan-sync.ts`；备用 `infra/tencent/boomer-youzan-sync.timer` + `scripts/run-youzan-sync.mjs` | 当前**无人执行**；腾讯 unit 文件头部注明「Template only」，未启用 | done 8、failed 16 |
-| 普通支付对账 | `infra/tencent/boomer-ordinary-reconcile.timer` → `scripts/reconcile-ordinary-payments.mjs` | 腾讯服务器（模板已就绪） | — |
-| 数据平台备份/健康/BOOMER OPEN 同步 | `infra/tencent-supabase/ops/systemd/*.timer` | 腾讯自建实例，与本源库无关 | — |
-| 打印任务 `print_jobs` + `print_jobs_lease` | 设备端拉取（handheld API），非 cron | 设备侧 | 表内当前无行 |
-| GO 授权 outbox `go_scope_sync_outbox` | 应用内触发，无 cron | 应用侧 | 表内当前无行 |
+| 语义 | 要求 |
+|---|---|
+| 门店作用域 | `skuIds` 仍完全由 `resolveShopVisibleSkuIds` 决定（库存 / link / 流水 / Vintage 全局标准商品），不得改变集合 |
+| 权限 | 继续用 `context.supabase`（RLS 以登录用户身份），**不得换成 `supabaseAdmin`** |
+| 搜索 | `data.search` 的三字段 ilike 逐批施加，语义与现在完全一致 |
+| 排序 | 最终结果 `created_at` 降序，与现在一致 |
+| 条数 | 返回全部匹配行，不截断、不去重丢失、不减少 SKU |
+| 返回结构 | `{ rows, location_id, store_format }` 三字段不变 |
 
-结论：**5 个 cron 里 4 个仍由 Lovable 域执行**，只有 listing-image-worker 已切到腾讯。
+### 备选方案（不推荐本轮做）
 
-## 5. 外部运行依赖与 env 变量名（不含值）
+改成服务端 RPC 一次性按门店条件筛选（避免传 ID 列表）语义更干净，但要新增 SECURITY DEFINER 函数并重新论证权限边界，属于扩大改动面。当前没有现成合适的 RPC：`search_inv_skus` 是商城公开检索用，不带门店作用域，套用会改变可见集合。
 
-| 依赖 | 代表文件 | 变量名 |
-|---|---|---|
-| Lovable AI 网关（识别/翻译/关税/包裹解析/上架图/内容） | `src/server/product-recognition.server.ts:332`、`src/server/handheld-ai.server.ts:7`、`src/server/handheld-editorial.server.ts:4`、`src/lib/ai.functions.ts`、`recognize.functions.ts`、`meruki-parse.functions.ts`、`translate.functions.ts`、`tariff.functions.ts`、`domestic-recognize.functions.ts`、`sku-image.functions.ts`、`pack-pieces.functions.ts`、`mobile.functions.ts` | `LOVABLE_API_KEY`、`PRODUCT_RECOGNITION_MODEL`、`HANDHELD_PRODUCT_RECOGNITION_MODEL` |
-| Firecrawl 抓取 | 抓取相关 functions | `FIRECRAWL_API_KEY` |
-| 有赞固定出口代理 | `src/lib/youzan-http.ts`、`youzan.functions.ts` | `YOUZAN_PROXY_URL`、`YOUZAN_PROXY_TOKEN`、`YOUZAN_PROXY_OUTBOUND_IP`、`YOUZAN_CLIENT_ID`、`YOUZAN_CLIENT_SECRET` |
-| 微信普通支付 | `src/server/wechat-ordinary-client.ts`、`ordinary-gateway-config.ts` | `WECHAT_PAY_MCHID`、`WECHAT_PAY_APPID`、`WECHAT_PAY_SERIAL_NO`、`WECHAT_PAY_PRIVATE_KEY`、`WECHAT_PAY_APIV3_KEY`、`WECHAT_PAY_PLATFORM_PUBLIC_KEY`、`WECHAT_PAY_NOTIFY_URL`、`WECHAT_ORDINARY_RECONCILE_TOKEN` |
-| 门店收单/分账网关 | `src/server/storefront-payment.server.ts` | `STOREFRONT_PAYMENT_MODE`、`STOREFRONT_PAYMENT_GATEWAY_URL`、`STOREFRONT_PAYMENT_GATEWAY_TOKEN`、`STOREFRONT_PAYMENT_WEBHOOK_SECRET` |
-| 支付宝（代码存在） | 支付 server 模块 | `ALIPAY_APP_ID`、`ALIPAY_GATEWAY_URL`、`ALIPAY_NOTIFY_URL`、`ALIPAY_PRIVATE_KEY`、`ALIPAY_PUBLIC_KEY` |
-| 腾讯云短信 | `src/server/sms.tencent.server.ts` | `TENCENTCLOUD_SECRET_ID`、`TENCENTCLOUD_SECRET_KEY`、`TENCENT_SMS_SDK_APP_ID`、`TENCENT_SMS_SIGN_NAME`、`TENCENT_SMS_TEMPLATE_ID` |
-| 消费者身份 JWKS | `src/server/consumer-auth.server.ts` | `CONSUMER_AUTH_ISSUER`、`CONSUMER_AUTH_JWKS_URL`、`CONSUMER_AUTH_AUDIENCE` |
-| GO 员工端桥接 | `src/server/go-bridge.server.ts`、`trusted-go-fetch.server.ts` | `GO_SUPABASE_URL`、`GO_SUPABASE_PUBLISHABLE_KEY`、`GO_SUPABASE_ANON_KEY` |
-| AIGC SSO | AIGC 路由 | `ERP_AIGC_SSO_SECRET`、`AIGC_PUBLIC_URL` |
-| meruki 凭据加密 | meruki server | `MERUKI_ENC_KEY` |
-| 主库/存储/鉴权 | `src/integrations/supabase/*` | `SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY`、`SUPABASE_ANON_KEY`、`SUPABASE_SERVICE_ROLE_KEY`、`SUPABASE_SECRET_KEYS`、`VITE_SUPABASE_*` |
-| 站点自身基址 | `src/lib/sku-media.ts:39`、`src/lib/handheld/openapi.ts:336-338` | `PUBLIC_APP_ORIGIN`、`PUBLIC_SITE_URL`、`ERP_BASE_URL`、`ERP_PORT`、`HOST`、`PORT` |
+## 3. 测试建议
 
-无语音（TTS/ASR）依赖，源码中未发现。仍硬编码 Lovable 域名的三处：`src/lib/sku-media.ts:39`、`src/lib/handheld/openapi.ts:336-338`、`src/components/youzan/message-push-panel.tsx:26`。
+1. **纯函数单测**（`src/lib/chunk-ids.test.ts`）：0 个、1 个、100 个、101 个、448 个 ID 的切分结果；批数与总数守恒，无重复无丢失。
+2. **排序单测**：把两个批次的乱序结果合并后断言 `created_at` 严格降序，且时间相同时顺序稳定。
+3. **回归断言**（可用现有 `shop-standard-catalog.test.ts` 的风格）：Vintage 门店 448 全局标准 + 若干门店自有 SKU 时，`resolveShopVisibleSkuIds` 输出条数与最终 `rows.length` 相等。
+4. **错误传播测**：模拟其中一个批次返回 error，断言整体抛错而不是返回空数组。
+5. **候选副本人工复验**：用已登录的门店账号打开 `/shop-mgmt/products`，确认条数等于该门店应见 SKU 数；搜索关键词后条数下降但不为 0；观察内部网关日志不再出现 414。
+6. 可选加固：在 `listShopSkus` 里对 `rows` 为空但 `skuIds` 非空的情况打一条服务端警告日志，未来同类静默失败能第一时间被发现。
 
-## 6. 未在本地迁移导出中的新 schema migration
+## 4. 未改动声明
 
-`infra/tencent-supabase/migration/` 目录里只有脚本与 `ordinary-expiry-before-20260908.sql` 一个 SQL，不包含平台迁移序列。相对该目录，`supabase/migrations` 下 `20260907191142` 及之后的三个文件未被覆盖：
-
-- `20260907191142_7d0f83df-f771-49f6-a846-10100a7b4151.sql`（有赞订单队列加固）
-- `20260908070711_aeaffca7-3783-4447-aff9-2cce0022a31b.sql`
-- `20260908081317_3b921feb-3d29-4792-aea4-d644e5375605.sql`（客服顾客上下文只读）
-
-数据库中最新已应用版本即 `20260908081317`，**此后无新增迁移**。
-
-## 7. 未证实事项
-
-- 平台侧是否存在仓库外的历史 Edge Function 部署——代码侧无法证明，待控制台核实。
-- 腾讯 `boomer-youzan-sync` / `boomer-ordinary-reconcile` 两个 unit 是否已在生产主机 enable——仓库只有模板文件，实际主机状态未知。
+未编辑源码、未运行迁移、未改数据库或调度器、未发布、未触碰腾讯生产，也未触发支付、库存写入或有赞同步。修复由你方在腾讯候选副本实现并复验。
