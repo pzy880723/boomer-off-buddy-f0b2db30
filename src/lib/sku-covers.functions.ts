@@ -26,13 +26,17 @@ export const signSkuCovers = createServerFn({ method: "POST" })
       .in("id", data.sku_ids);
     if (error) throw new Error(error.message);
 
-    const { signSkuCover } = await import("./sku-image-resolver.server");
-    const covers: Record<string, string | null> = {};
-    await Promise.all(
-      (rows ?? []).map(async (r) => {
-        const paths = ((r as { image_paths?: string[] | null }).image_paths ?? []) as string[];
-        covers[r.id] = await signSkuCover(paths, r.image_url ?? null);
-      }),
+    // 批量：所有需要签名的首图去重后只调一次 signSkuImagePaths（内部按桶一次 createSignedUrls），
+    // 避免每个 SKU 各发一个 /storage/v1/object/sign 请求。
+    const { signSkuImagePaths } = await import("./sku-image-resolver.server");
+    const { buildSkuCovers } = await import("./sku-cover-batch");
+    const covers = await buildSkuCovers(
+      (rows ?? []).map((r) => ({
+        id: String(r.id),
+        image_paths: (r as { image_paths?: string[] | null }).image_paths ?? null,
+        image_url: r.image_url ?? null,
+      })),
+      signSkuImagePaths,
     );
     return { covers };
   });
