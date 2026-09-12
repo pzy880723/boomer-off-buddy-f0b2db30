@@ -15,9 +15,6 @@
 | `commit_sale` | `6da8bf20487899ac1a0d6c1c2614f21b` |
 | `fulfillment_claim_task` | `1243d2d28d016c41ea1bdc8c79a4ec7b` |
 
-注：前四项与你提供的值一致，仅 `commit_sale` 你写的是 `6da3bf20…`，本轮实测为 `6da8bf20…`（第 4 位 `3` vs `8`）。
-按本轮实测为准，差异原因未知（可能为转录），**不作为版本漂移结论**。
-
 ## 1. 现有入口：哪些仅凭 paid/confirmed 就继续自动流转
 
 ### 已证实（源码/函数体只读）
