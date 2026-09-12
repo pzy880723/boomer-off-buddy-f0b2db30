@@ -61,7 +61,7 @@
 | 领取任务 | `fulfillments.$id.claim.ts:16` POST | RPC `fulfillment_claim_task`（UPDATE fulfillments allocated→picking） | `authenticateDevice` + `requireLocation`；`resolveSessionUser` 仅用于取 operator，**operator 可空、非强制登录**；**未**调用 `authorizeFulfillment` | 仅 RPC 内 `status IN ('allocated','picking')`，**无任何订单状态校验** | RPC 内（首选，因 TS 侧无 access 检查）+ 路由层 |
 | 绑框 | `fulfillments.$id.bind-tote.ts:19` POST | RPC `fulfillment_bind_tote` | `authenticateDevice` + `requireLocation`；**无 resolveSessionUser**（不能写成「鉴权同 claim」）；**未**调用 `authorizeFulfillment` | RPC 内仅校验 fulfillment 状态与 tote 占用，**无订单校验** | RPC 内 |
 | 拣货扫码 | `fulfillments.$id.pick-scan.ts:23` POST | RPC `fulfillment_pick_scan` | `authorizeFulfillment(mode:"write")` | TS 侧 `BLOCKING_ORDER_STATUSES`（cancelled/closed）；RPC 内仅 `status IN ('allocated','picking')` | RPC 内 + `authorizeFulfillment` |
-| 拣货完成 | `fulfillments.$id.pick-complete.ts:16` POST | RPC `fulfillment_complete_pick` | `authorizeFulfillment` + `loadPickGuard` | TS 侧 `order_status_unavailable` / `pick_blocked`；**RPC 内亦查 `commerce_orders.order_status IN ('cancelled','closed')`（唯一在 DB 侧有订单校验的履约 RPC）** | 与 RPC 内既有订单校验同处扩展 |
+| 拣货完成 | `fulfillments.$id.pick-complete.ts:16` POST | RPC `fulfillment_complete_pick` | `authorizeFulfillment` + `loadPickGuard` | TS 侧 `order_status_unavailable` / `pick_blocked`；**RPC 内除 `order_status IN ('cancelled','closed')` 外，还阻断 `pending_customer`、`refund_pending`、`unpicked`（不能写成仅阻断 cancelled/closed）**；是本轮唯一在 DB 侧有订单校验的履约 RPC | 与 RPC 内既有订单校验同处扩展 |
 | 缺货上报 | `fulfillments.$id.shortage.ts:27` POST | 直接写 `fulfillment_items`(读) / `fulfillment_shortages`(插/改) / `fulfillment_exceptions`(插) | `authorizeFulfillment(mode:"write")` | 仅行归属校验 + TS 侧阻断清单 | 路由层（无对应 RPC） |
 | 票据读取 | `fulfillments.$id.ticket.ts:16` GET | 只读（`buildFulfillmentTicket`） | `authorizeFulfillment` | — | **不需 hold 阻断**：这是读取，不是领取写入 |
 | 面单/快递发货 | `fulfillments.$id.waybill.ts:30` GET（读 `shipments`）、`:55` POST | POST 目前**无写入**，返回 409 `carrier_not_configured` 或 501 `carrier_not_implemented` | `authorizeFulfillment` | 承运商未接入 | 未来接入时在写 `shipments` 前 |
@@ -75,16 +75,27 @@
 
 ### 是否存在绕过 TS 检查的直连 RPC 路径
 
-只读权限核对（`pg_proc.proacl` 与 `information_schema.role_table_grants`）：
+只读权限核对（`pg_proc.proacl`、`has_function_privilege`、`has_table_privilege`）：
 
-- `fulfillment_claim_task`、`fulfillment_bind_tote`、`fulfillment_pick_scan`、
-  `fulfillment_complete_pick`、`handheld_search_fulfillment_ids`、`commerce_transition_after_sale`
-  的 ACL 均为 `postgres=X/postgres service_role=X/postgres`，**无 anon / authenticated EXECUTE**。
-- `fulfillments`、`fulfillment_items`、`fulfillment_shortages`、`fulfillment_exceptions`、
-  `shipments`、`commerce_orders` 对 anon/authenticated **无表级授权**（查询结果仅含本沙箱只读角色）。
-- 结论：**当前没有浏览器端直连 Data API 绕过 TS 检查的路径**；
-  但因 `claim` 与 `bind-tote` 两个路由本身不做订单级判定，
+- 函数级：只读 `has_function_privilege` 核验了 **6 个函数名、共 7 个签名**
+  （`fulfillment_pick_scan` 存在两重载），结论为这 7 个签名上
+  anon / authenticated 的 EXECUTE 均为 **false**；`proacl` 中亦无 anon/authenticated 条目。
+  **该结论只覆盖这 7 个签名，不能宣称整个 Data API 无绕过路径。**
+- 表级：更正此前结论 —— 经根端 `has_table_privilege` 核验，
+  `fulfillments`、`fulfillment_items`、`fulfillment_shortages`、`fulfillment_exceptions`、
+  `shipments`、`commerce_orders` 6 表对 anon 和 authenticated 的
+  SELECT / INSERT / UPDATE / DELETE **均为 true，且 6 表 RLS 均开启**。
+  此前 `information_schema.role_table_grants` 只反映本沙箱角色可见的授权，
+  **不足以得出「无表级授权」，该结论已撤回**。
+  表级 grant 存在 ≠ 实际可操作：能否真正读写取决于 RLS 策略、调用方角色身份及其他写入口，
+  需逐表评估，本轮未逐条核对 6 表的全部策略。
+- 结论（收窄）：函数侧已核实这 7 个签名不能被 anon/authenticated 直接调用；
+  表侧存在 anon/authenticated 授权，是否可绕过 `authorizeFulfillment` 直接写表
+  取决于 RLS 策略细节，**属于待核查项，不再断言**。
+- 另外：`claim` 与 `bind-tote` 两个路由本身不做订单级判定，
   若 hold 只加在 TS 侧的 `authorizeFulfillment`，这两条路径仍会漏过 —— 所以 hold 判定应下沉到 RPC 内。
+- 竞态不变量：hold 的判定必须与产生写入的变更**在同一事务内**并遵循统一锁顺序；
+  仅在 TS 侧「先读 hold、再发 RPC」存在读—写竞态，不构成阻断。
 
 ### 两点澄清（按你的要求）
 
