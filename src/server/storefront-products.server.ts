@@ -228,9 +228,18 @@ export function buildStorefrontProduct(input: {
  */
 export async function buildStorefrontProductDetail(
   listing: StorefrontListing,
-  options: { signer?: ImageSigner; thumbnailSigner?: ImageSigner } = {},
+  options: {
+    signer?: ImageSigner;
+    thumbnailSigner?: ImageSigner;
+    /** 测试注入用：默认 enrichStorefrontListings(signImages:false) */
+    enrich?: (
+      listings: StorefrontListing[],
+      options: { signImages?: boolean },
+    ) => Promise<StorefrontProduct[]>;
+  } = {},
 ): Promise<(StorefrontProduct & { thumbnail_url?: string | null }) | null> {
-  const products = await enrichStorefrontListings([listing], { signImages: false });
+  const enrich = options.enrich ?? enrichStorefrontListings;
+  const products = await enrich([listing], { signImages: false });
   const product = products[0];
   if (!product || product.stock < 1) return null;
   const listingsById = new Map([[listing.id, listing]]);
