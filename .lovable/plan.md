@@ -50,14 +50,16 @@
 
 ## 1b. 履约写入口逐条盘点（有界只读；未实施任何改动）
 
-盘点范围：`src/routes/api/public/handheld/`（60 个文件，已全量列目录）、
-`src/lib/commerce-operations.functions.ts`、`src/routes/orders.*.tsx`、`src/server/handheld-*`，
-以及上述入口调用到的 DB 函数定义（只读 `pg_get_functiondef`，未调用任何业务函数）。
+盘点范围（有界检索，非全覆盖）：`src/routes/api/public/handheld/`（`ls | head -60` 所见 60 个文件，
+**不代表**该目录仅有这 60 个）、`src/lib/commerce-operations.functions.ts`、
+`src/routes/orders.*.tsx`、`src/server/handheld-*`，以及上述入口调用到的 DB 函数定义
+（只读 `pg_get_functiondef`，未调用任何业务函数）。
+「未找到」仅表示在本次有界检索中未发现，不等于不存在。
 
 | 类别 | 入口（文件:行 / 方法） | 写入的 RPC / 表 | 当前鉴权 | 当前业务阻断 | 拟插入 hold 检查处 |
 |---|---|---|---|---|---|
-| 领取任务 | `fulfillments.$id.claim.ts:16` POST | RPC `fulfillment_claim_task`（UPDATE fulfillments allocated→picking） | `authenticateDevice` + `requireLocation` + `resolveSessionUser`；**未**调用 `authorizeFulfillment` | 仅 RPC 内 `status IN ('allocated','picking')`，**无任何订单状态校验** | RPC 内（首选，因 TS 侧无 access 检查）+ 路由层 |
-| 绑框 | `fulfillments.$id.bind-tote.ts:19` POST | RPC `fulfillment_bind_tote` | 同上，**未**调用 `authorizeFulfillment` | RPC 内仅校验 fulfillment 状态与 tote 占用，**无订单校验** | RPC 内 |
+| 领取任务 | `fulfillments.$id.claim.ts:16` POST | RPC `fulfillment_claim_task`（UPDATE fulfillments allocated→picking） | `authenticateDevice` + `requireLocation`；`resolveSessionUser` 仅用于取 operator，**operator 可空、非强制登录**；**未**调用 `authorizeFulfillment` | 仅 RPC 内 `status IN ('allocated','picking')`，**无任何订单状态校验** | RPC 内（首选，因 TS 侧无 access 检查）+ 路由层 |
+| 绑框 | `fulfillments.$id.bind-tote.ts:19` POST | RPC `fulfillment_bind_tote` | `authenticateDevice` + `requireLocation`；**无 resolveSessionUser**（不能写成「鉴权同 claim」）；**未**调用 `authorizeFulfillment` | RPC 内仅校验 fulfillment 状态与 tote 占用，**无订单校验** | RPC 内 |
 | 拣货扫码 | `fulfillments.$id.pick-scan.ts:23` POST | RPC `fulfillment_pick_scan` | `authorizeFulfillment(mode:"write")` | TS 侧 `BLOCKING_ORDER_STATUSES`（cancelled/closed）；RPC 内仅 `status IN ('allocated','picking')` | RPC 内 + `authorizeFulfillment` |
 | 拣货完成 | `fulfillments.$id.pick-complete.ts:16` POST | RPC `fulfillment_complete_pick` | `authorizeFulfillment` + `loadPickGuard` | TS 侧 `order_status_unavailable` / `pick_blocked`；**RPC 内亦查 `commerce_orders.order_status IN ('cancelled','closed')`（唯一在 DB 侧有订单校验的履约 RPC）** | 与 RPC 内既有订单校验同处扩展 |
 | 缺货上报 | `fulfillments.$id.shortage.ts:27` POST | 直接写 `fulfillment_items`(读) / `fulfillment_shortages`(插/改) / `fulfillment_exceptions`(插) | `authorizeFulfillment(mode:"write")` | 仅行归属校验 + TS 侧阻断清单 | 路由层（无对应 RPC） |
