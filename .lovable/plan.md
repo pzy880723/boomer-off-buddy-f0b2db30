@@ -48,6 +48,54 @@
 **全程没有可用的阻断位**。因此「收款事实与履约阻断解耦」必须同时提供 hold 载体
 **和**在上述 write 入口读取该载体，二者缺一不可。
 
+## 1b. 履约写入口逐条盘点（有界只读；未实施任何改动）
+
+盘点范围：`src/routes/api/public/handheld/`（60 个文件，已全量列目录）、
+`src/lib/commerce-operations.functions.ts`、`src/routes/orders.*.tsx`、`src/server/handheld-*`，
+以及上述入口调用到的 DB 函数定义（只读 `pg_get_functiondef`，未调用任何业务函数）。
+
+| 类别 | 入口（文件:行 / 方法） | 写入的 RPC / 表 | 当前鉴权 | 当前业务阻断 | 拟插入 hold 检查处 |
+|---|---|---|---|---|---|
+| 领取任务 | `fulfillments.$id.claim.ts:16` POST | RPC `fulfillment_claim_task`（UPDATE fulfillments allocated→picking） | `authenticateDevice` + `requireLocation` + `resolveSessionUser`；**未**调用 `authorizeFulfillment` | 仅 RPC 内 `status IN ('allocated','picking')`，**无任何订单状态校验** | RPC 内（首选，因 TS 侧无 access 检查）+ 路由层 |
+| 绑框 | `fulfillments.$id.bind-tote.ts:19` POST | RPC `fulfillment_bind_tote` | 同上，**未**调用 `authorizeFulfillment` | RPC 内仅校验 fulfillment 状态与 tote 占用，**无订单校验** | RPC 内 |
+| 拣货扫码 | `fulfillments.$id.pick-scan.ts:23` POST | RPC `fulfillment_pick_scan` | `authorizeFulfillment(mode:"write")` | TS 侧 `BLOCKING_ORDER_STATUSES`（cancelled/closed）；RPC 内仅 `status IN ('allocated','picking')` | RPC 内 + `authorizeFulfillment` |
+| 拣货完成 | `fulfillments.$id.pick-complete.ts:16` POST | RPC `fulfillment_complete_pick` | `authorizeFulfillment` + `loadPickGuard` | TS 侧 `order_status_unavailable` / `pick_blocked`；**RPC 内亦查 `commerce_orders.order_status IN ('cancelled','closed')`（唯一在 DB 侧有订单校验的履约 RPC）** | 与 RPC 内既有订单校验同处扩展 |
+| 缺货上报 | `fulfillments.$id.shortage.ts:27` POST | 直接写 `fulfillment_items`(读) / `fulfillment_shortages`(插/改) / `fulfillment_exceptions`(插) | `authorizeFulfillment(mode:"write")` | 仅行归属校验 + TS 侧阻断清单 | 路由层（无对应 RPC） |
+| 票据读取 | `fulfillments.$id.ticket.ts:16` GET | 只读（`buildFulfillmentTicket`） | `authorizeFulfillment` | — | **不需 hold 阻断**：这是读取，不是领取写入 |
+| 面单/快递发货 | `fulfillments.$id.waybill.ts:30` GET（读 `shipments`）、`:55` POST | POST 目前**无写入**，返回 409 `carrier_not_configured` 或 501 `carrier_not_implemented` | `authorizeFulfillment` | 承运商未接入 | 未来接入时在写 `shipments` 前 |
+| 撤销拣货 | **未找到** | — | — | — | — |
+| 打包扫码 / 打包完成 | **未找到**（`packing`/`packed` 仅出现在类型定义、`handheld-orders.server.ts:32-35` 的状态枚举与 `operational-dashboard.server.ts:222` 的统计） | — | — | — |
+| 交接 / 带走 / 自提 | **未找到**（`handed_over` 同上，仅枚举与统计） | — | — | — |
+| 手动状态更新（后台页） | **未找到**履约状态写入；`src/routes/orders.dispatch.tsx:13` 仅 GET 列表；`src/lib/commerce-operations.functions.ts` 内只有 `transitionCommerceAfterSale:138`（RPC `commerce_transition_after_sale`，售后状态，非履约） | — | serverFn | — | 售后流程后定，本轮不涉及 |
+| 自动完成 | **未找到**自动置 `handed_over`/completed 的任务 | — | — | — | — |
+| 创建履约 / 拣货票据任务 | `commerce_mark_ordinary_order_paid` / `commerce_mark_order_paid` 函数体内 INSERT `fulfillments` + `fulfillment_items`；触发器 `tg_fulfillment_enqueue_pick_ticket` | — | 仅 service_role | 无 | 内层子事务失败即写 hold（见第 3 节） |
+| 缺货确认 / 退款 | **未找到**「缺货确认后自动退款」路径；退款走既有普通支付退款链路 | — | — | — | 不自动退款（设计约束） |
+
+### 是否存在绕过 TS 检查的直连 RPC 路径
+
+只读权限核对（`pg_proc.proacl` 与 `information_schema.role_table_grants`）：
+
+- `fulfillment_claim_task`、`fulfillment_bind_tote`、`fulfillment_pick_scan`、
+  `fulfillment_complete_pick`、`handheld_search_fulfillment_ids`、`commerce_transition_after_sale`
+  的 ACL 均为 `postgres=X/postgres service_role=X/postgres`，**无 anon / authenticated EXECUTE**。
+- `fulfillments`、`fulfillment_items`、`fulfillment_shortages`、`fulfillment_exceptions`、
+  `shipments`、`commerce_orders` 对 anon/authenticated **无表级授权**（查询结果仅含本沙箱只读角色）。
+- 结论：**当前没有浏览器端直连 Data API 绕过 TS 检查的路径**；
+  但因 `claim` 与 `bind-tote` 两个路由本身不做订单级判定，
+  若 hold 只加在 TS 侧的 `authorizeFulfillment`，这两条路径仍会漏过 —— 所以 hold 判定应下沉到 RPC 内。
+
+### 两点澄清（按你的要求）
+
+- `buildFulfillmentTicket`（`fulfillments.$id.ticket.ts` GET）是**票据读取**，不是领取写入，
+  不应被当作需要 hold 阻断的写入口。
+- `fulfillment_exceptions` 是**单个履约单**的异常记录（`fulfillment_id` NOT NULL），
+  **不能**当作全局/订单级 hold 使用。
+
+正常路径与真实线下事件必须保留：hold 只阻断「已付款但库存冲突」的订单，
+不改变其余订单的正常领取/拣货/完成流程。
+
+
+
 ## 2. 订单级 hold 载体：三种取舍
 
 已证实的约束：`fulfillment_exceptions.fulfillment_id` 为 **NOT NULL**（12 列，2 FK）。
