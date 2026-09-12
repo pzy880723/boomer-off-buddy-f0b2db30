@@ -151,3 +151,91 @@ describe("storefront compound taxonomy contract", () => {
     ]);
   });
 });
+
+describe("storefront product detail handler", () => {
+  const listing: StorefrontListing = {
+    id: "listing-detail",
+    sku_id: "sku-detail",
+    location_id: "store-a",
+    title: "详情页杯",
+    description: null,
+    cover_url: null,
+    image_urls: [],
+    image_paths: ["sku-listing/detail-front.png"],
+    price: 100,
+    compare_at_price: null,
+    condition_grade: "A",
+    product_type: "custom",
+    published_at: null,
+    location: { id: "store-a", name: "上海店", kind: "shop" },
+  };
+
+  const enrichAvailable = async () => [
+    buildStorefrontProduct({
+      listing,
+      sku: { id: "sku-detail", category: null, keywords: [], stock_qty: 1 },
+      category: null,
+      brand: null,
+      facets: [],
+      availableQty: 1,
+    }),
+  ];
+
+  test("returns original images plus a signed thumbnail without double-signing originals", async () => {
+    let originalSignCalls = 0;
+    const product = await buildStorefrontProductDetail(listing, {
+      enrich: enrichAvailable,
+      signer: async (paths) => {
+        originalSignCalls += 1;
+        return paths.map((path) => `https://signed.test/${path}`);
+      },
+      thumbnailSigner: async (paths) =>
+        paths.map((path) => `https://thumb.test/480/${path}`),
+    });
+
+    assert.ok(product);
+    assert.equal(originalSignCalls, 1);
+    assert.equal(product.image_url, "https://signed.test/sku-listing/detail-front.png");
+    assert.deepEqual(product.image_urls, ["https://signed.test/sku-listing/detail-front.png"]);
+    assert.equal(product.thumbnail_url, "https://thumb.test/480/sku-listing/detail-front.png");
+    assert.equal(product.stock, 1);
+  });
+
+  test("falls back to the original image when thumbnail signing fails", async () => {
+    const product = await buildStorefrontProductDetail(listing, {
+      enrich: enrichAvailable,
+      signer: async (paths) => paths.map((path) => `https://signed.test/${path}`),
+      thumbnailSigner: async () => {
+        throw new Error("thumbnail signing unavailable");
+      },
+    });
+
+    assert.ok(product);
+    assert.equal(product.image_url, "https://signed.test/sku-listing/detail-front.png");
+    assert.equal(product.thumbnail_url, "https://signed.test/sku-listing/detail-front.png");
+  });
+
+  test("returns null for out-of-stock or missing products so the route answers 404", async () => {
+    const outOfStock = await buildStorefrontProductDetail(listing, {
+      enrich: async () => [
+        buildStorefrontProduct({
+          listing,
+          sku: { id: "sku-detail", category: null, keywords: [], stock_qty: 0 },
+          category: null,
+          brand: null,
+          facets: [],
+          availableQty: 0,
+        }),
+      ],
+      signer: async () => {
+        throw new Error("must not sign unavailable products");
+      },
+    });
+    assert.equal(outOfStock, null);
+
+    const missing = await buildStorefrontProductDetail(listing, {
+      enrich: async () => [],
+    });
+    assert.equal(missing, null);
+  });
+});
