@@ -220,6 +220,29 @@ export function buildStorefrontProduct(input: {
 }
 
 /**
+ * 详情页单商品装配：先 signImages:false 富化并确认可售（stock >= 1），
+ * 再仅对这一个商品调用 signStorefrontProductImages(..., { thumbnail: true })，
+ * 避免“先签原图再签一遍缩略图”的重复签名。
+ * 不可售（无 SKU / stock < 1）返回 null，由路由映射为 404。
+ * 缩略图签名失败时 thumbnail_url 回退原图（signStorefrontProductImages 内建行为）。
+ */
+export async function buildStorefrontProductDetail(
+  listing: StorefrontListing,
+  options: { signer?: ImageSigner; thumbnailSigner?: ImageSigner } = {},
+): Promise<(StorefrontProduct & { thumbnail_url?: string | null }) | null> {
+  const products = await enrichStorefrontListings([listing], { signImages: false });
+  const product = products[0];
+  if (!product || product.stock < 1) return null;
+  const listingsById = new Map([[listing.id, listing]]);
+  const [signed] = await signStorefrontProductImages([product], listingsById, {
+    thumbnail: true,
+    signer: options.signer,
+    thumbnailSigner: options.thumbnailSigner,
+  });
+  return signed;
+}
+
+/**
  * 元数据富化（分类/品牌/facets/可售库存）。
  * signImages=true（默认，详情页沿用）：桶级批量签名原图；
  * signImages=false：不做任何签名，留给调用方在筛选/分页之后对当前页调用 signStorefrontProductImages。
