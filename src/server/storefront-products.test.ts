@@ -4,8 +4,10 @@ import { describe, test } from "node:test";
 
 import {
   buildStorefrontProduct,
+  buildStorefrontProductDetail,
   parseStorefrontProductQuery,
   resolveStorefrontListingImages,
+  type StorefrontListing,
 } from "./storefront-products.server";
 
 describe("storefront compound taxonomy contract", () => {
