@@ -57,9 +57,9 @@
 |---|---|---|
 | A. `commerce_orders` 结构化字段（如 `fulfillment_hold_reason text` + `fulfillment_held_at timestamptz`，均可空） | 改动最小；查询天然随订单；不新建平台；write 入口只需多读两列 | 订单表已 37 列；语义单一，未来多条并发 hold 无法并存；需要明确「谁清除」 |
 | B. 独立小表 `commerce_order_holds(order_id, reason_code, created_at, resolved_at, ...)` | 可留痕多条、可审计、不改订单主表；与后续人工处置流程兼容 | 新表需 GRANT/RLS；查询要 join；有「建平台」的观感风险 |
-| C. 复用 `metadata` JSON | 零 DDL | 无法建索引/约束，易被覆盖，不适合阻断这类**安全判定**依赖 |
+| C. 复用 `metadata` JSON | 零 DDL | 当前读写边界、覆盖风险与契约不明确，不适合阻断这类**安全判定**依赖 |
 
-评审意见：**C 不可用于阻断判定**（无约束、可被任意写覆盖）。
+评审意见：**C 不可用于阻断判定**（当前契约与写边界不可控，可被任意覆盖）。
 A 与 B 的取舍取决于后续是否需要多条 hold 留痕与人工处置按钮；
 两者都不要求现在就新增 `order_status` 枚举值——hold 可作为**正交**标记，
 主状态继续沿用现有值，避免锁死枚举。**本轮不选定、不写 DDL。**
