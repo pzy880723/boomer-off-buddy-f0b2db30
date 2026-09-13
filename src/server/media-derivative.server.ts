@@ -14,6 +14,7 @@ import {
   DERIVATIVE_RESIZE,
   DERIVATIVE_WIDTHS,
   buildTencentDerivativeUrl,
+  isAllowedDerivativeWidth,
   parseStorageRef,
   type StorageRef,
 } from "@/lib/media-derivative";
@@ -28,6 +29,12 @@ export type DerivativeDeps = {
   signPrimary?: (ref: StorageRef, width: number) => Promise<string | null>;
   primaryOrigin?: string | null;
   tencentOrigin?: string | null;
+  /**
+   * 腾讯 render/image/public 衍生能力是否已在腾讯现场实测验证。
+   * 未显式置 true（或 env TENCENT_MEDIA_RENDER_VERIFIED=true）时，
+   * 腾讯 ref 一律返回 null —— 构造的 URL 未经实测不得当作真实衍生图下发。
+   */
+  tencentRenderVerified?: boolean;
 };
 
 function primaryOriginFromEnv(): string | null {
@@ -36,6 +43,11 @@ function primaryOriginFromEnv(): string | null {
 
 function tencentOriginFromEnv(): string | null {
   return process.env["TENCENT_MEDIA_URL"]?.trim() || null;
+}
+
+/** 腾讯 render 衍生能力开关：只有实测验证后显式置 "true" 才放行。 */
+function tencentRenderVerifiedFromEnv(): boolean {
+  return process.env["TENCENT_MEDIA_RENDER_VERIFIED"]?.trim() === "true";
 }
 
 async function defaultSignPrimary(ref: StorageRef, width: number): Promise<string | null> {
@@ -64,9 +76,12 @@ export async function signDerivativeUrls(
 ): Promise<(string | null)[]> {
   const out: (string | null)[] = new Array(values.length).fill(null);
   if (values.length === 0) return out;
+  // 宽度 fail-closed：只放行固定档位，其余一律全 null 且不发起任何签名/构造。
+  if (!isAllowedDerivativeWidth(width)) return out;
 
   const primaryOrigin = deps.primaryOrigin ?? primaryOriginFromEnv();
   const tencentOrigin = deps.tencentOrigin ?? tencentOriginFromEnv();
+  const tencentRenderVerified = deps.tencentRenderVerified ?? tencentRenderVerifiedFromEnv();
   const signPrimary = deps.signPrimary ?? defaultSignPrimary;
 
   const jobs = new Map<string, { ref: StorageRef; idxs: number[] }>();
@@ -74,6 +89,8 @@ export async function signDerivativeUrls(
     const ref = parseStorageRef(value, { primary: primaryOrigin, tencent: tencentOrigin });
     if (!ref) return;
     if (ref.origin === "tencent") {
+      // 腾讯 render 能力未经实测验证前，绝不下发构造 URL。
+      if (!tencentRenderVerified) return;
       out[idx] = buildTencentDerivativeUrl(ref, width, tencentOrigin);
       return;
     }
