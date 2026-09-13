@@ -71,7 +71,6 @@ describe("parseStorageRef", () => {
       path: "a/b.jpg",
     });
   });
-});
 
   test("未配置腾讯 origin 时腾讯地址不被认作已知存储", () => {
     assert.equal(
