@@ -295,7 +295,8 @@ describe("storefront detail image_previews contract", () => {
 
     assert.ok(product);
     assert.equal(originalCalls, 1);
-    assert.equal(thumbCalls, 1);
+    // 两次：一次 960 预览（整组），一次 480 封面缩略图
+    assert.equal(thumbCalls, 2);
     assert.equal(product.image_previews.length, 3);
     assert.deepEqual(
       product.image_previews.map((preview) => preview.image_url),
