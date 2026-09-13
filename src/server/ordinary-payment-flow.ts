@@ -72,7 +72,8 @@ async function query(deps: OrdinaryDependencies, payment: OrdinaryPayment) {
     return result;
   }
   catch (error) {
-    if ((error as { code?: string }).code === 'ORDERNOTEXIST') return null;
+    const code = (error as { code?: string }).code;
+    if (code === 'ORDERNOTEXIST' || code === 'ORDER_NOT_EXIST') return null;
     throw error;
   }
 }
