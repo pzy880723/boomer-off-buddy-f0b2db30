@@ -239,3 +239,185 @@ describe("storefront product detail handler", () => {
     assert.equal(missing, null);
   });
 });
+
+describe("storefront detail image_previews contract", () => {
+  const threePhotoListing: StorefrontListing = {
+    id: "listing-gallery",
+    sku_id: "sku-gallery",
+    location_id: null,
+    title: "三图商品",
+    description: null,
+    cover_url: null,
+    image_urls: [],
+    image_paths: [
+      "sku-listing/a-front.png",
+      "sku-listing/b-side.png",
+      "sku-listing/c-back.png",
+    ],
+    price: 200,
+    compare_at_price: null,
+    condition_grade: "A",
+    product_type: "custom",
+    published_at: null,
+    location: null,
+  };
+
+  const enrichFor = (listing: StorefrontListing, qty = 1) => async () =>
+    [
+      buildStorefrontProduct({
+        listing,
+        sku: { id: listing.sku_id, category: null, keywords: [], stock_qty: qty },
+        category: null,
+        brand: null,
+        facets: [],
+        availableQty: qty,
+      }),
+    ];
+
+  test("returns one preview per original with matching URLs and a single original signing pass", async () => {
+    let originalCalls = 0;
+    let thumbCalls = 0;
+    const product = await buildStorefrontProductDetail(threePhotoListing, {
+      enrich: enrichFor(threePhotoListing),
+      signer: async (paths) => {
+        originalCalls += 1;
+        return paths.map((path) => `https://signed.test/${path}`);
+      },
+      thumbnailSigner: async (paths) => {
+        thumbCalls += 1;
+        return paths.map((path) => `https://thumb.test/480/${path}`);
+      },
+    });
+
+    assert.ok(product);
+    assert.equal(originalCalls, 1);
+    assert.equal(thumbCalls, 1);
+    assert.equal(product.image_previews.length, 3);
+    assert.deepEqual(
+      product.image_previews.map((preview) => preview.image_url),
+      product.image_urls,
+    );
+    assert.deepEqual(product.image_previews, [
+      {
+        image_url: "https://signed.test/sku-listing/a-front.png",
+        preview_url: "https://thumb.test/480/sku-listing/a-front.png",
+      },
+      {
+        image_url: "https://signed.test/sku-listing/b-side.png",
+        preview_url: "https://thumb.test/480/sku-listing/b-side.png",
+      },
+      {
+        image_url: "https://signed.test/sku-listing/c-back.png",
+        preview_url: "https://thumb.test/480/sku-listing/c-back.png",
+      },
+    ]);
+    assert.equal(product.thumbnail_url, product.image_previews[0].preview_url);
+    assert.equal(product.image_url, product.image_previews[0].image_url);
+  });
+
+  test("drops only the failed middle original and keeps path association", async () => {
+    const product = await buildStorefrontProductDetail(threePhotoListing, {
+      enrich: enrichFor(threePhotoListing),
+      signer: async (paths) =>
+        paths.map((path) => (path.includes("b-side") ? null : `https://signed.test/${path}`)),
+      thumbnailSigner: async (paths) => paths.map((path) => `https://thumb.test/480/${path}`),
+    });
+
+    assert.ok(product);
+    assert.deepEqual(product.image_previews, [
+      {
+        image_url: "https://signed.test/sku-listing/a-front.png",
+        preview_url: "https://thumb.test/480/sku-listing/a-front.png",
+      },
+      {
+        image_url: "https://signed.test/sku-listing/c-back.png",
+        preview_url: "https://thumb.test/480/sku-listing/c-back.png",
+      },
+    ]);
+    assert.deepEqual(product.image_urls, [
+      "https://signed.test/sku-listing/a-front.png",
+      "https://signed.test/sku-listing/c-back.png",
+    ]);
+  });
+
+  test("falls back per image when thumbnails fail individually or entirely", async () => {
+    const partial = await buildStorefrontProductDetail(threePhotoListing, {
+      enrich: enrichFor(threePhotoListing),
+      signer: async (paths) => paths.map((path) => `https://signed.test/${path}`),
+      thumbnailSigner: async (paths) =>
+        paths.map((path) => (path.includes("b-side") ? null : `https://thumb.test/480/${path}`)),
+    });
+    assert.ok(partial);
+    assert.deepEqual(
+      partial.image_previews.map((preview) => preview.preview_url),
+      [
+        "https://thumb.test/480/sku-listing/a-front.png",
+        "https://signed.test/sku-listing/b-side.png",
+        "https://thumb.test/480/sku-listing/c-back.png",
+      ],
+    );
+
+    const allFailed = await buildStorefrontProductDetail(threePhotoListing, {
+      enrich: enrichFor(threePhotoListing),
+      signer: async (paths) => paths.map((path) => `https://signed.test/${path}`),
+      thumbnailSigner: async () => {
+        throw new Error("thumbnail service down");
+      },
+    });
+    assert.ok(allFailed);
+    assert.deepEqual(
+      allFailed.image_previews.map((preview) => preview.preview_url),
+      allFailed.image_previews.map((preview) => preview.image_url),
+    );
+    assert.equal(allFailed.thumbnail_url, allFailed.image_previews[0].image_url);
+  });
+
+  test("passes external URLs through with independent preview fallback", async () => {
+    const externalListing: StorefrontListing = {
+      ...threePhotoListing,
+      id: "listing-external",
+      image_paths: ["https://cdn.example.test/a.jpg", "sku-listing/b-side.png"],
+    };
+    const product = await buildStorefrontProductDetail(externalListing, {
+      enrich: enrichFor(externalListing),
+      signer: async (paths) =>
+        paths.map((path) => (/^https?:/i.test(path) ? path : `https://signed.test/${path}`)),
+      thumbnailSigner: async (paths) =>
+        paths.map((path) => (/^https?:/i.test(path) ? null : `https://thumb.test/480/${path}`)),
+    });
+
+    assert.ok(product);
+    assert.deepEqual(product.image_previews, [
+      {
+        image_url: "https://cdn.example.test/a.jpg",
+        preview_url: "https://cdn.example.test/a.jpg",
+      },
+      {
+        image_url: "https://signed.test/sku-listing/b-side.png",
+        preview_url: "https://thumb.test/480/sku-listing/b-side.png",
+      },
+    ]);
+  });
+
+  test("never signs galleries for sold or hidden products", async () => {
+    const sold = await buildStorefrontProductDetail(threePhotoListing, {
+      enrich: enrichFor(threePhotoListing, 0),
+      signer: async () => {
+        throw new Error("must not sign sold products");
+      },
+      thumbnailSigner: async () => {
+        throw new Error("must not sign sold products");
+      },
+    });
+    assert.equal(sold, null);
+
+    const hidden = await buildStorefrontProductDetail(threePhotoListing, {
+      // 隐藏 / 非 active SKU 在 enrich 阶段已被排除 → 空数组
+      enrich: async () => [],
+      signer: async () => {
+        throw new Error("must not sign hidden products");
+      },
+    });
+    assert.equal(hidden, null);
+  });
+});

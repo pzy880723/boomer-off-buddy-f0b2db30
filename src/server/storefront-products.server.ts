@@ -219,12 +219,25 @@ export function buildStorefrontProduct(input: {
   };
 }
 
+export type StorefrontImagePreview = {
+  /** 与原图一一对应的签名原图 URL */
+  image_url: string;
+  /** 轻量预览 URL；缩略图不可用时回退为同一张原图 URL */
+  preview_url: string;
+};
+
 /**
  * 详情页单商品装配：先 signImages:false 富化并确认可售（stock >= 1），
- * 再仅对这一个商品调用 signStorefrontProductImages(..., { thumbnail: true })，
- * 避免“先签原图再签一遍缩略图”的重复签名。
+ * 再只对这一个商品签一次原图 + 一次缩略图。
+ *
+ * 关键不变量：
+ * - 原图只签一次，且按“原始路径下标”保留 path → signed URL 关联；
+ *   中间某张原图签名失败（null）只丢弃那一张，绝不把过滤后的 URL 与未过滤路径错位拉链。
+ * - 缩略图对所有仍有原图 URL 的路径批量签一次（含封面，不重复签），
+ *   单张失败 / 外链 / 未知前缀各自独立回退到对应原图 URL。
+ * - image_url / image_urls / 顺序 / 数量 / 库存 / 价格契约不变；
+ *   thumbnail_url 保持等于 image_previews[0].preview_url。
  * 不可售（无 SKU / stock < 1）返回 null，由路由映射为 404。
- * 缩略图签名失败时 thumbnail_url 回退原图（signStorefrontProductImages 内建行为）。
  */
 export async function buildStorefrontProductDetail(
   listing: StorefrontListing,
@@ -237,18 +250,72 @@ export async function buildStorefrontProductDetail(
       options: { signImages?: boolean },
     ) => Promise<StorefrontProduct[]>;
   } = {},
-): Promise<(StorefrontProduct & { thumbnail_url?: string | null }) | null> {
+): Promise<
+  | (StorefrontProduct & {
+      thumbnail_url?: string | null;
+      image_previews: StorefrontImagePreview[];
+    })
+  | null
+> {
   const enrich = options.enrich ?? enrichStorefrontListings;
   const products = await enrich([listing], { signImages: false });
   const product = products[0];
   if (!product || product.stock < 1) return null;
-  const listingsById = new Map([[listing.id, listing]]);
-  const [signed] = await signStorefrontProductImages([product], listingsById, {
-    thumbnail: true,
-    signer: options.signer,
-    thumbnailSigner: options.thumbnailSigner,
+
+  const signer = options.signer ?? signSkuImagePaths;
+  const thumbnailSigner = options.thumbnailSigner ?? signSkuThumbnailPaths;
+
+  const rawPaths = (listing.image_paths ?? []).filter(Boolean);
+  if (rawPaths.length === 0) {
+    return {
+      ...product,
+      thumbnail_url: product.image_url,
+      image_previews: (product.image_urls ?? []).map((url) => ({
+        image_url: url,
+        preview_url: url,
+      })),
+    };
+  }
+
+  // 原图：一次签名，按下标保留与 rawPaths 的关联
+  const signedOriginals = await signer(rawPaths);
+  const kept: Array<{ path: string; imageUrl: string }> = [];
+  rawPaths.forEach((path, i) => {
+    const url = signedOriginals[i];
+    if (url) kept.push({ path, imageUrl: url });
   });
-  return signed;
+
+  if (kept.length === 0) {
+    return {
+      ...product,
+      thumbnail_url: product.image_url,
+      image_previews: (product.image_urls ?? []).map((url) => ({
+        image_url: url,
+        preview_url: url,
+      })),
+    };
+  }
+
+  // 缩略图：对保留下来的路径批量签一次（封面也在其中，不额外再签）
+  let thumbs: (string | null)[] = [];
+  try {
+    thumbs = await thumbnailSigner(kept.map((entry) => entry.path));
+  } catch {
+    thumbs = [];
+  }
+
+  const image_previews: StorefrontImagePreview[] = kept.map((entry, i) => ({
+    image_url: entry.imageUrl,
+    preview_url: thumbs[i] ?? entry.imageUrl,
+  }));
+
+  return {
+    ...product,
+    image_url: image_previews[0].image_url,
+    image_urls: image_previews.map((preview) => preview.image_url),
+    thumbnail_url: image_previews[0].preview_url,
+    image_previews,
+  };
 }
 
 /**
