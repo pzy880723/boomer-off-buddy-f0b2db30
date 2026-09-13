@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   ALLOWED_FOLDERS,
   MAX_FILE_BYTES,
+  MAX_MULTIPART_BYTES,
   PARCEL_MEDIA_BUCKET,
   REQUIRED_TENCENT_MEDIA_URL,
   buildObjectPath,
@@ -75,6 +76,38 @@ function form(bytes: Uint8Array, folder = "items", extra: Record<string, string>
   return fd;
 }
 
+/** 无 Content-Length 的 chunked 流式请求，可观察 cancel 与已拉取块数 */
+function streamingReq(
+  chunks: Uint8Array[],
+  opts: { token?: string; contentType?: string } = {},
+) {
+  let pulls = 0;
+  let cancelled = false;
+  const stream = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      if (pulls < chunks.length) {
+        controller.enqueue(chunks[pulls] as unknown as Uint8Array<ArrayBuffer>);
+        pulls += 1;
+      } else {
+        controller.close();
+      }
+    },
+    cancel() {
+      cancelled = true;
+    },
+  });
+  const headers = new Headers();
+  if (opts.token) headers.set("authorization", `Bearer ${opts.token}`);
+  if (opts.contentType) headers.set("content-type", opts.contentType);
+  const request = new Request("https://erp.example/api/internal/media/parcel-upload", {
+    method: "POST",
+    headers,
+    body: stream,
+    duplex: "half",
+  } as RequestInit & { duplex: "half" });
+  return { request, stats: () => ({ pulls, cancelled }) };
+}
+
 // ---------- 魔数识别 ----------
 test("detectImageType 只接受 jpeg/png/webp/gif，拒绝 SVG 与伪造 MIME", () => {
   assert.deepEqual(detectImageType(PNG), { mime: "image/png", ext: "png" });
@@ -132,6 +165,43 @@ test("单文件超过 8MiB 返回 413", async () => {
   assert.equal(res.status, 413);
   assert.deepEqual(await res.json(), { error: "file_too_large" });
   assert.deepEqual(calls, []);
+});
+
+// ---------- 流式总量上限（无 Content-Length / chunked） ----------
+test("无 Content-Length 的流超过 9MiB：读到超限立即取消，尚有后续 chunk，不调用 upload", async () => {
+  const big = new Uint8Array(MAX_MULTIPART_BYTES);
+  big.set(PNG.subarray(0, 8));
+  const trailing = new Uint8Array([1, 2, 3]);
+  const { deps, calls } = makeDeps();
+  // 5 个 chunk：若不取消会全部拉取（pulls=5）；超限取消后源立即停止补拉
+  const { request, stats } = streamingReq([PNG, big, trailing, trailing, trailing], {
+    token: "good",
+    contentType: "multipart/form-data; boundary=x",
+  });
+  const res = await handleParcelMediaUpload(request, deps);
+  assert.equal(res.status, 413);
+  assert.deepEqual(await res.json(), { error: "payload_too_large" });
+  assert.equal(stats().cancelled, true);
+  assert.ok(stats().pulls < 5, "超限即取消，后续 chunk 未被读取");
+  assert.deepEqual(calls, []);
+});
+
+test("无 Content-Length 的合法 multipart 流在限内可正常解析上传", async () => {
+  const reference = req(form(JPEG, "receive", { parcel_id: PARCEL }), { token: "good" });
+  const contentType = reference.headers.get("content-type");
+  assert.ok(contentType);
+  const bytes = new Uint8Array(await reference.arrayBuffer());
+  assert.ok(bytes.byteLength > 100 && bytes.byteLength <= MAX_MULTIPART_BYTES);
+  const { deps, calls } = makeDeps();
+  const { request } = streamingReq([bytes.subarray(0, 100), bytes.subarray(100)], {
+    token: "good",
+    contentType,
+  });
+  const res = await handleParcelMediaUpload(request, deps);
+  assert.equal(res.status, 200);
+  const body = (await res.json()) as { path: string };
+  assert.equal(body.path, `receive/${PARCEL}/${UUID}.jpg`);
+  assert.equal(calls.length, 1);
 });
 
 // ---------- 类型 / 路径 ----------

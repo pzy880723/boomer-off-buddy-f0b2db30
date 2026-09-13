@@ -74,6 +74,44 @@ function json(body: unknown, status: number): Response {
   return Response.json(body, { status });
 }
 
+/** 流式读取中超过多部分总量上限（已 cancel 底层 reader） */
+export class PayloadTooLargeError extends Error {}
+
+/**
+ * 流式读取请求体：逐块累加 byteLength，超过 MAX_MULTIPART_BYTES 立即 cancel
+ * （后续 chunk 不再拉取），绝不先把整包读进内存再校验。
+ */
+export async function readBodyWithLimit(request: Request): Promise<Uint8Array> {
+  const body = request.body;
+  if (!body) return new Uint8Array(0);
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_MULTIPART_BYTES) {
+        await reader.cancel().catch(() => undefined);
+        throw new PayloadTooLargeError("payload_too_large");
+      }
+      chunks.push(value);
+    }
+  } catch (err) {
+    if (err instanceof PayloadTooLargeError) throw err;
+    await reader.cancel().catch(() => undefined);
+    throw err;
+  }
+  const buf = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    buf.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return buf;
+}
+
 export async function handleParcelMediaUpload(
   request: Request,
   deps: ParcelMediaUploadDeps,
@@ -98,9 +136,23 @@ export async function handleParcelMediaUpload(
     return json({ error: "payload_too_large" }, 413);
   }
 
+  // 流式强制总量上限：无 Content-Length / chunked 也按实际字节拦截
+  let bodyBytes: Uint8Array;
+  try {
+    bodyBytes = await readBodyWithLimit(request);
+  } catch (err) {
+    if (err instanceof PayloadTooLargeError) return json({ error: "payload_too_large" }, 413);
+    return json({ error: "invalid_form" }, 400);
+  }
+
+  // 仅在限内缓冲完成后才做 multipart 解析
   let form: FormData;
   try {
-    form = await request.formData();
+    form = await new Request("https://parcel-media.invalid/upload", {
+      method: "POST",
+      headers: { "content-type": request.headers.get("content-type") ?? "" },
+      body: bodyBytes.byteLength > 0 ? (bodyBytes as unknown as BodyInit) : undefined,
+    }).formData();
   } catch {
     return json({ error: "invalid_form" }, 400);
   }
