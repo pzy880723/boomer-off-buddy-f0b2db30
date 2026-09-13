@@ -251,14 +251,14 @@ test("取消/退款优先覆盖门店履约状态", () => {
 /* -------------------------------- 图片 -------------------------------- */
 
 test("图源：快照优先，缺失回退 listing 首图/封面，未知为 null", () => {
-  assert.deepEqual(resolveItemImageRef({ id: "a", location_id: null, title_snapshot: null, image_snapshot: "https://c/a.jpg", unit_price: 0, quantity: 1, line_total: 0, listing_id: null }), { kind: "direct", value: "https://c/a.jpg" });
+  assert.deepEqual(resolveItemImageRef({ id: "a", location_id: null, title_snapshot: null, image_snapshot: "https://c/a.jpg", unit_price: 0, quantity: 1, line_total: 0, listing_id: null }), { kind: "path", value: "https://c/a.jpg" });
   assert.deepEqual(
     resolveItemImageRef({ id: "b", location_id: null, title_snapshot: null, image_snapshot: null, unit_price: 0, quantity: 1, line_total: 0, listing_id: null, listing: { image_paths: ["sku-listing/x/y.jpg"], cover_url: null } }),
     { kind: "path", value: "sku-listing/x/y.jpg" },
   );
   assert.deepEqual(
     resolveItemImageRef({ id: "c", location_id: null, title_snapshot: null, image_snapshot: "  ", unit_price: 0, quantity: 1, line_total: 0, listing_id: null, listing: { image_paths: [], cover_url: "https://c/cover.jpg" } }),
-    { kind: "direct", value: "https://c/cover.jpg" },
+    { kind: "path", value: "https://c/cover.jpg" },
   );
   assert.equal(
     resolveItemImageRef({ id: "d", location_id: null, title_snapshot: null, image_snapshot: null, unit_price: 0, quantity: 1, line_total: 0, listing_id: null }),
@@ -425,7 +425,7 @@ test("图源回退链补到关联 SKU（inv_skus.image_paths / image_url）", ()
   );
   assert.deepEqual(
     resolveItemImageRef({ ...base, sku: { image_paths: [], image_url: "https://cdn/s.jpg" } }),
-    { kind: "direct", value: "https://cdn/s.jpg" },
+    { kind: "path", value: "https://cdn/s.jpg" },
   );
   assert.deepEqual(
     resolveItemImageRef({ ...base, listing: { image_paths: [], cover_url: null, sku: { image_paths: ["sku-listing/l.jpg"] } } }),
