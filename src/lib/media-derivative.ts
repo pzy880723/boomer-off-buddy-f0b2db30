@@ -105,27 +105,33 @@ export function parseStorageRef(
 
 /**
  * 解码后的路径二次校验（fail-closed）：
- * 拒绝 `..`（含 %2e%2e 等编码形态解码后的结果）、反斜杠、
- * 段内隐藏的 `/`（%2f 编码斜杠）与空段。
+ * 拒绝 `..`（含 %2e%2e 等编码形态解码后的结果）、反斜杠与空段。
  */
 function sanitizeDecodedPath(path: string): string | null {
   if (!path || path.includes("..") || path.includes("\\")) return null;
-  const segments = path.split("/");
-  if (segments.some((s) => !s || s.includes("/") || s.includes("\\"))) return null;
+  if (path.split("/").some((s) => !s)) return null;
   return path;
 }
 
-function decodeSegments(path: string): string {
-  return path
-    .split("/")
-    .map((part) => {
-      try {
-        return decodeURIComponent(part);
-      } catch {
-        return part;
-      }
-    })
-    .join("/");
+/**
+ * 逐段解码并校验：段解码后若含 `/`（%2f 编码斜杠）、`\`、或为 `..`/空段，
+ * 整路径拒绝（返回 null）。逐段校验才能识破 "a%2fb" 这种隐藏分隔符。
+ */
+function decodeSegments(path: string): string | null {
+  const out: string[] = [];
+  for (const part of path.split("/")) {
+    let decoded: string;
+    try {
+      decoded = decodeURIComponent(part);
+    } catch {
+      decoded = part;
+    }
+    if (!decoded || decoded === "." || decoded === ".." || decoded.includes("/") || decoded.includes("\\")) {
+      return null;
+    }
+    out.push(decoded);
+  }
+  return out.join("/");
 }
 
 function encodeSegments(path: string): string {
