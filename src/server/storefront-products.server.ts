@@ -1,5 +1,14 @@
 import { supabaseAdmin } from "../integrations/supabase/client.server";
-import { signSkuImagePaths, signSkuThumbnailPaths } from "../lib/sku-image-resolver.server";
+import { signSkuImagePaths } from "../lib/sku-image-resolver.server";
+import { DERIVATIVE_WIDTHS, signDerivativeUrls } from "./media-derivative.server";
+
+/** 列表 / 购物车 / 订单默认展示图：真实 480px 衍生图，失败为 null（不回退原图）。 */
+export const thumbnailDerivativeSigner = (paths: readonly string[]) =>
+  signDerivativeUrls(paths, DERIVATIVE_WIDTHS.thumbnail);
+
+/** 详情轮播与放大预览：真实 960px 衍生图，失败为 null（不回退原图）。 */
+export const previewDerivativeSigner = (paths: readonly string[]) =>
+  signDerivativeUrls(paths, DERIVATIVE_WIDTHS.preview);
 
 export type StorefrontProductQuery = {
   q: string | null;
@@ -81,7 +90,7 @@ export async function signStorefrontProductImages(
   options: { thumbnail?: boolean; signer?: ImageSigner; thumbnailSigner?: ImageSigner } = {},
 ): Promise<StorefrontProduct[]> {
   const signer = options.signer ?? signSkuImagePaths;
-  const thumbnailSigner = options.thumbnailSigner ?? signSkuThumbnailPaths;
+  const thumbnailSigner = options.thumbnailSigner ?? thumbnailDerivativeSigner;
   const pageListings = products.map(
     (product) =>
       listingsById.get(product.id) ?? {
@@ -102,7 +111,10 @@ export async function signStorefrontProductImages(
       },
   );
   const resolved = await resolveStorefrontListingsImagesBatch(pageListings, signer);
-  const coverPaths = resolved.map((listing) => (listing.image_paths ?? []).find(Boolean) ?? "");
+  // 封面衍生图来源：优先原始存储路径，其次历史绝对 URL（由衍生签名器自行解回安全 bucket/path）
+  const coverPaths = pageListings.map(
+    (listing) => (listing.image_paths ?? []).find(Boolean) ?? listing.cover_url ?? "",
+  );
   let thumbs: (string | null)[] = [];
   if (options.thumbnail) {
     try {
@@ -117,7 +129,8 @@ export async function signStorefrontProductImages(
     const image_urls = listing.image_urls ?? product.image_urls;
     const base = { ...product, image_url, image_urls };
     if (!options.thumbnail) return base;
-    return { ...base, thumbnail_url: thumbs[i] ?? image_url };
+    // 衍生图不可用时为 null：前端占位，绝不让原图冒充缩略图
+    return { ...base, thumbnail_url: thumbs[i] ?? null };
   });
 }
 
@@ -220,30 +233,31 @@ export function buildStorefrontProduct(input: {
 }
 
 export type StorefrontImagePreview = {
-  /** 与原图一一对应的签名原图 URL */
+  /** 与原图一一对应的签名原图 URL（仅供用户主动“查看原图”使用） */
   image_url: string;
-  /** 轻量预览 URL；缩略图不可用时回退为同一张原图 URL */
-  preview_url: string;
+  /** 960px 压缩预览 URL；无法生成衍生图时为 null（前端占位，绝不回退原图） */
+  preview_url: string | null;
 };
 
 /**
  * 详情页单商品装配：先 signImages:false 富化并确认可售（stock >= 1），
- * 再只对这一个商品签一次原图 + 一次缩略图。
+ * 再对这一个商品签一次原图 + 一次 960 预览 + 一次 480 缩略图。
  *
  * 关键不变量：
- * - 原图只签一次，且按“原始路径下标”保留 path → signed URL 关联；
- *   中间某张原图签名失败（null）只丢弃那一张，绝不把过滤后的 URL 与未过滤路径错位拉链。
- * - 缩略图对所有仍有原图 URL 的路径批量签一次（含封面，不重复签），
- *   单张失败 / 外链 / 未知前缀各自独立回退到对应原图 URL。
- * - image_url / image_urls / 顺序 / 数量 / 库存 / 价格契约不变；
- *   thumbnail_url 保持等于 image_previews[0].preview_url。
+ * - 原图只签一次，按“原始路径下标”保留 path → signed URL 关联，中间失败只丢那一张。
+ * - preview_url 与 image_previews[i].image_url 一一对应，且必须是真实缩放结果；
+ *   任何转换失败返回 null，绝不用原图冒充。
+ * - image_url / image_urls / 顺序 / 数量 / 库存 / 价格契约不变（原图仅供主动查看原图）。
  * 不可售（无 SKU / stock < 1）返回 null，由路由映射为 404。
  */
 export async function buildStorefrontProductDetail(
   listing: StorefrontListing,
   options: {
     signer?: ImageSigner;
+    /** 960px 预览签名器 */
     thumbnailSigner?: ImageSigner;
+    /** 480px 缩略图签名器（列表/购物车同一档位） */
+    coverThumbnailSigner?: ImageSigner;
     /** 测试注入用：默认 enrichStorefrontListings(signImages:false) */
     enrich?: (
       listings: StorefrontListing[],
@@ -263,16 +277,32 @@ export async function buildStorefrontProductDetail(
   if (!product || product.stock < 1) return null;
 
   const signer = options.signer ?? signSkuImagePaths;
-  const thumbnailSigner = options.thumbnailSigner ?? signSkuThumbnailPaths;
+  const previewSigner = options.thumbnailSigner ?? previewDerivativeSigner;
+  const coverSigner =
+    options.coverThumbnailSigner ?? options.thumbnailSigner ?? thumbnailDerivativeSigner;
+
+  const safeSign = async (signFn: ImageSigner, values: readonly string[]) => {
+    if (values.length === 0) return [] as (string | null)[];
+    try {
+      return await signFn(values);
+    } catch {
+      return [] as (string | null)[];
+    }
+  };
 
   const rawPaths = (listing.image_paths ?? []).filter(Boolean);
+
+  // 无存储路径：只能用历史绝对 URL 作为衍生源（能解回本项目/腾讯存储才有衍生图，否则 null）
   if (rawPaths.length === 0) {
+    const originals = product.image_urls ?? [];
+    const previews = await safeSign(previewSigner, originals);
+    const covers = await safeSign(coverSigner, originals.slice(0, 1));
     return {
       ...product,
-      thumbnail_url: product.image_url,
-      image_previews: (product.image_urls ?? []).map((url) => ({
+      thumbnail_url: covers[0] ?? null,
+      image_previews: originals.map((url, i) => ({
         image_url: url,
-        preview_url: url,
+        preview_url: previews[i] ?? null,
       })),
     };
   }
@@ -286,34 +316,33 @@ export async function buildStorefrontProductDetail(
   });
 
   if (kept.length === 0) {
+    const originals = product.image_urls ?? [];
+    const previews = await safeSign(previewSigner, originals);
+    const covers = await safeSign(coverSigner, originals.slice(0, 1));
     return {
       ...product,
-      thumbnail_url: product.image_url,
-      image_previews: (product.image_urls ?? []).map((url) => ({
+      thumbnail_url: covers[0] ?? null,
+      image_previews: originals.map((url, i) => ({
         image_url: url,
-        preview_url: url,
+        preview_url: previews[i] ?? null,
       })),
     };
   }
 
-  // 缩略图：对保留下来的路径批量签一次（封面也在其中，不额外再签）
-  let thumbs: (string | null)[] = [];
-  try {
-    thumbs = await thumbnailSigner(kept.map((entry) => entry.path));
-  } catch {
-    thumbs = [];
-  }
+  const keptPaths = kept.map((entry) => entry.path);
+  const previews = await safeSign(previewSigner, keptPaths);
+  const covers = await safeSign(coverSigner, keptPaths.slice(0, 1));
 
   const image_previews: StorefrontImagePreview[] = kept.map((entry, i) => ({
     image_url: entry.imageUrl,
-    preview_url: thumbs[i] ?? entry.imageUrl,
+    preview_url: previews[i] ?? null,
   }));
 
   return {
     ...product,
     image_url: image_previews[0].image_url,
     image_urls: image_previews.map((preview) => preview.image_url),
-    thumbnail_url: image_previews[0].preview_url,
+    thumbnail_url: covers[0] ?? null,
     image_previews,
   };
 }

@@ -97,13 +97,29 @@ export async function buildPublicShops(
     .sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
 }
 
-/** 生产签名器：service-role 对私桶批量签短期 URL；失败返回 null，不抛。 */
+/**
+ * 生产签名器：service-role 对私桶签短期 **480px 衍生图**（transform）。
+ * 批量接口不支持 transform，故逐张签（门店数量很小）；失败返回 null，不抛，也不回退原图。
+ */
 export async function signShopImages(paths: readonly string[]): Promise<(string | null)[]> {
   if (paths.length === 0) return [];
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data, error } = await supabaseAdmin.storage
-    .from(SHOP_IMAGE_BUCKET)
-    .createSignedUrls(paths as string[], SHOP_IMAGE_TTL);
-  if (error || !data) return paths.map(() => null);
-  return data.map((row) => row?.signedUrl ?? null);
+  const { DERIVATIVE_WIDTHS } = await import("./media-derivative.server");
+  return Promise.all(
+    paths.map(async (path) => {
+      const clean = String(path ?? "").trim();
+      if (!clean || clean.includes("..")) return null;
+      try {
+        const { data, error } = await supabaseAdmin.storage
+          .from(SHOP_IMAGE_BUCKET)
+          .createSignedUrl(clean, SHOP_IMAGE_TTL, {
+            transform: { width: DERIVATIVE_WIDTHS.thumbnail, resize: "contain", quality: 75 },
+          });
+        if (error || !data?.signedUrl) return null;
+        return data.signedUrl;
+      } catch {
+        return null;
+      }
+    }),
+  );
 }

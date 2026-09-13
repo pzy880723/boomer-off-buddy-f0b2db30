@@ -201,7 +201,7 @@ describe("storefront product detail handler", () => {
     assert.equal(product.stock, 1);
   });
 
-  test("falls back to the original image when thumbnail signing fails", async () => {
+  test("returns null (never the original) when derivative signing fails", async () => {
     const product = await buildStorefrontProductDetail(listing, {
       enrich: enrichAvailable,
       signer: async (paths) => paths.map((path) => `https://signed.test/${path}`),
@@ -212,7 +212,11 @@ describe("storefront product detail handler", () => {
 
     assert.ok(product);
     assert.equal(product.image_url, "https://signed.test/sku-listing/detail-front.png");
-    assert.equal(product.thumbnail_url, "https://signed.test/sku-listing/detail-front.png");
+    assert.equal(product.thumbnail_url, null);
+    assert.deepEqual(
+      product.image_previews.map((preview) => preview.preview_url),
+      [null],
+    );
   });
 
   test("returns null for out-of-stock or missing products so the route answers 404", async () => {
@@ -291,7 +295,8 @@ describe("storefront detail image_previews contract", () => {
 
     assert.ok(product);
     assert.equal(originalCalls, 1);
-    assert.equal(thumbCalls, 1);
+    // 两次：一次 960 预览（整组），一次 480 封面缩略图
+    assert.equal(thumbCalls, 2);
     assert.equal(product.image_previews.length, 3);
     assert.deepEqual(
       product.image_previews.map((preview) => preview.image_url),
@@ -340,7 +345,7 @@ describe("storefront detail image_previews contract", () => {
     ]);
   });
 
-  test("falls back per image when thumbnails fail individually or entirely", async () => {
+  test("yields null preview per image when derivatives fail individually or entirely", async () => {
     const partial = await buildStorefrontProductDetail(threePhotoListing, {
       enrich: enrichFor(threePhotoListing),
       signer: async (paths) => paths.map((path) => `https://signed.test/${path}`),
@@ -352,7 +357,7 @@ describe("storefront detail image_previews contract", () => {
       partial.image_previews.map((preview) => preview.preview_url),
       [
         "https://thumb.test/480/sku-listing/a-front.png",
-        "https://signed.test/sku-listing/b-side.png",
+        null,
         "https://thumb.test/480/sku-listing/c-back.png",
       ],
     );
@@ -367,12 +372,17 @@ describe("storefront detail image_previews contract", () => {
     assert.ok(allFailed);
     assert.deepEqual(
       allFailed.image_previews.map((preview) => preview.preview_url),
-      allFailed.image_previews.map((preview) => preview.image_url),
+      [null, null, null],
     );
-    assert.equal(allFailed.thumbnail_url, allFailed.image_previews[0].image_url);
+    assert.equal(allFailed.thumbnail_url, null);
+    assert.deepEqual(allFailed.image_urls, [
+      "https://signed.test/sku-listing/a-front.png",
+      "https://signed.test/sku-listing/b-side.png",
+      "https://signed.test/sku-listing/c-back.png",
+    ]);
   });
 
-  test("passes external URLs through with independent preview fallback", async () => {
+  test("external URLs get no preview (null), storage paths still get a derivative", async () => {
     const externalListing: StorefrontListing = {
       ...threePhotoListing,
       id: "listing-external",
@@ -390,7 +400,7 @@ describe("storefront detail image_previews contract", () => {
     assert.deepEqual(product.image_previews, [
       {
         image_url: "https://cdn.example.test/a.jpg",
-        preview_url: "https://cdn.example.test/a.jpg",
+        preview_url: null,
       },
       {
         image_url: "https://signed.test/sku-listing/b-side.png",

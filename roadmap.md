@@ -35,3 +35,10 @@
 - [x] 公开门店清单只读接口 GET /api/public/storefront/shops（字段白名单、私桶短期签名、缺图容错；hours/coords 暂 null）
 
 - [x] 订单详情引用兼容（2026-09-13）：GET /api/public/storefront/orders/{reference} 支持 UUID / BO 订单号 / 32位hex merchant_order_no，严格按 customer_id 限定，统一 404，不泄漏支付快照
+
+## 消费者端统一压缩衍生图（2026-09-13）
+- [x] media-derivative：已知存储地址（bucket/path、本项目与腾讯 storage 绝对 URL）解回安全 ref，失败 null 不回退原图
+- [x] 商品列表 thumbnail_url=480、详情 image_previews.preview_url=960（原图仅供主动查看原图）
+- [x] 订单列表 / 订单详情 image_snapshot / 门店图改真实衍生图或 null
+- [ ] 客服上下文商品图（本仓无该字段，待 Codex 腾讯分支接入同一签名器）
+- [ ] 微信头像等外域图：无安全转换方案，仍由小程序自行处理
