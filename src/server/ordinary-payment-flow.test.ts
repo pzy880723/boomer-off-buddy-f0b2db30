@@ -45,6 +45,25 @@ test('query original merchant order before first create; return no private snaps
   assert.equal(result.payment.id, 'p1'); assert.equal(result.payment_payload.package, 'prepay_id=prepay');
   assert.equal('merchant_snapshot' in result.payment, false); assert.equal('payer_openid' in result.payment, false);
 });
+test('both WeChat not-found codes continue to first create with full payload', async () => {
+  for (const code of ['ORDERNOTEXIST', 'ORDER_NOT_EXIST']) {
+    const f = fixture();
+    f.client.queryPayment = async () => { throw Object.assign(new Error('not found'), { code }); };
+    const result = await startOrdinaryPayment(f.deps, f.input);
+    assert.deepEqual(f.calls, ['commerce_prepare_ordinary_payment', 'query', 'create', 'commerce_record_ordinary_prepay']);
+    assert.equal(result.payment_payload.package, 'prepay_id=prepay');
+    assert.equal(result.payment_payload.paySign, 'signature');
+    assert.equal(result.payment.status, 'processing');
+  }
+});
+test('other error codes never continue to create', async () => {
+  for (const code of ['INVALID_TRANSACTIONID', 'SIGN_ERROR', 'SYSTEMERROR', 'PARAM_ERROR']) {
+    const f = fixture();
+    f.client.queryPayment = async () => { throw Object.assign(new Error('wechat error'), { code }); };
+    await assert.rejects(startOrdinaryPayment(f.deps, f.input), /wechat error/);
+    assert.deepEqual(f.calls, ['commerce_prepare_ordinary_payment', 'query']);
+  }
+});
 test('unknown query never creates or releases inventory', async () => {
   const f = fixture(); f.client.queryPayment = async () => { throw new Error('timeout'); };
   await assert.rejects(startOrdinaryPayment(f.deps, f.input), /timeout/);
