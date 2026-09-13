@@ -14,6 +14,7 @@ import {
   DERIVATIVE_RESIZE,
   DERIVATIVE_WIDTHS,
   buildTencentDerivativeUrl,
+  isAllowedDerivativeWidth,
   parseStorageRef,
   type StorageRef,
 } from "@/lib/media-derivative";
@@ -28,6 +29,12 @@ export type DerivativeDeps = {
   signPrimary?: (ref: StorageRef, width: number) => Promise<string | null>;
   primaryOrigin?: string | null;
   tencentOrigin?: string | null;
+  /**
+   * 腾讯 render/image/public 衍生能力是否已在腾讯现场实测验证。
+   * 未显式置 true（或 env TENCENT_MEDIA_RENDER_VERIFIED=true）时，
+   * 腾讯 ref 一律返回 null —— 构造的 URL 未经实测不得当作真实衍生图下发。
+   */
+  tencentRenderVerified?: boolean;
 };
 
 function primaryOriginFromEnv(): string | null {
