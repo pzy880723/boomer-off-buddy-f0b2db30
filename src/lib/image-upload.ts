@@ -109,6 +109,10 @@ export async function uploadParcelImage(
 ): Promise<string> {
   const BUCKET = "parcel-item-images";
   const { blob, ext, mime } = await compressImage(file, (file as File).name);
+  if (tencentMediaUploadsEnabled()) {
+    // 开关打开：走腾讯 COS-backed Storage，失败直接抛错，不回退 Lovable
+    return await uploadParcelBlobViaTencent(blob, folder, parcelId ?? null);
+  }
   const sub = parcelId ? `${folder}/${parcelId}` : folder;
   const path = `${sub}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
   const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
