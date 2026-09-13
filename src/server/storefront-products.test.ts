@@ -376,7 +376,7 @@ describe("storefront detail image_previews contract", () => {
     assert.equal(allFailed.thumbnail_url, allFailed.image_previews[0].image_url);
   });
 
-  test("passes external URLs through with independent preview fallback", async () => {
+  test("external URLs get no preview (null), storage paths still get a derivative", async () => {
     const externalListing: StorefrontListing = {
       ...threePhotoListing,
       id: "listing-external",
@@ -394,7 +394,7 @@ describe("storefront detail image_previews contract", () => {
     assert.deepEqual(product.image_previews, [
       {
         image_url: "https://cdn.example.test/a.jpg",
-        preview_url: "https://cdn.example.test/a.jpg",
+        preview_url: null,
       },
       {
         image_url: "https://signed.test/sku-listing/b-side.png",
