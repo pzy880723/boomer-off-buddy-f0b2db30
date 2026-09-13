@@ -76,9 +76,12 @@ export async function signDerivativeUrls(
 ): Promise<(string | null)[]> {
   const out: (string | null)[] = new Array(values.length).fill(null);
   if (values.length === 0) return out;
+  // 宽度 fail-closed：只放行固定档位，其余一律全 null 且不发起任何签名/构造。
+  if (!isAllowedDerivativeWidth(width)) return out;
 
   const primaryOrigin = deps.primaryOrigin ?? primaryOriginFromEnv();
   const tencentOrigin = deps.tencentOrigin ?? tencentOriginFromEnv();
+  const tencentRenderVerified = deps.tencentRenderVerified ?? tencentRenderVerifiedFromEnv();
   const signPrimary = deps.signPrimary ?? defaultSignPrimary;
 
   const jobs = new Map<string, { ref: StorageRef; idxs: number[] }>();
@@ -86,6 +89,8 @@ export async function signDerivativeUrls(
     const ref = parseStorageRef(value, { primary: primaryOrigin, tencent: tencentOrigin });
     if (!ref) return;
     if (ref.origin === "tencent") {
+      // 腾讯 render 能力未经实测验证前，绝不下发构造 URL。
+      if (!tencentRenderVerified) return;
       out[idx] = buildTencentDerivativeUrl(ref, width, tencentOrigin);
       return;
     }
