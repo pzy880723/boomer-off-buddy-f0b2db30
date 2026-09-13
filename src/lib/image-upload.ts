@@ -1,5 +1,9 @@
 // 客户端图片压缩 + 上传工具（提取自 item-image-uploader，供 /m 和 /store 复用）
 import { supabase } from "@/integrations/supabase/client";
+import {
+  tencentMediaUploadsEnabled,
+  uploadParcelBlobViaTencent,
+} from "@/lib/tencent-media-upload";
 
 const MAX_DIM = 1280;
 const QUALITY = 0.78;
