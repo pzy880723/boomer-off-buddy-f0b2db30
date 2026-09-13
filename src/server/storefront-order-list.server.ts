@@ -354,3 +354,70 @@ export async function selectOrdersPage(
     nextCursor: hasMore && lastRow ? encodeOrderCursor(lastRow) : null,
   };
 }
+
+/* -------------------------------- images ------------------------------- */
+
+export type ImageRef =
+  | { kind: "direct"; value: string }
+  | { kind: "path"; value: string }
+  | null;
+
+function classifyImageValue(raw: unknown): ImageRef {
+  const value = typeof raw === "string" ? raw.trim() : "";
+  if (!value) return null;
+  if (/^https?:\/\//i.test(value) || value.startsWith("data:")) return { kind: "direct", value };
+  if (value.includes("/")) return { kind: "path", value };
+  return null;
+}
+
+/** 单条明细的图源：image_snapshot 优先，缺失回退关联 listing 的首图 / 封面。 */
+export function resolveItemImageRef(item: OrderItemRow): ImageRef {
+  const snapshot = classifyImageValue(item.image_snapshot);
+  if (snapshot) return snapshot;
+  const paths = item.listing?.image_paths;
+  if (Array.isArray(paths)) {
+    for (const p of paths) {
+      const ref = classifyImageValue(p);
+      if (ref) return ref;
+    }
+  }
+  return classifyImageValue(item.listing?.cover_url ?? null);
+}
+
+/** 拍平整页所有明细的图源，返回 itemId→ref 与需要签名的去重路径列表。 */
+export function collectImageRefs(orders: readonly OrderRow[]): {
+  refs: Map<string, ImageRef>;
+  paths: string[];
+} {
+  const refs = new Map<string, ImageRef>();
+  const seen = new Set<string>();
+  const paths: string[] = [];
+  for (const order of orders) {
+    for (const item of order.items ?? []) {
+      const ref = resolveItemImageRef(item);
+      refs.set(item.id, ref);
+      if (ref?.kind === "path" && !seen.has(ref.value)) {
+        seen.add(ref.value);
+        paths.push(ref.value);
+      }
+    }
+  }
+  return { refs, paths };
+}
+
+/** 把批量签名结果回填成 itemId→URL；签名失败为 null（前端占位，不泄露路径）。 */
+export function buildImageMap(
+  refs: Map<string, ImageRef>,
+  paths: readonly string[],
+  signed: readonly (string | null)[],
+): Map<string, string | null> {
+  const byPath = new Map<string, string | null>();
+  paths.forEach((p, i) => byPath.set(p, signed[i] ?? null));
+  const out = new Map<string, string | null>();
+  for (const [itemId, ref] of refs) {
+    if (!ref) out.set(itemId, null);
+    else if (ref.kind === "direct") out.set(itemId, ref.value);
+    else out.set(itemId, byPath.get(ref.value) ?? null);
+  }
+  return out;
+}
