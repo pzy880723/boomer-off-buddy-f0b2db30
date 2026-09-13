@@ -1,44 +1,35 @@
-# ERP APP 首页操作迁移 + 统一消息 首版
+# Roadmap
 
-- [ ] A 消息：notifications 权限/分页/按人已读（is_read、action_status、location_name、ref_type/ref_id）、单条已读、read-all 持久化、dashboard 未读同口径
-- [ ] B 客服：support_conversations/messages/participants/agents，共享接待（无独占）、internal 备注、handheld + storefront 双向 API、/customer-service Web 模块
-- [ ] C 履约：session 权限修正、format=items、resolve?code=、ticket 出票、pick-scan 支持 fulfillment_item_id + 数量、shortage 申报与客户确认、complete 阻塞
-- [ ] D 打印队列：print_jobs（fulfillment_id+ticket_type 唯一）、lease/ack/failed/unknown、paid 触发入队
-- [ ] E 面单：只暴露 capability 状态，未配置返回 carrier_not_configured，不伪造 tracking
-- [ ] OpenAPI 更新 + 测试
+## 当前闭环：缺货申报 → 客户确认 → 自动原路退款（v1）
 
-## 首版进度（2026-09-06）
-- [x] A 消息中心：可见范围过滤 + 分页 + 按人已读 + dashboard 同口径
-- [x] B 客服共享会话：员工/顾客 API + /customer-service Web 工作台
-- [x] C 履约：session 权限、format=items、resolve、ticket、按行扫码、缺货阻断完成
-- [x] D 打印任务队列：自动出票、设备互斥租约、ack/failed/unknown
-- [ ] E 面单：仅能力状态 carrier_not_configured，待真实快递商户资质后接入
-- [x] OpenAPI v1.11 + 契约测试 + 事务内数据库回归
+约束：本轮严禁真实短信发送、真实订单退款、客户数据批量写入、腾讯部署；worker/业务短信生产开关默认关闭；旧缺货不自动批处理；不得破坏旧腾讯版。
 
-## 门店日目标 / 线下补录（2026-09-07）
-- [x] 迁移：store_monthly_target_plans / store_daily_targets / store_target_audit_logs / store_offline_sales_entries / store_offline_sales_audit_logs / go_identity_links（含 GRANT + RLS）
-- [x] 月目标→日目标拆分算法（整数分、精确合计、周末/单日权重、过期与锁定日不重算、未达标不摊余）+ 24 项单测
-- [x] 日汇总口径（Asia/Shanghai、已付款毛额-运费、incomplete 原因）
-- [x] handheld API：/store/daily-summary、/store/offline-sales（GET/POST 幂等）；OpenAPI 1.15.0
-- [x] ERP 后台 /shop-mgmt/targets 配置页（HQ 可写，店员只读）
-- [ ] GO(bef32724) Supabase JWT ↔ ERP 身份/门店桥接：仅落 go_identity_links 登记表，验签与换票未实现
-- [ ] 有赞订单同步中断修复（Worker 超时自动重置，自 08-29 无新订单）
-- [ ] 有赞退款数据源接入（当前一律 incomplete）
+- [ ] 1. 只读核对：现有 shortages / after_sales / refunds / payments / notifications / 发货事务 / TC3 短信
+- [ ] 2. 迁移：客户通知表、短信 outbox（业务模板）、退款意图/任务表、refund 状态 CHECK 扩展、报价版本与分摊字段；含 GRANT
+- [ ] 3. 缺货申报事务（原子锁定可申报数量 + 待办 + 通知 + 短信 outbox）
+- [ ] 4. 客户确认事务（归属 + 报价版本 + 唯一退款意图 + 持久退款任务）
+- [ ] 5. 退款 worker（原支付通道、相同商户退款号、租约、未知先查；默认关闭）
+- [ ] 6. 门店子单详情 + 手工发货（快递公司/单号/数量）+ 缺货申报入口（ERP UI，按 Figma 25:2）
+- [ ] 7. 客户端 API：shortages 列表/详情/confirm-refund、notifications 列表/已读
+- [ ] 8. 金额分摊：按实付分摊、整数分尾差固定、并发上限、整组未发货才退该组运费
+- [ ] 9. docs/shortage-refund-contract-v1.md 字段合同
+- [ ] 10. 红绿测试 + 类型检查 + schema 权限检查证据
 
-## 销售仪表盘后端（2026-09-07）
-- [x] sales_dashboard_report 聚合 RPC（净销售/渠道/趋势/待办，Asia/Shanghai）
-- [x] src/lib/sales-dashboard.functions.ts + 授权（HQ 全部/单店，店员限授权门店）
-- [x] 契约测试（区间解析、AOV、warning 不造 0）
+## 待办（阻塞在用户侧）
+- 腾讯业务短信模板配置、worker 生产开关开启、腾讯部署（由 Codex 验收）
 
-- [x] 公共商品列表性能补丁：分页后签名、桶级批量、thumbnail_url、taxonomy 5min 缓存 + 单测（不发布腾讯）
+## 已挂起（不在本轮）
+- GO 本人 JWT 线下补录合同（设计已修订，等批准）
+- 有赞凭据在腾讯侧恢复（需用户手工注入）
 
-- [x] 公开门店清单只读接口 GET /api/public/storefront/shops（字段白名单、私桶短期签名、缺图容错；hours/coords 暂 null）
+## v1 已落地（commit 4094c70 / 9e20880）
+- [x] 迁移 0000_shortage_refund_v1 + 0001_shortage_refund_revoke_anon（已应用）
+- [x] RPC shortage_report_v1 / shortage_confirm_refund_v1（仅 service_role）
+- [x] 客户端四个接口 + Case 合同 + 通知已读
+- [x] ERP 页面 /orders/fulfillment/$orderId（手工发货 + 缺货申报）
+- [x] docs/shortage-refund-contract-v1.md
 
-- [x] 订单详情引用兼容（2026-09-13）：GET /api/public/storefront/orders/{reference} 支持 UUID / BO 订单号 / 32位hex merchant_order_no，严格按 customer_id 限定，统一 404，不泄漏支付快照
-
-## 消费者端统一压缩衍生图（2026-09-13）
-- [x] media-derivative：已知存储地址（bucket/path、本项目与腾讯 storage 绝对 URL）解回安全 ref，失败 null 不回退原图
-- [x] 商品列表 thumbnail_url=480、详情 image_previews.preview_url=960（原图仅供主动查看原图）
-- [x] 订单列表 / 订单详情 image_snapshot / 门店图改真实衍生图或 null
-- [ ] 客服上下文商品图（本仓无该字段，待 Codex 腾讯分支接入同一签名器）
-- [ ] 微信头像等外域图：无安全转换方案，仍由小程序自行处理
+## 仍未开启（阻塞项）
+- [ ] 退款执行 worker（消费 commerce_refund_intents）— 生产开关默认关闭，未实现执行器
+- [ ] 腾讯业务短信模板配置（shortage_reported 等）— outbox 记 template_missing
+- [ ] 腾讯生产部署（由 Codex 单独验收）

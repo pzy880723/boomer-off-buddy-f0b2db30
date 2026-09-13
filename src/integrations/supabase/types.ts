@@ -471,6 +471,67 @@ export type Database = {
           },
         ]
       }
+      commerce_customer_notifications: {
+        Row: {
+          body: string
+          created_at: string
+          customer_id: string
+          dedupe_key: string | null
+          id: string
+          kind: string
+          order_id: string | null
+          read_at: string | null
+          shortage_id: string | null
+          title: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          customer_id: string
+          dedupe_key?: string | null
+          id?: string
+          kind?: string
+          order_id?: string | null
+          read_at?: string | null
+          shortage_id?: string | null
+          title: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          customer_id?: string
+          dedupe_key?: string | null
+          id?: string
+          kind?: string
+          order_id?: string | null
+          read_at?: string | null
+          shortage_id?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_customer_notifications_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_customer_notifications_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_customer_notifications_shortage_id_fkey"
+            columns: ["shortage_id"]
+            isOneToOne: false
+            referencedRelation: "fulfillment_shortages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commerce_customers: {
         Row: {
           avatar_url: string | null
@@ -1544,6 +1605,121 @@ export type Database = {
           },
         ]
       }
+      commerce_refund_intents: {
+        Row: {
+          after_sale_id: string | null
+          amount_fen: number
+          attempts: number
+          created_at: string
+          customer_id: string
+          goods_fen: number
+          id: string
+          idempotency_key: string
+          last_error: string | null
+          lease_expires_at: string | null
+          lease_token: string | null
+          next_attempt_at: string
+          order_id: string
+          payment_id: string
+          quote_version: string
+          refund_id: string | null
+          shipping_fen: number
+          shortage_id: string
+          state: string
+          succeeded_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          after_sale_id?: string | null
+          amount_fen: number
+          attempts?: number
+          created_at?: string
+          customer_id: string
+          goods_fen?: number
+          id?: string
+          idempotency_key: string
+          last_error?: string | null
+          lease_expires_at?: string | null
+          lease_token?: string | null
+          next_attempt_at?: string
+          order_id: string
+          payment_id: string
+          quote_version: string
+          refund_id?: string | null
+          shipping_fen?: number
+          shortage_id: string
+          state?: string
+          succeeded_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          after_sale_id?: string | null
+          amount_fen?: number
+          attempts?: number
+          created_at?: string
+          customer_id?: string
+          goods_fen?: number
+          id?: string
+          idempotency_key?: string
+          last_error?: string | null
+          lease_expires_at?: string | null
+          lease_token?: string | null
+          next_attempt_at?: string
+          order_id?: string
+          payment_id?: string
+          quote_version?: string
+          refund_id?: string | null
+          shipping_fen?: number
+          shortage_id?: string
+          state?: string
+          succeeded_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_refund_intents_after_sale_id_fkey"
+            columns: ["after_sale_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_after_sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_refund_intents_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_refund_intents_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_refund_intents_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_refund_intents_refund_id_fkey"
+            columns: ["refund_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_refunds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_refund_intents_shortage_id_fkey"
+            columns: ["shortage_id"]
+            isOneToOne: true
+            referencedRelation: "fulfillment_shortages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commerce_refunds: {
         Row: {
           after_sale_id: string | null
@@ -1634,6 +1810,94 @@ export type Database = {
             columns: ["payment_id"]
             isOneToOne: false
             referencedRelation: "commerce_payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commerce_sms_outbox: {
+        Row: {
+          attempts: number
+          created_at: string
+          customer_id: string | null
+          dedupe_key: string | null
+          id: string
+          last_error: string | null
+          lease_expires_at: string | null
+          lease_token: string | null
+          order_id: string | null
+          params: Json
+          phone: string
+          provider_code: string | null
+          provider_message: string | null
+          provider_serial: string | null
+          sent_at: string | null
+          shortage_id: string | null
+          status: string
+          template_key: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          customer_id?: string | null
+          dedupe_key?: string | null
+          id?: string
+          last_error?: string | null
+          lease_expires_at?: string | null
+          lease_token?: string | null
+          order_id?: string | null
+          params?: Json
+          phone: string
+          provider_code?: string | null
+          provider_message?: string | null
+          provider_serial?: string | null
+          sent_at?: string | null
+          shortage_id?: string | null
+          status?: string
+          template_key: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          customer_id?: string | null
+          dedupe_key?: string | null
+          id?: string
+          last_error?: string | null
+          lease_expires_at?: string | null
+          lease_token?: string | null
+          order_id?: string | null
+          params?: Json
+          phone?: string
+          provider_code?: string | null
+          provider_message?: string | null
+          provider_serial?: string | null
+          sent_at?: string | null
+          shortage_id?: string | null
+          status?: string
+          template_key?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_sms_outbox_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_sms_outbox_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_sms_outbox_shortage_id_fkey"
+            columns: ["shortage_id"]
+            isOneToOne: false
+            referencedRelation: "fulfillment_shortages"
             referencedColumns: ["id"]
           },
         ]
@@ -2276,6 +2540,7 @@ export type Database = {
       }
       fulfillment_shortages: {
         Row: {
+          after_sale_id: string | null
           client_op_id: string | null
           created_at: string
           customer_responded_at: string | null
@@ -2285,15 +2550,28 @@ export type Database = {
           fulfillment_id: string
           fulfillment_item_id: string
           id: string
+          image_ref: string | null
+          location_id: string | null
           order_id: string | null
+          order_item_id: string | null
+          product_name: string | null
           quantity: number
+          quote_snapshot: Json | null
+          quote_version: string | null
           reason: string | null
+          refund_goods_fen: number | null
+          refund_intent_id: string | null
+          refund_requested_at: string | null
+          refund_shipping_fen: number | null
           refund_state: string
+          refund_total_fen: number | null
+          refunded_at: string | null
           reported_by: string | null
           status: string
           updated_at: string
         }
         Insert: {
+          after_sale_id?: string | null
           client_op_id?: string | null
           created_at?: string
           customer_responded_at?: string | null
@@ -2303,15 +2581,28 @@ export type Database = {
           fulfillment_id: string
           fulfillment_item_id: string
           id?: string
+          image_ref?: string | null
+          location_id?: string | null
           order_id?: string | null
+          order_item_id?: string | null
+          product_name?: string | null
           quantity: number
+          quote_snapshot?: Json | null
+          quote_version?: string | null
           reason?: string | null
+          refund_goods_fen?: number | null
+          refund_intent_id?: string | null
+          refund_requested_at?: string | null
+          refund_shipping_fen?: number | null
           refund_state?: string
+          refund_total_fen?: number | null
+          refunded_at?: string | null
           reported_by?: string | null
           status?: string
           updated_at?: string
         }
         Update: {
+          after_sale_id?: string | null
           client_op_id?: string | null
           created_at?: string
           customer_responded_at?: string | null
@@ -2321,15 +2612,34 @@ export type Database = {
           fulfillment_id?: string
           fulfillment_item_id?: string
           id?: string
+          image_ref?: string | null
+          location_id?: string | null
           order_id?: string | null
+          order_item_id?: string | null
+          product_name?: string | null
           quantity?: number
+          quote_snapshot?: Json | null
+          quote_version?: string | null
           reason?: string | null
+          refund_goods_fen?: number | null
+          refund_intent_id?: string | null
+          refund_requested_at?: string | null
+          refund_shipping_fen?: number | null
           refund_state?: string
+          refund_total_fen?: number | null
+          refunded_at?: string | null
           reported_by?: string | null
           status?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "fulfillment_shortages_after_sale_id_fkey"
+            columns: ["after_sale_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_after_sales"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "fulfillment_shortages_exception_id_fkey"
             columns: ["exception_id"]
@@ -2352,10 +2662,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "fulfillment_shortages_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "fulfillment_shortages_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "commerce_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fulfillment_shortages_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_order_items"
             referencedColumns: ["id"]
           },
         ]
@@ -8837,6 +9161,28 @@ export type Database = {
           p_reason?: string
           p_roles?: string[]
           p_target_user_id: string
+        }
+        Returns: Json
+      }
+      shortage_confirm_refund_v1: {
+        Args: {
+          p_customer_id: string
+          p_idempotency_key: string
+          p_quote_version: string
+          p_shortage_id: string
+        }
+        Returns: Json
+      }
+      shortage_report_v1: {
+        Args: {
+          p_client_op_id: string
+          p_device_id: string
+          p_fulfillment_id: string
+          p_fulfillment_item_id: string
+          p_quantity: number
+          p_quote: Json
+          p_reason: string
+          p_reported_by: string
         }
         Returns: Json
       }

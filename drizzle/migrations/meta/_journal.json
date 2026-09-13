@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1789326410973,
+      "tag": "0000_shortage_refund_v1",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789326922854,
+      "tag": "0001_shortage_refund_revoke_anon",
+      "breakpoints": true
+    }
+  ]
+}
