@@ -88,6 +88,7 @@ import { Route as OperationsContentIdRouteImport } from './routes/operations.con
 import { Route as OperationsContentNewRouteImport } from './routes/operations.content.new'
 import { Route as OperationsOfficialKnowledgeIdRouteImport } from './routes/operations.official-knowledge.$id'
 import { Route as OperationsOfficialKnowledgeNewRouteImport } from './routes/operations.official-knowledge.new'
+import { Route as OrdersFulfillmentOrderIdRouteImport } from './routes/orders.fulfillment.$orderId'
 import { Route as PurchaseDomesticBulkIndexRouteImport } from './routes/purchase.domestic-bulk.index'
 import { Route as PurchaseDomesticBulkIdRouteImport } from './routes/purchase.domestic-bulk.$id'
 import { Route as PurchaseDomesticBulkNewRouteImport } from './routes/purchase.domestic-bulk.new'
@@ -673,6 +674,12 @@ const OperationsOfficialKnowledgeNewRoute =
     id: '/new',
     path: '/new',
     getParentRoute: () => OperationsOfficialKnowledgeRoute,
+  } as any)
+const OrdersFulfillmentOrderIdRoute =
+  OrdersFulfillmentOrderIdRouteImport.update({
+    id: '/fulfillment/$orderId',
+    path: '/fulfillment/$orderId',
+    getParentRoute: () => OrdersRoute,
   } as any)
 const PurchaseDomesticBulkIndexRoute =
   PurchaseDomesticBulkIndexRouteImport.update({
@@ -1825,6 +1832,7 @@ export interface FileRoutesByFullPath {
   '/operations/content/new': typeof OperationsContentNewRoute
   '/operations/official-knowledge/$id': typeof OperationsOfficialKnowledgeIdRoute
   '/operations/official-knowledge/new': typeof OperationsOfficialKnowledgeNewRoute
+  '/orders/fulfillment/$orderId': typeof OrdersFulfillmentOrderIdRoute
   '/purchase/domestic-bulk/$id': typeof PurchaseDomesticBulkIdRoute
   '/purchase/domestic-bulk/new': typeof PurchaseDomesticBulkNewRoute
   '/purchase/domestic/$id': typeof PurchaseDomesticIdRoute
@@ -2083,6 +2091,7 @@ export interface FileRoutesByTo {
   '/operations/content/new': typeof OperationsContentNewRoute
   '/operations/official-knowledge/$id': typeof OperationsOfficialKnowledgeIdRoute
   '/operations/official-knowledge/new': typeof OperationsOfficialKnowledgeNewRoute
+  '/orders/fulfillment/$orderId': typeof OrdersFulfillmentOrderIdRoute
   '/purchase/domestic-bulk/$id': typeof PurchaseDomesticBulkIdRoute
   '/purchase/domestic-bulk/new': typeof PurchaseDomesticBulkNewRoute
   '/purchase/domestic/$id': typeof PurchaseDomesticIdRoute
@@ -2349,6 +2358,7 @@ export interface FileRoutesById {
   '/operations/content/new': typeof OperationsContentNewRoute
   '/operations/official-knowledge/$id': typeof OperationsOfficialKnowledgeIdRoute
   '/operations/official-knowledge/new': typeof OperationsOfficialKnowledgeNewRoute
+  '/orders/fulfillment/$orderId': typeof OrdersFulfillmentOrderIdRoute
   '/purchase/domestic-bulk/$id': typeof PurchaseDomesticBulkIdRoute
   '/purchase/domestic-bulk/new': typeof PurchaseDomesticBulkNewRoute
   '/purchase/domestic/$id': typeof PurchaseDomesticIdRoute
@@ -2616,6 +2626,7 @@ export interface FileRouteTypes {
     | '/operations/content/new'
     | '/operations/official-knowledge/$id'
     | '/operations/official-knowledge/new'
+    | '/orders/fulfillment/$orderId'
     | '/purchase/domestic-bulk/$id'
     | '/purchase/domestic-bulk/new'
     | '/purchase/domestic/$id'
@@ -2874,6 +2885,7 @@ export interface FileRouteTypes {
     | '/operations/content/new'
     | '/operations/official-knowledge/$id'
     | '/operations/official-knowledge/new'
+    | '/orders/fulfillment/$orderId'
     | '/purchase/domestic-bulk/$id'
     | '/purchase/domestic-bulk/new'
     | '/purchase/domestic/$id'
@@ -3139,6 +3151,7 @@ export interface FileRouteTypes {
     | '/operations/content/new'
     | '/operations/official-knowledge/$id'
     | '/operations/official-knowledge/new'
+    | '/orders/fulfillment/$orderId'
     | '/purchase/domestic-bulk/$id'
     | '/purchase/domestic-bulk/new'
     | '/purchase/domestic/$id'
@@ -4048,6 +4061,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/operations/official-knowledge/new'
       preLoaderRoute: typeof OperationsOfficialKnowledgeNewRouteImport
       parentRoute: typeof OperationsOfficialKnowledgeRoute
+    }
+    '/orders/fulfillment/$orderId': {
+      id: '/orders/fulfillment/$orderId'
+      path: '/fulfillment/$orderId'
+      fullPath: '/orders/fulfillment/$orderId'
+      preLoaderRoute: typeof OrdersFulfillmentOrderIdRouteImport
+      parentRoute: typeof OrdersRoute
     }
     '/purchase/domestic-bulk/': {
       id: '/purchase/domestic-bulk/'
@@ -5374,6 +5394,7 @@ interface OrdersRouteChildren {
   OrdersOnlineRoute: typeof OrdersOnlineRoute
   OrdersShopsRoute: typeof OrdersShopsRoute
   OrdersWholesaleRoute: typeof OrdersWholesaleRoute
+  OrdersFulfillmentOrderIdRoute: typeof OrdersFulfillmentOrderIdRoute
 }
 
 const OrdersRouteChildren: OrdersRouteChildren = {
@@ -5382,6 +5403,7 @@ const OrdersRouteChildren: OrdersRouteChildren = {
   OrdersOnlineRoute: OrdersOnlineRoute,
   OrdersShopsRoute: OrdersShopsRoute,
   OrdersWholesaleRoute: OrdersWholesaleRoute,
+  OrdersFulfillmentOrderIdRoute: OrdersFulfillmentOrderIdRoute,
 }
 
 const OrdersRouteWithChildren =
