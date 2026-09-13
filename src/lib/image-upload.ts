@@ -132,6 +132,10 @@ export async function uploadSkuImage(file: File | Blob): Promise<string> {
   const { blob, ext, mime } = await compressImage(file, (file as File).name);
   const t1 = performance.now();
 
+  if (tencentMediaUploadsEnabled()) {
+    return await uploadParcelBlobViaTencent(blob, "skus", null);
+  }
+
   let lastErr: unknown = null;
   for (let attempt = 0; attempt < 3; attempt++) {
     const path = `skus/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
