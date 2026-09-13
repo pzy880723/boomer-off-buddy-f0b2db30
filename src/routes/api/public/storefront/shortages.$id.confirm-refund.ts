@@ -34,7 +34,7 @@ export const Route = createFileRoute("/api/public/storefront/shortages/$id/confi
           shortageId: params.id,
           quoteVersion: body.quote_version,
         });
-        return storefrontJson(result.body, result.status);
+        return storefrontJson(result.body, { status: result.status });
       },
     },
   },
