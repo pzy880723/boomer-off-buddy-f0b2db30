@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   ALLOWED_FOLDERS,
   MAX_FILE_BYTES,
+  MAX_MULTIPART_BYTES,
   PARCEL_MEDIA_BUCKET,
   REQUIRED_TENCENT_MEDIA_URL,
   buildObjectPath,
@@ -73,6 +74,38 @@ function form(bytes: Uint8Array, folder = "items", extra: Record<string, string>
   for (const [k, v] of Object.entries(extra)) fd.set(k, v);
   fd.set("file", new Blob([bytes as unknown as BlobPart], { type: "image/png" }), "x.png");
   return fd;
+}
+
+/** 无 Content-Length 的 chunked 流式请求，可观察 cancel 与已拉取块数 */
+function streamingReq(
+  chunks: Uint8Array[],
+  opts: { token?: string; contentType?: string } = {},
+) {
+  let pulls = 0;
+  let cancelled = false;
+  const stream = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      if (pulls < chunks.length) {
+        controller.enqueue(chunks[pulls] as unknown as Uint8Array<ArrayBuffer>);
+        pulls += 1;
+      } else {
+        controller.close();
+      }
+    },
+    cancel() {
+      cancelled = true;
+    },
+  });
+  const headers = new Headers();
+  if (opts.token) headers.set("authorization", `Bearer ${opts.token}`);
+  if (opts.contentType) headers.set("content-type", opts.contentType);
+  const request = new Request("https://erp.example/api/internal/media/parcel-upload", {
+    method: "POST",
+    headers,
+    body: stream,
+    duplex: "half",
+  } as RequestInit & { duplex: "half" });
+  return { request, stats: () => ({ pulls, cancelled }) };
 }
 
 // ---------- 魔数识别 ----------
