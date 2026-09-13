@@ -173,7 +173,8 @@ test("无 Content-Length 的流超过 9MiB：读到超限立即取消，尚有�
   big.set(PNG.subarray(0, 8));
   const trailing = new Uint8Array([1, 2, 3]);
   const { deps, calls } = makeDeps();
-  const { request, stats } = streamingReq([PNG, big, trailing], {
+  // 5 个 chunk：若不取消会全部拉取（pulls=5）；超限取消后源立即停止补拉
+  const { request, stats } = streamingReq([PNG, big, trailing, trailing, trailing], {
     token: "good",
     contentType: "multipart/form-data; boundary=x",
   });
@@ -181,7 +182,7 @@ test("无 Content-Length 的流超过 9MiB：读到超限立即取消，尚有�
   assert.equal(res.status, 413);
   assert.deepEqual(await res.json(), { error: "payload_too_large" });
   assert.equal(stats().cancelled, true);
-  assert.ok(stats().pulls < 3, "超限即取消，后续 chunk 未被读取");
+  assert.ok(stats().pulls < 5, "超限即取消，后续 chunk 未被读取");
   assert.deepEqual(calls, []);
 });
 
