@@ -91,7 +91,7 @@ describe("signDerivativeUrls", () => {
       ["sku-listing/a.jpg", "sku-listing/a.jpg", "sku-raw/b.jpg"],
       DERIVATIVE_WIDTHS.preview,
       {
-        ...origins,
+        primaryOrigin: PRIMARY, tencentOrigin: TENCENT,
         signPrimary: async (ref, width) => {
           calls.push(width);
           return signOk(ref, width);
@@ -110,7 +110,7 @@ describe("signDerivativeUrls", () => {
       ["sku-listing/a.jpg", "sku-raw/b.jpg"],
       480,
       {
-        ...origins,
+        primaryOrigin: PRIMARY, tencentOrigin: TENCENT,
         signPrimary: async (ref) => {
           if (ref.bucket === "sku-raw") throw new Error("boom");
           return null;
@@ -129,7 +129,7 @@ describe("signDerivativeUrls", () => {
         "data:image/png;base64,AAA",
       ],
       480,
-      { ...origins, signPrimary: signOk },
+      { primaryOrigin: PRIMARY, tencentOrigin: TENCENT, signPrimary: signOk },
     );
     assert.match(out[0]!, /render\/image\/sign\/parcel-item-images\/old\.jpg\?width=480/);
     assert.equal(
