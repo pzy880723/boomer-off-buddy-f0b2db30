@@ -79,11 +79,15 @@ test("状态判定：取消/退款优先，processing 视为待发货", () => {
     "pending_payment",
   );
   assert.equal(deriveDisplayStatus(order({ order_status: "cancelled", payment_status: "unpaid" })), "cancelled");
-  // 退款优先于 completed / cancelled
+  // 退款三态互不混淆，优先于 completed / cancelled
   assert.equal(deriveDisplayStatus(order({ order_status: "completed", payment_status: "refunded" })), "refunded");
   assert.equal(
     deriveDisplayStatus(order({ order_status: "cancelled", payment_status: "refund_pending" })),
-    "refunded",
+    "refunding",
+  );
+  assert.equal(
+    deriveDisplayStatus(order({ payment_status: "partially_refunded" })),
+    "partially_refunded",
   );
 });
 
@@ -147,6 +151,18 @@ test("门店名优先历史快照，运费缺失为 null、0 保留 0", () => {
   assert.equal(snapshotStoreName(null, LOC_A), null);
   assert.equal(snapshotShippingFeeFen(null, LOC_A), null);
   assert.equal(snapshotShippingFeeFen({ groups: [] }, LOC_A), null);
+  // 显式 null / 空串 / 非数值 / 负数一律 null，绝不当成包邮 0
+  for (const bad of [null, "", "   ", "abc", -1, Number.NaN, undefined, {}]) {
+    assert.equal(
+      snapshotShippingFeeFen({ groups: [{ location_id: LOC_A, shipping_fee_fen: bad }] }, LOC_A),
+      null,
+      String(bad),
+    );
+  }
+  assert.equal(
+    snapshotShippingFeeFen({ groups: [{ location_id: LOC_A, shipping_fee_fen: "990" }] }, LOC_A),
+    990,
+  );
 });
 
 /* ------------------------------- 分组组装 ------------------------------ */
@@ -211,6 +227,11 @@ test("多店订单：按 location_id 分组、各店履约状态独立、无快�
 test("取消/退款优先覆盖门店履约状态", () => {
   assert.equal(deriveShopStatus("cancelled", "picking"), "cancelled");
   assert.equal(deriveShopStatus("refunded", "handed_over"), "refunded");
+  assert.equal(deriveShopStatus("refunding", "handed_over"), "refunding");
+  assert.equal(deriveShopStatus("partially_refunded", "picking"), "partially_refunded");
+  // 已完成总单：门店不得继续显示待收货
+  assert.equal(deriveShopStatus("completed", "handed_over"), "completed");
+  assert.equal(deriveShopStatus("completed", "picking"), "completed");
   assert.equal(deriveShopStatus("pending_payment", null), "pending_payment");
   assert.equal(deriveShopStatus("paid", null), "unallocated");
   const cancelled = buildOrderListItem(
