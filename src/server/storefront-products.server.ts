@@ -278,7 +278,8 @@ export async function buildStorefrontProductDetail(
 
   const signer = options.signer ?? signSkuImagePaths;
   const previewSigner = options.thumbnailSigner ?? previewDerivativeSigner;
-  const coverSigner = options.coverThumbnailSigner ?? thumbnailDerivativeSigner;
+  const coverSigner =
+    options.coverThumbnailSigner ?? options.thumbnailSigner ?? thumbnailDerivativeSigner;
 
   const safeSign = async (signFn: ImageSigner, values: readonly string[]) => {
     if (values.length === 0) return [] as (string | null)[];
