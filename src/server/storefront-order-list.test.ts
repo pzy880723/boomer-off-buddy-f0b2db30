@@ -95,6 +95,10 @@ test("状态判定：取消/退款优先，processing 视为待发货", () => {
 
 test("混合履约：部分门店已交接不算整单已发货", () => {
   const mixed = order({
+    items: [
+      { id: "i1", location_id: LOC_A, title_snapshot: "A", image_snapshot: null, unit_price: 1, quantity: 1, line_total: 1 },
+      { id: "i2", location_id: LOC_B, title_snapshot: "B", image_snapshot: null, unit_price: 1, quantity: 1, line_total: 1 },
+    ],
     fulfillments: [
       { location_id: LOC_A, status: "handed_over" },
       { location_id: LOC_B, status: "picking" },
