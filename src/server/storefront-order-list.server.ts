@@ -446,11 +446,15 @@ export async function selectOrdersPage(
 
 export type ImageRef = { kind: "direct"; value: string } | { kind: "path"; value: string } | null;
 
+/**
+ * 消费端只允许展示压缩衍生图：历史 http(s) 绝对 URL 也必须交给衍生签名器重新解析/缩放，
+ * 因此不再有 "direct" 直出分支；data: 内联快照无法缩放，直接丢弃。
+ */
 function classifyImageValue(raw: unknown): ImageRef {
   const value = typeof raw === "string" ? raw.trim() : "";
   if (!value) return null;
-  if (/^https?:\/\//i.test(value) || value.startsWith("data:")) return { kind: "direct", value };
-  if (value.includes("/")) return { kind: "path", value };
+  if (value.startsWith("data:")) return null;
+  if (/^https?:\/\//i.test(value) || value.includes("/")) return { kind: "path", value };
   return null;
 }
 
