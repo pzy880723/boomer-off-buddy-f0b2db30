@@ -81,7 +81,7 @@ export async function signStorefrontProductImages(
   options: { thumbnail?: boolean; signer?: ImageSigner; thumbnailSigner?: ImageSigner } = {},
 ): Promise<StorefrontProduct[]> {
   const signer = options.signer ?? signSkuImagePaths;
-  const thumbnailSigner = options.thumbnailSigner ?? signSkuThumbnailPaths;
+  const thumbnailSigner = options.thumbnailSigner ?? thumbnailDerivativeSigner;
   const pageListings = products.map(
     (product) =>
       listingsById.get(product.id) ?? {
