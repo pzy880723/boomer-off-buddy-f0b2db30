@@ -9,6 +9,8 @@ import {
   deriveDisplayStatus,
   deriveShopStatus,
   encodeOrderCursor,
+  fulfillmentStatusByLocation,
+  leastAdvancedStatus,
   matchesStatusFilter,
   parseOrdersListQuery,
   resolveItemImageRef,
@@ -79,16 +81,24 @@ test("状态判定：取消/退款优先，processing 视为待发货", () => {
     "pending_payment",
   );
   assert.equal(deriveDisplayStatus(order({ order_status: "cancelled", payment_status: "unpaid" })), "cancelled");
-  // 退款优先于 completed / cancelled
+  // 退款三态互不混淆，优先于 completed / cancelled
   assert.equal(deriveDisplayStatus(order({ order_status: "completed", payment_status: "refunded" })), "refunded");
   assert.equal(
     deriveDisplayStatus(order({ order_status: "cancelled", payment_status: "refund_pending" })),
-    "refunded",
+    "refunding",
+  );
+  assert.equal(
+    deriveDisplayStatus(order({ payment_status: "partially_refunded" })),
+    "partially_refunded",
   );
 });
 
 test("混合履约：部分门店已交接不算整单已发货", () => {
   const mixed = order({
+    items: [
+      { id: "i1", location_id: LOC_A, title_snapshot: "A", image_snapshot: null, unit_price: 1, quantity: 1, line_total: 1 },
+      { id: "i2", location_id: LOC_B, title_snapshot: "B", image_snapshot: null, unit_price: 1, quantity: 1, line_total: 1 },
+    ],
     fulfillments: [
       { location_id: LOC_A, status: "handed_over" },
       { location_id: LOC_B, status: "picking" },
@@ -147,6 +157,18 @@ test("门店名优先历史快照，运费缺失为 null、0 保留 0", () => {
   assert.equal(snapshotStoreName(null, LOC_A), null);
   assert.equal(snapshotShippingFeeFen(null, LOC_A), null);
   assert.equal(snapshotShippingFeeFen({ groups: [] }, LOC_A), null);
+  // 显式 null / 空串 / 非数值 / 负数一律 null，绝不当成包邮 0
+  for (const bad of [null, "", "   ", "abc", -1, Number.NaN, undefined, {}]) {
+    assert.equal(
+      snapshotShippingFeeFen({ groups: [{ location_id: LOC_A, shipping_fee_fen: bad }] }, LOC_A),
+      null,
+      String(bad),
+    );
+  }
+  assert.equal(
+    snapshotShippingFeeFen({ groups: [{ location_id: LOC_A, shipping_fee_fen: "990" }] }, LOC_A),
+    990,
+  );
 });
 
 /* ------------------------------- 分组组装 ------------------------------ */
@@ -211,6 +233,11 @@ test("多店订单：按 location_id 分组、各店履约状态独立、无快�
 test("取消/退款优先覆盖门店履约状态", () => {
   assert.equal(deriveShopStatus("cancelled", "picking"), "cancelled");
   assert.equal(deriveShopStatus("refunded", "handed_over"), "refunded");
+  assert.equal(deriveShopStatus("refunding", "handed_over"), "refunding");
+  assert.equal(deriveShopStatus("partially_refunded", "picking"), "partially_refunded");
+  // 已完成总单：门店不得继续显示待收货
+  assert.equal(deriveShopStatus("completed", "handed_over"), "completed");
+  assert.equal(deriveShopStatus("completed", "picking"), "completed");
   assert.equal(deriveShopStatus("pending_payment", null), "pending_payment");
   assert.equal(deriveShopStatus("paid", null), "unallocated");
   const cancelled = buildOrderListItem(
@@ -328,4 +355,136 @@ test("归属隔离：取数层按 customer_id 过滤，helper 不会引入他人
   assert.equal(page.rows.length, 3);
   assert.deepEqual(page.rows.map((r) => r.id), mine.map((r) => r.id));
   assert.deepEqual(seen, [null]);
+});
+
+/* ------------------------- 多门店发货覆盖 / 多履约 ------------------------- */
+
+test("整单已发货必须覆盖全部明细门店，单店交接不算整单 shipped", () => {
+  const twoStores = order({
+    items: [
+      { id: "i1", location_id: LOC_A, title_snapshot: "A", image_snapshot: null, unit_price: 1, quantity: 1, line_total: 1 },
+      { id: "i2", location_id: LOC_B, title_snapshot: "B", image_snapshot: null, unit_price: 1, quantity: 1, line_total: 1 },
+    ],
+    fulfillments: [{ location_id: LOC_A, status: "handed_over" }],
+  });
+  assert.equal(deriveDisplayStatus(twoStores), "paid");
+  const bothDone = order({
+    items: twoStores.items,
+    fulfillments: [
+      { location_id: LOC_A, status: "handed_over" },
+      { location_id: LOC_B, status: "handed_over" },
+    ],
+  });
+  assert.equal(deriveDisplayStatus(bothDone), "shipped");
+  // 已付款但完全没有履约行 → 待发货
+  assert.equal(deriveDisplayStatus(order({ items: twoStores.items, fulfillments: [] })), "paid");
+});
+
+test("同门店多条履约取最不推进的一条，顺序无关且不随机", () => {
+  assert.equal(leastAdvancedStatus(["handed_over", "picking"]), "picking");
+  assert.equal(leastAdvancedStatus(["picking", "handed_over"]), "picking");
+  assert.equal(leastAdvancedStatus(["handed_over", "exception"]), "exception");
+  assert.equal(leastAdvancedStatus(["handed_over", "weird_status"]), "weird_status");
+  assert.equal(leastAdvancedStatus([null, ""]), null);
+  const row = order({
+    fulfillments: [
+      { location_id: LOC_A, status: "handed_over" },
+      { location_id: LOC_A, status: "packing" },
+    ],
+  });
+  assert.equal(fulfillmentStatusByLocation(row).get(LOC_A), "packing");
+  assert.equal(deriveDisplayStatus(row), "paid");
+  assert.equal(
+    buildOrderListItem(row, { stores: stores(), images: new Map() }).shops[0]!.status,
+    "packing",
+  );
+});
+
+test("保留旧 GET 字段 courier_provider / courier_service_code / paid_at 原值", () => {
+  const item = buildOrderListItem(
+    order({ courier_provider: "sf", courier_service_code: "sf_standard", paid_at: "2026-09-09T14:10:00.000Z" }),
+    { stores: stores(), images: new Map() },
+  );
+  assert.equal(item.courier_provider, "sf");
+  assert.equal(item.courier_service_code, "sf_standard");
+  assert.equal(item.paid_at, "2026-09-09T14:10:00.000Z");
+  const unpaid = buildOrderListItem(
+    order({ order_status: "pending_payment", payment_status: "unpaid", paid_at: null, total_amount: 9.91 }),
+    { stores: stores(), images: new Map() },
+  );
+  assert.equal(unpaid.paid_at, null);
+  assert.equal(unpaid.payment_status, "unpaid");
+  assert.equal(unpaid.total_amount, 9.91); // canPay 依赖真实金额
+});
+
+test("图源回退链补到关联 SKU（inv_skus.image_paths / image_url）", () => {
+  const base = { id: "x", location_id: null, title_snapshot: null, image_snapshot: null, unit_price: 0, quantity: 1, line_total: 0 };
+  assert.deepEqual(
+    resolveItemImageRef({ ...base, sku: { image_paths: ["sku-raw/s1.jpg"], image_url: null } }),
+    { kind: "path", value: "sku-raw/s1.jpg" },
+  );
+  assert.deepEqual(
+    resolveItemImageRef({ ...base, sku: { image_paths: [], image_url: "https://cdn/s.jpg" } }),
+    { kind: "direct", value: "https://cdn/s.jpg" },
+  );
+  assert.deepEqual(
+    resolveItemImageRef({ ...base, listing: { image_paths: [], cover_url: null, sku: { image_paths: ["sku-listing/l.jpg"] } } }),
+    { kind: "path", value: "sku-listing/l.jpg" },
+  );
+  // listing 首图优先于 SKU 图
+  assert.deepEqual(
+    resolveItemImageRef({ ...base, listing: { image_paths: ["sku-listing/first.jpg"], cover_url: null }, sku: { image_paths: ["sku-raw/s1.jpg"] } }),
+    { kind: "path", value: "sku-listing/first.jpg" },
+  );
+  // 测试商品确实无图 → null
+  assert.equal(resolveItemImageRef({ ...base, sku: { image_paths: [], image_url: null } }), null);
+});
+
+test("游标严格 ISO 白名单：保留微秒，不接受截断/非法精度", () => {
+  const micro = "2026-09-09T14:08:43.123456Z";
+  const cur = encodeOrderCursor({ created_at: micro, id: ORDER_ID });
+  assert.equal(decodeOrderCursor(cur).created_at, micro); // 精度原样保留
+  assert.equal(decodeOrderCursor(encodeOrderCursor({ created_at: "2026-09-09T14:08:43+08:00", id: ORDER_ID })).created_at, "2026-09-09T14:08:43+08:00");
+  for (const bad of [
+    "2026-09-09 14:08:43Z",
+    "2026-09-09T14:08:43",
+    "2026-09-09T14:08:43.1234567Z",
+    "now()",
+    "2026-09-09T14:08:43.999Z,and(id.gt.0)",
+  ]) {
+    assert.throws(
+      () => decodeOrderCursor(Buffer.from(`${bad}|${ORDER_ID}`).toString("base64url")),
+      /Invalid cursor/,
+      bad,
+    );
+  }
+});
+
+test("扫描到 maxRounds 仍无匹配时返回进度游标，后续页不漏订单", async () => {
+  // 前 200 条不匹配，第 201 条才是目标单
+  const all = seq(260, (i) => (i < 200 ? { order_status: "completed", payment_status: "paid" } : {}));
+  const fetchBatch = async ({ cursor, size }: { cursor: { created_at: string; id: string } | null; size: number }) => {
+    const start = cursor ? all.findIndex((r) => r.id === cursor.id) + 1 : 0;
+    return all.slice(start, start + size);
+  };
+  const collected: string[] = [];
+  let cursor: { created_at: string; id: string } | null = null;
+  let pages = 0;
+  for (;;) {
+    const page: Awaited<ReturnType<typeof selectOrdersPage>> = await selectOrdersPage(
+      fetchBatch,
+      { status: "paid", limit: 20, cursor },
+      { batchSize: 10, maxRounds: 3 },
+    );
+    pages += 1;
+    collected.push(...page.rows.map((r) => r.id));
+    if (!page.hasMore) break;
+    assert.ok(page.nextCursor, "hasMore 时必须给出游标");
+    cursor = decodeOrderCursor(page.nextCursor!);
+    assert.ok(pages < 30, "不应无限翻页");
+  }
+  const expected = all.filter((r) => deriveDisplayStatus(r) === "paid").map((r) => r.id);
+  assert.equal(expected.length, 60);
+  assert.deepEqual(collected, expected); // 不漏
+  assert.equal(new Set(collected).size, collected.length); // 不重
 });
