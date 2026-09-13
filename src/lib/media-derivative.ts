@@ -22,6 +22,11 @@ export type DerivativeBucket = (typeof DERIVATIVE_BUCKETS)[number];
 export const TENCENT_PUBLIC_BUCKETS = ["parcel-item-images"] as const;
 
 export const DERIVATIVE_WIDTHS = { thumbnail: 480, preview: 960 } as const;
+/** 允许的全部衍生宽度档位（fail-closed 白名单，档位之外一律拒绝）。 */
+export const DERIVATIVE_ALLOWED_WIDTHS = [160, 480, 960] as const;
+export function isAllowedDerivativeWidth(width: number): boolean {
+  return (DERIVATIVE_ALLOWED_WIDTHS as readonly number[]).includes(width);
+}
 export const DERIVATIVE_QUALITY = 75;
 export const DERIVATIVE_RESIZE = "contain" as const;
 
@@ -72,7 +77,9 @@ export function parseStorageRef(
   if (!/^https?:\/\//i.test(raw)) {
     const parsed = splitBucketPath(raw);
     if (!parsed || !isAllowedBucket(parsed.bucket)) return null;
-    return { origin: "primary", bucket: parsed.bucket, path: decodeSegments(parsed.path) };
+    const path = sanitizeDecodedPath(decodeSegments(parsed.path));
+    if (!path) return null;
+    return { origin: "primary", bucket: parsed.bucket, path };
   }
 
   let url: URL;
