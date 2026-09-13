@@ -1,5 +1,14 @@
 import { supabaseAdmin } from "../integrations/supabase/client.server";
-import { signSkuImagePaths, signSkuThumbnailPaths } from "../lib/sku-image-resolver.server";
+import { signSkuImagePaths } from "../lib/sku-image-resolver.server";
+import { DERIVATIVE_WIDTHS, signDerivativeUrls } from "./media-derivative.server";
+
+/** 列表 / 购物车 / 订单默认展示图：真实 480px 衍生图，失败为 null（不回退原图）。 */
+export const thumbnailDerivativeSigner = (paths: readonly string[]) =>
+  signDerivativeUrls(paths, DERIVATIVE_WIDTHS.thumbnail);
+
+/** 详情轮播与放大预览：真实 960px 衍生图，失败为 null（不回退原图）。 */
+export const previewDerivativeSigner = (paths: readonly string[]) =>
+  signDerivativeUrls(paths, DERIVATIVE_WIDTHS.preview);
 
 export type StorefrontProductQuery = {
   q: string | null;
