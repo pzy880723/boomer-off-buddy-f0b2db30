@@ -45,6 +45,11 @@ function tencentOriginFromEnv(): string | null {
   return process.env["TENCENT_MEDIA_URL"]?.trim() || null;
 }
 
+/** 腾讯 render 衍生能力开关：只有实测验证后显式置 "true" 才放行。 */
+function tencentRenderVerifiedFromEnv(): boolean {
+  return process.env["TENCENT_MEDIA_RENDER_VERIFIED"]?.trim() === "true";
+}
+
 async function defaultSignPrimary(ref: StorageRef, width: number): Promise<string | null> {
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
