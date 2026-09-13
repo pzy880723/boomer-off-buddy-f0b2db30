@@ -77,8 +77,8 @@ export function parseStorageRef(
   if (!/^https?:\/\//i.test(raw)) {
     const parsed = splitBucketPath(raw);
     if (!parsed || !isAllowedBucket(parsed.bucket)) return null;
-    const path = sanitizeDecodedPath(decodeSegments(parsed.path));
-    if (!path) return null;
+    const path = decodeSegments(parsed.path);
+    if (!path || !sanitizeDecodedPath(path)) return null;
     return { origin: "primary", bucket: parsed.bucket, path };
   }
 
@@ -98,8 +98,8 @@ export function parseStorageRef(
   if (!match?.groups?.["rest"]) return null;
   const parsed = splitBucketPath(match.groups["rest"]);
   if (!parsed || !isAllowedBucket(parsed.bucket)) return null;
-  const path = sanitizeDecodedPath(decodeSegments(parsed.path));
-  if (!path) return null;
+  const path = decodeSegments(parsed.path);
+  if (!path || !sanitizeDecodedPath(path)) return null;
   return { origin, bucket: parsed.bucket, path };
 }
 
