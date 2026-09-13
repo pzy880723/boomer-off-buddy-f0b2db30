@@ -111,7 +111,10 @@ export async function signStorefrontProductImages(
       },
   );
   const resolved = await resolveStorefrontListingsImagesBatch(pageListings, signer);
-  const coverPaths = resolved.map((listing) => (listing.image_paths ?? []).find(Boolean) ?? "");
+  // 封面衍生图来源：优先原始存储路径，其次历史绝对 URL（由衍生签名器自行解回安全 bucket/path）
+  const coverPaths = pageListings.map(
+    (listing) => (listing.image_paths ?? []).find(Boolean) ?? listing.cover_url ?? "",
+  );
   let thumbs: (string | null)[] = [];
   if (options.thumbnail) {
     try {
@@ -126,7 +129,8 @@ export async function signStorefrontProductImages(
     const image_urls = listing.image_urls ?? product.image_urls;
     const base = { ...product, image_url, image_urls };
     if (!options.thumbnail) return base;
-    return { ...base, thumbnail_url: thumbs[i] ?? image_url };
+    // 衍生图不可用时为 null：前端占位，绝不让原图冒充缩略图
+    return { ...base, thumbnail_url: thumbs[i] ?? null };
   });
 }
 
