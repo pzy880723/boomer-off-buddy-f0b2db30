@@ -6,6 +6,7 @@ import {
   storefrontError,
   storefrontJson,
 } from "@/server/storefront-auth.server";
+import { withOrderItemThumbnails } from "@/server/storefront-order-detail-media.server";
 import { resolveStorefrontOrderId } from "@/server/storefront-orders.server";
 
 export const Route = createFileRoute("/api/public/storefront/orders/$id")({
