@@ -32,27 +32,19 @@ export const LOCATION_SELECT = "id, name, shop:youzan_shops(id, shop_name)";
 
 export type PathSigner = (paths: readonly string[]) => Promise<(string | null)[]>;
 
-/** 默认签名：缩略图优先，失败或缺失回退原图签名。 */
+/**
+ * 默认签名：只产出真实 480px 衍生图。
+ * 历史绝对 URL 快照由衍生签名器解回安全 bucket/path 后重新缩放；
+ * 无法安全解析或签名失败一律 null，**绝不回退原图**。
+ */
 export async function defaultSignPaths(paths: readonly string[]): Promise<(string | null)[]> {
   if (paths.length === 0) return [];
-  const { signSkuImagePaths, signSkuThumbnailPaths } = await import(
-    "@/lib/sku-image-resolver.server"
-  );
-  let thumbs: (string | null)[] = [];
+  const { DERIVATIVE_WIDTHS, signDerivativeUrls } = await import("./media-derivative.server");
   try {
-    thumbs = await signSkuThumbnailPaths(paths);
+    return await signDerivativeUrls(paths, DERIVATIVE_WIDTHS.thumbnail);
   } catch {
-    thumbs = [];
+    return paths.map(() => null);
   }
-  let originals: (string | null)[] = [];
-  if (thumbs.length !== paths.length || thumbs.some((url) => !url)) {
-    try {
-      originals = await signSkuImagePaths(paths);
-    } catch {
-      originals = [];
-    }
-  }
-  return paths.map((_, i) => thumbs[i] ?? originals[i] ?? null);
 }
 
 type QueryClient = {
