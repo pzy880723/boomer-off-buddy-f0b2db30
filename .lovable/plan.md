@@ -1,67 +1,70 @@
-# 消费者账号合并前只读核查（内嵌 Supabase）
+# 小程序图片“默认只加载压缩图”只读审计 + 统一图片契约建议
 
-本轮仅执行只读 SQL，未修改任何代码、数据、权限，未部署腾讯。
+审计基准 commit：`aea8deec66c39527ac569d2dfb0eff7f9ad7bd20`（工作区干净）。
+本轮**未修改任何代码、数据库、配置**，未迁移、未部署。腾讯当前基线为 `1e7a4ee-cart-thumbnails-20260913`（仅详情路由带 thumbnail），下文“仓库状态”一律不等同于腾讯已部署。
 
-## 1. 两个账号在本库的映射
+## 1. 为小程序供图的全部入口（静态证据）
 
-| 外部 consumer id（腾讯） | 本库 commerce_customers.id | 状态 | 创建 | 最近登录 | 手机号 | 微信 openid/unionid |
-| --- | --- | --- | --- | --- | --- | --- |
-| a615b209…86d4（旧手机号） | b782a331-a938-4156-b826-bc4c3ce6c664 | active | 2026-08-17 | 2026-09-08 | 有 | 无 / 无 |
-| 6aedbea1…f149（微信，保留） | 1b9676d9-1cf8-4e83-bc9e-323abfd9293c | active | 2026-09-08 | 2026-09-13 | 无 | 无 / 无 |
+| 场景 | 接口 / 函数 | 文件:行 | 当前下发字段 | 是否压缩图 |
+|---|---|---|---|---|
+| 商品列表 | GET /api/public/storefront/products | `src/routes/api/public/storefront/products.ts:76`（thumbnail:true） | `image_url`(原图签名) `image_urls[]`(原图) `thumbnail_url`(480) | 部分：同时下发原图数组 |
+| 商品详情/轮播/放大 | GET /api/public/storefront/products/$id → `buildStorefrontProductDetail` | `products.$id.ts:25`；`storefront-products.server.ts:242-318` | `image_url` `image_urls[]` `thumbnail_url` `image_previews[{image_url,preview_url}]` | 仓库已有 preview；**腾讯未部署 image_previews** |
+| 列表/详情签名 | `signStorefrontProductImages` | `storefront-products.server.ts:196-222` | thumbs 失败→`image_url`（原图） | 有原图回退 |
+| 订单列表 | GET /api/public/storefront/orders → `defaultSignPaths` | `storefront-order-list-query.server.ts:27,36-55`；组装 `storefront-order-list.server.ts:366` | 每 item 单一 `image_url` | 缩略图优先，**失败显式回退原图签名** |
+| 订单详情 | GET /api/public/storefront/orders/$id | `orders.$id.ts:49-58` | `select("*")` 直出 `image_snapshot` 原值 | 否，无任何压缩 |
+| 旧订单快照图源链 | `resolveItemImageRef` | `storefront-order-list.server.ts:445-484` | snapshot→listing.image_paths→cover_url→sku.image_paths→sku.image_url | `direct`（http/data）分支完全旁路签名与转换 |
+| 门店图 | GET /api/public/storefront/shops → `signShopImages` | `storefront-shops.server.ts:100-108` | `createSignedUrls`，**无 transform** | 否，原图 |
+| 头像 | `authenticateStorefrontCustomer` 写入/透出 `avatar_url` | `storefront-auth.server.ts:66` | 微信外链原图 | 否 |
+| 品牌 logo | GET /api/public/storefront/taxonomy | `taxonomy.ts:23`；`storefront-products.server.ts:135,374` | `logo_url` 原值 | 否 |
+| 社区/内容 | `toPublicContentDto` | `src/lib/content-public.ts:47-52` | `media.cover_url` `video_url` 原值 | 否 |
+| 私有图代理 | GET /api/public/media/sku/$ | `src/routes/api/public/media/sku/$.ts:24-35` | 整字节流回源，无 width/quality 参数 | 否 |
+| 客服上下文 | `src/server/support.server.ts` | — | 无任何图片字段（纯文本） | N/A，前端若渲染商品图需复用上表 |
 
-映射列为 `commerce_customers.external_subject`（UNIQUE），本库其余表一律引用内部 `commerce_customers.id`，不存储外部 consumer id。
+## 2. 确认的能力与边界
 
-## 2. 每账号每表关联条数（实查，仅计数）
+- **转换能力存在且已在用**：`signSkuThumbnailPaths`（`sku-image-resolver.server.ts:81-131`）走 `createSignedUrl(path, ttl, {transform:{width:480,resize:contain,quality:75}})`，并发 4、去重、TTL 24h；私桶白名单见 `:10-16`（含 `parcel-item-images`）。另有纯前端 `toThumbUrl`（`src/lib/image.ts:8-20`，render/image 复用同 token），ERP 用、小程序未用。
+- **腾讯新图路径不兼容转换**：`tencent-media-client.server.ts` 上传后用 `getPublicUrl` 产出**绝对 URL** 并入库；这类值在各处都落到 `direct` 分支（`storefront-order-list.server.ts:452`）或原样下发，既不签名也不缩放 → 新图天然是“永久原图”。历史 `parcel-item-images` 绝对 URL 同理。
+- **鉴权边界**：私桶只经 service-role 签名或 `/api/public/media/sku` 代理；代理仅允许 `sku-raw`/`sku-listing`，拒绝 `..`（`sku-media.ts:20-32`），无重定向。订单侧强制 `customer_id` 归属过滤。
+- **SSRF 边界**：目前服务端**不**按 URL 抓取外链，故无 SSRF；一旦新增“服务端转换外链”，必须域名白名单 + 禁私网/localhost + 禁重定向，否则会引入 SSRF。
+- **越权风险提示（非本次范围）**：`orders.$id` 用 `select("*")` 会带出地址/电话等列，建议另立项收敛字段白名单。
 
-| 表（列） | 旧手机号 b782a331 | 微信 1b9676d9 |
-| --- | --- | --- |
-| commerce_orders (customer_id / user_id) | 0 / 0 | 3 / 3 |
-| commerce_customer_identities (customer_id) | 1（provider=phone） | 0 |
-| commerce_membership_orders (customer_id) | 1（status=created，2026-08-21） | 0 |
-| commerce_recognition_usage_daily (customer_id) | 1（2026-08-18） | 0 |
-| commerce_recognition_usage_requests (customer_id) | 1（status=reserved） | 0 |
-| support_conversations / support_customer_reads / support_messages(sender) | 0 / 0 / 0 | 3 / 2 / 1 |
-| commerce_membership_entitlements、commerce_points_ledger、commerce_consumption_records、commerce_member_code_sessions、commerce_membership_admin_audit_logs、pos_customer_coupons、pos_customer_wallets、pos_held_carts、pos_payment_attempts、commerce_after_sales(user_id) | 0 | 0 |
+## 3. 主要缺口（即“会加载原图”的真实原因）
 
-订单明细（微信账号 3 单）：
-- BO20260913100009 — processing / paid / paid_at 2026-09-13 02:24:43Z
-- BO20260913100008 — cancelled / unpaid
-- BO20260909100007 — cancelled / unpaid
+1. 详情 `image_previews` 腾讯未部署 → 轮播与放大预览直接吃 `image_urls[]` 原图（实测 1.2MB+）。
+2. 列表/详情仍**同时**下发完整原图数组，客户端任意取用即退化。
+3. 订单列表缩略图失败 → 自动回退原图签名（`storefront-order-list-query.server.ts:48-55`），与“错误重试禁止回退原图”冲突。
+4. 订单详情、门店图、头像、品牌 logo、社区封面**完全无压缩衍生图**。
+5. `image_snapshot` / 腾讯新图 / 微信头像等外链一律旁路转换。
+6. 媒体代理路由不支持尺寸参数，无法为公开桶生成衍生图。
 
-旧手机号账号订单数为 0。
+## 4. 建议的最小统一图片契约（尚未实现，待批准后另立实施项）
 
-## 3. JSON 引用扫描
+统一一个可复用类型 `MediaImage`，所有面向小程序的图片字段一律返回它，替代裸 URL：
 
-对 `orders.metadata`、`orders.payment_route`、`orders.benefit_snapshot`、`payments.payment_payload`、`payments.merchant_snapshot`、`payment_events.payload`、`membership_orders.provider_payload`、`points_ledger.metadata`、`pos_payment_attempts.sale_payload`、`aigc_sso_tickets.user_id` 逐一 LIKE 扫描 4 个 id 字符串：
+```text
+MediaImage = {
+  thumbnail_url: string        // 必返，列表/购物车/订单/客服/头像/社区默认唯一可用图（<=480w）
+  preview_url:   string        // 放大预览默认图（<=1080w）
+  original_url:  string | null // 仅“查看原图”按钮使用；不可用时 null
+  degraded:      boolean       // true = 无法生成衍生图（外链/未知桶），客户端必须按占位处理
+}
+```
 
-- 命中仅两处，且都指向**微信账号内部 id**：`commerce_orders.payment_route` 3 行、`commerce_payments.merchant_snapshot` 3 行。
-- 两个**外部 consumer id** 在所有被扫 JSON 列中命中 0 次。
-- 旧手机号内部 id 在所有被扫 JSON 列中命中 0 次。
+落地要点（最小改动顺序）：
+1. 抽 `src/server/media-contract.server.ts`：`buildMediaImage(ref)`，内部只走既有 `signSkuThumbnailPaths`(480) / 新增 1080 档 / `signSkuImagePaths`，**不新增 SDK、不手拼签名**。
+2. 失败语义改为：thumbnail 失败 → `degraded:true` 且 `thumbnail_url` 用占位，**绝不回退 original**（改 `storefront-order-list-query.server.ts:36-55`）。
+3. 外链（含腾讯 `getPublicUrl`、微信头像）：`degraded:true`；中期把腾讯上传改为存 `bucket/path` 而非绝对 URL，使其重新进入转换链。
+4. 公开桶补衍生图：`/api/public/media/sku/$` 增加 `?w=` 白名单档位（480/1080），仅允许既有两桶。
+5. 覆盖面：products、products/$id、orders、orders/$id、shops、taxonomy(logo)、content(cover)、auth(avatar)。
 
-## 4. 唯一键与外键（决定合并安全性）
+## 5. 可机器验证的防回归规则
 
-- `commerce_customers`：PK(id)、UNIQUE(external_subject)、CHECK status ∈ active/blocked/deleted。
-- `commerce_customer_identities`：UNIQUE(provider, provider_subject)、FK customer_id → customers ON DELETE CASCADE、CHECK provider ∈ phone/wechat。
-- 引用 customers(id) 的外键共 16 个；其中 RESTRICT：`commerce_membership_orders`、`commerce_points_ledger`、`commerce_consumption_records`、`commerce_membership_admin_audit_logs`；`commerce_orders` 无级联动作；其余多为 CASCADE，`support_messages.sender_customer_id` 为 SET NULL。
+- 契约测试：上述每个接口的响应 schema 断言**不存在**裸 `image_url`/`cover_url`/`logo_url`/`avatar_url` 字符串字段（或存在时等于 `thumbnail_url`）。
+- 尺寸断言：`thumbnail_url` 必含 `width=480`（或代理 `w=480`）；`preview_url` 含 1080；`original_url` 不含 width 参数。
+- 回退断言：注入 thumbnailSigner 抛错 → 断言结果 `degraded===true` 且返回值 `!== original`；`upload/original` 调用次数为 0。
+- 静态规则：ESLint/脚本禁止在 `src/routes/api/public/storefront/**` 直接引用 `signSkuImagePaths`（只能经 `buildMediaImage`）。
+- 部署对照：脚本对线上 `GET /products?page_size=3`、`/products/{id}`、`/orders` 抓字段名集合，缺 `image_previews`/`thumbnail_url` 即失败，用于识别“腾讯落后于仓库”。
 
-关键含义：旧手机号账号有 1 条 RESTRICT 引用（membership_orders），**不能直接删除该客户行**；必须先改指或保留该行。
+## 6. 本轮结论
 
-## 5. 结论
-
-1. **保留微信 ID 完全安全**：今天已付款订单 BO20260913100009 及其支付快照全部挂在 `1b9676d9…` 上，只要不动这一行和其 `external_subject`，订单、支付、客服会话零变更。
-2. **旧手机号 ID 在 ERP 侧几乎没有必须迁移的资产**：无订单、无支付、无客服、无会员权益、无积分、无优惠券、无钱包。仅 3 类轻量记录：1 条 `status=created` 的会员订单（未完成）、1 条识别用量日计数、1 条 `reserved` 识别配额请求，以及 1 条 phone identity 行。
-3. 因此 409 冲突的根因在腾讯 consumer 侧的手机号唯一约束，本库不构成阻碍。
-
-## 6. 安全合并建议（待批准后再单独立项执行，本轮不写入）
-
-在腾讯 consumer 侧把手机号挂到保留的 `6aedbea1…f149` 之后，本库只需一次小事务：
-
-1. 在 `commerce_customer_identities` 把旧账号的 phone identity 行 `customer_id` 改指 `1b9676d9…`（UNIQUE(provider,provider_subject) 不冲突，因为保留账号当前无 phone identity）。
-2. `commerce_customers` 中保留账号补写 phone 字段（值由腾讯侧为准）。
-3. 三条轻量记录处理二选一：
-   - 最小风险：保持原样不迁移（它们不影响下单与支付，识别配额会按新账号重新计数）；
-   - 若要求归口统一：把 `commerce_membership_orders`、`commerce_recognition_usage_daily`、`commerce_recognition_usage_requests` 这 3 行 `customer_id` 改指保留账号，注意 `recognition_usage_daily` 可能存在 (customer_id, usage_date) 唯一键，需先查再决定 UPDATE 或丢弃。
-4. 旧客户行不要 DELETE（RESTRICT 外键 + 审计可追溯性），建议仅将 `status` 置为 `deleted` 并清空 `external_subject` 之外的可识别字段，且该动作需单独授权。
-5. 全程不触碰 `commerce_orders`、`commerce_payments`、`payment_route`、`merchant_snapshot`，避免影响已付款订单与对账。
-
-执行前建议先在腾讯生产库以同样 SQL 复核计数（本轮结果来自 Lovable 内嵌库），两库计数不一致时以腾讯为准。
+无代码变更、无数据库变更、无部署；未输出任何签名 URL、令牌或客户数据。
