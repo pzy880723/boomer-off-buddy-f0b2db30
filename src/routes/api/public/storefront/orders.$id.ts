@@ -51,7 +51,7 @@ export const Route = createFileRoute("/api/public/storefront/orders/$id")({
           .select(
             "*, items:commerce_order_items(*), fulfillments(*, shipment:shipments(*, events:shipment_events(*)))",
           )
-          .eq("id", params.id)
+          .eq("id", orderId)
           .eq("customer_id", auth.customer.id)
           .maybeSingle();
         if (error) return storefrontError(error.message, 500);
