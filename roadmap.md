@@ -21,3 +21,15 @@
 ## 已挂起（不在本轮）
 - GO 本人 JWT 线下补录合同（设计已修订，等批准）
 - 有赞凭据在腾讯侧恢复（需用户手工注入）
+
+## v1 已落地（commit 4094c70 / 9e20880）
+- [x] 迁移 0000_shortage_refund_v1 + 0001_shortage_refund_revoke_anon（已应用）
+- [x] RPC shortage_report_v1 / shortage_confirm_refund_v1（仅 service_role）
+- [x] 客户端四个接口 + Case 合同 + 通知已读
+- [x] ERP 页面 /orders/fulfillment/$orderId（手工发货 + 缺货申报）
+- [x] docs/shortage-refund-contract-v1.md
+
+## 仍未开启（阻塞项）
+- [ ] 退款执行 worker（消费 commerce_refund_intents）— 生产开关默认关闭，未实现执行器
+- [ ] 腾讯业务短信模板配置（shortage_reported 等）— outbox 记 template_missing
+- [ ] 腾讯生产部署（由 Codex 单独验收）
