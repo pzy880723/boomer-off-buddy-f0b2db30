@@ -56,7 +56,8 @@ export const Route = createFileRoute("/api/public/storefront/orders/$id")({
           .maybeSingle();
         if (error) return storefrontError(error.message, 500);
         if (!data) return storefrontError("Order not found", 404);
-        return storefrontJson({ ok: true, data });
+        // 展示图一律压缩衍生图；无法安全转换为 null（不回退原图）。归属过滤保持不变。
+        return storefrontJson({ ok: true, data: await withOrderItemThumbnails(data) });
       },
     },
   },
