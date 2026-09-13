@@ -8,10 +8,18 @@ import {
   beginPendingUpload,
 } from "@/lib/image-upload";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  tencentMediaUploadsEnabled,
+  uploadParcelBlobViaTencent,
+} from "@/lib/tencent-media-upload";
 
 const BUCKET = "parcel-item-images";
 
 async function uploadCompressed(blob: Blob, ext: string, mime: string): Promise<string> {
+  if (tencentMediaUploadsEnabled()) {
+    // 开关打开：走腾讯 COS-backed Storage，失败直接抛错，不回退 Lovable
+    return await uploadParcelBlobViaTencent(blob, "items", null);
+  }
   const path = `items/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
   const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
     cacheControl: "3600",

@@ -99,6 +99,7 @@ import { Route as PurchaseJapanParcelIdRouteImport } from './routes/purchase.jap
 import { Route as PurchaseJapanParcelAccountsRouteImport } from './routes/purchase.japan-parcel.accounts'
 import { Route as PurchaseJapanParcelImportRouteImport } from './routes/purchase.japan-parcel.import'
 import { Route as PurchaseJapanParcelNewRouteImport } from './routes/purchase.japan-parcel.new'
+import { Route as ApiInternalMediaParcelUploadRouteImport } from './routes/api/internal/media/parcel-upload'
 import { Route as ApiInternalPaymentsReconcileRouteImport } from './routes/api/internal/payments.reconcile'
 import { Route as ApiPublicContentIdRouteImport } from './routes/api/public/content/$id'
 import { Route as ApiPublicContentFeedRouteImport } from './routes/api/public/content/feed'
@@ -728,6 +729,12 @@ const PurchaseJapanParcelNewRoute = PurchaseJapanParcelNewRouteImport.update({
   path: '/new',
   getParentRoute: () => PurchaseJapanParcelRoute,
 } as any)
+const ApiInternalMediaParcelUploadRoute =
+  ApiInternalMediaParcelUploadRouteImport.update({
+    id: '/api/internal/media/parcel-upload',
+    path: '/api/internal/media/parcel-upload',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiInternalPaymentsReconcileRoute =
   ApiInternalPaymentsReconcileRouteImport.update({
     id: '/api/internal/payments/reconcile',
@@ -1805,6 +1812,7 @@ export interface FileRoutesByFullPath {
   '/purchase/domestic-bulk/': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic/': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
+  '/api/internal/media/parcel-upload': typeof ApiInternalMediaParcelUploadRoute
   '/api/internal/payments/reconcile': typeof ApiInternalPaymentsReconcileRoute
   '/api/public/content/$id': typeof ApiPublicContentIdRouteWithChildren
   '/api/public/content/feed': typeof ApiPublicContentFeedRoute
@@ -2058,6 +2066,7 @@ export interface FileRoutesByTo {
   '/purchase/domestic-bulk': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel': typeof PurchaseJapanParcelIndexRoute
+  '/api/internal/media/parcel-upload': typeof ApiInternalMediaParcelUploadRoute
   '/api/internal/payments/reconcile': typeof ApiInternalPaymentsReconcileRoute
   '/api/public/content/$id': typeof ApiPublicContentIdRouteWithChildren
   '/api/public/content/feed': typeof ApiPublicContentFeedRoute
@@ -2319,6 +2328,7 @@ export interface FileRoutesById {
   '/purchase/domestic-bulk/': typeof PurchaseDomesticBulkIndexRoute
   '/purchase/domestic/': typeof PurchaseDomesticIndexRoute
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
+  '/api/internal/media/parcel-upload': typeof ApiInternalMediaParcelUploadRoute
   '/api/internal/payments/reconcile': typeof ApiInternalPaymentsReconcileRoute
   '/api/public/content/$id': typeof ApiPublicContentIdRouteWithChildren
   '/api/public/content/feed': typeof ApiPublicContentFeedRoute
@@ -2581,6 +2591,7 @@ export interface FileRouteTypes {
     | '/purchase/domestic-bulk/'
     | '/purchase/domestic/'
     | '/purchase/japan-parcel/'
+    | '/api/internal/media/parcel-upload'
     | '/api/internal/payments/reconcile'
     | '/api/public/content/$id'
     | '/api/public/content/feed'
@@ -2834,6 +2845,7 @@ export interface FileRouteTypes {
     | '/purchase/domestic-bulk'
     | '/purchase/domestic'
     | '/purchase/japan-parcel'
+    | '/api/internal/media/parcel-upload'
     | '/api/internal/payments/reconcile'
     | '/api/public/content/$id'
     | '/api/public/content/feed'
@@ -3094,6 +3106,7 @@ export interface FileRouteTypes {
     | '/purchase/domestic-bulk/'
     | '/purchase/domestic/'
     | '/purchase/japan-parcel/'
+    | '/api/internal/media/parcel-upload'
     | '/api/internal/payments/reconcile'
     | '/api/public/content/$id'
     | '/api/public/content/feed'
@@ -3307,6 +3320,7 @@ export interface RootRouteChildren {
   ApiPublicOfficialKnowledgeRoute: typeof ApiPublicOfficialKnowledgeRouteWithChildren
   InventoryStocktakesIdRoute: typeof InventoryStocktakesIdRoute
   InventoryStocktakesIndexRoute: typeof InventoryStocktakesIndexRoute
+  ApiInternalMediaParcelUploadRoute: typeof ApiInternalMediaParcelUploadRoute
   ApiInternalPaymentsReconcileRoute: typeof ApiInternalPaymentsReconcileRoute
   ApiPublicContentIdRoute: typeof ApiPublicContentIdRouteWithChildren
   ApiPublicContentFeedRoute: typeof ApiPublicContentFeedRoute
@@ -4058,6 +4072,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/purchase/japan-parcel/new'
       preLoaderRoute: typeof PurchaseJapanParcelNewRouteImport
       parentRoute: typeof PurchaseJapanParcelRoute
+    }
+    '/api/internal/media/parcel-upload': {
+      id: '/api/internal/media/parcel-upload'
+      path: '/api/internal/media/parcel-upload'
+      fullPath: '/api/internal/media/parcel-upload'
+      preLoaderRoute: typeof ApiInternalMediaParcelUploadRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/internal/payments/reconcile': {
       id: '/api/internal/payments/reconcile'
@@ -5932,6 +5953,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicOfficialKnowledgeRoute: ApiPublicOfficialKnowledgeRouteWithChildren,
   InventoryStocktakesIdRoute: InventoryStocktakesIdRoute,
   InventoryStocktakesIndexRoute: InventoryStocktakesIndexRoute,
+  ApiInternalMediaParcelUploadRoute: ApiInternalMediaParcelUploadRoute,
   ApiInternalPaymentsReconcileRoute: ApiInternalPaymentsReconcileRoute,
   ApiPublicContentIdRoute: ApiPublicContentIdRouteWithChildren,
   ApiPublicContentFeedRoute: ApiPublicContentFeedRoute,

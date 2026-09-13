@@ -1,5 +1,9 @@
 // 客户端图片压缩 + 上传工具（提取自 item-image-uploader，供 /m 和 /store 复用）
 import { supabase } from "@/integrations/supabase/client";
+import {
+  tencentMediaUploadsEnabled,
+  uploadParcelBlobViaTencent,
+} from "@/lib/tencent-media-upload";
 
 const MAX_DIM = 1280;
 const QUALITY = 0.78;
@@ -105,6 +109,10 @@ export async function uploadParcelImage(
 ): Promise<string> {
   const BUCKET = "parcel-item-images";
   const { blob, ext, mime } = await compressImage(file, (file as File).name);
+  if (tencentMediaUploadsEnabled()) {
+    // 开关打开：走腾讯 COS-backed Storage，失败直接抛错，不回退 Lovable
+    return await uploadParcelBlobViaTencent(blob, folder, parcelId ?? null);
+  }
   const sub = parcelId ? `${folder}/${parcelId}` : folder;
   const path = `${sub}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
   const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
@@ -123,6 +131,10 @@ export async function uploadSkuImage(file: File | Blob): Promise<string> {
   const originalSize = (file as File).size ?? 0;
   const { blob, ext, mime } = await compressImage(file, (file as File).name);
   const t1 = performance.now();
+
+  if (tencentMediaUploadsEnabled()) {
+    return await uploadParcelBlobViaTencent(blob, "skus", null);
+  }
 
   let lastErr: unknown = null;
   for (let attempt = 0; attempt < 3; attempt++) {
