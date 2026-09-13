@@ -207,3 +207,45 @@ test("未认证请求在查询之前被拒（GET 返回 401）", async () => {
   const body = (await response.json()) as { ok: boolean };
   assert.equal(body.ok, false);
 });
+
+test("历史 http 快照也必须经衍生签名器；签名失败为 null，绝不回退原图", async () => {
+  const legacy = orderRow(7, {
+    items: [
+      {
+        id: "item-legacy",
+        location_id: LOC_A,
+        title_snapshot: "旧单商品",
+        image_snapshot: "https://legacy.example.com/storage/v1/object/public/parcel-item-images/x.jpg",
+        unit_price: 10,
+        quantity: 1,
+        line_total: 10,
+        listing_id: null,
+        sku_id: null,
+        sku: null,
+        listing: null,
+      },
+    ],
+  });
+  const { client } = mockClient((url) => {
+    if (url.includes("/inv_locations")) {
+      return [{ id: LOC_A, name: "温州仓", shop: { id: SHOP_A, shop_name: "温州店" } }];
+    }
+    return [legacy];
+  });
+
+  const seen: string[][] = [];
+  const result = await listStorefrontOrders({
+    client: client as never,
+    customerId: CUSTOMER,
+    url: new URL("https://x.test/api/public/storefront/orders"),
+    signPaths: async (paths) => {
+      seen.push([...paths]);
+      return paths.map(() => null); // 衍生图不可用
+    },
+  });
+
+  assert.deepEqual(seen[0], [
+    "https://legacy.example.com/storage/v1/object/public/parcel-item-images/x.jpg",
+  ]);
+  assert.equal(result.data[0].shops[0].items[0].image_url, null);
+});
