@@ -201,7 +201,7 @@ describe("storefront product detail handler", () => {
     assert.equal(product.stock, 1);
   });
 
-  test("falls back to the original image when thumbnail signing fails", async () => {
+  test("returns null (never the original) when derivative signing fails", async () => {
     const product = await buildStorefrontProductDetail(listing, {
       enrich: enrichAvailable,
       signer: async (paths) => paths.map((path) => `https://signed.test/${path}`),
@@ -212,7 +212,11 @@ describe("storefront product detail handler", () => {
 
     assert.ok(product);
     assert.equal(product.image_url, "https://signed.test/sku-listing/detail-front.png");
-    assert.equal(product.thumbnail_url, "https://signed.test/sku-listing/detail-front.png");
+    assert.equal(product.thumbnail_url, null);
+    assert.deepEqual(
+      product.image_previews.map((preview) => preview.preview_url),
+      [null],
+    );
   });
 
   test("returns null for out-of-stock or missing products so the route answers 404", async () => {
