@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { createClient } from "@supabase/supabase-js";
 import { classifyOrderReference, resolveStorefrontOrderId } from "./storefront-orders.server";
 
 const CUSTOMER = "11111111-2222-3333-4444-555555555555";
