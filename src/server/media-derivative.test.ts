@@ -47,6 +47,32 @@ describe("parseStorageRef", () => {
     assert.equal(parseStorageRef(null, origins), null);
   });
 
+  test("解码后仍拒绝目录穿越 / 反斜杠 / 编码斜杠 / 未知 scheme（fail-closed）", () => {
+    // 非 HTTP bucket/path 分支：%2e%2e 解码后是 ..
+    assert.equal(parseStorageRef("sku-listing/%2e%2e/secret", origins), null);
+    assert.equal(parseStorageRef("sku-listing/a/%2E%2E/b.jpg", origins), null);
+    // 编码斜杠：段解码后出现隐藏的 "/"
+    assert.equal(parseStorageRef("sku-listing/a%2fb.jpg", origins), null);
+    assert.equal(parseStorageRef(`${PRIMARY}/storage/v1/object/public/sku-listing/a%2fb.jpg`, origins), null);
+    // 反斜杠
+    assert.equal(parseStorageRef("sku-listing/a\\b.jpg", origins), null);
+    assert.equal(parseStorageRef("sku-listing/%5c/secret", origins), null);
+    assert.equal(parseStorageRef(`${PRIMARY}/storage/v1/object/public/sku-listing/a%5Cb.jpg`, origins), null);
+    // URL 分支解码后穿越
+    assert.equal(parseStorageRef(`${PRIMARY}/storage/v1/object/public/sku-listing/%2e%2e/secret`, origins), null);
+    // 未知 scheme / 伪协议
+    assert.equal(parseStorageRef("ftp://example.com/sku-listing/a.jpg", origins), null);
+    assert.equal(parseStorageRef("javascript:alert(1)", origins), null);
+    assert.equal(parseStorageRef("//evil.com/sku-listing/a.jpg", origins), null);
+    // 合法值不受影响
+    assert.deepEqual(parseStorageRef("sku-listing/a/b.jpg", origins), {
+      origin: "primary",
+      bucket: "sku-listing",
+      path: "a/b.jpg",
+    });
+  });
+});
+
   test("未配置腾讯 origin 时腾讯地址不被认作已知存储", () => {
     assert.equal(
       parseStorageRef(`${TENCENT}/storage/v1/object/public/parcel-item-images/n.jpg`, {
