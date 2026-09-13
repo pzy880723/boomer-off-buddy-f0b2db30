@@ -34,7 +34,7 @@ export const Route = createFileRoute("/api/public/storefront/orders/$id")({
                 .from("commerce_payments" as never)
                 .select("order:commerce_orders!inner(id,customer_id)")
                 .eq("merchant_order_no", merchantOrderNo)
-                .eq("commerce_orders.customer_id", customerId)
+                .eq("order.customer_id", customerId)
                 .maybeSingle();
               if (error) throw new Error(error.message);
               const order = (data as { order?: { id?: string; customer_id?: string } } | null)?.order;
