@@ -79,3 +79,32 @@ test("lookup failures surface as errors instead of a silent miss", async () => {
   });
   await assert.rejects(resolveStorefrontOrderId("BO20260909100007", CUSTOMER, f.deps), /db unavailable/);
 });
+
+test("PostgREST merchant-order join uses the embedded alias for customer filter", async () => {
+  const capturedUrls: string[] = [];
+  const mockFetch = (_url: string | URL | Request) => {
+    capturedUrls.push(typeof _url === "string" ? _url : String(_url));
+    return Promise.resolve(
+      new Response(JSON.stringify([]), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+  };
+  const client = createClient("https://test.supabase.co", "test-key", {
+    global: { fetch: mockFetch as typeof fetch },
+  });
+
+  await client
+    .from("commerce_payments")
+    .select("order:commerce_orders!inner(id,customer_id)")
+    .eq("merchant_order_no", "0123456789abcdef0123456789abcdef")
+    .eq("order.customer_id", CUSTOMER);
+
+  assert.equal(capturedUrls.length, 1);
+  const decoded = decodeURIComponent(capturedUrls[0]!);
+  assert.match(decoded, /select=order:commerce_orders!inner\(id,customer_id\)/);
+  assert.match(decoded, /order\.customer_id=eq\.[0-9a-f-]{36}/);
+  assert.doesNotMatch(decoded, /commerce_orders\.customer_id=eq\./);
+  assert.match(decoded, /merchant_order_no=eq\.[0-9a-f]{32}/);
+});
