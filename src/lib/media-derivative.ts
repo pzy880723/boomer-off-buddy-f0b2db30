@@ -98,9 +98,21 @@ export function parseStorageRef(
   if (!match?.groups?.["rest"]) return null;
   const parsed = splitBucketPath(match.groups["rest"]);
   if (!parsed || !isAllowedBucket(parsed.bucket)) return null;
-  const path = decodeSegments(parsed.path);
-  if (!path || path.includes("..")) return null;
+  const path = sanitizeDecodedPath(decodeSegments(parsed.path));
+  if (!path) return null;
   return { origin, bucket: parsed.bucket, path };
+}
+
+/**
+ * 解码后的路径二次校验（fail-closed）：
+ * 拒绝 `..`（含 %2e%2e 等编码形态解码后的结果）、反斜杠、
+ * 段内隐藏的 `/`（%2f 编码斜杠）与空段。
+ */
+function sanitizeDecodedPath(path: string): string | null {
+  if (!path || path.includes("..") || path.includes("\\")) return null;
+  const segments = path.split("/");
+  if (segments.some((s) => !s || s.includes("/") || s.includes("\\"))) return null;
+  return path;
 }
 
 function decodeSegments(path: string): string {
@@ -135,6 +147,7 @@ export function buildTencentDerivativeUrl(
 ): string | null {
   const base = origin?.trim().replace(/\/+$/, "");
   if (!base || ref.origin !== "tencent") return null;
+  if (!isAllowedDerivativeWidth(width)) return null;
   if (!(TENCENT_PUBLIC_BUCKETS as readonly string[]).includes(ref.bucket)) return null;
   return `${base}/storage/v1/render/image/public/${ref.bucket}/${encodeSegments(ref.path)}?width=${width}&quality=${DERIVATIVE_QUALITY}&resize=${DERIVATIVE_RESIZE}`;
 }
