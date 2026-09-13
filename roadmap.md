@@ -34,4 +34,4 @@
 
 - [x] 公开门店清单只读接口 GET /api/public/storefront/shops（字段白名单、私桶短期签名、缺图容错；hours/coords 暂 null）
 
-- [ ] 订单详情引用兼容（2026-09-13）：GET /api/public/storefront/orders/{reference} 支持 UUID / BO 订单号 / 32位hex merchant_order_no，严格按 customer_id 限定，统一 404，不泄漏支付快照
+- [x] 订单详情引用兼容（2026-09-13）：GET /api/public/storefront/orders/{reference} 支持 UUID / BO 订单号 / 32位hex merchant_order_no，严格按 customer_id 限定，统一 404，不泄漏支付快照
