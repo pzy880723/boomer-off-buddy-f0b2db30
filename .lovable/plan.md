@@ -1,63 +1,67 @@
-# 缺货申报 → 客户确认 → 自动原路退款：只读核查与最小接法
+# 原生 GO 收尾：门店目标 + 线下补录 集成合同核实
 
-腾讯生产基线仍为 `1e7a4ee-compressed-images-20260913`，本轮只读核查，未改代码、未迁移数据库、未发短信、未发起支付或退款。
+只读核实完成，未改代码、未恢复队列、未部署腾讯。腾讯运行基线仍为 `1e7a4ee-compressed-images-20260913`；本仓库 HEAD `6cef4bb`（仅 plan 文件），代码基线对应 main。
 
-## 1. 现状事实（已实查）
+## 一、现状实查证据（当前代码 / 内嵌库）
 
-### 表结构（内嵌 Supabase，只读）
-- `fulfillment_shortages`：`id, fulfillment_id, fulfillment_item_id, exception_id, order_id, quantity, reason, status, refund_state, reported_by, device_id, client_op_id, customer_responded_at, customer_response_note, created_at, updated_at`
-  - CHECK `status ∈ (pending_customer, customer_accepted, customer_cancelled, withdrawn)`
-  - CHECK `refund_state ∈ (not_required, refund_pending, refund_completed)`
-  - 缺口：没有 `order_item_id`、`refund_amount`、`after_sale_id`、`refund_id`，无法把缺货行与退款金额、退款记录绑定。
-- `commerce_after_sales`：`status ∈ (requested…refund_pending, refunded, closed, cancelled)`，有 `requested_amount / approved_amount / order_item_id / location_id / user_id`。
-- `commerce_refunds`：`payment_id, after_sale_id, amount, status ∈ (pending, processing, succeeded, failed, cancelled), merchant_refund_no, idempotency_key, lease_token, lease_expires_at, provider_refund_id, route_snapshot`。
-- `commerce_order_items`：有 `unit_price, quantity, line_total, original_unit_price, discount_total, discount_snapshot`（分摊后金额可直接取 `line_total`）。
-- `commerce_orders`：只有整单 `shipping_fee / discount_total / total_amount`，按门店运费只在 `courier_quote_snapshot.groups[].shipping_fee_fen` 快照里，没有行级运费列。
-- `inv_handheld_notifications`：`kind, title, payload, audience, user_id, device_id, location_id, action_status, ref_type, ref_id` —— 员工侧站内消息可直接复用（`ref_type='shortage'`）。
+### 1. 月目标 → 日目标
 
-### 真实退款的硬条件（`commerce_prepare_ordinary_refund` + `startOrdinaryRefund`）
-- 支付必须 `payment_channel='ordinary_wechat'` 且 `status ∈ (succeeded, partially_refunded, refunded)`。
-- 必须存在 `commerce_after_sales` 行，且 `order_id` 与支付一致、`status='refund_pending'`、`approved_amount` 非空且 `0 < approved_amount ≤ requested_amount`。
-- 同一 `after_sale_id` 只允许一个退款意图；租约 `lease_token/lease_expires_at` 提供并发预占；累计退款不得超过 `payment.amount`。
-- `startOrdinaryRefund`（`src/server/ordinary-refund-flow.ts:49`）**硬编码要求调用者 roles 含 `super_admin | hq_operator`**，并校验商户快照；`payments.refund.ts` 又用 `authenticatePosUser` 做总部 POS 鉴权。
-- 因此「客户确认即自动退款」当前无法直接复用：缺客户身份的服务端执行路径，且缺 after_sale 自动生成/审批置位。
+| 层 | 位置 | 事实 |
+|---|---|---|
+| 表 | `store_monthly_target_plans`（版本 + published/archived）、`store_daily_targets`（唯一键 `location_id,target_date`，含 `source`/`is_locked`/`plan_version`）、`store_target_audit_logs` | 迁移 `20260907102650_...`、`20260907104254_...` 已应用（库内最新 version `20260908081317`）。实查：plans 2 条、daily_targets 21 条 |
+| 分配逻辑 | `src/lib/store-targets/allocation.ts` + `src/server/store-targets.server.ts::publishMonthlyPlan` | 过去日与 `is_locked` 日冻结不覆盖，只 upsert 未冻结日；每次发布归档旧 published 并写审计 |
+| 日目标改写 | `overrideDailyTarget` | `source='manual_override'`，默认 `is_locked=true`，必须带 `reason`，写审计 |
+| ERP API | `src/lib/store-targets.functions.ts`：`listTargetLocations` / `getMonthlyTargetPlan` / `publishMonthlyTargetPlan` / `setDailyTargetOverride` / `getStoreDailySummary` / `listTargetAuditLogs` | 全部 `createServerFn` + `requireSupabaseAuth`。写操作 `requireHq()` 仅 `super_admin`/`hq_operator`；`getStoreDailySummary` 额外允许 `user_location_perms` 命中的门店 |
+| ERP 配置页 | `src/routes/shop-mgmt.targets.tsx` | 已接月计划发布、日目标覆盖、当日汇总、审计列表；**页面没有任何线下补录 UI** |
 
-### 其他入口现状
-- `POST /api/public/handheld/fulfillments/$id/shortage`：按 `client_op_id` 幂等，写 `fulfillment_exceptions` + `fulfillment_shortages(status=pending_customer, refund_state=refund_pending)`；不写通知、不发短信、不建 after_sale。
-- `POST /api/public/storefront/shortages/$id/respond`：本人订单校验走 `commerce_orders.customer_id`，只改 `status`，注释明确不伪造退款。
-- `GET /api/public/storefront/shortages`：仅列表。
-- `POST …/fulfillments/$id/waybill`：`carrierCapability()` 依赖 `COURIER_PROVIDER_CODE`，POST 恒返回 409/501，**没有手工录入快递单号的接口**；`shipments` 表已存在（GET 读取 `provider, tracking_no, status`），但无写入路径、无"发货事务"（订单状态/履约状态/物流事件联动）实现。
-- 短信：只有 `sendOtpSms`（`src/server/sms.tencent.server.ts`），TC3 签名齐全但**模板写死单变量验证码**，`TENCENT_SMS_TEMPLATE_ID` 只有一个；无业务通知模板、无发送回执表、无重试/outbox。`deliverStoredOtp` 只在失败时删除 OTP。
-- 消费者站内消息：可复用 `support_conversations / support_messages`（已有 storefront 端点）。
-- 身份错位风险：`commerce_create_after_sale(p_user_id …)` 按 `commerce_orders.user_id` 校验归属，而门店订单本人鉴权走 `customer_id`，小程序客户直连该 RPC 会命中 "order is not eligible"。
+结论：月目标→日目标链路完整，且**只能用 ERP 登录（Supabase 会话）调用**，GO JWT 无法调用这些 serverFn。
 
-## 2. 最小安全设计（推荐接法，未实施）
+### 2. 日汇总对外接口（GO 本人 JWT 可用）
 
-### 迁移（一次，加列不破坏）
-1. `fulfillment_shortages` 增列：`order_item_id uuid`、`refund_amount numeric`、`after_sale_id uuid`、`refund_id uuid`、`customer_confirm_token`（可选）、`notified_at`、状态扩展 `refund_processing/refund_succeeded/refund_failed` 走独立列而非改现有 CHECK —— 缺货状态与退款状态分离：`status` 只表达客户意见，`refund_state` 只表达资金结果。
-2. 新 RPC `commerce_confirm_shortage_refund(p_shortage_id, p_customer_id, p_expected_amount, p_idempotency_key)`：单事务内
-   - `FOR UPDATE` 锁 shortage + order，校验 `order.customer_id = p_customer_id`、`status='pending_customer'`；
-   - 金额**服务端自算**（`line_total / quantity × 缺货数量`，从 `commerce_order_items` 取，绝不接受客户端传值；`p_expected_amount` 只做一致性比对，不一致报错）；
-   - 自动建 `commerce_after_sales(type='refund_only', status='refund_pending', requested_amount=approved_amount=服务端金额, user_id=订单 user_id, location_id=行 location_id)`，写 `after_sale_id` 回 shortage；
-   - 返回 `payment_id + after_sale_id + idempotency_key`（由 `shortage_id` 派生，保证重放同键）。
-3. 不新增总部审批：审批位由该 RPC 在客户确认时写入，并在 `commerce_membership_admin_audit_logs` 同类审计表留痕（或新增 `shortage` 审计）。
+- `GET /api/public/go/daily-summary?date=&location_id=`
+- `GET /api/public/go/store/daily-sales?date=&location_id=`（同一套鉴权与口径的别名）
+- `GET /api/public/go/authorization`、`POST /api/public/go/authorization-ack`、`/api/public/go/session`
 
-### 服务端
-4. `startOrdinaryRefund` 增加一个受控执行身份，而不是放宽 roles：新增 `actor: { kind: 'customer_confirmed', shortageId }` 分支，要求调用方已通过 `commerce_confirm_shortage_refund` 返回的凭据；总部 POS 路径保持原样。
-5. 新路由 `POST /api/public/storefront/shortages/$id/confirm-refund`：`authenticateStorefrontCustomer` → RPC → `startOrdinaryRefund`（幂等键 = `shortage:{id}`）→ 失败只落 `refund_state` 与失败原因，绝不返回商户/签名信息。真实结果仍以 `payments.wechat-notify` / `payments.reconcile` 回写为准（`commerce_apply_ordinary_refund`），确认接口只允许把 `refund_state` 推进到 `refund_processing`。
-6. 通知三路同步（缺货申报时触发，一次事务后异步）：
-   - 短信：新增 `TENCENT_SMS_TEMPLATE_ID_SHORTAGE` + 通用 `sendTemplateSms(phone, templateId, params[])`（复用现有 TC3 签名），新增 `notification_deliveries` 表记录 `serial / code / message` 回执与重试；
-   - 站内消息：向订单会话写 `support_messages`（系统消息，带 shortage 深链）；
-   - 售后处理入口：写 `inv_handheld_notifications(kind='shortage_pending', ref_type='shortage', ref_id, audience/location_id=履约门店)`。
+鉴权：`authenticateGoActor()` 只接受固定 GO issuer（`GO_SUPABASE_ORIGIN`，`GO_SUPABASE_URL` 需同源）的用户 Bearer JWT，走 GO `auth.getUser` 实查，不本地 decode；门店由 GO 排班 + ERP `go_shop_location_links` 决定，忽略客户端声明；越权 403，未配置 503 `go_bridge_not_configured`。
 
-### 发货与运费
-7. 手工快递单：现无可复用实现，建议 `POST …/fulfillments/$id/waybill` 增加 `mode='manual'` 分支，事务内写 `shipments(provider='manual', tracking_no)` + `shipment_events` + 履约/订单状态推进，与未配置的真实面单能力并存。
-8. 运费与优惠分摊：商品金额直接用 `commerce_order_items.line_total`（已含 `discount_total` 分摊）；运费**不随缺货单自动退**，按门店运费只有 `courier_quote_snapshot.groups[].shipping_fee_fen` 快照，整组商品全缺时才可按该快照退运费，否则不摊派。
+返回（`ok:true,data`）字段口径：`target_fen`/`target_source`、`achieved_fen`、`gap_fen`、`progress_pct`、`youzan{performance_fen,gross_paid_fen,shipping_fee_fen,order_count,excluded_order_count,shop_bound}`、`offline{amount_fen,entry_count,order_count}`、`completeness`。金额整数分；无退款源时 `kind="paid_gross"`、`complete=false`。
 
-## 3. 明确缺口清单
-- 无 shortage↔after_sale↔refund 关联列；无服务端金额来源约束。
-- 无客户身份的退款执行路径（roles 硬校验）。
-- 无业务短信模板/回执/重试 outbox。
-- 无消费者侧自助售后创建（仅客服提示），且 `commerce_create_after_sale` 按 `user_id` 而非 `customer_id` 判定归属。
-- 无手工快递单写入与发货事务。
-- 无 shortage 操作审计表。
+这三条 GO 接口本轮必须保留原样。
+
+### 3. 线下补录现状
+
+- 表 `store_offline_sales_entries`（22 列，3 policies）+ `store_offline_sales_audit_logs`；实查行数 0（从未写过真实补录）。
+- 服务端实现 `src/server/store-targets.server.ts`：`createOfflineEntry`（幂等：同门店同 `client_op_id` 回放原记录并写 `replay_idempotent` 审计）、`listOfflineEntries`、`voidOfflineEntry`（必须 `reason`，改 `status='voided'` 并写审计）。
+- 唯一已接的 API：`/api/public/handheld/store/offline-sales`（GET 列表 / POST 新增），鉴权是 **手持设备令牌 + 员工会话**（`authenticateDevice` + `resolveSessionUser` + `userCanAccessLocation`），不是 GO JWT。
+- 防有赞重复靠申报字段：`youzan_exclusion_basis` ∈ `device_not_youzan|operator_declared|reconciled_against_youzan|unverified`，加 `youzan_excluded_tids[]`；除 `manual_declaration` 外必须给 `evidence_ref` 或 `evidence_url`。
+
+## 二、确认的缺口（不是未知，是实查缺失）
+
+1. **GO 端无补录入口**：原生已有每日目标卡，但补录只有手持设备通道；GO 本人 JWT 打不通 `createOfflineEntry`。
+2. **无“改正”API**：`store-targets.server.ts` 只有 create / void / list，没有 correct/amend；ERP 与手持均无。
+3. **`voidOfflineEntry` 没有任何路由调用**（全仓仅定义处出现），作废能力目前不可达。
+4. **ERP 端无补录审阅页**：`shop-mgmt.targets.tsx` 无补录列表/作废/改正 UI。
+5. **幂等键无库级唯一约束证据**：现为应用层先查后插，`client_op_id` 并发重复需确认唯一索引，否则可能双写。
+
+## 三、GO 授权 8 秒上游调用 / 9 月 8 日两次 erp_timeout
+
+- 超时常量在 `src/server/trusted-go-fetch.server.ts`：`GO_FETCH_TIMEOUT_MS = 8_000`，覆盖响应头之后的 body 读取，并与调用方 `request.signal` 联动 abort。
+- 后续修复已存在：`74233cc`（2026-09-08）`fix: harden GO issuer transport and disable response caching`，测试 `src/server/trusted-go-fetch.test.mjs` 断言 8000ms 计时覆盖 body 阶段与外部 abort 传播。
+- 内嵌库 `go_authorization_snapshots` 只有 1 条（2026-09-07），无 erp_timeout 记录；9 月 8 日两次超时属腾讯运行侧事实，本库无法核对。
+- 本轮不放宽权限、不改租约、不改超时值。
+
+## 四、建议的最小接法（需你批准后才实施）
+
+不新建 App 独立后台，只补三件事：
+
+1. **GO 本人 JWT 补录通道**：新增 `POST /api/public/go/store/offline-sales`，复用 `authenticateGoActor` + `scopeForActor`（门店由排班/映射决定，忽略 body 的 location_id），body 与手持端同构（`client_op_id`、`amount_fen`、`channel`、`evidence_*`、`youzan_exclusion_basis`），内部调用同一 `createOfflineEntry`，不新增业务逻辑分支。
+2. **改正与作废**：新增 `POST .../offline-sales/:id/void`（复用 `voidOfflineEntry`，必填 reason）；“改正”按 void + 新建（保留原始审计链）实现，不做原地改金额。
+3. **幂等硬化**：为 `store_offline_sales_entries(location_id, client_op_id)` 加唯一索引，并在冲突时回放原记录（迁移需单独批准）。
+
+权限边界保持：目标配置写操作仍只限 ERP 总部角色；GO 侧只能就自己排班门店补录与查看。
+
+## 五、待你确认
+
+- 是否批准上述 GO 补录/作废路由与唯一索引迁移？
+- 补录是否允许负数金额（当前只禁 0）？
+- “改正”是否接受 void+重建，而非原地修改？
