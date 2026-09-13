@@ -50,7 +50,7 @@ test('both WeChat not-found codes continue to first create with full payload', a
     const f = fixture();
     f.client.queryPayment = async () => { throw Object.assign(new Error('not found'), { code }); };
     const result = await startOrdinaryPayment(f.deps, f.input);
-    assert.deepEqual(f.calls, ['commerce_prepare_ordinary_payment', 'query', 'create', 'commerce_record_ordinary_prepay']);
+    assert.deepEqual(f.calls, ['commerce_prepare_ordinary_payment', 'create', 'commerce_record_ordinary_prepay']);
     assert.equal(result.payment_payload.package, 'prepay_id=prepay');
     assert.equal(result.payment_payload.paySign, 'signature');
     assert.equal(result.payment.status, 'processing');
@@ -61,7 +61,8 @@ test('other error codes never continue to create', async () => {
     const f = fixture();
     f.client.queryPayment = async () => { throw Object.assign(new Error('wechat error'), { code }); };
     await assert.rejects(startOrdinaryPayment(f.deps, f.input), /wechat error/);
-    assert.deepEqual(f.calls, ['commerce_prepare_ordinary_payment', 'query']);
+    assert.deepEqual(f.calls, ['commerce_prepare_ordinary_payment']);
+    assert.equal(f.calls.includes('create'), false);
   }
 });
 test('unknown query never creates or releases inventory', async () => {
