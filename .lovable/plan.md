@@ -1,67 +1,57 @@
-# 原生 GO 收尾：门店目标 + 线下补录 集成合同核实
+# 本任务只读收尾：有赞凭据安全恢复能力 + GO 本人 JWT 补录最小合同
 
-只读核实完成，未改代码、未恢复队列、未部署腾讯。腾讯运行基线仍为 `1e7a4ee-compressed-images-20260913`；本仓库 HEAD `6cef4bb`（仅 plan 文件），代码基线对应 main。
+范围仅此两项。不实施退款/售后计划，不改公网 release、队列、退款流程。腾讯基线仍为 `1e7a4ee-compressed-images-20260913`，本轮未部署。
 
-## 一、现状实查证据（当前代码 / 内嵌库）
+## 一、我是否有“安全配置导出 / 同步 / 直接注入腾讯”的能力
 
-### 1. 月目标 → 日目标
+明确答复：**没有。**
 
-| 层 | 位置 | 事实 |
-|---|---|---|
-| 表 | `store_monthly_target_plans`（版本 + published/archived）、`store_daily_targets`（唯一键 `location_id,target_date`，含 `source`/`is_locked`/`plan_version`）、`store_target_audit_logs` | 迁移 `20260907102650_...`、`20260907104254_...` 已应用（库内最新 version `20260908081317`）。实查：plans 2 条、daily_targets 21 条 |
-| 分配逻辑 | `src/lib/store-targets/allocation.ts` + `src/server/store-targets.server.ts::publishMonthlyPlan` | 过去日与 `is_locked` 日冻结不覆盖，只 upsert 未冻结日；每次发布归档旧 published 并写审计 |
-| 日目标改写 | `overrideDailyTarget` | `source='manual_override'`，默认 `is_locked=true`，必须带 `reason`，写审计 |
-| ERP API | `src/lib/store-targets.functions.ts`：`listTargetLocations` / `getMonthlyTargetPlan` / `publishMonthlyTargetPlan` / `setDailyTargetOverride` / `getStoreDailySummary` / `listTargetAuditLogs` | 全部 `createServerFn` + `requireSupabaseAuth`。写操作 `requireHq()` 仅 `super_admin`/`hq_operator`；`getStoreDailySummary` 额外允许 `user_location_perms` 命中的门店 |
-| ERP 配置页 | `src/routes/shop-mgmt.targets.tsx` | 已接月计划发布、日目标覆盖、当日汇总、审计列表；**页面没有任何线下补录 UI** |
+实查能力边界（仅核对名称，未读取任何值）：
 
-结论：月目标→日目标链路完整，且**只能用 ERP 登录（Supabase 会话）调用**，GO JWT 无法调用这些 serverFn。
+- 我能列出安全配置中的名称：`YOUZAN_CLIENT_ID`、`YOUZAN_CLIENT_SECRET`、`YOUZAN_PROXY_URL`、`YOUZAN_PROXY_TOKEN` 四项均存在。
+- 我**不能**读取、解密、导出或转发任何值：值为加密存储，工具只返回名称。
+- 我**不能**新建/修改已存在的同名配置项（已存在即拒绝），也**不能**把值写入腾讯 `shared/.env`、PM2 dump 或任何远端。
+- 平台没有“Lovable 安全配置 → 腾讯服务器”的官方同步通道；两边是各自独立的配置面。
+- 我拒绝构造任何临时导出接口、回显端点或代码路径来搬运密钥（那等于把密钥落进代码与公网面）。
 
-### 2. 日汇总对外接口（GO 本人 JWT 可用）
+### 最短安全操作路径（必须由你本人完成）
 
-- `GET /api/public/go/daily-summary?date=&location_id=`
-- `GET /api/public/go/store/daily-sales?date=&location_id=`（同一套鉴权与口径的别名）
-- `GET /api/public/go/authorization`、`POST /api/public/go/authorization-ack`、`/api/public/go/session`
+1. 打开 **Project Settings → Secrets（项目设置 → 安全配置）**，对 `YOUZAN_CLIENT_ID`、`YOUZAN_CLIENT_SECRET`、`YOUZAN_PROXY_URL`、`YOUZAN_PROXY_TOKEN` 四项逐一点击显示/复制。此面板是唯一能取回值的位置。
+2. 通过 SSH 直接在腾讯服务器上用编辑器写入 `shared/.env`（不要用带值的命令行参数，避免落入 shell history 与进程列表）。写完执行 `chmod 600 shared/.env`。
+3. 重载进程使配置生效（PM2 需带 `--update-env`），不重置任何游标。
+4. 生效验证只做只读探针：一次授权/只读 API 调用确认拿到真实 `code=200`；不得调用有赞商品写接口。
+5. 通过后再做单店单窗口有界 canary，人工核对游标推进，然后分批开放失败窗口；28 条失败游标不得一次性重置。
+6. 全过程密钥不进入聊天、日志、命令参数、代码与任何公开接口。
 
-鉴权：`authenticateGoActor()` 只接受固定 GO issuer（`GO_SUPABASE_ORIGIN`，`GO_SUPABASE_URL` 需同源）的用户 Bearer JWT，走 GO `auth.getUser` 实查，不本地 decode；门店由 GO 排班 + ERP `go_shop_location_links` 决定，忽略客户端声明；越权 403，未配置 503 `go_bridge_not_configured`。
+不新建有赞应用，不改权限、退款与租约。
 
-返回（`ok:true,data`）字段口径：`target_fen`/`target_source`、`achieved_fen`、`gap_fen`、`progress_pct`、`youzan{performance_fen,gross_paid_fen,shipping_fee_fen,order_count,excluded_order_count,shop_bound}`、`offline{amount_fen,entry_count,order_count}`、`completeness`。金额整数分；无退款源时 `kind="paid_gross"`、`complete=false`。
+## 二、GO 本人 JWT 补录现金/POS/微信 —— 最小既有业务合同
 
-这三条 GO 接口本轮必须保留原样。
+目标：原生已有每日目标卡，补上补录入口；不新建 App 独立后台，不新增业务逻辑分支，全部复用既有实现。
 
-### 3. 线下补录现状
+### 复用的既有资产（实查）
 
-- 表 `store_offline_sales_entries`（22 列，3 policies）+ `store_offline_sales_audit_logs`；实查行数 0（从未写过真实补录）。
-- 服务端实现 `src/server/store-targets.server.ts`：`createOfflineEntry`（幂等：同门店同 `client_op_id` 回放原记录并写 `replay_idempotent` 审计）、`listOfflineEntries`、`voidOfflineEntry`（必须 `reason`，改 `status='voided'` 并写审计）。
-- 唯一已接的 API：`/api/public/handheld/store/offline-sales`（GET 列表 / POST 新增），鉴权是 **手持设备令牌 + 员工会话**（`authenticateDevice` + `resolveSessionUser` + `userCanAccessLocation`），不是 GO JWT。
-- 防有赞重复靠申报字段：`youzan_exclusion_basis` ∈ `device_not_youzan|operator_declared|reconciled_against_youzan|unverified`，加 `youzan_excluded_tids[]`；除 `manual_declaration` 外必须给 `evidence_ref` 或 `evidence_url`。
+- 服务端：`src/server/store-targets.server.ts` 的 `createOfflineEntry`（含幂等回放 + 审计）、`voidOfflineEntry`（必填 reason + 审计）、`listOfflineEntries`。
+- 表：`store_offline_sales_entries`、`store_offline_sales_audit_logs`（迁移已应用；实查当前 0 条补录，历史干净）。
+- 鉴权：`src/server/go-bridge.server.ts` 的 `authenticateGoActor` + `scopeForActor`（固定 GO issuer 实查 JWT，门店由 GO 排班 + `go_shop_location_links` 决定）。
+- 现有唯一补录通道 `/api/public/handheld/store/offline-sales` 走手持设备令牌，GO JWT 打不通；`voidOfflineEntry` 目前没有任何路由调用。
 
-## 二、确认的缺口（不是未知，是实查缺失）
+### 建议合同（待批准后才实施）
 
-1. **GO 端无补录入口**：原生已有每日目标卡，但补录只有手持设备通道；GO 本人 JWT 打不通 `createOfflineEntry`。
-2. **无“改正”API**：`store-targets.server.ts` 只有 create / void / list，没有 correct/amend；ERP 与手持均无。
-3. **`voidOfflineEntry` 没有任何路由调用**（全仓仅定义处出现），作废能力目前不可达。
-4. **ERP 端无补录审阅页**：`shop-mgmt.targets.tsx` 无补录列表/作废/改正 UI。
-5. **幂等键无库级唯一约束证据**：现为应用层先查后插，`client_op_id` 并发重复需确认唯一索引，否则可能双写。
+1. `POST /api/public/go/store/offline-sales` — 创建
+   - 入参：`client_op_id`（必填，幂等键）、`business_date`(yyyy-mm-dd)、`channel` ∈ `cash|pos_card|wechat_qr|alipay_qr|bank_transfer|other`、`amount_fen`（非零整数分）、`order_count`、`evidence_type` ∈ `pos_receipt|payment_screenshot|bank_slip|handwritten_slip|manual_declaration`、`evidence_ref`/`evidence_url`（非口头申报必须至少一项）、`youzan_exclusion_basis` ∈ `device_not_youzan|operator_declared|reconciled_against_youzan|unverified`、`youzan_excluded_tids[]`、`note`。
+   - 门店：一律由排班/映射推导，**忽略 body 里的 location_id**；非本人当日门店 403。
+   - 返回：`{ ok:true, data:{ entry, replayed } }`；重复 `client_op_id` 回放原记录且 `replayed=true`，不产生第二条。
+2. `GET /api/public/go/store/offline-sales?date_from=&date_to=` — 只看本人当日门店的补录列表（复用 `listOfflineEntries`）。
+3. `POST /api/public/go/store/offline-sales/:id/void` — 作废，必填 `reason`，仅限同门店记录；复用 `voidOfflineEntry`。
+4. **更正 = 作废 + 重建**，不原地改金额，保留完整审计链。
+5. 幂等硬化：为 `store_offline_sales_entries(location_id, client_op_id)` 加唯一索引，冲突时回放（迁移需单独批准）。
+6. 防有赞重复：靠 `youzan_exclusion_basis` + `youzan_excluded_tids` 申报，并在日汇总里与有赞口径分列（`offline` 与 `youzan` 两块互不相加进同一来源）。
+7. 审计：创建 / 回放 / 作废均写 `store_offline_sales_audit_logs`，记录 actor、门店、业务日、`client_op_id`、前后快照。
+8. 权限边界不变：月目标/日目标配置写操作仍只限 ERP 总部角色（`super_admin`/`hq_operator`）；GO 侧只能补录与查看自己排班门店；现有 `/api/public/go/authorization`、`/session`、`/daily-summary` 三条接口保持原样不动。
 
-## 三、GO 授权 8 秒上游调用 / 9 月 8 日两次 erp_timeout
+### 待你确认
 
-- 超时常量在 `src/server/trusted-go-fetch.server.ts`：`GO_FETCH_TIMEOUT_MS = 8_000`，覆盖响应头之后的 body 读取，并与调用方 `request.signal` 联动 abort。
-- 后续修复已存在：`74233cc`（2026-09-08）`fix: harden GO issuer transport and disable response caching`，测试 `src/server/trusted-go-fetch.test.mjs` 断言 8000ms 计时覆盖 body 阶段与外部 abort 传播。
-- 内嵌库 `go_authorization_snapshots` 只有 1 条（2026-09-07），无 erp_timeout 记录；9 月 8 日两次超时属腾讯运行侧事实，本库无法核对。
-- 本轮不放宽权限、不改租约、不改超时值。
-
-## 四、建议的最小接法（需你批准后才实施）
-
-不新建 App 独立后台，只补三件事：
-
-1. **GO 本人 JWT 补录通道**：新增 `POST /api/public/go/store/offline-sales`，复用 `authenticateGoActor` + `scopeForActor`（门店由排班/映射决定，忽略 body 的 location_id），body 与手持端同构（`client_op_id`、`amount_fen`、`channel`、`evidence_*`、`youzan_exclusion_basis`），内部调用同一 `createOfflineEntry`，不新增业务逻辑分支。
-2. **改正与作废**：新增 `POST .../offline-sales/:id/void`（复用 `voidOfflineEntry`，必填 reason）；“改正”按 void + 新建（保留原始审计链）实现，不做原地改金额。
-3. **幂等硬化**：为 `store_offline_sales_entries(location_id, client_op_id)` 加唯一索引，并在冲突时回放原记录（迁移需单独批准）。
-
-权限边界保持：目标配置写操作仍只限 ERP 总部角色；GO 侧只能就自己排班门店补录与查看。
-
-## 五、待你确认
-
-- 是否批准上述 GO 补录/作废路由与唯一索引迁移？
-- 补录是否允许负数金额（当前只禁 0）？
-- “改正”是否接受 void+重建，而非原地修改？
+- 批准上述三条 GO 路由与唯一索引迁移？
+- 补录是否允许负数金额（当前实现只禁 0）？
+- 确认“更正”采用作废 + 重建。
