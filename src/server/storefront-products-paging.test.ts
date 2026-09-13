@@ -133,17 +133,15 @@ describe("storefront list paging + page-only image signing", () => {
     assert.equal(signed[0].price, 300);
   });
 
-  test("thumbnail failure falls back to the original signed image", async () => {
+  test("thumbnail failure yields null and never the original image", async () => {
     const l = listing("t", ["sku-listing/t.png"]);
     const [withNull] = await signStorefrontProductImages([product(l, 1)], new Map([[l.id, l]]), {
       thumbnail: true,
       signer: makeSigner([]),
       thumbnailSigner: async (paths) => paths.map(() => null),
     });
-    assert.equal(
-      (withNull as { thumbnail_url?: string }).thumbnail_url,
-      "https://signed.test/sku-listing/t.png",
-    );
+    assert.equal((withNull as { thumbnail_url?: string | null }).thumbnail_url, null);
+    assert.equal(withNull.image_url, "https://signed.test/sku-listing/t.png");
     const [withThrow] = await signStorefrontProductImages([product(l, 1)], new Map([[l.id, l]]), {
       thumbnail: true,
       signer: makeSigner([]),
@@ -151,10 +149,7 @@ describe("storefront list paging + page-only image signing", () => {
         throw new Error("transform unavailable");
       },
     });
-    assert.equal(
-      (withThrow as { thumbnail_url?: string }).thumbnail_url,
-      "https://signed.test/sku-listing/t.png",
-    );
+    assert.equal((withThrow as { thumbnail_url?: string | null }).thumbnail_url, null);
     // 不开 thumbnail 时不新增字段
     const [plain] = await signStorefrontProductImages([product(l, 1)], new Map([[l.id, l]]), {
       signer: makeSigner([]),
