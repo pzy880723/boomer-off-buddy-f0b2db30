@@ -59,6 +59,7 @@ test("case exposes only the contracted fields with integer fen and a derivative 
     "order_no",
     "product_name",
     "quantity",
+    "quote_version",
     "reason",
     "refund_goods_fen",
     "refund_requested_at",
