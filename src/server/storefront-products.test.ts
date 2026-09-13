@@ -344,7 +344,7 @@ describe("storefront detail image_previews contract", () => {
     ]);
   });
 
-  test("falls back per image when thumbnails fail individually or entirely", async () => {
+  test("yields null preview per image when derivatives fail individually or entirely", async () => {
     const partial = await buildStorefrontProductDetail(threePhotoListing, {
       enrich: enrichFor(threePhotoListing),
       signer: async (paths) => paths.map((path) => `https://signed.test/${path}`),
@@ -356,7 +356,7 @@ describe("storefront detail image_previews contract", () => {
       partial.image_previews.map((preview) => preview.preview_url),
       [
         "https://thumb.test/480/sku-listing/a-front.png",
-        "https://signed.test/sku-listing/b-side.png",
+        null,
         "https://thumb.test/480/sku-listing/c-back.png",
       ],
     );
@@ -371,9 +371,14 @@ describe("storefront detail image_previews contract", () => {
     assert.ok(allFailed);
     assert.deepEqual(
       allFailed.image_previews.map((preview) => preview.preview_url),
-      allFailed.image_previews.map((preview) => preview.image_url),
+      [null, null, null],
     );
-    assert.equal(allFailed.thumbnail_url, allFailed.image_previews[0].image_url);
+    assert.equal(allFailed.thumbnail_url, null);
+    assert.deepEqual(allFailed.image_urls, [
+      "https://signed.test/sku-listing/a-front.png",
+      "https://signed.test/sku-listing/b-side.png",
+      "https://signed.test/sku-listing/c-back.png",
+    ]);
   });
 
   test("external URLs get no preview (null), storage paths still get a derivative", async () => {
