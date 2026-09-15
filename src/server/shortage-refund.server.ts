@@ -61,6 +61,23 @@ export type ShortageDeps = {
   }): Promise<ConfirmOutcome>;
 };
 
+/** 键集游标编码：`<created_at>|<id>`。 */
+export function formatShortageCursor(row: { created_at: string; id: string }): string {
+  return `${row.created_at}|${row.id}`;
+}
+
+export function parseShortageCursor(
+  cursor: string | null,
+): { createdAt: string; id: string } | null {
+  if (!cursor) return null;
+  const idx = cursor.lastIndexOf("|");
+  if (idx <= 0) return null;
+  const createdAt = cursor.slice(0, idx);
+  const id = cursor.slice(idx + 1);
+  if (!createdAt || !id) return null;
+  return { createdAt, id };
+}
+
 export const SHORTAGE_PAGE_SIZE = 200;
 export const SHORTAGE_MAX_PAGES = 100;
 
@@ -212,14 +229,21 @@ export function createShortageDeps(): ShortageDeps {
         .select(SHORTAGE_COLUMNS)
         .eq("order.customer_id", customerId);
       if (orderId) query = query.eq("order_id", orderId);
-      if (cursor) query = query.lt("created_at", cursor);
+      // 键集游标 (created_at, id)：同一时间戳的多行不会被漏掉。
+      const parsed = parseShortageCursor(cursor);
+      if (parsed) {
+        query = query.or(
+          `created_at.lt.${parsed.createdAt},and(created_at.eq.${parsed.createdAt},id.lt.${parsed.id})`,
+        );
+      }
       const { data, error } = await query
         .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
         .limit(pageSize);
       if (error) throw new Error(`shortage_read_failed: ${error.message}`);
       const rows = mapRows(data);
-      // 键集游标：按 created_at 递减；不足一页即读完。
-      const next = rows.length >= pageSize ? (rows[rows.length - 1]!.created_at ?? null) : null;
+      const last = rows[rows.length - 1];
+      const next = rows.length >= pageSize && last ? formatShortageCursor(last) : null;
       return { rows, nextCursor: next };
     },
     async fetchShortageById(customerId, shortageId) {
