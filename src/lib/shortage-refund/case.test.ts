@@ -53,6 +53,7 @@ test("case exposes only the contracted fields with integer fen and a derivative 
   const c = toShortageCase(row, extra);
   assert.deepEqual(Object.keys(c).sort(), [
     "can_confirm",
+    "can_confirm_reason",
     "created_at",
     "customer_responded_at",
     "id",
