@@ -8374,6 +8374,14 @@ export type Database = {
         }
         Returns: undefined
       }
+      commerce_claim_refund_intent: {
+        Args: { p_intent_id: string; p_lease_seconds: number }
+        Returns: Json
+      }
+      commerce_claim_refund_intents: {
+        Args: { p_lease_seconds: number; p_limit: number }
+        Returns: Json
+      }
       commerce_close_ordinary_payment: {
         Args: { p_close_evidence: Json; p_payment_id: string }
         Returns: Json
@@ -8725,6 +8733,17 @@ export type Database = {
           p_customer_id: string
           p_request_id: string
           p_usage_date?: string
+        }
+        Returns: Json
+      }
+      commerce_settle_refund_intent: {
+        Args: {
+          p_error: string
+          p_intent_id: string
+          p_lease_token: string
+          p_refund_id: string
+          p_retry_delay_seconds: number
+          p_state: string
         }
         Returns: Json
       }
@@ -9161,6 +9180,16 @@ export type Database = {
           p_reason?: string
           p_roles?: string[]
           p_target_user_id: string
+        }
+        Returns: Json
+      }
+      shortage_attach_quote_v1: {
+        Args: {
+          p_customer_id: string
+          p_location_id: string
+          p_order_item_id: string
+          p_quote: Json
+          p_shortage_id: string
         }
         Returns: Json
       }

@@ -4,6 +4,7 @@
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { DERIVATIVE_WIDTHS, signDerivativeUrls } from "./media-derivative.server";
+import { ensureShortageQuote } from "./shortage-quote.server";
 import {
   confirmIdempotencyKey,
   toShortageCase,
@@ -14,6 +15,9 @@ import {
 export type ShortageDbRow = ShortageRow & {
   image_ref: string | null;
   location_id: string | null;
+  order_item_id: string | null;
+  fulfillment_item_id: string | null;
+  refund_intent_id: string | null;
 };
 
 export type ConfirmOutcome =
@@ -29,6 +33,8 @@ export type ShortageDeps = {
   fetchStoreNames(locationIds: string[]): Promise<Map<string, string>>;
   fetchIntentShortageIds(shortageIds: string[]): Promise<Set<string>>;
   signThumbnails(refs: string[]): Promise<(string | null)[]>;
+  /** 旧缺货兼容：无报价时按订单实付重新核算并落库（无法安全报价则留人工）。 */
+  ensureQuote(row: ShortageDbRow, customerId: string): Promise<ShortageDbRow>;
   confirmRefund(input: {
     shortageId: string;
     customerId: string;
@@ -39,10 +45,14 @@ export type ShortageDeps = {
 
 async function buildCases(
   deps: ShortageDeps,
-  rows: ShortageDbRow[],
+  inputRows: ShortageDbRow[],
   orderNoById: Map<string, string | null>,
+  customerId: string,
 ): Promise<ShortageCase[]> {
-  if (rows.length === 0) return [];
+  if (inputRows.length === 0) return [];
+  // 旧缺货：读时补真实报价（无法安全报价则转人工），使其成为可确认的待办。
+  const rows: ShortageDbRow[] = [];
+  for (const row of inputRows) rows.push(await deps.ensureQuote(row, customerId));
   const [stores, intents, thumbs] = await Promise.all([
     deps.fetchStoreNames(rows.map((r) => r.location_id).filter((v): v is string => !!v)),
     deps.fetchIntentShortageIds(rows.map((r) => r.id)),
@@ -66,7 +76,17 @@ export async function listShortageCases(
   const orders = await deps.fetchOrders(customerId, orderId);
   if (orders.length === 0) return [];
   const rows = await deps.fetchShortages(orders.map((o) => o.id));
-  return buildCases(deps, rows, new Map(orders.map((o) => [o.id, o.order_no])));
+  return buildCases(deps, rows, new Map(orders.map((o) => [o.id, o.order_no])), customerId);
+}
+
+/** 售后待办汇总：不依赖通知已读状态，旧缺货同样计入。 */
+export async function getAfterSalesSummary(
+  deps: ShortageDeps,
+  customerId: string,
+): Promise<{ pending_count: number; pending_shortage_count: number }> {
+  const cases = await listShortageCases(deps, customerId);
+  const pendingShortages = cases.filter((c) => c.status === "pending_customer").length;
+  return { pending_count: pendingShortages, pending_shortage_count: pendingShortages };
 }
 
 export async function getShortageCase(
@@ -80,7 +100,12 @@ export async function getShortageCase(
     orders.map((o) => o.id),
     shortageId,
   );
-  const cases = await buildCases(deps, rows, new Map(orders.map((o) => [o.id, o.order_no])));
+  const cases = await buildCases(
+    deps,
+    rows,
+    new Map(orders.map((o) => [o.id, o.order_no])),
+    customerId,
+  );
   return cases.find((c) => c.id === shortageId) ?? null;
 }
 
@@ -118,11 +143,12 @@ export async function confirmShortageRefund(
 }
 
 const SHORTAGE_COLUMNS =
-  "id, order_id, quantity, reason, status, refund_state, product_name, image_ref, location_id, quote_version, refund_goods_fen, refund_shipping_fen, refund_total_fen, created_at, customer_responded_at, refund_requested_at, refunded_at";
+  "id, order_id, order_item_id, fulfillment_item_id, refund_intent_id, quantity, reason, status, refund_state, product_name, image_ref, location_id, quote_version, refund_goods_fen, refund_shipping_fen, refund_total_fen, created_at, customer_responded_at, refund_requested_at, refunded_at";
 
 /** 生产依赖：内嵌 Supabase + 真实衍生图签名 + SECURITY DEFINER RPC。 */
 export function createShortageDeps(): ShortageDeps {
   return {
+    ensureQuote: (row, customerId) => ensureShortageQuote(row, customerId),
     async fetchOrders(customerId, orderId) {
       let query = supabaseAdmin
         .from("commerce_orders" as never)

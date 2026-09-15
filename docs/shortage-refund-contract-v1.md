@@ -79,3 +79,40 @@
 - 退款执行 worker（消费 `commerce_refund_intents`，复用原支付通道与相同商户退款号、租约、未知结果先查原退款号）：**未启用**。
 - 腾讯业务短信模板（`shortage_reported` 等）未配置：outbox 记 `template_missing`，不会假装成功。
 - 腾讯生产未部署；旧缺货数据不做自动批处理。
+
+## 7. v2：旧缺货兼容 + 退款执行 worker（迁移 `drizzle/migrations/0002_shortage_refund_worker_v1.sql`，已应用）
+
+### 7.1 新增接口
+
+`GET /api/public/storefront/after-sales-summary`
+→ `{ ok:true, data:{ pending_count:int, pending_shortage_count:int } }`
+统计仍需客户处理的售后（当前为 `status=pending_customer` 的缺货，含历史缺货），**不依赖通知 `read_at`**，看消息不会清待办。
+
+### 7.2 历史缺货
+
+读列表/详情时，对 `status=pending_customer` 且缺少报价、且尚无退款意图的缺货，服务端按当前订单实付重新核算并通过 `shortage_attach_quote_v1` 落库：
+- 可安全报价 → `refund_state=awaiting_confirmation` + `quote_version`，客户可直接确认。
+- 无法安全报价（无运费快照 / 无法映射门店 / 金额 ≤ 0）→ `refund_state=manual_review`，金额 0，**不编造金额**。
+- 旧接口 `POST /shortages/:id/respond` 不再只改意见：命中真实报价时走与 `confirm-refund` 完全相同的退款意图事务。
+
+### 7.3 确认时的锁内复核
+
+`shortage_confirm_refund_v1` 在锁内重新核对支付级上限：`实付 - (已退 + 其他未失败意图预占)`。超限即转 `manual_review`，不生成意图、不退款。报价不一致仍为 `QUOTE_CHANGED`，非本人 404。
+
+### 7.4 退款执行 worker
+
+- 策略：`src/lib/shortage-refund/worker-policy.ts`（最多 8 次；退避 60s 起指数、封顶 1 小时；未知结果按 processing 继续查询，超次数转 `manual_review`）。
+- 执行：`src/server/refund-intent-worker.server.ts` + `src/server/shortage-refund-runtime.server.ts`，走原支付通道 `executeOrdinaryRefund`（原商户退款号、账本预占与上限校验、未知先查原退款号），**不伪造 HQ 角色**，HQ 原退款入口的角色守卫不变。
+- 租约 RPC：`commerce_claim_refund_intents` / `commerce_claim_refund_intent`（`FOR UPDATE SKIP LOCKED` + 120s 租约，重复 worker 不会并发处理同一意图）、`commerce_settle_refund_intent`（校验 lease_token，同事务同步缺货 / 售后 / 客户通知）。全部 `service_role` only。
+- 只有 provider 明确 `SUCCESS` 才写 `succeeded`；`PROCESSING`/网络未知继续查询，不会自动发起第二笔退款。
+- 客户确认后立即尝试一次（`kickShortageRefund`）；进程崩溃由 worker 恢复。
+
+### 7.5 开关与运行方式
+
+- `SHORTAGE_REFUND_WORKER_ENABLED`（默认关闭）：未开启时服务端返回 `refund_worker_disabled` + HTTP 503，前端不得显示成功。
+- 内部入口 `POST /api/internal/refunds/run`，Bearer `SHORTAGE_REFUND_WORKER_TOKEN`（≥32 字符，未配置返回 503）。
+- 定时脚本 `scripts/run-shortage-refunds.mjs`（读环境变量 `SHORTAGE_REFUND_WORKER_TOKEN` / `SHORTAGE_REFUND_WORKER_URL`，令牌不进 argv/日志）。
+
+### 7.6 仍未开启
+
+- 腾讯生产未部署；业务短信模板未配置（记 `template_missing`）；worker 生产开关默认关闭；旧缺货不做批处理写入，只在客户本人读取时补报价。
