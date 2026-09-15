@@ -8,7 +8,8 @@ PSQL=/tmp/psql.sh
 PGDB=postgres $PSQL -c "drop database if exists shortage_test" -c "create database shortage_test" >/dev/null
 $PSQL -q -f tests/sql/harness/stubs.sql >/dev/null
 $PSQL -q -f /tmp/schema.sql >/tmp/load.log 2>&1 || true
-for f in drizzle/migrations/000*.sql tests/sql/0004_*.sql; do $PSQL -q -f "$f" >/dev/null; done
+# 结构 dump 已含 0000-0003 的对象，这里只叠加待验证的 0004
+for f in tests/sql/0004_*.sql; do $PSQL -q -f "$f" >/dev/null; done
 $PSQL -q -f tests/sql/fixtures.sql >/dev/null
 
 fail=0
