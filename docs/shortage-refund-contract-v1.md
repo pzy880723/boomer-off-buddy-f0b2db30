@@ -116,3 +116,26 @@
 ### 7.6 仍未开启
 
 - 腾讯生产未部署；业务短信模板未配置（记 `template_missing`）；worker 生产开关默认关闭；旧缺货不做批处理写入，只在客户本人读取时补报价。
+
+## 8. 我的订单 / 售后角标汇总（v2.1）
+
+`GET /api/public/storefront/after-sales-summary`
+→ `{ ok:true, data:{ pending_count, pending_shortage_count, order_counts:{ pending_payment, awaiting_shipment, awaiting_receipt, completed } } }`
+全部为非负整数；`order_counts` 统计**本人订单数**（不是商品件数），归属由服务端 `customer_id` 决定。
+
+口径与订单列表**同一判定函数**（`deriveDisplayStatus` + `coarseStatusFilter`），点角标跳列表数量必然一致：
+
+| 角标 | 对应列表 `status` | 判定 |
+| --- | --- | --- |
+| pending_payment | `pending_payment` | `order_status=pending_payment` 且 `payment_status=unpaid`，未取消 |
+| awaiting_shipment | `paid` | 已付款且仍有门店未交接（**部分发货只算这一档**，不会同时出现在待收货） |
+| awaiting_receipt | `shipped` | 已付款且明细涉及的每个门店都 `handed_over`，订单未完成 |
+| completed | `completed` | `order_status=completed` |
+
+`cancelled` / `closed` / `refund_pending` / `partially_refunded` / `refunded` **一律不计入任何角标**，也不会用 `payment_status=paid` 粗算待发货。
+
+其他约定：
+- `pending_count` 为仍须客户处理的售后单数，与通知 `read_at` 独立，看消息不清角标。
+- 轻量读取：仅查售后待办 + 订单计数（最近 500 单最小列），**不查积分 / 优惠券**；30 秒按账号隔离内存缓存。
+- 订单计数取数失败时**省略** `order_counts`（不缓存，下次重试）；前端在缺少该字段时保持原值，**不得伪造为 0**。
+- 前端只在 >0 时显示角标，99+ 封顶。
