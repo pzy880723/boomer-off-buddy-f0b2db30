@@ -235,6 +235,62 @@ export function coarseStatusFilter(status: OrderListStatus): {
   }
 }
 
+/* ------------------------------- counts ------------------------------- */
+
+/**
+ * 我的订单角标口径（与列表筛选同一判定，绝不另算）：
+ * - pending_payment  → 列表 status=pending_payment（未付款且订单有效未取消）
+ * - awaiting_shipment→ 列表 status=paid（已付款仍有待履约；**部分发货仍只算这一档**，与列表一致）
+ * - awaiting_receipt → 列表 status=shipped（涉及的每个门店都已交接、客户尚未完成）
+ * - completed        → 列表 status=completed
+ * 取消 / 关闭 / 退款中 / 部分退款 / 已退款一律不计入任何一档。
+ */
+export const ORDER_COUNT_KEYS = [
+  "pending_payment",
+  "awaiting_shipment",
+  "awaiting_receipt",
+  "completed",
+] as const;
+
+export type OrderCountKey = (typeof ORDER_COUNT_KEYS)[number];
+export type OrderCounts = Record<OrderCountKey, number>;
+
+/** 角标键 → 列表 status 取值，保证「点角标跳列表」数量一致。 */
+export const ORDER_COUNT_LIST_STATUS: Record<OrderCountKey, OrderListStatus> = {
+  pending_payment: "pending_payment",
+  awaiting_shipment: "paid",
+  awaiting_receipt: "shipped",
+  completed: "completed",
+};
+
+export function emptyOrderCounts(): OrderCounts {
+  return { pending_payment: 0, awaiting_shipment: 0, awaiting_receipt: 0, completed: 0 };
+}
+
+/** 订单表列粗筛的同一判定，用于计数取数与 JS 精筛保持一致。 */
+function passesCoarse(order: OrderRow, status: OrderListStatus): boolean {
+  const coarse = coarseStatusFilter(status);
+  const orderStatus = String(order.order_status ?? "");
+  const paymentStatus = String(order.payment_status ?? "");
+  if (coarse.orderStatuses && !coarse.orderStatuses.includes(orderStatus)) return false;
+  if (coarse.paymentStatuses && !coarse.paymentStatuses.includes(paymentStatus)) return false;
+  return true;
+}
+
+export function countOrdersByStatus(orders: readonly OrderRow[]): OrderCounts {
+  const counts = emptyOrderCounts();
+  for (const order of orders) {
+    for (const key of ORDER_COUNT_KEYS) {
+      const status = ORDER_COUNT_LIST_STATUS[key];
+      if (passesCoarse(order, status) && matchesStatusFilter(order, status)) {
+        counts[key] += 1;
+        break; // 展示状态互斥，一单最多命中一个角标
+      }
+    }
+  }
+  return counts;
+}
+
 /* ------------------------------ snapshot ------------------------------ */
 
 type SnapshotGroup = {
