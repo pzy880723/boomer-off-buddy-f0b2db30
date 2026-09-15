@@ -7,8 +7,8 @@ import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { buildQuoteInput, type CourierSnapshot } from "@/lib/shortage-refund/quote-input";
-import { computeShortageQuote } from "@/lib/shortage-refund/quote";
+import { computeQuoteFromFacts } from "@/lib/shortage-refund/facts";
+import { loadOrderSnapshot, loadQuoteFacts } from "@/lib/shortage-refund/facts.server";
 
 export type StoreSubOrderItem = {
   fulfillment_item_id: string;
@@ -215,76 +215,19 @@ export const reportStoreShortage = createServerFn({ method: "POST" })
     const fRow = fulfillment as { order_id: string; location_id: string | null } | null;
     if (!fRow) throw new Error("子单不存在");
 
-    const { data: order } = await supabaseAdmin
-      .from("commerce_orders" as never)
-      .select("id, total_amount, shipping_fee, courier_quote_snapshot")
-      .eq("id", fRow.order_id)
-      .maybeSingle();
-    const orderRow = order as
-      | { total_amount: number; shipping_fee: number; courier_quote_snapshot: CourierSnapshot }
-      | null;
+    const orderRow = await loadOrderSnapshot(fRow.order_id);
     if (!orderRow) throw new Error("订单不存在");
 
-    const { data: orderItems } = await supabaseAdmin
-      .from("commerce_order_items" as never)
-      .select("id, location_id, quantity, line_total, title_snapshot, image_snapshot")
-      .eq("order_id", fRow.order_id);
-    const orderItemRows =
-      ((orderItems as
-        | {
-            id: string;
-            location_id: string | null;
-            quantity: number;
-            line_total: number;
-            title_snapshot: string;
-            image_snapshot: string | null;
-          }[]
-        | null) ?? []);
-
-    const { data: shippedFulfillments } = await supabaseAdmin
-      .from("fulfillments" as never)
-      .select("location_id, status, shipments(id)")
-      .eq("order_id", fRow.order_id);
-    const shippedLocationIds = new Set<string>();
-    for (const row of ((shippedFulfillments as
-      | { location_id: string | null; status: string; shipments: { id: string }[] }[]
-      | null) ?? [])) {
-      if (row.location_id && row.shipments && row.shipments.length > 0) shippedLocationIds.add(row.location_id);
-    }
-
-    const { data: refunds } = await supabaseAdmin
-      .from("commerce_refunds" as never)
-      .select("amount, status")
-      .eq("order_id", fRow.order_id);
-    const paymentRefundedFen = ((refunds as { amount: number; status: string }[] | null) ?? [])
-      .filter((row) => ["pending", "processing", "succeeded"].includes(row.status))
-      .reduce((sum, row) => sum + Math.round(Number(row.amount) * 100), 0);
-
-    const { data: intents } = await supabaseAdmin
-      .from("commerce_refund_intents" as never)
-      .select("amount_fen, state")
-      .eq("order_id", fRow.order_id);
-    const intentFen = ((intents as { amount_fen: number; state: string }[] | null) ?? [])
-      .filter((row) => row.state !== "failed")
-      .reduce((sum, row) => sum + row.amount_fen, 0);
-
+    // 与旧单补报价共用同一条安全报价路径（同样的去重、上限、同组运费防重口径）
+    const { facts, snapshots } = await loadQuoteFacts(orderRow);
     const shortageItemId = itemRow.order_item_id ?? "";
-    const snapshot = orderItemRows.find((row) => row.id === shortageItemId);
-    const groupOutstanding = orderItemRows
-      .filter((row) => row.location_id === fRow.location_id && row.id !== shortageItemId)
-      .reduce((sum, row) => sum + row.quantity, 0);
-
-    const quote = computeShortageQuote(
-      buildQuoteInput({
-        order: orderRow,
-        items: orderItemRows,
-        shortage: { order_item_id: shortageItemId, quantity: data.quantity },
-        shippedLocationIds,
-        itemRefundedFen: 0,
-        paymentRefundedFen: paymentRefundedFen + intentFen,
-        groupOutstandingQuantity: groupOutstanding,
-      }),
-    );
+    const snapshot = snapshots.get(shortageItemId);
+    const quote = computeQuoteFromFacts(facts, {
+      shortageId: null,
+      orderItemId: shortageItemId,
+      locationId: fRow.location_id,
+      quantity: data.quantity,
+    });
 
     const { data: result, error } = await supabaseAdmin.rpc("shortage_report_v1" as never, {
       p_fulfillment_id: data.fulfillmentId,
