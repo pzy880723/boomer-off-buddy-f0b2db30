@@ -14,6 +14,9 @@ import {
 export type ShortageDbRow = ShortageRow & {
   image_ref: string | null;
   location_id: string | null;
+  order_item_id: string | null;
+  fulfillment_item_id: string | null;
+  refund_intent_id: string | null;
 };
 
 export type ConfirmOutcome =
