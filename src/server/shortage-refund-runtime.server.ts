@@ -94,7 +94,11 @@ export function createRefundWorkerDeps(
  * 客户确认后立即尝试同一退款意图；进程崩溃或未开启时由后台 worker 补偿。
  * 任何失败都不抛给客户：确认事实已入库，执行状态由 refund_state 反映。
  */
-export async function kickShortageRefund(shortageId: string): Promise<void> {
+/** 返回是否真的执行过；关闭 / 未认领 / 异常一律 executed=false，由调用方决定如何呈现。 */
+export async function kickShortageRefund(
+  shortageId: string,
+): Promise<{ executed: boolean; reason?: string }> {
+  if (!refundWorkerEnabled()) return { executed: false, reason: "refund_worker_disabled" };
   try {
     const { data } = await supabaseAdmin
       .from("commerce_refund_intents" as never)
@@ -102,10 +106,12 @@ export async function kickShortageRefund(shortageId: string): Promise<void> {
       .eq("shortage_id", shortageId)
       .maybeSingle();
     const intentId = (data as { id?: string } | null)?.id;
-    if (!intentId) return;
+    if (!intentId) return { executed: false, reason: "intent_not_found" };
     const { runRefundIntentNow } = await import("./refund-intent-worker.server");
     await runRefundIntentNow(createRefundWorkerDeps(), intentId);
-  } catch {
+    return { executed: true };
+  } catch (error) {
     /* 后台 worker 会重试；此处绝不向客户报告假成功或假失败 */
+    return { executed: false, reason: String((error as Error)?.message ?? error).slice(0, 200) };
   }
 }
