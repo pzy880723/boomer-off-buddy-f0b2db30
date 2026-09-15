@@ -8,7 +8,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { computeQuoteFromFacts } from "@/lib/shortage-refund/facts";
-import { loadOrderSnapshot, loadQuoteFacts } from "@/server/shortage-quote-facts.server";
+import { loadOrderSnapshot, loadQuoteFacts } from "@/lib/shortage-refund/facts.server";
 
 export type StoreSubOrderItem = {
   fulfillment_item_id: string;

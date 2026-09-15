@@ -12,7 +12,7 @@
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { computeQuoteFromFacts } from "@/lib/shortage-refund/facts";
-import { loadOrderSnapshot, loadQuoteFacts } from "./shortage-quote-facts.server";
+import { loadOrderSnapshot, loadQuoteFacts } from "@/lib/shortage-refund/facts.server";
 import type { ShortageDbRow } from "./shortage-refund.server";
 
 /** 仍可被改写报价的行：客户尚未表态、且没有退款意图。 */

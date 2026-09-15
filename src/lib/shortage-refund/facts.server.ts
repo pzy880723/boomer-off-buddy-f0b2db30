@@ -3,9 +3,9 @@
  * 任何一项取数失败都抛错，绝不按 0 继续报价。
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import type { QuoteFacts, ShortageSiblingRow } from "@/lib/shortage-refund/facts";
-import type { CourierSnapshot, OrderItemRow } from "@/lib/shortage-refund/quote-input";
-import type { IntentRowLite, RefundRowLite } from "@/lib/shortage-refund/reserved";
+import type { QuoteFacts, ShortageSiblingRow } from "./facts";
+import type { CourierSnapshot, OrderItemRow } from "./quote-input";
+import type { IntentRowLite, RefundRowLite } from "./reserved";
 
 export type OrderSnapshotRow = {
   id: string;
