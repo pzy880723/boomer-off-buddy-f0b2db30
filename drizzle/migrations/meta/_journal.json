@@ -15,6 +15,13 @@
       "when": 1789326922854,
       "tag": "0001_shortage_refund_revoke_anon",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789432318622,
+      "tag": "0002_shortage_refund_worker_v1",
+      "breakpoints": true
     }
   ]
 }
