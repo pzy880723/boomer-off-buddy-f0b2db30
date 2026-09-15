@@ -40,6 +40,8 @@ export type QuoteInput = {
   payment_refunded_fen: number;
   /** 同组其余行仍待履约的数量合计（不含本次申报行的剩余量）。 */
   group_outstanding_quantity: number;
+  /** 同组运费已被其它缺货预留/退掉 → 本次不得再退该组运费（goods-only）。 */
+  group_shipping_reserved?: boolean;
 };
 
 export type QuoteResult = {
@@ -146,6 +148,7 @@ export function computeShortageQuote(input: QuoteInput): QuoteResult {
     if (!group) {
       blocked.push("shipping_group_unmapped");
     } else if (
+      !input.group_shipping_reserved &&
       !group.shipped &&
       input.group_outstanding_quantity === 0 &&
       qty === item.quantity
@@ -174,6 +177,7 @@ export function computeShortageQuote(input: QuoteInput): QuoteResult {
       total,
       paid: input.paid_total_fen,
       paidShipping: input.paid_shipping_fen,
+      shippingReserved: input.group_shipping_reserved === true,
       itemRefunded: input.item_refunded_fen,
       paymentRefunded: input.payment_refunded_fen,
       lines: input.items.map((i) => [i.id, i.line_total_fen, i.quantity]),

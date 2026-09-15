@@ -29,6 +29,13 @@
       "when": 1789433682125,
       "tag": "0003_shortage_confirm_lock_reverify",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789435181904,
+      "tag": "0004_shortage_quote_eligibility_group_freight",
+      "breakpoints": true
     }
   ]
 }
