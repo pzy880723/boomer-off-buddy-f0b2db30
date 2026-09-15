@@ -31,6 +31,8 @@ export type ShortageCase = {
   refund_total_fen: number;
   quote_version: string | null;
   can_confirm: boolean;
+  /** can_confirm=false 时的机器可读原因；可确认时为 null。 */
+  can_confirm_reason: ShortageBlockReason | null;
   created_at: string;
   customer_responded_at: string | null;
   refund_requested_at: string | null;
