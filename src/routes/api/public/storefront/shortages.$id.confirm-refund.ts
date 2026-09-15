@@ -6,11 +6,8 @@ import {
   storefrontError,
   storefrontJson,
 } from "@/server/storefront-auth.server";
-import {
-  confirmShortageRefund,
-  createShortageDeps,
-  getShortageCase,
-} from "@/server/shortage-refund.server";
+import { createShortageDeps } from "@/server/shortage-refund.server";
+import { handleConfirmRefund } from "@/server/shortage-routes.server";
 import { kickShortageRefund } from "@/server/shortage-refund-runtime.server";
 import { confirmIdempotencyKey } from "@/lib/shortage-refund/case";
 
@@ -34,18 +31,20 @@ export const Route = createFileRoute("/api/public/storefront/shortages/$id/confi
         if (header && header !== expected) {
           return storefrontError("Idempotency-Key mismatch", 400, "validation_error");
         }
-        const deps = createShortageDeps();
-        const result = await confirmShortageRefund(deps, {
-          customerId: auth.customer.id,
-          shortageId: params.id,
-          quoteVersion: body.quote_version,
-        });
-        if (result.status === 200) {
-          // 确认成功后立即尝试执行同一退款意图；未开启或失败时由后台 worker 恢复
-          await kickShortageRefund(params.id);
-          const fresh = await getShortageCase(deps, auth.customer.id, params.id);
-          if (fresh) return storefrontJson({ ok: true, data: fresh });
-        }
+        const result = await handleConfirmRefund(
+          {
+            deps: createShortageDeps(),
+            kick: async (shortageId) => {
+              const outcome = await kickShortageRefund(shortageId);
+              return { executed: outcome?.executed === true };
+            },
+          },
+          {
+            customerId: auth.customer.id,
+            shortageId: params.id,
+            quoteVersion: body.quote_version,
+          },
+        );
         return storefrontJson(result.body, { status: result.status });
       },
     },
