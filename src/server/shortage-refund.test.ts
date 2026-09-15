@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   confirmShortageRefund,
+  getAfterSalesSummary,
   getShortageCase,
   listShortageCases,
   type ConfirmOutcome,
@@ -127,4 +128,67 @@ test("a shortage that is not the caller's returns 404 from confirm", async () =>
   const deps = makeDeps({ confirmRefund: async () => ({ kind: "not_found" }) });
   const res = await confirmShortageRefund(deps, { customerId: "c9", shortageId: "s1", quoteVersion: "v1" });
   assert.equal(res.status, 404);
+});
+
+test("历史缺货（无报价、refund_pending）读时补真实报价后成为可确认待办", async () => {
+  const legacy: ShortageDbRow = {
+    ...baseRow,
+    id: "legacy1",
+    refund_state: "refund_pending",
+    quote_version: null,
+    refund_goods_fen: null as unknown as number,
+    refund_shipping_fen: null as unknown as number,
+    refund_total_fen: null as unknown as number,
+  };
+  const quoted: ShortageDbRow = {
+    ...legacy,
+    refund_state: "awaiting_confirmation",
+    quote_version: "v-legacy",
+    refund_goods_fen: 1,
+    refund_shipping_fen: 990,
+    refund_total_fen: 991,
+  };
+  const deps = makeDeps({ ensureQuote: async () => quoted }, [legacy]);
+  const items = await listShortageCases(deps, "c1");
+  assert.equal(items[0]!.can_confirm, true);
+  // 运费 9.90 元必须退：整组未发货且整行缺货
+  assert.equal(items[0]!.refund_shipping_fen, 990);
+  assert.equal(items[0]!.refund_total_fen, 991);
+});
+
+test("历史缺货无法安全报价时明确人工处理，不编造金额", async () => {
+  const legacy: ShortageDbRow = { ...baseRow, id: "legacy2", refund_state: "refund_pending", quote_version: null };
+  const manual: ShortageDbRow = {
+    ...legacy,
+    refund_state: "manual_review",
+    quote_version: null,
+    refund_goods_fen: 0,
+    refund_shipping_fen: 0,
+    refund_total_fen: 0,
+  };
+  const deps = makeDeps({ ensureQuote: async () => manual }, [legacy]);
+  const found = await getShortageCase(deps, "c1", "legacy2");
+  assert.equal(found?.can_confirm, false);
+  assert.equal(found?.refund_total_fen, 0);
+  assert.equal(found?.refund_state, "manual_review");
+});
+
+test("跨客户：他人缺货既不补报价也不出现在待办汇总", async () => {
+  let quoted = 0;
+  const deps = makeDeps({
+    ensureQuote: async (row) => {
+      quoted += 1;
+      return row;
+    },
+  });
+  assert.deepEqual(await getAfterSalesSummary(deps, "c2"), { pending_count: 0, pending_shortage_count: 0 });
+  assert.equal(quoted, 0);
+});
+
+test("待办汇总统计 pending_customer，不依赖通知已读", async () => {
+  const summary = await getAfterSalesSummary(makeDeps(), "c1");
+  assert.deepEqual(summary, { pending_count: 1, pending_shortage_count: 1 });
+  const answered: ShortageDbRow = { ...baseRow, status: "customer_accepted", refund_state: "queued" };
+  const done = await getAfterSalesSummary(makeDeps({}, [answered]), "c1");
+  assert.deepEqual(done, { pending_count: 0, pending_shortage_count: 0 });
 });
