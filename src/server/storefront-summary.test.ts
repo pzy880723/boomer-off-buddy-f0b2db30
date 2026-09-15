@@ -63,8 +63,8 @@ test("缓存按账号隔离，绝不把他人计数返回给另一个客户", as
   });
   const a = await cache.get("c1", d);
   const b = await cache.get("c2", d);
-  assert.equal(a.order_counts.pending_payment, 1);
-  assert.equal(b.order_counts.pending_payment, 9);
+  assert.equal(a.order_counts?.pending_payment, 1);
+  assert.equal(b.order_counts?.pending_payment, 9);
 });
 
 test("汇总不查询积分/优惠券：只调用售后与订单计数两个依赖", async () => {
