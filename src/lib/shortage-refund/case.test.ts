@@ -30,6 +30,7 @@ const extra = {
   store_name: "温州店",
   thumbnail_url: "https://x/render/image/sign/a.jpg",
   has_refund_intent: false,
+  refund_execution_enabled: true,
 };
 
 test("legacy refund states fold into the v1 contract", () => {
