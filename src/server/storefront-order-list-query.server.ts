@@ -38,7 +38,9 @@ export const ORDER_COUNT_SELECT = [
   "fulfillments(location_id, status)",
 ].join(", ");
 
-export const ORDER_COUNT_MAX_ROWS = 500;
+/** 计数分页：完整键集分页读取，绝不截断（页大小仅影响往返次数）。 */
+export const ORDER_COUNT_PAGE_SIZE = 500;
+export const ORDER_COUNT_MAX_PAGES = 200;
 
 export const LOCATION_SELECT = "id, name, shop:youzan_shops(id, shop_name)";
 
