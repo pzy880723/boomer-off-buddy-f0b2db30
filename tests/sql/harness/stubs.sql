@@ -19,3 +19,5 @@ CREATE OR REPLACE FUNCTION public.commerce_ordinary_immutable_snapshot() RETURNS
 LANGUAGE plpgsql AS $$ BEGIN RETURN NEW; END $$;
 CREATE OR REPLACE FUNCTION public.commerce_assign_storefront_customer() RETURNS trigger
 LANGUAGE plpgsql AS $$ BEGIN RETURN NEW; END; $$;
+CREATE OR REPLACE FUNCTION public.commerce_resolve_order_coupon() RETURNS trigger
+LANGUAGE plpgsql AS $$ BEGIN RETURN NEW; END; $$;
