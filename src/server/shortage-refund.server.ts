@@ -75,7 +75,17 @@ export async function listShortageCases(
   const orders = await deps.fetchOrders(customerId, orderId);
   if (orders.length === 0) return [];
   const rows = await deps.fetchShortages(orders.map((o) => o.id));
-  return buildCases(deps, rows, new Map(orders.map((o) => [o.id, o.order_no])));
+  return buildCases(deps, rows, new Map(orders.map((o) => [o.id, o.order_no])), customerId);
+}
+
+/** 售后待办汇总：不依赖通知已读状态，旧缺货同样计入。 */
+export async function getAfterSalesSummary(
+  deps: ShortageDeps,
+  customerId: string,
+): Promise<{ pending_count: number; pending_shortage_count: number }> {
+  const cases = await listShortageCases(deps, customerId);
+  const pendingShortages = cases.filter((c) => c.status === "pending_customer").length;
+  return { pending_count: pendingShortages, pending_shortage_count: pendingShortages };
 }
 
 export async function getShortageCase(
@@ -89,7 +99,12 @@ export async function getShortageCase(
     orders.map((o) => o.id),
     shortageId,
   );
-  const cases = await buildCases(deps, rows, new Map(orders.map((o) => [o.id, o.order_no])));
+  const cases = await buildCases(
+    deps,
+    rows,
+    new Map(orders.map((o) => [o.id, o.order_no])),
+    customerId,
+  );
   return cases.find((c) => c.id === shortageId) ?? null;
 }
 
