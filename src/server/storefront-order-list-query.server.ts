@@ -2,6 +2,9 @@
 // client 与 signer 均可注入，便于用 mock fetch 断言真实查询构造（归属过滤、字段白名单）。
 import {
   buildImageMap,
+  countOrdersByStatus,
+  emptyOrderCounts,
+  type OrderCounts,
   buildOrderListItem,
   coarseStatusFilter,
   collectImageRefs,
@@ -27,6 +30,15 @@ export const ORDER_LIST_SELECT = [
   "items:commerce_order_items(id, location_id, title_snapshot, image_snapshot, unit_price, quantity, line_total, listing_id, sku_id, sku:inv_skus(image_paths, image_url), listing:commerce_listings(image_paths, cover_url))",
   "fulfillments(location_id, status)",
 ].join(", ");
+
+/** 计数取数：只取判定状态所需的最小列，不取金额/快照/地址/图片。 */
+export const ORDER_COUNT_SELECT = [
+  "id, order_status, payment_status, created_at",
+  "items:commerce_order_items(location_id)",
+  "fulfillments(location_id, status)",
+].join(", ");
+
+export const ORDER_COUNT_MAX_ROWS = 500;
 
 export const LOCATION_SELECT = "id, name, shop:youzan_shops(id, shop_name)";
 
@@ -131,4 +143,21 @@ export async function listStorefrontOrders(options: {
     has_more: page.hasMore,
     next_cursor: page.nextCursor,
   };
+}
+
+/** 我的订单角标计数：与列表同一判定，归属一律服务端 customer_id 过滤。 */
+export async function countStorefrontOrders(options: {
+  client: QueryClient;
+  customerId: string;
+  maxRows?: number;
+}): Promise<OrderCounts> {
+  const { data, error } = await options.client
+    .from("commerce_orders")
+    .select(ORDER_COUNT_SELECT)
+    .eq("customer_id", options.customerId)
+    .order("created_at", { ascending: false })
+    .limit(options.maxRows ?? ORDER_COUNT_MAX_ROWS);
+  if (error) throw new OrderListError(error.message, 500);
+  if (!data) return emptyOrderCounts();
+  return countOrdersByStatus(data as OrderRow[]);
 }
