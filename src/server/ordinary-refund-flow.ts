@@ -43,10 +43,22 @@ export async function reconcileOrdinaryRefund(deps: RefundDependencies, refund: 
   if (['succeeded', 'cancelled'].includes(refund.status)) return publicRefund(refund);
   return recordResponse(deps, await deps.client.queryRefund(refund.merchant_refund_no), refund, payment, null);
 }
+/**
+ * 总部审批退款入口：保留原有 HQ 角色校验，行为不变。
+ */
 export async function startOrdinaryRefund(deps: RefundDependencies, input: {
   paymentId: string; afterSaleId: string; idempotencyKey: string; operatorId: string; roles: string[];
 }) {
   if (!input.roles.some(role => role === 'super_admin' || role === 'hq_operator')) throw new Error('Refund permission denied');
+  return executeOrdinaryRefund(deps, input);
+}
+/**
+ * 退款执行核心：不做角色判断，授权由调用方负责（HQ 审批或客户确认产生的退款意图）。
+ * 客户确认路径绝不伪造 HQ 角色，也不绕过账本的预占/上限/租约校验。
+ */
+export async function executeOrdinaryRefund(deps: RefundDependencies, input: {
+  paymentId: string; afterSaleId: string; idempotencyKey: string; operatorId: string;
+}) {
   const prepared = await deps.store.rpc('commerce_prepare_ordinary_refund', { p_payment_id: input.paymentId,
     p_after_sale_id: input.afterSaleId, p_idempotency_key: input.idempotencyKey, p_operator_id: input.operatorId,
   }) as { payment: RefundPayment; refund: RefundRow; acquired: boolean; lease_token: string | null };
