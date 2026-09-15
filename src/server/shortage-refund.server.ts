@@ -32,6 +32,8 @@ export type ShortageDeps = {
   fetchStoreNames(locationIds: string[]): Promise<Map<string, string>>;
   fetchIntentShortageIds(shortageIds: string[]): Promise<Set<string>>;
   signThumbnails(refs: string[]): Promise<(string | null)[]>;
+  /** 旧缺货兼容：无报价时按订单实付重新核算并落库（无法安全报价则留人工）。 */
+  ensureQuote(row: ShortageDbRow, customerId: string): Promise<ShortageDbRow>;
   confirmRefund(input: {
     shortageId: string;
     customerId: string;
