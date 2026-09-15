@@ -134,12 +134,8 @@ export function toShortageCase(
     refund_shipping_fen: row.refund_shipping_fen ?? 0,
     refund_total_fen: total,
     quote_version: row.quote_version,
-    can_confirm:
-      !extra.has_refund_intent &&
-      refundState === "awaiting_confirmation" &&
-      row.status === "pending_customer" &&
-      !!row.quote_version &&
-      total > 0,
+    can_confirm: confirmable.can_confirm,
+    can_confirm_reason: confirmable.can_confirm_reason,
     created_at: row.created_at,
     customer_responded_at: row.customer_responded_at,
     refund_requested_at: row.refund_requested_at,
