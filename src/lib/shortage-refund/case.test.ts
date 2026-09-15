@@ -30,6 +30,7 @@ const extra = {
   store_name: "温州店",
   thumbnail_url: "https://x/render/image/sign/a.jpg",
   has_refund_intent: false,
+  refund_execution_enabled: true,
 };
 
 test("legacy refund states fold into the v1 contract", () => {
@@ -52,6 +53,7 @@ test("case exposes only the contracted fields with integer fen and a derivative 
   const c = toShortageCase(row, extra);
   assert.deepEqual(Object.keys(c).sort(), [
     "can_confirm",
+    "can_confirm_reason",
     "created_at",
     "customer_responded_at",
     "id",

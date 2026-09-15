@@ -38,7 +38,9 @@ export const ORDER_COUNT_SELECT = [
   "fulfillments(location_id, status)",
 ].join(", ");
 
-export const ORDER_COUNT_MAX_ROWS = 500;
+/** 计数分页：完整键集分页读取，绝不截断（页大小仅影响往返次数）。 */
+export const ORDER_COUNT_PAGE_SIZE = 500;
+export const ORDER_COUNT_MAX_PAGES = 200;
 
 export const LOCATION_SELECT = "id, name, shop:youzan_shops(id, shop_name)";
 
@@ -145,19 +147,41 @@ export async function listStorefrontOrders(options: {
   };
 }
 
-/** 我的订单角标计数：与列表同一判定，归属一律服务端 customer_id 过滤。 */
+/**
+ * 我的订单角标计数：与列表同一判定，归属一律服务端 customer_id 过滤。
+ * 完整键集分页，历史订单不会漏计；超出上限明确抛错，绝不静默截断为「最近 N 单」。
+ */
 export async function countStorefrontOrders(options: {
   client: QueryClient;
   customerId: string;
-  maxRows?: number;
+  pageSize?: number;
 }): Promise<OrderCounts> {
-  const { data, error } = await options.client
-    .from("commerce_orders")
-    .select(ORDER_COUNT_SELECT)
-    .eq("customer_id", options.customerId)
-    .order("created_at", { ascending: false })
-    .limit(options.maxRows ?? ORDER_COUNT_MAX_ROWS);
-  if (error) throw new OrderListError(error.message, 500);
-  if (!data) return emptyOrderCounts();
-  return countOrdersByStatus(data as OrderRow[]);
+  const pageSize = Math.max(1, options.pageSize ?? ORDER_COUNT_PAGE_SIZE);
+  const totals = emptyOrderCounts();
+  let cursor: { created_at: string; id: string } | null = null;
+
+  for (let page = 0; page < ORDER_COUNT_MAX_PAGES; page++) {
+    let builder = options.client
+      .from("commerce_orders")
+      .select(ORDER_COUNT_SELECT)
+      .eq("customer_id", options.customerId);
+    if (cursor) {
+      builder = builder.or(
+        `created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`,
+      );
+    }
+    const { data, error } = await builder
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(pageSize);
+    if (error) throw new OrderListError(error.message, 500);
+    const rows = (data ?? []) as OrderRow[];
+    if (rows.length === 0) return totals;
+    const counts = countOrdersByStatus(rows);
+    for (const key of Object.keys(totals) as (keyof OrderCounts)[]) totals[key] += counts[key];
+    if (rows.length < pageSize) return totals;
+    const last = rows[rows.length - 1]! as OrderRow & { created_at: string; id: string };
+    cursor = { created_at: last.created_at, id: last.id };
+  }
+  throw new OrderListError("order_count_pagination_overflow", 500);
 }

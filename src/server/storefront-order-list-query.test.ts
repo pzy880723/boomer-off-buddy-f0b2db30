@@ -5,6 +5,7 @@ import {
   LOCATION_SELECT,
   ORDER_LIST_SELECT,
   OrderListError,
+  countStorefrontOrders,
   listStorefrontOrders,
 } from "./storefront-order-list-query.server";
 
@@ -248,4 +249,55 @@ test("历史 http 快照也必须经衍生签名器；签名失败为 null，绝
     "https://legacy.example.com/storage/v1/object/public/parcel-item-images/x.jpg",
   ]);
   assert.equal(result.data[0].shops[0].items[0].image_url, null);
+});
+
+// ---- 角标计数：完整键集分页，历史订单绝不漏计 ----
+
+test("超过一页的订单会继续翻页计数，不截断为最近 N 单", async () => {
+  const total = 1201; // > 2 页（页大小 500）
+  const rows = Array.from({ length: total }, (_, i) =>
+    orderRow(i, {
+      id: `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`,
+      created_at: new Date(Date.UTC(2020, 0, 1) + (total - i) * 60_000).toISOString(),
+      order_status: "processing",
+      payment_status: "paid",
+      fulfillments: [{ location_id: LOC_A, status: "allocated" }],
+    }),
+  );
+
+  const { client, urls } = mockClient((url) => {
+    if (!url.includes("/commerce_orders")) return [];
+    const limit = Number(/limit=(\d+)/.exec(url)?.[1] ?? 500);
+    const cursor = /created_at\.lt\.([^,)&]+)/.exec(url)?.[1];
+    const start = cursor ? rows.findIndex((r) => r.created_at < cursor) : 0;
+    return rows.slice(start < 0 ? rows.length : start, (start < 0 ? rows.length : start) + limit);
+  });
+
+  const counts = await countStorefrontOrders({
+    client: client as never,
+    customerId: CUSTOMER,
+  });
+
+  assert.equal(counts.awaiting_shipment, total);
+  assert.ok(urls.filter((u) => u.includes("/commerce_orders")).length >= 3, "应至少翻 3 页");
+  for (const u of urls) assert.match(u, new RegExp(`customer_id=eq\\.${CUSTOMER}`));
+});
+
+test("计数分页的每一页都带归属过滤，且只选最小列", async () => {
+  const { client, urls } = mockClient(() => []);
+  await countStorefrontOrders({ client: client as never, customerId: CUSTOMER, pageSize: 2 });
+  const orderUrls = urls.filter((u) => u.includes("/commerce_orders"));
+  assert.equal(orderUrls.length, 1);
+  assert.match(orderUrls[0], new RegExp(`customer_id=eq\\.${CUSTOMER}`));
+  for (const forbidden of ["recipient_phone", "shipping_address", "total_amount", "image"]) {
+    assert.doesNotMatch(orderUrls[0], new RegExp(forbidden));
+  }
+});
+
+test("计数读取失败必须抛错，不能当成 0 单", async () => {
+  const { client } = mockClient(() => ({ status: 500, body: { message: "db down" } }));
+  await assert.rejects(
+    () => countStorefrontOrders({ client: client as never, customerId: CUSTOMER }),
+    OrderListError,
+  );
 });
