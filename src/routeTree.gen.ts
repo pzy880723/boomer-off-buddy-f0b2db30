@@ -102,6 +102,7 @@ import { Route as PurchaseJapanParcelImportRouteImport } from './routes/purchase
 import { Route as PurchaseJapanParcelNewRouteImport } from './routes/purchase.japan-parcel.new'
 import { Route as ApiInternalMediaParcelUploadRouteImport } from './routes/api/internal/media/parcel-upload'
 import { Route as ApiInternalPaymentsReconcileRouteImport } from './routes/api/internal/payments.reconcile'
+import { Route as ApiInternalRefundsRunRouteImport } from './routes/api/internal/refunds.run'
 import { Route as ApiPublicContentIdRouteImport } from './routes/api/public/content/$id'
 import { Route as ApiPublicContentFeedRouteImport } from './routes/api/public/content/feed'
 import { Route as ApiPublicGoAuthorizationRouteImport } from './routes/api/public/go/authorization'
@@ -150,6 +151,7 @@ import { Route as ApiPublicPosSalesRouteImport } from './routes/api/public/pos/s
 import { Route as ApiPublicPosStandardCatalogRouteImport } from './routes/api/public/pos/standard-catalog'
 import { Route as ApiPublicSsoAigcExchangeRouteImport } from './routes/api/public/sso/aigc-exchange'
 import { Route as ApiPublicSsoAigcTicketRouteImport } from './routes/api/public/sso/aigc-ticket'
+import { Route as ApiPublicStorefrontAfterSalesSummaryRouteImport } from './routes/api/public/storefront/after-sales-summary'
 import { Route as ApiPublicStorefrontNotificationsRouteImport } from './routes/api/public/storefront/notifications'
 import { Route as ApiPublicStorefrontOrdersRouteImport } from './routes/api/public/storefront/orders'
 import { Route as ApiPublicStorefrontPaymentsRouteImport } from './routes/api/public/storefront/payments'
@@ -752,6 +754,11 @@ const ApiInternalPaymentsReconcileRoute =
     path: '/api/internal/payments/reconcile',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiInternalRefundsRunRoute = ApiInternalRefundsRunRouteImport.update({
+  id: '/api/internal/refunds/run',
+  path: '/api/internal/refunds/run',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicContentIdRoute = ApiPublicContentIdRouteImport.update({
   id: '/api/public/content/$id',
   path: '/api/public/content/$id',
@@ -1028,6 +1035,12 @@ const ApiPublicSsoAigcTicketRoute = ApiPublicSsoAigcTicketRouteImport.update({
   path: '/api/public/sso/aigc-ticket',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicStorefrontAfterSalesSummaryRoute =
+  ApiPublicStorefrontAfterSalesSummaryRouteImport.update({
+    id: '/api/public/storefront/after-sales-summary',
+    path: '/api/public/storefront/after-sales-summary',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicStorefrontNotificationsRoute =
   ApiPublicStorefrontNotificationsRouteImport.update({
     id: '/api/public/storefront/notifications',
@@ -1850,6 +1863,7 @@ export interface FileRoutesByFullPath {
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
   '/api/internal/media/parcel-upload': typeof ApiInternalMediaParcelUploadRoute
   '/api/internal/payments/reconcile': typeof ApiInternalPaymentsReconcileRoute
+  '/api/internal/refunds/run': typeof ApiInternalRefundsRunRoute
   '/api/public/content/$id': typeof ApiPublicContentIdRouteWithChildren
   '/api/public/content/feed': typeof ApiPublicContentFeedRoute
   '/api/public/go/authorization': typeof ApiPublicGoAuthorizationRoute
@@ -1898,6 +1912,7 @@ export interface FileRoutesByFullPath {
   '/api/public/pos/standard-catalog': typeof ApiPublicPosStandardCatalogRoute
   '/api/public/sso/aigc-exchange': typeof ApiPublicSsoAigcExchangeRoute
   '/api/public/sso/aigc-ticket': typeof ApiPublicSsoAigcTicketRoute
+  '/api/public/storefront/after-sales-summary': typeof ApiPublicStorefrontAfterSalesSummaryRoute
   '/api/public/storefront/notifications': typeof ApiPublicStorefrontNotificationsRouteWithChildren
   '/api/public/storefront/orders': typeof ApiPublicStorefrontOrdersRouteWithChildren
   '/api/public/storefront/payments': typeof ApiPublicStorefrontPaymentsRouteWithChildren
@@ -2109,6 +2124,7 @@ export interface FileRoutesByTo {
   '/purchase/japan-parcel': typeof PurchaseJapanParcelIndexRoute
   '/api/internal/media/parcel-upload': typeof ApiInternalMediaParcelUploadRoute
   '/api/internal/payments/reconcile': typeof ApiInternalPaymentsReconcileRoute
+  '/api/internal/refunds/run': typeof ApiInternalRefundsRunRoute
   '/api/public/content/$id': typeof ApiPublicContentIdRouteWithChildren
   '/api/public/content/feed': typeof ApiPublicContentFeedRoute
   '/api/public/go/authorization': typeof ApiPublicGoAuthorizationRoute
@@ -2157,6 +2173,7 @@ export interface FileRoutesByTo {
   '/api/public/pos/standard-catalog': typeof ApiPublicPosStandardCatalogRoute
   '/api/public/sso/aigc-exchange': typeof ApiPublicSsoAigcExchangeRoute
   '/api/public/sso/aigc-ticket': typeof ApiPublicSsoAigcTicketRoute
+  '/api/public/storefront/after-sales-summary': typeof ApiPublicStorefrontAfterSalesSummaryRoute
   '/api/public/storefront/notifications': typeof ApiPublicStorefrontNotificationsRouteWithChildren
   '/api/public/storefront/orders': typeof ApiPublicStorefrontOrdersRouteWithChildren
   '/api/public/storefront/payments': typeof ApiPublicStorefrontPaymentsRouteWithChildren
@@ -2376,6 +2393,7 @@ export interface FileRoutesById {
   '/purchase/japan-parcel/': typeof PurchaseJapanParcelIndexRoute
   '/api/internal/media/parcel-upload': typeof ApiInternalMediaParcelUploadRoute
   '/api/internal/payments/reconcile': typeof ApiInternalPaymentsReconcileRoute
+  '/api/internal/refunds/run': typeof ApiInternalRefundsRunRoute
   '/api/public/content/$id': typeof ApiPublicContentIdRouteWithChildren
   '/api/public/content/feed': typeof ApiPublicContentFeedRoute
   '/api/public/go/authorization': typeof ApiPublicGoAuthorizationRoute
@@ -2424,6 +2442,7 @@ export interface FileRoutesById {
   '/api/public/pos/standard-catalog': typeof ApiPublicPosStandardCatalogRoute
   '/api/public/sso/aigc-exchange': typeof ApiPublicSsoAigcExchangeRoute
   '/api/public/sso/aigc-ticket': typeof ApiPublicSsoAigcTicketRoute
+  '/api/public/storefront/after-sales-summary': typeof ApiPublicStorefrontAfterSalesSummaryRoute
   '/api/public/storefront/notifications': typeof ApiPublicStorefrontNotificationsRouteWithChildren
   '/api/public/storefront/orders': typeof ApiPublicStorefrontOrdersRouteWithChildren
   '/api/public/storefront/payments': typeof ApiPublicStorefrontPaymentsRouteWithChildren
@@ -2644,6 +2663,7 @@ export interface FileRouteTypes {
     | '/purchase/japan-parcel/'
     | '/api/internal/media/parcel-upload'
     | '/api/internal/payments/reconcile'
+    | '/api/internal/refunds/run'
     | '/api/public/content/$id'
     | '/api/public/content/feed'
     | '/api/public/go/authorization'
@@ -2692,6 +2712,7 @@ export interface FileRouteTypes {
     | '/api/public/pos/standard-catalog'
     | '/api/public/sso/aigc-exchange'
     | '/api/public/sso/aigc-ticket'
+    | '/api/public/storefront/after-sales-summary'
     | '/api/public/storefront/notifications'
     | '/api/public/storefront/orders'
     | '/api/public/storefront/payments'
@@ -2903,6 +2924,7 @@ export interface FileRouteTypes {
     | '/purchase/japan-parcel'
     | '/api/internal/media/parcel-upload'
     | '/api/internal/payments/reconcile'
+    | '/api/internal/refunds/run'
     | '/api/public/content/$id'
     | '/api/public/content/feed'
     | '/api/public/go/authorization'
@@ -2951,6 +2973,7 @@ export interface FileRouteTypes {
     | '/api/public/pos/standard-catalog'
     | '/api/public/sso/aigc-exchange'
     | '/api/public/sso/aigc-ticket'
+    | '/api/public/storefront/after-sales-summary'
     | '/api/public/storefront/notifications'
     | '/api/public/storefront/orders'
     | '/api/public/storefront/payments'
@@ -3169,6 +3192,7 @@ export interface FileRouteTypes {
     | '/purchase/japan-parcel/'
     | '/api/internal/media/parcel-upload'
     | '/api/internal/payments/reconcile'
+    | '/api/internal/refunds/run'
     | '/api/public/content/$id'
     | '/api/public/content/feed'
     | '/api/public/go/authorization'
@@ -3217,6 +3241,7 @@ export interface FileRouteTypes {
     | '/api/public/pos/standard-catalog'
     | '/api/public/sso/aigc-exchange'
     | '/api/public/sso/aigc-ticket'
+    | '/api/public/storefront/after-sales-summary'
     | '/api/public/storefront/notifications'
     | '/api/public/storefront/orders'
     | '/api/public/storefront/payments'
@@ -3387,6 +3412,7 @@ export interface RootRouteChildren {
   InventoryStocktakesIndexRoute: typeof InventoryStocktakesIndexRoute
   ApiInternalMediaParcelUploadRoute: typeof ApiInternalMediaParcelUploadRoute
   ApiInternalPaymentsReconcileRoute: typeof ApiInternalPaymentsReconcileRoute
+  ApiInternalRefundsRunRoute: typeof ApiInternalRefundsRunRoute
   ApiPublicContentIdRoute: typeof ApiPublicContentIdRouteWithChildren
   ApiPublicContentFeedRoute: typeof ApiPublicContentFeedRoute
   ApiPublicGoAuthorizationRoute: typeof ApiPublicGoAuthorizationRoute
@@ -3434,6 +3460,7 @@ export interface RootRouteChildren {
   ApiPublicPosStandardCatalogRoute: typeof ApiPublicPosStandardCatalogRoute
   ApiPublicSsoAigcExchangeRoute: typeof ApiPublicSsoAigcExchangeRoute
   ApiPublicSsoAigcTicketRoute: typeof ApiPublicSsoAigcTicketRoute
+  ApiPublicStorefrontAfterSalesSummaryRoute: typeof ApiPublicStorefrontAfterSalesSummaryRoute
   ApiPublicStorefrontNotificationsRoute: typeof ApiPublicStorefrontNotificationsRouteWithChildren
   ApiPublicStorefrontOrdersRoute: typeof ApiPublicStorefrontOrdersRouteWithChildren
   ApiPublicStorefrontPaymentsRoute: typeof ApiPublicStorefrontPaymentsRouteWithChildren
@@ -4160,6 +4187,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiInternalPaymentsReconcileRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/internal/refunds/run': {
+      id: '/api/internal/refunds/run'
+      path: '/api/internal/refunds/run'
+      fullPath: '/api/internal/refunds/run'
+      preLoaderRoute: typeof ApiInternalRefundsRunRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/content/$id': {
       id: '/api/public/content/$id'
       path: '/api/public/content/$id'
@@ -4494,6 +4528,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/sso/aigc-ticket'
       fullPath: '/api/public/sso/aigc-ticket'
       preLoaderRoute: typeof ApiPublicSsoAigcTicketRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/storefront/after-sales-summary': {
+      id: '/api/public/storefront/after-sales-summary'
+      path: '/api/public/storefront/after-sales-summary'
+      fullPath: '/api/public/storefront/after-sales-summary'
+      preLoaderRoute: typeof ApiPublicStorefrontAfterSalesSummaryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/storefront/notifications': {
@@ -6091,6 +6132,7 @@ const rootRouteChildren: RootRouteChildren = {
   InventoryStocktakesIndexRoute: InventoryStocktakesIndexRoute,
   ApiInternalMediaParcelUploadRoute: ApiInternalMediaParcelUploadRoute,
   ApiInternalPaymentsReconcileRoute: ApiInternalPaymentsReconcileRoute,
+  ApiInternalRefundsRunRoute: ApiInternalRefundsRunRoute,
   ApiPublicContentIdRoute: ApiPublicContentIdRouteWithChildren,
   ApiPublicContentFeedRoute: ApiPublicContentFeedRoute,
   ApiPublicGoAuthorizationRoute: ApiPublicGoAuthorizationRoute,
@@ -6146,6 +6188,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicPosStandardCatalogRoute: ApiPublicPosStandardCatalogRoute,
   ApiPublicSsoAigcExchangeRoute: ApiPublicSsoAigcExchangeRoute,
   ApiPublicSsoAigcTicketRoute: ApiPublicSsoAigcTicketRoute,
+  ApiPublicStorefrontAfterSalesSummaryRoute:
+    ApiPublicStorefrontAfterSalesSummaryRoute,
   ApiPublicStorefrontNotificationsRoute:
     ApiPublicStorefrontNotificationsRouteWithChildren,
   ApiPublicStorefrontOrdersRoute: ApiPublicStorefrontOrdersRouteWithChildren,
