@@ -142,11 +142,12 @@ export async function confirmShortageRefund(
 }
 
 const SHORTAGE_COLUMNS =
-  "id, order_id, quantity, reason, status, refund_state, product_name, image_ref, location_id, quote_version, refund_goods_fen, refund_shipping_fen, refund_total_fen, created_at, customer_responded_at, refund_requested_at, refunded_at";
+  "id, order_id, order_item_id, fulfillment_item_id, refund_intent_id, quantity, reason, status, refund_state, product_name, image_ref, location_id, quote_version, refund_goods_fen, refund_shipping_fen, refund_total_fen, created_at, customer_responded_at, refund_requested_at, refunded_at";
 
 /** 生产依赖：内嵌 Supabase + 真实衍生图签名 + SECURITY DEFINER RPC。 */
 export function createShortageDeps(): ShortageDeps {
   return {
+    ensureQuote: (row, customerId) => ensureShortageQuote(row, customerId),
     async fetchOrders(customerId, orderId) {
       let query = supabaseAdmin
         .from("commerce_orders" as never)
