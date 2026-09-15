@@ -8686,6 +8686,14 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      commerce_order_item_reserved_fen: {
+        Args: { p_order_item_id: string; p_payment_id: string }
+        Returns: number
+      }
+      commerce_payment_reserved_fen: {
+        Args: { p_payment_id: string }
+        Returns: number
+      }
       commerce_prepare_ordinary_payment: {
         Args: {
           p_customer_id: string
