@@ -12,6 +12,15 @@ set -euo pipefail
 PGDIR=${SHORTAGE_TEST_PGDIR:-/tmp/shortage-pg}
 PGPORT_LOCAL=${SHORTAGE_TEST_PGPORT:-55432}
 
+# PostgreSQL 拒绝以 root 运行：自动降权到普通账号（uid 1000）。
+if [ "$(id -u)" = "0" ]; then
+  mkdir -p "$PGDIR"
+  chown -R 1000:1000 "$PGDIR"
+  exec setpriv --reuid=1000 --regid=1000 --clear-groups \
+    env HOME="$PGDIR" SHORTAGE_TEST_PGDIR="$PGDIR" SHORTAGE_TEST_PGPORT="$PGPORT_LOCAL" \
+    bash "$0" "$@"
+fi
+
 if [ ! -d "$PGDIR/data" ]; then
   mkdir -p "$PGDIR/data"
   initdb -D "$PGDIR/data" -U postgres --auth=trust >/dev/null
