@@ -89,3 +89,23 @@ export function createRefundWorkerDeps(
     },
   };
 }
+
+/**
+ * 客户确认后立即尝试同一退款意图；进程崩溃或未开启时由后台 worker 补偿。
+ * 任何失败都不抛给客户：确认事实已入库，执行状态由 refund_state 反映。
+ */
+export async function kickShortageRefund(shortageId: string): Promise<void> {
+  try {
+    const { data } = await supabaseAdmin
+      .from("commerce_refund_intents" as never)
+      .select("id")
+      .eq("shortage_id", shortageId)
+      .maybeSingle();
+    const intentId = (data as { id?: string } | null)?.id;
+    if (!intentId) return;
+    const { runRefundIntentNow } = await import("./refund-intent-worker.server");
+    await runRefundIntentNow(createRefundWorkerDeps(), intentId);
+  } catch {
+    /* 后台 worker 会重试；此处绝不向客户报告假成功或假失败 */
+  }
+}

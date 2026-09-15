@@ -29,11 +29,18 @@ export const Route = createFileRoute("/api/public/storefront/shortages/$id/confi
         if (header && header !== expected) {
           return storefrontError("Idempotency-Key mismatch", 400, "validation_error");
         }
-        const result = await confirmShortageRefund(createShortageDeps(), {
+        const deps = createShortageDeps();
+        const result = await confirmShortageRefund(deps, {
           customerId: auth.customer.id,
           shortageId: params.id,
           quoteVersion: body.quote_version,
         });
+        if (result.status === 200) {
+          // 确认成功后立即尝试执行同一退款意图；未开启或失败时由后台 worker 恢复
+          await kickShortageRefund(params.id);
+          const fresh = await getShortageCase(deps, auth.customer.id, params.id);
+          if (fresh) return storefrontJson({ ok: true, data: fresh });
+        }
         return storefrontJson(result.body, { status: result.status });
       },
     },
