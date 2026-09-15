@@ -76,6 +76,35 @@ export function normalizeRefundState(value: string): ShortageRefundState {
   }
 }
 
+export type ShortageBlockReason =
+  | "already_requested"
+  | "manual_review"
+  | "no_quote"
+  | "refund_worker_disabled";
+
+/** can_confirm 的唯一判定（服务端），顺带给出机器可读原因。 */
+export function evaluateConfirmable(
+  row: ShortageRow,
+  extra: { has_refund_intent: boolean; refund_execution_enabled: boolean },
+): { can_confirm: boolean; can_confirm_reason: ShortageBlockReason | null } {
+  const refundState = normalizeRefundState(row.refund_state);
+  const total = row.refund_total_fen ?? 0;
+  if (extra.has_refund_intent) {
+    return { can_confirm: false, can_confirm_reason: "already_requested" };
+  }
+  if (refundState !== "awaiting_confirmation" || row.status !== "pending_customer") {
+    return { can_confirm: false, can_confirm_reason: "manual_review" };
+  }
+  if (!row.quote_version || total <= 0) {
+    return { can_confirm: false, can_confirm_reason: "no_quote" };
+  }
+  // 真实退款执行未开启时，服务端不接受确认写入，UI 也不得显示可确认。
+  if (!extra.refund_execution_enabled) {
+    return { can_confirm: false, can_confirm_reason: "refund_worker_disabled" };
+  }
+  return { can_confirm: true, can_confirm_reason: null };
+}
+
 export function toShortageCase(
   row: ShortageRow,
   extra: {
@@ -83,10 +112,12 @@ export function toShortageCase(
     store_name: string | null;
     thumbnail_url: string | null;
     has_refund_intent: boolean;
+    refund_execution_enabled: boolean;
   },
 ): ShortageCase {
   const refundState = normalizeRefundState(row.refund_state);
   const total = row.refund_total_fen ?? 0;
+  const confirmable = evaluateConfirmable(row, extra);
   return {
     id: row.id,
     order_id: row.order_id ?? "",
