@@ -21,7 +21,7 @@ DECLARE
   i integer;
 BEGIN
   INSERT INTO public.commerce_customers (id, external_subject) VALUES (v_customer, 'test:' || p_tag);
-  INSERT INTO public.commerce_orders (id, order_no, customer_id, status, shipping_fee, total_amount,
+  INSERT INTO public.commerce_orders (id, order_no, customer_id, payment_status, shipping_fee, total_amount,
                                       idempotency_key, reservation_expires_at)
     VALUES (v_order, 'T-' || p_tag, v_customer, 'paid', p_shipping, p_paid, 'idem-' || p_tag, now() + interval '1 day');
   INSERT INTO public.commerce_payments (id, order_id, provider, amount, status, idempotency_key, paid_at)
