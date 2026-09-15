@@ -44,10 +44,14 @@ export type ShortageDeps = {
 
 async function buildCases(
   deps: ShortageDeps,
-  rows: ShortageDbRow[],
+  inputRows: ShortageDbRow[],
   orderNoById: Map<string, string | null>,
+  customerId: string,
 ): Promise<ShortageCase[]> {
-  if (rows.length === 0) return [];
+  if (inputRows.length === 0) return [];
+  // 旧缺货：读时补真实报价（无法安全报价则转人工），使其成为可确认的待办。
+  const rows: ShortageDbRow[] = [];
+  for (const row of inputRows) rows.push(await deps.ensureQuote(row, customerId));
   const [stores, intents, thumbs] = await Promise.all([
     deps.fetchStoreNames(rows.map((r) => r.location_id).filter((v): v is string => !!v)),
     deps.fetchIntentShortageIds(rows.map((r) => r.id)),
