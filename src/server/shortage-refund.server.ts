@@ -4,6 +4,7 @@
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { DERIVATIVE_WIDTHS, signDerivativeUrls } from "./media-derivative.server";
+import { ensureShortageQuote } from "./shortage-quote.server";
 import {
   confirmIdempotencyKey,
   toShortageCase,

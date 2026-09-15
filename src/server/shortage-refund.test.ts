@@ -19,6 +19,9 @@ const baseRow: ShortageDbRow = {
   product_name: "旧书",
   image_ref: "sku-listing/a.jpg",
   location_id: "L1",
+  order_item_id: "oi1",
+  fulfillment_item_id: "fi1",
+  refund_intent_id: null,
   quote_version: "v1",
   refund_goods_fen: 1000,
   refund_shipping_fen: 0,
@@ -40,6 +43,7 @@ function makeDeps(overrides: Partial<ShortageDeps> = {}, rows: ShortageDbRow[] =
     fetchStoreNames: async () => new Map([["L1", "温州店"]]),
     fetchIntentShortageIds: async () => new Set<string>(),
     signThumbnails: async (refs) => refs.map((r) => (r ? `signed:${r}` : null)),
+    ensureQuote: async (row) => row,
     confirmRefund: async (): Promise<ConfirmOutcome> => ({ kind: "ok", row: baseRow, replayed: false }),
     ...overrides,
   };
