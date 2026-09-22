@@ -5,6 +5,7 @@ import {
   ok,
   err,
   resolveSessionUser,
+  userCanAccessLocation,
 } from "@/server/handheld-auth.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { SmartCreateReq } from "@/lib/handheld/schemas";
@@ -88,6 +89,14 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
         } catch (e) {
           return err("Invalid body", 400, { code: "validation_error", detail: String(e) });
         }
+        const session = await resolveSessionUser(request);
+        if (!session) return err("Employee session required", 401, { code: "session_required" });
+        const locationId = body.location_id ?? auth.device.location_id;
+        if (!locationId)
+          return err("No target location (device unbound and no location_id given)", 400);
+        if (!(await userCanAccessLocation(session.user_id, locationId)))
+          return err("Location not accessible", 403, { code: "location_forbidden" });
+
         try {
           await assertActiveLeafCategory(body.category);
         } catch (e) {
@@ -121,11 +130,6 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
           opType: "items.smart-create",
         });
         if (replay) return jsonReplay(replay);
-        const session = await resolveSessionUser(request);
-        const locationId = body.location_id ?? auth.device.location_id;
-        if (!locationId)
-          return err("No target location (device unbound and no location_id given)", 400);
-
         const { data: loc } = await supabaseAdmin
           .from("inv_locations")
           .select("id, name, kind, shop_id, is_active")
