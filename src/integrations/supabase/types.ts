@@ -1082,6 +1082,44 @@ export type Database = {
           },
         ]
       }
+      commerce_order_status_audit: {
+        Row: {
+          created_at: string
+          evidence: Json
+          from_status: string
+          id: string
+          order_id: string
+          reason: string
+          to_status: string
+        }
+        Insert: {
+          created_at?: string
+          evidence?: Json
+          from_status: string
+          id?: string
+          order_id: string
+          reason: string
+          to_status: string
+        }
+        Update: {
+          created_at?: string
+          evidence?: Json
+          from_status?: string
+          id?: string
+          order_id?: string
+          reason?: string
+          to_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_order_status_audit_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commerce_orders: {
         Row: {
           authorization_id: string | null
@@ -8382,6 +8420,10 @@ export type Database = {
         Args: { p_lease_seconds: number; p_limit: number }
         Returns: Json
       }
+      commerce_close_order_if_fully_refunded: {
+        Args: { p_evidence: Json; p_order_id: string; p_reason: string }
+        Returns: boolean
+      }
       commerce_close_ordinary_payment: {
         Args: { p_close_evidence: Json; p_payment_id: string }
         Returns: Json
@@ -8685,6 +8727,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      commerce_order_is_refund_closed: {
+        Args: { p_order_id: string }
+        Returns: boolean
       }
       commerce_order_item_reserved_fen: {
         Args: { p_order_item_id: string; p_payment_id: string }

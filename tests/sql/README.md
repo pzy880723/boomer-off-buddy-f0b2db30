@@ -34,5 +34,6 @@ bash tests/sql/run-sql-tests.sh
 | `cases/03_refresh_stale_freight_quote.sql` | 发货后含运费的旧报价被安全重算为 goods-only |
 | `cases/04_partial_refund_continuation.sql` | 合法的连续部分退款可继续，已全退拒绝 |
 | `cases/05_group_freight_not_underrefunded.sql` | 两条 goods-only 旧报价：第二条必须 QUOTE_CHANGED，刷新后整组运费恰好退一次（防漏退） |
+| `cases/06_full_refund_closes_order.sql` | 全退关单+审计；部分/失败/处理中不关；重复回调幂等；多次部分合计全退关单；已交接/发货历史不改；已全退禁止拣货/出库；回填只关账本相符订单 |
 | `concurrency/group_freight_race.sh` | 并发确认：运费不会被退两次 |
 | `concurrency/group_freight_no_underrefund.sh` | 并发确认：后手过期报价被拒，刷新后运费不漏退 |
