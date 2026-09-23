@@ -1082,6 +1082,44 @@ export type Database = {
           },
         ]
       }
+      commerce_order_origin_audit: {
+        Row: {
+          created_at: string
+          evidence: Json
+          id: string
+          new_sales_origin: Json
+          order_id: string
+          previous_sales_origin: Json | null
+          reason: string
+        }
+        Insert: {
+          created_at?: string
+          evidence?: Json
+          id?: string
+          new_sales_origin: Json
+          order_id: string
+          previous_sales_origin?: Json | null
+          reason: string
+        }
+        Update: {
+          created_at?: string
+          evidence?: Json
+          id?: string
+          new_sales_origin?: Json
+          order_id?: string
+          previous_sales_origin?: Json | null
+          reason?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_order_origin_audit_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commerce_order_status_audit: {
         Row: {
           created_at: string
@@ -8763,6 +8801,15 @@ export type Database = {
         Returns: Json
       }
       commerce_quote_store_shipping: { Args: { p_items: Json }; Returns: Json }
+      commerce_record_order_origin: {
+        Args: {
+          p_customer_id: string
+          p_evidence: string
+          p_order_id: string
+          p_platform: string
+        }
+        Returns: Json
+      }
       commerce_record_ordinary_prepay: {
         Args: {
           p_expires_at: string
