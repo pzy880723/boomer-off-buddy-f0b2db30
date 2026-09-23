@@ -14,7 +14,7 @@ PGDB=postgres $PSQL -c "drop database if exists shortage_test" -c "create databa
 $PSQL -q -f tests/sql/harness/stubs.sql >/dev/null
 $PSQL -q -f tests/sql/harness/schema.sql >/tmp/load.log 2>&1 || true
 # 结构 dump 只含表；缺货相关函数由迁移按序加载
-for f in drizzle/migrations/0003_*.sql drizzle/migrations/0004_*.sql drizzle/migrations/0005_*.sql tests/sql/harness/payment_events.sql drizzle/migrations/0007_*.sql drizzle/migrations/0008_*.sql; do
+for f in drizzle/migrations/0003_*.sql drizzle/migrations/0004_*.sql drizzle/migrations/0005_*.sql tests/sql/harness/payment_events.sql drizzle/migrations/0007_*.sql drizzle/migrations/0009_*.sql; do
   [ -f "$f" ] && $PSQL -q -f "$f" >/dev/null
 done
 $PSQL -q -f tests/sql/fixtures.sql >/dev/null
