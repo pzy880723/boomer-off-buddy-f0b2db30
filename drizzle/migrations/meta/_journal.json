@@ -43,6 +43,13 @@
       "when": 1789437389723,
       "tag": "0005_shortage_group_freight_no_underrefund",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790189187184,
+      "tag": "0006_full_refund_closes_order",
+      "breakpoints": true
     }
   ]
 }
