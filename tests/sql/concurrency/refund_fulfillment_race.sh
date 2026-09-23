@@ -26,13 +26,14 @@ SELECT public.commerce_apply_ordinary_refund(jsonb_build_object(
 SELECT pg_sleep(2);
 COMMIT;
 SQL
-  echo $!
+  REFUND_PID=$!
 }
 
 # 场景 A：退款持锁后，并发增加 picked_qty 必须等待，随后被拒绝。
 IFS='|' read -r CTX ORDER PAYMENT TX <<<"$(make_refund 'refund-pick-race')"
 FID=$($PSQL -At -c "select ('$CTX'::jsonb)->>'fulfillment_id'")
-A=$(run_refund_holder 'refund-pick-race' "$ORDER" "$PAYMENT" "$TX" /tmp/refund_pick_a.log)
+run_refund_holder 'refund-pick-race' "$ORDER" "$PAYMENT" "$TX" /tmp/refund_pick_a.log
+A=$REFUND_PID
 sleep 0.5
 $PSQL -At >/tmp/refund_pick_b.log 2>&1 <<SQL &
 BEGIN; SET LOCAL statement_timeout = '8s';
@@ -49,7 +50,8 @@ fi
 # 场景 B：退款持锁后，并发新增 shipment 必须等待，随后被拒绝。
 IFS='|' read -r CTX ORDER PAYMENT TX <<<"$(make_refund 'refund-ship-race')"
 FID=$($PSQL -At -c "select ('$CTX'::jsonb)->>'fulfillment_id'")
-A=$(run_refund_holder 'refund-ship-race' "$ORDER" "$PAYMENT" "$TX" /tmp/refund_ship_a.log)
+run_refund_holder 'refund-ship-race' "$ORDER" "$PAYMENT" "$TX" /tmp/refund_ship_a.log
+A=$REFUND_PID
 sleep 0.5
 $PSQL -At >/tmp/refund_ship_b.log 2>&1 <<SQL &
 BEGIN; SET LOCAL statement_timeout = '8s';
