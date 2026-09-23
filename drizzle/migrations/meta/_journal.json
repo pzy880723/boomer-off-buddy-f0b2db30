@@ -50,6 +50,13 @@
       "when": 1790189187184,
       "tag": "0006_full_refund_closes_order",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790189239223,
+      "tag": "0007_full_refund_closes_order_v2",
+      "breakpoints": true
     }
   ]
 }
