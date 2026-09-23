@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { orderSourceLabel } from "@/lib/commerce/online-order-presentation";
 
 export type CommerceOrderAdminRow = {
   id: string;
@@ -10,6 +11,7 @@ export type CommerceOrderAdminRow = {
   payment_status: string;
   order_status: string;
   source_channel: "storefront" | "pos" | "youzan" | "manual";
+  source_label: string;
   fulfillment_method: "shipping" | "pickup" | "carryout";
   total_amount: number;
   recipient_name: string;
@@ -70,13 +72,15 @@ export const listCommerceOrders = createServerFn({ method: "GET" })
     const { data: rawRows, error } = await supabaseAdmin
       .from("commerce_orders" as never)
       .select(
-        "id,order_no,payment_status,order_status,source_channel,fulfillment_method,total_amount,recipient_name,recipient_phone,courier_provider,courier_service_name,paid_at,created_at,items:commerce_order_items(id,title_snapshot,image_snapshot,unit_price,quantity,line_total,location_id,location:inv_locations!location_id(name)),fulfillments(id,code,status,location_id,location:inv_locations!location_id(name))",
+        "id,order_no,payment_status,order_status,source_channel,metadata,fulfillment_method,total_amount,recipient_name,recipient_phone,courier_provider,courier_service_name,paid_at,created_at,items:commerce_order_items(id,title_snapshot,image_snapshot,unit_price,quantity,line_total,location_id,location:inv_locations!location_id(name)),fulfillments(id,code,status,location_id,location:inv_locations!location_id(name))",
       )
+      .neq("source_channel", "pos")
       .order("created_at", { ascending: false })
       .limit(data.limit);
     if (error) throw new Error(error.message);
     const needle = data.search?.toLocaleLowerCase() ?? "";
-    const rows = (rawRows ?? []) as unknown as CommerceOrderAdminRow[];
+    const rows = ((rawRows ?? []) as unknown as Array<Omit<CommerceOrderAdminRow, "source_label"> & {metadata?: unknown}>)
+      .map(({metadata, ...row}) => ({...row, source_label: orderSourceLabel({...row, metadata})}));
     return {
       rows: rows.filter((row) => {
         if (!needle) return true;
@@ -237,7 +241,9 @@ export const getCommerceOperationsSummary = createServerFn({ method: "GET" })
     return {
       stats: {
         published_listings: listings.filter((listing) => listing.status === "published").length,
-        pending_payment: orders.filter((order) => order.payment_status === "unpaid").length,
+        pending_payment: orders.filter(
+          (order) => order.payment_status === "unpaid" && order.order_status === "pending_payment",
+        ).length,
         pending_fulfillment: orders.filter(
           (order) =>
             order.payment_status === "paid" &&

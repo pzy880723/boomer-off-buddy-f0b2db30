@@ -17,6 +17,12 @@ import {
 } from "@/server/handheld-orders.server";
 
 describe("订单列表契约", () => {
+  test("退款后的列表与详情不能显示取消或普通售后", () => {
+    const counts = {fulfillment_count: 1, handed_over_count: 0};
+    assert.equal(orderStatusLabelFor("cancelled", counts, "refunded"), "已退款");
+    assert.equal(orderStatusLabelFor("after_sales", counts, "partially_refunded"), "部分退款");
+    assert.equal(orderStatusLabelFor("after_sales", counts, "refund_pending"), "退款中");
+  });
   test("状态枚举与 App 契约一致", () => {
     assert.deepEqual(ORDER_STATUS_FILTERS, [
       "all",

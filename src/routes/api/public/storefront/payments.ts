@@ -10,6 +10,7 @@ import {
 import { storefrontPaymentGatewayConfig } from "@/server/storefront-payment.server";
 import { ordinaryPaymentRuntime } from "@/server/ordinary-payment.server";
 import { startOrdinaryPayment } from "@/server/ordinary-payment-flow";
+import { recordOrderOrigin } from "@/server/order-origin.server";
 import { PaymentRouteError, resolveOrderChannel } from "@/server/payment-route";
 
 import {
@@ -98,6 +99,12 @@ export const Route = createFileRoute("/api/public/storefront/payments")({
               platform: body.client_context.platform,
               miniOpenId: auth.customer.wechatMiniOpenId,
               miniAppId: auth.customer.wechatMiniAppId,
+            });
+            // This path has validated the mini-program JWT identity and merchant AppID.
+            // Do not infer an order source merely from provider=wechat.
+            await recordOrderOrigin({rpc: (name, args) => supabaseAdmin.rpc(name as never, args as never)}, {
+              orderId: orderRow.id, customerId: auth.customer.id,
+              platform: "miniapp", evidence: "verified_miniapp_payment",
             });
             return storefrontJson({ ok: true, data });
           } catch (error) {

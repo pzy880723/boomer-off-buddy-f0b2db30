@@ -1860,6 +1860,9 @@ export const StorefrontCreateOrderReq = z
     shipping_fee: z.number().min(0).max(100000).default(0),
     courier_quote_snapshot: z.record(z.string(), z.unknown()).optional(),
     customer_note: z.string().max(500).optional(),
+    source_platform: z.enum(["miniapp", "app", "web"]).optional().meta({
+      description: "下单客户端来源；缺失时保持未知，不从支付方式或配送方式推断。幂等重试保留首次来源。",
+    }),
   })
   .meta({ id: "StorefrontCreateOrderRequest" });
 

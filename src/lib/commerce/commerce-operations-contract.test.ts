@@ -26,7 +26,7 @@ describe("commerce operations administration", () => {
 
   test("shows both entries in ERP order navigation", () => {
     const sidebar = readFileSync(join(srcRoot, "components/app-sidebar.tsx"), "utf8");
-    assert.match(sidebar, /网店订单/);
+    assert.match(sidebar, /线上订单/);
     assert.match(sidebar, /售后订单/);
   });
 

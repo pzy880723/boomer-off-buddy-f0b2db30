@@ -15496,6 +15496,15 @@
           "customer_note": {
             "type": "string",
             "maxLength": 500
+          },
+          "source_platform": {
+            "description": "下单客户端来源；缺失时保持未知，不从支付方式或配送方式推断。幂等重试保留首次来源。",
+            "type": "string",
+            "enum": [
+              "miniapp",
+              "app",
+              "web"
+            ]
           }
         },
         "required": [

@@ -30,6 +30,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getCommerceOperationsSummary } from "@/lib/commerce-operations.functions";
+import { onlineOrderState } from "@/lib/commerce/online-order-presentation";
 
 export const Route = createFileRoute("/shop-mgmt/commerce")({
   head: () => ({ meta: [{ title: "网店运营中心 · BOOMER OFF" }] }),
@@ -42,16 +43,6 @@ const channelLabel = {
   youzan: "有赞",
   manual: "人工订单",
 } as const;
-
-const orderStatusLabel: Record<string, string> = {
-  pending_payment: "待付款",
-  confirmed: "待履约",
-  processing: "履约中",
-  completed: "已完成",
-  cancelled: "已取消",
-  after_sale: "售后中",
-  closed: "已关闭",
-};
 
 function money(value: number) {
   return new Intl.NumberFormat("zh-CN", {
@@ -155,7 +146,7 @@ function CommerceOperationsPage() {
               </span>
             </div>
             <Button asChild variant="outline" className="w-full rounded-xl">
-              <Link to="/orders/online">查看网店订单</Link>
+              <Link to="/orders/online">查看线上订单</Link>
             </Button>
           </CardContent>
         </Card>
@@ -251,7 +242,7 @@ function CommerceOperationsPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {orderStatusLabel[order.order_status] ?? order.order_status}
+                      {onlineOrderState(order).label}
                     </TableCell>
                     <TableCell className="text-right font-medium tabular-nums">
                       {money(Number(order.total_amount))}

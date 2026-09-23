@@ -3,6 +3,7 @@
 // 不新建订单表，不改写任何写接口语义。
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { loadUserRoles } from "@/server/handheld-auth.server";
+import { onlineOrderState, orderSourceLabel } from "@/lib/commerce/online-order-presentation";
 
 export type OrderStatusFilter =
   | "all"
@@ -153,7 +154,11 @@ export function deriveOrderStatus(input: {
 export function orderStatusLabelFor(
   status: DerivedOrderStatus,
   counts: { fulfillment_count: number; handed_over_count: number },
+  paymentStatus?: string | null,
 ): string {
+  if (["refunded", "partially_refunded", "refund_pending"].includes(paymentStatus ?? "")) {
+    return onlineOrderState({order_status: "", payment_status: paymentStatus!}).label;
+  }
   if (status === "pending" && counts.handed_over_count > 0) return "部分履约";
   return ORDER_STATUS_LABELS[status];
 }
@@ -182,7 +187,7 @@ export function pickImageUrl(input: {
 }
 
 const ORDER_SELECT =
-  "id, order_no, payment_status, order_status, created_at, source_channel, subtotal, shipping_fee, discount_total, total_amount, recipient_name, recipient_phone, shipping_address, customer_note, paid_at, fulfillment_method, " +
+  "id, order_no, payment_status, order_status, created_at, source_channel, metadata, subtotal, shipping_fee, discount_total, total_amount, recipient_name, recipient_phone, shipping_address, customer_note, paid_at, fulfillment_method, " +
   "items:commerce_order_items(id, title_snapshot, image_snapshot, unit_price, quantity, line_total, sku:inv_skus!sku_id(barcode, image_url, image_paths)), " +
   "fulfillments:fulfillments(id, code, location_id, status, created_at, location:inv_locations!location_id(name), items:fulfillment_items(id, expected_qty, picked_qty, order_item:commerce_order_items!order_item_id(id, title_snapshot, image_snapshot, unit_price, quantity), sku:inv_skus!sku_id(name, barcode, image_url, image_paths)))";
 
@@ -207,6 +212,7 @@ type RawOrderRow = {
   order_status: string | null;
   created_at: string;
   source_channel: string | null;
+  metadata?: unknown;
   subtotal: number | null;
   shipping_fee: number | null;
   discount_total: number | null;
@@ -319,7 +325,8 @@ function shapeOrder(
       fulfillment_count: counts.fulfillment_count,
       handed_over_count: counts.handed_over_count,
     });
-  const orderCancelled = status === "cancelled";
+  const orderRefunded = row.payment_status === "refunded";
+  const orderCancelled = status === "cancelled" || orderRefunded;
   const fulfillments = rowFulfillments.map((f) => {
     const fItems = f.items ?? [];
     const goods = fItems.reduce(
@@ -332,8 +339,8 @@ function shapeOrder(
       location_id: f.location_id,
       location_name: f.location?.name ?? null,
       status: f.status,
-      status_label: orderCancelled
-        ? "订单已取消"
+      status_label: orderCancelled && f.status !== "handed_over"
+        ? orderRefunded ? "已退款 · 停止履约" : "订单已取消"
         : (FULFILLMENT_STATUS_LABELS[f.status] ?? f.status),
       order_cancelled: orderCancelled,
       actionable: !orderCancelled,
@@ -363,12 +370,13 @@ function shapeOrder(
     id: row.id,
     order_no: row.order_no,
     status,
-    status_label: orderStatusLabelFor(status, counts),
+    status_label: orderStatusLabelFor(status, counts, row.payment_status),
     fulfillment_count: counts.fulfillment_count,
     handed_over_count: counts.handed_over_count,
     partially_handed_over: status === "pending" && counts.handed_over_count > 0,
     created_at: row.created_at,
     source: row.source_channel ?? null,
+    source_label: orderSourceLabel({source_channel: row.source_channel ?? "", metadata: row.metadata}),
     customer_name: maskName(row.recipient_name),
     item_count: items.reduce((sum, it) => sum + it.quantity, 0),
     // 实付：仅已支付订单返回真实支付金额，未支付一律 0，不伪造
@@ -521,7 +529,7 @@ export const FULFILLMENT_STATUS_FILTERS: FulfillmentStatusFilter[] = [
 const FULFILLMENT_LIST_SELECT =
   "id, code, order_id, location_id, status, priority, claimed_device_id, claimed_at, created_at, " +
   "location:inv_locations!location_id(name), " +
-  "order:commerce_orders!order_id(order_no, order_status, courier_provider, courier_service_code, fulfillment_method, customer_note), " +
+  "order:commerce_orders!order_id(order_no, order_status, payment_status, courier_provider, courier_service_code, fulfillment_method, customer_note), " +
   "items:fulfillment_items(id, expected_qty, picked_qty, order_item:commerce_order_items!order_item_id(title_snapshot, unit_price, image_snapshot), sku:inv_skus!sku_id(name, barcode, image_url, image_paths, sku_code))";
 
 type RawFulfillmentRow = {
@@ -538,6 +546,7 @@ type RawFulfillmentRow = {
   order: {
     order_no: string;
     order_status: string | null;
+    payment_status: string | null;
     courier_provider: string | null;
     courier_service_code: string | null;
     fulfillment_method: string | null;
@@ -629,6 +638,7 @@ export async function listFulfillmentsPaged(input: {
     const rowItems = row.items ?? [];
     const orderCancelled =
       meta.order_cancelled === true ||
+      row.order?.payment_status === "refunded" ||
       ["cancelled", "closed"].includes(row.order?.order_status ?? "");
     return [
       {
@@ -646,8 +656,8 @@ export async function listFulfillmentsPaged(input: {
         // 新增字段
         location_name: row.location?.name ?? null,
         order_no: row.order?.order_no ?? null,
-        status_label: orderCancelled
-          ? "订单已取消"
+        status_label: orderCancelled && row.status !== "handed_over"
+          ? row.order?.payment_status === "refunded" ? "已退款 · 停止履约" : "订单已取消"
           : (FULFILLMENT_STATUS_LABELS[row.status] ?? row.status),
         // 履约表本身没有 cancelled 状态：由父订单取消推导，并禁止一切操作。
         order_cancelled: orderCancelled,

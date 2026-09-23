@@ -23,7 +23,7 @@ export const Route = createFileRoute("/orders/fulfillment/$orderId")({
   head: () => ({
     meta: [
       { title: "门店子单发货与缺货申报 · BOOMER OFF" },
-      { name: "description", content: "按门店查看网店订单子单，录入快递公司与单号发货，或申报缺货。" },
+      { name: "description", content: "按门店查看线上订单子单，录入快递公司与单号发货，或申报缺货。" },
       { property: "og:title", content: "门店子单发货与缺货申报 · BOOMER OFF" },
       { property: "og:description", content: "按门店发货、录入快递单号并申报缺货。" },
       { property: "og:type", content: "website" },
