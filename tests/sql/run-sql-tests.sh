@@ -32,4 +32,5 @@ done
 bash tests/sql/concurrency/group_freight_race.sh || fail=1
 bash tests/sql/concurrency/group_freight_no_underrefund.sh || fail=1
 bash tests/sql/concurrency/order_origin_race.sh || fail=1
+bash tests/sql/concurrency/refund_fulfillment_race.sh || fail=1
 exit $fail
