@@ -31,7 +31,8 @@ CREATE OR REPLACE FUNCTION pg_temp.st(c jsonb) RETURNS text LANGUAGE sql AS $$
   SELECT order_status || '/' || payment_status FROM public.commerce_orders WHERE id = (c->>'order_id')::uuid $$;
 
 DO $$
-DECLARE a jsonb; b jsonb; f jsonb; d jsonb; m jsonb; h jsonb; n int; blocked boolean;
+DECLARE a jsonb; b jsonb; f jsonb; d jsonb; m jsonb; h jsonb; x jsonb; mp jsonb;
+  p2 uuid; n int; blocked boolean;
 BEGIN
   -- 1) 全退
   a := pg_temp.mk('r_full', 100);
@@ -107,6 +108,44 @@ BEGIN
     FROM public.commerce_orders o WHERE o.payment_status = 'refunded' AND o.order_status NOT IN ('closed','cancelled');
   IF pg_temp.st(d) <> 'closed/refunded' THEN RAISE EXCEPTION 'FAIL backfill ok'; END IF;
   IF pg_temp.st(m) <> 'processing/refunded' THEN RAISE EXCEPTION 'FAIL backfill mismatched closed'; END IF;
+
+  -- 9) 付款账本只有订单金额一半，即使单笔付款/退款互相匹配也不得关单
+  x := pg_temp.mk('r_paid_short', 50);
+  UPDATE public.commerce_orders SET total_amount = 100, payment_status = 'refunded'
+   WHERE id = (x->>'order_id')::uuid;
+  INSERT INTO public.commerce_refunds(order_id, payment_id, provider, status, amount, idempotency_key, merchant_refund_no)
+    VALUES ((x->>'order_id')::uuid, (x->>'payment_id')::uuid, 'wechat', 'succeeded', 50, 'idem-X1', 'X1');
+  UPDATE public.commerce_payments SET status = 'refunded' WHERE id = (x->>'payment_id')::uuid;
+  PERFORM public.commerce_close_order_if_fully_refunded((x->>'order_id')::uuid, 'test_paid_total_mismatch', '{}');
+  IF pg_temp.st(x) <> 'processing/refunded' THEN RAISE EXCEPTION 'FAIL paid total mismatch closed: %', pg_temp.st(x); END IF;
+
+  -- 10) 两笔有效付款分别全退，订单汇总状态必须最终变为 refunded 并关单
+  mp := pg_temp.mk('r_multi_payment', 40);
+  UPDATE public.commerce_orders SET total_amount = 100 WHERE id = (mp->>'order_id')::uuid;
+  p2 := gen_random_uuid();
+  INSERT INTO public.commerce_payments(id, order_id, provider, amount, status, idempotency_key,
+                                       provider_transaction_id, paid_at)
+    VALUES (p2, (mp->>'order_id')::uuid, 'wechat', 60, 'succeeded', 'pay-r_multi_payment-2',
+            'tx-r_multi_payment-2', now());
+  PERFORM pg_temp.refund(mp, 'MP1', 40, 'succeeded');
+  IF pg_temp.st(mp) <> 'processing/partially_refunded' THEN RAISE EXCEPTION 'FAIL multi payment first: %', pg_temp.st(mp); END IF;
+  PERFORM pg_temp.refund(mp || jsonb_build_object('payment_id', p2), 'MP2', 60, 'succeeded');
+  IF pg_temp.st(mp) <> 'closed/refunded' THEN RAISE EXCEPTION 'FAIL multi payment full: %', pg_temp.st(mp); END IF;
+
+  -- 11) exception 不得成为全退后的恢复通道；handed_over/exception 父状态也不得放行子表新增出库
+  blocked := false;
+  BEGIN UPDATE public.fulfillments SET status = 'picking' WHERE order_id = (a->>'order_id')::uuid;
+  EXCEPTION WHEN others THEN blocked := SQLERRM LIKE '%order_refunded%'; END;
+  IF NOT blocked THEN RAISE EXCEPTION 'FAIL exception to picking not blocked'; END IF;
+  blocked := false;
+  BEGIN UPDATE public.fulfillments SET status = 'handed_over' WHERE order_id = (a->>'order_id')::uuid;
+  EXCEPTION WHEN others THEN blocked := SQLERRM LIKE '%order_refunded%'; END;
+  IF NOT blocked THEN RAISE EXCEPTION 'FAIL exception to handed_over not blocked'; END IF;
+  blocked := false;
+  BEGIN UPDATE public.fulfillment_items SET picked_qty = 1
+         WHERE fulfillment_id IN (SELECT id FROM public.fulfillments WHERE order_id = (h->>'order_id')::uuid);
+  EXCEPTION WHEN others THEN blocked := SQLERRM LIKE '%order_refunded%'; END;
+  IF NOT blocked THEN RAISE EXCEPTION 'FAIL handed_over child pick not blocked'; END IF;
 
   RAISE NOTICE 'PASS 06_full_refund_closes_order';
 END $$;
