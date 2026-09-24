@@ -9144,6 +9144,9 @@ export type Database = {
         Args: { p_delta: number; p_sku_id: string }
         Returns: undefined
       }
+      inv_sku_delete_blocker: { Args: { p_sku_id: string }; Returns: string }
+      inv_sku_is_hq_actor: { Args: never; Returns: boolean }
+      inventory_delete_unused_sku: { Args: { p_sku_id: string }; Returns: Json }
       pos_complete_return: {
         Args: {
           p_authorization_id?: string
