@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { findSanrioBrandCandidate } from "@/lib/product-classification";
 import { matchBrandCandidate } from "@/lib/product-taxonomy";
@@ -54,4 +55,37 @@ export async function persistSmartCreateBrand(input: {
     } as never)
     .eq("id", input.skuId);
   if (saved.error) throw new Error(`保存 SKU 品牌失败：${saved.error.message}`);
+}
+
+export type SmartCreateCommitResult = {
+  op_id: string | null;
+  replayed: boolean;
+  op_status: "committed" | "completed";
+  sku_id: string;
+  sku_code: string | null;
+  epc: string;
+  bound_epcs: number;
+  stock_qty: number | null;
+  response: unknown;
+};
+
+function canonical(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.keys(value as Record<string, unknown>)
+        .filter((k) => (value as Record<string, unknown>)[k] !== undefined)
+        .sort()
+        .map((k) => [k, canonical((value as Record<string, unknown>)[k])]),
+    );
+  }
+  return value;
+}
+
+/** 载荷指纹：排除 client_op_id，键排序，含目标库位；签名 URL 需先规范化再传入。 */
+export function smartCreateFingerprint(body: Record<string, unknown>, locationId: string): string {
+  const { client_op_id: _ignored, ...rest } = body;
+  return createHash("sha256")
+    .update(JSON.stringify(canonical({ ...rest, location_id: locationId })))
+    .digest("hex");
 }
