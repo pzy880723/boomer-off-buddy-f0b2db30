@@ -78,6 +78,8 @@ const { Route } = await load("src/routes/api/public/handheld/items.smart-create.
 });
 const { runHandheldReleaseWorker } = await load("src/server/handheld-release-outbox.server.ts", {
   "@/integrations/supabase/client.server": adminStub,
+  "@/lib/youzan-offline-products.functions": "export const releaseSkuToOfflineShopsCore = () => { throw Error('use injected deps'); };",
+  "@/lib/youzan-category-groups.server": "export const assignSkuToYouzanCategoryGroups = async () => {};",
 });
 
 beforeEach(() => {
