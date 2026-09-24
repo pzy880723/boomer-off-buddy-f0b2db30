@@ -21,7 +21,7 @@ CREATE TABLE public.inv_skus (
 CREATE TABLE public.inv_stocks (sku_id uuid NOT NULL REFERENCES public.inv_skus(id), location_id uuid NOT NULL, qty integer NOT NULL DEFAULT 0,
   updated_at timestamptz DEFAULT now(), PRIMARY KEY (sku_id, location_id));
 CREATE TABLE public.inv_stock_movements (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), sku_id uuid REFERENCES public.inv_skus(id),
-  location_id uuid, delta integer, balance_after integer, ref_type text, ref_id uuid, epc text, note text, created_by uuid,
+  location_id uuid, delta integer, balance_after integer, ref_type text CHECK (ref_type IN ('manual_adjust','handheld_smart_create','x')), ref_id uuid, epc text, note text, created_by uuid,
   created_at timestamptz DEFAULT now());
 CREATE TABLE public.inv_epcs (epc text PRIMARY KEY, sku_id uuid REFERENCES public.inv_skus(id), current_location_id uuid,
   status text NOT NULL DEFAULT 'unclaimed', last_seen_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now());

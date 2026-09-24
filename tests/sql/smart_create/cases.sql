@@ -100,7 +100,7 @@ BEGIN
   IF (SELECT status FROM handheld_youzan_release_outbox WHERE sku_id=dup) <> 'cancelled' THEN RAISE EXCEPTION 'FAIL outbox cancel'; END IF;
   -- 幂等重放：不再追加流水
   r := public.inv_revoke_duplicate_sku(dup, keep, loc, 'test');
-  SELECT count(*) INTO n FROM inv_stock_movements WHERE sku_id=dup AND ref_type='duplicate_listing_revoke';
+  SELECT count(*) INTO n FROM inv_stock_movements WHERE sku_id=dup AND ref_type='manual_adjust' AND note LIKE 'duplicate_listing_revoke%';
   IF NOT (r->>'replayed')::boolean OR n <> 1 THEN RAISE EXCEPTION 'FAIL revoke replay n=%', n; END IF;
   -- 有订单引用 → 拒绝
   INSERT INTO inv_skus(category,price_tier,name,epc) VALUES ('toy',1,'b','B') RETURNING id INTO bad;
