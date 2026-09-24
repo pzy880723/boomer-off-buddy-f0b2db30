@@ -29,7 +29,7 @@ export function RowActionsMenu({
   className = "",
   trigger,
 }: {
-  onEdit: () => void;
+  onEdit?: () => void;
   onDelete: () => Promise<unknown>;
   deleteTitle?: string;
   deleteDescription?: ReactNode;
@@ -67,7 +67,7 @@ export function RowActionsMenu({
           )}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" onClick={stop as never}>
-          <DropdownMenuItem
+          {onEdit && <><DropdownMenuItem
             onSelect={(e) => {
               e.preventDefault();
               onEdit();
@@ -75,7 +75,7 @@ export function RowActionsMenu({
           >
             <Pencil className="mr-2 h-3.5 w-3.5" /> 编辑
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
+          <DropdownMenuSeparator /></>}
           <DropdownMenuItem
             className="text-destructive focus:text-destructive"
             onSelect={(e) => {

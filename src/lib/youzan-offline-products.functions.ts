@@ -14,6 +14,9 @@ import {
   findOfflineProductMatch,
   isYouzanProductNotFoundError,
   queryYouzanOfflineProducts,
+  queryYouzanBranchChannelProduct,
+  assertCustomBranchProduct,
+  updateCustomHqPrice,
   releaseYouzanOfflineProduct,
   resolveOfflineReleaseSourceImages,
   resolveYouzanHqItemId,
@@ -40,11 +43,13 @@ async function findExistingOfflineProduct(args: {
   accessToken: string;
   warehouseCode: string | null;
   skuCode: string;
+  barcode?: string | null;
   name: string;
 }) {
   if (!args.warehouseCode) return null;
   const target = {
     skuCode: args.skuCode,
+    barcode: args.barcode,
     name: args.name,
   };
 
@@ -309,6 +314,22 @@ export async function releaseSkuToOfflineShopsCore(args: {
     // offline.spu.release publishes an existing HQ product to a branch.
     // Relation fields use Youzan's HQ codes; sku_no keeps the ERP barcode for POS scanning.
     const hqLink = customHqLink ?? (await ensureHqSpuLink(args.sku_id, branch.id));
+    const channelQuery = { accessToken, kdtId: Number(branch.kdt_id), itemCode: hqLink.spu_code };
+    const hqChannel = isCustom
+      ? await queryYouzanBranchChannelProduct({ ...channelQuery, kdtId: Number(hq.kdt_id) })
+      : null;
+    const verifyBranch = async () => {
+      let lastError: unknown;
+      for (const waitMs of [0, 1000, 2000, 4000, 8000, 15000]) {
+        if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
+        const product = await queryYouzanBranchChannelProduct(channelQuery);
+        try {
+          assertCustomBranchProduct(product, { barcode: posBarcode, priceYuan: Number(sku.price_tier) });
+          return product;
+        } catch (error) { lastError = error; }
+      }
+      throw lastError;
+    };
     const { data: location } = await supabase
       .from("inv_locations")
       .select("id")
@@ -343,20 +364,24 @@ export async function releaseSkuToOfflineShopsCore(args: {
 
     // The live branch query is authoritative. Database links can become stale when Youzan
     // rewrites an offline item id or a product is recreated in the branch.
-    const remoteExisting = await findExistingOfflineProduct({
+    const remoteExisting = isCustom ? await queryYouzanBranchChannelProduct(channelQuery) : await findExistingOfflineProduct({
       accessToken,
       warehouseCode: branch.warehouse_code,
       skuCode: remoteIdentity.code,
+      barcode: posBarcode,
       name: remoteIdentity.name,
     });
     if (remoteExisting) {
       const remoteSkuId = remoteExisting.skus[0]?.skuId ?? null;
       try {
+        if (isCustom && !hqChannel) throw new Error("有赞总部渠道商品尚未就绪，不能使用分店 ID 更新总部商品");
         await updateYouzanOfflineProduct({
           accessToken,
-          itemId: remoteExisting.itemId,
+          itemId: hqChannel?.itemId ?? remoteExisting.itemId,
           input: releaseInput,
         });
+        if (isCustom) await updateCustomHqPrice({ accessToken, hqKdtId: Number(hq.kdt_id), itemCode: hqLink.spu_code, priceYuan: Number(sku.price_tier) });
+        if (isCustom) await verifyBranch();
         await upsertBranchLink({
           skuId: args.sku_id,
           shopId: branch.id,
@@ -394,12 +419,16 @@ export async function releaseSkuToOfflineShopsCore(args: {
         accessToken,
         input: releaseInput,
       });
-      const remoteSkuId = released.skuIds[0] ?? null;
+      // A HQ release response identifies HQ's channel, not the target branch.
+      if (isCustom) await updateCustomHqPrice({ accessToken, hqKdtId: Number(hq.kdt_id), itemCode: hqLink.spu_code, priceYuan: Number(sku.price_tier) });
+      const branchProduct = isCustom ? await verifyBranch() : null;
+      const remoteItemId = branchProduct?.itemId ?? released.itemId;
+      const remoteSkuId = branchProduct?.skus[0]?.skuId ?? released.skuIds[0] ?? null;
       await upsertBranchLink({
         skuId: args.sku_id,
         shopId: branch.id,
         hqSpuId: hqLink.yz_item_id,
-        itemId: released.itemId,
+        itemId: remoteItemId,
         skuIdRemote: remoteSkuId,
         stock,
         recovered: false,
@@ -413,7 +442,7 @@ export async function releaseSkuToOfflineShopsCore(args: {
       results.push({
         shop_id: branch.id,
         ok: true,
-        item_id: released.itemId,
+        item_id: remoteItemId,
         sku_id: remoteSkuId,
         recovered: false,
         error: null,
@@ -422,12 +451,14 @@ export async function releaseSkuToOfflineShopsCore(args: {
       const message = error instanceof Error ? error.message : String(error);
       let recovered: { itemId: number; skuId: number | null } | null = null;
       try {
-        const matched = await findExistingOfflineProduct({
+        const matched = isCustom ? await queryYouzanBranchChannelProduct(channelQuery) : await findExistingOfflineProduct({
           accessToken,
           warehouseCode: branch.warehouse_code,
           skuCode: remoteIdentity.code,
+          barcode: posBarcode,
           name: remoteIdentity.name,
         });
+        if (isCustom) assertCustomBranchProduct(matched, { barcode: posBarcode, priceYuan: Number(sku.price_tier) });
         if (matched) {
           recovered = { itemId: matched.itemId, skuId: matched.skus[0]?.skuId ?? null };
         }
@@ -475,7 +506,7 @@ export async function releaseSkuToOfflineShopsCore(args: {
     const hqItem = await resolveYouzanHqItemId({
       accessToken,
       hqKdtId: Number(hq.kdt_id),
-      itemCode: String(sku.sku_code ?? ""),
+      itemCode: customHqLink.spu_code,
     });
     for (const branch of selectNonTargetBranches(allActiveBranches, shopIds)) {
       try {

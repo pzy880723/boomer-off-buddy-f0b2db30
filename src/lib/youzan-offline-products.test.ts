@@ -15,6 +15,9 @@ import {
   findOfflineProductMatch,
   normalizeYouzanProductCode,
   parseOfflineProductRows,
+  parseBranchChannelProduct,
+  assertCustomBranchProduct,
+  buildCustomHqPriceRequest,
   pickYouzanHqItemId,
   resolveOfflineReleaseSourceImages,
   isYouzanProductNotFoundError,
@@ -22,6 +25,33 @@ import {
 } from "./youzan-offline-products.server";
 
 describe("youzan offline products", () => {
+  test("custom listing succeeds only after price and printed barcode read back correctly", () => {
+    const row = { itemId: 10, title: "Kitty", spuNo: "2005336838530", isDisplay: true,
+      skus: [{ skuId: 20, skuNo: null, price: 159 }] };
+    const expected = { barcode: "2005336838530", priceYuan: 159 };
+    assert.doesNotThrow(() => assertCustomBranchProduct(row, expected));
+    assert.throws(() => assertCustomBranchProduct(null, expected));
+    assert.throws(() => assertCustomBranchProduct({ ...row, spuNo: "P260924" }, expected));
+    assert.throws(() => assertCustomBranchProduct({ ...row, skus: [{ ...row.skus[0], price: 15900 }] }, expected));
+  });
+  test("branch identity uses channel ids, never the product-library id or an invented sku id", () => {
+    const detail = { kdt_id: 212291308, channel: 1, item_code: "BM528690012347",
+      item_id: 5287810293, channel_item_id: 5288223915, title: "Hello Kitty",
+      item_barcode: "2005336838530", display: 1,
+      skus: [{ sku_id: 15112606074, channel_sku_id: 26277793955, price: 15900 }],
+    };
+    const target = { kdtId: 212291308, itemCode: "BM528690012347" };
+    const found = parseBranchChannelProduct(detail, target);
+    assert.equal(found?.itemId, 5288223915);
+    assert.equal(found?.skus[0]?.skuId, 26277793955);
+    assert.equal(found?.skus[0]?.price, 159);
+    assert.deepEqual(buildCustomHqPriceRequest(found!, 153242272, 159), {
+      request: { kdt_id: 153242272, item_id: 5287810293, sku_id: 15112606074, channel: 1, price: 15900 },
+    });
+    assert.equal(parseBranchChannelProduct({...detail, kdt_id: 153242272}, target), null);
+    assert.equal(parseBranchChannelProduct({...detail, channel_item_id: 0}, target), null);
+    assert.equal(parseBranchChannelProduct({...detail, skus: []}, target), null);
+  });
   test("custom products cancel the door channel on every non-target branch", () => {
     assert.deepEqual(
       buildCancelBranchChannelParams({
@@ -146,9 +176,9 @@ describe("youzan offline products", () => {
         sellStockCount: 1,
       },
     });
-    assert.equal(params.all_batch_operate, -1);
-    assert.equal(params.price, "16800");
-    assert.equal(params.retail_price, "16800");
+    assert.equal(params.sub_kdt_status_param.all_batch_operate, -1);
+    assert.equal(params.price, "168.00");
+    assert.equal(params.retail_price, "168.00");
     assert.deepEqual(params.sub_kdt_status_param.sale_up_kdt_ids, [233, 666]);
     assert.equal(params.stocks[0].price, "16800");
     assert.equal(params.stocks[0].sell_stock_count, "1");
@@ -174,8 +204,8 @@ describe("youzan offline products", () => {
       },
     });
 
-    assert.equal(params.price, "1");
-    assert.equal(params.retail_price, "1");
+    assert.equal(params.price, "0.01");
+    assert.equal(params.retail_price, "0.01");
     assert.equal(params.stocks[0].price, "1");
     assert.equal(params.stocks[0].min_retail_price, "1");
     assert.equal(params.stocks[0].max_retail_price, "1");
@@ -255,7 +285,7 @@ describe("youzan offline products", () => {
     // rejects that payload as 商品更多条码重复.
     assert.deepEqual(params.bar_codes, []);
     assert.deepEqual(params.sell_channel_setting_request, {
-      is_partial: 0,
+      is_partial: 1,
       sell_channel_ids: [187395218],
     });
   });
@@ -330,7 +360,7 @@ describe("youzan offline products", () => {
     );
   });
 
-  test("recovery accepts a unique title when Youzan rewrites the product code", () => {
+  test("recovery never claims another custom product by its title", () => {
     const rows = parseOfflineProductRows({
       data: {
         offline_spus: [
@@ -349,8 +379,17 @@ describe("youzan offline products", () => {
       skuCode: "SKU-JP-260712-C8FG",
       name: "test2",
     });
-    assert.equal(matched?.itemId, 4870205046);
-    assert.equal(matched?.skus[0]?.skuId, 15039602491);
+    assert.equal(matched, null);
+  });
+
+  test("recovery finds the ERP scan barcode even when the internal code differs", () => {
+    const rows = parseOfflineProductRows({ data: { offline_spus: [{
+      item_id: 6440996945, title: "Hello Kitty", spu_no: "2005336838530",
+      is_display: 1, sku_models: [{ sku_id: 26277793955, sku_no: "", price: "159" }],
+    }] } });
+    assert.equal(findOfflineProductMatch(rows, {
+      skuCode: "SKU-XX-260924-6FQB", name: "Hello Kitty", barcode: "2005336838530",
+    })?.itemId, 6440996945);
   });
 
   test("recovered branch listings reset failed stock sync tasks", () => {

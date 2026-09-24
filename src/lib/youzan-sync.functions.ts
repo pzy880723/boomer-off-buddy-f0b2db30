@@ -12,10 +12,11 @@ import {
   pushYouzanQuantityUpdate,
   runYouzanShopChainProbe,
 } from "./youzan.functions";
-import { selectTrustedBranchItemIds } from "./youzan-quantity.server";
+import { assertYouzanStockWriteSucceeded, buildWarehouseStockAdjustment, selectTrustedBranchItemIds } from "./youzan-quantity.server";
 import {
   buildBranchItemShelfRequest,
   buildCustomHqChannelUpdateParams,
+  queryYouzanBranchChannelProduct,
 } from "./youzan-offline-products.server";
 import { getPublicOrigin, resolvePublicSkuImageUrls } from "./sku-media";
 import {
@@ -78,7 +79,7 @@ export type LinkRow = {
 async function pushStockToYouzan(
   link: LinkRow,
   targetStock: number,
-  _clientSeq: string,
+  clientSeq: string,
 ): Promise<void> {
   const branchShop = await getShopById(link.shop_id);
   if ((branchShop as { role?: string }).role !== "branch") {
@@ -99,13 +100,45 @@ async function pushStockToYouzan(
     .maybeSingle();
   const hqSpuId = Number(hqLink?.yz_item_id ?? 0) || undefined;
 
-  await pushYouzanQuantityUpdate({
-    branchShop,
-    itemId: resolved.item_id,
-    skuId: resolved.sku_id,
-    quantity: Math.max(0, targetStock),
-    hqSpuIdGuard: hqSpuId,
-  });
+  try {
+    await pushYouzanQuantityUpdate({
+      branchShop,
+      itemId: resolved.item_id,
+      skuId: resolved.sku_id,
+      quantity: Math.max(0, targetStock),
+      hqSpuIdGuard: hqSpuId,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/进出存.*管理库存/.test(message)) throw error;
+    const { data: localSku } = await supabase.from("inv_skus").select("sku_scope").eq("id", link.sku_id).single();
+    if (localSku?.sku_scope !== "custom") throw error;
+    const warehouseCode = String((branchShop as { warehouse_code?: string }).warehouse_code ?? "");
+    if (!warehouseCode || !hqSpuId) throw new Error("有赞启用单据库存，但目标门店仓库映射缺失");
+    const accessToken = await ensureAccessToken(hq);
+    const master = await findHqSpuById(accessToken, hqSpuId);
+    if (!master) throw new Error("商品库规格编码缺失，不能调整仓库库存");
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${clientSeq}:${targetStock}`));
+    const operationHash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+    const params = buildWarehouseStockAdjustment({ warehouseCode, skuCode: master.skuCode,
+      quantity: Math.max(0, Math.trunc(targetStock)),
+      operationId: `ERP${operationHash.slice(0, 27)}`,
+      createTime: new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 19).replace("T", " "),
+    });
+    try {
+      const result = await callYouzanApiVerbose({ accessToken,
+        method: "youzan.retail.open.stock.adjust", version: "3.0.0", params, timeoutMs: 20_000 });
+      assertYouzanStockWriteSucceeded(result.payload);
+    } catch (adjustError) {
+      if (!/223001004/.test(String(adjustError))) throw adjustError;
+    }
+    const verified = await callYouzanApiVerbose({ accessToken,
+      method: "youzan.retail.open.query.warehousestock", version: "1.0.0",
+      params: { warehouse_code: warehouseCode, sku_codes: [master.skuCode] }, timeoutMs: 20_000 });
+    const rows = Array.isArray(verified.payload) ? verified.payload as Array<Record<string, unknown>> : [];
+    const stock = rows.find(row => row.sku_code === master.skuCode);
+    if (!stock || Number(stock.stock_num) !== targetStock) throw new Error("有赞仓库库存回读不一致，等待重试");
+  }
   void branchToken; // 已在 helper 内部拿 token
 }
 
@@ -132,6 +165,20 @@ async function resolveBranchItemIds(
     throw new Error(
       "branch item not visible / distribution missing：本地未登记 HQ SPU，请先 ensureBranchProduct",
     );
+  }
+
+  const { data: sku, error: skuError } = await supabase.from("inv_skus").select("sku_scope").eq("id", link.sku_id).single();
+  if (skuError) throw new Error(skuError.message);
+  if (sku.sku_scope === "custom") {
+    const accessToken = await ensureAccessToken(hq);
+    const master = await findHqSpuById(accessToken, hqSpuId);
+    if (!master) throw new Error("自定义商品总部关联失效，停止库存推送");
+    const remote = await queryYouzanBranchChannelProduct({ accessToken, kdtId: Number(branchShop.kdt_id), itemCode: master.spuCode });
+    if (!remote) throw new Error("目标门店尚未发布此商品，停止库存推送");
+    const ids = { item_id: remote.itemId, sku_id: remote.skus[0].skuId };
+    const { error } = await supabase.from("sku_youzan_links").update({ yz_item_id: ids.item_id, yz_sku_id: ids.sku_id }).eq("id", link.id);
+    if (error) throw new Error(error.message);
+    return ids;
   }
 
   const trustedIds = selectTrustedBranchItemIds({
@@ -1061,6 +1108,18 @@ function buildSpuCreateAttempts(
       }
     : {};
 
+  if (sku.scan_barcode) {
+    // Never retry a custom create with a weaker identity or another payload.
+    // The documented nested channel setting avoids publishing to every shop.
+    return [{
+      name: sku.name, unit: DEFAULT_RETAIL_UNIT, category_id: categoryId,
+      spu_code: sku.sku_code, spu_no: sku.scan_barcode, bar_codes: [],
+      retail_price: priceYuan, offline_create: false, is_up_offline: false,
+      sell_channel_setting_request: { is_partial: 1, sell_channel_ids: kdtIds },
+      ...(sku.image_url ? { photo_url: JSON.stringify([{ url: sku.image_url }]) } : {}),
+    }];
+  }
+
   return [
     {
       ...base,
@@ -1245,6 +1304,15 @@ async function findHqSpuById(
   spuId: number,
   forceRefresh = false,
 ): Promise<HqSpuRemoteIdentity | null> {
+  const cached = hqSpuIdentityCache?.expiresAt && hqSpuIdentityCache.expiresAt > Date.now()
+    ? hqSpuIdentityCache.byId.get(spuId) : null;
+  if (cached && !forceRefresh) return cached;
+  const exact = await callYouzanApiVerbose({
+    accessToken: token, method: "youzan.retail.open.spu.query", version: "3.0.0",
+    params: { page_no: 1, page_size: 20, spu_ids: [spuId] }, timeoutMs: 20_000,
+  });
+  const matchedById = selectHqSpuRemoteIdentity(collectSpuRowsFromPayload(exact.payload), { spuId });
+  if (matchedById) return matchedById;
   if (forceRefresh) {
     for (let pageNo = 1; pageNo <= 100; pageNo += 1) {
       const res = await callYouzanApiVerbose({
@@ -1391,6 +1459,10 @@ export async function ensureHqSpuLink(
           }),
           timeoutMs: 20_000,
         });
+        const refreshed = await findHqSpuById(token, Number(existed.yz_item_id), true);
+        if (!refreshed) throw new Error("总部商品更新后无法回读关系编码");
+        remote.spuCode = refreshed.spuCode;
+        remote.skuCode = refreshed.skuCode;
       }
       return {
         created: false,
@@ -1429,10 +1501,7 @@ export async function ensureHqSpuLink(
     categoryId,
     kdtIds,
   );
-  const existingRemote =
-    scope === "standard"
-    ? await findCreatedHqSpu(token, remoteIdentity.code, remoteIdentity.name)
-    : await findCreatedHqSpu(token, "", remoteIdentity.name);
+  const existingRemote = await findCreatedHqSpu(token, remoteIdentity.code, remoteIdentity.name);
   if (existingRemote.spuId > 0) {
     newSpuId = existingRemote.spuId;
     newSkuId = existingRemote.skuId;
@@ -1494,9 +1563,22 @@ export async function ensureHqSpuLink(
       priceTier: (sku as { price_tier: string | number }).price_tier,
       kdtIds,
     });
+  } else {
+    await callYouzanApiVerbose({
+      accessToken: token, method: "youzan.retail.open.spu.update", version: "3.0.0",
+      params: buildCustomHqChannelUpdateParams({ spuId: newSpuId, name: remoteIdentity.name,
+        spuCode: newSpuCode, barcode: String(sku.barcode ?? ""), categoryId,
+        priceYuan: Number(sku.price_tier), kdtIds, imageUrl: finalImage || null }),
+      timeoutMs: 20_000,
+    });
+    const refreshed = await findHqSpuById(token, newSpuId, true);
+    if (!refreshed) throw new Error("总部商品更新后无法回读关系编码");
+    newSpuCode = refreshed.spuCode;
+    newSkuCode = refreshed.skuCode;
+    newSkuId = refreshed.skuId;
   }
 
-  await supabase.from("sku_youzan_links").upsert(
+  const { error: hqLinkError } = await supabase.from("sku_youzan_links").upsert(
     {
       sku_id,
       shop_id: hq.id,
@@ -1509,6 +1591,7 @@ export async function ensureHqSpuLink(
     } as never,
     { onConflict: "sku_id,shop_id" },
   );
+  if (hqLinkError) throw new Error(hqLinkError.message);
 
   // 2026-07 audit：如果命中的是既有 SPU（existingRemote），spu.create 不会执行，
   // 图片就没有机会写进去。这里显式补一次 spu.update 回填图片。
@@ -1872,7 +1955,8 @@ async function runStockSyncWorkerCore(opts: {
         target = await resolveShopStockTarget(t.sku_id, t.location_id, t.shop_id ?? "");
       }
 
-      await pushStockToYouzan(link as LinkRow, target, t.id);
+      // The queue row is reused for later restocks; a new revision is a new operation.
+      await pushStockToYouzan(link as LinkRow, target, `${t.id}:${t.updated_at}`);
 
       await supabase
         .from("youzan_stock_sync_queue")
@@ -2370,6 +2454,22 @@ export async function ensureBranchProduct(
   sku_id: string,
   shop_id: string,
 ): Promise<{ yz_item_id: number | null; created: boolean; error?: string }> {
+  const { data: sku, error: skuError } = await supabase.from("inv_skus").select("sku_scope").eq("id", sku_id).single();
+  if (skuError) throw new Error(skuError.message);
+  if (sku.sku_scope === "custom") {
+    const hq = await getHqShop();
+    const accessToken = await ensureAccessToken(hq);
+    const { data: link } = await supabase.from("sku_youzan_links").select("yz_item_id").eq("sku_id", sku_id).eq("shop_id", hq.id).maybeSingle();
+    const master = link?.yz_item_id ? await findHqSpuById(accessToken, Number(link.yz_item_id)) : null;
+    const branch = await getShopById(shop_id);
+    const remote = master ? await queryYouzanBranchChannelProduct({ accessToken, kdtId: Number(branch.kdt_id), itemCode: master.spuCode }) : null;
+    if (!remote) return { yz_item_id: null, created: false, error: "自定义商品尚未发布到目标门店，请重试商品渠道同步" };
+    const { error } = await supabase.from("sku_youzan_links").upsert({ sku_id, shop_id,
+      yz_item_id: remote.itemId, yz_sku_id: remote.skus[0].skuId, status: "linked", role: "branch_stock", sync_stock: true, last_error: null } as never,
+      { onConflict: "sku_id,shop_id" });
+    if (error) throw new Error(error.message);
+    return { yz_item_id: remote.itemId, created: false };
+  }
   // 已经 linked 且 yz_item_id>0：跳过（真实 branch item_id 已回填）
   const { data: existed } = await supabase
     .from("sku_youzan_links")

@@ -5,7 +5,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertYouzanSyncOperator, dispatchYouzanSyncWorker } from "@/server/youzan-sync-auth.server";
 import { yzStatusText } from "./youzan-status";
 import { getYouzanOutboundStatus, youzanFetch } from "./youzan-http";
-import { buildYouzanQuantityUpdateParams } from "./youzan-quantity.server";
+import { assertYouzanStockWriteSucceeded, buildYouzanQuantityUpdateParams } from "./youzan-quantity.server";
 import { createSupabaseYouzanSaleAdapter } from "./youzan-sale.functions";
 import {
   extractYouzanSale,
@@ -760,6 +760,7 @@ export async function pushYouzanQuantityUpdate(opts: {
     params,
     timeoutMs: opts.timeoutMs ?? 20_000,
   });
+  assertYouzanStockWriteSucceeded(r.payload);
   return { trace_id: r.trace_id, preview: r.preview, version: "4.0.0", params };
 }
 

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   Plus,
@@ -62,6 +62,10 @@ import {
 } from "@/lib/shop-products.functions";
 import { groupStandardSkus, type SkuRow, type StandardProductGroup } from "@/lib/inventory.helpers";
 import { useSkuCovers, pickCover } from "@/hooks/use-sku-covers";
+import { RowActionsMenu } from "@/components/inventory/row-actions-menu";
+import { deleteSku } from "@/lib/inventory.functions";
+import { useAuthSession } from "@/hooks/use-auth-session";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/shop-mgmt/products")({
   head: () => ({
@@ -102,6 +106,17 @@ function ShopProductsPage() {
   const registerFn = useServerFn(registerNewSkuAtShop);
   const retryFn = useServerFn(retryBranchListing);
   const retryAllFn = useServerFn(retryFailedBranchListings);
+  const deleteFn = useServerFn(deleteSku);
+  const { session } = useAuthSession();
+  const deletePermission = useQuery({
+    queryKey: ["sku-delete-permission", session?.user.id],
+    enabled: !!session,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("inv_sku_is_hq_actor");
+      if (error) throw new Error(error.message);
+      return data === true;
+    },
+  });
 
   const shopsQ = useQuery({
     queryKey: ["yz-branch-shops"],
@@ -134,7 +149,7 @@ function ShopProductsPage() {
     enabled: !!activeShopId,
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
-    placeholderData: keepPreviousData,
+    placeholderData: (previous, query) => query?.queryKey[1] === activeShopId ? previous : undefined,
   });
   const rows = (rowsQ.data?.rows ?? []) as ShopSkuRow[];
 
@@ -151,7 +166,7 @@ function ShopProductsPage() {
     enabled: !!activeShopId && rows.length > 0,
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
-    placeholderData: keepPreviousData,
+    placeholderData: (previous, query) => query?.queryKey[1] === activeShopId ? previous : undefined,
   });
   const links = linksQ.data?.links ?? {};
 
@@ -298,6 +313,15 @@ function ShopProductsPage() {
   const skuActions = (r: ShopSkuRow) => (
     <div className="flex items-center gap-1">
       {renderLinkBadge(r.id)}
+      {deletePermission.data && <RowActionsMenu
+        deleteTitle={`删除「${r.name}」？`}
+        deleteDescription="仅可删除未使用、所有库位库存为零的商品。有订单、库存流水或渠道关联的商品会被保护，不会连带删除历史记录。"
+        onDelete={async () => {
+          await deleteFn({ data: { id: r.id } });
+          refresh();
+          qc.invalidateQueries({ queryKey: ["inv-skus"] });
+        }}
+      />}
       <Button
         size="sm"
         variant="outline"
@@ -330,7 +354,7 @@ function ShopProductsPage() {
               <Store className="mr-1 inline h-3 w-3" />
               {activeShop.shop_name}
               <span className="ml-2 text-border">·</span>
-              <span className="ml-2">{rows.length} 件商品</span>
+              <span className="ml-2">{rowsQ.isError ? "加载失败" : rowsQ.isLoading ? "加载中" : `${rows.length} 件商品`}</span>
             </>
           ) : (
             <span className="text-muted-foreground">请先选择门店</span>
@@ -404,7 +428,12 @@ function ShopProductsPage() {
         </p>
       )}
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as TabKind)}>
+      {rowsQ.isError && <div role="alert" className="mb-4 rounded-md border border-destructive/30 p-3 text-sm text-destructive">
+        商品加载失败，不代表库存为零：{rowsQ.error.message}
+        <Button variant="outline" size="sm" className="ml-3" onClick={() => rowsQ.refetch()}>重新加载</Button>
+      </div>}
+
+      {!rowsQ.isLoading && !rowsQ.isError && <Tabs value={tab} onValueChange={(v) => setTab(v as TabKind)}>
         <TabsList>
           <TabsTrigger value="custom">
             自定义商品{" "}
@@ -540,7 +569,7 @@ function ShopProductsPage() {
             </Card>
           )}
         </TabsContent>
-      </Tabs>
+      </Tabs>}
 
       <CustomSkuDialog
         open={openDialog === "custom"}

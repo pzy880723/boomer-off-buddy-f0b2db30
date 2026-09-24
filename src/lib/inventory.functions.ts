@@ -560,23 +560,8 @@ export const updateStandardProduct = createServerFn({ method: "POST" })
   });
 
 async function safeDeleteSkuById(sb: typeof supabaseAdmin, id: string) {
-  const { data: row, error: rErr } = await sb
-    .from("inv_skus")
-    .select("id, stock_qty, name")
-    .eq("id", id)
-    .single();
-  if (rErr) throw new Error(rErr.message);
-  if (!row) throw new Error("SKU 不存在");
-  if ((row.stock_qty ?? 0) > 0) {
-    throw new Error(`【${row.name}】仍有 ${row.stock_qty} 件库存，无法删除`);
-  }
-  const { data: lines } = await sb.from("inv_inbound_lines").select("id").eq("sku_id", id).limit(1);
-  if ((lines?.length ?? 0) > 0) {
-    throw new Error(`【${row.name}】存在入库记录，请先归档而不是删除`);
-  }
-  await sb.from("inv_label_batches").delete().eq("sku_id", id);
-  const { error: dErr } = await sb.from("inv_skus").delete().eq("id", id);
-  if (dErr) throw new Error(dErr.message);
+  const { error } = await sb.rpc("inventory_delete_unused_sku", { p_sku_id: id });
+  if (error) throw new Error(error.message);
 }
 
 export const deleteSku = createServerFn({ method: "POST" })

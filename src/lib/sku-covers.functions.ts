@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { readSkuBatches } from "./sku-query-batches";
 
 /**
  * 批量给一组 SKU 签封面 URL。
@@ -18,11 +19,10 @@ export const signSkuCovers = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     if (data.sku_ids.length === 0) return { covers: {} as Record<string, string | null> };
 
-    const { data: rows, error } = await context.supabase
+    const rows = await readSkuBatches(data.sku_ids, ids => context.supabase
       .from("inv_skus")
       .select("id, image_paths, image_url")
-      .in("id", data.sku_ids);
-    if (error) throw new Error(error.message);
+      .in("id", ids));
 
     // 批量：所有需要签名的首图去重后只调一次 signSkuImagePaths（内部按桶一次 createSignedUrls），
     // 避免每个 SKU 各发一个 /storage/v1/object/sign 请求。

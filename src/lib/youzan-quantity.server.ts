@@ -17,6 +17,29 @@ export function buildYouzanQuantityUpdateParams(args: {
   };
 }
 
+export function assertYouzanStockWriteSucceeded(payload: unknown) {
+  const result = payload as { success?: boolean; message?: string } | null;
+  if (payload === false || result?.success === false) {
+    throw new Error(result?.message || "有赞库存更新未生效");
+  }
+}
+
+export function buildWarehouseStockAdjustment(args: {
+  warehouseCode: string; skuCode: string; quantity: number; operationId: string; createTime: string;
+}) {
+  if (!args.warehouseCode || !args.skuCode || !Number.isInteger(args.quantity) || args.quantity < 0) {
+    throw new Error("仓库编码、规格编码或库存数量无效");
+  }
+  return {
+    warehouse_code: args.warehouseCode,
+    source_order_no: args.operationId,
+    create_time: args.createTime,
+    creator: "BOOMER ERP", remark: "按ERP对应库位同步绝对库存",
+    // Omitting operate_type means an absolute quantity, not another inbound.
+    order_items: [{ sku_code: args.skuCode, quantity: String(args.quantity) }],
+  };
+}
+
 export function selectTrustedBranchItemIds(args: {
   linkItemId: number | null | undefined;
   linkSkuId: number | null | undefined;

@@ -139,11 +139,94 @@ export function buildOfflineProductQueryParams(input: OfflineProductQueryInput) 
 
 export type OfflineProductRow = {
   itemId: number;
+  libraryItemId?: number;
   title: string;
   spuNo: string | null;
   isDisplay: boolean;
-  skus: Array<{ skuId: number; skuNo: string | null; price: number }>;
+  skus: Array<{ skuId: number; librarySkuId?: number; skuNo: string | null; price: number }>;
 };
+
+export function parseBranchChannelProduct(
+  payload: unknown,
+  target: { kdtId: number; itemCode: string },
+): OfflineProductRow | null {
+  if (!payload || typeof payload !== "object") return null;
+  const root = payload as Record<string, unknown>;
+  const row = (root.data && typeof root.data === "object" ? root.data : root) as Record<string, unknown>;
+  if (Number(row.kdt_id) !== target.kdtId || Number(row.channel) !== 1 ||
+      String(row.item_code ?? "") !== target.itemCode) return null;
+  // Library IDs and HQ channel IDs cannot be used to update branch stock.
+  const itemId = Number(row.channel_item_id ?? 0);
+  if (!Number.isSafeInteger(itemId) || itemId <= 0) return null;
+  const skus = (Array.isArray(row.skus) ? row.skus : []).flatMap((value) => {
+    if (!value || typeof value !== "object") return [];
+    const sku = value as Record<string, unknown>;
+    const skuId = Number(sku.channel_sku_id ?? 0);
+    if (!Number.isSafeInteger(skuId) || skuId <= 0) return [];
+    return [{ skuId, librarySkuId: Number(sku.sku_id), skuNo: String(sku.sku_barcode ?? "").trim() || null, price: Number(sku.price ?? 0) / 100 }];
+  });
+  if (skus.length !== 1) return null;
+  return { itemId, libraryItemId: Number(row.item_id), title: String(row.title ?? ""), spuNo: String(row.item_barcode ?? "") || null,
+    isDisplay: Number(row.display) === 1, skus };
+}
+
+export async function queryYouzanBranchChannelProduct(args: {
+  accessToken: string; kdtId: number; itemCode: string;
+}): Promise<OfflineProductRow | null> {
+  const { callYouzanApiVerbose } = await import("./youzan.functions");
+  try {
+    const result = await callYouzanApiVerbose({
+      accessToken: args.accessToken,
+      method: "youzan.item.itemdetail.get", version: "1.0.0",
+      params: { request: { kdt_id: args.kdtId, item_code: args.itemCode, channel: 1 } },
+      timeoutMs: 20_000,
+    });
+    return parseBranchChannelProduct(result.payload, args);
+  } catch (error) {
+    if (isYouzanProductNotFoundError(error instanceof Error ? error.message : String(error))) return null;
+    throw error;
+  }
+}
+
+export function assertCustomBranchProduct(
+  product: OfflineProductRow | null,
+  expected: { barcode: string; priceYuan: number },
+): asserts product is OfflineProductRow {
+  if (!product) throw new Error("目标门店商品尚未可查询，请稍后重试");
+  if (product.spuNo !== expected.barcode && product.skus[0]?.skuNo !== expected.barcode) {
+    throw new Error("有赞门店回读条码与 ERP 标签不一致，同步未完成");
+  }
+  if (product.skus.length !== 1 || !Number.isFinite(product.skus[0].price) ||
+      Math.round(product.skus[0].price * 100) !== Math.round(expected.priceYuan * 100)) {
+    throw new Error("有赞门店回读价格与 ERP 不一致，同步未完成");
+  }
+}
+
+export function buildCustomHqPriceRequest(product: OfflineProductRow, hqKdtId: number, priceYuan: number) {
+  const itemId = product.libraryItemId;
+  const skuId = product.skus[0]?.librarySkuId;
+  if (!itemId || !skuId || product.skus.length !== 1 || !Number.isFinite(priceYuan) || priceYuan <= 0) {
+    throw new Error("总部商品价格身份不完整，不能更新价格");
+  }
+  return { request: { kdt_id: hqKdtId, item_id: itemId, sku_id: skuId, channel: 1, price: Math.round(priceYuan * 100) } };
+}
+
+export async function updateCustomHqPrice(args: { accessToken: string; hqKdtId: number; itemCode: string; priceYuan: number }) {
+  let product: OfflineProductRow | null = null;
+  for (const waitMs of [0, 1000, 2000, 4000, 8000]) {
+    if (waitMs) await new Promise(resolve => setTimeout(resolve, waitMs));
+    product = await queryYouzanBranchChannelProduct({ accessToken: args.accessToken, kdtId: args.hqKdtId, itemCode: args.itemCode });
+    if (product) break;
+  }
+  if (!product) throw new Error("总部渠道商品尚未可查询，不能同步价格");
+  const { callYouzanApiVerbose } = await import("./youzan.functions");
+  const result = await callYouzanApiVerbose({ accessToken: args.accessToken,
+    method: "youzan.item.price.update", version: "1.0.0",
+    params: buildCustomHqPriceRequest(product, args.hqKdtId, args.priceYuan), timeoutMs: 20_000 });
+  if (!(result.payload as { success?: boolean } | null)?.success) {
+    throw new Error("有赞总部价格更新未成功");
+  }
+}
 
 export function parseOfflineProductRows(payload: unknown): OfflineProductRow[] {
   const root = (payload && typeof payload === "object" ? payload : {}) as Record<string, unknown>;
@@ -184,32 +267,32 @@ export function parseOfflineProductRows(payload: unknown): OfflineProductRow[] {
 
 export function findOfflineProductMatch(
   rows: OfflineProductRow[],
-  target: { skuCode: string; name: string },
+  target: { skuCode: string; name: string; barcode?: string | null },
 ) {
   const skuCode = target.skuCode.trim();
-  const normalizedSkuCode = normalizeYouzanProductCode(skuCode);
+  const codes = [skuCode, target.barcode?.trim()].filter((value): value is string => Boolean(value));
   const codesMatch = (value: string | null) =>
     Boolean(
-      value && (value === skuCode || normalizeYouzanProductCode(value) === normalizedSkuCode),
+      value && codes.some((code) => value === code || normalizeYouzanProductCode(value) === normalizeYouzanProductCode(code)),
     );
   const exactCode = rows.find(
     (row) => codesMatch(row.spuNo) || row.skus.some((remoteSku) => codesMatch(remoteSku.skuNo)),
   );
   if (exactCode) return exactCode;
 
-  const sameTitle = rows.filter((row) => row.title.trim() === target.name.trim());
-  return sameTitle.length === 1 ? sameTitle[0] : null;
+  // Unique pieces can have identical AI titles. A title is never an identity.
+  return null;
 }
 
 export function normalizeYouzanProductCode(value: string) {
   return value.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
 }
 
-export function buildOfflineProductLookupTerms(target: { skuCode: string; name: string }) {
+export function buildOfflineProductLookupTerms(target: { skuCode: string; name: string; barcode?: string | null }) {
   const rawSkuCode = target.skuCode.trim();
   return Array.from(
     new Set(
-      [rawSkuCode, normalizeYouzanProductCode(rawSkuCode), target.name.trim()].filter(Boolean),
+      [target.barcode?.trim(), rawSkuCode, normalizeYouzanProductCode(rawSkuCode), target.name.trim()].filter((value): value is string => Boolean(value)),
     ),
   );
 }
@@ -331,7 +414,7 @@ export function buildOfflineProductReleaseParams(input: OfflineProductReleaseInp
     category_id: input.categoryId,
     unit: input.unit,
     sell_type: 1,
-    price: priceFen,
+    price: input.priceYuan.toFixed(2),
     title: input.title,
     picture: JSON.stringify(pictures),
     spu_code: input.spuCode,
@@ -339,11 +422,12 @@ export function buildOfflineProductReleaseParams(input: OfflineProductReleaseInp
     sub_kdt_status_param: {
       sale_up_kdt_ids: input.saleUpKdtIds,
       sale_down_kdt_ids: input.saleDownKdtIds,
+      all_batch_operate: -1,
     },
-    all_batch_operate: -1,
     name: input.title,
     display: 1,
-    retail_price: priceFen,
+    // Unlike stocks.price (fen), the SPU retail_price is documented in yuan.
+    retail_price: input.priceYuan.toFixed(2),
     photo_url: JSON.stringify(pictures),
     stocks: [
       {
@@ -396,13 +480,13 @@ export function buildCustomHqChannelUpdateParams(input: {
     category_id: input.categoryId,
     retail_price: input.priceYuan.toFixed(2),
     sell_channel_setting_request: {
-      // Custom products are unique pieces. Replace the full channel set so a
-      // stale branch can never continue selling the same physical item.
-      is_partial: 0,
+      // Youzan defines 0 as ALL channels, 1 as the explicitly selected set.
+      is_partial: 1,
       sell_channel_ids: kdtIds,
     },
   };
   if (input.imageUrl) {
+    params.photo_url = JSON.stringify([{ url: input.imageUrl }]);
     params.pic_url = input.imageUrl;
     params.spu_pic_list = [input.imageUrl];
     params.spu_img_list = [{ img_url: input.imageUrl }];
@@ -410,7 +494,7 @@ export function buildCustomHqChannelUpdateParams(input: {
   return params as typeof params & {
     spu_no: string;
     bar_codes: string[];
-    sell_channel_setting_request: { is_partial: 0; sell_channel_ids: number[] };
+    sell_channel_setting_request: { is_partial: 1; sell_channel_ids: number[] };
   };
 }
 
@@ -461,14 +545,23 @@ export async function updateYouzanOfflineProduct(args: {
   input: OfflineProductReleaseInput;
 }): Promise<{ traceId: string | null }> {
   const { callYouzanApiVerbose } = await import("./youzan.functions");
-  const result = await callYouzanApiVerbose({
-    accessToken: args.accessToken,
-    method: "youzan.retail.open.offline.spu.update",
-    version: "3.0.0",
-    params: buildOfflineProductUpdateParams(args.input, args.itemId),
-    timeoutMs: 30_000,
-  });
-  return { traceId: result.trace_id };
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      const result = await callYouzanApiVerbose({
+        accessToken: args.accessToken,
+        method: "youzan.retail.open.offline.spu.update",
+        version: "3.0.0",
+        params: buildOfflineProductUpdateParams(args.input, args.itemId),
+        timeoutMs: 30_000,
+      });
+      if (result.payload === false) throw new Error("有赞商品更新未成功");
+      return { traceId: result.trace_id };
+    } catch (error) {
+      // HQ field updates briefly lock the linked channel product.
+      if (attempt >= 3 || !/22140022|22140027/.test(String(error))) throw error;
+      await new Promise(resolve => setTimeout(resolve, 2000 * 2 ** attempt));
+    }
+  }
 }
 
 export async function cancelYouzanBranchOfflineChannel(args: {

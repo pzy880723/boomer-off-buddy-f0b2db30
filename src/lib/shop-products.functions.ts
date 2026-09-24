@@ -20,6 +20,7 @@ import { ensureBranchListing, triggerStockWorker } from "./youzan-sync.functions
 import { releaseSkuToOfflineShopsCore } from "./youzan-offline-products.functions";
 import { explainYouzanError } from "./youzan.functions";
 import { loadShopSkuIdSources } from "./shop-sku-sources";
+import { readSkuBatches } from "./sku-query-batches";
 
 // ---------- 内部工具 ----------
 
@@ -79,17 +80,19 @@ export const listShopSkus = createServerFn({ method: "GET" })
       if (!location_id) return { rows: [], location_id: null, store_format: storeFormat };
       if (skuIds.length === 0) return { rows: [], location_id, store_format: storeFormat };
 
-      let q = sb
+      const rows = await readSkuBatches(skuIds, (ids) => {
+        let q = sb
         .from("inv_skus")
         .select("*")
-        .in("id", skuIds)
+        .in("id", ids)
         .order("created_at", { ascending: false });
       if (data.search) {
         const s = `%${data.search}%`;
         q = q.or(`name.ilike.${s},epc.ilike.${s},sku_code.ilike.${s}`);
       }
-      const { data: rows, error } = await q;
-      if (error) throw new Error(error.message);
+        return q;
+      });
+      rows.sort((a, b) => b.created_at.localeCompare(a.created_at));
 
       const stockMap = new Map(stocks.map((s) => [String(s.sku_id), Number(s.qty)]));
       const patched: ShopSkuRow[] = (rows ?? []).map((r) => {
@@ -278,11 +281,11 @@ export const listShopLinksForSkus = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     if (data.sku_ids.length === 0) return { links: {} };
-    const { data: rows } = await context.supabase
+    const rows = await readSkuBatches(data.sku_ids, ids => context.supabase
       .from("sku_youzan_links")
       .select("sku_id, yz_item_id, status, last_error")
       .eq("shop_id", data.shop_id)
-      .in("sku_id", data.sku_ids);
+      .in("sku_id", ids));
     const map: Record<string, { yz_item_id: number; status: string; last_error: string | null }> =
       {};
     for (const r of rows ?? []) {
