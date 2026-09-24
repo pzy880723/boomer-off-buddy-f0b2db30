@@ -1,5 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { HANDHELD_CORS, authenticateDevice, ok } from "@/server/handheld-auth.server";
+import {
+  HANDHELD_CORS,
+  authenticateDevice,
+  ok,
+  resolveSessionUser,
+} from "@/server/handheld-auth.server";
+import {
+  handleItemDelete,
+  handleItemPatch,
+  loadItemCapabilities,
+} from "@/server/handheld-item-edit.server";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 import { errCode } from "@/lib/handheld/errors";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { buildPrintPayload } from "@/server/handheld-print.server";
@@ -68,10 +80,22 @@ export const Route = createFileRoute("/api/public/handheld/items/$id")({
             .filter((row) => row.facet)
             .map((row) => ({ ...row.facet!, source: row.source }));
           const [item] = await signProductItems(buildProductItems([sku], inventory));
+          const session = await resolveSessionUser(request);
+          const capabilities = session
+            ? await loadItemCapabilities({
+                userId: session.user_id,
+                locationId: scope.scope.startsWith("location:") ? scope.scope.slice(9) : null,
+                skuId: sku.id,
+                productType: item.product_type,
+                status: sku.status,
+              })
+            : { can_edit: false, can_delete: false };
 
           return ok({
             scope: scope.scope,
             id: sku.id,
+            can_edit: capabilities.can_edit,
+            can_delete: capabilities.can_delete,
             product_type: item.product_type,
             editable: item.editable,
             is_unlimited_stock: item.is_unlimited_stock,
@@ -123,6 +147,18 @@ export const Route = createFileRoute("/api/public/handheld/items/$id")({
         } catch (error) {
           return productReadError(error);
         }
+      },
+      PATCH: async ({ request, params }) => {
+        const auth = await authenticateDevice(request);
+        if (!auth.ok) return auth.response;
+        if (!UUID_RE.test(params.id)) return errCode("not_found", "SKU not found");
+        return handleItemPatch(request, auth.device.id, params.id.toLowerCase());
+      },
+      DELETE: async ({ request, params }) => {
+        const auth = await authenticateDevice(request);
+        if (!auth.ok) return auth.response;
+        if (!UUID_RE.test(params.id)) return errCode("not_found", "SKU not found");
+        return handleItemDelete(request, auth.device.id, params.id.toLowerCase());
       },
     },
   },

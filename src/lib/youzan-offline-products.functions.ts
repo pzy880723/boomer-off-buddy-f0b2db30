@@ -630,3 +630,62 @@ export const releaseOfflineProduct = createServerFn({ method: "POST" })
       },
     });
   });
+
+/**
+ * 手持端商品修改后的有赞信息同步（仅 custom 孤品、仅已存在的门店商品）。
+ * - 不重建、不 release、不全门店发布：远端查不到直接报错，由 outbox 重试/人工处理。
+ * - 改价复用生产已验证路径：youzan.item.price.update（总部）+ itemdetail.get 回读分店价格。
+ * - 改名：尚未确认可安全单独改名的接口，返回 name_pending，不猜测调用。
+ */
+export async function syncSkuInfoToYouzanBranchCore(args: { sku_id: string; shop_id: string }): Promise<{
+  skipped?: string;
+  price_synced: boolean;
+  name_pending: boolean;
+  remote_item_id?: number;
+}> {
+  const [{ data: sku, error: skuError }, { data: shop, error: shopError }, { data: link, error: linkError }] =
+    await Promise.all([
+      supabase.from("inv_skus").select("id,name,sku_code,barcode,price_tier,sku_scope,status").eq("id", args.sku_id).maybeSingle(),
+      supabase.from("youzan_shops").select("id,kdt_id,role,status").eq("id", args.shop_id).maybeSingle(),
+      supabase.from("sku_youzan_links").select("status,role,sync_stock,yz_item_id")
+        .eq("sku_id", args.sku_id).eq("shop_id", args.shop_id).maybeSingle(),
+    ]);
+  const readError = skuError ?? shopError ?? linkError;
+  if (readError) throw new Error(readError.message);
+  if (!sku || sku.status !== "active") return { skipped: "sku_not_active", price_synced: false, name_pending: false };
+  if (!link || link.role !== "branch_stock" || link.status !== "linked" || !link.sync_stock || !(Number(link.yz_item_id) > 0))
+    return { skipped: "link_not_active", price_synced: false, name_pending: false };
+  if (!shop || shop.role !== "branch" || shop.status !== "active")
+    return { skipped: "shop_not_active", price_synced: false, name_pending: false };
+  const { data: listing, error: listingError } = await supabase.from("sku_channel_listings").select("listing_status")
+    .eq("sku_id", args.sku_id).eq("shop_id", args.shop_id).eq("channel", "youzan_branch_offline").maybeSingle();
+  if (listingError) throw new Error(listingError.message);
+  if (listing?.listing_status !== "published") return { skipped: "listing_not_published", price_synced: false, name_pending: false };
+  if (sku.sku_scope !== "custom") return { skipped: "unsupported_scope", price_synced: false, name_pending: false };
+  const itemCode = String(sku.sku_code ?? "").trim();
+  const barcode = String(sku.barcode ?? "").trim();
+  const priceYuan = Number(sku.price_tier);
+  if (!itemCode || !barcode) throw new Error("SKU 缺少编码或条码，不能同步有赞");
+
+  const hq = await getHqShop();
+  const accessToken = await ensureAccessToken(hq);
+  const branchQuery = { accessToken, kdtId: Number(shop.kdt_id), itemCode };
+  const remote = await queryYouzanBranchChannelProduct(branchQuery);
+  if (!remote) throw new Error("remote_not_found: 有赞门店商品查不到，未重建商品");
+  let priceSynced = false;
+  if (Math.round((remote.skus[0]?.price ?? -1) * 100) !== Math.round(priceYuan * 100)) {
+    await updateCustomHqPrice({ accessToken, hqKdtId: Number(hq.kdt_id), itemCode, priceYuan });
+    let lastError: unknown;
+    for (const waitMs of [0, 1000, 2000, 4000, 8000]) {
+      if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
+      try {
+        assertCustomBranchProduct(await queryYouzanBranchChannelProduct(branchQuery), { barcode, priceYuan });
+        lastError = null;
+        break;
+      } catch (error) { lastError = error; }
+    }
+    if (lastError) throw lastError;
+    priceSynced = true;
+  }
+  return { price_synced: priceSynced, name_pending: remote.title.trim() !== String(sku.name).trim(), remote_item_id: remote.itemId };
+}

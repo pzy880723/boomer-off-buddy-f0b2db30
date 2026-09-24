@@ -693,6 +693,8 @@ test("detail: preserves every existing identity, price, label, image and print f
     delete data[key];
   assert.deepEqual(data, {
     id: "a",
+    can_edit: false,
+    can_delete: false,
     sku_code: "a",
     barcode: "bar-a",
     epc: "epc-a",

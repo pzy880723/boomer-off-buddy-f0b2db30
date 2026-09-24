@@ -5,6 +5,12 @@
 import { createDocument, type ZodOpenApiObject } from "zod-openapi";
 import * as z from "zod";
 import {
+  ItemDeleteReq,
+  ItemDeleteRes,
+  ItemPatchReq,
+  ItemPatchRes,
+} from "./item-edit-schemas";
+import {
   AiListingImageReq,
   AiListingImageRes,
   AiRecognizeReq,
@@ -852,7 +858,7 @@ X-Session-Token: <操作员 session token>
         tags: ["商品"],
         summary: "SKU 详情（含 barcode / condition_grade / 多库位库存）",
         description:
-          "必须携带员工会话。scope/location_id 与商品列表一致；门店仅返回本库位有归属的商品，scope=all 仅限总部角色。stocks、stock_qty、total_stock_qty 和状态均按所选范围计算，并返回已保存的品牌、具体 IP 与年代。",
+          "必须携带员工会话。scope/location_id 与商品列表一致；门店仅返回本库位有归属的商品，scope=all 仅限总部角色。stocks、stock_qty、total_stock_qty 和状态均按所选范围计算，并返回已保存的品牌、具体 IP 与年代。另返回 can_edit / can_delete（仅权限能力，不保证无业务引用）与 updated_at（PATCH 的 expected_updated_at）。",
         requestParams: {
           path: z.object({ id: z.string().uuid() }),
           query: z.object({
@@ -861,6 +867,24 @@ X-Session-Token: <操作员 session token>
           }),
         },
         responses: { "200": jsonRes("OK", SkuDetailRes), ...ERROR_RESPONSES },
+      },
+      patch: {
+        tags: ["商品"],
+        summary: "修改商品（名称/价格/描述/成色）",
+        description:
+          "需设备+员工会话。仅 name / price_tier（元，>0，最多两位小数）/ description（→notes）/ condition_grade（→grade）；条码、库存等不可改。总部可改；store_manager 仅限自己库位且商品在该库位；其他角色 403。standard 403 standard_readonly。expected_updated_at 不一致 409 version_conflict（带 current_updated_at）；同 client_op_id 同载荷重放返回原结果，不同载荷 409 client_op_id_conflict。同步更新商城当前展示字段，不改订单快照；改名/改价写入有赞 outbox 由腾讯 worker 异步执行，失败不影响本次返回。",
+        requestParams: { path: z.object({ id: z.string().uuid() }) },
+        requestBody: { content: { "application/json": { schema: ItemPatchReq } } },
+        responses: { "200": jsonRes("OK", ItemPatchRes), ...ERROR_RESPONSES },
+      },
+      delete: {
+        tags: ["商品"],
+        summary: "删除未使用商品（仅总部）",
+        description:
+          "需 confirm:true、location_id、client_op_id。复用 inventory_delete_unused_sku：仅零库存且无任何流水/订单/销售/调拨/有赞/商城引用的商品可永久删除，不自动扣库存；否则 409 delete_blocked，reason 为中文原因。成功后同 client_op_id 重试返回原结果（replayed=true）。",
+        requestParams: { path: z.object({ id: z.string().uuid() }) },
+        requestBody: { content: { "application/json": { schema: ItemDeleteReq } } },
+        responses: { "200": jsonRes("OK", ItemDeleteRes), ...ERROR_RESPONSES },
       },
     },
     "/api/public/handheld/items/{id}/set-status": {

@@ -1068,6 +1068,10 @@ export const SkuDetailRes = okEnvelope(
     id: uuidSchema,
     product_type: z.enum(["standard", "custom", "bundle"]),
     editable: z.boolean(),
+    can_edit: z.boolean().meta({ description: "当前员工在当前库位可 PATCH；standard 恒为 false" }),
+    can_delete: z
+      .boolean()
+      .meta({ description: "仅表示有删除权限（总部），不保证无业务引用；DELETE 可能返回 409 delete_blocked" }),
     is_unlimited_stock: z.boolean(),
     sku_code: z.string().nullable(),
     barcode: z.string().nullable(),

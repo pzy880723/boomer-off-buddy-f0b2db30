@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Boomer Off — Public API",
-    "version": "1.14.0",
+    "version": "1.17.0",
     "description": "本文档覆盖：\n\n- `/api/public/handheld/*`：ERP 手持终端接口。\n- `/api/public/storefront/*`：自营商城商品、分类和订单接口。\n\n## 手持终端鉴权\n手持终端业务请求带：\n\n```\nX-Device-Token: <设备 token>\nX-Session-Token: <操作员 session token>\n```\n\n## 商城鉴权\n\n- 商品和分类接口公开读取。\n- 订单接口使用 `Authorization: Bearer <腾讯云消费者 JWT>`。\n- 消费者 JWT 由独立身份服务签发，ERP 通过 JWKS 验签，不复用 ERP 员工账号。\n- 创建订单和支付还必须带 `Idempotency-Key`。\n\n## 统一响应\n\n```json\n{ \"ok\": true, \"data\": { ... } }\n{ \"ok\": false, \"error\": \"...\", \"...\": \"...\" }\n```\n\n## 字段同步约定\n\n服务端的 Zod schema 是唯一真源（`src/lib/handheld/schemas.ts`）。\n本文档 + APP 端 SDK 都从它生成。改字段流程：\n\n1. 改 `schemas.ts`\n2. 运行 `bun run sdk:gen` 生成新的 `openapi.snapshot.json` 和 TS 类型\n3. APP 端拉取 `/api/public/handheld/openapi.json` 重新生成本地 SDK"
   },
   "servers": [
@@ -1090,7 +1090,7 @@
                   "paid_at": {
                     "type": "string",
                     "format": "date-time",
-                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                   },
                   "failure_code": {
                     "type": "string",
@@ -1597,7 +1597,7 @@
                                     "last_seen_at": {
                                       "type": "string",
                                       "format": "date-time",
-                                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                                     }
                                   },
                                   "required": [
@@ -2524,30 +2524,46 @@
                           "type": "boolean"
                         },
                         "sku_code": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "barcode": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "item_code": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "name": {
                           "type": "string"
                         },
                         "category": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "price": {
@@ -2572,11 +2588,15 @@
                           ]
                         },
                         "image_url": {
-                          "description": "主图 read URL；没有图片时为 null",
-                          "type": [
-                            "string",
-                            "null"
-                          ]
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "主图 read URL；没有图片时为 null"
                         },
                         "image_paths": {
                           "default": [],
@@ -2619,9 +2639,13 @@
                           ]
                         },
                         "notes": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "is_unlimited_stock": {
@@ -4663,9 +4687,13 @@
                           "description": "ERP 当前启用的二级商品分类 code"
                         },
                         "predicted_category_code": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "status": {
@@ -4690,17 +4718,25 @@
                           "description": "兼容旧 APP；等同 category_code"
                         },
                         "brand": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "ip_name": {
-                          "description": "角色/IP 名称，如 Hello Kitty",
-                          "type": [
-                            "string",
-                            "null"
-                          ]
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "角色/IP 名称，如 Hello Kitty"
                         },
                         "ip_match_status": {
                           "type": "string",
@@ -4739,11 +4775,15 @@
                           }
                         },
                         "era": {
-                          "description": "年代，如 1970s",
-                          "type": [
-                            "string",
-                            "null"
-                          ]
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "年代，如 1970s"
                         },
                         "attributes": {
                           "$ref": "#/components/schemas/ProductRecognitionAttributes"
@@ -4767,9 +4807,13 @@
                           ]
                         },
                         "description": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "keywords": {
@@ -4793,9 +4837,13 @@
                           "description": "AI 命中的 ERP 标签中文名"
                         },
                         "suggested_price_cny": {
-                          "type": [
-                            "number",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "confidence": {
@@ -4813,9 +4861,13 @@
                         },
                         "warning": {
                           "description": "低置信度或多角度矛盾时的提示，APP 用于弹人工确认",
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "alternatives": {
@@ -4883,9 +4935,13 @@
                                 ]
                               },
                               "reason": {
-                                "type": [
-                                  "string",
-                                  "null"
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
                                 ]
                               }
                             },
@@ -5550,11 +5606,15 @@
                           "type": "string"
                         },
                         "barcode": {
-                          "description": "EAN-13 全局唯一条码，自动生成",
-                          "type": [
-                            "string",
-                            "null"
-                          ]
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "EAN-13 全局唯一条码，自动生成"
                         },
                         "epc": {
                           "type": "string",
@@ -5595,9 +5655,13 @@
                               "type": "string"
                             },
                             "barcode": {
-                              "type": [
-                                "string",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "epc": {
@@ -5610,9 +5674,13 @@
                               "type": "number"
                             },
                             "grade": {
-                              "type": [
-                                "string",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "condition_grade": {
@@ -5634,9 +5702,13 @@
                               ]
                             },
                             "location_name": {
-                              "type": [
-                                "string",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "qrcode_payload": {
@@ -5981,15 +6053,23 @@
                                 "example": "550e8400-e29b-41d4-a716-446655440000"
                               },
                               "shop_name": {
-                                "type": [
-                                  "string",
-                                  "null"
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
                                 ]
                               },
                               "yz_item_id": {
-                                "type": [
-                                  "number",
-                                  "null"
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
                                 ]
                               },
                               "last_pushed_stock": {
@@ -6005,18 +6085,26 @@
                                 ]
                               },
                               "last_pushed_at": {
-                                "type": [
-                                  "string",
-                                  "null"
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
                                 ]
                               },
                               "status": {
                                 "type": "string"
                               },
                               "last_error": {
-                                "type": [
-                                  "string",
-                                  "null"
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
                                 ]
                               }
                             },
@@ -6051,15 +6139,23 @@
                                 "maximum": 9007199254740991
                               },
                               "next_run_at": {
-                                "type": [
-                                  "string",
-                                  "null"
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
                                 ]
                               },
                               "last_error": {
-                                "type": [
-                                  "string",
-                                  "null"
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
                                 ]
                               },
                               "created_at": {
@@ -6469,7 +6565,7 @@
                                     "last_seen_at": {
                                       "type": "string",
                                       "format": "date-time",
-                                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                                     }
                                   },
                                   "required": [
@@ -7462,7 +7558,7 @@
           "商品"
         ],
         "summary": "SKU 详情（含 barcode / condition_grade / 多库位库存）",
-        "description": "必须携带员工会话。scope/location_id 与商品列表一致；门店仅返回本库位有归属的商品，scope=all 仅限总部角色。stocks、stock_qty、total_stock_qty 和状态均按所选范围计算，并返回已保存的品牌、具体 IP 与年代。",
+        "description": "必须携带员工会话。scope/location_id 与商品列表一致；门店仅返回本库位有归属的商品，scope=all 仅限总部角色。stocks、stock_qty、total_stock_qty 和状态均按所选范围计算，并返回已保存的品牌、具体 IP 与年代。另返回 can_edit / can_delete（仅权限能力，不保证无业务引用）与 updated_at（PATCH 的 expected_updated_at）。",
         "parameters": [
           {
             "in": "path",
@@ -7538,19 +7634,35 @@
                         "editable": {
                           "type": "boolean"
                         },
+                        "can_edit": {
+                          "type": "boolean",
+                          "description": "当前员工在当前库位可 PATCH；standard 恒为 false"
+                        },
+                        "can_delete": {
+                          "type": "boolean",
+                          "description": "仅表示有删除权限（总部），不保证无业务引用；DELETE 可能返回 409 delete_blocked"
+                        },
                         "is_unlimited_stock": {
                           "type": "boolean"
                         },
                         "sku_code": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "barcode": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "epc": {
@@ -7563,21 +7675,33 @@
                           "type": "string"
                         },
                         "brand": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "era": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "ip_name": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "attributes": {
@@ -7654,18 +7778,26 @@
                           ]
                         },
                         "grade": {
-                          "description": "兼容旧字段，等同 condition_grade",
-                          "type": [
-                            "string",
-                            "null"
-                          ]
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "兼容旧字段，等同 condition_grade"
                         },
                         "image_url": {
-                          "description": "主图 read URL（兼容旧 APP）；优先用 images",
-                          "type": [
-                            "string",
-                            "null"
-                          ]
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "主图 read URL（兼容旧 APP）；优先用 images"
                         },
                         "image_paths": {
                           "type": "array",
@@ -7710,15 +7842,23 @@
                           ]
                         },
                         "notes": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "weight_g": {
-                          "type": [
-                            "number",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "stock_qty": {
@@ -7806,6 +7946,8 @@
                         "id",
                         "product_type",
                         "editable",
+                        "can_edit",
+                        "can_delete",
                         "is_unlimited_stock",
                         "sku_code",
                         "barcode",
@@ -7840,6 +7982,412 @@
                         "updated_at",
                         "stocks",
                         "print_payload"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "商品"
+        ],
+        "summary": "修改商品（名称/价格/描述/成色）",
+        "description": "需设备+员工会话。仅 name / price_tier（元，>0，最多两位小数）/ description（→notes）/ condition_grade（→grade）；条码、库存等不可改。总部可改；store_manager 仅限自己库位且商品在该库位；其他角色 403。standard 403 standard_readonly。expected_updated_at 不一致 409 version_conflict（带 current_updated_at）；同 client_op_id 同载荷重放返回原结果，不同载荷 409 client_op_id_conflict。同步更新商城当前展示字段，不改订单快照；改名/改价写入有赞 outbox 由腾讯 worker 异步执行，失败不影响本次返回。",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "location_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "client_op_id": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 128
+                  },
+                  "expected_updated_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "price_tier": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "exclusiveMaximum": 1000000
+                  },
+                  "description": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 2000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "condition_grade": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "N",
+                          "S",
+                          "A",
+                          "B",
+                          "C",
+                          "J"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "location_id",
+                  "client_op_id",
+                  "expected_updated_at"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "sku_id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "updated_at": {
+                          "type": "string"
+                        },
+                        "changed_fields": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "name",
+                              "price_tier",
+                              "notes",
+                              "grade"
+                            ]
+                          }
+                        },
+                        "replayed": {
+                          "type": "boolean"
+                        },
+                        "youzan_sync_queued": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "已持久化的有赞改名/改价任务数（异步，由腾讯 worker 执行）"
+                        }
+                      },
+                      "required": [
+                        "sku_id",
+                        "updated_at",
+                        "changed_fields",
+                        "replayed",
+                        "youzan_sync_queued"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "商品"
+        ],
+        "summary": "删除未使用商品（仅总部）",
+        "description": "需 confirm:true、location_id、client_op_id。复用 inventory_delete_unused_sku：仅零库存且无任何流水/订单/销售/调拨/有赞/商城引用的商品可永久删除，不自动扣库存；否则 409 delete_blocked，reason 为中文原因。成功后同 client_op_id 重试返回原结果（replayed=true）。",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "location_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "client_op_id": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 128
+                  },
+                  "confirm": {
+                    "type": "boolean",
+                    "const": true
+                  }
+                },
+                "required": [
+                  "location_id",
+                  "client_op_id",
+                  "confirm"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "deleted_sku_id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "replayed": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "deleted_sku_id",
+                        "replayed"
                       ],
                       "additionalProperties": false
                     }
@@ -8424,9 +8972,13 @@
                           "example": "550e8400-e29b-41d4-a716-446655440000"
                         },
                         "image_url": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "image_paths": {
@@ -8755,7 +9307,7 @@
               "description": "上次拉取的 server_ts；空=最近 50 条",
               "type": "string",
               "format": "date-time",
-              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
             },
             "description": "上次拉取的 server_ts；空=最近 50 条"
           },
@@ -8794,7 +9346,7 @@
                         "server_ts": {
                           "type": "string",
                           "format": "date-time",
-                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
                           "description": "下次请求把它当成 ts"
                         }
                       },
@@ -9015,8 +9567,43 @@
         "tags": [
           "客服"
         ],
-        "summary": "客服会话列表（v1.11）",
-        "description": "门店员工按授权库位、总部客服可见全部会话；共享接待，无独占领取。返回 `data.items[]`，含 `unread_count` 与 `participants`。",
+        "summary": "客服会话列表（v1.16）",
+        "description": "门店员工按授权库位、总部客服可见全部会话；共享接待，无独占领取。返回 `data.items[]`，含 `unread_count` 与 `participants`。查询参数 `location_id` 可选：HQ 不传=全部授权门店(`scope=hq_all_conversations`)，传入即按该门店过滤(`scope=hq_single_location`)；分店员工必须传本店，传非授权门店返回 403 `forbidden_location`，不传时仍被服务端限制在授权门店内(`scope=assigned_locations`)。授权一律由服务端强制，不信任客户端声明。",
+        "parameters": [
+          {
+            "name": "location_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -9347,13 +9934,350 @@
         }
       }
     },
+    "/api/public/handheld/store/daily-summary": {
+      "get": {
+        "tags": [
+          "门店经营"
+        ],
+        "summary": "门店当日目标 / 实绩 / 差额（v1.15 新增）",
+        "description": "日期为 Asia/Shanghai 自然日，默认今天，可传 `date=yyyy-mm-dd`、`location_id`。金额一律整数分。返回 `target_fen`、`achieved_fen`、`gap_fen`、`progress_pct`，以及 `youzan`（`performance_fen` = 已付款毛额 - 运费）与 `offline`（线下补录）两部分明细。\n\n口径警告：有赞侧无退款数据源，且订单同步可能滞后，因此 `completeness.complete=false` 时 **不得** 把 `achieved_fen` 当作净销售展示；`completeness.reasons` 可能包含 `youzan_sync_stale`、`youzan_never_synced`、`refund_data_unavailable`、`location_not_bound_to_youzan_shop`。已付款判定不是白名单 `TRADE_SUCCESS`，而是「有 pay_time 且状态不在未付款/已关闭集合」，避免漏掉待发货订单。\n\n权限：普通员工固定为设备当前绑定库位；传入其它 `location_id` 需要 `X-Session-Token` 且对该库位有授权，否则 403 `location_forbidden`。",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {}
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/handheld/store/offline-sales": {
+      "get": {
+        "tags": [
+          "门店经营"
+        ],
+        "summary": "线下补录列表（v1.15 新增）",
+        "description": "参数 `location_id`、`date_from`、`date_to`（默认今天）、`limit`(≤200)、`offset`、`include_voided`。返回 `{items,total,limit,offset}`，默认只含 `status=active`。",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {}
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "门店经营"
+        ],
+        "summary": "新增线下补录（v1.15 新增）",
+        "description": "仅用于 **未进入有赞** 的现金 / 刷卡 / 微信等收款。必须带 `X-Session-Token`。请求体：`business_date`(yyyy-mm-dd)、`channel`(cash|pos_card|wechat_qr|alipay_qr|bank_transfer|other)、`amount_fen`(非零整数分)、`order_count`、`evidence_type`(pos_receipt|payment_screenshot|bank_slip|handwritten_slip|manual_declaration)、`evidence_ref`/`evidence_url`（除 manual_declaration 外必填其一）、`youzan_exclusion_basis`(device_not_youzan|operator_declared|reconciled_against_youzan|unverified)、`youzan_excluded_tids`、`note`、`client_op_id`(必填，幂等)。\n\n重复提交同一 `client_op_id` 返回原记录并置 `replayed=true`，同时写一条 `replay_idempotent` 审计。注意：渠道枚举本身不能证明与有赞不重复，重复排除由 `evidence_*` 与 `youzan_exclusion_basis` 承担，`unverified` 属于低可信来源，对账时应单独复核。",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {}
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/public/handheld/fulfillments": {
       "get": {
         "tags": [
           "履约"
         ],
         "summary": "履约任务列表（v1.12 新增分页契约）",
-        "description": "默认仍返回旧版数组。`?format=items` 返回 `{items,total,page,page_size,scope}`，支持 `page`、`page_size`、`q`(履约单号/订单号/商品标题/条码)、`status`(all|pending_customer|allocated|picking|picked|handover_ready|handed_over|cancelled)。`scope=all` 仅 HQ 角色可用，其余固定为设备当前授权库位，禁止跨店。筛选、计数、分页全部在数据库函数 `handheld_search_fulfillment_ids` 内完成，`total` 为过滤后全量精确计数。契约差异：fulfillments 表本身没有 `cancelled` 状态，`status=cancelled` 返回父订单已取消/关闭的子单，并置 `order_cancelled=true`、`actionable=false`（客户端必须禁用一切操作）。`pending_customer` 由待客户确认的缺货记录推导，行内另有 `has_pending_customer`。v1.13 新增 `location_id` 参数：普通员工只能传设备当前授权库位（否则 403 `location_forbidden`），HQ 传入需对该库位有授权，返回 `scope=location:<id>`；HQ `scope=all` 且未传 `location_id` 时返回 `scope=all`。`items[].location_label` 表示货架/储位，当前库位表没有货架字段，因此恒为 null，不会用库位名或 SKU 码冒充货架；库位名单独在 `location_name`。图片优先返回 `inv_skus.image_paths` 的新签名 URL，签名快照可能过期时回退到当前图。",
+        "description": "默认仍返回旧版数组。`?format=items` 返回 `{items,total,page,page_size,scope}`，支持 `page`、`page_size`、`q`(履约单号/订单号/商品标题/条码)、`status`(all|pending_customer|allocated|picking|picked|handover_ready|handed_over|cancelled)。`scope=all` 仅 HQ 角色可用，其余固定为设备当前授权库位，禁止跨店。筛选、计数、分页全部在数据库函数 `handheld_search_fulfillment_ids` 内完成，`total` 为过滤后全量精确计数。契约差异：fulfillments 表本身没有 `cancelled` 状态，`status=cancelled` 返回父订单已取消/关闭的子单，并置 `order_cancelled=true`、`actionable=false`（客户端必须禁用一切操作）。`pending_customer` 由待客户确认的缺货记录推导，行内另有 `has_pending_customer`。v1.13 新增 `location_id` 参数：普通员工只能传设备当前授权库位（否则 403 `location_forbidden`），HQ 传入需对该库位有授权，返回 `scope=location:<id>`；HQ `scope=all` 且未传 `location_id` 时返回 `scope=all`。`items[].location_label` 表示货架/储位，当前库位表没有货架字段，因此恒为 null，不会用库位名或 SKU 码冒充货架；库位名单独在 `location_name`。`format=items` 响应同时回传 `location_id`（`scope=all` 时为 null）。v1.17 起旧版数组契约也走同一套 scope 鉴权，不再无条件按设备库位返回。图片优先返回 `inv_skus.image_paths` 的新签名 URL，签名快照可能过期时回退到当前图。",
         "responses": {
           "200": {
             "description": "OK",
@@ -13027,21 +13951,33 @@
                               "example": "550e8400-e29b-41d4-a716-446655440000"
                             },
                             "system_code": {
-                              "type": [
-                                "string",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "source_order_no": {
-                              "type": [
-                                "string",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "tracking_no": {
-                              "type": [
-                                "string",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "status": {
@@ -13059,85 +13995,137 @@
                               "type": "boolean"
                             },
                             "seller": {
-                              "type": [
-                                "string",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "warehouse_location": {
-                              "type": [
-                                "string",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "receiver_name": {
-                              "type": [
-                                "string",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "receiver_address": {
-                              "type": [
-                                "string",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "total_weight_g": {
-                              "type": [
-                                "number",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "weight_g": {
-                              "type": [
-                                "number",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "purchased_at": {
-                              "type": [
-                                "string",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "intl_pay_at": {
-                              "type": [
-                                "string",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "received_at": {
-                              "type": [
-                                "string",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "notes": {
-                              "type": [
-                                "string",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "created_at": {
                               "type": "string"
                             },
                             "created_by": {
-                              "type": [
-                                "string",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "item_image_url": {
-                              "description": "首图（包裹自身或首件的图）",
-                              "type": [
-                                "string",
-                                "null"
-                              ]
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "首图（包裹自身或首件的图）"
                             },
                             "first_item_name": {
-                              "type": [
-                                "string",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "status_timeline": {
@@ -13178,45 +14166,69 @@
                               "type": "number"
                             },
                             "items_cny": {
-                              "type": [
-                                "number",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "intl_total_jpy": {
-                              "type": [
-                                "number",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "intl_total_cny": {
-                              "type": [
-                                "number",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "tariff_jpy": {
                               "type": "number"
                             },
                             "tariff_cny": {
-                              "type": [
-                                "number",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "fx_rate": {
-                              "description": "1 JPY 对应的 CNY",
-                              "type": [
-                                "number",
-                                "null"
-                              ]
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "1 JPY 对应的 CNY"
                             },
                             "total_cny": {
-                              "description": "拆包前包裹合计人民币（大字展示）",
-                              "type": [
-                                "number",
-                                "null"
-                              ]
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "拆包前包裹合计人民币（大字展示）"
                             }
                           },
                           "required": [
@@ -13400,27 +14412,43 @@
                           ]
                         },
                         "pack_pieces_source": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "pack_unit_note": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "piece_price_cny": {
-                          "type": [
-                            "number",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "piece_price_jpy": {
-                          "type": [
-                            "number",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         }
                       },
@@ -13589,15 +14617,23 @@
                           ]
                         },
                         "reasoning": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "unit": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         }
                       },
@@ -13764,15 +14800,23 @@
                           ]
                         },
                         "reasoning": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "unit": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         }
                       },
@@ -14048,27 +15092,43 @@
                           "type": "string"
                         },
                         "provider_transaction_id": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "qr_content": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "code_url": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "expires_at": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "order_id": {
@@ -14084,15 +15144,23 @@
                           ]
                         },
                         "message": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "error_code": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "receipt": {
@@ -14107,9 +15175,13 @@
                               "type": "string"
                             },
                             "receipt_no": {
-                              "type": [
-                                "string",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "total_amount": {
@@ -14125,15 +15197,23 @@
                               "type": "string"
                             },
                             "provider_transaction_id": {
-                              "type": [
-                                "string",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "paid_at": {
-                              "type": [
-                                "string",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "location_name": {
@@ -14143,9 +15223,13 @@
                               "type": "string"
                             },
                             "customer_name": {
-                              "type": [
-                                "string",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "items": {
@@ -14157,9 +15241,13 @@
                                     "type": "string"
                                   },
                                   "sku_code": {
-                                    "type": [
-                                      "string",
-                                      "null"
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
                                     ]
                                   },
                                   "quantity": {
@@ -14472,27 +15560,43 @@
                           "type": "string"
                         },
                         "provider_transaction_id": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "qr_content": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "code_url": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "expires_at": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "order_id": {
@@ -14508,15 +15612,23 @@
                           ]
                         },
                         "message": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "error_code": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "receipt": {
@@ -14531,9 +15643,13 @@
                               "type": "string"
                             },
                             "receipt_no": {
-                              "type": [
-                                "string",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "total_amount": {
@@ -14549,15 +15665,23 @@
                               "type": "string"
                             },
                             "provider_transaction_id": {
-                              "type": [
-                                "string",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "paid_at": {
-                              "type": [
-                                "string",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "location_name": {
@@ -14567,9 +15691,13 @@
                               "type": "string"
                             },
                             "customer_name": {
-                              "type": [
-                                "string",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "items": {
@@ -14581,9 +15709,13 @@
                                     "type": "string"
                                   },
                                   "sku_code": {
-                                    "type": [
-                                      "string",
-                                      "null"
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
                                     ]
                                   },
                                   "quantity": {
@@ -14803,27 +15935,43 @@
                           "type": "string"
                         },
                         "provider_transaction_id": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "qr_content": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "code_url": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "expires_at": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "order_id": {
@@ -14839,15 +15987,23 @@
                           ]
                         },
                         "message": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "error_code": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "receipt": {
@@ -14862,9 +16018,13 @@
                               "type": "string"
                             },
                             "receipt_no": {
-                              "type": [
-                                "string",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "total_amount": {
@@ -14880,15 +16040,23 @@
                               "type": "string"
                             },
                             "provider_transaction_id": {
-                              "type": [
-                                "string",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "paid_at": {
-                              "type": [
-                                "string",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "location_name": {
@@ -14898,9 +16066,13 @@
                               "type": "string"
                             },
                             "customer_name": {
-                              "type": [
-                                "string",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "items": {
@@ -14912,9 +16084,13 @@
                                     "type": "string"
                                   },
                                   "sku_code": {
-                                    "type": [
-                                      "string",
-                                      "null"
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
                                     ]
                                   },
                                   "quantity": {
@@ -15134,27 +16310,43 @@
                           "type": "string"
                         },
                         "provider_transaction_id": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "qr_content": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "code_url": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "expires_at": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "order_id": {
@@ -15170,15 +16362,23 @@
                           ]
                         },
                         "message": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "error_code": {
-                          "type": [
-                            "string",
-                            "null"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
                           ]
                         },
                         "receipt": {
@@ -15193,9 +16393,13 @@
                               "type": "string"
                             },
                             "receipt_no": {
-                              "type": [
-                                "string",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "total_amount": {
@@ -15211,15 +16415,23 @@
                               "type": "string"
                             },
                             "provider_transaction_id": {
-                              "type": [
-                                "string",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "paid_at": {
-                              "type": [
-                                "string",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "location_name": {
@@ -15229,9 +16441,13 @@
                               "type": "string"
                             },
                             "customer_name": {
-                              "type": [
-                                "string",
-                                "null"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
                               ]
                             },
                             "items": {
@@ -15243,9 +16459,13 @@
                                     "type": "string"
                                   },
                                   "sku_code": {
-                                    "type": [
-                                      "string",
-                                      "null"
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
                                     ]
                                   },
                                   "quantity": {
@@ -15999,9 +17219,13 @@
             ]
           },
           "notes": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "image_url": {
@@ -16042,9 +17266,13 @@
             }
           },
           "weight_g": {
-            "type": [
-              "number",
-              "null"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "recognition_request_id": {
@@ -16415,7 +17643,7 @@
                 "scanned_at": {
                   "type": "string",
                   "format": "date-time",
-                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
                 }
               },
               "required": [
@@ -16686,15 +17914,23 @@
             "type": "object",
             "properties": {
               "q": {
-                "type": [
-                  "string",
-                  "null"
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
                 ]
               },
               "primary_category": {
-                "type": [
-                  "string",
-                  "null"
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
                 ]
               },
               "brand_ids": {
@@ -16710,9 +17946,13 @@
                 }
               },
               "location_id": {
-                "type": [
-                  "string",
-                  "null"
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
                 ]
               },
               "sort": {
@@ -16775,9 +18015,13 @@
             "type": "string"
           },
           "description": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "primary_category": {
@@ -16809,15 +18053,23 @@
             "type": "number"
           },
           "compare_at_price": {
-            "type": [
-              "number",
-              "null"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "image_url": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "image_urls": {
@@ -16832,9 +18084,13 @@
             "maximum": 9007199254740991
           },
           "condition_grade": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "location": {
@@ -16848,9 +18104,13 @@
             ]
           },
           "published_at": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           }
         },
@@ -16910,15 +18170,23 @@
             "type": "string"
           },
           "name_original": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "logo_url": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           }
         },
@@ -16943,9 +18211,13 @@
             "type": "string"
           },
           "confidence": {
-            "type": [
-              "number",
-              "null"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
             ]
           }
         },
@@ -17064,9 +18336,13 @@
                       "type": "string"
                     },
                     "name_original": {
-                      "type": [
-                        "string",
-                        "null"
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
                       ]
                     },
                     "aliases": {
@@ -17083,21 +18359,33 @@
                       ]
                     },
                     "entity_type": {
-                      "type": [
-                        "string",
-                        "null"
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
                       ]
                     },
                     "origin_country": {
-                      "type": [
-                        "string",
-                        "null"
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
                       ]
                     },
                     "logo_url": {
-                      "type": [
-                        "string",
-                        "null"
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
                       ]
                     },
                     "category_codes": {
@@ -17200,9 +18488,13 @@
             "additionalProperties": false
           },
           "selected_primary_category": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           }
         },
@@ -17238,21 +18530,33 @@
             "type": "string"
           },
           "courier_provider": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "courier_service_code": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "paid_at": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "created_at": {
@@ -17362,26 +18666,38 @@
             "description": "warehouse=仓库 / shop=门店"
           },
           "location_name": {
-            "example": "总仓",
-            "type": [
-              "string",
-              "null"
-            ]
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "example": "总仓"
           },
           "device_capabilities": {
             "description": "v1.2：设备能力。后台未设置时全字段走默认值",
             "$ref": "#/components/schemas/DeviceCapabilitiesOutput"
           },
           "app_version": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "os_version": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           }
         },
@@ -17446,28 +18762,40 @@
             "example": "550e8400-e29b-41d4-a716-446655440000"
           },
           "sku_code": {
-            "example": "TOY-PIKA-001",
-            "type": [
-              "string",
-              "null"
-            ]
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "example": "TOY-PIKA-001"
           },
           "name": {
             "type": "string",
             "example": "皮卡丘公仔"
           },
           "category": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "price_tier": {
-            "description": "价格档 / 售价",
-            "type": [
-              "number",
-              "null"
-            ]
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "价格档 / 售价"
           },
           "stock_qty": {
             "type": "integer",
@@ -17476,11 +18804,15 @@
             "example": 12
           },
           "image_url": {
-            "description": "主图 read URL；没有图片时为 null",
-            "type": [
-              "string",
-              "null"
-            ]
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "主图 read URL；没有图片时为 null"
           },
           "image_paths": {
             "default": [],
@@ -17548,30 +18880,46 @@
             "type": "boolean"
           },
           "sku_code": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "barcode": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "item_code": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "name": {
             "type": "string"
           },
           "category": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "price": {
@@ -17596,11 +18944,15 @@
             ]
           },
           "image_url": {
-            "description": "主图 read URL；没有图片时为 null",
-            "type": [
-              "string",
-              "null"
-            ]
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "主图 read URL；没有图片时为 null"
           },
           "image_paths": {
             "default": [],
@@ -17643,9 +18995,13 @@
             ]
           },
           "notes": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "is_unlimited_stock": {
@@ -17798,21 +19154,33 @@
             "type": "string"
           },
           "sku_code": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "barcode": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "category": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "product_type": {
@@ -17824,9 +19192,13 @@
             ]
           },
           "image_url": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "price": {
@@ -17907,7 +19279,7 @@
           "opened_at": {
             "type": "string",
             "format": "date-time",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
           },
           "reused": {
             "type": "boolean",
@@ -17942,15 +19314,23 @@
             "example": "550e8400-e29b-41d4-a716-446655440000"
           },
           "device_code": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "label": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "scan_count": {
@@ -17963,7 +19343,7 @@
               {
                 "type": "string",
                 "format": "date-time",
-                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
               },
               {
                 "type": "null"
@@ -17990,15 +19370,23 @@
             "example": "550e8400-e29b-41d4-a716-446655440000"
           },
           "email": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "display_name": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "roles": {
@@ -18051,33 +19439,53 @@
         "type": "object",
         "properties": {
           "brand": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "maker": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "origin_region": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "origin_country": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "era": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "material": {
@@ -18093,9 +19501,13 @@
             }
           },
           "object_type": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "colors": {
@@ -18112,11 +19524,19 @@
                   "type": "string"
                 },
                 "additionalProperties": {
-                  "type": [
-                    "string",
-                    "number",
-                    "boolean",
-                    "null"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
                   ]
                 }
               },
@@ -18126,9 +19546,13 @@
             ]
           },
           "functional_status": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "missing_parts": {
@@ -18158,15 +19582,23 @@
         "type": "object",
         "properties": {
           "sku_code": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "barcode": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "title_short": {
@@ -18178,9 +19610,13 @@
             "example": "¥699"
           },
           "grade": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           }
         },
@@ -18220,9 +19656,13 @@
             "type": "string"
           },
           "cover_url": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "related_sku_id": {
@@ -18291,24 +19731,36 @@
                   "type": "boolean"
                 },
                 "item_id": {
-                  "type": [
-                    "number",
-                    "null"
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
                   ]
                 },
                 "sku_id": {
-                  "type": [
-                    "number",
-                    "null"
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
                   ]
                 },
                 "recovered": {
                   "type": "boolean"
                 },
                 "error": {
-                  "type": [
-                    "string",
-                    "null"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
                   ]
                 }
               },
@@ -18353,9 +19805,13 @@
             ]
           },
           "title": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "payload": {
@@ -18368,7 +19824,7 @@
           "ts": {
             "type": "string",
             "format": "date-time",
-            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
           }
         },
         "required": [
@@ -18404,57 +19860,93 @@
             ]
           },
           "sub_order_no": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "merchant_order_no": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "source_platform": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "condition": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "addon_service": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "item_title": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "item_title_cn": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "item_image_url": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "unit_price_jpy": {
-            "type": [
-              "number",
-              "null"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "quantity": {
@@ -18470,75 +19962,123 @@
             ]
           },
           "item_total_jpy": {
-            "type": [
-              "number",
-              "null"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "item_total_cny": {
-            "type": [
-              "number",
-              "null"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "weight_g": {
-            "type": [
-              "number",
-              "null"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "exchange_rate": {
-            "type": [
-              "number",
-              "null"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "service_fee_jpy": {
-            "type": [
-              "number",
-              "null"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "domestic_freight_jpy": {
-            "type": [
-              "number",
-              "null"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "freight_diff_jpy": {
-            "type": [
-              "number",
-              "null"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "pay_method": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "pay_at": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "tariff_category": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "tariff_rate": {
-            "type": [
-              "number",
-              "null"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "notes": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "arrival_photo_urls": {
@@ -18561,42 +20101,66 @@
             ]
           },
           "pack_pieces_source": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "pack_unit_note": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "system_code": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "created_by": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "created_at": {
             "type": "string"
           },
           "source_order_no": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "tracking_no": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "status": {
@@ -18618,52 +20182,80 @@
             ]
           },
           "received_at": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "is_problem": {
             "type": "boolean"
           },
           "intl_pay_at": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "parcel_system_code": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "parcel_created_by": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "landed_cny": {
-            "description": "到岸总额（拆包前）",
-            "type": [
-              "number",
-              "null"
-            ]
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "到岸总额（拆包前）"
           },
           "piece_price_cny": {
-            "description": "组包每小件 CNY；非组包为 null",
-            "type": [
-              "number",
-              "null"
-            ]
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "组包每小件 CNY；非组包为 null"
           },
           "piece_price_jpy": {
-            "description": "组包每小件 JPY；非组包为 null",
-            "type": [
-              "number",
-              "null"
-            ]
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "组包每小件 JPY；非组包为 null"
           }
         },
         "required": [
@@ -18722,21 +20314,33 @@
             "example": "550e8400-e29b-41d4-a716-446655440000"
           },
           "system_code": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "source_order_no": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "tracking_no": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "status": {
@@ -18754,54 +20358,86 @@
             "type": "boolean"
           },
           "seller": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "warehouse_location": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "purchased_at": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "intl_pay_at": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "received_at": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "created_at": {
             "type": "string"
           },
           "created_by": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "first_item_name": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "item_image_url": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "item_count": {
@@ -18815,16 +20451,24 @@
             "maximum": 9007199254740991
           },
           "grand_total_cny": {
-            "description": "包裹合计人民币（含运费+关税）",
-            "type": [
-              "number",
-              "null"
-            ]
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "包裹合计人民币（含运费+关税）"
           },
           "avg_unit_cny": {
-            "type": [
-              "number",
-              "null"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
             ]
           }
         },
@@ -18873,57 +20517,93 @@
             ]
           },
           "system_code": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "sub_order_no": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "merchant_order_no": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "source_platform": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "condition": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "addon_service": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "item_title": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "item_title_cn": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "item_image_url": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "quantity": {
@@ -18939,81 +20619,133 @@
             ]
           },
           "unit_price_jpy": {
-            "type": [
-              "number",
-              "null"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "item_total_jpy": {
-            "type": [
-              "number",
-              "null"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "item_total_cny": {
-            "type": [
-              "number",
-              "null"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "weight_g": {
-            "type": [
-              "number",
-              "null"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "exchange_rate": {
-            "type": [
-              "number",
-              "null"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "service_fee_jpy": {
-            "type": [
-              "number",
-              "null"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "domestic_freight_jpy": {
-            "type": [
-              "number",
-              "null"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "freight_diff_jpy": {
-            "type": [
-              "number",
-              "null"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "tariff_rate": {
-            "type": [
-              "number",
-              "null"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "tariff_category": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "pay_at": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "pay_method": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "notes": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "arrival_photo_urls": {
@@ -19024,15 +20756,23 @@
             }
           },
           "created_by": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "created_at": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "pack_pieces": {
@@ -19049,15 +20789,23 @@
             "description": ">0 表示组包，APP 才显示「单件价」"
           },
           "pack_pieces_source": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "pack_unit_note": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "landed": {
@@ -19070,50 +20818,78 @@
                 "type": "number"
               },
               "item_cny": {
-                "type": [
-                  "number",
-                  "null"
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
                 ]
               },
               "freight_share_cny": {
-                "type": [
-                  "number",
-                  "null"
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
                 ]
               },
               "tariff_cny": {
-                "type": [
-                  "number",
-                  "null"
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
                 ]
               },
               "landed_cny": {
-                "description": "到岸总额（拆包前）",
-                "type": [
-                  "number",
-                  "null"
-                ]
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "到岸总额（拆包前）"
               },
               "unit_price_cny": {
-                "description": "到岸单价 = landed_cny / quantity",
-                "type": [
-                  "number",
-                  "null"
-                ]
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "到岸单价 = landed_cny / quantity"
               },
               "piece_price_jpy": {
-                "description": "组包每小件 JPY；非组包为 null",
-                "type": [
-                  "number",
-                  "null"
-                ]
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "组包每小件 JPY；非组包为 null"
               },
               "piece_price_cny": {
-                "description": "组包每小件 CNY；非组包为 null",
-                "type": [
-                  "number",
-                  "null"
-                ]
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "组包每小件 CNY；非组包为 null"
               }
             },
             "required": [
