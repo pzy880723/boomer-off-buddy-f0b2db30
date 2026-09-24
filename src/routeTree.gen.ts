@@ -126,6 +126,7 @@ import { Route as ApiPublicHandheldTransfersRouteImport } from './routes/api/pub
 import { Route as ApiPublicHooksChainProbeVerifyRouteImport } from './routes/api/public/hooks/chain-probe-verify'
 import { Route as ApiPublicHooksChannelSyncWorkerRouteImport } from './routes/api/public/hooks/channel-sync-worker'
 import { Route as ApiPublicHooksCommerceReleaseExpiredRouteImport } from './routes/api/public/hooks/commerce-release-expired'
+import { Route as ApiPublicHooksHandheldReleaseWorkerRouteImport } from './routes/api/public/hooks/handheld-release-worker'
 import { Route as ApiPublicHooksListingImageWorkerRouteImport } from './routes/api/public/hooks/listing-image-worker'
 import { Route as ApiPublicHooksTestPublishWithStockRouteImport } from './routes/api/public/hooks/test-publish-with-stock'
 import { Route as ApiPublicHooksYouzanCategoryGroupsSyncRouteImport } from './routes/api/public/hooks/youzan-category-groups-sync'
@@ -889,6 +890,12 @@ const ApiPublicHooksCommerceReleaseExpiredRoute =
   ApiPublicHooksCommerceReleaseExpiredRouteImport.update({
     id: '/api/public/hooks/commerce-release-expired',
     path: '/api/public/hooks/commerce-release-expired',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksHandheldReleaseWorkerRoute =
+  ApiPublicHooksHandheldReleaseWorkerRouteImport.update({
+    id: '/api/public/hooks/handheld-release-worker',
+    path: '/api/public/hooks/handheld-release-worker',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicHooksListingImageWorkerRoute =
@@ -1887,6 +1894,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/chain-probe-verify': typeof ApiPublicHooksChainProbeVerifyRoute
   '/api/public/hooks/channel-sync-worker': typeof ApiPublicHooksChannelSyncWorkerRoute
   '/api/public/hooks/commerce-release-expired': typeof ApiPublicHooksCommerceReleaseExpiredRoute
+  '/api/public/hooks/handheld-release-worker': typeof ApiPublicHooksHandheldReleaseWorkerRoute
   '/api/public/hooks/listing-image-worker': typeof ApiPublicHooksListingImageWorkerRoute
   '/api/public/hooks/test-publish-with-stock': typeof ApiPublicHooksTestPublishWithStockRoute
   '/api/public/hooks/youzan-category-groups-sync': typeof ApiPublicHooksYouzanCategoryGroupsSyncRoute
@@ -2148,6 +2156,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/chain-probe-verify': typeof ApiPublicHooksChainProbeVerifyRoute
   '/api/public/hooks/channel-sync-worker': typeof ApiPublicHooksChannelSyncWorkerRoute
   '/api/public/hooks/commerce-release-expired': typeof ApiPublicHooksCommerceReleaseExpiredRoute
+  '/api/public/hooks/handheld-release-worker': typeof ApiPublicHooksHandheldReleaseWorkerRoute
   '/api/public/hooks/listing-image-worker': typeof ApiPublicHooksListingImageWorkerRoute
   '/api/public/hooks/test-publish-with-stock': typeof ApiPublicHooksTestPublishWithStockRoute
   '/api/public/hooks/youzan-category-groups-sync': typeof ApiPublicHooksYouzanCategoryGroupsSyncRoute
@@ -2417,6 +2426,7 @@ export interface FileRoutesById {
   '/api/public/hooks/chain-probe-verify': typeof ApiPublicHooksChainProbeVerifyRoute
   '/api/public/hooks/channel-sync-worker': typeof ApiPublicHooksChannelSyncWorkerRoute
   '/api/public/hooks/commerce-release-expired': typeof ApiPublicHooksCommerceReleaseExpiredRoute
+  '/api/public/hooks/handheld-release-worker': typeof ApiPublicHooksHandheldReleaseWorkerRoute
   '/api/public/hooks/listing-image-worker': typeof ApiPublicHooksListingImageWorkerRoute
   '/api/public/hooks/test-publish-with-stock': typeof ApiPublicHooksTestPublishWithStockRoute
   '/api/public/hooks/youzan-category-groups-sync': typeof ApiPublicHooksYouzanCategoryGroupsSyncRoute
@@ -2687,6 +2697,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/chain-probe-verify'
     | '/api/public/hooks/channel-sync-worker'
     | '/api/public/hooks/commerce-release-expired'
+    | '/api/public/hooks/handheld-release-worker'
     | '/api/public/hooks/listing-image-worker'
     | '/api/public/hooks/test-publish-with-stock'
     | '/api/public/hooks/youzan-category-groups-sync'
@@ -2948,6 +2959,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/chain-probe-verify'
     | '/api/public/hooks/channel-sync-worker'
     | '/api/public/hooks/commerce-release-expired'
+    | '/api/public/hooks/handheld-release-worker'
     | '/api/public/hooks/listing-image-worker'
     | '/api/public/hooks/test-publish-with-stock'
     | '/api/public/hooks/youzan-category-groups-sync'
@@ -3216,6 +3228,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/chain-probe-verify'
     | '/api/public/hooks/channel-sync-worker'
     | '/api/public/hooks/commerce-release-expired'
+    | '/api/public/hooks/handheld-release-worker'
     | '/api/public/hooks/listing-image-worker'
     | '/api/public/hooks/test-publish-with-stock'
     | '/api/public/hooks/youzan-category-groups-sync'
@@ -3436,6 +3449,7 @@ export interface RootRouteChildren {
   ApiPublicHooksChainProbeVerifyRoute: typeof ApiPublicHooksChainProbeVerifyRoute
   ApiPublicHooksChannelSyncWorkerRoute: typeof ApiPublicHooksChannelSyncWorkerRoute
   ApiPublicHooksCommerceReleaseExpiredRoute: typeof ApiPublicHooksCommerceReleaseExpiredRoute
+  ApiPublicHooksHandheldReleaseWorkerRoute: typeof ApiPublicHooksHandheldReleaseWorkerRoute
   ApiPublicHooksListingImageWorkerRoute: typeof ApiPublicHooksListingImageWorkerRoute
   ApiPublicHooksTestPublishWithStockRoute: typeof ApiPublicHooksTestPublishWithStockRoute
   ApiPublicHooksYouzanCategoryGroupsSyncRoute: typeof ApiPublicHooksYouzanCategoryGroupsSyncRoute
@@ -4353,6 +4367,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/hooks/commerce-release-expired'
       fullPath: '/api/public/hooks/commerce-release-expired'
       preLoaderRoute: typeof ApiPublicHooksCommerceReleaseExpiredRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/handheld-release-worker': {
+      id: '/api/public/hooks/handheld-release-worker'
+      path: '/api/public/hooks/handheld-release-worker'
+      fullPath: '/api/public/hooks/handheld-release-worker'
+      preLoaderRoute: typeof ApiPublicHooksHandheldReleaseWorkerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/listing-image-worker': {
@@ -6160,6 +6181,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksChannelSyncWorkerRoute: ApiPublicHooksChannelSyncWorkerRoute,
   ApiPublicHooksCommerceReleaseExpiredRoute:
     ApiPublicHooksCommerceReleaseExpiredRoute,
+  ApiPublicHooksHandheldReleaseWorkerRoute:
+    ApiPublicHooksHandheldReleaseWorkerRoute,
   ApiPublicHooksListingImageWorkerRoute: ApiPublicHooksListingImageWorkerRoute,
   ApiPublicHooksTestPublishWithStockRoute:
     ApiPublicHooksTestPublishWithStockRoute,
