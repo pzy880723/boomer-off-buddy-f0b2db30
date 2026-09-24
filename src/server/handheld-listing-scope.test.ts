@@ -19,5 +19,6 @@ test("smart-create authorizes the exact inventory movement location before writi
   assert.match(source, /Location not accessible", 403/);
   assert.match(source, /p_location_id: locationId/);
   assert.match(source, /shopId: loc.shop_id/);
-  assert.match(source, /shop_ids: \[releaseShopId\]/);
+  assert.match(source, /p_release_shop_id: releaseShopId/);
+  assert.doesNotMatch(source, /releaseSkuToOfflineShopsCore/);
 });

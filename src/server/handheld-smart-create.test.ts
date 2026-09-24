@@ -152,7 +152,8 @@ describe("handheld AI classification contract", () => {
   });
 
   test("smart-create records a movement reference required by the production RPC", () => {
-    assert.match(smartCreate, /p_ref_id:\s*skuId/);
+    const mig = readFileSync("drizzle/migrations/0012_handheld_smart_create_idempotency.sql", "utf8");
+    assert.match(mig, /inv_apply_movement\(v_sku\.id, p_location_id, 1 \+ v_bound,\s*'handheld_smart_create', v_sku\.id/);
   });
 
   test("label QR uses the stable retail barcode instead of an app-only deep link", () => {

@@ -39,4 +39,11 @@ PGDB=inv_delete_test $PSQL -q -f tests/sql/harness/inventory_delete_stubs.sql >/
 PGDB=inv_delete_test $PSQL -q -f drizzle/migrations/0011_inventory_delete_unused_sku.sql >/dev/null
 PGDB=inv_delete_test $PSQL -q -f tests/sql/inventory_delete/cases.sql 2>&1 | grep -o 'PASS .*' || fail=1
 bash tests/sql/inventory_delete/concurrency.sh || fail=1
+# 手持智能上架幂等 / 有赞发布 outbox / 重复孤品撤销（独立隔离库 smart_create_test）
+PGDB=postgres $PSQL -c "drop database if exists smart_create_test" -c "create database smart_create_test" >/dev/null
+PGDB=smart_create_test $PSQL -q -f tests/sql/harness/smart_create_stubs.sql >/dev/null
+PGDB=smart_create_test $PSQL -q -f drizzle/migrations/0012_handheld_smart_create_idempotency.sql >/dev/null
+PGDB=smart_create_test $PSQL -q -f drizzle/migrations/0013_duplicate_revoke_ref_type.sql >/dev/null
+PGDB=smart_create_test $PSQL -q -f tests/sql/smart_create/cases.sql 2>&1 | grep -o 'PASS .*' || fail=1
+bash tests/sql/smart_create/concurrency.sh || fail=1
 exit $fail
