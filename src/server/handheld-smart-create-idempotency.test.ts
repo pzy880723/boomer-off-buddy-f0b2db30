@@ -43,7 +43,7 @@ async function load(entry: string, stubs: Record<string, string>) {
   const bundle = await build({
     entryPoints: [entry], bundle: true, write: false, platform: "node", format: "esm",
     plugins: [{ name: "stubs", setup(b: any) {
-      b.onResolve({ filter: /^@\// }, (a: any) => ({ path: a.path, namespace: "stub" }));
+      b.onResolve({ filter: /^@/ }, (a: any) => ({ path: a.path, namespace: "stub" }));
       b.onLoad({ filter: /.*/, namespace: "stub" }, (a: any) => {
         assert.ok(stubs[a.path], `unhandled import ${a.path}`);
         return { contents: stubs[a.path], loader: "js" };
