@@ -3086,6 +3086,128 @@ export type Database = {
           },
         ]
       }
+      handheld_smart_create_ops: {
+        Row: {
+          bound_epcs: number
+          client_op_id: string
+          completed_at: string | null
+          created_at: string
+          device_id: string
+          id: string
+          location_id: string
+          payload_fingerprint: string
+          response_json: Json | null
+          sku_id: string | null
+          status: string
+          stock_qty: number | null
+          user_id: string
+        }
+        Insert: {
+          bound_epcs?: number
+          client_op_id: string
+          completed_at?: string | null
+          created_at?: string
+          device_id: string
+          id?: string
+          location_id: string
+          payload_fingerprint: string
+          response_json?: Json | null
+          sku_id?: string | null
+          status?: string
+          stock_qty?: number | null
+          user_id: string
+        }
+        Update: {
+          bound_epcs?: number
+          client_op_id?: string
+          completed_at?: string | null
+          created_at?: string
+          device_id?: string
+          id?: string
+          location_id?: string
+          payload_fingerprint?: string
+          response_json?: Json | null
+          sku_id?: string | null
+          status?: string
+          stock_qty?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "handheld_smart_create_ops_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      handheld_youzan_release_outbox: {
+        Row: {
+          attempts: number
+          claim_token: string | null
+          created_at: string
+          id: string
+          last_error: string | null
+          lease_until: string | null
+          location_id: string
+          next_attempt_at: string
+          result: Json | null
+          shop_id: string
+          sku_id: string
+          source_op_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          claim_token?: string | null
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          lease_until?: string | null
+          location_id: string
+          next_attempt_at?: string
+          result?: Json | null
+          shop_id: string
+          sku_id: string
+          source_op_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          claim_token?: string | null
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          lease_until?: string | null
+          location_id?: string
+          next_attempt_at?: string
+          result?: Json | null
+          shop_id?: string
+          sku_id?: string
+          source_op_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "handheld_youzan_release_outbox_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "handheld_youzan_release_outbox_source_op_id_fkey"
+            columns: ["source_op_id"]
+            isOneToOne: false
+            referencedRelation: "handheld_smart_create_ops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       integration_api_probes: {
         Row: {
           capability_key: string
@@ -4040,6 +4162,54 @@ export type Database = {
           {
             foreignKeyName: "inv_sku_classifications_sku_id_fkey"
             columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inv_sku_duplicate_revocations: {
+        Row: {
+          after_snapshot: Json | null
+          before_snapshot: Json
+          created_at: string
+          duplicate_sku_id: string
+          id: string
+          kept_sku_id: string
+          location_id: string
+          reason: string
+        }
+        Insert: {
+          after_snapshot?: Json | null
+          before_snapshot: Json
+          created_at?: string
+          duplicate_sku_id: string
+          id?: string
+          kept_sku_id: string
+          location_id: string
+          reason: string
+        }
+        Update: {
+          after_snapshot?: Json | null
+          before_snapshot?: Json
+          created_at?: string
+          duplicate_sku_id?: string
+          id?: string
+          kept_sku_id?: string
+          location_id?: string
+          reason?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inv_sku_duplicate_revocations_duplicate_sku_id_fkey"
+            columns: ["duplicate_sku_id"]
+            isOneToOne: true
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inv_sku_duplicate_revocations_kept_sku_id_fkey"
+            columns: ["kept_sku_id"]
             isOneToOne: false
             referencedRelation: "inv_skus"
             referencedColumns: ["id"]
@@ -9070,6 +9240,42 @@ export type Database = {
         }
         Returns: string
       }
+      handheld_release_outbox_claim: {
+        Args: { p_lease_seconds: number; p_limit: number }
+        Returns: {
+          attempts: number
+          claim_token: string | null
+          created_at: string
+          id: string
+          last_error: string | null
+          lease_until: string | null
+          location_id: string
+          next_attempt_at: string
+          result: Json | null
+          shop_id: string
+          sku_id: string
+          source_op_id: string | null
+          status: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "handheld_youzan_release_outbox"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      handheld_release_outbox_finish: {
+        Args: {
+          p_cancel?: boolean
+          p_claim_token: string
+          p_error: string
+          p_id: string
+          p_ok: boolean
+          p_result: Json
+        }
+        Returns: string
+      }
       handheld_search_fulfillment_ids: {
         Args: {
           p_limit?: number
@@ -9100,6 +9306,25 @@ export type Database = {
           order_id: string
           total_count: number
         }[]
+      }
+      handheld_smart_create_commit: {
+        Args: {
+          p_client_op_id: string
+          p_device_id: string
+          p_epcs: string[]
+          p_fingerprint: string
+          p_location_id: string
+          p_note: string
+          p_release_shop_id: string
+          p_reuse: boolean
+          p_sku: Json
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      handheld_smart_create_complete: {
+        Args: { p_op_id: string; p_response: Json }
+        Returns: undefined
       }
       has_role: {
         Args: {
@@ -9143,6 +9368,15 @@ export type Database = {
       inv_apply_stock_delta: {
         Args: { p_delta: number; p_sku_id: string }
         Returns: undefined
+      }
+      inv_revoke_duplicate_sku: {
+        Args: {
+          p_duplicate_sku_id: string
+          p_kept_sku_id: string
+          p_location_id: string
+          p_reason: string
+        }
+        Returns: Json
       }
       inv_sku_delete_blocker: { Args: { p_sku_id: string }; Returns: string }
       inv_sku_is_hq_actor: { Args: never; Returns: boolean }
