@@ -33,4 +33,10 @@ bash tests/sql/concurrency/group_freight_race.sh || fail=1
 bash tests/sql/concurrency/group_freight_no_underrefund.sh || fail=1
 bash tests/sql/concurrency/order_origin_race.sh || fail=1
 bash tests/sql/concurrency/refund_fulfillment_race.sh || fail=1
+# 库存 SKU 安全删除（独立隔离库 inv_delete_test）
+PGDB=postgres $PSQL -c "drop database if exists inv_delete_test" -c "create database inv_delete_test" >/dev/null
+PGDB=inv_delete_test $PSQL -q -f tests/sql/harness/inventory_delete_stubs.sql >/dev/null
+PGDB=inv_delete_test $PSQL -q -f drizzle/migrations/0011_inventory_delete_unused_sku.sql >/dev/null
+PGDB=inv_delete_test $PSQL -q -f tests/sql/inventory_delete/cases.sql 2>&1 | grep -o 'PASS .*' || fail=1
+bash tests/sql/inventory_delete/concurrency.sh || fail=1
 exit $fail
