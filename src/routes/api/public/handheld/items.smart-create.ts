@@ -16,6 +16,8 @@ import {
   getSmartCreateReleaseTarget,
   persistSmartCreateBrand,
   shouldReuseSmartCreateSku,
+  smartCreateFingerprint,
+  type SmartCreateCommitResult,
 } from "@/server/handheld-smart-create.server";
 import {
   assertActiveLeafCategory,
@@ -123,7 +125,7 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
         } catch (e) {
           return err((e as Error).message, 422, { code: "ip_confirmation_required" });
         }
-        // 幂等回放
+        // 旧版幂等日志（历史请求）仍可回放
         const replay = await replayIfPresent({
           deviceId: auth.device.id,
           clientOpId: body.client_op_id,
@@ -138,7 +140,6 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
         if (!loc || !loc.is_active) return err("Location not found or disabled", 404);
 
         // 规范化新图：先 image_storage_paths（持久私桶路径），再兼容 image_url。
-        // 如果 APP 传的是 /storage/v1/object/sign/... signed URL，这里反解为 bucket/path 持久保存。
         const incomingPaths: string[] = [];
         for (const p of body.image_storage_paths ?? []) {
           const normalized = normalizeBucketPath(p.bucket, p.storage_path);
@@ -147,102 +148,99 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
         const normalizedImageUrl = normalizeIncomingImageUrl(body.image_url);
         if (normalizedImageUrl) incomingPaths.push(normalizedImageUrl);
         const hasRecognition = !!body.recognition_request_id;
-        const recognitionFields = hasRecognition
-          ? {
-              attributes: body.attributes,
-              category_source: "ai",
-              category_confidence: body.category_confidence ?? null,
-              classification_status: body.classification_status ?? "fallback",
-              ai_suggested_price: body.ai_suggested_price ?? null,
-              recognition_request_id: body.recognition_request_id,
-            }
-          : {};
+        const releaseShopId = getSmartCreateReleaseTarget({
+          autoPushYouzan: body.auto_push_youzan,
+          locationKind: loc.kind,
+          shopId: loc.shop_id,
+        });
+        const fingerprint = smartCreateFingerprint(
+          { ...body, image_url: normalizedImageUrl },
+          locationId,
+        );
 
-        // Standard catalog rows may be reused; every custom vintage item owns a distinct SKU.
-        const reuseSku = shouldReuseSmartCreateSku(body.is_custom_price);
-        const { data: existSku } = reuseSku
-          ? await supabaseAdmin
-              .from("inv_skus")
-              .select("id, sku_code, epc, stock_qty, image_paths, image_url")
-              .eq("category", body.category)
-              .eq("price_tier", body.price_tier)
-              .eq("name", body.name)
-              .maybeSingle()
-          : { data: null };
+        // SKU 建档 + EPC 绑定 + 一次入库 + 有赞发布 outbox + 幂等行：同一数据库事务。
+        // 同 (device, client_op_id) 重试只得到原 SKU；user / location / 载荷不同返回 409。
+        const firstHttp = incomingPaths.find((p) => /^https?:\/\//i.test(p)) ?? null;
+        const commit = await supabaseAdmin.rpc("handheld_smart_create_commit" as never, {
+          p_device_id: auth.device.id,
+          p_user_id: session.user_id,
+          p_client_op_id: body.client_op_id ?? null,
+          p_fingerprint: fingerprint,
+          p_location_id: locationId,
+          p_reuse: shouldReuseSmartCreateSku(body.is_custom_price),
+          p_sku: {
+            category: body.category,
+            name: body.name,
+            price_tier: body.price_tier,
+            is_custom_price: body.is_custom_price,
+            inventory_policy: body.is_custom_price ? "tracked" : "unlimited",
+            epc: generateEpc(body.category, body.price_tier),
+            sku_code: generateSkuCode(body.category, "single"),
+            image_paths: incomingPaths,
+            image_url: firstHttp,
+            weight_g: body.weight_g ?? null,
+            notes: body.notes ?? null,
+            grade: body.grade ?? null,
+            attributes: body.attributes,
+            category_source: hasRecognition ? "ai" : "manual",
+            category_confidence: body.category_confidence ?? null,
+            classification_status: hasRecognition
+              ? (body.classification_status ?? "fallback")
+              : "legacy",
+            ai_suggested_price: body.ai_suggested_price ?? null,
+            recognition_request_id: body.recognition_request_id ?? null,
+            ip_id: resolvedIp.id,
+            ip_candidate_text: resolvedIp.status === "review" ? resolvedIp.name : null,
+          },
+          p_epcs: body.epcs ?? [],
+          p_note: `device:${auth.device.device_code} user:${session.email ?? session.user_id}`,
+          p_release_shop_id: releaseShopId,
+        } as never);
+        if (commit.error) {
+          if ((commit.error as { code?: string }).code === "P0409")
+            return err("client_op_id reused with a different payload, user or location", 409, {
+              code: "client_op_id_conflict",
+            });
+          return err(`Create SKU failed: ${commit.error.message}`, 500);
+        }
+        const committed = commit.data as unknown as SmartCreateCommitResult;
+        if (committed.response && typeof committed.response === "object") {
+          return jsonReplay({ response_status: 200, response_json: committed.response });
+        }
+        const skuId = committed.sku_id;
+        const skuCode = committed.sku_code ?? "";
+        const epc = committed.epc;
+        const boundCount = committed.bound_epcs;
 
-        let skuId: string;
-        let skuCode: string;
-        let epc: string;
-        if (existSku) {
-          skuId = existSku.id;
-          skuCode = existSku.sku_code ?? generateSkuCode(body.category, "single");
-          epc = existSku.epc;
-          // 把新图 append 到已有数组，去重保序
-          const existing = ((existSku as { image_paths?: string[] | null }).image_paths ??
-            []) as string[];
-          const merged: string[] = [];
-          const seen = new Set<string>();
-          for (const x of [...existing, ...incomingPaths]) {
-            if (!x || seen.has(x)) continue;
-            seen.add(x);
-            merged.push(x);
-          }
-          if (incomingPaths.length > 0 || hasRecognition) {
-            await supabaseAdmin
-              .from("inv_skus")
-              .update({
-                ...(incomingPaths.length > 0
-                  ? {
-                      image_paths: merged,
-                      // 兼容：旧 image_url 仍指向第 0 张外链（无外链则保持原值）
-                      image_url:
-                        merged.find((p) => /^https?:\/\//i.test(p)) ?? existSku.image_url ?? null,
-                    }
-                  : {}),
-                ...recognitionFields,
-                updated_at: new Date().toISOString(),
-              } as never)
-              .eq("id", skuId);
-          }
-        } else {
-          skuCode = generateSkuCode(body.category, "single");
-          epc = generateEpc(body.category, body.price_tier);
-          const firstHttp = incomingPaths.find((p) => /^https?:\/\//i.test(p)) ?? null;
-          const ins = await supabaseAdmin
+        // 以下步骤均为幂等写入；提交后中途失败时，客户端用同一 client_op_id 重试会重放这些步骤。
+        const { data: current } = await supabaseAdmin
+          .from("inv_skus")
+          .select("image_paths, image_url")
+          .eq("id", skuId)
+          .maybeSingle();
+        const existing = ((current?.image_paths as string[] | null) ?? []) as string[];
+        const merged = [...new Set([...existing, ...incomingPaths].filter(Boolean))];
+        if (merged.length !== existing.length || hasRecognition) {
+          const upd = await supabaseAdmin
             .from("inv_skus")
-            .insert({
-              category: body.category,
-              name: body.name,
-              price_tier: body.price_tier,
-              is_custom_price: body.is_custom_price,
-              inventory_policy: body.is_custom_price ? "tracked" : "unlimited",
-              kind: "single",
-              epc,
-              sku_code: skuCode,
-              image_paths: incomingPaths,
-              image_url: firstHttp, // 仅在有外链时填，避免存过期 signed URL
-              weight_g: body.weight_g ?? null,
-              notes: body.notes ?? null,
-              grade: body.grade ?? null,
-              attributes: body.attributes,
-              category_source: hasRecognition ? "ai" : "manual",
-              category_confidence: body.category_confidence ?? null,
-              classification_status: hasRecognition
-                ? (body.classification_status ?? "fallback")
-                : "legacy",
-              ai_suggested_price: body.ai_suggested_price ?? null,
-              recognition_request_id: body.recognition_request_id ?? null,
-              ip_id: resolvedIp.id,
-              ip_candidate_text: resolvedIp.status === "review" ? resolvedIp.name : null,
-              stock_qty: 0,
-              status: "active",
+            .update({
+              image_paths: merged,
+              image_url:
+                merged.find((p) => /^https?:\/\//i.test(p)) ?? current?.image_url ?? null,
+              ...(hasRecognition
+                ? {
+                    attributes: body.attributes,
+                    category_source: "ai",
+                    category_confidence: body.category_confidence ?? null,
+                    classification_status: body.classification_status ?? "fallback",
+                    ai_suggested_price: body.ai_suggested_price ?? null,
+                    recognition_request_id: body.recognition_request_id,
+                  }
+                : {}),
+              updated_at: new Date().toISOString(),
             } as never)
-            .select("id, sku_code, epc, barcode, grade")
-            .single();
-          if (ins.error || !ins.data) return err(`Create SKU failed: ${ins.error?.message}`, 500);
-          skuId = ins.data.id;
-          skuCode = ins.data.sku_code ?? skuCode;
-          epc = ins.data.epc;
+            .eq("id", skuId);
+          if (upd.error) return err(`Save SKU images failed: ${upd.error.message}`, 500);
         }
 
         if (body.recognition_request_id) {
@@ -267,7 +265,7 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
             await replaceManualProductFacets({
               skuId,
               facets: manualFacets,
-              createdBy: session?.user_id ?? null,
+              createdBy: session.user_id,
             });
           } catch (e) {
             return err(`Save product tags failed: ${(e as Error).message}`, 500);
@@ -305,65 +303,12 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
           imageProcessing = { status: "retryable_failed", queued: 0 };
         }
 
-        // Bind extra EPCs (if APP scanned labels already)
-        let boundCount = 0;
-        for (const e of body.epcs ?? []) {
-          const upsertEpc = await supabaseAdmin.from("inv_epcs").upsert(
-            {
-              epc: e,
-              sku_id: skuId,
-              status: "in_stock",
-              current_location_id: locationId,
-              last_seen_at: new Date().toISOString(),
-            },
-            { onConflict: "epc" },
-          );
-          if (!upsertEpc.error) boundCount++;
-        }
-
-        // +1 movement at the chosen location (and warehouse stock_qty if warehouse)
-        const mv = await supabaseAdmin.rpc("inv_apply_movement", {
-          p_sku_id: skuId,
-          p_location_id: locationId,
-          p_delta: 1 + boundCount,
-          p_ref_type: "handheld_smart_create",
-          p_ref_id: skuId,
-          p_epc: epc,
-          p_note: `device:${auth.device.device_code}${session ? ` user:${session.email ?? session.user_id}` : ""}`,
-        } as never);
-        if (mv.error) return err(`Stock movement failed: ${mv.error.message}`, 500);
-
-        // 有赞自动上架：门店库位必须走正式的门店商品发布链路，发布成功后再推库存。
-        let syncStatus: "disabled" | "queued" | "linked" | "unlinked" | "hq_created" | "hq_failed" =
-          "disabled";
-        const releaseShopId = getSmartCreateReleaseTarget({
-          autoPushYouzan: body.auto_push_youzan,
-          locationKind: loc.kind,
-          shopId: loc.shop_id,
-        });
-        if (releaseShopId) {
-          try {
-            const { releaseSkuToOfflineShopsCore } =
-              await import("@/lib/youzan-offline-products.functions");
-            const release = await releaseSkuToOfflineShopsCore({
-              sku_id: skuId,
-              shop_ids: [releaseShopId],
-            });
-            if (release.ok) {
-              const { assignSkuToYouzanCategoryGroups } =
-                await import("@/lib/youzan-category-groups.server");
-              await assignSkuToYouzanCategoryGroups(skuId);
-              syncStatus = "queued";
-            } else {
-              syncStatus = "hq_failed";
-            }
-          } catch (e) {
-            console.error("[handheld smart-create] 门店自动上架失败", e);
-            syncStatus = "hq_failed";
-          }
-        } else if (body.auto_push_youzan) {
-          syncStatus = "unlinked";
-        }
+        // 有赞发布已在上面同一事务写入持久化 outbox，由腾讯固定出口 worker 异步执行，不阻塞上架返回。
+        const syncStatus: "disabled" | "queued" | "unlinked" = releaseShopId
+          ? "queued"
+          : body.auto_push_youzan
+            ? "unlinked"
+            : "disabled";
 
         // inv_apply_movement atomically publishes eligible custom items. Read
         // the resulting listing here so the API can report the final state.
@@ -399,7 +344,7 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
           | "J"
           | null;
 
-        const locationStockQty = Number(mv.data ?? finalSku?.stock_qty ?? 0);
+        const locationStockQty = Number(committed.stock_qty ?? finalSku?.stock_qty ?? 0);
         const responseBody = {
           sku_id: skuId,
           sku_code: skuCode,
@@ -432,12 +377,20 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
           storefront_listing_id: storefrontListingId,
           storefront_status: storefrontStatus,
         };
+        const successBody = { ok: true, data: responseBody };
+        if (committed.op_id) {
+          const done = await supabaseAdmin.rpc("handheld_smart_create_complete" as never, {
+            p_op_id: committed.op_id,
+            p_response: successBody,
+          } as never);
+          if (done.error) console.error("[handheld smart-create] 保存幂等响应失败", done.error);
+        }
         await recordOp({
           deviceId: auth.device.id,
           clientOpId: body.client_op_id,
           opType: "items.smart-create",
           status: 200,
-          body: { ok: true, data: responseBody },
+          body: successBody,
         });
         if (imageProcessing.queued > 0) triggerListingImageWorker(imageProcessing.queued);
         return ok(responseBody);
