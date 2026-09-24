@@ -66,8 +66,8 @@ if (apply) {
   assert.ok(!afterChannel?.isDisplay);
   const shopId = "eecdad4d-6c86-47af-8878-b24cb6f12bd9";
   for (const [table, patch] of [
-    ["sku_youzan_links", { status: "unlinked", sync_stock: false, last_pushed_stock: 0, last_error: null }],
-    ["sku_channel_listings", { listing_status: "unpublished", last_stock: 0, last_error: null, last_verified_at: new Date().toISOString() }],
+    ["sku_youzan_links", { status: "linked", sync_stock: false, last_pushed_stock: 0, last_error: null }],
+    ["sku_channel_listings", { listing_status: "delisted", last_stock: 0, last_error: null, last_verified_at: new Date().toISOString() }],
     ["youzan_stock_sync_queue", { status: "done", target_stock: 0, reason: "duplicate_listing_reversed", last_error: null }],
   ] as const) {
     const result = await (db as any).from(table).update(patch).eq("sku_id", duplicate).eq("shop_id", shopId);

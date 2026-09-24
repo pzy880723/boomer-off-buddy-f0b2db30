@@ -194,7 +194,7 @@ async function markBranchChannelRemoved(skuId: string, shopId: string) {
     supabase
       .from("sku_youzan_links")
       .update({
-        status: "unlinked",
+        status: "linked",
         sync_stock: false,
         last_error: null,
       } as never)
@@ -204,7 +204,7 @@ async function markBranchChannelRemoved(skuId: string, shopId: string) {
     supabase
       .from("sku_channel_listings")
       .update({
-        listing_status: "unpublished",
+        listing_status: "delisted",
         last_stock: 0,
         last_error: null,
         last_verified_at: now,

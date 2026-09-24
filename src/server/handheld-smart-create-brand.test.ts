@@ -36,6 +36,18 @@ const db = createClient("https://smart-create-tests.invalid", "unit-test-only-ke
         return Response.json({ message: "brand update denied" }, { status: 403 });
       }
       if (method !== "GET") writes.push({ table, method, body: structuredClone(body) });
+      if (table === "handheld_smart_create_commit") {
+        const existing = body.p_reuse ? tables.inv_skus.find(row => row.name === body.p_sku.name && row.category === body.p_sku.category && row.price_tier === body.p_sku.price_tier) : null;
+        const saved: Row = existing ?? { id: "saved-sku", barcode: "test-barcode", ...body.p_sku };
+        if (!existing) {
+          tables.inv_skus.push(saved);
+        }
+        return Response.json({ op_id: "op", sku_id: saved.id, sku_code: saved.sku_code, epc: saved.epc, stock_qty: 1, bound_epcs: 0, response: null });
+      }
+      if (table === "handheld_smart_create_complete") {
+        recorded = true;
+        return Response.json(null);
+      }
       if (table === "inv_apply_movement") return Response.json(1);
       assert.ok(tables[table], `Unexpected test table: ${table}`);
       assert.ok(table !== "inv_brands" || method === "GET", "must not create taxonomy identities");
@@ -85,7 +97,8 @@ const bundled = await build({
         "@/server/handheld-auth.server": `
           export const HANDHELD_CORS = {};
           export const authenticateDevice = globalThis.__smartCreateBrandTest.authenticateDevice;
-          export const resolveSessionUser = async () => null;
+          export const resolveSessionUser = async () => ({user_id: 'employee'});
+          export const userCanAccessLocation = async () => true;
           export const ok = data => Response.json({ ok: true, data });
           export const err = (error, status = 500) => Response.json({ ok: false, error }, { status });`,
         "@/server/handheld-idempotency.server": `
@@ -128,6 +141,7 @@ beforeEach(() => {
       { id: "review", name: "ReviewBrand", name_original: null, aliases: [], entity_type: "brand", status: "review" },
     ],
     inv_skus: [],
+    handheld_smart_create_ops: [],
     inv_sku_facets: [],
     commerce_listings: [],
     inv_sku_classifications: [{
@@ -220,7 +234,7 @@ test("manual-only creation persists brand while retaining submitted attributes",
 test("reused standard SKU persists an explicit brand even without images or recognition", async () => {
   tables.inv_skus.push({
     id: "existing", category: "toy_character_figure", name: "Hello Kitty item", price_tier: 69,
-    sku_code: "existing-code", epc: "existing-epc", attributes: { colors: ["red"], brand: "Old" },
+    sku_code: "existing-code", barcode: "existing-barcode", epc: "existing-epc", attributes: { colors: ["red"], brand: "Old" },
     brand_id: "old-id", brand_candidate_text: "Old",
   });
   const response = await create({ brand: "Nike", recognition_request_id: null, is_custom_price: false });

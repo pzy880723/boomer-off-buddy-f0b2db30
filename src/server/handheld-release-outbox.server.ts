@@ -53,7 +53,7 @@ export async function runHandheldReleaseWorker(limit = 3, deps?: ReleaseDeps) {
   for (const row of rows) {
     try {
       // 已归档/撤销或该库位已无库存的商品不再发布（例如重复孤品已被撤销）。
-      const [{ data: sku }, { data: stock }] = await Promise.all([
+      const [{ data: sku, error: skuError }, { data: stock, error: stockError }] = await Promise.all([
         supabaseAdmin.from("inv_skus").select("status").eq("id", row.sku_id).maybeSingle(),
         supabaseAdmin
           .from("inv_stocks")
@@ -62,6 +62,7 @@ export async function runHandheldReleaseWorker(limit = 3, deps?: ReleaseDeps) {
           .eq("location_id", row.location_id)
           .maybeSingle(),
       ]);
+      if (skuError || stockError) throw new Error(skuError?.message ?? stockError!.message);
       if (!sku || sku.status !== "active" || Number(stock?.qty ?? 0) <= 0) {
         outcomes.push({ id: row.id, status: await finish(row, false, "sku_not_publishable", null, true) });
         continue;

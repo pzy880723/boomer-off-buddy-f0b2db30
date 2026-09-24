@@ -9,7 +9,7 @@ if (!token || (port !== '3005' && port !== '3006')) {
     const response = await fetch(`http://127.0.0.1:${port}/api/public/hooks/handheld-release-worker`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ limit: 3 }),
+      body: JSON.stringify({ limit: 1 }),
       redirect: 'error',
       signal: AbortSignal.timeout(590000),
     });

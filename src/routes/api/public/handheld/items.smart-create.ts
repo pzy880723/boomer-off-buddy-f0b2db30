@@ -11,7 +11,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { SmartCreateReq } from "@/lib/handheld/schemas";
 import { generateEpc, generateSkuCode } from "@/lib/inventory.helpers";
 import { buildPrintPayload } from "@/server/handheld-print.server";
-import { replayIfPresent, recordOp, jsonReplay } from "@/server/handheld-idempotency.server";
+import { replayIfPresent, jsonReplay } from "@/server/handheld-idempotency.server";
 import {
   getSmartCreateReleaseTarget,
   persistSmartCreateBrand,
@@ -99,10 +99,37 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
         if (!(await userCanAccessLocation(session.user_id, locationId)))
           return err("Location not accessible", 403, { code: "location_forbidden" });
 
+        const incomingPaths: string[] = [];
+        for (const p of body.image_storage_paths ?? []) {
+          const normalized = normalizeBucketPath(p.bucket, p.storage_path);
+          if (normalized) incomingPaths.push(normalized);
+        }
+        const normalizedImageUrl = normalizeIncomingImageUrl(body.image_url);
+        if (normalizedImageUrl) incomingPaths.push(normalizedImageUrl);
+        const fingerprint = smartCreateFingerprint({ ...body, image_url: normalizedImageUrl }, locationId);
+        let existingOp = false;
+        if (body.client_op_id) {
+          const prior = await supabaseAdmin.from("handheld_smart_create_ops")
+            .select("user_id,location_id,payload_fingerprint,response_json")
+            .eq("device_id", auth.device.id).eq("client_op_id", body.client_op_id).maybeSingle();
+          if (prior.error) return err("Unable to check listing operation; retry with the same client_op_id", 503);
+          existingOp = !!prior.data;
+          if (prior.data) {
+            if (prior.data.user_id !== session.user_id || prior.data.location_id !== locationId ||
+                prior.data.payload_fingerprint !== fingerprint) {
+              return err("client_op_id reused with a different payload, user or location", 409, { code: "client_op_id_conflict" });
+            }
+            if (prior.data.response_json) return jsonReplay({ response_status: 200, response_json: prior.data.response_json });
+          } else {
+            // Only old clients' historical operations use the legacy log; new writes never populate it.
+            const replay = await replayIfPresent({ deviceId: auth.device.id, clientOpId: body.client_op_id, opType: "items.smart-create" });
+            if (replay) return jsonReplay(replay);
+          }
+        }
         try {
           await assertActiveLeafCategory(body.category);
         } catch (e) {
-          return err((e as Error).message, 422, { code: "validation_error" });
+          return err((e as Error).message, existingOp ? 500 : 422, { code: "validation_error" });
         }
         let manualFacets: Awaited<ReturnType<typeof resolveManualProductFacets>> | null = null;
         if (body.facet_codes !== undefined || body.tags !== undefined) {
@@ -113,7 +140,7 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
               legacyTags: body.tags,
             });
           } catch (e) {
-            return err((e as Error).message, 422, { code: "validation_error" });
+            return err((e as Error).message, existingOp ? 500 : 422, { code: "validation_error" });
           }
         }
         let resolvedIp: Awaited<ReturnType<typeof resolveOrCreateConfirmedIp>>;
@@ -123,15 +150,8 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
             confirmed: body.ip_confirmed,
           });
         } catch (e) {
-          return err((e as Error).message, 422, { code: "ip_confirmation_required" });
+          return err((e as Error).message, existingOp ? 500 : 422, { code: "ip_confirmation_required" });
         }
-        // 旧版幂等日志（历史请求）仍可回放
-        const replay = await replayIfPresent({
-          deviceId: auth.device.id,
-          clientOpId: body.client_op_id,
-          opType: "items.smart-create",
-        });
-        if (replay) return jsonReplay(replay);
         const { data: loc } = await supabaseAdmin
           .from("inv_locations")
           .select("id, name, kind, shop_id, is_active")
@@ -139,24 +159,12 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
           .maybeSingle();
         if (!loc || !loc.is_active) return err("Location not found or disabled", 404);
 
-        // 规范化新图：先 image_storage_paths（持久私桶路径），再兼容 image_url。
-        const incomingPaths: string[] = [];
-        for (const p of body.image_storage_paths ?? []) {
-          const normalized = normalizeBucketPath(p.bucket, p.storage_path);
-          if (normalized) incomingPaths.push(normalized);
-        }
-        const normalizedImageUrl = normalizeIncomingImageUrl(body.image_url);
-        if (normalizedImageUrl) incomingPaths.push(normalizedImageUrl);
         const hasRecognition = !!body.recognition_request_id;
         const releaseShopId = getSmartCreateReleaseTarget({
           autoPushYouzan: body.auto_push_youzan,
           locationKind: loc.kind,
           shopId: loc.shop_id,
         });
-        const fingerprint = smartCreateFingerprint(
-          { ...body, image_url: normalizedImageUrl },
-          locationId,
-        );
 
         // SKU 建档 + EPC 绑定 + 一次入库 + 有赞发布 outbox + 幂等行：同一数据库事务。
         // 同 (device, client_op_id) 重试只得到原 SKU；user / location / 载荷不同返回 409。
@@ -213,11 +221,12 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
         const boundCount = committed.bound_epcs;
 
         // 以下步骤均为幂等写入；提交后中途失败时，客户端用同一 client_op_id 重试会重放这些步骤。
-        const { data: current } = await supabaseAdmin
+        const { data: current, error: currentError } = await supabaseAdmin
           .from("inv_skus")
           .select("image_paths, image_url")
           .eq("id", skuId)
           .maybeSingle();
+        if (currentError || !current) return err("Unable to read committed SKU; retry the same operation", 503);
         const existing = ((current?.image_paths as string[] | null) ?? []) as string[];
         const merged = [...new Set([...existing, ...incomingPaths].filter(Boolean))];
         if (merged.length !== existing.length || hasRecognition) {
@@ -328,11 +337,12 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
           storefrontStatus = storefrontListing.status === "published" ? "published" : "sold";
         }
 
-        const { data: finalSku } = await supabaseAdmin
+        const { data: finalSku, error: finalSkuError } = await supabaseAdmin
           .from("inv_skus")
           .select("stock_qty, barcode, grade")
           .eq("id", skuId)
           .maybeSingle();
+        if (finalSkuError || !finalSku?.barcode) return err("Unable to confirm product barcode; retry the same operation", 503);
 
         const barcode = finalSku?.barcode ?? null;
         const conditionGrade = (finalSku?.grade ?? body.grade ?? null) as
@@ -385,13 +395,6 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
           } as never);
           if (done.error) console.error("[handheld smart-create] 保存幂等响应失败", done.error);
         }
-        await recordOp({
-          deviceId: auth.device.id,
-          clientOpId: body.client_op_id,
-          opType: "items.smart-create",
-          status: 200,
-          body: successBody,
-        });
         if (imageProcessing.queued > 0) triggerListingImageWorker(imageProcessing.queued);
         return ok(responseBody);
       },

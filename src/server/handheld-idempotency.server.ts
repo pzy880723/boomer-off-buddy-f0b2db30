@@ -22,12 +22,14 @@ export async function replayIfPresent(args: {
   opType: string;
 }): Promise<OpLogRow | null> {
   if (!args.clientOpId) return null;
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from("inv_handheld_op_log" as never)
     .select("response_status, response_json")
     .eq("device_id", args.deviceId)
     .eq("client_op_id", args.clientOpId)
+    .eq("op_type", args.opType)
     .maybeSingle();
+  if (error) throw new Error(`Unable to read operation log: ${error.message}`);
   return (data as OpLogRow | null) ?? null;
 }
 

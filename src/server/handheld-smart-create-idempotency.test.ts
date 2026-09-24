@@ -13,12 +13,16 @@ const state: {
   finish: string[];
   releaseCalls: number;
   release: () => Promise<{ ok: boolean }>;
+  legacy: unknown;
+  failedTable: string | null;
 } = {} as never;
 
 function chain(table: string) {
   const q: any = {
     select: () => q, eq: () => q, update: () => q, insert: () => q, upsert: () => q,
-    maybeSingle: async () => ({ data: state.tables[table] ?? null, error: null }),
+    maybeSingle: async () => state.failedTable === table
+      ? { data: null, error: { message: "database unavailable" } }
+      : { data: state.tables[table] ?? null, error: null },
     then: (r: any) => r({ data: null, error: null }),
   };
   return q;
@@ -66,7 +70,7 @@ const { Route } = await load("src/routes/api/public/handheld/items.smart-create.
   "@/lib/handheld/schemas": "export const SmartCreateReq = { parse: v => ({ auto_push_youzan: true, is_custom_price: true, attributes: {}, ...v }) };",
   "@/lib/inventory.helpers": "export const generateEpc = () => 'E'; export const generateSkuCode = () => 'S';",
   "@/server/handheld-print.server": "export const buildPrintPayload = () => ({});",
-  "@/server/handheld-idempotency.server": `export const replayIfPresent = async () => null; export const recordOp = async () => {};
+  "@/server/handheld-idempotency.server": `export const replayIfPresent = async () => globalThis.__sc.state.legacy; export const recordOp = async () => {};
     export const jsonReplay = r => Response.json({ ...r.response_json, replayed: true }, { status: r.response_status });`,
   "@/server/handheld-smart-create.server": `export const getSmartCreateReleaseTarget = i => i.autoPushYouzan && i.locationKind === 'shop' ? i.shopId : null;
     export const persistSmartCreateBrand = async () => {}; export const shouldReuseSmartCreateSku = c => !c;
@@ -83,6 +87,7 @@ const { runHandheldReleaseWorker } = await load("src/server/handheld-release-out
 });
 
 beforeEach(() => {
+  state.legacy = null; state.failedTable = null;
   state.rpcs = []; state.finish = []; state.releaseCalls = 0;
   state.tables = { inv_locations: { id: "loc", name: "新天地", kind: "shop", shop_id: "shop", is_active: true }, inv_skus: { status: "active", image_paths: [], barcode: "200" }, inv_stocks: { qty: 1 } };
   state.commit = () => ({ data: { op_id: "op", replayed: false, op_status: "committed", sku_id: "s1", sku_code: "S", epc: "E", bound_epcs: 0, stock_qty: 1, response: null } });
@@ -108,6 +113,13 @@ test("payload/user/location conflict on the same client_op_id returns 409", asyn
   const res = await post();
   assert.equal(res.status, 409);
   assert.equal((await res.json()).code, "client_op_id_conflict");
+});
+
+test("legacy response cannot bypass the new operation fingerprint and actor check", async () => {
+  state.tables.handheld_smart_create_ops = { user_id: "another", location_id: "loc", payload_fingerprint: "fp" };
+  state.legacy = { response_status: 200, response_json: { ok: true, data: { sku_id: "old" } } };
+  const res = await post();
+  assert.equal(res.status, 409);
 });
 
 test("retry after timeout replays the stored response and performs no further writes", async () => {
@@ -142,4 +154,11 @@ test("worker cancels archived or zero-stock SKUs instead of publishing", async (
   const r = await runHandheldReleaseWorker(1, deps);
   assert.equal(state.releaseCalls, 0);
   assert.deepEqual(r.outcomes.map((o: any) => o.status), ["cancelled"]);
+});
+
+test("temporary database read failure retries rather than permanently cancelling publication", async () => {
+  state.failedTable = "inv_stocks";
+  const result = await runHandheldReleaseWorker(1, deps);
+  assert.equal(state.releaseCalls, 0);
+  assert.deepEqual(result.outcomes.map((o: any) => o.status), ["failed"]);
 });
