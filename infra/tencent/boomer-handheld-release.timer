@@ -1,0 +1,11 @@
+[Unit]
+Description=Run handheld Youzan release outbox every minute (oneshot, no overlap)
+
+[Timer]
+OnBootSec=60
+OnUnitInactiveSec=60s
+AccuracySec=5
+Unit=boomer-handheld-release.service
+
+[Install]
+WantedBy=timers.target
