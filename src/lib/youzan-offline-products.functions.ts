@@ -240,7 +240,7 @@ export async function releaseSkuToOfflineShopsCore(args: {
   const [{ data: sku, error: skuError }, { data: shops, error: shopsError }] = await Promise.all([
     supabase
       .from("inv_skus")
-      .select("id,name,sku_code,barcode,price_tier,image_url,image_paths,sku_scope")
+      .select("id,name,sku_code,barcode,price_tier,image_url,image_paths,sku_scope,status")
       .eq("id", args.sku_id)
       .maybeSingle(),
     supabase
@@ -251,6 +251,7 @@ export async function releaseSkuToOfflineShopsCore(args: {
   if (skuError) throw new Error(skuError.message);
   if (shopsError) throw new Error(shopsError.message);
   if (!sku) throw new Error("SKU 不存在");
+  if (sku.status === "archived") throw new Error("商品已归档，不能重新发布到有赞");
 
   const branches = (shops ?? []).filter(
     (shop) => shop.role === "branch" && shop.status === "active",

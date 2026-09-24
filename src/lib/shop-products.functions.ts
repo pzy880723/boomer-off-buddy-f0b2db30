@@ -85,6 +85,7 @@ export const listShopSkus = createServerFn({ method: "GET" })
         .from("inv_skus")
         .select("*")
         .in("id", ids)
+        .not("status", "eq", "archived")
         .order("created_at", { ascending: false });
       if (data.search) {
         const s = `%${data.search}%`;

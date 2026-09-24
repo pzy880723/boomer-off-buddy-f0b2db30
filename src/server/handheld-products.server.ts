@@ -62,7 +62,7 @@ export type ProductItem = {
 const SKU_COLS =
   "id, sku_code, barcode, epc, name, category, price_tier, grade, image_url, image_paths, image_processing_status, notes, status, is_display, kind, is_custom_price, inventory_policy, stock_qty, created_at, updated_at";
 export function productQuery() {
-  return supabaseAdmin.from("inv_skus").select(SKU_COLS).order("id");
+  return supabaseAdmin.from("inv_skus").select(SKU_COLS).not("status", "eq", "archived").order("id");
 }
 type SkuQuery = ReturnType<typeof productQuery>;
 type Sku = NonNullable<Awaited<SkuQuery>["data"]>[number];

@@ -549,6 +549,16 @@ test("global standard catalog is allowed only for vintage stores, not custom or 
   assert.equal((await call("lookup", `location_id=${B}&code=bar-standard`)).status, 404);
   assert.equal((await call("lookup", `location_id=${A}&code=bar-archived-standard`)).status, 404);
 });
+test("archived duplicate stays out of all product lists and barcode lookup despite stock history", async () => {
+  tables.inv_skus.push(sku("duplicate", { status: "archived", is_display: false }));
+  tables.inv_stocks.push({ sku_id: "duplicate", location_id: A, qty: 0 });
+  for (const query of [`location_id=${A}`, "scope=all"]) {
+    const result = await call("list", query);
+    assert.equal(result.status, 200);
+    assert.ok(!ids(result.body).includes("duplicate"));
+  }
+  assert.equal((await call("lookup", `location_id=${A}&code=bar-duplicate`)).status, 404);
+});
 test("products and membership beyond the database page cap are not silently dropped from totals", async () => {
   tables.inv_skus = Array.from({ length: 2105 }, (_, i) =>
     sku(`large-${String(i).padStart(4, "0")}`),
