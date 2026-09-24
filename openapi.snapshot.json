@@ -7634,6 +7634,14 @@
                         "editable": {
                           "type": "boolean"
                         },
+                        "can_edit": {
+                          "type": "boolean",
+                          "description": "当前员工在当前库位可 PATCH；standard 恒为 false"
+                        },
+                        "can_delete": {
+                          "type": "boolean",
+                          "description": "仅表示有删除权限（总部），不保证无业务引用；DELETE 可能返回 409 delete_blocked"
+                        },
                         "is_unlimited_stock": {
                           "type": "boolean"
                         },
@@ -7938,6 +7946,8 @@
                         "id",
                         "product_type",
                         "editable",
+                        "can_edit",
+                        "can_delete",
                         "is_unlimited_stock",
                         "sku_code",
                         "barcode",
