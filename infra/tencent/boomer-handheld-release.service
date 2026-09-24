@@ -1,0 +1,15 @@
+[Unit]
+Description=BOOMER handheld listing -> Youzan release outbox worker
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/var/www/boomer-erp/current
+EnvironmentFile=/var/www/boomer-erp/shared/.env
+ExecStart=/usr/bin/node /var/www/boomer-erp/current/scripts/run-handheld-release-worker.mjs
+TimeoutStartSec=600
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
