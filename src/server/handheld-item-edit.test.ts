@@ -44,6 +44,7 @@ const edit = await load("src/server/handheld-item-edit.server.ts", {
 });
 const worker = await load("src/server/handheld-item-sync-outbox.server.ts", {
   "@/integrations/supabase/client.server": admin,
+  "@/lib/youzan-offline-products.functions": "export const syncSkuInfoToYouzanBranchCore = async () => { throw new Error('no network in tests'); };",
 });
 
 const LOC = "2df58305-57c1-4792-9920-3c3aa49890bc";
