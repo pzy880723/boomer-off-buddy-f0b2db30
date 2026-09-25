@@ -8081,8 +8081,8 @@
         "tags": [
           "商品"
         ],
-        "summary": "修改商品（名称/价格/描述/成色）",
-        "description": "需设备+员工会话。仅 name / price_tier（元，>0，最多两位小数）/ description（→notes）/ condition_grade（→grade）；条码、库存等不可改。总部可改；store_manager 仅限自己库位且商品在该库位；其他角色 403。standard 403 standard_readonly。expected_updated_at 不一致 409 version_conflict（带 current_updated_at）；同 client_op_id 同载荷重放返回原结果，不同载荷 409 client_op_id_conflict。同步更新商城当前展示字段，不改订单快照；改名/改价写入有赞 outbox 由腾讯 worker 异步执行，失败不影响本次返回。",
+        "summary": "修改商品（名称/价格/描述/成色/图片）",
+        "description": "需设备+员工会话。可改 name / price_tier（元，>0，最多两位小数）/ description（→notes）/ condition_grade（→grade）/ image_paths（有序稳定路径，第一张为主图，[] 清空，省略不改；新图须为本设备完成的 sku-raw 或 sku-listing 上传，不能传签名 URL）。条码、库存不可改。总部可改；store_manager 仅限自己库位且商品在该库位；其他角色 403。standard 403 standard_readonly。expected_updated_at 不一致 409 version_conflict；同 client_op_id 同载荷重放，不同载荷 409 client_op_id_conflict。图片同步到商城当前展示，不删除存储对象、不改订单快照。改名/改价写入有赞 outbox；图片不进入该 outbox。",
         "parameters": [
           {
             "in": "path",
@@ -8154,6 +8154,15 @@
                         "type": "null"
                       }
                     ]
+                  },
+                  "image_paths": {
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2048
+                    }
                   }
                 },
                 "required": [
@@ -8197,7 +8206,8 @@
                               "name",
                               "price_tier",
                               "notes",
-                              "grade"
+                              "grade",
+                              "image_paths"
                             ]
                           }
                         },

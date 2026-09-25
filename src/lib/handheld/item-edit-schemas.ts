@@ -1,11 +1,17 @@
 /**
  * 手持端商品修改 / 删除契约（PATCH / DELETE /api/public/handheld/items/{id}）。
- * 仅允许 name / price_tier / description / condition_grade；条码、库存、分类等不可改。
+ * 图片使用稳定存储路径，不接受临时签名 URL；条码、库存、分类等不可改。
  */
 import * as z from "zod";
 
 const uuid = z.string().uuid();
 const clientOpId = z.string().min(8).max(128);
+
+const imagePath = z.string().min(1).max(2048).refine(
+  (v) => /^(sku-raw\/|sku-listing\/|https:\/\/)/.test(v)
+    && !/[?#\s]/.test(v) && !v.split("/").includes(".."),
+  "图片需使用稳定存储路径，不能使用临时签名地址",
+);
 
 export const ItemPriceYuan = z
   .number()
@@ -23,6 +29,7 @@ export const ItemPatchReq = z
     price_tier: ItemPriceYuan.optional(),
     description: z.string().max(2000).nullable().optional(),
     condition_grade: z.enum(["N", "S", "A", "B", "C", "J"]).nullable().optional(),
+    image_paths: z.array(imagePath).max(20).refine(v => new Set(v).size === v.length, "图片不能重复").optional(),
   })
   .strict()
   .refine(
@@ -30,7 +37,7 @@ export const ItemPatchReq = z
       b.name !== undefined ||
       b.price_tier !== undefined ||
       b.description !== undefined ||
-      b.condition_grade !== undefined,
+      b.condition_grade !== undefined || b.image_paths !== undefined,
     { message: "至少修改一个字段" },
   );
 
@@ -48,7 +55,7 @@ export const ItemPatchRes = env(
   z.object({
     sku_id: uuid,
     updated_at: z.string(),
-    changed_fields: z.array(z.enum(["name", "price_tier", "notes", "grade"])),
+    changed_fields: z.array(z.enum(["name", "price_tier", "notes", "grade", "image_paths"])),
     replayed: z.boolean(),
     youzan_sync_queued: z.number().int().describe("已持久化的有赞改名/改价任务数（异步，由腾讯 worker 执行）"),
   }),

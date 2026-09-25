@@ -1,6 +1,5 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { aiPrepareListingImage } from "@/server/handheld-ai.server";
-import { applyListingImageReplacement } from "@/lib/commerce/listing-image-sync";
 
 type ImageRef = {
   bucket: "sku-raw" | "sku-listing";
@@ -61,60 +60,13 @@ export async function enqueueListingImageJobs(input: {
   return { queued: rows.length, status: "queued" };
 }
 
-/** 把官方商城 listing 上仍引用同一张原图的路径同步成成图；其它人工指定的图原样保留。 */
-async function propagateListingImages(
-  skuId: string,
-  rawKey: string,
-  listingKey: string,
-): Promise<void> {
-  const listings = await supabaseAdmin
-    .from("commerce_listings")
-    .select("id, image_paths")
-    .eq("sku_id", skuId);
-  if (listings.error) {
-    console.error("[listing image sync] 读取商城记录失败", listings.error.message);
-    return;
-  }
-  for (const row of (listings.data ?? []) as { id: string; image_paths: unknown }[]) {
-    const current = Array.isArray(row.image_paths) ? (row.image_paths as unknown[]) : [];
-    const { changed, next } = applyListingImageReplacement(current, rawKey, listingKey);
-    if (!changed) continue;
-    const update = await supabaseAdmin
-      .from("commerce_listings")
-      .update({ image_paths: next, updated_at: new Date().toISOString() } as never)
-      .eq("id", row.id);
-    if (update.error) {
-      console.error("[listing image sync] 同步商城图片失败", update.error.message);
-    }
-  }
-}
-
 async function replaceRawPathWithListing(job: JobRow, targetPath: string): Promise<void> {
-  const skuResult = await supabaseAdmin
-    .from("inv_skus")
-    .select("image_paths")
-    .eq("id", job.sku_id)
-    .maybeSingle();
-  if (skuResult.error || !skuResult.data) {
-    throw new Error(`读取 SKU 图片失败：${skuResult.error?.message ?? "not found"}`);
-  }
-  const rawKey = `${job.source_bucket}/${job.source_path}`;
-  const listingKey = `sku-listing/${targetPath}`;
-  const existing = ((skuResult.data as { image_paths?: string[] | null }).image_paths ?? []).filter(
-    Boolean,
-  );
-  const next = existing.map((path) => (path === rawKey ? listingKey : path));
-  if (!next.includes(listingKey)) {
-    const insertAt = Math.min(Math.max(job.source_index, 0), next.length);
-    next.splice(insertAt, 0, listingKey);
-  }
-  const deduped = [...new Set(next)];
-  const update = await supabaseAdmin
-    .from("inv_skus")
-    .update({ image_paths: deduped, updated_at: new Date().toISOString() } as never)
-    .eq("id", job.sku_id);
-  if (update.error) throw new Error(`替换 SKU 上架图失败：${update.error.message}`);
-  await propagateListingImages(job.sku_id, rawKey, listingKey);
+  const { error } = await supabaseAdmin.rpc("handheld_apply_listing_image_result" as never, {
+    p_sku_id: job.sku_id,
+    p_source_key: `${job.source_bucket}/${job.source_path}`,
+    p_target_key: `sku-listing/${targetPath}`,
+  } as never);
+  if (error) throw new Error(`替换 SKU 上架图失败：${error.message}`);
 }
 
 

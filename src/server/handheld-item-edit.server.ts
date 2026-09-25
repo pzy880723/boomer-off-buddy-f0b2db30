@@ -68,6 +68,7 @@ export async function handleItemPatch(request: Request, deviceId: string, skuId:
   if (b.price_tier !== undefined) patch.price_tier = Math.round(b.price_tier * 100) / 100;
   if (b.description !== undefined) patch.notes = b.description;
   if (b.condition_grade !== undefined) patch.grade = b.condition_grade;
+  if (b.image_paths !== undefined) patch.image_paths = b.image_paths;
   const { data, error } = await supabaseAdmin.rpc("handheld_item_update" as never, {
     p_device_id: deviceId,
     p_user_id: session.user_id,

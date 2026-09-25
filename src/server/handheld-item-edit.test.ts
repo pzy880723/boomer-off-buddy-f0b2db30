@@ -93,6 +93,31 @@ test("fingerprint is stable and payload-sensitive", () => {
   assert.notEqual(a, edit.itemOpFingerprint("update", SKU, { patch: { name: "b", notes: null } }));
 });
 
+test("PATCH accepts ordered image-only edits and deletion of all images", async () => {
+  for (const paths of [["sku-listing/2026-09-25/device/b.jpg", "sku-raw/2026-09-25/device/a.jpg"], []]) {
+    state.rpcs = [];
+    const res = await edit.handleItemPatch(req(patchBody({ image_paths: paths })), "dev", SKU);
+    assert.equal(res.status, 200);
+    assert.deepEqual(state.rpcs[0].args.p_patch, { image_paths: paths });
+  }
+});
+
+for (const paths of [null, ["sku-raw/a.jpg", "sku-raw/a.jpg"], ["sku-raw/../a.jpg"],
+  ["sku-raw/a.jpg?token=secret"], ["other/a.jpg"], ["https://example.com/a.jpg?token=secret"],
+  Array.from({ length: 21 }, (_, i) => `sku-raw/${i}.jpg`)]) {
+  test(`PATCH rejects invalid image references ${JSON.stringify(paths)}`, async () => {
+    const res = await edit.handleItemPatch(req(patchBody({ image_paths: paths })), "dev", SKU);
+    assert.equal(res.status, 422);
+    assert.equal(state.rpcs.length, 0);
+  });
+}
+
+test("image ordering participates in idempotency fingerprint", () => {
+  const paths = ["sku-raw/a.jpg", "sku-raw/b.jpg"];
+  assert.notEqual(edit.itemOpFingerprint("update", SKU, { image_paths: paths }),
+    edit.itemOpFingerprint("update", SKU, { image_paths: [...paths].reverse() }));
+});
+
 for (const [code, status] of [
   ["location_forbidden", 403], ["edit_forbidden", 403], ["standard_readonly", 403],
   ["version_conflict", 409], ["client_op_id_conflict", 409], ["not_found", 404],
