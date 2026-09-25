@@ -1897,7 +1897,8 @@ async function runStockSyncWorkerCore(opts: {
       // 按 (sku, shop) 精确取 link；老队列可能没有 shop_id，退回 sku 唯一 link
       let linkQuery = supabase.from("sku_youzan_links").select("*").eq("sku_id", t.sku_id);
       if (t.shop_id) linkQuery = linkQuery.eq("shop_id", t.shop_id);
-      let { data: link } = await linkQuery.maybeSingle();
+      let { data: link, error: linkError } = await linkQuery.maybeSingle();
+      if (linkError) throw linkError;
 
       // 自愈：没有 link 或 link 处于 error/未拿到 item_id → 尝试上架
       const needsListing =

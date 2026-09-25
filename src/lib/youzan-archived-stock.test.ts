@@ -8,6 +8,7 @@ const { build } = createRequire(require.resolve("vite"))("esbuild");
 let tables: Record<string, any[]>;
 let writes: any[];
 let failure: string | null;
+let linkReadError = false;
 const db = {
   from(table: string) {
     const filters: ((r: any) => boolean)[] = [];
@@ -22,6 +23,9 @@ const db = {
       maybeSingle: () => { single = true; return q; }, single: () => { single = true; return q; },
       then: (yes: any, no: any) => Promise.resolve().then(() => {
         assert.ok(tables[table], `Unexpected table ${table}`);
+        if (table === "sku_youzan_links" && !patch && linkReadError) {
+          return { data: null, error: { message: "link read unavailable" } };
+        }
         const rows = tables[table].filter(r => filters.every(f => f(r)));
         if (patch) rows.forEach(r => Object.assign(r, patch));
         return { data: single ? rows[0] ?? null : rows.map(r => ({...r})), error: null };
@@ -61,7 +65,7 @@ const bundle = await build({entryPoints:["src/lib/youzan-sync.functions.ts"],bun
   }}]});
 const worker=await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString("base64")}`);
 beforeEach(()=>{
-  writes=[]; failure=null;
+  writes=[]; failure=null; linkReadError=false;
   tables={
     youzan_stock_sync_queue:[{id:"q",sku_id:"sku",shop_id:"branch",status:"pending",action:"push_is_display",target_is_display:true,target_stock:9999,attempts:0,updated_at:"rev"}],
     inv_skus:[{id:"sku",status:"archived",is_custom_price:false,sku_scope:"standard"}],
@@ -118,4 +122,11 @@ test("minute worker recovers an abandoned delete job but not a fresh running job
   await worker.runArchivedItemStockSyncWorker();
   assert.equal(tables.youzan_stock_sync_queue[0].status,"done");
   assert.equal(tables.youzan_stock_sync_queue[1].status,"running");
+});
+test("link database failure must not be mistaken for an absent remote listing",async()=>{
+  linkReadError=true;
+  const r=await worker.runStockSyncWorkerForSkus(["sku"]);
+  assert.equal(r.failed,1);
+  assert.equal(tables.youzan_stock_sync_queue[0].status,"failed");
+  assert.deepEqual(writes,[]);
 });
