@@ -17194,7 +17194,8 @@
           "price_tier": {
             "type": "number",
             "exclusiveMinimum": 0,
-            "maximum": 9999.9
+            "exclusiveMaximum": 1000000,
+            "description": "售价，以元为单位，0.01–999999.99，最多两位小数"
           },
           "is_custom_price": {
             "default": false,

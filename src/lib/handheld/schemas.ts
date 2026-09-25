@@ -10,6 +10,7 @@
  * 改字段：只动这一个文件。CI 的 sdk:check 会检测漂移。
  */
 import * as z from "zod";
+import { ItemPriceYuan } from "./item-edit-schemas";
 /// <reference types="zod-openapi" />
 // Zod v4 的 .meta() 原生支持任意元数据；zod-openapi 通过类型补全 OpenAPI 字段。
 
@@ -828,7 +829,7 @@ export const SmartCreateReq = z
       .boolean()
       .default(false)
       .meta({ description: "IP 未匹配时，店员确认后才允许创建待审核 IP" }),
-    price_tier: z.number().positive().max(9999.9),
+    price_tier: ItemPriceYuan.meta({ description: "售价，以元为单位，0.01–999999.99，最多两位小数" }),
     is_custom_price: z.boolean().default(false),
     grade: z.enum(["N", "S", "A", "B", "C", "J"]).nullable().optional(),
     notes: z.string().nullable().optional(),
