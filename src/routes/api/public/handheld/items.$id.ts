@@ -39,6 +39,21 @@ export const Route = createFileRoute("/api/public/handheld/items/$id")({
           );
           if (!sku) return errCode("not_found", "SKU not found");
 
+          const [unsignedItem] = buildProductItems([sku], inventory);
+          const session = await resolveSessionUser(request);
+          const capabilities = session
+            ? await loadItemCapabilities({
+                userId: session.user_id,
+                locationId: scope.scope.startsWith("location:") ? scope.scope.slice(9) : null,
+                skuId: sku.id,
+                productType: unsignedItem.product_type,
+                status: sku.status,
+              })
+            : { can_edit: false, can_delete: false };
+          if (new URL(request.url).searchParams.get("capabilities_only") === "1") {
+            return ok({ id: sku.id, scope: scope.scope, ...capabilities });
+          }
+
           // Read persisted detail metadata only after location membership is established.
           const { data: metadata, error: metadataError } = await supabaseAdmin
             .from("inv_skus")
@@ -79,17 +94,7 @@ export const Route = createFileRoute("/api/public/handheld/items/$id")({
           )
             .filter((row) => row.facet)
             .map((row) => ({ ...row.facet!, source: row.source }));
-          const [item] = await signProductItems(buildProductItems([sku], inventory));
-          const session = await resolveSessionUser(request);
-          const capabilities = session
-            ? await loadItemCapabilities({
-                userId: session.user_id,
-                locationId: scope.scope.startsWith("location:") ? scope.scope.slice(9) : null,
-                skuId: sku.id,
-                productType: item.product_type,
-                status: sku.status,
-              })
-            : { can_edit: false, can_delete: false };
+          const [item] = await signProductItems([unsignedItem]);
 
           return ok({
             scope: scope.scope,

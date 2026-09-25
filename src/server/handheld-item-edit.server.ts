@@ -114,7 +114,11 @@ export async function handleItemDelete(request: Request, deviceId: string, skuId
   } as never);
   if (error) return mapRpcError(error as never);
   const r = data as Record<string, unknown>;
-  return ok({ deleted_sku_id: r.deleted_sku_id, replayed: r.replayed === true });
+  return ok({
+    deleted_sku_id: r.deleted_sku_id, replayed: r.replayed === true,
+    stock_removed: Number(r.stock_removed ?? 0),
+    youzan_sync_queued: Number(r.youzan_sync_queued ?? 0),
+  });
 }
 
 /** GET 详情附带的能力位：can_delete 仅代表权限，不保证无业务引用。 */

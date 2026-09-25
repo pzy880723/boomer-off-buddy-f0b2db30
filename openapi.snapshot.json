@@ -7558,7 +7558,7 @@
           "商品"
         ],
         "summary": "SKU 详情（含 barcode / condition_grade / 多库位库存）",
-        "description": "必须携带员工会话。scope/location_id 与商品列表一致；门店仅返回本库位有归属的商品，scope=all 仅限总部角色。stocks、stock_qty、total_stock_qty 和状态均按所选范围计算，并返回已保存的品牌、具体 IP 与年代。另返回 can_edit / can_delete（仅权限能力，不保证无业务引用）与 updated_at（PATCH 的 expected_updated_at）。",
+        "description": "必须携带员工会话。scope/location_id 与商品列表一致；scope=all 仅限总部角色。capabilities_only=1 时只返回 id/scope/can_edit/can_delete，不查询图片签名和详情元数据，客户端可并行加载。普通详情返回库存、品牌、IP、年代、图片及权限。权限能力不代表没有未完成业务，删除时服务器再次校验。",
         "parameters": [
           {
             "in": "path",
@@ -7596,6 +7596,17 @@
               "example": "550e8400-e29b-41d4-a716-446655440000"
             },
             "description": "明确选择的 ERP 库位，总部账号选择门店时也按该库位筛选"
+          },
+          {
+            "in": "query",
+            "name": "capabilities_only",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "0",
+                "1"
+              ]
+            }
           }
         ],
         "responses": {
@@ -7604,393 +7615,437 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "const": true
-                    },
-                    "data": {
+                  "anyOf": [
+                    {
                       "type": "object",
                       "properties": {
-                        "scope": {
-                          "type": "string",
-                          "description": "实际授权查询范围：location:<库位ID> 或 all"
-                        },
-                        "id": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-                          "example": "550e8400-e29b-41d4-a716-446655440000"
-                        },
-                        "product_type": {
-                          "type": "string",
-                          "enum": [
-                            "standard",
-                            "custom",
-                            "bundle"
-                          ]
-                        },
-                        "editable": {
-                          "type": "boolean"
-                        },
-                        "can_edit": {
+                        "ok": {
                           "type": "boolean",
-                          "description": "当前员工在当前库位可 PATCH；standard 恒为 false"
+                          "const": true
                         },
-                        "can_delete": {
-                          "type": "boolean",
-                          "description": "仅表示有删除权限（总部），不保证无业务引用；DELETE 可能返回 409 delete_blocked"
-                        },
-                        "is_unlimited_stock": {
-                          "type": "boolean"
-                        },
-                        "sku_code": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "barcode": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "epc": {
-                          "type": "string"
-                        },
-                        "name": {
-                          "type": "string"
-                        },
-                        "category": {
-                          "type": "string"
-                        },
-                        "brand": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "era": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "ip_name": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "attributes": {
+                        "data": {
                           "type": "object",
-                          "propertyNames": {
-                            "type": "string"
-                          },
-                          "additionalProperties": {}
-                        },
-                        "facet_codes": {
-                          "default": [],
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
-                        "tags": {
-                          "default": [],
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
-                        "facets": {
-                          "default": [],
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "code": {
-                                "type": "string"
-                              },
-                              "name": {
-                                "type": "string"
-                              },
-                              "dimension": {
-                                "type": "string"
-                              },
-                              "source": {
-                                "type": "string"
-                              }
+                          "properties": {
+                            "scope": {
+                              "type": "string",
+                              "description": "实际授权查询范围：location:<库位ID> 或 all"
                             },
-                            "required": [
-                              "code",
-                              "name",
-                              "dimension",
-                              "source"
-                            ],
-                            "additionalProperties": false
-                          }
-                        },
-                        "price_tier": {
-                          "type": "number"
-                        },
-                        "is_custom_price": {
-                          "type": "boolean"
-                        },
-                        "condition_grade": {
-                          "anyOf": [
-                            {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                              "example": "550e8400-e29b-41d4-a716-446655440000"
+                            },
+                            "product_type": {
                               "type": "string",
                               "enum": [
-                                "N",
-                                "S",
-                                "A",
-                                "B",
-                                "C",
-                                "J"
+                                "standard",
+                                "custom",
+                                "bundle"
                               ]
                             },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "grade": {
-                          "anyOf": [
-                            {
+                            "editable": {
+                              "type": "boolean"
+                            },
+                            "can_edit": {
+                              "type": "boolean",
+                              "description": "当前员工在当前库位可 PATCH；standard 恒为 false"
+                            },
+                            "can_delete": {
+                              "type": "boolean",
+                              "description": "仅表示有删除权限（总部），不保证无业务引用；DELETE 可能返回 409 delete_blocked"
+                            },
+                            "is_unlimited_stock": {
+                              "type": "boolean"
+                            },
+                            "sku_code": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "barcode": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "epc": {
                               "type": "string"
                             },
-                            {
-                              "type": "null"
-                            }
-                          ],
-                          "description": "兼容旧字段，等同 condition_grade"
-                        },
-                        "image_url": {
-                          "anyOf": [
-                            {
+                            "name": {
                               "type": "string"
                             },
-                            {
-                              "type": "null"
-                            }
-                          ],
-                          "description": "主图 read URL（兼容旧 APP）；优先用 images"
-                        },
-                        "image_paths": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          },
-                          "description": "持久化的图片来源列表：可能是 'sku-listing/2026-06-29/xxx.jpg' 形式的私桶路径或 https:// 外链"
-                        },
-                        "images": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "storage_path": {
-                                "type": "string",
-                                "description": "对应 image_paths 里的原值"
-                              },
-                              "read_url": {
-                                "type": "string",
-                                "description": "可直接渲染的 URL；私桶为 24h signed，外链原样"
-                              }
-                            },
-                            "required": [
-                              "storage_path",
-                              "read_url"
-                            ],
-                            "additionalProperties": false
-                          },
-                          "description": "image_paths 顺序签名后的结果；第 0 张是主图"
-                        },
-                        "image_processing_status": {
-                          "default": "idle",
-                          "description": "后台主图修整状态；queued/processing/retryable_failed 时 APP 显示正在修图",
-                          "type": "string",
-                          "enum": [
-                            "idle",
-                            "queued",
-                            "processing",
-                            "succeeded",
-                            "partial_failed",
-                            "retryable_failed"
-                          ]
-                        },
-                        "notes": {
-                          "anyOf": [
-                            {
+                            "category": {
                               "type": "string"
                             },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "weight_g": {
-                          "anyOf": [
-                            {
-                              "type": "number"
+                            "brand": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
                             },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "stock_qty": {
-                          "type": "integer",
-                          "minimum": -9007199254740991,
-                          "maximum": 9007199254740991,
-                          "description": "当前授权查询范围内的库存，不能包含其他门店库存"
-                        },
-                        "total_stock_qty": {
-                          "type": "integer",
-                          "minimum": -9007199254740991,
-                          "maximum": 9007199254740991,
-                          "description": "当前查询范围内的 location 累加库存；scope=all 时为全库位总和"
-                        },
-                        "status": {
-                          "type": "string"
-                        },
-                        "is_display": {
-                          "type": "boolean"
-                        },
-                        "listing_status": {
-                          "type": "string",
-                          "enum": [
-                            "selling",
-                            "sold_out",
-                            "in_warehouse"
-                          ]
-                        },
-                        "status_label": {
-                          "type": "string"
-                        },
-                        "can_restock": {
-                          "type": "boolean",
-                          "description": "listing_status=sold_out 时为 true"
-                        },
-                        "created_at": {
-                          "type": "string"
-                        },
-                        "updated_at": {
-                          "type": "string"
-                        },
-                        "stocks": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "location_id": {
-                                "type": "string",
-                                "format": "uuid",
-                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-                                "example": "550e8400-e29b-41d4-a716-446655440000"
-                              },
-                              "location_name": {
+                            "era": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "ip_name": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "attributes": {
+                              "type": "object",
+                              "propertyNames": {
                                 "type": "string"
                               },
-                              "location_kind": {
-                                "type": "string",
-                                "enum": [
-                                  "warehouse",
-                                  "shop"
-                                ]
-                              },
-                              "qty": {
-                                "type": "integer",
-                                "minimum": -9007199254740991,
-                                "maximum": 9007199254740991
+                              "additionalProperties": {}
+                            },
+                            "facet_codes": {
+                              "default": [],
+                              "type": "array",
+                              "items": {
+                                "type": "string"
                               }
                             },
-                            "required": [
-                              "location_id",
-                              "location_name",
-                              "location_kind",
-                              "qty"
-                            ],
-                            "additionalProperties": false
-                          }
-                        },
-                        "print_payload": {
-                          "description": "v1.2：扁平打印 payload",
-                          "$ref": "#/components/schemas/PrintPayload"
+                            "tags": {
+                              "default": [],
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "facets": {
+                              "default": [],
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "code": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "dimension": {
+                                    "type": "string"
+                                  },
+                                  "source": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "code",
+                                  "name",
+                                  "dimension",
+                                  "source"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "price_tier": {
+                              "type": "number"
+                            },
+                            "is_custom_price": {
+                              "type": "boolean"
+                            },
+                            "condition_grade": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "N",
+                                    "S",
+                                    "A",
+                                    "B",
+                                    "C",
+                                    "J"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "grade": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "兼容旧字段，等同 condition_grade"
+                            },
+                            "image_url": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "主图 read URL（兼容旧 APP）；优先用 images"
+                            },
+                            "image_paths": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              },
+                              "description": "持久化的图片来源列表：可能是 'sku-listing/2026-06-29/xxx.jpg' 形式的私桶路径或 https:// 外链"
+                            },
+                            "images": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "storage_path": {
+                                    "type": "string",
+                                    "description": "对应 image_paths 里的原值"
+                                  },
+                                  "read_url": {
+                                    "type": "string",
+                                    "description": "可直接渲染的 URL；私桶为 24h signed，外链原样"
+                                  }
+                                },
+                                "required": [
+                                  "storage_path",
+                                  "read_url"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "description": "image_paths 顺序签名后的结果；第 0 张是主图"
+                            },
+                            "image_processing_status": {
+                              "default": "idle",
+                              "description": "后台主图修整状态；queued/processing/retryable_failed 时 APP 显示正在修图",
+                              "type": "string",
+                              "enum": [
+                                "idle",
+                                "queued",
+                                "processing",
+                                "succeeded",
+                                "partial_failed",
+                                "retryable_failed"
+                              ]
+                            },
+                            "notes": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "weight_g": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "stock_qty": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "当前授权查询范围内的库存，不能包含其他门店库存"
+                            },
+                            "total_stock_qty": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "当前查询范围内的 location 累加库存；scope=all 时为全库位总和"
+                            },
+                            "status": {
+                              "type": "string"
+                            },
+                            "is_display": {
+                              "type": "boolean"
+                            },
+                            "listing_status": {
+                              "type": "string",
+                              "enum": [
+                                "selling",
+                                "sold_out",
+                                "in_warehouse"
+                              ]
+                            },
+                            "status_label": {
+                              "type": "string"
+                            },
+                            "can_restock": {
+                              "type": "boolean",
+                              "description": "listing_status=sold_out 时为 true"
+                            },
+                            "created_at": {
+                              "type": "string"
+                            },
+                            "updated_at": {
+                              "type": "string"
+                            },
+                            "stocks": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "location_id": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                                  },
+                                  "location_name": {
+                                    "type": "string"
+                                  },
+                                  "location_kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "warehouse",
+                                      "shop"
+                                    ]
+                                  },
+                                  "qty": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  }
+                                },
+                                "required": [
+                                  "location_id",
+                                  "location_name",
+                                  "location_kind",
+                                  "qty"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "print_payload": {
+                              "description": "v1.2：扁平打印 payload",
+                              "$ref": "#/components/schemas/PrintPayload"
+                            }
+                          },
+                          "required": [
+                            "scope",
+                            "id",
+                            "product_type",
+                            "editable",
+                            "can_edit",
+                            "can_delete",
+                            "is_unlimited_stock",
+                            "sku_code",
+                            "barcode",
+                            "epc",
+                            "name",
+                            "category",
+                            "brand",
+                            "era",
+                            "ip_name",
+                            "attributes",
+                            "facet_codes",
+                            "tags",
+                            "facets",
+                            "price_tier",
+                            "is_custom_price",
+                            "condition_grade",
+                            "grade",
+                            "image_url",
+                            "image_paths",
+                            "images",
+                            "image_processing_status",
+                            "notes",
+                            "weight_g",
+                            "stock_qty",
+                            "total_stock_qty",
+                            "status",
+                            "is_display",
+                            "listing_status",
+                            "status_label",
+                            "can_restock",
+                            "created_at",
+                            "updated_at",
+                            "stocks",
+                            "print_payload"
+                          ],
+                          "additionalProperties": false
                         }
                       },
                       "required": [
-                        "scope",
-                        "id",
-                        "product_type",
-                        "editable",
-                        "can_edit",
-                        "can_delete",
-                        "is_unlimited_stock",
-                        "sku_code",
-                        "barcode",
-                        "epc",
-                        "name",
-                        "category",
-                        "brand",
-                        "era",
-                        "ip_name",
-                        "attributes",
-                        "facet_codes",
-                        "tags",
-                        "facets",
-                        "price_tier",
-                        "is_custom_price",
-                        "condition_grade",
-                        "grade",
-                        "image_url",
-                        "image_paths",
-                        "images",
-                        "image_processing_status",
-                        "notes",
-                        "weight_g",
-                        "stock_qty",
-                        "total_stock_qty",
-                        "status",
-                        "is_display",
-                        "listing_status",
-                        "status_label",
-                        "can_restock",
-                        "created_at",
-                        "updated_at",
-                        "stocks",
-                        "print_payload"
+                        "ok",
+                        "data"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean",
+                          "const": true
+                        },
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "scope": {
+                              "type": "string"
+                            },
+                            "can_edit": {
+                              "type": "boolean"
+                            },
+                            "can_delete": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "scope",
+                            "can_edit",
+                            "can_delete"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "ok",
+                        "data"
                       ],
                       "additionalProperties": false
                     }
-                  },
-                  "required": [
-                    "ok",
-                    "data"
-                  ],
-                  "additionalProperties": false
+                  ]
                 }
               }
             }
@@ -8326,8 +8381,8 @@
         "tags": [
           "商品"
         ],
-        "summary": "删除未使用商品（仅总部）",
-        "description": "需 confirm:true、location_id、client_op_id。复用 inventory_delete_unused_sku：仅零库存且无任何流水/订单/销售/调拨/有赞/商城引用的商品可永久删除，不自动扣库存；否则 409 delete_blocked，reason 为中文原因。成功后同 client_op_id 重试返回原结果（replayed=true）。",
+        "summary": "删除商品并清退库存（仅总部管理员）",
+        "description": "需 confirm:true、location_id、client_op_id。super_admin/hq_operator 可删除有库存或零库存商品：归档 SKU/商城展示，按库位清退库存并保留审计流水，关联有赞门店异步清零下架。不会物理删除历史订单或图片。未完成订单、预留、调拨或活动组包引用返回 409 delete_blocked 和中文原因。同 client_op_id 重试返回原结果，不重复清退库存。",
         "parameters": [
           {
             "in": "path",
@@ -8393,11 +8448,23 @@
                         },
                         "replayed": {
                           "type": "boolean"
+                        },
+                        "stock_removed": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "youzan_sync_queued": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
                         }
                       },
                       "required": [
                         "deleted_sku_id",
-                        "replayed"
+                        "replayed",
+                        "stock_removed",
+                        "youzan_sync_queued"
                       ],
                       "additionalProperties": false
                     }

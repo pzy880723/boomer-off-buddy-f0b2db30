@@ -22,7 +22,10 @@ export const Route = createFileRoute("/api/public/hooks/handheld-item-sync-worke
           // Empty body uses the default.
         }
         try {
-          return Response.json({ ok: true, data: await runHandheldItemSyncWorker(limit) });
+          const { runArchivedItemStockSyncWorker } = await import("@/lib/youzan-sync.functions");
+          const archived = await runArchivedItemStockSyncWorker(limit);
+          const data = await runHandheldItemSyncWorker(limit);
+          return Response.json({ ok: archived.failed === 0, data: { ...data, archived } });
         } catch (error) {
           return Response.json(
             { ok: false, code: "worker_failed", message: error instanceof Error ? error.message : String(error) },

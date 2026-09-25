@@ -16,7 +16,8 @@ if (!token || (port !== '3005' && port !== '3006')) {
     const data = await response.json();
     const ok = response.ok && data?.ok === true;
     console.log(JSON.stringify({ ok, status: response.status, claimed: data?.data?.claimed ?? null,
-      outcomes: Array.isArray(data?.data?.outcomes) ? data.data.outcomes.map((o) => o.status) : null }));
+      outcomes: Array.isArray(data?.data?.outcomes) ? data.data.outcomes.map((o) => o.status) : null,
+      archived: data?.data?.archived ?? null }));
     if (!ok) process.exitCode = 1;
   } catch {
     console.error('Handheld item sync worker request failed; outbox rows keep their lease and will be retried');

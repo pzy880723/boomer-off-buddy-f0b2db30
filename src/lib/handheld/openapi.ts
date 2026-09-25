@@ -7,6 +7,7 @@ import * as z from "zod";
 import {
   ItemDeleteReq,
   ItemDeleteRes,
+  ItemCapabilitiesRes,
   ItemPatchReq,
   ItemPatchRes,
 } from "./item-edit-schemas";
@@ -858,15 +859,16 @@ X-Session-Token: <操作员 session token>
         tags: ["商品"],
         summary: "SKU 详情（含 barcode / condition_grade / 多库位库存）",
         description:
-          "必须携带员工会话。scope/location_id 与商品列表一致；门店仅返回本库位有归属的商品，scope=all 仅限总部角色。stocks、stock_qty、total_stock_qty 和状态均按所选范围计算，并返回已保存的品牌、具体 IP 与年代。另返回 can_edit / can_delete（仅权限能力，不保证无业务引用）与 updated_at（PATCH 的 expected_updated_at）。",
+          "必须携带员工会话。scope/location_id 与商品列表一致；scope=all 仅限总部角色。capabilities_only=1 时只返回 id/scope/can_edit/can_delete，不查询图片签名和详情元数据，客户端可并行加载。普通详情返回库存、品牌、IP、年代、图片及权限。权限能力不代表没有未完成业务，删除时服务器再次校验。",
         requestParams: {
           path: z.object({ id: z.string().uuid() }),
           query: z.object({
             scope: ProductsQuery.shape.scope,
             location_id: ProductsQuery.shape.location_id,
+            capabilities_only: z.enum(["0", "1"]).optional(),
           }),
         },
-        responses: { "200": jsonRes("OK", SkuDetailRes), ...ERROR_RESPONSES },
+        responses: { "200": jsonRes("OK", z.union([SkuDetailRes, ItemCapabilitiesRes])), ...ERROR_RESPONSES },
       },
       patch: {
         tags: ["商品"],
@@ -879,9 +881,9 @@ X-Session-Token: <操作员 session token>
       },
       delete: {
         tags: ["商品"],
-        summary: "删除未使用商品（仅总部）",
+        summary: "删除商品并清退库存（仅总部管理员）",
         description:
-          "需 confirm:true、location_id、client_op_id。复用 inventory_delete_unused_sku：仅零库存且无任何流水/订单/销售/调拨/有赞/商城引用的商品可永久删除，不自动扣库存；否则 409 delete_blocked，reason 为中文原因。成功后同 client_op_id 重试返回原结果（replayed=true）。",
+          "需 confirm:true、location_id、client_op_id。super_admin/hq_operator 可删除有库存或零库存商品：归档 SKU/商城展示，按库位清退库存并保留审计流水，关联有赞门店异步清零下架。不会物理删除历史订单或图片。未完成订单、预留、调拨或活动组包引用返回 409 delete_blocked 和中文原因。同 client_op_id 重试返回原结果，不重复清退库存。",
         requestParams: { path: z.object({ id: z.string().uuid() }) },
         requestBody: { content: { "application/json": { schema: ItemDeleteReq } } },
         responses: { "200": jsonRes("OK", ItemDeleteRes), ...ERROR_RESPONSES },

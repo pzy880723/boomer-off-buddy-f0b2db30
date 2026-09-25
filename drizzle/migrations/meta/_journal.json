@@ -120,6 +120,13 @@
       "when": 1790317099894,
       "tag": "0016_handheld_item_images",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1790353194000,
+      "tag": "0017_handheld_item_archive_delete",
+      "breakpoints": true
     }
   ]
 }

@@ -1865,6 +1865,7 @@ async function runStockSyncWorkerCore(opts: {
   sku_ids?: string[];
   task_ids?: string[];
   limit?: number;
+  reason?: string;
 }): Promise<{ processed: number; ok: number; failed: number }> {
   const limit = opts.limit ?? 20;
   let q = supabase
@@ -1876,6 +1877,7 @@ async function runStockSyncWorkerCore(opts: {
     .limit(limit);
   if (opts.sku_ids?.length) q = q.in("sku_id", opts.sku_ids);
   if (opts.task_ids?.length) q = q.in("id", opts.task_ids);
+  if (opts.reason) q = q.eq("reason", opts.reason);
   const { data: tasks, error } = await q;
   if (error) throw new Error(error.message);
 
@@ -1883,10 +1885,13 @@ async function runStockSyncWorkerCore(opts: {
   let failed = 0;
   for (const t of tasks ?? []) {
     // 占位 running
-    await supabase
+    const { data: claimed, error: claimError } = await supabase
       .from("youzan_stock_sync_queue")
-      .update({ status: "running" } as never)
-      .eq("id", t.id);
+      .update({ status: "running", updated_at: new Date().toISOString() } as never)
+      .eq("id", t.id).eq("status", t.status).eq("updated_at", t.updated_at)
+      .select("id").maybeSingle();
+    if (claimError) throw claimError;
+    if (!claimed) continue;
 
     try {
       // 按 (sku, shop) 精确取 link；老队列可能没有 shop_id，退回 sku 唯一 link
@@ -1899,6 +1904,36 @@ async function runStockSyncWorkerCore(opts: {
         !link ||
         !(link as { yz_item_id?: number }).yz_item_id ||
         Number((link as { yz_item_id?: number }).yz_item_id ?? 0) <= 0;
+      const { data: currentSku, error: currentSkuError } = await supabase
+        .from("inv_skus").select("status,is_custom_price").eq("id", t.sku_id).maybeSingle();
+      if (currentSkuError) throw currentSkuError;
+      if (!currentSku) throw new Error("商品不存在，停止自动上架");
+      if (currentSku.status === "archived") {
+        // Old publish tasks must never recreate a deleted item. Standard price
+        // variants share an SPU: clear the variant, not the whole product group.
+        if (!needsListing && link) {
+          const shop = await getShopById(link.shop_id);
+          if (shop.role === "branch") {
+            await pushStockToYouzan(link as LinkRow, 0, `${t.id}:${t.updated_at}:archive`);
+            if (currentSku.is_custom_price) {
+              const { data: refreshed, error: refreshError } = await supabase
+                .from("sku_youzan_links").select("*").eq("id", link.id).single();
+              if (refreshError || !refreshed) throw refreshError ?? new Error("门店关联缺失");
+              await pushIsDisplayToYouzan(refreshed as LinkRow, false);
+            }
+            const { error } = await supabase.from("sku_youzan_links")
+              .update({ last_pushed_stock: 0, last_pushed_at: new Date().toISOString(), last_error: null } as never)
+              .eq("id", link.id);
+            if (error) throw error;
+          }
+        }
+        const { error } = await supabase.from("youzan_stock_sync_queue")
+          .update({ status: "done", target_stock: 0, last_error: null, attempts: (t.attempts ?? 0) + 1 } as never)
+          .eq("id", t.id);
+        if (error) throw error;
+        ok += 1;
+        continue;
+      }
       if (needsListing) {
         if (!t.shop_id) throw new Error("队列缺少 shop_id，无法自动上架");
         const r = await ensureBranchListing(t.sku_id, t.shop_id);
@@ -2025,6 +2060,15 @@ export const runStockSyncWorker = createServerFn({ method: "POST" })
 // 给公共路由用的不带 auth 版本
 export async function runStockSyncWorkerForCron() {
   return runStockSyncWorkerCore({ limit: 50 });
+}
+
+export async function runArchivedItemStockSyncWorker(limit = 3) {
+  const { error } = await supabase.from("youzan_stock_sync_queue")
+    .update({ status: "failed", next_run_at: new Date().toISOString(), last_error: "删除同步超时，自动重试" } as never)
+    .eq("reason", "handheld_item_deleted").eq("status", "running")
+    .lt("updated_at", new Date(Date.now() - 15 * 60_000).toISOString());
+  if (error) throw error;
+  return runStockSyncWorkerCore({ reason: "handheld_item_deleted", limit });
 }
 
 // Request-scoped variant for flows that must not return before Youzan stock is durable.

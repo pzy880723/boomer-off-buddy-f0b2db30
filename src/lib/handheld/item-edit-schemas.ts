@@ -61,7 +61,14 @@ export const ItemPatchRes = env(
   }),
 );
 
-export const ItemDeleteRes = env(z.object({ deleted_sku_id: uuid, replayed: z.boolean() }));
+export const ItemDeleteRes = env(z.object({
+  deleted_sku_id: uuid, replayed: z.boolean(),
+  stock_removed: z.number().int(), youzan_sync_queued: z.number().int(),
+}));
+
+export const ItemCapabilitiesRes = env(z.object({
+  id: uuid, scope: z.string(), can_edit: z.boolean(), can_delete: z.boolean(),
+}));
 
 export const ItemCapabilities = z.object({
   can_edit: z.boolean().describe("当前员工在当前库位可修改；standard 恒为 false"),

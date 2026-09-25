@@ -820,3 +820,36 @@ test("detail: persisted attribute read failure fails closed", async () => {
   detailMetadataFailure = true;
   assert.equal((await call("detail")).status, 500);
 });
+
+test("capabilities: permissions do not wait for metadata, taxonomy or signed images", async () => {
+  detailMetadataFailure = true;
+  failures.add("inv_sku_facets");
+  const { status, body } = await call("detail", `location_id=${A}&capabilities_only=1`, "hq");
+  assert.equal(status, 200);
+  assert.equal(body.data.can_delete, true);
+  assert.equal(body.data.can_edit, true);
+  assert.equal(body.data.scope, `location:${A}`);
+  assert.equal(body.data.image_url, undefined);
+  assert.ok(!requests.includes("inv_sku_facets"));
+});
+
+test("capabilities: a staff member cannot delete or query another store", async () => {
+  const own = await call("detail", `location_id=${A}&capabilities_only=1`, "staff");
+  assert.equal(own.status, 200);
+  assert.equal(own.body.data.can_delete, false);
+  const foreign = await call("detail", `location_id=${B}&capabilities_only=1`, "staff");
+  assert.notEqual(foreign.status, 200);
+});
+
+test("deleted product stays hidden after refresh in store, HQ and barcode lookup", async () => {
+  const id = tables.inv_skus.find(row => row.id === "custom-a")?.id ?? tables.inv_skus[0].id;
+  const item = tables.inv_skus.find(row => row.id === id)!;
+  item.status = "archived";
+  for (const params of [`location_id=${A}`, "scope=all"]) {
+    const result = await call("list", params, "hq");
+    assert.equal(result.status, 200);
+    assert.ok(!result.body.data.items.some((row: Row) => row.id === id));
+  }
+  assert.equal((await call("detail", "scope=all", "hq", id)).status, 404);
+  assert.equal((await call("detail", "scope=all&capabilities_only=1", "hq", id)).status, 404);
+});
