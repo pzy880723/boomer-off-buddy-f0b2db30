@@ -15,7 +15,7 @@ if (!token || (port !== '3005' && port !== '3006')) {
     });
     const data = await response.json();
     const ok = response.ok && data?.ok === true;
-    console.log(JSON.stringify({ ok, status: response.status, claimed: data?.data?.claimed ?? null,
+    console.log(JSON.stringify({ ok, status: response.status, code: data?.code ?? null, claimed: data?.data?.claimed ?? null,
       outcomes: Array.isArray(data?.data?.outcomes) ? data.data.outcomes.map((o) => o.status) : null }));
     if (!ok) process.exitCode = 1;
   } catch {

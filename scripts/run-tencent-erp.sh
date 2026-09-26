@@ -4,6 +4,9 @@ set -euo pipefail
 APP_DIR="${APP_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 BIND_HOST="${ERP_BIND_HOST:-127.0.0.1}"
 BIND_PORT="${ERP_PORT:-3005}"
+RELEASE_WORKER_OVERRIDE="${HANDHELD_RELEASE_WORKER_ENABLED-}"
+ITEM_SYNC_WORKER_OVERRIDE="${HANDHELD_ITEM_SYNC_WORKER_ENABLED-}"
+WORKER_ENV_FILE="${ERP_WORKER_ENV_FILE:-/etc/boomer-erp/workers.env}"
 
 if [[ ! -f "$APP_DIR/.env" ]]; then
   echo "Missing $APP_DIR/.env" >&2
@@ -27,6 +30,19 @@ fi
 
 set -a
 source "$APP_DIR/.env"
+if [[ "$BIND_PORT" == 3005 && -f "$WORKER_ENV_FILE" ]]; then
+  # Host-owned flags survive PM2 recreation and application release switches.
+  source "$WORKER_ENV_FILE"
+fi
+if [[ -n "$RELEASE_WORKER_OVERRIDE" ]]; then
+  export HANDHELD_RELEASE_WORKER_ENABLED="$RELEASE_WORKER_OVERRIDE"
+fi
+if [[ -n "$ITEM_SYNC_WORKER_OVERRIDE" ]]; then
+  export HANDHELD_ITEM_SYNC_WORKER_ENABLED="$ITEM_SYNC_WORKER_OVERRIDE"
+fi
+if [[ "$BIND_PORT" != 3005 ]]; then
+  export HANDHELD_RELEASE_WORKER_ENABLED=false HANDHELD_ITEM_SYNC_WORKER_ENABLED=false
+fi
 set +a
 
 cd "$APP_DIR"
