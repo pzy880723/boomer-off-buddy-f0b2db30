@@ -38,6 +38,9 @@ CREATE TABLE commerce_listings(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),sku
 CREATE TABLE youzan_stock_sync_queue(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),sku_id uuid,shop_id uuid,location_id uuid,target_stock int,
  reason text,action text,status text DEFAULT 'pending',created_at timestamptz DEFAULT now(),updated_at timestamptz DEFAULT now(),attempts int DEFAULT 0,next_run_at timestamptz DEFAULT now(),last_error text);
 CREATE UNIQUE INDEX uq_youzan_stock_sync_queue_pending ON youzan_stock_sync_queue(sku_id,shop_id) WHERE status IN ('pending','failed');
+ALTER TABLE youzan_stock_sync_queue ENABLE ROW LEVEL SECURITY;
+GRANT ALL ON youzan_stock_sync_queue TO authenticated;
+CREATE POLICY legacy_queue ON youzan_stock_sync_queue FOR ALL TO authenticated USING(true) WITH CHECK(true);
 CREATE TABLE handheld_youzan_release_outbox(sku_id uuid,shop_id uuid,location_id uuid,status text DEFAULT 'pending',
  next_attempt_at timestamptz,attempts int DEFAULT 0,last_error text,updated_at timestamptz,UNIQUE(sku_id,shop_id));
 CREATE FUNCTION inv_apply_movement(uuid,uuid,int,text,uuid,text,text) RETURNS int LANGUAGE plpgsql AS $$
@@ -47,6 +50,7 @@ DECLARE q int; BEGIN
 END $$;
 `);
 await db.exec(await readFile(new URL('../supabase/migrations/20260926170909_custom_product_transfers.sql',import.meta.url),'utf8'));
+await db.exec(await readFile(new URL('../supabase/migrations/20260926183000_custom_transfer_sync_ack_guard.sql',import.meta.url),'utf8'));
 const id = n => `00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
 const hq=id(1),staff=id(2),stranger=id(3),a=id(11),b=id(12),shop=id(13),sku=id(21),other=id(22);
 await db.query(`INSERT INTO user_roles VALUES($1,'hq_operator'),($2,'store_staff'),($3,'shop_manager')`,[hq,staff,stranger]);
@@ -101,6 +105,17 @@ await assert.rejects(receive(staff,first.id,[photo]),/receipt_missing/);
 await db.query(`INSERT INTO storage.objects VALUES('transfer-receipts',$1)`,[`${first.id}/${staff}/proof.jpg`]);
 await assert.rejects(receive(hq,first.id,[photo]),/receipt_missing/);
 await assert.rejects(receive(staff,first.id,[photo,photo]),/receipt_missing/);
+await assert.rejects(receive(staff,first.id,[photo]),/source_sync_pending/);
+await db.exec(`SET ROLE authenticated`);
+const forged=await db.query(`UPDATE youzan_stock_sync_queue SET status='done',target_stock=0 RETURNING id`);
+assert.equal(forged.rows.length,0,'Authenticated clients must not forge source stock ACKs');
+assert.equal((await db.query(`DELETE FROM youzan_stock_sync_queue RETURNING id`)).rows.length,0);
+const linked=(await db.query(`SELECT id FROM youzan_stock_sync_queue`)).rows[0].id;
+await assert.rejects(db.query(`INSERT INTO youzan_stock_sync_queue(id,status,target_stock) VALUES($1,'done',0) ON CONFLICT(id) DO UPDATE SET status='done'`,[linked]),/row-level security/);
+const unrelated=await db.query(`INSERT INTO youzan_stock_sync_queue(status,target_stock) VALUES('pending',1) RETURNING id`);
+assert.equal((await db.query(`UPDATE youzan_stock_sync_queue SET status='done' WHERE id=$1 RETURNING id`,[unrelated.rows[0].id])).rows.length,1,'Keep unrelated legacy queue access unchanged');
+assert.equal((await db.query(`DELETE FROM youzan_stock_sync_queue WHERE id=$1 RETURNING id`,[unrelated.rows[0].id])).rows.length,1);
+await db.exec(`RESET ROLE`);
 await assert.rejects(receive(staff,first.id,[photo]),/source_sync_pending/);
 await db.exec(`UPDATE youzan_stock_sync_queue SET status='done'`);
 const received=await receive(staff,first.id,[photo]);
