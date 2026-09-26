@@ -20,6 +20,7 @@ export const Route = createFileRoute("/api/public/handheld/transfers")({
           .select(
             "id, code, status, qty, from_location_id, to_location_id, shipped_at, received_at, created_at, notes",
           )
+          .neq("kind", "custom")
           .order("created_at", { ascending: false })
           .limit(50);
         if (role === "incoming") qb = qb.eq("to_location_id", locationId);

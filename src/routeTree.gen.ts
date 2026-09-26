@@ -110,6 +110,7 @@ import { Route as ApiPublicGoAuthorizationAckRouteImport } from './routes/api/pu
 import { Route as ApiPublicGoDailySummaryRouteImport } from './routes/api/public/go/daily-summary'
 import { Route as ApiPublicGoScopeSyncRouteImport } from './routes/api/public/go/scope-sync'
 import { Route as ApiPublicGoSessionRouteImport } from './routes/api/public/go/session'
+import { Route as ApiPublicHandheldCustomTransfersRouteImport } from './routes/api/public/handheld/custom-transfers'
 import { Route as ApiPublicHandheldDashboardRouteImport } from './routes/api/public/handheld/dashboard'
 import { Route as ApiPublicHandheldFulfillmentsRouteImport } from './routes/api/public/handheld/fulfillments'
 import { Route as ApiPublicHandheldGlobalStockRouteImport } from './routes/api/public/handheld/global-stock'
@@ -798,6 +799,12 @@ const ApiPublicGoSessionRoute = ApiPublicGoSessionRouteImport.update({
   path: '/api/public/go/session',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHandheldCustomTransfersRoute =
+  ApiPublicHandheldCustomTransfersRouteImport.update({
+    id: '/api/public/handheld/custom-transfers',
+    path: '/api/public/handheld/custom-transfers',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHandheldDashboardRoute =
   ApiPublicHandheldDashboardRouteImport.update({
     id: '/api/public/handheld/dashboard',
@@ -1885,6 +1892,7 @@ export interface FileRoutesByFullPath {
   '/api/public/go/daily-summary': typeof ApiPublicGoDailySummaryRoute
   '/api/public/go/scope-sync': typeof ApiPublicGoScopeSyncRoute
   '/api/public/go/session': typeof ApiPublicGoSessionRoute
+  '/api/public/handheld/custom-transfers': typeof ApiPublicHandheldCustomTransfersRoute
   '/api/public/handheld/dashboard': typeof ApiPublicHandheldDashboardRoute
   '/api/public/handheld/fulfillments': typeof ApiPublicHandheldFulfillmentsRouteWithChildren
   '/api/public/handheld/global-stock': typeof ApiPublicHandheldGlobalStockRoute
@@ -2148,6 +2156,7 @@ export interface FileRoutesByTo {
   '/api/public/go/daily-summary': typeof ApiPublicGoDailySummaryRoute
   '/api/public/go/scope-sync': typeof ApiPublicGoScopeSyncRoute
   '/api/public/go/session': typeof ApiPublicGoSessionRoute
+  '/api/public/handheld/custom-transfers': typeof ApiPublicHandheldCustomTransfersRoute
   '/api/public/handheld/dashboard': typeof ApiPublicHandheldDashboardRoute
   '/api/public/handheld/fulfillments': typeof ApiPublicHandheldFulfillmentsRouteWithChildren
   '/api/public/handheld/global-stock': typeof ApiPublicHandheldGlobalStockRoute
@@ -2419,6 +2428,7 @@ export interface FileRoutesById {
   '/api/public/go/daily-summary': typeof ApiPublicGoDailySummaryRoute
   '/api/public/go/scope-sync': typeof ApiPublicGoScopeSyncRoute
   '/api/public/go/session': typeof ApiPublicGoSessionRoute
+  '/api/public/handheld/custom-transfers': typeof ApiPublicHandheldCustomTransfersRoute
   '/api/public/handheld/dashboard': typeof ApiPublicHandheldDashboardRoute
   '/api/public/handheld/fulfillments': typeof ApiPublicHandheldFulfillmentsRouteWithChildren
   '/api/public/handheld/global-stock': typeof ApiPublicHandheldGlobalStockRoute
@@ -2691,6 +2701,7 @@ export interface FileRouteTypes {
     | '/api/public/go/daily-summary'
     | '/api/public/go/scope-sync'
     | '/api/public/go/session'
+    | '/api/public/handheld/custom-transfers'
     | '/api/public/handheld/dashboard'
     | '/api/public/handheld/fulfillments'
     | '/api/public/handheld/global-stock'
@@ -2954,6 +2965,7 @@ export interface FileRouteTypes {
     | '/api/public/go/daily-summary'
     | '/api/public/go/scope-sync'
     | '/api/public/go/session'
+    | '/api/public/handheld/custom-transfers'
     | '/api/public/handheld/dashboard'
     | '/api/public/handheld/fulfillments'
     | '/api/public/handheld/global-stock'
@@ -3224,6 +3236,7 @@ export interface FileRouteTypes {
     | '/api/public/go/daily-summary'
     | '/api/public/go/scope-sync'
     | '/api/public/go/session'
+    | '/api/public/handheld/custom-transfers'
     | '/api/public/handheld/dashboard'
     | '/api/public/handheld/fulfillments'
     | '/api/public/handheld/global-stock'
@@ -3446,6 +3459,7 @@ export interface RootRouteChildren {
   ApiPublicGoDailySummaryRoute: typeof ApiPublicGoDailySummaryRoute
   ApiPublicGoScopeSyncRoute: typeof ApiPublicGoScopeSyncRoute
   ApiPublicGoSessionRoute: typeof ApiPublicGoSessionRoute
+  ApiPublicHandheldCustomTransfersRoute: typeof ApiPublicHandheldCustomTransfersRoute
   ApiPublicHandheldDashboardRoute: typeof ApiPublicHandheldDashboardRoute
   ApiPublicHandheldFulfillmentsRoute: typeof ApiPublicHandheldFulfillmentsRouteWithChildren
   ApiPublicHandheldGlobalStockRoute: typeof ApiPublicHandheldGlobalStockRoute
@@ -4269,6 +4283,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/go/session'
       fullPath: '/api/public/go/session'
       preLoaderRoute: typeof ApiPublicGoSessionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/custom-transfers': {
+      id: '/api/public/handheld/custom-transfers'
+      path: '/api/public/handheld/custom-transfers'
+      fullPath: '/api/public/handheld/custom-transfers'
+      preLoaderRoute: typeof ApiPublicHandheldCustomTransfersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/handheld/dashboard': {
@@ -6182,6 +6203,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicGoDailySummaryRoute: ApiPublicGoDailySummaryRoute,
   ApiPublicGoScopeSyncRoute: ApiPublicGoScopeSyncRoute,
   ApiPublicGoSessionRoute: ApiPublicGoSessionRoute,
+  ApiPublicHandheldCustomTransfersRoute: ApiPublicHandheldCustomTransfersRoute,
   ApiPublicHandheldDashboardRoute: ApiPublicHandheldDashboardRoute,
   ApiPublicHandheldFulfillmentsRoute:
     ApiPublicHandheldFulfillmentsRouteWithChildren,

@@ -6,6 +6,10 @@ import { PageHeader } from "@/components/page-header";
 import { DataTable } from "@/components/data-table";
 import { Badge } from "@/components/ui/badge";
 import { listStockTransfers } from "@/lib/stock-transfer.functions";
+import { CustomTransfersPanelView, TransferRejected } from "@/components/custom-transfers-panel";
+import { customTransfers } from "@/lib/custom-transfers.functions";
+import { useAuthSession } from "@/hooks/use-auth-session";
+import type { CustomTransferInput, TransferResult } from "@/lib/custom-transfer-contract";
 
 export const Route = createFileRoute("/inventory/transfers")({
   head: () => ({
@@ -14,8 +18,28 @@ export const Route = createFileRoute("/inventory/transfers")({
       { name: "description", content: "仓库与门店之间的库存调拨流水" },
     ],
   }),
-  component: TransfersPage,
+  component: TransfersRoute,
 });
+
+function TransfersRoute() {
+  const { session, loading } = useAuthSession();
+  const fn = useServerFn(customTransfers);
+  const call = async (input: CustomTransferInput): Promise<TransferResult> => {
+    const result = await fn({ data: input });
+    if (result.error) throw new TransferRejected(result.error.message);
+    return result;
+  };
+  if (loading) return <p>正在检查登录状态…</p>;
+  if (!session) return <p>请先登录后查看调拨单</p>;
+  return (
+    <CustomTransfersPanelView
+      key={session.user.id}
+      actor={session.user.id}
+      call={call}
+      legacy={<TransfersPage />}
+    />
+  );
+}
 
 type Transfer = {
   id: string;
@@ -102,11 +126,21 @@ function TransfersPage() {
             cell: (r) => (
               <div className="flex items-center gap-1.5 text-xs">
                 <span>
-                  {r.from_sku_id ? "仓库 SKU" : r.from_shop_id ? `店#${r.from_youzan_item_id ?? "-"}` : "-"}
+                  {r.from_sku_id
+                    ? "仓库 SKU"
+                    : r.from_shop_id
+                      ? `店#${r.from_youzan_item_id ?? "-"}`
+                      : "-"}
                 </span>
                 <ArrowRight className="h-3 w-3 text-muted-foreground" />
                 <span>
-                  {r.to_sku_id ? "仓库 SKU" : r.to_shop_id ? `店#${r.to_youzan_item_id ?? "-"}` : r.kind === "consume" ? "出库" : "-"}
+                  {r.to_sku_id
+                    ? "仓库 SKU"
+                    : r.to_shop_id
+                      ? `店#${r.to_youzan_item_id ?? "-"}`
+                      : r.kind === "consume"
+                        ? "出库"
+                        : "-"}
                 </span>
               </div>
             ),
@@ -132,13 +166,23 @@ function TransfersPage() {
             header: "有赞同步",
             cell: (r) =>
               r.youzan_sync_status === "ok" ? (
-                <Badge className="text-[10px] bg-success text-success-foreground hover:bg-success">同步成功</Badge>
+                <Badge className="text-[10px] bg-success text-success-foreground hover:bg-success">
+                  同步成功
+                </Badge>
               ) : r.youzan_sync_status === "not_required" ? (
-                <Badge variant="secondary" className="text-[10px]">无需同步</Badge>
+                <Badge variant="secondary" className="text-[10px]">
+                  无需同步
+                </Badge>
               ) : r.youzan_sync_status === "partial" ? (
-                <Badge variant="destructive" className="text-[10px]">部分失败</Badge>
+                <Badge variant="destructive" className="text-[10px]">
+                  部分失败
+                </Badge>
               ) : (
-                <Badge variant="destructive" className="text-[10px]" title={r.youzan_error_msg ?? ""}>
+                <Badge
+                  variant="destructive"
+                  className="text-[10px]"
+                  title={r.youzan_error_msg ?? ""}
+                >
                   失败
                 </Badge>
               ),

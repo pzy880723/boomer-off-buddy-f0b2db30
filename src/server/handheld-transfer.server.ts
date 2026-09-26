@@ -14,6 +14,7 @@ export async function getTransfer(id: string) {
       "id, status, from_location_id, to_location_id, lines:stock_transfer_lines(sku_id, expected_qty, shipped_qty, received_qty)"
     )
     .eq("id", id)
+    .neq("kind", "custom")
     .maybeSingle();
   return data;
 }

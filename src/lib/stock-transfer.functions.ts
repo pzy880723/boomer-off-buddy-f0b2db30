@@ -1,5 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { loadUserRoles } from "@/server/handheld-auth.server";
 import { supabaseAdmin as supabase } from "@/integrations/supabase/client.server";
 import { getYouzanOutboundStatus, youzanFetch } from "./youzan-http";
 
@@ -292,6 +294,7 @@ export const listShopProducts = createServerFn({ method: "GET" })
 // listStockTransfers
 // ============================================================
 export const listStockTransfers = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -301,10 +304,13 @@ export const listStockTransfers = createServerFn({ method: "GET" })
       })
       .parse(input ?? {}),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const roles = await loadUserRoles(context.userId);
+    if (!roles.some((role) => ["super_admin", "hq_operator"].includes(role))) return { transfers: [] };
     let q = supabase
       .from("stock_transfers")
       .select("*")
+      .neq("kind", "custom")
       .order("created_at", { ascending: false })
       .limit(data.limit);
     if (data.kind) q = q.eq("kind", data.kind);
@@ -332,8 +338,14 @@ const TransferInput = z.object({
 });
 
 export const createTransfer = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => TransferInput.parse(input))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const roles = await loadUserRoles(context.userId);
+    if (!roles.some(role => role === "super_admin" || role === "hq_operator"))
+      throw new Error("只有管理员和总部人员可以发起调拨");
+    if (["wh_to_shop", "shop_to_shop", "shop_to_wh"].includes(data.kind))
+      throw new Error("请使用调拨管理中的新建调拨和拍照签收流程");
     // 1. 校验参数组合
     const { kind, qty } = data;
     if (kind === "wh_to_shop") {

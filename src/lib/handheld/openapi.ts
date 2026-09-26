@@ -4,6 +4,7 @@
  */
 import { createDocument, type ZodOpenApiObject } from "zod-openapi";
 import * as z from "zod";
+import { CustomTransferRequest, CustomTransferResponseSchema } from "../custom-transfer-contract";
 import {
   ItemDeleteReq,
   ItemDeleteRes,
@@ -635,6 +636,15 @@ X-Session-Token: <操作员 session token>
         description: "聚合所有扫描，生成差异行，状态变 submitted。等待总部审核后才会修正库存。",
         requestBody: jsonBody(StocktakeSubmitReq),
         responses: { "200": jsonRes("OK", StocktakeSubmitRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/custom-transfers": {
+      post: {
+        tags: ["调拨"],
+        summary: "自定义商品调拨、照片上传及签收",
+        description: "必须携带 X-Device-Token 与员工 X-Session-Token。action=list/products/detail/create/upload/receive。仅 super_admin/hq_operator 可发起；收货需目标库位授权。create 必须持久保存 client_op_id 与原载荷以安全重试，整件扣源库存转为在途；receive 至少一张本单据本账号上传凭证，源有赞库存未清零返回 409 source_sync_pending，签收成功才加目标库存。upload 为不带 data 前缀的 JPEG/PNG base64，最多 5MB，返回 photo.id；签收仅引用 ID。已签收重复调用不加库存。旧 RFID 接口不能操作这些单据。",
+        requestBody: jsonBody(CustomTransferRequest),
+        responses: { "200": jsonRes("OK", CustomTransferResponseSchema), ...ERROR_RESPONSES },
       },
     },
     "/api/public/handheld/transfer/ship-scan": {
