@@ -5,6 +5,7 @@
 import { createDocument, type ZodOpenApiObject } from "zod-openapi";
 import * as z from "zod";
 import { CustomTransferRequest, CustomTransferResponseSchema } from "../custom-transfer-contract";
+import { ProductContentRequest } from "../product-content";
 import {
   ItemDeleteReq,
   ItemDeleteRes,
@@ -16,6 +17,8 @@ import {
   AiListingImageReq,
   AiListingImageRes,
   AiRecognizeReq,
+  AiTitleReq,
+  AiTitleRes,
   AiRecognizeRes,
   AuthMeRes,
   AuthPingRes,
@@ -724,12 +727,36 @@ X-Session-Token: <操作员 session token>
         responses: { "200": jsonRes("OK", LocationSwitchRes), ...ERROR_RESPONSES },
       },
     },
+    "/api/public/handheld/items/{id}/content": {
+      post: {
+        tags: ["商品"], summary: "独立图文详情：读取、保存草稿、发布或生成 AI 预览",
+        description: "需要员工会话和当前库位商品编辑权限。AI 生成不自动保存；save 通过 expected_version 防覆盖，通过 client_op_id 幂等。简介与库存不变。",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
+        requestBody: jsonBody(ProductContentRequest),
+        responses: { "200": jsonRes("OK", z.object({ ok: z.literal(true), data: z.object({
+          version: z.number().int(),
+          draft_blocks: z.array(z.object({ id: z.string(), type: z.enum(["heading", "paragraph", "facts", "image"]),
+            text: z.string().optional(), storage_path: z.string().optional(), caption: z.string().optional(), read_url: z.string().nullable().optional() })),
+          published_blocks: z.array(z.object({ id: z.string(), type: z.enum(["heading", "paragraph", "facts", "image"]),
+            text: z.string().optional(), storage_path: z.string().optional(), caption: z.string().optional(), read_url: z.string().nullable().optional() })),
+          blocks: z.array(z.object({ id: z.string(), type: z.enum(["heading", "paragraph", "facts", "image"]),
+            text: z.string().optional(), storage_path: z.string().optional(), caption: z.string().optional(), read_url: z.string().nullable().optional() })).optional(),
+        }) })), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/ai/recognize-title": {
+      post: {
+        tags: ["AI"], summary: "主图快速标题（完整识别并行运行）",
+        requestBody: jsonBody(AiTitleReq),
+        responses: { "200": jsonRes("OK", AiTitleRes), ...ERROR_RESPONSES },
+      },
+    },
     "/api/public/handheld/ai/recognize-item": {
       post: {
         tags: ["AI"],
         summary: "拍照识别商品 → 结构化字段",
         description:
-          "多模态识别。默认模型 `google/gemini-2.5-pro`，走 Lovable AI Gateway。返回 name / category / brand / era / condition_grade / description / suggested_price_cny。不确定的字段为 null。",
+          "多模态识别。手持端默认 Gemini Flash。返回分类、品牌候选、IP、标签、价签简介和年代；品牌模糊匹配需人工确认，无依据的年代为 null。",
         requestBody: jsonBody(AiRecognizeReq),
         responses: { "200": jsonRes("OK", AiRecognizeRes), ...ERROR_RESPONSES },
       },

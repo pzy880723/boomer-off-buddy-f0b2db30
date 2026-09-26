@@ -133,13 +133,14 @@ describe("shared product recognition core", () => {
     assert.equal(raw.attributes.brand, null);
   });
 
-  test("handheld description retains an era range or explicitly leaves the era unconfirmed", async () => {
+  test("handheld description retains evidenced ranges but omits unknown-era filler", async () => {
     for (const era of [null, "约1980-1990年代"]) {
       const result = await runProductRecognition({ images: ["front"], source: "handheld" }, depsFor(async () => ({
         model: "test-vision", raw: { category_code: "toy_character_figure", confidence: 0.9,
           name: "角色玩偶", description: "角色玩偶挂件。", attributes: { era } },
       }), []));
-      assert.ok(result.description?.includes(era ?? "年代待确认"));
+      if (era) assert.ok(result.description?.includes(era));
+      else assert.doesNotMatch(result.description ?? "", /待确认/);
       assert.equal(result.attributes.era, era);
     }
   });

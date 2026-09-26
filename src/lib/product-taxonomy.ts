@@ -99,16 +99,21 @@ export function matchBrandCandidate(value: unknown, brands: BrandCandidate[]): B
     return { match: null, candidate_text: null, status: "empty", suggestions: [] };
   }
 
-  const exact = brands.find((brand) =>
+  const uniqueBrands = [...new Map(brands.map((brand) => [brand.id, brand])).values()];
+  const exact = uniqueBrands.filter((brand) =>
     [brand.name, brand.name_original, ...brand.aliases]
       .map(normalizeLookupText)
       .some((name) => name === normalized),
   );
-  if (exact) {
-    return { match: exact, candidate_text: candidateText, status: "matched", suggestions: [] };
+  if (exact.length === 1) {
+    return { match: exact[0], candidate_text: candidateText, status: "matched", suggestions: [] };
+  }
+  if (exact.length > 1) {
+    return { match: null, candidate_text: candidateText, status: "review_required",
+      suggestions: exact.slice(0, 5).map((brand) => ({ brand, score: 1 })) };
   }
 
-  const suggestions = brands
+  const suggestions = uniqueBrands
     .map((brand) => ({
       brand,
       score: Math.max(

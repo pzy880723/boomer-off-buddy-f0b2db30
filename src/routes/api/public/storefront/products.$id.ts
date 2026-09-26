@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { STOREFRONT_CORS, storefrontError, storefrontJson } from "@/server/storefront-auth.server";
+import { loadPublishedProductContent } from "@/server/product-content.server";
 import {
   buildStorefrontProductDetail,
   type StorefrontListing,
@@ -28,7 +29,11 @@ export const Route = createFileRoute("/api/public/storefront/products/$id")({
           if (!product) {
             return storefrontError("Product not available", 404);
           }
-          return storefrontJson({ ok: true, data: product });
+          const content = await loadPublishedProductContent(product.sku_id);
+          return storefrontJson({ ok: true, data: { ...product,
+            detail_content: content?.published_blocks ?? [],
+            detail_content_version: content?.version ?? 0,
+          } });
         } catch (metadataError) {
           return storefrontError(
             metadataError instanceof Error ? metadataError.message : "Product metadata failed",

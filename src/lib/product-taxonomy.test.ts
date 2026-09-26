@@ -71,6 +71,13 @@ describe("compound product taxonomy", () => {
     assert.equal(matchBrandCandidate("索尼", brands).match?.id, "brand-sony");
   });
 
+  test("ambiguous exact aliases require confirmation", () => {
+    const result = matchBrandCandidate("索尼", [...brands, { id: "other", name: "Other", name_original: null, aliases: ["索尼"] }]);
+    assert.equal(result.match, null);
+    assert.equal(result.status, "review_required");
+    assert.equal(result.suggestions.length, 2);
+  });
+
   test("returns a review candidate instead of creating an unknown brand", () => {
     const result = matchBrandCandidate("Noritake Studio 1978", brands);
 

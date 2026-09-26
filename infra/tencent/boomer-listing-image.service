@@ -1,0 +1,15 @@
+[Unit]
+Description=BOOMER gallery and product content image worker
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/var/www/boomer-erp/current
+EnvironmentFile=/var/www/boomer-erp/current/.env
+ExecStart=/usr/bin/node /var/www/boomer-erp/current/scripts/run-listing-image-worker.mjs
+TimeoutStartSec=250
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true

@@ -9,7 +9,7 @@ import {
 } from "../lib/product-classification";
 import type { BrandCandidate, FacetTerm } from "../lib/product-taxonomy";
 
-export const PRODUCT_RECOGNITION_PROMPT_VERSION = "boomer-product-v4-recognition-brand";
+export const PRODUCT_RECOGNITION_PROMPT_VERSION = "boomer-product-v5-listing-content";
 export const DEFAULT_PRODUCT_RECOGNITION_MODEL = "google/gemini-2.5-pro";
 export const DEFAULT_HANDHELD_PRODUCT_RECOGNITION_MODEL = "google/gemini-2.5-flash";
 export const HANDHELD_RECOGNITION_TIMEOUT_MS = 25_000;
@@ -217,8 +217,8 @@ export async function runProductRecognition(
   };
   const normalized = normalizeProductRecognition(modelResult, categories, { facets, brands, ips });
   if (input.source === "handheld" && !failed && normalized.description) {
-    const era = normalized.attributes.era || "年代待确认";
-    if (!normalized.description.includes(era)) {
+    const era = normalized.attributes.era;
+    if (era && !normalized.description.includes(era)) {
       normalized.description = [normalized.description.replace(/[。；;]+$/u, ""), era]
         .filter(Boolean).join("；") + "。";
     }
@@ -275,7 +275,7 @@ function parseGatewayJson(content: unknown): RawProductRecognition {
 }
 
 export function buildEraInstruction(source: ProductRecognitionSource): string {
-  const shared = `年代规则：attributes.era 只能来自图片可见证据（底款、生产标记、包装印刷、型号）。有证据但不精确时可给大致年代范围，例如"约1980-1990年代"；完全没有证据时 era 返回 null，并在 description 中写"年代待确认"。禁止把版权年 (©/Copyright 年份) 当作生产年，禁止凭风格猜测年代。`;
+  const shared = `年代规则：attributes.era 只能来自图片可见证据（底款、生产标记、包装印刷、型号）。有证据但不精确时可给大致年代范围，例如"约1980-1990年代"；完全没有证据时 era 返回 null，简介省略年代，不写"年代待确认"。禁止把版权年 (©/Copyright 年份) 当作生产年，禁止凭风格猜测年代。没有真实检索结果时不得声称已联网核实。`;
   if (source !== "handheld") return shared;
   return `${shared}
 手持端输出请精简：description 控制在 20-30 字的一句话介绍，可包含有证据的大致年代范围；evidence 最多 3 条、keywords 最多 5 个、alternative_categories 最多 2 个、clarification_requests 最多 2 条。不要输出任何多余解释。`;
@@ -316,7 +316,8 @@ ${input.ipPrompt || "（当前 IP 库为空）"}
 联名或授权制造商品有其他明确品牌时保留该品牌，不得仅因出现 Hello Kitty 图案改成三丽鸥；maker 与品牌、角色分开。店员明确指定的品牌优先保留，不要用角色归属覆盖。
 attribute_confidence 返回逐字段置信度对象，例如 brand、ip_name、era、origin_country、material、craft、object_type；ip_name 必须给出角色识别置信度，不要用类目置信度代替。
 clarification_requests 返回需要店员补拍或确认的问题数组，每项包含 field、question、reason；无需追问时返回空数组。
-品名使用中文，不超过40字；描述不超过160字。只根据图片可见证据判断，不确定字段返回 null 或空数组。禁止编造稀有度、真伪和收藏升值承诺。
+品名使用中文，不超过40字，突出最有辨识度的角色、造型、材质、色彩或玩法，读起来有吸引力，避免官方参数堆砌。禁止随机添加限定、绝版、收藏级等无证据营销词；只有可验证标记支持时才能使用。描述不超过160字。只根据图片可见证据判断，不确定字段返回 null 或空数组。禁止编造稀有度、真伪和收藏升值承诺。
+尽可能提取有依据的物件类型、用途、材质、工艺、产地、风格等不同维度标签，而不只返回分类；只能选择给定标签。肉眼无法判断的材质和产地不要猜测。
 瓷器：能确认日本产地时选日本瓷器下的 active 叶子，能确认欧洲产地时选欧洲瓷器下的 active 叶子；产地无法确认时必须返回 ai_low_confidence，并在 warning 中写明需人工核对产地，禁止猜测产地，也禁止返回 porcelain_origin_unknown（该类目已停用）。古美术不收瓷器。
 游戏设备：Switch Lite 等掌上主机选 game_handheld；PS5、Xbox 等桌面主机选 game_desktop_console；实体游戏卡带/卡匣选 game_cartridge；手柄、底座、保护壳等选 game_accessory。禁止再返回 digital_game_console。
 疑似受监管文物、违禁品或无法安全销售的物品，将风险写入 compliance_flags。

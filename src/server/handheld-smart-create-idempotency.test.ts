@@ -73,6 +73,7 @@ const { Route } = await load("src/routes/api/public/handheld/items.smart-create.
   "@/server/handheld-idempotency.server": `export const replayIfPresent = async () => globalThis.__sc.state.legacy; export const recordOp = async () => {};
     export const jsonReplay = r => Response.json({ ...r.response_json, replayed: true }, { status: r.response_status });`,
   "@/server/handheld-smart-create.server": `export const getSmartCreateReleaseTarget = i => i.autoPushYouzan && i.locationKind === 'shop' ? i.shopId : null;
+    export const resolveConfirmedListingBrand = async () => null;
     export const persistSmartCreateBrand = async () => {}; export const shouldReuseSmartCreateSku = c => !c;
     export const smartCreateFingerprint = () => 'fp';`,
   "@/server/product-classification.server": `export const assertActiveLeafCategory = async () => {}; export const attachProductClassificationAuditToSku = async () => {};

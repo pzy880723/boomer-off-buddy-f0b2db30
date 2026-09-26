@@ -3463,6 +3463,760 @@
         }
       }
     },
+    "/api/public/handheld/custom-transfers": {
+      "post": {
+        "tags": [
+          "调拨"
+        ],
+        "summary": "自定义商品调拨、照片上传及签收",
+        "description": "必须携带 X-Device-Token 与员工 X-Session-Token。action=list/products/detail/create/upload/receive。仅 super_admin/hq_operator 可发起；收货需目标库位授权。create 必须持久保存 client_op_id 与原载荷以安全重试，整件扣源库存转为在途；receive 至少一张本单据本账号上传凭证，源有赞库存未清零返回 409 source_sync_pending，签收成功才加目标库存。upload 为不带 data 前缀的 JPEG/PNG base64，最多 5MB，返回 photo.id；签收仅引用 ID。已签收重复调用不加库存。旧 RFID 接口不能操作这些单据。",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "const": "list"
+                      },
+                      "location_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "q": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 100
+                      },
+                      "status": {
+                        "default": "all",
+                        "type": "string",
+                        "enum": [
+                          "all",
+                          "in_transit",
+                          "received"
+                        ]
+                      },
+                      "page": {
+                        "default": 1,
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 10000
+                      }
+                    },
+                    "required": [
+                      "action"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "const": "products"
+                      },
+                      "location_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "q": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 100
+                      }
+                    },
+                    "required": [
+                      "action",
+                      "location_id"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "const": "detail"
+                      },
+                      "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      }
+                    },
+                    "required": [
+                      "action",
+                      "id"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "const": "create"
+                      },
+                      "client_op_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
+                      },
+                      "from_location_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "to_location_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "notes": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 1000
+                      },
+                      "lines": {
+                        "minItems": 1,
+                        "maxItems": 100,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "sku_id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "qty": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 10000
+                            }
+                          },
+                          "required": [
+                            "sku_id",
+                            "qty"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "action",
+                      "client_op_id",
+                      "from_location_id",
+                      "to_location_id",
+                      "lines"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "const": "upload"
+                      },
+                      "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "image_base64": {
+                        "type": "string",
+                        "minLength": 8,
+                        "maxLength": 7000000
+                      }
+                    },
+                    "required": [
+                      "action",
+                      "id",
+                      "image_base64"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "const": "receive"
+                      },
+                      "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "photo_ids": {
+                        "minItems": 1,
+                        "maxItems": 6,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        }
+                      }
+                    },
+                    "required": [
+                      "action",
+                      "id",
+                      "photo_ids"
+                    ]
+                  }
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "actor_id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "in_transit",
+                                  "received"
+                                ]
+                              },
+                              "qty": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "from_location_id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "to_location_id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "from_name": {
+                                "type": "string"
+                              },
+                              "to_name": {
+                                "type": "string"
+                              },
+                              "notes": {
+                                "type": "string"
+                              },
+                              "created_at": {
+                                "type": "string"
+                              },
+                              "received_at": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "can_receive": {
+                                "type": "boolean"
+                              },
+                              "source_sync_pending": {
+                                "type": "boolean"
+                              },
+                              "lines": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "sku_id": {
+                                      "type": "string",
+                                      "format": "uuid",
+                                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "sku_code": {
+                                      "type": "string"
+                                    },
+                                    "barcode": {
+                                      "type": "string"
+                                    },
+                                    "price": {
+                                      "type": "number"
+                                    },
+                                    "qty": {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    "available_qty": {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    "image_url": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "sku_id",
+                                    "name",
+                                    "sku_code",
+                                    "barcode",
+                                    "price",
+                                    "qty",
+                                    "available_qty",
+                                    "image_url"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "photos": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "format": "uuid",
+                                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                    },
+                                    "url": {
+                                      "type": "string"
+                                    },
+                                    "used": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "url",
+                                    "used"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "code",
+                              "status",
+                              "qty",
+                              "from_location_id",
+                              "to_location_id",
+                              "from_name",
+                              "to_name",
+                              "notes",
+                              "created_at",
+                              "received_at",
+                              "can_receive",
+                              "source_sync_pending",
+                              "lines",
+                              "photos"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "locations": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "warehouse",
+                                  "shop"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name",
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "can_create": {
+                          "type": "boolean"
+                        },
+                        "has_more": {
+                          "type": "boolean"
+                        },
+                        "products": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "sku_id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "sku_code": {
+                                "type": "string"
+                              },
+                              "barcode": {
+                                "type": "string"
+                              },
+                              "price": {
+                                "type": "number"
+                              },
+                              "qty": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "available_qty": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "image_url": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "sku_id",
+                              "name",
+                              "sku_code",
+                              "barcode",
+                              "price",
+                              "qty",
+                              "available_qty",
+                              "image_url"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "transfer": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "code": {
+                              "type": "string"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "in_transit",
+                                "received"
+                              ]
+                            },
+                            "qty": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "from_location_id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "to_location_id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "from_name": {
+                              "type": "string"
+                            },
+                            "to_name": {
+                              "type": "string"
+                            },
+                            "notes": {
+                              "type": "string"
+                            },
+                            "created_at": {
+                              "type": "string"
+                            },
+                            "received_at": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "can_receive": {
+                              "type": "boolean"
+                            },
+                            "source_sync_pending": {
+                              "type": "boolean"
+                            },
+                            "lines": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "sku_id": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "sku_code": {
+                                    "type": "string"
+                                  },
+                                  "barcode": {
+                                    "type": "string"
+                                  },
+                                  "price": {
+                                    "type": "number"
+                                  },
+                                  "qty": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "available_qty": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "image_url": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "sku_id",
+                                  "name",
+                                  "sku_code",
+                                  "barcode",
+                                  "price",
+                                  "qty",
+                                  "available_qty",
+                                  "image_url"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "photos": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "url": {
+                                    "type": "string"
+                                  },
+                                  "used": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "url",
+                                  "used"
+                                ],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "code",
+                            "status",
+                            "qty",
+                            "from_location_id",
+                            "to_location_id",
+                            "from_name",
+                            "to_name",
+                            "notes",
+                            "created_at",
+                            "received_at",
+                            "can_receive",
+                            "source_sync_pending",
+                            "lines",
+                            "photos"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "replayed": {
+                          "type": "boolean"
+                        },
+                        "photo": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "url": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "url"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/public/handheld/transfer/ship-scan": {
       "post": {
         "tags": [
@@ -4640,13 +5394,694 @@
         }
       }
     },
+    "/api/public/handheld/items/{id}/content": {
+      "post": {
+        "tags": [
+          "商品"
+        ],
+        "summary": "独立图文详情：读取、保存草稿、发布或生成 AI 预览",
+        "description": "需要员工会话和当前库位商品编辑权限。AI 生成不自动保存；save 通过 expected_version 防覆盖，通过 client_op_id 幂等。简介与库存不变。",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "const": "get"
+                      },
+                      "location_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      }
+                    },
+                    "required": [
+                      "action"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "const": "generate"
+                      },
+                      "location_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "blocks": {
+                        "maxItems": 80,
+                        "type": "array",
+                        "items": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "pattern": "^[A-Za-z0-9_-]{1,128}$"
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "const": "heading"
+                                },
+                                "text": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 4000
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "type",
+                                "text"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "pattern": "^[A-Za-z0-9_-]{1,128}$"
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "const": "paragraph"
+                                },
+                                "text": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 4000
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "type",
+                                "text"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "pattern": "^[A-Za-z0-9_-]{1,128}$"
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "const": "facts"
+                                },
+                                "text": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 4000
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "type",
+                                "text"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "pattern": "^[A-Za-z0-9_-]{1,128}$"
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "const": "image"
+                                },
+                                "storage_path": {
+                                  "type": "string",
+                                  "maxLength": 2048,
+                                  "pattern": "^sku-(?:raw|listing)\\/[A-Za-z0-9_./-]+$"
+                                },
+                                "caption": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 4000
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "type",
+                                "storage_path"
+                              ],
+                              "additionalProperties": false
+                            }
+                          ],
+                          "type": "object"
+                        }
+                      }
+                    },
+                    "required": [
+                      "action"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "const": "save"
+                      },
+                      "location_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "expected_version": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483646
+                      },
+                      "client_op_id": {
+                        "type": "string",
+                        "minLength": 8,
+                        "maxLength": 128
+                      },
+                      "blocks": {
+                        "maxItems": 80,
+                        "type": "array",
+                        "items": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "pattern": "^[A-Za-z0-9_-]{1,128}$"
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "const": "heading"
+                                },
+                                "text": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 4000
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "type",
+                                "text"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "pattern": "^[A-Za-z0-9_-]{1,128}$"
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "const": "paragraph"
+                                },
+                                "text": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 4000
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "type",
+                                "text"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "pattern": "^[A-Za-z0-9_-]{1,128}$"
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "const": "facts"
+                                },
+                                "text": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 4000
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "type",
+                                "text"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "pattern": "^[A-Za-z0-9_-]{1,128}$"
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "const": "image"
+                                },
+                                "storage_path": {
+                                  "type": "string",
+                                  "maxLength": 2048,
+                                  "pattern": "^sku-(?:raw|listing)\\/[A-Za-z0-9_./-]+$"
+                                },
+                                "caption": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 4000
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "type",
+                                "storage_path"
+                              ],
+                              "additionalProperties": false
+                            }
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "publish": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "action",
+                      "expected_version",
+                      "client_op_id",
+                      "blocks"
+                    ],
+                    "additionalProperties": false
+                  }
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "draft_blocks": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "heading",
+                                  "paragraph",
+                                  "facts",
+                                  "image"
+                                ]
+                              },
+                              "text": {
+                                "type": "string"
+                              },
+                              "storage_path": {
+                                "type": "string"
+                              },
+                              "caption": {
+                                "type": "string"
+                              },
+                              "read_url": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "type"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "published_blocks": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "heading",
+                                  "paragraph",
+                                  "facts",
+                                  "image"
+                                ]
+                              },
+                              "text": {
+                                "type": "string"
+                              },
+                              "storage_path": {
+                                "type": "string"
+                              },
+                              "caption": {
+                                "type": "string"
+                              },
+                              "read_url": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "type"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "blocks": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "heading",
+                                  "paragraph",
+                                  "facts",
+                                  "image"
+                                ]
+                              },
+                              "text": {
+                                "type": "string"
+                              },
+                              "storage_path": {
+                                "type": "string"
+                              },
+                              "caption": {
+                                "type": "string"
+                              },
+                              "read_url": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "type"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "draft_blocks",
+                        "published_blocks"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/handheld/ai/recognize-title": {
+      "post": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "主图快速标题（完整识别并行运行）",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiTitleReq"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiTitleRes"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/public/handheld/ai/recognize-item": {
       "post": {
         "tags": [
           "AI"
         ],
         "summary": "拍照识别商品 → 结构化字段",
-        "description": "多模态识别。默认模型 `google/gemini-2.5-pro`，走 Lovable AI Gateway。返回 name / category / brand / era / condition_grade / description / suggested_price_cny。不确定的字段为 null。",
+        "description": "多模态识别。手持端默认 Gemini Flash。返回分类、品牌候选、IP、标签、价签简介和年代；品牌模糊匹配需人工确认，无依据的年代为 null。",
         "requestBody": {
           "content": {
             "application/json": {
@@ -4737,6 +6172,53 @@
                             }
                           ],
                           "description": "角色/IP 名称，如 Hello Kitty"
+                        },
+                        "brand_id": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                              "example": "550e8400-e29b-41d4-a716-446655440000"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "brand_match_status": {
+                          "type": "string",
+                          "enum": [
+                            "empty",
+                            "matched",
+                            "review_required"
+                          ]
+                        },
+                        "brand_suggestions": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                                "example": "550e8400-e29b-41d4-a716-446655440000"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "score": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name",
+                              "score"
+                            ],
+                            "additionalProperties": false
+                          }
                         },
                         "ip_match_status": {
                           "type": "string",
@@ -4985,6 +6467,9 @@
                         "category",
                         "brand",
                         "ip_name",
+                        "brand_id",
+                        "brand_match_status",
+                        "brand_suggestions",
                         "ip_match_status",
                         "ip_suggestions",
                         "era",
@@ -16732,752 +18217,6 @@
           }
         }
       }
-    },
-    "/api/public/handheld/custom-transfers": {
-      "post": {
-        "tags": [
-          "调拨"
-        ],
-        "summary": "自定义商品调拨、照片上传及签收",
-        "description": "必须携带 X-Device-Token 与员工 X-Session-Token。action=list/products/detail/create/upload/receive。仅 super_admin/hq_operator 可发起；收货需目标库位授权。create 必须持久保存 client_op_id 与原载荷以安全重试，整件扣源库存转为在途；receive 至少一张本单据本账号上传凭证，源有赞库存未清零返回 409 source_sync_pending，签收成功才加目标库存。upload 为不带 data 前缀的 JPEG/PNG base64，最多 5MB，返回 photo.id；签收仅引用 ID。已签收重复调用不加库存。旧 RFID 接口不能操作这些单据。",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "oneOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "action": {
-                        "type": "string",
-                        "const": "list"
-                      },
-                      "location_id": {
-                        "type": "string",
-                        "format": "uuid",
-                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                      },
-                      "q": {
-                        "default": "",
-                        "type": "string",
-                        "maxLength": 100
-                      },
-                      "status": {
-                        "default": "all",
-                        "type": "string",
-                        "enum": [
-                          "all",
-                          "in_transit",
-                          "received"
-                        ]
-                      },
-                      "page": {
-                        "default": 1,
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 10000
-                      }
-                    },
-                    "required": [
-                      "action"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "action": {
-                        "type": "string",
-                        "const": "products"
-                      },
-                      "location_id": {
-                        "type": "string",
-                        "format": "uuid",
-                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                      },
-                      "q": {
-                        "default": "",
-                        "type": "string",
-                        "maxLength": 100
-                      }
-                    },
-                    "required": [
-                      "action",
-                      "location_id"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "action": {
-                        "type": "string",
-                        "const": "detail"
-                      },
-                      "id": {
-                        "type": "string",
-                        "format": "uuid",
-                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                      }
-                    },
-                    "required": [
-                      "action",
-                      "id"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "action": {
-                        "type": "string",
-                        "const": "create"
-                      },
-                      "client_op_id": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 100
-                      },
-                      "from_location_id": {
-                        "type": "string",
-                        "format": "uuid",
-                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                      },
-                      "to_location_id": {
-                        "type": "string",
-                        "format": "uuid",
-                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                      },
-                      "notes": {
-                        "default": "",
-                        "type": "string",
-                        "maxLength": 1000
-                      },
-                      "lines": {
-                        "minItems": 1,
-                        "maxItems": 100,
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "properties": {
-                            "sku_id": {
-                              "type": "string",
-                              "format": "uuid",
-                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                            },
-                            "qty": {
-                              "type": "integer",
-                              "exclusiveMinimum": 0,
-                              "maximum": 10000
-                            }
-                          },
-                          "required": [
-                            "sku_id",
-                            "qty"
-                          ]
-                        }
-                      }
-                    },
-                    "required": [
-                      "action",
-                      "client_op_id",
-                      "from_location_id",
-                      "to_location_id",
-                      "lines"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "action": {
-                        "type": "string",
-                        "const": "upload"
-                      },
-                      "id": {
-                        "type": "string",
-                        "format": "uuid",
-                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                      },
-                      "image_base64": {
-                        "type": "string",
-                        "minLength": 8,
-                        "maxLength": 7000000
-                      }
-                    },
-                    "required": [
-                      "action",
-                      "id",
-                      "image_base64"
-                    ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "action": {
-                        "type": "string",
-                        "const": "receive"
-                      },
-                      "id": {
-                        "type": "string",
-                        "format": "uuid",
-                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                      },
-                      "photo_ids": {
-                        "minItems": 1,
-                        "maxItems": 6,
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                        }
-                      }
-                    },
-                    "required": [
-                      "action",
-                      "id",
-                      "photo_ids"
-                    ]
-                  }
-                ],
-                "type": "object"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "const": true
-                    },
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "actor_id": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                        },
-                        "items": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "id": {
-                                "type": "string",
-                                "format": "uuid",
-                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                              },
-                              "code": {
-                                "type": "string"
-                              },
-                              "status": {
-                                "type": "string",
-                                "enum": [
-                                  "in_transit",
-                                  "received"
-                                ]
-                              },
-                              "qty": {
-                                "type": "integer",
-                                "minimum": -9007199254740991,
-                                "maximum": 9007199254740991
-                              },
-                              "from_location_id": {
-                                "type": "string",
-                                "format": "uuid",
-                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                              },
-                              "to_location_id": {
-                                "type": "string",
-                                "format": "uuid",
-                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                              },
-                              "from_name": {
-                                "type": "string"
-                              },
-                              "to_name": {
-                                "type": "string"
-                              },
-                              "notes": {
-                                "type": "string"
-                              },
-                              "created_at": {
-                                "type": "string"
-                              },
-                              "received_at": {
-                                "type": [
-                                  "string",
-                                  "null"
-                                ]
-                              },
-                              "can_receive": {
-                                "type": "boolean"
-                              },
-                              "source_sync_pending": {
-                                "type": "boolean"
-                              },
-                              "lines": {
-                                "type": "array",
-                                "items": {
-                                  "type": "object",
-                                  "properties": {
-                                    "sku_id": {
-                                      "type": "string",
-                                      "format": "uuid",
-                                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                                    },
-                                    "name": {
-                                      "type": "string"
-                                    },
-                                    "sku_code": {
-                                      "type": "string"
-                                    },
-                                    "barcode": {
-                                      "type": "string"
-                                    },
-                                    "price": {
-                                      "type": "number"
-                                    },
-                                    "qty": {
-                                      "type": "integer",
-                                      "minimum": -9007199254740991,
-                                      "maximum": 9007199254740991
-                                    },
-                                    "available_qty": {
-                                      "type": "integer",
-                                      "minimum": -9007199254740991,
-                                      "maximum": 9007199254740991
-                                    },
-                                    "image_url": {
-                                      "type": "string"
-                                    }
-                                  },
-                                  "required": [
-                                    "sku_id",
-                                    "name",
-                                    "sku_code",
-                                    "barcode",
-                                    "price",
-                                    "qty",
-                                    "available_qty",
-                                    "image_url"
-                                  ],
-                                  "additionalProperties": false
-                                }
-                              },
-                              "photos": {
-                                "type": "array",
-                                "items": {
-                                  "type": "object",
-                                  "properties": {
-                                    "id": {
-                                      "type": "string",
-                                      "format": "uuid",
-                                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                                    },
-                                    "url": {
-                                      "type": "string"
-                                    },
-                                    "used": {
-                                      "type": "boolean"
-                                    }
-                                  },
-                                  "required": [
-                                    "id",
-                                    "url",
-                                    "used"
-                                  ],
-                                  "additionalProperties": false
-                                }
-                              }
-                            },
-                            "required": [
-                              "id",
-                              "code",
-                              "status",
-                              "qty",
-                              "from_location_id",
-                              "to_location_id",
-                              "from_name",
-                              "to_name",
-                              "notes",
-                              "created_at",
-                              "received_at",
-                              "can_receive",
-                              "source_sync_pending",
-                              "lines",
-                              "photos"
-                            ],
-                            "additionalProperties": false
-                          }
-                        },
-                        "locations": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "id": {
-                                "type": "string",
-                                "format": "uuid",
-                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                              },
-                              "name": {
-                                "type": "string"
-                              },
-                              "kind": {
-                                "type": "string",
-                                "enum": [
-                                  "warehouse",
-                                  "shop"
-                                ]
-                              }
-                            },
-                            "required": [
-                              "id",
-                              "name",
-                              "kind"
-                            ],
-                            "additionalProperties": false
-                          }
-                        },
-                        "can_create": {
-                          "type": "boolean"
-                        },
-                        "has_more": {
-                          "type": "boolean"
-                        },
-                        "products": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "sku_id": {
-                                "type": "string",
-                                "format": "uuid",
-                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                              },
-                              "name": {
-                                "type": "string"
-                              },
-                              "sku_code": {
-                                "type": "string"
-                              },
-                              "barcode": {
-                                "type": "string"
-                              },
-                              "price": {
-                                "type": "number"
-                              },
-                              "qty": {
-                                "type": "integer",
-                                "minimum": -9007199254740991,
-                                "maximum": 9007199254740991
-                              },
-                              "available_qty": {
-                                "type": "integer",
-                                "minimum": -9007199254740991,
-                                "maximum": 9007199254740991
-                              },
-                              "image_url": {
-                                "type": "string"
-                              }
-                            },
-                            "required": [
-                              "sku_id",
-                              "name",
-                              "sku_code",
-                              "barcode",
-                              "price",
-                              "qty",
-                              "available_qty",
-                              "image_url"
-                            ],
-                            "additionalProperties": false
-                          }
-                        },
-                        "transfer": {
-                          "type": "object",
-                          "properties": {
-                            "id": {
-                              "type": "string",
-                              "format": "uuid",
-                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                            },
-                            "code": {
-                              "type": "string"
-                            },
-                            "status": {
-                              "type": "string",
-                              "enum": [
-                                "in_transit",
-                                "received"
-                              ]
-                            },
-                            "qty": {
-                              "type": "integer",
-                              "minimum": -9007199254740991,
-                              "maximum": 9007199254740991
-                            },
-                            "from_location_id": {
-                              "type": "string",
-                              "format": "uuid",
-                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                            },
-                            "to_location_id": {
-                              "type": "string",
-                              "format": "uuid",
-                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                            },
-                            "from_name": {
-                              "type": "string"
-                            },
-                            "to_name": {
-                              "type": "string"
-                            },
-                            "notes": {
-                              "type": "string"
-                            },
-                            "created_at": {
-                              "type": "string"
-                            },
-                            "received_at": {
-                              "type": [
-                                "string",
-                                "null"
-                              ]
-                            },
-                            "can_receive": {
-                              "type": "boolean"
-                            },
-                            "source_sync_pending": {
-                              "type": "boolean"
-                            },
-                            "lines": {
-                              "type": "array",
-                              "items": {
-                                "type": "object",
-                                "properties": {
-                                  "sku_id": {
-                                    "type": "string",
-                                    "format": "uuid",
-                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                                  },
-                                  "name": {
-                                    "type": "string"
-                                  },
-                                  "sku_code": {
-                                    "type": "string"
-                                  },
-                                  "barcode": {
-                                    "type": "string"
-                                  },
-                                  "price": {
-                                    "type": "number"
-                                  },
-                                  "qty": {
-                                    "type": "integer",
-                                    "minimum": -9007199254740991,
-                                    "maximum": 9007199254740991
-                                  },
-                                  "available_qty": {
-                                    "type": "integer",
-                                    "minimum": -9007199254740991,
-                                    "maximum": 9007199254740991
-                                  },
-                                  "image_url": {
-                                    "type": "string"
-                                  }
-                                },
-                                "required": [
-                                  "sku_id",
-                                  "name",
-                                  "sku_code",
-                                  "barcode",
-                                  "price",
-                                  "qty",
-                                  "available_qty",
-                                  "image_url"
-                                ],
-                                "additionalProperties": false
-                              }
-                            },
-                            "photos": {
-                              "type": "array",
-                              "items": {
-                                "type": "object",
-                                "properties": {
-                                  "id": {
-                                    "type": "string",
-                                    "format": "uuid",
-                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                                  },
-                                  "url": {
-                                    "type": "string"
-                                  },
-                                  "used": {
-                                    "type": "boolean"
-                                  }
-                                },
-                                "required": [
-                                  "id",
-                                  "url",
-                                  "used"
-                                ],
-                                "additionalProperties": false
-                              }
-                            }
-                          },
-                          "required": [
-                            "id",
-                            "code",
-                            "status",
-                            "qty",
-                            "from_location_id",
-                            "to_location_id",
-                            "from_name",
-                            "to_name",
-                            "notes",
-                            "created_at",
-                            "received_at",
-                            "can_receive",
-                            "source_sync_pending",
-                            "lines",
-                            "photos"
-                          ],
-                          "additionalProperties": false
-                        },
-                        "id": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                        },
-                        "code": {
-                          "type": "string"
-                        },
-                        "status": {
-                          "type": "string"
-                        },
-                        "replayed": {
-                          "type": "boolean"
-                        },
-                        "photo": {
-                          "type": "object",
-                          "properties": {
-                            "id": {
-                              "type": "string",
-                              "format": "uuid",
-                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                            },
-                            "url": {
-                              "type": "string"
-                            }
-                          },
-                          "required": [
-                            "id",
-                            "url"
-                          ],
-                          "additionalProperties": false
-                        }
-                      },
-                      "additionalProperties": false
-                    }
-                  },
-                  "required": [
-                    "ok",
-                    "data"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "入参不合法（code: invalid_body / validation_error）",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "缺少 / 无效 token（code: unauthorized）",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "资源不存在（code: not_found / unlinked）",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "状态冲突（code: already_exists / transfer_required）",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "校验失败（数量不一致等，code: validation_error）",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "限流（code: rate_limited / ai_credits_exhausted）",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "服务端错误（code: internal_error）",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
     }
   },
   "components": {
@@ -17792,6 +18531,19 @@
           "location_id"
         ]
       },
+      "AiTitleReq": {
+        "type": "object",
+        "properties": {
+          "image_base64": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000000
+          }
+        },
+        "required": [
+          "image_base64"
+        ]
+      },
       "AiRecognizeReq": {
         "type": "object",
         "properties": {
@@ -17997,6 +18749,17 @@
                 "type": "null"
               }
             ]
+          },
+          "brand_id": {
+            "description": "店员明确选择的已有品牌 ID，服务端校验",
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
+          "brand_confirmed": {
+            "description": "明确确认新建时创建待总部审核品牌；不自动启用",
+            "type": "boolean"
           },
           "ip_name": {
             "anyOf": [
@@ -20256,6 +21019,32 @@
           "name",
           "kind",
           "is_active"
+        ],
+        "additionalProperties": false
+      },
+      "AiTitleRes": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "ok",
+          "data"
         ],
         "additionalProperties": false
       },

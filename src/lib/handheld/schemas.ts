@@ -591,6 +591,9 @@ export const AiRecognizeStoragePath = z.object({
   storage_path: z.string().min(1),
 });
 
+export const AiTitleReq = z.object({ image_base64: z.string().min(1).max(2_000_000) }).meta({ id: "AiTitleReq" });
+export const AiTitleRes = okEnvelope(z.object({ name: z.string() })).meta({ id: "AiTitleRes" });
+
 export const AiRecognizeReq = z
   .object({
     // 单图字段（向后兼容旧 APP）
@@ -639,6 +642,9 @@ export const AiRecognizeRes = okEnvelope(
     }),
     brand: z.string().nullable(),
     ip_name: z.string().nullable().meta({ description: "角色/IP 名称，如 Hello Kitty" }),
+    brand_id: uuidSchema.nullable(),
+    brand_match_status: z.enum(["empty", "matched", "review_required"]),
+    brand_suggestions: z.array(z.object({ id: uuidSchema, name: z.string(), score: z.number() })),
     ip_match_status: z.enum(["empty", "matched", "review_required"]),
     ip_suggestions: z.array(
       z.object({
@@ -824,6 +830,8 @@ export const SmartCreateReq = z
     brand: z.string().trim().max(120).nullable().optional().meta({
       description: "店员确认的品牌优先于识别结果；省略保留识别品牌，null 或空串清空。匹配既有品牌库，不自动新建品牌。",
     }),
+    brand_id: uuidSchema.optional().meta({ description: "店员明确选择的已有品牌 ID，服务端校验" }),
+    brand_confirmed: z.boolean().optional().meta({ description: "明确确认新建时创建待总部审核品牌；不自动启用" }),
     ip_name: z.string().trim().max(120).nullable().optional(),
     ip_confirmed: z
       .boolean()

@@ -17,6 +17,68 @@ type JobRow = {
 
 const BACKOFF_SECONDS = [30, 5 * 60, 30 * 60, 2 * 60 * 60];
 
+type ContentImageJob = {
+  id: string;
+  sku_id: string;
+  block_id: string;
+  source_path: string;
+  claim_token: string;
+};
+
+async function prepareImage(
+  sourceBucket: string,
+  sourcePath: string,
+  targetStem: string,
+): Promise<string> {
+  const signed = await supabaseAdmin.storage
+    .from(sourceBucket)
+    .createSignedUrl(sourcePath, 60 * 60);
+  if (signed.error) throw new Error(signed.error.message);
+  const prepared = await aiPrepareListingImage({ image_url: signed.data.signedUrl });
+  const extension = prepared.mime.includes("png")
+    ? "png"
+    : prepared.mime.includes("webp")
+      ? "webp"
+      : "jpg";
+  const targetPath = `${targetStem}.${extension}`;
+  const upload = await supabaseAdmin.storage
+    .from("sku-listing")
+    .upload(targetPath, Buffer.from(prepared.b64, "base64"), {
+      contentType: prepared.mime,
+      cacheControl: "31536000",
+      upsert: false,
+    });
+  if (upload.error) throw new Error(upload.error.message);
+  return targetPath;
+}
+
+async function processContentImageJob(job: ContentImageJob): Promise<void> {
+  let targetPath: string | null = null;
+  let failure: string | null = null;
+  try {
+    const slash = job.source_path.indexOf("/");
+    const path = await prepareImage(
+      job.source_path.slice(0, slash),
+      job.source_path.slice(slash + 1),
+      `content/${job.sku_id}/${job.id}/${job.claim_token}`,
+    );
+    targetPath = `sku-listing/${path}`;
+  } catch (error) {
+    failure = (error instanceof Error ? error.message : String(error)).slice(0, 1000);
+  }
+  // A crashed completion is recovered by lease expiry; only the current token may apply.
+  const result = await supabaseAdmin.rpc(
+    "product_content_image_finish" as never,
+    {
+      p_id: job.id,
+      p_claim_token: job.claim_token,
+      p_target_path: targetPath,
+      p_error: failure,
+    } as never,
+  );
+  if (result.error) throw new Error(`Complete detail image job: ${result.error.message}`);
+}
+
 function cleanStoragePath(bucket: string, path: string): string {
   return path
     .trim()
@@ -43,12 +105,10 @@ export async function enqueueListingImageJobs(input: {
     }));
 
   if (rows.length === 0) return { queued: 0, status: "idle" };
-  const result = await supabaseAdmin
-    .from("inv_listing_image_jobs" as never)
-    .upsert(rows as never, {
-      onConflict: "sku_id,source_bucket,source_path",
-      ignoreDuplicates: true,
-    });
+  const result = await supabaseAdmin.from("inv_listing_image_jobs" as never).upsert(rows as never, {
+    onConflict: "sku_id,source_bucket,source_path",
+    ignoreDuplicates: true,
+  });
   if (result.error) throw new Error(`创建图片优化任务失败：${result.error.message}`);
 
   const now = new Date().toISOString();
@@ -61,14 +121,16 @@ export async function enqueueListingImageJobs(input: {
 }
 
 async function replaceRawPathWithListing(job: JobRow, targetPath: string): Promise<void> {
-  const { error } = await supabaseAdmin.rpc("handheld_apply_listing_image_result" as never, {
-    p_sku_id: job.sku_id,
-    p_source_key: `${job.source_bucket}/${job.source_path}`,
-    p_target_key: `sku-listing/${targetPath}`,
-  } as never);
+  const { error } = await supabaseAdmin.rpc(
+    "handheld_apply_listing_image_result" as never,
+    {
+      p_sku_id: job.sku_id,
+      p_source_key: `${job.source_bucket}/${job.source_path}`,
+      p_target_key: `sku-listing/${targetPath}`,
+    } as never,
+  );
   if (error) throw new Error(`替换 SKU 上架图失败：${error.message}`);
 }
-
 
 async function refreshSkuStatus(skuId: string): Promise<void> {
   const result = await supabaseAdmin
@@ -111,25 +173,11 @@ async function processJob(job: JobRow, workerId: string): Promise<boolean> {
   if (!locked.data) return false;
 
   try {
-    const signed = await supabaseAdmin.storage
-      .from(job.source_bucket)
-      .createSignedUrl(job.source_path, 60 * 60);
-    if (signed.error) throw new Error(signed.error.message);
-    const prepared = await aiPrepareListingImage({ image_url: signed.data.signedUrl });
-    const extension = prepared.mime.includes("png")
-      ? "png"
-      : prepared.mime.includes("webp")
-        ? "webp"
-        : "jpg";
-    const targetPath = `${new Date().toISOString().slice(0, 10)}/${job.sku_id}/${job.source_index + 1}-${crypto.randomUUID()}.${extension}`;
-    const upload = await supabaseAdmin.storage
-      .from("sku-listing")
-      .upload(targetPath, Buffer.from(prepared.b64, "base64"), {
-        contentType: prepared.mime,
-        cacheControl: "31536000",
-        upsert: false,
-      });
-    if (upload.error) throw new Error(upload.error.message);
+    const targetPath = await prepareImage(
+      job.source_bucket,
+      job.source_path,
+      `${new Date().toISOString().slice(0, 10)}/${job.sku_id}/${job.source_index + 1}-${crypto.randomUUID()}`,
+    );
     await replaceRawPathWithListing(job, targetPath);
     await supabaseAdmin
       .from("inv_listing_image_jobs" as never)
@@ -161,23 +209,67 @@ async function processJob(job: JobRow, workerId: string): Promise<boolean> {
   return true;
 }
 
-export async function runListingImageWorker(limit = 2): Promise<{ processed: number }> {
+type BatchResult = { processed: number; failed: number };
+
+async function runLegacyImageBatch(limit: number): Promise<BatchResult> {
   const result = await supabaseAdmin
     .from("inv_listing_image_jobs" as never)
     .select("id, sku_id, source_bucket, source_path, source_index, attempts")
     .in("status", ["queued", "retryable_failed"])
     .lte("next_run_at", new Date().toISOString())
     .order("created_at", { ascending: true })
-    .limit(Math.max(1, Math.min(limit, 6)));
+    .limit(limit);
   if (result.error) throw new Error(`读取图片任务失败：${result.error.message}`);
   const jobs = (result.data ?? []) as unknown as JobRow[];
   const workerId = `erp-${crypto.randomUUID()}`;
-  const processed = await Promise.all(jobs.map((job) => processJob(job, workerId)));
-  return { processed: processed.filter(Boolean).length };
+  const outcomes = await Promise.allSettled(jobs.map((job) => processJob(job, workerId)));
+  return {
+    processed: outcomes.filter((outcome) => outcome.status === "fulfilled" && outcome.value).length,
+    failed: outcomes.filter((outcome) => outcome.status === "rejected").length,
+  };
+}
+
+async function runContentImageBatch(limit: number): Promise<BatchResult> {
+  const contentJobs = await supabaseAdmin.rpc(
+    "product_content_image_claim" as never,
+    {
+      p_limit: limit,
+    } as never,
+  );
+  if (contentJobs.error) throw new Error(`Claim detail image jobs: ${contentJobs.error.message}`);
+  const claimed = (contentJobs.data ?? []) as unknown as ContentImageJob[];
+  const outcomes = await Promise.allSettled(claimed.map(processContentImageJob));
+  return {
+    processed: outcomes.filter((outcome) => outcome.status === "fulfilled").length,
+    failed: outcomes.filter((outcome) => outcome.status === "rejected").length,
+  };
+}
+
+export async function runListingImageWorker(limit = 2): Promise<{ processed: number; failed?: number }> {
+  if ((process.env.HANDHELD_LISTING_IMAGE_WORKER_ENABLED ?? "true") !== "true")
+    return { processed: 0 };
+  const boundedLimit = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 6)) : 2;
+  // Each queue claims and completes independently, even when the other queue stalls or fails.
+  const batches = await Promise.allSettled([
+    runLegacyImageBatch(boundedLimit),
+    runContentImageBatch(boundedLimit),
+  ]);
+  let processed = 0;
+  let failed = 0;
+  for (const batch of batches) {
+    if (batch.status === "rejected") failed += 1;
+    else {
+      processed += batch.value.processed;
+      failed += batch.value.failed;
+    }
+  }
+  return { processed, ...(failed ? { failed } : {}) };
 }
 
 export function triggerListingImageWorker(limit = 2): void {
-  void runListingImageWorker(limit).catch((error) => {
-    console.error("[handheld listing image worker]", error);
-  });
+  void runListingImageWorker(limit)
+    .then((result) => {
+      if (result.failed) console.error("[handheld listing image worker] partial failure", result);
+    })
+    .catch(() => console.error("[handheld listing image worker] dispatch failed"));
 }

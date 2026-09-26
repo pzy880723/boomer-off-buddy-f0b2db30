@@ -15,6 +15,7 @@ import { replayIfPresent, jsonReplay } from "@/server/handheld-idempotency.serve
 import {
   getSmartCreateReleaseTarget,
   persistSmartCreateBrand,
+  resolveConfirmedListingBrand,
   shouldReuseSmartCreateSku,
   smartCreateFingerprint,
   type SmartCreateCommitResult,
@@ -143,6 +144,9 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
             return err((e as Error).message, existingOp ? 500 : 422, { code: "validation_error" });
           }
         }
+        let confirmedBrand: Awaited<ReturnType<typeof resolveConfirmedListingBrand>>;
+        try { confirmedBrand = await resolveConfirmedListingBrand(body); }
+        catch (e) { return err((e as Error).message, existingOp ? 500 : 422, { code: "brand_confirmation_required" }); }
         let resolvedIp: Awaited<ReturnType<typeof resolveOrCreateConfirmedIp>>;
         try {
           resolvedIp = await resolveOrCreateConfirmedIp({
@@ -265,7 +269,7 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
         }
         // The confirmed draft brand takes precedence over the attached recognition audit.
         try {
-          await persistSmartCreateBrand({ skuId, brand: body.brand });
+          await persistSmartCreateBrand({ skuId, brand: body.brand, confirmedBrand });
         } catch (e) {
           return err(`Save product brand failed: ${(e as Error).message}`, 500);
         }

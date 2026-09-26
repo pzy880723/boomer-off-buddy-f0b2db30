@@ -15,6 +15,7 @@ let failBrandWrite: boolean;
 let failBrandLookup: boolean;
 let failBrandRead: boolean;
 let recorded: boolean;
+let allowBrandApplication = false;
 
 // Run the real route, taxonomy matching and audit attachment, but never send HTTP.
 const db = createClient("https://smart-create-tests.invalid", "unit-test-only-key", {
@@ -50,7 +51,7 @@ const db = createClient("https://smart-create-tests.invalid", "unit-test-only-ke
       }
       if (table === "inv_apply_movement") return Response.json(1);
       assert.ok(tables[table], `Unexpected test table: ${table}`);
-      assert.ok(table !== "inv_brands" || method === "GET", "must not create taxonomy identities");
+      assert.ok(table !== "inv_brands" || method === "GET" || allowBrandApplication, "must not create taxonomy identities without confirmation");
       let rows = tables[table].filter((row) => [...url.searchParams].every(([key, value]) => {
         if (["select", "order"].includes(key)) return true;
         assert.ok(value.startsWith("eq."), `Unexpected filter: ${key}=${value}`);
@@ -127,6 +128,7 @@ beforeEach(() => {
   failBrandLookup = false;
   failBrandRead = false;
   recorded = false;
+  allowBrandApplication = false;
   tables = {
     inv_locations: [{ id: LOCATION, name: "Test", kind: "warehouse", is_active: true }],
     inv_categories: [
@@ -167,6 +169,46 @@ async function create(extra: Row = {}) {
     }),
   }) });
 }
+
+test("confirmed brand ID is checked and its alias resolves to the canonical name", async () => {
+  const id = "33333333-3333-4333-8333-333333333333";
+  tables.inv_brands.find(row => row.id === "nike")!.id = id;
+  const response = await create({ brand: "耐克", brand_id: id, brand_confirmed: true });
+  assert.equal(response.status, 200, await response.text());
+  assert.equal(tables.inv_skus[0].brand_id, id);
+  assert.equal(tables.inv_skus[0].attributes.brand, "Nike");
+});
+
+test("invalid confirmed brand cannot create inventory", async () => {
+  const response = await create({ brand: "Unrelated", brand_id: "33333333-3333-4333-8333-333333333333" });
+  assert.equal(response.status, 422);
+  assert.equal(tables.inv_skus.length, 0);
+});
+
+for (const brand of ["三丽鸥 (Sanrio)", "Sanrio", "三丽鸥"]) {
+  test(`confirmed ${brand} without an ID reuses the legacy Sanrio parent`, async () => {
+    const parent = tables.inv_brands.find(row => row.id === "sanrio-parent")!;
+    parent.normalized_name = "三丽鸥sanrio";
+    allowBrandApplication = true;
+    const response = await create({ brand, brand_confirmed: true });
+    assert.equal(response.status, 200, await response.text());
+    assert.equal(tables.inv_skus[0].brand_id, parent.id);
+    assert.equal(tables.inv_skus[0].attributes.brand, parent.name);
+    assert.equal(tables.inv_skus[0].brand_candidate_text, null);
+    assert.equal(tables.inv_skus[0].ip_id, "hello-kitty");
+    assert.equal(writes.some(row => row.table === "inv_brands"), false);
+  });
+}
+
+test("new brand is created only as review after explicit confirmation", async () => {
+  allowBrandApplication = true;
+  const response = await create({ brand: "New Maker", brand_confirmed: true });
+  assert.equal(response.status, 200, await response.text());
+  const application = writes.find(row => row.table === "inv_brands" && row.method === "POST")?.body;
+  assert.equal(application?.status, "review");
+  assert.equal(application?.entity_type, "brand");
+  assert.equal(tables.inv_skus[0].brand_candidate_text, "New Maker");
+});
 
 test("posted manual brand wins after the real recognition audit is attached", async () => {
   const response = await create({ brand: "  Nike  " });

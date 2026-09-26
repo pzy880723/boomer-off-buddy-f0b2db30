@@ -171,6 +171,7 @@ import { Route as ApiPublicContentIdShareRouteImport } from './routes/api/public
 import { Route as ApiPublicGoStoreDailySalesRouteImport } from './routes/api/public/go/store/daily-sales'
 import { Route as ApiPublicHandheldAiPrepareListingImageRouteImport } from './routes/api/public/handheld/ai.prepare-listing-image'
 import { Route as ApiPublicHandheldAiRecognizeItemRouteImport } from './routes/api/public/handheld/ai.recognize-item'
+import { Route as ApiPublicHandheldAiRecognizeTitleRouteImport } from './routes/api/public/handheld/ai.recognize-title'
 import { Route as ApiPublicHandheldAuthBootstrapRouteImport } from './routes/api/public/handheld/auth.bootstrap'
 import { Route as ApiPublicHandheldAuthLoginRouteImport } from './routes/api/public/handheld/auth.login'
 import { Route as ApiPublicHandheldAuthLogoutRouteImport } from './routes/api/public/handheld/auth.logout'
@@ -249,6 +250,7 @@ import { Route as ApiPublicHandheldFulfillmentsIdShortageRouteImport } from './r
 import { Route as ApiPublicHandheldFulfillmentsIdTicketRouteImport } from './routes/api/public/handheld/fulfillments.$id.ticket'
 import { Route as ApiPublicHandheldFulfillmentsIdWaybillRouteImport } from './routes/api/public/handheld/fulfillments.$id.waybill'
 import { Route as ApiPublicHandheldItemsIdAttachImagesRouteImport } from './routes/api/public/handheld/items.$id.attach-images'
+import { Route as ApiPublicHandheldItemsIdContentRouteImport } from './routes/api/public/handheld/items.$id.content'
 import { Route as ApiPublicHandheldItemsIdRestockRouteImport } from './routes/api/public/handheld/items.$id.restock'
 import { Route as ApiPublicHandheldItemsIdSetStatusRouteImport } from './routes/api/public/handheld/items.$id.set-status'
 import { Route as ApiPublicHandheldItemsIdSyncStatusRouteImport } from './routes/api/public/handheld/items.$id.sync-status'
@@ -1154,6 +1156,12 @@ const ApiPublicHandheldAiRecognizeItemRoute =
     path: '/api/public/handheld/ai/recognize-item',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHandheldAiRecognizeTitleRoute =
+  ApiPublicHandheldAiRecognizeTitleRouteImport.update({
+    id: '/api/public/handheld/ai/recognize-title',
+    path: '/api/public/handheld/ai/recognize-title',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHandheldAuthBootstrapRoute =
   ApiPublicHandheldAuthBootstrapRouteImport.update({
     id: '/api/public/handheld/auth/bootstrap',
@@ -1615,6 +1623,12 @@ const ApiPublicHandheldItemsIdAttachImagesRoute =
     path: '/attach-images',
     getParentRoute: () => ApiPublicHandheldItemsIdRoute,
   } as any)
+const ApiPublicHandheldItemsIdContentRoute =
+  ApiPublicHandheldItemsIdContentRouteImport.update({
+    id: '/content',
+    path: '/content',
+    getParentRoute: () => ApiPublicHandheldItemsIdRoute,
+  } as any)
 const ApiPublicHandheldItemsIdRestockRoute =
   ApiPublicHandheldItemsIdRestockRouteImport.update({
     id: '/restock',
@@ -1953,6 +1967,7 @@ export interface FileRoutesByFullPath {
   '/api/public/go/store/daily-sales': typeof ApiPublicGoStoreDailySalesRoute
   '/api/public/handheld/ai/prepare-listing-image': typeof ApiPublicHandheldAiPrepareListingImageRoute
   '/api/public/handheld/ai/recognize-item': typeof ApiPublicHandheldAiRecognizeItemRoute
+  '/api/public/handheld/ai/recognize-title': typeof ApiPublicHandheldAiRecognizeTitleRoute
   '/api/public/handheld/auth/bootstrap': typeof ApiPublicHandheldAuthBootstrapRoute
   '/api/public/handheld/auth/login': typeof ApiPublicHandheldAuthLoginRoute
   '/api/public/handheld/auth/logout': typeof ApiPublicHandheldAuthLogoutRoute
@@ -2031,6 +2046,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/fulfillments/$id/ticket': typeof ApiPublicHandheldFulfillmentsIdTicketRoute
   '/api/public/handheld/fulfillments/$id/waybill': typeof ApiPublicHandheldFulfillmentsIdWaybillRoute
   '/api/public/handheld/items/$id/attach-images': typeof ApiPublicHandheldItemsIdAttachImagesRoute
+  '/api/public/handheld/items/$id/content': typeof ApiPublicHandheldItemsIdContentRoute
   '/api/public/handheld/items/$id/restock': typeof ApiPublicHandheldItemsIdRestockRoute
   '/api/public/handheld/items/$id/set-status': typeof ApiPublicHandheldItemsIdSetStatusRoute
   '/api/public/handheld/items/$id/sync-status': typeof ApiPublicHandheldItemsIdSyncStatusRoute
@@ -2217,6 +2233,7 @@ export interface FileRoutesByTo {
   '/api/public/go/store/daily-sales': typeof ApiPublicGoStoreDailySalesRoute
   '/api/public/handheld/ai/prepare-listing-image': typeof ApiPublicHandheldAiPrepareListingImageRoute
   '/api/public/handheld/ai/recognize-item': typeof ApiPublicHandheldAiRecognizeItemRoute
+  '/api/public/handheld/ai/recognize-title': typeof ApiPublicHandheldAiRecognizeTitleRoute
   '/api/public/handheld/auth/bootstrap': typeof ApiPublicHandheldAuthBootstrapRoute
   '/api/public/handheld/auth/login': typeof ApiPublicHandheldAuthLoginRoute
   '/api/public/handheld/auth/logout': typeof ApiPublicHandheldAuthLogoutRoute
@@ -2295,6 +2312,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/fulfillments/$id/ticket': typeof ApiPublicHandheldFulfillmentsIdTicketRoute
   '/api/public/handheld/fulfillments/$id/waybill': typeof ApiPublicHandheldFulfillmentsIdWaybillRoute
   '/api/public/handheld/items/$id/attach-images': typeof ApiPublicHandheldItemsIdAttachImagesRoute
+  '/api/public/handheld/items/$id/content': typeof ApiPublicHandheldItemsIdContentRoute
   '/api/public/handheld/items/$id/restock': typeof ApiPublicHandheldItemsIdRestockRoute
   '/api/public/handheld/items/$id/set-status': typeof ApiPublicHandheldItemsIdSetStatusRoute
   '/api/public/handheld/items/$id/sync-status': typeof ApiPublicHandheldItemsIdSyncStatusRoute
@@ -2489,6 +2507,7 @@ export interface FileRoutesById {
   '/api/public/go/store/daily-sales': typeof ApiPublicGoStoreDailySalesRoute
   '/api/public/handheld/ai/prepare-listing-image': typeof ApiPublicHandheldAiPrepareListingImageRoute
   '/api/public/handheld/ai/recognize-item': typeof ApiPublicHandheldAiRecognizeItemRoute
+  '/api/public/handheld/ai/recognize-title': typeof ApiPublicHandheldAiRecognizeTitleRoute
   '/api/public/handheld/auth/bootstrap': typeof ApiPublicHandheldAuthBootstrapRoute
   '/api/public/handheld/auth/login': typeof ApiPublicHandheldAuthLoginRoute
   '/api/public/handheld/auth/logout': typeof ApiPublicHandheldAuthLogoutRoute
@@ -2567,6 +2586,7 @@ export interface FileRoutesById {
   '/api/public/handheld/fulfillments/$id/ticket': typeof ApiPublicHandheldFulfillmentsIdTicketRoute
   '/api/public/handheld/fulfillments/$id/waybill': typeof ApiPublicHandheldFulfillmentsIdWaybillRoute
   '/api/public/handheld/items/$id/attach-images': typeof ApiPublicHandheldItemsIdAttachImagesRoute
+  '/api/public/handheld/items/$id/content': typeof ApiPublicHandheldItemsIdContentRoute
   '/api/public/handheld/items/$id/restock': typeof ApiPublicHandheldItemsIdRestockRoute
   '/api/public/handheld/items/$id/set-status': typeof ApiPublicHandheldItemsIdSetStatusRoute
   '/api/public/handheld/items/$id/sync-status': typeof ApiPublicHandheldItemsIdSyncStatusRoute
@@ -2762,6 +2782,7 @@ export interface FileRouteTypes {
     | '/api/public/go/store/daily-sales'
     | '/api/public/handheld/ai/prepare-listing-image'
     | '/api/public/handheld/ai/recognize-item'
+    | '/api/public/handheld/ai/recognize-title'
     | '/api/public/handheld/auth/bootstrap'
     | '/api/public/handheld/auth/login'
     | '/api/public/handheld/auth/logout'
@@ -2840,6 +2861,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/fulfillments/$id/ticket'
     | '/api/public/handheld/fulfillments/$id/waybill'
     | '/api/public/handheld/items/$id/attach-images'
+    | '/api/public/handheld/items/$id/content'
     | '/api/public/handheld/items/$id/restock'
     | '/api/public/handheld/items/$id/set-status'
     | '/api/public/handheld/items/$id/sync-status'
@@ -3026,6 +3048,7 @@ export interface FileRouteTypes {
     | '/api/public/go/store/daily-sales'
     | '/api/public/handheld/ai/prepare-listing-image'
     | '/api/public/handheld/ai/recognize-item'
+    | '/api/public/handheld/ai/recognize-title'
     | '/api/public/handheld/auth/bootstrap'
     | '/api/public/handheld/auth/login'
     | '/api/public/handheld/auth/logout'
@@ -3104,6 +3127,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/fulfillments/$id/ticket'
     | '/api/public/handheld/fulfillments/$id/waybill'
     | '/api/public/handheld/items/$id/attach-images'
+    | '/api/public/handheld/items/$id/content'
     | '/api/public/handheld/items/$id/restock'
     | '/api/public/handheld/items/$id/set-status'
     | '/api/public/handheld/items/$id/sync-status'
@@ -3297,6 +3321,7 @@ export interface FileRouteTypes {
     | '/api/public/go/store/daily-sales'
     | '/api/public/handheld/ai/prepare-listing-image'
     | '/api/public/handheld/ai/recognize-item'
+    | '/api/public/handheld/ai/recognize-title'
     | '/api/public/handheld/auth/bootstrap'
     | '/api/public/handheld/auth/login'
     | '/api/public/handheld/auth/logout'
@@ -3375,6 +3400,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/fulfillments/$id/ticket'
     | '/api/public/handheld/fulfillments/$id/waybill'
     | '/api/public/handheld/items/$id/attach-images'
+    | '/api/public/handheld/items/$id/content'
     | '/api/public/handheld/items/$id/restock'
     | '/api/public/handheld/items/$id/set-status'
     | '/api/public/handheld/items/$id/sync-status'
@@ -3515,6 +3541,7 @@ export interface RootRouteChildren {
   ApiPublicGoStoreDailySalesRoute: typeof ApiPublicGoStoreDailySalesRoute
   ApiPublicHandheldAiPrepareListingImageRoute: typeof ApiPublicHandheldAiPrepareListingImageRoute
   ApiPublicHandheldAiRecognizeItemRoute: typeof ApiPublicHandheldAiRecognizeItemRoute
+  ApiPublicHandheldAiRecognizeTitleRoute: typeof ApiPublicHandheldAiRecognizeTitleRoute
   ApiPublicHandheldAuthBootstrapRoute: typeof ApiPublicHandheldAuthBootstrapRoute
   ApiPublicHandheldAuthLoginRoute: typeof ApiPublicHandheldAuthLoginRoute
   ApiPublicHandheldAuthLogoutRoute: typeof ApiPublicHandheldAuthLogoutRoute
@@ -4712,6 +4739,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldAiRecognizeItemRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/handheld/ai/recognize-title': {
+      id: '/api/public/handheld/ai/recognize-title'
+      path: '/api/public/handheld/ai/recognize-title'
+      fullPath: '/api/public/handheld/ai/recognize-title'
+      preLoaderRoute: typeof ApiPublicHandheldAiRecognizeTitleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/handheld/auth/bootstrap': {
       id: '/api/public/handheld/auth/bootstrap'
       path: '/api/public/handheld/auth/bootstrap'
@@ -5256,6 +5290,13 @@ declare module '@tanstack/react-router' {
       path: '/attach-images'
       fullPath: '/api/public/handheld/items/$id/attach-images'
       preLoaderRoute: typeof ApiPublicHandheldItemsIdAttachImagesRouteImport
+      parentRoute: typeof ApiPublicHandheldItemsIdRoute
+    }
+    '/api/public/handheld/items/$id/content': {
+      id: '/api/public/handheld/items/$id/content'
+      path: '/content'
+      fullPath: '/api/public/handheld/items/$id/content'
+      preLoaderRoute: typeof ApiPublicHandheldItemsIdContentRouteImport
       parentRoute: typeof ApiPublicHandheldItemsIdRoute
     }
     '/api/public/handheld/items/$id/restock': {
@@ -6040,6 +6081,7 @@ const ApiPublicStorefrontShortagesRouteWithChildren =
 
 interface ApiPublicHandheldItemsIdRouteChildren {
   ApiPublicHandheldItemsIdAttachImagesRoute: typeof ApiPublicHandheldItemsIdAttachImagesRoute
+  ApiPublicHandheldItemsIdContentRoute: typeof ApiPublicHandheldItemsIdContentRoute
   ApiPublicHandheldItemsIdRestockRoute: typeof ApiPublicHandheldItemsIdRestockRoute
   ApiPublicHandheldItemsIdSetStatusRoute: typeof ApiPublicHandheldItemsIdSetStatusRoute
   ApiPublicHandheldItemsIdSyncStatusRoute: typeof ApiPublicHandheldItemsIdSyncStatusRoute
@@ -6050,6 +6092,7 @@ const ApiPublicHandheldItemsIdRouteChildren: ApiPublicHandheldItemsIdRouteChildr
   {
     ApiPublicHandheldItemsIdAttachImagesRoute:
       ApiPublicHandheldItemsIdAttachImagesRoute,
+    ApiPublicHandheldItemsIdContentRoute: ApiPublicHandheldItemsIdContentRoute,
     ApiPublicHandheldItemsIdRestockRoute: ApiPublicHandheldItemsIdRestockRoute,
     ApiPublicHandheldItemsIdSetStatusRoute:
       ApiPublicHandheldItemsIdSetStatusRoute,
@@ -6275,6 +6318,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHandheldAiPrepareListingImageRoute:
     ApiPublicHandheldAiPrepareListingImageRoute,
   ApiPublicHandheldAiRecognizeItemRoute: ApiPublicHandheldAiRecognizeItemRoute,
+  ApiPublicHandheldAiRecognizeTitleRoute:
+    ApiPublicHandheldAiRecognizeTitleRoute,
   ApiPublicHandheldAuthBootstrapRoute: ApiPublicHandheldAuthBootstrapRoute,
   ApiPublicHandheldAuthLoginRoute: ApiPublicHandheldAuthLoginRoute,
   ApiPublicHandheldAuthLogoutRoute: ApiPublicHandheldAuthLogoutRoute,

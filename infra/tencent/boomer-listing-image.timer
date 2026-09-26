@@ -1,0 +1,11 @@
+[Unit]
+Description=Drain listing image jobs every minute (oneshot, no overlap)
+
+[Timer]
+OnBootSec=90
+OnUnitInactiveSec=60s
+AccuracySec=5
+Unit=boomer-listing-image.service
+
+[Install]
+WantedBy=timers.target

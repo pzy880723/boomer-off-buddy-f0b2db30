@@ -27,7 +27,7 @@ const stubs: Record<string, string> = {
   "@/lib/inventory.helpers": "export const generateEpc = () => {}; export const generateSkuCode = () => {};",
   "@/server/handheld-print.server": "export const buildPrintPayload = () => {};",
   "@/server/handheld-idempotency.server": "export const replayIfPresent = () => {throw Error('unexpected replay')}; export const recordOp = () => {}; export const jsonReplay = () => {};",
-  "@/server/handheld-smart-create.server": "export const getSmartCreateReleaseTarget = () => {}; export const persistSmartCreateBrand = () => {}; export const shouldReuseSmartCreateSku = () => {}; export const smartCreateFingerprint = () => \"fp\";",
+  "@/server/handheld-smart-create.server": "export const getSmartCreateReleaseTarget = () => {}; export const resolveConfirmedListingBrand = () => {throw Error('unexpected brand write')}; export const persistSmartCreateBrand = () => {}; export const shouldReuseSmartCreateSku = () => {}; export const smartCreateFingerprint = () => \"fp\";",
   "@/server/product-classification.server": "export const {assertActiveLeafCategory} = globalThis.__listingAuthTest; export const attachProductClassificationAuditToSku = () => {}; export const replaceManualProductFacets = () => {}; export const resolveOrCreateConfirmedIp = () => {throw Error('unexpected IP write')}; export const resolveManualProductFacets = () => {};",
   "@/server/handheld-listing-image-jobs.server": "export const enqueueListingImageJobs = () => {}; export const triggerListingImageWorker = () => {};",
   "@/lib/youzan-offline-products.functions": "export const releaseSkuToOfflineShopsCore = () => {throw Error('unexpected publish')};",

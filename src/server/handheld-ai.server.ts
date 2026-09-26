@@ -3,6 +3,7 @@
 // 走 Lovable AI Gateway，无需单独 key。
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { recognizeProductFromImages } from "@/server/product-recognition.server";
+import { loadOriginalImage, measurementProtectionRequired, squareOriginalImage } from "./listing-image-safety.server";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1";
 
@@ -104,6 +105,8 @@ const SYSTEM_LISTING_IMAGE = `把这张中古杂货实物图修整成上架主�
 - 背景统一为干净浅灰底
 - 校正角度，修正白平衡和曝光
 - 严禁改 logo、文字、瑕疵、颜色、配件数量
+- 清除商品外部附加的售价贴纸、价格牌；不得删除商品本体印刷、型号、生产标记或真实瑕疵
+- 如果有尺子、卷尺、尺寸刻度，不得重绘、删除或修改刻度，保留原始测量证据
 - 严禁添加任何文字、水印、贴纸`;
 
 /** Returns base64 PNG (no data: prefix). */
@@ -117,6 +120,10 @@ export async function aiPrepareListingImage(input: {
     : input.image_base64?.startsWith("data:")
       ? input.image_base64
       : `data:image/jpeg;base64,${input.image_base64}`;
+
+  if (await measurementProtectionRequired(dataUrl, getKey())) {
+    return squareOriginalImage(await loadOriginalImage(dataUrl));
+  }
 
   const body = {
     model: "google/gemini-3.1-flash-image",
@@ -138,6 +145,7 @@ export async function aiPrepareListingImage(input: {
 
   const res = await fetch(`${GATEWAY}/chat/completions`, {
     method: "POST",
+    signal: AbortSignal.timeout(60_000),
     headers: {
       Authorization: `Bearer ${getKey()}`,
       "Content-Type": "application/json",
