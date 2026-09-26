@@ -61,6 +61,8 @@ if (repair) {
   const { count, error: reservationError } = await db.from("inventory_reservations").select("id", { count: "exact", head: true }).eq("sku_id", skuId).eq("status", "active");
   if (reservationError) throw reservationError;
   assert.equal(count, 0, "Active order reservation");
-  console.log(JSON.stringify({ phase: "repair", result: await releaseSkuToOfflineShopsCore({ sku_id: skuId, shop_ids: [shopId] }) }));
+  const result = await releaseSkuToOfflineShopsCore({ sku_id: skuId, shop_ids: [shopId] });
+  console.log(JSON.stringify({ phase: "repair", result }));
+  assert.equal(result.ok, true, "Release incomplete; inspect the reported error");
   console.log(JSON.stringify({ phase: "after", ...await inspect() }));
 }
