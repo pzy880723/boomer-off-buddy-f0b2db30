@@ -11,16 +11,29 @@ check() {
   done
   return 1
 }
-if [[ "${1:-}" == prepare ]]; then
+if [[ "${1:-}" == prepare || "${1:-}" == resume-prepare ]]; then
   [[ "$(readlink -f "$base/current")" == "$old" ]]
-  [[ ! -e "$release" && -z "$(ss -Hlt 'sport = :3006')" ]]
-  mkdir -p "$release"
-  cp -a "$old/." "$release/"
+  [[ -z "$(ss -Hlt 'sport = :3006')" ]]
+  if [[ "$1" == prepare ]]; then
+    [[ ! -e "$release" ]]
+    mkdir -p "$release"
+    cp -a "$old/." "$release/"
+  else
+    [[ -d "$release" ]]
+  fi
   cd "$release"
-  git apply --check /tmp/boomer-listing-content.patch
-  git apply /tmp/boomer-listing-content.patch
+  # Production has separate image-loading and dependency fixes. Preserve those,
+  # regenerate generated files, and merge only the new published-content fields.
+  excludes=(--exclude=bun.lock --exclude=package.json --exclude=openapi.snapshot.json
+    --exclude=src/routeTree.gen.ts '--exclude=src/routes/api/public/storefront/products.$id.ts')
+  git apply --check "${excludes[@]}" /tmp/boomer-listing-content.patch
+  git apply --check /tmp/boomer-listing-content-runtime.patch
+  git apply "${excludes[@]}" /tmp/boomer-listing-content.patch
+  git apply /tmp/boomer-listing-content-runtime.patch
   # Keep the existing production dependency tree untouched; the pinned native module already exists.
   node -e 'if(require("sharp/package.json").version!=="0.35.2")throw Error("Unexpected sharp runtime")'
+  node -e 'const r=require("node:module").createRequire(require.resolve("vite"));r("esbuild").buildSync({entryPoints:["scripts/gen-sdk.ts"],outfile:"scripts/.listing-sdk-gen.cjs",bundle:true,platform:"node",format:"cjs",packages:"external"})'
+  node scripts/.listing-sdk-gen.cjs
   NODE_OPTIONS=--max-old-space-size=3072 npm run build:tencent > /tmp/boomer-listing-content-build.log 2>&1
   APP_DIR="$release" ERP_PORT=3006 pm2 start "$release/scripts/run-tencent-erp.sh" --name "$candidate" --cwd "$release" --interpreter bash --time >/dev/null
   check 3006
@@ -69,5 +82,5 @@ elif [[ "${1:-}" == publish ]]; then
   rollback=0
   echo "published=$release rollback=$old"
 else
-  echo 'Usage: prepare | publish' >&2; exit 2
+  echo 'Usage: prepare | resume-prepare | publish' >&2; exit 2
 fi

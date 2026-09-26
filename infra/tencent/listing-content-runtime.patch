@@ -1,0 +1,21 @@
+--- a/src/routes/api/public/storefront/products.$id.ts
++++ b/src/routes/api/public/storefront/products.$id.ts
+@@ -2,6 +2,7 @@
+ import { supabaseAdmin } from "@/integrations/supabase/client.server";
+ import { STOREFRONT_CORS, storefrontError, storefrontJson } from "@/server/storefront-auth.server";
+ import { signDerivativeUrls } from "@/server/media-derivative.server";
++import { loadPublishedProductContent } from "@/server/product-content.server";
+ import {
+   enrichStorefrontListings,
+   signStorefrontProductImages,
+@@ -33,7 +34,10 @@
+           const product = signed[0];
+           const originals = [...new Set([product.image_url, ...product.image_urls].filter((url): url is string => Boolean(url)))];
+           const previews = await signDerivativeUrls(originals, 960);
++          const content = await loadPublishedProductContent(product.sku_id);
+           return storefrontJson({ ok: true, data: { ...product,
++            detail_content: content?.published_blocks ?? [],
++            detail_content_version: content?.version ?? 0,
+             image_previews: originals.map((image_url, index) => ({ image_url, preview_url: previews[index] ?? null })) } });
+         } catch (metadataError) {
+           return storefrontError(
