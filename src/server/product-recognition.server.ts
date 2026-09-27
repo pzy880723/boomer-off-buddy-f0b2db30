@@ -9,7 +9,7 @@ import {
 } from "../lib/product-classification";
 import type { BrandCandidate, FacetTerm } from "../lib/product-taxonomy";
 
-export const PRODUCT_RECOGNITION_PROMPT_VERSION = "boomer-product-v5-listing-content";
+export const PRODUCT_RECOGNITION_PROMPT_VERSION = "boomer-product-v6-date-markings";
 export const DEFAULT_PRODUCT_RECOGNITION_MODEL = "google/gemini-2.5-pro";
 export const DEFAULT_HANDHELD_PRODUCT_RECOGNITION_MODEL = "google/gemini-2.5-flash";
 export const HANDHELD_RECOGNITION_TIMEOUT_MS = 25_000;
@@ -215,11 +215,11 @@ export async function runProductRecognition(
     name: "未命名中古商品",
     warning: `AI 识别暂时不可用：${lastError?.message ?? "未知错误"}`,
   };
-  const normalized = normalizeProductRecognition(modelResult, categories, { facets, brands, ips });
-  if (input.source === "handheld" && !failed && normalized.description) {
+  const normalized = normalizeProductRecognition(modelResult, categories, { facets, brands, ips }, { imageCount: images.length });
+  if (input.source === "handheld" && !failed) {
     const era = normalized.attributes.era;
-    if (era && !normalized.description.includes(era)) {
-      normalized.description = [normalized.description.replace(/[。；;]+$/u, ""), era]
+    if (era && !normalized.description?.includes(era)) {
+      normalized.description = [normalized.description?.replace(/[。；;]+$/u, ""), era]
         .filter(Boolean).join("；") + "。";
     }
   }
@@ -275,10 +275,16 @@ function parseGatewayJson(content: unknown): RawProductRecognition {
 }
 
 export function buildEraInstruction(source: ProductRecognitionSource): string {
-  const shared = `年代规则：attributes.era 只能来自图片可见证据（底款、生产标记、包装印刷、型号）。有证据但不精确时可给大致年代范围，例如"约1980-1990年代"；完全没有证据时 era 返回 null，简介省略年代，不写"年代待确认"。禁止把版权年 (©/Copyright 年份) 当作生产年，禁止凭风格猜测年代。没有真实检索结果时不得声称已联网核实。`;
+  const shared = `年代规则：逐图检查全部上传图片的底款、吊牌、背标和包装日期文字，优先找清楚可读的具体年份，不只看主图或从风格猜年代。
+返回可选 date_markings 数组（无证据时 []，最多16项），每项 {text:逐字原文,image_index:图片序号,years:原文中完整可读的四位年份数组,kind:"manufacturing"|"copyright"|"character"|"label"|"unknown"}。image_index 为实际传入图序的 1-based 索引，不能超过图片总数；第1张为主图。不同独立日期标记分项记录，不要把猜测补入原文，不完整年份不要补全。
+明确平成10年可换算1998年，但仍按标记性质区分；只有Heisei无年数不能换算。©’76,’20等两位版权年不猜世纪，保留原文、years返回空数组并提示补拍。不同角色独立的初始版权行不得合并取较晚年。
+只有明确写着生产日期、製造年月、MFG或manufactured等制造标记且年份无冲突，才能输出“2020年（生产年份）”。版权、角色诞生年、首次版权年不是生产年；禁止把版权年 (©/Copyright 年份) 当作生产年，也禁止单看较晚年份就断言生产。
+例如 ©1975,2020 SANRIO 必须完整保留原文及全部年份，可能是多个角色的版权组合；最多显示“2020年（版权标注）”，不能称2020年生产。单个角色年或初始版权年不能断代；清楚的普通商品标签年份只可显示“2020年（标签标注）”。
+明确制造年份优先于版权/标签标注；多图同性质日期冲突、模糊或完全没有证据时 era 返回 null，并通过 clarification_requests 提示补拍底款/吊牌/背标，不阻塞分类上架；简介省略年代，不写“年代待确认”。新结果只有Heisei/平成而无具体日期证据时 era 也返回 null，不把年号范围当作商品生产年代。
+attributes.era、description、evidence 与 date_markings 必须一致，简介不能残留Heisei或错误的“1975年生产”；不要用era标签库别名代替日期证据。没有真实检索结果时不得声称已联网核实。`;
   if (source !== "handheld") return shared;
   return `${shared}
-手持端输出请精简：description 控制在 20-30 字的一句话介绍，可包含有证据的大致年代范围；evidence 最多 3 条、keywords 最多 5 个、alternative_categories 最多 2 个、clarification_requests 最多 2 条。不要输出任何多余解释。`;
+手持端输出请精简：description 控制在 20-30 字的一句话介绍，日期若出现须保留生产/版权/标签性质；evidence 最多 3 条、keywords 最多 5 个、alternative_categories 最多 2 个、clarification_requests 最多 2 条。不要输出任何多余解释。`;
 }
 
 export async function callLovableProductModel(input: {
@@ -301,7 +307,7 @@ export async function callLovableProductModel(input: {
 你必须从下面 ERP 当前启用的二级分类中选择且只选择一个 category_code，禁止创造新分类：
 ${input.taxonomyPrompt}
 
-返回字段：category_code、confidence(0~1)、alternative_categories(最多3个)、name、ip_name、attributes、facet_predictions、attribute_confidence、clarification_requests、condition_grade、description、keywords、suggested_price_cny、compliance_flags、evidence、warning。
+返回字段：category_code、confidence(0~1)、alternative_categories(最多3个)、name、ip_name、attributes、date_markings、facet_predictions、attribute_confidence、clarification_requests、condition_grade、description、keywords、suggested_price_cny、compliance_flags、evidence、warning。
 attributes 必须包含 brand、maker、origin_region、origin_country、era、material(数组)、craft(数组)、object_type、colors(数组)、dimensions、functional_status、missing_parts(数组)。
 facet_predictions 必须是数组，每项包含 dimension、value、confidence；只能使用下面标签库中已有的名称或别名，不能创造正式标签：
 ${input.facetPrompt || "（当前标签库为空，返回空数组）"}

@@ -16,12 +16,20 @@ export type CategoryNode = {
   is_active: boolean;
 };
 
+export type ProductDateMarking = {
+  text: string;
+  image_index: number;
+  years: number[];
+  kind: "manufacturing" | "copyright" | "character" | "label" | "unknown";
+};
+
 export type ProductRecognitionAttributes = {
   brand: string | null;
   maker: string | null;
   origin_region: string | null;
   origin_country: string | null;
   era: string | null;
+  date_markings?: ProductDateMarking[];
   material: string[];
   craft: string[];
   object_type: string | null;
@@ -47,6 +55,7 @@ export type RawProductRecognition = {
   origin_region?: string | null;
   origin_country?: string | null;
   era?: string | null;
+  date_markings?: unknown;
   material?: string[] | string | null;
   craft?: string[] | string | null;
   object_type?: string | null;
@@ -171,6 +180,61 @@ function cleanClarificationRequests(
     .slice(0, 8);
 }
 
+function normalizeDateMarkings(raw: RawProductRecognition, imageCount?: number) {
+  const input = raw.date_markings ?? raw.attributes?.date_markings;
+  const strict = imageCount !== undefined || input !== undefined;
+  if (!strict) {
+    const legacy = cleanString(raw.attributes?.era ?? raw.era);
+    const era = legacy && /^(?:heisei|era_heisei|平成|平成时代)$/i.test(legacy)
+      ? "平成（1989–2019年）" : legacy;
+    return { strict, era, markings: [] as ProductDateMarking[], reason: null as string | null };
+  }
+  const markings: ProductDateMarking[] = [];
+  let invalid = input !== undefined && !Array.isArray(input);
+  for (const item of (Array.isArray(input) ? input : []).slice(0, 16)) {
+    const text = cleanString(item?.text);
+    const index = item?.image_index;
+    if (!text || text.length > 300 || /[<>\u0000-\u001f]/.test(text) ||
+        !Number.isInteger(index) || index < 1 || index > (imageCount ?? 8)) {
+      invalid = true;
+      continue;
+    }
+    const comparable = text.normalize("NFKC");
+    const westernYears = (comparable.match(/(?<!\d)(?:18|19|20)\d{2}(?!\d)/g) ?? []).map(Number);
+    const heiseiYears = [...comparable.matchAll(/平成(元|[1-9]\d?)年/g)]
+      .map((match) => match[1] === "元" ? 1 : Number(match[1]))
+      .filter((year) => year <= 31).map((year) => 1988 + year);
+    const years = [...new Set([...westernYears, ...heiseiYears])].sort();
+    const claimed = item.years;
+    const supported = years.length > 0 && years.every((year) => year <= new Date().getUTCFullYear()) &&
+      Array.isArray(claimed) && claimed.length === years.length &&
+      claimed.every((year: unknown) => typeof year === "number" && Number.isInteger(year) && years.includes(year)) && new Set(claimed).size === years.length;
+    let kind: ProductDateMarking["kind"] = ["manufacturing", "copyright", "character", "label", "unknown"].includes(item.kind) ? item.kind : "unknown";
+    // Printed copyright symbols override model guesses, never the other way around.
+    if (/©|copyright|版权/i.test(comparable)) kind = "copyright";
+    if (kind === "copyright" && (!/(?:©|copyright|版权)\s*(?:(?:18|19|20)\d{2}\s*[,，、/]\s*)+(?:18|19|20)\d{2}/i.test(comparable) || (comparable.match(/©|copyright|版权/gi) ?? []).length !== 1)) kind = "unknown";
+    if (kind === "manufacturing" && (!/(?:生产日期|生产年月|制造日期|制造年月|製造年月|製造日|\bMFG\b|manufactured\s+(?:in|on)|date of manufacture)/i.test(comparable) || /\b(?:not|never|maybe|probably|estimated|unknown|unconfirmed)\b|不明|不详|可能|疑似|推测|[?？]/i.test(comparable))) kind = "unknown";
+    if (!supported) { kind = "unknown"; invalid = true; }
+    markings.push({ text, image_index: index, years, kind });
+  }
+  if (Array.isArray(input) && input.length > 16) invalid = true;
+  const manufacture = markings.filter((mark) => mark.kind === "manufacturing");
+  const candidates = manufacture.length ? manufacture : markings.filter((mark) =>
+    (mark.kind === "copyright" && mark.years.length > 1) || mark.kind === "label",
+  );
+  const selected = candidates.map((mark) => ({
+    year: mark.kind === "copyright" ? Math.max(...mark.years) : mark.years.length === 1 ? mark.years[0] : null,
+    kind: mark.kind,
+  }));
+  const conflict = selected.some((mark) => mark.year === null) || new Set(selected.map((mark) => mark.year)).size > 1;
+  if (invalid || conflict || !selected.length) return {
+    strict, era: null, markings,
+    reason: conflict ? "多图日期证据冲突，请核对是否为同一商品" : "没有足够明确的商品日期证据，版权或角色年份不能当作生产年份",
+  };
+  const label = manufacture.length ? "生产年份" : selected.some((mark) => mark.kind === "copyright") ? "版权标注" : "标签标注";
+  return { strict, era: `${selected[0].year}年（${label}）`, markings, reason: null };
+}
+
 export function activeLeafCategories(categories: CategoryNode[]): CategoryNode[] {
   const activeRoots = new Set(
     categories.filter((row) => row.is_active && row.parent_id === null).map((row) => row.id),
@@ -220,6 +284,7 @@ export function normalizeProductRecognition(
   raw: RawProductRecognition,
   categories: CategoryNode[],
   taxonomy: ProductTaxonomyContext = { facets: [], brands: [], ips: [] },
+  context?: { imageCount: number },
 ): NormalizedProductRecognition {
   const leaves = activeLeafCategories(categories);
   if (leaves.length === 0) throw new Error("ERP 分类树没有启用的二级分类");
@@ -261,6 +326,22 @@ export function normalizeProductRecognition(
   const ip = matchBrandCandidate(raw.ip_name, taxonomy.ips);
   const sanrio = findSanrioBrandCandidate(taxonomy.brands, taxonomy.ips);
   const clarificationRequests = cleanClarificationRequests(raw.clarification_requests);
+  const dates = normalizeDateMarkings(raw, context?.imageCount);
+  if (dates.reason && !clarificationRequests.some((item) => item.field === "era")) {
+    clarificationRequests.push({ field: "era", question: "请补拍清晰的底款、吊牌或背标日期文字", reason: dates.reason });
+  }
+  // Guard only explicit era/manufacture claims, not ordinary model numbers or product prose.
+  const description = cleanString(raw.description);
+  const descriptionParts = description?.split(/[。；;]/u) ?? [];
+  const keptParts = dates.strict ? descriptionParts.filter((part) => !/(?:\bHeisei\b|平成|\d{4}年\s*(?:生产|制造|製造)|(?:生产|制造|製造)(?:于|年份|日期|年月)?[：:\s]*\d{4})/i.test(part.normalize("NFKC"))) : descriptionParts;
+  const safeDescription = keptParts.length === descriptionParts.length ? description : cleanString(keptParts.filter((part) => part.trim()).join("；"));
+  const productionYear = Number(dates.era?.match(/^(\d{4})年（生产年份）$/)?.[1]);
+  const keepFacet = (facet: { dimension: string; code?: string }) => {
+    if (!dates.strict || facet.dimension !== "era") return true;
+    if (facet.code === "era_heisei") return productionYear > 1989 && productionYear < 2019;
+    if (facet.code === "era_showa") return productionYear > 1926 && productionYear < 1989;
+    return false;
+  };
   const ipConfidence = raw.attribute_confidence?.ip_name === undefined
     ? confidence
     : cleanConfidence(raw.attribute_confidence.ip_name);
@@ -302,7 +383,8 @@ export function normalizeProductRecognition(
       maker: cleanString(nested.maker ?? raw.maker),
       origin_region: cleanString(nested.origin_region ?? raw.origin_region),
       origin_country: cleanString(nested.origin_country ?? raw.origin_country),
-      era: cleanString(nested.era ?? raw.era),
+      era: dates.era,
+      ...(dates.strict ? { date_markings: dates.markings } : {}),
       material: cleanStringArray(nested.material ?? raw.material),
       craft: cleanStringArray(nested.craft ?? raw.craft),
       object_type: cleanString(nested.object_type ?? raw.object_type),
@@ -317,11 +399,11 @@ export function normalizeProductRecognition(
       missing_parts: cleanStringArray(nested.missing_parts ?? raw.missing_parts),
     },
     condition_grade: cleanGrade(raw.condition_grade),
-    description: cleanString(raw.description),
+    description: safeDescription,
     keywords: cleanStringArray(raw.keywords),
     suggested_price_cny: cleanPrice(raw.suggested_price_cny),
     compliance_flags: complianceFlags,
-    evidence: cleanStringArray(raw.evidence),
+    evidence: [...cleanStringArray(raw.evidence), ...dates.markings.map((mark) => `图${mark.image_index} 日期原文（${mark.kind}）：${mark.text}`)],
     warning: cleanString(raw.warning),
     brand_id: brand.match?.id ?? null,
     brand_candidate_text: brand.candidate_text,
@@ -339,8 +421,8 @@ export function normalizeProductRecognition(
       name: item.brand.name,
       score: Math.round(item.score * 1000) / 1000,
     })),
-    facets: normalizedFacets.matches,
-    unmatched_facets: normalizedFacets.unmatched,
+    facets: normalizedFacets.matches.filter(keepFacet),
+    unmatched_facets: normalizedFacets.unmatched.filter(keepFacet),
     attribute_confidence: cleanConfidenceMap(raw.attribute_confidence),
     clarification_requests: clarificationRequests,
   };
