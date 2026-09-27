@@ -13,9 +13,8 @@ type JobRow = {
   source_path: string;
   source_index: number;
   attempts: number;
+  claim_token: string;
 };
-
-const BACKOFF_SECONDS = [30, 5 * 60, 30 * 60, 2 * 60 * 60];
 
 type ContentImageJob = {
   id: string;
@@ -120,112 +119,42 @@ export async function enqueueListingImageJobs(input: {
   return { queued: rows.length, status: "queued" };
 }
 
-async function replaceRawPathWithListing(job: JobRow, targetPath: string): Promise<void> {
-  const { error } = await supabaseAdmin.rpc(
-    "handheld_apply_listing_image_result" as never,
-    {
-      p_sku_id: job.sku_id,
-      p_source_key: `${job.source_bucket}/${job.source_path}`,
-      p_target_key: `sku-listing/${targetPath}`,
-    } as never,
-  );
-  if (error) throw new Error(`替换 SKU 上架图失败：${error.message}`);
-}
-
-async function refreshSkuStatus(skuId: string): Promise<void> {
-  const result = await supabaseAdmin
-    .from("inv_listing_image_jobs" as never)
-    .select("status")
-    .eq("sku_id", skuId);
-  if (result.error) return;
-  const statuses = (result.data ?? []).map((row) => String((row as { status: string }).status));
-  let status = "idle";
-  if (statuses.length > 0 && statuses.every((value) => value === "succeeded")) status = "succeeded";
-  else if (statuses.some((value) => value === "processing")) status = "processing";
-  else if (statuses.some((value) => value === "queued")) status = "queued";
-  else if (statuses.some((value) => value === "succeeded")) status = "partial_failed";
-  else if (statuses.some((value) => value === "retryable_failed" || value === "permanent_failed"))
-    status = "retryable_failed";
-  await supabaseAdmin
-    .from("inv_skus")
-    .update({
-      image_processing_status: status,
-      image_processing_updated_at: new Date().toISOString(),
-    } as never)
-    .eq("id", skuId);
-}
-
-async function processJob(job: JobRow, workerId: string): Promise<boolean> {
-  const locked = await supabaseAdmin
-    .from("inv_listing_image_jobs" as never)
-    .update({
-      status: "processing",
-      attempts: job.attempts + 1,
-      locked_at: new Date().toISOString(),
-      locked_by: workerId,
-      updated_at: new Date().toISOString(),
-    } as never)
-    .eq("id", job.id)
-    .in("status", ["queued", "retryable_failed"])
-    .select("id")
-    .maybeSingle();
-  if (locked.error) throw new Error(locked.error.message);
-  if (!locked.data) return false;
-
+async function processJob(job: JobRow): Promise<string> {
+  let targetPath: string | null = null;
+  let failure: string | null = null;
   try {
-    const targetPath = await prepareImage(
+    const path = await prepareImage(
       job.source_bucket,
       job.source_path,
-      `${new Date().toISOString().slice(0, 10)}/${job.sku_id}/${job.source_index + 1}-${crypto.randomUUID()}`,
+      `gallery/${job.sku_id}/${job.id}/${job.claim_token}`,
     );
-    await replaceRawPathWithListing(job, targetPath);
-    await supabaseAdmin
-      .from("inv_listing_image_jobs" as never)
-      .update({
-        status: "succeeded",
-        target_path: targetPath,
-        last_error: null,
-        completed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      } as never)
-      .eq("id", job.id);
+    targetPath = `sku-listing/${path}`;
   } catch (error) {
-    const attempts = job.attempts + 1;
-    const permanent = attempts >= BACKOFF_SECONDS.length + 1;
-    const delay = BACKOFF_SECONDS[Math.min(attempts - 1, BACKOFF_SECONDS.length - 1)];
-    await supabaseAdmin
-      .from("inv_listing_image_jobs" as never)
-      .update({
-        status: permanent ? "permanent_failed" : "retryable_failed",
-        last_error:
-          error instanceof Error ? error.message.slice(0, 1000) : String(error).slice(0, 1000),
-        next_run_at: new Date(Date.now() + delay * 1000).toISOString(),
-        updated_at: new Date().toISOString(),
-      } as never)
-      .eq("id", job.id);
-  } finally {
-    await refreshSkuStatus(job.sku_id);
+    failure = (error instanceof Error ? error.message : String(error)).slice(0, 1000);
   }
-  return true;
+  // The transaction fences ownership before applying pixels and completing the job.
+  const result = await supabaseAdmin.rpc("handheld_listing_image_finish" as never, {
+    p_id: job.id, p_claim_token: job.claim_token, p_target_path: targetPath, p_error: failure,
+  } as never);
+  if (result.error) throw new Error(`Complete gallery image job: ${result.error.message}`);
+  const status = String(result.data);
+  if (!["succeeded", "retryable_failed", "permanent_failed", "stale"].includes(status)) {
+    throw new Error("Unexpected gallery image completion status");
+  }
+  return status;
 }
 
 type BatchResult = { processed: number; failed: number };
 
 async function runLegacyImageBatch(limit: number): Promise<BatchResult> {
-  const result = await supabaseAdmin
-    .from("inv_listing_image_jobs" as never)
-    .select("id, sku_id, source_bucket, source_path, source_index, attempts")
-    .in("status", ["queued", "retryable_failed"])
-    .lte("next_run_at", new Date().toISOString())
-    .order("created_at", { ascending: true })
-    .limit(limit);
+  const result = await supabaseAdmin.rpc("handheld_listing_image_claim" as never, { p_limit: limit } as never);
   if (result.error) throw new Error(`读取图片任务失败：${result.error.message}`);
   const jobs = (result.data ?? []) as unknown as JobRow[];
-  const workerId = `erp-${crypto.randomUUID()}`;
-  const outcomes = await Promise.allSettled(jobs.map((job) => processJob(job, workerId)));
+  const outcomes = await Promise.allSettled(jobs.map(processJob));
   return {
-    processed: outcomes.filter((outcome) => outcome.status === "fulfilled" && outcome.value).length,
-    failed: outcomes.filter((outcome) => outcome.status === "rejected").length,
+    processed: outcomes.filter((outcome) => outcome.status === "fulfilled" && outcome.value !== "stale").length,
+    failed: outcomes.filter((outcome) => outcome.status === "rejected" ||
+      (outcome.status === "fulfilled" && ["retryable_failed", "permanent_failed"].includes(outcome.value))).length,
   };
 }
 

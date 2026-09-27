@@ -63,6 +63,33 @@ if (mode === "prepare") {
     }, null, 2), { mode: 0o600 });
     console.log(JSON.stringify({ job_id: job.id, result: "ready_for_visual_review", imageFile, manifest }));
   }
+} else if (mode === "stage-reviewed") {
+  // Only stage a visually reviewed replacement for a proven padded-original failure.
+  if (!/^[a-f0-9-]{36}$/.test(argument) || !onlyJob) throw new Error("Job ID and reviewed image file required");
+  const selected = await db.from("inv_listing_image_jobs" as never).select("*").eq("id", argument).single();
+  check(selected.error);
+  const job = selected.data as any;
+  if (!allowedSkus.has(job.sku_id) || job.status !== "succeeded") throw new Error("Unapproved or changed job");
+  const sku = await db.from("inv_skus").select("id,name,image_paths,status").eq("id", job.sku_id).single();
+  check(sku.error);
+  const oldKey = `${job.target_bucket}/${job.target_path}`;
+  if (sku.data!.status !== "active" || !sku.data!.image_paths?.includes(oldKey)) throw new Error("SKU image changed");
+  const original = await download(job.source_bucket, job.source_path);
+  const padded = Buffer.from((await squareOriginalImage(original)).b64, "base64");
+  if (!await samePixels(padded, await download(job.target_bucket, job.target_path))) throw new Error("Not a padded-original failure");
+  const bytes = await readFile(onlyJob);
+  const metadata = await sharp(bytes).metadata();
+  if (metadata.format !== "png" || metadata.width !== metadata.height || (metadata.width ?? 0) < 1024) {
+    throw new Error("Reviewed image must be a square PNG of at least 1024px");
+  }
+  if (await samePixels(bytes, padded)) throw new Error("Replacement is still the original");
+  const imageFile = `/tmp/listing-repair-${job.id}.image`;
+  const manifest = `/tmp/listing-repair-${job.id}.json`;
+  await writeFile(imageFile, bytes, { mode: 0o600 });
+  await writeFile(manifest, JSON.stringify({ job, sku: sku.data, oldKey, imageFile, mime: "image/png",
+    targetPath: `2026-09-27/${job.sku_id}/reviewed-${crypto.randomUUID()}.png`,
+  }, null, 2), { mode: 0o600 });
+  console.log(JSON.stringify({ job_id: job.id, result: "reviewed_staged", manifest }));
 } else if (mode === "apply") {
   if (!/^\/tmp\/listing-repair-[a-f0-9-]+\.json$/.test(argument)) throw new Error("Manifest required");
   const saved = JSON.parse(await readFile(argument, "utf8"));
@@ -87,5 +114,5 @@ if (mode === "prepare") {
   if ((update.data ?? []).length !== 1) throw new Error("Image applied but job metadata changed; review needed");
   console.log(JSON.stringify({ sku_id: saved.job.sku_id, job_id: saved.job.id, result: "applied", target_path: saved.targetPath }));
 } else {
-  throw new Error("Usage: prepare <approved SKU> | apply /tmp/listing-repair-<job>.json");
+  throw new Error("Usage: prepare <approved SKU> [job ID] | stage-reviewed <job ID> <PNG> | apply /tmp/listing-repair-<job>.json");
 }

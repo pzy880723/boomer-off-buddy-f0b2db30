@@ -13,6 +13,8 @@ after(() => {
 const stubs: Record<string, string> = {
   "@/integrations/supabase/client.server": `export const supabaseAdmin={
     rpc:async(name,args)=>{const s=globalThis.__contentJobs;s.calls.push({name,args});
+      if(name==='handheld_listing_image_claim'){await s.legacyGate;return {data:s.legacyJobs,error:s.legacyError?{message:'legacy unavailable'}:null};}
+      if(name==='handheld_listing_image_finish')return {data:s.legacyFinishStatus??(args.p_error?'retryable_failed':'succeeded'),error:s.legacyFinishError?{message:'legacy completion unavailable'}:null};
       if(name==='product_content_image_finish' && args.p_id===s.finishError) return {data:null,error:{message:'completion unavailable'}};
       if(name==='product_content_image_claim' && s.claimError) return {data:null,error:{message:'claim unavailable'}};
       return name==='product_content_image_claim'?{data:s.jobs,error:null}:{data:'succeeded',error:null};},
@@ -73,6 +75,8 @@ beforeEach(() => {
     legacyError: false,
     claimError: false,
     finishError: undefined,
+    legacyFinishError: false,
+    legacyFinishStatus: undefined,
   });
 });
 test("content finishes while the legacy queue is still blocked", async () => {
@@ -106,7 +110,7 @@ test("content claim failure does not suppress successful legacy outcomes", async
     },
   ];
   assert.deepEqual(await worker.runListingImageWorker(2), { processed: 1, failed: 1 });
-  assert.ok(state.calls.some((call: any) => call.name === "handheld_apply_listing_image_result"));
+  assert.ok(state.calls.some((call: any) => call.name === "handheld_listing_image_finish"));
 });
 test("one content completion error retains sibling completion counts", async () => {
   state.jobs = [{ ...job, id: "bad" }, job];
@@ -186,24 +190,48 @@ test("legacy gallery jobs still apply their SKU result and refresh status after 
       source_path: "date/device/gallery.jpg",
       source_index: 0,
       attempts: 0,
+      claim_token: "legacy-claim",
     },
   ];
   assert.equal((await worker.runListingImageWorker(2)).processed, 1);
   const apply = state.calls.find(
-    (call: any) => call.name === "handheld_apply_listing_image_result",
+    (call: any) => call.name === "handheld_listing_image_finish",
   );
-  assert.equal(apply.args.p_source_key, "sku-raw/date/device/gallery.jpg");
-  assert.equal(apply.args.p_target_key, `sku-listing/${state.uploads[0].path}`);
-  assert.ok(
-    state.writes.some(
-      (write: any) =>
-        write.table === "inv_listing_image_jobs" && write.value.status === "succeeded",
-    ),
-  );
-  assert.ok(
-    state.writes.some(
-      (write: any) =>
-        write.table === "inv_skus" && write.value.image_processing_status === "succeeded",
-    ),
-  );
+  assert.equal(apply.args.p_id, "legacy");
+  assert.equal(apply.args.p_claim_token, "legacy-claim");
+  assert.equal(apply.args.p_target_path, `sku-listing/${state.uploads[0].path}`);
+  assert.equal(apply.args.p_error, null);
+  assert.deepEqual(state.writes, [], "Only the owner-fenced SQL transaction may apply and finish");
+  assert.equal(state.calls.some((call: any) => call.name === "handheld_apply_listing_image_result"), false);
+});
+
+function legacyOnly() {
+  state.jobs = [];
+  state.legacyJobs = [{ id: "legacy", sku_id: "sku", source_bucket: "sku-raw", source_path: "gallery.jpg", source_index: 0, attempts: 1, claim_token: "owner" }];
+}
+test("legacy completion failure is visible and leaves recovery to the lease", async () => {
+  legacyOnly(); state.legacyFinishError = true;
+  assert.deepEqual(await worker.runListingImageWorker(2), { processed: 0, failed: 1 });
+  assert.deepEqual(state.writes, []);
+});
+test("legacy preparation errors are durably finished as failures, never raw-success", async () => {
+  legacyOnly(); state.fail = true;
+  assert.deepEqual(await worker.runListingImageWorker(2), { processed: 1, failed: 1 });
+  const finish = state.calls.find((c: any) => c.name === "handheld_listing_image_finish");
+  assert.equal(finish.args.p_target_path, null);
+  assert.match(finish.args.p_error, /ruler service failed/);
+  assert.deepEqual(state.uploads, []);
+});
+test("removed source completion is reported as failed rather than successful", async () => {
+  legacyOnly(); state.legacyFinishStatus = "permanent_failed";
+  assert.deepEqual(await worker.runListingImageWorker(2), { processed: 1, failed: 1 });
+});
+test("stale owner cannot report a completed legacy job", async () => {
+  legacyOnly(); state.legacyFinishStatus = "stale";
+  assert.deepEqual(await worker.runListingImageWorker(2), { processed: 0 });
+  assert.deepEqual(state.writes, []);
+});
+test("unrecognized legacy completion response is not accepted", async () => {
+  legacyOnly(); state.legacyFinishStatus = "unexpected";
+  assert.deepEqual(await worker.runListingImageWorker(2), { processed: 0, failed: 1 });
 });
