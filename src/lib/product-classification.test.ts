@@ -16,6 +16,27 @@ describe("image date markings", () => {
   const normalize = (date_markings: unknown, imageCount = 3) => normalizeProductRecognition(
     { ...raw, date_markings } as RawProductRecognition, categories, undefined, { imageCount },
   );
+  const estimate = { start_decade: 1990, end_decade: 2000, clues: [{ image_index: 2, detail: "包装采用该系列早期商标与旧式型号排版" }] };
+  const estimated = (era_estimate: unknown, date_markings: unknown = []) => normalizeProductRecognition(
+    { ...raw, date_markings, era_estimate } as RawProductRecognition, categories, undefined, { imageCount: 2 },
+  );
+  test("photo-based estimates display a Chinese approximate decade range with traceable clues", () => {
+    const result = estimated(estimate);
+    assert.equal(result.attributes.era, "约1990—2000年代（推测）");
+    assert.ok(result.evidence.some(text => text.includes("推测依据") && text.includes("图2") && text.includes("旧式型号")));
+    assert.ok(!result.clarification_requests.some(item => item.field === "era"));
+    assert.equal(estimated({ ...estimate, end_decade: 1990 }).attributes.era, "约1990年代（推测）");
+  });
+  test("exact markings still win over a plausible estimate and conflicts cannot be hidden", () => {
+    assert.equal(estimated(estimate, [mark("MFG 2020", [2020], "manufacturing")]).attributes.era, "2020年（生产年份）");
+    assert.equal(estimated(estimate, [mark("©1975,2020 SANRIO", [1975, 2020], "copyright")]).attributes.era, "2020年（版权标注）");
+    assert.equal(estimated(estimate, [mark("MFG 2019", [2019], "manufacturing"), mark("MFG 2020", [2020], "manufacturing", 2)]).attributes.era, null);
+  });
+  test("estimates reject bare era names, missing clues, invalid images and non-decade ranges", () => {
+    for (const invalid of ["Heisei", { ...estimate, clues: [] }, { ...estimate, clues: [{ image_index: 3, detail: "商标" }] }, { ...estimate, clues: [{ image_index: 1, detail: " " }] }, { ...estimate, start_decade: 1995 }, { ...estimate, start_decade: 2010 }, { ...estimate, end_decade: 2090 }]) {
+      assert.equal(estimated(invalid).attributes.era, null);
+    }
+  });
   test("manufacturing evidence on later uploaded images beats era and character copyright", () => {
     const result = normalize([mark("©1975 SANRIO", [1975], "character"), mark("製造年月 2020年06月", [2020], "manufacturing", 3)]);
     assert.equal(result.attributes.era, "2020年（生产年份）");

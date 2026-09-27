@@ -56,6 +56,7 @@ export type RawProductRecognition = {
   origin_country?: string | null;
   era?: string | null;
   date_markings?: unknown;
+  era_estimate?: unknown;
   material?: string[] | string | null;
   craft?: string[] | string | null;
   object_type?: string | null;
@@ -180,14 +181,31 @@ function cleanClarificationRequests(
     .slice(0, 8);
 }
 
+function normalizeEraEstimate(value: unknown, imageCount: number) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const { start_decade: start, end_decade: end, clues } = value as Record<string, unknown>;
+  const latestDecade = Math.floor(new Date().getUTCFullYear() / 10) * 10;
+  if (typeof start !== "number" || typeof end !== "number" || !Number.isInteger(start) ||
+      !Number.isInteger(end) || start % 10 !== 0 || end % 10 !== 0 || start < 1800 ||
+      end < start || end > latestDecade || !Array.isArray(clues) || !clues.length || clues.length > 3) return null;
+  const evidence: string[] = [];
+  for (const clue of clues) {
+    const detail = cleanString(clue?.detail);
+    if (!detail || detail.length > 200 || /[<>\u0000-\u001f]/.test(detail) ||
+        !Number.isInteger(clue?.image_index) || clue.image_index < 1 || clue.image_index > imageCount) return null;
+    evidence.push(`年代推测依据（图${clue.image_index}）：${detail}`);
+  }
+  return { era: `约${start}${start === end ? "" : `—${end}`}年代（推测）`, evidence };
+}
+
 function normalizeDateMarkings(raw: RawProductRecognition, imageCount?: number) {
   const input = raw.date_markings ?? raw.attributes?.date_markings;
-  const strict = imageCount !== undefined || input !== undefined;
+  const strict = imageCount !== undefined || input !== undefined || raw.era_estimate !== undefined;
   if (!strict) {
     const legacy = cleanString(raw.attributes?.era ?? raw.era);
     const era = legacy && /^(?:heisei|era_heisei|平成|平成时代)$/i.test(legacy)
       ? "平成（1989–2019年）" : legacy;
-    return { strict, era, markings: [] as ProductDateMarking[], reason: null as string | null };
+    return { strict, era, markings: [] as ProductDateMarking[], reason: null as string | null, estimateEvidence: [] as string[] };
   }
   const markings: ProductDateMarking[] = [];
   let invalid = input !== undefined && !Array.isArray(input);
@@ -227,12 +245,16 @@ function normalizeDateMarkings(raw: RawProductRecognition, imageCount?: number) 
     kind: mark.kind,
   }));
   const conflict = selected.some((mark) => mark.year === null) || new Set(selected.map((mark) => mark.year)).size > 1;
-  if (invalid || conflict || !selected.length) return {
-    strict, era: null, markings,
-    reason: conflict ? "多图日期证据冲突，请核对是否为同一商品" : "没有足够明确的商品日期证据，版权或角色年份不能当作生产年份",
-  };
+  if (invalid || conflict || !selected.length) {
+    // Estimates never override a concrete date, malformed evidence, or a date conflict.
+    const estimate = !invalid && !conflict ? normalizeEraEstimate(raw.era_estimate, imageCount ?? 8) : null;
+    return {
+      strict, era: estimate?.era ?? null, markings, estimateEvidence: estimate?.evidence ?? [],
+      reason: estimate ? null : conflict ? "多图日期证据冲突，请核对是否为同一商品" : "没有足够明确的商品日期证据，版权或角色年份不能当作生产年份",
+    };
+  }
   const label = manufacture.length ? "生产年份" : selected.some((mark) => mark.kind === "copyright") ? "版权标注" : "标签标注";
-  return { strict, era: `${selected[0].year}年（${label}）`, markings, reason: null };
+  return { strict, era: `${selected[0].year}年（${label}）`, markings, reason: null, estimateEvidence: [] as string[] };
 }
 
 export function activeLeafCategories(categories: CategoryNode[]): CategoryNode[] {
@@ -333,7 +355,12 @@ export function normalizeProductRecognition(
   // Guard only explicit era/manufacture claims, not ordinary model numbers or product prose.
   const description = cleanString(raw.description);
   const descriptionParts = description?.split(/[。；;]/u) ?? [];
-  const keptParts = dates.strict ? descriptionParts.filter((part) => !/(?:\bHeisei\b|平成|\d{4}年\s*(?:生产|制造|製造)|(?:生产|制造|製造)(?:于|年份|日期|年月)?[：:\s]*\d{4})/i.test(part.normalize("NFKC"))) : descriptionParts;
+  const keptParts = dates.strict ? descriptionParts.filter((part) => {
+    const text = part.normalize("NFKC");
+    if (/(?:\bHeisei\b|平成|\d{4}年\s*(?:生产|制造|製造)|(?:生产|制造|製造)(?:于|年份|日期|年月)?[：:\s]*\d{4})/i.test(text)) return false;
+    // Reinsert only the normalized era; rejected estimates must not survive in prose.
+    return !/(?:\d{2,4}|[一二三四五六七八九十〇零]{1,4})\s*年代|\b(?:18|19|20)\d0s\b/i.test(text);
+  }) : descriptionParts;
   const safeDescription = keptParts.length === descriptionParts.length ? description : cleanString(keptParts.filter((part) => part.trim()).join("；"));
   const productionYear = Number(dates.era?.match(/^(\d{4})年（生产年份）$/)?.[1]);
   const keepFacet = (facet: { dimension: string; code?: string }) => {
@@ -403,7 +430,7 @@ export function normalizeProductRecognition(
     keywords: cleanStringArray(raw.keywords),
     suggested_price_cny: cleanPrice(raw.suggested_price_cny),
     compliance_flags: complianceFlags,
-    evidence: [...cleanStringArray(raw.evidence), ...dates.markings.map((mark) => `图${mark.image_index} 日期原文（${mark.kind}）：${mark.text}`)],
+    evidence: [...cleanStringArray(raw.evidence), ...dates.markings.map((mark) => `图${mark.image_index} 日期原文（${mark.kind}）：${mark.text}`), ...dates.estimateEvidence],
     warning: cleanString(raw.warning),
     brand_id: brand.match?.id ?? null,
     brand_candidate_text: brand.candidate_text,

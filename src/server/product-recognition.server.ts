@@ -9,7 +9,7 @@ import {
 } from "../lib/product-classification";
 import type { BrandCandidate, FacetTerm } from "../lib/product-taxonomy";
 
-export const PRODUCT_RECOGNITION_PROMPT_VERSION = "boomer-product-v6-date-markings";
+export const PRODUCT_RECOGNITION_PROMPT_VERSION = "boomer-product-v7-era-estimate";
 export const DEFAULT_PRODUCT_RECOGNITION_MODEL = "google/gemini-2.5-pro";
 export const DEFAULT_HANDHELD_PRODUCT_RECOGNITION_MODEL = "google/gemini-2.5-flash";
 export const HANDHELD_RECOGNITION_TIMEOUT_MS = 25_000;
@@ -280,7 +280,8 @@ export function buildEraInstruction(source: ProductRecognitionSource): string {
 明确平成10年可换算1998年，但仍按标记性质区分；只有Heisei无年数不能换算。©’76,’20等两位版权年不猜世纪，保留原文、years返回空数组并提示补拍。不同角色独立的初始版权行不得合并取较晚年。
 只有明确写着生产日期、製造年月、MFG或manufactured等制造标记且年份无冲突，才能输出“2020年（生产年份）”。版权、角色诞生年、首次版权年不是生产年；禁止把版权年 (©/Copyright 年份) 当作生产年，也禁止单看较晚年份就断言生产。
 例如 ©1975,2020 SANRIO 必须完整保留原文及全部年份，可能是多个角色的版权组合；最多显示“2020年（版权标注）”，不能称2020年生产。单个角色年或初始版权年不能断代；清楚的普通商品标签年份只可显示“2020年（标签标注）”。
-明确制造年份优先于版权/标签标注；多图同性质日期冲突、模糊或完全没有证据时 era 返回 null，并通过 clarification_requests 提示补拍底款/吊牌/背标，不阻塞分类上架；简介省略年代，不写“年代待确认”。新结果只有Heisei/平成而无具体日期证据时 era 也返回 null，不把年号范围当作商品生产年代。
+明确制造年份优先于版权/标签标注；多图同性质日期冲突时 era 返回 null，不得用推测掩盖冲突。没有明确日期但有照片可见线索时，允许保守推测中文年代范围：返回 era_estimate:{start_decade:1990,end_decade:2000,clues:[{image_index:1,detail:"具体可见的型号、商标版本、包装版式或工艺线索及其年代关联"}]}。起止值须为完整十年起点，例如1990；同一年代起止相同，最多3条依据，图片序号必须有效。输出“约1990年代（推测）”或“约1990—2000年代（推测）”，不能当确切生产年，也不直接输出Heisei等英文代号。
+推测必须说明具体照片线索与年代范围的关联，不能仅凭角色/IP诞生年、初始版权年或泛泛“复古感”推断；可能是复刻、新生产或线索不足时不要硬填。没有可支持推测的线索时 era_estimate 返回 null、era 返回 null，可通过 clarification_requests 提示补拍底款/吊牌/背标，不阻塞上架；不写“年代待确认”。
 attributes.era、description、evidence 与 date_markings 必须一致，简介不能残留Heisei或错误的“1975年生产”；不要用era标签库别名代替日期证据。没有真实检索结果时不得声称已联网核实。`;
   if (source !== "handheld") return shared;
   return `${shared}
@@ -307,7 +308,7 @@ export async function callLovableProductModel(input: {
 你必须从下面 ERP 当前启用的二级分类中选择且只选择一个 category_code，禁止创造新分类：
 ${input.taxonomyPrompt}
 
-返回字段：category_code、confidence(0~1)、alternative_categories(最多3个)、name、ip_name、attributes、date_markings、facet_predictions、attribute_confidence、clarification_requests、condition_grade、description、keywords、suggested_price_cny、compliance_flags、evidence、warning。
+返回字段：category_code、confidence(0~1)、alternative_categories(最多3个)、name、ip_name、attributes、date_markings、era_estimate、facet_predictions、attribute_confidence、clarification_requests、condition_grade、description、keywords、suggested_price_cny、compliance_flags、evidence、warning。
 attributes 必须包含 brand、maker、origin_region、origin_country、era、material(数组)、craft(数组)、object_type、colors(数组)、dimensions、functional_status、missing_parts(数组)。
 facet_predictions 必须是数组，每项包含 dimension、value、confidence；只能使用下面标签库中已有的名称或别名，不能创造正式标签：
 ${input.facetPrompt || "（当前标签库为空，返回空数组）"}

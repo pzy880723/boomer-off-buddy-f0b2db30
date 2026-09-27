@@ -423,14 +423,44 @@ describe("handheld recognition performance policy", () => {
     assert.match(handheld, /逐图/);
     assert.match(handheld, /©1975,2020/);
     assert.match(handheld, /多个角色/);
-    assert.match(handheld, /没有证据时 era 返回 null/);
+    assert.match(handheld, /没有可支持推测的线索/);
+    assert.match(handheld, /era_estimate/);
+    assert.match(handheld, /约1990—2000年代（推测）/);
     assert.match(handheld, /年代待确认/);
     assert.match(handheld, /禁止把版权年/);
     assert.match(handheld, /20-30 字/);
     const erp = buildEraInstruction("erp");
     assert.match(erp, /禁止把版权年/);
     assert.equal(/20-30 字/.test(erp), false);
-    assert.equal(PRODUCT_RECOGNITION_PROMPT_VERSION, "boomer-product-v6-date-markings");
+    assert.equal(PRODUCT_RECOGNITION_PROMPT_VERSION, "boomer-product-v7-era-estimate");
+  });
+
+  test("estimated decades stay qualified in the handheld description and use one model request", async () => {
+    const audits: ProductRecognitionAuditInput[] = [];
+    let calls = 0;
+    const era_estimate = { start_decade: 1990, end_decade: 2000, clues: [{ image_index: 1, detail: "旧式包装商标与型号版式，可能为该系列早期版本" }] };
+    const result = await runProductRecognition({ images: ["front"], source: "handheld" }, depsFor(async () => {
+      calls++;
+      return { model: "test-vision", raw: { category_code: "toy_character_figure", confidence: 0.95, description: "凯蒂猫挂件。1990年代出品。", date_markings: [], era_estimate } };
+    }, audits));
+    assert.equal(calls, 1);
+    assert.equal(result.attributes.era, "约1990—2000年代（推测）");
+    assert.equal(result.description, "凯蒂猫挂件；约1990—2000年代（推测）。");
+    assert.deepEqual((audits[0].raw_result as any).era_estimate, era_estimate);
+    assert.ok(audits[0].evidence.some(text => text.includes("年代推测依据")));
+  });
+  test("unqualified decades cannot survive exact-date precedence or rejected estimates", async () => {
+    const estimate = { start_decade: 1990, end_decade: 2000, clues: [{ image_index: 1, detail: "包装与型号线索" }] };
+    const cases = [
+      { description: "挂件。1990年代出品。", era_estimate: estimate, date_markings: [{ text: "MFG 2020", years: [2020], kind: "manufacturing", image_index: 1 }], expected: "挂件；2020年（生产年份）。" },
+      { description: "挂件。1990年代出品。", era_estimate: { ...estimate, end_decade: 2090 }, date_markings: [], expected: "挂件" },
+      { description: "挂件。90年代出品。", era_estimate: estimate, date_markings: [], expected: "挂件；约1990—2000年代（推测）。" },
+      { description: "挂件。上世纪九十年代出品。", era_estimate: estimate, date_markings: [], expected: "挂件；约1990—2000年代（推测）。" },
+    ];
+    for (const { expected, ...raw } of cases) {
+      const result = await runProductRecognition({ images: ["front"], source: "handheld" }, depsFor(async () => ({ model: "test-vision", raw: { category_code: "toy_character_figure", confidence: 0.95, ...raw } }), []));
+      assert.equal(result.description, expected);
+    }
   });
 
   test("one multi-image model call audits indexed date evidence and the normalized qualified year", async () => {

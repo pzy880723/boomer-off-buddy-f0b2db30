@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 base=/var/www/boomer-erp
-old="$base/releases/content-era-20260927"
-release="$base/releases/photo-year-evidence-20260927"
-candidate=boomer-photo-year-candidate
+old="$base/releases/photo-year-evidence-20260927"
+release="$base/releases/era-estimate-20260927-r2"
+candidate=boomer-era-estimate-candidate
 check() {
   for attempt in $(seq 1 40); do
     if curl -fsS --max-time 5 "http://127.0.0.1:$1/api/public/handheld/openapi.json" -o /dev/null; then return; fi
@@ -17,9 +17,9 @@ if [[ "${1:-}" == prepare ]]; then
   mkdir -p "$release"
   cp -a "$old/." "$release/"
   cd "$release"
-  git apply --check /tmp/boomer-photo-year.patch
-  git apply /tmp/boomer-photo-year.patch
-  NODE_OPTIONS=--max-old-space-size=3072 npm run build:tencent > /tmp/boomer-photo-year-build.log 2>&1
+  git apply --check /tmp/boomer-era-estimate.patch
+  git apply /tmp/boomer-era-estimate.patch
+  NODE_OPTIONS=--max-old-space-size=3072 npm run build:tencent > /tmp/boomer-era-estimate-build.log 2>&1
   APP_DIR="$release" ERP_PORT=3006 pm2 start "$release/scripts/run-tencent-erp.sh" --name "$candidate" --cwd "$release" --interpreter bash --time >/dev/null
   check 3006
   node --env-file=.env scripts/verify-listing-content-live.mjs http://127.0.0.1:3006
