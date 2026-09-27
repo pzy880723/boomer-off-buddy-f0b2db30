@@ -148,7 +148,7 @@ export type OfflineProductRow = {
 
 export function parseBranchChannelProduct(
   payload: unknown,
-  target: { kdtId: number; itemCode: string },
+  target: { kdtId: number; itemCode: string; skuBarcode?: string },
 ): OfflineProductRow | null {
   if (!payload || typeof payload !== "object") return null;
   const root = payload as Record<string, unknown>;
@@ -158,7 +158,12 @@ export function parseBranchChannelProduct(
   // Library IDs and HQ channel IDs cannot be used to update branch stock.
   const itemId = Number(row.channel_item_id ?? 0);
   if (!Number.isSafeInteger(itemId) || itemId <= 0) return null;
-  const skus = (Array.isArray(row.skus) ? row.skus : []).flatMap((value) => {
+  if (!Array.isArray(row.skus)) return null;
+  const candidates = target.skuBarcode === undefined ? row.skus : row.skus.filter((value) =>
+    target.skuBarcode?.trim() && value && typeof value === "object" &&
+    String((value as Record<string, unknown>).sku_barcode ?? "").trim() === target.skuBarcode.trim());
+  if (candidates.length !== 1) return null;
+  const skus = candidates.flatMap((value) => {
     if (!value || typeof value !== "object") return [];
     const sku = value as Record<string, unknown>;
     const skuId = Number(sku.channel_sku_id ?? 0);
@@ -171,7 +176,7 @@ export function parseBranchChannelProduct(
 }
 
 export async function queryYouzanBranchChannelProduct(args: {
-  accessToken: string; kdtId: number; itemCode: string;
+  accessToken: string; kdtId: number; itemCode: string; skuBarcode?: string;
 }): Promise<OfflineProductRow | null> {
   const { callYouzanApiVerbose } = await import("./youzan.functions");
   try {
@@ -464,6 +469,7 @@ export function buildCustomHqChannelUpdateParams(input: {
   priceYuan: number;
   kdtIds: number[];
   imageUrl?: string | null;
+  imageUrls?: string[];
 }) {
   const barcode = input.barcode.trim();
   if (!barcode) throw new Error("SKU 缺少 ERP 条码，无法同步有赞收银条码");
@@ -485,11 +491,10 @@ export function buildCustomHqChannelUpdateParams(input: {
       sell_channel_ids: kdtIds,
     },
   };
-  if (input.imageUrl) {
-    params.photo_url = JSON.stringify([{ url: input.imageUrl }]);
-    params.pic_url = input.imageUrl;
-    params.spu_pic_list = [input.imageUrl];
-    params.spu_img_list = [{ img_url: input.imageUrl }];
+  const images = input.imageUrls ?? (input.imageUrl ? [input.imageUrl] : []);
+  if (images.length) {
+    // Official spu.update contract accepts photo_url; aliases are not documented.
+    params.photo_url = JSON.stringify(images.map(url => ({url})));
   }
   return params as typeof params & {
     spu_no: string;

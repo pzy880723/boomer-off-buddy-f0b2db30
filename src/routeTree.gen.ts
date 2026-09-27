@@ -135,6 +135,7 @@ import { Route as ApiPublicHooksYouzanCategoryGroupsSyncRouteImport } from './ro
 import { Route as ApiPublicHooksYouzanCleanupRouteImport } from './routes/api/public/hooks/youzan-cleanup'
 import { Route as ApiPublicHooksYouzanDistributionProbeRouteImport } from './routes/api/public/hooks/youzan-distribution-probe'
 import { Route as ApiPublicHooksYouzanFixChannelRouteImport } from './routes/api/public/hooks/youzan-fix-channel'
+import { Route as ApiPublicHooksYouzanImageRefreshWorkerRouteImport } from './routes/api/public/hooks/youzan-image-refresh-worker'
 import { Route as ApiPublicHooksYouzanMessageRouteImport } from './routes/api/public/hooks/youzan-message'
 import { Route as ApiPublicHooksYouzanOrderSyncRouteImport } from './routes/api/public/hooks/youzan-order-sync'
 import { Route as ApiPublicHooksYouzanReconcileRouteImport } from './routes/api/public/hooks/youzan-reconcile'
@@ -948,6 +949,12 @@ const ApiPublicHooksYouzanFixChannelRoute =
   ApiPublicHooksYouzanFixChannelRouteImport.update({
     id: '/api/public/hooks/youzan-fix-channel',
     path: '/api/public/hooks/youzan-fix-channel',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksYouzanImageRefreshWorkerRoute =
+  ApiPublicHooksYouzanImageRefreshWorkerRouteImport.update({
+    id: '/api/public/hooks/youzan-image-refresh-worker',
+    path: '/api/public/hooks/youzan-image-refresh-worker',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicHooksYouzanMessageRoute =
@@ -1931,6 +1938,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/youzan-cleanup': typeof ApiPublicHooksYouzanCleanupRoute
   '/api/public/hooks/youzan-distribution-probe': typeof ApiPublicHooksYouzanDistributionProbeRoute
   '/api/public/hooks/youzan-fix-channel': typeof ApiPublicHooksYouzanFixChannelRoute
+  '/api/public/hooks/youzan-image-refresh-worker': typeof ApiPublicHooksYouzanImageRefreshWorkerRoute
   '/api/public/hooks/youzan-message': typeof ApiPublicHooksYouzanMessageRoute
   '/api/public/hooks/youzan-order-sync': typeof ApiPublicHooksYouzanOrderSyncRoute
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
@@ -2197,6 +2205,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/youzan-cleanup': typeof ApiPublicHooksYouzanCleanupRoute
   '/api/public/hooks/youzan-distribution-probe': typeof ApiPublicHooksYouzanDistributionProbeRoute
   '/api/public/hooks/youzan-fix-channel': typeof ApiPublicHooksYouzanFixChannelRoute
+  '/api/public/hooks/youzan-image-refresh-worker': typeof ApiPublicHooksYouzanImageRefreshWorkerRoute
   '/api/public/hooks/youzan-message': typeof ApiPublicHooksYouzanMessageRoute
   '/api/public/hooks/youzan-order-sync': typeof ApiPublicHooksYouzanOrderSyncRoute
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
@@ -2471,6 +2480,7 @@ export interface FileRoutesById {
   '/api/public/hooks/youzan-cleanup': typeof ApiPublicHooksYouzanCleanupRoute
   '/api/public/hooks/youzan-distribution-probe': typeof ApiPublicHooksYouzanDistributionProbeRoute
   '/api/public/hooks/youzan-fix-channel': typeof ApiPublicHooksYouzanFixChannelRoute
+  '/api/public/hooks/youzan-image-refresh-worker': typeof ApiPublicHooksYouzanImageRefreshWorkerRoute
   '/api/public/hooks/youzan-message': typeof ApiPublicHooksYouzanMessageRoute
   '/api/public/hooks/youzan-order-sync': typeof ApiPublicHooksYouzanOrderSyncRoute
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
@@ -2746,6 +2756,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-cleanup'
     | '/api/public/hooks/youzan-distribution-probe'
     | '/api/public/hooks/youzan-fix-channel'
+    | '/api/public/hooks/youzan-image-refresh-worker'
     | '/api/public/hooks/youzan-message'
     | '/api/public/hooks/youzan-order-sync'
     | '/api/public/hooks/youzan-reconcile'
@@ -3012,6 +3023,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-cleanup'
     | '/api/public/hooks/youzan-distribution-probe'
     | '/api/public/hooks/youzan-fix-channel'
+    | '/api/public/hooks/youzan-image-refresh-worker'
     | '/api/public/hooks/youzan-message'
     | '/api/public/hooks/youzan-order-sync'
     | '/api/public/hooks/youzan-reconcile'
@@ -3285,6 +3297,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-cleanup'
     | '/api/public/hooks/youzan-distribution-probe'
     | '/api/public/hooks/youzan-fix-channel'
+    | '/api/public/hooks/youzan-image-refresh-worker'
     | '/api/public/hooks/youzan-message'
     | '/api/public/hooks/youzan-order-sync'
     | '/api/public/hooks/youzan-reconcile'
@@ -3510,6 +3523,7 @@ export interface RootRouteChildren {
   ApiPublicHooksYouzanCleanupRoute: typeof ApiPublicHooksYouzanCleanupRoute
   ApiPublicHooksYouzanDistributionProbeRoute: typeof ApiPublicHooksYouzanDistributionProbeRoute
   ApiPublicHooksYouzanFixChannelRoute: typeof ApiPublicHooksYouzanFixChannelRoute
+  ApiPublicHooksYouzanImageRefreshWorkerRoute: typeof ApiPublicHooksYouzanImageRefreshWorkerRoute
   ApiPublicHooksYouzanMessageRoute: typeof ApiPublicHooksYouzanMessageRoute
   ApiPublicHooksYouzanOrderSyncRoute: typeof ApiPublicHooksYouzanOrderSyncRoute
   ApiPublicHooksYouzanReconcileRoute: typeof ApiPublicHooksYouzanReconcileRoute
@@ -4485,6 +4499,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/hooks/youzan-fix-channel'
       fullPath: '/api/public/hooks/youzan-fix-channel'
       preLoaderRoute: typeof ApiPublicHooksYouzanFixChannelRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/youzan-image-refresh-worker': {
+      id: '/api/public/hooks/youzan-image-refresh-worker'
+      path: '/api/public/hooks/youzan-image-refresh-worker'
+      fullPath: '/api/public/hooks/youzan-image-refresh-worker'
+      preLoaderRoute: typeof ApiPublicHooksYouzanImageRefreshWorkerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/youzan-message': {
@@ -6280,6 +6301,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksYouzanDistributionProbeRoute:
     ApiPublicHooksYouzanDistributionProbeRoute,
   ApiPublicHooksYouzanFixChannelRoute: ApiPublicHooksYouzanFixChannelRoute,
+  ApiPublicHooksYouzanImageRefreshWorkerRoute:
+    ApiPublicHooksYouzanImageRefreshWorkerRoute,
   ApiPublicHooksYouzanMessageRoute: ApiPublicHooksYouzanMessageRoute,
   ApiPublicHooksYouzanOrderSyncRoute: ApiPublicHooksYouzanOrderSyncRoute,
   ApiPublicHooksYouzanReconcileRoute: ApiPublicHooksYouzanReconcileRoute,

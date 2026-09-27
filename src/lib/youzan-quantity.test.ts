@@ -67,6 +67,12 @@ test("HQ ids stored in a branch link are rejected", () => {
   );
 });
 
+test("cached branch links never invent SKU IDs or trust old item-as-SKU fallbacks", () => {
+  for (const linkSkuId of [null, undefined, 6451683371, NaN, Infinity, 1.5]) {
+    assert.equal(selectTrustedBranchItemIds({ linkItemId: 6451683371, linkSkuId, hqSpuId: 5298219403 }), null);
+  }
+});
+
 test("stock worker failures only mark the current shop link as failed", () => {
   const source = readFileSync(
     new URL("./youzan-sync.functions.ts", import.meta.url),

@@ -155,6 +155,7 @@ export const publishSkuToHq = createServerFn({ method: "POST" })
 async function probeBranchItemId(params: {
   branch_shop: { id: string; kdt_id: number };
   hq_spu_id: number;
+  sku_id: string;
 }): Promise<{
   item_id: number;
   sku_id: number;
@@ -167,6 +168,10 @@ async function probeBranchItemId(params: {
     .eq("id", branch_shop.id)
     .maybeSingle();
   if (!branchRow) return null;
+  const { data: sku, error: skuError } = await supabase.from("inv_skus")
+    .select("sku_scope,barcode").eq("id", params.sku_id).single();
+  if (skuError) throw new Error(skuError.message);
+  if (sku.sku_scope !== "custom" && !sku.barcode?.trim()) return null;
   const branchToken = await ensureAccessToken(
     branchRow as unknown as Parameters<typeof ensureAccessToken>[0],
   );
@@ -174,11 +179,12 @@ async function probeBranchItemId(params: {
     hqSpuId: hq_spu_id,
     branchKdtId: branch_shop.kdt_id,
     branchToken,
+    skuBarcode: sku.sku_scope === "custom" ? undefined : sku.barcode!,
   });
-  if (!probe.item_id) return { item_id: 0, sku_id: 0, attempts: probe.attempts };
+  if (!probe.item_id || !probe.sku_id) return null;
   return {
     item_id: probe.item_id,
-    sku_id: probe.sku_id || probe.item_id,
+    sku_id: probe.sku_id,
     attempts: probe.attempts,
   };
 }
@@ -290,6 +296,7 @@ export async function verifyListingCore(listing_id: string) {
     .maybeSingle();
   if (!branch) throw new Error("门店不存在");
   const probe = await probeBranchItemId({
+    sku_id: l.sku_id,
     branch_shop: { id: (branch as { id: string }).id, kdt_id: Number((branch as { kdt_id: number }).kdt_id) },
     hq_spu_id: Number(l.external_spu_id),
   });

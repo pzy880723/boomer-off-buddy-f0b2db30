@@ -25,6 +25,22 @@ import {
 } from "./youzan-offline-products.server";
 
 describe("youzan offline products", () => {
+  test("grouped standard channels select only the exact target barcode across price variants", () => {
+    for (let group = 0; group < 14; group += 1) {
+      const skus = [99, 199, 299, 399].map((price, index) => ({
+        sku_id: 1000 + index, channel_sku_id: 2000 + index,
+        sku_barcode: `GROUP${group}-${price}`, price: price * 100,
+      }));
+      const detail = { kdt_id: 123, channel: 1, item_code: `GROUP${group}`, channel_item_id: 42, skus };
+      const target = { kdtId: 123, itemCode: `GROUP${group}`, skuBarcode: `GROUP${group}-299` };
+      assert.equal(parseBranchChannelProduct(detail, target)?.skus[0].skuId, 2002);
+      assert.equal(parseBranchChannelProduct({ ...detail, skus: [...skus].reverse() }, target)?.skus[0].skuId, 2002);
+      assert.equal(parseBranchChannelProduct(detail, { ...target, skuBarcode: "missing" }), null);
+      assert.equal(parseBranchChannelProduct({ ...detail, skus: [...skus, skus[2]] }, target), null);
+      assert.equal(parseBranchChannelProduct({ ...detail, skus: [{ ...skus[2], channel_sku_id: 0 }] }, target), null);
+      assert.equal(parseBranchChannelProduct(detail, { kdtId: 123, itemCode: `GROUP${group}` }), null);
+    }
+  });
   test("custom listing succeeds only after price and printed barcode read back correctly", () => {
     const row = { itemId: 10, title: "Kitty", spuNo: "2005336838530", isDisplay: true,
       skus: [{ skuId: 20, skuNo: null, price: 159 }] };

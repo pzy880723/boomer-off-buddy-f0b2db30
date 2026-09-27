@@ -1,0 +1,11 @@
+[Unit]
+Description=Converge Youzan product images every minute
+
+[Timer]
+OnBootSec=90
+OnUnitInactiveSec=60s
+AccuracySec=5
+Unit=boomer-youzan-image-refresh.service
+
+[Install]
+WantedBy=timers.target

@@ -169,23 +169,31 @@ async function enqueueBranchStock(args: {
   locationId: string | null;
   targetStock: number;
 }) {
-  const row = buildOfflineStockQueueRow(args);
-  const { data: existing } = await supabase
-    .from("youzan_stock_sync_queue")
-    .select("id")
-    .eq("sku_id", args.skuId)
-    .eq("shop_id", args.shopId)
-    .order("updated_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const query = existing?.id
-    ? supabase
-        .from("youzan_stock_sync_queue")
-        .update(row as never)
-        .eq("id", existing.id)
-    : supabase.from("youzan_stock_sync_queue").insert(row as never);
-  const { error } = await query;
-  if (error) throw new Error(error.message);
+  // Coalesced absolute target: the last successful CAS wins, not a stock delta.
+  const row = { ...buildOfflineStockQueueRow(args), operation_id: crypto.randomUUID(), attempts: 0 };
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const findExisting = (activeOnly: boolean) => {
+      let query = supabase.from("youzan_stock_sync_queue")
+        .select("id,status,updated_at").eq("sku_id", args.skuId).eq("shop_id", args.shopId);
+      // Prefer the partial-unique pending/failed slot over a newer terminal row.
+      if (activeOnly) query = query.in("status", ["pending", "failed"]);
+      return query.order("updated_at", { ascending: false }).limit(1).maybeSingle();
+    };
+    let found = await findExisting(true);
+    if (found.error) throw new Error(found.error.message);
+    if (!found.data) found = await findExisting(false);
+    if (found.error) throw new Error(found.error.message);
+    const existing = found.data;
+    const query = existing
+      ? supabase.from("youzan_stock_sync_queue").update(row as never)
+          .eq("id", existing.id).eq("status", existing.status).eq("updated_at", existing.updated_at)
+      : supabase.from("youzan_stock_sync_queue").insert(row as never);
+    const { data, error } = await query.select("id").maybeSingle();
+    if (error && error.code !== "23505") throw new Error(error.message);
+    if (!error && data) return;
+    // A claim/enqueue changed the revision or won the unique slot. Reread it.
+  }
+  throw new Error("库存同步请求并发更新，请重试");
 }
 
 async function markBranchChannelRemoved(skuId: string, shopId: string) {
@@ -373,7 +381,6 @@ export async function releaseSkuToOfflineShopsCore(args: {
       name: remoteIdentity.name,
     });
     if (remoteExisting) {
-      const remoteSkuId = remoteExisting.skus[0]?.skuId ?? null;
       try {
         if (isCustom && !hqChannel) throw new Error("有赞总部渠道商品尚未就绪，不能使用分店 ID 更新总部商品");
         await updateYouzanOfflineProduct({
@@ -382,12 +389,13 @@ export async function releaseSkuToOfflineShopsCore(args: {
           input: releaseInput,
         });
         if (isCustom) await updateCustomHqPrice({ accessToken, hqKdtId: Number(hq.kdt_id), itemCode: hqLink.spu_code, priceYuan: Number(sku.price_tier) });
-        if (isCustom) await verifyBranch();
+        const verified = isCustom ? await verifyBranch() : remoteExisting;
+        const remoteSkuId = verified.skus[0]?.skuId ?? null;
         await upsertBranchLink({
           skuId: args.sku_id,
           shopId: branch.id,
           hqSpuId: hqLink.yz_item_id,
-          itemId: remoteExisting.itemId,
+          itemId: verified.itemId,
           skuIdRemote: remoteSkuId,
           stock,
           recovered: true,
@@ -401,7 +409,7 @@ export async function releaseSkuToOfflineShopsCore(args: {
         results.push({
           shop_id: branch.id,
           ok: true,
-          item_id: remoteExisting.itemId,
+          item_id: verified.itemId,
           sku_id: remoteSkuId,
           recovered: true,
           error: null,

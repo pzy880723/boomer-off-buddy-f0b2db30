@@ -1,0 +1,11 @@
+[Unit]
+Description=Drain Youzan stock queue every minute (oneshot, no overlap)
+
+[Timer]
+OnBootSec=90
+OnUnitInactiveSec=60s
+AccuracySec=5
+Unit=boomer-youzan-stock.service
+
+[Install]
+WantedBy=timers.target

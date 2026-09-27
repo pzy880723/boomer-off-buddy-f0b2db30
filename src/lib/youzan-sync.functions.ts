@@ -5,7 +5,6 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   callYouzanApiVerbose,
   callYouzanMultipartApiVerbose,
-  callYouzanApiWithVersionFallback,
   ensureAccessToken,
   explainYouzanError,
   getHqShop,
@@ -19,6 +18,7 @@ import {
   queryYouzanBranchChannelProduct,
 } from "./youzan-offline-products.server";
 import { getPublicOrigin, resolvePublicSkuImageUrls } from "./sku-media";
+import { buildHqImageParams, YOUZAN_CHANNEL_IMAGE_LIMIT } from "./youzan-image-media";
 import {
   buildHqSpuLookupParams,
   buildStandardYouzanRemoteIdentity,
@@ -145,7 +145,7 @@ async function pushStockToYouzan(
 // ============================================================
 // resolveBranchItemIds —— 分店真实 item_id / sku_id 反查
 // ------------------------------------------------------------
-// 只允许：HQ SPU id -> online.spu.query 反查分店真实 item_id；
+// 只允许：HQ SPU id -> 确认总部编码 -> 目标门店 channel=1 真实 ID；
 // 禁止把 HQ SPU id 直接传给 item.detail.get 或库存接口。
 // ============================================================
 async function resolveBranchItemIds(
@@ -167,7 +167,7 @@ async function resolveBranchItemIds(
     );
   }
 
-  const { data: sku, error: skuError } = await supabase.from("inv_skus").select("sku_scope").eq("id", link.sku_id).single();
+  const { data: sku, error: skuError } = await supabase.from("inv_skus").select("sku_scope,barcode").eq("id", link.sku_id).single();
   if (skuError) throw new Error(skuError.message);
   if (sku.sku_scope === "custom") {
     const accessToken = await ensureAccessToken(hq);
@@ -188,17 +188,20 @@ async function resolveBranchItemIds(
   });
   if (trustedIds) return trustedIds;
 
+  if (!sku.barcode?.trim()) throw new Error("标准商品缺少条码，不能反查目标规格");
+
   const probe = await probeBranchRealIds({
     hqSpuId,
     branchKdtId: branchShop.kdt_id,
     branchToken,
+    skuBarcode: sku.barcode,
   });
-  if (!probe.item_id) {
+  if (!probe.item_id || !probe.sku_id) {
     throw new Error(
       `branch item not visible / distribution missing：分店无此 SPU (spu_id=${hqSpuId} kdt=${branchShop.kdt_id})，需要先铺货。attempts=${JSON.stringify(probe.attempts).slice(0, 400)}`,
     );
   }
-  const sku_id = probe.sku_id || probe.item_id;
+  const sku_id = probe.sku_id;
   await supabase
     .from("sku_youzan_links")
     .update({
@@ -210,174 +213,36 @@ async function resolveBranchItemIds(
 }
 
 /**
- * 用 HQ SPU id 反查分店真实 item_id / sku_id。
- * 有赞 item.detail.get 只接受 item_id/alias，不支持 spu_id 入参
- * （会报 [301000002] 查询参数商品ID或商品别名缺失）。
- * 所以主策略是先用 retail.open.online.spu.query（HQ token + kdt_id=分店 + spu_ids=[hq spu]）拿到分店 item_id，
- * 然后用 item.detail.get(item_id=..., node_kdt_id=分店) 补 sku_id。
- * 禁止用 item.detail.get(item_id=hqSpuId) 兜底；那会重新把 HQ SPU id 当分店 item_id。
+ * Resolve a branch SKU using the exact HQ code, shop and offline channel.
+ * Grouped standard products must supply their exact ERP variant barcode.
+ * Ambiguous/missing channel identities must never fall back to library/search IDs.
  */
 export async function probeBranchRealIds(args: {
   hqSpuId: number;
   branchKdtId: number;
   branchToken: string;
+  skuBarcode?: string;
 }): Promise<{
   item_id: number;
   sku_id: number;
-  attempts: Array<{
-    label: string;
-    version?: string;
-    ok: boolean;
-    trace?: string | null;
-    error?: string;
-  }>;
+  attempts: Array<{ label: string; version?: string; ok: boolean; trace?: string | null; error?: string }>;
 }> {
-  const attempts: Array<{
-    label: string;
-    version?: string;
-    ok: boolean;
-    trace?: string | null;
-    error?: string;
-  }> = [];
-  let item_id = 0;
-  let sku_id = 0;
-  const hq = await getHqShop();
-  const hqToken = await ensureAccessToken(hq);
-
-  const strategies: Array<{
-    label: string;
-    accessToken: string;
-    method: string;
-    params: Record<string, unknown>;
-  }> = [
-    {
-      label: "retail.open.online.spu.query spu_ids (hq token, kdt=branch)",
-      accessToken: hqToken,
-      method: "youzan.retail.open.online.spu.query",
-      params: { page_no: 1, page_size: 20, kdt_id: args.branchKdtId, spu_ids: [args.hqSpuId] },
-    },
-    {
-      label: "retail.open.online.spu.query spu_ids (branch token)",
-      accessToken: args.branchToken,
-      method: "youzan.retail.open.online.spu.query",
-      params: { page_no: 1, page_size: 20, kdt_id: args.branchKdtId, spu_ids: [args.hqSpuId] },
-    },
-  ];
-
-  for (const s of strategies) {
-    try {
-      const res = await callYouzanApiWithVersionFallback({
-        accessToken: s.accessToken,
-        method: s.method,
-        params: s.params,
-        timeoutMs: 15_000,
-      });
-      const ex = pickBranchItemIds(res.payload);
-      attempts.push({
-        label: s.label,
-        version: res.version,
-        ok: !!ex.item_id,
-        trace: res.trace_id,
-      });
-      // 把每个版本的尝试摊平进来，方便查
-      for (const a of res.attempts) {
-        if (!a.ok)
-          attempts.push({
-            label: s.label,
-            version: a.version,
-            ok: false,
-            error: a.error,
-            trace: a.trace,
-          });
-      }
-      if (ex.item_id) {
-        if (ex.item_id === args.hqSpuId) {
-          attempts.push({
-            label: `${s.label} rejected`,
-            version: res.version,
-            ok: false,
-            trace: res.trace_id,
-            error: "反查结果 item_id 等于 HQ SPU id，拒绝写入分店 link",
-          });
-          continue;
-        }
-        item_id = ex.item_id;
-        if (ex.sku_id) sku_id = ex.sku_id;
-        break;
-      }
-    } catch (e) {
-      attempts.push({
-        label: s.label,
-        ok: false,
-        error: (e instanceof Error ? e.message : String(e)).slice(0, 400),
-      });
-    }
+  const label = "item.itemdetail.get (HQ code, target branch, channel=1)";
+  try {
+    const hq = await getHqShop();
+    const accessToken = await ensureAccessToken(hq);
+    const master = await findHqSpuById(accessToken, args.hqSpuId);
+    if (!master) throw new Error("总部商品关联失效，停止分店 ID 解析");
+    const product = await queryYouzanBranchChannelProduct({
+      accessToken, kdtId: args.branchKdtId, itemCode: master.spuCode, skuBarcode: args.skuBarcode,
+    });
+    if (!product) throw new Error("门店渠道身份缺失或规格不唯一，停止库存推送");
+    return { item_id: product.itemId, sku_id: product.skus[0].skuId,
+      attempts: [{ label, version: "1.0.0", ok: true }] };
+  } catch (error) {
+    return { item_id: 0, sku_id: 0, attempts: [{ label, ok: false,
+      error: (error instanceof Error ? error.message : String(error)).slice(0, 300) }] };
   }
-
-  // 拿到 item_id 但没 sku_id 时补一发
-  if (item_id && !sku_id) {
-    try {
-      const res = await callYouzanApiWithVersionFallback({
-        accessToken: args.branchToken,
-        method: "youzan.item.detail.get",
-        params: { node_kdt_id: args.branchKdtId, item_id },
-        timeoutMs: 15_000,
-      });
-      const ex = pickBranchItemIds(res.payload);
-      attempts.push({
-        label: "item.detail.get item_id (branch, backfill sku)",
-        version: res.version,
-        ok: !!ex.sku_id,
-        trace: res.trace_id,
-      });
-      if (ex.sku_id) sku_id = ex.sku_id;
-    } catch (e) {
-      attempts.push({
-        label: "item.detail.get item_id (branch, backfill sku)",
-        ok: false,
-        error: (e instanceof Error ? e.message : String(e)).slice(0, 300),
-      });
-    }
-  }
-  return { item_id, sku_id, attempts };
-}
-
-function pickBranchItemIds(payload: unknown): { item_id: number; sku_id: number } {
-  let itemId = 0;
-  let skuId = 0;
-  const seen = new Set<unknown>();
-  const itemKeys = ["item_id", "itemId", "num_iid", "id"];
-  const skuKeys = ["sku_id", "skuId"];
-  const walk = (v: unknown, depth = 0) => {
-    if (!v || typeof v !== "object" || depth > 6 || seen.has(v)) return;
-    seen.add(v);
-    if (Array.isArray(v)) {
-      for (const el of v) walk(el, depth + 1);
-      return;
-    }
-    const obj = v as Record<string, unknown>;
-    if (!itemId) {
-      for (const k of itemKeys) {
-        const n = Number(obj[k]);
-        if (n > 0) {
-          itemId = n;
-          break;
-        }
-      }
-    }
-    if (!skuId) {
-      for (const k of skuKeys) {
-        const n = Number(obj[k]);
-        if (n > 0) {
-          skuId = n;
-          break;
-        }
-      }
-    }
-    for (const val of Object.values(obj)) walk(val, depth + 1);
-  };
-  walk(payload);
-  return { item_id: itemId, sku_id: skuId };
 }
 
 // ============================================================
@@ -860,16 +725,16 @@ export async function uploadImageToYouzanMaterialRecord(
   try {
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
-        const source = await fetch(url);
+        const source = await fetch(url, { signal: AbortSignal.timeout(20_000) });
         if (!source.ok) throw new Error(`拉取 ERP 图片失败：HTTP ${source.status}`);
         const bytes = await source.arrayBuffer();
         if (bytes.byteLength === 0) throw new Error("ERP 图片内容为空");
-        if (bytes.byteLength > 3 * 1024 * 1024) throw new Error("ERP 图片超过有赞 3MB 限制");
-        const mimeType = source.headers.get("content-type")?.split(";")[0] || "image/jpeg";
+        const { prepareYouzanMaterialImage } = await import("./youzan-material-image.server");
+        const image = await prepareYouzanMaterialImage(new Uint8Array(bytes));
         const pathname = new URL(url).pathname;
-        const filename = decodeURIComponent(pathname.split("/").pop() || "product.jpg");
+        const filename = decodeURIComponent(pathname.split("/").pop() || "product").replace(/\.[^.]+$/, "") + ".jpg";
         const formData = new FormData();
-        formData.append("image", new Blob([bytes], { type: mimeType }), filename);
+        formData.append("image", new Blob([image], { type: "image/jpeg" }), filename);
         const res = await callYouzanMultipartApiVerbose({
           accessToken: token,
           method: "youzan.materials.storage.platform.img.upload",
@@ -916,11 +781,7 @@ export async function uploadImageToYouzanMaterial(
   url: string,
   ctx?: { shop_id?: string | null; kdt_id?: number | null; sku_id?: string | null },
 ): Promise<string> {
-  try {
-    return (await uploadImageToYouzanMaterialRecord(token, url, ctx)).imageUrl;
-  } catch {
-    return url;
-  }
+  return (await uploadImageToYouzanMaterialRecord(token, url, ctx)).imageUrl;
 }
 
 async function resolveHqRetailProductCategoryId(): Promise<number> {
@@ -1367,6 +1228,19 @@ async function findHqSpuById(
  *  - 若给了 branch 参数，把该分店 kdt_id 放进 sell_channel_ids（连锁"分店独占"= 只勾这家）
  *  - 返回的 spu_id 存到 sku_youzan_links (role=hq_spu, shop_id=HQ.id)
  */
+export async function queryYouzanHqImageMaster(token: string, spuId: number) {
+  // Some installations ignore spu_ids. Match the returned ID, never the first/name-matched row.
+  for (let page = 1; page <= 100; page += 1) {
+    const r = await callYouzanApiVerbose({accessToken:token,method:"youzan.retail.open.spu.query",version:"3.0.0",
+      params:{page_no:page,page_size:20},timeoutMs:20_000});
+    const rows = collectSpuRowsFromPayload(r.payload);
+    const found = selectHqSpuRemoteIdentity(rows,{spuId});
+    if (found) return {spuId:found.spuId,spuCode:found.spuCode};
+    if (rows.length<20) return null;
+  }
+  throw new Error("HQ image identity scan exceeded bound");
+}
+
 export async function ensureHqSpuLink(
   sku_id: string,
   addBranchShopId?: string,
@@ -1407,22 +1281,16 @@ export async function ensureHqSpuLink(
 
   const token = await ensureAccessToken(hq);
   const sourceImages = resolvePublicSkuImageUrls(
-    [
-      (sku as { image_url?: string | null }).image_url,
-      ...((sku as { image_paths?: string[] | null }).image_paths ?? []),
-    ],
+    sku.image_paths?.length ? sku.image_paths : [sku.image_url],
     getPublicOrigin(),
-    5,
+    YOUZAN_CHANNEL_IMAGE_LIMIT,
   );
-  const rawImage = sourceImages[0] ?? "";
-  const cdnImage = rawImage
-    ? await uploadImageToYouzanMaterial(token, rawImage, {
+  const finalImages = await Promise.all(sourceImages.map(url => uploadImageToYouzanMaterial(token, url, {
         shop_id: hq.id,
         kdt_id: hq.kdt_id,
         sku_id,
-      })
-    : "";
-  const finalImage = cdnImage || rawImage || "";
+      })));
+  const finalImage = finalImages[0] ?? "";
   const { data: existed } = await supabase
     .from("sku_youzan_links")
     .select("yz_item_id, yz_sku_id")
@@ -1455,7 +1323,7 @@ export async function ensureHqSpuLink(
             categoryId,
             priceYuan: Number((sku as { price_tier: string | number }).price_tier),
             kdtIds,
-            imageUrl: finalImage || null,
+            imageUrls: finalImages,
           }),
           timeoutMs: 20_000,
         });
@@ -1568,7 +1436,7 @@ export async function ensureHqSpuLink(
       accessToken: token, method: "youzan.retail.open.spu.update", version: "3.0.0",
       params: buildCustomHqChannelUpdateParams({ spuId: newSpuId, name: remoteIdentity.name,
         spuCode: newSpuCode, barcode: String(sku.barcode ?? ""), categoryId,
-        priceYuan: Number(sku.price_tier), kdtIds, imageUrl: finalImage || null }),
+        priceYuan: Number(sku.price_tier), kdtIds, imageUrls: finalImages }),
       timeoutMs: 20_000,
     });
     const refreshed = await findHqSpuById(token, newSpuId, true);
@@ -1601,12 +1469,7 @@ export async function ensureHqSpuLink(
         accessToken: token,
         method: "youzan.retail.open.spu.update",
         version: "3.0.0",
-        params: {
-          spu_id: newSpuId,
-          pic_url: finalImage,
-          spu_pic_list: [finalImage],
-          spu_img_list: [{ img_url: finalImage }],
-        },
+        params: buildHqImageParams(newSpuId,finalImages),
         timeoutMs: 20_000,
       });
     } catch (e) {
@@ -1889,11 +1752,22 @@ async function runStockSyncWorkerCore(opts: {
       .from("youzan_stock_sync_queue")
       .update({ status: "running", updated_at: new Date().toISOString() } as never)
       .eq("id", t.id).eq("status", t.status).eq("updated_at", t.updated_at)
-      .select("id").maybeSingle();
+      .select("id,updated_at").maybeSingle();
     if (claimError) throw claimError;
     if (!claimed) continue;
 
+    // The DB trigger owns updated_at. Never acknowledge a superseding enqueue.
+    const finishClaim = async (patch: Record<string, unknown>) => {
+      const { data, error } = await supabase.from("youzan_stock_sync_queue")
+        .update(patch as never).eq("id", t.id).eq("status", "running")
+        .eq("updated_at", claimed.updated_at).select("id").maybeSingle();
+      if (error) throw error;
+      return Boolean(data);
+    };
+
     try {
+      const operationId = (t as typeof t & { operation_id?: string }).operation_id;
+      if (!operationId) throw new Error("Stock queue operation_id migration required");
       // 按 (sku, shop) 精确取 link；老队列可能没有 shop_id，退回 sku 唯一 link
       let linkQuery = supabase.from("sku_youzan_links").select("*").eq("sku_id", t.sku_id);
       if (t.shop_id) linkQuery = linkQuery.eq("shop_id", t.shop_id);
@@ -1912,26 +1786,27 @@ async function runStockSyncWorkerCore(opts: {
       if (currentSku.status === "archived") {
         // Old publish tasks must never recreate a deleted item. Standard price
         // variants share an SPU: clear the variant, not the whole product group.
+        let clearedLinkId: string | undefined;
         if (!needsListing && link) {
           const shop = await getShopById(link.shop_id);
           if (shop.role === "branch") {
-            await pushStockToYouzan(link as LinkRow, 0, `${t.id}:${t.updated_at}:archive`);
+            await pushStockToYouzan(link as LinkRow, 0, `${operationId}:archive`);
             if (currentSku.is_custom_price) {
               const { data: refreshed, error: refreshError } = await supabase
                 .from("sku_youzan_links").select("*").eq("id", link.id).single();
               if (refreshError || !refreshed) throw refreshError ?? new Error("门店关联缺失");
               await pushIsDisplayToYouzan(refreshed as LinkRow, false);
             }
-            const { error } = await supabase.from("sku_youzan_links")
-              .update({ last_pushed_stock: 0, last_pushed_at: new Date().toISOString(), last_error: null } as never)
-              .eq("id", link.id);
-            if (error) throw error;
+            clearedLinkId = link.id;
           }
         }
-        const { error } = await supabase.from("youzan_stock_sync_queue")
-          .update({ status: "done", target_stock: 0, last_error: null, attempts: (t.attempts ?? 0) + 1 } as never)
-          .eq("id", t.id);
-        if (error) throw error;
+        if (!await finishClaim({ status: "done", target_stock: 0, last_error: null, attempts: (t.attempts ?? 0) + 1 })) continue;
+        if (clearedLinkId) {
+          const { error } = await supabase.from("sku_youzan_links")
+            .update({ last_pushed_stock: 0, last_pushed_at: new Date().toISOString(), last_error: null } as never)
+            .eq("id", clearedLinkId);
+          if (error) throw error;
+        }
         ok += 1;
         continue;
       }
@@ -1954,14 +1829,11 @@ async function runStockSyncWorkerCore(opts: {
 
       // v2：HQ 主 SPU 不推库存 / 上下架，直接标 done 跳过
       if ((link as { sync_stock?: boolean }).sync_stock === false && action === "push_stock") {
-        await supabase
-          .from("youzan_stock_sync_queue")
-          .update({
-            status: "done",
-            last_error: null,
-            attempts: (t.attempts ?? 0) + 1,
-          } as never)
-          .eq("id", t.id);
+        if (!await finishClaim({
+          status: "done",
+          last_error: null,
+          attempts: (t.attempts ?? 0) + 1,
+        })) continue;
         ok += 1;
         continue;
       }
@@ -1969,14 +1841,11 @@ async function runStockSyncWorkerCore(opts: {
       if (action === "push_is_display") {
         const targetIsDisplay = Boolean((t as { target_is_display?: boolean }).target_is_display);
         await pushIsDisplayToYouzan(link as LinkRow, targetIsDisplay);
-        await supabase
-          .from("youzan_stock_sync_queue")
-          .update({
-            status: "done",
-            last_error: null,
-            attempts: (t.attempts ?? 0) + 1,
-          } as never)
-          .eq("id", t.id);
+        if (!await finishClaim({
+          status: "done",
+          last_error: null,
+          attempts: (t.attempts ?? 0) + 1,
+        })) continue;
         await supabase
           .from("sku_youzan_links")
           .update({ status: "linked", last_error: null } as never)
@@ -1991,18 +1860,15 @@ async function runStockSyncWorkerCore(opts: {
         target = await resolveShopStockTarget(t.sku_id, t.location_id, t.shop_id ?? "");
       }
 
-      // The queue row is reused for later restocks; a new revision is a new operation.
-      await pushStockToYouzan(link as LinkRow, target, `${t.id}:${t.updated_at}`);
+      // Attempts change the claim revision, but not the remote idempotency key.
+      await pushStockToYouzan(link as LinkRow, target, operationId);
 
-      await supabase
-        .from("youzan_stock_sync_queue")
-        .update({
-          status: "done",
-          last_error: null,
-          target_stock: target,
-          attempts: (t.attempts ?? 0) + 1,
-        } as never)
-        .eq("id", t.id);
+      if (!await finishClaim({
+        status: "done",
+        last_error: null,
+        target_stock: target,
+        attempts: (t.attempts ?? 0) + 1,
+      })) continue;
 
       await supabase
         .from("sku_youzan_links")
@@ -2022,15 +1888,12 @@ async function runStockSyncWorkerCore(opts: {
         ? new Date(Date.now() + 24 * 3600_000).toISOString()
         : new Date(Date.now() + BACKOFF_SEC[attempts - 1] * 1000).toISOString();
 
-      await supabase
-        .from("youzan_stock_sync_queue")
-        .update({
-          status: giveUp ? "failed" : "failed",
-          attempts,
-          next_run_at: nextRun,
-          last_error: msg.slice(0, 500),
-        } as never)
-        .eq("id", t.id);
+      if (!await finishClaim({
+        status: giveUp ? "failed" : "failed",
+        attempts,
+        next_run_at: nextRun,
+        last_error: msg.slice(0, 500),
+      })) continue;
 
       await supabase
         .from("sku_youzan_links")
@@ -2059,8 +1922,8 @@ export const runStockSyncWorker = createServerFn({ method: "POST" })
   .handler(async ({ data }) => runStockSyncWorkerCore(data));
 
 // 给公共路由用的不带 auth 版本
-export async function runStockSyncWorkerForCron() {
-  return runStockSyncWorkerCore({ limit: 50 });
+export async function runStockSyncWorkerForCron(limit = 50) {
+  return runStockSyncWorkerCore({ limit: Number.isFinite(limit) ? Math.max(1, Math.min(50, Math.floor(limit))) : 1 });
 }
 
 export async function runArchivedItemStockSyncWorker(limit = 3) {
@@ -2381,10 +2244,17 @@ export async function ensureBranchDistribution(
   }
 
   // 6. 反查分店真实 item_id / sku_id
+  const { data: targetSku, error: targetSkuError } = await supabase.from("inv_skus")
+    .select("sku_scope,barcode").eq("id", sku_id).single();
+  if (targetSkuError) throw new Error(targetSkuError.message);
+  if (targetSku.sku_scope !== "custom" && !targetSku.barcode?.trim()) {
+    throw new Error("标准商品缺少条码，不能反查目标规格");
+  }
   const probe = await probeBranchRealIds({
     hqSpuId,
     branchKdtId,
     branchToken,
+    skuBarcode: targetSku.sku_scope === "custom" ? undefined : targetSku.barcode!,
   });
 
   // 7. 记 release 日志（不论成功失败）
@@ -2407,7 +2277,7 @@ export async function ensureBranchDistribution(
     .single();
   void probeLog;
 
-  if (!probe.item_id) {
+  if (!probe.item_id || !probe.sku_id) {
     await supabase.from("sku_youzan_links").upsert(
       {
         sku_id,
@@ -2436,7 +2306,7 @@ export async function ensureBranchDistribution(
     };
   }
 
-  const branchSkuId = probe.sku_id || probe.item_id;
+  const branchSkuId = probe.sku_id;
   const confirmedChannelIds = Array.from(new Set(targetChannelIds));
   const [linkWrite, shopWrite] = await Promise.all([
     supabase.from("sku_youzan_links").upsert(

@@ -1,0 +1,16 @@
+[Unit]
+Description=BOOMER Youzan image-only refresh queue
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/var/www/boomer-erp/current
+EnvironmentFile=/var/www/boomer-erp/current/.env
+Environment=ERP_PORT=3005
+ExecStart=/usr/bin/node /var/www/boomer-erp/current/scripts/run-youzan-image-refresh-worker.mjs
+TimeoutStartSec=600
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true

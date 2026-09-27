@@ -46,8 +46,9 @@ export function selectTrustedBranchItemIds(args: {
   hqSpuId: number;
 }): { item_id: number; sku_id: number } | null {
   const itemId = Number(args.linkItemId ?? 0);
-  const skuId = Number(args.linkSkuId ?? itemId);
+  const skuId = Number(args.linkSkuId ?? 0);
 
-  if (itemId <= 0 || skuId <= 0 || itemId === args.hqSpuId) return null;
+  if (!Number.isSafeInteger(itemId) || !Number.isSafeInteger(skuId) ||
+      itemId <= 0 || skuId <= 0 || itemId === args.hqSpuId || skuId === itemId) return null;
   return { item_id: itemId, sku_id: skuId };
 }
