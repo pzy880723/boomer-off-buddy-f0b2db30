@@ -26,6 +26,8 @@ const stubs: Record<string, string> = {
       s.derivatives.push({paths,width}); if(s.derivativeFail) throw new Error('render');
       return paths.map((_,i)=>s.derivativeUrls[i]??null);};`,
   "@/server/handheld-listing-image-jobs.server": `export const triggerListingImageWorker=()=>{globalThis.__productContent.triggers++;};`,
+  "@/server/product-era-research.server": `export const researchProductRelease=async input=>{
+    const s=globalThis.__productContent;s.researchCalls.push(input);return s.research(input);};`,
 };
 const bundle = await build({
   entryPoints: ["src/server/product-content.server.ts"],
@@ -71,6 +73,8 @@ beforeEach(() => {
     derivativeUrls: [],
     derivativeFail: false,
     triggers: 0,
+    researchCalls: [],
+    research: async () => [],
     signFail: false,
     session: { user_id: "employee" },
     rpc: () => ({ data: { version: 0, draft_blocks: [image], published_blocks: [] }, error: null }),
@@ -96,6 +100,7 @@ test("all actions require an employee before RPC or signing", async () => {
   }
   assert.deepEqual(state.calls, []);
   assert.deepEqual(state.signed, []);
+  assert.deepEqual(state.researchCalls, []);
 });
 for (const action of ["get", "save", "generate"])
   test(`${action} authorizes in SQL before metadata, AI or signing`, async () => {
@@ -113,6 +118,7 @@ for (const action of ["get", "save", "generate"])
     assert.equal(res.status, 403);
     assert.deepEqual(state.reads, []);
     assert.deepEqual(state.signed, []);
+    assert.deepEqual(state.researchCalls, []);
   });
 test("get preserves raw references and IDs when storage signing fails", async () => {
   state.signFail = true;
@@ -254,6 +260,7 @@ for (const generated of [
   { blocks: [{ type: "paragraph", text: "<iframe src='x'></iframe>" }] },
   { blocks: [{ type: "image", storage_path: "sku-raw/another-store.jpg" }] },
   { blocks: [] },
+  { blocks: [{ type: "facts", text: "来源：Sony官方档案，已联网查证。" }] },
 ])
   test(`unsafe or malformed AI output cannot change the draft: ${JSON.stringify(generated)}`, async () => {
     const previous = globalThis.fetch;
@@ -367,4 +374,115 @@ test("save returns a snapshot without reusing transient signed URLs as stored co
     draft_blocks: [{ ...image, read_url: null }],
     published_blocks: [{ ...image, read_url: null }],
   });
+});
+
+test("research and story start independently, evidence never enters the LLM and only preview gains facts", async () => {
+  const previous = globalThis.fetch;
+  const key = process.env.LOVABLE_API_KEY;
+  process.env.LOVABLE_API_KEY = "test";
+  state.rows.inv_skus = {
+    ...state.rows.inv_skus,
+    name: "Sony TPS-L2 cassette player",
+    brand_id: "sony",
+  };
+  state.rows.inv_brands = [{ id: "sony", name: "Sony" }];
+  const evidence = {
+    id: "research-evidence",
+    type: "facts",
+    text: "型号首次发布：1979年（Sony官方档案；不代表本件商品的生产年份）\n来源（HTTPS）：www.sony.com/history/\n官方正文摘录：TPS-L2 was introduced in 1979.",
+  };
+  let releaseResearch!: (blocks: unknown[]) => void;
+  const researchPending = new Promise<unknown[]>((resolve) => {
+    releaseResearch = resolve;
+  });
+  state.research = () => researchPending;
+  let aiStarted = false;
+  globalThis.fetch = (async (_url: string, init: RequestInit) => {
+    aiStarted = true;
+    assert.deepEqual(state.researchCalls, [{ name: "Sony TPS-L2 cassette player", brand: "Sony" }]);
+    assert.doesNotMatch(String(init.body), /1979|www\.sony\.com|introduced in/);
+    return Response.json({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              blocks: [{ type: "paragraph", text: "A quiet moment at your desk." }],
+            }),
+          },
+        },
+      ],
+    });
+  }) as typeof fetch;
+  const pending = content.handleProductContent(request({ action: "generate" }), device, sku);
+  try {
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(aiStarted, true, "AI must start before research resolves");
+    releaseResearch([evidence]);
+    const response = await pending;
+    assert.equal(response.status, 200);
+    const data = (await response.json()).data;
+    assert.deepEqual(
+      data.blocks.find((block: any) => block.id === evidence.id),
+      evidence,
+    );
+    assert.deepEqual(data.draft_blocks, [{ ...image, read_url: null }]);
+    assert.deepEqual(data.published_blocks, []);
+    assert.equal(state.calls.length, 1);
+    // Existing save request carries the stable evidence block and its provenance text unchanged.
+    await content.handleProductContent(
+      request({
+        action: "save",
+        blocks: [evidence],
+        expected_version: 0,
+        client_op_id: "era-save-0001",
+      }),
+      device,
+      sku,
+    );
+    assert.deepEqual(state.calls.at(-1).args.p_request.blocks, [evidence]);
+    assert.equal(state.researchCalls.length, 1);
+    await content.handleProductContent(request({ action: "get" }), device, sku);
+    assert.equal(state.researchCalls.length, 1);
+  } finally {
+    releaseResearch([]);
+    await pending;
+    globalThis.fetch = previous;
+    if (key === undefined) delete process.env.LOVABLE_API_KEY;
+    else process.env.LOVABLE_API_KEY = key;
+  }
+});
+
+test("research failure skips enrichment without failing normal detail generation", async () => {
+  const previous = globalThis.fetch;
+  const key = process.env.LOVABLE_API_KEY;
+  process.env.LOVABLE_API_KEY = "test";
+  state.research = async () => {
+    throw new Error("provider timeout with private details");
+  };
+  globalThis.fetch = async () =>
+    Response.json({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              blocks: [{ type: "paragraph", text: "A quiet moment at your desk." }],
+            }),
+          },
+        },
+      ],
+    });
+  try {
+    const response = await content.handleProductContent(
+      request({ action: "generate" }),
+      device,
+      sku,
+    );
+    assert.equal(response.status, 200);
+    assert.equal(state.researchCalls.length, 1);
+    assert.doesNotMatch(JSON.stringify(await response.json()), /private details|型号首次发布/);
+  } finally {
+    globalThis.fetch = previous;
+    if (key === undefined) delete process.env.LOVABLE_API_KEY;
+    else process.env.LOVABLE_API_KEY = key;
+  }
 });

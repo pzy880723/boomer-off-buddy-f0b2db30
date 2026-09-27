@@ -12,6 +12,7 @@ import { signSkuImagePaths } from "@/lib/sku-image-resolver.server";
 import { DERIVATIVE_WIDTHS, signDerivativeUrls } from "@/server/media-derivative.server";
 import { triggerListingImageWorker } from "@/server/handheld-listing-image-jobs.server";
 import { err, ok, resolveSessionUser, type DeviceContext } from "@/server/handheld-auth.server";
+import { researchProductRelease } from "@/server/product-era-research.server";
 
 type ContentSnapshot = {
   version: number;
@@ -79,6 +80,8 @@ async function generateBlocks(skuId: string): Promise<ProductContentBlock[]> {
   };
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("AI gateway not configured");
+  // Optional research runs beside story generation. Neither external text nor citations enter the LLM.
+  const research = researchProductRelease({ name: facts.name, brand: facts.brand }).catch(() => []);
   const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
     signal: AbortSignal.timeout(25_000),
@@ -130,14 +133,14 @@ No HTML, URLs, images or IDs. This is a preview requiring human confirmation; ne
     blocks.some(
       (block) =>
         block.type !== "image" &&
-        /(?:限量|限定|绝版|稀有|收藏级|保值|升值|正品|前主人|生产于|制造于|功能正常|测试正常|完好可用|联名|\b(?:rare|limited|authentic|tested|working|vintage|19\d{2}|20\d{2})\b|\d{2}\s*年代)/i.test(
+        /(?:限量|限定|绝版|稀有|收藏级|保值|升值|正品|前主人|生产于|制造于|功能正常|测试正常|完好可用|联名|官方|来源|查证|档案|\b(?:source|citation|archive|official|rare|limited|authentic|tested|working|vintage|19\d{2}|20\d{2})\b|\d{2}\s*年代)/i.test(
           block.text,
         ),
     )
   ) {
     throw new Error("AI preview contains unsupported claims");
   }
-  return blocks;
+  return [...blocks, ...(await research)];
 }
 
 export async function handleProductContent(
