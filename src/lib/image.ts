@@ -1,8 +1,7 @@
 /**
- * 把 Supabase Storage 的 public / 签名 URL 转成服务端缩略图（webp）。
+ * 把 Supabase Storage 的 public URL 转成服务端缩略图。
  * - /storage/v1/object/public/... → /storage/v1/render/image/public/...
- * - /storage/v1/object/sign/...?token=... → /storage/v1/render/image/sign/...?token=...
- *   （签名 transform 端点复用同一 token，无需重签）
+ * 私桶签名 URL 原样保留；transform 参数必须在服务端签名时指定，不能在客户端改写。
  * 非 Supabase URL 原样返回。
  */
 export function toThumbUrl(url: string | null | undefined, width = 256): string | null {
@@ -15,7 +14,6 @@ export function toThumbUrl(url: string | null | undefined, width = 256): string 
   };
   return (
     swap("/storage/v1/object/public/", "/storage/v1/render/image/public/") ??
-    swap("/storage/v1/object/sign/", "/storage/v1/render/image/sign/") ??
     url
   );
 }

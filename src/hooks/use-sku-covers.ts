@@ -5,10 +5,10 @@ import { signSkuCovers } from "@/lib/sku-covers.functions";
 
 /**
  * 给一组 SKU id 批量签封面图 URL。
- * - 输入 ids 变化时自动重取
+ * - 输入 ids 或来源查询的 dataUpdatedAt 变化时自动重取
  * - 返回稳定 Map 引用，配合 row.image_url 做兜底
  */
-export function useSkuCovers(skuIds: string[]): {
+export function useSkuCovers(skuIds: string[], sourceRevision = 0): {
   covers: Record<string, string | null>;
   isLoading: boolean;
 } {
@@ -16,7 +16,7 @@ export function useSkuCovers(skuIds: string[]): {
   const ids = useMemo(() => Array.from(new Set(skuIds)).sort(), [skuIds]);
   const key = ids.join(",");
   const q = useQuery({
-    queryKey: ["sku-covers", key],
+    queryKey: ["sku-covers", key, sourceRevision],
     queryFn: () => fn({ data: { sku_ids: ids } }),
     enabled: ids.length > 0,
     staleTime: 5 * 60 * 1000,

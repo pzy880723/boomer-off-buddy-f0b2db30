@@ -64,7 +64,7 @@ function MSkusPage() {
   }, [rows]);
 
   const allSkuIds = useMemo(() => rows.map((r) => r.id), [rows]);
-  const { covers } = useSkuCovers(allSkuIds);
+  const { covers } = useSkuCovers(allSkuIds, q.dataUpdatedAt);
   const groupCover = (g: StandardProductGroup): string | null => {
     for (const s of g.skus) {
       const c = covers[s.id];

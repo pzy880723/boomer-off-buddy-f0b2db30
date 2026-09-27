@@ -1,0 +1,16 @@
+# Template only. Keep the existing 30-minute product sync service/timer unchanged.
+[Unit]
+Description=BOOMER bounded order-only Youzan synchronization
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/var/www/boomer-erp/current
+EnvironmentFile=/var/www/boomer-erp/shared/.env
+ExecStart=/usr/bin/node /var/www/boomer-erp/current/scripts/run-youzan-order-sync.mjs
+TimeoutStartSec=250
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true

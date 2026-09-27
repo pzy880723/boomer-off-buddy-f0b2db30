@@ -1,0 +1,12 @@
+# Template only: enable after queue migration and candidate verification.
+[Unit]
+Description=Advance current Youzan orders every minute without overlapping runner processes
+
+[Timer]
+OnBootSec=60
+OnUnitInactiveSec=60s
+AccuracySec=5
+Unit=boomer-youzan-order-sync.service
+
+[Install]
+WantedBy=timers.target

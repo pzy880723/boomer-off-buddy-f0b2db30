@@ -165,7 +165,11 @@ export async function processYouzanSale(input: {
     unmatched: 0,
     failed: 0,
   };
+  if (!isYouzanSaleStatus(sale.status)) return result;
   const locationId = await input.adapter.findLocationId(input.shopId);
+  if (sale.sourceChannel === "youzan_branch_offline" && !locationId) {
+    throw new Error("销售门店未绑定库位，已停止库存扣减");
+  }
 
   for (let lineIndex = 0; lineIndex < sale.items.length; lineIndex += 1) {
     const item = sale.items[lineIndex];

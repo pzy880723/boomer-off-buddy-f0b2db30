@@ -27,6 +27,25 @@ const offlineTrade = {
 };
 
 describe("youzan sale reconciliation", () => {
+  test("unpaid or cancelled trades cannot deduct stock", async () => {
+    for (const status of ["WAIT_BUYER_PAY", "TRADE_CLOSED", ""]) {
+      const trade = structuredClone(offlineTrade);
+      trade.full_order_info.order_info.status = status;
+      const unexpected = async (): Promise<never> => { throw Error("must not reconcile unpaid trade"); };
+      const result = await processYouzanSale({ trade, shopId: "shop-1", adapter: {
+        findLocationId: unexpected, findSkuId: unexpected, commitSale: unexpected,
+      } });
+      assert.equal(result.processed, 0);
+    }
+  });
+
+  test("offline sales without a store location cannot deduct headquarters stock", async () => {
+    await assert.rejects(processYouzanSale({ trade: offlineTrade, shopId: "shop-1", adapter: {
+      findLocationId: async () => null,
+      findSkuId: async () => "sku-1",
+      commitSale: async () => { throw Error("must not commit without location"); },
+    } }), /销售门店未绑定库位/);
+  });
   test("extracts full trade details and classifies an offline store sale", () => {
     assert.deepEqual(extractYouzanSale(offlineTrade), {
       tid: "E20260712123357064106193",

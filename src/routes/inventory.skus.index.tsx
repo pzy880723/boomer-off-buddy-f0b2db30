@@ -91,7 +91,7 @@ function SkusPage() {
 
   // 批量给所有 SKU 签封面（私桶图）
   const allSkuIds = useMemo(() => rows.map((r) => r.id), [rows]);
-  const { covers } = useSkuCovers(allSkuIds);
+  const { covers } = useSkuCovers(allSkuIds, q.dataUpdatedAt);
   const groupCover = (g: StandardProductGroup): string | null => {
     for (const s of g.skus) {
       const c = covers[s.id];

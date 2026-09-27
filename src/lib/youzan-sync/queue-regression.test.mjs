@@ -18,7 +18,7 @@ test('HTTP failure cannot be a successful empty payload', async () => {
   await assert.rejects(() => parser()(new Response('{}', { status: 500 })), /HTTP|http/);
 });
 
-function runner(responses, { failWrite = false } = {}) {
+function runner(responses, { failWrite = false, failSale = false, throwSale = false } = {}) {
   const calls = [];
   const writes = [];
   const accepted = [];
@@ -40,7 +40,11 @@ function runner(responses, { failWrite = false } = {}) {
     createSupabaseYouzanSaleAdapter: () => ({}),
     extractYouzanSale: () => ({ sourceChannel: 'youzan_offline', targetKdtId: 7 }),
     isYouzanSaleStatus: () => true,
-    processYouzanSale: async () => { accepted.push('inventory'); return { processed: 1, idempotent: 0, unmatched: 0, failed: 0 }; },
+    processYouzanSale: async () => {
+      accepted.push('inventory');
+      if (throwSale) throw Error('inventory_unavailable');
+      return { processed: failSale ? 0 : 1, idempotent: 0, unmatched: 0, failed: failSale ? 1 : 0 };
+    },
     yzStatusText: String,
     callYouzanApiVerbose: async ({ version, params }) => {
       calls.push({ version, params });
@@ -56,6 +60,17 @@ const order = { tid: 'order-1', payment: 10, status: 'TRADE_SUCCESS', modified: 
 const shop = { id: 'shop', kdt_id: 7, role: 'branch' };
 const start = new Date('2026-09-07T00:00:00Z');
 const end = new Date('2026-09-07T04:30:00Z');
+for (const options of [{ failSale: true }, { throwSale: true }]) {
+  test(`stock reconciliation failure retains the page for retry: ${JSON.stringify(options)}`, async () => {
+    const r = runner([{ trades: [order] }], options);
+    const result = await r.run(shop, start, end, {
+      startPage: 4, maxPages: 2,
+      commitRows: async batch => batch.map(row => `${row.kdt_id}:${row.tid}`),
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.next_page, 4);
+  });
+}
 test('empty successful version cannot mask nonempty version write failure', async () => {
   const r = runner([{ trades: [] }, { trades: [order] }], { failWrite: true });
   const result = await r.run(shop, start, end, { startPage: 1, maxPages: 2 });

@@ -2174,6 +2174,9 @@ async function runOrdersSyncForShop(
       if (attemptReturned > 0) break;
     }
 
+    // Replaying this page is safe: order writes accept equal versions and sale
+    // commits retain their stable per-unit idempotency keys.
+    if (saleFailed > 0) apiCallSucceeded = false;
     const status = !apiCallSucceeded ? "error" : totalUpserted > 0 ? "ok" : "empty";
     // 所有接口版本都抛错时，绝不能把窗口当成"跑完了"
     if (!apiCallSucceeded) nextPage = slice?.startPage ?? nextPage ?? 1;
