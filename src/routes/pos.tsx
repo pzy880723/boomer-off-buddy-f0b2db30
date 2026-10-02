@@ -38,10 +38,13 @@ import {
   addScannedProduct,
   posCartLineKey,
   posCartLineLabel,
+  preparePosSaleAttempt,
+  restorePosSaleAttempt,
   validatePosTenders,
   type PosCartLine,
   type PosScannableProduct,
   type PosTender,
+  type PosSaleAttempt,
 } from "@/lib/pos/pos-policy";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -56,6 +59,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { StandardCatalogGroup } from "@/lib/pos/standard-catalog";
+import { PosCatalog } from "@/components/pos/pos-catalog";
+import { PosHidScanner } from "@/lib/pos/hid-scanner";
+import type { calculatePointsRedemption } from "@/lib/pos/points-policy";
+import { SaleRecoveryResult } from "@/lib/pos/sale-recovery";
+type PointsRedemption = ReturnType<typeof calculatePointsRedemption>;
 
 export const Route = createFileRoute("/pos")({
   head: () => ({
@@ -109,6 +117,7 @@ type PosCustomer = {
   wallet?: { points: number; store_credit: number; member_level: string };
 };
 type CustomerBenefits = {
+  points_redemption?: PointsRedemption;
   customer: PosCustomer;
   wallet: { points: number; store_credit: number; member_level: string };
   coupons: Array<{
@@ -126,6 +135,7 @@ type PosDiscount = {
   reason: string;
 };
 type DiscountPreview = {
+  points_redemption?: PointsRedemption;
   subtotal: number;
   eligible_total: number;
   excluded_total: number;
@@ -136,6 +146,7 @@ type DiscountPreview = {
 };
 type HeldCart = {
   id: string;
+  location_id: string;
   customer_id: string | null;
   note: string | null;
   discount_snapshot: PosDiscount | Record<string, never>;
@@ -230,24 +241,40 @@ async function posRequest<T>(
   token: string,
   init?: RequestInit,
 ): Promise<ApiResponse<T>> {
-  const response = await fetch(path, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      ...(init?.headers ?? {}),
-    },
-  });
-  const contentType = response.headers.get("content-type") ?? "";
-  if (!contentType.includes("application/json")) {
-    return { ok: false, message: `接口返回异常（HTTP ${response.status}）` };
+  try {
+    const response = await fetch(path, {
+      ...init,
+      signal: init?.signal ?? AbortSignal.timeout(25_000),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        ...(init?.headers ?? {}),
+      },
+    });
+    const contentType = response.headers.get("content-type") ?? "";
+    if (!contentType.includes("application/json")) {
+      return {
+        ok: false,
+        code: "result_unknown",
+        message: `接口返回异常（HTTP ${response.status}）`,
+      };
+    }
+    const body = (await response.json()) as ApiResponse<T>;
+    if (response.status >= 500)
+      return {
+        ok: false,
+        code: "result_unknown",
+        message: !body.ok ? body.message : "服务器暂时不可用",
+      };
+    if (!response.ok && body.ok)
+      return { ok: false, message: `请求失败（HTTP ${response.status}）` };
+    return body;
+  } catch {
+    return { ok: false, code: "result_unknown", message: "网络连接失败或超时，请检查网络后重试" };
   }
-  const body = (await response.json()) as ApiResponse<T>;
-  if (!response.ok && body.ok) return { ok: false, message: `请求失败（HTTP ${response.status}）` };
-  return body;
 }
 
-function PosPage() {
+export function PosPage() {
   const { session } = useAuthSession();
   const token = session?.access_token ?? "";
   const scanRef = useRef<HTMLInputElement>(null);
@@ -255,10 +282,30 @@ function PosPage() {
   const [loading, setLoading] = useState(true);
   const [selectedLocationId, setSelectedLocationId] = useState("");
   const [cart, setCart] = useState<PosCartLine[]>([]);
+  const cartRef = useRef(cart);
+  cartRef.current = cart;
   const [productMeta, setProductMeta] = useState<Record<string, LookupProduct>>({});
   const [scanCode, setScanCode] = useState("");
   const [scanning, setScanning] = useState(false);
-  const [browseOpen, setBrowseOpen] = useState(true);
+  const [catalogTab, setCatalogTab] = useState<"standard" | "custom">("standard");
+  const [searchDialog, setSearchDialog] = useState(false);
+  const [productQuery, setProductQuery] = useState("");
+  const [phoneCart, setPhoneCart] = useState(false);
+  const [standardError, setStandardError] = useState("");
+  const [browseError, setBrowseError] = useState("");
+  const [browseNext, setBrowseNext] = useState<number | null>(null);
+  const [browseLoadingMore, setBrowseLoadingMore] = useState(false);
+  const locationRef = useRef(selectedLocationId);
+  locationRef.current = selectedLocationId;
+  const catalogRequest = useRef(0);
+  const browseRequest = useRef(0);
+  const heldRequest = useRef(0);
+  const discountRequest = useRef(0);
+  const [browseQuery, setBrowseQuery] = useState("");
+  const scanQueue = useRef<Array<{ code: string; locationId: string }>>([]);
+  const scanRunning = useRef(false);
+  const scanHandler = useRef<(code: string) => Promise<void>>(async () => {});
+  const resolveScan = useRef<(code: string) => Promise<void>>(async () => {});
   const [standardGroups, setStandardGroups] = useState<StandardCatalogGroup[]>([]);
   const [standardLoading, setStandardLoading] = useState(false);
   const [activeCategoryCode, setActiveCategoryCode] = useState<string | null>(null);
@@ -278,6 +325,22 @@ function PosPage() {
   const [paymentDialog, setPaymentDialog] = useState(false);
   const [tenders, setTenders] = useState<PosTender[]>([]);
   const [paying, setPaying] = useState(false);
+  const saleAttempt = useRef<PosSaleAttempt | null>(null);
+  const [recoveryAttempt, setRecoveryAttempt] = useState<PosSaleAttempt | null>(null);
+  const [recoveryError, setRecoveryError] = useState("");
+  const pendingSaleKey = session?.user.id ? `boomer.pos.pending-sale:${session.user.id}` : null;
+
+  useEffect(() => {
+    if (!pendingSaleKey) return;
+    try {
+      const pending = restorePosSaleAttempt(localStorage.getItem(pendingSaleKey));
+      saleAttempt.current = pending;
+      setRecoveryAttempt(pending);
+      setRecoveryError("");
+    } catch {
+      setRecoveryError("待确认收款记录无法读取，请先在 ERP 核实上一笔订单，不能直接再次收款");
+    }
+  }, [pendingSaleKey]);
   const [saleResult, setSaleResult] = useState<Record<string, unknown> | null>(null);
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
   const [receiptDialog, setReceiptDialog] = useState(false);
@@ -286,6 +349,8 @@ function PosPage() {
   const [memberLoading, setMemberLoading] = useState(false);
   const [memberResults, setMemberResults] = useState<PosCustomer[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<PosCustomer | null>(null);
+  const customerRef = useRef(selectedCustomer);
+  customerRef.current = selectedCustomer;
   const [customerBenefits, setCustomerBenefits] = useState<CustomerBenefits | null>(null);
   const [discountDialog, setDiscountDialog] = useState(false);
   const [discount, setDiscount] = useState<PosDiscount>({
@@ -294,6 +359,11 @@ function PosPage() {
     reason: "",
   });
   const [discountPreview, setDiscountPreview] = useState<DiscountPreview | null>(null);
+  const [appliedDiscount, setAppliedDiscount] = useState<PosDiscount | null>(null);
+  const [pointsInput, setPointsInput] = useState(0);
+  const [pointsQuote, setPointsQuote] = useState<PointsRedemption | null>(null);
+  const [pointsQuoteLoading, setPointsQuoteLoading] = useState(false);
+  const [pointsQuoteError, setPointsQuoteError] = useState("");
   const [discountLoading, setDiscountLoading] = useState(false);
   const [heldDialog, setHeldDialog] = useState(false);
   const [heldCarts, setHeldCarts] = useState<HeldCart[]>([]);
@@ -374,16 +444,81 @@ function PosPage() {
     (location) => location.id === selectedLocationId,
   );
   const subtotal = useMemo(
-    () => cart.reduce((sum, line) => sum + line.unit_price * line.quantity, 0),
+    () =>
+      cart.reduce((sum, line) => sum + Math.round(line.unit_price * 100) * line.quantity, 0) / 100,
     [cart],
   );
   const discountTotal = discountPreview?.discount_total ?? 0;
   const total = discountPreview?.payable_total ?? subtotal;
   const itemCount = useMemo(() => cart.reduce((sum, line) => sum + line.quantity, 0), [cart]);
-  const activeGroup = useMemo(
-    () => standardGroups.find((group) => group.category_code === activeCategoryCode) ?? null,
-    [standardGroups, activeCategoryCode],
-  );
+  const appliedPoints = discountPreview?.points_redemption?.applied_points ?? 0;
+
+  useEffect(() => {
+    if (!discountDialog || !selectedCustomer || !cart.length) {
+      setPointsQuote(null);
+      setPointsQuoteLoading(false);
+      setPointsQuoteError("");
+      return;
+    }
+    let cancelled = false;
+    setPointsQuote(null);
+    setPointsQuoteLoading(true);
+    setPointsQuoteError("");
+    const timer = window.setTimeout(async () => {
+      const result = await posRequest<DiscountPreview>("/api/public/pos/discounts/preview", token, {
+        method: "POST",
+        body: JSON.stringify({
+          location_id: selectedLocationId,
+          customer_id: selectedCustomer.id,
+          points_to_redeem: pointsInput,
+          items: cart.map((line) => ({ sku_id: line.sku_id, quantity: line.quantity })),
+          discount,
+        }),
+      });
+      if (cancelled) return;
+      setPointsQuoteLoading(false);
+      if (result.ok) setPointsQuote(result.data.points_redemption ?? null);
+      else setPointsQuoteError(result.message ?? "积分试算失败，请重试");
+    }, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [
+    discountDialog,
+    selectedCustomer?.id,
+    cart,
+    selectedLocationId,
+    pointsInput,
+    discount.type,
+    discount.value,
+    token,
+  ]);
+
+  useEffect(() => {
+    const scanner = new PosHidScanner();
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (
+        event.ctrlKey ||
+        event.metaKey ||
+        event.altKey ||
+        event.isComposing ||
+        document.querySelector('[role="dialog"]') ||
+        target?.closest('input, textarea, select, [contenteditable="true"]')
+      ) {
+        scanner.reset();
+        return;
+      }
+      const code = scanner.key(event.key, event.timeStamp);
+      if (code) {
+        event.preventDefault();
+        void scanHandler.current(code);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedLocationId]);
 
   useEffect(() => {
     if (activeShift && selectedLocationId) {
@@ -413,14 +548,19 @@ function PosPage() {
 
   async function loadStandardCatalog() {
     if (!selectedLocationId) return;
+    const requestId = ++catalogRequest.current;
+    const locationId = selectedLocationId;
     setStandardLoading(true);
+    setStandardError("");
     const result = await posRequest<{ groups: StandardCatalogGroup[] }>(
       `/api/public/pos/standard-catalog?location_id=${encodeURIComponent(selectedLocationId)}`,
       token,
     );
+    if (requestId !== catalogRequest.current || locationRef.current !== locationId) return;
     setStandardLoading(false);
     if (!result.ok) {
       setStandardGroups([]);
+      setStandardError(result.message ?? "标准商品目录加载失败");
       return;
     }
     setStandardGroups(result.data.groups);
@@ -434,10 +574,12 @@ function PosPage() {
       unit_price: price.price,
       available_qty: 9999,
       is_unlimited_stock: true,
-      image_url: null,
+      image_url: (group as StandardCatalogGroup & { image_url?: string | null }).image_url ?? null,
       barcode: null,
       sku_code: null,
-      sale_ownership: null,
+      sale_ownership: "owned",
+      location_id: selectedLocationId,
+      discount_eligible: true,
       category_code: group.category_code,
       category_name: group.category_name,
       subcategory_code: activeSubcategory?.code ?? null,
@@ -448,27 +590,32 @@ function PosPage() {
 
   function addProduct(product: LookupProduct) {
     try {
-      setCart((current) => addScannedProduct(current, product));
+      // Validate before enqueuing a state update: React may evaluate an updater later.
+      const nextCart = addScannedProduct(cartRef.current, product);
+      cartRef.current = nextCart;
+      setCart(nextCart);
       setProductMeta((current) => ({ ...current, [product.sku_id]: product }));
       setDiscountPreview(null);
       playAcceptedTone();
-      toast.success(`${product.name} 已加入购物车`);
+      toast.success(`${product.name} 已加入购物车`, { position: "top-center", duration: 1500 });
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
-      if (message.includes("already")) toast.warning("孤品已经在购物车中，不会重复加入");
-      else if (message.includes("stock")) toast.warning("可售库存不足");
-      else toast.error("商品无法加入购物车");
+      if (message.includes("already"))
+        toast.warning("孤品已经在购物车中，不会重复加入", { position: "top-center" });
+      else if (message.includes("stock")) toast.warning("可售库存不足", { position: "top-center" });
+      else toast.error("商品无法加入购物车", { position: "top-center" });
     }
   }
 
-  async function scanProduct() {
-    const code = scanCode.trim();
+  async function scanProduct(rawCode = scanCode) {
+    const code = rawCode.trim();
     if (!code) return;
     if (!activeShift || !selectedLocationId) {
       toast.error("收银台正在初始化，请稍候");
       return;
     }
     setScanning(true);
+    const locationId = selectedLocationId;
     const result = await posRequest<
       | { code_type: "product"; product: LookupProduct }
       | { code_type: "customer"; customer: PosCustomer }
@@ -486,6 +633,7 @@ function PosPage() {
       token,
     );
     setScanning(false);
+    if (locationRef.current !== locationId) return;
     setScanCode("");
     scanRef.current?.focus();
     if (!result.ok) {
@@ -509,6 +657,21 @@ function PosPage() {
     setDiscountDialog(true);
     toast.success("优惠券已识别，请确认优惠");
   }
+
+  resolveScan.current = scanProduct;
+  scanHandler.current = async (code: string) => {
+    scanQueue.current.push({ code, locationId: selectedLocationId });
+    if (scanRunning.current) return;
+    scanRunning.current = true;
+    try {
+      while (scanQueue.current.length) {
+        const next = scanQueue.current.shift()!;
+        if (next.locationId === locationRef.current) await resolveScan.current(next.code);
+      }
+    } finally {
+      scanRunning.current = false;
+    }
+  };
 
   async function searchMembers() {
     const query = memberQuery.trim();
@@ -539,34 +702,69 @@ function PosPage() {
       return;
     }
     setSelectedCustomer({ ...customer, wallet: result.data.wallet });
+    setPointsInput(0);
+    setPointsQuote(null);
+    setDiscountPreview(null);
     setCustomerBenefits(result.data);
     setMemberDialog(false);
   }
 
   async function previewDiscount(nextDiscount = discount) {
     if (!selectedLocationId || cart.length === 0) return;
-    if (!nextDiscount.reason.trim()) {
+    if (!nextDiscount.reason.trim() && nextDiscount.value > 0) {
       toast.warning("请填写优惠原因");
       return;
     }
     setDiscountLoading(true);
+    const requestId = ++discountRequest.current;
+    const requestedCart = cartRef.current;
+    const requestedCustomer = customerRef.current;
+    const requestedLocation = selectedLocationId;
+    const scope = catalogRequest.current;
+    const nextAppliedDiscount = {
+      ...nextDiscount,
+      reason: nextDiscount.reason.trim() || (pointsInput > 0 ? "会员积分抵扣" : "取消优惠"),
+    };
     const result = await posRequest<DiscountPreview>("/api/public/pos/discounts/preview", token, {
       method: "POST",
       body: JSON.stringify({
         location_id: selectedLocationId,
+        customer_id: selectedCustomer?.id,
+        points_to_redeem: pointsInput,
         items: cart.map((line) => ({ sku_id: line.sku_id, quantity: line.quantity })),
-        discount: nextDiscount,
+        discount: nextAppliedDiscount,
       }),
     });
-    setDiscountLoading(false);
+    if (requestId === discountRequest.current) setDiscountLoading(false);
+    if (
+      requestId !== discountRequest.current ||
+      requestedCart !== cartRef.current ||
+      requestedCustomer !== customerRef.current ||
+      requestedLocation !== locationRef.current ||
+      scope !== catalogRequest.current
+    ) {
+      toast.warning("购物车或会员已变化，请重新应用优惠");
+      return;
+    }
     if (!result.ok) {
       toast.error(result.message ?? "当前优惠不可用");
       return;
     }
+    if (
+      pointsInput > 0 &&
+      (!result.data.points_redemption?.enabled || result.data.points_redemption.applied_points <= 0)
+    ) {
+      setPointsQuote(result.data.points_redemption ?? null);
+      toast.warning("积分余额或抵扣规则已变化，请重新核对后应用优惠");
+      return;
+    }
     if (result.data.requires_authorization) {
       toast.warning(result.data.authorization_rule ?? "该优惠需要店长授权");
+      return;
     }
     setDiscountPreview(result.data);
+    setAppliedDiscount(nextAppliedDiscount);
+    setPointsInput(result.data.points_redemption?.applied_points ?? 0);
     setDiscountDialog(false);
   }
 
@@ -583,8 +781,8 @@ function PosPage() {
           quantity: line.quantity,
           ...toHeldCartSnapshot(line),
         })),
-        discount_snapshot: discountPreview ? discount : {},
-        benefit_snapshot: customerBenefits ?? {},
+        discount_snapshot: discountPreview ? (appliedDiscount ?? {}) : {},
+        benefit_snapshot: { ...(customerBenefits ?? {}), points_to_redeem: appliedPoints },
       }),
     });
     if (!result.ok) {
@@ -595,18 +793,22 @@ function PosPage() {
     setProductMeta({});
     setSelectedCustomer(null);
     setCustomerBenefits(null);
+    setPointsInput(0);
     setDiscountPreview(null);
     toast.success("已挂单，可随时从挂单列表取回");
   }
 
   async function loadHeldCarts() {
     if (!selectedLocationId) return;
+    const requestId = ++heldRequest.current;
+    const locationId = selectedLocationId;
     setHeldDialog(true);
     setHeldLoading(true);
     const result = await posRequest<{ items: HeldCart[] }>(
       `/api/public/pos/carts/held?location_id=${encodeURIComponent(selectedLocationId)}`,
       token,
     );
+    if (requestId !== heldRequest.current || locationRef.current !== locationId) return;
     setHeldLoading(false);
     if (!result.ok) {
       toast.error(result.message ?? "挂单列表加载失败");
@@ -616,13 +818,27 @@ function PosPage() {
   }
 
   async function resumeHeldCart(held: HeldCart) {
+    if (held.location_id !== selectedLocationId) {
+      toast.error("挂单不属于当前门店，请切换到挂单门店再取回");
+      return;
+    }
+    if (cart.length) {
+      toast.warning("请先结算或挂起当前购物车，再取回挂单");
+      return;
+    }
+    const locationId = selectedLocationId;
     const result = await posRequest<HeldCart>(
       `/api/public/pos/carts/${encodeURIComponent(held.id)}/resume`,
       token,
       { method: "POST", body: "{}" },
     );
+    if (locationRef.current !== locationId) return;
     if (!result.ok) {
       toast.error(result.message ?? "取单失败");
+      return;
+    }
+    if (result.data.location_id !== locationId) {
+      toast.error("挂单门店不匹配，请在 ERP 核实");
       return;
     }
     const items = result.data.pos_held_cart_items;
@@ -645,15 +861,75 @@ function PosPage() {
         },
       ];
     });
+    if (locationRef.current !== locationId) return;
     setCart(resumedCart);
     setProductMeta(Object.fromEntries(products.map((product) => [product.sku_id, product])));
     const heldDiscount = result.data.discount_snapshot as PosDiscount;
-    if (heldDiscount?.type) {
-      setDiscount(heldDiscount);
-      await previewDiscount(heldDiscount);
+    const nextDiscount = heldDiscount?.type
+      ? heldDiscount
+      : { type: "amount" as const, value: 0, reason: "" };
+    setDiscount(nextDiscount);
+    setDiscountPreview(null);
+    setAppliedDiscount(null);
+    setSelectedCustomer(null);
+    setCustomerBenefits(null);
+    setPointsInput(0);
+    let restoredCustomer: PosCustomer | null = null;
+    if (result.data.customer_id) {
+      const benefits = await posRequest<CustomerBenefits>(
+        `/api/public/pos/customers/${encodeURIComponent(result.data.customer_id)}/benefits`,
+        token,
+      );
+      if (locationRef.current !== locationId) return;
+      if (benefits.ok) {
+        restoredCustomer = { ...benefits.data.customer, wallet: benefits.data.wallet };
+        setSelectedCustomer(restoredCustomer);
+        setCustomerBenefits(benefits.data);
+      } else toast.warning("挂单会员权益读取失败，请重新选择会员后设置优惠");
+    }
+    const heldPoints = Number(result.data.benefit_snapshot?.points_to_redeem ?? 0);
+    if (heldPoints > 0 && !restoredCustomer) {
+      setHeldDialog(false);
+      setDiscountDialog(true);
+      return;
+    }
+    const requestedPoints = restoredCustomer ? heldPoints : 0;
+    if (resumedCart.length && (nextDiscount.value > 0 || requestedPoints > 0)) {
+      const preview = await posRequest<DiscountPreview>(
+        "/api/public/pos/discounts/preview",
+        token,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            location_id: locationId,
+            customer_id: restoredCustomer?.id,
+            points_to_redeem: requestedPoints,
+            items: resumedCart.map((line) => ({ sku_id: line.sku_id, quantity: line.quantity })),
+            discount: nextDiscount,
+          }),
+        },
+      );
+      if (locationRef.current !== locationId) return;
+      if (
+        preview.ok &&
+        !preview.data.requires_authorization &&
+        (requestedPoints === 0 ||
+          (preview.data.points_redemption?.enabled &&
+            preview.data.points_redemption.applied_points > 0))
+      ) {
+        setDiscountPreview(preview.data);
+        setAppliedDiscount(nextDiscount);
+        setPointsInput(preview.data.points_redemption?.applied_points ?? 0);
+      } else {
+        toast.warning("挂单优惠或积分已失效，或需要店长授权；尚未应用，请重新设置后结算");
+        setHeldDialog(false);
+        setDiscountDialog(true);
+        return;
+      }
     }
     setHeldDialog(false);
-    toast.success("挂单已取回");
+    if (resumedCart.length !== items.length) toast.warning("部分挂单商品已不可售，请核对购物车");
+    else toast.success("挂单已取回，会员优惠已重新核对");
   }
 
   async function searchOrders() {
@@ -695,27 +971,42 @@ function PosPage() {
       toast.error(result.message ?? "退货失败");
       return;
     }
-    toast.success("退货已登记；孤品将进入验货流程");
+    const pointsRestored = Number(result.data.points_restored ?? 0);
+    toast.success(
+      `退货已登记；孤品将进入验货流程${pointsRestored > 0 ? `，已退回 ${pointsRestored} 积分` : ""}`,
+    );
     await searchOrders();
   }
 
-  async function loadProductBrowser() {
+  async function loadProductBrowser(query = browseQuery, offset = 0) {
     if (!activeShift || !selectedLocationId) {
       toast.error("收银台正在初始化，请稍候");
       return;
     }
-    setBrowseOpen(true);
-    setBrowseLoading(true);
-    const result = await posRequest<{ items: LookupProduct[] }>(
-      `/api/public/pos/products?location_id=${encodeURIComponent(selectedLocationId)}&q=${encodeURIComponent(scanCode.trim())}`,
+    const requestId = ++browseRequest.current;
+    const locationId = selectedLocationId;
+    if (offset === 0) setBrowseLoading(true);
+    else setBrowseLoadingMore(true);
+    setBrowseError("");
+    const result = await posRequest<{ items: LookupProduct[]; next_offset?: number | null }>(
+      `/api/public/pos/products?location_id=${encodeURIComponent(selectedLocationId)}&type=custom&offset=${offset}&q=${encodeURIComponent(query.trim())}`,
       token,
     );
+    if (requestId !== browseRequest.current || locationRef.current !== locationId) return;
     setBrowseLoading(false);
+    setBrowseLoadingMore(false);
     if (!result.ok) {
-      toast.error(result.message ?? "商品加载失败");
+      setBrowseProducts([]);
+      setBrowseError(result.message ?? "商品加载失败");
       return;
     }
-    setBrowseProducts(result.data.items);
+    setBrowseProducts((current) =>
+      offset === 0
+        ? result.data.items
+        : [...new Map([...current, ...result.data.items].map((p) => [p.sku_id, p])).values()],
+    );
+    if (offset === 0) setBrowseQuery(query);
+    setBrowseNext(result.data.next_offset ?? null);
   }
 
   async function loadReceipt(orderId: string) {
@@ -787,6 +1078,31 @@ function PosPage() {
       return;
     }
     setSelectedLocationId(locationId);
+    locationRef.current = locationId;
+    catalogRequest.current++;
+    browseRequest.current++;
+    heldRequest.current++;
+    discountRequest.current++;
+    setHeldCarts([]);
+    setHeldDialog(false);
+    setHeldLoading(false);
+    setStandardGroups([]);
+    setBrowseProducts([]);
+    setBrowseNext(null);
+    setBrowseLoadingMore(false);
+    setStandardError("");
+    setBrowseError("");
+    setActiveCategoryCode(null);
+    setActiveSubcategory(null);
+    setProductQuery("");
+    setBrowseQuery("");
+    setSelectedCustomer(null);
+    setCustomerBenefits(null);
+    setDiscountPreview(null);
+    setScanCode("");
+    setPointsInput(0);
+    setPointsQuote(null);
+    scanQueue.current = [];
     const existing = bootstrap?.open_shifts.find(
       (shift) => shift.location_id === locationId && shift.status !== "closed",
     );
@@ -887,10 +1203,20 @@ function PosPage() {
   }
 
   async function completeSale() {
-    if (!activeShift) return;
+    if (!activeShift || paying || recoveryAttempt || recoveryError || !pendingSaleKey) return;
     let checked: PosTender[];
     try {
       checked = validatePosTenders(total, tenders);
+      if (
+        appliedPoints > 0 &&
+        checked.some(
+          (tender) =>
+            !discountPreview?.points_redemption?.supported_tenders.includes(tender.provider),
+        )
+      ) {
+        toast.error("当前积分抵扣仅支持现金收款，请更换支付方式或取消积分抵扣");
+        return;
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       if (message.includes("transaction")) toast.error("非现金支付请填写渠道交易号");
@@ -898,29 +1224,62 @@ function PosPage() {
       else toast.error("请检查收款信息");
       return;
     }
+    const saleBody = {
+      shift_id: activeShift.id,
+      items: cart.map((line) => ({
+        sku_id: line.sku_id,
+        quantity: line.quantity,
+        subcategory_code: line.subcategory_code ?? null,
+      })),
+      tenders: checked,
+      customer_id: selectedCustomer?.id,
+      points_to_redeem: appliedPoints,
+      discount: discountPreview ? (appliedDiscount ?? undefined) : undefined,
+      benefit_snapshot: customerBenefits ?? undefined,
+    };
+    const signature = JSON.stringify(saleBody);
+    // A timeout is not proof that the server rejected the sale. Retry the same operation.
+    try {
+      saleAttempt.current = preparePosSaleAttempt(saleAttempt.current, signature, () =>
+        crypto.randomUUID(),
+      );
+    } catch {
+      toast.error("上次收款结果尚未确认，请保留原单重试；不要修改后再次收款，请先在 ERP 核实订单");
+      return;
+    }
+    const attempt = saleAttempt.current;
+    try {
+      // Persist before sending, so refreshing during the request cannot create a second sale.
+      localStorage.setItem(pendingSaleKey, JSON.stringify(attempt));
+    } catch {
+      toast.error("无法保存收款保护记录，请检查浏览器存储后再收款");
+      return;
+    }
     setPaying(true);
     const result = await posRequest<Record<string, unknown>>("/api/public/pos/sales", token, {
       method: "POST",
-      body: JSON.stringify({
-        shift_id: activeShift.id,
-        client_op_id: crypto.randomUUID(),
-        items: cart.map((line) => ({
-          sku_id: line.sku_id,
-          quantity: line.quantity,
-          subcategory_code: line.subcategory_code ?? null,
-        })),
-        tenders: checked,
-        customer_id: selectedCustomer?.id,
-        discount: discountPreview ? discount : undefined,
-        benefit_snapshot: customerBenefits ?? undefined,
-      }),
+      body: JSON.stringify({ ...saleBody, client_op_id: attempt.id }),
     });
     setPaying(false);
     if (!result.ok) {
-      toast.error(result.message ?? "收款失败，订单未完成");
+      if (result.code === "result_unknown") {
+        attempt.uncertain = true;
+        setPaymentDialog(false);
+        setRecoveryAttempt({ ...attempt });
+      } else if (!attempt.uncertain && saleAttempt.current === attempt) {
+        saleAttempt.current = null;
+        localStorage.removeItem(pendingSaleKey);
+      }
+      toast.error(
+        result.code === "result_unknown"
+          ? "收款结果尚未确认，请保留原单重试，不要重复收取现金"
+          : (result.message ?? "收款失败，请核对订单后重试"),
+      );
       return;
     }
     setSaleResult(result.data);
+    localStorage.removeItem(pendingSaleKey);
+    saleAttempt.current = null;
     setPaymentDialog(false);
     setCart([]);
     setProductMeta({});
@@ -931,6 +1290,75 @@ function PosPage() {
     toast.success("收款完成，库存与订单已同步");
     const orderId = String(result.data.order_id ?? "");
     if (orderId) await loadReceipt(orderId);
+  }
+
+  async function retryPendingSale() {
+    if (!recoveryAttempt || !pendingSaleKey || paying) return;
+    setPaying(true);
+    const result = await posRequest<Record<string, unknown>>("/api/public/pos/sales", token, {
+      method: "POST",
+      body: JSON.stringify({
+        ...JSON.parse(recoveryAttempt.signature),
+        client_op_id: recoveryAttempt.id,
+      }),
+    });
+    setPaying(false);
+    if (!result.ok) {
+      setRecoveryError(result.message ?? "仍未确认结果，请保留原单，不要重复收款");
+      return;
+    }
+    localStorage.removeItem(pendingSaleKey);
+    saleAttempt.current = null;
+    setRecoveryAttempt(null);
+    setRecoveryError("");
+    setCart([]);
+    setDiscountPreview(null);
+    setSelectedCustomer(null);
+    setCustomerBenefits(null);
+    setSaleResult(result.data);
+    toast.success("原单已确认成功，没有创建重复订单");
+    const orderId = String(result.data.order_id ?? "");
+    if (orderId) await loadReceipt(orderId);
+  }
+
+  async function cancelUnfinishedSale() {
+    if (!recoveryAttempt || !pendingSaleKey || paying) return;
+    const original = JSON.parse(recoveryAttempt.signature);
+    setPaying(true);
+    const result = await posRequest<unknown>("/api/public/pos/sales/recover/cancel", token, {
+      method: "POST",
+      body: JSON.stringify({ shift_id: original.shift_id, client_op_id: recoveryAttempt.id }),
+    });
+    setPaying(false);
+    if (!result.ok) {
+      setRecoveryError(result.message ?? "暂时无法核对原单，已保留收款保护记录");
+      return;
+    }
+    const checked = SaleRecoveryResult.safeParse(result.data);
+    if (!checked.success || checked.data.client_op_id !== recoveryAttempt.id) {
+      setRecoveryError("核对结果异常，已保留收款保护记录，请稍后重试");
+      return;
+    }
+    localStorage.removeItem(pendingSaleKey);
+    saleAttempt.current = null;
+    setRecoveryAttempt(null);
+    setRecoveryError("");
+    setDiscountPreview(null);
+    setAppliedDiscount(null);
+    setPointsInput(0);
+    if (checked.data.status === "completed") {
+      setCart([]);
+      setProductMeta({});
+      setSelectedCustomer(null);
+      setCustomerBenefits(null);
+      setSaleResult(checked.data.order);
+      toast.success("原单已经成交，已恢复原订单，没有重复收款");
+      await loadReceipt(checked.data.order.order_id);
+    } else {
+      toast.info("原单确认未成交，已安全取消。若已收现金，请核对后再结算，勿重复收取", {
+        duration: 7000,
+      });
+    }
   }
 
   if (loading) {
@@ -962,7 +1390,7 @@ function PosPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f6f8] text-[#101828]">
+    <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-[#f7f8fa] text-[#101828]">
       <style>{`
         @media print {
           @page { size: 58mm auto; margin: 4mm; }
@@ -978,21 +1406,24 @@ function PosPage() {
           .pos-receipt-actions { display: none !important; }
         }
       `}</style>
-      <header className="flex min-h-16 flex-wrap items-center gap-3 border-b border-[#e4e7ec] bg-white px-4 py-3 sm:px-5">
+      <header className="flex min-h-[76px] shrink-0 flex-wrap items-center gap-2 border-b border-[#e4e7ec] bg-white px-3 py-2 sm:gap-3 sm:px-5">
         <Link
           to="/dashboard"
-          className="mr-4 inline-flex h-10 w-10 items-center justify-center rounded-xl text-[#344054] transition hover:bg-[#f2f4f7]"
+          className="inline-flex h-10 w-9 items-center justify-center rounded-xl text-[#344054] transition hover:bg-[#f2f4f7] sm:mr-4"
           aria-label="返回 ERP"
         >
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div className="flex items-center gap-2 sm:gap-3">
-          <img src={logo} alt="BOOMER OFF" className="h-8 w-auto" />
+          <img src={logo} alt="BOOMER OFF" className="h-7 w-auto sm:h-8" />
           <span className="hidden text-sm font-medium text-[#667085] sm:inline">门店收银</span>
         </div>
-        <div className="ml-auto flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+        <div className="contents sm:ml-auto sm:flex sm:flex-wrap sm:items-center sm:justify-end sm:gap-3">
           <Select value={selectedLocationId} onValueChange={(value) => void switchLocation(value)}>
-            <SelectTrigger className="h-10 w-40 rounded-xl border-[#d0d5dd] bg-white sm:w-52">
+            <SelectTrigger
+              disabled={scanning || paying}
+              className="ml-auto h-10 w-28 rounded-xl border-[#e4e7ec] bg-white sm:ml-0 sm:w-40"
+            >
               <SelectValue placeholder="选择门店" />
             </SelectTrigger>
             <SelectContent>
@@ -1003,20 +1434,39 @@ function PosPage() {
               ))}
             </SelectContent>
           </Select>
-          <Badge
+          <Button
             variant="outline"
-            className={
-              activeShift
-                ? "hidden h-8 rounded-full border-[#abefc6] bg-[#ecfdf3] px-3 text-[#067647] md:inline-flex"
-                : "hidden h-8 rounded-full border-[#fedf89] bg-[#fffaeb] px-3 text-[#b54708] md:inline-flex"
-            }
+            size="icon"
+            aria-label="搜索商品或输入条码"
+            className="h-10 w-10 rounded-xl border-[#e4e7ec]"
+            onClick={() => setSearchDialog(true)}
           >
-            {activeShift
-              ? `收银可用 · ${activeShift.register?.name ?? "收银机"}`
-              : shiftLoading
-                ? "正在准备收银"
-                : "收银暂不可用"}
-          </Badge>
+            <Search className="h-4 w-4" />
+          </Button>
+          <button
+            type="button"
+            onClick={() => setMemberDialog(true)}
+            className="order-last flex min-h-11 w-full items-center gap-2 rounded-xl border border-[#e4e7ec] px-3 text-left sm:order-none sm:w-auto sm:min-w-52"
+          >
+            <UserRoundSearch className="h-5 w-5 shrink-0 text-[#0a315d]" />
+            <span className="text-xs font-semibold">
+              {selectedCustomer?.nickname || (selectedCustomer ? "会员" : "识别会员")}
+            </span>
+            {selectedCustomer ? (
+              <>
+                <span className="rounded bg-[#fbf0df] px-2 py-1 text-[10px] text-[#98713d]">
+                  {selectedCustomer.wallet?.member_level || "暂无类型"}
+                </span>
+                <span className="ml-auto text-xs text-[#667085]">
+                  {selectedCustomer.wallet?.points == null
+                    ? "暂无积分"
+                    : `${selectedCustomer.wallet.points} 积分`}
+                </span>
+              </>
+            ) : (
+              <span className="hidden text-xs text-[#667085] xl:inline">手机号 / 会员码</span>
+            )}
+          </button>
           <Button
             variant="outline"
             className="hidden h-10 rounded-xl border-[#d0d5dd] sm:inline-flex"
@@ -1029,492 +1479,357 @@ function PosPage() {
         </div>
       </header>
 
-      <main className="grid min-h-[calc(100vh-64px)] grid-cols-1 gap-3 p-3 sm:p-4 lg:h-[calc(100vh-64px)] lg:grid-cols-[minmax(0,1fr)_clamp(420px,30vw,500px)] lg:overflow-hidden">
-        <section className="flex min-h-0 min-w-0 flex-col gap-3">
-          <div className="flex flex-1 flex-col rounded-2xl border border-[#e4e7ec] bg-white p-4 shadow-[0_2px_8px_rgba(15,23,42,0.04)]">
-            <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
-              <div className="relative flex-1">
-                <ScanLine className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#0a315d]" />
-                <Input
-                  ref={scanRef}
-                  value={scanCode}
-                  onChange={(event) => setScanCode(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") void scanProduct();
-                  }}
-                  placeholder="扫描商品条码、SKU、RFID，或输入编码后回车"
-                  className="h-14 rounded-xl border-[#d0d5dd] bg-[#f9fafb] pl-12 pr-12 text-base focus-visible:border-[#0a315d] focus-visible:ring-[#0a315d]/10"
-                  autoComplete="off"
-                  inputMode="search"
-                />
-                {scanning && (
-                  <Loader2 className="absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 animate-spin text-[#e8343a]" />
-                )}
-              </div>
-              <Button
-                onClick={() => void scanProduct()}
-                disabled={scanning || !scanCode.trim()}
-                className="h-12 rounded-xl bg-[#e8343a] px-7 text-base hover:bg-[#c92930] sm:h-14"
-              >
-                <Barcode className="mr-2 h-5 w-5" />
-                扫码查询
-              </Button>
-            </div>
-            <div className="mt-3 flex items-center justify-between text-xs text-[#667085]">
-              <span>孤品重复扫码不会重复加入；标准商品重复扫码自动增加数量。</span>
-              <div className="flex items-center gap-3">
-                <span>{selectedLocation?.name ?? "未选择库位"}</span>
-                <button
-                  type="button"
-                  className="inline-flex items-center font-semibold text-[#0a315d] hover:text-[#e8343a]"
-                  onClick={() => {
-                    if (browseOpen) setBrowseOpen(false);
-                    else void loadProductBrowser();
-                  }}
-                >
-                  商品浏览
-                  <ChevronDown
-                    className={`ml-1 h-3.5 w-3.5 transition ${browseOpen ? "rotate-180" : ""}`}
-                  />
-                </button>
-              </div>
-            </div>
-            <div className="mt-4 border-t border-[#eaecf0] pt-4">
-              <div className="mb-3 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold">标准商品</p>
-                  <p className="mt-0.5 text-xs text-[#667085]">
-                    选择一级类目后直接点价格即可加入；细分类可选，不选也能结算。
-                  </p>
-                </div>
-                {standardLoading && <Loader2 className="h-4 w-4 animate-spin text-[#0a315d]" />}
-              </div>
-              {standardGroups.length === 0 ? (
-                <div className="flex h-20 items-center justify-center rounded-xl bg-[#f9fafb] text-sm text-[#667085]">
-                  当前门店不继承标准商品目录
-                </div>
-              ) : activeGroup ? (
-                <div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="rounded-lg px-2"
-                      onClick={() => {
-                        setActiveCategoryCode(null);
-                        setActiveSubcategory(null);
-                      }}
-                    >
-                      <ArrowLeft className="mr-1 h-3.5 w-3.5" />
-                      全部类目
-                    </Button>
-                    <span className="text-sm font-semibold">{activeGroup.category_name}</span>
-                  </div>
-                  {activeGroup.subcategories.length > 0 && (
-                    <div className="mt-3">
-                      <p className="text-xs text-[#667085]">细分类（可选）</p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {activeGroup.subcategories.map((sub) => {
-                          const active = activeSubcategory?.code === sub.code;
-                          return (
-                            <button
-                              type="button"
-                              key={sub.code}
-                              aria-pressed={active}
-                              className={`rounded-full border px-3 py-1.5 text-xs transition ${
-                                active
-                                  ? "border-[#0a315d] bg-[#0a315d] text-white"
-                                  : "border-[#d0d5dd] bg-white text-[#475467] hover:border-[#0a315d]"
-                              }`}
-                              onClick={() =>
-                                setActiveSubcategory(
-                                  active ? null : { code: sub.code, name: sub.name },
-                                )
-                              }
-                            >
-                              {sub.name}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                  <div className="mt-4 grid grid-cols-4 gap-2 sm:grid-cols-6 xl:grid-cols-8">
-                    {activeGroup.prices.map((price) => (
-                      <button
-                        type="button"
-                        key={price.sku_id}
-                        className="rounded-xl border border-[#e4e7ec] bg-white py-3 text-sm font-bold tabular-nums text-[#e8343a] transition hover:border-[#e8343a] hover:bg-[#fff1f2]"
-                        onClick={() => addStandardPrice(activeGroup, price)}
-                      >
-                        {money(price.price)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-5">
-                  {standardGroups.map((group) => (
-                    <button
-                      type="button"
-                      key={group.category_code}
-                      className="rounded-xl border border-[#e4e7ec] bg-white px-3 py-4 text-sm font-semibold transition hover:border-[#0a315d] hover:bg-[#eef4fb]"
-                      onClick={() => {
-                        setActiveCategoryCode(group.category_code);
-                        setActiveSubcategory(null);
-                      }}
-                    >
-                      {group.category_name}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            {browseOpen && (
-              <div className="mt-4 border-t border-[#eaecf0] pt-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold">商品浏览</p>
-                    <p className="mt-0.5 text-xs text-[#667085]">
-                      显示当前库位有可售库存的商品；输入名称后重新查询可缩小范围。
-                    </p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="rounded-lg"
-                    disabled={browseLoading}
-                    onClick={() => void loadProductBrowser()}
-                  >
-                    {browseLoading && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-                    查询
-                  </Button>
-                </div>
-                {browseLoading ? (
-                  <div className="flex h-28 items-center justify-center text-sm text-[#667085]">
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    正在读取当前库位库存
-                  </div>
-                ) : browseProducts.length === 0 ? (
-                  <div className="flex h-28 items-center justify-center rounded-xl bg-[#f9fafb] text-sm text-[#667085]">
-                    暂无可售商品
-                  </div>
-                ) : (
-                  <div className="grid max-h-[calc(100vh-310px)] grid-cols-2 gap-3 overflow-y-auto pr-1 sm:grid-cols-3 xl:grid-cols-4">
-                    {browseProducts.map((product) => (
-                      <button
-                        type="button"
-                        key={product.sku_id}
-                        className="group overflow-hidden rounded-xl border border-[#e4e7ec] bg-white text-left transition hover:border-[#fda4af] hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)]"
-                        onClick={() => addProduct(product)}
-                      >
-                        <div className="aspect-[4/3] bg-[#f2f4f7]">
-                          {product.image_url ? (
-                            <img
-                              src={product.image_url}
-                              alt=""
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-full items-center justify-center">
-                              <PackageOpen className="h-6 w-6 text-[#98a2b3]" />
-                            </div>
-                          )}
-                        </div>
-                        <div className="p-3">
-                          <p className="truncate text-sm font-semibold">{product.name}</p>
-                          <div className="mt-2 flex items-center justify-between">
-                            <span className="font-bold text-[#e8343a]">
-                              {money(product.unit_price)}
-                            </span>
-                            <span className="text-[11px] text-[#667085]">
-                              {product.is_unlimited_stock
-                                ? "库存不限"
-                                : `库存 ${product.available_qty}`}
-                            </span>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+      <main
+        className={`grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden p-3 sm:p-4 lg:grid-cols-[minmax(0,1fr)_76px_clamp(340px,28vw,430px)] lg:grid-rows-1 ${phoneCart ? "grid-rows-1" : "grid-rows-[minmax(0,1fr)_auto]"}`}
+      >
+        <div className={`min-h-0 ${phoneCart ? "hidden lg:contents" : "contents"}`}>
+          <PosCatalog
+            tab={catalogTab}
+            groups={standardGroups}
+            products={browseProducts}
+            activeCategoryCode={activeCategoryCode}
+            subcategory={activeSubcategory}
+            loading={catalogTab === "standard" ? standardLoading : browseLoading}
+            error={catalogTab === "standard" ? standardError : browseError}
+            onTab={setCatalogTab}
+            onGroup={(code) => {
+              setActiveCategoryCode(code);
+              setActiveSubcategory(null);
+            }}
+            onSubcategory={setActiveSubcategory}
+            onPrice={addStandardPrice}
+            onProduct={(product) => addProduct(product as LookupProduct)}
+            onRetry={() =>
+              void (catalogTab === "standard" ? loadStandardCatalog() : loadProductBrowser())
+            }
+            hasMore={browseNext !== null}
+            loadingMore={browseLoadingMore}
+            onMore={() => {
+              if (browseNext !== null) void loadProductBrowser(browseQuery, browseNext);
+            }}
+          />
+        </div>
+        <nav
+          data-pos-action-rail
+          aria-label="收银操作"
+          className={`flex gap-2 rounded-2xl bg-[#edf0f4] p-2 lg:flex-col ${phoneCart ? "hidden lg:flex" : ""}`}
+        >
+          <button
+            type="button"
+            onClick={() => setDiscountDialog(true)}
+            disabled={cart.length === 0}
+            className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-[#f3dfe2] bg-[#fff5f6] text-xs font-semibold text-[#e8343a] disabled:opacity-40 lg:h-[72px] lg:flex-none lg:flex-col"
+          >
+            <TicketPercent className="h-5 w-5" />
+            优惠
+          </button>
+          <button
+            type="button"
+            onClick={() => void loadHeldCarts()}
+            disabled={!activeShift}
+            className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-[#e4e7ec] bg-white text-xs font-semibold disabled:opacity-40 lg:h-[72px] lg:flex-none lg:flex-col"
+          >
+            <History className="h-5 w-5" />
+            取单
+          </button>
+          <button
+            type="button"
+            onClick={() => void holdCart()}
+            disabled={!activeShift || cart.length === 0}
+            className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-[#e4e7ec] bg-white text-xs font-semibold disabled:opacity-40 lg:h-[72px] lg:flex-none lg:flex-col"
+          >
+            <PauseCircle className="h-5 w-5" />
+            挂单
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setOrdersDialog(true);
+              void searchOrders();
+            }}
+            disabled={!activeShift}
+            className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-[#e4e7ec] bg-white text-xs font-semibold disabled:opacity-40 lg:h-[72px] lg:flex-none lg:flex-col"
+          >
+            <RotateCcw className="h-5 w-5" />
+            退换
+          </button>
+          <div className="mt-auto hidden items-center gap-2 pb-5 pt-4 text-center text-[10px] text-[#667085] lg:flex lg:flex-col">
+            {scanning ? (
+              <Loader2 className="h-5 w-5 animate-spin text-[#0a315d]" />
+            ) : (
+              <ScanLine className="h-5 w-5 text-[#067647]" />
             )}
+            {scanning ? "识别中" : "扫码即选品"}
           </div>
-        </section>
-
+        </nav>
         <aside
           data-pos-checkout-panel
-          className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-2xl border border-[#e4e7ec] bg-white p-4 shadow-[0_2px_8px_rgba(15,23,42,0.04)]"
+          className={`min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-2xl border border-[#e4e7ec] bg-white ${phoneCart ? "grid" : "hidden lg:grid"}`}
         >
-          <div className="flex items-center justify-between pb-3">
-            <div>
-              <p className="text-sm font-semibold">本单结算</p>
-              <p className="mt-1 text-xs text-[#667085]">库存将在收款成功后扣减</p>
-            </div>
-            <Badge variant="outline" className="rounded-full border-[#d0d5dd] text-[#475467]">
-              {itemCount} 件商品
-            </Badge>
-            {cart.length > 0 && (
-              <button
-                type="button"
-                className="ml-auto text-xs text-[#667085] hover:text-[#e8343a]"
-                onClick={() => {
-                  setCart([]);
-                  setProductMeta({});
-                  setDiscountPreview(null);
-                }}
-              >
-                清空
-              </button>
-            )}
+          <div className="flex h-16 items-center gap-2 border-b border-[#eaecf0] px-4">
+            <button
+              type="button"
+              aria-label="返回选品"
+              className="mr-1 flex h-10 w-9 items-center lg:hidden"
+              onClick={() => setPhoneCart(false)}
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <h2 className="text-base font-bold">购物车</h2>
+            <p className="ml-auto text-xs text-[#667085]">
+              共 <strong className="px-1 text-lg tabular-nums text-[#101828]">{itemCount}</strong>{" "}
+              件
+            </p>
+            <button
+              type="button"
+              className="ml-4 min-h-10 text-xs text-[#667085] hover:text-[#e8343a]"
+              disabled={cart.length === 0}
+              onClick={() => {
+                setCart([]);
+                cartRef.current = [];
+                setProductMeta({});
+                setDiscountPreview(null);
+              }}
+            >
+              清空
+            </button>
           </div>
-
-          <div
-            data-pos-cart-scroll
-            className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-[#eaecf0] bg-[#f9fafb]"
-          >
-            <div className="flex h-10 shrink-0 items-center border-b border-[#eaecf0] px-3">
-              <ShoppingBag className="mr-2 h-4 w-4 text-[#e60012]" />
-              <span className="text-sm font-semibold">当前购物车</span>
-              {cart.length > 0 && (
-                <button
-                  type="button"
-                  className="ml-auto text-xs text-[#667085] hover:text-[#e8343a]"
-                  onClick={() => {
-                    setCart([]);
-                    setProductMeta({});
-                    setDiscountPreview(null);
-                  }}
-                >
-                  清空
-                </button>
-              )}
-            </div>
+          <div data-pos-cart-scroll className="min-h-0 overflow-y-auto px-3">
             {cart.length === 0 ? (
-              <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-4 text-center">
-                {saleResult ? (
-                  <div className="mb-4 flex items-center gap-2 rounded-full bg-[#ecfdf3] px-3 py-1.5 text-xs font-semibold text-[#067647]">
-                    <Check className="h-3.5 w-3.5" />
-                    <span>上一单已完成</span>
-                    <button
-                      type="button"
-                      className="underline underline-offset-2"
-                      onClick={() => {
-                        const orderId = String(saleResult.order_id ?? "");
-                        if (orderId) void loadReceipt(orderId);
-                      }}
-                    >
-                      打印小票
-                    </button>
-                  </div>
-                ) : null}
-                <ScanLine className="h-6 w-6 text-[#98a2b3]" />
-                <p className="text-sm font-medium text-[#475467]">等待扫码或选择商品</p>
+              <div className="flex h-full min-h-32 flex-col items-center justify-center gap-3 text-center text-sm text-[#667085]">
+                <ShoppingBag className="h-7 w-7 text-[#98a2b3]" />
+                <p>等待扫码或选择商品</p>
                 {saleResult && (
-                  <div className="flex w-full max-w-[280px] items-center gap-2 rounded-xl border border-[#abefc6] bg-[#ecfdf3] px-3 py-2 text-left">
-                    <Check className="h-4 w-4 shrink-0 text-[#067647]" />
-                    <span className="flex-1 truncate text-xs font-semibold text-[#067647]">
-                      上一单已完成
-                    </span>
-                    <button
-                      type="button"
-                      className="inline-flex shrink-0 items-center text-xs font-semibold text-[#067647] underline underline-offset-4"
-                      onClick={() => {
-                        const orderId = String(saleResult.order_id ?? "");
-                        if (orderId) void loadReceipt(orderId);
-                      }}
-                    >
-                      <Printer className="mr-1 h-3.5 w-3.5" />
-                      打印小票
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    className="flex items-center gap-2 rounded-xl bg-[#ecfdf3] px-3 py-2 text-xs text-[#067647]"
+                    onClick={() => {
+                      const id = String(saleResult.order_id ?? "");
+                      if (id) void loadReceipt(id);
+                    }}
+                  >
+                    <Check className="h-4 w-4" />
+                    上一单已完成 · 打印小票
+                  </button>
                 )}
               </div>
             ) : (
-              <div className="min-h-0 flex-1 overflow-y-auto p-2">
-                {cart.map((line) => {
-                  const meta = productMeta[line.sku_id];
-                  const lineKey = posCartLineKey(line);
-                  return (
-                    <div
-                      key={lineKey}
-                      className="mb-1.5 rounded-lg border border-[#eaecf0] bg-white px-3 py-2.5 last:mb-0"
-                    >
-                      <div className="grid grid-cols-[44px_minmax(0,1fr)_auto] items-start gap-2.5">
-                        <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-md bg-[#f2f4f7]">
-                          {meta?.image_url ? (
-                            <img
-                              src={meta.image_url}
-                              alt=""
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <PackageOpen className="h-4 w-4 text-[#98a2b3]" />
-                          )}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold">{posCartLineLabel(line)}</p>
-                          <p className="mt-0.5 truncate font-mono text-[10px] text-[#667085]">
-                            {meta?.barcode || meta?.sku_code || line.sku_id}
-                          </p>
-                        </div>
-                        <p className="font-bold tabular-nums text-[#e8343a]">
-                          {money(line.unit_price * line.quantity)}
-                        </p>
-                      </div>
-                      <div className="mt-2 flex items-center justify-between pl-[54px]">
-                        <Badge
-                          variant="secondary"
-                          className="h-5 rounded px-1.5 text-[10px] font-normal"
+              cart.map((line) => {
+                const meta = productMeta[line.sku_id];
+                const lineKey = posCartLineKey(line);
+                return (
+                  <div
+                    key={lineKey}
+                    data-pos-cart-line
+                    className="grid min-h-[72px] grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-2 border-b border-[#eaecf0] py-2"
+                  >
+                    <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-lg bg-[#f2f4f7]">
+                      {meta?.image_url ? (
+                        <img src={meta.image_url} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <PackageOpen className="h-5 w-5 text-[#98a2b3]" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p title={posCartLineLabel(line)} className="truncate text-xs font-semibold">
+                        {posCartLineLabel(line)}
+                      </p>
+                      <p className="mt-2 truncate text-[10px] text-[#667085]">
+                        {money(line.unit_price)}
+                        {line.product_type === "standard" ? " 档" : ""} ·{" "}
+                        {meta?.barcode ||
+                          meta?.sku_code ||
+                          (line.product_type === "standard" ? "标准商品" : "自定义商品")}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <p className="text-sm font-bold tabular-nums">
+                        {money(line.unit_price * line.quantity)}
+                      </p>
+                      <div className="flex items-center">
+                        <button
+                          type="button"
+                          aria-label={`减少 ${posCartLineLabel(line)}`}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#f7f8fa]"
+                          onClick={() => updateQuantity(lineKey, line.quantity - 1)}
                         >
-                          {line.product_type === "custom"
-                            ? "孤品"
-                            : line.product_type === "bundle"
-                              ? "组包"
-                              : "标准"}
-                        </Badge>
-                        <div className="flex items-center">
-                          <button
-                            type="button"
-                            className="flex h-7 w-7 items-center justify-center rounded-l-md border border-[#d0d5dd]"
-                            onClick={() => updateQuantity(lineKey, line.quantity - 1)}
-                          >
-                            <Minus className="h-3 w-3" />
-                          </button>
-                          <span className="flex h-7 w-9 items-center justify-center border-y border-[#d0d5dd] bg-white text-xs font-semibold">
-                            {line.quantity}
-                          </span>
-                          <button
-                            type="button"
-                            className="flex h-7 w-7 items-center justify-center rounded-r-md border border-[#d0d5dd] disabled:opacity-35"
-                            disabled={
-                              line.product_type === "custom" ||
-                              (!line.is_unlimited_stock && line.quantity >= line.available_qty)
-                            }
-                            onClick={() => updateQuantity(lineKey, line.quantity + 1)}
-                          >
-                            <Plus className="h-3 w-3" />
-                          </button>
-                          <button
-                            type="button"
-                            className="ml-1.5 flex h-7 w-7 items-center justify-center rounded-md text-[#98a2b3] hover:bg-[#fff1f2] hover:text-[#e8343a]"
-                            onClick={() => updateQuantity(lineKey, 0)}
-                            aria-label={`删除 ${posCartLineLabel(line)}`}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
+                          <Minus className="h-3.5 w-3.5" />
+                        </button>
+                        <span className="min-w-7 text-center text-xs tabular-nums">
+                          {line.quantity}
+                        </span>
+                        <button
+                          type="button"
+                          aria-label={`增加 ${posCartLineLabel(line)}`}
+                          disabled={
+                            line.product_type === "custom" ||
+                            (!line.is_unlimited_stock && line.quantity >= line.available_qty)
+                          }
+                          className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#f7f8fa] disabled:opacity-30"
+                          onClick={() => updateQuantity(lineKey, line.quantity + 1)}
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`删除 ${posCartLineLabel(line)}`}
+                          className="ml-0.5 flex h-8 w-7 items-center justify-center text-[#98a2b3] hover:text-[#e8343a]"
+                          onClick={() => updateQuantity(lineKey, 0)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
+                  </div>
+                );
+              })
             )}
           </div>
-
-          <div data-pos-settlement-footer className="space-y-2.5 border-t border-[#eaecf0] pt-3">
+          <div data-pos-settlement-footer className="space-y-3 border-t border-[#eaecf0] p-4">
+            <div className="flex justify-between text-xs text-[#667085]">
+              <span>商品小计</span>
+              <span className="tabular-nums">{money(subtotal)}</span>
+            </div>
             <button
               type="button"
-              className="flex h-12 w-full items-center gap-2.5 rounded-lg bg-[#fff0f1] px-3 text-left transition hover:bg-[#ffe3e6]"
-              onClick={() => setMemberDialog(true)}
+              className="flex w-full justify-between text-xs text-[#667085]"
+              disabled={!cart.length}
+              onClick={() => setDiscountDialog(true)}
             >
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[#e60012]">
-                <UserRoundSearch className="h-4 w-4" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-[#e60012]">
-                  {selectedCustomer?.nickname || "识别会员"}
-                </p>
-                <p className="truncate text-[11px] text-[#667085]">
-                  {selectedCustomer
-                    ? `${selectedCustomer.wallet?.member_level ?? "普通会员"} · ${selectedCustomer.wallet?.points ?? 0} 积分`
-                    : "扫码会员码或输入手机号"}
-                </p>
-              </div>
-              <ChevronDown className="h-4 w-4 -rotate-90 text-[#667085]" />
+              <span>整单优惠</span>
+              <span className="tabular-nums text-[#e8343a]">-{money(discountTotal)}</span>
             </button>
-
-            <div className="grid grid-cols-4 gap-1.5">
-              <Button
-                variant="outline"
-                className="h-10 rounded-lg px-2 text-xs"
-                disabled={cart.length === 0}
-                onClick={() => setDiscountDialog(true)}
-              >
-                <TicketPercent className="mr-1 h-3.5 w-3.5 text-[#e8343a]" />
-                优惠
-              </Button>
-              <Button
-                variant="outline"
-                className="h-10 rounded-lg px-2 text-xs"
-                onClick={() => void loadHeldCarts()}
-              >
-                <History className="mr-1 h-3.5 w-3.5" />
-                取单
-              </Button>
-              <Button
-                variant="outline"
-                className="h-10 rounded-lg px-2 text-xs"
-                disabled={!activeShift || cart.length === 0}
-                onClick={() => void holdCart()}
-              >
-                <PauseCircle className="mr-1 h-3.5 w-3.5" />
-                挂单
-              </Button>
-              <Button
-                variant="outline"
-                className="h-10 rounded-lg px-2 text-xs"
-                disabled={!activeShift}
-                onClick={() => {
-                  setOrdersDialog(true);
-                  void searchOrders();
-                }}
-              >
-                <RotateCcw className="mr-1 h-3.5 w-3.5" />
-                退换
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-[1fr_auto] items-end gap-4 border-t border-[#eaecf0] pt-2.5">
-              <div className="space-y-1 text-xs text-[#667085]">
-                <div className="flex gap-3">
-                  <span>小计</span>
-                  <span className="tabular-nums text-[#344054]">{money(subtotal)}</span>
-                </div>
-                <div className="flex gap-3">
-                  <span>优惠</span>
-                  <span className="tabular-nums font-medium text-[#e8343a]">
-                    {discountTotal > 0 ? `-${money(discountTotal)}` : money(0)}
-                  </span>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-[11px] font-medium text-[#667085]">应收金额</p>
-                <p className="text-3xl font-black leading-none tracking-[-0.04em] tabular-nums text-[#101828]">
-                  {money(total)}
-                </p>
-              </div>
-            </div>
-
             {discountPreview?.excluded_total ? (
-              <div className="flex justify-between text-[11px] text-[#98a2b3]">
-                <span>寄售/特殊商品不参与优惠</span>
-                <span>{money(discountPreview.excluded_total)}</span>
-              </div>
+              <p className="text-[10px] text-[#98a2b3]">
+                寄售/特殊商品 {money(discountPreview.excluded_total)} 不参与优惠
+              </p>
             ) : null}
-
+            <div className="flex items-end justify-between pt-2">
+              <span className="text-sm font-semibold">应收金额</span>
+              <strong className="text-3xl leading-none tabular-nums text-[#e8343a]">
+                {money(total)}
+              </strong>
+            </div>
             <Button
-              className="h-14 w-full rounded-xl bg-[#e8343a] text-base font-semibold hover:bg-[#c92930]"
+              className="h-13 w-full rounded-xl bg-[#e8343a] text-base font-semibold hover:bg-[#c92930]"
               disabled={!activeShift || cart.length === 0}
               onClick={startPayment}
             >
-              <Banknote className="mr-2 h-5 w-5" />
-              收款 {total > 0 ? money(total) : ""}
+              <Barcode className="mr-2 h-5 w-5" />
+              收款
             </Button>
           </div>
         </aside>
       </main>
+      {!phoneCart && (
+        <div className="flex shrink-0 items-center gap-3 border-t border-[#eaecf0] bg-white px-4 py-3 lg:hidden">
+          <button
+            type="button"
+            className="flex flex-1 items-center gap-3 text-left"
+            onClick={() => setPhoneCart(true)}
+          >
+            <ShoppingBag className="h-6 w-6 text-[#0a315d]" />
+            <span>
+              <b className="text-lg tabular-nums">{money(total)}</b>
+              <span className="ml-3 text-xs text-[#667085]">共 {itemCount} 件</span>
+            </span>
+          </button>
+          <Button
+            disabled={!cart.length}
+            onClick={() => setPhoneCart(true)}
+            className="h-11 rounded-xl bg-[#e8343a] px-6"
+          >
+            查看购物车
+          </Button>
+        </div>
+      )}
+
+      <Dialog open={Boolean(recoveryAttempt || recoveryError)}>
+        <DialogContent
+          className="max-w-md rounded-2xl"
+          onEscapeKeyDown={(event) => event.preventDefault()}
+          onInteractOutside={(event) => event.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle>核对上一笔收款</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm leading-6 text-[#667085]">
+            上一笔提交后未确认结果。请重试原单，不要再次收取现金，也不要重新建单。刷新页面不会清除这笔记录。
+          </p>
+          {recoveryError && (
+            <p role="alert" className="text-sm text-[#e8343a]">
+              {recoveryError}
+            </p>
+          )}
+          <Button disabled={!recoveryAttempt || paying} onClick={() => void retryPendingSale()}>
+            {paying ? "正在核对原单" : "重试原单（不重复收款）"}
+          </Button>
+          <Button
+            variant="outline"
+            disabled={!recoveryAttempt || paying}
+            onClick={() => void cancelUnfinishedSale()}
+          >
+            核对并取消未成交单
+          </Button>
+          <p className="text-xs leading-5 text-[#667085]">
+            只有服务端确认未成交才会解除；若已成交，会恢复原订单。
+          </p>
+          <Button variant="outline" asChild>
+            <Link to="/dashboard">返回 ERP 核实订单</Link>
+          </Button>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={searchDialog} onOpenChange={setSearchDialog}>
+        <DialogContent className="max-w-lg rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>商品搜索</DialogTitle>
+          </DialogHeader>
+          <form
+            className="flex gap-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              setCatalogTab("custom");
+              setPhoneCart(false);
+              void loadProductBrowser(productQuery);
+              setSearchDialog(false);
+            }}
+          >
+            <Input
+              autoFocus
+              aria-label="商品名称"
+              placeholder="输入自定义商品名称"
+              value={productQuery}
+              onChange={(e) => setProductQuery(e.target.value)}
+            />
+            <Button type="submit" disabled={browseLoading}>
+              搜索
+            </Button>
+          </form>
+          <p className="text-xs text-[#667085]">
+            标准商品请在商品名称下选择价位；扫码枪在选品页直接使用。
+          </p>
+          <form
+            className="flex gap-2 border-t pt-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void scanHandler.current(scanCode);
+            }}
+          >
+            <Input
+              ref={scanRef}
+              aria-label="商品或会员条码"
+              placeholder="手动输入条码 / SKU / 会员码"
+              value={scanCode}
+              onChange={(e) => setScanCode(e.target.value)}
+              autoComplete="off"
+            />
+            <Button type="submit" disabled={scanning || !scanCode.trim()}>
+              {scanning ? "识别中" : "识别"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={cashDialog} onOpenChange={setCashDialog}>
         <DialogContent className="max-w-lg rounded-2xl">
@@ -1703,6 +2018,9 @@ function PosPage() {
               onClick={() => {
                 setSelectedCustomer(null);
                 setCustomerBenefits(null);
+                setPointsInput(0);
+                setPointsQuote(null);
+                setDiscountPreview(null);
                 setMemberDialog(false);
               }}
             >
@@ -1717,6 +2035,83 @@ function PosPage() {
           <DialogHeader>
             <DialogTitle>整单优惠</DialogTitle>
           </DialogHeader>
+          <section
+            className="rounded-xl border border-[#e4e7ec] bg-[#f9fafb] p-4"
+            aria-label="积分抵扣"
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold">积分抵扣</h3>
+              <span className="text-xs text-[#667085]">
+                {selectedCustomer
+                  ? `可用 ${pointsQuote?.available_points ?? selectedCustomer.wallet?.points ?? 0} 积分`
+                  : "请先选择会员"}
+              </span>
+            </div>
+            {!selectedCustomer ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={() => {
+                  setDiscountDialog(false);
+                  setMemberDialog(true);
+                }}
+              >
+                选择会员
+              </Button>
+            ) : (
+              <>
+                <div className="mt-3 flex items-center gap-2">
+                  <Input
+                    aria-label="抵扣积分"
+                    type="number"
+                    min="0"
+                    step={pointsQuote?.points_per_unit ?? 1}
+                    max={pointsQuote?.max_points ?? 0}
+                    disabled={!pointsQuote?.enabled && !pointsQuoteLoading}
+                    value={pointsInput || ""}
+                    placeholder="输入积分"
+                    onChange={(e) =>
+                      setPointsInput(Math.max(0, Math.floor(Number(e.target.value) || 0)))
+                    }
+                  />
+                  <Button
+                    variant="outline"
+                    disabled={!pointsQuote?.enabled || pointsQuoteLoading}
+                    onClick={() => setPointsInput(pointsQuote?.max_points ?? 0)}
+                  >
+                    用满
+                  </Button>
+                  {pointsInput > 0 && (
+                    <button
+                      type="button"
+                      className="shrink-0 text-xs text-[#667085]"
+                      onClick={() => setPointsInput(0)}
+                    >
+                      不用积分
+                    </button>
+                  )}
+                </div>
+                <p className="mt-2 text-xs leading-5 text-[#667085]">
+                  {pointsQuoteLoading
+                    ? "正在向 ERP 试算积分…"
+                    : pointsQuoteError ||
+                      (!pointsQuote
+                        ? "当前服务尚未开通积分抵扣"
+                        : !pointsQuote.enabled
+                          ? pointsQuote.reason === "membership_points_not_allowed"
+                            ? "当前会员暂不享有积分抵扣权益"
+                            : "积分抵扣规则尚未配置，暂不可使用"
+                          : `本单最多 ${pointsQuote.max_points} 积分；本次抵扣 ${money(pointsQuote.discount_amount)}`)}
+                </p>
+                {pointsQuote?.enabled && (
+                  <p className="text-xs leading-5 text-[#98713d]">
+                    当前支持现金收款；付款成功后才扣积分。整单优惠后按会员上限计算。
+                  </p>
+                )}
+              </>
+            )}
+          </section>
           <div className="grid grid-cols-3 gap-2">
             {[
               { value: "amount", label: "减金额", icon: Tag },
@@ -1797,7 +2192,9 @@ function PosPage() {
           </div>
           <Button
             className="h-12 rounded-xl bg-[#e8343a] hover:bg-[#c92930]"
-            disabled={discountLoading || discount.value <= 0}
+            disabled={
+              discountLoading || pointsQuoteLoading || (pointsInput > 0 && !pointsQuote?.enabled)
+            }
             onClick={() => void previewDiscount()}
           >
             {discountLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

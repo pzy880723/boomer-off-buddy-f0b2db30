@@ -31,6 +31,7 @@ const QrOrderBody = z.object({
     .min(1)
     .max(100),
   customer_id: z.string().uuid().optional(),
+  points_to_redeem: z.number().int().min(0).max(2147483647).default(0),
   note: z.string().trim().max(500).optional(),
   authorization_id: z.string().uuid().optional(),
   discount: z
@@ -50,6 +51,9 @@ export const Route = createFileRoute("/api/public/pos/payments/qr-order")({
         const parsed = QrOrderBody.safeParse(await request.json().catch(() => null));
         if (!parsed.success) return posError("参数错误", 400, "invalid_request");
         const body = parsed.data;
+        if (body.points_to_redeem > 0) {
+          return posError("扫码支付暂不支持积分抵扣，请取消积分或使用现金结算", 422, "points_async_not_supported");
+        }
 
         const auth = await authenticatePosUser(request, body.location_id);
         if (!auth.ok) return auth.response;
@@ -94,6 +98,7 @@ export const Route = createFileRoute("/api/public/pos/payments/qr-order")({
           locationId: body.location_id,
           items: body.items,
           discount: body.discount,
+          pointsToRedeem: body.points_to_redeem,
         });
         if (!amount.ok) {
           return posError(amount.failure.message, amount.failure.status, amount.failure.code);
@@ -112,6 +117,7 @@ export const Route = createFileRoute("/api/public/pos/payments/qr-order")({
           merchant: merchant.merchant,
           expiresAt,
           salePayload: {
+            points_to_redeem: body.points_to_redeem,
             items: body.items,
             discount: body.discount ?? null,
             authorization_id: body.authorization_id ?? null,

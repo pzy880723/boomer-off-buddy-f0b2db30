@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { calculatePosDiscount } from "@/lib/pos/pos-policy";
+import { calculatePointsDiscountTotals, calculatePointsRedemption, moneyFen } from "@/lib/pos/points-policy";
+import { loadPointsRules } from "@/lib/pos/points-policy.server";
 import {
   POS_CORS,
   authenticatePosUser,
@@ -12,6 +13,8 @@ import {
 
 const PreviewBody = z.object({
   location_id: z.string().uuid(),
+  customer_id: z.string().uuid().nullable().optional(),
+  points_to_redeem: z.number().int().min(0).max(2147483647).default(0),
   items: z
     .array(z.object({ sku_id: z.string().uuid(), quantity: z.number().int().min(1).max(999) }))
     .min(1),
@@ -19,7 +22,7 @@ const PreviewBody = z.object({
     type: z.enum(["amount", "percentage", "final_price"]),
     value: z.number().nonnegative(),
     reason: z.string().trim().max(200).optional(),
-  }),
+  }).default({ type: "amount", value: 0 }),
 });
 
 export const Route = createFileRoute("/api/public/pos/discounts/preview")({
@@ -56,19 +59,25 @@ export const Route = createFileRoute("/api/public/pos/discounts/preview")({
             return {
               sku_id: item.sku_id,
               quantity: item.quantity,
-              unit_price: Number(sku.price_tier) || 0,
+              unit_price: Number(sku.price_tier),
               discount_eligible: sku.discount_eligible && sku.sale_ownership === "owned",
             };
           });
-          const totals = calculatePosDiscount(lines, parsed.data.discount);
-          const discountRate =
-            totals.eligible_total > 0 ? totals.discount_total / totals.eligible_total : 0;
+          const totals = calculatePointsDiscountTotals(lines, parsed.data.discount);
+          const points = calculatePointsRedemption(
+            totals, parsed.data.points_to_redeem, await loadPointsRules(parsed.data.customer_id),
+          );
+          const combinedDiscount = (moneyFen(totals.discount_total) + moneyFen(points.discount_amount)) / 100;
           const requiresAuthorization =
-            !hasPosManagerRole(auth.roles) && (totals.discount_total > 20 || discountRate > 0.1);
+            !hasPosManagerRole(auth.roles) &&
+            (combinedDiscount > 20 || moneyFen(combinedDiscount) * 10 > moneyFen(totals.eligible_total));
           return posJson({
             ok: true,
             data: {
               ...totals,
+              discount_total: combinedDiscount,
+              payable_total: (moneyFen(totals.payable_total) - moneyFen(points.discount_amount)) / 100,
+              points_redemption: points,
               lines,
               reason_required: totals.discount_total > 0,
               requires_authorization: requiresAuthorization,

@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { signSkuImagePaths } from "@/lib/sku-image-resolver.server";
 import { POS_CORS, authenticatePosUser, posError, posJson } from "@/server/pos-auth.server";
+import { collectPosAvailablePage } from "@/lib/pos/available-page";
 
 const SKU_COLUMNS =
   "id,sku_code,barcode,name,kind,is_custom_price,inventory_policy,price_tier,grade,image_url,image_paths,sale_ownership,discount_eligible";
@@ -17,6 +18,87 @@ export const Route = createFileRoute("/api/public/pos/products")({
         if (!locationId) return posError("location_id 必填", 400);
         const auth = await authenticatePosUser(request, locationId);
         if (!auth.ok) return auth.response;
+
+        const type = url.searchParams.get("type") ?? "all";
+        if (type !== "custom" && type !== "all") return posError("商品类型不正确", 400);
+        if (type === "custom") {
+          const offset = Number(url.searchParams.get("offset") ?? 0);
+          if (!Number.isSafeInteger(offset) || offset < 0) return posError("分页参数不正确", 400);
+          type CustomSku = {
+            id: string;
+            sku_code: string | null;
+            barcode: string | null;
+            name: string;
+            price_tier: number;
+            grade: string | null;
+            image_paths: string[] | null;
+            image_url: string | null;
+            sale_ownership: string;
+            discount_eligible: boolean;
+          };
+          try {
+            const page = await collectPosAvailablePage<CustomSku>(
+              offset,
+              async (start, size) => {
+                let scopedQuery = supabaseAdmin
+                  .from("inv_skus")
+                  .select(`${SKU_COLUMNS},inv_stocks!inner(location_id,qty)`)
+                  .eq("status", "active")
+                  .eq("is_display", true)
+                  .eq("kind", "single")
+                  .eq("is_custom_price", true)
+                  .eq("inv_stocks.location_id", locationId)
+                  .gt("inv_stocks.qty", 0)
+                  .order("updated_at", { ascending: false })
+                  .order("id")
+                  .range(start, start + size - 1);
+                if (query) {
+                  const escaped = query.replace(/[%_,()]/g, " ");
+                  scopedQuery = scopedQuery.or(
+                    `name.ilike.%${escaped}%,sku_code.ilike.%${escaped}%,barcode.ilike.%${escaped}%`,
+                  );
+                }
+                const { data, error } = await scopedQuery;
+                if (error) throw new Error(error.message);
+                return (data ?? []) as unknown as CustomSku[];
+              },
+              async (sku) => {
+                const { data, error } = await supabaseAdmin.rpc(
+                  "sales_sku_available_qty" as never,
+                  { p_sku_id: sku.id, p_location_id: locationId } as never,
+                );
+                if (error) throw new Error(error.message);
+                return Number(data) || 0;
+              },
+            );
+            const covers = await signSkuImagePaths(
+              page.items.map(({ row }) => row.image_paths?.[0] || row.image_url || ""),
+            );
+            return posJson({
+              ok: true,
+              data: {
+                next_offset: page.next_offset,
+                items: page.items.map(({ row, qty }, index) => ({
+                  sku_id: row.id,
+                  sku_code: row.sku_code,
+                  barcode: row.barcode,
+                  name: row.name,
+                  product_type: "custom",
+                  unit_price: Number(row.price_tier) || 0,
+                  condition_grade: row.grade,
+                  image_url: covers[index] ?? null,
+                  available_qty: qty,
+                  is_unlimited_stock: false,
+                  location_id: locationId,
+                  sale_ownership: row.sale_ownership,
+                  discount_eligible: row.discount_eligible,
+                })),
+              },
+            });
+          } catch (error) {
+            return posError(error instanceof Error ? error.message : "读取门店商品失败", 500);
+          }
+        }
 
         let skuQuery = supabaseAdmin
           .from("inv_skus")
@@ -87,9 +169,8 @@ export const Route = createFileRoute("/api/public/pos/products")({
             500,
           );
         }
-        const { locationInheritsStandardCatalog, isGlobalStandardItem } = await import(
-          "@/server/standard-catalog-scope.server"
-        );
+        const { locationInheritsStandardCatalog, isGlobalStandardItem } =
+          await import("@/server/standard-catalog-scope.server");
         const inheritsStandards = await locationInheritsStandardCatalog(locationId);
         return posJson({
           ok: true,
@@ -101,7 +182,6 @@ export const Route = createFileRoute("/api/public/pos/products")({
             ),
           },
         });
-
       },
     },
   },

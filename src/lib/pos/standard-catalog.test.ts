@@ -33,10 +33,38 @@ function standard(overrides: Partial<PosScannableProduct> = {}): PosScannablePro
 }
 
 describe("标准商品目录契约", () => {
+  test("group cover prefers canonical ERP image paths and prices remain ascending", () => {
+    const group = buildStandardCatalog(
+      [],
+      [
+        {
+          id: "high",
+          category: "porcelain_jp",
+          name: "日本瓷器",
+          price_tier: "15.9",
+          image_paths: [],
+          image_url: null,
+        },
+        {
+          id: "low",
+          category: "porcelain_jp",
+          name: "日本瓷器",
+          price_tier: "12.9",
+          image_paths: ["sku-listing/japan.jpg"],
+          image_url: "https://example.com/old.jpg",
+        },
+      ],
+    ).find((g) => g.category_code === "porcelain_jp")!;
+    assert.equal(group.image_url, "sku-listing/japan.jpg");
+    assert.deepEqual(group.prices, [
+      { sku_id: "low", price: 12.9 },
+      { sku_id: "high", price: 15.9 },
+    ]);
+  });
   test("14 个业务一级类目 + 32 个价格档", () => {
-    assert.equal((INV_CATEGORIES).length, 14);
-    assert.equal((PRICE_TIERS).length, 32);
-    assert.equal((STANDARD_CATEGORY_CODES).length, 14);
+    assert.equal(INV_CATEGORIES.length, 14);
+    assert.equal(PRICE_TIERS.length, 32);
+    assert.equal(STANDARD_CATEGORY_CODES.length, 14);
     assert.equal(STANDARD_PRICE_TIERS[0], 6.9);
     assert.deepEqual(STANDARD_PRICE_TIERS.slice(1, 4), [9.9, 12.9, 15.9]);
     assert.equal(STANDARD_PRICE_TIERS.at(-1), 1580);
@@ -83,12 +111,15 @@ describe("标准商品目录契约", () => {
       ],
     );
     const game = groups.find((group) => group.category_code === "game_device")!;
-    assert.equal((groups).length, 14);
-    assert.deepEqual(game.subcategories.map((sub) => sub.code), [
-      "game_handheld",
-      "game_cartridge",
-    ]);
-    assert.deepEqual(game.prices.map((price) => price.sku_id), ["sku-a", "sku-b"]);
+    assert.equal(groups.length, 14);
+    assert.deepEqual(
+      game.subcategories.map((sub) => sub.code),
+      ["game_handheld", "game_cartridge"],
+    );
+    assert.deepEqual(
+      game.prices.map((price) => price.sku_id),
+      ["sku-a", "sku-b"],
+    );
   });
 });
 
@@ -97,7 +128,7 @@ describe("POS 购物车合并键", () => {
     let cart: PosCartLine[] = [];
     cart = addScannedProduct(cart, standard({ subcategory_code: "porcelain_eu_cup" }));
     cart = addScannedProduct(cart, standard({ subcategory_code: "porcelain_eu_cup" }));
-    assert.equal((cart).length, 1);
+    assert.equal(cart.length, 1);
     assert.equal(cart[0].quantity, 2);
   });
 
@@ -106,13 +137,14 @@ describe("POS 购物车合并键", () => {
     cart = addScannedProduct(cart, standard());
     cart = addScannedProduct(cart, standard({ subcategory_code: "porcelain_eu_cup" }));
     cart = addScannedProduct(cart, standard({ subcategory_code: "porcelain_eu_plate" }));
-    assert.equal((cart).length, 3);
+    assert.equal(cart.length, 3);
     assert.equal(new Set(cart.map(posCartLineKey)).size, 3);
   });
 
   test("展示名按是否选择二级类目切换", () => {
     assert.equal(posCartLineLabel({ name: "欧洲瓷器", subcategory_name: null }), "欧洲瓷器");
-    assert.equal(posCartLineLabel({ name: "欧洲瓷器", subcategory_name: "散瓷杯碟" }), 
+    assert.equal(
+      posCartLineLabel({ name: "欧洲瓷器", subcategory_name: "散瓷杯碟" }),
       "欧洲瓷器 · 散瓷杯碟",
     );
   });

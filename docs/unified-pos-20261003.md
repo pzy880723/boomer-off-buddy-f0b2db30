@@ -1,0 +1,40 @@
+# Unified POS and Points Redemption
+
+## Implemented
+
+- Web and native Android/iOS use authenticated ERP standard groups, representative images and ascending actual SKU price tiers. No SKU IDs are generated from labels. The 12.9 tier is preserved.
+- Standard/custom tabs, compact top search/member summary, quantity-sum cart count and compact cart rows. Desktop/tablet use a narrow central action rail. Phone uses a separate cart view and fixed quantity/amount dock.
+- Custom browsing filters store stock before pagination, then checks reservation-aware availability. Pagination can continue through empty reserved pages. Store switches reject stale catalog responses.
+- Web keyboard-wedge input is isolated from editable fields and dialogs. Native camera/payment paths and the existing app navigation remain in place.
+- Discount contains server-quoted points redemption. Changing member/cart invalidates old discounts. Cash retries reuse the operation ID. Web held-cart restore reloads member benefits and re-quotes points.
+- Points cash sale/debit/ledger and returns are transactional and idempotent. Return previews use cumulative per-line rounding and expose restored points. Zero-points sales remain compatible with the existing v2 backend.
+- Web persists an unresolved sale before sending it. Reload retries the same payload and operation. Safe recovery returns the existing order or atomically cancels the original operation under the sale lock; a late cancelled request cannot create a sale. It never refunds money or clears a record on an uncertain response.
+- Final review also fixed stale discount responses, invalid held-cart points, cross-store held-list responses, unsupported discount authorization and custom-search pagination drift.
+
+## Verified Locally
+
+- Web: 119 tests passed, zero failures; TypeScript passed; Tencent Node build passed.
+- Browser checks use real production React components with intercepted in-memory API fixtures, not live sales: widths 360, 390, 1024 and 1440; no horizontal overflow; group covers loaded; 12.9 repeated twice gives 25.80; custom repeated twice stays one item; member/points quote, disabled rules and held-cart re-quote verified.
+- Actual component fixtures also verified response-loss -> reload -> same-operation receipt recovery, uncommitted-sale cancellation -> reload without a pending lock, and a fresh held-cart quote preserving the member and points discount. Browser console errors: none. These cases never contact a real payment provider.
+- Android: 162 JVM tests passed, zero failures/skips; Debug APK assembled. Includes 52 POS tests and account-bound persistent pending-cash protection.
+- iOS: earlier full run 149 tests, 147 passed and two physical-camera skips; final POS/recovery run 54 tests passed and arm64 unsigned build passed. Native phone/tablet/points snapshots inspected. Exact cash payload and operation persist by account/location; recovery replays the original request or uses the server-confirmed cancellation endpoint.
+- SQL tests use disposable PGlite with real legacy POS functions and a minimal schema. Inventory integrations are fixture stubs. These are not proof of real multi-connection PostgreSQL concurrency or hardware acceptance.
+
+## Release Boundary
+
+- Not deployed to Tencent; no real-device install, live payment, production SQL, real scanner/printer/customer-display acceptance performed.
+- New migration: `20261002174301_pos_points_redemption.sql`. Rules default disabled/null. A membership policy owner must approve the point-to-money conversion and enable it after staging validation. Do not invent the conversion rate.
+- Positive points currently support cash only. WeChat/Alipay endpoints reject points before contacting providers. No silent fallback that charges more than the quoted amount.
+- Before enabling points: apply/review migration in staging, run true concurrent wallet/refund tests, verify actual location/catalog/receipt endpoints and physical devices, then use the Tencent candidate release and rollback workflow.
+- Lovable's queue was explicitly paused by the user. It has not been resumed. Coordination messages do not mean migrations or deployments happened.
+- Native Android take-held-order/returns were absent before this change; their action entries still direct staff to ERP. iOS retains its existing held workflow. Native optional subcategory editing was not added.
+- Android pending-cash protection does not yet expose the new server-side recovery/cancellation UI or reconstruct a cart after restart; iOS does expose server-confirmed recovery. Unknown Android outcomes need ERP reconciliation before a replacement sale. No native real-payment/restart/hardware recovery acceptance is claimed.
+- Native sources live in the separate local app workspace, currently untracked with no configured remote; they are not included in this ERP web/backend branch. Existing native files were backed up before editing.
+
+## Local Evidence
+
+- Web logs: `/tmp/boomer-pos-web-tests-final.log`, `/tmp/boomer-pos-web-typecheck-final.log`, `/tmp/boomer-pos-web-build-final.log`.
+- Actual component screenshots: app workspace `previews/pos-unified-20261003/implementation/`.
+- Android logs/report: `/tmp/boomer-pos-android-20261003/`; latest test/build `owner-final-verify.log`, independently rebuilt in `main-final-verify.log`; APK: app workspace `android/app/build/outputs/apk/debug/app-debug.apk`.
+- iOS logs/results: `/tmp/boomer-pos-ios-20261003/`; latest POS result: `cash-recovery-handoff-tests.xcresult`, build log: `cash-recovery-device-build.log`.
+- Integration and activation contract: `docs/pos-points-redemption.md`.

@@ -27,6 +27,7 @@ const SaleBody = z.object({
     .min(1)
     .max(5),
   customer_id: z.string().uuid().optional(),
+  points_to_redeem: z.number().int().min(0).max(2147483647).default(0),
   note: z.string().trim().max(500).optional(),
   discount: z
     .object({
@@ -70,7 +71,7 @@ export const Route = createFileRoute("/api/public/pos/sales")({
           return posError("不能使用其他员工的班次", 403, "shift_forbidden");
         }
         const { data, error } = await supabaseAdmin.rpc(
-          "pos_complete_sale_v2" as never,
+          (body.points_to_redeem > 0 ? "pos_complete_sale_v3" : "pos_complete_sale_v2") as never,
           {
             p_shift_id: body.shift_id,
             p_operator_id: auth.user.id,
@@ -78,6 +79,7 @@ export const Route = createFileRoute("/api/public/pos/sales")({
             p_items: body.items,
             p_tenders: body.tenders,
             p_customer_id: body.customer_id ?? null,
+            ...(body.points_to_redeem > 0 ? { p_points_to_redeem: body.points_to_redeem } : {}),
             p_note: body.note ?? null,
             p_discount_snapshot: body.discount ?? {},
             p_benefit_snapshot: body.benefit_snapshot ?? {},
@@ -85,7 +87,16 @@ export const Route = createFileRoute("/api/public/pos/sales")({
           } as never,
         );
         if (error) {
-          const conflict = /stock|quantity|shift|tender|sellable/i.test(error.message);
+          if (error.message === "sale_operation_cancelled") {
+            return posError("原收款操作已安全取消，不能再次提交该操作编号", 409, "sale_operation_cancelled");
+          }
+          if (body.points_to_redeem > 0 && (error.code === "PGRST202" || error.code === "42883")) {
+            return posError("积分抵扣数据库功能尚未启用", 503, "points_rule_not_configured");
+          }
+          if (/points_|idempotency_conflict/.test(error.message)) {
+            return posError(error.message, 409, "points_redemption_conflict");
+          }
+          const conflict = /stock|quantity|shift|tender|sellable|authorization/i.test(error.message);
           return posError(
             error.message,
             conflict ? 409 : 500,

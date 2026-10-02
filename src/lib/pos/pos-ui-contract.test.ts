@@ -9,7 +9,7 @@ describe("POS UI contract", () => {
     const routeUrl = new URL("pos.tsx", routesRoot);
     assert.equal(existsSync(routeUrl), true);
     const source = readFileSync(routeUrl, "utf8");
-    for (const capability of ["扫码", "商品浏览", "购物车", "收款", "打印小票", "钱箱"]) {
+    for (const capability of ["扫码", "PosCatalog", "购物车", "收款", "打印小票", "钱箱"]) {
       assert.match(source, new RegExp(capability));
     }
     assert.doesNotMatch(source, /开班备用金|确认开班|确认交班/);
@@ -35,9 +35,9 @@ describe("POS UI contract", () => {
     // header / 弹性购物车 / 固定结算底栏
     assert.match(source, /grid-rows-\[auto_minmax\(0,1fr\)_auto\]/);
     // 桌面右栏宽度
-    assert.match(source, /clamp\(420px,30vw,500px\)/);
-    // 优惠 / 取单 / 挂单 / 退换 同一行
-    assert.match(source, /grid-cols-4/);
+    assert.match(source, /76px_clamp\(340px,28vw,430px\)/);
+    assert.match(source, /data-pos-action-rail/);
+    assert.doesNotMatch(source, /本单结算|扫码查询/);
     // 购物车不再限制 36vh，滚动交给右栏唯一滚动区
     assert.doesNotMatch(source, /max-h-\[36vh\]/);
     // 业务逻辑不得被布局改动带走
@@ -66,8 +66,9 @@ describe("POS UI contract", () => {
     assert.match(source, /logo-boomeroff\.png/);
     assert.match(source, /alt="BOOMER OFF"/);
     assert.match(source, /grid-rows-\[auto_minmax\(0,1fr\)_auto\]/);
-    assert.match(source, /lg:grid-cols-\[minmax\(0,1fr\)_clamp\(420px,30vw,500px\)\]/);
-    assert.match(source, /grid-cols-4/);
+    assert.match(source, /lg:grid-cols-\[minmax\(0,1fr\)_76px_clamp\(340px,28vw,430px\)\]/);
+    assert.match(source, /min-h-\[72px\]/);
+    assert.match(source, /PosHidScanner/);
     assert.doesNotMatch(source, /max-h-\[36vh\]/);
   });
 });

@@ -3,9 +3,42 @@ import { describe, test } from "node:test";
 import {
   addScannedProduct,
   calculatePosDiscount,
+  preparePosSaleAttempt,
+  restorePosSaleAttempt,
   validatePosTenders,
   type PosCartLine,
 } from "./pos-policy";
+
+test("cash retries keep their key and cannot change an unresolved sale", () => {
+  const initial = preparePosSaleAttempt(null, "cart-a", () => "operation-a");
+  const unknown = { ...initial, uncertain: true };
+  assert.equal(
+    preparePosSaleAttempt(unknown, "cart-a", () => "wrong-key"),
+    unknown,
+  );
+  assert.throws(
+    () => preparePosSaleAttempt(unknown, "cart-b", () => "operation-b"),
+    /result_unknown/,
+  );
+  assert.equal(preparePosSaleAttempt(initial, "cart-b", () => "operation-b").id, "operation-b");
+  assert.equal(preparePosSaleAttempt(null, "cart-a", () => "next-sale").id, "next-sale");
+});
+
+test("pending sale survives reload and rejects corrupted recovery records", () => {
+  const pending = {
+    id: "op-pending",
+    signature: JSON.stringify({
+      shift_id: "shift",
+      items: [{ sku_id: "sku", quantity: 1 }],
+      tenders: [{ provider: "cash", amount: 12.9 }],
+    }),
+  };
+  assert.deepEqual(restorePosSaleAttempt(JSON.stringify(pending)), { ...pending, uncertain: true });
+  assert.equal(restorePosSaleAttempt(null), null);
+  for (const bad of ["broken", "null", "{}", JSON.stringify({ id: "op", signature: "{}" })]) {
+    assert.throws(() => restorePosSaleAttempt(bad));
+  }
+});
 
 const standard = {
   sku_id: "7baf7ec2-8061-4d3c-8f4d-d4698f5ac2bf",

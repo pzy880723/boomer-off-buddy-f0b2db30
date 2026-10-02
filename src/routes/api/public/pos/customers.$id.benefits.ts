@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { calculatePointsRedemption } from "@/lib/pos/points-policy";
+import { loadPointsRules } from "@/lib/pos/points-policy.server";
 import { POS_CORS, authenticatePosUser, posError, posJson } from "@/server/pos-auth.server";
 
 export const Route = createFileRoute("/api/public/pos/customers/$id/benefits")({
@@ -36,10 +38,20 @@ export const Route = createFileRoute("/api/public/pos/customers/$id/benefits")({
           .or(`expires_at.is.null,expires_at.gt.${now}`)
           .order("expires_at", { ascending: true, nullsFirst: false });
         if (couponError) return posError(couponError.message, 500);
+        let points;
+        try {
+          points = calculatePointsRedemption(
+            { subtotal: 0, eligible_total: 0, discount_total: 0, payable_total: 0 },
+            0, await loadPointsRules(params.id),
+          );
+        } catch {
+          return posError("积分规则暂时不可用", 503, "points_policy_unavailable");
+        }
         return posJson({
           ok: true,
           data: {
             customer,
+            points_redemption: { ...points, requires_cart_preview: true },
             wallet: wallet ?? {
               customer_id: params.id,
               points: 0,

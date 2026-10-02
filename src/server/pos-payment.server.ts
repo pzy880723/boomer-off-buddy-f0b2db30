@@ -31,6 +31,7 @@ export type PosPaymentAttempt = {
   client_op_id: string;
   customer_id: string | null;
   sale_payload: {
+    points_to_redeem?: number;
     items?: Array<{ sku_id: string; quantity: number }>;
     discount?: { type: string; value: number; reason?: string } | null;
     authorization_id?: string | null;
@@ -148,6 +149,7 @@ export async function recomputePayableAmount(input: {
   locationId: string;
   items: SaleItemInput[];
   discount?: SaleDiscountInput;
+  pointsToRedeem?: number;
 }): Promise<
   | {
       ok: true;
@@ -158,6 +160,9 @@ export async function recomputePayableAmount(input: {
     }
   | { ok: false; failure: PosPaymentFailure }
 > {
+  if ((input.pointsToRedeem ?? 0) !== 0) {
+    return { ok: false, failure: { code: "points_async_not_supported", message: "扫码支付暂不支持积分抵扣", status: 422 } };
+  }
   const skuIds = [...new Set(input.items.map((item) => item.sku_id))];
   const { data, error } = await supabaseAdmin
     .from("inv_skus")
@@ -335,6 +340,9 @@ export async function finalizePaidAttempt(
   attempt: PosPaymentAttempt,
   input: { providerTransactionId: string; paidAt?: string; providerResponse?: Record<string, unknown> },
 ): Promise<PosPaymentAttempt> {
+  if ((attempt.sale_payload.points_to_redeem ?? 0) !== 0) {
+    throw new Error("points_async_not_supported");
+  }
   if (attempt.status === "paid" && attempt.order_id) return attempt;
   const items = attempt.sale_payload.items ?? [];
   if (items.length === 0) throw new Error("支付流水缺少销售明细");

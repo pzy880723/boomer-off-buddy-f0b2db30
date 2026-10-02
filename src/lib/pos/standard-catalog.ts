@@ -28,11 +28,14 @@ export type StandardSkuRowLike = {
   category: string;
   name: string;
   price_tier: number | string;
+  image_paths?: string[] | null;
+  image_url?: string | null;
 };
 
 export type StandardCatalogGroup = {
   category_code: string;
   category_name: string;
+  image_url: string | null;
   subcategories: Array<{ code: string; name: string }>;
   prices: Array<{ sku_id: string; price: number }>;
 };
@@ -68,14 +71,20 @@ export function buildStandardCatalog(
       .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
       .map((row) => ({ code: row.code, name: row.name }));
 
-    const prices = skus
-      .filter((sku) => sku.category === code)
+    const groupSkus = skus.filter((sku) => sku.category === code);
+    const prices = groupSkus
       .map((sku) => ({ sku_id: sku.id, price: Number(sku.price_tier) }))
+      .filter((sku) => Number.isFinite(sku.price) && sku.price > 0)
       .sort((a, b) => a.price - b.price);
+    const cover =
+      groupSkus.find((sku) => sku.image_paths?.[0])?.image_paths?.[0] ??
+      groupSkus.find((sku) => sku.image_url)?.image_url ??
+      null;
 
     return {
       category_code: code,
       category_name: root?.name ?? fallbackName,
+      image_url: cover,
       subcategories,
       prices,
     };

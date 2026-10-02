@@ -150,3 +150,39 @@ export function validatePosTenders(total: number, tenders: PosTender[]): PosTend
   }
   return tenders;
 }
+
+export type PosSaleAttempt = { signature: string; id: string; uncertain?: boolean };
+
+export function restorePosSaleAttempt(raw: string | null): PosSaleAttempt | null {
+  if (raw === null) return null;
+  const value = JSON.parse(raw);
+  if (
+    !value ||
+    typeof value.id !== "string" ||
+    !value.id.trim() ||
+    typeof value.signature !== "string"
+  ) {
+    throw new Error("pending_sale_corrupt");
+  }
+  const body = JSON.parse(value.signature);
+  if (
+    !body ||
+    typeof body.shift_id !== "string" ||
+    !Array.isArray(body.items) ||
+    !body.items.length ||
+    !Array.isArray(body.tenders) ||
+    !body.tenders.length
+  )
+    throw new Error("pending_sale_corrupt");
+  return { id: value.id, signature: value.signature, uncertain: true };
+}
+
+export function preparePosSaleAttempt(
+  current: PosSaleAttempt | null,
+  signature: string,
+  createId: () => string,
+): PosSaleAttempt {
+  if (current?.signature === signature) return current;
+  if (current?.uncertain) throw new Error("sale_result_unknown");
+  return { signature, id: createId() };
+}

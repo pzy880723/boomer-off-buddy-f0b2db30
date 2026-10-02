@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { signSkuImagePaths } from "@/lib/sku-image-resolver.server";
 import { POS_CORS, authenticatePosUser, posError, posJson } from "@/server/pos-auth.server";
 import {
   STANDARD_CATEGORY_CODES,
@@ -19,9 +20,8 @@ export const Route = createFileRoute("/api/public/pos/standard-catalog")({
         const auth = await authenticatePosUser(request, locationId);
         if (!auth.ok) return auth.response;
 
-        const { locationInheritsStandardCatalog } = await import(
-          "@/server/standard-catalog-scope.server"
-        );
+        const { locationInheritsStandardCatalog } =
+          await import("@/server/standard-catalog-scope.server");
         const inherits = await locationInheritsStandardCatalog(locationId);
         if (!inherits) {
           return posJson({ ok: true, data: { location_id: locationId, groups: [] } });
@@ -34,7 +34,7 @@ export const Route = createFileRoute("/api/public/pos/standard-catalog")({
             .eq("is_active", true),
           supabaseAdmin
             .from("inv_skus")
-            .select("id,category,name,price_tier")
+            .select("id,category,name,price_tier,image_paths,image_url")
             .in("category", STANDARD_CATEGORY_CODES)
             .eq("kind", "single")
             .eq("is_custom_price", false)
@@ -49,6 +49,10 @@ export const Route = createFileRoute("/api/public/pos/standard-catalog")({
           (categoriesResult.data ?? []) as unknown as CategoryRowLike[],
           (skusResult.data ?? []) as unknown as StandardSkuRowLike[],
         );
+        const covers = await signSkuImagePaths(groups.map((group) => group.image_url ?? ""));
+        groups.forEach((group, index) => {
+          group.image_url = covers[index] ?? null;
+        });
         return posJson({ ok: true, data: { location_id: locationId, groups } });
       },
     },

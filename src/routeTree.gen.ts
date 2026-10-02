@@ -269,6 +269,7 @@ import { Route as ApiPublicPosOrdersIdReturnsRouteImport } from './routes/api/pu
 import { Route as ApiPublicPosPaymentsIdCloseRouteImport } from './routes/api/public/pos/payments.$id.close'
 import { Route as ApiPublicPosPaymentsCallbackProviderRouteImport } from './routes/api/public/pos/payments.callback.$provider'
 import { Route as ApiPublicPosSalesIdReceiptRouteImport } from './routes/api/public/pos/sales.$id.receipt'
+import { Route as ApiPublicPosSalesRecoverCancelRouteImport } from './routes/api/public/pos/sales.recover.cancel'
 import { Route as ApiPublicPosShiftsIdCloseRouteImport } from './routes/api/public/pos/shifts.$id.close'
 import { Route as ApiPublicStorefrontMembershipAppleTransactionsRouteImport } from './routes/api/public/storefront/membership.apple.transactions'
 import { Route as ApiPublicStorefrontMembershipRecognitionQuotaReserveRouteImport } from './routes/api/public/storefront/membership.recognition-quota.reserve'
@@ -1738,6 +1739,12 @@ const ApiPublicPosSalesIdReceiptRoute =
     path: '/$id/receipt',
     getParentRoute: () => ApiPublicPosSalesRoute,
   } as any)
+const ApiPublicPosSalesRecoverCancelRoute =
+  ApiPublicPosSalesRecoverCancelRouteImport.update({
+    id: '/recover/cancel',
+    path: '/recover/cancel',
+    getParentRoute: () => ApiPublicPosSalesRoute,
+  } as any)
 const ApiPublicPosShiftsIdCloseRoute =
   ApiPublicPosShiftsIdCloseRouteImport.update({
     id: '/api/public/pos/shifts/$id/close',
@@ -2072,6 +2079,7 @@ export interface FileRoutesByFullPath {
   '/api/public/pos/payments/$id/close': typeof ApiPublicPosPaymentsIdCloseRoute
   '/api/public/pos/payments/callback/$provider': typeof ApiPublicPosPaymentsCallbackProviderRoute
   '/api/public/pos/sales/$id/receipt': typeof ApiPublicPosSalesIdReceiptRoute
+  '/api/public/pos/sales/recover/cancel': typeof ApiPublicPosSalesRecoverCancelRoute
   '/api/public/pos/shifts/$id/close': typeof ApiPublicPosShiftsIdCloseRoute
   '/api/public/storefront/membership/apple/transactions': typeof ApiPublicStorefrontMembershipAppleTransactionsRoute
   '/api/public/storefront/membership/recognition-quota/reserve': typeof ApiPublicStorefrontMembershipRecognitionQuotaReserveRoute
@@ -2339,6 +2347,7 @@ export interface FileRoutesByTo {
   '/api/public/pos/payments/$id/close': typeof ApiPublicPosPaymentsIdCloseRoute
   '/api/public/pos/payments/callback/$provider': typeof ApiPublicPosPaymentsCallbackProviderRoute
   '/api/public/pos/sales/$id/receipt': typeof ApiPublicPosSalesIdReceiptRoute
+  '/api/public/pos/sales/recover/cancel': typeof ApiPublicPosSalesRecoverCancelRoute
   '/api/public/pos/shifts/$id/close': typeof ApiPublicPosShiftsIdCloseRoute
   '/api/public/storefront/membership/apple/transactions': typeof ApiPublicStorefrontMembershipAppleTransactionsRoute
   '/api/public/storefront/membership/recognition-quota/reserve': typeof ApiPublicStorefrontMembershipRecognitionQuotaReserveRoute
@@ -2614,6 +2623,7 @@ export interface FileRoutesById {
   '/api/public/pos/payments/$id/close': typeof ApiPublicPosPaymentsIdCloseRoute
   '/api/public/pos/payments/callback/$provider': typeof ApiPublicPosPaymentsCallbackProviderRoute
   '/api/public/pos/sales/$id/receipt': typeof ApiPublicPosSalesIdReceiptRoute
+  '/api/public/pos/sales/recover/cancel': typeof ApiPublicPosSalesRecoverCancelRoute
   '/api/public/pos/shifts/$id/close': typeof ApiPublicPosShiftsIdCloseRoute
   '/api/public/storefront/membership/apple/transactions': typeof ApiPublicStorefrontMembershipAppleTransactionsRoute
   '/api/public/storefront/membership/recognition-quota/reserve': typeof ApiPublicStorefrontMembershipRecognitionQuotaReserveRoute
@@ -2890,6 +2900,7 @@ export interface FileRouteTypes {
     | '/api/public/pos/payments/$id/close'
     | '/api/public/pos/payments/callback/$provider'
     | '/api/public/pos/sales/$id/receipt'
+    | '/api/public/pos/sales/recover/cancel'
     | '/api/public/pos/shifts/$id/close'
     | '/api/public/storefront/membership/apple/transactions'
     | '/api/public/storefront/membership/recognition-quota/reserve'
@@ -3157,6 +3168,7 @@ export interface FileRouteTypes {
     | '/api/public/pos/payments/$id/close'
     | '/api/public/pos/payments/callback/$provider'
     | '/api/public/pos/sales/$id/receipt'
+    | '/api/public/pos/sales/recover/cancel'
     | '/api/public/pos/shifts/$id/close'
     | '/api/public/storefront/membership/apple/transactions'
     | '/api/public/storefront/membership/recognition-quota/reserve'
@@ -3431,6 +3443,7 @@ export interface FileRouteTypes {
     | '/api/public/pos/payments/$id/close'
     | '/api/public/pos/payments/callback/$provider'
     | '/api/public/pos/sales/$id/receipt'
+    | '/api/public/pos/sales/recover/cancel'
     | '/api/public/pos/shifts/$id/close'
     | '/api/public/storefront/membership/apple/transactions'
     | '/api/public/storefront/membership/recognition-quota/reserve'
@@ -5439,6 +5452,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicPosSalesIdReceiptRouteImport
       parentRoute: typeof ApiPublicPosSalesRoute
     }
+    '/api/public/pos/sales/recover/cancel': {
+      id: '/api/public/pos/sales/recover/cancel'
+      path: '/recover/cancel'
+      fullPath: '/api/public/pos/sales/recover/cancel'
+      preLoaderRoute: typeof ApiPublicPosSalesRecoverCancelRouteImport
+      parentRoute: typeof ApiPublicPosSalesRoute
+    }
     '/api/public/pos/shifts/$id/close': {
       id: '/api/public/pos/shifts/$id/close'
       path: '/api/public/pos/shifts/$id/close'
@@ -5988,10 +6008,12 @@ const ApiPublicPosProductsRouteWithChildren =
 
 interface ApiPublicPosSalesRouteChildren {
   ApiPublicPosSalesIdReceiptRoute: typeof ApiPublicPosSalesIdReceiptRoute
+  ApiPublicPosSalesRecoverCancelRoute: typeof ApiPublicPosSalesRecoverCancelRoute
 }
 
 const ApiPublicPosSalesRouteChildren: ApiPublicPosSalesRouteChildren = {
   ApiPublicPosSalesIdReceiptRoute: ApiPublicPosSalesIdReceiptRoute,
+  ApiPublicPosSalesRecoverCancelRoute: ApiPublicPosSalesRecoverCancelRoute,
 }
 
 const ApiPublicPosSalesRouteWithChildren =

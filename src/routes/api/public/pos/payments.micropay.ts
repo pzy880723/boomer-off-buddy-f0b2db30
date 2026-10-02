@@ -31,6 +31,7 @@ const MicropayBody = z.object({
     .min(1)
     .max(100),
   customer_id: z.string().uuid().optional(),
+  points_to_redeem: z.number().int().min(0).max(2147483647).default(0),
   note: z.string().trim().max(500).optional(),
   authorization_id: z.string().uuid().optional(),
   discount: z
@@ -50,6 +51,9 @@ export const Route = createFileRoute("/api/public/pos/payments/micropay")({
         const parsed = MicropayBody.safeParse(await request.json().catch(() => null));
         if (!parsed.success) return posError("参数错误", 400, "invalid_request");
         const body = parsed.data;
+        if (body.points_to_redeem > 0) {
+          return posError("扫码支付暂不支持积分抵扣，请取消积分或使用现金结算", 422, "points_async_not_supported");
+        }
 
         const detected = detectAuthCodeProvider(body.auth_code);
         if (!detected) return posError("付款码不合法", 422, "auth_code_invalid");
@@ -100,6 +104,7 @@ export const Route = createFileRoute("/api/public/pos/payments/micropay")({
           locationId: body.location_id,
           items: body.items,
           discount: body.discount,
+          pointsToRedeem: body.points_to_redeem,
         });
         if (!amount.ok) {
           return posError(amount.failure.message, amount.failure.status, amount.failure.code);
@@ -117,6 +122,7 @@ export const Route = createFileRoute("/api/public/pos/payments/micropay")({
           merchant: merchant.merchant,
           authCode: body.auth_code,
           salePayload: {
+            points_to_redeem: body.points_to_redeem,
             items: body.items,
             discount: body.discount ?? null,
             authorization_id: body.authorization_id ?? null,
