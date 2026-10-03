@@ -2,6 +2,16 @@
 
 ## Latest Resumed Delivery
 
+- Subsequent explicit policy request removed per-order membership percentage caps.
+  Migration `20261003131000` was applied atomically through Lovable: free, explorer
+  monthly and annual now have `points_redemption_cap_rate=1`, `policy_version=2`.
+  Conversion units remain NULL and activation remains false. A transaction guard
+  verified every unrelated plan field stayed unchanged. 30 targeted policy/SQL/
+  recovery tests passed, including migration idempotence and unchanged conversion.
+  No wallet/order/inventory writes were made. Existing eligible-goods, wallet,
+  whole-unit conversion and minimum payable 0.01 yuan safeguards remain. This is
+  a live configuration change; the existing deployed POS reads it without rebuild.
+  Activating redemption remains a separate task requiring a valid exchange rule.
 - Web application commit `0b09343` is on GitHub main and Tencent release
   `/var/www/boomer-erp/releases/pos-held-0b09343-20261003`. Public asset
   `index-BUDhLCJT.js` matches the candidate byte-for-byte. Previous release
