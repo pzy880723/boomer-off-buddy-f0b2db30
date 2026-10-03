@@ -18,9 +18,9 @@ test("remove plan caps without changing conversion, activation or other benefits
       VALUES ('free','free',0,false),('explorer_monthly','explorer',0.15,false),('explorer_annual','explorer',0.15,true);
     UPDATE commerce_membership_plans SET points_redemption_points_per_unit=17,
       points_redemption_unit_fen=23, benefit_rules='{"discount":0.95}' WHERE code='explorer_annual';`);
-    const before = (await db.query("SELECT * FROM commerce_membership_plans ORDER BY code")).rows;
+    const before = (await db.query<Record<string, unknown>>("SELECT * FROM commerce_membership_plans ORDER BY code")).rows;
     await db.exec(sql);
-    const after = (await db.query("SELECT * FROM commerce_membership_plans ORDER BY code")).rows;
+    const after = (await db.query<Record<string, unknown>>("SELECT * FROM commerce_membership_plans ORDER BY code")).rows;
     for (let i = 0; i < after.length; i++) {
       assert.equal(Number(after[i].points_redemption_cap_rate), 1);
       assert.equal(after[i].policy_version, 2);
