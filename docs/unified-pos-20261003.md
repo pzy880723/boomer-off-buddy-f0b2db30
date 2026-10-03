@@ -2,20 +2,32 @@
 
 ## Latest Resumed Delivery
 
-- Web application commit `fc451ae` is on GitHub main and Tencent release
-  `/var/www/boomer-erp/releases/pos-recovery-fc451ae-20261003`. Public asset
+- Web application commit `0b09343` is on GitHub main and Tencent release
+  `/var/www/boomer-erp/releases/pos-held-0b09343-20261003`. Public asset
   `index-BUDhLCJT.js` matches the candidate byte-for-byte. Previous release
-  `mini-release-audit-20261003` is retained, including all of its storefront fixes.
+  `pos-recovery-fc451ae-20261003` is retained. Both releases preserve the preceding
+  mini-program release's storefront fixes.
 - Web transport now treats malformed JSON envelopes and incomplete sale-success
   payloads as unknown. Neither first submission nor original-operation retry may
-  discard the pending record without a confirmed order. 122 tests and TypeScript
+  discard the pending record without a confirmed order. 127 tests and TypeScript
   passed; candidate/public login hydration and worker guards passed.
+- Held-cart resume now checks that its conditional update actually claimed a row.
+  Two concurrent clients cannot both receive the same held cart: route regression
+  verifies one 200 and one 409. This is not response-loss idempotent resume.
 - Authenticated live Web checks at 390x844 and 1024x768 verified image/name groups,
   ascending price tiers including 12.9, cart selection/count/total, phone cart view,
   and the desktop central rail. The test cart was emptied; no sale was submitted.
 - iPhone 16 Pro Max now has signed **1.1.27 (42)** installed and launched. No
   uninstall/reset occurred; parsed listing-draft data is unchanged. 77 focused
   tests passed. See the app workspace `ios/POS_DELIVERY_20261003_BUILD42.md`.
+- Android now restores the original persisted cash payload/cart after restart,
+  exposes server-confirmed recovery/cancellation, and implements native held-cart
+  retrieval with stock/member/discount revalidation before claiming the hold.
+  Final JVM tests: 193/193, including 83 POS tests. Debug APK built; no Android
+  device is connected, so installation and physical acceptance remain unperformed.
+  APK SHA-256: `6fb6b4da759db63029b74bfd0c25868b8257f2e92017df623374e7d2d8825534`.
+  Native sources remain in the app workspace with the pre-edit backup; they are
+  not part of this web repository's GitHub push.
 - Migration `20261002174301` was installed through the connected Lovable database
   API as one transaction, with its migration-history record and schema-cache
   notification. Before installation POS HTTP routes briefly returned 503; all old
@@ -33,16 +45,23 @@
 - This does not enable monetary redemption or verify physical payment/scanner/
   receipt hardware. An approved conversion rule is still required. Positive points
   remain cash-only; online payment restart recovery is not the durable cash guarantee.
+- The latest membership review explicitly pauses rule writes. A read-only call to
+  `youzan.scrm.pointdecution.get/1.0.0` succeeded for BOOMER headquarters
+  `kdt_id=153242272`: plugin 5 value `0`, plugin 6 status `0`, no threshold or cap.
+  Returned update time: `2026-10-03T04:51:45.268Z`. This current disabled rule does
+  not establish what the historical intended rate was. No credentials or customer
+  data were exported; no rule was written. Findings were sent directly to the
+  coordinating membership task for the user's benefits review.
 
 ### Current Web Rollback
 
-Only if current still resolves to `pos-recovery-fc451ae-20261003`:
+Only if current still resolves to `pos-held-0b09343-20261003`:
 
 ```sh
 sudo env \
-  POS_PREVIOUS_RELEASE=/var/www/boomer-erp/releases/mini-release-audit-20261003 \
-  POS_NEXT_RELEASE=/var/www/boomer-erp/releases/pos-recovery-fc451ae-20261003 \
-  POS_SOURCE_ARCHIVE=/tmp/boomer-pos-recovery-fc451ae.tar.gz \
+  POS_PREVIOUS_RELEASE=/var/www/boomer-erp/releases/pos-recovery-fc451ae-20261003 \
+  POS_NEXT_RELEASE=/var/www/boomer-erp/releases/pos-held-0b09343-20261003 \
+  POS_SOURCE_ARCHIVE=/tmp/boomer-pos-held-0b09343.tar.gz \
   bash /tmp/deploy-pos-20261003.sh rollback
 ```
 
