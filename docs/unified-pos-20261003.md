@@ -2,6 +2,29 @@
 
 ## Latest Resumed Delivery
 
+- Optional category labels restored in application commit `cc2e894`, deployed to
+  Tencent release `pos-tags-cc2e894-20261003`. Public asset `index-CHYcBlcQ.js`
+  matches the verified candidate. Labels now stay visible above price tiers;
+  choosing none remains the default and does not prevent checkout.
+- Migration `20261003140000` was applied through Lovable in one transaction:
+  seven cartoon-porcelain labels and one game-disc label added, giving 86 active
+  children across all 14 standard categories. A transaction assertion compared
+  every preexisting category row and confirmed none changed. System-defined
+  business categories remain eligible; the explicit root whitelist excludes the
+  pending-classification fallback. No SKU, price or stock writes were made.
+- QR/micropay request schemas now retain `subcategory_code`; active child/parent
+  validation occurs before creating a payment attempt or contacting a provider.
+  Receipt payloads include category/subcategory snapshots. 159 focused tests,
+  TypeScript, candidate/public hydration and worker guards passed. Provider and
+  sale RPC tests are mocked; no real payment/hardware acceptance is claimed.
+- Authenticated public-browser checks verified existing Japanese-porcelain and
+  newly added cartoon-porcelain labels, optional untagged add-to-cart, and distinct
+  tagged/untagged lines for the same SKU. Desktop and 390x844 layouts were checked.
+  Local mocked UI also verified hold/resume label preservation. The separate
+  production test cart was emptied without submitting a sale; the user's original
+  three-item cart was not refreshed or cleared. Native applications were not
+  changed in this optional-label request. The membership configuration entries
+  below are earlier checkpoints, not a current rule-activation claim.
 - Subsequent explicit policy request removed per-order membership percentage caps.
   Migration `20261003131000` was applied atomically through Lovable: free, explorer
   monthly and annual now have `points_redemption_cap_rate=1`, `policy_version=2`.
@@ -69,17 +92,18 @@
 
 ### Current Web Rollback
 
-Only if current still resolves to `pos-held-0b09343-20261003`:
+Only if current still resolves to `pos-tags-cc2e894-20261003`:
 
 ```sh
 sudo env \
-  POS_PREVIOUS_RELEASE=/var/www/boomer-erp/releases/pos-recovery-fc451ae-20261003 \
-  POS_NEXT_RELEASE=/var/www/boomer-erp/releases/pos-held-0b09343-20261003 \
-  POS_SOURCE_ARCHIVE=/tmp/boomer-pos-held-0b09343.tar.gz \
+  POS_PREVIOUS_RELEASE=/var/www/boomer-erp/releases/pos-held-0b09343-20261003 \
+  POS_NEXT_RELEASE=/var/www/boomer-erp/releases/pos-tags-cc2e894-20261003 \
+  POS_SOURCE_ARCHIVE=/tmp/boomer-pos-tags-cc2e894.tar.gz \
   bash /tmp/deploy-pos-20261003.sh rollback
 ```
 
-This is an application rollback only. Keep the compatible DB wrappers and the
+This is an application rollback only. Keep the additive taxonomy rows as order
+history may reference them. Keep the compatible DB wrappers and the
 cancellation ledger; do not remove their late-request protection. Original function
 definitions/ACLs, preflight, applied SQL envelope and post-install evidence are under
 `tests/backend/pos-production-*-20261003.*`. Review any database reversal separately.
