@@ -32,7 +32,7 @@ export type PosPaymentAttempt = {
   customer_id: string | null;
   sale_payload: {
     points_to_redeem?: number;
-    items?: Array<{ sku_id: string; quantity: number }>;
+    items?: SaleItemInput[];
     discount?: { type: string; value: number; reason?: string } | null;
     authorization_id?: string | null;
     note?: string | null;
@@ -141,7 +141,7 @@ export async function resolveStoreMerchant(
   };
 }
 
-export type SaleItemInput = { sku_id: string; quantity: number };
+export type SaleItemInput = { sku_id: string; quantity: number; subcategory_code?: string | null };
 export type SaleDiscountInput = { type: "amount" | "percentage" | "final_price"; value: number; reason: string };
 
 /** 服务端重算应收金额，并校验可售与库存。绝不信任 APP 传来的金额。 */
@@ -166,7 +166,7 @@ export async function recomputePayableAmount(input: {
   const skuIds = [...new Set(input.items.map((item) => item.sku_id))];
   const { data, error } = await supabaseAdmin
     .from("inv_skus")
-    .select("id,name,price_tier,status,is_display,sale_ownership,discount_eligible")
+    .select("id,name,price_tier,status,is_display,sale_ownership,discount_eligible,category")
     .in("id", skuIds);
   if (error) return { ok: false, failure: { code: "server_error", message: error.message, status: 500 } };
   const skus = (data ?? []) as unknown as Array<{
@@ -177,6 +177,7 @@ export async function recomputePayableAmount(input: {
     is_display: boolean;
     sale_ownership: string;
     discount_eligible: boolean;
+    category: string | null;
   }>;
   if (skus.length !== skuIds.length) {
     return { ok: false, failure: { code: "sku_not_found", message: "部分商品不存在", status: 404 } };
@@ -188,6 +189,33 @@ export async function recomputePayableAmount(input: {
         ok: false,
         failure: { code: "sku_not_sellable", message: `商品「${sku.name}」当前不可售`, status: 422 },
       };
+    }
+  }
+  const taggedItems = input.items.filter((item) => item.subcategory_code != null);
+  if (taggedItems.length) {
+    const codes = new Set<string>();
+    for (const item of taggedItems) {
+      codes.add(item.subcategory_code!);
+      const rootCode = skuMap.get(item.sku_id)!.category;
+      if (rootCode) codes.add(rootCode);
+    }
+    const { data: categories, error: categoryError } = await supabaseAdmin
+      .from("inv_categories")
+      .select("id,code,parent_id,is_active")
+      .in("code", [...codes]);
+    if (categoryError) {
+      return { ok: false, failure: { code: "server_error", message: categoryError.message, status: 500 } };
+    }
+    const rows = (categories ?? []) as Array<{ id: string; code: string; parent_id: string | null; is_active: boolean }>;
+    const byCode = new Map(rows.map((category) => [category.code, category]));
+    const byId = new Map(rows.map((category) => [category.id, category]));
+    // Match the sale RPC's active-child/parent check before contacting the provider.
+    for (const item of taggedItems) {
+      const child = byCode.get(item.subcategory_code!);
+      const parent = child?.parent_id ? byId.get(child.parent_id) : undefined;
+      if (!child?.is_active || !parent || parent.code !== skuMap.get(item.sku_id)!.category) {
+        return { ok: false, failure: { code: "invalid_subcategory", message: "所选标签已停用或不属于该商品品类，请重新选择", status: 422 } };
+      }
     }
   }
   for (const item of input.items) {
@@ -411,6 +439,10 @@ export type PosReceipt = {
   items: Array<{
     name: string;
     sku_code: string | null;
+    category_code: string | null;
+    category_name_snapshot: string | null;
+    subcategory_code: string | null;
+    subcategory_name_snapshot: string | null;
     quantity: number;
     unit_price: number;
     line_total: number;
@@ -428,7 +460,7 @@ export async function buildPosReceipt(attempt: PosPaymentAttempt): Promise<PosRe
         .maybeSingle(),
       supabaseAdmin
         .from("commerce_order_items" as never)
-        .select("sku_id,title_snapshot,unit_price,quantity,line_total")
+        .select("sku_id,title_snapshot,unit_price,quantity,line_total,category_code,category_name_snapshot,subcategory_code,subcategory_name_snapshot")
         .eq("order_id", attempt.order_id),
       supabaseAdmin
         .from("pos_receipts" as never)
@@ -456,6 +488,10 @@ export async function buildPosReceipt(attempt: PosPaymentAttempt): Promise<PosRe
   const rawItems = (itemsResult.data ?? []) as unknown as Array<{
     sku_id: string;
     title_snapshot: string;
+    category_code: string | null;
+    category_name_snapshot: string | null;
+    subcategory_code: string | null;
+    subcategory_name_snapshot: string | null;
     unit_price: number;
     quantity: number;
     line_total: number;
@@ -488,6 +524,10 @@ export async function buildPosReceipt(attempt: PosPaymentAttempt): Promise<PosRe
     items: rawItems.map((item) => ({
       name: item.title_snapshot,
       sku_code: skuCodes.get(item.sku_id) ?? null,
+      category_code: item.category_code ?? null,
+      category_name_snapshot: item.category_name_snapshot ?? null,
+      subcategory_code: item.subcategory_code ?? null,
+      subcategory_name_snapshot: item.subcategory_name_snapshot ?? null,
       quantity: Number(item.quantity),
       unit_price: Number(item.unit_price),
       line_total: Number(item.line_total),

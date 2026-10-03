@@ -27,7 +27,11 @@ const QrOrderBody = z.object({
   provider: z.enum(["wechat", "alipay"]),
   client_op_id: z.string().trim().min(8).max(100),
   items: z
-    .array(z.object({ sku_id: z.string().uuid(), quantity: z.number().int().min(1).max(999) }))
+    .array(z.object({
+      sku_id: z.string().uuid(),
+      quantity: z.number().int().min(1).max(999),
+      subcategory_code: z.string().trim().min(1).max(80).nullable().optional(),
+    }))
     .min(1)
     .max(100),
   customer_id: z.string().uuid().optional(),

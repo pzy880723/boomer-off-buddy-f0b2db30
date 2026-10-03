@@ -47,6 +47,24 @@ test("selected group shows actual IDs and ascending decimal prices", () => {
   assert.ok(html.indexOf('data-sku-id="sku-99"') < html.indexOf('data-sku-id="sku-129"'));
   assert.ok(html.indexOf('data-sku-id="sku-129"') < html.indexOf('data-sku-id="sku-159"'));
 });
+test("optional category tags are visible before prices without expanding a disclosure", () => {
+  const html = render({ activeCategoryCode: group.category_code, groups: [{ ...group,
+    subcategories: [{ code: "porcelain_drinkware", name: "散瓷杯具" }],
+  }] });
+  assert.match(html, /品类标签（可选）/);
+  assert.match(html, /不选标签/);
+  assert.doesNotMatch(html, /<details/);
+  assert.ok(html.indexOf("散瓷杯具") < html.indexOf('data-sku-id="sku-99"'));
+  assert.match(html, /aria-pressed="true"[^>]*>不选标签/);
+});
+test("selected tag is explicit and prices stay available without choosing a tag", () => {
+  const sub = { code: "porcelain_drinkware", name: "散瓷杯具" };
+  const html = render({ activeCategoryCode: group.category_code,
+    groups: [{ ...group, subcategories: [sub] }], subcategory: sub });
+  assert.match(html, /aria-pressed="true"[^>]*>散瓷杯具/);
+  assert.match(html, /data-sku-id="sku-129"/);
+  assert.doesNotMatch(render({ activeCategoryCode: group.category_code }), /disabled/);
+});
 test("loading, errors and empty catalog have different actionable states", () => {
   assert.match(render({ loading: true }), /正在加载/);
   assert.match(render({ error: "目录获取失败" }), /重试/);

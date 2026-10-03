@@ -107,7 +107,7 @@ export function PosCatalog(props: PosCatalogProps) {
         ) : props.tab === "standard" ? (
           group ? (
             <>
-              <div className="mb-5 flex items-center gap-3">
+              <div className="mb-3 flex flex-wrap items-center gap-3">
                 <button
                   type="button"
                   onClick={() => props.onGroup(null)}
@@ -119,6 +119,31 @@ export function PosCatalog(props: PosCatalogProps) {
                 <h2 className="font-semibold">{group.category_name}</h2>
                 <span className="ml-auto text-xs text-[#667085]">点选价位，即可加购</span>
               </div>
+              {group.subcategories.length > 0 && (
+                <div className="mb-4 rounded-xl bg-[#f8fafc] p-3" role="group" aria-label="品类标签（可选）">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-1 text-xs">
+                    <span className="font-medium text-[#344054]">品类标签（可选）</span>
+                    <span className="text-[#667085]">先选标签再点价位；不选也可加购</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      aria-pressed={props.subcategory === null}
+                      onClick={() => props.onSubcategory(null)}
+                      className={`min-h-10 rounded-full border px-3 text-xs ${props.subcategory === null ? "border-[#0a315d] bg-[#0a315d] text-white" : "border-[#e4e7ec] bg-white text-[#475467]"}`}
+                    >不选标签</button>
+                    {group.subcategories.map((sub) => (
+                      <button
+                        key={sub.code}
+                        type="button"
+                        aria-pressed={props.subcategory?.code === sub.code}
+                        onClick={() => props.onSubcategory(props.subcategory?.code === sub.code ? null : sub)}
+                        className={`min-h-10 rounded-full border px-3 text-xs ${props.subcategory?.code === sub.code ? "border-[#0a315d] bg-[#0a315d] text-white" : "border-[#e4e7ec] bg-white text-[#475467]"}`}
+                      >{sub.name}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
               {group.prices.length === 0 ? (
                 <p className="py-8 text-center text-sm text-[#667085]">该商品暂无可售价格档</p>
               ) : (
@@ -137,28 +162,6 @@ export function PosCatalog(props: PosCatalogProps) {
                       </button>
                     ))}
                 </div>
-              )}
-              {group.subcategories.length > 0 && (
-                <details className="mt-5 border-t border-[#eaecf0] pt-3">
-                  <summary className="cursor-pointer text-xs text-[#667085]">
-                    细分类（可选）{props.subcategory ? ` · ${props.subcategory.name}` : ""}
-                  </summary>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {group.subcategories.map((sub) => (
-                      <button
-                        key={sub.code}
-                        type="button"
-                        aria-pressed={props.subcategory?.code === sub.code}
-                        onClick={() =>
-                          props.onSubcategory(props.subcategory?.code === sub.code ? null : sub)
-                        }
-                        className={`min-h-9 rounded-full border px-3 text-xs ${props.subcategory?.code === sub.code ? "bg-[#0a315d] text-white" : "text-[#475467]"}`}
-                      >
-                        {sub.name}
-                      </button>
-                    ))}
-                  </div>
-                </details>
               )}
             </>
           ) : props.groups.length === 0 ? (
