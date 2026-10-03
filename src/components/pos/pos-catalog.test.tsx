@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
+import { parseHTML } from "linkedom";
 import { PosCatalog, type PosCatalogProps } from "./pos-catalog";
 
 const group = {
@@ -64,6 +65,21 @@ test("selected tag is explicit and prices stay available without choosing a tag"
   assert.match(html, /aria-pressed="true"[^>]*>散瓷杯具/);
   assert.match(html, /data-sku-id="sku-129"/);
   assert.doesNotMatch(render({ activeCategoryCode: group.category_code }), /disabled/);
+});
+test("optional tags occupy one horizontal row between category heading and prices", () => {
+  const html = render({ activeCategoryCode: group.category_code, groups: [{ ...group,
+    subcategories: Array.from({ length: 12 }, (_, i) => ({ code: `tag-${i}`, name: `标签${i}` })),
+  }] });
+  const { document } = parseHTML(html);
+  const row = document.querySelector('[role="group"][aria-label="品类标签（可选）"]')!;
+  const choices = row.querySelector('[data-pos-tag-choices]');
+  assert.ok(choices, "tag choices need a dedicated horizontally scrollable row");
+  assert.match(choices.className, /overflow-x-auto/);
+  assert.match(choices.className, /flex-nowrap/);
+  assert.doesNotMatch(choices.className, /flex-wrap(?:\s|$)/);
+  assert.equal(choices.querySelectorAll("button").length, 13);
+  assert.ok(html.indexOf("<h2") < html.indexOf('aria-label="品类标签（可选）"'));
+  assert.ok(html.indexOf('aria-label="品类标签（可选）"') < html.indexOf('data-sku-id="sku-99"'));
 });
 test("loading, errors and empty catalog have different actionable states", () => {
   assert.match(render({ loading: true }), /正在加载/);

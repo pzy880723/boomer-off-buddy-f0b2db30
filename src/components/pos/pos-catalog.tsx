@@ -120,17 +120,14 @@ export function PosCatalog(props: PosCatalogProps) {
                 <span className="ml-auto text-xs text-[#667085]">点选价位，即可加购</span>
               </div>
               {group.subcategories.length > 0 && (
-                <div className="mb-4 rounded-xl bg-[#f8fafc] p-3" role="group" aria-label="品类标签（可选）">
-                  <div className="mb-2 flex flex-wrap items-center justify-between gap-1 text-xs">
-                    <span className="font-medium text-[#344054]">品类标签（可选）</span>
-                    <span className="text-[#667085]">先选标签再点价位；不选也可加购</span>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
+                <div className="mb-3 flex min-w-0 items-center gap-2 border-y border-[#eaecf0]" role="group" aria-label="品类标签（可选）">
+                  <span className="shrink-0 whitespace-nowrap text-xs text-[#667085]">标签（可选）</span>
+                  <div data-pos-tag-choices className="flex min-w-0 flex-1 flex-nowrap gap-1.5 overflow-x-auto py-2">
                     <button
                       type="button"
                       aria-pressed={props.subcategory === null}
                       onClick={() => props.onSubcategory(null)}
-                      className={`min-h-10 rounded-full border px-3 text-xs ${props.subcategory === null ? "border-[#0a315d] bg-[#0a315d] text-white" : "border-[#e4e7ec] bg-white text-[#475467]"}`}
+                      className={`min-h-8 shrink-0 whitespace-nowrap rounded-full border px-3 text-xs ${props.subcategory === null ? "border-[#0a315d] bg-[#0a315d] text-white" : "border-[#e4e7ec] bg-white text-[#475467]"}`}
                     >不选标签</button>
                     {group.subcategories.map((sub) => (
                       <button
@@ -138,7 +135,7 @@ export function PosCatalog(props: PosCatalogProps) {
                         type="button"
                         aria-pressed={props.subcategory?.code === sub.code}
                         onClick={() => props.onSubcategory(props.subcategory?.code === sub.code ? null : sub)}
-                        className={`min-h-10 rounded-full border px-3 text-xs ${props.subcategory?.code === sub.code ? "border-[#0a315d] bg-[#0a315d] text-white" : "border-[#e4e7ec] bg-white text-[#475467]"}`}
+                        className={`min-h-8 shrink-0 whitespace-nowrap rounded-full border px-3 text-xs ${props.subcategory?.code === sub.code ? "border-[#0a315d] bg-[#0a315d] text-white" : "border-[#e4e7ec] bg-white text-[#475467]"}`}
                       >{sub.name}</button>
                     ))}
                   </div>
