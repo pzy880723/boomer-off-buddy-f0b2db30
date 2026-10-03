@@ -1,0 +1,100 @@
+{
+  "rows": [
+    {
+      "acl": "{=X/postgres,postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+      "arguments": "",
+      "body_md5": "b651cd404616369db677ef3bff8030e0",
+      "definition": "CREATE OR REPLACE FUNCTION public.commerce_assign_storefront_customer()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'public'\nAS $function$\nBEGIN\n  IF NEW.source_channel = 'storefront' AND NEW.customer_id IS NULL AND NEW.user_id IS NOT NULL\n     AND EXISTS (SELECT 1 FROM public.commerce_customers WHERE id = NEW.user_id) THEN\n    NEW.customer_id := NEW.user_id;\n  END IF;\n  RETURN NEW;\nEND;\n$function$\n",
+      "owner": "postgres",
+      "proname": "commerce_assign_storefront_customer",
+      "security_definer": false,
+      "settings": [
+        "search_path=public"
+      ]
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "arguments": "",
+      "body_md5": "985d090b33915839467aca8128fa5ae6",
+      "definition": "CREATE OR REPLACE FUNCTION public.commerce_ordinary_immutable_snapshot()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'public'\nAS $function$\nBEGIN\n  IF TG_TABLE_NAME = 'commerce_orders' THEN\n    IF OLD.payment_route IS NOT NULL AND NEW.payment_route IS DISTINCT FROM OLD.payment_route THEN\n      RAISE EXCEPTION 'payment route is immutable';\n    END IF;\n  ELSIF TG_TABLE_NAME = 'commerce_payments' THEN\n    IF OLD.payment_channel = 'ordinary_wechat' AND\n      (NEW.order_id,NEW.payment_channel,NEW.merchant_order_no,NEW.payer_openid,NEW.merchant_snapshot,NEW.amount,NEW.currency)\n      IS DISTINCT FROM\n      (OLD.order_id,OLD.payment_channel,OLD.merchant_order_no,OLD.payer_openid,OLD.merchant_snapshot,OLD.amount,OLD.currency) THEN\n      RAISE EXCEPTION 'payment snapshot is immutable';\n    END IF;\n  ELSE\n    IF OLD.merchant_refund_no IS NOT NULL AND\n      (NEW.order_id,NEW.payment_id,NEW.after_sale_id,NEW.merchant_refund_no,NEW.route_snapshot,NEW.amount)\n      IS DISTINCT FROM\n      (OLD.order_id,OLD.payment_id,OLD.after_sale_id,OLD.merchant_refund_no,OLD.route_snapshot,OLD.amount) THEN\n      RAISE EXCEPTION 'refund snapshot is immutable';\n    END IF;\n  END IF;\n  RETURN NEW;\nEND;\n$function$\n",
+      "owner": "postgres",
+      "proname": "commerce_ordinary_immutable_snapshot",
+      "security_definer": false,
+      "settings": [
+        "search_path=public"
+      ]
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "arguments": "",
+      "body_md5": "548c08b7efd0b59f0761aa6e1688eadd",
+      "definition": "CREATE OR REPLACE FUNCTION public.commerce_resolve_order_coupon()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nBEGIN\n  IF NEW.payment_status IN ('paid','partially_refunded','refunded') THEN\n    UPDATE public.pos_customer_coupons SET status='used',updated_at=now() WHERE reserved_order_id=NEW.id AND status='reserved';\n  ELSIF NEW.payment_status='unpaid' AND NEW.order_status IN ('cancelled','closed') THEN\n    UPDATE public.pos_customer_coupons SET status=CASE WHEN expires_at IS NOT NULL AND expires_at<=now() THEN 'expired' ELSE 'active' END,\n      reserved_order_id=NULL,updated_at=now() WHERE reserved_order_id=NEW.id AND status='reserved';\n  END IF;\n  RETURN NEW;\nEND;\n$function$\n",
+      "owner": "postgres",
+      "proname": "commerce_resolve_order_coupon",
+      "security_definer": true,
+      "settings": [
+        "search_path=\"\""
+      ]
+    },
+    {
+      "acl": "{=X/postgres,postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+      "arguments": "",
+      "body_md5": "a8914f55037f1e581872020c4c841799",
+      "definition": "CREATE OR REPLACE FUNCTION public.tg_inv_skus_derive_scope()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'public'\nAS $function$\nBEGIN\n  IF NEW.is_custom_price = true OR NEW.kind = 'pack' THEN\n    NEW.sku_scope := 'custom';\n  END IF;\n  RETURN NEW;\nEND;\n$function$\n",
+      "owner": "postgres",
+      "proname": "tg_inv_skus_derive_scope",
+      "security_definer": false,
+      "settings": [
+        "search_path=public"
+      ]
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "arguments": "",
+      "body_md5": "06ca962f30a93e6aa60504a1815915e1",
+      "definition": "CREATE OR REPLACE FUNCTION public.tg_inv_skus_fill_barcode()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nDECLARE\n  candidate text;\n  attempts int := 0;\nBEGIN\n  IF NEW.barcode IS NOT NULL THEN RETURN NEW; END IF;\n  LOOP\n    candidate := public.gen_ean13();\n    PERFORM 1 FROM public.inv_skus WHERE barcode = candidate;\n    IF NOT FOUND THEN\n      NEW.barcode := candidate;\n      RETURN NEW;\n    END IF;\n    attempts := attempts + 1;\n    IF attempts > 10 THEN\n      RAISE EXCEPTION 'failed to generate unique EAN-13 after 10 attempts';\n    END IF;\n  END LOOP;\nEND;\n$function$\n",
+      "owner": "postgres",
+      "proname": "tg_inv_skus_fill_barcode",
+      "security_definer": true,
+      "settings": [
+        "search_path=public"
+      ]
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "arguments": "",
+      "body_md5": "5b733ab523bad442e4b10f836de9e4ba",
+      "definition": "CREATE OR REPLACE FUNCTION public.tg_set_updated_at()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'public'\nAS $function$\nBEGIN NEW.updated_at = now(); RETURN NEW; END;\n$function$\n",
+      "owner": "postgres",
+      "proname": "tg_set_updated_at",
+      "security_definer": false,
+      "settings": [
+        "search_path=public"
+      ]
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "arguments": "",
+      "body_md5": "b09e886655073b8e1a71fca6767ac45b",
+      "definition": "CREATE OR REPLACE FUNCTION public.tg_shop_movement_enqueue()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nDECLARE\n  v_kind text;\n  v_shop uuid;\n  v_target integer;\nBEGIN\n  SELECT kind, shop_id INTO v_kind, v_shop\n    FROM public.inv_locations\n    WHERE id = NEW.location_id;\n\n  IF v_kind IS DISTINCT FROM 'shop' OR v_shop IS NULL THEN\n    RETURN NEW;\n  END IF;\n\n  -- Current stock at that (sku, location) — balance_after is the fresh value\n  v_target := GREATEST(0, COALESCE(NEW.balance_after, 0));\n\n  INSERT INTO public.youzan_stock_sync_queue\n    (sku_id, shop_id, location_id, target_stock, action, reason, status, next_run_at)\n  VALUES\n    (NEW.sku_id, v_shop, NEW.location_id, v_target,\n     'push_stock',\n     COALESCE(NEW.ref_type, 'movement'),\n     'pending', now())\n  ON CONFLICT (sku_id, shop_id) WHERE status IN ('pending', 'failed')\n  DO UPDATE SET\n    target_stock = EXCLUDED.target_stock,\n    location_id  = EXCLUDED.location_id,\n    reason       = EXCLUDED.reason,\n    next_run_at  = now(),\n    status       = 'pending',\n    last_error   = NULL,\n    updated_at   = now();\n\n  RETURN NEW;\nEND;\n$function$\n",
+      "owner": "postgres",
+      "proname": "tg_shop_movement_enqueue",
+      "security_definer": true,
+      "settings": [
+        "search_path=public"
+      ]
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "arguments": "",
+      "body_md5": "f0c047be356ac6caaf13ab4d78dc231b",
+      "definition": "CREATE OR REPLACE FUNCTION public.youzan_image_refresh_on_images()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nBEGIN\n  IF NEW.image_paths IS DISTINCT FROM OLD.image_paths OR NEW.image_url IS DISTINCT FROM OLD.image_url THEN\n    PERFORM youzan_image_refresh_enqueue(NEW.id);\n  END IF;\n  RETURN NEW;\nEND;\n$function$\n",
+      "owner": "postgres",
+      "proname": "youzan_image_refresh_on_images",
+      "security_definer": true,
+      "settings": [
+        "search_path=public"
+      ]
+    }
+  ]
+}

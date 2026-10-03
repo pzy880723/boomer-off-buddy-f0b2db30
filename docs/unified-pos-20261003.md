@@ -1,5 +1,58 @@
 # Unified POS and Points Redemption
 
+## Latest Resumed Delivery
+
+- Web application commit `fc451ae` is on GitHub main and Tencent release
+  `/var/www/boomer-erp/releases/pos-recovery-fc451ae-20261003`. Public asset
+  `index-BUDhLCJT.js` matches the candidate byte-for-byte. Previous release
+  `mini-release-audit-20261003` is retained, including all of its storefront fixes.
+- Web transport now treats malformed JSON envelopes and incomplete sale-success
+  payloads as unknown. Neither first submission nor original-operation retry may
+  discard the pending record without a confirmed order. 122 tests and TypeScript
+  passed; candidate/public login hydration and worker guards passed.
+- Authenticated live Web checks at 390x844 and 1024x768 verified image/name groups,
+  ascending price tiers including 12.9, cart selection/count/total, phone cart view,
+  and the desktop central rail. The test cart was emptied; no sale was submitted.
+- iPhone 16 Pro Max now has signed **1.1.27 (42)** installed and launched. No
+  uninstall/reset occurred; parsed listing-draft data is unchanged. 77 focused
+  tests passed. See the app workspace `ios/POS_DELIVERY_20261003_BUILD42.md`.
+- Migration `20261002174301` was installed through the connected Lovable database
+  API as one transaction, with its migration-history record and schema-cache
+  notification. Before installation POS HTTP routes briefly returned 503; all old
+  Nginx requests drained and active POS DB transaction count was zero. The original
+  Nginx configuration was restored unchanged in a finally block. No production
+  payment, stock movement, refund, cancellation or wallet transaction was created.
+- Production function definitions and trigger bodies were inspected and used in
+  isolated real PostgreSQL testing: 16 passing tests, including observed concurrent
+  lock waits, refund rounding, coupons and stock-sync-trigger rollback. API/permission
+  tests passed 10/10. See `pos-points-postgres-audit-20261003.md`.
+- Post-install verification confirms migration history, wrapper RPC signatures,
+  service-only execute rights, revoked direct legacy-core execution, zero enabled
+  plans and NULL conversion fields. The real PostgREST rules RPC returns HTTP 200
+  with `enabled=false`. Existing free/explorer caps were not changed.
+- This does not enable monetary redemption or verify physical payment/scanner/
+  receipt hardware. An approved conversion rule is still required. Positive points
+  remain cash-only; online payment restart recovery is not the durable cash guarantee.
+
+### Current Web Rollback
+
+Only if current still resolves to `pos-recovery-fc451ae-20261003`:
+
+```sh
+sudo env \
+  POS_PREVIOUS_RELEASE=/var/www/boomer-erp/releases/mini-release-audit-20261003 \
+  POS_NEXT_RELEASE=/var/www/boomer-erp/releases/pos-recovery-fc451ae-20261003 \
+  POS_SOURCE_ARCHIVE=/tmp/boomer-pos-recovery-fc451ae.tar.gz \
+  bash /tmp/deploy-pos-20261003.sh rollback
+```
+
+This is an application rollback only. Keep the compatible DB wrappers and the
+cancellation ledger; do not remove their late-request protection. Original function
+definitions/ACLs, preflight, applied SQL envelope and post-install evidence are under
+`tests/backend/pos-production-*-20261003.*`. Review any database reversal separately.
+
+The sections below describe the earlier release checkpoint and its then-open gaps.
+
 ## Implemented
 
 - Web and native Android/iOS use authenticated ERP standard groups, representative images and ascending actual SKU price tiers. No SKU IDs are generated from labels. The 12.9 tier is preserved.
@@ -31,7 +84,7 @@
 - Android pending-cash protection does not yet expose the new server-side recovery/cancellation UI or reconstruct a cart after restart; iOS does expose server-confirmed recovery. Unknown Android outcomes need ERP reconciliation before a replacement sale. No native real-payment/restart/hardware recovery acceptance is claimed.
 - Native sources live in the separate local app workspace, currently untracked with no configured remote; they are not included in this ERP web/backend branch. Existing native files were backed up before editing.
 
-## Tencent Release Evidence (2026-10-03)
+## Earlier Tencent Release Evidence (2026-10-03)
 
 - Application commit `b52dfb851c39dd25af5e73d744f99ba069d6bd0f` pushed to GitHub `main` without force.
 - Release `/var/www/boomer-erp/releases/pos-unified-b52dfb8-20261003` copies the previous production release and overlays only this commit's changed files. Existing changed-file hashes matched the main baseline except generated routeTree, which was preserved and regenerated during the Linux build. No unrelated live hotfixes were replaced.

@@ -1,0 +1,1701 @@
+{
+  "rows": [
+    {
+      "pos_points_preflight": {
+        "captured_at": "2026-10-03T04:32:29.895083+00:00",
+        "constraints": [
+          {
+            "definition": "FOREIGN KEY (payment_id) REFERENCES commerce_payments(id) ON DELETE SET NULL",
+            "name": "commerce_payment_events_payment_id_fkey",
+            "table": "commerce_payment_events",
+            "validated": true
+          },
+          {
+            "definition": "PRIMARY KEY (id)",
+            "name": "commerce_payment_events_pkey",
+            "table": "commerce_payment_events",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((processing_status = ANY (ARRAY['received'::text, 'processed'::text, 'ignored'::text, 'failed'::text])))",
+            "name": "commerce_payment_events_processing_status_check",
+            "table": "commerce_payment_events",
+            "validated": true
+          },
+          {
+            "definition": "UNIQUE (provider, provider_event_id)",
+            "name": "commerce_payment_events_provider_provider_event_id_key",
+            "table": "commerce_payment_events",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (order_id) REFERENCES commerce_orders(id) ON DELETE CASCADE",
+            "name": "pos_receipts_order_id_fkey",
+            "table": "pos_receipts",
+            "validated": true
+          },
+          {
+            "definition": "UNIQUE (order_id)",
+            "name": "pos_receipts_order_id_key",
+            "table": "pos_receipts",
+            "validated": true
+          },
+          {
+            "definition": "PRIMARY KEY (id)",
+            "name": "pos_receipts_pkey",
+            "table": "pos_receipts",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((print_count >= 0))",
+            "name": "pos_receipts_print_count_check",
+            "table": "pos_receipts",
+            "validated": true
+          },
+          {
+            "definition": "UNIQUE (receipt_no)",
+            "name": "pos_receipts_receipt_no_key",
+            "table": "pos_receipts",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (shift_id) REFERENCES pos_shifts(id)",
+            "name": "pos_receipts_shift_id_fkey",
+            "table": "pos_receipts",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (customer_id) REFERENCES commerce_customers(id) ON DELETE CASCADE",
+            "name": "pos_customer_wallets_customer_id_fkey",
+            "table": "pos_customer_wallets",
+            "validated": true
+          },
+          {
+            "definition": "PRIMARY KEY (customer_id)",
+            "name": "pos_customer_wallets_pkey",
+            "table": "pos_customer_wallets",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((points >= 0))",
+            "name": "pos_customer_wallets_points_check",
+            "table": "pos_customer_wallets",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((store_credit >= (0)::numeric))",
+            "name": "pos_customer_wallets_store_credit_check",
+            "table": "pos_customer_wallets",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (authorization_id) REFERENCES pos_authorizations(id)",
+            "name": "pos_returns_authorization_id_fkey",
+            "table": "pos_returns",
+            "validated": true
+          },
+          {
+            "definition": "UNIQUE (client_op_id)",
+            "name": "pos_returns_client_op_id_key",
+            "table": "pos_returns",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (location_id) REFERENCES inv_locations(id)",
+            "name": "pos_returns_location_id_fkey",
+            "table": "pos_returns",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (order_id) REFERENCES commerce_orders(id)",
+            "name": "pos_returns_order_id_fkey",
+            "table": "pos_returns",
+            "validated": true
+          },
+          {
+            "definition": "PRIMARY KEY (id)",
+            "name": "pos_returns_pkey",
+            "table": "pos_returns",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((refund_total >= (0)::numeric))",
+            "name": "pos_returns_refund_total_check",
+            "table": "pos_returns",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (shift_id) REFERENCES pos_shifts(id)",
+            "name": "pos_returns_shift_id_fkey",
+            "table": "pos_returns",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((status = ANY (ARRAY['pending'::text, 'refund_pending'::text, 'refunded'::text, 'inspection_pending'::text, 'completed'::text, 'rejected'::text])))",
+            "name": "pos_returns_status_check",
+            "table": "pos_returns",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (location_id) REFERENCES inv_locations(id) ON DELETE CASCADE",
+            "name": "inv_stocks_location_id_fkey",
+            "table": "inv_stocks",
+            "validated": true
+          },
+          {
+            "definition": "PRIMARY KEY (sku_id, location_id)",
+            "name": "inv_stocks_pkey",
+            "table": "inv_stocks",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (sku_id) REFERENCES inv_skus(id) ON DELETE CASCADE",
+            "name": "inv_stocks_sku_id_fkey",
+            "table": "inv_stocks",
+            "validated": true
+          },
+          {
+            "definition": "PRIMARY KEY (id)",
+            "name": "user_roles_pkey",
+            "table": "user_roles",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE",
+            "name": "user_roles_user_id_fkey",
+            "table": "user_roles",
+            "validated": true
+          },
+          {
+            "definition": "UNIQUE (user_id, role)",
+            "name": "user_roles_user_id_role_key",
+            "table": "user_roles",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((kind = ANY (ARRAY['warehouse'::text, 'shop'::text])))",
+            "name": "inv_locations_kind_check",
+            "table": "inv_locations",
+            "validated": true
+          },
+          {
+            "definition": "PRIMARY KEY (id)",
+            "name": "inv_locations_pkey",
+            "table": "inv_locations",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (shop_id) REFERENCES youzan_shops(id) ON DELETE SET NULL",
+            "name": "inv_locations_shop_id_fkey",
+            "table": "inv_locations",
+            "validated": true
+          },
+          {
+            "definition": "UNIQUE (shop_id)",
+            "name": "inv_locations_shop_id_key",
+            "table": "inv_locations",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((amount <> (0)::numeric))",
+            "name": "pos_cash_movements_amount_check",
+            "table": "pos_cash_movements",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (order_id) REFERENCES commerce_orders(id)",
+            "name": "pos_cash_movements_order_id_fkey",
+            "table": "pos_cash_movements",
+            "validated": true
+          },
+          {
+            "definition": "PRIMARY KEY (id)",
+            "name": "pos_cash_movements_pkey",
+            "table": "pos_cash_movements",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (shift_id) REFERENCES pos_shifts(id)",
+            "name": "pos_cash_movements_shift_id_fkey",
+            "table": "pos_cash_movements",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((type = ANY (ARRAY['opening'::text, 'sale'::text, 'refund'::text, 'cash_in'::text, 'cash_out'::text, 'closing_adjustment'::text])))",
+            "name": "pos_cash_movements_type_check",
+            "table": "pos_cash_movements",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (location_id) REFERENCES inv_locations(id)",
+            "name": "inv_stock_movements_location_id_fkey",
+            "table": "inv_stock_movements",
+            "validated": true
+          },
+          {
+            "definition": "PRIMARY KEY (id)",
+            "name": "inv_stock_movements_pkey",
+            "table": "inv_stock_movements",
+            "validated": true
+          },
+          {
+            "definition": "CHECK (((ref_type = ANY (ARRAY['rfid_inbound'::text, 'transfer_out'::text, 'transfer_in'::text, 'transfer_ship'::text, 'transfer_receive'::text, 'stocktake_adjust'::text, 'youzan_sale'::text, 'unclaim'::text, 'manual_adjust'::text, 'shop_adjust'::text, 'shop_new_sku'::text, 'return_inspection'::text, 'commerce_sale'::text, 'commerce_return'::text, 'pos_sale'::text, 'pos_return'::text, 'handheld_restock'::text, 'handheld_smart_create'::text])) OR (ref_type ~~ 'sale:%'::text)))",
+            "name": "inv_stock_movements_ref_type_check",
+            "table": "inv_stock_movements",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (sku_id) REFERENCES inv_skus(id) ON DELETE CASCADE",
+            "name": "inv_stock_movements_sku_id_fkey",
+            "table": "inv_stock_movements",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (location_id) REFERENCES inv_locations(id)",
+            "name": "pos_authorizations_location_id_fkey",
+            "table": "pos_authorizations",
+            "validated": true
+          },
+          {
+            "definition": "PRIMARY KEY (id)",
+            "name": "pos_authorizations_pkey",
+            "table": "pos_authorizations",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((status = ANY (ARRAY['approved'::text, 'rejected'::text, 'expired'::text])))",
+            "name": "pos_authorizations_status_check",
+            "table": "pos_authorizations",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((inspection_status = ANY (ARRAY['pending'::text, 'passed'::text, 'rejected'::text])))",
+            "name": "pos_return_items_inspection_status_check",
+            "table": "pos_return_items",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (order_item_id) REFERENCES commerce_order_items(id)",
+            "name": "pos_return_items_order_item_id_fkey",
+            "table": "pos_return_items",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((physical_status = ANY (ARRAY['not_received'::text, 'received'::text, 'damaged'::text])))",
+            "name": "pos_return_items_physical_status_check",
+            "table": "pos_return_items",
+            "validated": true
+          },
+          {
+            "definition": "PRIMARY KEY (id)",
+            "name": "pos_return_items_pkey",
+            "table": "pos_return_items",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((quantity > 0))",
+            "name": "pos_return_items_quantity_check",
+            "table": "pos_return_items",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((refund_amount >= (0)::numeric))",
+            "name": "pos_return_items_refund_amount_check",
+            "table": "pos_return_items",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (return_id) REFERENCES pos_returns(id) ON DELETE CASCADE",
+            "name": "pos_return_items_return_id_fkey",
+            "table": "pos_return_items",
+            "validated": true
+          },
+          {
+            "definition": "UNIQUE (return_id, order_item_id)",
+            "name": "pos_return_items_return_id_order_item_id_key",
+            "table": "pos_return_items",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (sku_id) REFERENCES inv_skus(id)",
+            "name": "pos_return_items_sku_id_fkey",
+            "table": "pos_return_items",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (listing_id) REFERENCES commerce_listings(id)",
+            "name": "commerce_order_items_listing_id_fkey",
+            "table": "commerce_order_items",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (location_id) REFERENCES inv_locations(id)",
+            "name": "commerce_order_items_location_id_fkey",
+            "table": "commerce_order_items",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (order_id) REFERENCES commerce_orders(id) ON DELETE CASCADE",
+            "name": "commerce_order_items_order_id_fkey",
+            "table": "commerce_order_items",
+            "validated": true
+          },
+          {
+            "definition": "UNIQUE (order_id, listing_id)",
+            "name": "commerce_order_items_order_id_listing_id_key",
+            "table": "commerce_order_items",
+            "validated": true
+          },
+          {
+            "definition": "PRIMARY KEY (id)",
+            "name": "commerce_order_items_pkey",
+            "table": "commerce_order_items",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((quantity > 0))",
+            "name": "commerce_order_items_quantity_check",
+            "table": "commerce_order_items",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (settlement_subject_id) REFERENCES payment_subjects(id)",
+            "name": "commerce_order_items_settlement_subject_id_fkey",
+            "table": "commerce_order_items",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (sku_id) REFERENCES inv_skus(id)",
+            "name": "commerce_order_items_sku_id_fkey",
+            "table": "commerce_order_items",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (listing_id) REFERENCES commerce_listings(id)",
+            "name": "inventory_reservations_listing_id_fkey",
+            "table": "inventory_reservations",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (location_id) REFERENCES inv_locations(id)",
+            "name": "inventory_reservations_location_id_fkey",
+            "table": "inventory_reservations",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (order_id) REFERENCES commerce_orders(id) ON DELETE CASCADE",
+            "name": "inventory_reservations_order_id_fkey",
+            "table": "inventory_reservations",
+            "validated": true
+          },
+          {
+            "definition": "UNIQUE (order_id, listing_id)",
+            "name": "inventory_reservations_order_id_listing_id_key",
+            "table": "inventory_reservations",
+            "validated": true
+          },
+          {
+            "definition": "PRIMARY KEY (id)",
+            "name": "inventory_reservations_pkey",
+            "table": "inventory_reservations",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((quantity > 0))",
+            "name": "inventory_reservations_quantity_check",
+            "table": "inventory_reservations",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (sku_id) REFERENCES inv_skus(id)",
+            "name": "inventory_reservations_sku_id_fkey",
+            "table": "inventory_reservations",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((status = ANY (ARRAY['active'::text, 'consumed'::text, 'released'::text, 'expired'::text])))",
+            "name": "inventory_reservations_status_check",
+            "table": "inventory_reservations",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (location_id) REFERENCES inv_locations(id)",
+            "name": "inventory_reservation_lines_location_id_fkey",
+            "table": "inventory_reservation_lines",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (order_item_id) REFERENCES commerce_order_items(id) ON DELETE CASCADE",
+            "name": "inventory_reservation_lines_order_item_id_fkey",
+            "table": "inventory_reservation_lines",
+            "validated": true
+          },
+          {
+            "definition": "PRIMARY KEY (id)",
+            "name": "inventory_reservation_lines_pkey",
+            "table": "inventory_reservation_lines",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((quantity > 0))",
+            "name": "inventory_reservation_lines_quantity_check",
+            "table": "inventory_reservation_lines",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (reservation_id) REFERENCES inventory_reservations(id) ON DELETE CASCADE",
+            "name": "inventory_reservation_lines_reservation_id_fkey",
+            "table": "inventory_reservation_lines",
+            "validated": true
+          },
+          {
+            "definition": "UNIQUE (reservation_id, stock_sku_id)",
+            "name": "inventory_reservation_lines_reservation_id_stock_sku_id_key",
+            "table": "inventory_reservation_lines",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (stock_sku_id) REFERENCES inv_skus(id)",
+            "name": "inventory_reservation_lines_stock_sku_id_fkey",
+            "table": "inventory_reservation_lines",
+            "validated": true
+          },
+          {
+            "definition": "CHECK (((expires_at IS NULL) OR (expires_at > starts_at)))",
+            "name": "commerce_membership_entitlements_check",
+            "table": "commerce_membership_entitlements",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (customer_id) REFERENCES commerce_customers(id) ON DELETE CASCADE",
+            "name": "commerce_membership_entitlements_customer_id_fkey",
+            "table": "commerce_membership_entitlements",
+            "validated": true
+          },
+          {
+            "definition": "PRIMARY KEY (id)",
+            "name": "commerce_membership_entitlements_pkey",
+            "table": "commerce_membership_entitlements",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (plan_id) REFERENCES commerce_membership_plans(id) ON DELETE RESTRICT",
+            "name": "commerce_membership_entitlements_plan_id_fkey",
+            "table": "commerce_membership_entitlements",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((policy_version > 0))",
+            "name": "commerce_membership_entitlements_policy_version_check",
+            "table": "commerce_membership_entitlements",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (source_order_id) REFERENCES commerce_membership_orders(id) ON DELETE SET NULL",
+            "name": "commerce_membership_entitlements_source_order_id_fkey",
+            "table": "commerce_membership_entitlements",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((status = ANY (ARRAY['active'::text, 'expired'::text, 'cancelled'::text, 'refunded'::text])))",
+            "name": "commerce_membership_entitlements_status_check",
+            "table": "commerce_membership_entitlements",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((tier_code = ANY (ARRAY['free'::text, 'explorer'::text])))",
+            "name": "commerce_membership_entitlements_tier_code_check",
+            "table": "commerce_membership_entitlements",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((balance_after >= 0))",
+            "name": "commerce_points_ledger_balance_after_check",
+            "table": "commerce_points_ledger",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (customer_id) REFERENCES commerce_customers(id) ON DELETE RESTRICT",
+            "name": "commerce_points_ledger_customer_id_fkey",
+            "table": "commerce_points_ledger",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((delta <> 0))",
+            "name": "commerce_points_ledger_delta_check",
+            "table": "commerce_points_ledger",
+            "validated": true
+          },
+          {
+            "definition": "UNIQUE (idempotency_key)",
+            "name": "commerce_points_ledger_idempotency_key_key",
+            "table": "commerce_points_ledger",
+            "validated": true
+          },
+          {
+            "definition": "PRIMARY KEY (id)",
+            "name": "commerce_points_ledger_pkey",
+            "table": "commerce_points_ledger",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((amount_fen >= 0))",
+            "name": "commerce_membership_plans_amount_fen_check",
+            "table": "commerce_membership_plans",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((billing_period = ANY (ARRAY['free'::text, 'monthly'::text, 'annual'::text])))",
+            "name": "commerce_membership_plans_billing_period_check",
+            "table": "commerce_membership_plans",
+            "validated": true
+          },
+          {
+            "definition": "UNIQUE (code)",
+            "name": "commerce_membership_plans_code_key",
+            "table": "commerce_membership_plans",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((daily_recognition_limit > 0))",
+            "name": "commerce_membership_plans_daily_recognition_limit_check",
+            "table": "commerce_membership_plans",
+            "validated": true
+          },
+          {
+            "definition": "CHECK (((first_period_amount_fen IS NULL) OR (first_period_amount_fen >= 0)))",
+            "name": "commerce_membership_plans_first_period_amount_fen_check",
+            "table": "commerce_membership_plans",
+            "validated": true
+          },
+          {
+            "definition": "CHECK (((official_discount_rate > (0)::numeric) AND (official_discount_rate <= (1)::numeric)))",
+            "name": "commerce_membership_plans_official_discount_rate_check",
+            "table": "commerce_membership_plans",
+            "validated": true
+          },
+          {
+            "definition": "PRIMARY KEY (id)",
+            "name": "commerce_membership_plans_pkey",
+            "table": "commerce_membership_plans",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((points_multiplier >= (1)::numeric))",
+            "name": "commerce_membership_plans_points_multiplier_check",
+            "table": "commerce_membership_plans",
+            "validated": true
+          },
+          {
+            "definition": "CHECK (((points_redemption_cap_rate >= (0)::numeric) AND (points_redemption_cap_rate <= (1)::numeric)))",
+            "name": "commerce_membership_plans_points_redemption_cap_rate_check",
+            "table": "commerce_membership_plans",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((policy_version > 0))",
+            "name": "commerce_membership_plans_policy_version_check",
+            "table": "commerce_membership_plans",
+            "validated": true
+          },
+          {
+            "definition": "CHECK (((renewal_amount_fen IS NULL) OR (renewal_amount_fen >= 0)))",
+            "name": "commerce_membership_plans_renewal_amount_fen_check",
+            "table": "commerce_membership_plans",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((tier_code = ANY (ARRAY['free'::text, 'explorer'::text])))",
+            "name": "commerce_membership_plans_tier_code_check",
+            "table": "commerce_membership_plans",
+            "validated": true
+          },
+          {
+            "definition": "CHECK (((ai_suggested_price IS NULL) OR (ai_suggested_price >= (0)::numeric)))",
+            "name": "inv_skus_ai_suggested_price_check",
+            "table": "inv_skus",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (brand_id) REFERENCES inv_brands(id) ON DELETE SET NULL",
+            "name": "inv_skus_brand_id_fkey",
+            "table": "inv_skus",
+            "validated": true
+          },
+          {
+            "definition": "CHECK (((category_confidence IS NULL) OR ((category_confidence >= (0)::numeric) AND (category_confidence <= (1)::numeric))))",
+            "name": "inv_skus_category_confidence_check",
+            "table": "inv_skus",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((category_source = ANY (ARRAY['ai'::text, 'manual'::text, 'import'::text, 'legacy'::text])))",
+            "name": "inv_skus_category_source_check",
+            "table": "inv_skus",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((classification_status = ANY (ARRAY['legacy'::text, 'auto_classified'::text, 'fallback'::text, 'corrected'::text])))",
+            "name": "inv_skus_classification_status_check",
+            "table": "inv_skus",
+            "validated": true
+          },
+          {
+            "definition": "UNIQUE (epc)",
+            "name": "inv_skus_epc_key",
+            "table": "inv_skus",
+            "validated": true
+          },
+          {
+            "definition": "CHECK (((grade IS NULL) OR (grade = ANY (ARRAY['N'::text, 'S'::text, 'A'::text, 'B'::text, 'C'::text, 'J'::text]))))",
+            "name": "inv_skus_grade_check",
+            "table": "inv_skus",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((image_processing_status = ANY (ARRAY['idle'::text, 'queued'::text, 'processing'::text, 'succeeded'::text, 'partial_failed'::text, 'retryable_failed'::text])))",
+            "name": "inv_skus_image_processing_status_check",
+            "table": "inv_skus",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((inventory_policy = ANY (ARRAY['tracked'::text, 'unlimited'::text])))",
+            "name": "inv_skus_inventory_policy_check",
+            "table": "inv_skus",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (ip_id) REFERENCES inv_brands(id) ON DELETE SET NULL",
+            "name": "inv_skus_ip_id_fkey",
+            "table": "inv_skus",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((kind = ANY (ARRAY['single'::text, 'pack'::text])))",
+            "name": "inv_skus_kind_check",
+            "table": "inv_skus",
+            "validated": true
+          },
+          {
+            "definition": "PRIMARY KEY (id)",
+            "name": "inv_skus_pkey",
+            "table": "inv_skus",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (recognition_request_id) REFERENCES inv_sku_classifications(id) ON DELETE SET NULL",
+            "name": "inv_skus_recognition_request_id_fkey",
+            "table": "inv_skus",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((sale_ownership = ANY (ARRAY['owned'::text, 'consigned'::text, 'vendor'::text, 'trade_in'::text])))",
+            "name": "inv_skus_sale_ownership_check",
+            "table": "inv_skus",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((sales_state = ANY (ARRAY['draft'::text, 'publishing'::text, 'active'::text, 'sold_syncing'::text, 'sold'::text, 'return_pending'::text, 'return_inspecting'::text, 'retired'::text])))",
+            "name": "inv_skus_sales_state_check",
+            "table": "inv_skus",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((sku_scope = ANY (ARRAY['standard'::text, 'custom'::text])))",
+            "name": "inv_skus_sku_scope_check",
+            "table": "inv_skus",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((status = ANY (ARRAY['active'::text, 'archived'::text])))",
+            "name": "inv_skus_status_check",
+            "table": "inv_skus",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((amount > (0)::numeric))",
+            "name": "commerce_payments_amount_check",
+            "table": "commerce_payments",
+            "validated": true
+          },
+          {
+            "definition": "UNIQUE (merchant_order_no)",
+            "name": "commerce_payments_merchant_order_no_key",
+            "table": "commerce_payments",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (order_id) REFERENCES commerce_orders(id) ON DELETE CASCADE",
+            "name": "commerce_payments_order_id_fkey",
+            "table": "commerce_payments",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((payment_channel = ANY (ARRAY['legacy'::text, 'ordinary_wechat'::text])))",
+            "name": "commerce_payments_payment_channel_check",
+            "table": "commerce_payments",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (payment_profile_id) REFERENCES store_payment_profiles(id)",
+            "name": "commerce_payments_payment_profile_id_fkey",
+            "table": "commerce_payments",
+            "validated": true
+          },
+          {
+            "definition": "PRIMARY KEY (id)",
+            "name": "commerce_payments_pkey",
+            "table": "commerce_payments",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((provider = ANY (ARRAY['cash'::text, 'wechat'::text, 'alipay'::text, 'bank_card'::text, 'store_credit'::text, 'manual'::text])))",
+            "name": "commerce_payments_provider_check",
+            "table": "commerce_payments",
+            "validated": true
+          },
+          {
+            "definition": "UNIQUE (provider, idempotency_key)",
+            "name": "commerce_payments_provider_idempotency_key_key",
+            "table": "commerce_payments",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'succeeded'::text, 'failed'::text, 'cancelled'::text, 'partially_refunded'::text, 'refunded'::text])))",
+            "name": "commerce_payments_status_check",
+            "table": "commerce_payments",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (authorization_id) REFERENCES pos_authorizations(id)",
+            "name": "commerce_orders_authorization_id_fkey",
+            "table": "commerce_orders",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((courier_provider = ANY (ARRAY['sf'::text, 'cainiao'::text, 'platform'::text])))",
+            "name": "commerce_orders_courier_provider_check",
+            "table": "commerce_orders",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (customer_id) REFERENCES commerce_customers(id)",
+            "name": "commerce_orders_customer_id_fkey",
+            "table": "commerce_orders",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((fulfillment_method = ANY (ARRAY['shipping'::text, 'pickup'::text, 'carryout'::text])))",
+            "name": "commerce_orders_fulfillment_method_check",
+            "table": "commerce_orders",
+            "validated": true
+          },
+          {
+            "definition": "UNIQUE (order_no)",
+            "name": "commerce_orders_order_no_key",
+            "table": "commerce_orders",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((order_status = ANY (ARRAY['pending_payment'::text, 'confirmed'::text, 'processing'::text, 'completed'::text, 'cancelled'::text, 'after_sale'::text, 'closed'::text])))",
+            "name": "commerce_orders_order_status_check",
+            "table": "commerce_orders",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((payment_status = ANY (ARRAY['unpaid'::text, 'paid'::text, 'refund_pending'::text, 'partially_refunded'::text, 'refunded'::text, 'payment_failed'::text])))",
+            "name": "commerce_orders_payment_status_check",
+            "table": "commerce_orders",
+            "validated": true
+          },
+          {
+            "definition": "PRIMARY KEY (id)",
+            "name": "commerce_orders_pkey",
+            "table": "commerce_orders",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (pos_shift_id) REFERENCES pos_shifts(id)",
+            "name": "commerce_orders_pos_shift_id_fkey",
+            "table": "commerce_orders",
+            "validated": true
+          },
+          {
+            "definition": "UNIQUE (provider_transaction_id)",
+            "name": "commerce_orders_provider_transaction_id_key",
+            "table": "commerce_orders",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (sale_location_id) REFERENCES inv_locations(id)",
+            "name": "commerce_orders_sale_location_id_fkey",
+            "table": "commerce_orders",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((source_channel = ANY (ARRAY['storefront'::text, 'pos'::text, 'youzan'::text, 'manual'::text])))",
+            "name": "commerce_orders_source_channel_check",
+            "table": "commerce_orders",
+            "validated": true
+          },
+          {
+            "definition": "UNIQUE (user_id, idempotency_key)",
+            "name": "commerce_orders_user_id_idempotency_key_key",
+            "table": "commerce_orders",
+            "validated": true
+          },
+          {
+            "definition": "UNIQUE (external_subject)",
+            "name": "commerce_customers_external_subject_key",
+            "table": "commerce_customers",
+            "validated": true
+          },
+          {
+            "definition": "PRIMARY KEY (id)",
+            "name": "commerce_customers_pkey",
+            "table": "commerce_customers",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((status = ANY (ARRAY['active'::text, 'blocked'::text, 'deleted'::text])))",
+            "name": "commerce_customers_status_check",
+            "table": "commerce_customers",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (device_id) REFERENCES inv_handheld_devices(id)",
+            "name": "pos_registers_device_id_fkey",
+            "table": "pos_registers",
+            "validated": true
+          },
+          {
+            "definition": "UNIQUE (location_id, code)",
+            "name": "pos_registers_location_id_code_key",
+            "table": "pos_registers",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (location_id) REFERENCES inv_locations(id)",
+            "name": "pos_registers_location_id_fkey",
+            "table": "pos_registers",
+            "validated": true
+          },
+          {
+            "definition": "PRIMARY KEY (id)",
+            "name": "pos_registers_pkey",
+            "table": "pos_registers",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (location_id) REFERENCES inv_locations(id)",
+            "name": "pos_shifts_location_id_fkey",
+            "table": "pos_shifts",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((opening_cash >= (0)::numeric))",
+            "name": "pos_shifts_opening_cash_check",
+            "table": "pos_shifts",
+            "validated": true
+          },
+          {
+            "definition": "PRIMARY KEY (id)",
+            "name": "pos_shifts_pkey",
+            "table": "pos_shifts",
+            "validated": true
+          },
+          {
+            "definition": "FOREIGN KEY (register_id) REFERENCES pos_registers(id)",
+            "name": "pos_shifts_register_id_fkey",
+            "table": "pos_shifts",
+            "validated": true
+          },
+          {
+            "definition": "CHECK ((status = ANY (ARRAY['open'::text, 'closing'::text, 'closed'::text])))",
+            "name": "pos_shifts_status_check",
+            "table": "pos_shifts",
+            "validated": true
+          }
+        ],
+        "database": "postgres",
+        "default_transaction_isolation": "read committed",
+        "functions": [
+          {
+            "acl": [
+              {
+                "grantee": "postgres",
+                "privilege": "EXECUTE"
+              },
+              {
+                "grantee": "service_role",
+                "privilege": "EXECUTE"
+              }
+            ],
+            "body_md5": "35ba69b763fa2266515492e6f23b2900",
+            "identity_arguments": "p_sku_id uuid, p_location_id uuid, p_delta integer, p_ref_type text, p_ref_id uuid, p_epc text, p_note text",
+            "name": "inv_apply_movement",
+            "owner": "postgres",
+            "result_type": "integer",
+            "security_definer": true,
+            "service_role_execute": true,
+            "settings": [
+              "search_path=public"
+            ]
+          },
+          {
+            "acl": [
+              {
+                "grantee": "postgres",
+                "privilege": "EXECUTE"
+              },
+              {
+                "grantee": "anon",
+                "privilege": "EXECUTE"
+              },
+              {
+                "grantee": "authenticated",
+                "privilege": "EXECUTE"
+              },
+              {
+                "grantee": "service_role",
+                "privilege": "EXECUTE"
+              }
+            ],
+            "body_md5": "cb171225951805d6cc5445ac5c88edb8",
+            "identity_arguments": "p_sku_id uuid, p_location_id uuid, p_delta integer, p_ref_type text, p_epc text, p_note text",
+            "name": "inv_apply_movement",
+            "owner": "postgres",
+            "result_type": "integer",
+            "security_definer": true,
+            "service_role_execute": true,
+            "settings": [
+              "search_path=public"
+            ]
+          },
+          {
+            "acl": [
+              {
+                "grantee": "postgres",
+                "privilege": "EXECUTE"
+              },
+              {
+                "grantee": "service_role",
+                "privilege": "EXECUTE"
+              }
+            ],
+            "body_md5": "04314a7097ea72cafbea623228fbfb7a",
+            "identity_arguments": "p_shift_id uuid, p_operator_id uuid, p_order_id uuid, p_client_op_id text, p_items jsonb, p_reason text, p_authorization_id uuid",
+            "name": "pos_complete_return",
+            "owner": "postgres",
+            "result_type": "jsonb",
+            "security_definer": true,
+            "service_role_execute": true,
+            "settings": [
+              "search_path=public"
+            ]
+          },
+          {
+            "acl": [
+              {
+                "grantee": "postgres",
+                "privilege": "EXECUTE"
+              },
+              {
+                "grantee": "service_role",
+                "privilege": "EXECUTE"
+              }
+            ],
+            "body_md5": "84dd6e195341d8d1128f4e3f410ceac0",
+            "identity_arguments": "p_shift_id uuid, p_operator_id uuid, p_client_op_id text, p_items jsonb, p_tenders jsonb, p_customer_id uuid, p_note text",
+            "name": "pos_complete_sale",
+            "owner": "postgres",
+            "result_type": "jsonb",
+            "security_definer": true,
+            "service_role_execute": true,
+            "settings": [
+              "search_path=public"
+            ]
+          },
+          {
+            "acl": [
+              {
+                "grantee": "postgres",
+                "privilege": "EXECUTE"
+              },
+              {
+                "grantee": "service_role",
+                "privilege": "EXECUTE"
+              }
+            ],
+            "body_md5": "bd6d14561bbcea2861e4a1db63d3ab4f",
+            "identity_arguments": "p_shift_id uuid, p_operator_id uuid, p_client_op_id text, p_items jsonb, p_tenders jsonb, p_customer_id uuid, p_note text, p_discount_snapshot jsonb, p_benefit_snapshot jsonb, p_authorization_id uuid",
+            "name": "pos_complete_sale_v2",
+            "owner": "postgres",
+            "result_type": "jsonb",
+            "security_definer": true,
+            "service_role_execute": true,
+            "settings": [
+              "search_path=public"
+            ]
+          },
+          {
+            "acl": [
+              {
+                "grantee": "postgres",
+                "privilege": "EXECUTE"
+              },
+              {
+                "grantee": "service_role",
+                "privilege": "EXECUTE"
+              }
+            ],
+            "body_md5": "689e36e04257b067ad6994e810336e5a",
+            "identity_arguments": "p_sku_id uuid, p_location_id uuid",
+            "name": "sales_sku_available_qty",
+            "owner": "postgres",
+            "result_type": "integer",
+            "security_definer": true,
+            "service_role_execute": true,
+            "settings": [
+              "search_path=public"
+            ]
+          },
+          {
+            "acl": [
+              {
+                "grantee": "postgres",
+                "privilege": "EXECUTE"
+              },
+              {
+                "grantee": "anon",
+                "privilege": "EXECUTE"
+              },
+              {
+                "grantee": "authenticated",
+                "privilege": "EXECUTE"
+              },
+              {
+                "grantee": "service_role",
+                "privilege": "EXECUTE"
+              }
+            ],
+            "body_md5": "79fa425e5c4825bddcc287acca1860af",
+            "identity_arguments": "p_sku_id uuid, p_location_id uuid, p_ref_type text, p_delta integer",
+            "name": "sync_handheld_custom_listing",
+            "owner": "postgres",
+            "result_type": "void",
+            "security_definer": true,
+            "service_role_execute": true,
+            "settings": [
+              "search_path=public"
+            ]
+          }
+        ],
+        "indexes": [
+          {
+            "definition": "CREATE UNIQUE INDEX commerce_payment_events_pkey ON public.commerce_payment_events USING btree (id)",
+            "table": "commerce_payment_events",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX commerce_payment_events_provider_provider_event_id_key ON public.commerce_payment_events USING btree (provider, provider_event_id)",
+            "table": "commerce_payment_events",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX pos_receipts_pkey ON public.pos_receipts USING btree (id)",
+            "table": "pos_receipts",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX pos_receipts_order_id_key ON public.pos_receipts USING btree (order_id)",
+            "table": "pos_receipts",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX pos_receipts_receipt_no_key ON public.pos_receipts USING btree (receipt_no)",
+            "table": "pos_receipts",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX pos_customer_wallets_pkey ON public.pos_customer_wallets USING btree (customer_id)",
+            "table": "pos_customer_wallets",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX pos_returns_pkey ON public.pos_returns USING btree (id)",
+            "table": "pos_returns",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX pos_returns_client_op_id_key ON public.pos_returns USING btree (client_op_id)",
+            "table": "pos_returns",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE INDEX idx_pos_returns_order ON public.pos_returns USING btree (order_id, created_at DESC)",
+            "table": "pos_returns",
+            "unique": false,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX inv_stocks_pkey ON public.inv_stocks USING btree (sku_id, location_id)",
+            "table": "inv_stocks",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE INDEX idx_inv_stocks_location ON public.inv_stocks USING btree (location_id)",
+            "table": "inv_stocks",
+            "unique": false,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX user_roles_pkey ON public.user_roles USING btree (id)",
+            "table": "user_roles",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX user_roles_user_id_role_key ON public.user_roles USING btree (user_id, role)",
+            "table": "user_roles",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX inv_locations_pkey ON public.inv_locations USING btree (id)",
+            "table": "inv_locations",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX inv_locations_shop_id_key ON public.inv_locations USING btree (shop_id)",
+            "table": "inv_locations",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE INDEX idx_inv_locations_kind ON public.inv_locations USING btree (kind)",
+            "table": "inv_locations",
+            "unique": false,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX pos_cash_movements_pkey ON public.pos_cash_movements USING btree (id)",
+            "table": "pos_cash_movements",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE INDEX idx_pos_cash_movements_shift ON public.pos_cash_movements USING btree (shift_id, created_at)",
+            "table": "pos_cash_movements",
+            "unique": false,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX inv_stock_movements_pkey ON public.inv_stock_movements USING btree (id)",
+            "table": "inv_stock_movements",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE INDEX idx_movements_sku ON public.inv_stock_movements USING btree (sku_id, created_at DESC)",
+            "table": "inv_stock_movements",
+            "unique": false,
+            "valid": true
+          },
+          {
+            "definition": "CREATE INDEX idx_movements_location ON public.inv_stock_movements USING btree (location_id, created_at DESC)",
+            "table": "inv_stock_movements",
+            "unique": false,
+            "valid": true
+          },
+          {
+            "definition": "CREATE INDEX idx_movements_ref ON public.inv_stock_movements USING btree (ref_type, ref_id)",
+            "table": "inv_stock_movements",
+            "unique": false,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX pos_authorizations_pkey ON public.pos_authorizations USING btree (id)",
+            "table": "pos_authorizations",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE INDEX idx_pos_authorizations_operator ON public.pos_authorizations USING btree (operator_id, location_id, status, expires_at)",
+            "table": "pos_authorizations",
+            "unique": false,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX pos_return_items_pkey ON public.pos_return_items USING btree (id)",
+            "table": "pos_return_items",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX pos_return_items_return_id_order_item_id_key ON public.pos_return_items USING btree (return_id, order_item_id)",
+            "table": "pos_return_items",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX commerce_order_items_pkey ON public.commerce_order_items USING btree (id)",
+            "table": "commerce_order_items",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX commerce_order_items_order_id_listing_id_key ON public.commerce_order_items USING btree (order_id, listing_id)",
+            "table": "commerce_order_items",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE INDEX idx_commerce_order_items_order ON public.commerce_order_items USING btree (order_id)",
+            "table": "commerce_order_items",
+            "unique": false,
+            "valid": true
+          },
+          {
+            "definition": "CREATE INDEX idx_commerce_order_items_settlement_subject ON public.commerce_order_items USING btree (settlement_subject_id)",
+            "table": "commerce_order_items",
+            "unique": false,
+            "valid": true
+          },
+          {
+            "definition": "CREATE INDEX idx_commerce_order_items_order_id ON public.commerce_order_items USING btree (order_id)",
+            "table": "commerce_order_items",
+            "unique": false,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX inventory_reservations_pkey ON public.inventory_reservations USING btree (id)",
+            "table": "inventory_reservations",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX inventory_reservations_order_id_listing_id_key ON public.inventory_reservations USING btree (order_id, listing_id)",
+            "table": "inventory_reservations",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE INDEX idx_inventory_reservations_expiry ON public.inventory_reservations USING btree (expires_at) WHERE (status = 'active'::text)",
+            "table": "inventory_reservations",
+            "unique": false,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX inventory_reservation_lines_pkey ON public.inventory_reservation_lines USING btree (id)",
+            "table": "inventory_reservation_lines",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX inventory_reservation_lines_reservation_id_stock_sku_id_key ON public.inventory_reservation_lines USING btree (reservation_id, stock_sku_id)",
+            "table": "inventory_reservation_lines",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE INDEX idx_inventory_reservation_lines_stock ON public.inventory_reservation_lines USING btree (stock_sku_id, location_id)",
+            "table": "inventory_reservation_lines",
+            "unique": false,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX commerce_membership_entitlements_pkey ON public.commerce_membership_entitlements USING btree (id)",
+            "table": "commerce_membership_entitlements",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE INDEX commerce_membership_entitlements_customer_active ON public.commerce_membership_entitlements USING btree (customer_id, status, expires_at DESC)",
+            "table": "commerce_membership_entitlements",
+            "unique": false,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX commerce_points_ledger_pkey ON public.commerce_points_ledger USING btree (id)",
+            "table": "commerce_points_ledger",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX commerce_points_ledger_idempotency_key_key ON public.commerce_points_ledger USING btree (idempotency_key)",
+            "table": "commerce_points_ledger",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE INDEX commerce_points_ledger_customer ON public.commerce_points_ledger USING btree (customer_id, created_at DESC)",
+            "table": "commerce_points_ledger",
+            "unique": false,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX commerce_membership_plans_pkey ON public.commerce_membership_plans USING btree (id)",
+            "table": "commerce_membership_plans",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX commerce_membership_plans_code_key ON public.commerce_membership_plans USING btree (code)",
+            "table": "commerce_membership_plans",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX inv_skus_pkey ON public.inv_skus USING btree (id)",
+            "table": "inv_skus",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX inv_skus_epc_key ON public.inv_skus USING btree (epc)",
+            "table": "inv_skus",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE INDEX idx_inv_skus_category ON public.inv_skus USING btree (category)",
+            "table": "inv_skus",
+            "unique": false,
+            "valid": true
+          },
+          {
+            "definition": "CREATE INDEX idx_inv_skus_price_tier ON public.inv_skus USING btree (price_tier)",
+            "table": "inv_skus",
+            "unique": false,
+            "valid": true
+          },
+          {
+            "definition": "CREATE INDEX idx_inv_skus_sku_code ON public.inv_skus USING btree (sku_code) WHERE (sku_code IS NOT NULL)",
+            "table": "inv_skus",
+            "unique": false,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX inv_skus_barcode_uidx ON public.inv_skus USING btree (barcode) WHERE (barcode IS NOT NULL)",
+            "table": "inv_skus",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE INDEX idx_inv_skus_is_display ON public.inv_skus USING btree (is_display)",
+            "table": "inv_skus",
+            "unique": false,
+            "valid": true
+          },
+          {
+            "definition": "CREATE INDEX idx_inv_skus_sales_state ON public.inv_skus USING btree (sales_state)",
+            "table": "inv_skus",
+            "unique": false,
+            "valid": true
+          },
+          {
+            "definition": "CREATE INDEX idx_inv_skus_recognition_request ON public.inv_skus USING btree (recognition_request_id) WHERE (recognition_request_id IS NOT NULL)",
+            "table": "inv_skus",
+            "unique": false,
+            "valid": true
+          },
+          {
+            "definition": "CREATE INDEX idx_inv_skus_brand ON public.inv_skus USING btree (brand_id)",
+            "table": "inv_skus",
+            "unique": false,
+            "valid": true
+          },
+          {
+            "definition": "CREATE INDEX idx_inv_skus_keywords ON public.inv_skus USING gin (keywords)",
+            "table": "inv_skus",
+            "unique": false,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX uniq_inv_skus_standard_identity ON public.inv_skus USING btree (category, price_tier, name) WHERE (is_custom_price = false)",
+            "table": "inv_skus",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE INDEX idx_inv_skus_ip ON public.inv_skus USING btree (ip_id)",
+            "table": "inv_skus",
+            "unique": false,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX commerce_payments_pkey ON public.commerce_payments USING btree (id)",
+            "table": "commerce_payments",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX commerce_payments_provider_idempotency_key_key ON public.commerce_payments USING btree (provider, idempotency_key)",
+            "table": "commerce_payments",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX uniq_commerce_payment_provider_transaction ON public.commerce_payments USING btree (provider, provider_transaction_id) WHERE (provider_transaction_id IS NOT NULL)",
+            "table": "commerce_payments",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE INDEX idx_commerce_payments_order ON public.commerce_payments USING btree (order_id, created_at)",
+            "table": "commerce_payments",
+            "unique": false,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX commerce_payments_merchant_order_no_key ON public.commerce_payments USING btree (merchant_order_no)",
+            "table": "commerce_payments",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX uniq_ordinary_payment_order ON public.commerce_payments USING btree (order_id) WHERE (payment_channel = 'ordinary_wechat'::text)",
+            "table": "commerce_payments",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE INDEX idx_ordinary_payments_recovery ON public.commerce_payments USING btree (ordinary_checked_at NULLS FIRST, created_at) WHERE ((payment_channel = 'ordinary_wechat'::text) AND (status = ANY (ARRAY['pending'::text, 'processing'::text, 'failed'::text])))",
+            "table": "commerce_payments",
+            "unique": false,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX commerce_orders_pkey ON public.commerce_orders USING btree (id)",
+            "table": "commerce_orders",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX commerce_orders_order_no_key ON public.commerce_orders USING btree (order_no)",
+            "table": "commerce_orders",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX commerce_orders_provider_transaction_id_key ON public.commerce_orders USING btree (provider_transaction_id)",
+            "table": "commerce_orders",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX commerce_orders_user_id_idempotency_key_key ON public.commerce_orders USING btree (user_id, idempotency_key)",
+            "table": "commerce_orders",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE INDEX idx_commerce_orders_user ON public.commerce_orders USING btree (user_id, created_at DESC)",
+            "table": "commerce_orders",
+            "unique": false,
+            "valid": true
+          },
+          {
+            "definition": "CREATE INDEX idx_commerce_orders_status ON public.commerce_orders USING btree (order_status, created_at DESC)",
+            "table": "commerce_orders",
+            "unique": false,
+            "valid": true
+          },
+          {
+            "definition": "CREATE INDEX idx_commerce_orders_reservation_expiry ON public.commerce_orders USING btree (reservation_expires_at) WHERE ((payment_status = 'unpaid'::text) AND (order_status = 'pending_payment'::text))",
+            "table": "commerce_orders",
+            "unique": false,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX uniq_pos_order_client_op ON public.commerce_orders USING btree (idempotency_key) WHERE (source_channel = 'pos'::text)",
+            "table": "commerce_orders",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE INDEX idx_commerce_orders_source_created ON public.commerce_orders USING btree (source_channel, created_at DESC)",
+            "table": "commerce_orders",
+            "unique": false,
+            "valid": true
+          },
+          {
+            "definition": "CREATE INDEX idx_commerce_orders_sale_location ON public.commerce_orders USING btree (sale_location_id, created_at DESC)",
+            "table": "commerce_orders",
+            "unique": false,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX uniq_storefront_customer_order_op ON public.commerce_orders USING btree (customer_id, idempotency_key) WHERE ((source_channel = 'storefront'::text) AND (customer_id IS NOT NULL))",
+            "table": "commerce_orders",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX commerce_customers_pkey ON public.commerce_customers USING btree (id)",
+            "table": "commerce_customers",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX commerce_customers_external_subject_key ON public.commerce_customers USING btree (external_subject)",
+            "table": "commerce_customers",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX commerce_customers_phone_unique ON public.commerce_customers USING btree (phone) WHERE (phone IS NOT NULL)",
+            "table": "commerce_customers",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX commerce_customers_wechat_unionid_unique ON public.commerce_customers USING btree (wechat_unionid) WHERE (wechat_unionid IS NOT NULL)",
+            "table": "commerce_customers",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX pos_registers_pkey ON public.pos_registers USING btree (id)",
+            "table": "pos_registers",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX pos_registers_location_id_code_key ON public.pos_registers USING btree (location_id, code)",
+            "table": "pos_registers",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX pos_shifts_pkey ON public.pos_shifts USING btree (id)",
+            "table": "pos_shifts",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE UNIQUE INDEX uniq_open_pos_shift_per_register ON public.pos_shifts USING btree (register_id) WHERE (status = ANY (ARRAY['open'::text, 'closing'::text]))",
+            "table": "pos_shifts",
+            "unique": true,
+            "valid": true
+          },
+          {
+            "definition": "CREATE INDEX idx_pos_shifts_location_opened ON public.pos_shifts USING btree (location_id, opened_at DESC)",
+            "table": "pos_shifts",
+            "unique": false,
+            "valid": true
+          }
+        ],
+        "isolation_overrides": null,
+        "migration_history_relation": "supabase_migrations.schema_migrations",
+        "missing_required_columns": [],
+        "missing_required_functions": [],
+        "new_function_presence": [
+          {
+            "present": false,
+            "signature": "public.pos_points_rules(uuid)"
+          },
+          {
+            "present": false,
+            "signature": "public.pos_complete_sale_v3(uuid,uuid,text,jsonb,jsonb,uuid,text,jsonb,jsonb,uuid,integer)"
+          },
+          {
+            "present": false,
+            "signature": "public.pos_recover_sale_cancel(uuid,uuid,text)"
+          },
+          {
+            "present": false,
+            "signature": "public.pos_complete_sale_without_points(uuid,uuid,text,jsonb,jsonb,uuid,text,jsonb,jsonb,uuid)"
+          },
+          {
+            "present": false,
+            "signature": "public.pos_complete_return_without_points(uuid,uuid,uuid,text,jsonb,text,uuid)"
+          }
+        ],
+        "new_plan_columns": [],
+        "new_table_present": false,
+        "query_transaction_isolation": "read committed",
+        "server_version": "17.6",
+        "triggers": [
+          {
+            "definition": "CREATE TRIGGER trg_ensure_store_payment_profile AFTER INSERT OR UPDATE OF kind, is_active ON public.inv_locations FOR EACH ROW EXECUTE FUNCTION ensure_store_payment_profile()",
+            "enabled": "O",
+            "name": "trg_ensure_store_payment_profile",
+            "table": "inv_locations"
+          },
+          {
+            "definition": "CREATE TRIGGER trg_inv_locations_updated BEFORE UPDATE ON public.inv_locations FOR EACH ROW EXECUTE FUNCTION tg_set_updated_at()",
+            "enabled": "O",
+            "name": "trg_inv_locations_updated",
+            "table": "inv_locations"
+          },
+          {
+            "definition": "CREATE TRIGGER trg_shop_movement_enqueue AFTER INSERT ON public.inv_stock_movements FOR EACH ROW EXECUTE FUNCTION tg_shop_movement_enqueue()",
+            "enabled": "O",
+            "name": "trg_shop_movement_enqueue",
+            "table": "inv_stock_movements"
+          },
+          {
+            "definition": "CREATE TRIGGER inv_skus_fill_barcode BEFORE INSERT ON public.inv_skus FOR EACH ROW EXECUTE FUNCTION tg_inv_skus_fill_barcode()",
+            "enabled": "O",
+            "name": "inv_skus_fill_barcode",
+            "table": "inv_skus"
+          },
+          {
+            "definition": "CREATE TRIGGER trg_inv_skus_derive_scope BEFORE INSERT ON public.inv_skus FOR EACH ROW EXECUTE FUNCTION tg_inv_skus_derive_scope()",
+            "enabled": "O",
+            "name": "trg_inv_skus_derive_scope",
+            "table": "inv_skus"
+          },
+          {
+            "definition": "CREATE TRIGGER trg_inv_skus_updated BEFORE UPDATE ON public.inv_skus FOR EACH ROW EXECUTE FUNCTION tg_set_updated_at()",
+            "enabled": "O",
+            "name": "trg_inv_skus_updated",
+            "table": "inv_skus"
+          },
+          {
+            "definition": "CREATE TRIGGER youzan_image_refresh_images AFTER UPDATE OF image_paths, image_url ON public.inv_skus FOR EACH ROW EXECUTE FUNCTION youzan_image_refresh_on_images()",
+            "enabled": "O",
+            "name": "youzan_image_refresh_images",
+            "table": "inv_skus"
+          },
+          {
+            "definition": "CREATE TRIGGER ordinary_payment_snapshot_immutable BEFORE UPDATE ON public.commerce_payments FOR EACH ROW EXECUTE FUNCTION commerce_ordinary_immutable_snapshot()",
+            "enabled": "O",
+            "name": "ordinary_payment_snapshot_immutable",
+            "table": "commerce_payments"
+          },
+          {
+            "definition": "CREATE TRIGGER commerce_assign_storefront_customer BEFORE INSERT OR UPDATE OF user_id, customer_id, source_channel ON public.commerce_orders FOR EACH ROW EXECUTE FUNCTION commerce_assign_storefront_customer()",
+            "enabled": "O",
+            "name": "commerce_assign_storefront_customer",
+            "table": "commerce_orders"
+          },
+          {
+            "definition": "CREATE TRIGGER commerce_order_coupon_resolution AFTER UPDATE OF payment_status, order_status ON public.commerce_orders FOR EACH ROW EXECUTE FUNCTION commerce_resolve_order_coupon()",
+            "enabled": "O",
+            "name": "commerce_order_coupon_resolution",
+            "table": "commerce_orders"
+          },
+          {
+            "definition": "CREATE TRIGGER ordinary_order_route_immutable BEFORE UPDATE ON public.commerce_orders FOR EACH ROW EXECUTE FUNCTION commerce_ordinary_immutable_snapshot()",
+            "enabled": "O",
+            "name": "ordinary_order_route_immutable",
+            "table": "commerce_orders"
+          }
+        ]
+      }
+    }
+  ]
+}

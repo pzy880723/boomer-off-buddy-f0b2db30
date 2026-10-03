@@ -1,0 +1,85 @@
+{
+  "rows": [
+    {
+      "verification": {
+        "cancellation_rows": 0,
+        "configured_conversion_plans": 0,
+        "enabled_plans": 0,
+        "functions": [
+          {
+            "anon_execute": false,
+            "arguments": "p_shift_id uuid, p_operator_id uuid, p_order_id uuid, p_client_op_id text, p_items jsonb, p_reason text, p_authorization_id uuid",
+            "authenticated_execute": false,
+            "name": "pos_complete_return",
+            "service_execute": true
+          },
+          {
+            "anon_execute": false,
+            "arguments": "p_shift_id uuid, p_operator_id uuid, p_order_id uuid, p_client_op_id text, p_items jsonb, p_reason text, p_authorization_id uuid",
+            "authenticated_execute": false,
+            "name": "pos_complete_return_without_points",
+            "service_execute": false
+          },
+          {
+            "anon_execute": false,
+            "arguments": "p_shift_id uuid, p_operator_id uuid, p_client_op_id text, p_items jsonb, p_tenders jsonb, p_customer_id uuid, p_note text",
+            "authenticated_execute": false,
+            "name": "pos_complete_sale",
+            "service_execute": false
+          },
+          {
+            "anon_execute": false,
+            "arguments": "p_shift_id uuid, p_operator_id uuid, p_client_op_id text, p_items jsonb, p_tenders jsonb, p_customer_id uuid, p_note text, p_discount_snapshot jsonb, p_benefit_snapshot jsonb, p_authorization_id uuid",
+            "authenticated_execute": false,
+            "name": "pos_complete_sale_v2",
+            "service_execute": true
+          },
+          {
+            "anon_execute": false,
+            "arguments": "p_shift_id uuid, p_operator_id uuid, p_client_op_id text, p_items jsonb, p_tenders jsonb, p_customer_id uuid, p_note text, p_discount_snapshot jsonb, p_benefit_snapshot jsonb, p_authorization_id uuid, p_points_to_redeem integer",
+            "authenticated_execute": false,
+            "name": "pos_complete_sale_v3",
+            "service_execute": true
+          },
+          {
+            "anon_execute": false,
+            "arguments": "p_shift_id uuid, p_operator_id uuid, p_client_op_id text, p_items jsonb, p_tenders jsonb, p_customer_id uuid, p_note text, p_discount_snapshot jsonb, p_benefit_snapshot jsonb, p_authorization_id uuid",
+            "authenticated_execute": false,
+            "name": "pos_complete_sale_without_points",
+            "service_execute": false
+          },
+          {
+            "anon_execute": false,
+            "arguments": "p_customer_id uuid",
+            "authenticated_execute": false,
+            "name": "pos_points_rules",
+            "service_execute": true
+          },
+          {
+            "anon_execute": false,
+            "arguments": "p_shift_id uuid, p_operator_id uuid, p_client_op_id text",
+            "authenticated_execute": false,
+            "name": "pos_recover_sale_cancel",
+            "service_execute": true
+          }
+        ],
+        "migration": [
+          {
+            "name": "pos_points_redemption",
+            "version": "20261002174301"
+          }
+        ],
+        "rules_probe": {
+          "available_points": 0,
+          "cap_rate": 0,
+          "customer_active": false,
+          "enabled": false,
+          "plan_code": "free",
+          "points_per_unit": null,
+          "policy_version": 1,
+          "unit_fen": null
+        }
+      }
+    }
+  ]
+}
