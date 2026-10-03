@@ -22,7 +22,7 @@
 
 ## Release Boundary
 
-- Not deployed to Tencent; no real-device install, live payment, production SQL, real scanner/printer/customer-display acceptance performed.
+- Web deployed to Tencent on 2026-10-03. Native installation, live payment, production SQL and real scanner/printer/customer-display acceptance have not been performed.
 - New migration: `20261002174301_pos_points_redemption.sql`. Rules default disabled/null. A membership policy owner must approve the point-to-money conversion and enable it after staging validation. Do not invent the conversion rate.
 - Positive points currently support cash only. WeChat/Alipay endpoints reject points before contacting providers. No silent fallback that charges more than the quoted amount.
 - Before enabling points: apply/review migration in staging, run true concurrent wallet/refund tests, verify actual location/catalog/receipt endpoints and physical devices, then use the Tencent candidate release and rollback workflow.
@@ -30,6 +30,17 @@
 - Native Android take-held-order/returns were absent before this change; their action entries still direct staff to ERP. iOS retains its existing held workflow. Native optional subcategory editing was not added.
 - Android pending-cash protection does not yet expose the new server-side recovery/cancellation UI or reconstruct a cart after restart; iOS does expose server-confirmed recovery. Unknown Android outcomes need ERP reconciliation before a replacement sale. No native real-payment/restart/hardware recovery acceptance is claimed.
 - Native sources live in the separate local app workspace, currently untracked with no configured remote; they are not included in this ERP web/backend branch. Existing native files were backed up before editing.
+
+## Tencent Release Evidence (2026-10-03)
+
+- Application commit `b52dfb851c39dd25af5e73d744f99ba069d6bd0f` pushed to GitHub `main` without force.
+- Release `/var/www/boomer-erp/releases/pos-unified-b52dfb8-20261003` copies the previous production release and overlays only this commit's changed files. Existing changed-file hashes matched the main baseline except generated routeTree, which was preserved and regenerated during the Linux build. No unrelated live hotfixes were replaced.
+- Previous release `/var/www/boomer-erp/releases/product-sale-repair-20260927` retained. Rollback: run `sudo bash /tmp/deploy-pos-20261003.sh rollback` on the ERP server. Script source is `scripts/deploy-pos-20261003.sh` in this repository.
+- Fresh 119 tests passed. Candidate Linux build passed. Candidate worker guards rejected execution; public guards rejected unauthenticated requests. Existing host worker configuration checksum unchanged. No SQL applied, no new timers installed.
+- Public login hydration passed. Public `/assets/index-ByNbWEtH.js` exactly matches the candidate output containing the new POS. Existing hashed browser assets were retained for already-open sessions.
+- Authenticated Chrome at `https://erp.boomeroff.com/pos` verified: 14 image/name groups; standard/custom tabs; Japan ceramics ascending prices including 12.9; two items total 25.80; central action rail; compact cart quantity; discount dialog with points entry. Test cart cleared. No sale, payment, refund or stock mutation submitted.
+- Read-only production schema compatibility passed. `pos_points_rules` remains absent (`PGRST202`), so redemption is disabled. Safe cancellation RPC also still needs the separately reviewed migration; unknown sale outcomes must not be treated as cancellation success.
+- User explicitly prioritized POS completion before mini-program publishing. The coordinating task was told to pause mini-program release and related production changes.
 
 ## Local Evidence
 
