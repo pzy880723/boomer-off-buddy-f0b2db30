@@ -25,7 +25,11 @@
   retrieval with stock/member/discount revalidation before claiming the hold.
   Final JVM tests: 193/193, including 83 POS tests. Debug APK built; no Android
   device is connected, so installation and physical acceptance remain unperformed.
-  APK SHA-256: `6fb6b4da759db63029b74bfd0c25868b8257f2e92017df623374e7d2d8825534`.
+  APK SHA-256: `e446dab1296ef20e602a6af9948aec3aeabf8e2bc22281cd29636c7c2ef0fe5d`.
+  Independent incremental rebuild found a duplicate generated ` 2.dex` cache file;
+  `:app:clean :app:testDebugUnitTest :app:assembleDebug` then passed in 28 seconds,
+  all 44 tasks executed and XML reports confirm 193 tests with zero failures,
+  errors or skips. The hash above is this clean-build deliverable.
   Native sources remain in the app workspace with the pre-edit backup; they are
   not part of this web repository's GitHub push.
 - Migration `20261002174301` was installed through the connected Lovable database
