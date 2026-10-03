@@ -61,8 +61,12 @@ export type ProductItem = {
 
 const SKU_COLS =
   "id, sku_code, barcode, epc, name, category, price_tier, grade, image_url, image_paths, image_processing_status, notes, status, is_display, kind, is_custom_price, inventory_policy, stock_qty, created_at, updated_at";
-export function productQuery() {
-  return supabaseAdmin.from("inv_skus").select(SKU_COLS).not("status", "eq", "archived").order("id");
+export function productQuery(exactCount = false) {
+  return supabaseAdmin
+    .from("inv_skus")
+    .select(SKU_COLS, exactCount ? { count: "exact" } : {})
+    .not("status", "eq", "archived")
+    .order("id");
 }
 type SkuQuery = ReturnType<typeof productQuery>;
 type Sku = NonNullable<Awaited<SkuQuery>["data"]>[number];
@@ -70,7 +74,7 @@ type PageQuery = {
   range(
     from: number,
     to: number,
-  ): PromiseLike<{ data: unknown; error: { message: string } | null }>;
+  ): PromiseLike<{ data: unknown; error: { message: string } | null; count?: number | null }>;
 };
 
 class ProductReadError extends Error {
@@ -93,12 +97,21 @@ export function productReadError(error: unknown): Response {
 async function readRows<T>(query: () => PageQuery): Promise<T[]> {
   const rows: T[] = [];
   for (;;) {
-    const { data, error } = await query().range(rows.length, rows.length + 499);
+    const { data, error, count } = await query().range(rows.length, rows.length + 499);
     if (error || !Array.isArray(data)) {
       throw new ProductReadError("Unable to load scoped products", 500, "product_query_failed");
     }
     if (data.length === 0) return rows;
     rows.push(...(data as T[]));
+    // Only exact counts requested by these callers can replace the empty-page probe.
+    if (
+      typeof count === "number" &&
+      Number.isSafeInteger(count) &&
+      count >= 0 &&
+      rows.length >= count
+    ) {
+      return rows;
+    }
   }
 }
 
@@ -154,7 +167,10 @@ export async function authorizeProductScope(
       throw new ProductReadError("Location not accessible", 403, "location_forbidden");
   }
   const allLocations = await readRows<Location>(() =>
-    supabaseAdmin.from("inv_locations").select("id, name, kind, shop_id, is_active").order("id"),
+    supabaseAdmin
+      .from("inv_locations")
+      .select("id, name, kind, shop_id, is_active", { count: "exact" })
+      .order("id"),
   );
   const locations = allLocations.filter(
     (l) => l.is_active && (scope === "all" || l.id === locationId),
@@ -186,7 +202,7 @@ export async function loadProductInventory(
       : await readRows<Stock>(() => {
           const query = supabaseAdmin
             .from("inv_stocks")
-            .select("sku_id, location_id, qty")
+            .select("sku_id, location_id, qty", scope.scope === "all" ? {} : { count: "exact" })
             .in("location_id", locationIds)
             .order("sku_id")
             .order("location_id");
@@ -199,7 +215,7 @@ export async function loadProductInventory(
       : await readRows<{ id: string }>(() =>
           supabaseAdmin
             .from("youzan_shops")
-            .select("id")
+            .select("id", { count: "exact" })
             .in("id", shopIds)
             .eq("store_format", "vintage")
             .order("id"),
@@ -218,7 +234,7 @@ export async function loadScopedProductSkus(
   for (let offset = 0; offset < ids.length; offset += 100) {
     rows.push(
       ...(await readRows<Sku>(() =>
-        filter(productQuery().in("id", ids.slice(offset, offset + 100))),
+        filter(productQuery(true).in("id", ids.slice(offset, offset + 100))),
       )),
     );
   }
@@ -226,13 +242,13 @@ export async function loadScopedProductSkus(
     rows.push(
       ...(await readRows<Sku>(() =>
         filter(
-          productQuery().eq("kind", "single").eq("is_custom_price", false).eq("status", "active"),
+          productQuery(true).eq("kind", "single").eq("is_custom_price", false).eq("status", "active"),
         ),
       )),
     );
   }
   if (inventory.legacyWarehouseId) {
-    rows.push(...(await readRows<Sku>(() => filter(productQuery().gt("stock_qty", 0)))));
+    rows.push(...(await readRows<Sku>(() => filter(productQuery(true).gt("stock_qty", 0)))));
   }
   return [...new Map(rows.map((s) => [s.id, s])).values()];
 }

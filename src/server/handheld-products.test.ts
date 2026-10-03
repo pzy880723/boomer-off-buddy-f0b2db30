@@ -22,6 +22,8 @@ let deviceLocation: string | null;
 let rowCap: number;
 let allowFixtureBrandWrite: boolean;
 let detailMetadataFailure: boolean;
+let omitCount: boolean;
+let skuReadUrls: URL[];
 
 function sku(id: string, extra: Row = {}): Row {
   return {
@@ -93,6 +95,9 @@ const db = createClient("https://product-tests.invalid", "unit-test-only-key", {
         "product reads must not write",
       );
       requests.push(table);
+      if (table === "inv_skus") {
+        skuReadUrls.push(url);
+      }
       if (table === "inv_stocks") stockSkuFilters.push(url.searchParams.get("sku_id"));
       if (
         failures.has(table) ||
@@ -160,7 +165,8 @@ const db = createClient("https://product-tests.invalid", "unit-test-only-key", {
           Object.fromEntries(columns.map((column) => [column, row[column]])),
         );
       }
-      const headers = { "content-range": `${offset}-${offset + rows.length - 1}/${count}` };
+      const hasCount = !omitCount && new Headers(init?.headers).get("prefer")?.includes("count=exact");
+      const headers = { "content-range": `${offset}-${offset + rows.length - 1}/${hasCount ? count : "*"}` };
       return init?.method === "HEAD"
         ? new Response(null, { headers })
         : Response.json(rows, { headers });
@@ -219,6 +225,8 @@ beforeEach(() => {
   rowCap = 1000;
   allowFixtureBrandWrite = false;
   detailMetadataFailure = false;
+  omitCount = false;
+  skuReadUrls = [];
   tables = {
     inv_handheld_devices: [{ id: "device", token: "device", is_active: true, device_code: "test" }],
     user_roles: [
@@ -559,6 +567,83 @@ test("archived duplicate stays out of all product lists and barcode lookup despi
   }
   assert.equal((await call("lookup", `location_id=${A}&code=bar-duplicate`)).status, 404);
 });
+function seedScopedProducts(count: number) {
+  tables.inv_skus = Array.from({ length: count }, (_, i) => sku(`perf-${String(i).padStart(4, "0")}`));
+  tables.inv_stocks = tables.inv_skus.map((s) => ({ sku_id: s.id, location_id: B, qty: 0 }));
+}
+
+test("48 local custom plus 448 shared standards need only five product dependency reads", async () => {
+  seedScopedProducts(48);
+  tables.inv_skus[0].status = "archived";
+  tables.inv_skus[1].status = "archived";
+  tables.inv_stocks.forEach((stock) => { stock.location_id = A; });
+  tables.inv_skus.push(...Array.from({ length: 448 }, (_, i) =>
+    sku(`standard-${i}`, { is_custom_price: false, inventory_policy: "unlimited" }),
+  ));
+  const { status, body } = await call("list", `location_id=${A}&page_size=500`);
+  assert.equal(status, 200);
+  assert.equal(body.data.total, 494);
+  assert.equal(body.data.counts.custom, 46);
+  assert.equal(body.data.counts.standard, 448);
+  for (const table of ["inv_locations", "inv_stocks", "youzan_shops"]) {
+    assert.equal(requests.filter((request) => request === table).length, 1, table);
+  }
+  assert.equal(skuReadUrls.length, 2);
+});
+
+test("450 scoped SKUs take five SKU reads without empty tail probes", async () => {
+  seedScopedProducts(450);
+  const { status, body } = await call("list", `location_id=${B}&page_size=500`);
+  assert.equal(status, 200);
+  assert.equal(body.data.total, 450);
+  assert.equal(new Set(ids(body)).size, 450);
+  assert.equal(skuReadUrls.length, 5);
+  assert.ok(skuReadUrls.every((url) => url.searchParams.has("id")));
+});
+
+test("exact count preserves every row when the server truncates 100-ID batches to 20", async () => {
+  seedScopedProducts(230);
+  rowCap = 20;
+  const { status, body } = await call("list", `location_id=${B}&page_size=500`);
+  assert.equal(status, 200);
+  assert.equal(new Set(ids(body)).size, 230);
+  assert.equal(body.data.total, 230);
+  assert.equal(skuReadUrls.length, 12);
+});
+
+test("missing count retains empty-page fallback even below the requested range", async () => {
+  seedScopedProducts(230);
+  rowCap = 20;
+  omitCount = true;
+  const { body } = await call("list", `location_id=${B}&page_size=500`);
+  assert.equal(new Set(ids(body)).size, 230);
+  assert.equal(body.data.total, 230);
+  assert.equal(skuReadUrls.length, 15);
+});
+
+test("filtered ID batches use their matching count, not the number of requested IDs", async () => {
+  seedScopedProducts(230);
+  const { body } = await call("list", `location_id=${B}&q=perf-0001`);
+  assert.deepEqual(ids(body), ["perf-0001"]);
+  assert.equal(skuReadUrls.length, 3);
+});
+
+test("HQ all retains uncounted inventory/catalog reads and zero-stock/warehouse states", async () => {
+  const { status, body } = await call("list", "scope=all");
+  assert.equal(status, 200);
+  assert.equal(body.data.items.find((item: Row) => item.id === "sold-a").listing_status, "sold_out");
+  assert.equal(body.data.items.find((item: Row) => item.id === "down-a").listing_status, "in_warehouse");
+  assert.ok(ids(body).includes("orphan"));
+  assert.equal(requests.filter((request) => request === "inv_locations").length, 1);
+  for (const table of ["inv_stocks", "inv_skus"]) {
+    assert.equal(requests.filter((request) => request === table).length, 2, table);
+  }
+  requests = [];
+  const warehouse = await call("list", `location_id=${W}`);
+  assert.deepEqual(ids(warehouse.body), ["warehouse"]);
+  assert.equal(requests.filter((request) => request === "inv_skus").length, 2);
+});
+
 test("products and membership beyond the database page cap are not silently dropped from totals", async () => {
   tables.inv_skus = Array.from({ length: 2105 }, (_, i) =>
     sku(`large-${String(i).padStart(4, "0")}`),
