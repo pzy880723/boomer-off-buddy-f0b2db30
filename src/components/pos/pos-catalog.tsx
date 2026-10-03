@@ -2,6 +2,8 @@ import { ArrowLeft, ChevronRight, Loader2, PackageOpen, RotateCcw } from "lucide
 import type { StandardCatalogGroup } from "@/lib/pos/standard-catalog";
 import type { PosScannableProduct } from "@/lib/pos/pos-policy";
 import type { PosBrand } from "@/lib/pos/brand-catalog";
+import { PosCharacterRow } from "./pos-character-row";
+import type { PosCharacter } from "@/lib/pos/character-catalog";
 import { PosBrandRow } from "./pos-brand-row";
 
 type Group = StandardCatalogGroup & { image_url?: string | null };
@@ -12,6 +14,9 @@ export type PosCatalogProps = {
   products: Product[];
   activeCategoryCode: string | null;
   subcategory: { code: string; name: string } | null;
+  characters?: PosCharacter[];
+  character?: PosCharacter | null;
+  onCharacter?: (character: PosCharacter | null) => void;
   brands?: PosBrand[];
   brand?: PosBrand | null;
   onBrand?: (brand: PosBrand | null) => void;
@@ -148,6 +153,8 @@ export function PosCatalog(props: PosCatalogProps) {
               )}
               {props.onBrand && <PosBrandRow key={group.category_code} brands={props.brands ?? []} category={group.category_code}
                 value={props.brand ?? null} onChange={props.onBrand} />}
+              {props.onCharacter && <PosCharacterRow key={`character-${group.category_code}-${props.brand?.id ?? ""}`} characters={props.characters ?? []}
+                brand={props.brand ?? null} value={props.character ?? null} onChange={props.onCharacter} />}
               {group.prices.length === 0 ? (
                 <p className="py-8 text-center text-sm text-[#667085]">该商品暂无可售价格档</p>
               ) : (
@@ -172,7 +179,7 @@ export function PosCatalog(props: PosCatalogProps) {
             <p className="py-16 text-center text-sm text-[#667085]">当前门店暂无标准商品</p>
           ) : (
             <>
-              <p className="mb-2 text-xs text-[#667085]">选大类 → 类型、品牌（可选）→ 价位</p>
+              <p className="mb-2 text-xs text-[#667085]">选大类 → 类型、品牌、角色（可选）→ 价位</p>
               <div className="grid grid-cols-3 gap-3 lg:grid-cols-4 xl:grid-cols-5">
                 {props.groups.map((g) => (
                   <button

@@ -171,6 +171,12 @@ beforeEach(() => {
       { id: id(20), code: "disabled", parent_id: id(7), is_active: false },
     ],
     pos_payment_attempts: [],
+    inv_facets: [
+      { id: id(40), name: "Hello Kitty", dimension: "character", is_active: true },
+      { id: id(41), name: "Kuromi", dimension: "character", is_active: true },
+      { id: id(42), name: "Disabled", dimension: "character", is_active: false },
+      { id: id(43), name: "Company", dimension: "ip", is_active: true },
+    ],
     inv_brands: [
       { id: id(30), name: "Brand A", status: "active", entity_type: "brand" },
       { id: id(31), name: "Brand B", status: "active", entity_type: "kiln" },
@@ -222,6 +228,21 @@ for (const [name, route] of [
   ["QR", qr],
   ["micropay", micropay],
 ] as const) {
+  for (const provider of ["wechat", "alipay"]) test(`${name}/${provider} preserves character IDs before and after payment`, async () => {
+    const items = [40,41].map((n) => ({sku_id:id(6),quantity:1,brand_id:id(30),character_id:id(n)}));
+    const response = await submit(route, items, provider);
+    assert.ok(response.ok);
+    const attempt = tables.pos_payment_attempts[0];
+    assert.deepEqual(attempt.sale_payload.items, items);
+    await finalizePaidAttempt(attempt, {providerTransactionId:"TEST-CHARACTER"});
+    assert.deepEqual(saleCalls[0].p_items, items);
+  });
+  for (const n of [42,43,99]) test(`${name} rejects invalid character ${n} before charging`, async () => {
+    const response = await submit(route, [{sku_id:id(6),quantity:1,character_id:id(n)}]);
+    assert.equal(response.status,422);
+    assert.equal(providerCalls.length,0);
+    assert.equal(tables.pos_payment_attempts.length,0);
+  });
   test(`${name} preserves brand IDs through provider and final sale`, async () => {
     const items = [30,31].map((n) => ({ sku_id:id(6), quantity:1, brand_id:id(n) }));
     const response = await submit(route, items);

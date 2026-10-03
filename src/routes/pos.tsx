@@ -164,7 +164,9 @@ type HeldCart = {
     subcategory_code: string | null;
     subcategory_name_snapshot: string | null;
     brand_id: string | null;
+    character_id: string | null;
     brand_name_snapshot: string | null;
+    character_name_snapshot: string | null;
   }>;
 };
 type PosOrder = {
@@ -269,6 +271,8 @@ export function PosPage() {
   const scanHandler = useRef<(code: string) => Promise<void>>(async () => {});
   const resolveScan = useRef<(code: string) => Promise<void>>(async () => {});
   const [standardGroups, setStandardGroups] = useState<StandardCatalogGroup[]>([]);
+  const [characters, setCharacters] = useState<import("@/lib/pos/character-catalog").PosCharacter[]>([]);
+  const [activeCharacter, setActiveCharacter] = useState<import("@/lib/pos/character-catalog").PosCharacter | null>(null);
   const [brands, setBrands] = useState<import("@/lib/pos/brand-catalog").PosBrand[]>([]);
   const [activeBrand, setActiveBrand] = useState<import("@/lib/pos/brand-catalog").PosBrand | null>(null);
   const [standardLoading, setStandardLoading] = useState(false);
@@ -516,7 +520,7 @@ export function PosPage() {
     const locationId = selectedLocationId;
     setStandardLoading(true);
     setStandardError("");
-    const result = await posRequest<{ groups: StandardCatalogGroup[]; brands?: import("@/lib/pos/brand-catalog").PosBrand[] }>(
+    const result = await posRequest<{ groups: StandardCatalogGroup[]; brands?: import("@/lib/pos/brand-catalog").PosBrand[]; characters?: import("@/lib/pos/character-catalog").PosCharacter[] }>(
       `/api/public/pos/standard-catalog?location_id=${encodeURIComponent(selectedLocationId)}`,
       token,
     );
@@ -525,11 +529,13 @@ export function PosPage() {
     if (!result.ok) {
       setStandardGroups([]);
       setBrands([]);
+      setCharacters([]);
       setStandardError(result.message ?? "标准商品目录加载失败");
       return;
     }
     setStandardGroups(result.data.groups);
     setBrands(result.data.brands ?? []);
+    setCharacters(result.data.characters ?? []);
   }
 
   function addStandardPrice(group: StandardCatalogGroup, price: { sku_id: string; price: number }) {
@@ -551,10 +557,13 @@ export function PosPage() {
       subcategory_code: activeSubcategory?.code ?? null,
       subcategory_name: activeSubcategory?.name ?? null,
       brand_id: activeBrand?.id ?? null,
+      character_id: activeCharacter?.id ?? null,
       brand_name: activeBrand?.name ?? null,
+      character_name: activeCharacter?.name ?? null,
     } as unknown as LookupProduct);
     setActiveSubcategory(null);
     setActiveBrand(null);
+    setActiveCharacter(null);
   }
 
   function addProduct(product: LookupProduct) {
@@ -1057,7 +1066,9 @@ export function PosPage() {
     setHeldLoading(false);
     setStandardGroups([]);
     setBrands([]);
+    setCharacters([]);
     setActiveBrand(null);
+    setActiveCharacter(null);
     setBrowseProducts([]);
     setBrowseNext(null);
     setBrowseLoadingMore(false);
@@ -1202,6 +1213,7 @@ export function PosPage() {
         quantity: line.quantity,
         subcategory_code: line.subcategory_code ?? null,
         brand_id: line.brand_id ?? null,
+        character_id: line.character_id ?? null,
       })),
       tenders: checked,
       customer_id: selectedCustomer?.id,
@@ -1461,9 +1473,12 @@ export function PosPage() {
             products={browseProducts}
             activeCategoryCode={activeCategoryCode}
             subcategory={activeSubcategory}
+            characters={characters}
+            character={activeCharacter}
+            onCharacter={setActiveCharacter}
             brands={brands}
             brand={activeBrand}
-            onBrand={setActiveBrand}
+            onBrand={(brand) => { setActiveBrand(brand); setActiveCharacter(null); }}
             loading={catalogTab === "standard" ? standardLoading : browseLoading}
             error={catalogTab === "standard" ? standardError : browseError}
             onTab={setCatalogTab}
@@ -1471,6 +1486,7 @@ export function PosPage() {
               setActiveCategoryCode(code);
               setActiveSubcategory(null);
               setActiveBrand(null);
+              setActiveCharacter(null);
             }}
             onSubcategory={setActiveSubcategory}
             onPrice={addStandardPrice}
@@ -1611,6 +1627,7 @@ export function PosPage() {
                         {posCartLineLabel(line)}
                       </p>
                       <p className="mt-2 truncate text-[10px] text-[#667085]">
+                        {line.character_name && <span className="font-semibold text-[#0a315d]">{line.character_name} · </span>}
                         {money(line.unit_price)}
                         {line.product_type === "standard" ? " 档" : ""} ·{" "}
                         {meta?.barcode ||

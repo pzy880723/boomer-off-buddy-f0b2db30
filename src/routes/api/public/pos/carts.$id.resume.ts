@@ -10,7 +10,7 @@ export const Route = createFileRoute("/api/public/pos/carts/$id/resume")({
         const { data: cart, error } = await supabaseAdmin
           .from("pos_held_carts" as never)
           .select(
-            "id,location_id,customer_id,note,discount_snapshot,benefit_snapshot,status,pos_held_cart_items(id,sku_id,quantity,price_snapshot,ownership_snapshot,discount_eligible,category_code,category_name_snapshot,subcategory_code,subcategory_name_snapshot,brand_id,brand_name_snapshot)",
+            "id,location_id,customer_id,note,discount_snapshot,benefit_snapshot,status,pos_held_cart_items(id,sku_id,quantity,price_snapshot,ownership_snapshot,discount_eligible,category_code,category_name_snapshot,subcategory_code,subcategory_name_snapshot,brand_id,brand_name_snapshot,character_id,character_name_snapshot)",
           )
           .eq("id", params.id)
           .maybeSingle();

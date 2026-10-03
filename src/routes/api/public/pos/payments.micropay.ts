@@ -32,6 +32,7 @@ const MicropayBody = z.object({
       quantity: z.number().int().min(1).max(999),
       subcategory_code: z.string().trim().min(1).max(80).nullable().optional(),
       brand_id: z.string().uuid().nullable().optional(),
+      character_id: z.string().uuid().nullable().optional(),
     }))
     .min(1)
     .max(100),

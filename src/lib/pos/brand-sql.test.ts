@@ -20,6 +20,13 @@ before(async () => {
     CREATE UNIQUE INDEX pos_held_cart_items_line_key ON pos_held_cart_items(held_cart_id,sku_id,coalesce(subcategory_code,''));`);
   await db.exec(migration);
   await db.exec(migration);
+  await db.exec(`CREATE TABLE inv_facets(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),code text UNIQUE,name text,dimension text,
+    aliases text[],sort_order int,is_active boolean,is_system boolean,UNIQUE(dimension,name));`);
+  await db.exec(read("supabase/migrations/20261003121301_pos_character_tags.sql"));
+  await db.exec(read("supabase/migrations/20261003121301_pos_character_tags.sql"));
+  await db.exec(`INSERT INTO inv_facets(id,code,name,dimension,is_active) VALUES
+    ('${id(40)}','test_kitty','Kitty','character',true),('${id(41)}','test_kuromi','Kuromi','character',true),
+    ('${id(42)}','test_inactive','Inactive','character',false),('${id(43)}','test_company','Company','ip',true);`);
   await db.exec(`INSERT INTO inv_locations VALUES ('${id(1)}');
     INSERT INTO commerce_customers VALUES ('${id(2)}','active');
     INSERT INTO pos_registers(id) VALUES ('${id(3)}');
@@ -57,6 +64,36 @@ test("null brands remain compatible; no values are invented", async () => {
   await sale([{sku_id:id(6),quantity:1}]);
   const row = (await db.query<any>("SELECT brand_id,brand_name_snapshot FROM commerce_order_items")).rows[0];
   assert.deepEqual(row,{brand_id:null,brand_name_snapshot:null});
+});
+test("same brand and price preserve character identity through sale, points and receipt", async () => {
+  const items = [40,41].map((n) => ({sku_id:id(6),quantity:1,brand_id:id(8),character_id:id(n)}));
+  const result = await sale(items,10);
+  assert.equal((await sale(items,10)).replayed,true);
+  const rows = (await db.query<any>("SELECT character_id,character_name_snapshot FROM commerce_order_items ORDER BY character_name_snapshot")).rows;
+  assert.deepEqual(rows.map((r) => r.character_name_snapshot),["Kitty","Kuromi"]);
+  assert.deepEqual(new Set(result.items.map((r: any) => r.character_id)),new Set([id(40),id(41)]));
+  assert.equal((await db.query<any>("SELECT qty FROM inv_stocks")).rows[0].qty,98);
+});
+test("Disney remains a brand; a character can be selected without a brand", async () => {
+  await db.exec("INSERT INTO inv_brands VALUES ('a2e45bd6-7e46-4483-83c0-3a092ac949a7','Disney','active','ip')");
+  const result = await sale([{sku_id:id(6),quantity:1,brand_id:'a2e45bd6-7e46-4483-83c0-3a092ac949a7',character_id:id(40)},
+    {sku_id:id(6),quantity:1,character_id:id(41)}]);
+  assert.equal(result.items.length,2);
+  assert.ok(result.items.some((row: any) => row.character_name === 'Kuromi' && row.brand_id === null));
+});
+for (const n of [42,43,99]) test(`invalid character ${n} rolls back stock and sale`,async () => {
+  await db.exec("SAVEPOINT invalid_character");
+  await assert.rejects(sale([{sku_id:id(6),quantity:1,character_id:id(n)}]),/invalid_character/);
+  await db.exec("ROLLBACK TO SAVEPOINT invalid_character");
+  assert.equal((await db.query<any>("SELECT count(*)::int n FROM commerce_orders")).rows[0].n,0);
+  assert.equal((await db.query<any>("SELECT qty FROM inv_stocks")).rows[0].qty,100);
+});
+test("held lines separate two characters of the same brand",async () => {
+  await db.exec(`INSERT INTO pos_held_carts(id,shift_id,location_id,operator_id,client_op_id)
+    VALUES ('${id(20)}','${id(4)}','${id(1)}','${id(5)}','held-character');
+    INSERT INTO pos_held_cart_items(held_cart_id,sku_id,quantity,price_snapshot,brand_id,character_id)
+    VALUES ('${id(20)}','${id(6)}',1,10,'${id(8)}','${id(40)}'),('${id(20)}','${id(6)}',1,10,'${id(8)}','${id(41)}');`);
+  assert.equal((await db.query<any>("SELECT count(*)::int n FROM pos_held_cart_items")).rows[0].n,2);
 });
 for (const n of [10,11,99]) test(`invalid brand ${n} rolls back sale, payment and stock`,async () => {
   await db.exec("SAVEPOINT invalid_brand");

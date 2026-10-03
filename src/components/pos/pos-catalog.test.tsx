@@ -87,15 +87,20 @@ test("loading, errors and empty catalog have different actionable states", () =>
   assert.doesNotMatch(render({ loading: true, groups: [] }), /暂无标准商品/);
   assert.match(render({ groups: [] }), /暂无标准商品/);
 });
-test("type and brand form two optional compact rows before prices", () => {
+test("type, brand and character form three optional compact rows before prices", () => {
   const html = render({ activeCategoryCode: group.category_code,
     groups: [{ ...group, subcategories: [{ code: "cup", name: "杯具" }] }],
-    brands: [{ id: "noritake", name: "则武" }], brand: null, onBrand: () => {} });
+    brands: [{ id: "noritake", name: "则武" }], brand: null, onBrand: () => {},
+    characters: [{ id: "kitty", code: "character_hello_kitty", name: "Hello Kitty" }], character: null, onCharacter: () => {} });
   assert.ok(html.indexOf("类型／器型") < html.indexOf("品牌／窑口"));
   assert.ok(html.indexOf("品牌／窑口") < html.indexOf('data-sku-id="sku-99"'));
   assert.match(html, /不选品牌/);
   assert.match(html, /更多品牌/);
   assert.match(html, /则武/);
+  assert.ok(html.indexOf("品牌／窑口") < html.indexOf("IP／角色"));
+  assert.ok(html.indexOf("IP／角色") < html.indexOf('data-sku-id="sku-99"'));
+  assert.match(html, /不选角色/);
+  assert.match(html, /Hello Kitty/);
   assert.doesNotMatch(html, /h-16 shrink-0|sm:p-5/);
 });
 test("custom tab cannot display standard SKUs even if endpoint is old", () => {

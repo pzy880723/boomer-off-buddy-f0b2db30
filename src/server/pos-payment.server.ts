@@ -4,6 +4,7 @@
  */
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { calculatePosDiscount } from "@/lib/pos/pos-policy";
+import { validatePosCharacters } from "@/server/pos-characters.server";
 import { validatePosBrands } from "@/server/pos-brands.server";
 import {
   authCodeLast4,
@@ -142,7 +143,7 @@ export async function resolveStoreMerchant(
   };
 }
 
-export type SaleItemInput = { sku_id: string; quantity: number; subcategory_code?: string | null; brand_id?: string | null };
+export type SaleItemInput = { sku_id: string; quantity: number; subcategory_code?: string | null; brand_id?: string | null; character_id?: string | null };
 export type SaleDiscountInput = { type: "amount" | "percentage" | "final_price"; value: number; reason: string };
 
 /** 服务端重算应收金额，并校验可售与库存。绝不信任 APP 传来的金额。 */
@@ -193,6 +194,8 @@ export async function recomputePayableAmount(input: {
     }
   }
   const taggedItems = input.items.filter((item) => item.subcategory_code != null);
+  const characters = await validatePosCharacters(input.items);
+  if (!characters.ok) return { ok: false, failure: { code: "invalid_character", message: characters.message, status: characters.status } };
   const brands = await validatePosBrands(input.items);
   if (!brands.ok) return { ok: false, failure: { code: "invalid_brand", message: brands.message, status: brands.status } };
   if (taggedItems.length) {
@@ -447,7 +450,9 @@ export type PosReceipt = {
     subcategory_code: string | null;
     subcategory_name_snapshot: string | null;
     brand_id: string | null;
+    character_id: string | null;
     brand_name_snapshot: string | null;
+    character_name_snapshot: string | null;
     quantity: number;
     unit_price: number;
     line_total: number;
@@ -465,7 +470,7 @@ export async function buildPosReceipt(attempt: PosPaymentAttempt): Promise<PosRe
         .maybeSingle(),
       supabaseAdmin
         .from("commerce_order_items" as never)
-        .select("sku_id,title_snapshot,unit_price,quantity,line_total,category_code,category_name_snapshot,subcategory_code,subcategory_name_snapshot,brand_id,brand_name_snapshot")
+        .select("sku_id,title_snapshot,unit_price,quantity,line_total,category_code,category_name_snapshot,subcategory_code,subcategory_name_snapshot,brand_id,brand_name_snapshot,character_id,character_name_snapshot")
         .eq("order_id", attempt.order_id),
       supabaseAdmin
         .from("pos_receipts" as never)
@@ -498,7 +503,9 @@ export async function buildPosReceipt(attempt: PosPaymentAttempt): Promise<PosRe
     subcategory_code: string | null;
     subcategory_name_snapshot: string | null;
     brand_id: string | null;
+    character_id: string | null;
     brand_name_snapshot: string | null;
+    character_name_snapshot: string | null;
     unit_price: number;
     quantity: number;
     line_total: number;
@@ -536,7 +543,9 @@ export async function buildPosReceipt(attempt: PosPaymentAttempt): Promise<PosRe
       subcategory_code: item.subcategory_code ?? null,
       subcategory_name_snapshot: item.subcategory_name_snapshot ?? null,
       brand_id: item.brand_id ?? null,
+      character_id: item.character_id ?? null,
       brand_name_snapshot: item.brand_name_snapshot ?? null,
+      character_name_snapshot: item.character_name_snapshot ?? null,
       quantity: Number(item.quantity),
       unit_price: Number(item.unit_price),
       line_total: Number(item.line_total),

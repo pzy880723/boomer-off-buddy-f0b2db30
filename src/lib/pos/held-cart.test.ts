@@ -21,7 +21,9 @@ describe("挂单快照字段", () => {
         subcategory_code: "game_handheld",
         subcategory_name_snapshot: "掌机",
         brand_id: null,
+        character_id: null,
         brand_name_snapshot: null,
+        character_name_snapshot: null,
       },
     );
   });
@@ -33,7 +35,9 @@ describe("挂单快照字段", () => {
       subcategory_code: null,
       subcategory_name_snapshot: null,
       brand_id: null,
+      character_id: null,
       brand_name_snapshot: null,
+      character_name_snapshot: null,
     });
   });
 
@@ -49,7 +53,9 @@ describe("挂单快照字段", () => {
         subcategory_code: null,
         subcategory_name: "杯具",
         brand_id: null,
+        character_id: null,
         brand_name: null,
+        character_name: null,
       },
     );
   });

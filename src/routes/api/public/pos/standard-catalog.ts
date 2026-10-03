@@ -28,7 +28,7 @@ export const Route = createFileRoute("/api/public/pos/standard-catalog")({
           return posJson({ ok: true, data: { location_id: locationId, groups: [] } });
         }
 
-        const [categoriesResult, skusResult, brandsResult] = await Promise.all([
+        const [categoriesResult, skusResult, brandsResult, charactersResult] = await Promise.all([
           supabaseAdmin
             .from("inv_categories")
             .select("id,code,name,parent_id,is_active,sort_order")
@@ -45,9 +45,12 @@ export const Route = createFileRoute("/api/public/pos/standard-catalog")({
           supabaseAdmin.from("inv_brands")
             .select("id,name,aliases,category_codes,entity_type,status")
             .eq("status", "active").order("name").limit(1000),
+          supabaseAdmin.from("inv_facets").select("id,code,name,aliases,category_codes")
+            .eq("dimension", "character").eq("is_active", true).order("sort_order").order("name").limit(1000),
         ]);
         if (categoriesResult.error) return posError(categoriesResult.error.message, 500);
         if (skusResult.error) return posError(skusResult.error.message, 500);
+        if (charactersResult.error) return posError(charactersResult.error.message, 500);
         if (brandsResult.error) return posError(brandsResult.error.message, 500);
 
         const groups = buildStandardCatalog(
@@ -60,7 +63,7 @@ export const Route = createFileRoute("/api/public/pos/standard-catalog")({
         });
         const brands = (brandsResult.data ?? []).filter(isPosBrand)
           .map(({ id, name, aliases, category_codes }) => ({ id, name, aliases, category_codes }));
-        return posJson({ ok: true, data: { location_id: locationId, groups, brands } });
+        return posJson({ ok: true, data: { location_id: locationId, groups, brands, characters: charactersResult.data ?? [] } });
       },
     },
   },

@@ -5,10 +5,11 @@ export type PosBrand = {
   category_codes?: string[] | null;
 };
 
-// Existing ERP taxonomy classifies these two companies as IPs. Do not include characters.
+// Existing ERP taxonomy classifies these companies as IPs. Do not include characters.
 const COMPANY_IDS = new Set([
   "66222295-6e7b-4336-8055-3a7ef23c8d7d",
   "74c76f9f-817b-4f5c-b02d-20acc5e8c10c",
+  "a2e45bd6-7e46-4483-83c0-3a092ac949a7",
 ]);
 
 export function isPosBrand(row: { id: string; entity_type: string; status: string }): boolean {
