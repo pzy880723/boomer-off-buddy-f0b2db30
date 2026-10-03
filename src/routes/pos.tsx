@@ -163,6 +163,8 @@ type HeldCart = {
     category_name_snapshot: string | null;
     subcategory_code: string | null;
     subcategory_name_snapshot: string | null;
+    brand_id: string | null;
+    brand_name_snapshot: string | null;
   }>;
 };
 type PosOrder = {
@@ -267,6 +269,8 @@ export function PosPage() {
   const scanHandler = useRef<(code: string) => Promise<void>>(async () => {});
   const resolveScan = useRef<(code: string) => Promise<void>>(async () => {});
   const [standardGroups, setStandardGroups] = useState<StandardCatalogGroup[]>([]);
+  const [brands, setBrands] = useState<import("@/lib/pos/brand-catalog").PosBrand[]>([]);
+  const [activeBrand, setActiveBrand] = useState<import("@/lib/pos/brand-catalog").PosBrand | null>(null);
   const [standardLoading, setStandardLoading] = useState(false);
   const [activeCategoryCode, setActiveCategoryCode] = useState<string | null>(null);
   const [activeSubcategory, setActiveSubcategory] = useState<{
@@ -512,7 +516,7 @@ export function PosPage() {
     const locationId = selectedLocationId;
     setStandardLoading(true);
     setStandardError("");
-    const result = await posRequest<{ groups: StandardCatalogGroup[] }>(
+    const result = await posRequest<{ groups: StandardCatalogGroup[]; brands?: import("@/lib/pos/brand-catalog").PosBrand[] }>(
       `/api/public/pos/standard-catalog?location_id=${encodeURIComponent(selectedLocationId)}`,
       token,
     );
@@ -520,10 +524,12 @@ export function PosPage() {
     setStandardLoading(false);
     if (!result.ok) {
       setStandardGroups([]);
+      setBrands([]);
       setStandardError(result.message ?? "标准商品目录加载失败");
       return;
     }
     setStandardGroups(result.data.groups);
+    setBrands(result.data.brands ?? []);
   }
 
   function addStandardPrice(group: StandardCatalogGroup, price: { sku_id: string; price: number }) {
@@ -544,8 +550,11 @@ export function PosPage() {
       category_name: group.category_name,
       subcategory_code: activeSubcategory?.code ?? null,
       subcategory_name: activeSubcategory?.name ?? null,
+      brand_id: activeBrand?.id ?? null,
+      brand_name: activeBrand?.name ?? null,
     } as unknown as LookupProduct);
     setActiveSubcategory(null);
+    setActiveBrand(null);
   }
 
   function addProduct(product: LookupProduct) {
@@ -1047,6 +1056,8 @@ export function PosPage() {
     setHeldDialog(false);
     setHeldLoading(false);
     setStandardGroups([]);
+    setBrands([]);
+    setActiveBrand(null);
     setBrowseProducts([]);
     setBrowseNext(null);
     setBrowseLoadingMore(false);
@@ -1190,6 +1201,7 @@ export function PosPage() {
         sku_id: line.sku_id,
         quantity: line.quantity,
         subcategory_code: line.subcategory_code ?? null,
+        brand_id: line.brand_id ?? null,
       })),
       tenders: checked,
       customer_id: selectedCustomer?.id,
@@ -1366,7 +1378,7 @@ export function PosPage() {
           .pos-receipt-actions { display: none !important; }
         }
       `}</style>
-      <header className="flex min-h-[76px] shrink-0 flex-wrap items-center gap-2 border-b border-[#e4e7ec] bg-white px-3 py-2 sm:gap-3 sm:px-5">
+      <header className="flex min-h-16 shrink-0 flex-wrap items-center gap-2 border-b border-[#e4e7ec] bg-white px-3 py-1.5 sm:gap-3 sm:px-4">
         <Link
           to="/dashboard"
           className="inline-flex h-10 w-9 items-center justify-center rounded-xl text-[#344054] transition hover:bg-[#f2f4f7] sm:mr-4"
@@ -1440,7 +1452,7 @@ export function PosPage() {
       </header>
 
       <main
-        className={`grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden p-3 sm:p-4 lg:grid-cols-[minmax(0,1fr)_76px_clamp(340px,28vw,430px)] lg:grid-rows-1 ${phoneCart ? "grid-rows-1" : "grid-rows-[minmax(0,1fr)_auto]"}`}
+        className={`grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden p-3 lg:grid-cols-[minmax(0,1fr)_76px_clamp(340px,28vw,430px)] lg:grid-rows-1 ${phoneCart ? "grid-rows-1" : "grid-rows-[minmax(0,1fr)_auto]"}`}
       >
         <div className={`min-h-0 ${phoneCart ? "hidden lg:contents" : "contents"}`}>
           <PosCatalog
@@ -1449,12 +1461,16 @@ export function PosPage() {
             products={browseProducts}
             activeCategoryCode={activeCategoryCode}
             subcategory={activeSubcategory}
+            brands={brands}
+            brand={activeBrand}
+            onBrand={setActiveBrand}
             loading={catalogTab === "standard" ? standardLoading : browseLoading}
             error={catalogTab === "standard" ? standardError : browseError}
             onTab={setCatalogTab}
             onGroup={(code) => {
               setActiveCategoryCode(code);
               setActiveSubcategory(null);
+              setActiveBrand(null);
             }}
             onSubcategory={setActiveSubcategory}
             onPrice={addStandardPrice}
@@ -1526,7 +1542,7 @@ export function PosPage() {
           data-pos-checkout-panel
           className={`min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-2xl border border-[#e4e7ec] bg-white ${phoneCart ? "grid" : "hidden lg:grid"}`}
         >
-          <div className="flex h-16 items-center gap-2 border-b border-[#eaecf0] px-4">
+          <div className="flex h-12 items-center gap-2 border-b border-[#eaecf0] px-4">
             <button
               type="button"
               aria-label="返回选品"

@@ -13,6 +13,8 @@ export type PosScannableProduct = {
   /** 二级类目：POS 可选分析字段，允许为空 */
   subcategory_code?: string | null;
   subcategory_name?: string | null;
+  brand_id?: string | null;
+  brand_name?: string | null;
 };
 
 export type PosCartLine = PosScannableProduct & {
@@ -46,16 +48,18 @@ export type PosDiscountLine = {
 export function posCartLineKey(product: {
   sku_id: string;
   subcategory_code?: string | null;
+  brand_id?: string | null;
 }): string {
-  return `${product.sku_id}::${product.subcategory_code ?? ""}`;
+  return `${product.sku_id}::${product.subcategory_code ?? ""}${product.brand_id ? `::${product.brand_id}` : ""}`;
 }
 
 /** 展示名：未选二级类目为「欧洲瓷器」，已选为「欧洲瓷器 · 散瓷杯碟」 */
 export function posCartLineLabel(line: {
   name: string;
   subcategory_name?: string | null;
+  brand_name?: string | null;
 }): string {
-  return line.subcategory_name ? `${line.name} · ${line.subcategory_name}` : line.name;
+  return [line.name, line.subcategory_name, line.brand_name].filter(Boolean).join(" · ");
 }
 
 export function addScannedProduct(

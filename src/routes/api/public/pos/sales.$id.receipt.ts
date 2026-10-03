@@ -41,7 +41,7 @@ export const Route = createFileRoute("/api/public/pos/sales/$id/receipt")({
             supabaseAdmin
               .from("commerce_order_items" as never)
               .select(
-                "sku_id,title_snapshot,unit_price,quantity,line_total,discount_total,category_code,category_name_snapshot,subcategory_code,subcategory_name_snapshot",
+                "sku_id,title_snapshot,unit_price,quantity,line_total,discount_total,category_code,category_name_snapshot,subcategory_code,subcategory_name_snapshot,brand_id,brand_name_snapshot",
               )
               .eq("order_id", params.id)
               .order("created_at", { ascending: true }),

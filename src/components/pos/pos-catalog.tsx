@@ -1,6 +1,8 @@
 import { ArrowLeft, ChevronRight, Loader2, PackageOpen, RotateCcw } from "lucide-react";
 import type { StandardCatalogGroup } from "@/lib/pos/standard-catalog";
 import type { PosScannableProduct } from "@/lib/pos/pos-policy";
+import type { PosBrand } from "@/lib/pos/brand-catalog";
+import { PosBrandRow } from "./pos-brand-row";
 
 type Group = StandardCatalogGroup & { image_url?: string | null };
 type Product = PosScannableProduct & { image_url: string | null };
@@ -10,6 +12,9 @@ export type PosCatalogProps = {
   products: Product[];
   activeCategoryCode: string | null;
   subcategory: { code: string; name: string } | null;
+  brands?: PosBrand[];
+  brand?: PosBrand | null;
+  onBrand?: (brand: PosBrand | null) => void;
   loading: boolean;
   error: string;
   onTab: (tab: "standard" | "custom") => void;
@@ -52,7 +57,7 @@ export function PosCatalog(props: PosCatalogProps) {
       className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-[#e4e7ec] bg-white"
     >
       <div
-        className="flex h-16 shrink-0 items-stretch gap-7 border-b border-[#eaecf0] px-4 sm:px-5"
+        className="flex h-12 shrink-0 items-stretch gap-7 border-b border-[#eaecf0] px-3 sm:px-4"
         role="tablist"
         aria-label="商品类型"
       >
@@ -80,7 +85,7 @@ export function PosCatalog(props: PosCatalogProps) {
         id="pos-catalog-panel"
         role="tabpanel"
         aria-labelledby={`pos-tab-${props.tab}`}
-        className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-5"
+        className="min-h-0 flex-1 overflow-y-auto p-3"
       >
         {props.loading ? (
           <div
@@ -107,22 +112,22 @@ export function PosCatalog(props: PosCatalogProps) {
         ) : props.tab === "standard" ? (
           group ? (
             <>
-              <div className="mb-3 flex flex-wrap items-center gap-3">
+              <div className="mb-1 flex flex-wrap items-center gap-3">
                 <button
                   type="button"
                   onClick={() => props.onGroup(null)}
-                  className="flex min-h-10 items-center gap-1 text-sm text-[#667085]"
+                  className="flex min-h-9 items-center gap-1 text-sm text-[#667085]"
                 >
                   <ArrowLeft className="h-4 w-4" />
                   全部标准商品
                 </button>
                 <h2 className="font-semibold">{group.category_name}</h2>
-                <span className="ml-auto text-xs text-[#667085]">点选价位，即可加购</span>
+                <span className="ml-auto text-xs text-[#667085]">标签可跳过 · 点价格加购</span>
               </div>
               {group.subcategories.length > 0 && (
-                <div className="mb-3 flex min-w-0 items-center gap-2 border-y border-[#eaecf0]" role="group" aria-label="品类标签（可选）">
-                  <span className="shrink-0 whitespace-nowrap text-xs text-[#667085]">标签（可选）</span>
-                  <div data-pos-tag-choices className="flex min-w-0 flex-1 flex-nowrap gap-1.5 overflow-x-auto py-2">
+                <div className="flex min-w-0 items-center gap-2 border-y border-[#eaecf0]" role="group" aria-label="品类标签（可选）">
+                  <span className="w-16 shrink-0 whitespace-nowrap text-xs text-[#667085]">类型／器型</span>
+                  <div data-pos-tag-choices className="flex min-w-0 flex-1 flex-nowrap gap-1.5 overflow-x-auto py-1.5">
                     <button
                       type="button"
                       aria-pressed={props.subcategory === null}
@@ -141,10 +146,12 @@ export function PosCatalog(props: PosCatalogProps) {
                   </div>
                 </div>
               )}
+              {props.onBrand && <PosBrandRow key={group.category_code} brands={props.brands ?? []} category={group.category_code}
+                value={props.brand ?? null} onChange={props.onBrand} />}
               {group.prices.length === 0 ? (
                 <p className="py-8 text-center text-sm text-[#667085]">该商品暂无可售价格档</p>
               ) : (
-                <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 xl:grid-cols-6">
+                <div className="mt-2 grid grid-cols-4 gap-2 sm:grid-cols-5 xl:grid-cols-6">
                   {[...group.prices]
                     .sort((a, b) => a.price - b.price)
                     .map((price) => (
@@ -165,7 +172,7 @@ export function PosCatalog(props: PosCatalogProps) {
             <p className="py-16 text-center text-sm text-[#667085]">当前门店暂无标准商品</p>
           ) : (
             <>
-              <p className="mb-4 text-xs text-[#667085]">选商品名称，再选价位档</p>
+              <p className="mb-2 text-xs text-[#667085]">选大类 → 类型、品牌（可选）→ 价位</p>
               <div className="grid grid-cols-3 gap-3 lg:grid-cols-4 xl:grid-cols-5">
                 {props.groups.map((g) => (
                   <button

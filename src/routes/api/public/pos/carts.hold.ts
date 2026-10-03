@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { POS_CORS, authenticatePosUser, posError, posJson } from "@/server/pos-auth.server";
+import { validatePosBrands } from "@/server/pos-brands.server";
 
 const HoldBody = z.object({
   shift_id: z.string().uuid(),
@@ -19,6 +20,7 @@ const HoldBody = z.object({
         category_name_snapshot: z.string().trim().min(1).max(120).nullable().optional(),
         subcategory_code: z.string().trim().min(1).max(80).nullable().optional(),
         subcategory_name_snapshot: z.string().trim().min(1).max(120).nullable().optional(),
+        brand_id: z.string().uuid().nullable().optional(),
       }),
     )
     .min(1)
@@ -67,6 +69,8 @@ export const Route = createFileRoute("/api/public/pos/carts/hold")({
           ).map((sku) => [sku.id, sku]),
         );
         if (skuMap.size !== skuIds.length) return posError("部分商品不存在", 404);
+        const brands = await validatePosBrands(parsed.data.items);
+        if (!brands.ok) return posError(brands.message, brands.status, "invalid_brand");
 
         const { data: heldCart, error: cartError } = await supabaseAdmin
           .from("pos_held_carts" as never)
@@ -105,6 +109,8 @@ export const Route = createFileRoute("/api/public/pos/carts/hold")({
             category_name_snapshot: item.category_name_snapshot ?? null,
             subcategory_code: item.subcategory_code ?? null,
             subcategory_name_snapshot: item.subcategory_name_snapshot ?? null,
+            brand_id: item.brand_id ?? null,
+            brand_name_snapshot: item.brand_id ? brands.names.get(item.brand_id) : null,
             ownership_snapshot: sku.sale_ownership,
             discount_eligible: sku.discount_eligible,
           };

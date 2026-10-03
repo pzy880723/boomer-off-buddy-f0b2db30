@@ -12,6 +12,7 @@ const SaleBody = z.object({
         sku_id: z.string().uuid(),
         quantity: z.number().int().min(1).max(999),
         subcategory_code: z.string().trim().min(1).max(80).nullable().optional(),
+        brand_id: z.string().uuid().nullable().optional(),
       }),
     )
     .min(1)
@@ -87,6 +88,7 @@ export const Route = createFileRoute("/api/public/pos/sales")({
           } as never,
         );
         if (error) {
+          if (/invalid_brand/.test(error.message)) return posError("所选品牌已不可用，请重新选择", 422, "invalid_brand");
           if (error.message === "sale_operation_cancelled") {
             return posError("原收款操作已安全取消，不能再次提交该操作编号", 409, "sale_operation_cancelled");
           }

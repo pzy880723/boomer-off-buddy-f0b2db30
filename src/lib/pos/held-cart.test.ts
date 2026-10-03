@@ -20,6 +20,8 @@ describe("挂单快照字段", () => {
         category_name_snapshot: "游戏设备",
         subcategory_code: "game_handheld",
         subcategory_name_snapshot: "掌机",
+        brand_id: null,
+        brand_name_snapshot: null,
       },
     );
   });
@@ -30,6 +32,8 @@ describe("挂单快照字段", () => {
       category_name_snapshot: null,
       subcategory_code: null,
       subcategory_name_snapshot: null,
+      brand_id: null,
+      brand_name_snapshot: null,
     });
   });
 
@@ -44,6 +48,8 @@ describe("挂单快照字段", () => {
         category_name: "欧洲瓷器",
         subcategory_code: null,
         subcategory_name: "杯具",
+        brand_id: null,
+        brand_name: null,
       },
     );
   });

@@ -6,6 +6,8 @@ export type HeldCartItemSnapshot = {
   category_name_snapshot: string | null;
   subcategory_code: string | null;
   subcategory_name_snapshot: string | null;
+  brand_id: string | null;
+  brand_name_snapshot: string | null;
 };
 
 export type CartLineCategoryFields = {
@@ -13,6 +15,8 @@ export type CartLineCategoryFields = {
   category_name?: string | null;
   subcategory_code?: string | null;
   subcategory_name?: string | null;
+  brand_id?: string | null;
+  brand_name?: string | null;
 };
 
 /** 挂单写入：购物车行 -> 快照字段（缺失一律 null，不造假） */
@@ -22,6 +26,8 @@ export function toHeldCartSnapshot(line: CartLineCategoryFields): HeldCartItemSn
     category_name_snapshot: line.category_name ?? null,
     subcategory_code: line.subcategory_code ?? null,
     subcategory_name_snapshot: line.subcategory_name ?? null,
+    brand_id: line.brand_id ?? null,
+    brand_name_snapshot: line.brand_name ?? null,
   };
 }
 
@@ -35,5 +41,7 @@ export function fromHeldCartSnapshot(
     category_name: snapshot.category_name_snapshot ?? fallback.category_name ?? null,
     subcategory_code: snapshot.subcategory_code ?? fallback.subcategory_code ?? null,
     subcategory_name: snapshot.subcategory_name_snapshot ?? fallback.subcategory_name ?? null,
+    brand_id: snapshot.brand_id ?? null,
+    brand_name: snapshot.brand_name_snapshot ?? null,
   };
 }

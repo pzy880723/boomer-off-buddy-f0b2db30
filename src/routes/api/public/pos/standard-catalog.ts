@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { signSkuImagePaths } from "@/lib/sku-image-resolver.server";
 import { POS_CORS, authenticatePosUser, posError, posJson } from "@/server/pos-auth.server";
+import { isPosBrand } from "@/lib/pos/brand-catalog";
 import {
   STANDARD_CATEGORY_CODES,
   buildStandardCatalog,
@@ -27,7 +28,7 @@ export const Route = createFileRoute("/api/public/pos/standard-catalog")({
           return posJson({ ok: true, data: { location_id: locationId, groups: [] } });
         }
 
-        const [categoriesResult, skusResult] = await Promise.all([
+        const [categoriesResult, skusResult, brandsResult] = await Promise.all([
           supabaseAdmin
             .from("inv_categories")
             .select("id,code,name,parent_id,is_active,sort_order")
@@ -41,9 +42,13 @@ export const Route = createFileRoute("/api/public/pos/standard-catalog")({
             .eq("inventory_policy", "unlimited")
             .eq("is_display", true)
             .eq("status", "active"),
+          supabaseAdmin.from("inv_brands")
+            .select("id,name,aliases,category_codes,entity_type,status")
+            .eq("status", "active").order("name").limit(1000),
         ]);
         if (categoriesResult.error) return posError(categoriesResult.error.message, 500);
         if (skusResult.error) return posError(skusResult.error.message, 500);
+        if (brandsResult.error) return posError(brandsResult.error.message, 500);
 
         const groups = buildStandardCatalog(
           (categoriesResult.data ?? []) as unknown as CategoryRowLike[],
@@ -53,7 +58,9 @@ export const Route = createFileRoute("/api/public/pos/standard-catalog")({
         groups.forEach((group, index) => {
           group.image_url = covers[index] ?? null;
         });
-        return posJson({ ok: true, data: { location_id: locationId, groups } });
+        const brands = (brandsResult.data ?? []).filter(isPosBrand)
+          .map(({ id, name, aliases, category_codes }) => ({ id, name, aliases, category_codes }));
+        return posJson({ ok: true, data: { location_id: locationId, groups, brands } });
       },
     },
   },

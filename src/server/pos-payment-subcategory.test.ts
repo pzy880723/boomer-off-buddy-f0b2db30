@@ -171,6 +171,12 @@ beforeEach(() => {
       { id: id(20), code: "disabled", parent_id: id(7), is_active: false },
     ],
     pos_payment_attempts: [],
+    inv_brands: [
+      { id: id(30), name: "Brand A", status: "active", entity_type: "brand" },
+      { id: id(31), name: "Brand B", status: "active", entity_type: "kiln" },
+      { id: id(32), name: "Disabled", status: "inactive", entity_type: "brand" },
+      { id: id(33), name: "Character", status: "active", entity_type: "ip" },
+    ],
     commerce_orders: [
       { id: id(11), order_no: "TEST", subtotal: 30, discount_total: 0, total_amount: 30 },
     ],
@@ -216,6 +222,21 @@ for (const [name, route] of [
   ["QR", qr],
   ["micropay", micropay],
 ] as const) {
+  test(`${name} preserves brand IDs through provider and final sale`, async () => {
+    const items = [30,31].map((n) => ({ sku_id:id(6), quantity:1, brand_id:id(n) }));
+    const response = await submit(route, items);
+    assert.ok(response.ok);
+    const attempt = tables.pos_payment_attempts[0];
+    assert.deepEqual(attempt.sale_payload.items, items);
+    await finalizePaidAttempt(attempt, { providerTransactionId:"TEST-BRAND" });
+    assert.deepEqual(saleCalls[0].p_items, items);
+  });
+  for (const n of [32,33,99]) test(`${name} rejects invalid brand ${n} before provider`, async () => {
+    const response = await submit(route, [{sku_id:id(6),quantity:1,brand_id:id(n)}]);
+    assert.equal(response.status,422);
+    assert.equal(providerCalls.length,0);
+    assert.equal(tables.pos_payment_attempts.length,0);
+  });
   for (const payProvider of ["wechat", "alipay"]) {
     test(`${name}/${payProvider} preserves same-SKU distinct tags through attempt, paid finalization and receipt`, async () => {
       const expected = taggedItems();
