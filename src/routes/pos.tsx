@@ -63,6 +63,7 @@ import { PosCatalog } from "@/components/pos/pos-catalog";
 import { PosHidScanner } from "@/lib/pos/hid-scanner";
 import type { calculatePointsRedemption } from "@/lib/pos/points-policy";
 import { SaleRecoveryResult } from "@/lib/pos/sale-recovery";
+import { posRequest, isConfirmedSale } from "@/lib/pos/request";
 type PointsRedemption = ReturnType<typeof calculatePointsRedemption>;
 
 export const Route = createFileRoute("/pos")({
@@ -212,9 +213,6 @@ type CashMovementData = {
     created_at: string;
   }>;
 };
-type ApiResponse<T> =
-  | { ok: true; data: T; replayed?: boolean }
-  | { ok: false; message?: string; error?: string; code?: string };
 
 const paymentOptions: Array<{
   value: PosTender["provider"];
@@ -234,44 +232,6 @@ function money(value: number) {
     currency: "CNY",
     minimumFractionDigits: 2,
   }).format(value);
-}
-
-async function posRequest<T>(
-  path: string,
-  token: string,
-  init?: RequestInit,
-): Promise<ApiResponse<T>> {
-  try {
-    const response = await fetch(path, {
-      ...init,
-      signal: init?.signal ?? AbortSignal.timeout(25_000),
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-        ...(init?.headers ?? {}),
-      },
-    });
-    const contentType = response.headers.get("content-type") ?? "";
-    if (!contentType.includes("application/json")) {
-      return {
-        ok: false,
-        code: "result_unknown",
-        message: `接口返回异常（HTTP ${response.status}）`,
-      };
-    }
-    const body = (await response.json()) as ApiResponse<T>;
-    if (response.status >= 500)
-      return {
-        ok: false,
-        code: "result_unknown",
-        message: !body.ok ? body.message : "服务器暂时不可用",
-      };
-    if (!response.ok && body.ok)
-      return { ok: false, message: `请求失败（HTTP ${response.status}）` };
-    return body;
-  } catch {
-    return { ok: false, code: "result_unknown", message: "网络连接失败或超时，请检查网络后重试" };
-  }
 }
 
 export function PosPage() {
@@ -1259,7 +1219,7 @@ export function PosPage() {
     const result = await posRequest<Record<string, unknown>>("/api/public/pos/sales", token, {
       method: "POST",
       body: JSON.stringify({ ...saleBody, client_op_id: attempt.id }),
-    });
+    }, isConfirmedSale);
     setPaying(false);
     if (!result.ok) {
       if (result.code === "result_unknown") {
@@ -1301,7 +1261,7 @@ export function PosPage() {
         ...JSON.parse(recoveryAttempt.signature),
         client_op_id: recoveryAttempt.id,
       }),
-    });
+    }, isConfirmedSale);
     setPaying(false);
     if (!result.ok) {
       setRecoveryError(result.message ?? "仍未确认结果，请保留原单，不要重复收款");

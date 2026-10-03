@@ -2,9 +2,9 @@
 # Scoped POS release. Does not apply SQL or enable points redemption.
 set -euo pipefail
 base=/var/www/boomer-erp
-old=$base/releases/product-sale-repair-20260927
-release=$base/releases/pos-unified-b52dfb8-20261003
-archive=/tmp/boomer-pos-b52dfb8.tar.gz
+old=${POS_PREVIOUS_RELEASE:-$base/releases/product-sale-repair-20260927}
+release=${POS_NEXT_RELEASE:-$base/releases/pos-unified-b52dfb8-20261003}
+archive=${POS_SOURCE_ARCHIVE:-/tmp/boomer-pos-b52dfb8.tar.gz}
 candidate=boomer-pos-candidate
 workers=/etc/boomer-erp/workers.env
 case "${1:-}" in prepare|verify|publish|rollback) mode=$1 ;; *) exit 2 ;; esac
@@ -58,7 +58,7 @@ fi
 [[ "$(readlink -f "$base/current")" == "$old" ]] || exit 1
 if [[ "$mode" == prepare ]]; then
   [[ ! -e "$release" ]] || exit 1
-  sha256sum -c /tmp/boomer-pos-b52dfb8.tar.gz.sha256
+  sha256sum -c "$archive.sha256"
   # Only regular source files from the reviewed commit enter this archive.
   tar -tzf "$archive" | awk '/(^\/|(^|\/)\.\.($|\/)|(^|\/)\.env($|\/)|^node_modules\/|^\.output\/)/ {bad=1} END {exit bad}'
   tar -tvzf "$archive" | awk 'substr($1,1,1)!="-" && substr($1,1,1)!="d" {bad=1} END {exit bad}'
@@ -68,6 +68,7 @@ if [[ "$mode" == prepare ]]; then
   sha256sum "$workers" > .pos-workers.sha256
   NODE_OPTIONS=--max-old-space-size=3072 timeout 1200s npm run build:tencent > /tmp/boomer-pos-candidate-build.log 2>&1
   grep -l '本单最多' .output/public/assets/*.js | xargs -n1 basename > .pos-asset
+  [[ "$(wc -l < .pos-asset)" -eq 1 ]]
   # Preserve old hashed assets for already-open browser sessions during rollout.
   cp -an "$old/.output/public/assets/." .output/public/assets/
   env APP_DIR="$release" ERP_PORT=3006 HANDHELD_RELEASE_WORKER_ENABLED=false \
@@ -84,7 +85,8 @@ fi
 cd "$release"
 if [[ "$mode" == verify ]]; then
   sha256sum -c .pos-workers.sha256
-  grep -l '本单最多' .output/public/assets/*.js | xargs -n1 basename > .pos-asset
+  # Keep the freshly built asset recorded before old session assets were copied.
+  [[ "$(wc -l < .pos-asset)" -eq 1 ]]
   ready 3006
   verify http://127.0.0.1:3006 --candidate
   find src .output -type f -print0 | sort -z | xargs -0 sha256sum > .pos-ready.sha256
@@ -116,4 +118,4 @@ ln -sfn "$release" "$base/current"
 pm2 delete "$candidate" >/dev/null
 pm2 save >/dev/null
 rollback=0
-echo 'POS b52dfb8 published; previous release retained; SQL unchanged.'
+echo "POS published: $release; previous release retained; SQL unchanged."
