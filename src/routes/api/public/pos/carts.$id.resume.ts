@@ -20,12 +20,15 @@ export const Route = createFileRoute("/api/public/pos/carts/$id/resume")({
         const auth = await authenticatePosUser(request, row.location_id);
         if (!auth.ok) return auth.response;
         if (row.status !== "held") return posError("挂单已经处理", 409, "cart_not_held");
-        const { error: updateError } = await supabaseAdmin
+        const { data: resumedCart, error: updateError } = await supabaseAdmin
           .from("pos_held_carts" as never)
           .update({ status: "resumed", resumed_at: new Date().toISOString() } as never)
           .eq("id", params.id)
-          .eq("status", "held");
+          .eq("status", "held")
+          .select("id")
+          .maybeSingle();
         if (updateError) return posError(updateError.message, 500);
+        if (!resumedCart) return posError("挂单已经处理", 409, "cart_not_held");
         return posJson({ ok: true, data: cart });
       },
     },
