@@ -4,6 +4,13 @@ const MAX_BYTES = 12 * 1024 * 1024;
 const TTL_MS = 30 * 60 * 1000;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
 
+export function uploadRelayURL(requestURL: string) {
+  const url = new URL("/api/public/handheld/items/upload-image", requestURL);
+  // Nginx terminates TLS; the upstream Request may still carry http.
+  if (!["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)) url.protocol = "https:";
+  return url.toString();
+}
+
 function signature(payload: string, secret: string) {
   return createHmac("sha256", secret).update(`handheld-upload-v1:${payload}`).digest();
 }

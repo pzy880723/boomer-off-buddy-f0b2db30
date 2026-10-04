@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { HANDHELD_CORS, authenticateDevice, ok, err } from "@/server/handheld-auth.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { UploadImageReq } from "@/lib/handheld/schemas";
-import { createUploadRelayGrant, relayImageUpload } from "@/server/handheld-upload-relay.server";
+import { createUploadRelayGrant, relayImageUpload, uploadRelayURL } from "@/server/handheld-upload-relay.server";
 
 const UPLOAD_CORS = {
   ...HANDHELD_CORS,
@@ -65,7 +65,7 @@ export const Route = createFileRoute("/api/public/handheld/items/upload-image")(
         );
         return ok({
           storage_path: path,
-          upload_url: new URL("/api/public/handheld/items/upload-image", request.url).toString(),
+          upload_url: uploadRelayURL(request.url),
           read_url: null,
           method: "PUT" as const,
           mode: "signed" as const,

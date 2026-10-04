@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFile } from 'node:fs/promises';
-import { createUploadRelayGrant, relayImageUpload } from '../src/server/handheld-upload-relay.server.ts';
+import { createUploadRelayGrant, relayImageUpload, uploadRelayURL } from '../src/server/handheld-upload-relay.server.ts';
 
 const secret = 'test-only-key';
 const storageOrigin = 'https://storage.example.test';
@@ -11,6 +11,11 @@ const request = (token = grant(), body = new Uint8Array([255, 216, 1, 255, 217])
   method: 'PUT', headers: { 'X-Upload-Token': token, 'Content-Type': 'image/jpeg', ...headers }, body,
 });
 const options = (f) => ({ secret, storageOrigin, fetch: f });
+
+test('TLS termination behind Nginx must still issue HTTPS to iPhone', () => {
+  assert.equal(uploadRelayURL('http://erp.boomeroff.com/api/public/handheld/items/upload-image'), 'https://erp.boomeroff.com/api/public/handheld/items/upload-image');
+  assert.equal(uploadRelayURL('http://127.0.0.1:3006/any'), 'http://127.0.0.1:3006/api/public/handheld/items/upload-image');
+});
 
 test('signed upload uses ERP relay and keeps the existing PUT/header contract', async () => {
   const route = await readFile(new URL('../src/routes/api/public/handheld/items.upload-image.ts', import.meta.url), 'utf8');
