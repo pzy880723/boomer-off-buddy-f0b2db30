@@ -729,7 +729,7 @@ export const UploadImageReq = z
     content_type: z.string().min(1).meta({ example: "image/jpeg" }),
     mode: z.enum(["signed", "multipart"]).default("signed").meta({
       description:
-        "signed=返回 signed PUT URL，APP 直传 Storage（推荐）；multipart=同时返回一个 ERP 中转 POST 端点，APP 走 multipart/form-data 上传（兼容受限网络）。",
+        "signed=返回 ERP 安全中转 PUT URL，必须携带返回的 headers；multipart=返回 ERP 中转 POST 端点，APP 走 multipart/form-data 上传。",
     }),
   })
   .meta({ id: "UploadImageReq" });
@@ -738,7 +738,7 @@ export const UploadImageRes = okEnvelope(
   z.object({
     storage_path: z.string(),
     upload_url: z.string().url().meta({
-      description: "30 分钟有效；signed 模式为 Storage PUT URL，multipart 模式为 ERP 中转 POST URL",
+      description: "30 分钟有效；signed 模式为 ERP 安全中转 PUT URL，multipart 模式为 ERP 中转 POST URL",
     }),
     read_url: z.string().url().nullable().meta({
       description:
