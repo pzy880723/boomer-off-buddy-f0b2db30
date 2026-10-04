@@ -242,7 +242,10 @@ export async function loadScopedProductSkus(
     rows.push(
       ...(await readRows<Sku>(() =>
         filter(
-          productQuery(true).eq("kind", "single").eq("is_custom_price", false).eq("status", "active"),
+          productQuery(true)
+            .eq("kind", "single")
+            .eq("is_custom_price", false)
+            .eq("status", "active"),
         ),
       )),
     );
@@ -336,11 +339,25 @@ export function buildProductItems(skus: Sku[], inventory: Inventory): ProductIte
 
 export async function signProductItems(items: ProductItem[]): Promise<ProductItem[]> {
   const paths = collectUniqueProductImagePaths(items);
+  const { parseSkuMediaPath, buildPublicSkuMediaUrl, getPublicOrigin } =
+    await import("@/lib/sku-media");
   const { signSkuImagePaths } = await import("@/lib/sku-image-resolver.server");
-  const urls = await signSkuImagePaths(paths);
+  const legacy = paths.filter((path) => !parseSkuMediaPath(path));
+  const urls = await signSkuImagePaths(legacy);
   const signed = new Map<string, string>();
-  paths.forEach((path, index) => {
+  legacy.forEach((path, index) => {
     if (urls[index]) signed.set(path, urls[index]!);
   });
-  return mergeSignedProductImages(items, signed);
+  const origin = getPublicOrigin();
+  for (const path of paths) {
+    if (parseSkuMediaPath(path))
+      signed.set(path, `${buildPublicSkuMediaUrl(path, origin)}?width=1600`);
+  }
+  return mergeSignedProductImages(items, signed).map((item) => ({
+    ...item,
+    image_url:
+      item.image_paths[0] && parseSkuMediaPath(item.image_paths[0])
+        ? `${buildPublicSkuMediaUrl(item.image_paths[0], origin)}?width=480`
+        : item.image_url,
+  }));
 }

@@ -25,7 +25,7 @@ export const Route = createFileRoute("/api/public/handheld/custom-transfers")({
           return err("调拨参数无效", 400, { code: "validation_error" });
         }
         try {
-          return ok(await executeCustomTransfer(user.user_id, data));
+          return ok(await executeCustomTransfer(user.user_id, data, device.device.location_id));
         } catch (e) {
           if (e instanceof CustomTransferError) return err(e.message, e.status, { code: e.code });
           console.error("[custom-transfer-route]", e);

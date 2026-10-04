@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { loadUserRoles } from "@/server/handheld-auth.server";
+import { receiptPhotoURL } from "@/server/erp-image-delivery.server";
+import { getPublicOrigin } from "@/lib/sku-media";
 import type {
   CustomTransferInput,
   CustomTransfer,
@@ -8,10 +10,18 @@ import type {
 } from "@/lib/custom-transfer-contract";
 
 const db = supabaseAdmin as any;
+function photoURLs(path: string) {
+  const secret = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const origin = getPublicOrigin();
+  return {
+    url: receiptPhotoURL(path, 1600, secret, origin),
+    thumbnail_url: receiptPhotoURL(path, 480, secret, origin),
+  };
+}
 const messages: Record<string, string> = {
   source_sync_busy: "商品正在同步源门店，请稍后重试发起调拨",
   transfer_create_forbidden: "只有管理员和总部人员可以发起调拨",
-  transfer_receive_forbidden: "只能签收授权目标库位的调拨单",
+  transfer_receive_forbidden: "仅调入门店可签收，请切换到调入库位后操作；发出方无需签收",
   transfer_not_found: "调拨单不存在或无权访问",
   same_location: "调出和调入库位不能相同",
   invalid_location: "库位不存在或已停用",
@@ -49,7 +59,7 @@ function check(error: any) {
   console.error("[custom-transfer]", error.code, error.message);
   throw new CustomTransferError("调拨服务暂时不可用，请保留当前页面稍后重试", 503);
 }
-async function context(user: string) {
+async function context(user: string, location?: string | null) {
   const roles = await loadUserRoles(user);
   const hq = roles.some((r) => ["super_admin", "hq_operator"].includes(r));
   const perms = await db.from("user_location_perms").select("location_id").eq("user_id", user);
@@ -61,11 +71,16 @@ async function context(user: string) {
     .eq("is_active", true)
     .order("name");
   check(locations.error);
+  const canReceive = (id: string) =>
+    id === location &&
+    (hq || allowed.has(id)) &&
+    (locations.data ?? []).some((l: any) => l.id === id);
   return {
     hq,
     allowed,
     locations: (locations.data ?? []).filter((l: any) => hq || allowed.has(l.id)),
     canAccess: (id: string) => hq || allowed.has(id),
+    canReceive,
   };
 }
 const selection =
@@ -111,7 +126,7 @@ async function detail(user: string, id: string, ctx: Awaited<ReturnType<typeof c
   check(r.error);
   if (!r.data || (!ctx.canAccess(r.data.from_location_id) && !ctx.canAccess(r.data.to_location_id)))
     throw new CustomTransferError("transfer_not_found", 404);
-  const transfer = mapTransfer(r.data, ctx.canAccess);
+  const transfer = mapTransfer(r.data, ctx.canReceive);
   const photos = await db
     .from("stock_transfer_receipts")
     .select("id,storage_path,used_at,uploaded_by")
@@ -119,17 +134,17 @@ async function detail(user: string, id: string, ctx: Awaited<ReturnType<typeof c
   check(photos.error);
   for (const p of photos.data ?? []) {
     if (!p.used_at && p.uploaded_by !== user) continue;
-    const signed = await db.storage.from("transfer-receipts").createSignedUrl(p.storage_path, 3600);
-    check(signed.error);
-    transfer.photos.push({ id: p.id, url: signed.data.signedUrl, used: !!p.used_at });
+    transfer.photos.push({ id: p.id, ...photoURLs(p.storage_path), used: !!p.used_at });
   }
   return transfer;
 }
 export async function executeCustomTransfer(
   user: string,
   input: CustomTransferInput,
+  deviceLocation?: string | null,
 ): Promise<TransferResult> {
-  const ctx = await context(user);
+  const location = "location_id" in input ? (input.location_id ?? deviceLocation) : deviceLocation;
+  const ctx = await context(user, location);
   if (input.action === "list") {
     if (input.location_id && !ctx.canAccess(input.location_id))
       throw new CustomTransferError("transfer_not_found", 404);
@@ -155,7 +170,7 @@ export async function executeCustomTransfer(
     check(r.error);
     return {
       actor_id: user,
-      items: (r.data ?? []).slice(0, 50).map((x: any) => mapTransfer(x, ctx.canAccess)),
+      items: (r.data ?? []).slice(0, 50).map((x: any) => mapTransfer(x, ctx.canReceive)),
       locations: ctx.locations,
       can_create: ctx.hq,
       has_more: (r.data ?? []).length > 50,
@@ -188,7 +203,7 @@ export async function executeCustomTransfer(
   }
   if (input.action === "detail") return { transfer: await detail(user, input.id, ctx) };
   const transfer = await detail(user, input.id, ctx);
-  if (!ctx.canAccess(transfer.to_location_id))
+  if (!ctx.canReceive(transfer.to_location_id))
     throw new CustomTransferError("transfer_receive_forbidden", 403);
   if (input.action === "upload") {
     if (transfer.status !== "in_transit") throw new CustomTransferError("transfer_not_in_transit");
@@ -210,9 +225,7 @@ export async function executeCustomTransfer(
       await db.storage.from("transfer-receipts").remove([path]);
       check(saved.error);
     }
-    const signed = await db.storage.from("transfer-receipts").createSignedUrl(path, 3600);
-    check(signed.error);
-    return { photo: { id, url: signed.data.signedUrl } };
+    return { photo: { id, ...photoURLs(path) } };
   }
   const r = await db.rpc("custom_transfer_receive", {
     p_user: user,

@@ -11,7 +11,12 @@ const Product = z.object({
   available_qty: z.number().int(),
   image_url: z.string(),
 });
-const Photo = z.object({ id: uuid, url: z.string(), used: z.boolean() });
+const Photo = z.object({
+  id: uuid,
+  url: z.string(),
+  thumbnail_url: z.string().optional(),
+  used: z.boolean(),
+});
 const Transfer = z.object({
   id: uuid,
   code: z.string(),
@@ -61,7 +66,7 @@ export const CustomTransferRequest = z.discriminatedUnion("action", [
     location_id: uuid,
     q: z.string().trim().max(100).default(""),
   }),
-  z.object({ action: z.literal("detail"), id: uuid }),
+  z.object({ action: z.literal("detail"), id: uuid, location_id: uuid.optional() }),
   z.object({
     action: z.literal("create"),
     client_op_id: z.string().min(1).max(100),
@@ -76,9 +81,15 @@ export const CustomTransferRequest = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("upload"),
     id: uuid,
+    location_id: uuid.optional(),
     image_base64: z.string().min(8).max(7_000_000),
   }),
-  z.object({ action: z.literal("receive"), id: uuid, photo_ids: z.array(uuid).min(1).max(6) }),
+  z.object({
+    action: z.literal("receive"),
+    id: uuid,
+    location_id: uuid.optional(),
+    photo_ids: z.array(uuid).min(1).max(6),
+  }),
 ]);
 export type CustomTransferInput = z.infer<typeof CustomTransferRequest>;
 export type TransferProduct = {
@@ -105,7 +116,7 @@ export type CustomTransfer = {
   received_at: string | null;
   can_receive: boolean;
   lines: TransferProduct[];
-  photos: { id: string; url: string; used: boolean }[];
+  photos: { id: string; url: string; thumbnail_url?: string; used: boolean }[];
   source_sync_pending: boolean;
 };
 export type TransferResult = {
@@ -120,5 +131,5 @@ export type TransferResult = {
   id?: string;
   code?: string;
   status?: string;
-  photo?: { id: string; url: string };
+  photo?: { id: string; url: string; thumbnail_url?: string };
 };

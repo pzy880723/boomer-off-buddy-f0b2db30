@@ -123,6 +123,7 @@ import { Route as ApiPublicHandheldParcelsRouteImport } from './routes/api/publi
 import { Route as ApiPublicHandheldProductsRouteImport } from './routes/api/public/handheld/products'
 import { Route as ApiPublicHandheldStocktakesRouteImport } from './routes/api/public/handheld/stocktakes'
 import { Route as ApiPublicHandheldSyncRecordsRouteImport } from './routes/api/public/handheld/sync-records'
+import { Route as ApiPublicHandheldTransferPhotoRouteImport } from './routes/api/public/handheld/transfer-photo'
 import { Route as ApiPublicHandheldTransfersRouteImport } from './routes/api/public/handheld/transfers'
 import { Route as ApiPublicHooksChainProbeVerifyRouteImport } from './routes/api/public/hooks/chain-probe-verify'
 import { Route as ApiPublicHooksChannelSyncWorkerRouteImport } from './routes/api/public/hooks/channel-sync-worker'
@@ -878,6 +879,12 @@ const ApiPublicHandheldSyncRecordsRoute =
   ApiPublicHandheldSyncRecordsRouteImport.update({
     id: '/api/public/handheld/sync-records',
     path: '/api/public/handheld/sync-records',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldTransferPhotoRoute =
+  ApiPublicHandheldTransferPhotoRouteImport.update({
+    id: '/api/public/handheld/transfer-photo',
+    path: '/api/public/handheld/transfer-photo',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicHandheldTransfersRoute =
@@ -1933,6 +1940,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/products': typeof ApiPublicHandheldProductsRouteWithChildren
   '/api/public/handheld/stocktakes': typeof ApiPublicHandheldStocktakesRoute
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
+  '/api/public/handheld/transfer-photo': typeof ApiPublicHandheldTransferPhotoRoute
   '/api/public/handheld/transfers': typeof ApiPublicHandheldTransfersRouteWithChildren
   '/api/public/hooks/chain-probe-verify': typeof ApiPublicHooksChainProbeVerifyRoute
   '/api/public/hooks/channel-sync-worker': typeof ApiPublicHooksChannelSyncWorkerRoute
@@ -2201,6 +2209,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/products': typeof ApiPublicHandheldProductsRouteWithChildren
   '/api/public/handheld/stocktakes': typeof ApiPublicHandheldStocktakesRoute
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
+  '/api/public/handheld/transfer-photo': typeof ApiPublicHandheldTransferPhotoRoute
   '/api/public/handheld/transfers': typeof ApiPublicHandheldTransfersRouteWithChildren
   '/api/public/hooks/chain-probe-verify': typeof ApiPublicHooksChainProbeVerifyRoute
   '/api/public/hooks/channel-sync-worker': typeof ApiPublicHooksChannelSyncWorkerRoute
@@ -2477,6 +2486,7 @@ export interface FileRoutesById {
   '/api/public/handheld/products': typeof ApiPublicHandheldProductsRouteWithChildren
   '/api/public/handheld/stocktakes': typeof ApiPublicHandheldStocktakesRoute
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
+  '/api/public/handheld/transfer-photo': typeof ApiPublicHandheldTransferPhotoRoute
   '/api/public/handheld/transfers': typeof ApiPublicHandheldTransfersRouteWithChildren
   '/api/public/hooks/chain-probe-verify': typeof ApiPublicHooksChainProbeVerifyRoute
   '/api/public/hooks/channel-sync-worker': typeof ApiPublicHooksChannelSyncWorkerRoute
@@ -2754,6 +2764,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/products'
     | '/api/public/handheld/stocktakes'
     | '/api/public/handheld/sync-records'
+    | '/api/public/handheld/transfer-photo'
     | '/api/public/handheld/transfers'
     | '/api/public/hooks/chain-probe-verify'
     | '/api/public/hooks/channel-sync-worker'
@@ -3022,6 +3033,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/products'
     | '/api/public/handheld/stocktakes'
     | '/api/public/handheld/sync-records'
+    | '/api/public/handheld/transfer-photo'
     | '/api/public/handheld/transfers'
     | '/api/public/hooks/chain-probe-verify'
     | '/api/public/hooks/channel-sync-worker'
@@ -3297,6 +3309,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/products'
     | '/api/public/handheld/stocktakes'
     | '/api/public/handheld/sync-records'
+    | '/api/public/handheld/transfer-photo'
     | '/api/public/handheld/transfers'
     | '/api/public/hooks/chain-probe-verify'
     | '/api/public/hooks/channel-sync-worker'
@@ -3524,6 +3537,7 @@ export interface RootRouteChildren {
   ApiPublicHandheldProductsRoute: typeof ApiPublicHandheldProductsRouteWithChildren
   ApiPublicHandheldStocktakesRoute: typeof ApiPublicHandheldStocktakesRoute
   ApiPublicHandheldSyncRecordsRoute: typeof ApiPublicHandheldSyncRecordsRoute
+  ApiPublicHandheldTransferPhotoRoute: typeof ApiPublicHandheldTransferPhotoRoute
   ApiPublicHandheldTransfersRoute: typeof ApiPublicHandheldTransfersRouteWithChildren
   ApiPublicHooksChainProbeVerifyRoute: typeof ApiPublicHooksChainProbeVerifyRoute
   ApiPublicHooksChannelSyncWorkerRoute: typeof ApiPublicHooksChannelSyncWorkerRoute
@@ -4428,6 +4442,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/handheld/sync-records'
       fullPath: '/api/public/handheld/sync-records'
       preLoaderRoute: typeof ApiPublicHandheldSyncRecordsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/transfer-photo': {
+      id: '/api/public/handheld/transfer-photo'
+      path: '/api/public/handheld/transfer-photo'
+      fullPath: '/api/public/handheld/transfer-photo'
+      preLoaderRoute: typeof ApiPublicHandheldTransferPhotoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/handheld/transfers': {
@@ -6305,6 +6326,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHandheldProductsRoute: ApiPublicHandheldProductsRouteWithChildren,
   ApiPublicHandheldStocktakesRoute: ApiPublicHandheldStocktakesRoute,
   ApiPublicHandheldSyncRecordsRoute: ApiPublicHandheldSyncRecordsRoute,
+  ApiPublicHandheldTransferPhotoRoute: ApiPublicHandheldTransferPhotoRoute,
   ApiPublicHandheldTransfersRoute: ApiPublicHandheldTransfersRouteWithChildren,
   ApiPublicHooksChainProbeVerifyRoute: ApiPublicHooksChainProbeVerifyRoute,
   ApiPublicHooksChannelSyncWorkerRoute: ApiPublicHooksChannelSyncWorkerRoute,

@@ -188,9 +188,10 @@ export function CustomTransfersPanelView({
           </DialogHeader>
           {detail && (
             <TransferDetail
-              key={detail}
+              key={`${detail}:${location}`}
               actor={actor}
               id={detail}
+              location={location}
               call={call}
               onReceived={refresh}
             />
@@ -395,17 +396,19 @@ function CreateTransfer({
 function TransferDetail({
   actor,
   id,
+  location,
   call,
   onReceived,
 }: {
   actor: string;
   id: string;
+  location: string;
   call: Call;
   onReceived: () => unknown;
 }) {
   const detail = useQuery({
-    queryKey: ["custom-transfer-detail", actor, id],
-    queryFn: () => call({ action: "detail", id }),
+    queryKey: ["custom-transfer-detail", actor, id, location],
+    queryFn: () => call({ action: "detail", id, location_id: location || undefined }),
     refetchInterval: 15_000,
   });
   const t = detail.data?.transfer;
@@ -433,7 +436,12 @@ function TransferDetail({
     try {
       for (const file of Array.from(files)) {
         const base64 = await receiptImage(file);
-        const r = await call({ action: "upload", id, image_base64: base64 });
+        const r = await call({
+          action: "upload",
+          id,
+          location_id: location || undefined,
+          image_base64: base64,
+        });
         if (!r.photo) throw new Error("照片上传未确认，请刷新查看后重试");
         setPicked((prev) => [...prev, r.photo!.id]);
         await detail.refetch();
@@ -448,7 +456,7 @@ function TransferDetail({
     setBusy(true);
     setError("");
     try {
-      await call({ action: "receive", id, photo_ids: picked });
+      await call({ action: "receive", id, location_id: location || undefined, photo_ids: picked });
       await detail.refetch();
       onReceived();
     } catch (e) {
@@ -492,6 +500,11 @@ function TransferDetail({
           </div>
         ))}
       </div>
+      {t.status === "in_transit" && !t.can_receive && (
+        <p className="text-sm text-muted-foreground">
+          等待 {t.to_name} 签收，发出方无需签收。接收人员请先在列表选择调入库位。
+        </p>
+      )}
       {t.status === "in_transit" && t.source_sync_pending && (
         <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
           源店有赞库存正在清零，确认完成后才能签收。可先上传照片，稍后刷新重试。
@@ -542,7 +555,7 @@ function TransferDetail({
           <div key={p.id} className="space-y-2">
             <button onClick={() => setPreview(p.url)} className="w-full">
               <img
-                src={p.url}
+                src={p.thumbnail_url || p.url}
                 alt="签收凭证"
                 className="aspect-square rounded-lg object-cover w-full"
               />
