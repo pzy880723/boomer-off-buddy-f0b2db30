@@ -442,7 +442,7 @@ function EditShopDialog({
                 />
               </div>
               <p className="col-span-2 -mt-1 text-[11px] text-muted-foreground">
-                坐标须为 GCJ-02（腾讯/高德地图取值），成对填写或成对清空，用于小程序“附近门店”。
+                坐标须为 GCJ-02（腾讯/高德地图取值），成对填写或成对清空，用于小程序“附近门店”。仅总部管理员可修改，其他人只读。
               </p>
               <div>
                 <Label className="mb-1.5 block text-xs">店长</Label>
