@@ -50,6 +50,26 @@ export function buildContextKey(input: {
   return input.locationId ? `general:${input.locationId}` : "general";
 }
 
+export const SUPPORT_QUEUES = ["unclaimed", "mine", "escalated", "closed", "all"] as const;
+export type SupportQueue = (typeof SUPPORT_QUEUES)[number];
+
+/** 稳定分页游标：updated_at + id，避免 updated_at 相同的会话被跳过。 */
+export function encodeSupportCursor(row: { updated_at: string; id: string }): string {
+  return `${row.updated_at}|${row.id}`;
+}
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export function decodeSupportCursor(cursor: string | null | undefined):
+  | { updated_at: string; id: string }
+  | null
+  | "invalid" {
+  if (!cursor) return null;
+  const [ts, id, extra] = cursor.split("|");
+  if (extra !== undefined || !ts || !id || !UUID_RE.test(id) || Number.isNaN(Date.parse(ts))) {
+    return "invalid";
+  }
+  return { updated_at: ts, id };
+}
+
 export const SUPPORT_ERRORS: Record<string, { status: number; message: string }> = {
   not_found: { status: 404, message: "会话不存在或无权查看" },
   forbidden: { status: 403, message: "无权处理该门店的会话" },
@@ -71,6 +91,7 @@ export const SUPPORT_ERRORS: Record<string, { status: number; message: string }>
   order_not_found: { status: 404, message: "订单不存在或不属于当前账号" },
   product_not_found: { status: 404, message: "商品不存在或已下架" },
   location_not_found: { status: 404, message: "门店不存在" },
+  invalid_cursor: { status: 400, message: "分页游标无效，请从第一页重新加载" },
   validation_error: { status: 400, message: "参数不正确" },
 };
 

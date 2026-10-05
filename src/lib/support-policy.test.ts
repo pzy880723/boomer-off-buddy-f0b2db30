@@ -63,3 +63,15 @@ describe("context derivation", () => {
     assert.equal(supportError("nope").status, 500);
   });
 });
+
+import { decodeSupportCursor, encodeSupportCursor } from "./support-policy";
+describe("support cursor", () => {
+  it("round-trips updated_at + id and rejects garbage", () => {
+    const row = { updated_at: "2026-10-05T12:00:00.123456+00:00", id: "c4cc4b1c-26d3-4178-93e8-be490cf7172b" };
+    assert.deepEqual(decodeSupportCursor(encodeSupportCursor(row)), row);
+    assert.equal(decodeSupportCursor(null), null);
+    assert.equal(decodeSupportCursor("2026-10-05"), "invalid");
+    assert.equal(decodeSupportCursor("x|c4cc4b1c-26d3-4178-93e8-be490cf7172b"), "invalid");
+    assert.equal(decodeSupportCursor("2026-10-05T00:00:00Z|id,and(x)"), "invalid");
+  });
+});
