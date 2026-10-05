@@ -218,6 +218,13 @@
       "when": 1791197208335,
       "tag": "0030_youzan_points_observation_version_guard",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1791198209961,
+      "tag": "0031_youzan_observation_identity_guard",
+      "breakpoints": true
     }
   ]
 }
