@@ -176,6 +176,13 @@
       "when": 1791189330207,
       "tag": "0024_youzan_member_asset_inbox",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1791189725117,
+      "tag": "0025_youzan_asset_inbox_fencing",
+      "breakpoints": true
     }
   ]
 }

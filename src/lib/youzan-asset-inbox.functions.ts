@@ -15,7 +15,8 @@ export const getYouzanAssetInboxStatus = createServerFn({ method: "GET" })
       .limit(100);
     if (error) throw new Error("收件箱状态暂不可读");
     const rows = data ?? [];
-    const counts: Record<string, number> = {};
-    for (const r of rows) counts[r.status] = (counts[r.status] ?? 0) + 1;
-    return { counts, rows };
+    // 仅最近 100 条的分布，不是全局统计。
+    const recentCounts: Record<string, number> = {};
+    for (const r of rows) recentCounts[r.status] = (recentCounts[r.status] ?? 0) + 1;
+    return { recentLimit: 100, recentCounts, rows };
   });

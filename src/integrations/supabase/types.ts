@@ -8750,6 +8750,7 @@ export type Database = {
       youzan_member_asset_inbox: {
         Row: {
           attempts: number
+          claim_token: string | null
           conflict_count: number
           event_id: string
           id: string
@@ -8768,6 +8769,7 @@ export type Database = {
         }
         Insert: {
           attempts?: number
+          claim_token?: string | null
           conflict_count?: number
           event_id: string
           id?: string
@@ -8786,6 +8788,7 @@ export type Database = {
         }
         Update: {
           attempts?: number
+          claim_token?: string | null
           conflict_count?: number
           event_id?: string
           id?: string
@@ -10522,6 +10525,7 @@ export type Database = {
         Args: { p_limit: number }
         Returns: {
           attempts: number
+          claim_token: string | null
           conflict_count: number
           event_id: string
           id: string
@@ -10547,12 +10551,13 @@ export type Database = {
       }
       youzan_asset_inbox_finish: {
         Args: {
+          p_claim_token: string
           p_id: string
           p_next_attempt_at: string
           p_reason: string
           p_status: string
         }
-        Returns: undefined
+        Returns: boolean
       }
       youzan_asset_inbox_ingest: {
         Args: {
