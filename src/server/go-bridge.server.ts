@@ -32,6 +32,7 @@ import { assertGoScopeSynced, type GoSyncRow } from "@/lib/go-bridge/sync-state"
 import { buildGoDailySummary, type GoStoreInput } from "@/lib/go-bridge/daily-contract";
 import { completedSyncCoverage, type CompletedScan } from "@/lib/go-bridge/sync-coverage";
 import { shanghaiToday, shanghaiDayWindow } from "@/lib/store-targets/sales-window";
+import { fetchAllPages, mapLimit, sumYouzanPaid } from "@/lib/go-bridge/concurrency";
 
 export { GoScopeError };
 
@@ -342,6 +343,12 @@ async function loadSyncCoverage(shopId: string, startUtc: string, endUtc: string
   return completedSyncCoverage({ rows: (data ?? []) as CompletedScan[], startUtc, endUtc, now });
 }
 
+/** 总部多店汇总时同时处理的门店数上限 */
+export const GO_SUMMARY_STORE_CONCURRENCY = 3;
+
+type OfflineRow = { amount_fen: number; order_count: number };
+type YouzanRow = { id: string; tid: string | null; status: string | null; payment: unknown; total_fee: unknown };
+
 async function loadStoreFacts(params: {
   locationId: string;
   name: string;
@@ -350,13 +357,33 @@ async function loadStoreFacts(params: {
 }): Promise<GoStoreInput> {
   const { startUtc, endUtc } = shanghaiDayWindow(params.date);
   try {
-    const { data: loc, error: locErr } = await sb()
-      .from("inv_locations")
-      .select("id, name, shop_id")
-      .eq("id", params.locationId)
-      .maybeSingle();
-    if (locErr) throw new SourceError("location_read_failed", locErr.message);
-    const shopId: string | null = (loc as { shop_id: string | null } | null)?.shop_id ?? null;
+    // 门店主数据、线下补录、日目标互不依赖 → 并行
+    const [locRes, offRes, targetRes] = await Promise.all([
+      sb().from("inv_locations").select("id, name, shop_id").eq("id", params.locationId).maybeSingle(),
+      fetchAllPages<OfflineRow>((from, to) =>
+        sb()
+          .from("store_offline_sales_entries")
+          .select("id, amount_fen, order_count")
+          .eq("location_id", params.locationId)
+          .eq("business_date", params.date)
+          .eq("status", "active")
+          .order("id", { ascending: true })
+          .range(from, to),
+      ).then(
+        (v) => ({ ok: true as const, v }),
+        (e: unknown) => ({ ok: false as const, e }),
+      ),
+      sb()
+        .from("store_daily_targets")
+        .select("target_amount_fen")
+        .eq("location_id", params.locationId)
+        .eq("target_date", params.date)
+        .maybeSingle(),
+    ]);
+    if (locRes.error) throw new SourceError("location_read_failed", locRes.error.message);
+    if (!offRes.ok) throw new SourceError("offline_read_failed", String((offRes.e as Error)?.message ?? offRes.e));
+    if (targetRes.error) throw new SourceError("target_read_failed", targetRes.error.message);
+    const shopId: string | null = (locRes.data as { shop_id: string | null } | null)?.shop_id ?? null;
 
     let youzanFen: number | null = 0;
     let youzanOrders: number | null = 0;
@@ -366,41 +393,46 @@ async function loadStoreFacts(params: {
     let sourceFresh = false;
 
     if (shopId) {
-      const { data: rows, error: ordErr } = await sb()
-        .from("youzan_orders")
-        .select("status, pay_time, payment, total_fee")
-        .eq("shop_id", shopId)
-        .gte("pay_time", startUtc)
-        .lt("pay_time", endUtc);
-      if (ordErr) throw new SourceError("youzan_read_failed", ordErr.message);
-      const paid = (
-        (rows ?? []) as { status: string; payment: number; total_fee: number }[]
-      ).filter((r) => String(r.status ?? "").toUpperCase() !== "TRADE_CLOSED");
-      youzanFen = paid.reduce(
-        (s, r) => s + Math.round(Number(r.payment ?? r.total_fee ?? 0) * 100),
-        0,
-      );
-      youzanOrders = paid.length;
-
-      const coverage = await loadSyncCoverage(shopId, startUtc, endUtc, params.now);
+      // 订单完整分页（按 id 稳定排序，不受默认 1000 行截断）与同步覆盖并行
+      const [ordersRes, coverageRes] = await Promise.all([
+        fetchAllPages<YouzanRow>((from, to) =>
+          sb()
+            .from("youzan_orders")
+            .select("id, tid, status, payment, total_fee")
+            .eq("shop_id", shopId)
+            .gte("pay_time", startUtc)
+            .lt("pay_time", endUtc)
+            .order("id", { ascending: true })
+            .range(from, to),
+        ).then(
+          (v) => ({ ok: true as const, v }),
+          (e: unknown) => ({ ok: false as const, e }),
+        ),
+        loadSyncCoverage(shopId, startUtc, endUtc, params.now).then(
+          (v) => ({ ok: true as const, v }),
+          (e: unknown) => ({ ok: false as const, e }),
+        ),
+      ]);
+      if (!ordersRes.ok) {
+        throw new SourceError("youzan_read_failed", String((ordersRes.e as Error)?.message ?? ordersRes.e));
+      }
+      if (!coverageRes.ok) throw coverageRes.e;
+      let paid: { fen: number; orders: number };
+      try {
+        paid = sumYouzanPaid(ordersRes.v);
+      } catch (e) {
+        throw new SourceError("youzan_amount_invalid", (e as Error).message);
+      }
+      youzanFen = paid.fen;
+      youzanOrders = paid.orders;
+      const coverage = coverageRes.v;
       syncedThrough = coverage.syncedThrough;
       covered = coverage.wholeDayCovered;
       hasSnapshot = coverage.hasSnapshot;
       sourceFresh = coverage.fresh;
     }
 
-    const { data: offlineRows, error: offErr } = await sb()
-      .from("store_offline_sales_entries")
-      .select("amount_fen, order_count")
-      .eq("location_id", params.locationId)
-      .eq("business_date", params.date)
-      .eq("status", "active");
-    if (offErr) throw new SourceError("offline_read_failed", offErr.message);
-    const offline = ((offlineRows ?? []) as { amount_fen: number; order_count: number }[]).reduce<{
-      amount_fen: number;
-      entry_count: number;
-      order_count: number;
-    }>(
+    const offline = offRes.v.reduce(
       (acc, r) => ({
         amount_fen: acc.amount_fen + Number(r.amount_fen || 0),
         entry_count: acc.entry_count + 1,
@@ -408,22 +440,13 @@ async function loadStoreFacts(params: {
       }),
       { amount_fen: 0, entry_count: 0, order_count: 0 },
     );
-
-    const { data: targetRow, error: tErr } = await sb()
-      .from("store_daily_targets")
-      .select("target_amount_fen")
-      .eq("location_id", params.locationId)
-      .eq("target_date", params.date)
-      .maybeSingle();
-    if (tErr) throw new SourceError("target_read_failed", tErr.message);
+    const targetRow = targetRes.data as { target_amount_fen: number } | null;
 
     return {
       status: "ok",
       location_id: params.locationId,
       name: params.name,
-      target_fen: targetRow
-        ? Number((targetRow as { target_amount_fen: number }).target_amount_fen)
-        : null,
+      target_fen: targetRow ? Number(targetRow.target_amount_fen) : null,
       youzan_fen: youzanFen,
       offline_fen: offline.amount_fen,
       youzan_order_count: youzanOrders,
@@ -433,7 +456,7 @@ async function loadStoreFacts(params: {
       day_covered_by_sync: covered,
       has_current_day_snapshot: hasSnapshot,
       source_fresh: sourceFresh,
-      // 本地暂无有赞退款数据源 → 只能是已付款毛额口径
+      // 有赞订单同步不含退款单，也没有可验证的退款覆盖 → 只能是已付款毛额口径
       has_refund_source: false,
       offline_entry_count: offline.entry_count,
     };
@@ -443,7 +466,8 @@ async function loadStoreFacts(params: {
       location_id: params.locationId,
       name: params.name,
       code: e instanceof SourceError ? e.code : "store_summary_failed",
-      message: e instanceof Error ? e.message.slice(0, 200) : undefined,
+      // 不把数据库原始报错回传客户端
+      message: undefined,
     };
   }
 }
@@ -460,17 +484,14 @@ export async function loadGoDailySummary(params: {
     names.set(params.actor.today_location.id, params.actor.today_location.name);
   }
 
-  const stores: GoStoreInput[] = [];
-  for (const locationId of params.scope.locationIds) {
-    stores.push(
-      await loadStoreFacts({
-        locationId,
-        name: names.get(locationId) ?? "未知门店",
-        date: params.date,
-        now,
-      }),
-    );
-  }
+  const stores = await mapLimit(params.scope.locationIds, GO_SUMMARY_STORE_CONCURRENCY, (locationId) =>
+    loadStoreFacts({
+      locationId,
+      name: names.get(locationId) ?? "未知门店",
+      date: params.date,
+      now,
+    }),
+  );
 
   return buildGoDailySummary({
     date: params.date,
