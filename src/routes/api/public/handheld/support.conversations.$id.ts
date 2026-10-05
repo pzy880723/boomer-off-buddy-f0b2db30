@@ -12,7 +12,7 @@ import {
   postStaffMessage,
   resolveSupportAccess,
 } from "@/server/support.server";
-import { supportError } from "@/server/support-policy";
+import { supportError } from "@/lib/support-policy";
 
 // 对外回复（internal=false）必须先领取并带 assignment_version；缺失返回 409 assignment_version_required，
 // 不再悄悄绕过主接待人锁。内部备注不需要版本。

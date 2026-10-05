@@ -8,7 +8,7 @@ import {
   err,
 } from "@/server/handheld-auth.server";
 import { resolveSupportAccess, updateConversationAssignment } from "@/server/support.server";
-import { supportError } from "@/server/support-policy";
+import { supportError } from "@/lib/support-policy";
 
 const Body = z.object({
   action: z.enum(["claim", "takeover", "close", "reopen"], {

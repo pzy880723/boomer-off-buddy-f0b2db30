@@ -8,7 +8,7 @@ import {
   deriveOrderLocation,
   supportCapabilities,
   type SupportAssignmentAction,
-} from "@/server/support-policy";
+} from "@/lib/support-policy";
 
 const CONVERSATION_COLUMNS =
   "id,title,location_id,customer_id,order_id,status,topic,last_message_at,last_message_preview,created_at,updated_at,context_key,context,channel,primary_agent_id,assignment_version,escalated_at,escalation_reason,waiting_since";

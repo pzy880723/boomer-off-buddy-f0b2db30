@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { SupportError } from "@/server/support-policy";
+import { SupportError } from "@/lib/support-policy";
 
 // 错误统一抛出 "[code] 中文说明"，UI 可按 code 判断（例如 version_conflict → 刷新）。
 

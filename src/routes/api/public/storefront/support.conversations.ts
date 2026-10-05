@@ -7,7 +7,7 @@ import {
   storefrontJson,
 } from "@/server/storefront-auth.server";
 import { ensureCustomerConversation, listCustomerConversations } from "@/server/support.server";
-import { supportError } from "@/server/support-policy";
+import { supportError } from "@/lib/support-policy";
 
 // 门店由服务端从订单行 / 商品派生；location_id 只在无订单、无商品的一般咨询时生效。
 const Body = z
