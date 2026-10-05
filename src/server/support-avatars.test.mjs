@@ -71,7 +71,9 @@ mock.module("@/integrations/supabase/client.server", () => ({
       authCalls.push(id);
       return { data: { user: { app_metadata: id === "hq-one" ? { avatar_url: "https://images.example.com/hq-one.jpg" } : {}, user_metadata: { avatar_url: "https://images.example.com/unverified.jpg", name: "总部" } } }, error: null };
     } } },
-    async rpc() {
+    async rpc(fn, args) {
+      if (fn === "support_conversation_stats") return { data: args.p_conversation_ids.map((id) => ({ conversation_id: id, unread_count: 0, last_customer_message_at: null })), error: null };
+      if (fn === "support_mark_read") return { data: args.p_read_at, error: null };
       rpcCalls++;
       return { data: { ok: true, message: messages[immediateType === "customer" ? 0 : 1], replayed: false }, error: null };
     }
