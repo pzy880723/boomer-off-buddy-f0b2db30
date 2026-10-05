@@ -47,6 +47,7 @@ export type AssetQuery = { kdtId: number; yzOpenId: string; assetKind: AssetKind
 export type AssetQueryResult =
   | { kind: "ok"; kdtId: number; yzOpenId: string; assetKey: string; observed: Record<string, unknown>; observedAt: number }
   | { kind: "not_found" }
+  | { kind: "blocked"; reason: string }
   | { kind: "unavailable" };
 
 export type ObservationDeps = {
@@ -121,6 +122,7 @@ export async function processObservationInbox(
       const q = await deps.queryAsset({ kdtId: row.kdt_id, yzOpenId: who.yzOpenId, assetKind: h.kind, assetKey: h.key });
       if (q.kind === "unavailable") { await retry("asset_query_unavailable"); continue; }
       if (q.kind === "not_found") { await block("asset_not_found_on_query"); continue; }
+      if (q.kind === "blocked") { await block(/^[a-z_]{1,60}$/.test(q.reason) ? q.reason : "asset_query_blocked"); continue; }
       if (q.kdtId !== row.kdt_id || q.yzOpenId !== who.yzOpenId || q.assetKey !== h.key) {
         await block("query_identity_mismatch"); continue;
       }
