@@ -27,3 +27,9 @@
 - 无头：legacy body.sign（按解码 msg），入库即 blocked legacy_signature_readonly_hint，不进资产处理。
 - 路由 `readYouzanPush` 只读一次 request.text()，原文传给 `dispatchAssetPush`。
 - 积分只读查询：`youzan-points-query.server.ts`（points.get 1.0.0 + is_query_points_account_version=true，必须固定出口）。入参待腾讯真实 code=200 核对。L 店不在积分查询扩展点、冻结 4.0.0 不含 L：ERP 独立抵扣保持关闭。
+
+## 0030 积分版本守卫
+- points 观察以 points_account_version（numeric 精确比较，支持 ≤20 位字符串）为准：低版本 → older_observation + inbox superseded_by_newer_observation；同版本不同 point → version_conflict + inbox points_version_conflict（不覆盖）；同版本同值 → same_version_observed（快照不动）；高版本即使查询时间更早也更新，observed_at 取较大值不倒退。
+- point 必须非负整数（≤15 位），版本必须非负整数；否则 22023。
+- fencing（claim_token+lease）与 expected_row_version 保留；coupon 仍按 observed_at。
+- TS 处理器需识别新结果 version_conflict / same_version_observed（由 Codex 在其分支补，RPC 已自行结束 inbox）。
