@@ -10,6 +10,8 @@ import {
   type SupportAssignmentAction,
 } from "@/lib/support-policy";
 
+export type SupportContext = { [key: string]: string | number | boolean | null } | null;
+
 const CONVERSATION_COLUMNS =
   "id,title,location_id,customer_id,order_id,status,topic,last_message_at,last_message_preview,created_at,updated_at,context_key,context,channel,primary_agent_id,assignment_version,escalated_at,escalation_reason,waiting_since";
 
@@ -40,7 +42,7 @@ export type SupportConversationSummary = {
   escalation_reason: string | null;
   waiting_since: string | null;
   context_key: string | null;
-  context: unknown;
+  context: SupportContext;
   can_reply: boolean;
   can_note: boolean;
   can_claim: boolean;
@@ -129,7 +131,7 @@ type ConversationRow = {
   created_at: string;
   updated_at: string;
   context_key: string | null;
-  context: unknown;
+  context: SupportContext;
   channel: string;
   primary_agent_id: string | null;
   assignment_version: number;
