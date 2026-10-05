@@ -8819,6 +8819,54 @@ export type Database = {
         }
         Relationships: []
       }
+      youzan_member_asset_observations: {
+        Row: {
+          asset_key: string
+          asset_kind: string
+          created_at: string
+          customer_id: string
+          id: string
+          kdt_id: number
+          last_inbox_id: string | null
+          observed: Json
+          observed_at: string
+          query_source: string
+          row_version: number
+          updated_at: string
+          yz_open_id: string
+        }
+        Insert: {
+          asset_key?: string
+          asset_kind: string
+          created_at?: string
+          customer_id: string
+          id?: string
+          kdt_id: number
+          last_inbox_id?: string | null
+          observed: Json
+          observed_at: string
+          query_source: string
+          row_version?: number
+          updated_at?: string
+          yz_open_id: string
+        }
+        Update: {
+          asset_key?: string
+          asset_kind?: string
+          created_at?: string
+          customer_id?: string
+          id?: string
+          kdt_id?: number
+          last_inbox_id?: string | null
+          observed?: Json
+          observed_at?: string
+          query_source?: string
+          row_version?: number
+          updated_at?: string
+          yz_open_id?: string
+        }
+        Relationships: []
+      }
       youzan_order_sync_cursors: {
         Row: {
           attempts: number
@@ -10591,6 +10639,31 @@ export type Database = {
         Returns: Json
       }
       youzan_asset_inbox_requeue: { Args: { p_id: string }; Returns: undefined }
+      youzan_asset_observation_record: {
+        Args: {
+          p_asset_key: string
+          p_asset_kind: string
+          p_claim_token: string
+          p_customer_id: string
+          p_expected_row_version: number
+          p_inbox_id: string
+          p_kdt_id: number
+          p_observed: Json
+          p_observed_at: string
+          p_query_source: string
+          p_yz_open_id: string
+        }
+        Returns: Json
+      }
+      youzan_asset_observation_version: {
+        Args: {
+          p_asset_key: string
+          p_asset_kind: string
+          p_kdt_id: number
+          p_yz_open_id: string
+        }
+        Returns: number
+      }
       youzan_claim_order_sync_cursor: {
         Args: { p_lease_seconds?: number; p_worker_id: string }
         Returns: {

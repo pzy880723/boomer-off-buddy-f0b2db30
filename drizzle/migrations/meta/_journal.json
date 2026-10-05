@@ -197,6 +197,13 @@
       "when": 1791190223565,
       "tag": "0027_youzan_asset_inbox_coupon_events",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1791196484759,
+      "tag": "0028_youzan_member_asset_observations",
+      "breakpoints": true
     }
   ]
 }
