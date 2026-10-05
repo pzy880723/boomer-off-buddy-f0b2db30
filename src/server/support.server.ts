@@ -7,7 +7,10 @@ import {
   buildContextKey,
   deriveOrderLocation,
   supportCapabilities,
+  decodeSupportCursor,
+  encodeSupportCursor,
   type SupportAssignmentAction,
+  type SupportQueue,
 } from "@/lib/support-policy";
 
 export type SupportContext = { [key: string]: string | number | boolean | null } | null;
@@ -299,23 +302,39 @@ export function resolveConversationLocationFilter(
 export async function listStaffConversations(input: {
   access: SupportAccess;
   status?: string | null;
+  queue?: SupportQueue | null;
   limit?: number;
   cursor?: string | null;
   location_id?: string | null;
-}): Promise<{ items: SupportConversationSummary[]; next_cursor: string | null }> {
+}): Promise<{ items: SupportConversationSummary[]; next_cursor: string | null; queue: SupportQueue }> {
   const limit = Math.min(Math.max(input.limit ?? 30, 1), 100);
+  const queue: SupportQueue = input.queue ?? "all";
+  const cursor = decodeSupportCursor(input.cursor);
+  if (cursor === "invalid") throw new Error("invalid_cursor");
   if (!input.access.is_hq_agent && input.access.location_ids.length === 0) {
-    return { items: [], next_cursor: null };
+    return { items: [], next_cursor: null, queue };
   }
+  // 所有筛选（门店范围 + 队列 + 游标）都在 limit 之前由数据库执行
   let query = supabaseAdmin
     .from("support_conversations" as never)
     .select(CONVERSATION_COLUMNS)
     .order("updated_at", { ascending: false })
+    .order("id", { ascending: false })
     .limit(limit + 1);
   if (!input.access.is_hq_agent) query = query.in("location_id", input.access.location_ids);
   if (input.location_id) query = query.eq("location_id", input.location_id);
   if (input.status) query = query.eq("status", input.status);
-  if (input.cursor) query = query.lt("updated_at", input.cursor);
+  if (queue === "unclaimed") query = query.in("status", ["open", "pending"]).is("primary_agent_id", null);
+  else if (queue === "mine")
+    query = query.in("status", ["open", "pending"]).eq("primary_agent_id", input.access.user_id);
+  else if (queue === "escalated")
+    query = query.in("status", ["open", "pending"]).not("escalated_at", "is", null);
+  else if (queue === "closed") query = query.eq("status", "closed");
+  if (cursor) {
+    query = query.or(
+      `updated_at.lt."${cursor.updated_at}",and(updated_at.eq."${cursor.updated_at}",id.lt.${cursor.id})`,
+    );
+  }
   const { data, error } = await query;
   if (error) throw new Error(error.message);
   const rows = (data as unknown as ConversationRow[]) ?? [];
@@ -323,7 +342,8 @@ export async function listStaffConversations(input: {
   const page = hasMore ? rows.slice(0, limit) : rows;
   return {
     items: await hydrate(page, input.access),
-    next_cursor: hasMore ? (page[page.length - 1]?.updated_at ?? null) : null,
+    next_cursor: hasMore && page.length ? encodeSupportCursor(page[page.length - 1]!) : null,
+    queue,
   };
 }
 
@@ -339,17 +359,21 @@ export async function loadConversationRow(id: string): Promise<ConversationRow |
 async function loadMessages(
   conversationId: string,
   includeInternal: boolean,
-): Promise<SupportMessage[]> {
+): Promise<{ messages: SupportMessage[]; has_more: boolean }> {
   let query = supabaseAdmin
     .from("support_messages" as never)
     .select("id, sender_name, sender_type, body, internal, delivery_status, created_at")
     .eq("conversation_id", conversationId)
-    .order("created_at", { ascending: true })
-    .limit(500);
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(MESSAGE_WINDOW + 1);
   if (!includeInternal) query = query.eq("internal", false).eq("delivery_status", "sent");
   const { data, error } = await query;
   if (error) throw new Error(error.message);
-  return ((data as unknown as SupportMessage[]) ?? []).map((row) => ({
+  const rows = (data as unknown as SupportMessage[]) ?? [];
+  const has_more = rows.length > MESSAGE_WINDOW;
+  // 取最近 500 条，再按时间正序返回；has_more=true 表示更早消息未返回（非完整历史）
+  const messages = rows.slice(0, MESSAGE_WINDOW).reverse().map((row) => ({
     id: row.id,
     sender_name: row.sender_name,
     sender_type: row.sender_type,
@@ -358,7 +382,10 @@ async function loadMessages(
     delivery_status: row.delivery_status ?? "sent",
     created_at: row.created_at,
   }));
+  return { messages, has_more };
 }
+
+const MESSAGE_WINDOW = 500;
 
 /** 员工打开会话：自动成为参与人（共享接待，不独占），并刷新已读水位。 */
 export async function joinConversation(access: SupportAccess, conversationId: string) {
@@ -386,7 +413,7 @@ export async function getStaffConversation(access: SupportAccess, conversationId
     ok: true as const,
     data: {
       conversation: { ...summary, order_id: conversation.order_id, topic: conversation.topic },
-      messages: await loadMessages(conversationId, true),
+      ...(await loadMessages(conversationId, true)),
       can_reply: summary.can_reply,
       can_note: summary.can_note,
     },
@@ -634,7 +661,7 @@ export async function getCustomerConversation(customerId: string, conversationId
         updated_at: conversation.updated_at,
       },
       // 客户永远看不到内部备注
-      messages: await loadMessages(conversationId, false),
+      ...(await loadMessages(conversationId, false)),
       can_reply: conversation.status !== "closed",
     },
   };

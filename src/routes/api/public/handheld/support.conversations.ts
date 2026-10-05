@@ -11,6 +11,7 @@ import {
   resolveSupportAccess,
   resolveConversationLocationFilter,
 } from "@/server/support.server";
+import { SUPPORT_QUEUES, supportError, type SupportQueue } from "@/lib/support-policy";
 
 export const Route = createFileRoute("/api/public/handheld/support/conversations")({
   server: {
@@ -22,6 +23,10 @@ export const Route = createFileRoute("/api/public/handheld/support/conversations
         const session = await resolveSessionUser(request);
         if (!session) return err("Employee session required", 401, { code: "session_required" });
         const url = new URL(request.url);
+        const rawQueue = url.searchParams.get("queue");
+        if (rawQueue && !(SUPPORT_QUEUES as readonly string[]).includes(rawQueue)) {
+          return err("队列只能是 unclaimed/mine/escalated/closed/all", 400, { code: "validation_error" });
+        }
         const access = await resolveSupportAccess(session.user_id);
         const filter = resolveConversationLocationFilter(
           access,
@@ -34,6 +39,7 @@ export const Route = createFileRoute("/api/public/handheld/support/conversations
           const page = await listStaffConversations({
             access,
             status: url.searchParams.get("status"),
+            queue: (rawQueue as SupportQueue | null) ?? "all",
             limit: Number(url.searchParams.get("limit") ?? 30),
             cursor: url.searchParams.get("cursor"),
             location_id: filter.location_id,
@@ -41,6 +47,7 @@ export const Route = createFileRoute("/api/public/handheld/support/conversations
           return ok({
             items: page.items,
             next_cursor: page.next_cursor,
+            queue: page.queue,
             location_id: filter.location_id,
             scope: access.is_hq_agent
               ? filter.location_id
@@ -49,6 +56,10 @@ export const Route = createFileRoute("/api/public/handheld/support/conversations
               : "assigned_locations",
           });
         } catch (error) {
+          if (error instanceof Error && error.message === "invalid_cursor") {
+            const e = supportError("invalid_cursor");
+            return err(e.message, e.status, { code: "invalid_cursor" });
+          }
           return err(error instanceof Error ? error.message : String(error), 500);
         }
       },

@@ -1,19 +1,42 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { SupportError } from "@/lib/support-policy";
+import { SUPPORT_QUEUES, SupportError } from "@/lib/support-policy";
 
 // 错误统一抛出 "[code] 中文说明"，UI 可按 code 判断（例如 version_conflict → 刷新）。
 
 export const listSupportConversationsFn = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        queue: z.enum(SUPPORT_QUEUES, { message: "队列只能是 unclaimed/mine/escalated/closed/all" }).optional(),
+        cursor: z.string().max(200).optional(),
+        limit: z.number().int().min(1).max(100).optional(),
+      })
+      .optional()
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
     const { resolveSupportAccess, listStaffConversations } =
       await import("@/server/support.server");
     const access = await resolveSupportAccess(context.userId);
-    const page = await listStaffConversations({ access, limit: 50 });
+    let page;
+    try {
+      page = await listStaffConversations({
+        access,
+        queue: data?.queue ?? "all",
+        cursor: data?.cursor ?? null,
+        limit: data?.limit ?? 50,
+      });
+    } catch (e) {
+      if (e instanceof Error && e.message === "invalid_cursor") throw new SupportError("invalid_cursor");
+      throw e;
+    }
     return {
       items: page.items,
+      next_cursor: page.next_cursor,
+      queue: page.queue,
       scope: access.is_hq_agent ? "hq_all_conversations" : "assigned_locations",
       agent: { id: access.user_id, name: access.display_name, role: access.participant_role },
     };
