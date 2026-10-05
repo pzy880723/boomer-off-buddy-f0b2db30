@@ -12,6 +12,7 @@ import {
 const queries = [];
 let authCalls = [];
 let rpcCalls = 0;
+const rpcLog = [];
 let locationId = "11111111-1111-4111-8111-111111111111";
 const OTHER_LOC = "22222222-2222-4222-8222-222222222222";
 const SAME_TS = "2026-10-05T12:00:00.000000+00:00";
@@ -77,7 +78,13 @@ mock.module("@/integrations/supabase/client.server", () => ({
       return chain;
     },
     auth: { admin: { async getUserById(id) { authCalls.push(id); return { data: { user: { app_metadata: {}, user_metadata: { name: id } } }, error: null }; } } },
-    async rpc() { rpcCalls++; return { data: { ok: true, message: messages[1] }, error: null }; },
+    async rpc(fn, args) {
+      rpcLog.push([fn, args]);
+      if (fn === "support_conversation_stats") return { data: args.p_conversation_ids.map((id) => ({ conversation_id: id, unread_count: "7", last_customer_message_at: SAME_TS })), error: null };
+      if (fn === "support_mark_read") return { data: args.p_read_at, error: null };
+      rpcCalls++;
+      return { data: { ok: true, message: messages[1] }, error: null };
+    },
   },
 }));
 mock.module("@/server/handheld-auth.server", () => ({ loadUserRoles: async () => [] }));
@@ -88,7 +95,7 @@ const staff = { user_id: "me", display_name: "我", is_hq_agent: false, location
 const hq = { user_id: "hq-one", display_name: "总部", is_hq_agent: true, location_ids: [], participant_role: "hq_agent" };
 const win = (p) => { const r = parseMessageWindow(p); if (!r.ok) throw new Error(r.code); return r.window; };
 
-beforeEach(() => { queries.length = 0; authCalls = []; rpcCalls = 0; locationId = "11111111-1111-4111-8111-111111111111"; });
+beforeEach(() => { rpcLog.length = 0; queries.length = 0; authCalls = []; rpcCalls = 0; locationId = "11111111-1111-4111-8111-111111111111"; });
 
 test("参数解析：before/after 互斥、limit 越界、非法游标、旧客户端默认 500", () => {
   expect(parseMessageWindow({ before: `${SAME_TS}|${messages[0].id}`, after: `${SAME_TS}|${messages[0].id}` })).toEqual({ ok: false, code: "cursor_conflict" });
@@ -206,4 +213,30 @@ test("纯函数：shapeMessageWindow 输出正序且游标正确", () => {
   expect(s.rows.map((r) => r.id)).toEqual([messages[4].id, messages[5].id]);
   expect(s.has_more).toBe(true);
   expect(s.older_cursor).toBe(encodeMessageCursor(messages[4]));
+});
+
+test("摘要：单次聚合 RPC，不再逐会话查询消息表；已读写入与摘要使用同一 read_at", async () => {
+  const r = await getStaffConversation(staff, "conv-a", { window: win({ limit: 50 }) });
+  const stats = rpcLog.filter(([f]) => f === "support_conversation_stats");
+  const marks = rpcLog.filter(([f]) => f === "support_mark_read");
+  expect(stats.length).toBe(1);
+  expect(marks.length).toBe(1);
+  expect(stats[0][1].p_user_id).toBe("me");
+  expect(stats[0][1].p_read_at).toBe(marks[0][1].p_read_at);
+  expect(r.data.conversation.unread_count).toBe(7);
+  expect(r.data.conversation.last_customer_message_at).toBe(SAME_TS);
+  // 消息表只被消息窗口查询 1 次（无 per-conversation count / last 查询）
+  expect(queries.filter((q) => q.table === "support_messages").length).toBe(1);
+  expect(queries.some((q) => q.table === "support_participants" && q.upsert)).toBe(false);
+});
+
+test("阶段耗时：auth → summary/messages 均被标记，且授权失败时不进入后续阶段", async () => {
+  const marks = [];
+  await getStaffConversation(staff, "conv-a", { window: win({ limit: 10 }), timing: { mark: (n) => marks.push(n) } });
+  expect(marks[0]).toBe("auth");
+  expect(marks).toEqual(expect.arrayContaining(["summary", "messages"]));
+  const denied = [];
+  await getStaffConversation(hq, "conv-a", { locationId: OTHER_LOC, timing: { mark: (n) => denied.push(n) } });
+  expect(denied).toEqual(["auth"]);
+  expect(rpcLog.filter(([f]) => f === "support_mark_read").length).toBe(1);
 });

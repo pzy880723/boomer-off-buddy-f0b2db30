@@ -36,27 +36,63 @@ export const Route = createFileRoute("/api/public/handheld/support/conversations
     handlers: {
       OPTIONS: async () => new Response(null, { status: 204, headers: HANDHELD_CORS }),
       GET: async ({ request, params }) => {
-        const auth = await authenticateDevice(request);
-        if (!auth.ok) return auth.response;
-        const session = await resolveSessionUser(request);
-        if (!session) return err("Employee session required", 401, { code: "session_required" });
-        const url = new URL(request.url);
-        const locationId = url.searchParams.get("location_id")?.trim() || null;
-        if (!LocationId.safeParse(locationId).success) return fail("validation_error");
-        const win = parseMessageWindow({
-          limit: url.searchParams.get("limit"),
-          before: url.searchParams.get("before"),
-          after: url.searchParams.get("after"),
-        });
-        if (!win.ok) return fail(win.code);
-        const access = await resolveSupportAccess(session.user_id);
-        try {
-          const result = await getStaffConversation(access, params.id, { locationId, window: win.window });
-          if (!result.ok) return fail(result.code);
-          return ok(result.data);
-        } catch {
-          return fail("internal_error");
-        }
+        // 阶段耗时（距请求开始的毫秒数，非敏感）：auth/summary/messages/total；不记录正文、手机号、token、会话 id
+        const t0 = performance.now();
+        const requestId = crypto.randomUUID();
+        const phases: Record<string, number> = {};
+        const timing = {
+          mark: (name: string) => {
+            phases[name] = Math.round(performance.now() - t0);
+          },
+        };
+        const finish = (res: Response) => {
+          phases.total = Math.round(performance.now() - t0);
+          const header = Object.entries(phases)
+            .map(([k, v]) => `${k};dur=${v}`)
+            .join(", ");
+          const out = new Response(res.body, res);
+          out.headers.set("Server-Timing", header);
+          out.headers.set("X-Request-Id", requestId);
+          console.log(
+            JSON.stringify({
+              evt: "support_detail",
+              request_id: requestId,
+              status: out.status,
+              phases,
+            }),
+          );
+          return out;
+        };
+        return finish(
+          await (async () => {
+            const auth = await authenticateDevice(request);
+            if (!auth.ok) return auth.response;
+            const session = await resolveSessionUser(request);
+            if (!session)
+              return err("Employee session required", 401, { code: "session_required" });
+            const url = new URL(request.url);
+            const locationId = url.searchParams.get("location_id")?.trim() || null;
+            if (!LocationId.safeParse(locationId).success) return fail("validation_error");
+            const win = parseMessageWindow({
+              limit: url.searchParams.get("limit"),
+              before: url.searchParams.get("before"),
+              after: url.searchParams.get("after"),
+            });
+            if (!win.ok) return fail(win.code);
+            const access = await resolveSupportAccess(session.user_id);
+            try {
+              const result = await getStaffConversation(access, params.id, {
+                locationId,
+                window: win.window,
+                timing,
+              });
+              if (!result.ok) return fail(result.code);
+              return ok(result.data);
+            } catch {
+              return fail("internal_error");
+            }
+          })(),
+        );
       },
       POST: async ({ request, params }) => {
         const auth = await authenticateDevice(request);
@@ -78,7 +114,8 @@ export const Route = createFileRoute("/api/public/handheld/support/conversations
             internal: parsed.data.internal,
             clientOpId: parsed.data.client_op_id,
             assignmentVersion: parsed.data.assignment_version ?? null,
-            locationId: parsed.data.location_id ?? new URL(request.url).searchParams.get("location_id"),
+            locationId:
+              parsed.data.location_id ?? new URL(request.url).searchParams.get("location_id"),
           });
           if (!result.ok) return fail(result.code, result.detail);
           return ok(result.data);

@@ -195,13 +195,14 @@ export function staffCanAccessConversation(
 async function hydrate(
   rows: ConversationRow[],
   access: SupportAccess,
+  readAt: string | null = null,
 ): Promise<SupportConversationSummary[]> {
   if (rows.length === 0) return [];
   const ids = rows.map((row) => row.id);
   const locationIds = [...new Set(rows.map((row) => row.location_id).filter(Boolean))] as string[];
   const customerIds = [...new Set(rows.map((row) => row.customer_id).filter(Boolean))] as string[];
 
-  const [{ data: participants }, { data: locations }, { data: customers }, { data: myRows }] =
+  const [{ data: participants }, { data: locations }, { data: customers }, statsRes] =
     await Promise.all([
       supabaseAdmin
         .from("support_participants" as never)
@@ -216,12 +217,18 @@ async function hydrate(
             .select("id,nickname,phone,avatar_url")
             .in("id", customerIds)
         : Promise.resolve({ data: [] as { id: string; nickname: string | null }[] }),
-      supabaseAdmin
-        .from("support_participants" as never)
-        .select("conversation_id, last_read_at")
-        .eq("user_id", access.user_id)
-        .in("conversation_id", ids),
+      // 单次数据库聚合：未读（顾客消息晚于本人 last_read_at）+ 最近顾客消息时间，精确计数无行数截断
+      supabaseAdmin.rpc("support_conversation_stats" as never, {
+        p_user_id: access.user_id,
+        p_conversation_ids: ids,
+        p_read_at: readAt,
+      } as never),
     ]);
+  if (statsRes.error) throw new Error(`support_stats_failed: ${statsRes.error.message}`);
+  const stats = new Map(
+    ((statsRes.data as { conversation_id: string; unread_count: number | string; last_customer_message_at: string | null }[] | null) ?? [])
+      .map((r) => [r.conversation_id, r]),
+  );
 
   const locationNames = new Map(
     ((locations as { id: string; name: string }[] | null) ?? []).map((r) => [r.id, r.name]),
@@ -237,11 +244,6 @@ async function hydrate(
   const customerAvatars = new Map(
     ((customers as { id: string; avatar_url?: string | null }[] | null) ?? [])
       .map((r) => [r.id, safePublicAvatarUrl(r.avatar_url)]),
-  );
-  const lastReads = new Map(
-    ((myRows as { conversation_id: string; last_read_at: string | null }[] | null) ?? []).map(
-      (r) => [r.conversation_id, r.last_read_at],
-    ),
   );
   const participantRows =
     (participants as
@@ -264,37 +266,6 @@ async function hydrate(
     }),
   );
 
-  // 未读 = 客户发来的、晚于我 last_read_at 的消息数
-  const unreadCounts = new Map<string, number>();
-  const lastCustomerAt = new Map<string, string | null>();
-  await Promise.all(
-    ids.map(async (conversationId) => {
-      const lastRead = lastReads.get(conversationId) ?? null;
-      let query = supabaseAdmin
-        .from("support_messages" as never)
-        .select("id", { count: "exact", head: true })
-        .eq("conversation_id", conversationId)
-        .eq("sender_type", "customer");
-      if (lastRead) query = query.gt("created_at", lastRead);
-      const [{ count }, { data: lastCustomer }] = await Promise.all([
-        query,
-        supabaseAdmin
-          .from("support_messages" as never)
-          .select("created_at")
-          .eq("conversation_id", conversationId)
-          .eq("sender_type", "customer")
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-      ]);
-      unreadCounts.set(conversationId, count ?? 0);
-      lastCustomerAt.set(
-        conversationId,
-        (lastCustomer as { created_at: string } | null)?.created_at ?? null,
-      );
-    }),
-  );
-
   return rows.map((row) => ({
     id: row.id,
     title: row.title,
@@ -304,8 +275,8 @@ async function hydrate(
     customer_avatar_url: row.customer_id ? (customerAvatars.get(row.customer_id) ?? null) : null,
     last_message: row.last_message_preview,
     updated_at: row.updated_at,
-    last_customer_message_at: lastCustomerAt.get(row.id) ?? null,
-    unread_count: unreadCounts.get(row.id) ?? 0,
+    last_customer_message_at: stats.get(row.id)?.last_customer_message_at ?? null,
+    unread_count: Number(stats.get(row.id)?.unread_count ?? 0),
     status: row.status,
     participants: participantRows
       .filter((p) => p.conversation_id === row.id)
@@ -533,17 +504,20 @@ async function loadMessages(
 const MESSAGE_WINDOW = 500;
 
 /** 员工打开会话：自动成为参与人（共享接待，不独占），并刷新已读水位。 */
-export async function joinConversation(access: SupportAccess, conversationId: string) {
-  await supabaseAdmin.from("support_participants" as never).upsert(
-    {
-      conversation_id: conversationId,
-      user_id: access.user_id,
-      participant_role: access.participant_role,
-      display_name: access.display_name,
-      last_read_at: new Date().toISOString(),
-    } as never,
-    { onConflict: "conversation_id,user_id" },
-  );
+export async function joinConversation(
+  access: SupportAccess,
+  conversationId: string,
+  readAt: string = new Date().toISOString(),
+) {
+  // 只单调前移本人 last_read_at；已存在参与人时不改 participant_role / display_name
+  const { error } = await supabaseAdmin.rpc("support_mark_read" as never, {
+    p_conversation_id: conversationId,
+    p_user_id: access.user_id,
+    p_participant_role: access.participant_role,
+    p_display_name: access.display_name,
+    p_read_at: readAt,
+  } as never);
+  if (error) throw new Error(`support_mark_read_failed: ${error.message}`);
 }
 
 /** 授权：会话存在 → 员工有权 → 可选 location_id 必须等于会话门店（HQ 也不例外）。 */
@@ -563,16 +537,29 @@ async function authorizeStaffConversation(
 export async function getStaffConversation(
   access: SupportAccess,
   conversationId: string,
-  opts: { locationId?: string | null; window?: MessageWindow } = {},
+  opts: {
+    locationId?: string | null;
+    window?: MessageWindow;
+    timing?: { mark: (name: string) => void };
+  } = {},
 ) {
   const auth = await authorizeStaffConversation(access, conversationId, opts.locationId);
+  opts.timing?.mark("auth");
   if (!auth.ok) return { ok: false as const, code: auth.code };
   const conversation = auth.conversation;
-  // 授权之后：已读写入、会话摘要、消息窗口互不依赖 → 并行，已读不再拖慢正文返回
+  // 授权之后：已读写入、会话摘要、消息窗口互不依赖 → 并行。
+  // 同一个 readAt 同时用于写入水位和摘要未读计算，避免并行时返回旧未读。
+  const readAt = new Date().toISOString();
   const [, [summary], window] = await Promise.all([
-    joinConversation(access, conversationId),
-    hydrate([conversation], access),
-    loadMessages(conversation, true, opts.window, access.user_id),
+    joinConversation(access, conversationId, readAt),
+    hydrate([conversation], access, readAt).then((r) => {
+      opts.timing?.mark("summary");
+      return r;
+    }),
+    loadMessages(conversation, true, opts.window, access.user_id).then((r) => {
+      opts.timing?.mark("messages");
+      return r;
+    }),
   ]);
   return {
     ok: true as const,
