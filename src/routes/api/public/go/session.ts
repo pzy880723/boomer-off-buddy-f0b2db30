@@ -5,8 +5,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   GO_CORS,
   authenticateGoActor,
-  goError,
   goJson,
+  goTraced,
   goSessionPayload,
 } from "@/server/go-bridge.server";
 
@@ -15,12 +15,10 @@ export const Route = createFileRoute("/api/public/go/session")({
     handlers: {
       OPTIONS: () => new Response(null, { status: 204, headers: GO_CORS }),
       GET: async ({ request }) => {
-        try {
-          const actor = await authenticateGoActor(request);
+        return goTraced("session", async (timing) => {
+          const actor = await authenticateGoActor(request, new Date(), timing);
           return goJson({ ok: true, data: goSessionPayload(actor) });
-        } catch (e) {
-          return goError(e);
-        }
+        });
       },
     },
   },

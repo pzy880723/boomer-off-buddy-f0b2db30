@@ -5,8 +5,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   GO_CORS,
   authenticateGoActor,
-  goError,
   goJson,
+  goTraced,
   loadGoDailySummary,
   scopeForActor,
 } from "@/server/go-bridge.server";
@@ -17,7 +17,7 @@ export const Route = createFileRoute("/api/public/go/daily-summary")({
     handlers: {
       OPTIONS: () => new Response(null, { status: 204, headers: GO_CORS }),
       GET: async ({ request }) => {
-        try {
+        return goTraced("daily_summary", async (timing) => {
           const url = new URL(request.url);
           const date = url.searchParams.get("date") ?? shanghaiToday();
           if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -26,13 +26,12 @@ export const Route = createFileRoute("/api/public/go/daily-summary")({
               400,
             );
           }
-          const actor = await authenticateGoActor(request);
+          const actor = await authenticateGoActor(request, new Date(), timing);
           const scope = scopeForActor(actor, url.searchParams.get("location_id"));
           const data = await loadGoDailySummary({ actor, scope, date });
+          timing.mark("summary");
           return goJson({ ok: true, data });
-        } catch (e) {
-          return goError(e);
-        }
+        });
       },
     },
   },
