@@ -7,6 +7,7 @@ import {
   storefrontJson,
 } from "@/server/storefront-auth.server";
 import { getCustomerConversation, postCustomerMessage } from "@/server/support.server";
+import { supportError } from "@/lib/support-policy";
 
 const Body = z.object({
   body: z.string().trim().min(1).max(4000),
@@ -40,7 +41,10 @@ export const Route = createFileRoute("/api/public/storefront/support/conversatio
           body: body.body,
           clientOpId: body.client_op_id,
         });
-        if (!result.ok) return storefrontError("Conversation not found", 404, result.code);
+        if (!result.ok) {
+          const e = supportError(result.code);
+          return storefrontError(e.message, e.status, result.code);
+        }
         return storefrontJson({ ok: true, data: result.data });
       },
     },
