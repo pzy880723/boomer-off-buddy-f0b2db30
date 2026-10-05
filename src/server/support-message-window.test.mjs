@@ -25,7 +25,7 @@ const messages = Array.from({ length: 120 }, (_, i) => ({
   body: `m${i}`,
   internal: i % 7 === 0 && i % 3 !== 0,
   delivery_status: "sent",
-  created_at: i < 60 ? SAME_TS : `2026-10-05T12:${String(i).padStart(2, "0")}:00.000000+00:00`,
+  created_at: i < 60 ? SAME_TS : `2026-10-05T13:${String(i - 60).padStart(2, "0")}:00.000000+00:00`,
 }));
 const key = (m) => `${m.created_at}|${m.id}`;
 const cmp = (a, b) => (a.created_at === b.created_at ? (a.id < b.id ? -1 : a.id > b.id ? 1 : 0) : a.created_at < b.created_at ? -1 : 1);
