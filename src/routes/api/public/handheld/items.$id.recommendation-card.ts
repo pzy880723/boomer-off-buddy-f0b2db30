@@ -61,6 +61,18 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/recommendat
                 return new Map((data ?? []).map((r) => [r.id, r.name]));
               },
               signImage: async (path) => (await signSkuImagePaths([path]))[0] ?? null,
+              // 只读本门店已发布正文；不读 inv_skus.notes 等内部字段
+              publishedDescription: async (skuId, loc) => {
+                const { data, error } = await supabaseAdmin
+                  .from("commerce_listings")
+                  .select("description")
+                  .eq("sku_id", skuId)
+                  .eq("location_id", loc)
+                  .eq("status", "published")
+                  .maybeSingle();
+                if (error) throw error;
+                return data?.description ?? null;
+              },
               generate: generateCardCopy,
             },
             { userId: session.user_id, locationId, skuId: params.id },

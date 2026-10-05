@@ -1,12 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildRecommendationCard, type CardDeps, type SkuRow } from "./recommendation-card.server";
+import { buildRecommendationCard, CardAiError, cleanDescription, type CardDeps, type SkuRow } from "./recommendation-card.server";
 
 const sku: SkuRow = {
   id: "s1", name: "昭和玻璃杯", category: "杯子", grade: "B", status: "active",
   sku_scope: "custom", brand_id: null, ip_id: null, keywords: ["玻璃"], image_paths: ["sku-listing/a.jpg"],
 };
-const goodAi = { headline: "桌上的小光泽", keywords: ["玻璃", "杯子"], intro: "日常喝水也能多一点心情。", highlights: ["通透杯身"] };
+const goodAi = { card_title: "昭和玻璃水杯", headline: "桌上的小光泽", keywords: ["玻璃", "杯子"], intro: "日常喝水也能多一点心情。", highlights: ["通透杯身"] };
 
 function deps(p: Partial<CardDeps> = {}): CardDeps {
   return {
@@ -119,4 +119,55 @@ test("长商品名 fallback：product_name ≤24、关键词 ≤6", async () => 
   assert.equal(r.card.source, "product");
   assert.ok(r.card.product_name.length <= 24);
   for (const k of r.card.keywords) assert.ok(k.length <= 6, `keyword ${k} too long`);
+});
+
+// —— 标题重写 / 已发布正文 / 英文词 / 错误归因 ——
+
+test("product_name 用 AI 重写的 card_title，而非截断原名", async () => {
+  const long = { ...sku, name: "昭和中古手工吹制玻璃杯大号带原装木盒三十字以上超长名称" };
+  const r = await buildRecommendationCard(deps({ loadSku: async () => long }), input);
+  assert.ok(r.ok);
+  assert.equal(r.card.source, "ai");
+  assert.equal(r.card.product_name, "昭和玻璃水杯");
+  assert.notEqual(r.card.product_name, long.name.slice(0, 24));
+  const miss = await buildRecommendationCard(deps({ generate: async () => { const { card_title, ...rest } = goodAi; return rest; } }), input);
+  assert.ok(miss.ok); assert.equal(miss.card.fallback_reason, "ai_invalid_output");
+  const longHead = await buildRecommendationCard(deps({ generate: async () => ({ ...goodAi, headline: "一".repeat(15) }) }), input);
+  assert.ok(longHead.ok); assert.equal(longHead.card.fallback_reason, "ai_invalid_output");
+});
+
+test("AI 素材取自已发布正文（清洗 HTML），不含 notes", async () => {
+  let seen: any;
+  const r = await buildRecommendationCard(deps({
+    loadSku: async () => ({ ...sku, notes: "内部成本 30 元 采购备注" } as any),
+    publishedDescription: async (id, loc) => { assert.equal(id, "s1"); assert.equal(loc, "L"); return "<p>通透厚底&nbsp;玻璃</p>"; },
+    generate: async (f) => { seen = f; return goodAi; },
+  }), input);
+  assert.ok(r.ok);
+  assert.equal(seen.published_description, "通透厚底 玻璃");
+  assert.equal(JSON.stringify(seen).includes("内部成本"), false);
+  assert.equal("notes" in seen, false);
+  let none: any;
+  await buildRecommendationCard(deps({ publishedDescription: async () => null, generate: async (f) => { none = f; return goodAi; } }), input);
+  assert.equal(none.published_description, null);
+  assert.equal(cleanDescription("   "), null);
+});
+
+test("英文词：名称已有 APOLLO 放行，杜撰英文品牌拒绝", async () => {
+  const apollo = { ...sku, name: "APOLLO 玻璃杯", brand_id: null };
+  const ok1 = await buildRecommendationCard(deps({ loadSku: async () => apollo, generate: async () => ({ ...goodAi, card_title: "APOLLO玻璃杯", headline: "Apollo 桌面光泽" }) }), input);
+  assert.ok(ok1.ok); assert.equal(ok1.card.source, "ai");
+  const bad = await buildRecommendationCard(deps({ loadSku: async () => apollo, generate: async () => ({ ...goodAi, intro: "APOLLO 与 Pyrex 同款工艺的杯子" }) }), input);
+  assert.ok(bad.ok); assert.equal(bad.card.fallback_reason, "ai_unconfirmed_brand");
+  const brand = await buildRecommendationCard(deps({ loadSku: async () => ({ ...sku, brand_id: "b" }), entityNames: async () => new Map([["b", "HOYA"]]), generate: async () => ({ ...goodAi, card_title: "HOYA 玻璃杯" }) }), input);
+  assert.ok(brand.ok); assert.equal(brand.card.source, "ai");
+});
+
+test("错误归因：timeout / network / http / invalid，未知错误 ai_unavailable", async () => {
+  for (const code of ["ai_timeout", "ai_network_error", "ai_http_error", "ai_invalid_output"] as const) {
+    const r = await buildRecommendationCard(deps({ generate: async () => { throw new CardAiError(code, 503); } }), input);
+    assert.ok(r.ok); assert.equal(r.card.source, "product"); assert.equal(r.card.fallback_reason, code);
+  }
+  const y = await buildRecommendationCard(deps({ generate: async () => ({ ...goodAi, highlights: ["绝版好物"] }) }), input);
+  assert.ok(y.ok); assert.equal(y.card.fallback_reason, "ai_unsupported_claim");
 });
