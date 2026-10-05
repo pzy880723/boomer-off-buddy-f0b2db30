@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { normalizeShopCoords } from "./shop-coords";
 
-const NOW = "2026-10-05T03:00:00.000Z";
 
 describe("normalizeShopCoords", () => {
   test("两者都缺省时不触碰坐标（地址修改不清空已有坐标）", () => {
