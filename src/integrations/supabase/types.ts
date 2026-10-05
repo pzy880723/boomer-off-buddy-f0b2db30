@@ -10648,6 +10648,18 @@ export type Database = {
         Returns: boolean
       }
       support_actor_is_hq: { Args: { p_actor: string }; Returns: boolean }
+      support_conversation_stats: {
+        Args: {
+          p_conversation_ids: string[]
+          p_read_at?: string
+          p_user_id: string
+        }
+        Returns: {
+          conversation_id: string
+          last_customer_message_at: string
+          unread_count: number
+        }[]
+      }
       support_customer_conversation_list: {
         Args: { p_customer_id: string }
         Returns: Json
@@ -10673,6 +10685,16 @@ export type Database = {
       support_escalate_overdue: {
         Args: { p_reply_seconds?: number; p_unclaimed_seconds?: number }
         Returns: Json
+      }
+      support_mark_read: {
+        Args: {
+          p_conversation_id: string
+          p_display_name: string
+          p_participant_role: string
+          p_read_at: string
+          p_user_id: string
+        }
+        Returns: string
       }
       support_staff_post_message: {
         Args: {
