@@ -1,56 +1,65 @@
-# 会员积分/优惠券同步有赞：只读差距审计 + 最小安全实施路径
+# 门店二维码录入核查报告（只读，2026-10-05 10:41 UTC）
 
-当前 commit：`f0cc7d9b`。本轮只做了读取：没有写有赞，没有写数据库，没有发券或加积分，也没有部署。
+本次只读查询，未改代码、配置、数据，未部署。
 
-## 1. 只读结论（已查证）
+## 结论
+- 3 家在营门店中，只有新天地店录了二维码（4/5 通道，缺小程序码）。中信泰富店、温州朔门古港店 5 个通道全部没录。
+- 新天地店先前的 4 个二维码仍然在，每条记录都有对应的存储文件。
+- 其他营销或门店配置里没有找到"录了二维码但没接进打印"的情况。
 
-| 已确认方案里的组件 | 是否存在 | 证据 |
-|---|---|---|
-| member_channel_links（ERP 会员 ↔ 有赞用户） | 不存在 | public 下没有这张表，代码里没有引用；commerce_customer_identities 里只有 phone 身份 |
-| benefit mappings（ERP 券模板 ↔ 有赞券活动） | 不存在 | 没有对应表；commerce_coupon_definitions 没有有赞字段 |
-| 会员资产 outbox（积分/券推往有赞） | 不存在 | 现有 outbox 都是商品、库存、图片、渠道库存，没有会员资产这一类 |
-| 积分入站回流（有赞变动回写 ERP）和退款回补 | 不存在 | 代码里没有任何 youzan.scrm.* 或 points.* 接口调用 |
-| 有赞券核销防双花 | 不存在 | pos_customer_coupons 的 external_provider/external_id 有字段，但 0 行在用；只有 commerce_reserved_coupon_guard 负责 ERP 内部订单占用 |
+## 打印接口读的是哪里
+- 表：`public.store_qr_configs`。只采用 status=active、存储桶为 `store-qr`、路径为 `{location}/{channel}/{uuid}.png|jpg` 的记录。
+- 文件：Storage 私有桶 `store-qr`（public=false），目前一共 4 个文件。
+- 通道和数据库里的 purpose 对应关系：wechat→wecom_contact，xiaohongshu→xiaohongshu，dianping→dianping，identify→identify，miniprogram→mini_program。
 
-可以复用的部分：
-- 唯一会员主档 commerce_customers（不另建平行主档）。
-- 积分钱包 pos_customer_wallets 加流水 commerce_points_ledger（idempotency_key 唯一）。
-- 正规调整服务 commerce_admin_adjust_membership，带审计和幂等。
-- 券实例 pos_customer_coupons（code/idempotency_key 唯一，有 external_* 预留字段）。
-- 有赞固定出口 youzanFetch，以及现有 outbox 的 claim/finish 模式（参照 handheld_youzan_item_sync_outbox）。
+## 在营实体门店矩阵（Y = 有可用记录且存储文件存在）
 
-目标账号（customer 1b9676d9…，尾号 3310）ERP 当前状态：3000 积分（1 条流水），3 张有效券 c760ce03/548a1d77/ac281f2b。以上已发放，不再在 ERP 重复发放。
+| 门店 | location_id | 小红书 | 微信 | 点评 | 鉴定 | 小程序 |
+|---|---|---|---|---|---|---|
+| 新天地店 | 2df58305-57c1-4792-9920-3c3aa49890bc | Y | Y | Y | Y | 未录 |
+| 中信泰富店 | 7111b585-7d7f-4777-b4ae-61ce2b868f78 | 未录 | 未录 | 未录 | 未录 | 未录 |
+| 温州朔门古港店 | 8f0d9f93-eb49-40e8-8ec6-65f3770196bb | 未录 | 未录 | 未录 | 未录 | 未录 |
 
-## 2. 积分换算配置（已查证）
+新天地 4 条记录的明细：
+- 记录更新时间都是 2026-10-05 06:41:15 UTC。
+- 存储文件都是 PNG，上传时间在 06:41:08 到 06:41:14 之间，大小：小红书 299,723 B，微信 63,037 B，点评 304,359 B，鉴定 21,141 B。
+- 路径里的通道段（xiaohongshu/wechat/dianping/identify）都和 purpose 对得上，打印接口会采用这 4 条。
 
-- free/explorer_monthly/explorer_annual 三个方案都是：points_redemption_enabled=false，points_per_unit/unit_fen 为 NULL，也就是没有已确认的积分兑人民币比例。
-- 单笔上限 cap_rate 读回为 1.0000。最初迁移里是 0.15，现在已经是 100%，相当于"取消 15% 上限"已落库。
-- 有赞侧：10 月 3 日的只读 youzan.scrm.pointdecution.get/1.0.0 返回抵现插件值 0、状态 0（关闭），没有门槛和上限。
-- 结论：ERP 和有赞都没有已确认的抵现比例。本计划不设定任何比例，"开通积分抵现"需要用户先给出比例。
+## 单列（不算门店）
+- 总部仓库 f45dc754-b46b-411a-af7b-28e95ce2b1a0（kind=warehouse，在用）：无二维码记录。
+- 已停用 BOOMER OFF vintage 673f674c-55ad-45d8-8175-53f7044d7014：kind=shop、is_active=false，对应有赞总部店 153242272。无二维码记录。
 
-## 3. 双花风险（必须指出）
+## 其他配置中的二维码
+- `store_payment_profiles.qr_mode`：3 家门店都是 dynamic_order。这是收款时按订单动态生成的码，不是可打印的静态码，不需要接进打印。
+- `pos_payment_attempts.qr_content`：单笔支付的码内容，不属于门店配置。
+- `app_settings`：没有和二维码、微信、小红书、点评、小程序相关的配置项。
+- 全库没有其他 qrcode、小程序码或小红书、点评二维码字段。
+- 存储里文件名含 qr 的另有 2 个，在 `parcel-item-images` 桶，是采购包裹图片，和门店二维码无关。
 
-- **积分**：如果只是把 ERP 的 3000 余额复制到有赞，同时 ERP 小程序/POS 仍按自己的钱包抵扣，两边各有 3000，可以各花一次。必须只保留一个可花账本：要么有赞是唯一可花余额、ERP 只做镜像；要么 ERP 是唯一账本、有赞每次扣减都同步回写。不能两边独立可花。
-- **券**：把 3 张 ERP 券在有赞再发一份，一个人就有 6 张可用。ERP 券必须在有赞发放成功后作废（void，并记录 external_id），或反过来有赞核销后同步把 ERP 券标记为 used。目前两种都没有实现。
+## 图片能不能读
+- 已确认：4 个存储文件都存在，元数据显示 MIME 是 image/png，大小正常。
+- 未确认：没有生成签名链接，也没有下载文件内容，所以没有逐字节确认图片能正常解码。要确认可以在 ERP 打印页预览，或由腾讯侧用接口拉一次。
 
-## 4. 最小安全实施路径（获批后再做）
+## 实际查询 SQL
+```sql
+select now();
+select l.id, l.kind, l.name, l.is_active, s.kdt_id, s.shop_name, s.role, s.status
+  from inv_locations l left join youzan_shops s on s.id = l.shop_id;
+select location_id, purpose, status, image_bucket, image_path is not null,
+       split_part(image_path,'/',2) as path_channel, updated_at
+  from store_qr_configs order by location_id, purpose;
+select c.location_id, c.purpose, o.id is not null as obj_exists,
+       o.metadata->>'mimetype', (o.metadata->>'size')::int, o.updated_at
+  from store_qr_configs c
+  left join storage.objects o on o.bucket_id = c.image_bucket and o.name = c.image_path;
+select bucket_id, count(*) from storage.objects where bucket_id ilike '%qr%' group by 1;
+select id, public from storage.buckets where id ilike '%qr%' or id ilike '%store%';
+select key from app_settings where key ~* 'qr|code|wechat|xiaohongshu|dianping|mini' or value::text ~* 'qr|二维码';
+select location_id, qr_mode from store_payment_profiles;
+select table_name, column_name from information_schema.columns
+ where table_schema='public' and column_name ~* 'qrcode|qr_|_qr|wxacode|mini_program|xiaohongshu|dianping';
+select bucket_id, count(*) from storage.objects where name ~* 'qr|qrcode|二维码' group by 1;
+```
 
-1. **身份链接**：新增 member_channel_links(customer_id, provider='youzan', kdt_id, yz_open_id, 唯一约束)。按手机号调用有赞客户查询来绑定；查到多个或查不到时不绑定。
-2. **资产 outbox**：新增 member_asset_sync_outbox，按 (customer_id, asset_kind, source_ledger_id/coupon_id) 唯一，幂等键沿用 ERP 流水/券的 idempotency_key。只由腾讯固定出口 worker 认领执行。
-3. **积分推送**：使用有赞积分增加接口（候选 youzan.crm.customer.points.increase 或 youzan.scrm.customer.points.increase，版本以 Codex 固定出口实测为准），传入 ERP 幂等键作为业务单号。推送成功后，ERP 钱包改为有赞镜像，ERP 侧停止独立抵扣。
-4. **券推送**：ERP 模板映射到有赞的隐藏券活动（benefit mapping），用有赞发券接口按用户发放。成功后 ERP 券写入 external_provider/external_id 并置为 void；失败则保留 ERP 券、不重复发放。
-5. **回流**：订阅有赞积分变动和券核销/退款消息，或定时对账，回写 ERP 流水，退款回补同样走幂等键。
-6. **抵现开通**：比例确认后，写有赞抵现规则（pointdecution 对应的更新接口），同时把 ERP 方案设为同一比例，或在 ERP 关闭抵扣，避免两套规则并存。
-7. 验证顺序：只针对 3310 测试账号；有赞写入只走固定出口；每一步读回双方余额和券数。
-
-## 5. 真正阻塞
-
-- 有赞权限：积分规则读取（points.rule.list）、抵现规则读写（pointdecution）、积分增减、按用户发券、客户按手机号查询，这几项权限要等 Codex 从固定出口实测确认。代码里还没有任何 scrm/ump 调用。
-- 积分兑人民币比例未确认（ERP 为 NULL，有赞为 0 且关闭），需要用户给出。
-- 需要用户选定唯一可花账本（有赞或 ERP），否则一定会双花。
-- 有赞侧是否有隐藏的测试券活动可供映射，尚未查证。
-
-## 技术细节
-
-- 查证来源：information_schema 表清单；rg 检索 youzan.(scrm|ump|crm|points) 只命中 docs/unified-pos-20261003.md:86；commerce_membership_plans 读回；pos_points_rules 函数定义；pos_customer_coupons 的 external_provider 非空 0 行；commerce_reserved_coupon_guard 是 BEFORE UPDATE/DELETE 触发器。
-- 新增迁移按惯例先在 BEGIN/ROLLBACK 中验证再应用；新表都开启 RLS，只允许 service_role 写。
+## 下一步（需要你决定，本次不执行）
+- 在 ERP 打印页给中信泰富店、温州朔门古港店上传二维码，并补上新天地店的小程序码。
