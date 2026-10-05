@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { runShopSyncCore } from "@/lib/youzan.functions";
-import { normalizeShopCoords } from "@/lib/shop-coords";
+import { normalizeShopCoords, shopCoordFieldsSchema, buildShopMetaPatch } from "@/lib/shop-coords";
 
 export const syncSingleShop = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -154,17 +154,14 @@ export const updateShopMeta = createServerFn({ method: "POST" })
         phone: z.string().nullish(),
         notes: z.string().nullish(),
         image_url: z.string().nullish(),
-        latitude: z.number().nullable().optional(),
-        longitude: z.number().nullable().optional(),
       })
+      .merge(shopCoordFieldsSchema)
       .parse(i)
   )
   .handler(async ({ data, context }) => {
-    const { id, latitude, longitude, ...rest } = data;
-    // 坐标成对校验；缺省表示不触碰，绝不因改地址等清空已有坐标
-    const coords = normalizeShopCoords({ latitude, longitude });
-    const patch: Record<string, unknown> = { ...rest };
-    if (coords) Object.assign(patch, coords);
+    const { id } = data;
+    // 坐标成对校验；缺省不触碰；coord_updated_at 由数据库触发器按真实变化写入
+    const patch = buildShopMetaPatch(data);
     const { error } = await context.supabase
       .from("youzan_shops")
       .update(patch as never)
@@ -184,9 +181,8 @@ export const createShop = createServerFn({ method: "POST" })
         address: z.string().nullish(),
         manager: z.string().nullish(),
         phone: z.string().nullish(),
-        latitude: z.number().nullable().optional(),
-        longitude: z.number().nullable().optional(),
       })
+      .merge(shopCoordFieldsSchema)
       .parse(i)
   )
   .handler(async ({ data }) => {
@@ -226,6 +222,7 @@ export const createShop = createServerFn({ method: "POST" })
     const coords = normalizeShopCoords({
       latitude: data.latitude,
       longitude: data.longitude,
+      coord_system: data.coord_system,
     });
     const { data: inserted, error } = await supabaseAdmin
       .from("youzan_shops")
