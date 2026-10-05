@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { runShopSyncCore } from "@/lib/youzan.functions";
+import { normalizeShopCoords } from "@/lib/shop-coords";
 
 export const syncSingleShop = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -44,6 +45,9 @@ export type ShopWithStats = {
   ownership: string;
   status: string;
   address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  coord_system: string | null;
   image_url: string | null;
   image_signed_url: string | null;
   manager: string | null;
@@ -72,7 +76,7 @@ export const listShopsWithStats = createServerFn({ method: "GET" })
       supabase
         .from("youzan_shops")
         .select(
-          "id, kdt_id, shop_name, role, ownership, status, address, image_url, manager, area_sqm, opened_at, phone, notes, last_ping_ok, last_ping_at, access_token"
+          "id, kdt_id, shop_name, role, ownership, status, address, latitude, longitude, coord_system, image_url, manager, area_sqm, opened_at, phone, notes, last_ping_ok, last_ping_at, access_token"
         )
         .order("role")
         .order("shop_name"),
@@ -150,14 +154,20 @@ export const updateShopMeta = createServerFn({ method: "POST" })
         phone: z.string().nullish(),
         notes: z.string().nullish(),
         image_url: z.string().nullish(),
+        latitude: z.number().nullable().optional(),
+        longitude: z.number().nullable().optional(),
       })
       .parse(i)
   )
   .handler(async ({ data, context }) => {
-    const { id, ...patch } = data;
+    const { id, latitude, longitude, ...rest } = data;
+    // 坐标成对校验；缺省表示不触碰，绝不因改地址等清空已有坐标
+    const coords = normalizeShopCoords({ latitude, longitude });
+    const patch: Record<string, unknown> = { ...rest };
+    if (coords) Object.assign(patch, coords);
     const { error } = await context.supabase
       .from("youzan_shops")
-      .update(patch)
+      .update(patch as never)
       .eq("id", id);
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -174,6 +184,8 @@ export const createShop = createServerFn({ method: "POST" })
         address: z.string().nullish(),
         manager: z.string().nullish(),
         phone: z.string().nullish(),
+        latitude: z.number().nullable().optional(),
+        longitude: z.number().nullable().optional(),
       })
       .parse(i)
   )
@@ -211,6 +223,10 @@ export const createShop = createServerFn({ method: "POST" })
       }
     }
 
+    const coords = normalizeShopCoords({
+      latitude: data.latitude,
+      longitude: data.longitude,
+    });
     const { data: inserted, error } = await supabaseAdmin
       .from("youzan_shops")
       .insert({
@@ -223,6 +239,7 @@ export const createShop = createServerFn({ method: "POST" })
         address: data.address ?? null,
         manager: data.manager ?? null,
         phone: data.phone ?? null,
+        ...(coords ?? {}),
         access_token: token_row?.access_token ?? null,
         refresh_token: token_row?.refresh_token ?? null,
         token_expires_at: token_row?.token_expires_at ?? null,

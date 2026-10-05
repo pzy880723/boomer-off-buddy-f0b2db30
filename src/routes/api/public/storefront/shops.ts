@@ -16,7 +16,7 @@ export const Route = createFileRoute("/api/public/storefront/shops")({
         const { data, error } = await supabaseAdmin
           .from("youzan_shops" as never)
           .select(
-            "id, shop_name, status, address, image_url, location:inv_locations!shop_id(id,name,kind,is_active)",
+            "id, shop_name, status, address, image_url, latitude, longitude, coord_system, location:inv_locations!shop_id(id,name,kind,is_active)",
           )
           .eq("status", "active");
         if (error) return storefrontJson({ ok: false, error: error.message }, { status: 500 });

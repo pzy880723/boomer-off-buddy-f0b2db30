@@ -127,6 +127,13 @@
       "when": 1790353194000,
       "tag": "0017_handheld_item_archive_delete",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1791172211277,
+      "tag": "0018_youzan_shops_gcj02_coords",
+      "breakpoints": true
     }
   ]
 }

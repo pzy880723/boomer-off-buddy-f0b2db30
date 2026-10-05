@@ -14,6 +14,9 @@ const row = (over: Partial<ShopSourceRow> = {}): ShopSourceRow => ({
   status: "active",
   address: "上海市静安区 南京西路 1168 号",
   image_url: "shops/a.jpg",
+  latitude: null,
+  longitude: null,
+  coord_system: null,
   location: { id: "loc-1", name: "中信泰富店", kind: "shop", is_active: true },
   ...over,
 });
@@ -61,6 +64,7 @@ describe("字段白名单", () => {
         "address",
         "business_hours",
         "city",
+        "coord_system",
         "id",
         "image_url",
         "latitude",
@@ -72,6 +76,45 @@ describe("字段白名单", () => {
     assert.deepEqual(out.business_hours, null);
     assert.equal(out.latitude, null);
     assert.equal(out.longitude, null);
+    assert.equal(out.coord_system, null);
+  });
+});
+
+describe("坐标公开映射", () => {
+  test("成对合法 gcj02 坐标原样公开", () => {
+    const out = toPublicShop(
+      row({ latitude: 31.223456, longitude: 121.46917, coord_system: "gcj02" }),
+      null,
+    );
+    assert.equal(out.latitude, 31.223456);
+    assert.equal(out.longitude, 121.46917);
+    assert.equal(out.coord_system, "gcj02");
+  });
+
+  test("缺一个、坐标系缺失/非 gcj02、越界、NaN 一律降级 null，不猜测", () => {
+    const cases: Array<Partial<ShopSourceRow>> = [
+      { latitude: 31.2, longitude: null, coord_system: "gcj02" },
+      { latitude: 31.2, longitude: 121.4, coord_system: null },
+      { latitude: 31.2, longitude: 121.4, coord_system: "wgs84" },
+      { latitude: 91, longitude: 121.4, coord_system: "gcj02" },
+      { latitude: 31.2, longitude: 139.7, coord_system: "gcj02" },
+      { latitude: NaN, longitude: 121.4, coord_system: "gcj02" },
+    ];
+    for (const over of cases) {
+      const out = toPublicShop(row(over), null);
+      assert.equal(out.latitude, null);
+      assert.equal(out.longitude, null);
+      assert.equal(out.coord_system, null);
+    }
+  });
+
+  test("数字字符串坐标（numeric 序列化）也能正确公开", () => {
+    const out = toPublicShop(
+      row({ latitude: "31.223456" as never, longitude: "121.469170" as never, coord_system: "gcj02" }),
+      null,
+    );
+    assert.equal(out.latitude, 31.223456);
+    assert.equal(out.longitude, 121.46917);
   });
 });
 

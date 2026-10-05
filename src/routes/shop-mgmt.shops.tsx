@@ -249,6 +249,8 @@ function EditShopDialog({
   const update = useServerFn(updateShopMeta);
   const [form, setForm] = useState<{
     address: string;
+    latitude: string;
+    longitude: string;
     manager: string;
     area_sqm: string;
     opened_at: string;
@@ -263,6 +265,8 @@ function EditShopDialog({
   if (shop && (form === null || (form as { _id?: string })._id !== shop.id)) {
     setForm({
       address: shop.address ?? "",
+      latitude: shop.latitude != null ? String(shop.latitude) : "",
+      longitude: shop.longitude != null ? String(shop.longitude) : "",
       manager: shop.manager ?? "",
       area_sqm: shop.area_sqm != null ? String(shop.area_sqm) : "",
       opened_at: shop.opened_at ?? "",
@@ -277,10 +281,18 @@ function EditShopDialog({
   const save = useMutation({
     mutationFn: async () => {
       if (!shop || !form) return;
+      const lat = form.latitude.trim();
+      const lng = form.longitude.trim();
+      if ((lat === "") !== (lng === "")) {
+        throw new Error("纬度和经度必须成对填写或成对清空");
+      }
       await update({
         data: {
           id: shop.id,
           address: form.address || null,
+          // 空串=null 成对清空；绝不把空值转成 0
+          latitude: lat === "" ? null : Number(lat),
+          longitude: lng === "" ? null : Number(lng),
           manager: form.manager || null,
           area_sqm: form.area_sqm ? Number(form.area_sqm) : null,
           opened_at: form.opened_at || null,
@@ -387,6 +399,27 @@ function EditShopDialog({
                 />
               </div>
               <div>
+                <Label className="mb-1.5 block text-xs">纬度（GCJ-02）</Label>
+                <Input
+                  type="number"
+                  step="0.000001"
+                  value={form.latitude}
+                  onChange={(e) => setForm({ ...form, latitude: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label className="mb-1.5 block text-xs">经度（GCJ-02）</Label>
+                <Input
+                  type="number"
+                  step="0.000001"
+                  value={form.longitude}
+                  onChange={(e) => setForm({ ...form, longitude: e.target.value })}
+                />
+              </div>
+              <p className="col-span-2 -mt-1 text-[11px] text-muted-foreground">
+                坐标须为 GCJ-02（腾讯/高德地图取值），成对填写或成对清空，用于小程序“附近门店”。
+              </p>
+              <div>
                 <Label className="mb-1.5 block text-xs">店长</Label>
                 <Input
                   value={form.manager}
@@ -463,6 +496,8 @@ function CreateShopDialog({ open, onClose }: { open: boolean; onClose: () => voi
     ownership: "自营" as "自营" | "加盟",
     kdt_id: "",
     address: "",
+    latitude: "",
+    longitude: "",
     manager: "",
     phone: "",
   });
@@ -471,12 +506,19 @@ function CreateShopDialog({ open, onClose }: { open: boolean; onClose: () => voi
     mutationFn: async () => {
       if (!form.shop_name.trim()) throw new Error("请填写门店名称");
       const kdt = form.kdt_id.trim();
+      const lat = form.latitude.trim();
+      const lng = form.longitude.trim();
+      if ((lat === "") !== (lng === "")) {
+        throw new Error("纬度和经度必须成对填写或成对清空");
+      }
       return await create({
         data: {
           shop_name: form.shop_name.trim(),
           ownership: form.ownership,
           kdt_id: kdt ? Number(kdt) : null,
           address: form.address || null,
+          latitude: lat === "" ? null : Number(lat),
+          longitude: lng === "" ? null : Number(lng),
           manager: form.manager || null,
           phone: form.phone || null,
         },
@@ -490,6 +532,8 @@ function CreateShopDialog({ open, onClose }: { open: boolean; onClose: () => voi
         ownership: "自营",
         kdt_id: "",
         address: "",
+        latitude: "",
+        longitude: "",
         manager: "",
         phone: "",
       });
@@ -553,6 +597,24 @@ function CreateShopDialog({ open, onClose }: { open: boolean; onClose: () => voi
               <Input
                 value={form.address}
                 onChange={(e) => setForm({ ...form, address: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label className="mb-1.5 block text-xs">纬度（GCJ-02，可后补）</Label>
+              <Input
+                type="number"
+                step="0.000001"
+                value={form.latitude}
+                onChange={(e) => setForm({ ...form, latitude: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label className="mb-1.5 block text-xs">经度（GCJ-02，可后补）</Label>
+              <Input
+                type="number"
+                step="0.000001"
+                value={form.longitude}
+                onChange={(e) => setForm({ ...form, longitude: e.target.value })}
               />
             </div>
             <div>
