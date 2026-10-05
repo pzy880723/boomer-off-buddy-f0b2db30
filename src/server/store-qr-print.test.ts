@@ -31,7 +31,7 @@ test("get：跨店 403", async () => {
 
 test("get：仅 active 且有图的渠道返回短签名；停用/缺码不返回；can_manage 仅 super_admin", async () => {
   const rows = [
-    { purpose: "wechat_follow", target_url: null, image_bucket: "store-qr", image_path: `${LOC}/wechat/a.png`, status: "active", version: 3, updated_at: "t1" },
+    { purpose: "wechat_follow", target_url: null, image_bucket: "store-qr", image_path: `${LOC}/wechat/0f8fad5b-d9cb-469f-a165-70867728950e.png`, status: "active", version: 3, updated_at: "t1" },
     { purpose: "dianping", target_url: null, image_bucket: "store-qr", image_path: `${LOC}/dianping/b.png`, status: "disabled", version: 2, updated_at: "t2" },
     { purpose: "mini_program", target_url: "https://x", image_bucket: null, image_path: null, status: "active", version: 1, updated_at: "t3" },
     { purpose: "wecom_contact", target_url: null, image_bucket: "store-qr", image_path: "x.png", status: "active", version: 1, updated_at: "t4" },
@@ -39,7 +39,7 @@ test("get：仅 active 且有图的渠道返回短签名；停用/缺码不返�
   const { d } = deps({ list: async () => rows });
   const r: any = await printStoreQr(d, "u", { action: "get", location_id: LOC });
   assert.equal(r.ok, true);
-  assert.deepEqual(r.body.channels, [{ channel: "wechat", image_url: `https://signed/${LOC}/wechat/a.png?ttl=300`, updated_at: "t1" }]);
+  assert.deepEqual(r.body.channels, [{ channel: "wechat", image_url: `https://signed/${LOC}/wechat/0f8fad5b-d9cb-469f-a165-70867728950e.png?ttl=300`, updated_at: "t1" }]);
   assert.equal(r.body.can_manage, false);
   const { d: d2 } = deps({ ...admin, list: async () => rows });
   assert.equal(((await printStoreQr(d2, "u", { action: "get", location_id: LOC })) as any).body.can_manage, true);
