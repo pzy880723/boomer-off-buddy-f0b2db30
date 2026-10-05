@@ -49,3 +49,13 @@
 - 手持：`GET /api/public/handheld/support/conversations?queue=&cursor=&limit=&location_id=&status=`，返回值新增 `queue`。
 - 会话详情（员工和顾客两端）只返回最近 500 条消息，按时间正序排列，并带 `has_more`。`has_more=true` 表示还有更早的消息没返回，这一版不提供完整历史。
 - 回填核查：未关闭会话中，waiting_since 为空、但最后一条顾客公开消息晚于最后一条员工公开消息的，数量为 0，所以不需要回填迁移。
+
+## 头像与发言身份（2026-10-05，无迁移）
+- 每条消息保留所有旧字段，新增 `sender_avatar_url: string|null`、`sender_role: customer|store_staff|hq_agent|system`、`sender_location_name: string|null`。员工 ServerFn、handheld GET/POST 和 storefront GET/POST 共享同一消息投影，POST 的 `message` 与再次 GET 一致。
+- 员工列表/详情 conversation 新增 `customer_avatar_url: string|null`，复用所属 `commerce_customers.avatar_url`。客户消息只有 sender_customer_id 匹配会话 customer_id 才加载头像，不借用其他客户头像。
+- 门店字段核查：`inv_locations` 无头像字段，但 `shop_id` 关联 `youzan_shops.id`，后者已有 `image_url`。按当前授权会话门店关联加载该图片；如果为私桶对象 key、签名 URL 或缺图，则返回 null，绝不生成签名或读取原图。`inv_brands.logo_url` 是品牌图片，不作门店头像。
+- 历史员工按消息 `sender_user_id` + 该会话 `support_participants.participant_role` 区分，绝不用当前 primary_agent_id 替代。缺失/未知历史 participant 采用 system/null 保守回退，不猜测身份。
+- HQ 仅使用服务端管理的 `app_metadata.avatar_url`（通过认证管理读取）；当前未发现已验证个人头像生产者，不信任可自行修改的 user_metadata.avatar_url，未配置默认 null。不新增头像配置入口。
+- 安全 HTTPS 公开 URL 采用保守白名单规则：拒绝所有查询参数、片段、凭据、非标准端口、IP/本地主机、签名/私有路径、相对对象 key；不发网络请求或签名。UI 加载失败仍需默认头像回退。
+- GET 在会话授权后才查头像；POST 在数据库事务成功后重新核对会话授权再加载头像。顾客只看公开 sent 消息，员工 sender_name 使用门店/总部/系统安全称谓，不返回员工 ID、邮箱或原始 metadata。
+- 本轮无数据库/权限/迁移修改、无真实客户写入、无 UI 修改、无微信外发或腾讯部署。0001–0034 不需要在腾讯重复执行。
