@@ -1,6 +1,6 @@
 // 有赞会员资产「只读观察」处理器。
-// 收件箱通知只是重新查询的触发器：外层 kdt_id / yz_open_id 不在签名范围内（签名只覆盖 msg），
-// 只当线索用，绝不直接改资产。
+// 收件箱通知只是重新查询的触发器；只接受覆盖完整正文的 Event-Sign 协议，
+// 老协议即使人工重排也只保留为线索，绝不直接改资产。
 // 记录 observed 必须同时满足：授权 active 店铺 → 可信映射（腾讯 membership-youzan-links，注入依赖）
 // → 经固定出口的有赞只读查询返回、且返回的店铺/身份/券号与映射一致。
 // 观察快照不是本地可花余额，不写 pos_customer_wallets / pos_customer_coupons / 积分账本。
@@ -29,7 +29,7 @@ export type ObservationRecordArgs = ObservationKey & {
   expected_row_version: number;
   query_source: string;
 };
-export type RecordResult = "recorded" | "older_observation" | "stale_version" | "stale_lease";
+export type RecordResult = "recorded" | "older_observation" | "stale_version" | "stale_lease" | "same_version_observed" | "version_conflict";
 
 export interface ObservationStore {
   claim(limit: number, now: number): Promise<ObsRow[]>;
@@ -106,6 +106,9 @@ export async function processObservationInbox(
       } else out.stale++;
     };
     try {
+      if (obj(row.envelope).auth_protocol !== "event_sign") {
+        await block("legacy_signature_readonly_hint"); continue;
+      }
       const h = hints(row);
       if (!h) { await block("unsupported_msg_type"); continue; }
       if (!h.openId) { await block("missing_member_identity"); continue; }
@@ -138,8 +141,8 @@ export async function processObservationInbox(
         expected_row_version: expected,
         query_source: "youzan_fixed_proxy_readonly",
       });
-      if (r === "recorded") out.observed++;
-      else if (r === "older_observation") out.blocked++;
+      if (r === "recorded" || r === "same_version_observed") out.observed++;
+      else if (r === "older_observation" || r === "version_conflict") out.blocked++;
       else if (r === "stale_version") await retry("stale_version");
       else out.stale++;
     } catch (e) {

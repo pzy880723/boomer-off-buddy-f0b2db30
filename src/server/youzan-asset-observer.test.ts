@@ -48,12 +48,12 @@ function stores(rows: Inbox[]) {
 
 const pointsRow = (o: Partial<Inbox> = {}): Inbox => ({
   id: "r1", kdt_id: 100, msg_type: "POINTS", biz_id: "yuser_1", attempts: 0,
-  payload: { yz_open_id: "OPEN1", total: 999 }, envelope: {},
+  payload: { yz_open_id: "OPEN1", total: 999 }, envelope: { auth_protocol: "event_sign" },
   status: "pending", reason: null, claim_token: null, lease_until: null, ...o,
 });
 const couponRow = (o: Partial<Inbox> = {}): Inbox => ({
   id: "c1", kdt_id: 100, msg_type: "COUPON_CUSTOMER_PROMOTION", biz_id: "V9", attempts: 0,
-  payload: { id: "V9", status: "CARD_TAKE" }, envelope: { yz_open_id: "OPEN1", voucher_id: "V9" },
+  payload: { id: "V9", status: "CARD_TAKE" }, envelope: { yz_open_id: "OPEN1", voucher_id: "V9", auth_protocol: "event_sign" },
   status: "pending", reason: null, claim_token: null, lease_until: null, ...o,
 });
 
@@ -95,9 +95,30 @@ test("未知会员 blocked unknown_member；不凭手机号建会员（依赖只
 });
 
 test("缺 yz_open_id：blocked missing_member_identity", async () => {
-  const st = stores([couponRow({ envelope: {} })]);
+  const st = stores([couponRow({ envelope: { auth_protocol: "event_sign" } })]);
   await processObservationInbox(st, deps());
   assert.equal(st.rows[0].reason, "missing_member_identity");
+});
+
+test("manually requeued legacy or unverified messages cannot be observed", async () => {
+  for (const envelope of [{}, { auth_protocol: "legacy_body_sign" }]) {
+    const st = stores([pointsRow({ envelope })]);
+    let queried = false;
+    await processObservationInbox(st, deps({ queryAsset: async () => { queried = true; return { kind: "unavailable" }; } }));
+    assert.equal(st.rows[0].reason, "legacy_signature_readonly_hint");
+    assert.equal(st.snaps.size, 0);
+    assert.equal(queried, false);
+  }
+});
+
+test("SQL completed observations and version conflicts are not counted as lost leases", async () => {
+  for (const result of ["same_version_observed", "version_conflict"] as const) {
+    const st = stores([pointsRow()]);
+    st.record = async () => result;
+    const out = await processObservationInbox(st, deps());
+    assert.equal(out.stale, 0);
+    assert.equal(result === "same_version_observed" ? out.observed : out.blocked, 1);
+  }
 });
 
 test("非授权店铺：blocked shop_not_authorized，不调用映射/查询", async () => {
@@ -130,7 +151,7 @@ test("查询结果身份/店铺/券号与映射不一致：blocked query_identit
 });
 
 test("映射返回的 yz_open_id 为准：通知外层 id 只是线索", async () => {
-  const st = stores([couponRow({ envelope: { yz_open_id: "HINT", voucher_id: "V9" } })]);
+  const st = stores([couponRow({ envelope: { yz_open_id: "HINT", voucher_id: "V9", auth_protocol: "event_sign" } })]);
   let asked = "";
   await processObservationInbox(st, deps({
     resolveIdentity: async () => ({ kind: "found", customerId: "c", yzOpenId: "TRUSTED" }),

@@ -1,7 +1,7 @@
 // 有赞积分只读查询适配器：youzan.crm.customer.points.get/1.0.0（支持 L 总部），
 // is_query_points_account_version=true 返回 point / points_account_version。
 // 只读；必须经 youzanFetch 固定出口（未配置代理直接 blocked，不直连）。
-// 入参结构按用户提供的合同；未拿到腾讯侧真实 code=200 前不要注入生产。
+// 官方合同 SxGawlMSTiDAPkkRPM0cCtUKnky：以 user.account_type=5 查询映射后的有赞会员。
 // 优惠券暂无确认的只读查询接口 → blocked asset_query_not_supported。
 import type { AssetQuery, AssetQueryResult } from "./youzan-asset-observer.server";
 
@@ -17,6 +17,18 @@ export type PointsQueryDeps = {
 
 const isInt = (v: unknown) => typeof v === "number" && Number.isSafeInteger(v);
 const toInt = (v: unknown) => (isInt(v) ? (v as number) : typeof v === "string" && /^-?\d{1,15}$/.test(v) ? Number(v) : null);
+const exactVersion = (v: unknown) =>
+  typeof v === "string" && /^\d{1,19}$/.test(v) ? v : isInt(v) && (v as number) >= 0 ? String(v) : null;
+
+type PointsShop = { kdt_id: number; parent_kdt_id?: number | null; role: string; status: string;
+  access_token?: string | null; token_expires_at?: string | null };
+export function selectPointsHeadquarters(shops: PointsShop[], kdtId: number, now = Date.now()): PointsShop | null {
+  const shop = shops.find(s => s.kdt_id === kdtId && s.status === "active");
+  if (!shop) return null;
+  const root = shop.role === "hq" ? shop.kdt_id : shop.parent_kdt_id;
+  const head = shops.find(s => s.kdt_id === root && s.role === "hq" && s.status === "active");
+  return head?.access_token && Date.parse(head.token_expires_at ?? "") > now + 300000 ? head : null;
+}
 
 export function createYouzanPointsQuery(deps: PointsQueryDeps) {
   const now = deps.now ?? Date.now;
@@ -31,24 +43,26 @@ export function createYouzanPointsQuery(deps: PointsQueryDeps) {
       res = await deps.fetchImpl(url, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ yz_open_id: q.yzOpenId, is_query_points_account_version: true }),
+        body: JSON.stringify({ user: { account_id: q.yzOpenId, account_type: 5 }, is_do_extpoint: false, is_query_points_account_version: true }),
+        signal: AbortSignal.timeout(15000),
       });
     } catch {
       return { kind: "unavailable" };
     }
     if (res.status >= 500 || res.status === 429) return { kind: "unavailable" };
+    if (!res.ok) return { kind: "blocked", reason: "youzan_query_rejected" };
     let j: Record<string, unknown>;
     try {
       j = (await res.json()) as Record<string, unknown>;
     } catch {
       return { kind: "unavailable" };
     }
-    const ok = j && (j.success === true || j.code === 200);
+    const ok = j && j.success !== false && (j.code === 200 || j.code === 0);
     if (!ok) return { kind: "blocked", reason: "youzan_query_rejected" };
     const data = (j.data && typeof j.data === "object" ? j.data : {}) as Record<string, unknown>;
     const point = toInt(data.point);
-    const ver = toInt(data.points_account_version);
-    if (point === null || ver === null) return { kind: "blocked", reason: "points_response_incomplete" };
+    const ver = exactVersion(data.points_account_version);
+    if (point === null || point < 0 || ver === null) return { kind: "blocked", reason: "points_response_incomplete" };
     return {
       kind: "ok",
       kdtId: q.kdtId,
@@ -69,9 +83,9 @@ export async function productionPointsQuery() {
     fetchImpl: (u, i) => youzanFetch(u, i),
     async getAccessToken(kdtId) {
       const { data, error } = await supabaseAdmin
-        .from("youzan_shops").select("access_token").eq("kdt_id", kdtId).eq("status", "active").maybeSingle();
+        .from("youzan_shops").select("kdt_id,parent_kdt_id,role,status,access_token,token_expires_at").eq("status", "active");
       if (error) throw new Error("token lookup failed");
-      return (data?.access_token as string | null) ?? null;
+      return selectPointsHeadquarters((data ?? []) as PointsShop[], kdtId)?.access_token ?? null;
     },
   });
 }

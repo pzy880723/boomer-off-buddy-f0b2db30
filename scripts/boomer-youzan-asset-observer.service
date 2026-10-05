@@ -1,0 +1,12 @@
+[Unit]
+Description=BOOMER read-only Youzan member asset observations
+After=network-online.target youzan-proxy.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /var/www/boomer-erp/current/scripts/run-youzan-asset-observer.sh
+TimeoutStartSec=150
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
