@@ -8,11 +8,7 @@ import { getYouzanOutboundStatus, youzanFetch } from "./youzan-http";
 import { assertYouzanStockWriteSucceeded, buildYouzanQuantityUpdateParams } from "./youzan-quantity.server";
 import { createSupabaseYouzanSaleAdapter } from "./youzan-sale.functions";
 import { commitOrderPage } from "./youzan-order-page";
-import {
-  extractYouzanSale,
-  isYouzanSaleStatus,
-  processYouzanSale,
-} from "./youzan-sale.server";
+import { extractYouzanSale, processYouzanSale } from "./youzan-sale.server";
 
 // ============================================================
 // 有赞自用型应用 OAuth：grant_type=silent + kdt_id
