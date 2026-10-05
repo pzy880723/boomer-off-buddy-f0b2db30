@@ -132,7 +132,7 @@ test("延迟重试：暂时性错误按退避重排，到期后可重放，超�
   assert.equal((await processAssetInbox(st, boom, { now: retryDelayMs(1) - 1 })).claimed, 0);
   // 到期重放
   assert.equal((await processAssetInbox(st, boom, { now: retryDelayMs(1) })).claimed, 1);
-  for (let i = 0; i < 10; i++) await processAssetInbox(st, boom, { now: 1e12 });
+  for (let i = 0; i < 10; i++) await processAssetInbox(st, boom, { now: 1e12 + i * 1e8 });
   assert.equal(st.rows[0].status, "dead");
 });
 
