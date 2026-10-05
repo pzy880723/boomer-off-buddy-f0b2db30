@@ -25,6 +25,13 @@ export type SkuRow = {
   image_paths: string[] | null;
 };
 
+/** AI 失败的细分原因（不含密钥/请求体/原始 AI 内容）。 */
+export class CardAiError extends Error {
+  constructor(readonly code: "ai_timeout" | "ai_network_error" | "ai_http_error" | "ai_invalid_output" | "ai_not_configured", readonly status?: number) {
+    super(code);
+  }
+}
+
 export type CardDeps = {
   canAccessLocation(userId: string, locationId: string): Promise<boolean>;
   loadSku(skuId: string): Promise<SkuRow | null>;
@@ -32,6 +39,8 @@ export type CardDeps = {
   hasStockAt(skuId: string, locationId: string): Promise<boolean>;
   entityNames(ids: string[]): Promise<Map<string, string>>;
   signImage(path: string): Promise<string | null>;
+  /** 本门店已发布正文（只读 commerce_listings.description），无则 null。 */
+  publishedDescription?(skuId: string, locationId: string): Promise<string | null>;
   generate(facts: CardFacts): Promise<unknown>;
 };
 
@@ -63,6 +72,9 @@ export async function buildRecommendationCard(
     brand: sku.brand_id ? (names.get(sku.brand_id) ?? null) : null,
     ip: sku.ip_id ? (names.get(sku.ip_id) ?? null) : null,
     keywords: (sku.keywords ?? []).filter(Boolean).slice(0, 5),
+    published_description: deps.publishedDescription
+      ? cleanDescription(await deps.publishedDescription(sku.id, input.locationId).catch(() => null))
+      : null,
   };
 
   const path = sku.image_paths?.[0] ?? null;
@@ -78,23 +90,34 @@ export async function buildRecommendationCard(
       fallback = rejectAiCard(parsed.data, facts);
       if (!fallback) ai = parsed.data;
     }
-  } catch {
-    fallback = "ai_unavailable";
+  } catch (e) {
+    fallback = e instanceof CardAiError ? e.code : "ai_unavailable";
+    console.warn("recommendation_card_ai_fallback", { code: fallback, status: e instanceof CardAiError ? (e.status ?? null) : null });
   }
   const body = ai ? mergeAiCard(facts, ai) : productCard(facts);
   return { ok: true, card: { ...body, image, source: ai ? "ai" : "product", fallback_reason: ai ? null : fallback } };
 }
 
+/** 去 HTML、压空白、限长；只作素材。 */
+export function cleanDescription(s: string | null | undefined): string | null {
+  if (!s) return null;
+  const t = s.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+  return t ? t.slice(0, 400) : null;
+}
+
 /** 生产 AI 调用：Lovable AI Gateway，只输入已确认事实。 */
 export async function generateCardCopy(facts: CardFacts): Promise<unknown> {
   const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) throw new Error("ai_not_configured");
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
+  if (!apiKey) throw new CardAiError("ai_not_configured");
+  let res: Response;
+  try {
+  res = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
     method: "POST",
     signal: AbortSignal.timeout(15_000),
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model: "openai/gpt-6-astra",
+      reasoning: { effort: "low" },
       text: { format: { type: "json_object" } },
       input: [
         {
@@ -107,14 +130,28 @@ export async function generateCardCopy(facts: CardFacts): Promise<unknown> {
       ],
     }),
   });
-  if (!res.ok) throw new Error(`ai_http_${res.status}`);
-  const payload = (await res.json()) as {
+  } catch (e) {
+    const name = (e as { name?: string })?.name;
+    throw new CardAiError(name === "TimeoutError" || name === "AbortError" ? "ai_timeout" : "ai_network_error");
+  }
+  if (!res.ok) throw new CardAiError("ai_http_error", res.status);
+  let payload: {
     output_text?: string;
     output?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }>;
   };
+  try {
+    payload = await res.json();
+  } catch (e) {
+    const name = (e as { name?: string })?.name;
+    throw new CardAiError(name === "TimeoutError" || name === "AbortError" ? "ai_timeout" : "ai_invalid_output");
+  }
   const text =
     payload.output_text ??
     payload.output?.flatMap((o) => o.content ?? []).find((c) => c.type === "output_text")?.text ??
     "null";
-  return JSON.parse(text);
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new CardAiError("ai_invalid_output");
+  }
 }
