@@ -40,6 +40,14 @@ test('read calls use the fixed proxy and preserve successful data', async () => 
     } });
   assert.deepEqual(await read('youzan.crm.customer.points.get', '1.0.0', { user: { account_id: 'mapped-id', account_type: 5 } }), { point: 8 });
 });
+test('L-chain coupon activity and claim-log discovery are read-only allowed methods', async () => {
+  const read = createReadOnlyYouzan({ proxyUrl: 'https://proxy.test', proxyToken: 'private', accessToken: 'private',
+    fetchImpl: async () => Response.json({ status: 200, body: JSON.stringify({ code: 200, success: true, data: {} }) }) });
+  for (const [method, version] of [
+    ['youzan.ump.voucheractivity.manage.info.search', '1.0.1'],
+    ['youzan.ump.coupon.consume.fetchlogs.get', '3.0.2'],
+  ]) assert.deepEqual(await read(method, version, {}), {});
+});
 test('failure messages cannot leak token or customer data; missing proxy never goes direct', async () => {
   assert.throws(() => createReadOnlyYouzan({ accessToken: 'private' }), /fixed_proxy_not_configured/);
   const read = createReadOnlyYouzan({ proxyUrl: 'https://proxy.test', proxyToken: 'private', accessToken: 'private',

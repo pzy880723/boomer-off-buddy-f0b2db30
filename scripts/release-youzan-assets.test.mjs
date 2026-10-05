@@ -20,3 +20,10 @@ test('candidate is removed before PM2 persistence on both success and rollback p
   assert.ok(deletion.pos > cleanup.pos && deletion.end < cleanup.end);
   assert.ok(saves[0].pos > deletion.end && saves[0].end < cleanup.end);
 });
+test('release scripts require an explicit current release instead of a stale rollback path', () => {
+  const deploy = readFileSync(new URL('./release-youzan-assets.mjs', import.meta.url), 'utf8');
+  const prepare = readFileSync(new URL('./prepare-youzan-assets-candidate.sh', import.meta.url), 'utf8');
+  assert.match(deploy, /previous = process\.env\.ASSET_PREVIOUS_DIR/);
+  assert.match(prepare, /ASSET_PREVIOUS_DIR:\?/);
+  assert.doesNotMatch(deploy + prepare, /listing-summary-90d6633/);
+});

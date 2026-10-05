@@ -23,13 +23,15 @@ import { StatusBadge } from "@/components/status-badge";
 import { getMessagePushStats } from "@/lib/youzan-message-push.functions";
 
 const PUSH_URL =
-  "https://boomer-off-buddy.lovable.app/api/public/hooks/youzan-message";
+  "https://erp.boomeroff.com/api/public/hooks/youzan-message";
 
 const EVENTS: Array<{ code: string; label: string; note: string }> = [
   { code: "TRADE_TradePaid", label: "订单已付款", note: "扣本地库存（核心）" },
   { code: "TRADE_TradeSuccess", label: "订单已完成", note: "兜底扣库存" },
   { code: "REFUND_RefundSuccess", label: "退款成功", note: "回补本地库存（核心）" },
   { code: "REFUND_SellerAgree", label: "卖家同意退款", note: "兜底回补" },
+  { code: "POINTS", label: "客户积分变更", note: "查询最新积分，记录同步状态" },
+  { code: "COUPON_CUSTOMER_PROMOTION", label: "客户优惠券变更", note: "跟踪领券、核销和退券" },
 ];
 
 function relativeTime(iso: string | null) {
@@ -82,11 +84,12 @@ export function MessagePushPanel() {
             )}
             <div>
               <div className="text-sm font-medium">
-                {active ? "已联通 · 有赞推送正常" : "尚未收到有赞推送"}
+                {q.isError ? "推送状态暂不可读" : active ? "最近收到有赞推送" : last ? "近期暂无新推送" : "尚未收到有赞推送"}
               </div>
               <div className="text-xs text-muted-foreground">
                 最近一次推送：{relativeTime(last)} · 24h 内 {q.data?.total24h ?? 0} 条
               </div>
+              <div className="text-xs text-muted-foreground">收到通知不代表积分或优惠券已经核销，需核对具体处理状态。</div>
             </div>
           </div>
           <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 font-mono text-xs">
@@ -122,7 +125,7 @@ export function MessagePushPanel() {
           </Step>
           <Step
             n={3}
-            title="打开右上角『消息推送服务』总开关 → 勾选下面 4 个事件"
+            title="打开右上角『消息推送服务』总开关 → 勾选下面 6 个事件"
           >
             <div className="mt-2 overflow-hidden rounded-md border">
               <table className="w-full text-xs">
@@ -149,7 +152,7 @@ export function MessagePushPanel() {
             </p>
           </Step>
           <div className="rounded-md border border-dashed bg-muted/30 p-3 text-xs text-muted-foreground">
-            💡 配好后：随便去有赞门店 POS 下一单付款，回到本页刷新，「最近一次推送」应该变成刚才的时间 = 通了。
+            配置后分别核对订单、积分和优惠券的真实事件记录。不要为了测试随意创建顾客订单或扣减顾客资产；真实联调只使用指定测试会员。
           </div>
         </CardContent>
       </Card>

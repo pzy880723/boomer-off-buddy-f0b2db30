@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 base=/var/www/boomer-erp
-old="$base/releases/listing-summary-90d6633-20261005"
+old="${ASSET_PREVIOUS_DIR:?Missing ASSET_PREVIOUS_DIR}"
+[[ "$old" =~ ^/var/www/boomer-erp/releases/[a-z0-9-]+$ ]]
 release="${ASSET_RELEASE_DIR:?Missing ASSET_RELEASE_DIR}"
 [[ "$release" =~ ^/var/www/boomer-erp/releases/member-assets-[a-f0-9]{7,40}-20261005$ ]]
 [[ "$(readlink -f "$base/current")" == "$old" ]]
@@ -14,5 +15,6 @@ ln -s "$old/.env" "$release/.env"
 tar -C "$release" -xf /tmp/boomer-member-assets.tar
 cd "$release"
 node_modules/.bin/esbuild scripts/run-youzan-asset-observer.ts --bundle --platform=node --format=esm --packages=external --outfile=scripts/.youzan-asset-observer.mjs
+node_modules/.bin/esbuild scripts/run-youzan-points-canary.ts --bundle --platform=node --format=esm --packages=external --outfile=scripts/.youzan-points-canary.mjs
 npm run build:tencent > /tmp/boomer-member-assets-build.log 2>&1
 printf 'Candidate built: %s\n' "$release"

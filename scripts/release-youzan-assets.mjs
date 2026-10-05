@@ -4,9 +4,11 @@ import { execFileSync } from 'node:child_process';
 import { readlinkSync, renameSync, symlinkSync, existsSync, unlinkSync, accessSync, constants } from 'node:fs';
 
 const base = '/var/www/boomer-erp';
-const previous = `${base}/releases/listing-summary-90d6633-20261005`;
+const previous = process.env.ASSET_PREVIOUS_DIR;
+assert.match(previous ?? '', /^\/var\/www\/boomer-erp\/releases\/[a-z0-9-]+$/);
 const release = process.env.ASSET_RELEASE_DIR;
 assert.match(release ?? '', /^\/var\/www\/boomer-erp\/releases\/member-assets-[a-f0-9]{7,40}-20261005$/);
+assert.notEqual(release, previous);
 const candidate = 'boomer-member-assets-candidate';
 const pm = (...args) => execFileSync('pm2', args, { encoding: 'utf8' });
 assert.equal(readlinkSync(`${base}/current`), previous);

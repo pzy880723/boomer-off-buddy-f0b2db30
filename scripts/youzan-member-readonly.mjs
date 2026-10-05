@@ -3,6 +3,8 @@ const READS = new Set([
   'youzan.scrm.pointdecution.get/1.0.0',
   'youzan.scrm.customer.points.rule.list/1.0.0',
   'youzan.ump.voucher.query.info/1.0.0',
+  'youzan.ump.voucheractivity.manage.info.search/1.0.1',
+  'youzan.ump.coupon.consume.fetchlogs.get/3.0.2',
 ]);
 
 export function parsePoints(data) {
