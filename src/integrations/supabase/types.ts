@@ -918,6 +918,9 @@ export type Database = {
           official_discount_rate: number
           points_multiplier: number
           points_redemption_cap_rate: number
+          points_redemption_enabled: boolean
+          points_redemption_points_per_unit: number | null
+          points_redemption_unit_fen: number | null
           policy_version: number
           renewal_amount_fen: number | null
           starts_at: string
@@ -939,6 +942,9 @@ export type Database = {
           official_discount_rate?: number
           points_multiplier?: number
           points_redemption_cap_rate?: number
+          points_redemption_enabled?: boolean
+          points_redemption_points_per_unit?: number | null
+          points_redemption_unit_fen?: number | null
           policy_version?: number
           renewal_amount_fen?: number | null
           starts_at?: string
@@ -960,6 +966,9 @@ export type Database = {
           official_discount_rate?: number
           points_multiplier?: number
           points_redemption_cap_rate?: number
+          points_redemption_enabled?: boolean
+          points_redemption_points_per_unit?: number | null
+          points_redemption_unit_fen?: number | null
           policy_version?: number
           renewal_amount_fen?: number | null
           starts_at?: string
@@ -970,8 +979,12 @@ export type Database = {
       }
       commerce_order_items: {
         Row: {
+          brand_id: string | null
+          brand_name_snapshot: string | null
           category_code: string | null
           category_name_snapshot: string | null
+          character_id: string | null
+          character_name_snapshot: string | null
           condition_snapshot: string | null
           created_at: string
           discount_snapshot: Json
@@ -995,8 +1008,12 @@ export type Database = {
           unit_price: number
         }
         Insert: {
+          brand_id?: string | null
+          brand_name_snapshot?: string | null
           category_code?: string | null
           category_name_snapshot?: string | null
+          character_id?: string | null
+          character_name_snapshot?: string | null
           condition_snapshot?: string | null
           created_at?: string
           discount_snapshot?: Json
@@ -1020,8 +1037,12 @@ export type Database = {
           unit_price: number
         }
         Update: {
+          brand_id?: string | null
+          brand_name_snapshot?: string | null
           category_code?: string | null
           category_name_snapshot?: string | null
+          character_id?: string | null
+          character_name_snapshot?: string | null
           condition_snapshot?: string | null
           created_at?: string
           discount_snapshot?: Json
@@ -1045,6 +1066,20 @@ export type Database = {
           unit_price?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "commerce_order_items_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "inv_brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_order_items_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "inv_facets"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "commerce_order_items_listing_id_fkey"
             columns: ["listing_id"]
@@ -4093,10 +4128,12 @@ export type Database = {
       inv_listing_image_jobs: {
         Row: {
           attempts: number
+          claim_token: string | null
           completed_at: string | null
           created_at: string
           id: string
           last_error: string | null
+          lease_until: string | null
           locked_at: string | null
           locked_by: string | null
           next_run_at: string
@@ -4111,10 +4148,12 @@ export type Database = {
         }
         Insert: {
           attempts?: number
+          claim_token?: string | null
           completed_at?: string | null
           created_at?: string
           id?: string
           last_error?: string | null
+          lease_until?: string | null
           locked_at?: string | null
           locked_by?: string | null
           next_run_at?: string
@@ -4129,10 +4168,12 @@ export type Database = {
         }
         Update: {
           attempts?: number
+          claim_token?: string | null
           completed_at?: string | null
           created_at?: string
           id?: string
           last_error?: string | null
+          lease_until?: string | null
           locked_at?: string | null
           locked_by?: string | null
           next_run_at?: string
@@ -4192,6 +4233,141 @@ export type Database = {
             columns: ["shop_id"]
             isOneToOne: true
             referencedRelation: "youzan_shops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inv_product_content: {
+        Row: {
+          draft_blocks: Json
+          published_blocks: Json
+          published_version: number | null
+          sku_id: string
+          updated_at: string
+          updated_by: string
+          version: number
+        }
+        Insert: {
+          draft_blocks?: Json
+          published_blocks?: Json
+          published_version?: number | null
+          sku_id: string
+          updated_at?: string
+          updated_by: string
+          version?: number
+        }
+        Update: {
+          draft_blocks?: Json
+          published_blocks?: Json
+          published_version?: number | null
+          sku_id?: string
+          updated_at?: string
+          updated_by?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inv_product_content_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: true
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inv_product_content_image_jobs: {
+        Row: {
+          attempts: number
+          block_id: string
+          claim_token: string | null
+          created_at: string
+          id: string
+          last_error: string | null
+          lease_until: string | null
+          next_run_at: string
+          sku_id: string
+          source_path: string
+          status: string
+          target_path: string | null
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          block_id: string
+          claim_token?: string | null
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          lease_until?: string | null
+          next_run_at?: string
+          sku_id: string
+          source_path: string
+          status?: string
+          target_path?: string | null
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          block_id?: string
+          claim_token?: string | null
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          lease_until?: string | null
+          next_run_at?: string
+          sku_id?: string
+          source_path?: string
+          status?: string
+          target_path?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inv_product_content_image_jobs_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inv_product_content_ops: {
+        Row: {
+          client_op_id: string
+          created_at: string
+          device_id: string
+          location_id: string
+          request: Json
+          response: Json
+          sku_id: string
+          user_id: string
+        }
+        Insert: {
+          client_op_id: string
+          created_at?: string
+          device_id: string
+          location_id: string
+          request: Json
+          response: Json
+          sku_id: string
+          user_id: string
+        }
+        Update: {
+          client_op_id?: string
+          created_at?: string
+          device_id?: string
+          location_id?: string
+          request?: Json
+          response?: Json
+          sku_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inv_product_content_ops_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
             referencedColumns: ["id"]
           },
         ]
@@ -5979,8 +6155,12 @@ export type Database = {
       }
       pos_held_cart_items: {
         Row: {
+          brand_id: string | null
+          brand_name_snapshot: string | null
           category_code: string | null
           category_name_snapshot: string | null
+          character_id: string | null
+          character_name_snapshot: string | null
           discount_eligible: boolean
           held_cart_id: string
           id: string
@@ -5993,8 +6173,12 @@ export type Database = {
           subcategory_name_snapshot: string | null
         }
         Insert: {
+          brand_id?: string | null
+          brand_name_snapshot?: string | null
           category_code?: string | null
           category_name_snapshot?: string | null
+          character_id?: string | null
+          character_name_snapshot?: string | null
           discount_eligible?: boolean
           held_cart_id: string
           id?: string
@@ -6007,8 +6191,12 @@ export type Database = {
           subcategory_name_snapshot?: string | null
         }
         Update: {
+          brand_id?: string | null
+          brand_name_snapshot?: string | null
           category_code?: string | null
           category_name_snapshot?: string | null
+          character_id?: string | null
+          character_name_snapshot?: string | null
           discount_eligible?: boolean
           held_cart_id?: string
           id?: string
@@ -6021,6 +6209,20 @@ export type Database = {
           subcategory_name_snapshot?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "pos_held_cart_items_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "inv_brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_held_cart_items_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "inv_facets"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "pos_held_cart_items_held_cart_id_fkey"
             columns: ["held_cart_id"]
@@ -6463,6 +6665,45 @@ export type Database = {
           },
           {
             foreignKeyName: "pos_returns_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "pos_shifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pos_sale_cancellations: {
+        Row: {
+          cancelled_at: string
+          client_op_id: string
+          location_id: string
+          operator_id: string
+          shift_id: string
+        }
+        Insert: {
+          cancelled_at?: string
+          client_op_id: string
+          location_id: string
+          operator_id: string
+          shift_id: string
+        }
+        Update: {
+          cancelled_at?: string
+          client_op_id?: string
+          location_id?: string
+          operator_id?: string
+          shift_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_sale_cancellations_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_sale_cancellations_shift_id_fkey"
             columns: ["shift_id"]
             isOneToOne: false
             referencedRelation: "pos_shifts"
@@ -7076,6 +7317,7 @@ export type Database = {
           received_qty: number
           shipped_qty: number
           sku_id: string
+          source_sync_id: string | null
           transfer_id: string
         }
         Insert: {
@@ -7085,6 +7327,7 @@ export type Database = {
           received_qty?: number
           shipped_qty?: number
           sku_id: string
+          source_sync_id?: string | null
           transfer_id: string
         }
         Update: {
@@ -7094,6 +7337,7 @@ export type Database = {
           received_qty?: number
           shipped_qty?: number
           sku_id?: string
+          source_sync_id?: string | null
           transfer_id?: string
         }
         Relationships: [
@@ -7105,7 +7349,49 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "stock_transfer_lines_source_sync_id_fkey"
+            columns: ["source_sync_id"]
+            isOneToOne: false
+            referencedRelation: "youzan_stock_sync_queue"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "stock_transfer_lines_transfer_id_fkey"
+            columns: ["transfer_id"]
+            isOneToOne: false
+            referencedRelation: "stock_transfers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_transfer_receipts: {
+        Row: {
+          created_at: string
+          id: string
+          storage_path: string
+          transfer_id: string
+          uploaded_by: string
+          used_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          storage_path: string
+          transfer_id: string
+          uploaded_by: string
+          used_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          storage_path?: string
+          transfer_id?: string
+          uploaded_by?: string
+          used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_transfer_receipts_transfer_id_fkey"
             columns: ["transfer_id"]
             isOneToOne: false
             referencedRelation: "stock_transfers"
@@ -7115,6 +7401,7 @@ export type Database = {
       }
       stock_transfers: {
         Row: {
+          client_op_id: string | null
           code: string
           created_at: string
           from_location_id: string | null
@@ -7130,6 +7417,7 @@ export type Database = {
           reason: string | null
           received_at: string | null
           received_by: string | null
+          request_snapshot: Json | null
           shipped_at: string | null
           shipped_by: string | null
           status: string
@@ -7142,6 +7430,7 @@ export type Database = {
           youzan_sync_status: string
         }
         Insert: {
+          client_op_id?: string | null
           code?: string
           created_at?: string
           from_location_id?: string | null
@@ -7157,6 +7446,7 @@ export type Database = {
           reason?: string | null
           received_at?: string | null
           received_by?: string | null
+          request_snapshot?: Json | null
           shipped_at?: string | null
           shipped_by?: string | null
           status?: string
@@ -7169,6 +7459,7 @@ export type Database = {
           youzan_sync_status?: string
         }
         Update: {
+          client_op_id?: string | null
           code?: string
           created_at?: string
           from_location_id?: string | null
@@ -7184,6 +7475,7 @@ export type Database = {
           reason?: string | null
           received_at?: string | null
           received_by?: string | null
+          request_snapshot?: Json | null
           shipped_at?: string | null
           shipped_by?: string | null
           status?: string
@@ -8245,6 +8537,72 @@ export type Database = {
           },
         ]
       }
+      youzan_image_refresh_outbox: {
+        Row: {
+          attempts: number
+          claim_token: string | null
+          completed_claim_token: string | null
+          id: string
+          last_error: string | null
+          lease_until: string | null
+          next_run_at: string
+          result: Json | null
+          revision: number
+          shop_id: string
+          sku_id: string
+          stale_claim_token: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          claim_token?: string | null
+          completed_claim_token?: string | null
+          id?: string
+          last_error?: string | null
+          lease_until?: string | null
+          next_run_at?: string
+          result?: Json | null
+          revision?: number
+          shop_id: string
+          sku_id: string
+          stale_claim_token?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          claim_token?: string | null
+          completed_claim_token?: string | null
+          id?: string
+          last_error?: string | null
+          lease_until?: string | null
+          next_run_at?: string
+          result?: Json | null
+          revision?: number
+          shop_id?: string
+          sku_id?: string
+          stale_claim_token?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "youzan_image_refresh_outbox_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "youzan_shops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "youzan_image_refresh_outbox_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       youzan_items: {
         Row: {
           created_at: string
@@ -8587,6 +8945,7 @@ export type Database = {
           last_error: string | null
           location_id: string | null
           next_run_at: string
+          operation_id: string
           reason: string
           shop_id: string | null
           sku_id: string
@@ -8603,6 +8962,7 @@ export type Database = {
           last_error?: string | null
           location_id?: string | null
           next_run_at?: string
+          operation_id?: string
           reason?: string
           shop_id?: string | null
           sku_id: string
@@ -8619,6 +8979,7 @@ export type Database = {
           last_error?: string | null
           location_id?: string | null
           next_run_at?: string
+          operation_id?: string
           reason?: string
           shop_id?: string | null
           sku_id?: string
@@ -9232,6 +9593,39 @@ export type Database = {
         }
         Returns: Json
       }
+      custom_transfer_can_access: {
+        Args: { p_location: string; p_user: string }
+        Returns: boolean
+      }
+      custom_transfer_create: {
+        Args: {
+          p_from: string
+          p_lines: Json
+          p_note: string
+          p_operation: string
+          p_to: string
+          p_user: string
+        }
+        Returns: Json
+      }
+      custom_transfer_is_hq: { Args: { p_user: string }; Returns: boolean }
+      custom_transfer_is_legacy: { Args: { p_id: string }; Returns: boolean }
+      custom_transfer_products: {
+        Args: { p_location: string; p_query?: string; p_user: string }
+        Returns: Json
+      }
+      custom_transfer_queue_is_unlinked: {
+        Args: { p_id: string }
+        Returns: boolean
+      }
+      custom_transfer_receive: {
+        Args: { p_photos: string[]; p_transfer: string; p_user: string }
+        Returns: Json
+      }
+      custom_transfer_reserved: {
+        Args: { p_location: string; p_sku: string }
+        Returns: number
+      }
       fulfillment_bind_tote: {
         Args: {
           p_fulfillment_id: string
@@ -9392,6 +9786,10 @@ export type Database = {
         }
         Returns: string
       }
+      handheld_apply_listing_image_result: {
+        Args: { p_sku_id: string; p_source_key: string; p_target_key: string }
+        Returns: boolean
+      }
       handheld_item_actor: {
         Args: { p_location_id: string; p_user_id: string }
         Returns: Json
@@ -9466,6 +9864,58 @@ export type Database = {
           p_fingerprint: string
           p_location_id: string
           p_patch: Json
+          p_sku_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      handheld_listing_image_claim: {
+        Args: { p_limit?: number }
+        Returns: {
+          attempts: number
+          claim_token: string | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          last_error: string | null
+          lease_until: string | null
+          locked_at: string | null
+          locked_by: string | null
+          next_run_at: string
+          sku_id: string
+          source_bucket: string
+          source_index: number
+          source_path: string
+          status: string
+          target_bucket: string
+          target_path: string | null
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "inv_listing_image_jobs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      handheld_listing_image_finish: {
+        Args: {
+          p_claim_token: string
+          p_error?: string
+          p_id: string
+          p_target_path: string
+        }
+        Returns: string
+      }
+      handheld_listing_image_refresh_status: {
+        Args: { p_sku_id: string }
+        Returns: undefined
+      }
+      handheld_product_content: {
+        Args: {
+          p_device_id: string
+          p_location_id: string
+          p_request: Json
           p_sku_id: string
           p_user_id: string
         }
@@ -9624,6 +10074,18 @@ export type Database = {
         }
         Returns: Json
       }
+      pos_complete_return_without_points: {
+        Args: {
+          p_authorization_id?: string
+          p_client_op_id: string
+          p_items: Json
+          p_operator_id: string
+          p_order_id: string
+          p_reason: string
+          p_shift_id: string
+        }
+        Returns: Json
+      }
       pos_complete_sale: {
         Args: {
           p_client_op_id: string
@@ -9651,6 +10113,38 @@ export type Database = {
         }
         Returns: Json
       }
+      pos_complete_sale_v3: {
+        Args: {
+          p_authorization_id?: string
+          p_benefit_snapshot?: Json
+          p_client_op_id: string
+          p_customer_id?: string
+          p_discount_snapshot?: Json
+          p_items: Json
+          p_note?: string
+          p_operator_id: string
+          p_points_to_redeem?: number
+          p_shift_id: string
+          p_tenders: Json
+        }
+        Returns: Json
+      }
+      pos_complete_sale_without_points: {
+        Args: {
+          p_authorization_id?: string
+          p_benefit_snapshot?: Json
+          p_client_op_id: string
+          p_customer_id?: string
+          p_discount_snapshot?: Json
+          p_items: Json
+          p_note?: string
+          p_operator_id: string
+          p_shift_id: string
+          p_tenders: Json
+        }
+        Returns: Json
+      }
+      pos_points_rules: { Args: { p_customer_id: string }; Returns: Json }
       pos_record_cash_adjustment: {
         Args: {
           p_amount: number
@@ -9658,6 +10152,14 @@ export type Database = {
           p_reason: string
           p_shift_id: string
           p_type: string
+        }
+        Returns: Json
+      }
+      pos_recover_sale_cancel: {
+        Args: {
+          p_client_op_id: string
+          p_operator_id: string
+          p_shift_id: string
         }
         Returns: Json
       }
@@ -9692,6 +10194,44 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      product_content_image_claim: {
+        Args: { p_limit: number }
+        Returns: {
+          attempts: number
+          block_id: string
+          claim_token: string | null
+          created_at: string
+          id: string
+          last_error: string | null
+          lease_until: string | null
+          next_run_at: string
+          sku_id: string
+          source_path: string
+          status: string
+          target_path: string | null
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "inv_product_content_image_jobs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      product_content_image_finish: {
+        Args: {
+          p_claim_token: string
+          p_error: string
+          p_id: string
+          p_target_path: string
+        }
+        Returns: string
+      }
+      product_content_validate_blocks: {
+        Args: { p_blocks: Json }
+        Returns: undefined
+      }
+      published_product_content: { Args: { p_sku_id: string }; Returns: Json }
       restore_after_return_inspection: {
         Args: {
           p_inspection_id: string
@@ -9855,6 +10395,49 @@ export type Database = {
       youzan_enqueue_order_sync_windows: {
         Args: { p_windows: Json }
         Returns: number
+      }
+      youzan_image_refresh_claim: {
+        Args: { p_limit?: number }
+        Returns: {
+          attempts: number
+          claim_token: string | null
+          completed_claim_token: string | null
+          id: string
+          last_error: string | null
+          lease_until: string | null
+          next_run_at: string
+          result: Json | null
+          revision: number
+          shop_id: string
+          sku_id: string
+          stale_claim_token: string | null
+          status: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "youzan_image_refresh_outbox"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      youzan_image_refresh_enqueue: {
+        Args: { p_shop_id?: string; p_sku_id: string }
+        Returns: undefined
+      }
+      youzan_image_refresh_finish: {
+        Args: {
+          p_claim_token: string
+          p_error?: string
+          p_id: string
+          p_result?: Json
+          p_revision: number
+        }
+        Returns: string
+      }
+      youzan_image_refresh_snapshot: {
+        Args: { p_claim_token: string; p_id: string; p_revision: number }
+        Returns: Json
       }
       youzan_order_raw_updated_at: { Args: { p_raw: Json }; Returns: string }
     }
