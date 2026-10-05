@@ -993,7 +993,7 @@ X-Session-Token: <操作员 session token>
         tags: ["客服"],
         summary: "客服会话列表（v1.16）",
         description:
-          "门店员工按授权库位、总部客服可见全部会话；协作者可写内部备注，对外回复仅限当前主接待人。返回 data.items 与 next_cursor；服务端先按 queue 和授权范围筛选，再分页。HQ 不传 location_id 表示全部授权门店，传入按该门店过滤；门店员工不传时仍限制在授权库位，传非授权门店返回 403 forbidden_location。",
+          "门店员工按授权库位、总部客服可见全部会话；协作者可写内部备注，对外回复仅限当前主接待人。返回 data.items 与 next_cursor；服务端先按 queue 和授权范围筛选，再分页。HQ 不传 location_id 表示全部授权门店，传入按该门店过滤；门店员工不传时仍限制在授权库位，传非授权门店返回 403 forbidden_location。items[] 含 unread_count（顾客消息晚于本人 last_read_at 的精确数）、last_customer_message_at:string|null（前台通知去重）、customer_avatar_url、location_id、updated_at。",
         parameters: [
           {
             name: "location_id",
@@ -1005,6 +1005,13 @@ X-Session-Token: <操作员 session token>
           { name: "queue", in: "query", required: false, schema: { type: "string", enum: ["unclaimed", "mine", "escalated", "closed", "all"] } },
           { name: "limit", in: "query", required: false, schema: { type: "integer" } },
           { name: "cursor", in: "query", required: false, schema: { type: "string" } },
+          {
+            name: "q",
+            in: "query",
+            required: false,
+            description: "搜索词，最多 80 字（超长 400 invalid_query）；客户昵称、4 位以上数字匹配手机号、商品标题/编码、订单号；在数据库分页前按授权门店过滤。",
+            schema: { type: "string", maxLength: 80 },
+          },
         ],
         responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
       },
@@ -1018,6 +1025,7 @@ X-Session-Token: <操作员 session token>
         requestBody: jsonBody(z.object({
           action: z.enum(["claim", "takeover", "close", "reopen"]),
           assignment_version: z.number().int().min(0),
+          location_id: z.string().uuid().optional().describe("可选；提供时必须等于会话门店（HQ 也不例外），否则 403 location_mismatch，写入前拒绝"),
         })),
         responses: { ...ERROR_RESPONSES, "200": jsonRes("OK", AnyOkRes), "409": jsonRes("会话状态或版本冲突", ErrorResponse) },
       },
@@ -1026,14 +1034,21 @@ X-Session-Token: <操作员 session token>
       get: {
         tags: ["客服"],
         summary: "会话详情与消息（v1.11）",
-        description: "员工可见 internal:true 的内部备注；顾客端接口永不下发内部备注。消息保留旧字段，新增 sender_avatar_url:string|null、sender_role:customer|store_staff|hq_agent|system、sender_location_name:string|null。按历史发言者而非当前主接待人解析；头像仅安全公开 HTTPS，缺图/私桶路径返回 null。详情最近500条正序及 has_more，conversation 新增 customer_avatar_url:string|null。",
+        description: "员工可见 internal:true 的内部备注；顾客端接口永不下发内部备注。消息保留旧字段，新增 sender_avatar_url:string|null、sender_role:customer|store_staff|hq_agent|system、sender_location_name:string|null。按历史发言者而非当前主接待人解析；头像仅安全公开 HTTPS，缺图/私桶路径返回 null。conversation 含 customer_avatar_url:string|null、last_customer_message_at:string|null。\n\n分页：不传 limit/before/after 返回最近 500 条（旧客户端兼容）；limit 1–100（带游标默认 50）；before 与 after 互斥（400 cursor_conflict）；游标 \"<created_at>|<uuid>\"。响应 messages 永远正序，并含 has_more（还有更早）、has_newer（after 模式还有更新）、older_cursor、latest_cursor。before 模式 latest_cursor 为 null，不得覆盖增量水位；after 无结果时 latest_cursor 回传请求游标。员工消息含 is_mine（是否当前登录员工发送），顾客端不返回。响应头带 X-Request-Id 与 Server-Timing（auth/summary/messages/total，距请求开始毫秒）。",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          { name: "location_id", in: "query", required: false, description: "可选；必须等于会话门店，否则 403 location_mismatch", schema: { type: "string", format: "uuid" } },
+          { name: "limit", in: "query", required: false, description: "1–100；不传且无游标时默认 500", schema: { type: "integer", minimum: 1, maximum: 100 } },
+          { name: "before", in: "query", required: false, description: "与 after 互斥；取更早消息", schema: { type: "string" } },
+          { name: "after", in: "query", required: false, description: "与 before 互斥；取更新消息，配合 has_newer 排空", schema: { type: "string" } },
+        ],
         responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
       },
       post: {
         tags: ["客服"],
         summary: "发送客服消息（v1.11）",
         description:
-          "body: {body,internal,client_op_id,assignment_version?}。对外必须已领取且带 assignment_version；微信渠道未接通返回409 channel_not_connected。data.message 与 GET 相同，包含 sender_avatar_url、sender_role、sender_location_name；同 op 不同载荷返回 client_op_id_conflict。",
+          "body: {body,internal,client_op_id,assignment_version?,location_id?}。location_id 可选，提供时必须等于会话门店，否则 403 location_mismatch 且不写入。对外必须已领取且带 assignment_version；微信渠道未接通返回409 channel_not_connected。data.message 与 GET 相同，包含 sender_avatar_url、sender_role、sender_location_name；同 op 不同载荷返回 client_op_id_conflict。",
         responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
       },
     },
