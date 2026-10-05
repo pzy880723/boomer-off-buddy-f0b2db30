@@ -23,7 +23,13 @@ export async function commitOrderPage<T>(input: {
     unmatched: number;
     failed: number;
   }>;
-}): Promise<{ upserted: number; processed: number; idempotent: number; unmatched: number; failed: number }> {
+}): Promise<{
+  upserted: number;
+  processed: number;
+  idempotent: number;
+  unmatched: number;
+  failed: number;
+}> {
   const out = { upserted: 0, processed: 0, idempotent: 0, unmatched: 0, failed: 0 };
   const rows = input.mapped.map((e) => e.row);
   if (rows.length === 0) return out;
@@ -49,4 +55,3 @@ export async function commitOrderPage<T>(input: {
   }
   return out;
 }
-
