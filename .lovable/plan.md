@@ -1,19 +1,27 @@
-# 附近门店：补齐真实 GCJ-02 坐标（只读核对结论 + 最小方案）
+# 只读排查结论：SKU 5bf7c0b9（花小兔收纳盒）商品卡预览/图片不显示
 
-## 只读核对结论（commit 151d0c1d30783f56c4ddcdb263af9833a519020c）
-- 数据库：`youzan_shops` 只有 `address`（文本）字段，`inv_locations` 和 `youzan_shops` 都没有纬度、经度、坐标系、城市或营业时间字段。所以数据库里没有任何真实坐标，公开接口返回 null 是正确的，不是数据丢了。
-- 正在营业的公开门店有 3 家：温州朔门古港店、BOOMER OFF vintage（中信泰富店）、新天地店。另有一家叫“BOOMER OFF vintage”的门店，它的库位已停用，所以不公开。
-- 公开门店接口：`src/routes/api/public/storefront/shops.ts` 的查询只取 `id, shop_name, status, address, image_url` 和库位。`src/server/storefront-shops.server.ts` 里，`PublicShop.latitude/longitude` 的类型固定是 null，`toPublicShop` 第 65–66 行也写死了 null。
-- 门店管理：页面是 `src/routes/shop-mgmt.shops.tsx`，有编辑和新建两个表单，目前只能填地址。保存接口在 `src/lib/shops.functions.ts`：编辑用 `updateShopMeta`（按白名单字段更新），新建用 `createShop`。
-- 环境：以上结论只针对 Lovable 库。腾讯生产库是独立的迁移副本，我无法读取，不能断定两边一样。本次没有部署腾讯，也没有改动任何东西。
+本轮只读，没有改代码、数据库，也没有部署。
 
-## 最小后端方案（待批准）
-1. 增量迁移：在 `youzan_shops` 新增可空字段 `latitude numeric(9,6)`、`longitude numeric(9,6)`，再加 `coord_system text default 'gcj02'` 和 `coord_updated_at`。加检查约束：纬度和经度要么都填、要么都空，并限制在中国范围内（纬度 3–54，经度 73–136），坐标系只允许 `gcj02`。不回填任何数据。
-2. 保存接口：`updateShopMeta` 和 `createShop` 接受可选的 `latitude`、`longitude`（最多 6 位小数，必须成对出现），写入时固定坐标系为 gcj02。
-3. 管理表单：编辑表单加“纬度 / 经度（GCJ-02，腾讯地图坐标拾取）”两个输入框，由店长或总部人工填真实坐标。系统不根据地址推算，也不填示例坐标。
-4. 公开接口：查询加上这两个字段。`PublicShop` 改为 `latitude: number | null`、`longitude: number | null`，再加 `coord_system: "gcj02" | null`。只有纬度和经度都合法时才返回，否则一律返回 null，不猜测。其他字段的白名单不变。
-5. 距离计算：附近排序由小程序拿 wx.getLocation（type=gcj02）的结果在本地计算，服务端不接收、不保存用户位置。
-6. 测试：补 `storefront-shops.test.ts` 的用例，覆盖有坐标、缺一个坐标、超出范围、坐标系不对等情况，并确认不泄露店长和电话。
+## 数据证据（非敏感）
+- 商品状态 active，sku_scope=custom，image_processing_status=succeeded。
+- `image_url` 为空（NULL），不是过期签名的外链。
+- `image_paths` 只有 1 条：`sku-listing/gallery/<sku>/<uuid>/<uuid>.png`，路径格式合法。
+- 存储对象确实存在：sku-listing 桶，image/png，约 1.31 MB（1,306,838 字节）。
+- 品牌=三丽鸥 (Sanrio)，IP=Usahana，都已确认。关键词 5 个。
+- 上架名：`绝版！Usahana花小兔粉色卡通文具盒收纳盒`，开头带"绝版！"。
+- 已发布正文：1 家门店 published，正文 18 字。
 
-## 部署说明
-- 迁移和代码改在 Lovable 主线完成。腾讯库要由 Codex 按同一迁移文件执行并发布，之后再由人工录入 3 家店的真实坐标。在那之前，公开接口仍然返回 null。
+## 两个接口取图方式不同
+- **商品详情 image_url**（`src/server/handheld-products.server.ts` `signProductItems`）：路径能被 `parseSkuMediaPath` 识别时，不签名，返回公开代理地址 `{PUBLIC_APP_ORIGIN}/api/public/media/sku/sku-listing/...?width=480`（大图用 width=1600）。代理在 `src/routes/api/public/media/sku/$.ts`，由服务端读图并缩放成 JPEG。没有过期问题，但要求腾讯配置的 PUBLIC_APP_ORIGIN 指向能访问的站点。
+- **商品卡 image.read_url**（`items.$id.recommendation-card.ts` → `signSkuImagePaths`，`src/lib/sku-image-resolver.server.ts`）：用 service-role `createSignedUrls` 给存储直链签名，有效 24 小时。返回的是 **1.31 MB 原图 PNG**，不缩放；地址是存储域名，不是代理域名。
+- 只有签名失败时 read_url 才会是 null、status 才会是 missing。本次路径和对象都有效，按代码推断应为 ready（腾讯响应体本轮看不到，未核实）。
+
+## 可能原因（按可能性排序）
+1. **原生端加载问题**：商品卡给的是存储直链和 1.3 MB 原图 PNG，详情给的是代理地址和 480 宽 JPEG。iOS 预览如果对存储域名有访问限制（ATS 或网络白名单）、做大图解码或抠图，或者错误地沿用了详情的 image_url 逻辑，就会出现"详情有图、卡片无图"。请 Codex 在原生端检查 `card.image.status` 和 read_url 的域名能否访问。
+2. **AI 被拒导致整卡判失败**：上架名带"绝版！"，正好是禁用词，AI 一旦沿用就会报 `ai_unsupported_claim`。另外 card_title、headline 长度上限收紧了，`ai_invalid_output` 的概率也上升了。新 iOS 会拒收 source=product 的成品，表现可能就是"预览不显示"。英文词这块风险低：Usahana、Sanrio 都在名称或已确认品牌/IP 里，可以放行。
+3. 腾讯 Tencent 的 fallback_reason 只写在 `recommendation_card_ai_fallback` 日志里，只含原因码和状态码，本轮拿不到。
+
+## 建议下一步（需你授权，本轮不执行）
+- Codex 查腾讯 15:15:54 那次响应的 `source`、`fallback_reason`、`image.status`，以及 `recommendation_card_ai_fallback` 日志的原因码。
+- 如果确认是第 1 条：把商品卡 read_url 改成和详情一致的代理地址（width=1600），或者给签名加缩放参数。只改推荐卡这一处路径。
+- 如果确认是第 2 条：在发给 AI 前，把上架名里的禁用词（绝版/限量等）去掉，只当素材用，不改商品本身。
