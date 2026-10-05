@@ -238,6 +238,20 @@ function ShopCard({ shop, onEdit }: { shop: ShopWithStats; onEdit: () => void })
 }
 
 
+/** 仅用于界面只读提示；真正防线在服务端与数据库触发器。 */
+function useIsCoordAdmin(): boolean {
+  const q = useQuery({
+    queryKey: ["my-coord-admin"],
+    queryFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return false;
+      const { data } = await supabase.from("user_roles").select("role").eq("user_id", u.user.id);
+      return (data ?? []).some((r) => r.role === "super_admin");
+    },
+  });
+  return q.data === true;
+}
+
 function EditShopDialog({
   shop,
   onClose,
@@ -247,6 +261,7 @@ function EditShopDialog({
 }) {
   const qc = useQueryClient();
   const update = useServerFn(updateShopMeta);
+  const isCoordAdmin = useIsCoordAdmin();
   const [form, setForm] = useState<{
     address: string;
     latitude: string;
@@ -286,13 +301,21 @@ function EditShopDialog({
       if ((lat === "") !== (lng === "")) {
         throw new Error("纬度和经度必须成对填写或成对清空");
       }
+      const newLat = lat === "" ? null : Number(lat);
+      const newLng = lng === "" ? null : Number(lng);
+      const coordsChanged =
+        newLat !== (shop.latitude ?? null) || newLng !== (shop.longitude ?? null);
+      // 坐标未改动或非管理员时不提交坐标字段，避免无关保存被拒
+      const coordFields =
+        coordsChanged && isCoordAdmin
+          ? { latitude: newLat, longitude: newLng }
+          : {};
       await update({
         data: {
           id: shop.id,
           address: form.address || null,
           // 空串=null 成对清空；绝不把空值转成 0
-          latitude: lat === "" ? null : Number(lat),
-          longitude: lng === "" ? null : Number(lng),
+          ...coordFields,
           manager: form.manager || null,
           area_sqm: form.area_sqm ? Number(form.area_sqm) : null,
           opened_at: form.opened_at || null,
