@@ -40,3 +40,13 @@ The separate `boomer-youzan-asset-observer` timer is enabled only after the rele
 - [Raw-body push signature](https://doc.youzanyun.com/v2/doc/cloud/token/ZnS3wHtzOiuGNMkB31bcHr9jnUc.md)
 - [Points query and L headquarters support](https://doc.youzanyun.com/v2/doc/cloud/token/SxGawlMSTiDAPkkRPM0cCtUKnky.md)
 - [Buyer coupon query by voucher code](https://doc.youzanyun.com/v2/doc/cloud/token/VryPwHebmiDy4okZUk1czCDWnQf.md)
+
+## Production Result
+
+- Application commit `8b1c5f63bd58446977b84a464507156ab094b1fa` is on GitHub main and deployed at `/var/www/boomer-erp/releases/member-assets-8b1c5f6-20261005`.
+- Candidate port 3006, production port 3005 and `https://erp.boomeroff.com` all passed the signed/invalid/malformed and existing-route probes above.
+- PM2 application is online; the candidate is absent both live and in the saved restart state. Previous release is retained.
+- `boomer-youzan-asset-observer.timer` is enabled/active. First service run exited 0 with no pending events and zero asset writes.
+- Production rules re-read: free/monthly/annual plans all have redemption disabled, 100 points per 100 fen, cap rate 1. No enablement occurred during release.
+- Inbox and observation tables both contained zero rows at final verification. Real platform message delivery and cross-channel debit/refund acceptance remain unverified. The release is not a declaration that full points/coupon interoperability is live.
+- Independent review's three findings (candidate persistence, legacy-event suppression, changed snapshot ownership) were fixed and rechecked with 37 focused tests. Total final regression coverage: 101 server/client/release tests plus 10 SQL tests.
