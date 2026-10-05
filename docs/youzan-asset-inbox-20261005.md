@@ -33,3 +33,6 @@
 - point 必须非负整数（≤15 位），版本必须非负整数；否则 22023。
 - fencing（claim_token+lease）与 expected_row_version 保留；coupon 仍按 observed_at。
 - TS 处理器需识别新结果 version_conflict / same_version_observed（由 Codex 在其分支补，RPC 已自行结束 inbox）。
+
+## 0031 身份守卫
+- 已有快照 customer_id 与本次可信映射不同 → identity_conflict，inbox blocked identity_mapping_conflict（清 claim/lease），快照不覆写；积分/券、同版本/高版本均适用。TS 计数由 Codex 接。
