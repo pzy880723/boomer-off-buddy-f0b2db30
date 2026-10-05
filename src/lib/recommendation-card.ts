@@ -81,7 +81,7 @@ export function productCard(facts: CardFacts): Omit<RecommendationCard, "image" 
     card_type: "product_recommendation",
     size_mm: { width: 60, height: 90 },
     headline: clip(`${subject}好物`, 18),
-    product_name: clip(facts.name, 40),
+    product_name: clip(facts.name, 24),
     keywords,
     intro: clip(`${facts.name}，到店可看实物。`, 60),
     highlights: highlights.length ? highlights : ["欢迎到店看实物"],
