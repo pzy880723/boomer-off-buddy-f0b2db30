@@ -21,3 +21,9 @@
 - 表 `youzan_member_asset_observations`：只读外部观察，不是本地可花余额，不写钱包/pos_customer_coupons/积分账本。
 - 原子 RPC：claim_token+lease fencing → 授权店铺 → 乐观 row_version → observed_at 单调；旧结果 older_observation，inbox 置 blocked superseded_by_newer_observation；成功 inbox 置 blocked observed_asset_adapter_not_connected（仍无成功态）。
 - 权限：RPC 仅 service_role；表仅 super_admin/hq_operator 经 RLS 只读，anon 无权限。
+
+## 推送签名协议（现行合同 ZnS3wHtzOiuGNMkB31bcHr9jnUc）
+- 有 `Event-Sign` 头：只验 MD5(client_id + 原始 HTTP body + client_secret)，失败 401，不回退 body.sign；Client-Id/Event-Type 头若存在须一致；body.client_id 严格标量。
+- 无头：legacy body.sign（按解码 msg），入库即 blocked legacy_signature_readonly_hint，不进资产处理。
+- 路由 `readYouzanPush` 只读一次 request.text()，原文传给 `dispatchAssetPush`。
+- 积分只读查询：`youzan-points-query.server.ts`（points.get 1.0.0 + is_query_points_account_version=true，必须固定出口）。入参待腾讯真实 code=200 核对。L 店不在积分查询扩展点、冻结 4.0.0 不含 L：ERP 独立抵扣保持关闭。
