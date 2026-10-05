@@ -12,8 +12,27 @@ import {
   userCanAccessLocation,
 } from "@/server/handheld-auth.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { QR_BUCKET, printStoreQr, type QrPrintDeps } from "@/server/store-qr-print.server";
+import { QR_BUCKET, QR_MAX_BODY_BYTES, printStoreQr, type QrPrintDeps } from "@/server/store-qr-print.server";
 import type { QrRow } from "@/server/store-qr.server";
+
+const TOO_LARGE = Symbol("too_large");
+/** 先看 Content-Length，再按流累计字节，超限立即中止，避免整包读入。 */
+export async function readJsonCapped(request: Request, max: number): Promise<unknown> {
+  const len = Number(request.headers.get("content-length") ?? "");
+  if (Number.isFinite(len) && len > max) return TOO_LARGE;
+  if (!request.body) return null;
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > max) { await reader.cancel().catch(() => undefined); return TOO_LARGE; }
+    chunks.push(value);
+  }
+  try { return JSON.parse(new TextDecoder().decode(Buffer.concat(chunks))); } catch { return null; }
+}
 
 function deps(): QrPrintDeps {
   return {
@@ -61,7 +80,9 @@ export const Route = createFileRoute("/api/public/handheld/print/store-qr")({
           if (!auth.ok) return auth.response;
           const session = await resolveSessionUser(request);
           if (!session) return err("Employee session required", 401, { code: "session_required" });
-          const r = await printStoreQr(deps(), session.user_id, await request.json().catch(() => null));
+          const body = await readJsonCapped(request, QR_MAX_BODY_BYTES);
+          if (body === TOO_LARGE) return err("Payload too large", 413, { code: "payload_too_large" });
+          const r = await printStoreQr(deps(), session.user_id, body);
           return r.ok ? ok(r.body) : err(r.code, r.status, { code: r.code });
         } catch {
           return err("QR config unavailable", 500, { code: "internal_error" });

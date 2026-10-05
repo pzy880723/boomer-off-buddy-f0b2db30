@@ -6,10 +6,28 @@
  *   DB 失败时只清理本次新对象；旧对象从不删除（其他版本可能仍引用）。
  */
 import { z } from "zod";
+import sharp from "sharp";
 import type { QrRow } from "./store-qr.server";
 
 export const QR_BUCKET = "store-qr";
-export const QR_MAX_BYTES = 15 * 1024 * 1024;
+export const QR_MAX_BYTES = 15_000_000; // 与 iOS 一致（十进制字节，非 MiB）
+export const QR_MAX_PIXELS = 40_000_000;
+/** JSON 请求体上限：base64 膨胀 + 少量字段余量。 */
+export const QR_MAX_BODY_BYTES = Math.ceil(QR_MAX_BYTES / 3) * 4 + 4096;
+
+/** 完整解码校验（不修改原字节）；格式须与魔数一致，像素总量受限。 */
+export async function decodeCheck(bytes: Uint8Array, mime: "image/png" | "image/jpeg"): Promise<boolean> {
+  try {
+    const img = sharp(bytes, { limitInputPixels: QR_MAX_PIXELS, failOn: "truncated" });
+    const meta = await img.metadata();
+    if ((mime === "image/png" ? "png" : "jpeg") !== meta.format) return false;
+    if (!meta.width || !meta.height) return false;
+    const { info } = await img.raw().toBuffer({ resolveWithObject: true });
+    return info.width === meta.width && info.height === meta.height;
+  } catch {
+    return false;
+  }
+}
 export const QR_SIGN_TTL = 300;
 
 export const CHANNEL_TO_PURPOSE = {
@@ -32,6 +50,7 @@ export type QrPrintDeps = {
   remove(path: string): Promise<void>;
   saveImage(row: { location_id: string; purpose: string; image_path: string; updated_by: string }): Promise<{ updated_at: string } | null>;
   newObjectId(): string;
+  decode?(bytes: Uint8Array, mime: "image/png" | "image/jpeg"): Promise<boolean>;
 };
 
 const Get = z.object({ action: z.literal("get"), location_id: z.string().uuid() }).strict();
@@ -93,6 +112,7 @@ export async function printStoreQr(deps: QrPrintDeps, userId: string, body: unkn
   if (bytes.length > QR_MAX_BYTES) return fail(422, "image_too_large");
   const real = sniffImage(bytes);
   if (!real || real !== mime_type) return fail(422, "invalid_image");
+  if (!(await (deps.decode ?? decodeCheck)(bytes, real))) return fail(422, "invalid_image");
 
   const path = `${location_id}/${channel}/${deps.newObjectId()}.${real === "image/png" ? "png" : "jpg"}`;
   try {
