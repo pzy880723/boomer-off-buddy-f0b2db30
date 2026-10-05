@@ -433,7 +433,7 @@ async function loadStoreFacts(params: {
       sourceFresh = coverage.fresh;
     }
 
-    const offline = offRes.v.reduce(
+    const offline = offRes.v.reduce<{ amount_fen: number; entry_count: number; order_count: number }>(
       (acc, r) => ({
         amount_fen: acc.amount_fen + Number(r.amount_fen || 0),
         entry_count: acc.entry_count + 1,
