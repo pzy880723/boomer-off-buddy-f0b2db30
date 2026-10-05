@@ -195,5 +195,5 @@ test("POINTS client_id 严格标量 / body null 数组 400", async () => {
 
 test("hook：JSON null/数组直接 400", () => {
   const src = readFileSync(new URL("../routes/api/public/hooks/youzan-message.ts", import.meta.url), "utf8");
-  assert.match(src, /Array\.isArray\(payload\)/);
+  assert.match(src, /Array\.isArray\(parsed\.body\)/);
 });
