@@ -10647,6 +10647,7 @@ export type Database = {
         Args: { p_actor: string; p_location_id: string; p_require_hq?: boolean }
         Returns: boolean
       }
+      support_actor_is_hq: { Args: { p_actor: string }; Returns: boolean }
       support_customer_conversation_list: {
         Args: { p_customer_id: string }
         Returns: Json
@@ -10658,6 +10659,16 @@ export type Database = {
           p_last_read_at: string
         }
         Returns: undefined
+      }
+      support_customer_post_message: {
+        Args: {
+          p_body: string
+          p_client_op_id: string
+          p_conversation_id: string
+          p_customer_id: string
+          p_customer_name: string
+        }
+        Returns: Json
       }
       support_escalate_overdue: {
         Args: { p_reply_seconds?: number; p_unclaimed_seconds?: number }

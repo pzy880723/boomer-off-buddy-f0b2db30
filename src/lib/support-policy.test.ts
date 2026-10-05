@@ -21,6 +21,15 @@ describe("supportCapabilities", () => {
     assert.equal(supportCapabilities(s2, c).can_note, false);
     assert.equal(supportCapabilities(s1, c).can_takeover, false);
   });
+  it("close/reopen only primary or HQ; wechat cannot reply", () => {
+    const c = { location_id: "L1", status: "open", primary_agent_id: "s1" };
+    const other = { user_id: "s1b", is_hq_agent: false, location_ids: ["L1"] };
+    assert.equal(supportCapabilities(other, c).can_close, false);
+    assert.equal(supportCapabilities(hq, c).can_close, true);
+    assert.equal(supportCapabilities(s1, { ...c, primary_agent_id: null }).can_close, false);
+    assert.equal(supportCapabilities(s1, { ...c, channel: "wechat_kf" }).can_reply, false);
+    assert.equal(supportCapabilities(s1, { ...c, channel: "wechat_kf" }).can_note, true);
+  });
   it("closed blocks reply/claim, allows reopen", () => {
     const c = { location_id: "L1", status: "closed", primary_agent_id: "s1" };
     const caps = supportCapabilities(s1, c);
