@@ -32,6 +32,7 @@ import { assertGoScopeSynced, type GoSyncRow } from "@/lib/go-bridge/sync-state"
 import { buildGoDailySummary, type GoStoreInput } from "@/lib/go-bridge/daily-contract";
 import { completedSyncCoverage, type CompletedScan } from "@/lib/go-bridge/sync-coverage";
 import { shanghaiToday, shanghaiDayWindow } from "@/lib/store-targets/sales-window";
+import { createServerTiming } from "@/lib/server-timing";
 import { fetchAllPages, mapLimit, sumYouzanPaid } from "@/lib/go-bridge/concurrency";
 
 export { GoScopeError };
@@ -522,4 +523,36 @@ export function goError(e: unknown) {
     return goJson({ ok: false, code: e.code, error: e.message }, e.status);
   }
   return goJson({ ok: false, code: "internal_error", error: "服务暂时不可用" }, 500);
+}
+
+/** 非敏感请求追踪：随机 request id + 阶段耗时（Server-Timing），不含 token/用户信息。
+ * 响应体只追加 request_id 字段，原有字段不变；同时写 X-Request-Id 头。 */
+export async function goTraced(
+  route: string,
+  run: (timing: { mark: (name: string) => void }) => Promise<Response>,
+): Promise<Response> {
+  const requestId = crypto.randomUUID();
+  const timer = createServerTiming();
+  let res: Response;
+  try {
+    res = await run(timer);
+  } catch (e) {
+    res = goError(e);
+  }
+  let out = res;
+  if ((res.headers.get("content-type") ?? "").includes("application/json")) {
+    try {
+      const body = (await res.clone().json()) as unknown;
+      if (body && typeof body === "object" && !Array.isArray(body)) {
+        out = new Response(JSON.stringify({ ...(body as object), request_id: requestId }), res);
+      }
+    } catch {
+      /* keep original */
+    }
+  }
+  out = timer.apply(out);
+  out.headers.set("X-Request-Id", requestId);
+  out.headers.set("Access-Control-Expose-Headers", "X-Request-Id, Server-Timing");
+  console.log(JSON.stringify({ evt: "go_api", route, request_id: requestId, status: out.status, timing: out.headers.get("Server-Timing") }));
+  return out;
 }
