@@ -41,7 +41,8 @@ export type CardDeps = {
   signImage(path: string): Promise<string | null>;
   /** 本门店已发布正文（只读 commerce_listings.description），无则 null。 */
   publishedDescription?(skuId: string, locationId: string): Promise<string | null>;
-  generate(facts: CardFacts): Promise<unknown>;
+  /** retry 存在时为第二次生成：告知上次被拒的机器原因，要求重写。 */
+  generate(facts: CardFacts, retry?: { reason: string }): Promise<unknown>;
 };
 
 export type CardResult =
@@ -83,15 +84,25 @@ export async function buildRecommendationCard(
 
   let ai: AiCard | null = null;
   let fallback: string | null = null;
+  const review = (out: unknown): string | null => {
+    const parsed = AiCardSchema.safeParse(out);
+    if (!parsed.success) return "ai_invalid_output";
+    const r = rejectAiCard(parsed.data, facts);
+    if (!r) ai = parsed.data;
+    return r;
+  };
   try {
-    const parsed = AiCardSchema.safeParse(await deps.generate(facts));
-    if (!parsed.success) fallback = "ai_invalid_output";
-    else {
-      fallback = rejectAiCard(parsed.data, facts);
-      if (!fallback) ai = parsed.data;
+    fallback = review(await deps.generate(facts));
+    if (fallback) {
+      // 审核失败只重写一次；不放宽审核
+      console.warn("recommendation_card_ai_review_failed", { attempt: 1, code: fallback });
+      const first = fallback;
+      fallback = review(await deps.generate(facts, { reason: first }));
+      if (fallback) console.warn("recommendation_card_ai_review_failed", { attempt: 2, code: fallback });
     }
   } catch (e) {
     fallback = e instanceof CardAiError ? e.code : "ai_unavailable";
+    ai = null;
     console.warn("recommendation_card_ai_fallback", { code: fallback, status: e instanceof CardAiError ? (e.status ?? null) : null });
   }
   const body = ai ? mergeAiCard(facts, ai) : productCard(facts);
@@ -106,7 +117,14 @@ export function cleanDescription(s: string | null | undefined): string | null {
 }
 
 /** 生产 AI 调用：Lovable AI Gateway，只输入已确认事实。 */
-export async function generateCardCopy(facts: CardFacts): Promise<unknown> {
+const RETRY_HINT: Record<string, string> = {
+  ai_unsupported_claim: "上次文案含未经允许的年份/年代（包括版权年份，版权年不等于生产年）或限量/绝版/稀有/收藏级/保值/正品/联名/功能测试等词，请全部删除后重写。",
+  ai_unconfirmed_brand: "上次文案出现了 name/brand/ip 中没有的英文词，请删除后重写。",
+  ai_invalid_markup: "上次文案含链接或标记，请改为纯文本。",
+  ai_invalid_output: "上次输出字段或长度不合规：card_title 2-18字符、headline ≤14、keywords 2-3个≤6字、intro ≤65、highlights 用分号连接总长 ≤55，不得有其他字段。",
+};
+
+export async function generateCardCopy(facts: CardFacts, retry?: { reason: string }): Promise<unknown> {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new CardAiError("ai_not_configured");
   let res: Response;
@@ -126,10 +144,11 @@ export async function generateCardCopy(facts: CardFacts): Promise<unknown> {
 name（上架名）与 published_description（已发布正文）只是素材，必须重新编辑，不得照抄或截断。
 card_title：卡面独立短标题，2-18字符，品牌/IP+器型或用途，推荐中文6-10字；英文名可保留，不堆叠年份/价格/绝版词。
 名称里其余有依据的信息放进 intro/highlights。英文词只能使用 name/brand/ip 中已出现的，不得新造英文品牌。
-禁止编造品牌、IP、年份、年代、产地、限量/绝版/稀有/收藏级/保值/正品/联名/功能测试；不知道就不写。不写价格。
+禁止写任何年份/年代（包括版权年份，正文里出现也不写），禁止编造品牌、IP、产地、限量/绝版/稀有/收藏级/保值/正品/联名/功能测试；不知道就不写。不写价格。
 返回 JSON {"card_title":"2-18字符短标题","headline":"≤14字一句定位推荐语","keywords":["2-3个≤6字短词"],"intro":"≤65字简介","highlights":["1-3条收藏看点，单条≤24字，全部用分号连接后含分隔符总长≤55字"]}，不得有其他字段。`,
         },
         { role: "user", content: JSON.stringify({ ...facts, sku_id: undefined }) },
+        ...(retry ? [{ role: "user", content: `重写要求：${RETRY_HINT[retry.reason] ?? RETRY_HINT.ai_invalid_output}` }] : []),
       ],
     }),
   });
