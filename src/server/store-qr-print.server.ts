@@ -13,7 +13,7 @@ export const QR_MAX_BYTES = 15 * 1024 * 1024;
 export const QR_SIGN_TTL = 300;
 
 export const CHANNEL_TO_PURPOSE = {
-  wechat: "wechat_follow",
+  wechat: "wecom_contact", // 门店个人/企微联系码，非公众号
   xiaohongshu: "xiaohongshu",
   dianping: "dianping",
   identify: "identify",
