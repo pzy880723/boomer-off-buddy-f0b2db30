@@ -600,6 +600,24 @@ function CreateShopDialog({ open, onClose }: { open: boolean; onClose: () => voi
               />
             </div>
             <div>
+              <Label className="mb-1.5 block text-xs">纬度（GCJ-02，可后补）</Label>
+              <Input
+                type="number"
+                step="0.000001"
+                value={form.latitude}
+                onChange={(e) => setForm({ ...form, latitude: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label className="mb-1.5 block text-xs">经度（GCJ-02，可后补）</Label>
+              <Input
+                type="number"
+                step="0.000001"
+                value={form.longitude}
+                onChange={(e) => setForm({ ...form, longitude: e.target.value })}
+              />
+            </div>
+            <div>
               <Label className="mb-1.5 block text-xs">店长</Label>
               <Input
                 value={form.manager}
