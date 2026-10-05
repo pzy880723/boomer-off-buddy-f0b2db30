@@ -45,10 +45,10 @@ const PURPOSE_TO_CHANNEL = new Map(Object.entries(CHANNEL_TO_PURPOSE).map(([c, p
 /** 旧客户端渠道名：dianping 仅等同于评价码（新天地历史记录即评价码），绝不当打卡码。 */
 const LEGACY_CHANNEL = "dianping" as const;
 const SAVE_CHANNELS = [...CHANNELS, LEGACY_CHANNEL] as const;
-/** 中性展示文案（无赠品/活动）。 */
+/** 展示文案：打卡卡允许宣传收藏打卡赠品（到收银台领取）；评价卡必须保持中性，禁止任何赠品/奖励/领取或字数要求。 */
 export const CHANNEL_LABELS: Partial<Record<QrChannel, { title: string; caption: string }>> = {
-  dianping_checkin: { title: "大众点评打卡", caption: "扫码打开本店大众点评，记录你的到店体验" },
-  dianping_review: { title: "分享真实评价", caption: "扫码评价本次体验" },
+  dianping_checkin: { title: "收藏打卡送冰箱贴", caption: "完成收藏打卡后，到收银台领取" },
+  dianping_review: { title: "诚邀您点评", caption: "欢迎分享真实体验" },
 };
 
 export type QrPrintDeps = {

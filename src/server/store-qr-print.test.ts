@@ -164,7 +164,7 @@ test("点评双用途独立：打卡与评价各自返回，不互相替用", as
 test("旧码兼容：历史 {loc}/dianping/ 对象作为评价码可读，别名仅指向评价码；残留 purpose=dianping 不返回", async () => {
   const r: any = await printStoreQr(deps({ list: async () => [row("dianping_review", "dianping"), row("dianping", "dianping")] }).d, "u", { action: "get", location_id: LOC });
   assert.deepEqual(r.body.channels.map((c: any) => [c.channel, c.legacy_alias_of ?? null]), [["dianping_review", null], ["dianping", "dianping_review"]]);
-  assert.equal(r.body.channels[0].title, "分享真实评价");
+  assert.equal(r.body.channels[0].title, "诚邀您点评");
 });
 
 test("门店隔离：他店路径的点评码不返回", async () => {
