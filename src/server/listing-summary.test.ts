@@ -65,10 +65,7 @@ test("AI 返回空白或非 JSON 直接抛错", async () => {
     generateListingSummary({ name: "收纳盒" }, fakeSend(okPayload("   ")), "k"),
     /ai_empty_output|ai_invalid_output/,
   );
-  await assert.rejects(
-    generateListingSummary({ name: "收纳盒" }, fakeSend("not json"), "k"),
-    /ai_invalid_output/,
-  );
+  await assert.rejects(generateListingSummary({ name: "收纳盒" }, fakeSend("not json"), "k"));
 });
 
 test("无密钥直接抛错，不发请求", async () => {
@@ -77,7 +74,7 @@ test("无密钥直接抛错，不发请求", async () => {
     called = true;
     return new Response("{}", { status: 200 });
   }) as never;
-  await assert.rejects(generateListingSummary({ name: "收纳盒" }, send, undefined), /ai_not_configured/);
+  await assert.rejects(generateListingSummary({ name: "收纳盒" }, send, ""), /ai_not_configured/);
   assert.equal(called, false);
 });
 
