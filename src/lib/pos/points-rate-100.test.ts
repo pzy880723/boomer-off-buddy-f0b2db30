@@ -52,6 +52,7 @@ test("real pos_points_rules returns 100/100, cap 1, enabled unchanged after the 
   await db.exec(await readFile(new URL("tests/sql/pos-points-fixture.sql", root), "utf8"));
   const mig = await readFile(new URL("supabase/migrations/20261002174301_pos_points_redemption.sql", root), "utf8");
   const start = mig.indexOf("CREATE OR REPLACE FUNCTION public.pos_points_rules(");
+  await db.exec("CREATE TABLE public.pos_customer_wallets(customer_id uuid PRIMARY KEY, points integer)");
   await db.exec(`ALTER TABLE commerce_membership_plans
     ADD COLUMN points_redemption_enabled boolean NOT NULL DEFAULT false,
     ADD COLUMN points_redemption_points_per_unit integer CHECK (points_redemption_points_per_unit > 0),
@@ -59,7 +60,6 @@ test("real pos_points_rules returns 100/100, cap 1, enabled unchanged after the 
     ADD COLUMN updated_at timestamptz DEFAULT now();`);
   await db.exec(mig.slice(start, mig.indexOf("$$;", start) + 3));
   await db.exec(`
-    CREATE TABLE IF NOT EXISTS public.pos_customer_wallets(customer_id uuid PRIMARY KEY, points integer);
     INSERT INTO commerce_customers VALUES ('00000000-0000-0000-0000-000000000002','active');
     INSERT INTO pos_customer_wallets(customer_id,points) VALUES ('00000000-0000-0000-0000-000000000002',3000);
     INSERT INTO commerce_membership_plans(id,code,tier_code,points_redemption_cap_rate) VALUES
