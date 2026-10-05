@@ -142,7 +142,7 @@ export async function handlePointsMessage(
       envelope: { auth_protocol: protocol, biz_id: bizId, version, send_count: sendCount, kdt_name: scalarStr(body.kdt_name) || null },
       // legacy 签名只作只读提示：一律 blocked，不进入资产处理。
       initial_status: protocol === "legacy_body_sign" ? "blocked" : initialStatus,
-      initial_reason: protocol === "legacy_body_sign" ? "legacy_signature_readonly_hint" : initialReason,
+      initial_reason: protocol === "legacy_body_sign" && initialStatus === "pending" ? "legacy_signature_readonly_hint" : initialReason,
     });
     if (r.result === "conflict") return { status: 409, body: { code: 409, message: "unique_id_payload_conflict" }, result: r.result };
     return { status: 200, body: { code: 0, msg: "success" }, result: r.result };
