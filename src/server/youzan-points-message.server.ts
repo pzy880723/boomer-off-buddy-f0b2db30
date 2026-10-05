@@ -100,7 +100,13 @@ export async function handlePointsMessage(
   // 分类：只决定初始状态，不做任何资产动作。
   let initialStatus: PointsIngest["initial_status"] = "pending";
   let initialReason: string | null = null;
-  if (!(await deps.isActiveShop(kdtId))) {
+  let active: boolean;
+  try {
+    active = await deps.isActiveShop(kdtId);
+  } catch {
+    return fail(503, "shop_lookup_unavailable");
+  }
+  if (!active) {
     initialStatus = "blocked"; initialReason = "shop_not_authorized";
   } else if (typeof msg.client_hash === "string" && msg.client_hash.toLowerCase() === md5hex(clientId)) {
     initialStatus = "blocked"; initialReason = "own_operation_loop";
