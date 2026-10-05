@@ -21,7 +21,8 @@ before(async () => {
     INSERT INTO public.youzan_shops VALUES (${HQ},'hq',NULL,'active'),(${SHOP},'branch',${HQ},'active'),
       (${OTHER_HQ},'hq',NULL,'active'),(${OTHER_SHOP},'branch',${OTHER_HQ},'active');
   `);
-  await db.exec(await readFile(new URL('../drizzle/migrations/0032_youzan_points_operations.sql', import.meta.url), 'utf8'));
+  const sqlPath = process.env.YZ_POINTS_OPS_SQL ? pathToFileURL(process.env.YZ_POINTS_OPS_SQL) : new URL('../drizzle/migrations/0032_youzan_points_operations.sql', import.meta.url);
+  await db.exec(await readFile(sqlPath, 'utf8'));
 });
 beforeEach(() => db.exec('RESET ROLE; TRUNCATE public.youzan_points_operations;'));
 after(() => db.close());
