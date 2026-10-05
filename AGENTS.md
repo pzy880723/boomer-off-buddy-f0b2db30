@@ -1,3 +1,5 @@
 # Architecture rules
 - Youzan push callbacks: when the Event-Sign header is present, verify MD5(client_id + raw HTTP body + client_secret) only, with no fallback to body.sign. Header-less legacy body.sign messages are read-only hints and stay blocked. Why: only the raw body is covered by the current official signature.
 - Youzan member-asset notifications only trigger read-only re-queries into youzan_member_asset_observations. They never write wallets, coupons or the points ledger. Why: the outer fields are unsigned and the ERP is the single ledger.
+- Support conversations: external replies only by primary_agent_id with matching assignment_version, enforced inside DB RPCs (support_update_assignment / support_staff_post_message) in one transaction; internal notes open to any authorized collaborator. Why: prevents race between old owner and HQ takeover.
+- Support context location is derived server-side (order lines → single store else HQ null; product → listing location); open conversations dedupe on customer_id + context_key. Why: client-provided store is untrusted.

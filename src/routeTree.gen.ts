@@ -284,6 +284,7 @@ import { Route as ApiPublicStorefrontShortagesIdConfirmRefundRouteImport } from 
 import { Route as ApiPublicStorefrontShortagesIdRespondRouteImport } from './routes/api/public/storefront/shortages.$id.respond'
 import { Route as ApiPublicStorefrontSupportConversationsIdRouteImport } from './routes/api/public/storefront/support.conversations.$id'
 import { Route as ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteImport } from './routes/api/public/handheld/parcels.items.$itemId.pack-pieces'
+import { Route as ApiPublicHandheldSupportConversationsIdAssignmentRouteImport } from './routes/api/public/handheld/support.conversations.$id.assignment'
 import { Route as ApiPublicPosOrdersIdReturnsPreviewRouteImport } from './routes/api/public/pos/orders.$id.returns.preview'
 import { Route as ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateImageRouteImport } from './routes/api/public/handheld/parcels.items.$itemId.pack-pieces.estimate-image'
 import { Route as ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRouteImport } from './routes/api/public/handheld/parcels.items.$itemId.pack-pieces.estimate-title'
@@ -1834,6 +1835,12 @@ const ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute =
     path: '/items/$itemId/pack-pieces',
     getParentRoute: () => ApiPublicHandheldParcelsRoute,
   } as any)
+const ApiPublicHandheldSupportConversationsIdAssignmentRoute =
+  ApiPublicHandheldSupportConversationsIdAssignmentRouteImport.update({
+    id: '/assignment',
+    path: '/assignment',
+    getParentRoute: () => ApiPublicHandheldSupportConversationsIdRoute,
+  } as any)
 const ApiPublicPosOrdersIdReturnsPreviewRoute =
   ApiPublicPosOrdersIdReturnsPreviewRouteImport.update({
     id: '/preview',
@@ -2110,7 +2117,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/label-templates/$id/set-default': typeof ApiPublicHandheldLabelTemplatesIdSetDefaultRoute
   '/api/public/handheld/notifications/$id/read': typeof ApiPublicHandheldNotificationsIdReadRoute
   '/api/public/handheld/print-jobs/$id/ack': typeof ApiPublicHandheldPrintJobsIdAckRoute
-  '/api/public/handheld/support/conversations/$id': typeof ApiPublicHandheldSupportConversationsIdRoute
+  '/api/public/handheld/support/conversations/$id': typeof ApiPublicHandheldSupportConversationsIdRouteWithChildren
   '/api/public/handheld/transfers/$id/confirm': typeof ApiPublicHandheldTransfersIdConfirmRoute
   '/api/public/handheld/transfers/$id/scan': typeof ApiPublicHandheldTransfersIdScanRoute
   '/api/public/pos/carts/$id/resume': typeof ApiPublicPosCartsIdResumeRoute
@@ -2129,6 +2136,7 @@ export interface FileRoutesByFullPath {
   '/api/public/storefront/shortages/$id/respond': typeof ApiPublicStorefrontShortagesIdRespondRoute
   '/api/public/storefront/support/conversations/$id': typeof ApiPublicStorefrontSupportConversationsIdRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteWithChildren
+  '/api/public/handheld/support/conversations/$id/assignment': typeof ApiPublicHandheldSupportConversationsIdAssignmentRoute
   '/api/public/pos/orders/$id/returns/preview': typeof ApiPublicPosOrdersIdReturnsPreviewRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-image': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateImageRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-title': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRoute
@@ -2383,7 +2391,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/label-templates/$id/set-default': typeof ApiPublicHandheldLabelTemplatesIdSetDefaultRoute
   '/api/public/handheld/notifications/$id/read': typeof ApiPublicHandheldNotificationsIdReadRoute
   '/api/public/handheld/print-jobs/$id/ack': typeof ApiPublicHandheldPrintJobsIdAckRoute
-  '/api/public/handheld/support/conversations/$id': typeof ApiPublicHandheldSupportConversationsIdRoute
+  '/api/public/handheld/support/conversations/$id': typeof ApiPublicHandheldSupportConversationsIdRouteWithChildren
   '/api/public/handheld/transfers/$id/confirm': typeof ApiPublicHandheldTransfersIdConfirmRoute
   '/api/public/handheld/transfers/$id/scan': typeof ApiPublicHandheldTransfersIdScanRoute
   '/api/public/pos/carts/$id/resume': typeof ApiPublicPosCartsIdResumeRoute
@@ -2402,6 +2410,7 @@ export interface FileRoutesByTo {
   '/api/public/storefront/shortages/$id/respond': typeof ApiPublicStorefrontShortagesIdRespondRoute
   '/api/public/storefront/support/conversations/$id': typeof ApiPublicStorefrontSupportConversationsIdRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteWithChildren
+  '/api/public/handheld/support/conversations/$id/assignment': typeof ApiPublicHandheldSupportConversationsIdAssignmentRoute
   '/api/public/pos/orders/$id/returns/preview': typeof ApiPublicPosOrdersIdReturnsPreviewRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-image': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateImageRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-title': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRoute
@@ -2664,7 +2673,7 @@ export interface FileRoutesById {
   '/api/public/handheld/label-templates/$id/set-default': typeof ApiPublicHandheldLabelTemplatesIdSetDefaultRoute
   '/api/public/handheld/notifications/$id/read': typeof ApiPublicHandheldNotificationsIdReadRoute
   '/api/public/handheld/print-jobs/$id/ack': typeof ApiPublicHandheldPrintJobsIdAckRoute
-  '/api/public/handheld/support/conversations/$id': typeof ApiPublicHandheldSupportConversationsIdRoute
+  '/api/public/handheld/support/conversations/$id': typeof ApiPublicHandheldSupportConversationsIdRouteWithChildren
   '/api/public/handheld/transfers/$id/confirm': typeof ApiPublicHandheldTransfersIdConfirmRoute
   '/api/public/handheld/transfers/$id/scan': typeof ApiPublicHandheldTransfersIdScanRoute
   '/api/public/pos/carts/$id/resume': typeof ApiPublicPosCartsIdResumeRoute
@@ -2683,6 +2692,7 @@ export interface FileRoutesById {
   '/api/public/storefront/shortages/$id/respond': typeof ApiPublicStorefrontShortagesIdRespondRoute
   '/api/public/storefront/support/conversations/$id': typeof ApiPublicStorefrontSupportConversationsIdRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteWithChildren
+  '/api/public/handheld/support/conversations/$id/assignment': typeof ApiPublicHandheldSupportConversationsIdAssignmentRoute
   '/api/public/pos/orders/$id/returns/preview': typeof ApiPublicPosOrdersIdReturnsPreviewRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-image': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateImageRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-title': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateTitleRoute
@@ -2965,6 +2975,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/shortages/$id/respond'
     | '/api/public/storefront/support/conversations/$id'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces'
+    | '/api/public/handheld/support/conversations/$id/assignment'
     | '/api/public/pos/orders/$id/returns/preview'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-image'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-title'
@@ -3238,6 +3249,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/shortages/$id/respond'
     | '/api/public/storefront/support/conversations/$id'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces'
+    | '/api/public/handheld/support/conversations/$id/assignment'
     | '/api/public/pos/orders/$id/returns/preview'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-image'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-title'
@@ -3518,6 +3530,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/shortages/$id/respond'
     | '/api/public/storefront/support/conversations/$id'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces'
+    | '/api/public/handheld/support/conversations/$id/assignment'
     | '/api/public/pos/orders/$id/returns/preview'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-image'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-title'
@@ -5626,6 +5639,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteImport
       parentRoute: typeof ApiPublicHandheldParcelsRoute
     }
+    '/api/public/handheld/support/conversations/$id/assignment': {
+      id: '/api/public/handheld/support/conversations/$id/assignment'
+      path: '/assignment'
+      fullPath: '/api/public/handheld/support/conversations/$id/assignment'
+      preLoaderRoute: typeof ApiPublicHandheldSupportConversationsIdAssignmentRouteImport
+      parentRoute: typeof ApiPublicHandheldSupportConversationsIdRoute
+    }
     '/api/public/pos/orders/$id/returns/preview': {
       id: '/api/public/pos/orders/$id/returns/preview'
       path: '/preview'
@@ -6272,14 +6292,29 @@ const ApiPublicHandheldItemsUploadImageRouteWithChildren =
     ApiPublicHandheldItemsUploadImageRouteChildren,
   )
 
+interface ApiPublicHandheldSupportConversationsIdRouteChildren {
+  ApiPublicHandheldSupportConversationsIdAssignmentRoute: typeof ApiPublicHandheldSupportConversationsIdAssignmentRoute
+}
+
+const ApiPublicHandheldSupportConversationsIdRouteChildren: ApiPublicHandheldSupportConversationsIdRouteChildren =
+  {
+    ApiPublicHandheldSupportConversationsIdAssignmentRoute:
+      ApiPublicHandheldSupportConversationsIdAssignmentRoute,
+  }
+
+const ApiPublicHandheldSupportConversationsIdRouteWithChildren =
+  ApiPublicHandheldSupportConversationsIdRoute._addFileChildren(
+    ApiPublicHandheldSupportConversationsIdRouteChildren,
+  )
+
 interface ApiPublicHandheldSupportConversationsRouteChildren {
-  ApiPublicHandheldSupportConversationsIdRoute: typeof ApiPublicHandheldSupportConversationsIdRoute
+  ApiPublicHandheldSupportConversationsIdRoute: typeof ApiPublicHandheldSupportConversationsIdRouteWithChildren
 }
 
 const ApiPublicHandheldSupportConversationsRouteChildren: ApiPublicHandheldSupportConversationsRouteChildren =
   {
     ApiPublicHandheldSupportConversationsIdRoute:
-      ApiPublicHandheldSupportConversationsIdRoute,
+      ApiPublicHandheldSupportConversationsIdRouteWithChildren,
   }
 
 const ApiPublicHandheldSupportConversationsRouteWithChildren =
