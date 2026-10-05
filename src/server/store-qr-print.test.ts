@@ -182,8 +182,13 @@ test("save：旧客户端 channel=dianping 写入评价码，独立目录；打�
   assert.equal(r.body.channel.channel, "dianping_review");
 });
 
-test("文案中性：无赠品/活动字样", async () => {
+test("文案规则：赠品/领取语仅允许打卡卡；评价卡必须中性，无赠品/奖励/领取/字数要求", async () => {
   const { CHANNEL_LABELS } = await import("./store-qr-print.server");
-  const txt = JSON.stringify(CHANNEL_LABELS);
-  for (const bad of ["有礼", "礼品", "赠", "9图", "100字", "送"]) assert.ok(!txt.includes(bad), bad);
+  const review = JSON.stringify(CHANNEL_LABELS.dianping_review ?? {});
+  for (const bad of ["有礼", "礼品", "赠", "送", "领", "奖", "9图", "100字"]) assert.ok(!review.includes(bad), bad);
+  assert.ok(review.includes("诚邀您点评"));
+  assert.ok(review.includes("欢迎分享真实体验"));
+  const checkin = CHANNEL_LABELS.dianping_checkin ?? {};
+  assert.equal(checkin.title, "收藏打卡送冰箱贴");
+  assert.equal(checkin.caption, "完成收藏打卡后，到收银台领取");
 });
