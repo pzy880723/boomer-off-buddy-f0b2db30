@@ -137,5 +137,7 @@ test('anon/authenticated cannot read, write or execute', async () => {
 
 test('no secret/phone/raw-response columns', async () => {
   const cols = (await db.query(`SELECT column_name FROM information_schema.columns WHERE table_name='youzan_points_operations'`)).rows.map(r => r.column_name);
-  for (const c of cols) assert.doesNotMatch(c, /token$|access|mobile|phone|response|raw/);
+  // claim_token 是租约 fencing 令牌（必需），不是有赞凭据。
+  for (const c of cols) assert.doesNotMatch(c, /access|secret|mobile|phone|response|raw/);
+  assert.deepEqual(cols.filter(c => /token/.test(c)), ['claim_token']);
 });
