@@ -59,6 +59,7 @@ test("real pos_points_rules returns 100/100, cap 1, enabled unchanged after the 
     ADD COLUMN updated_at timestamptz DEFAULT now();`);
   await db.exec(mig.slice(start, mig.indexOf("$$;", start) + 3));
   await db.exec(`
+    CREATE TABLE IF NOT EXISTS pos_customer_wallets(customer_id uuid PRIMARY KEY, points integer);
     INSERT INTO commerce_customers VALUES ('00000000-0000-0000-0000-000000000002','active');
     INSERT INTO pos_customer_wallets(customer_id,points) VALUES ('00000000-0000-0000-0000-000000000002',3000);
     INSERT INTO commerce_membership_plans(id,code,tier_code,points_redemption_cap_rate) VALUES
