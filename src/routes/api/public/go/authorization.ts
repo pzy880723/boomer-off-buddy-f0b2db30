@@ -9,19 +9,23 @@ import {
   authzJson,
   loadAuthorizationSnapshot,
 } from "@/server/go-authorization.server";
+import { goTraced } from "@/server/go-bridge.server";
 
 export const Route = createFileRoute("/api/public/go/authorization")({
   server: {
     handlers: {
       OPTIONS: () => new Response(null, { status: 204, headers: GO_AUTHZ_CORS }),
       GET: async ({ request }) => {
-        try {
-          const identity = await authenticateGoIdentity(request);
-          const snapshot = await loadAuthorizationSnapshot(identity.erpUserId, identity.goUserId);
-          return authzJson({ ok: true, data: snapshot });
-        } catch (e) {
-          return authzError(e);
-        }
+        return goTraced(
+          "authorization",
+          async (timing) => {
+            const identity = await authenticateGoIdentity(request, timing);
+            const snapshot = await loadAuthorizationSnapshot(identity.erpUserId, identity.goUserId);
+            timing.mark("snapshot");
+            return authzJson({ ok: true, data: snapshot });
+          },
+          authzError,
+        );
       },
     },
   },
