@@ -163,6 +163,25 @@ test("英文词：名称已有 APOLLO 放行，杜撰英文品牌拒绝", async 
   assert.ok(brand.ok); assert.equal(brand.card.source, "ai");
 });
 
+test("审核失败带原因重写一次：第二次合规 → source=ai", async () => {
+  const calls: any[] = [];
+  const r = await buildRecommendationCard(deps({ generate: async (_f, retry) => {
+    calls.push(retry);
+    return retry ? goodAi : { ...goodAi, intro: "盒上版权标注为2004年，粉色卡通造型。" };
+  } }), input);
+  assert.ok(r.ok); assert.equal(r.card.source, "ai");
+  assert.deepEqual(calls, [undefined, { reason: "ai_unsupported_claim" }]);
+});
+
+test("重写仍失败 → product + 第二次原因；HTTP 错误不重写", async () => {
+  let n = 0;
+  const r = await buildRecommendationCard(deps({ generate: async (_f, retry) => { n++; return retry ? { headline: "x" } : { ...goodAi, highlights: ["2004年版权标注"] }; } }), input);
+  assert.ok(r.ok); assert.equal(r.card.source, "product"); assert.equal(r.card.fallback_reason, "ai_invalid_output"); assert.equal(n, 2);
+  let m = 0;
+  const h = await buildRecommendationCard(deps({ generate: async () => { m++; throw new CardAiError("ai_http_error", 402); } }), input);
+  assert.ok(h.ok); assert.equal(h.card.fallback_reason, "ai_http_error"); assert.equal(m, 1);
+});
+
 test("错误归因：timeout / network / http / invalid，未知错误 ai_unavailable", async () => {
   for (const code of ["ai_timeout", "ai_network_error", "ai_http_error", "ai_invalid_output"] as const) {
     const r = await buildRecommendationCard(deps({ generate: async () => { throw new CardAiError(code, 503); } }), input);
