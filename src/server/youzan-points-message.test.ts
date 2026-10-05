@@ -73,12 +73,20 @@ test("签名按编码原文计算（非官方方案）被拒，不做多方案�
   assert.equal(d.store.rows.length, 0);
 });
 
-test("body 无 sign 时可用 Event-Sign 头（同一算法）", async () => {
+test("legacy：body 无 sign 时 401（不再接受按解码 msg 计算的头签名）", async () => {
   const d = deps();
   const e = envelope(baseMsg());
-  const sign = e.sign;
-  const r = await handlePointsMessage({ body: { ...e, sign: undefined }, headerSign: sign }, d);
-  assert.equal(r.status, 200);
+  const r = await handlePointsMessage({ body: { ...e, sign: undefined } }, d);
+  assert.equal(r.status, 401);
+  assert.equal(d.store.rows.length, 0);
+});
+
+test("legacy body.sign 通过：只读提示 blocked legacy_signature_readonly_hint", async () => {
+  const d = deps();
+  await handlePointsMessage({ body: envelope(baseMsg()) }, d);
+  assert.equal(d.store.rows[0].initial_status, "blocked");
+  assert.equal(d.store.rows[0].initial_reason, "legacy_signature_readonly_hint");
+  assert.equal((d.store.rows[0].envelope as { auth_protocol: string }).auth_protocol, "legacy_body_sign");
 });
 
 test("密钥未配置 503；client_id 不一致 401；均不落库", async () => {
@@ -160,7 +168,7 @@ test("client_hash = md5(本应用 client_id)：blocked own_operation_loop 防回
 
 test("正常消息也只进 pending，不含任何记账字段", async () => {
   const d = deps();
-  await handlePointsMessage({ body: envelope(baseMsg()) }, d);
+  await handlePointsMessage({ body: envelope(baseMsg()), auth: { protocol: "event_sign" } }, d);
   assert.equal(d.store.rows[0].initial_status, "pending");
 });
 
@@ -195,5 +203,5 @@ test("POINTS client_id 严格标量 / body null 数组 400", async () => {
 
 test("hook：JSON null/数组直接 400", () => {
   const src = readFileSync(new URL("../routes/api/public/hooks/youzan-message.ts", import.meta.url), "utf8");
-  assert.match(src, /Array\.isArray\(payload\)/);
+  assert.match(src, /Array\.isArray\(parsed\.body\)/);
 });

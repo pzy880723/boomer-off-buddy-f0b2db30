@@ -70,7 +70,7 @@ export function maskMobile(v: unknown) {
 }
 
 export async function handlePointsMessage(
-  input: { body: Record<string, unknown>; headerSign?: string | null },
+  input: { body: Record<string, unknown>; auth?: { protocol: "event_sign" | "legacy_body_sign" } },
   deps: PointsDeps,
 ): Promise<Out> {
   const { clientId, clientSecret } = deps.creds;
@@ -81,8 +81,9 @@ export async function handlePointsMessage(
 
   const decoded = decodeYouzanMsg(body.msg);
   if (decoded === null) return fail(400, "invalid_msg_encoding");
-  const sign = typeof body.sign === "string" && body.sign ? body.sign : input.headerSign;
-  if (!signOk(decoded, sign, clientId, clientSecret)) return fail(401, "invalid_sign");
+  // event_sign：路由层已对原始 HTTP body 验过 Event-Sign。否则只按 legacy body.sign 验，绝不读请求头回退。
+  const protocol = input.auth?.protocol === "event_sign" ? "event_sign" : "legacy_body_sign";
+  if (protocol === "legacy_body_sign" && !signOk(decoded, body.sign, clientId, clientSecret)) return fail(401, "invalid_sign");
   // 文档示例未带 client_id；签名已绑定本应用密钥。若带了就必须一致。
   const cid = strictClientId(body.client_id);
   if (cid === false || (cid !== null && cid !== clientId)) return fail(401, "client_id_mismatch");
@@ -138,9 +139,10 @@ export async function handlePointsMessage(
       payload,
       biz_id: bizId,
       msg_version: version,
-      envelope: { biz_id: bizId, version, send_count: sendCount, kdt_name: scalarStr(body.kdt_name) || null },
-      initial_status: initialStatus,
-      initial_reason: initialReason,
+      envelope: { auth_protocol: protocol, biz_id: bizId, version, send_count: sendCount, kdt_name: scalarStr(body.kdt_name) || null },
+      // legacy 签名只作只读提示：一律 blocked，不进入资产处理。
+      initial_status: protocol === "legacy_body_sign" ? "blocked" : initialStatus,
+      initial_reason: protocol === "legacy_body_sign" && initialStatus === "pending" ? "legacy_signature_readonly_hint" : initialReason,
     });
     if (r.result === "conflict") return { status: 409, body: { code: 409, message: "unique_id_payload_conflict" }, result: r.result };
     return { status: 200, body: { code: 0, msg: "success" }, result: r.result };

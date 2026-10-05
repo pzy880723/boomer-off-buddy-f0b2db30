@@ -121,7 +121,7 @@ test("无 yz_open_id 仅有手机号：blocked missing_member_identity，手机�
 
 test("有 yz_open_id：pending，envelope 保留 yz_open_id/version/sendCount/status", async () => {
   const d = deps();
-  await run(d, msgOf(), { sendCount: 1 });
+  await handleCouponMessage({ body: envelope(msgOf(), { sendCount: 1 }), auth: { protocol: "event_sign" } }, d);
   const row = d.store.rows[0];
   assert.equal(row.initial_status, "pending");
   assert.equal(row.msg_type, "COUPON_CUSTOMER_PROMOTION");

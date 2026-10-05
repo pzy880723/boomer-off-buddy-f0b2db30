@@ -33,51 +33,20 @@ export const Route = createFileRoute("/api/public/hooks/youzan-message")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const contentType = request.headers.get("content-type") ?? "";
-        let payload: YZMessage;
-        try {
-          if (contentType.includes("application/json")) {
-            payload = (await request.json()) as YZMessage;
-          } else {
-            const text = await request.text();
-            const params = new URLSearchParams(text);
-            payload = Object.fromEntries(params.entries()) as YZMessage;
-          }
-        } catch (e) {
-          return Response.json(
-            { code: 400, message: "bad body" },
-            { status: 400 },
-          );
-        }
-
-        // JSON null / 数组 / 非对象：直接 400，不进入任何分支。
-        if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+        // 原始 body 只读一次：现行 Event-Sign 协议必须对原始字节验签。
+        const { readYouzanPush, dispatchAssetPush } = await import("@/server/youzan-push-auth.server");
+        const parsed = await readYouzanPush(request);
+        if (!parsed || !parsed.body || typeof parsed.body !== "object" || Array.isArray(parsed.body)) {
           return Response.json({ code: 400, message: "bad body" }, { status: 400 });
         }
+        const payload = parsed.body as YZMessage;
 
-        // POINTS（客户积分变更，MSG/279）：只进会员资产收件箱，不扣账、不走下方交易/退款逻辑。
-        // 验签按解码后的 msg 计算（见 youzan-points-message.server.ts），落库失败返回 503 不 ack。
-        if (payload.type === "POINTS") {
-          const { handlePointsMessage, productionPointsDeps } = await import(
-            "@/server/youzan-points-message.server"
-          );
-          const out = await handlePointsMessage(
-            { body: payload as Record<string, unknown>, headerSign: request.headers.get("event-sign") },
-            await productionPointsDeps(),
-          );
-          return Response.json(out.body, { status: out.status });
-        }
-
-        // COUPON_CUSTOMER_PROMOTION（买家优惠券/码事件）：只进会员资产收件箱，不改券资产。
-        // 商家活动类型 COUPON_PROMOTION 本轮不分流（活动 id 不是用户券）。
-        if (payload.type === "COUPON_CUSTOMER_PROMOTION") {
-          const { handleCouponMessage } = await import("@/server/youzan-coupon-message.server");
+        // POINTS / COUPON_CUSTOMER_PROMOTION：只进会员资产收件箱，不扣账、不改券。
+        // 有 Event-Sign 头只验原始 body，不回退 body.sign；无头才走 legacy（只读提示，入库即 blocked）。
+        if (payload.type === "POINTS" || payload.type === "COUPON_CUSTOMER_PROMOTION") {
           const { productionPointsDeps } = await import("@/server/youzan-points-message.server");
-          const out = await handleCouponMessage(
-            { body: payload as Record<string, unknown>, headerSign: request.headers.get("event-sign") },
-            await productionPointsDeps(),
-          );
-          return Response.json(out.body, { status: out.status });
+          const out = await dispatchAssetPush(parsed, await productionPointsDeps());
+          if (out) return Response.json(out.body, { status: out.status });
         }
 
         // 有赞平台"验证订阅 URL"时会发一个 test=1 的空消息，回 { code:0, msg:"success" } 即可

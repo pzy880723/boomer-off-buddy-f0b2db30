@@ -23,7 +23,7 @@ const MERCHANT = /^(CARD|CODE)_(CREATED|UPDATED|GROUP_INVALID|EXPIRED|GROUP_DELE
 const TYPE = "COUPON_CUSTOMER_PROMOTION";
 
 export async function handleCouponMessage(
-  input: { body: Record<string, unknown>; headerSign?: string | null },
+  input: { body: Record<string, unknown>; auth?: { protocol: "event_sign" | "legacy_body_sign" } },
   deps: PointsDeps,
 ): Promise<Out> {
   const { clientId, clientSecret } = deps.creds;
@@ -34,8 +34,9 @@ export async function handleCouponMessage(
 
   const decoded = decodeYouzanMsg(body.msg);
   if (decoded === null) return fail(400, "invalid_msg_encoding");
-  const sign = typeof body.sign === "string" && body.sign ? body.sign : input.headerSign;
-  if (!signOk(decoded, sign, clientId, clientSecret)) return fail(401, "invalid_sign");
+  // event_sign：路由层已对原始 HTTP body 验过 Event-Sign。否则只按 legacy body.sign 验，绝不读请求头回退。
+  const protocol = input.auth?.protocol === "event_sign" ? "event_sign" : "legacy_body_sign";
+  if (protocol === "legacy_body_sign" && !signOk(decoded, body.sign, clientId, clientSecret)) return fail(401, "invalid_sign");
   const cid = strictClientId(body.client_id);
   if (cid === false || (cid !== null && cid !== clientId)) return fail(401, "client_id_mismatch");
 
@@ -109,12 +110,14 @@ export async function handleCouponMessage(
       biz_id: voucherId,
       msg_version: version,
       envelope: {
+        auth_protocol: protocol,
         voucher_id: voucherId, status, version, send_count: sendCount,
         yz_open_id: yzOpenId || null, order_no: orderNo || null, event_time: eventTime || null,
         kdt_name: scalarStr(body.kdt_name) || null,
       },
-      initial_status: initialStatus,
-      initial_reason: initialReason,
+      // legacy 签名只作只读提示：一律 blocked，不进入资产处理。
+      initial_status: protocol === "legacy_body_sign" ? "blocked" : initialStatus,
+      initial_reason: protocol === "legacy_body_sign" && initialStatus === "pending" ? "legacy_signature_readonly_hint" : initialReason,
     });
     if (r.result === "conflict") return { status: 409, body: { code: 409, message: "coupon_event_payload_conflict" }, result: r.result };
     return { status: 200, body: { code: 0, msg: "success" }, result: r.result };
