@@ -13,6 +13,12 @@ import {
   type SupportAssignmentAction,
   type SupportQueue,
 } from "@/lib/support-policy";
+import {
+  cursorFilter,
+  shapeMessageWindow,
+  assertConversationLocation,
+  type MessageWindow,
+} from "@/lib/support-message-window";
 
 export type SupportContext = { [key: string]: string | number | boolean | null } | null;
 
@@ -48,6 +54,8 @@ export type SupportConversationSummary = {
   customer_avatar_url: string | null;
   last_message: string | null;
   updated_at: string;
+  /** 最近一条顾客消息时间（前台通知去重用），无顾客消息为 null */
+  last_customer_message_at: string | null;
   unread_count: number;
   status: string;
   participants: { user_id: string; name: string; role: string }[];
@@ -76,18 +84,36 @@ export type SupportMessage = SupportSenderPresentation & {
   internal: boolean;
   delivery_status: "sent" | "pending" | "failed";
   created_at: string;
+  /** 仅员工端：该消息是否由当前登录员工发送。顾客端不返回此字段。 */
+  is_mine?: boolean;
 };
 
-const nameCache = new Map<string, string>();
+/** 员工名称/可信头像短缓存（进程内 5 分钟），避免详情每 3 秒轮询都调用 admin.getUserById。 */
+const STAFF_CACHE_TTL_MS = 5 * 60_000;
+type StaffProfile = { name: string; hq_avatar_url: string | null };
+const staffCache = new Map<string, { at: number; value: Promise<StaffProfile> }>();
+
+function loadStaffProfile(userId: string): Promise<StaffProfile> {
+  const hit = staffCache.get(userId);
+  if (hit && Date.now() - hit.at < STAFF_CACHE_TTL_MS) return hit.value;
+  const value = supabaseAdmin.auth.admin.getUserById(userId).then(({ data, error }) => {
+    if (error) {
+      staffCache.delete(userId); // 失败不缓存
+      return { name: userId.slice(-6), hq_avatar_url: null };
+    }
+    const meta = (data?.user?.user_metadata ?? {}) as { name?: string; full_name?: string };
+    return {
+      name: meta.name || meta.full_name || data?.user?.email?.split("@")[0] || userId.slice(-6),
+      // user_metadata 可被本人修改，不可信；只认服务端控制的 app_metadata
+      hq_avatar_url: safePublicAvatarUrl(data?.user?.app_metadata?.avatar_url),
+    };
+  });
+  staffCache.set(userId, { at: Date.now(), value });
+  return value;
+}
 
 export async function resolveUserDisplayName(userId: string): Promise<string> {
-  const cached = nameCache.get(userId);
-  if (cached) return cached;
-  const { data } = await supabaseAdmin.auth.admin.getUserById(userId);
-  const meta = (data?.user?.user_metadata ?? {}) as { name?: string; full_name?: string };
-  const name = meta.name || meta.full_name || data?.user?.email?.split("@")[0] || userId.slice(-6);
-  nameCache.set(userId, name);
-  return name;
+  return (await loadStaffProfile(userId)).name;
 }
 
 export async function resolveSupportAccess(userId: string): Promise<SupportAccess> {
@@ -240,6 +266,7 @@ async function hydrate(
 
   // 未读 = 客户发来的、晚于我 last_read_at 的消息数
   const unreadCounts = new Map<string, number>();
+  const lastCustomerAt = new Map<string, string | null>();
   await Promise.all(
     ids.map(async (conversationId) => {
       const lastRead = lastReads.get(conversationId) ?? null;
@@ -249,8 +276,22 @@ async function hydrate(
         .eq("conversation_id", conversationId)
         .eq("sender_type", "customer");
       if (lastRead) query = query.gt("created_at", lastRead);
-      const { count } = await query;
+      const [{ count }, { data: lastCustomer }] = await Promise.all([
+        query,
+        supabaseAdmin
+          .from("support_messages" as never)
+          .select("created_at")
+          .eq("conversation_id", conversationId)
+          .eq("sender_type", "customer")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
       unreadCounts.set(conversationId, count ?? 0);
+      lastCustomerAt.set(
+        conversationId,
+        (lastCustomer as { created_at: string } | null)?.created_at ?? null,
+      );
     }),
   );
 
@@ -263,6 +304,7 @@ async function hydrate(
     customer_avatar_url: row.customer_id ? (customerAvatars.get(row.customer_id) ?? null) : null,
     last_message: row.last_message_preview,
     updated_at: row.updated_at,
+    last_customer_message_at: lastCustomerAt.get(row.id) ?? null,
     unread_count: unreadCounts.get(row.id) ?? 0,
     status: row.status,
     participants: participantRows
@@ -313,6 +355,8 @@ export async function listStaffConversations(input: {
   limit?: number;
   cursor?: string | null;
   location_id?: string | null;
+  /** 已清洗的搜索词（客户昵称/手机号片段、商品标题/编码、订单号），在数据库分页前过滤 */
+  q?: string | null;
 }): Promise<{ items: SupportConversationSummary[]; next_cursor: string | null; queue: SupportQueue }> {
   const limit = Math.min(Math.max(input.limit ?? 30, 1), 100);
   const queue: SupportQueue = input.queue ?? "all";
@@ -337,6 +381,32 @@ export async function listStaffConversations(input: {
   else if (queue === "escalated")
     query = query.in("status", ["open", "pending"]).not("escalated_at", "is", null);
   else if (queue === "closed") query = query.eq("status", "closed");
+  if (input.q) {
+    const like = `*${input.q}*`;
+    const digits = /^\d{4,}$/.test(input.q);
+    // 先按搜索词解析出客户/订单编号（各最多 200），再与门店范围、队列、游标一起交给数据库过滤后分页
+    const [{ data: custRows, error: custErr }, { data: orderRows, error: orderErr }] = await Promise.all([
+      supabaseAdmin
+        .from("commerce_customers" as never)
+        .select("id")
+        .or(digits ? `nickname.ilike.${like},phone.ilike.${like}` : `nickname.ilike.${like}`)
+        .limit(200),
+      supabaseAdmin.from("commerce_orders" as never).select("id").ilike("order_no", like).limit(200),
+    ]);
+    if (custErr) throw new Error(custErr.message);
+    if (orderErr) throw new Error(orderErr.message);
+    const custIds = ((custRows as { id: string }[] | null) ?? []).map((r) => r.id);
+    const orderIds = ((orderRows as { id: string }[] | null) ?? []).map((r) => r.id);
+    const parts = [
+      `title.ilike.${like}`,
+      `context->>title.ilike.${like}`,
+      `context->>order_no.ilike.${like}`,
+      `context->>sku_code.ilike.${like}`,
+    ];
+    if (custIds.length) parts.push(`customer_id.in.(${custIds.join(",")})`);
+    if (orderIds.length) parts.push(`order_id.in.(${orderIds.join(",")})`);
+    query = query.or(parts.join(","));
+  }
   if (cursor) {
     query = query.or(
       `updated_at.lt."${cursor.updated_at}",and(updated_at.eq."${cursor.updated_at}",id.lt.${cursor.id})`,
@@ -370,7 +440,12 @@ type MessageRow = Omit<SupportMessage, keyof SupportSenderPresentation> & {
 };
 
 /** Caller must have authorized this exact conversation before invoking any avatar lookup. */
-async function presentMessages(conversation: ConversationRow, rows: MessageRow[], staffView: boolean): Promise<SupportMessage[]> {
+async function presentMessages(
+  conversation: ConversationRow,
+  rows: MessageRow[],
+  staffView: boolean,
+  viewerUserId: string | null = null,
+): Promise<SupportMessage[]> {
   if (!rows.length) return [];
   const staffIds = [...new Set(rows.filter((r) => r.sender_type === "staff" && r.sender_user_id)
     .map((r) => r.sender_user_id).filter((id): id is string => !!id))];
@@ -395,9 +470,7 @@ async function presentMessages(conversation: ConversationRow, rows: MessageRow[]
     : { data: null };
   const hqAvatars = new Map<string, string | null>();
   await Promise.all(staffIds.filter((id) => roles.get(id) === "hq_agent").map(async (id) => {
-    const { data, error } = await supabaseAdmin.auth.admin.getUserById(id);
-    // user_metadata is self-editable, not a verified avatar source. Only server-controlled metadata is eligible.
-    hqAvatars.set(id, error ? null : safePublicAvatarUrl(data?.user?.app_metadata?.avatar_url));
+    hqAvatars.set(id, (await loadStaffProfile(id)).hq_avatar_url);
   }));
   return rows.map((r) => {
     const presentation = senderPresentation({
@@ -416,6 +489,8 @@ async function presentMessages(conversation: ConversationRow, rows: MessageRow[]
         : presentation.sender_role === "store_staff" ? `${presentation.sender_location_name ?? "门店"}客服` : "系统",
       body: r.body, internal: r.internal, delivery_status: r.delivery_status ?? "sent", created_at: r.created_at,
       ...presentation,
+      // is_mine 只在员工端返回；顾客端永不暴露 sender_user_id 或其派生字段
+      ...(staffView ? { is_mine: !!viewerUserId && r.sender_user_id === viewerUserId } : {}),
     };
   });
 }
@@ -423,22 +498,36 @@ async function presentMessages(conversation: ConversationRow, rows: MessageRow[]
 async function loadMessages(
   conversation: ConversationRow,
   includeInternal: boolean,
-): Promise<{ messages: SupportMessage[]; has_more: boolean }> {
+  window: MessageWindow = { mode: "latest", limit: MESSAGE_WINDOW, legacy: true },
+  viewerUserId: string | null = null,
+): Promise<{
+  messages: SupportMessage[];
+  has_more: boolean;
+  has_newer: boolean;
+  older_cursor: string | null;
+  latest_cursor: string | null;
+}> {
+  const asc = window.mode === "after";
   let query = supabaseAdmin
     .from("support_messages" as never)
     .select("id, sender_name, sender_type, sender_user_id, sender_customer_id, body, internal, delivery_status, created_at")
     .eq("conversation_id", conversation.id)
-    .order("created_at", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(MESSAGE_WINDOW + 1);
+    .order("created_at", { ascending: asc })
+    .order("id", { ascending: asc })
+    .limit(window.limit + 1);
   if (!includeInternal) query = query.eq("internal", false).eq("delivery_status", "sent");
+  if (window.mode !== "latest") query = query.or(cursorFilter(window.mode, window.cursor));
   const { data, error } = await query;
   if (error) throw new Error(error.message);
-  const rows = (data as unknown as MessageRow[]) ?? [];
-  const has_more = rows.length > MESSAGE_WINDOW;
-  // 取最近 500 条，再按时间正序返回；has_more=true 表示更早消息未返回（非完整历史）
-  const messages = await presentMessages(conversation, rows.slice(0, MESSAGE_WINDOW).reverse(), includeInternal);
-  return { messages, has_more };
+  const shaped = shapeMessageWindow(window, (data as unknown as MessageRow[]) ?? []);
+  const messages = await presentMessages(conversation, shaped.rows, includeInternal, viewerUserId);
+  return {
+    messages,
+    has_more: shaped.has_more,
+    has_newer: shaped.has_newer,
+    older_cursor: shaped.older_cursor,
+    latest_cursor: shaped.latest_cursor,
+  };
 }
 
 const MESSAGE_WINDOW = 500;
@@ -457,19 +546,39 @@ export async function joinConversation(access: SupportAccess, conversationId: st
   );
 }
 
-export async function getStaffConversation(access: SupportAccess, conversationId: string) {
+/** 授权：会话存在 → 员工有权 → 可选 location_id 必须等于会话门店（HQ 也不例外）。 */
+async function authorizeStaffConversation(
+  access: SupportAccess,
+  conversationId: string,
+  locationId?: string | null,
+): Promise<{ ok: true; conversation: ConversationRow } | { ok: false; code: string }> {
   const conversation = await loadConversationRow(conversationId);
-  if (!conversation) return { ok: false as const, code: "not_found" };
-  if (!staffCanAccessConversation(access, conversation)) {
-    return { ok: false as const, code: "forbidden" };
-  }
-  await joinConversation(access, conversationId);
-  const [summary] = await hydrate([conversation], access);
+  if (!conversation) return { ok: false, code: "not_found" };
+  if (!staffCanAccessConversation(access, conversation)) return { ok: false, code: "forbidden" };
+  const loc = assertConversationLocation(conversation.location_id, locationId);
+  if (!loc.ok) return { ok: false, code: loc.code };
+  return { ok: true, conversation };
+}
+
+export async function getStaffConversation(
+  access: SupportAccess,
+  conversationId: string,
+  opts: { locationId?: string | null; window?: MessageWindow } = {},
+) {
+  const auth = await authorizeStaffConversation(access, conversationId, opts.locationId);
+  if (!auth.ok) return { ok: false as const, code: auth.code };
+  const conversation = auth.conversation;
+  // 授权之后：已读写入、会话摘要、消息窗口互不依赖 → 并行，已读不再拖慢正文返回
+  const [, [summary], window] = await Promise.all([
+    joinConversation(access, conversationId),
+    hydrate([conversation], access),
+    loadMessages(conversation, true, opts.window, access.user_id),
+  ]);
   return {
     ok: true as const,
     data: {
       conversation: { ...summary, order_id: conversation.order_id, topic: conversation.topic },
-      ...(await loadMessages(conversation, true)),
+      ...window,
       can_reply: summary.can_reply,
       can_note: summary.can_note,
     },
@@ -513,11 +622,10 @@ export async function postStaffMessage(input: {
   internal: boolean;
   clientOpId: string;
   assignmentVersion?: number | null;
+  locationId?: string | null;
 }) {
-  const conversation = await loadConversationRow(input.conversationId);
-  if (!conversation || !staffCanAccessConversation(input.access, conversation)) {
-    return { ok: false as const, code: conversation ? "forbidden" : "not_found" };
-  }
+  const auth = await authorizeStaffConversation(input.access, input.conversationId, input.locationId);
+  if (!auth.ok) return { ok: false as const, code: auth.code };
   const { data, error } = await supabaseAdmin.rpc("support_staff_post_message" as never, {
     p_conversation_id: input.conversationId,
     p_actor: input.access.user_id,
@@ -541,7 +649,7 @@ export async function postStaffMessage(input: {
   const fresh = await loadConversationRow(input.conversationId);
   if (!fresh || !staffCanAccessConversation(input.access, fresh)) return { ok: false as const, code: "forbidden" };
   const message = pickMessage(r.message);
-  const presented = message ? await presentMessages(fresh, [message], true) : [];
+  const presented = message ? await presentMessages(fresh, [message], true, input.access.user_id) : [];
   return { ok: true as const, data: { message: presented[0] ?? null, replayed: Boolean(r.replayed) } };
 }
 
@@ -550,7 +658,13 @@ export async function updateConversationAssignment(input: {
   conversationId: string;
   action: SupportAssignmentAction;
   assignmentVersion: number | null;
+  locationId?: string | null;
 }) {
+  if (input.locationId?.trim()) {
+    // 提供了门店时先在写入前核对，错误库位不能写
+    const auth = await authorizeStaffConversation(input.access, input.conversationId, input.locationId);
+    if (!auth.ok) return { ok: false as const, code: auth.code, detail: {} };
+  }
   const { data, error } = await supabaseAdmin.rpc("support_update_assignment" as never, {
     p_conversation_id: input.conversationId,
     p_actor: input.access.user_id,
@@ -569,7 +683,10 @@ export async function updateConversationAssignment(input: {
   if (input.action === "claim" || input.action === "takeover") {
     await joinConversation(input.access, input.conversationId);
   }
-  const fresh = await getStaffConversation(input.access, input.conversationId);
+  const fresh = await getStaffConversation(input.access, input.conversationId, {
+    locationId: input.locationId,
+    window: { mode: "latest", limit: 1, legacy: false },
+  });
   return {
     ok: true as const,
     data: {

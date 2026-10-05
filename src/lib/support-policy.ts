@@ -93,6 +93,10 @@ export const SUPPORT_ERRORS: Record<string, { status: number; message: string }>
   location_not_found: { status: 404, message: "门店不存在" },
   invalid_cursor: { status: 400, message: "分页游标无效，请从第一页重新加载" },
   validation_error: { status: 400, message: "参数不正确" },
+  location_mismatch: { status: 403, message: "该会话不属于当前门店" },
+  cursor_conflict: { status: 400, message: "before 和 after 不能同时传" },
+  invalid_limit: { status: 400, message: "limit 必须是 1–100 的整数" },
+  invalid_query: { status: 400, message: "搜索词不超过 80 字" },
 };
 
 export function supportError(code: string) {

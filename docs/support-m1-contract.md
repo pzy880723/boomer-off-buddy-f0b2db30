@@ -59,3 +59,17 @@
 - 安全 HTTPS 公开 URL 采用保守白名单规则：拒绝所有查询参数、片段、凭据、非标准端口、IP/本地主机、签名/私有路径、相对对象 key；不发网络请求或签名。UI 加载失败仍需默认头像回退。
 - GET 在会话授权后才查头像；POST 在数据库事务成功后重新核对会话授权再加载头像。顾客只看公开 sent 消息，员工 sender_name 使用门店/总部/系统安全称谓，不返回员工 ID、邮箱或原始 metadata。
 - 本轮无数据库/权限/迁移修改、无真实客户写入、无 UI 修改、无微信外发或腾讯部署。0001–0034 不需要在腾讯重复执行。
+
+## 2026-10-05 手机消息配套（无迁移）
+
+- GET `/api/public/handheld/support/conversations/:id?location_id=&limit=&before=&after=`
+  - `location_id` 可选；提供时必须等于会话门店，HQ 也不例外，否则 403 `location_mismatch`（在消息/头像查询前拒绝）。
+  - `limit` 1–100（带游标时默认 50）；`before`/`after` 互斥（400 `cursor_conflict`），游标 `"<created_at>|<uuid>"`，非法 400 `invalid_cursor`。
+  - 不传任何参数：最近 500 条（旧网页兼容）。
+  - 响应：`conversation, messages(正序), has_more, has_newer, older_cursor, latest_cursor, can_reply, can_note`。
+    - 首次/before：has_more=还有更早；latest_cursor 仅首次（无游标）返回，before 固定 null，不得覆盖增量水位；before 无结果 older_cursor 回传请求游标。
+    - after：返回严格晚于游标的最早 N 条；has_newer=true 继续排空；has_more 固定 false；无结果 latest_cursor 回传请求游标。
+- POST 回复 / assignment：body `location_id`（或 query）可选，校验同上，错误库位在 RPC 前拒绝。
+- 员工消息新增 `is_mine`（= sender_user_id 是否为当前登录员工）；顾客端不返回。
+- 列表新增 `last_customer_message_at`（由 support_messages 现有数据计算，无新列）和 `q`（<=80 字；昵称、4 位以上数字匹配手机号、商品标题/编码、订单号），在数据库分页前过滤。
+- 网页 ServerFn 同步：`getSupportConversationFn({conversationId, locationId?, limit?, before?, after?})`、`listSupportConversationsFn({..., q?})`。

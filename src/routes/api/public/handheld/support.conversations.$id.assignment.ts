@@ -15,6 +15,7 @@ const Body = z.object({
     message: "操作只能是 claim / takeover / close / reopen",
   }),
   assignment_version: z.number({ message: "缺少会话版本，请刷新后再操作" }).int().min(0),
+  location_id: z.string().uuid("门店编号格式不正确").optional(),
 });
 
 export const Route = createFileRoute("/api/public/handheld/support/conversations/$id/assignment")({
@@ -39,6 +40,7 @@ export const Route = createFileRoute("/api/public/handheld/support/conversations
             conversationId: params.id,
             action: parsed.data.action,
             assignmentVersion: parsed.data.assignment_version,
+            locationId: parsed.data.location_id ?? new URL(request.url).searchParams.get("location_id"),
           });
           if (!result.ok) {
             const e = supportError(result.code);

@@ -12,6 +12,7 @@ import {
   resolveConversationLocationFilter,
 } from "@/server/support.server";
 import { SUPPORT_QUEUES, supportError, type SupportQueue } from "@/lib/support-policy";
+import { sanitizeSupportSearch } from "@/lib/support-message-window";
 
 export const Route = createFileRoute("/api/public/handheld/support/conversations")({
   server: {
@@ -26,6 +27,11 @@ export const Route = createFileRoute("/api/public/handheld/support/conversations
         const rawQueue = url.searchParams.get("queue");
         if (rawQueue && !(SUPPORT_QUEUES as readonly string[]).includes(rawQueue)) {
           return err("队列只能是 unclaimed/mine/escalated/closed/all", 400, { code: "validation_error" });
+        }
+        const search = sanitizeSupportSearch(url.searchParams.get("q"));
+        if (!search.ok) {
+          const e = supportError(search.code);
+          return err(e.message, e.status, { code: search.code });
         }
         const access = await resolveSupportAccess(session.user_id);
         const filter = resolveConversationLocationFilter(
@@ -43,6 +49,7 @@ export const Route = createFileRoute("/api/public/handheld/support/conversations
             limit: Number(url.searchParams.get("limit") ?? 30),
             cursor: url.searchParams.get("cursor"),
             location_id: filter.location_id,
+            q: search.q,
           });
           return ok({
             items: page.items,

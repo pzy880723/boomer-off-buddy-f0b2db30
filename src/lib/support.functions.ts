@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { SUPPORT_QUEUES, SupportError } from "@/lib/support-policy";
+import { parseMessageWindow, sanitizeSupportSearch } from "@/lib/support-message-window";
 
 // 错误统一抛出 "[code] 中文说明"，UI 可按 code 判断（例如 version_conflict → 刷新）。
 
@@ -13,6 +14,7 @@ export const listSupportConversationsFn = createServerFn({ method: "GET" })
         queue: z.enum(SUPPORT_QUEUES, { message: "队列只能是 unclaimed/mine/escalated/closed/all" }).optional(),
         cursor: z.string().max(200).optional(),
         limit: z.number().int().min(1).max(100).optional(),
+        q: z.string().max(80, "搜索词不超过 80 字").optional(),
       })
       .optional()
       .parse(input),
@@ -28,6 +30,7 @@ export const listSupportConversationsFn = createServerFn({ method: "GET" })
         queue: data?.queue ?? "all",
         cursor: data?.cursor ?? null,
         limit: data?.limit ?? 50,
+        q: sanitizeSupportSearch(data?.q).ok ? (sanitizeSupportSearch(data?.q) as { q: string | null }).q : null,
       });
     } catch (e) {
       if (e instanceof Error && e.message === "invalid_cursor") throw new SupportError("invalid_cursor");
@@ -46,11 +49,26 @@ const ConversationId = z.string().uuid("会话编号格式不正确");
 
 export const getSupportConversationFn = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ conversationId: ConversationId }).parse(input))
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        conversationId: ConversationId,
+        locationId: z.string().uuid().optional(),
+        limit: z.number().int().min(1).max(100).optional(),
+        before: z.string().max(200).optional(),
+        after: z.string().max(200).optional(),
+      })
+      .parse(input),
+  )
   .handler(async ({ data, context }) => {
+    const win = parseMessageWindow({ limit: data.limit, before: data.before, after: data.after });
+    if (!win.ok) throw new SupportError(win.code);
     const { resolveSupportAccess, getStaffConversation } = await import("@/server/support.server");
     const access = await resolveSupportAccess(context.userId);
-    const result = await getStaffConversation(access, data.conversationId);
+    const result = await getStaffConversation(access, data.conversationId, {
+      locationId: data.locationId,
+      window: win.window,
+    });
     if (!result.ok) throw new SupportError(result.code);
     return result.data;
   });
