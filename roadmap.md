@@ -40,3 +40,13 @@
 - [ ] 退款执行 worker（消费 commerce_refund_intents）— 生产开关默认关闭，未实现执行器
 - [ ] 腾讯业务短信模板配置（shortage_reported 等）— outbox 记 template_missing
 - [ ] 腾讯生产部署（由 Codex 单独验收）
+
+## 2026-10-05 清理后剩余 8 条
+- [x] 1 分批缺货退款（quote 按件顺延 + 最后一批退组运费）
+- [x] 2 补录销售：同 op 载荷不同 → 409；并发 23505 → 回放/冲突
+- [x] 3 smart-create：只读校验并行 + Server-Timing
+- [x] 4 标签缺失：当前无丢失路径，关单
+- [x] 5+7 推荐卡只读 API（items/{id}/recommendation-card）
+- [x] 6 会员购买上下文：事实契约审计文档（实施待与腾讯 customer-purchase-notes 对齐）
+- [x] 8 门店二维码配置：迁移 0021 已应用 + API + 权限测试
+- [ ] 外部：腾讯部署、store-qr 私有桶与真实二维码、ERP 网页商品卡 UI（Codex 本地）

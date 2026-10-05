@@ -121,6 +121,7 @@ export function computeQuoteFromFacts(facts: QuoteFacts, target: QuoteTarget): Q
       paymentRefundedFen,
       groupOutstandingQuantity: groupOutstanding,
       groupShippingReserved: groupShippingReserved(facts.shortages, target),
+      itemProcessedQuantity: processedByItem.get(target.orderItemId) ?? 0,
     }),
   );
 }

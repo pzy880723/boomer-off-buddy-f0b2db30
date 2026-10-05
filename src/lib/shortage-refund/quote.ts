@@ -42,6 +42,8 @@ export type QuoteInput = {
   group_outstanding_quantity: number;
   /** 同组运费已被其它缺货预留/退掉 → 本次不得再退该组运费（goods-only）。 */
   group_shipping_reserved?: boolean;
+  /** 本行此前已真正处理（已生成意图/已接受）的缺货数量；分批缺货按件顺延分摊。 */
+  item_processed_quantity?: number;
 };
 
 export type QuoteResult = {
@@ -127,10 +129,12 @@ export function computeShortageQuote(input: QuoteInput): QuoteResult {
   const shares = allocateItemPaidShares(input.items, paidGoodsFen);
   const itemShare = shares.get(item.id) ?? 0;
   const units = allocateUnitShares(itemShare, item.quantity);
-  const qty = Math.min(Math.max(input.shortage.quantity, 0), item.quantity);
+  const processed = Math.min(Math.max(input.item_processed_quantity ?? 0, 0), item.quantity);
+  const remainingQty = item.quantity - processed;
+  const qty = Math.min(Math.max(input.shortage.quantity, 0), remainingQty);
   if (qty !== input.shortage.quantity) blocked.push("shortage_quantity_exceeds_line");
-  // 取前 qty 件的分摊额（确定性，尾差固定）
-  let goods = units.slice(0, qty).reduce((a, b) => a + b, 0);
+  // 按件顺延：取第 processed..processed+qty 件的分摊额（尾差固定，多次合计 = 行分摊额）
+  let goods = units.slice(processed, processed + qty).reduce((a, b) => a + b, 0);
 
   // 商品级上限：该行分摊额 - 已退/预占
   const itemRemaining = Math.max(itemShare - input.item_refunded_fen, 0);
@@ -151,7 +155,7 @@ export function computeShortageQuote(input: QuoteInput): QuoteResult {
       !input.group_shipping_reserved &&
       !group.shipped &&
       input.group_outstanding_quantity === 0 &&
-      qty === item.quantity
+      processed + qty === item.quantity
     ) {
       shipping = Math.max(group.shipping_fee_fen, 0);
     }
@@ -172,6 +176,7 @@ export function computeShortageQuote(input: QuoteInput): QuoteResult {
     JSON.stringify({
       item: item.id,
       qty,
+      processed,
       goods,
       shipping,
       total,

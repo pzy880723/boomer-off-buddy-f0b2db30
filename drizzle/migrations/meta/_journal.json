@@ -148,6 +148,13 @@
       "when": 1791173179402,
       "tag": "0020_youzan_shops_coord_admin_guard",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1791177292389,
+      "tag": "0021_store_qr_configs",
+      "breakpoints": true
     }
   ]
 }

@@ -211,6 +211,7 @@ import { Route as ApiPublicHandheldStocktakeScanRouteImport } from './routes/api
 import { Route as ApiPublicHandheldStocktakeSubmitRouteImport } from './routes/api/public/handheld/stocktake.submit'
 import { Route as ApiPublicHandheldStoreDailySummaryRouteImport } from './routes/api/public/handheld/store.daily-summary'
 import { Route as ApiPublicHandheldStoreOfflineSalesRouteImport } from './routes/api/public/handheld/store.offline-sales'
+import { Route as ApiPublicHandheldStoreQrConfigsRouteImport } from './routes/api/public/handheld/store.qr-configs'
 import { Route as ApiPublicHandheldSupportConversationsRouteImport } from './routes/api/public/handheld/support.conversations'
 import { Route as ApiPublicHandheldTransferReceiveConfirmRouteImport } from './routes/api/public/handheld/transfer.receive-confirm'
 import { Route as ApiPublicHandheldTransferReceiveScanRouteImport } from './routes/api/public/handheld/transfer.receive-scan'
@@ -253,6 +254,7 @@ import { Route as ApiPublicHandheldFulfillmentsIdTicketRouteImport } from './rou
 import { Route as ApiPublicHandheldFulfillmentsIdWaybillRouteImport } from './routes/api/public/handheld/fulfillments.$id.waybill'
 import { Route as ApiPublicHandheldItemsIdAttachImagesRouteImport } from './routes/api/public/handheld/items.$id.attach-images'
 import { Route as ApiPublicHandheldItemsIdContentRouteImport } from './routes/api/public/handheld/items.$id.content'
+import { Route as ApiPublicHandheldItemsIdRecommendationCardRouteImport } from './routes/api/public/handheld/items.$id.recommendation-card'
 import { Route as ApiPublicHandheldItemsIdRestockRouteImport } from './routes/api/public/handheld/items.$id.restock'
 import { Route as ApiPublicHandheldItemsIdSetStatusRouteImport } from './routes/api/public/handheld/items.$id.set-status'
 import { Route as ApiPublicHandheldItemsIdSyncStatusRouteImport } from './routes/api/public/handheld/items.$id.sync-status'
@@ -1398,6 +1400,12 @@ const ApiPublicHandheldStoreOfflineSalesRoute =
     path: '/api/public/handheld/store/offline-sales',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHandheldStoreQrConfigsRoute =
+  ApiPublicHandheldStoreQrConfigsRouteImport.update({
+    id: '/api/public/handheld/store/qr-configs',
+    path: '/api/public/handheld/store/qr-configs',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHandheldSupportConversationsRoute =
   ApiPublicHandheldSupportConversationsRouteImport.update({
     id: '/api/public/handheld/support/conversations',
@@ -1642,6 +1650,12 @@ const ApiPublicHandheldItemsIdContentRoute =
   ApiPublicHandheldItemsIdContentRouteImport.update({
     id: '/content',
     path: '/content',
+    getParentRoute: () => ApiPublicHandheldItemsIdRoute,
+  } as any)
+const ApiPublicHandheldItemsIdRecommendationCardRoute =
+  ApiPublicHandheldItemsIdRecommendationCardRouteImport.update({
+    id: '/recommendation-card',
+    path: '/recommendation-card',
     getParentRoute: () => ApiPublicHandheldItemsIdRoute,
   } as any)
 const ApiPublicHandheldItemsIdRestockRoute =
@@ -2028,6 +2042,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/stocktake/submit': typeof ApiPublicHandheldStocktakeSubmitRoute
   '/api/public/handheld/store/daily-summary': typeof ApiPublicHandheldStoreDailySummaryRoute
   '/api/public/handheld/store/offline-sales': typeof ApiPublicHandheldStoreOfflineSalesRoute
+  '/api/public/handheld/store/qr-configs': typeof ApiPublicHandheldStoreQrConfigsRoute
   '/api/public/handheld/support/conversations': typeof ApiPublicHandheldSupportConversationsRouteWithChildren
   '/api/public/handheld/transfer/receive-confirm': typeof ApiPublicHandheldTransferReceiveConfirmRoute
   '/api/public/handheld/transfer/receive-scan': typeof ApiPublicHandheldTransferReceiveScanRoute
@@ -2070,6 +2085,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/fulfillments/$id/waybill': typeof ApiPublicHandheldFulfillmentsIdWaybillRoute
   '/api/public/handheld/items/$id/attach-images': typeof ApiPublicHandheldItemsIdAttachImagesRoute
   '/api/public/handheld/items/$id/content': typeof ApiPublicHandheldItemsIdContentRoute
+  '/api/public/handheld/items/$id/recommendation-card': typeof ApiPublicHandheldItemsIdRecommendationCardRoute
   '/api/public/handheld/items/$id/restock': typeof ApiPublicHandheldItemsIdRestockRoute
   '/api/public/handheld/items/$id/set-status': typeof ApiPublicHandheldItemsIdSetStatusRoute
   '/api/public/handheld/items/$id/sync-status': typeof ApiPublicHandheldItemsIdSyncStatusRoute
@@ -2297,6 +2313,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/stocktake/submit': typeof ApiPublicHandheldStocktakeSubmitRoute
   '/api/public/handheld/store/daily-summary': typeof ApiPublicHandheldStoreDailySummaryRoute
   '/api/public/handheld/store/offline-sales': typeof ApiPublicHandheldStoreOfflineSalesRoute
+  '/api/public/handheld/store/qr-configs': typeof ApiPublicHandheldStoreQrConfigsRoute
   '/api/public/handheld/support/conversations': typeof ApiPublicHandheldSupportConversationsRouteWithChildren
   '/api/public/handheld/transfer/receive-confirm': typeof ApiPublicHandheldTransferReceiveConfirmRoute
   '/api/public/handheld/transfer/receive-scan': typeof ApiPublicHandheldTransferReceiveScanRoute
@@ -2339,6 +2356,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/fulfillments/$id/waybill': typeof ApiPublicHandheldFulfillmentsIdWaybillRoute
   '/api/public/handheld/items/$id/attach-images': typeof ApiPublicHandheldItemsIdAttachImagesRoute
   '/api/public/handheld/items/$id/content': typeof ApiPublicHandheldItemsIdContentRoute
+  '/api/public/handheld/items/$id/recommendation-card': typeof ApiPublicHandheldItemsIdRecommendationCardRoute
   '/api/public/handheld/items/$id/restock': typeof ApiPublicHandheldItemsIdRestockRoute
   '/api/public/handheld/items/$id/set-status': typeof ApiPublicHandheldItemsIdSetStatusRoute
   '/api/public/handheld/items/$id/sync-status': typeof ApiPublicHandheldItemsIdSyncStatusRoute
@@ -2574,6 +2592,7 @@ export interface FileRoutesById {
   '/api/public/handheld/stocktake/submit': typeof ApiPublicHandheldStocktakeSubmitRoute
   '/api/public/handheld/store/daily-summary': typeof ApiPublicHandheldStoreDailySummaryRoute
   '/api/public/handheld/store/offline-sales': typeof ApiPublicHandheldStoreOfflineSalesRoute
+  '/api/public/handheld/store/qr-configs': typeof ApiPublicHandheldStoreQrConfigsRoute
   '/api/public/handheld/support/conversations': typeof ApiPublicHandheldSupportConversationsRouteWithChildren
   '/api/public/handheld/transfer/receive-confirm': typeof ApiPublicHandheldTransferReceiveConfirmRoute
   '/api/public/handheld/transfer/receive-scan': typeof ApiPublicHandheldTransferReceiveScanRoute
@@ -2616,6 +2635,7 @@ export interface FileRoutesById {
   '/api/public/handheld/fulfillments/$id/waybill': typeof ApiPublicHandheldFulfillmentsIdWaybillRoute
   '/api/public/handheld/items/$id/attach-images': typeof ApiPublicHandheldItemsIdAttachImagesRoute
   '/api/public/handheld/items/$id/content': typeof ApiPublicHandheldItemsIdContentRoute
+  '/api/public/handheld/items/$id/recommendation-card': typeof ApiPublicHandheldItemsIdRecommendationCardRoute
   '/api/public/handheld/items/$id/restock': typeof ApiPublicHandheldItemsIdRestockRoute
   '/api/public/handheld/items/$id/set-status': typeof ApiPublicHandheldItemsIdSetStatusRoute
   '/api/public/handheld/items/$id/sync-status': typeof ApiPublicHandheldItemsIdSyncStatusRoute
@@ -2852,6 +2872,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/stocktake/submit'
     | '/api/public/handheld/store/daily-summary'
     | '/api/public/handheld/store/offline-sales'
+    | '/api/public/handheld/store/qr-configs'
     | '/api/public/handheld/support/conversations'
     | '/api/public/handheld/transfer/receive-confirm'
     | '/api/public/handheld/transfer/receive-scan'
@@ -2894,6 +2915,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/fulfillments/$id/waybill'
     | '/api/public/handheld/items/$id/attach-images'
     | '/api/public/handheld/items/$id/content'
+    | '/api/public/handheld/items/$id/recommendation-card'
     | '/api/public/handheld/items/$id/restock'
     | '/api/public/handheld/items/$id/set-status'
     | '/api/public/handheld/items/$id/sync-status'
@@ -3121,6 +3143,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/stocktake/submit'
     | '/api/public/handheld/store/daily-summary'
     | '/api/public/handheld/store/offline-sales'
+    | '/api/public/handheld/store/qr-configs'
     | '/api/public/handheld/support/conversations'
     | '/api/public/handheld/transfer/receive-confirm'
     | '/api/public/handheld/transfer/receive-scan'
@@ -3163,6 +3186,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/fulfillments/$id/waybill'
     | '/api/public/handheld/items/$id/attach-images'
     | '/api/public/handheld/items/$id/content'
+    | '/api/public/handheld/items/$id/recommendation-card'
     | '/api/public/handheld/items/$id/restock'
     | '/api/public/handheld/items/$id/set-status'
     | '/api/public/handheld/items/$id/sync-status'
@@ -3397,6 +3421,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/stocktake/submit'
     | '/api/public/handheld/store/daily-summary'
     | '/api/public/handheld/store/offline-sales'
+    | '/api/public/handheld/store/qr-configs'
     | '/api/public/handheld/support/conversations'
     | '/api/public/handheld/transfer/receive-confirm'
     | '/api/public/handheld/transfer/receive-scan'
@@ -3439,6 +3464,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/fulfillments/$id/waybill'
     | '/api/public/handheld/items/$id/attach-images'
     | '/api/public/handheld/items/$id/content'
+    | '/api/public/handheld/items/$id/recommendation-card'
     | '/api/public/handheld/items/$id/restock'
     | '/api/public/handheld/items/$id/set-status'
     | '/api/public/handheld/items/$id/sync-status'
@@ -3611,6 +3637,7 @@ export interface RootRouteChildren {
   ApiPublicHandheldStocktakeSubmitRoute: typeof ApiPublicHandheldStocktakeSubmitRoute
   ApiPublicHandheldStoreDailySummaryRoute: typeof ApiPublicHandheldStoreDailySummaryRoute
   ApiPublicHandheldStoreOfflineSalesRoute: typeof ApiPublicHandheldStoreOfflineSalesRoute
+  ApiPublicHandheldStoreQrConfigsRoute: typeof ApiPublicHandheldStoreQrConfigsRoute
   ApiPublicHandheldSupportConversationsRoute: typeof ApiPublicHandheldSupportConversationsRouteWithChildren
   ApiPublicHandheldTransferReceiveConfirmRoute: typeof ApiPublicHandheldTransferReceiveConfirmRoute
   ApiPublicHandheldTransferReceiveScanRoute: typeof ApiPublicHandheldTransferReceiveScanRoute
@@ -5060,6 +5087,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldStoreOfflineSalesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/handheld/store/qr-configs': {
+      id: '/api/public/handheld/store/qr-configs'
+      path: '/api/public/handheld/store/qr-configs'
+      fullPath: '/api/public/handheld/store/qr-configs'
+      preLoaderRoute: typeof ApiPublicHandheldStoreQrConfigsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/handheld/support/conversations': {
       id: '/api/public/handheld/support/conversations'
       path: '/api/public/handheld/support/conversations'
@@ -5352,6 +5386,13 @@ declare module '@tanstack/react-router' {
       path: '/content'
       fullPath: '/api/public/handheld/items/$id/content'
       preLoaderRoute: typeof ApiPublicHandheldItemsIdContentRouteImport
+      parentRoute: typeof ApiPublicHandheldItemsIdRoute
+    }
+    '/api/public/handheld/items/$id/recommendation-card': {
+      id: '/api/public/handheld/items/$id/recommendation-card'
+      path: '/recommendation-card'
+      fullPath: '/api/public/handheld/items/$id/recommendation-card'
+      preLoaderRoute: typeof ApiPublicHandheldItemsIdRecommendationCardRouteImport
       parentRoute: typeof ApiPublicHandheldItemsIdRoute
     }
     '/api/public/handheld/items/$id/restock': {
@@ -6146,6 +6187,7 @@ const ApiPublicStorefrontShortagesRouteWithChildren =
 interface ApiPublicHandheldItemsIdRouteChildren {
   ApiPublicHandheldItemsIdAttachImagesRoute: typeof ApiPublicHandheldItemsIdAttachImagesRoute
   ApiPublicHandheldItemsIdContentRoute: typeof ApiPublicHandheldItemsIdContentRoute
+  ApiPublicHandheldItemsIdRecommendationCardRoute: typeof ApiPublicHandheldItemsIdRecommendationCardRoute
   ApiPublicHandheldItemsIdRestockRoute: typeof ApiPublicHandheldItemsIdRestockRoute
   ApiPublicHandheldItemsIdSetStatusRoute: typeof ApiPublicHandheldItemsIdSetStatusRoute
   ApiPublicHandheldItemsIdSyncStatusRoute: typeof ApiPublicHandheldItemsIdSyncStatusRoute
@@ -6157,6 +6199,8 @@ const ApiPublicHandheldItemsIdRouteChildren: ApiPublicHandheldItemsIdRouteChildr
     ApiPublicHandheldItemsIdAttachImagesRoute:
       ApiPublicHandheldItemsIdAttachImagesRoute,
     ApiPublicHandheldItemsIdContentRoute: ApiPublicHandheldItemsIdContentRoute,
+    ApiPublicHandheldItemsIdRecommendationCardRoute:
+      ApiPublicHandheldItemsIdRecommendationCardRoute,
     ApiPublicHandheldItemsIdRestockRoute: ApiPublicHandheldItemsIdRestockRoute,
     ApiPublicHandheldItemsIdSetStatusRoute:
       ApiPublicHandheldItemsIdSetStatusRoute,
@@ -6423,6 +6467,7 @@ const rootRouteChildren: RootRouteChildren = {
     ApiPublicHandheldStoreDailySummaryRoute,
   ApiPublicHandheldStoreOfflineSalesRoute:
     ApiPublicHandheldStoreOfflineSalesRoute,
+  ApiPublicHandheldStoreQrConfigsRoute: ApiPublicHandheldStoreQrConfigsRoute,
   ApiPublicHandheldSupportConversationsRoute:
     ApiPublicHandheldSupportConversationsRouteWithChildren,
   ApiPublicHandheldTransferReceiveConfirmRoute:

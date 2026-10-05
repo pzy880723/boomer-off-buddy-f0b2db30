@@ -1,6 +1,7 @@
 // GET  /api/public/handheld/store/offline-sales?location_id=&date_from=&date_to=
 // POST /api/public/handheld/store/offline-sales   线下补录（仅未进入有赞的现金/POS/微信等收款）
 // 幂等：同门店同 client_op_id 只落一条，重复提交回放原记录并写审计。
+import { OfflineEntryConflictError } from "@/lib/offline-sales-contract";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   HANDHELD_CORS,
@@ -174,6 +175,8 @@ export const Route = createFileRoute("/api/public/handheld/store/offline-sales")
           });
           return ok(result);
         } catch (e) {
+          if (e instanceof OfflineEntryConflictError)
+            return err(e.message, 409, { code: e.code, fields: e.fields });
           return err((e as Error).message, 400, { code: "offline_entry_rejected" });
         }
       },
