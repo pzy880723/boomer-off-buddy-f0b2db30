@@ -9,7 +9,7 @@
 // 签名与 POINTS 相同：MD5(client_id + 解码后 msg + client_secret)。
 import { createHash } from "node:crypto";
 import {
-  decodeYouzanMsg, fail, maskMobile, scalarStr, signOk,
+  decodeYouzanMsg, fail, isPlainBody, maskMobile, scalarStr, signOk, strictClientId,
   type Out, type PointsDeps, type PointsIngest,
 } from "./youzan-points-message.server";
 
@@ -28,6 +28,7 @@ export async function handleCouponMessage(
 ): Promise<Out> {
   const { clientId, clientSecret } = deps.creds;
   if (!clientId || !clientSecret) return fail(503, "sign_not_configured");
+  if (!isPlainBody(input.body)) return fail(400, "invalid_body");
   const body = input.body;
   if (body.type !== TYPE) return fail(422, "not_coupon_customer_message");
 
@@ -35,9 +36,8 @@ export async function handleCouponMessage(
   if (decoded === null) return fail(400, "invalid_msg_encoding");
   const sign = typeof body.sign === "string" && body.sign ? body.sign : input.headerSign;
   if (!signOk(decoded, sign, clientId, clientSecret)) return fail(401, "invalid_sign");
-  if (body.client_id !== undefined && body.client_id !== null && String(body.client_id) !== clientId) {
-    return fail(401, "client_id_mismatch");
-  }
+  const cid = strictClientId(body.client_id);
+  if (cid === false || (cid !== null && cid !== clientId)) return fail(401, "client_id_mismatch");
 
   let msg: Record<string, unknown>;
   try {
@@ -74,9 +74,14 @@ export async function handleCouponMessage(
   const sendCount = Number.isSafeInteger(Number(body.sendCount)) ? Number(body.sendCount) : null;
   const yzOpenId = scalarStr(body.yz_open_id).slice(0, 128);
 
-  const eventId = "coupon:" + createHash("sha256")
-    .update([kdtId, TYPE, voucherId, status, version ?? "", orderNo, eventTime].join("\u0001"), "utf8")
-    .digest("hex");
+  // 可信事件身份需要 version + event_time；核销/退回还需要 order_no。
+  // 缺任一项：不能用残缺字段合并多条合法事件 → 身份带入解码原文，并阻断待人工检查。
+  const needsOrder = /_(CONSUME|REVERT)$/.test(status);
+  const weak = !version || !eventTime || (needsOrder && !orderNo);
+  const idParts = [kdtId, TYPE, voucherId, status, version ?? "", orderNo, eventTime];
+  if (weak) idParts.push(yzOpenId, decoded);
+  const eventId = (weak ? "coupon-raw:" : "coupon:") + createHash("sha256")
+    .update(idParts.join("\u0001"), "utf8").digest("hex");
 
   let active: boolean;
   try {
@@ -88,6 +93,7 @@ export async function handleCouponMessage(
   let initialReason: string | null = null;
   if (!active) { initialStatus = "blocked"; initialReason = "shop_not_authorized"; }
   else if (!yzOpenId) { initialStatus = "blocked"; initialReason = "missing_member_identity"; }
+  else if (weak) { initialStatus = "blocked"; initialReason = "weak_event_identity"; }
 
   const payload: Record<string, unknown> = { ...msg };
   if (msg.mobile !== undefined) payload.mobile = maskMobile(msg.mobile);

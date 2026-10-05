@@ -161,3 +161,31 @@ test("hook 分流 COUPON_CUSTOMER_PROMOTION（在旧验签前），不分流 COU
   assert.ok(i > 0 && i < src.indexOf("// ===== 验签 ====="));
   assert.ok(!src.includes('payload.type === "COUPON_PROMOTION"'));
 });
+
+test("client_id 严格标量：对象/数组/布尔 401", async () => {
+  for (const bad of [{ a: 1 }, [CID], true]) {
+    const d = deps();
+    assert.equal((await run(d, msgOf(), { client_id: bad })).status, 401, JSON.stringify(bad));
+    assert.equal(d.store.rows.length, 0);
+  }
+});
+
+test("body 为 null/数组：400", async () => {
+  const d = deps();
+  assert.equal((await handleCouponMessage({ body: null as never }, d)).status, 400);
+  assert.equal((await handleCouponMessage({ body: [] as never }, d)).status, 400);
+});
+
+test("缺 version 或 event_time：弱身份不合并两条合法事件，并 blocked weak_event_identity", async () => {
+  const d = deps();
+  await run(d, msgOf({ event_time: undefined, verify_code: "A" }), { version: undefined });
+  await run(d, msgOf({ event_time: undefined, verify_code: "B" }), { version: undefined });
+  assert.equal(d.store.rows.length, 2);
+  assert.ok(d.store.rows.every((r) => r.initial_reason === "weak_event_identity" && r.event_id.startsWith("coupon-raw:")));
+});
+
+test("核销/退回缺 order_no：弱身份", async () => {
+  const d = deps();
+  await run(d, msgOf({ status: "CARD_CONSUME" }), { status: "CARD_CONSUME" });
+  assert.equal(d.store.rows[0].initial_reason, "weak_event_identity");
+});
