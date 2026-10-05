@@ -11154,7 +11154,7 @@
           "客服"
         ],
         "summary": "客服会话列表（v1.16）",
-        "description": "门店员工按授权库位、总部客服可见全部会话；共享接待，无独占领取。返回 `data.items[]`，含 `unread_count` 与 `participants`。查询参数 `location_id` 可选：HQ 不传=全部授权门店(`scope=hq_all_conversations`)，传入即按该门店过滤(`scope=hq_single_location`)；分店员工必须传本店，传非授权门店返回 403 `forbidden_location`，不传时仍被服务端限制在授权门店内(`scope=assigned_locations`)。授权一律由服务端强制，不信任客户端声明。",
+        "description": "门店员工按授权库位、总部客服可见全部会话；协作者可写内部备注，对外回复仅限当前主接待人。返回 data.items 与 next_cursor；服务端先按 queue 和授权范围筛选，再分页。HQ 不传 location_id 表示全部授权门店，传入按该门店过滤；门店员工不传时仍限制在授权库位，传非授权门店返回 403 forbidden_location。items[] 含 unread_count（顾客消息晚于本人 last_read_at 的精确数）、last_customer_message_at:string|null（前台通知去重）、customer_avatar_url、location_id、updated_at。",
         "parameters": [
           {
             "name": "location_id",
@@ -11174,6 +11174,21 @@
             }
           },
           {
+            "name": "queue",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "unclaimed",
+                "mine",
+                "escalated",
+                "closed",
+                "all"
+              ]
+            }
+          },
+          {
             "name": "limit",
             "in": "query",
             "required": false,
@@ -11187,6 +11202,16 @@
             "required": false,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "搜索词，最多 80 字（超长 400 invalid_query）；客户昵称、4 位以上数字匹配手机号、商品标题/编码、订单号；在数据库分页前按授权门店过滤。",
+            "schema": {
+              "type": "string",
+              "maxLength": 80
             }
           }
         ],
@@ -11296,13 +11321,223 @@
         }
       }
     },
+    "/api/public/handheld/support/conversations/{id}/assignment": {
+      "post": {
+        "tags": [
+          "客服"
+        ],
+        "summary": "领取、总部接管、关闭或重新打开会话",
+        "description": "需要设备与员工身份，授权库位由服务器校验。takeover 仅总部可用；领取和状态变更使用 assignment_version 防止并发覆盖，版本冲突返回 409。",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "claim",
+                      "takeover",
+                      "close",
+                      "reopen"
+                    ]
+                  },
+                  "assignment_version": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "location_id": {
+                    "description": "可选；提供时必须等于会话门店（HQ 也不例外），否则 403 location_mismatch，写入前拒绝",
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "action",
+                  "assignment_version"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {}
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "会话状态或版本冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/public/handheld/support/conversations/{id}": {
       "get": {
         "tags": [
           "客服"
         ],
         "summary": "会话详情与消息（v1.11）",
-        "description": "员工可见 `internal:true` 的内部备注；顾客端接口永不下发内部备注。",
+        "description": "员工可见 internal:true 的内部备注；顾客端接口永不下发内部备注。消息保留旧字段，新增 sender_avatar_url:string|null、sender_role:customer|store_staff|hq_agent|system、sender_location_name:string|null。按历史发言者而非当前主接待人解析；头像仅安全公开 HTTPS，缺图/私桶路径返回 null。conversation 含 customer_avatar_url:string|null、last_customer_message_at:string|null。\n\n分页：不传 limit/before/after 返回最近 500 条（旧客户端兼容）；limit 1–100（带游标默认 50）；before 与 after 互斥（400 cursor_conflict）；游标 \"<created_at>|<uuid>\"。响应 messages 永远正序，并含 has_more（还有更早）、has_newer（after 模式还有更新）、older_cursor、latest_cursor。before 模式 latest_cursor 为 null，不得覆盖增量水位；after 无结果时 latest_cursor 回传请求游标。员工消息含 is_mine（是否当前登录员工发送），顾客端不返回。location_id 不等于会话门店返回 403 location_mismatch。响应头带 X-Request-Id 与 Server-Timing（auth/summary/messages/total，距请求开始毫秒）。",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "location_id",
+            "in": "query",
+            "required": false,
+            "description": "可选；必须等于会话门店，否则 403 location_mismatch",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "1–100；不传且无游标时默认 500",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "description": "与 after 互斥；取更早消息",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "description": "与 before 互斥；取更新消息，配合 has_newer 排空",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -11413,7 +11648,7 @@
           "客服"
         ],
         "summary": "发送客服消息（v1.11）",
-        "description": "body: `{ body, internal:false, client_op_id }`。`client_op_id` 唯一，重试返回同一条消息且 `replayed:true`。",
+        "description": "body: {body,internal,client_op_id,assignment_version?,location_id?}。location_id 可选，提供时必须等于会话门店，否则 403 location_mismatch 且不写入。对外必须已领取且带 assignment_version；微信渠道未接通返回409 channel_not_connected。data.message 与 GET 相同，包含 sender_avatar_url、sender_role、sender_location_name；同 op 不同载荷返回 client_op_id_conflict。",
         "responses": {
           "200": {
             "description": "OK",
@@ -13552,6 +13787,7 @@
           "商城"
         ],
         "summary": "顾客会话详情（v1.11，不含内部备注）",
+        "description": "仅所属客户授权后读取最近500条公开 sent 消息，has_more 表示更早历史。消息新增 sender_avatar_url:string|null、sender_role:customer|store_staff|hq_agent|system、sender_location_name:string|null；不返回员工ID、邮箱、认证metadata或私有签名地址。",
         "responses": {
           "200": {
             "description": "OK",
@@ -13662,6 +13898,7 @@
           "商城"
         ],
         "summary": "顾客发送消息（v1.11）",
+        "description": "返回 data.message 与顾客 GET 同一字段契约，包含 sender_avatar_url、sender_role、sender_location_name；客户头像只取所属客户的安全公开 HTTPS URL。",
         "responses": {
           "200": {
             "description": "OK",
