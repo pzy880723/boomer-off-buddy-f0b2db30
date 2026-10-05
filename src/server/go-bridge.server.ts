@@ -127,44 +127,75 @@ async function loadPermittedLocationIds(erpUserId: string): Promise<string[]> {
   return ((data ?? []) as { location_id: string }[]).map((r) => r.location_id);
 }
 
-/** 核验 GO token 并解析出 ERP 侧可信身份与当天门店 */
-export async function authenticateGoActor(request: Request, now = new Date()): Promise<GoActor> {
+/** 核验 GO token 并解析出 ERP 侧可信身份与当天门店。
+ * 每次请求都实时核验，不缓存 token 结果或权限；只把互不依赖的读取并发。
+ * 错误优先级与串行版本一致：先读完，再按原顺序逐项判定。 */
+export async function authenticateGoActor(
+  request: Request,
+  now = new Date(),
+  timing?: { mark: (name: string) => void },
+): Promise<GoActor> {
   const env = goEnvironment();
   if (!env) throw new GoScopeError("go_bridge_not_configured", "GO 桥接尚未配置", 503);
 
   const token = bearerToken(request);
   if (!token) throw new GoScopeError("missing_token", "缺少 GO 访问令牌", 401);
 
-  // 1) 固定 issuer 实际核验 token
-  const { data: userData, error: userErr } = await goClient(env).auth.getUser(token);
+  // 1)+2) 固定 issuer 核验 token 与用户本人 token 调可信范围 RPC 互不依赖 → 并行；
+  //       两者都必须成功，且 RPC 返回的 user 必须等于 getUser 的 user（parseGoVerifyPayload 校验）。
+  const [userRes, scopeRes] = await Promise.all([
+    goClient(env).auth.getUser(token),
+    goClient(env, token).rpc(GO_SCOPE_RPC),
+  ]);
+  timing?.mark("go_verify");
+  const { data: userData, error: userErr } = userRes;
   if (userErr || !userData?.user) {
     throw new GoScopeError("invalid_go_token", "GO 访问令牌无效或已过期", 401);
   }
   const goUserId = userData.user.id;
-
   const today = shanghaiToday(now);
-
-  // 2) 以用户本人 token 调 GO 的可信范围函数（**无参数**，传参会 PGRST202）
-  const asUser = goClient(env, token);
-  const { data: scopeRaw, error: scopeErr } = await asUser.rpc(GO_SCOPE_RPC);
-  if (scopeErr) {
+  if (scopeRes.error) {
     throw new GoScopeError("go_scope_unavailable", "GO 身份/排班服务暂时不可用", 503);
   }
-  const verified = parseGoVerifyPayload(scopeRaw, {
+  const verified = parseGoVerifyPayload(scopeRes.data, {
     expectedDate: today,
     expectedGoUserId: goUserId,
   });
   const erpUserId = verified.erpUserId;
 
-  // 3) ERP 侧只做否决：显式 revoked 优先拒绝；不一致也拒绝；没有记录则复用 GO 可信映射
-  const { data: erpLinkRow, error: erpLinkErr } = await sb()
-    .from("go_identity_links")
-    .select("erp_user_id, status")
-    .eq("go_project_ref", env.projectRef)
-    .eq("go_user_id", goUserId)
-    .maybeSingle();
-  if (erpLinkErr) throw new GoScopeError("identity_unavailable", "身份登记暂不可用", 503);
-  const erpLink = erpLinkRow as { erp_user_id: string | null; status: string } | null;
+  // 3)–5.x) ERP 侧读取全部依赖 erpUserId，互相独立 → 并行读取，之后按原顺序判定
+  const [linkRes, erpUserRes, roleRes, syncRes, shopsRes, permRes, linksRes] = await Promise.all([
+    sb()
+      .from("go_identity_links")
+      .select("erp_user_id, status")
+      .eq("go_project_ref", env.projectRef)
+      .eq("go_user_id", goUserId)
+      .maybeSingle(),
+    sb().auth.admin.getUserById(erpUserId),
+    sb().from("user_roles").select("role").eq("user_id", erpUserId),
+    sb()
+      .from("go_scope_sync_outbox")
+      .select("subject_type, subject_key, change_kind, status, attempts")
+      .eq("go_project_ref", env.projectRef)
+      .eq("target_user_id", erpUserId)
+      .neq("status", "synced"),
+    loadRealShops().then(
+      (v) => ({ ok: true as const, v }),
+      (e: unknown) => ({ ok: false as const, e }),
+    ),
+    loadPermittedLocationIds(erpUserId).then(
+      (v) => ({ ok: true as const, v }),
+      (e: unknown) => ({ ok: false as const, e }),
+    ),
+    sb()
+      .from("go_shop_location_links")
+      .select("go_shop_id, location_id, status")
+      .eq("go_project_ref", env.projectRef),
+  ]);
+  timing?.mark("erp_reads");
+
+  if (linkRes.error) throw new GoScopeError("identity_unavailable", "身份登记暂不可用", 503);
+  const erpLink = linkRes.data as { erp_user_id: string | null; status: string } | null;
   const reasons: string[] = [...verified.reasons];
   if (erpLink) {
     if (erpLink.status === "revoked") {
@@ -177,9 +208,8 @@ export async function authenticateGoActor(request: Request, now = new Date()): P
     reasons.push("erp_link_from_go_trusted_mapping");
   }
 
-  // 4) ERP 账号状态（停用 / 删除即拒绝）
-  const { data: erpUser, error: erpUserErr } = await sb().auth.admin.getUserById(erpUserId);
-  if (erpUserErr || !erpUser?.user) {
+  const erpUser = erpUserRes.data;
+  if (erpUserRes.error || !erpUser?.user) {
     throw new GoScopeError("erp_account_missing", "ERP 账号不存在", 403);
   }
   const u = erpUser.user as unknown as Record<string, unknown>;
@@ -188,42 +218,25 @@ export async function authenticateGoActor(request: Request, now = new Date()): P
   }
   if (u["deleted_at"]) throw new GoScopeError("erp_account_disabled", "ERP 账号已停用", 403);
 
-  // 5) 当前角色实时读取，不信任 token / GO 里的角色声明
-  const { data: roleRows, error: roleErr } = await sb()
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", erpUserId);
-  if (roleErr) throw new GoScopeError("roles_unavailable", "角色信息暂不可用", 503);
-  const roles = ((roleRows as { role: string }[] | null) ?? []).map((r) => r.role);
+  if (roleRes.error) throw new GoScopeError("roles_unavailable", "角色信息暂不可用", 503);
+  const roles = ((roleRes.data as { role: string }[] | null) ?? []).map((r) => r.role);
   if (roles.length === 0) throw new GoScopeError("no_erp_role", "该账号在 ERP 尚未配置角色", 403);
-
-  // HQ 由 ERP 显式角色判定，不由 GO 的 scope 决定，也不由"没有门店"反推
   const isHq = roles.some((r) => HQ_ROLES.has(r));
 
-  // 5.1) 撤销类变更未同步到 GO 前一律 fail closed
-  const { data: syncRows, error: syncErr } = await sb()
-    .from("go_scope_sync_outbox")
-    .select("subject_type, subject_key, change_kind, status, attempts")
-    .eq("go_project_ref", env.projectRef)
-    .eq("target_user_id", erpUserId)
-    .neq("status", "synced");
-  if (syncErr) throw new GoScopeError("scope_sync_unavailable", "权限同步状态不可用", 503);
-  assertGoScopeSynced((syncRows ?? []) as GoSyncRow[]);
+  if (syncRes.error) throw new GoScopeError("scope_sync_unavailable", "权限同步状态不可用", 503);
+  assertGoScopeSynced((syncRes.data ?? []) as GoSyncRow[]);
 
-  // 5.2) ERP 实时角色与 GO 上下文不一致 → 明确「上下文过期，请刷新」，不悄悄降级
   if (isHq !== (verified.scope === "hq")) {
     throw new GoScopeError("go_scope_stale", "GO 范围上下文已过期，请刷新后重试", 409);
   }
 
-  const allShops = await loadRealShops();
-  const permitted = await loadPermittedLocationIds(erpUserId);
+  if (!shopsRes.ok) throw shopsRes.e;
+  if (!permRes.ok) throw permRes.e;
+  const allShops = shopsRes.v;
+  const permitted = permRes.v;
 
-  const { data: linkRows, error: linksErr } = await sb()
-    .from("go_shop_location_links")
-    .select("go_shop_id, location_id, status")
-    .eq("go_project_ref", env.projectRef);
-  if (linksErr) throw new GoScopeError("shop_mapping_unavailable", "门店映射暂不可用", 503);
-  const links = (linkRows ?? []) as {
+  if (linksRes.error) throw new GoScopeError("shop_mapping_unavailable", "门店映射暂不可用", 503);
+  const links = (linksRes.data ?? []) as {
     go_shop_id: string;
     location_id: string;
     status: string;
