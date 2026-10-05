@@ -28,7 +28,7 @@ type ShopRow = {
   shop_name: string;
   role: "hq" | "branch";
   parent_kdt_id: number | null;
-  status: string | null;
+  status: string;
   access_token: string | null;
   refresh_token: string | null;
   token_expires_at: string | null;
@@ -1866,7 +1866,7 @@ type OrderPageEntry<T> = {
   row: Record<string, unknown> & { kdt_id?: unknown; tid?: unknown };
   trade: T;
   targetShopId: string;
-  status: string;
+  status: string | null;
 };
 
 /**
