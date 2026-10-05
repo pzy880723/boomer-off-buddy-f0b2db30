@@ -162,6 +162,13 @@
       "when": 1791177992524,
       "tag": "0022_store_qr_configs_ios_channels",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1791185666062,
+      "tag": "0023_membership_plan_points_audit",
+      "breakpoints": true
     }
   ]
 }

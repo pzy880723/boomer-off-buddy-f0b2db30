@@ -902,6 +902,47 @@ export type Database = {
           },
         ]
       }
+      commerce_membership_plan_audit_logs: {
+        Row: {
+          after_value: Json
+          before_value: Json
+          changed_by: string
+          created_at: string
+          id: string
+          plan_code: string
+          plan_id: string
+          reason: string | null
+        }
+        Insert: {
+          after_value: Json
+          before_value: Json
+          changed_by?: string
+          created_at?: string
+          id?: string
+          plan_code: string
+          plan_id: string
+          reason?: string | null
+        }
+        Update: {
+          after_value?: Json
+          before_value?: Json
+          changed_by?: string
+          created_at?: string
+          id?: string
+          plan_code?: string
+          plan_id?: string
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_membership_plan_audit_logs_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_membership_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commerce_membership_plans: {
         Row: {
           amount_fen: number
