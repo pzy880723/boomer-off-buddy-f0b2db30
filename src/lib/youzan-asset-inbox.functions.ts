@@ -9,7 +9,7 @@ export const getYouzanAssetInboxStatus = createServerFn({ method: "GET" })
     const { data, error } = await context.supabase
       .from("youzan_member_asset_inbox")
       .select(
-        "id, kdt_id, event_id, msg_type, status, reason, attempts, next_attempt_at, conflict_count, last_conflict_at, received_at, updated_at",
+        "id, kdt_id, event_id, msg_type, biz_id, msg_version, redelivery_count, status, reason, attempts, next_attempt_at, conflict_count, last_conflict_at, received_at, updated_at",
       )
       .order("received_at", { ascending: false })
       .limit(100);

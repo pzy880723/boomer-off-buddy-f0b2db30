@@ -50,6 +50,19 @@ export const Route = createFileRoute("/api/public/hooks/youzan-message")({
           );
         }
 
+        // POINTS（客户积分变更，MSG/279）：只进会员资产收件箱，不扣账、不走下方交易/退款逻辑。
+        // 验签按解码后的 msg 计算（见 youzan-points-message.server.ts），落库失败返回 503 不 ack。
+        if (payload.type === "POINTS") {
+          const { handlePointsMessage, productionPointsDeps } = await import(
+            "@/server/youzan-points-message.server"
+          );
+          const out = await handlePointsMessage(
+            { body: payload as Record<string, unknown>, headerSign: request.headers.get("event-sign") },
+            await productionPointsDeps(),
+          );
+          return Response.json(out.body, { status: out.status });
+        }
+
         // 有赞平台"验证订阅 URL"时会发一个 test=1 的空消息，回 { code:0, msg:"success" } 即可
         if (payload.test === "1" || payload.test === "true") {
           return Response.json({ code: 0, msg: "success" });

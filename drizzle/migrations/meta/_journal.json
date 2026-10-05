@@ -183,6 +183,13 @@
       "when": 1791189725117,
       "tag": "0025_youzan_asset_inbox_fencing",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1791189966390,
+      "tag": "0026_youzan_asset_inbox_points_envelope",
+      "breakpoints": true
     }
   ]
 }
