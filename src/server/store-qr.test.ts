@@ -12,7 +12,7 @@ function deps(p: Partial<QrDeps> = {}): QrDeps {
     ...p,
   };
 }
-const LOC = "11111111-1111-1111-1111-111111111111";
+const LOC = "11111111-1111-4111-8111-111111111111";
 
 test("无库位权限读取 → 403", async () => {
   const r = await listStoreQr(deps({ canAccessLocation: async () => false }), "u", LOC);
