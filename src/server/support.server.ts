@@ -347,9 +347,10 @@ export async function listStaffConversations(input: {
   const rows = (data as unknown as ConversationRow[]) ?? [];
   const hasMore = rows.length > limit;
   const page = hasMore ? rows.slice(0, limit) : rows;
+  const last = page.at(-1);
   return {
     items: await hydrate(page, input.access),
-    next_cursor: hasMore && page.at(-1) ? encodeSupportCursor(page.at(-1) as ConversationRow) : null,
+    next_cursor: hasMore && last ? encodeSupportCursor(last) : null,
     queue,
   };
 }

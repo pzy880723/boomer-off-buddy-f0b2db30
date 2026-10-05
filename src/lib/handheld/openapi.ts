@@ -1012,14 +1012,14 @@ X-Session-Token: <操作员 session token>
       get: {
         tags: ["客服"],
         summary: "会话详情与消息（v1.11）",
-        description: "员工可见 `internal:true` 的内部备注；顾客端接口永不下发内部备注。",
+        description: "员工可见 internal:true 的内部备注；顾客端接口永不下发内部备注。消息保留旧字段，新增 sender_avatar_url:string|null、sender_role:customer|store_staff|hq_agent|system、sender_location_name:string|null。按历史发言者而非当前主接待人解析；头像仅安全公开 HTTPS，缺图/私桶路径返回 null。详情最近500条正序及 has_more，conversation 新增 customer_avatar_url:string|null。",
         responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
       },
       post: {
         tags: ["客服"],
         summary: "发送客服消息（v1.11）",
         description:
-          "body: `{ body, internal:false, client_op_id }`。`client_op_id` 唯一，重试返回同一条消息且 `replayed:true`。",
+          "body: {body,internal,client_op_id,assignment_version?}。对外必须已领取且带 assignment_version；微信渠道未接通返回409 channel_not_connected。data.message 与 GET 相同，包含 sender_avatar_url、sender_role、sender_location_name；同 op 不同载荷返回 client_op_id_conflict。",
         responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
       },
     },
@@ -1179,11 +1179,13 @@ X-Session-Token: <操作员 session token>
       get: {
         tags: ["商城"],
         summary: "顾客会话详情（v1.11，不含内部备注）",
+        description: "仅所属客户授权后读取最近500条公开 sent 消息，has_more 表示更早历史。消息新增 sender_avatar_url:string|null、sender_role:customer|store_staff|hq_agent|system、sender_location_name:string|null；不返回员工ID、邮箱、认证metadata或私有签名地址。",
         responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
       },
       post: {
         tags: ["商城"],
         summary: "顾客发送消息（v1.11）",
+        description: "返回 data.message 与顾客 GET 同一字段契约，包含 sender_avatar_url、sender_role、sender_location_name；客户头像只取所属客户的安全公开 HTTPS URL。",
         responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
       },
     },
