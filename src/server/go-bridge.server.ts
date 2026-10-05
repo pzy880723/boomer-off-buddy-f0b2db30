@@ -32,6 +32,8 @@ import { assertGoScopeSynced, type GoSyncRow } from "@/lib/go-bridge/sync-state"
 import { buildGoDailySummary, type GoStoreInput } from "@/lib/go-bridge/daily-contract";
 import { completedSyncCoverage, type CompletedScan } from "@/lib/go-bridge/sync-coverage";
 import { shanghaiToday, shanghaiDayWindow } from "@/lib/store-targets/sales-window";
+import { createServerTiming } from "@/lib/server-timing";
+import { fetchAllPages, mapLimit, sumYouzanPaid } from "@/lib/go-bridge/concurrency";
 
 export { GoScopeError };
 
@@ -127,44 +129,75 @@ async function loadPermittedLocationIds(erpUserId: string): Promise<string[]> {
   return ((data ?? []) as { location_id: string }[]).map((r) => r.location_id);
 }
 
-/** 核验 GO token 并解析出 ERP 侧可信身份与当天门店 */
-export async function authenticateGoActor(request: Request, now = new Date()): Promise<GoActor> {
+/** 核验 GO token 并解析出 ERP 侧可信身份与当天门店。
+ * 每次请求都实时核验，不缓存 token 结果或权限；只把互不依赖的读取并发。
+ * 错误优先级与串行版本一致：先读完，再按原顺序逐项判定。 */
+export async function authenticateGoActor(
+  request: Request,
+  now = new Date(),
+  timing?: { mark: (name: string) => void },
+): Promise<GoActor> {
   const env = goEnvironment();
   if (!env) throw new GoScopeError("go_bridge_not_configured", "GO 桥接尚未配置", 503);
 
   const token = bearerToken(request);
   if (!token) throw new GoScopeError("missing_token", "缺少 GO 访问令牌", 401);
 
-  // 1) 固定 issuer 实际核验 token
-  const { data: userData, error: userErr } = await goClient(env).auth.getUser(token);
+  // 1)+2) 固定 issuer 核验 token 与用户本人 token 调可信范围 RPC 互不依赖 → 并行；
+  //       两者都必须成功，且 RPC 返回的 user 必须等于 getUser 的 user（parseGoVerifyPayload 校验）。
+  const [userRes, scopeRes] = await Promise.all([
+    goClient(env).auth.getUser(token),
+    goClient(env, token).rpc(GO_SCOPE_RPC),
+  ]);
+  timing?.mark("go_verify");
+  const { data: userData, error: userErr } = userRes;
   if (userErr || !userData?.user) {
     throw new GoScopeError("invalid_go_token", "GO 访问令牌无效或已过期", 401);
   }
   const goUserId = userData.user.id;
-
   const today = shanghaiToday(now);
-
-  // 2) 以用户本人 token 调 GO 的可信范围函数（**无参数**，传参会 PGRST202）
-  const asUser = goClient(env, token);
-  const { data: scopeRaw, error: scopeErr } = await asUser.rpc(GO_SCOPE_RPC);
-  if (scopeErr) {
+  if (scopeRes.error) {
     throw new GoScopeError("go_scope_unavailable", "GO 身份/排班服务暂时不可用", 503);
   }
-  const verified = parseGoVerifyPayload(scopeRaw, {
+  const verified = parseGoVerifyPayload(scopeRes.data, {
     expectedDate: today,
     expectedGoUserId: goUserId,
   });
   const erpUserId = verified.erpUserId;
 
-  // 3) ERP 侧只做否决：显式 revoked 优先拒绝；不一致也拒绝；没有记录则复用 GO 可信映射
-  const { data: erpLinkRow, error: erpLinkErr } = await sb()
-    .from("go_identity_links")
-    .select("erp_user_id, status")
-    .eq("go_project_ref", env.projectRef)
-    .eq("go_user_id", goUserId)
-    .maybeSingle();
-  if (erpLinkErr) throw new GoScopeError("identity_unavailable", "身份登记暂不可用", 503);
-  const erpLink = erpLinkRow as { erp_user_id: string | null; status: string } | null;
+  // 3)–5.x) ERP 侧读取全部依赖 erpUserId，互相独立 → 并行读取，之后按原顺序判定
+  const [linkRes, erpUserRes, roleRes, syncRes, shopsRes, permRes, linksRes] = await Promise.all([
+    sb()
+      .from("go_identity_links")
+      .select("erp_user_id, status")
+      .eq("go_project_ref", env.projectRef)
+      .eq("go_user_id", goUserId)
+      .maybeSingle(),
+    sb().auth.admin.getUserById(erpUserId),
+    sb().from("user_roles").select("role").eq("user_id", erpUserId),
+    sb()
+      .from("go_scope_sync_outbox")
+      .select("subject_type, subject_key, change_kind, status, attempts")
+      .eq("go_project_ref", env.projectRef)
+      .eq("target_user_id", erpUserId)
+      .neq("status", "synced"),
+    loadRealShops().then(
+      (v) => ({ ok: true as const, v }),
+      (e: unknown) => ({ ok: false as const, e }),
+    ),
+    loadPermittedLocationIds(erpUserId).then(
+      (v) => ({ ok: true as const, v }),
+      (e: unknown) => ({ ok: false as const, e }),
+    ),
+    sb()
+      .from("go_shop_location_links")
+      .select("go_shop_id, location_id, status")
+      .eq("go_project_ref", env.projectRef),
+  ]);
+  timing?.mark("erp_reads");
+
+  if (linkRes.error) throw new GoScopeError("identity_unavailable", "身份登记暂不可用", 503);
+  const erpLink = linkRes.data as { erp_user_id: string | null; status: string } | null;
   const reasons: string[] = [...verified.reasons];
   if (erpLink) {
     if (erpLink.status === "revoked") {
@@ -177,9 +210,8 @@ export async function authenticateGoActor(request: Request, now = new Date()): P
     reasons.push("erp_link_from_go_trusted_mapping");
   }
 
-  // 4) ERP 账号状态（停用 / 删除即拒绝）
-  const { data: erpUser, error: erpUserErr } = await sb().auth.admin.getUserById(erpUserId);
-  if (erpUserErr || !erpUser?.user) {
+  const erpUser = erpUserRes.data;
+  if (erpUserRes.error || !erpUser?.user) {
     throw new GoScopeError("erp_account_missing", "ERP 账号不存在", 403);
   }
   const u = erpUser.user as unknown as Record<string, unknown>;
@@ -188,42 +220,25 @@ export async function authenticateGoActor(request: Request, now = new Date()): P
   }
   if (u["deleted_at"]) throw new GoScopeError("erp_account_disabled", "ERP 账号已停用", 403);
 
-  // 5) 当前角色实时读取，不信任 token / GO 里的角色声明
-  const { data: roleRows, error: roleErr } = await sb()
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", erpUserId);
-  if (roleErr) throw new GoScopeError("roles_unavailable", "角色信息暂不可用", 503);
-  const roles = ((roleRows as { role: string }[] | null) ?? []).map((r) => r.role);
+  if (roleRes.error) throw new GoScopeError("roles_unavailable", "角色信息暂不可用", 503);
+  const roles = ((roleRes.data as { role: string }[] | null) ?? []).map((r) => r.role);
   if (roles.length === 0) throw new GoScopeError("no_erp_role", "该账号在 ERP 尚未配置角色", 403);
-
-  // HQ 由 ERP 显式角色判定，不由 GO 的 scope 决定，也不由"没有门店"反推
   const isHq = roles.some((r) => HQ_ROLES.has(r));
 
-  // 5.1) 撤销类变更未同步到 GO 前一律 fail closed
-  const { data: syncRows, error: syncErr } = await sb()
-    .from("go_scope_sync_outbox")
-    .select("subject_type, subject_key, change_kind, status, attempts")
-    .eq("go_project_ref", env.projectRef)
-    .eq("target_user_id", erpUserId)
-    .neq("status", "synced");
-  if (syncErr) throw new GoScopeError("scope_sync_unavailable", "权限同步状态不可用", 503);
-  assertGoScopeSynced((syncRows ?? []) as GoSyncRow[]);
+  if (syncRes.error) throw new GoScopeError("scope_sync_unavailable", "权限同步状态不可用", 503);
+  assertGoScopeSynced((syncRes.data ?? []) as GoSyncRow[]);
 
-  // 5.2) ERP 实时角色与 GO 上下文不一致 → 明确「上下文过期，请刷新」，不悄悄降级
   if (isHq !== (verified.scope === "hq")) {
     throw new GoScopeError("go_scope_stale", "GO 范围上下文已过期，请刷新后重试", 409);
   }
 
-  const allShops = await loadRealShops();
-  const permitted = await loadPermittedLocationIds(erpUserId);
+  if (!shopsRes.ok) throw shopsRes.e;
+  if (!permRes.ok) throw permRes.e;
+  const allShops = shopsRes.v;
+  const permitted = permRes.v;
 
-  const { data: linkRows, error: linksErr } = await sb()
-    .from("go_shop_location_links")
-    .select("go_shop_id, location_id, status")
-    .eq("go_project_ref", env.projectRef);
-  if (linksErr) throw new GoScopeError("shop_mapping_unavailable", "门店映射暂不可用", 503);
-  const links = (linkRows ?? []) as {
+  if (linksRes.error) throw new GoScopeError("shop_mapping_unavailable", "门店映射暂不可用", 503);
+  const links = (linksRes.data ?? []) as {
     go_shop_id: string;
     location_id: string;
     status: string;
@@ -329,6 +344,12 @@ async function loadSyncCoverage(shopId: string, startUtc: string, endUtc: string
   return completedSyncCoverage({ rows: (data ?? []) as CompletedScan[], startUtc, endUtc, now });
 }
 
+/** 总部多店汇总时同时处理的门店数上限 */
+export const GO_SUMMARY_STORE_CONCURRENCY = 3;
+
+type OfflineRow = { amount_fen: number; order_count: number };
+type YouzanRow = { id: string; tid: string | null; status: string | null; payment: unknown; total_fee: unknown };
+
 async function loadStoreFacts(params: {
   locationId: string;
   name: string;
@@ -337,13 +358,33 @@ async function loadStoreFacts(params: {
 }): Promise<GoStoreInput> {
   const { startUtc, endUtc } = shanghaiDayWindow(params.date);
   try {
-    const { data: loc, error: locErr } = await sb()
-      .from("inv_locations")
-      .select("id, name, shop_id")
-      .eq("id", params.locationId)
-      .maybeSingle();
-    if (locErr) throw new SourceError("location_read_failed", locErr.message);
-    const shopId: string | null = (loc as { shop_id: string | null } | null)?.shop_id ?? null;
+    // 门店主数据、线下补录、日目标互不依赖 → 并行
+    const [locRes, offRes, targetRes] = await Promise.all([
+      sb().from("inv_locations").select("id, name, shop_id").eq("id", params.locationId).maybeSingle(),
+      fetchAllPages<OfflineRow>((from, to) =>
+        sb()
+          .from("store_offline_sales_entries")
+          .select("id, amount_fen, order_count")
+          .eq("location_id", params.locationId)
+          .eq("business_date", params.date)
+          .eq("status", "active")
+          .order("id", { ascending: true })
+          .range(from, to),
+      ).then(
+        (v) => ({ ok: true as const, v }),
+        (e: unknown) => ({ ok: false as const, e }),
+      ),
+      sb()
+        .from("store_daily_targets")
+        .select("target_amount_fen")
+        .eq("location_id", params.locationId)
+        .eq("target_date", params.date)
+        .maybeSingle(),
+    ]);
+    if (locRes.error) throw new SourceError("location_read_failed", locRes.error.message);
+    if (!offRes.ok) throw new SourceError("offline_read_failed", String((offRes.e as Error)?.message ?? offRes.e));
+    if (targetRes.error) throw new SourceError("target_read_failed", targetRes.error.message);
+    const shopId: string | null = (locRes.data as { shop_id: string | null } | null)?.shop_id ?? null;
 
     let youzanFen: number | null = 0;
     let youzanOrders: number | null = 0;
@@ -353,41 +394,46 @@ async function loadStoreFacts(params: {
     let sourceFresh = false;
 
     if (shopId) {
-      const { data: rows, error: ordErr } = await sb()
-        .from("youzan_orders")
-        .select("status, pay_time, payment, total_fee")
-        .eq("shop_id", shopId)
-        .gte("pay_time", startUtc)
-        .lt("pay_time", endUtc);
-      if (ordErr) throw new SourceError("youzan_read_failed", ordErr.message);
-      const paid = (
-        (rows ?? []) as { status: string; payment: number; total_fee: number }[]
-      ).filter((r) => String(r.status ?? "").toUpperCase() !== "TRADE_CLOSED");
-      youzanFen = paid.reduce(
-        (s, r) => s + Math.round(Number(r.payment ?? r.total_fee ?? 0) * 100),
-        0,
-      );
-      youzanOrders = paid.length;
-
-      const coverage = await loadSyncCoverage(shopId, startUtc, endUtc, params.now);
+      // 订单完整分页（按 id 稳定排序，不受默认 1000 行截断）与同步覆盖并行
+      const [ordersRes, coverageRes] = await Promise.all([
+        fetchAllPages<YouzanRow>((from, to) =>
+          sb()
+            .from("youzan_orders")
+            .select("id, tid, status, payment, total_fee")
+            .eq("shop_id", shopId)
+            .gte("pay_time", startUtc)
+            .lt("pay_time", endUtc)
+            .order("id", { ascending: true })
+            .range(from, to),
+        ).then(
+          (v) => ({ ok: true as const, v }),
+          (e: unknown) => ({ ok: false as const, e }),
+        ),
+        loadSyncCoverage(shopId, startUtc, endUtc, params.now).then(
+          (v) => ({ ok: true as const, v }),
+          (e: unknown) => ({ ok: false as const, e }),
+        ),
+      ]);
+      if (!ordersRes.ok) {
+        throw new SourceError("youzan_read_failed", String((ordersRes.e as Error)?.message ?? ordersRes.e));
+      }
+      if (!coverageRes.ok) throw coverageRes.e;
+      let paid: { fen: number; orders: number };
+      try {
+        paid = sumYouzanPaid(ordersRes.v);
+      } catch (e) {
+        throw new SourceError("youzan_amount_invalid", (e as Error).message);
+      }
+      youzanFen = paid.fen;
+      youzanOrders = paid.orders;
+      const coverage = coverageRes.v;
       syncedThrough = coverage.syncedThrough;
       covered = coverage.wholeDayCovered;
       hasSnapshot = coverage.hasSnapshot;
       sourceFresh = coverage.fresh;
     }
 
-    const { data: offlineRows, error: offErr } = await sb()
-      .from("store_offline_sales_entries")
-      .select("amount_fen, order_count")
-      .eq("location_id", params.locationId)
-      .eq("business_date", params.date)
-      .eq("status", "active");
-    if (offErr) throw new SourceError("offline_read_failed", offErr.message);
-    const offline = ((offlineRows ?? []) as { amount_fen: number; order_count: number }[]).reduce<{
-      amount_fen: number;
-      entry_count: number;
-      order_count: number;
-    }>(
+    const offline = offRes.v.reduce<{ amount_fen: number; entry_count: number; order_count: number }>(
       (acc, r) => ({
         amount_fen: acc.amount_fen + Number(r.amount_fen || 0),
         entry_count: acc.entry_count + 1,
@@ -395,22 +441,13 @@ async function loadStoreFacts(params: {
       }),
       { amount_fen: 0, entry_count: 0, order_count: 0 },
     );
-
-    const { data: targetRow, error: tErr } = await sb()
-      .from("store_daily_targets")
-      .select("target_amount_fen")
-      .eq("location_id", params.locationId)
-      .eq("target_date", params.date)
-      .maybeSingle();
-    if (tErr) throw new SourceError("target_read_failed", tErr.message);
+    const targetRow = targetRes.data as { target_amount_fen: number } | null;
 
     return {
       status: "ok",
       location_id: params.locationId,
       name: params.name,
-      target_fen: targetRow
-        ? Number((targetRow as { target_amount_fen: number }).target_amount_fen)
-        : null,
+      target_fen: targetRow ? Number(targetRow.target_amount_fen) : null,
       youzan_fen: youzanFen,
       offline_fen: offline.amount_fen,
       youzan_order_count: youzanOrders,
@@ -420,7 +457,7 @@ async function loadStoreFacts(params: {
       day_covered_by_sync: covered,
       has_current_day_snapshot: hasSnapshot,
       source_fresh: sourceFresh,
-      // 本地暂无有赞退款数据源 → 只能是已付款毛额口径
+      // 有赞订单同步不含退款单，也没有可验证的退款覆盖 → 只能是已付款毛额口径
       has_refund_source: false,
       offline_entry_count: offline.entry_count,
     };
@@ -430,7 +467,8 @@ async function loadStoreFacts(params: {
       location_id: params.locationId,
       name: params.name,
       code: e instanceof SourceError ? e.code : "store_summary_failed",
-      message: e instanceof Error ? e.message.slice(0, 200) : undefined,
+      // 不把数据库原始报错回传客户端
+      message: undefined,
     };
   }
 }
@@ -447,17 +485,14 @@ export async function loadGoDailySummary(params: {
     names.set(params.actor.today_location.id, params.actor.today_location.name);
   }
 
-  const stores: GoStoreInput[] = [];
-  for (const locationId of params.scope.locationIds) {
-    stores.push(
-      await loadStoreFacts({
-        locationId,
-        name: names.get(locationId) ?? "未知门店",
-        date: params.date,
-        now,
-      }),
-    );
-  }
+  const stores = await mapLimit(params.scope.locationIds, GO_SUMMARY_STORE_CONCURRENCY, (locationId) =>
+    loadStoreFacts({
+      locationId,
+      name: names.get(locationId) ?? "未知门店",
+      date: params.date,
+      now,
+    }),
+  );
 
   return buildGoDailySummary({
     date: params.date,
@@ -488,4 +523,36 @@ export function goError(e: unknown) {
     return goJson({ ok: false, code: e.code, error: e.message }, e.status);
   }
   return goJson({ ok: false, code: "internal_error", error: "服务暂时不可用" }, 500);
+}
+
+/** 非敏感请求追踪：随机 request id + 阶段耗时（Server-Timing），不含 token/用户信息。
+ * 响应体只追加 request_id 字段，原有字段不变；同时写 X-Request-Id 头。 */
+export async function goTraced(
+  route: string,
+  run: (timing: { mark: (name: string) => void }) => Promise<Response>,
+): Promise<Response> {
+  const requestId = crypto.randomUUID();
+  const timer = createServerTiming();
+  let res: Response;
+  try {
+    res = await run(timer);
+  } catch (e) {
+    res = goError(e);
+  }
+  let out = res;
+  if ((res.headers.get("content-type") ?? "").includes("application/json")) {
+    try {
+      const body = (await res.clone().json()) as unknown;
+      if (body && typeof body === "object" && !Array.isArray(body)) {
+        out = new Response(JSON.stringify({ ...(body as object), request_id: requestId }), res);
+      }
+    } catch {
+      /* keep original */
+    }
+  }
+  out = timer.apply(out);
+  out.headers.set("X-Request-Id", requestId);
+  out.headers.set("Access-Control-Expose-Headers", "X-Request-Id, Server-Timing");
+  console.log(JSON.stringify({ evt: "go_api", route, request_id: requestId, status: out.status, timing: out.headers.get("Server-Timing") }));
+  return out;
 }
