@@ -7,6 +7,7 @@ export type SupportPolicyConversation = {
   location_id: string | null;
   status: string;
   primary_agent_id: string | null;
+  channel?: string;
 };
 
 export function canAccessLocation(access: SupportPolicyAccess, locationId: string | null): boolean {
@@ -17,13 +18,17 @@ export function canAccessLocation(access: SupportPolicyAccess, locationId: strin
 export function supportCapabilities(access: SupportPolicyAccess, c: SupportPolicyConversation) {
   const allowed = canAccessLocation(access, c.location_id);
   const open = c.status !== "closed";
+  const isPrimary = c.primary_agent_id === access.user_id;
+  // 与 support_update_assignment 一致：关闭/重开仅主接待人或总部；微信渠道未接入外发
+  const ownerOrHq = allowed && (access.is_hq_agent || isPrimary);
+  const channelConnected = (c.channel ?? "native") === "native";
   return {
     can_note: allowed,
-    can_reply: allowed && open && c.primary_agent_id === access.user_id,
+    can_reply: allowed && open && isPrimary && channelConnected,
     can_claim: allowed && open && c.primary_agent_id === null,
-    can_takeover: access.is_hq_agent && open && c.primary_agent_id !== access.user_id,
-    can_close: allowed && open,
-    can_reopen: allowed && !open,
+    can_takeover: access.is_hq_agent && open && !isPrimary,
+    can_close: ownerOrHq && open,
+    can_reopen: ownerOrHq && !open,
   };
 }
 
@@ -48,6 +53,8 @@ export function buildContextKey(input: {
 export const SUPPORT_ERRORS: Record<string, { status: number; message: string }> = {
   not_found: { status: 404, message: "会话不存在或无权查看" },
   forbidden: { status: 403, message: "无权处理该门店的会话" },
+  primary_or_hq_only: { status: 403, message: "只有主接待人或总部可以关闭/重开会话" },
+  channel_not_connected: { status: 409, message: "微信客服渠道尚未接通，暂不能对外回复，可先写内部备注" },
   hq_only: { status: 403, message: "只有总部客服可以接管会话" },
   invalid_action: { status: 400, message: "不支持的操作" },
   assignment_version_required: { status: 409, message: "会话状态已更新，请刷新后再操作" },

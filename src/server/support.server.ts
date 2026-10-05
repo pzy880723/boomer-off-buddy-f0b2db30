@@ -12,6 +12,18 @@ import {
 
 export type SupportContext = { [key: string]: string | number | boolean | null } | null;
 
+/** 只返回展示用安全字段，去掉 image_url 等可能带签名/原图地址的字段。 */
+export function safeContext(raw: unknown): SupportContext {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const out: { [key: string]: string | number | boolean | null } = {};
+  for (const k of ["type", "id", "title", "order_no", "price", "sku_code"]) {
+    const v = r[k];
+    if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") out[k] = v;
+  }
+  return out;
+}
+
 const CONVERSATION_COLUMNS =
   "id,title,location_id,customer_id,order_id,status,topic,last_message_at,last_message_preview,created_at,updated_at,context_key,context,channel,primary_agent_id,assignment_version,escalated_at,escalation_reason,waiting_since";
 
@@ -264,7 +276,7 @@ async function hydrate(
     waiting_since: row.waiting_since,
     context_key: row.context_key,
     // 列表只含授权会话；context 仅在授权范围内返回
-    context: staffCanAccessConversation(access, row) ? row.context : null,
+    context: staffCanAccessConversation(access, row) ? safeContext(row.context) : null,
     ...supportCapabilities(access, row),
   }));
 }
@@ -540,7 +552,7 @@ export async function ensureCustomerConversation(input: {
   } else if (input.productId) {
     const { data: listing } = await supabaseAdmin
       .from("commerce_listings" as never)
-      .select("id, location_id, title, price, cover_url, status")
+      .select("id, location_id, title, price, status")
       .eq("id", input.productId)
       .maybeSingle();
     const l = listing as {
@@ -548,12 +560,13 @@ export async function ensureCustomerConversation(input: {
       location_id: string | null;
       title: string | null;
       price: number | null;
-      cover_url: string | null;
+      status: string | null;
     } | null;
-    if (!l) return { ok: false, code: "product_not_found" };
+    // 仅已上架商品可发起商品咨询；已售/下架请走订单咨询
+    if (!l || l.status !== "published") return { ok: false, code: "product_not_found" };
     locationId = l.location_id;
     productId = l.id;
-    context = { type: "product", id: l.id, title: l.title, price: l.price, image_url: l.cover_url };
+    context = { type: "product", id: l.id, title: l.title, price: l.price };
   } else if (input.locationId) {
     const { data: loc } = await supabaseAdmin
       .from("inv_locations")
@@ -617,7 +630,7 @@ export async function getCustomerConversation(customerId: string, conversationId
         status: conversation.status,
         order_id: conversation.order_id,
         location_id: conversation.location_id,
-        context: conversation.context,
+        context: safeContext(conversation.context),
         updated_at: conversation.updated_at,
       },
       // 客户永远看不到内部备注
@@ -627,6 +640,7 @@ export async function getCustomerConversation(customerId: string, conversationId
   };
 }
 
+/** 顾客发送：数据库行锁事务（support_customer_post_message），与关闭竞争时关闭后不可插入。 */
 export async function postCustomerMessage(input: {
   customerId: string;
   customerName: string;
@@ -634,32 +648,18 @@ export async function postCustomerMessage(input: {
   body: string;
   clientOpId: string;
 }) {
-  const conversation = await loadConversationRow(input.conversationId);
-  if (!conversation || conversation.customer_id !== input.customerId) {
-    return { ok: false as const, code: "not_found" };
-  }
-  if (conversation.status === "closed") return { ok: false as const, code: "conversation_closed" };
-  const existing = await supabaseAdmin
-    .from("support_messages" as never)
-    .select("id, sender_name, sender_type, body, internal, delivery_status, created_at")
-    .eq("conversation_id", input.conversationId)
-    .eq("client_op_id", input.clientOpId)
-    .maybeSingle();
-  if (existing.data) return { ok: true as const, data: { message: existing.data, replayed: true } };
-
-  const { data, error } = await supabaseAdmin
-    .from("support_messages" as never)
-    .insert({
-      conversation_id: input.conversationId,
-      sender_type: "customer",
-      sender_customer_id: input.customerId,
-      sender_name: input.customerName,
-      body: input.body,
-      internal: false,
-      client_op_id: input.clientOpId,
-    } as never)
-    .select("id, sender_name, sender_type, body, internal, delivery_status, created_at")
-    .single();
+  const { data, error } = await supabaseAdmin.rpc("support_customer_post_message" as never, {
+    p_conversation_id: input.conversationId,
+    p_customer_id: input.customerId,
+    p_customer_name: input.customerName,
+    p_body: input.body,
+    p_client_op_id: input.clientOpId,
+  } as never);
   if (error) throw new Error(error.message);
-  return { ok: true as const, data: { message: data, replayed: false } };
+  const r = data as unknown as RpcResult;
+  if (!r.ok) return { ok: false as const, code: r.code ?? "unknown" };
+  return {
+    ok: true as const,
+    data: { message: pickMessage(r.message), replayed: Boolean(r.replayed) },
+  };
 }
