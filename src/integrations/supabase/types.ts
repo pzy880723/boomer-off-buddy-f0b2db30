@@ -8750,8 +8750,10 @@ export type Database = {
       youzan_member_asset_inbox: {
         Row: {
           attempts: number
+          biz_id: string | null
           claim_token: string | null
           conflict_count: number
+          envelope: Json | null
           event_id: string
           id: string
           kdt_id: number
@@ -8759,18 +8761,22 @@ export type Database = {
           last_conflict_hash: string | null
           lease_until: string | null
           msg_type: string
+          msg_version: number | null
           next_attempt_at: string
           payload: Json
           payload_hash: string
           reason: string | null
           received_at: string
+          redelivery_count: number
           status: string
           updated_at: string
         }
         Insert: {
           attempts?: number
+          biz_id?: string | null
           claim_token?: string | null
           conflict_count?: number
+          envelope?: Json | null
           event_id: string
           id?: string
           kdt_id: number
@@ -8778,18 +8784,22 @@ export type Database = {
           last_conflict_hash?: string | null
           lease_until?: string | null
           msg_type: string
+          msg_version?: number | null
           next_attempt_at?: string
           payload: Json
           payload_hash: string
           reason?: string | null
           received_at?: string
+          redelivery_count?: number
           status?: string
           updated_at?: string
         }
         Update: {
           attempts?: number
+          biz_id?: string | null
           claim_token?: string | null
           conflict_count?: number
+          envelope?: Json | null
           event_id?: string
           id?: string
           kdt_id?: number
@@ -8797,11 +8807,13 @@ export type Database = {
           last_conflict_hash?: string | null
           lease_until?: string | null
           msg_type?: string
+          msg_version?: number | null
           next_attempt_at?: string
           payload?: Json
           payload_hash?: string
           reason?: string | null
           received_at?: string
+          redelivery_count?: number
           status?: string
           updated_at?: string
         }
@@ -10525,8 +10537,10 @@ export type Database = {
         Args: { p_limit: number }
         Returns: {
           attempts: number
+          biz_id: string | null
           claim_token: string | null
           conflict_count: number
+          envelope: Json | null
           event_id: string
           id: string
           kdt_id: number
@@ -10534,11 +10548,13 @@ export type Database = {
           last_conflict_hash: string | null
           lease_until: string | null
           msg_type: string
+          msg_version: number | null
           next_attempt_at: string
           payload: Json
           payload_hash: string
           reason: string | null
           received_at: string
+          redelivery_count: number
           status: string
           updated_at: string
         }[]
@@ -10561,9 +10577,14 @@ export type Database = {
       }
       youzan_asset_inbox_ingest: {
         Args: {
+          p_biz_id?: string
+          p_envelope?: Json
           p_event_id: string
+          p_initial_reason?: string
+          p_initial_status?: string
           p_kdt_id: number
           p_msg_type: string
+          p_msg_version?: string
           p_payload: Json
           p_payload_hash: string
         }
