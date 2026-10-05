@@ -9039,6 +9039,78 @@ export type Database = {
           },
         ]
       }
+      youzan_points_operations: {
+        Row: {
+          attempts: number
+          claim_token: string | null
+          created_at: string
+          customer_id: string
+          id: string
+          kdt_id: number
+          kind: string
+          lease_until: string | null
+          operation_key: string
+          parent_id: string | null
+          points: number
+          reason: string | null
+          source_kdt_id: number
+          status: string
+          updated_at: string
+          yz_open_id: string
+        }
+        Insert: {
+          attempts?: number
+          claim_token?: string | null
+          created_at?: string
+          customer_id: string
+          id?: string
+          kdt_id: number
+          kind: string
+          lease_until?: string | null
+          operation_key: string
+          parent_id?: string | null
+          points: number
+          reason?: string | null
+          source_kdt_id: number
+          status?: string
+          updated_at?: string
+          yz_open_id: string
+        }
+        Update: {
+          attempts?: number
+          claim_token?: string | null
+          created_at?: string
+          customer_id?: string
+          id?: string
+          kdt_id?: number
+          kind?: string
+          lease_until?: string | null
+          operation_key?: string
+          parent_id?: string | null
+          points?: number
+          reason?: string | null
+          source_kdt_id?: number
+          status?: string
+          updated_at?: string
+          yz_open_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "youzan_points_operations_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "youzan_points_operations_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "youzan_points_operations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       youzan_shops: {
         Row: {
           access_token: string | null
@@ -10746,6 +10818,36 @@ export type Database = {
         Returns: Json
       }
       youzan_order_raw_updated_at: { Args: { p_raw: Json }; Returns: string }
+      youzan_points_operation_begin: {
+        Args: {
+          p_customer_id: string
+          p_kdt_id: number
+          p_kind: string
+          p_operation_key: string
+          p_parent_id?: string
+          p_points: number
+          p_source_kdt_id: number
+          p_yz_open_id: string
+        }
+        Returns: Json
+      }
+      youzan_points_operation_claim: { Args: { p_id: string }; Returns: Json }
+      youzan_points_operation_finish: {
+        Args: {
+          p_claim_token: string
+          p_id: string
+          p_reason?: string
+          p_status: string
+        }
+        Returns: boolean
+      }
+      youzan_points_operation_json: {
+        Args: {
+          o: Database["public"]["Tables"]["youzan_points_operations"]["Row"]
+          p_idempotent: boolean
+        }
+        Returns: Json
+      }
     }
     Enums: {
       app_role:
