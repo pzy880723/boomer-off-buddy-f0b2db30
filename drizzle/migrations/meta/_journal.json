@@ -204,6 +204,13 @@
       "when": 1791196484759,
       "tag": "0028_youzan_member_asset_observations",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1791196547817,
+      "tag": "0029_youzan_asset_tables_tighten_grants",
+      "breakpoints": true
     }
   ]
 }
