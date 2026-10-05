@@ -31,10 +31,12 @@ test("get：跨店 403", async () => {
 
 test("get：仅 active 且有图的渠道返回短签名；停用/缺码不返回；can_manage 仅 super_admin", async () => {
   const rows = [
-    { purpose: "wechat_follow", target_url: null, image_bucket: "store-qr", image_path: `${LOC}/wechat/0f8fad5b-d9cb-469f-a165-70867728950e.png`, status: "active", version: 3, updated_at: "t1" },
+    { purpose: "wecom_contact", target_url: null, image_bucket: "store-qr", image_path: `${LOC}/wechat/0f8fad5b-d9cb-469f-a165-70867728950e.png`, status: "active", version: 3, updated_at: "t1" },
     { purpose: "dianping", target_url: null, image_bucket: "store-qr", image_path: `${LOC}/dianping/b.png`, status: "disabled", version: 2, updated_at: "t2" },
     { purpose: "mini_program", target_url: "https://x", image_bucket: null, image_path: null, status: "active", version: 1, updated_at: "t3" },
-    { purpose: "wecom_contact", target_url: null, image_bucket: "store-qr", image_path: "x.png", status: "active", version: 1, updated_at: "t4" },
+    { purpose: "wechat_follow", target_url: null, image_bucket: "store-qr", image_path: `${LOC}/wechat/0f8fad5b-d9cb-469f-a165-70867728950e.png`, status: "active", version: 1, updated_at: "t4" },
+    { purpose: "xiaohongshu", target_url: null, image_bucket: "store-qr", image_path: `22222222-2222-4222-8222-222222222222/xiaohongshu/0f8fad5b-d9cb-469f-a165-70867728950e.png`, status: "active", version: 1, updated_at: "t5" },
+    { purpose: "identify", target_url: null, image_bucket: "other", image_path: `${LOC}/identify/0f8fad5b-d9cb-469f-a165-70867728950e.png`, status: "active", version: 1, updated_at: "t6" },
   ] as any;
   const { d } = deps({ list: async () => rows });
   const r: any = await printStoreQr(d, "u", { action: "get", location_id: LOC });
@@ -97,4 +99,15 @@ test("save：DB 失败 → 不报成功，仅清理本次新对象（不删旧�
   const { d: d2, log: l2 } = deps({ ...admin, saveImage: async () => null });
   assert.equal(((await printStoreQr(d2, "u", save())) as any).ok, false);
   assert.equal(l2.removed.length, 1);
+});
+
+test("渠道映射：wechat→wecom_contact，miniprogram→mini_program，其余同名", async () => {
+  const { CHANNEL_TO_PURPOSE } = await import("./store-qr-print.server");
+  assert.deepEqual(CHANNEL_TO_PURPOSE, { wechat: "wecom_contact", xiaohongshu: "xiaohongshu", dianping: "dianping", identify: "identify", miniprogram: "mini_program" });
+  for (const ch of ["wechat", "xiaohongshu", "dianping", "identify", "miniprogram"]) {
+    const { d, log } = deps(admin);
+    await printStoreQr(d, "u", save({ channel: ch }));
+    assert.equal(log.saved[0].purpose, (CHANNEL_TO_PURPOSE as any)[ch]);
+    assert.ok(log.uploads[0].path.startsWith(`${LOC}/${ch}/`));
+  }
 });
