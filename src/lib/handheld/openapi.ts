@@ -1019,7 +1019,7 @@ X-Session-Token: <操作员 session token>
           action: z.enum(["claim", "takeover", "close", "reopen"]),
           assignment_version: z.number().int().min(0),
         })),
-        responses: { "200": jsonRes("OK", AnyOkRes), "409": jsonRes("会话状态或版本冲突", ErrorResponse), ...ERROR_RESPONSES },
+        responses: { ...ERROR_RESPONSES, "200": jsonRes("OK", AnyOkRes), "409": jsonRes("会话状态或版本冲突", ErrorResponse) },
       },
     },
     "/api/public/handheld/support/conversations/{id}": {
