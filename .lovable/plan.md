@@ -1,65 +1,72 @@
-# 门店二维码录入核查报告（只读，2026-10-05 10:41 UTC）
+# 客服方案：只读核查结果与落地路线
 
-本次只读查询，未改代码、配置、数据，未部署。
+核查时间：2026-10-05 12:36 UTC。这次只做了读取：没改代码、没跑迁移、没设密钥，也没给客户发消息。腾讯还没有部署任何客服功能。
 
-## 结论
-- 3 家在营门店中，只有新天地店录了二维码（4/5 通道，缺小程序码）。中信泰富店、温州朔门古港店 5 个通道全部没录。
-- 新天地店先前的 4 个二维码仍然在，每条记录都有对应的存储文件。
-- 其他营销或门店配置里没有找到"录了二维码但没接进打印"的情况。
+## 一、现在已经有什么（只读证据）
 
-## 打印接口读的是哪里
-- 表：`public.store_qr_configs`。只采用 status=active、存储桶为 `store-qr`、路径为 `{location}/{channel}/{uuid}.png|jpg` 的记录。
-- 文件：Storage 私有桶 `store-qr`（public=false），目前一共 4 个文件。
-- 通道和数据库里的 purpose 对应关系：wechat→wecom_contact，xiaohongshu→xiaohongshu，dianping→dianping，identify→identify，miniprogram→mini_program。
+**5 张表**（RLS 全部开启，策略只有 `ALL TO service_role`，anon/authenticated 没有表级授权，也没有任何触发器）
 
-## 在营实体门店矩阵（Y = 有可用记录且存储文件存在）
+| 表 | 关键字段 | 唯一键 / 约束 |
+|---|---|---|
+| support_conversations | location_id→inv_locations, customer_id→commerce_customers, order_id→commerce_orders, topic, status(open/pending/closed), context_key, context jsonb, last_message_at/preview | 部分唯一 (customer_id, context_key)，仅 open/pending 时生效 |
+| support_messages | sender_type(customer/staff/system), sender_user_id, sender_customer_id, body, internal, client_op_id | 部分唯一 (conversation_id, client_op_id)；CHECK：只有员工能发内部备注 |
+| support_participants | conversation_id, user_id, participant_role(store_staff/hq_agent), last_read_at | UNIQUE (conversation_id, user_id) |
+| support_agents | user_id, scope(hq/location), location_id, is_active | UNIQUE (user_id, scope, location_id) |
+| support_customer_reads | conversation_id, customer_id, last_read_at | PK (conversation_id, customer_id) |
 
-| 门店 | location_id | 小红书 | 微信 | 点评 | 鉴定 | 小程序 |
-|---|---|---|---|---|---|---|
-| 新天地店 | 2df58305-57c1-4792-9920-3c3aa49890bc | Y | Y | Y | Y | 未录 |
-| 中信泰富店 | 7111b585-7d7f-4777-b4ae-61ce2b868f78 | 未录 | 未录 | 未录 | 未录 | 未录 |
-| 温州朔门古港店 | 8f0d9f93-eb49-40e8-8ec6-65f3770196bb | 未录 | 未录 | 未录 | 未录 | 未录 |
+数据量：会话 3 条 / 消息 4 条 / 客服登记 0 条。
 
-新天地 4 条记录的明细：
-- 记录更新时间都是 2026-10-05 06:41:15 UTC。
-- 存储文件都是 PNG，上传时间在 06:41:08 到 06:41:14 之间，大小：小红书 299,723 B，微信 63,037 B，点评 304,359 B，鉴定 21,141 B。
-- 路径里的通道段（xiaohongshu/wechat/dianping/identify）都和 purpose 对得上，打印接口会采用这 4 条。
+**上下文**：有顾客和订单的外键，商品只能放在 `context` jsonb 里，没有 SKU/商品外键。
+**身份**：`commerce_customer_identities(customer_id, provider, provider_subject)` 可以登记微信 openid/unionid、企业微信外部联系人 ID；另有 `go_identity_links`（GO 用）。
+**订单的门店拆单字段**：`commerce_orders.sale_location_id`（销售门店），`commerce_order_items.location_id`（逐件发货门店），`commerce_payment_suborders`（按收款主体分账，没有门店字段，门店信息只在 `allocation_snapshot` 里）。
+**企业微信配置**：`app_settings` 里查了 wecom / work_weixin / corp / kf / wechat / weixin 等键名，**0 条**。代码中的 corpid/kf 只出现在门店二维码模块，没有接入企业微信接口。
 
-## 单列（不算门店）
-- 总部仓库 f45dc754-b46b-411a-af7b-28e95ce2b1a0（kind=warehouse，在用）：无二维码记录。
-- 已停用 BOOMER OFF vintage 673f674c-55ad-45d8-8175-53f7044d7014：kind=shop、is_active=false，对应有赞总部店 153242272。无二维码记录。
+**能复用的代码**
+- `src/server/support.server.ts`：resolveSupportAccess、staffCanAccessConversation、resolveConversationLocationFilter、list/get/postStaffMessage、ensure/get/postCustomerMessage（门店授权和总部看全部门店已经实现）。
+- 后台 `src/lib/support.functions.ts` + 页面 `/customer-service`（列表/详情/内部备注，靠 10–15 秒轮询刷新）。
+- 手持：`/api/public/handheld/support/conversations[/$id]`；小程序/商城：`/api/public/storefront/support/conversations[/$id]`。
+- 可以照搬的模式：有赞收件箱的验签 + 去重 + 租约（youzan_member_asset_inbox），外发 outbox 的 claim/finish 写法（handheld_*_outbox），以及 `youzanFetch` 那种固定出口代理。
 
-## 其他配置中的二维码
-- `store_payment_profiles.qr_mode`：3 家门店都是 dynamic_order。这是收款时按订单动态生成的码，不是可打印的静态码，不需要接进打印。
-- `pos_payment_attempts.qr_content`：单笔支付的码内容，不属于门店配置。
-- `app_settings`：没有和二维码、微信、小红书、点评、小程序相关的配置项。
-- 全库没有其他 qrcode、小程序码或小红书、点评二维码字段。
-- 存储里文件名含 qr 的另有 2 个，在 `parcel-item-images` 桶，是采购包裹图片，和门店二维码无关。
+## 二、缺口
 
-## 图片能不能读
-- 已确认：4 个存储文件都存在，元数据显示 MIME 是 image/png，大小正常。
-- 未确认：没有生成签名链接，也没有下载文件内容，所以没有逐字节确认图片能正常解码。要确认可以在 ERP 打印页预览，或由腾讯侧用接口拉一次。
+1. 没有主接待人字段（会话上没有 owner_user_id / 状态机），总部"接管"只能靠多加一个参与人，没有明确的交接记录。
+2. 没有渠道维度：会话和消息都不记录来源（小程序 / 微信客服 / APP），也没有外部消息 ID（msgid）去重。
+3. 没有回调收件箱和同步游标：微信客服 `kf/sync_msg` 要求保存 next_cursor 和事件 token，现在没有对应的表。
+4. 没有外发 outbox：员工回复不能可靠送到微信客服（48 小时窗口、最多 5 条、失败要重试），也没有发送状态。
+5. 没有超时任务：没有"门店 N 分钟没回复就升级到总部"的计时和调度。
+6. `support_agents` 是 0 行，现在全靠角色兜底判断权限。
+7. 企业微信 corp_id、客服 secret、回调 Token/EncodingAESKey 都没有配置，渠道身份也没有绑定数据。
+8. 消息只有纯文本，不支持图片、商品卡片和订单卡片。
+9. 没有实时推送，靠轮询。APP 原生聊天之后要用 Realtime 或长轮询。
 
-## 实际查询 SQL
-```sql
-select now();
-select l.id, l.kind, l.name, l.is_active, s.kdt_id, s.shop_name, s.role, s.status
-  from inv_locations l left join youzan_shops s on s.id = l.shop_id;
-select location_id, purpose, status, image_bucket, image_path is not null,
-       split_part(image_path,'/',2) as path_channel, updated_at
-  from store_qr_configs order by location_id, purpose;
-select c.location_id, c.purpose, o.id is not null as obj_exists,
-       o.metadata->>'mimetype', (o.metadata->>'size')::int, o.updated_at
-  from store_qr_configs c
-  left join storage.objects o on o.bucket_id = c.image_bucket and o.name = c.image_path;
-select bucket_id, count(*) from storage.objects where bucket_id ilike '%qr%' group by 1;
-select id, public from storage.buckets where id ilike '%qr%' or id ilike '%store%';
-select key from app_settings where key ~* 'qr|code|wechat|xiaohongshu|dianping|mini' or value::text ~* 'qr|二维码';
-select location_id, qr_mode from store_payment_profiles;
-select table_name, column_name from information_schema.columns
- where table_schema='public' and column_name ~* 'qrcode|qr_|_qr|wxacode|mini_program|xiaohongshu|dianping';
-select bucket_id, count(*) from storage.objects where name ~* 'qr|qrcode|二维码' group by 1;
+## 三、建议落地路线（等你批准后分阶段做）
+
+```text
+顾客: 小程序客服按钮 / 微信客服链接 / APP
+        │
+        ▼
+ 企业微信「微信客服」(总部统一主体) ──回调──► 腾讯 ERP 收件箱(验签+msgid去重+游标)
+                                              │
+                                              ▼
+                               support_conversations (门店优先分配)
+                                  │ 超时/门店无人 → 总部接管同一会话
+                                  ▼
+                               员工回复 → 外发 outbox → kf/send_msg (固定出口)
 ```
 
-## 下一步（需要你决定，本次不执行）
-- 在 ERP 打印页给中信泰富店、温州朔门古港店上传二维码，并补上新天地店的小程序码。
+- **阶段 1（只动数据库）**：会话加上 channel、owner_user_id、assigned_location_id、escalated_at、sla_due_at；消息加上 channel、external_msg_id（唯一）、msg_type、payload；新建渠道身份绑定表（或扩展 commerce_customer_identities）、support_channel_inbox、support_channel_cursors、support_outbox，全部只允许 service_role 访问。
+- **阶段 2**：企业微信回调接口 `/api/public/hooks/wecom-kf`（先验签、解密，再落库，有赞那套校验模式照搬过来）+ 定时拉取 sync_msg 的任务 + 外发任务。门店分配规则：先看订单的 sale_location_id，再看扫码来源门店，最后落到总部队列。
+- **阶段 3**：后台工作台增加"接待人 / 接管 / 转回门店"和商品、订单卡片；小程序加 open-type=contact 或微信客服链接；APP 走 storefront 接口 + 实时推送。
+- **阶段 4**：超时升级任务、满意度、对账报表。
+
+## 需要你提供 / 确认
+
+- 企业微信主体（总部统一）的 corp_id 和微信客服 secret。在项目设置的密钥里添加，不要发在聊天里。
+- 门店超时升级的分钟数，以及总部接管后是否允许门店继续回复（建议允许，并显示主接待人）。
+- 回调和外发都部署在腾讯（erp.boomeroff.com），并走固定出口 IP 白名单。
+
+## 技术附注：只读查询
+- `information_schema.columns where table_name like 'support_%'`
+- 对 `support_%` 查询 `pg_constraint` / `pg_indexes` / `pg_policies` / `information_schema.triggers` / `pg_class.relrowsecurity` / `role_table_grants`
+- `select key from app_settings where key ilike any('%wecom%','%work_weixin%','%corp%','%kf%','%wechat%','%weixin%')` → 0 行，没有读取任何值
+- 对 commerce_orders / commerce_order_items / commerce_payment_suborders / commerce_customer_identities 查询 `information_schema.columns`
