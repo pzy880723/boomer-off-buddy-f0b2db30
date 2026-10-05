@@ -13,3 +13,11 @@
 
 ## 缺口
 会员身份解析（对接腾讯 membership-youzan-links.sqlite 只读接口）、积分冻结/消耗/解冻/回补、券查询/占用/核销/退还、对账、worker 调度。
+
+## 只读观察处理器（0028/0029）
+- 通知只触发重新查询；外层 kdt_id/yz_open_id 不在签名范围，只作线索。
+- `src/server/youzan-asset-observer.server.ts`：授权 active 店铺 → 注入 `resolveIdentity`（腾讯 membership-youzan-links 映射，只收 kdt_id+yz_open_id，不新建会员）→ 注入 `queryAsset`（必须经 youzanFetch 固定出口只读）→ 校验返回店铺/身份/券号一致 → `youzan_asset_observation_record`。
+- 依赖未注入：blocked identity_resolver_not_connected / asset_query_not_connected。
+- 表 `youzan_member_asset_observations`：只读外部观察，不是本地可花余额，不写钱包/pos_customer_coupons/积分账本。
+- 原子 RPC：claim_token+lease fencing → 授权店铺 → 乐观 row_version → observed_at 单调；旧结果 older_observation，inbox 置 blocked superseded_by_newer_observation；成功 inbox 置 blocked observed_asset_adapter_not_connected（仍无成功态）。
+- 权限：RPC 仅 service_role；表仅 super_admin/hq_operator 经 RLS 只读，anon 无权限。
