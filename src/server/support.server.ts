@@ -1,8 +1,17 @@
-// 客服会话：门店员工与总部客服共享同一会话，无独占领取。
+// 客服会话：门店员工与总部客服共享同一会话；对外回复由主接待人（primary_agent_id）负责，其他授权协作者写内部备注。
 // 授权口径：super_admin / hq_operator / support_agents(scope='hq') → 全部会话；
 // 其余员工按 user_location_perms + support_agents(scope='location') 覆盖的 location_id。
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { loadUserRoles } from "@/server/handheld-auth.server";
+import {
+  buildContextKey,
+  deriveOrderLocation,
+  supportCapabilities,
+  type SupportAssignmentAction,
+} from "@/server/support-policy";
+
+const CONVERSATION_COLUMNS =
+  "id,title,location_id,customer_id,order_id,status,topic,last_message_at,last_message_preview,created_at,updated_at,context_key,context,channel,primary_agent_id,assignment_version,escalated_at,escalation_reason,waiting_since";
 
 export type SupportAccess = {
   user_id: string;
@@ -23,6 +32,21 @@ export type SupportConversationSummary = {
   unread_count: number;
   status: string;
   participants: { user_id: string; name: string; role: string }[];
+  channel: string;
+  primary_agent_id: string | null;
+  primary_agent_name: string | null;
+  assignment_version: number;
+  escalated_at: string | null;
+  escalation_reason: string | null;
+  waiting_since: string | null;
+  context_key: string | null;
+  context: unknown;
+  can_reply: boolean;
+  can_note: boolean;
+  can_claim: boolean;
+  can_takeover: boolean;
+  can_close: boolean;
+  can_reopen: boolean;
 };
 
 export type SupportMessage = {
@@ -31,6 +55,7 @@ export type SupportMessage = {
   sender_type: "customer" | "staff" | "system";
   body: string;
   internal: boolean;
+  delivery_status: "sent" | "pending" | "failed";
   created_at: string;
 };
 
@@ -103,6 +128,14 @@ type ConversationRow = {
   last_message_preview: string | null;
   created_at: string;
   updated_at: string;
+  context_key: string | null;
+  context: unknown;
+  channel: string;
+  primary_agent_id: string | null;
+  assignment_version: number;
+  escalated_at: string | null;
+  escalation_reason: string | null;
+  waiting_since: string | null;
 };
 
 export function staffCanAccessConversation(
@@ -172,7 +205,12 @@ async function hydrate(
       | null) ?? [];
   const participantNames = new Map<string, string>();
   await Promise.all(
-    [...new Set(participantRows.map((r) => r.user_id))].map(async (userId) => {
+    [
+      ...new Set([
+        ...participantRows.map((r) => r.user_id),
+        ...rows.map((r) => r.primary_agent_id).filter((v): v is string => !!v),
+      ]),
+    ].map(async (userId) => {
       participantNames.set(userId, await resolveUserDisplayName(userId));
     }),
   );
@@ -210,6 +248,22 @@ async function hydrate(
         name: p.display_name ?? participantNames.get(p.user_id) ?? p.user_id.slice(-6),
         role: p.participant_role,
       })),
+    channel: row.channel,
+    primary_agent_id: row.primary_agent_id,
+    primary_agent_name: row.primary_agent_id
+      ? (participantRows.find((p) => p.user_id === row.primary_agent_id && p.conversation_id === row.id)
+          ?.display_name ??
+        participantNames.get(row.primary_agent_id) ??
+        null)
+      : null,
+    assignment_version: row.assignment_version,
+    escalated_at: row.escalated_at,
+    escalation_reason: row.escalation_reason,
+    waiting_since: row.waiting_since,
+    context_key: row.context_key,
+    // 列表只含授权会话；context 仅在授权范围内返回
+    context: staffCanAccessConversation(access, row) ? row.context : null,
+    ...supportCapabilities(access, row),
   }));
 }
 
@@ -241,9 +295,7 @@ export async function listStaffConversations(input: {
   }
   let query = supabaseAdmin
     .from("support_conversations" as never)
-    .select(
-      "id,title,location_id,customer_id,order_id,status,topic,last_message_at,last_message_preview,created_at,updated_at",
-    )
+    .select(CONVERSATION_COLUMNS)
     .order("updated_at", { ascending: false })
     .limit(limit + 1);
   if (!input.access.is_hq_agent) query = query.in("location_id", input.access.location_ids);
@@ -264,9 +316,7 @@ export async function listStaffConversations(input: {
 export async function loadConversationRow(id: string): Promise<ConversationRow | null> {
   const { data } = await supabaseAdmin
     .from("support_conversations" as never)
-    .select(
-      "id,title,location_id,customer_id,order_id,status,topic,last_message_at,last_message_preview,created_at,updated_at",
-    )
+    .select(CONVERSATION_COLUMNS)
     .eq("id", id)
     .maybeSingle();
   return (data as unknown as ConversationRow) ?? null;
@@ -278,11 +328,11 @@ async function loadMessages(
 ): Promise<SupportMessage[]> {
   let query = supabaseAdmin
     .from("support_messages" as never)
-    .select("id, sender_name, sender_type, body, internal, created_at")
+    .select("id, sender_name, sender_type, body, internal, delivery_status, created_at")
     .eq("conversation_id", conversationId)
     .order("created_at", { ascending: true })
     .limit(500);
-  if (!includeInternal) query = query.eq("internal", false);
+  if (!includeInternal) query = query.eq("internal", false).eq("delivery_status", "sent");
   const { data, error } = await query;
   if (error) throw new Error(error.message);
   return ((data as unknown as SupportMessage[]) ?? []).map((row) => ({
@@ -291,6 +341,7 @@ async function loadMessages(
     sender_type: row.sender_type,
     body: row.body,
     internal: row.internal,
+    delivery_status: row.delivery_status ?? "sent",
     created_at: row.created_at,
   }));
 }
@@ -322,62 +373,118 @@ export async function getStaffConversation(access: SupportAccess, conversationId
     data: {
       conversation: { ...summary, order_id: conversation.order_id, topic: conversation.topic },
       messages: await loadMessages(conversationId, true),
-      can_reply: conversation.status !== "closed",
+      can_reply: summary.can_reply,
+      can_note: summary.can_note,
     },
   };
 }
 
+type RpcResult = {
+  ok: boolean;
+  code?: string;
+  replayed?: boolean;
+  message?: Record<string, unknown>;
+  assignment_version?: number;
+  primary_agent_id?: string | null;
+  status?: string;
+};
+
+function pickMessage(m: Record<string, unknown> | undefined): SupportMessage | null {
+  if (!m) return null;
+  return {
+    id: String(m.id),
+    sender_name: String(m.sender_name),
+    sender_type: m.sender_type as SupportMessage["sender_type"],
+    body: String(m.body),
+    internal: Boolean(m.internal),
+    delivery_status: (m.delivery_status as SupportMessage["delivery_status"]) ?? "sent",
+    created_at: String(m.created_at),
+  };
+}
+
+/**
+ * 员工发消息：对外回复必须是主接待人且带当前 assignment_version；内部备注任何授权协作者可写。
+ * 授权、版本、幂等、insert 在数据库同一事务内完成（support_staff_post_message）。
+ * wechat_kf 渠道对外消息落库为 pending，尚未接入微信外发，绝不显示为已发送。
+ */
 export async function postStaffMessage(input: {
   access: SupportAccess;
   conversationId: string;
   body: string;
   internal: boolean;
   clientOpId: string;
+  assignmentVersion?: number | null;
 }) {
-  const conversation = await loadConversationRow(input.conversationId);
-  if (!conversation) return { ok: false as const, code: "not_found" };
-  if (!staffCanAccessConversation(input.access, conversation)) {
-    return { ok: false as const, code: "forbidden" };
+  const { data, error } = await supabaseAdmin.rpc("support_staff_post_message" as never, {
+    p_conversation_id: input.conversationId,
+    p_actor: input.access.user_id,
+    p_actor_name: input.access.display_name,
+    p_participant_role: input.access.participant_role,
+    p_body: input.body,
+    p_internal: input.internal,
+    p_client_op_id: input.clientOpId,
+    p_expected_version: input.assignmentVersion ?? null,
+  } as never);
+  if (error) throw new Error(error.message);
+  const r = data as unknown as RpcResult;
+  if (!r.ok) {
+    return {
+      ok: false as const,
+      code: r.code ?? "unknown",
+      detail: { assignment_version: r.assignment_version, primary_agent_id: r.primary_agent_id },
+    };
   }
-  if (conversation.status === "closed") return { ok: false as const, code: "conversation_closed" };
+  return {
+    ok: true as const,
+    data: { message: pickMessage(r.message), replayed: Boolean(r.replayed) },
+  };
+}
 
-  const existing = await supabaseAdmin
-    .from("support_messages" as never)
-    .select("id, sender_name, sender_type, body, internal, created_at")
-    .eq("conversation_id", input.conversationId)
-    .eq("client_op_id", input.clientOpId)
-    .maybeSingle();
-  if (existing.data) {
-    return { ok: true as const, data: { message: existing.data, replayed: true } };
+export async function updateConversationAssignment(input: {
+  access: SupportAccess;
+  conversationId: string;
+  action: SupportAssignmentAction;
+  assignmentVersion: number | null;
+}) {
+  const { data, error } = await supabaseAdmin.rpc("support_update_assignment" as never, {
+    p_conversation_id: input.conversationId,
+    p_actor: input.access.user_id,
+    p_action: input.action,
+    p_expected_version: input.assignmentVersion,
+  } as never);
+  if (error) throw new Error(error.message);
+  const r = data as unknown as RpcResult;
+  if (!r.ok) {
+    return {
+      ok: false as const,
+      code: r.code ?? "unknown",
+      detail: { assignment_version: r.assignment_version, primary_agent_id: r.primary_agent_id },
+    };
   }
+  if (input.action === "claim" || input.action === "takeover") {
+    await joinConversation(input.access, input.conversationId);
+  }
+  const fresh = await getStaffConversation(input.access, input.conversationId);
+  return {
+    ok: true as const,
+    data: {
+      code: r.code,
+      assignment_version: r.assignment_version,
+      primary_agent_id: r.primary_agent_id ?? null,
+      status: r.status,
+      conversation: fresh.ok ? fresh.data.conversation : null,
+    },
+  };
+}
 
-  await joinConversation(input.access, input.conversationId);
-  const { data, error } = await supabaseAdmin
-    .from("support_messages" as never)
-    .insert({
-      conversation_id: input.conversationId,
-      sender_type: "staff",
-      sender_user_id: input.access.user_id,
-      sender_name: input.access.display_name,
-      body: input.body,
-      internal: input.internal,
-      client_op_id: input.clientOpId,
-    } as never)
-    .select("id, sender_name, sender_type, body, internal, created_at")
-    .single();
-  if (error) {
-    if (/duplicate key/i.test(error.message)) {
-      const retry = await supabaseAdmin
-        .from("support_messages" as never)
-        .select("id, sender_name, sender_type, body, internal, created_at")
-        .eq("conversation_id", input.conversationId)
-        .eq("client_op_id", input.clientOpId)
-        .maybeSingle();
-      if (retry.data) return { ok: true as const, data: { message: retry.data, replayed: true } };
-    }
-    throw new Error(error.message);
-  }
-  return { ok: true as const, data: { message: data, replayed: false } };
+/** 超时升级（幂等，数据库时间）：供管理员服务器 worker 调用，不自动排程。 */
+export async function runSupportEscalation(unclaimedSeconds = 60, replySeconds = 180) {
+  const { data, error } = await supabaseAdmin.rpc("support_escalate_overdue" as never, {
+    p_unclaimed_seconds: unclaimedSeconds,
+    p_reply_seconds: replySeconds,
+  } as never);
+  if (error) throw new Error(error.message);
+  return data as unknown as { escalated: number; conversation_ids: string[]; checked_at: string };
 }
 
 // ---------- 消费者侧 ----------
@@ -393,36 +500,105 @@ export async function listCustomerConversations(customerId: string) {
   return (data ?? []) as unknown as Array<Record<string, unknown>>;
 }
 
+/**
+ * 顾客开会话：订单必须属于该顾客；订单/商品上下文门店由服务端派生（跨店订单归总部 null）；
+ * 已开放会话按 customer + context_key 隔离复用，不跨门店复用。
+ */
 export async function ensureCustomerConversation(input: {
   customerId: string;
   customerName: string;
   locationId?: string | null;
   orderId?: string | null;
+  productId?: string | null;
   title?: string | null;
   topic?: string;
-}) {
-  const existing = await supabaseAdmin
-    .from("support_conversations" as never)
-    .select("id")
-    .eq("customer_id", input.customerId)
-    .eq("status", "open")
-    .order("updated_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (existing.data) return (existing.data as { id: string }).id;
+}): Promise<{ ok: true; id: string; reused: boolean } | { ok: false; code: string }> {
+  let locationId: string | null = null;
+  let context: Record<string, unknown> | null = null;
+  let orderId: string | null = null;
+  let productId: string | null = null;
+
+  if (input.orderId) {
+    const { data: order } = await supabaseAdmin
+      .from("commerce_orders" as never)
+      .select("id, customer_id, order_no")
+      .eq("id", input.orderId)
+      .maybeSingle();
+    const o = order as { id: string; customer_id: string | null; order_no: string | null } | null;
+    if (!o || o.customer_id !== input.customerId) return { ok: false, code: "order_not_found" };
+    const { data: lines } = await supabaseAdmin
+      .from("commerce_order_items" as never)
+      .select("location_id")
+      .eq("order_id", o.id);
+    locationId = deriveOrderLocation(
+      ((lines as { location_id: string | null }[] | null) ?? []).map((l) => l.location_id),
+    );
+    orderId = o.id;
+    context = { type: "order", id: o.id, order_no: o.order_no };
+  } else if (input.productId) {
+    const { data: listing } = await supabaseAdmin
+      .from("commerce_listings" as never)
+      .select("id, location_id, title, price, cover_url, status")
+      .eq("id", input.productId)
+      .maybeSingle();
+    const l = listing as {
+      id: string;
+      location_id: string | null;
+      title: string | null;
+      price: number | null;
+      cover_url: string | null;
+    } | null;
+    if (!l) return { ok: false, code: "product_not_found" };
+    locationId = l.location_id;
+    productId = l.id;
+    context = { type: "product", id: l.id, title: l.title, price: l.price, image_url: l.cover_url };
+  } else if (input.locationId) {
+    const { data: loc } = await supabaseAdmin
+      .from("inv_locations")
+      .select("id")
+      .eq("id", input.locationId)
+      .maybeSingle();
+    if (!loc) return { ok: false, code: "location_not_found" };
+    locationId = input.locationId;
+  }
+
+  const contextKey = buildContextKey({ orderId, productId, locationId });
+  const findOpen = async () => {
+    const { data } = await supabaseAdmin
+      .from("support_conversations" as never)
+      .select("id")
+      .eq("customer_id", input.customerId)
+      .eq("context_key", contextKey)
+      .in("status", ["open", "pending"])
+      .limit(1)
+      .maybeSingle();
+    return (data as { id: string } | null)?.id ?? null;
+  };
+  const existing = await findOpen();
+  if (existing) return { ok: true, id: existing, reused: true };
   const { data, error } = await supabaseAdmin
     .from("support_conversations" as never)
     .insert({
       customer_id: input.customerId,
-      location_id: input.locationId ?? null,
-      order_id: input.orderId ?? null,
+      location_id: locationId,
+      order_id: orderId,
+      context_key: contextKey,
+      context,
+      channel: "native",
       title: input.title ?? `${input.customerName} 的咨询`,
-      topic: input.topic ?? "general",
+      topic: input.topic ?? (orderId ? "order" : productId ? "product" : "general"),
     } as never)
     .select("id")
     .single();
-  if (error) throw new Error(error.message);
-  return (data as { id: string }).id;
+  if (error) {
+    // 并发创建撞唯一索引 uq_support_active_customer_context → 复用已存在会话
+    if (/duplicate key/i.test(error.message)) {
+      const raced = await findOpen();
+      if (raced) return { ok: true, id: raced, reused: true };
+    }
+    throw new Error(error.message);
+  }
+  return { ok: true, id: (data as { id: string }).id, reused: false };
 }
 
 export async function getCustomerConversation(customerId: string, conversationId: string) {
@@ -438,6 +614,8 @@ export async function getCustomerConversation(customerId: string, conversationId
         title: conversation.title,
         status: conversation.status,
         order_id: conversation.order_id,
+        location_id: conversation.location_id,
+        context: conversation.context,
         updated_at: conversation.updated_at,
       },
       // 客户永远看不到内部备注
@@ -461,7 +639,7 @@ export async function postCustomerMessage(input: {
   if (conversation.status === "closed") return { ok: false as const, code: "conversation_closed" };
   const existing = await supabaseAdmin
     .from("support_messages" as never)
-    .select("id, sender_name, sender_type, body, internal, created_at")
+    .select("id, sender_name, sender_type, body, internal, delivery_status, created_at")
     .eq("conversation_id", input.conversationId)
     .eq("client_op_id", input.clientOpId)
     .maybeSingle();
@@ -478,7 +656,7 @@ export async function postCustomerMessage(input: {
       internal: false,
       client_op_id: input.clientOpId,
     } as never)
-    .select("id, sender_name, sender_type, body, internal, created_at")
+    .select("id, sender_name, sender_type, body, internal, delivery_status, created_at")
     .single();
   if (error) throw new Error(error.message);
   return { ok: true as const, data: { message: data, replayed: false } };
