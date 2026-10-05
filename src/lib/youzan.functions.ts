@@ -7,6 +7,7 @@ import { yzStatusText } from "./youzan-status";
 import { getYouzanOutboundStatus, youzanFetch } from "./youzan-http";
 import { assertYouzanStockWriteSucceeded, buildYouzanQuantityUpdateParams } from "./youzan-quantity.server";
 import { createSupabaseYouzanSaleAdapter } from "./youzan-sale.functions";
+import { commitOrderPage } from "./youzan-order-page";
 import {
   extractYouzanSale,
   isYouzanSaleStatus,
@@ -1858,7 +1859,7 @@ type OrderSliceOptions = {
   startPage?: number;
   maxPages?: number;
   methodLabel?: string | null;
-  /** Queue-only: validates lease and commits rows atomically before inventory work. */
+  /** Queue-only: validates lease and commits rows atomically; inventory sale processing is skipped. */
   commitRows?: (rows: Record<string, unknown>[]) => Promise<string[]>;
 };
 
@@ -2112,35 +2113,23 @@ async function runOrdersSyncForShop(
           const rows = mapped.map((entry) => entry.row);
 
           if (rows.length > 0) {
-            let accepted: Set<string> | null = null;
-            if (slice?.commitRows) {
-              accepted = new Set(await slice.commitRows(rows));
-              attemptUpserted += accepted.size;
-            } else {
-              const { error } = await supabase
-                .from("youzan_orders")
-                .upsert(rows as never, { onConflict: "kdt_id,tid" });
-              if (error) throw new Error(error.message);
-              attemptUpserted += rows.length;
-            }
-            for (const entry of mapped) {
-              if (accepted && !accepted.has(`${entry.row.kdt_id}:${entry.row.tid}`)) continue;
-              if (!isYouzanSaleStatus(entry.status)) continue;
-              try {
-                const saleResult = await processYouzanSale({
-                  trade: entry.trade,
-                  shopId: entry.targetShopId,
-                  adapter: saleAdapter,
-                });
-                saleProcessed += saleResult.processed;
-                saleIdempotent += saleResult.idempotent;
-                saleUnmatched += saleResult.unmatched;
-                saleFailed += saleResult.failed;
-              } catch (saleError) {
-                saleFailed += 1;
-                console.error("[youzan-orders] 库存对账失败", saleError);
-              }
-            }
+            const pageResult = await commitOrderPage({
+              mapped,
+              commitRows: slice?.commitRows,
+              upsertRows: async (r) => {
+                const { error } = await supabase
+                  .from("youzan_orders")
+                  .upsert(r as never, { onConflict: "kdt_id,tid" });
+                if (error) throw new Error(error.message);
+              },
+              processSale: (entry) =>
+                processYouzanSale({ trade: entry.trade, shopId: entry.targetShopId, adapter: saleAdapter }),
+            });
+            attemptUpserted += pageResult.upserted;
+            saleProcessed += pageResult.processed;
+            saleIdempotent += pageResult.idempotent;
+            saleUnmatched += pageResult.unmatched;
+            saleFailed += pageResult.failed;
           }
           usedLabel = m.label;
           pagesThisSlice += 1;
