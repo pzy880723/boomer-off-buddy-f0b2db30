@@ -8188,49 +8188,67 @@ export type Database = {
       }
       support_conversations: {
         Row: {
+          assignment_version: number
+          channel: string
           context: Json | null
           context_key: string | null
           created_at: string
           customer_id: string | null
+          escalated_at: string | null
+          escalation_reason: string | null
           id: string
           last_message_at: string | null
           last_message_preview: string | null
           location_id: string | null
           order_id: string | null
+          primary_agent_id: string | null
           status: string
           title: string | null
           topic: string
           updated_at: string
+          waiting_since: string | null
         }
         Insert: {
+          assignment_version?: number
+          channel?: string
           context?: Json | null
           context_key?: string | null
           created_at?: string
           customer_id?: string | null
+          escalated_at?: string | null
+          escalation_reason?: string | null
           id?: string
           last_message_at?: string | null
           last_message_preview?: string | null
           location_id?: string | null
           order_id?: string | null
+          primary_agent_id?: string | null
           status?: string
           title?: string | null
           topic?: string
           updated_at?: string
+          waiting_since?: string | null
         }
         Update: {
+          assignment_version?: number
+          channel?: string
           context?: Json | null
           context_key?: string | null
           created_at?: string
           customer_id?: string | null
+          escalated_at?: string | null
+          escalation_reason?: string | null
           id?: string
           last_message_at?: string | null
           last_message_preview?: string | null
           location_id?: string | null
           order_id?: string | null
+          primary_agent_id?: string | null
           status?: string
           title?: string | null
           topic?: string
           updated_at?: string
+          waiting_since?: string | null
         }
         Relationships: [
           {
@@ -8291,10 +8309,12 @@ export type Database = {
       }
       support_messages: {
         Row: {
+          assignment_version: number | null
           body: string
           client_op_id: string | null
           conversation_id: string
           created_at: string
+          delivery_status: string
           id: string
           internal: boolean
           sender_customer_id: string | null
@@ -8303,10 +8323,12 @@ export type Database = {
           sender_user_id: string | null
         }
         Insert: {
+          assignment_version?: number | null
           body: string
           client_op_id?: string | null
           conversation_id: string
           created_at?: string
+          delivery_status?: string
           id?: string
           internal?: boolean
           sender_customer_id?: string | null
@@ -8315,10 +8337,12 @@ export type Database = {
           sender_user_id?: string | null
         }
         Update: {
+          assignment_version?: number | null
           body?: string
           client_op_id?: string | null
           conversation_id?: string
           created_at?: string
+          delivery_status?: string
           id?: string
           internal?: boolean
           sender_customer_id?: string | null
@@ -10619,6 +10643,10 @@ export type Database = {
         }
         Returns: Json
       }
+      support_actor_can_access: {
+        Args: { p_actor: string; p_location_id: string; p_require_hq?: boolean }
+        Returns: boolean
+      }
       support_customer_conversation_list: {
         Args: { p_customer_id: string }
         Returns: Json
@@ -10630,6 +10658,32 @@ export type Database = {
           p_last_read_at: string
         }
         Returns: undefined
+      }
+      support_escalate_overdue: {
+        Args: { p_reply_seconds?: number; p_unclaimed_seconds?: number }
+        Returns: Json
+      }
+      support_staff_post_message: {
+        Args: {
+          p_actor: string
+          p_actor_name: string
+          p_body: string
+          p_client_op_id: string
+          p_conversation_id: string
+          p_expected_version: number
+          p_internal: boolean
+          p_participant_role: string
+        }
+        Returns: Json
+      }
+      support_update_assignment: {
+        Args: {
+          p_action: string
+          p_actor: string
+          p_conversation_id: string
+          p_expected_version: number
+        }
+        Returns: Json
       }
       sync_handheld_custom_listing: {
         Args: {
