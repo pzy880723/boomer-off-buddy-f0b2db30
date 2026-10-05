@@ -72,3 +72,51 @@ test("缺图 → image.status=missing，不伪造；二维码不生成", async (
   assert.equal(r.card.image.status, "missing");
   assert.equal(r.card.qr.status, "not_configured");
 });
+
+// —— 60×90mm 卡面容量约束（与 Codex 本地回归等价）——
+
+test("7 字关键词超出容量 → 拒绝回退 product", async () => {
+  const r = await buildRecommendationCard(
+    deps({ generate: async () => ({ ...goodAi, keywords: ["玻璃", "一二三四五六七"] }) }),
+    input,
+  );
+  assert.ok(r.ok);
+  assert.equal(r.card.source, "product");
+  assert.equal(r.card.fallback_reason, "ai_invalid_output");
+});
+
+test("highlights 分号连接总长 >55 被拒，=55 通过", async () => {
+  const l24 = "一".repeat(24);
+  // 24+24+6 + 2 个分号 = 56 → 拒绝
+  const over = await buildRecommendationCard(
+    deps({ generate: async () => ({ ...goodAi, highlights: [l24, l24, "六".repeat(6)] }) }),
+    input,
+  );
+  assert.ok(over.ok);
+  assert.equal(over.card.source, "product");
+  assert.equal(over.card.fallback_reason, "ai_invalid_output");
+  // 24+24+5 + 2 个分号 = 55 → 通过
+  const exact = await buildRecommendationCard(
+    deps({ generate: async () => ({ ...goodAi, highlights: [l24, l24, "五".repeat(5)] }) }),
+    input,
+  );
+  assert.ok(exact.ok);
+  assert.equal(exact.card.source, "ai");
+  assert.equal(exact.card.highlights.join("；").length, 55);
+});
+
+test("长商品名 fallback：product_name ≤24、关键词 ≤6", async () => {
+  const longSku: SkuRow = {
+    ...sku,
+    name: "昭和中古手工吹制玻璃杯大号带原装木盒收藏款三十字以上超长名称",
+    keywords: ["手工吹制玻璃工艺"],
+  };
+  const r = await buildRecommendationCard(
+    deps({ loadSku: async () => longSku, generate: async () => { throw new Error("x"); } }),
+    input,
+  );
+  assert.ok(r.ok);
+  assert.equal(r.card.source, "product");
+  assert.ok(r.card.product_name.length <= 24);
+  for (const k of r.card.keywords) assert.ok(k.length <= 6, `keyword ${k} too long`);
+});
