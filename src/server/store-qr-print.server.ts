@@ -30,16 +30,26 @@ export async function decodeCheck(bytes: Uint8Array, mime: "image/png" | "image/
 }
 export const QR_SIGN_TTL = 300;
 
+/** 大众点评打卡码与评价码完全独立，互不替用。 */
 export const CHANNEL_TO_PURPOSE = {
   wechat: "wecom_contact", // 门店个人/企微联系码，非公众号
   xiaohongshu: "xiaohongshu",
-  dianping: "dianping",
+  dianping_checkin: "dianping_checkin",
+  dianping_review: "dianping_review",
   identify: "identify",
   miniprogram: "mini_program",
 } as const;
 export type QrChannel = keyof typeof CHANNEL_TO_PURPOSE;
 const CHANNELS = Object.keys(CHANNEL_TO_PURPOSE) as QrChannel[];
 const PURPOSE_TO_CHANNEL = new Map(Object.entries(CHANNEL_TO_PURPOSE).map(([c, p]) => [p as string, c as QrChannel]));
+/** 旧客户端渠道名：dianping 仅等同于评价码（新天地历史记录即评价码），绝不当打卡码。 */
+const LEGACY_CHANNEL = "dianping" as const;
+const SAVE_CHANNELS = [...CHANNELS, LEGACY_CHANNEL] as const;
+/** 展示文案：打卡卡允许宣传收藏打卡赠品（到收银台领取）；评价卡必须保持中性，禁止任何赠品/奖励/领取或字数要求。 */
+export const CHANNEL_LABELS: Partial<Record<QrChannel, { title: string; caption: string }>> = {
+  dianping_checkin: { title: "收藏打卡送冰箱贴", caption: "完成收藏打卡后，到收银台领取" },
+  dianping_review: { title: "诚邀您点评", caption: "欢迎分享真实体验" },
+};
 
 export type QrPrintDeps = {
   canAccessLocation(userId: string, locationId: string): Promise<boolean>;
@@ -58,7 +68,7 @@ const Save = z
   .object({
     action: z.literal("save"),
     location_id: z.string().uuid(),
-    channel: z.enum(CHANNELS as [QrChannel, ...QrChannel[]]),
+    channel: z.enum(SAVE_CHANNELS as unknown as [string, ...string[]]),
     image_base64: z.string().min(1).max(Math.ceil(QR_MAX_BYTES / 3) * 4 + 4),
     mime_type: z.enum(["image/png", "image/jpeg"]),
   })
@@ -79,8 +89,12 @@ function decodeBase64(s: string): Uint8Array | null {
   return new Uint8Array(Buffer.from(clean, "base64"));
 }
 
+const pathRe = (locationId: string, folder: string) => new RegExp(`^${locationId}/${folder}/[0-9a-f-]{36}\\.(png|jpg)$`);
+/** 评价码额外接受历史 {loc}/dianping/ 目录（迁移 0033 保留原对象）；打卡码只认自身目录。 */
 const isOwnPath = (locationId: string, channel: QrChannel, p: string | null) =>
-  !!p && new RegExp(`^${locationId}/${channel}/[0-9a-f-]{36}\\.(png|jpg)$`).test(p);
+  !!p && (pathRe(locationId, channel).test(p) || (channel === "dianping_review" && pathRe(locationId, LEGACY_CHANNEL).test(p)));
+
+type ChannelOut = { channel: QrChannel | typeof LEGACY_CHANNEL; image_url: string; updated_at: string; title?: string; caption?: string; legacy_alias_of?: QrChannel };
 
 export async function printStoreQr(deps: QrPrintDeps, userId: string, body: unknown) {
   const action = (body as { action?: unknown } | null)?.action;
@@ -90,14 +104,17 @@ export async function printStoreQr(deps: QrPrintDeps, userId: string, body: unkn
     const loc = p.data.location_id;
     if (!(await deps.canAccessLocation(userId, loc))) return fail(403, "location_forbidden");
     const [rows, roles] = await Promise.all([deps.list(loc), deps.roles(userId)]);
-    const channels: { channel: QrChannel; image_url: string; updated_at: string }[] = [];
+    const channels: ChannelOut[] = [];
     for (const r of rows) {
       const ch = PURPOSE_TO_CHANNEL.get(r.purpose);
       if (!ch || r.status !== "active" || r.image_bucket !== QR_BUCKET || !isOwnPath(loc, ch, r.image_path)) continue;
       const url = await deps.sign(QR_BUCKET, r.image_path!, QR_SIGN_TTL).catch(() => null);
-      if (url) channels.push({ channel: ch, image_url: url, updated_at: r.updated_at });
+      if (url) channels.push({ channel: ch, image_url: url, updated_at: r.updated_at, ...CHANNEL_LABELS[ch] });
     }
-    channels.sort((a, b) => CHANNELS.indexOf(a.channel) - CHANNELS.indexOf(b.channel));
+    channels.sort((a, b) => CHANNELS.indexOf(a.channel as QrChannel) - CHANNELS.indexOf(b.channel as QrChannel));
+    // 旧客户端兼容：仅当评价码存在时附加 dianping 别名（排在最后，新客户端应忽略）；打卡码永不作别名。
+    const review = channels.find((c) => c.channel === "dianping_review");
+    if (review) channels.push({ ...review, channel: LEGACY_CHANNEL, legacy_alias_of: "dianping_review" });
     return { ok: true as const, body: { location_id: loc, channels, can_manage: roles.includes("super_admin") } };
   }
   if (action !== "save") return fail(422, "validation_error");
@@ -106,7 +123,8 @@ export async function printStoreQr(deps: QrPrintDeps, userId: string, body: unkn
   if (!(await deps.roles(userId)).includes("super_admin")) return fail(403, "admin_only");
   const p = Save.safeParse(body);
   if (!p.success) return fail(422, "validation_error");
-  const { location_id, channel, mime_type } = p.data;
+  const { location_id, mime_type } = p.data;
+  const channel: QrChannel = p.data.channel === LEGACY_CHANNEL ? "dianping_review" : (p.data.channel as QrChannel);
   const bytes = decodeBase64(p.data.image_base64);
   if (!bytes || bytes.length === 0) return fail(422, "invalid_image");
   if (bytes.length > QR_MAX_BYTES) return fail(422, "image_too_large");

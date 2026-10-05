@@ -34,7 +34,7 @@ test("get：跨店 403", async () => {
 test("get：仅 active 且有图的渠道返回短签名；停用/缺码不返回；can_manage 仅 super_admin", async () => {
   const rows = [
     { purpose: "wecom_contact", target_url: null, image_bucket: "store-qr", image_path: `${LOC}/wechat/0f8fad5b-d9cb-469f-a165-70867728950e.png`, status: "active", version: 3, updated_at: "t1" },
-    { purpose: "dianping", target_url: null, image_bucket: "store-qr", image_path: `${LOC}/dianping/b.png`, status: "disabled", version: 2, updated_at: "t2" },
+    { purpose: "dianping_checkin", target_url: null, image_bucket: "store-qr", image_path: `${LOC}/dianping_checkin/0f8fad5b-d9cb-469f-a165-70867728950e.png`, status: "disabled", version: 2, updated_at: "t2" },
     { purpose: "mini_program", target_url: "https://x", image_bucket: null, image_path: null, status: "active", version: 1, updated_at: "t3" },
     { purpose: "wechat_follow", target_url: null, image_bucket: "store-qr", image_path: `${LOC}/wechat/0f8fad5b-d9cb-469f-a165-70867728950e.png`, status: "active", version: 1, updated_at: "t4" },
     { purpose: "xiaohongshu", target_url: null, image_bucket: "store-qr", image_path: `22222222-2222-4222-8222-222222222222/xiaohongshu/0f8fad5b-d9cb-469f-a165-70867728950e.png`, status: "active", version: 1, updated_at: "t5" },
@@ -77,12 +77,12 @@ test("save：伪装格式 / mime 不符 / 超 15MB / 空 → 422 且不上传", 
 
 test("save：原样字节上传至 location/channel/不可猜 ID，落库 active，返回签名", async () => {
   const { d, log } = deps(admin);
-  const r: any = await printStoreQr(d, "u", save({ channel: "dianping", image_base64: JPG.toString("base64"), mime_type: "image/jpeg" }));
+  const r: any = await printStoreQr(d, "u", save({ channel: "dianping_checkin", image_base64: JPG.toString("base64"), mime_type: "image/jpeg" }));
   assert.equal(r.ok, true);
-  assert.equal(log.uploads[0].path, `${LOC}/dianping/0f8fad5b-d9cb-469f-a165-70867728950e.jpg`);
+  assert.equal(log.uploads[0].path, `${LOC}/dianping_checkin/0f8fad5b-d9cb-469f-a165-70867728950e.jpg`);
   assert.ok(Buffer.from(log.uploads[0].bytes).equals(JPG));
-  assert.deepEqual(log.saved[0], { location_id: LOC, purpose: "dianping", image_path: log.uploads[0].path, updated_by: "u" });
-  assert.equal(r.body.channel.channel, "dianping");
+  assert.deepEqual(log.saved[0], { location_id: LOC, purpose: "dianping_checkin", image_path: log.uploads[0].path, updated_by: "u" });
+  assert.equal(r.body.channel.channel, "dianping_checkin");
   assert.match(r.body.channel.image_url, /^https:\/\/signed\//);
   assert.equal(log.removed.length, 0);
 });
@@ -105,8 +105,8 @@ test("save：DB 失败 → 不报成功，仅清理本次新对象（不删旧�
 
 test("渠道映射：wechat→wecom_contact，miniprogram→mini_program，其余同名", async () => {
   const { CHANNEL_TO_PURPOSE } = await import("./store-qr-print.server");
-  assert.deepEqual(CHANNEL_TO_PURPOSE, { wechat: "wecom_contact", xiaohongshu: "xiaohongshu", dianping: "dianping", identify: "identify", miniprogram: "mini_program" });
-  for (const ch of ["wechat", "xiaohongshu", "dianping", "identify", "miniprogram"]) {
+  assert.deepEqual(CHANNEL_TO_PURPOSE, { wechat: "wecom_contact", xiaohongshu: "xiaohongshu", dianping_checkin: "dianping_checkin", dianping_review: "dianping_review", identify: "identify", miniprogram: "mini_program" });
+  for (const ch of ["wechat", "xiaohongshu", "dianping_checkin", "dianping_review", "identify", "miniprogram"]) {
     const { d, log } = deps(admin);
     await printStoreQr(d, "u", save({ channel: ch }));
     assert.equal(log.saved[0].purpose, (CHANNEL_TO_PURPOSE as any)[ch]);
@@ -147,4 +147,49 @@ test("请求体上限：Content-Length 与流式累计均 413", async () => {
   assert.equal(await readJsonCapped(new Request("http://x", { method: "POST", body: "x".repeat(50) }), 10), TOO_LARGE);
   const okReq = new Request("http://x", { method: "POST", body: JSON.stringify({ a: 1 }) });
   assert.deepEqual(await readJsonCapped(okReq, 1000), { a: 1 });
+});
+
+const U = "0f8fad5b-d9cb-469f-a165-70867728950e";
+const row = (purpose: string, folder: string, loc = LOC): any => ({ purpose, target_url: null, image_bucket: "store-qr", image_path: `${loc}/${folder}/${U}.png`, status: "active", version: 1, updated_at: purpose });
+
+test("点评双用途独立：打卡与评价各自返回，不互相替用", async () => {
+  const only = async (rows: any[]) => ((await printStoreQr(deps({ list: async () => rows }).d, "u", { action: "get", location_id: LOC })) as any).body.channels.map((c: any) => c.channel);
+  assert.deepEqual(await only([row("dianping_checkin", "dianping_checkin")]), ["dianping_checkin"]);
+  assert.deepEqual(await only([row("dianping_review", "dianping_review")]), ["dianping_review", "dianping"]);
+  assert.deepEqual(await only([row("dianping_checkin", "dianping_checkin"), row("dianping_review", "dianping_review")]), ["dianping_checkin", "dianping_review", "dianping"]);
+  // 打卡码不得指向评价目录/旧 dianping 目录
+  assert.deepEqual(await only([row("dianping_checkin", "dianping_review"), row("dianping_checkin", "dianping")]), []);
+});
+
+test("旧码兼容：历史 {loc}/dianping/ 对象作为评价码可读，别名仅指向评价码；残留 purpose=dianping 不返回", async () => {
+  const r: any = await printStoreQr(deps({ list: async () => [row("dianping_review", "dianping"), row("dianping", "dianping")] }).d, "u", { action: "get", location_id: LOC });
+  assert.deepEqual(r.body.channels.map((c: any) => [c.channel, c.legacy_alias_of ?? null]), [["dianping_review", null], ["dianping", "dianping_review"]]);
+  assert.equal(r.body.channels[0].title, "诚邀您点评");
+});
+
+test("门店隔离：他店路径的点评码不返回", async () => {
+  const other = "22222222-2222-4222-8222-222222222222";
+  const r: any = await printStoreQr(deps({ list: async () => [row("dianping_checkin", "dianping_checkin", other), row("dianping_review", "dianping", other)] }).d, "u", { action: "get", location_id: LOC });
+  assert.deepEqual(r.body.channels, []);
+});
+
+test("save：旧客户端 channel=dianping 写入评价码，独立目录；打卡码不受影响", async () => {
+  const { d, log } = deps(admin);
+  const r: any = await printStoreQr(d, "u", save({ channel: "dianping" }));
+  assert.equal(r.ok, true);
+  assert.equal(log.saved[0].purpose, "dianping_review");
+  assert.ok(log.uploads[0].path.startsWith(`${LOC}/dianping_review/`));
+  assert.equal(r.body.channel.channel, "dianping_review");
+});
+
+test("文案规则：赠品/领取语仅允许打卡卡；评价卡必须中性，无赠品/奖励/领取/字数要求", async () => {
+  const { CHANNEL_LABELS } = await import("./store-qr-print.server");
+  const review = JSON.stringify(CHANNEL_LABELS.dianping_review ?? {});
+  for (const bad of ["有礼", "礼品", "赠", "送", "领", "奖", "9图", "100字"]) assert.ok(!review.includes(bad), bad);
+  assert.ok(review.includes("诚邀您点评"));
+  assert.ok(review.includes("欢迎分享真实体验"));
+  const checkin = CHANNEL_LABELS.dianping_checkin;
+  assert.ok(checkin);
+  assert.equal(checkin.title, "收藏打卡送冰箱贴");
+  assert.equal(checkin.caption, "完成收藏打卡后，到收银台领取");
 });
