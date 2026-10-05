@@ -17,10 +17,10 @@ const CUST = '00000000-0000-0000-0000-0000000000c1';
 const CONV = '00000000-0000-0000-0000-0000000000d1';
 const db = new PGlite();
 
-async function migrationSql() {
-  if (process.env.SUPPORT_M1_SQL) return readFile(process.env.SUPPORT_M1_SQL, 'utf8');
+async function migrationSql(suffix, envKey) {
+  if (process.env[envKey]) return readFile(process.env[envKey], 'utf8');
   const dir = new URL('../drizzle/migrations/', import.meta.url);
-  const file = (await readdir(dir)).find((f) => f.endsWith('_support_assignment_m1.sql'));
+  const file = (await readdir(dir)).find((f) => f.endsWith(suffix));
   return readFile(new URL(file, dir), 'utf8');
 }
 
@@ -46,7 +46,8 @@ before(async () => {
     INSERT INTO public.user_location_perms (user_id, location_id) VALUES ('${S1}','${L1}'),('${S2}','${L2}');
     INSERT INTO public.support_agents (user_id, scope, location_id) VALUES ('${S1B}','location','${L1}');
   `);
-  await db.exec(await migrationSql());
+  await db.exec(await migrationSql('_support_assignment_m1.sql', 'SUPPORT_M1_SQL'));
+  await db.exec(await migrationSql('_support_m1_hardening.sql', 'SUPPORT_M1B_SQL'));
 });
 beforeEach(() => db.exec(`RESET ROLE; DELETE FROM support_messages; DELETE FROM support_participants; DELETE FROM support_conversations;
   INSERT INTO support_conversations (id, location_id, customer_id) VALUES ('${CONV}','${L1}','${CUST}');`));
@@ -100,19 +101,67 @@ test('external send needs claim; collaborators from other stores are rejected; i
   assert.equal(first.message.delivery_status, 'sent');
 });
 
-test('wechat_kf outbound is pending, never sent', async () => {
+test('wechat_kf external reply rejected (channel_not_connected), internal note allowed, nothing pending', async () => {
   await db.query(`UPDATE support_conversations SET channel='wechat_kf' WHERE id=$1`, [CONV]);
   await assign(S1, 'claim', 0);
-  assert.equal((await post(S1, 'x', false, 'w', 1)).message.delivery_status, 'pending');
+  assert.equal((await post(S1, 'x', false, 'w', 1)).code, 'channel_not_connected');
+  assert.equal((await post(S1, '备注', true, 'w2', null)).ok, true);
+  assert.equal((await db.query(`SELECT count(*)::int n FROM support_messages WHERE delivery_status <> 'sent'`)).rows[0].n, 0);
+});
+
+test('close/reopen only by primary agent or HQ; unclaimed only HQ', async () => {
+  assert.equal((await assign(S1, 'close', 0)).code, 'primary_or_hq_only');
+  await assign(S1, 'claim', 0);
+  assert.equal((await assign(S1B, 'close', 1)).code, 'primary_or_hq_only');
+  assert.equal((await assign(HQ, 'close', 1)).status, 'closed');
+  assert.equal((await assign(S1B, 'reopen', 2)).code, 'primary_or_hq_only');
+  assert.equal((await assign(S1, 'reopen', 2)).status, 'open');
+});
+
+test('replay with same op but different body/internal conflicts; no duplicate outbound', async () => {
+  await assign(S1, 'claim', 0);
+  await post(S1, 'A', false, 'op', 1);
+  assert.equal((await post(S1, 'B', false, 'op', 1)).code, 'client_op_id_conflict');
+  assert.equal((await post(S1, 'A', true, 'op', 1)).code, 'client_op_id_conflict');
+  assert.equal((await post(S1, 'A', false, 'op', 1)).replayed, true);
+  assert.equal((await db.query(`SELECT count(*)::int n FROM support_messages`)).rows[0].n, 1);
+});
+
+const cpost = async (body, op, cust = CUST) =>
+  (await db.query('SELECT public.support_customer_post_message($1,$2,$3,$4,$5) r', [CONV, cust, 'c', body, op])).rows[0].r;
+
+test('customer post: ownership, closed rejects insert, op payload conflict', async () => {
+  assert.equal((await cpost('hi', 'k1', S2)).code, 'not_found');
+  assert.equal((await cpost('hi', 'k1')).ok, true);
+  assert.equal((await cpost('changed', 'k1')).code, 'client_op_id_conflict');
+  await assign(HQ, 'close', 0);
+  assert.equal((await cpost('after close', 'k2')).code, 'conversation_closed');
+  assert.equal((await db.query(`SELECT count(*)::int n FROM support_messages`)).rows[0].n, 1);
+});
+
+test('preview: internal notes never leak, older created_at never overwrites newer', async () => {
+  await assign(S1, 'claim', 0);
+  await post(S1, '公开回复', false, 'p1', 1);
+  await post(S1, '内部机密', true, 'p2', null);
+  let c = await conv();
+  assert.equal(c.last_message_preview, '公开回复');
+  const latest = c.last_message_at;
+  await db.query(`INSERT INTO support_messages (conversation_id, sender_type, sender_customer_id, sender_name, body, created_at)
+    VALUES ($1,'customer',$2,'c','旧消息', now() - interval '1 hour')`, [CONV, CUST]);
+  c = await conv();
+  assert.equal(c.last_message_preview, '公开回复');
+  assert.equal(c.last_message_at.getTime(), latest.getTime());
 });
 
 test('close blocks sending, reopen restores; both versioned', async () => {
   await assign(S1, 'claim', 0);
   assert.equal((await assign(S1, 'close', 0)).code, 'version_conflict');
+  assert.equal((await assign(S1B, 'close', 1)).code, 'primary_or_hq_only');
   assert.equal((await assign(S1, 'close', 1)).status, 'closed');
   assert.equal((await post(S1, 'x', false, 'c', 2)).code, 'conversation_closed');
   assert.equal((await assign(S1, 'claim', 2)).code, 'conversation_closed');
   assert.equal((await assign(S2, 'reopen', 2)).code, 'forbidden');
+  assert.equal((await assign(S1B, 'reopen', 2)).code, 'primary_or_hq_only');
   const r = await assign(S1, 'reopen', 2);
   assert.equal(r.status, 'open'); assert.equal(r.assignment_version, 3);
 });
