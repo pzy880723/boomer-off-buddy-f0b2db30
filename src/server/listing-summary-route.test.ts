@@ -18,8 +18,11 @@ const stubs: Record<string, string> = {
     export const resolveSessionUser=async()=>globalThis.__summaryRoute.session;
     export const ok=(data)=>Response.json({ok:true,data});
     export const err=(message,status,extra)=>Response.json({ok:false,error:message,...extra},{status});`,
-  "@/server/listing-summary.server": `import { z } from "zod";
-    export const SummaryInput = z.object({ name: z.string().trim().min(1).max(120) }).strict();
+  "@/server/listing-summary.server": `export const SummaryInput = { safeParse(b) {
+      if (!b || typeof b.name !== "string") return { success: false };
+      const name = b.name.trim();
+      if (!name || name.length > 120 || Object.keys(b).some(k => k !== "name")) return { success: false };
+      return { success: true, data: { name } }; } };
     export const generateListingSummary=async(input)=>{ globalThis.__summaryRoute.calls.push(input);
       const r = globalThis.__summaryRoute.summaryResult;
       if (r instanceof Error) throw r;
