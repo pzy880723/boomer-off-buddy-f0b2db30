@@ -1,4 +1,4 @@
-import { isYouzanSaleStatus } from "@/lib/youzan-sale-status";
+import { isYouzanSaleStatus } from "./youzan-sale.server";
 
 export type OrderPageEntry<T> = {
   row: Record<string, unknown> & { kdt_id?: unknown; tid?: unknown };
