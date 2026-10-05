@@ -14,6 +14,8 @@ export type CardFacts = {
   brand: string | null;
   ip: string | null;
   keywords: string[];
+  /** 本门店已发布商品正文（commerce_listings.description，status=published）；仅作 AI 素材，可为 null。 */
+  published_description?: string | null;
 };
 
 export type RecommendationCard = {
@@ -35,9 +37,12 @@ export type RecommendationCard = {
 
 export const AiCardSchema = z
   .object({
-    headline: z.string().trim().min(2).max(18),
+    /** 卡面独立短标题：品牌/IP+器型或用途，重写而非截断上架名。 */
+    card_title: z.string().trim().min(2).max(18),
+    /** 一句定位推荐语。 */
+    headline: z.string().trim().min(2).max(14),
     keywords: z.array(z.string().trim().min(1).max(6)).min(2).max(3),
-    intro: z.string().trim().min(4).max(60),
+    intro: z.string().trim().min(4).max(65),
     highlights: z
       .array(z.string().trim().min(2).max(24))
       .min(1)
@@ -53,13 +58,19 @@ const BANNED =
 
 /** AI 文案的事实闸门：返回拒绝原因，null 表示可用。 */
 export function rejectAiCard(card: AiCard, facts: CardFacts): string | null {
-  const texts = [card.headline, card.intro, ...card.keywords, ...card.highlights];
+  const texts = [card.card_title, card.headline, card.intro, ...card.keywords, ...card.highlights];
   if (texts.some((t) => BANNED.test(t))) return "ai_unsupported_claim";
   if (/https?:|<[a-z]/i.test(texts.join(" "))) return "ai_invalid_markup";
-  // 未确认品牌/IP 时，文案里不得冒出品牌英文名（粗粒度：拉丁大写单词）
-  if (!facts.brand && !facts.ip && texts.some((t) => /\b[A-Z][A-Za-z]{2,}\b/.test(t)))
-    return "ai_unconfirmed_brand";
+  // 英文专名（拉丁大写开头 ≥3 字母）只允许来自商品名称/已确认品牌/IP，不放行杜撰英文品牌
+  const allowed = latinWords([facts.name, facts.brand, facts.ip].filter(Boolean).join(" "));
+  for (const t of texts)
+    for (const w of t.match(/\b[A-Z][A-Za-z]{2,}\b/g) ?? [])
+      if (!allowed.has(w.toLowerCase())) return "ai_unconfirmed_brand";
   return null;
+}
+
+function latinWords(s: string): Set<string> {
+  return new Set((s.match(/[A-Za-z]{2,}/g) ?? []).map((w) => w.toLowerCase()));
 }
 
 function clip(s: string, n: number) {
@@ -97,5 +108,9 @@ export function productCard(facts: CardFacts): Omit<RecommendationCard, "image" 
 
 export function mergeAiCard(facts: CardFacts, ai: AiCard) {
   const base = productCard(facts);
-  return { ...base, headline: ai.headline, keywords: ai.keywords, intro: ai.intro, highlights: ai.highlights };
+  return {
+    ...base,
+    product_name: ai.card_title,
+    headline: ai.headline,
+    keywords: ai.keywords, intro: ai.intro, highlights: ai.highlights };
 }
