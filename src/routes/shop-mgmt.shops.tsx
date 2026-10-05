@@ -238,6 +238,20 @@ function ShopCard({ shop, onEdit }: { shop: ShopWithStats; onEdit: () => void })
 }
 
 
+/** 仅用于界面只读提示；真正防线在服务端与数据库触发器。 */
+function useIsCoordAdmin(): boolean {
+  const q = useQuery({
+    queryKey: ["my-coord-admin"],
+    queryFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return false;
+      const { data } = await supabase.from("user_roles").select("role").eq("user_id", u.user.id);
+      return (data ?? []).some((r) => r.role === "super_admin");
+    },
+  });
+  return q.data === true;
+}
+
 function EditShopDialog({
   shop,
   onClose,
@@ -247,6 +261,7 @@ function EditShopDialog({
 }) {
   const qc = useQueryClient();
   const update = useServerFn(updateShopMeta);
+  const isCoordAdmin = useIsCoordAdmin();
   const [form, setForm] = useState<{
     address: string;
     latitude: string;
@@ -286,13 +301,21 @@ function EditShopDialog({
       if ((lat === "") !== (lng === "")) {
         throw new Error("纬度和经度必须成对填写或成对清空");
       }
+      const newLat = lat === "" ? null : Number(lat);
+      const newLng = lng === "" ? null : Number(lng);
+      const coordsChanged =
+        newLat !== (shop.latitude ?? null) || newLng !== (shop.longitude ?? null);
+      // 坐标未改动或非管理员时不提交坐标字段，避免无关保存被拒
+      const coordFields =
+        coordsChanged && isCoordAdmin
+          ? { latitude: newLat, longitude: newLng }
+          : {};
       await update({
         data: {
           id: shop.id,
           address: form.address || null,
           // 空串=null 成对清空；绝不把空值转成 0
-          latitude: lat === "" ? null : Number(lat),
-          longitude: lng === "" ? null : Number(lng),
+          ...coordFields,
           manager: form.manager || null,
           area_sqm: form.area_sqm ? Number(form.area_sqm) : null,
           opened_at: form.opened_at || null,
@@ -405,6 +428,7 @@ function EditShopDialog({
                   step="0.000001"
                   value={form.latitude}
                   onChange={(e) => setForm({ ...form, latitude: e.target.value })}
+                  disabled={!isCoordAdmin}
                 />
               </div>
               <div>
@@ -414,10 +438,11 @@ function EditShopDialog({
                   step="0.000001"
                   value={form.longitude}
                   onChange={(e) => setForm({ ...form, longitude: e.target.value })}
+                  disabled={!isCoordAdmin}
                 />
               </div>
               <p className="col-span-2 -mt-1 text-[11px] text-muted-foreground">
-                坐标须为 GCJ-02（腾讯/高德地图取值），成对填写或成对清空，用于小程序“附近门店”。
+                坐标须为 GCJ-02（腾讯/高德地图取值），成对填写或成对清空，用于小程序“附近门店”。仅总部管理员可修改，其他人只读。
               </p>
               <div>
                 <Label className="mb-1.5 block text-xs">店长</Label>
@@ -491,6 +516,7 @@ function ImagePreview({ path }: { path: string }) {
 function CreateShopDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const qc = useQueryClient();
   const create = useServerFn(createShop);
+  const isCoordAdmin = useIsCoordAdmin();
   const [form, setForm] = useState({
     shop_name: "",
     ownership: "自营" as "自营" | "加盟",
@@ -517,8 +543,9 @@ function CreateShopDialog({ open, onClose }: { open: boolean; onClose: () => voi
           ownership: form.ownership,
           kdt_id: kdt ? Number(kdt) : null,
           address: form.address || null,
-          latitude: lat === "" ? null : Number(lat),
-          longitude: lng === "" ? null : Number(lng),
+          ...(isCoordAdmin && lat !== ""
+            ? { latitude: Number(lat), longitude: Number(lng) }
+            : {}),
           manager: form.manager || null,
           phone: form.phone || null,
         },
@@ -606,6 +633,7 @@ function CreateShopDialog({ open, onClose }: { open: boolean; onClose: () => voi
                 step="0.000001"
                 value={form.latitude}
                 onChange={(e) => setForm({ ...form, latitude: e.target.value })}
+                disabled={!isCoordAdmin}
               />
             </div>
             <div>
@@ -615,6 +643,7 @@ function CreateShopDialog({ open, onClose }: { open: boolean; onClose: () => voi
                 step="0.000001"
                 value={form.longitude}
                 onChange={(e) => setForm({ ...form, longitude: e.target.value })}
+                disabled={!isCoordAdmin}
               />
             </div>
             <div>
