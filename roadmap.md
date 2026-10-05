@@ -67,3 +67,6 @@
 - [x] request id / 阶段耗时
 - [x] 退款来源核查（无权威来源，保持毛额）
 - [ ] 门店映射：等用户提供 GO 门店编号
+
+## 当前任务：手机客服 API 配套（无迁移）
+- [x] location_id 校验 / 游标分页 / is_mine / last_customer_message_at / q 搜索 / 缓存与并行
