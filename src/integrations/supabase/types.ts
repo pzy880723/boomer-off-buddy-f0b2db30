@@ -8747,6 +8747,63 @@ export type Database = {
           },
         ]
       }
+      youzan_member_asset_inbox: {
+        Row: {
+          attempts: number
+          conflict_count: number
+          event_id: string
+          id: string
+          kdt_id: number
+          last_conflict_at: string | null
+          last_conflict_hash: string | null
+          lease_until: string | null
+          msg_type: string
+          next_attempt_at: string
+          payload: Json
+          payload_hash: string
+          reason: string | null
+          received_at: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          conflict_count?: number
+          event_id: string
+          id?: string
+          kdt_id: number
+          last_conflict_at?: string | null
+          last_conflict_hash?: string | null
+          lease_until?: string | null
+          msg_type: string
+          next_attempt_at?: string
+          payload: Json
+          payload_hash: string
+          reason?: string | null
+          received_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          conflict_count?: number
+          event_id?: string
+          id?: string
+          kdt_id?: number
+          last_conflict_at?: string | null
+          last_conflict_hash?: string | null
+          lease_until?: string | null
+          msg_type?: string
+          next_attempt_at?: string
+          payload?: Json
+          payload_hash?: string
+          reason?: string | null
+          received_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       youzan_order_sync_cursors: {
         Row: {
           attempts: number
@@ -10461,6 +10518,53 @@ export type Database = {
         }
         Returns: boolean
       }
+      youzan_asset_inbox_claim: {
+        Args: { p_limit: number }
+        Returns: {
+          attempts: number
+          conflict_count: number
+          event_id: string
+          id: string
+          kdt_id: number
+          last_conflict_at: string | null
+          last_conflict_hash: string | null
+          lease_until: string | null
+          msg_type: string
+          next_attempt_at: string
+          payload: Json
+          payload_hash: string
+          reason: string | null
+          received_at: string
+          status: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "youzan_member_asset_inbox"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      youzan_asset_inbox_finish: {
+        Args: {
+          p_id: string
+          p_next_attempt_at: string
+          p_reason: string
+          p_status: string
+        }
+        Returns: undefined
+      }
+      youzan_asset_inbox_ingest: {
+        Args: {
+          p_event_id: string
+          p_kdt_id: number
+          p_msg_type: string
+          p_payload: Json
+          p_payload_hash: string
+        }
+        Returns: Json
+      }
+      youzan_asset_inbox_requeue: { Args: { p_id: string }; Returns: undefined }
       youzan_claim_order_sync_cursor: {
         Args: { p_lease_seconds?: number; p_worker_id: string }
         Returns: {
