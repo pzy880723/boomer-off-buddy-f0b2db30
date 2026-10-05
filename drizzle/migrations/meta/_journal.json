@@ -211,6 +211,13 @@
       "when": 1791196547817,
       "tag": "0029_youzan_asset_tables_tighten_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1791197208335,
+      "tag": "0030_youzan_points_observation_version_guard",
+      "breakpoints": true
     }
   ]
 }
