@@ -26,3 +26,13 @@
 - 关闭后禁止对外回复，内部备注仍可写。
 - 超时升级不自动运行：腾讯用 systemd timer 每 15–30 秒执行 `node scripts/run-support-escalation.mjs`。
 - 未做：微信客服真实收发/验签/凭证、AI 回复、实时推送、任何资产/支付/退款变更。
+
+## 0034 补丁（2026-10-05，增量，不改 0033）
+- 0033 和 0034 都是 Lovable Cloud 内嵌库的迁移（数据库 `postgres`，表和函数的 owner 都是 `postgres`），不是另建的腾讯数据库；腾讯库由 Codex 按同一份 SQL 部署。
+- wechat_kf 对外回复返回 `channel_not_connected`（409），不再插入 pending 消息；内部备注照常可写；`can_reply` 在非 native 渠道一律为 false。历史 pending 消息保留，不补发（当前 0 条）。
+- 关闭 / 重开：只有主接待人或总部可以操作，未领取的会话只有总部能操作，否则返回 `primary_or_hq_only`（403）；`supportCapabilities.can_close/can_reopen` 与此一致。接管始终以登录者本人身份执行。
+- 现有触发器 `trg_support_conversation_touch` 已重写：只有公开且已发送的消息才更新 `last_message_preview/last_message_at`；时间更早的消息不会覆盖更新的预览；内部备注只更新 `updated_at`，不再清空或泄漏顾客看到的预览。
+- 幂等：同一 client_op_id 但 body / internal / 发送者不同，返回 `client_op_id_conflict`。
+- 顾客发送改走 `support_customer_post_message`（行锁事务）：会话关闭后不能再插入新消息；同一 op 但内容不同也返回冲突。商城接口的错误码改为与业务码对应的状态码（不再一律 404）。
+- 商品上下文：只接受 `published` 状态的商品；context 只存/返回 type、id、title、price、order_no、sku_code，去掉 image_url 和 cover_url（历史会话的 image_url 在输出时剔除）。
+- `run-support-escalation.mjs`：15 秒超时（AbortSignal.timeout）；阈值必须是 10–3600 的整数；会校验响应格式；只输出 `{escalated, checked_at}`，不打印会话 id 和原始错误内容。
