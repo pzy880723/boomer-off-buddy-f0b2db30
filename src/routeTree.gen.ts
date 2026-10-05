@@ -198,6 +198,7 @@ import { Route as ApiPublicHandheldOrdersIdRouteImport } from './routes/api/publ
 import { Route as ApiPublicHandheldParcelsIdRouteImport } from './routes/api/public/handheld/parcels.$id'
 import { Route as ApiPublicHandheldParcelsCountsRouteImport } from './routes/api/public/handheld/parcels.counts'
 import { Route as ApiPublicHandheldPrintJobsLeaseRouteImport } from './routes/api/public/handheld/print-jobs.lease'
+import { Route as ApiPublicHandheldPrintStoreQrRouteImport } from './routes/api/public/handheld/print.store-qr'
 import { Route as ApiPublicHandheldProductsLookupRouteImport } from './routes/api/public/handheld/products.lookup'
 import { Route as ApiPublicHandheldRfidEpcRouteImport } from './routes/api/public/handheld/rfid.$epc'
 import { Route as ApiPublicHandheldRfidBatchStockInRouteImport } from './routes/api/public/handheld/rfid.batch-stock-in'
@@ -1322,6 +1323,12 @@ const ApiPublicHandheldPrintJobsLeaseRoute =
     path: '/api/public/handheld/print-jobs/lease',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHandheldPrintStoreQrRoute =
+  ApiPublicHandheldPrintStoreQrRouteImport.update({
+    id: '/api/public/handheld/print/store-qr',
+    path: '/api/public/handheld/print/store-qr',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHandheldProductsLookupRoute =
   ApiPublicHandheldProductsLookupRouteImport.update({
     id: '/lookup',
@@ -2029,6 +2036,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/parcels/$id': typeof ApiPublicHandheldParcelsIdRoute
   '/api/public/handheld/parcels/counts': typeof ApiPublicHandheldParcelsCountsRoute
   '/api/public/handheld/print-jobs/lease': typeof ApiPublicHandheldPrintJobsLeaseRoute
+  '/api/public/handheld/print/store-qr': typeof ApiPublicHandheldPrintStoreQrRoute
   '/api/public/handheld/products/lookup': typeof ApiPublicHandheldProductsLookupRoute
   '/api/public/handheld/rfid/$epc': typeof ApiPublicHandheldRfidEpcRoute
   '/api/public/handheld/rfid/batch-stock-in': typeof ApiPublicHandheldRfidBatchStockInRoute
@@ -2300,6 +2308,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/parcels/$id': typeof ApiPublicHandheldParcelsIdRoute
   '/api/public/handheld/parcels/counts': typeof ApiPublicHandheldParcelsCountsRoute
   '/api/public/handheld/print-jobs/lease': typeof ApiPublicHandheldPrintJobsLeaseRoute
+  '/api/public/handheld/print/store-qr': typeof ApiPublicHandheldPrintStoreQrRoute
   '/api/public/handheld/products/lookup': typeof ApiPublicHandheldProductsLookupRoute
   '/api/public/handheld/rfid/$epc': typeof ApiPublicHandheldRfidEpcRoute
   '/api/public/handheld/rfid/batch-stock-in': typeof ApiPublicHandheldRfidBatchStockInRoute
@@ -2579,6 +2588,7 @@ export interface FileRoutesById {
   '/api/public/handheld/parcels/$id': typeof ApiPublicHandheldParcelsIdRoute
   '/api/public/handheld/parcels/counts': typeof ApiPublicHandheldParcelsCountsRoute
   '/api/public/handheld/print-jobs/lease': typeof ApiPublicHandheldPrintJobsLeaseRoute
+  '/api/public/handheld/print/store-qr': typeof ApiPublicHandheldPrintStoreQrRoute
   '/api/public/handheld/products/lookup': typeof ApiPublicHandheldProductsLookupRoute
   '/api/public/handheld/rfid/$epc': typeof ApiPublicHandheldRfidEpcRoute
   '/api/public/handheld/rfid/batch-stock-in': typeof ApiPublicHandheldRfidBatchStockInRoute
@@ -2859,6 +2869,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/parcels/$id'
     | '/api/public/handheld/parcels/counts'
     | '/api/public/handheld/print-jobs/lease'
+    | '/api/public/handheld/print/store-qr'
     | '/api/public/handheld/products/lookup'
     | '/api/public/handheld/rfid/$epc'
     | '/api/public/handheld/rfid/batch-stock-in'
@@ -3130,6 +3141,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/parcels/$id'
     | '/api/public/handheld/parcels/counts'
     | '/api/public/handheld/print-jobs/lease'
+    | '/api/public/handheld/print/store-qr'
     | '/api/public/handheld/products/lookup'
     | '/api/public/handheld/rfid/$epc'
     | '/api/public/handheld/rfid/batch-stock-in'
@@ -3408,6 +3420,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/parcels/$id'
     | '/api/public/handheld/parcels/counts'
     | '/api/public/handheld/print-jobs/lease'
+    | '/api/public/handheld/print/store-qr'
     | '/api/public/handheld/products/lookup'
     | '/api/public/handheld/rfid/$epc'
     | '/api/public/handheld/rfid/batch-stock-in'
@@ -3625,6 +3638,7 @@ export interface RootRouteChildren {
   ApiPublicHandheldItemsUploadImageRoute: typeof ApiPublicHandheldItemsUploadImageRouteWithChildren
   ApiPublicHandheldLocationSwitchRoute: typeof ApiPublicHandheldLocationSwitchRoute
   ApiPublicHandheldPrintJobsLeaseRoute: typeof ApiPublicHandheldPrintJobsLeaseRoute
+  ApiPublicHandheldPrintStoreQrRoute: typeof ApiPublicHandheldPrintStoreQrRoute
   ApiPublicHandheldRfidEpcRoute: typeof ApiPublicHandheldRfidEpcRoute
   ApiPublicHandheldRfidBatchStockInRoute: typeof ApiPublicHandheldRfidBatchStockInRoute
   ApiPublicHandheldRfidBindItemRoute: typeof ApiPublicHandheldRfidBindItemRoute
@@ -4994,6 +5008,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/handheld/print-jobs/lease'
       fullPath: '/api/public/handheld/print-jobs/lease'
       preLoaderRoute: typeof ApiPublicHandheldPrintJobsLeaseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/print/store-qr': {
+      id: '/api/public/handheld/print/store-qr'
+      path: '/api/public/handheld/print/store-qr'
+      fullPath: '/api/public/handheld/print/store-qr'
+      preLoaderRoute: typeof ApiPublicHandheldPrintStoreQrRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/handheld/products/lookup': {
@@ -6451,6 +6472,7 @@ const rootRouteChildren: RootRouteChildren = {
     ApiPublicHandheldItemsUploadImageRouteWithChildren,
   ApiPublicHandheldLocationSwitchRoute: ApiPublicHandheldLocationSwitchRoute,
   ApiPublicHandheldPrintJobsLeaseRoute: ApiPublicHandheldPrintJobsLeaseRoute,
+  ApiPublicHandheldPrintStoreQrRoute: ApiPublicHandheldPrintStoreQrRoute,
   ApiPublicHandheldRfidEpcRoute: ApiPublicHandheldRfidEpcRoute,
   ApiPublicHandheldRfidBatchStockInRoute:
     ApiPublicHandheldRfidBatchStockInRoute,

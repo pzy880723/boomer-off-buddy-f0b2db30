@@ -155,6 +155,13 @@
       "when": 1791177292389,
       "tag": "0021_store_qr_configs",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1791177992524,
+      "tag": "0022_store_qr_configs_ios_channels",
+      "breakpoints": true
     }
   ]
 }
