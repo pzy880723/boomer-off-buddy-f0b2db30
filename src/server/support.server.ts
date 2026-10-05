@@ -3,6 +3,7 @@
 // 其余员工按 user_location_perms + support_agents(scope='location') 覆盖的 location_id。
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { loadUserRoles } from "@/server/handheld-auth.server";
+import { safePublicAvatarUrl, senderPresentation, type SupportSenderPresentation } from "@/lib/support-avatar-policy";
 import {
   buildContextKey,
   deriveOrderLocation,
@@ -44,6 +45,7 @@ export type SupportConversationSummary = {
   location_id: string | null;
   location_name: string | null;
   customer_name: string | null;
+  customer_avatar_url: string | null;
   last_message: string | null;
   updated_at: string;
   unread_count: number;
@@ -66,7 +68,7 @@ export type SupportConversationSummary = {
   can_reopen: boolean;
 };
 
-export type SupportMessage = {
+export type SupportMessage = SupportSenderPresentation & {
   id: string;
   sender_name: string;
   sender_type: "customer" | "staff" | "system";
@@ -185,7 +187,7 @@ async function hydrate(
       customerIds.length
         ? supabaseAdmin
             .from("commerce_customers" as never)
-            .select("id,nickname,phone")
+            .select("id,nickname,phone,avatar_url")
             .in("id", customerIds)
         : Promise.resolve({ data: [] as { id: string; nickname: string | null }[] }),
       supabaseAdmin
@@ -205,6 +207,10 @@ async function hydrate(
       r.id,
       r.nickname || (r.phone ? `${r.phone.slice(0, 3)}****${r.phone.slice(-2)}` : "顾客"),
     ]),
+  );
+  const customerAvatars = new Map(
+    ((customers as { id: string; avatar_url?: string | null }[] | null) ?? [])
+      .map((r) => [r.id, safePublicAvatarUrl(r.avatar_url)]),
   );
   const lastReads = new Map(
     ((myRows as { conversation_id: string; last_read_at: string | null }[] | null) ?? []).map(
@@ -254,6 +260,7 @@ async function hydrate(
     location_id: row.location_id,
     location_name: row.location_id ? (locationNames.get(row.location_id) ?? null) : null,
     customer_name: row.customer_id ? (customerNames.get(row.customer_id) ?? null) : null,
+    customer_avatar_url: row.customer_id ? (customerAvatars.get(row.customer_id) ?? null) : null,
     last_message: row.last_message_preview,
     updated_at: row.updated_at,
     unread_count: unreadCounts.get(row.id) ?? 0,
@@ -342,7 +349,7 @@ export async function listStaffConversations(input: {
   const page = hasMore ? rows.slice(0, limit) : rows;
   return {
     items: await hydrate(page, input.access),
-    next_cursor: hasMore && page.length ? encodeSupportCursor(page[page.length - 1]!) : null,
+    next_cursor: hasMore && page.at(-1) ? encodeSupportCursor(page.at(-1) as ConversationRow) : null,
     queue,
   };
 }
@@ -356,32 +363,80 @@ export async function loadConversationRow(id: string): Promise<ConversationRow |
   return (data as unknown as ConversationRow) ?? null;
 }
 
+type MessageRow = Omit<SupportMessage, keyof SupportSenderPresentation> & {
+  sender_user_id: string | null;
+  sender_customer_id: string | null;
+};
+
+/** Caller must have authorized this exact conversation before invoking any avatar lookup. */
+async function presentMessages(conversation: ConversationRow, rows: MessageRow[], staffView: boolean): Promise<SupportMessage[]> {
+  if (!rows.length) return [];
+  const staffIds = [...new Set(rows.filter((r) => r.sender_type === "staff" && r.sender_user_id)
+    .map((r) => r.sender_user_id).filter((id): id is string => !!id))];
+  const [{ data: customer }, { data: location }, { data: participants }] = await Promise.all([
+    conversation.customer_id && rows.some((r) => r.sender_type === "customer" && r.sender_customer_id === conversation.customer_id)
+      ? supabaseAdmin.from("commerce_customers").select("avatar_url").eq("id", conversation.customer_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    conversation.location_id && staffIds.length
+      ? supabaseAdmin.from("inv_locations").select("name,shop_id").eq("id", conversation.location_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    staffIds.length
+      ? supabaseAdmin.from("support_participants" as never).select("user_id,participant_role")
+        .eq("conversation_id", conversation.id).in("user_id", staffIds)
+      : Promise.resolve({ data: [] }),
+  ]);
+  const roles = new Map(((participants as { user_id: string; participant_role: string }[] | null) ?? [])
+    .map((p) => [p.user_id, p.participant_role]));
+  // Existing shop image_url can be a private object key; never sign it or return the key.
+  const shopId = location?.shop_id;
+  const { data: shop } = shopId && [...roles.values()].includes("store_staff")
+    ? await supabaseAdmin.from("youzan_shops").select("image_url").eq("id", shopId).maybeSingle()
+    : { data: null };
+  const hqAvatars = new Map<string, string | null>();
+  await Promise.all(staffIds.filter((id) => roles.get(id) === "hq_agent").map(async (id) => {
+    const { data, error } = await supabaseAdmin.auth.admin.getUserById(id);
+    // user_metadata is self-editable, not a verified avatar source. Only server-controlled metadata is eligible.
+    hqAvatars.set(id, error ? null : safePublicAvatarUrl(data?.user?.app_metadata?.avatar_url));
+  }));
+  return rows.map((r) => {
+    const presentation = senderPresentation({
+      sender_type: r.sender_type, sender_customer_id: r.sender_customer_id,
+      conversation_customer_id: conversation.customer_id,
+      participant_role: r.sender_user_id ? roles.get(r.sender_user_id) : null,
+      customer_avatar_url: customer?.avatar_url, store_avatar_url: shop?.image_url,
+      hq_avatar_url: r.sender_user_id ? hqAvatars.get(r.sender_user_id) : null,
+      location_name: location?.name,
+    });
+    return {
+      id: r.id, sender_type: r.sender_type,
+      // Historical sender_name can contain an email/UUID: customer responses use safe role labels.
+      sender_name: staffView || r.sender_type === "customer" ? r.sender_name
+        : presentation.sender_role === "hq_agent" ? "总部客服"
+        : presentation.sender_role === "store_staff" ? `${presentation.sender_location_name ?? "门店"}客服` : "系统",
+      body: r.body, internal: r.internal, delivery_status: r.delivery_status ?? "sent", created_at: r.created_at,
+      ...presentation,
+    };
+  });
+}
+
 async function loadMessages(
-  conversationId: string,
+  conversation: ConversationRow,
   includeInternal: boolean,
 ): Promise<{ messages: SupportMessage[]; has_more: boolean }> {
   let query = supabaseAdmin
     .from("support_messages" as never)
-    .select("id, sender_name, sender_type, body, internal, delivery_status, created_at")
-    .eq("conversation_id", conversationId)
+    .select("id, sender_name, sender_type, sender_user_id, sender_customer_id, body, internal, delivery_status, created_at")
+    .eq("conversation_id", conversation.id)
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
     .limit(MESSAGE_WINDOW + 1);
   if (!includeInternal) query = query.eq("internal", false).eq("delivery_status", "sent");
   const { data, error } = await query;
   if (error) throw new Error(error.message);
-  const rows = (data as unknown as SupportMessage[]) ?? [];
+  const rows = (data as unknown as MessageRow[]) ?? [];
   const has_more = rows.length > MESSAGE_WINDOW;
   // 取最近 500 条，再按时间正序返回；has_more=true 表示更早消息未返回（非完整历史）
-  const messages = rows.slice(0, MESSAGE_WINDOW).reverse().map((row) => ({
-    id: row.id,
-    sender_name: row.sender_name,
-    sender_type: row.sender_type,
-    body: row.body,
-    internal: row.internal,
-    delivery_status: row.delivery_status ?? "sent",
-    created_at: row.created_at,
-  }));
+  const messages = await presentMessages(conversation, rows.slice(0, MESSAGE_WINDOW).reverse(), includeInternal);
   return { messages, has_more };
 }
 
@@ -413,7 +468,7 @@ export async function getStaffConversation(access: SupportAccess, conversationId
     ok: true as const,
     data: {
       conversation: { ...summary, order_id: conversation.order_id, topic: conversation.topic },
-      ...(await loadMessages(conversationId, true)),
+      ...(await loadMessages(conversation, true)),
       can_reply: summary.can_reply,
       can_note: summary.can_note,
     },
@@ -430,12 +485,14 @@ type RpcResult = {
   status?: string;
 };
 
-function pickMessage(m: Record<string, unknown> | undefined): SupportMessage | null {
+function pickMessage(m: Record<string, unknown> | undefined): MessageRow | null {
   if (!m) return null;
   return {
     id: String(m.id),
     sender_name: String(m.sender_name),
     sender_type: m.sender_type as SupportMessage["sender_type"],
+    sender_user_id: typeof m.sender_user_id === "string" ? m.sender_user_id : null,
+    sender_customer_id: typeof m.sender_customer_id === "string" ? m.sender_customer_id : null,
     body: String(m.body),
     internal: Boolean(m.internal),
     delivery_status: (m.delivery_status as SupportMessage["delivery_status"]) ?? "sent",
@@ -446,7 +503,7 @@ function pickMessage(m: Record<string, unknown> | undefined): SupportMessage | n
 /**
  * 员工发消息：对外回复必须是主接待人且带当前 assignment_version；内部备注任何授权协作者可写。
  * 授权、版本、幂等、insert 在数据库同一事务内完成（support_staff_post_message）。
- * wechat_kf 渠道对外消息落库为 pending，尚未接入微信外发，绝不显示为已发送。
+ * wechat_kf 渠道未接通，RPC 拒绝外发；历史 pending 不补发。
  */
 export async function postStaffMessage(input: {
   access: SupportAccess;
@@ -456,6 +513,10 @@ export async function postStaffMessage(input: {
   clientOpId: string;
   assignmentVersion?: number | null;
 }) {
+  const conversation = await loadConversationRow(input.conversationId);
+  if (!conversation || !staffCanAccessConversation(input.access, conversation)) {
+    return { ok: false as const, code: conversation ? "forbidden" : "not_found" };
+  }
   const { data, error } = await supabaseAdmin.rpc("support_staff_post_message" as never, {
     p_conversation_id: input.conversationId,
     p_actor: input.access.user_id,
@@ -475,10 +536,12 @@ export async function postStaffMessage(input: {
       detail: { assignment_version: r.assignment_version, primary_agent_id: r.primary_agent_id },
     };
   }
-  return {
-    ok: true as const,
-    data: { message: pickMessage(r.message), replayed: Boolean(r.replayed) },
-  };
+  // Re-authorize after the transaction before reading presentation sources.
+  const fresh = await loadConversationRow(input.conversationId);
+  if (!fresh || !staffCanAccessConversation(input.access, fresh)) return { ok: false as const, code: "forbidden" };
+  const message = pickMessage(r.message);
+  const presented = message ? await presentMessages(fresh, [message], true) : [];
+  return { ok: true as const, data: { message: presented[0] ?? null, replayed: Boolean(r.replayed) } };
 }
 
 export async function updateConversationAssignment(input: {
@@ -661,7 +724,7 @@ export async function getCustomerConversation(customerId: string, conversationId
         updated_at: conversation.updated_at,
       },
       // 客户永远看不到内部备注
-      ...(await loadMessages(conversationId, false)),
+       ...(await loadMessages(conversation, false)),
       can_reply: conversation.status !== "closed",
     },
   };
@@ -675,6 +738,8 @@ export async function postCustomerMessage(input: {
   body: string;
   clientOpId: string;
 }) {
+  const conversation = await loadConversationRow(input.conversationId);
+  if (!conversation || conversation.customer_id !== input.customerId) return { ok: false as const, code: "not_found" };
   const { data, error } = await supabaseAdmin.rpc("support_customer_post_message" as never, {
     p_conversation_id: input.conversationId,
     p_customer_id: input.customerId,
@@ -685,8 +750,10 @@ export async function postCustomerMessage(input: {
   if (error) throw new Error(error.message);
   const r = data as unknown as RpcResult;
   if (!r.ok) return { ok: false as const, code: r.code ?? "unknown" };
-  return {
-    ok: true as const,
-    data: { message: pickMessage(r.message), replayed: Boolean(r.replayed) },
-  };
+  const fresh = await loadConversationRow(input.conversationId);
+  if (!fresh || fresh.customer_id !== input.customerId) return { ok: false as const, code: "not_found" };
+  const message = pickMessage(r.message);
+  const presented = message && !message.internal && message.delivery_status === "sent"
+    ? await presentMessages(fresh, [message], false) : [];
+  return { ok: true as const, data: { message: presented[0] ?? null, replayed: Boolean(r.replayed) } };
 }
