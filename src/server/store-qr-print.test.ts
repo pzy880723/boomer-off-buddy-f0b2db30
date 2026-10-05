@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { printStoreQr, type QrPrintDeps } from "./store-qr-print.server";
+import sharp from "sharp";
+import { printStoreQr, decodeCheck, QR_MAX_BYTES, type QrPrintDeps } from "./store-qr-print.server";
 
 const LOC = "11111111-1111-4111-8111-111111111111";
 const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from("rest-bytes")]);
@@ -17,6 +18,7 @@ function deps(p: Partial<QrPrintDeps> = {}) {
     remove: async (path) => { log.removed.push(path); },
     saveImage: async (r) => { log.saved.push(r); return { updated_at: "2026-10-05T00:00:00Z" }; },
     newObjectId: () => "0f8fad5b-d9cb-469f-a165-70867728950e",
+    decode: async () => true,
     ...p,
   };
   return { d, log };
@@ -68,7 +70,7 @@ test("save：伪装格式 / mime 不符 / 超 15MB / 空 → 422 且不上传", 
     save({ mime_type: "image/jpeg" }),
     save({ mime_type: "image/gif" }),
     save({ image_base64: "" }),
-    save({ image_base64: Buffer.concat([PNG, Buffer.alloc(15 * 1024 * 1024)]).toString("base64") }),
+    save({ image_base64: Buffer.concat([PNG, Buffer.alloc(QR_MAX_BYTES)]).toString("base64") }),
   ]) assert.equal(((await printStoreQr(d, "u", b)) as any).status, 422);
   assert.equal(log.uploads.length, 0);
 });
@@ -110,4 +112,39 @@ test("渠道映射：wechat→wecom_contact，miniprogram→mini_program，其�
     assert.equal(log.saved[0].purpose, (CHANNEL_TO_PURPOSE as any)[ch]);
     assert.ok(log.uploads[0].path.startsWith(`${LOC}/${ch}/`));
   }
+});
+
+const realPng = () => sharp({ create: { width: 64, height: 64, channels: 3, background: "#123456" } }).png().toBuffer();
+const realJpg = () => sharp({ create: { width: 64, height: 64, channels: 3, background: "#abcdef" } }).jpeg().toBuffer();
+
+test("解码校验：仅文件头 / 截断 → false；真实 PNG/JPEG → true；格式不符 → false", async () => {
+  const png = await realPng(), jpg = await realJpg();
+  assert.equal(await decodeCheck(PNG, "image/png"), false);
+  assert.equal(await decodeCheck(JPG, "image/jpeg"), false);
+  assert.equal(await decodeCheck(png.subarray(0, Math.floor(png.length / 2)), "image/png"), false);
+  assert.equal(await decodeCheck(jpg.subarray(0, Math.floor(jpg.length / 2)), "image/jpeg"), false);
+  assert.equal(await decodeCheck(png, "image/png"), true);
+  assert.equal(await decodeCheck(jpg, "image/jpeg"), true);
+  assert.equal(await decodeCheck(png, "image/jpeg"), false);
+});
+
+test("save（真实解码）：header-only 拒绝不上传；真实 PNG/JPEG 原字节逐字节保留", async () => {
+  const { d, log } = deps({ ...admin, decode: undefined });
+  assert.equal(((await printStoreQr(d, "u", save())) as any).code, "invalid_image");
+  assert.equal(log.uploads.length, 0);
+  for (const [buf, mime] of [[await realPng(), "image/png"], [await realJpg(), "image/jpeg"]] as const) {
+    const { d: d2, log: l2 } = deps({ ...admin, decode: undefined });
+    const r: any = await printStoreQr(d2, "u", save({ image_base64: buf.toString("base64"), mime_type: mime }));
+    assert.equal(r.ok, true);
+    assert.ok(Buffer.from(l2.uploads[0].bytes).equals(buf));
+  }
+});
+
+test("请求体上限：Content-Length 与流式累计均 413", async () => {
+  const { readJsonCapped, TOO_LARGE } = await import("./store-qr-print.server");
+  const big = new Request("http://x", { method: "POST", body: "x".repeat(50), headers: { "content-type": "application/json" } });
+  assert.equal(await readJsonCapped(big, 10), TOO_LARGE);
+  assert.equal(await readJsonCapped(new Request("http://x", { method: "POST", body: "x".repeat(50) }), 10), TOO_LARGE);
+  const okReq = new Request("http://x", { method: "POST", body: JSON.stringify({ a: 1 }) });
+  assert.deepEqual(await readJsonCapped(okReq, 1000), { a: 1 });
 });

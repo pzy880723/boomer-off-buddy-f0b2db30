@@ -12,7 +12,7 @@ import {
   userCanAccessLocation,
 } from "@/server/handheld-auth.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { QR_BUCKET, printStoreQr, type QrPrintDeps } from "@/server/store-qr-print.server";
+import { QR_BUCKET, QR_MAX_BODY_BYTES, TOO_LARGE, readJsonCapped, printStoreQr, type QrPrintDeps } from "@/server/store-qr-print.server";
 import type { QrRow } from "@/server/store-qr.server";
 
 function deps(): QrPrintDeps {
@@ -61,7 +61,9 @@ export const Route = createFileRoute("/api/public/handheld/print/store-qr")({
           if (!auth.ok) return auth.response;
           const session = await resolveSessionUser(request);
           if (!session) return err("Employee session required", 401, { code: "session_required" });
-          const r = await printStoreQr(deps(), session.user_id, await request.json().catch(() => null));
+          const body = await readJsonCapped(request, QR_MAX_BODY_BYTES);
+          if (body === TOO_LARGE) return err("Payload too large", 413, { code: "payload_too_large" });
+          const r = await printStoreQr(deps(), session.user_id, body);
           return r.ok ? ok(r.body) : err(r.code, r.status, { code: r.code });
         } catch {
           return err("QR config unavailable", 500, { code: "internal_error" });
