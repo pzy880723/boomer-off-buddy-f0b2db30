@@ -993,7 +993,7 @@ X-Session-Token: <操作员 session token>
         tags: ["客服"],
         summary: "客服会话列表（v1.16）",
         description:
-          "门店员工按授权库位、总部客服可见全部会话；共享接待，无独占领取。返回 `data.items[]`，含 `unread_count` 与 `participants`。查询参数 `location_id` 可选：HQ 不传=全部授权门店(`scope=hq_all_conversations`)，传入即按该门店过滤(`scope=hq_single_location`)；分店员工必须传本店，传非授权门店返回 403 `forbidden_location`，不传时仍被服务端限制在授权门店内(`scope=assigned_locations`)。授权一律由服务端强制，不信任客户端声明。",
+          "门店员工按授权库位、总部客服可见全部会话；协作者可写内部备注，对外回复仅限当前主接待人。返回 data.items 与 next_cursor；服务端先按 queue 和授权范围筛选，再分页。HQ 不传 location_id 表示全部授权门店，传入按该门店过滤；门店员工不传时仍限制在授权库位，传非授权门店返回 403 forbidden_location。",
         parameters: [
           {
             name: "location_id",
@@ -1002,10 +1002,24 @@ X-Session-Token: <操作员 session token>
             schema: { type: "string", format: "uuid" },
           },
           { name: "status", in: "query", required: false, schema: { type: "string" } },
+          { name: "queue", in: "query", required: false, schema: { type: "string", enum: ["unclaimed", "mine", "escalated", "closed", "all"] } },
           { name: "limit", in: "query", required: false, schema: { type: "integer" } },
           { name: "cursor", in: "query", required: false, schema: { type: "string" } },
         ],
         responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/support/conversations/{id}/assignment": {
+      post: {
+        tags: ["客服"],
+        summary: "领取、总部接管、关闭或重新打开会话",
+        description: "需要设备与员工身份，授权库位由服务器校验。takeover 仅总部可用；领取和状态变更使用 assignment_version 防止并发覆盖，版本冲突返回 409。",
+        requestParams: { path: z.object({ id: z.string().uuid() }) },
+        requestBody: jsonBody(z.object({
+          action: z.enum(["claim", "takeover", "close", "reopen"]),
+          assignment_version: z.number().int().min(0),
+        })),
+        responses: { "200": jsonRes("OK", AnyOkRes), "409": jsonRes("会话状态或版本冲突", ErrorResponse), ...ERROR_RESPONSES },
       },
     },
     "/api/public/handheld/support/conversations/{id}": {
