@@ -36,9 +36,14 @@ export type RecommendationCard = {
 export const AiCardSchema = z
   .object({
     headline: z.string().trim().min(2).max(18),
-    keywords: z.array(z.string().trim().min(1).max(8)).min(2).max(3),
+    keywords: z.array(z.string().trim().min(1).max(6)).min(2).max(3),
     intro: z.string().trim().min(4).max(60),
-    highlights: z.array(z.string().trim().min(2).max(24)).min(1).max(3),
+    highlights: z
+      .array(z.string().trim().min(2).max(24))
+      .min(1)
+      .max(3)
+      // 60×90mm 卡面容量：highlights 以「；」连接后总长（含分隔符）≤55 字
+      .refine((lines) => lines.join("；").length <= 55, { message: "highlights_total_too_long" }),
   })
   .strict();
 export type AiCard = z.infer<typeof AiCardSchema>;
@@ -66,7 +71,7 @@ export function productCard(facts: CardFacts): Omit<RecommendationCard, "image" 
   const subject = facts.ip ?? facts.brand ?? facts.category ?? "店长推荐";
   const kw = [facts.ip, facts.brand, facts.category, ...facts.keywords]
     .filter((x): x is string => !!x && x.trim().length > 0)
-    .map((x) => clip(x.trim(), 8));
+    .map((x) => clip(x.trim(), 6));
   const keywords = [...new Set(kw)].slice(0, 3);
   const highlights = [
     facts.condition_grade ? `成色 ${facts.condition_grade}` : null,
@@ -76,7 +81,7 @@ export function productCard(facts: CardFacts): Omit<RecommendationCard, "image" 
     card_type: "product_recommendation",
     size_mm: { width: 60, height: 90 },
     headline: clip(`${subject}好物`, 18),
-    product_name: clip(facts.name, 40),
+    product_name: clip(facts.name, 24),
     keywords,
     intro: clip(`${facts.name}，到店可看实物。`, 60),
     highlights: highlights.length ? highlights : ["欢迎到店看实物"],
