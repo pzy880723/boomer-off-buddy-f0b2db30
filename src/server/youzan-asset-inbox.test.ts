@@ -6,6 +6,7 @@ import {
   ingestAssetMessage,
   processAssetInbox,
   retryDelayMs,
+  LEASE_MS,
   verifyYouzanSign,
   type InboxStore,
   type InboxRow,
@@ -19,6 +20,7 @@ const msg = (o: unknown) => JSON.stringify(o);
 /** In-memory twin of the SQL functions (unique (kdt_id,event_id), hash conflict, SKIP LOCKED claim). */
 function memStore(): InboxStore & { rows: InboxRow[]; conflicts: number } {
   const rows: InboxRow[] = [];
+  let tok = 0;
   const s = {
     rows,
     conflicts: 0,
@@ -34,13 +36,26 @@ function memStore(): InboxStore & { rows: InboxRow[]; conflicts: number } {
       return { result: "accepted" as const, id: row.id };
     },
     async claim(limit: number, now: number) {
-      const due = rows.filter((r) => (r.status === "pending" || r.status === "retry") && r.next_attempt_at <= now).slice(0, limit);
-      for (const r of due) { r.status = "processing"; r.attempts++; }
+      const due = rows
+        .filter((r) => r.next_attempt_at <= now && (r.status === "pending" || r.status === "retry" ||
+          (r.status === "processing" && (r.lease_until ?? 0) < now)))
+        .slice(0, limit);
+      for (const r of due) {
+        r.status = "processing"; r.attempts++; r.claim_token = `t${++tok}`; r.lease_until = now + LEASE_MS;
+      }
       return due.map((r) => ({ ...r }));
     },
-    async finish(id: string, status: InboxRow["status"], reason: string | null, next: number) {
+    async finish(id: string, token: string, status: InboxRow["status"], reason: string | null, next: number, now: number) {
       const r = rows.find((x) => x.id === id)!;
-      r.status = status; r.reason = reason; r.next_attempt_at = next;
+      if (r.status !== "processing" || r.claim_token !== token || (r.lease_until ?? 0) <= now) return false;
+      r.status = status; r.reason = reason; r.next_attempt_at = next; r.claim_token = null; r.lease_until = null;
+      return true;
+    },
+    async requeue(id: string) {
+      const r = rows.find((x) => x.id === id)!;
+      if (r.status === "blocked" || r.status === "dead" || r.status === "processing") {
+        r.status = "pending"; r.claim_token = null; r.lease_until = null; r.next_attempt_at = 0;
+      }
     },
   };
   return s;
@@ -140,4 +155,68 @@ test("retryDelayMs 指数退避且封顶 1 小时", () => {
   assert.equal(retryDelayMs(1), 60_000);
   assert.equal(retryDelayMs(2), 120_000);
   assert.equal(retryDelayMs(20), 3_600_000);
+});
+
+// ---- 审查边界（0025）----
+const creds = { clientId: CID, clientSecret: SECRET };
+
+test("fencing：lease 过期被 B 认领后，A 的旧 token 不能覆盖 B 的结果", async () => {
+  const st = memStore();
+  await ingestAssetMessage(st, body({}), creds);
+  const [a] = await st.claim(1, 0);
+  const [b] = await st.claim(1, LEASE_MS + 1);
+  assert.ok(b && b.claim_token !== a.claim_token);
+  assert.equal(await st.finish(b.id, b.claim_token!, "blocked", "unknown_member", 0, LEASE_MS + 2), true);
+  assert.equal(await st.finish(a.id, a.claim_token!, "retry", "transient_error", 9, LEASE_MS + 3), false);
+  assert.equal(st.rows[0].status, "blocked");
+});
+
+test("过期 lease 不能 finish", async () => {
+  const st = memStore();
+  await ingestAssetMessage(st, body({}), creds);
+  const [a] = await st.claim(1, 0);
+  assert.equal(await st.finish(a.id, a.claim_token!, "blocked", "x", 0, LEASE_MS), false);
+});
+
+test("requeue 后旧 claim 失效", async () => {
+  const st = memStore();
+  await ingestAssetMessage(st, body({}), creds);
+  const [a] = await st.claim(1, 0);
+  await st.requeue(a.id);
+  assert.equal(await st.finish(a.id, a.claim_token!, "blocked", "x", 0, 1), false);
+  assert.equal(st.rows[0].status, "pending");
+});
+
+test("processAssetInbox 丢失 lease 时计 stale，不报错", async () => {
+  const st = memStore();
+  await ingestAssetMessage(st, body({}), creds);
+  const slow = { resolveMember: async () => { await st.claim(1, LEASE_MS + 10); return { kind: "unknown" as const }; } };
+  const out = await processAssetInbox(st, slow, { now: 0 });
+  assert.equal(out.stale, 1);
+  assert.equal(st.rows[0].status, "processing");
+});
+
+test("签名：32 个非 ASCII 字符或非 hex 不抛错，直接 false", () => {
+  assert.equal(verifyYouzanSign("x", "签".repeat(32), CID, SECRET), false);
+  assert.equal(verifyYouzanSign("x", "g".repeat(32), CID, SECRET), false);
+  assert.equal(verifyYouzanSign("x", undefined as never, CID, SECRET), false);
+});
+
+test("reason 固定安全代码，不复制 Error.name", async () => {
+  const st = memStore();
+  await ingestAssetMessage(st, body({}), creds);
+  const e = new Error("m"); e.name = "token=SECRET123";
+  await processAssetInbox(st, { resolveMember: async () => { throw e; } }, { now: 0 });
+  assert.equal(st.rows[0].reason, "transient_error");
+});
+
+test("事件身份严格标量：对象/布尔/数组被拒", async () => {
+  for (const bad of [{ id: { x: 1 } }, { kdt_id: true }, { type: 5 }, { id: ["e1"] }, { kdt_id: "12a" }, { kdt_id: 1.5 }]) {
+    const st = memStore();
+    const r = await ingestAssetMessage(st, { ...body({}), ...bad } as never, creds);
+    assert.equal(r.status, 422, JSON.stringify(bad));
+    assert.equal(st.rows.length, 0);
+  }
+  const st = memStore();
+  assert.equal((await ingestAssetMessage(st, { ...body({}), id: 123, kdt_id: "153242272" }, creds)).status, 200);
 });
