@@ -8837,6 +8837,8 @@ export type Database = {
           chain_probe_at: string | null
           chain_probe_result: Json | null
           chain_probe_status: string
+          coord_system: string | null
+          coord_updated_at: string | null
           created_at: string
           expires_at: string | null
           id: string
@@ -8845,6 +8847,8 @@ export type Database = {
           last_ping_at: string | null
           last_ping_msg: string | null
           last_ping_ok: boolean | null
+          latitude: number | null
+          longitude: number | null
           manager: string | null
           notes: string | null
           offline_sell_channel_id: number | null
@@ -8872,6 +8876,8 @@ export type Database = {
           chain_probe_at?: string | null
           chain_probe_result?: Json | null
           chain_probe_status?: string
+          coord_system?: string | null
+          coord_updated_at?: string | null
           created_at?: string
           expires_at?: string | null
           id?: string
@@ -8880,6 +8886,8 @@ export type Database = {
           last_ping_at?: string | null
           last_ping_msg?: string | null
           last_ping_ok?: boolean | null
+          latitude?: number | null
+          longitude?: number | null
           manager?: string | null
           notes?: string | null
           offline_sell_channel_id?: number | null
@@ -8907,6 +8915,8 @@ export type Database = {
           chain_probe_at?: string | null
           chain_probe_result?: Json | null
           chain_probe_status?: string
+          coord_system?: string | null
+          coord_updated_at?: string | null
           created_at?: string
           expires_at?: string | null
           id?: string
@@ -8915,6 +8925,8 @@ export type Database = {
           last_ping_at?: string | null
           last_ping_msg?: string | null
           last_ping_ok?: boolean | null
+          latitude?: number | null
+          longitude?: number | null
           manager?: string | null
           notes?: string | null
           offline_sell_channel_id?: number | null
