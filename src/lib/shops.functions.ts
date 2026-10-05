@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { runShopSyncCore } from "@/lib/youzan.functions";
 import { normalizeShopCoords, shopCoordFieldsSchema, buildShopMetaPatch } from "@/lib/shop-coords";
+import { assertCoordWriteAllowed, assertUpdatedOneRow, hasCoordFields } from "@/lib/shop-coords-auth";
 
 export const syncSingleShop = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -160,13 +161,17 @@ export const updateShopMeta = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { id } = data;
+    // 坐标字段仅总部管理员可提交（按认证 userId 查 user_roles）
+    if (hasCoordFields(data)) await assertCoordWriteAllowed(context.supabase as never, context.userId);
     // 坐标成对校验；缺省不触碰；coord_updated_at 由数据库触发器按真实变化写入
     const patch = buildShopMetaPatch(data);
-    const { error } = await context.supabase
+    const { data: rows, error } = await context.supabase
       .from("youzan_shops")
       .update(patch as never)
-      .eq("id", id);
+      .eq("id", id)
+      .select("id");
     if (error) throw new Error(error.message);
+    assertUpdatedOneRow(rows);
     return { ok: true };
   });
 
@@ -185,7 +190,9 @@ export const createShop = createServerFn({ method: "POST" })
       .merge(shopCoordFieldsSchema)
       .parse(i)
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    // 后台写入走最高权限，坐标须在此先按认证 userId 鉴权
+    if (hasCoordFields(data)) await assertCoordWriteAllowed(context.supabase as never, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     let bound = false;
