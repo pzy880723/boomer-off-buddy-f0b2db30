@@ -53,6 +53,17 @@ export function decodeYouzanMsg(msg: unknown): string | null {
 export const scalarStr = (v: unknown) =>
   typeof v === "string" ? v.trim() : typeof v === "number" && Number.isSafeInteger(v) ? String(v) : "";
 
+/** client_id 只接受非空字符串或安全整数；对象/数组/布尔视为非法。缺省返回 null。 */
+export function strictClientId(v: unknown): string | null | false {
+  if (v === undefined || v === null) return null;
+  if (typeof v === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(v)) return v;
+  if (typeof v === "number" && Number.isSafeInteger(v) && v > 0) return String(v);
+  return false;
+}
+
+export const isPlainBody = (b: unknown): b is Record<string, unknown> =>
+  !!b && typeof b === "object" && !Array.isArray(b);
+
 export function maskMobile(v: unknown) {
   const s = typeof v === "string" ? v : "";
   return s.length >= 7 ? `${s.slice(0, 3)}****${s.slice(-4)}` : s ? "****" : s;
@@ -64,6 +75,7 @@ export async function handlePointsMessage(
 ): Promise<Out> {
   const { clientId, clientSecret } = deps.creds;
   if (!clientId || !clientSecret) return fail(503, "sign_not_configured");
+  if (!isPlainBody(input.body)) return fail(400, "invalid_body");
   const body = input.body;
   if (body.type !== "POINTS") return fail(422, "not_points_message");
 
@@ -72,9 +84,8 @@ export async function handlePointsMessage(
   const sign = typeof body.sign === "string" && body.sign ? body.sign : input.headerSign;
   if (!signOk(decoded, sign, clientId, clientSecret)) return fail(401, "invalid_sign");
   // 文档示例未带 client_id；签名已绑定本应用密钥。若带了就必须一致。
-  if (body.client_id !== undefined && body.client_id !== null && String(body.client_id) !== clientId) {
-    return fail(401, "client_id_mismatch");
-  }
+  const cid = strictClientId(body.client_id);
+  if (cid === false || (cid !== null && cid !== clientId)) return fail(401, "client_id_mismatch");
 
   let msg: Record<string, unknown>;
   try {

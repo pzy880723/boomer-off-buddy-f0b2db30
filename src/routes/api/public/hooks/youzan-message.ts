@@ -45,9 +45,14 @@ export const Route = createFileRoute("/api/public/hooks/youzan-message")({
           }
         } catch (e) {
           return Response.json(
-            { code: 400, message: `bad body: ${e instanceof Error ? e.message : String(e)}` },
+            { code: 400, message: "bad body" },
             { status: 400 },
           );
+        }
+
+        // JSON null / 数组 / 非对象：直接 400，不进入任何分支。
+        if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+          return Response.json({ code: 400, message: "bad body" }, { status: 400 });
         }
 
         // POINTS（客户积分变更，MSG/279）：只进会员资产收件箱，不扣账、不走下方交易/退款逻辑。
