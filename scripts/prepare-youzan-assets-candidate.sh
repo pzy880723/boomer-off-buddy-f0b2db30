@@ -7,7 +7,7 @@ release="${ASSET_RELEASE_DIR:?Missing ASSET_RELEASE_DIR}"
 [[ "$release" =~ ^/var/www/boomer-erp/releases/member-assets-[a-f0-9]{7,40}-20261005$ ]]
 [[ "$(readlink -f "$base/current")" == "$old" ]]
 [[ ! -e "$release" ]]
-if tar -tf /tmp/boomer-member-assets.tar | grep -Eq '^(\./)?\.env($|\.)'; then
+if tar -tf /tmp/boomer-member-assets.tar | grep -E '^(\./)?\.env($|\.)' > /dev/null; then
   printf 'release_archive_contains_environment\n' >&2
   exit 1
 fi
