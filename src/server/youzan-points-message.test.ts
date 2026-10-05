@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { handlePointsMessage, type PointsIngest } from "./youzan-points-message.server";
+import { assetEventKey, handlePointsMessage, type PointsIngest } from "./youzan-points-message.server";
 
 const CID = "98835eddeb9be63a79";
 const SECRET = "sec";
@@ -112,7 +112,7 @@ test("同一客户（同外层 id）不同 unique_id：都接收，不当冲突"
   assert.equal(a.status, 200);
   assert.equal(b.status, 200);
   assert.equal(d.store.rows.length, 2);
-  assert.deepEqual(d.store.rows.map((r) => r.event_id), ["u-1", "u-2"]);
+  assert.deepEqual(d.store.rows.map((r) => r.event_id), ["u-1", "u-2"].map(id => assetEventKey("POINTS", id, "legacy_body_sign")));
 });
 
 test("同 unique_id 不同内容：409 冲突，不 ack", async () => {

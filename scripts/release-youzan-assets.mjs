@@ -80,7 +80,6 @@ try {
   await verify('http://127.0.0.1:3005');
   await verify('https://erp.boomeroff.com');
   pointTo(release);
-  pm('save');
   console.log(JSON.stringify({ release, previous, status: 'deployed', independentRedemptionEnabled: false }));
 } catch (error) {
   console.error('Asset release verification failed:', error.message);
@@ -88,10 +87,10 @@ try {
     try { pm('delete', 'boomer-off-buddy'); } catch {}
     start(previous, 'boomer-off-buddy', 3005);
     pointTo(previous);
-    pm('save');
     console.error('Rolled back to previous release');
   }
   throw error;
 } finally {
   try { pm('delete', candidate); } catch {}
+  if (switched) pm('save');
 }

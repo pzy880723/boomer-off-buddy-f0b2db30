@@ -112,7 +112,7 @@ test("manually requeued legacy or unverified messages cannot be observed", async
 });
 
 test("SQL completed observations and version conflicts are not counted as lost leases", async () => {
-  for (const result of ["same_version_observed", "version_conflict"] as const) {
+  for (const result of ["same_version_observed", "version_conflict", "identity_conflict"] as const) {
     const st = stores([pointsRow()]);
     st.record = async () => result;
     const out = await processObservationInbox(st, deps());

@@ -181,7 +181,7 @@ test("缺 version 或 event_time：弱身份不合并两条合法事件，并 bl
   await run(d, msgOf({ event_time: undefined, verify_code: "A" }), { version: undefined });
   await run(d, msgOf({ event_time: undefined, verify_code: "B" }), { version: undefined });
   assert.equal(d.store.rows.length, 2);
-  assert.ok(d.store.rows.every((r) => r.initial_reason === "weak_event_identity" && r.event_id.startsWith("coupon-raw:")));
+  assert.ok(d.store.rows.every((r) => r.initial_reason === "weak_event_identity" && r.event_id.length <= 128));
 });
 
 test("核销/退回缺 order_no：弱身份", async () => {

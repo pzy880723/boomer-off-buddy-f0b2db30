@@ -29,7 +29,7 @@ export type ObservationRecordArgs = ObservationKey & {
   expected_row_version: number;
   query_source: string;
 };
-export type RecordResult = "recorded" | "older_observation" | "stale_version" | "stale_lease" | "same_version_observed" | "version_conflict";
+export type RecordResult = "recorded" | "older_observation" | "stale_version" | "stale_lease" | "same_version_observed" | "version_conflict" | "identity_conflict";
 
 export interface ObservationStore {
   claim(limit: number, now: number): Promise<ObsRow[]>;
@@ -142,7 +142,7 @@ export async function processObservationInbox(
         query_source: "youzan_fixed_proxy_readonly",
       });
       if (r === "recorded" || r === "same_version_observed") out.observed++;
-      else if (r === "older_observation" || r === "version_conflict") out.blocked++;
+      else if (r === "older_observation" || r === "version_conflict" || r === "identity_conflict") out.blocked++;
       else if (r === "stale_version") await retry("stale_version");
       else out.stale++;
     } catch (e) {

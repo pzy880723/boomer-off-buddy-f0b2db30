@@ -117,6 +117,20 @@ test("无 Event-Sign 头：legacy body.sign，入库即 blocked legacy_signature
   assert.equal(d.rows[0].initial_reason, "legacy_signature_readonly_hint");
 });
 
+test("legacy hints cannot suppress signed events, and signed redelivery remains idempotent", async () => {
+  for (const json of [pointsJson, couponJson]) {
+    const d = deps();
+    const body = JSON.parse(json);
+    const legacy = JSON.stringify({ ...body, sign: md5(`${CID}${decodeURIComponent(body.msg)}${SECRET}`) });
+    assert.equal((await send(req(legacy, {}), d)).out?.result, "accepted");
+    assert.equal((await send(req(json, signed(json)), d)).out?.result, "accepted");
+    assert.equal((await send(req(json, signed(json)), d)).out?.result, "duplicate");
+    assert.equal(d.rows.length, 2);
+    assert.deepEqual(d.rows.map(r => r.initial_status), ["blocked", "pending"]);
+    assert.notEqual(d.rows[0].event_id, d.rows[1].event_id);
+  }
+});
+
 test("JSON null / 数组 → 400；非资产 type 交回旧逻辑", async () => {
   for (const raw of ["null", "[]"]) {
     const p = await readYouzanPush(req(raw, {}));

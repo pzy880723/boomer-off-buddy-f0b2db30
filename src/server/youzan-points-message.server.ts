@@ -5,8 +5,7 @@
 // - 外层 version 用于顺序（高版本覆盖低版本），sendCount 是重推次数（同一事件）；
 // - msg.total 是当前积分（保护期内不增加），msg.amount 不能当本地增减 delta；
 // - msg.client_hash = md5(client_id)，等于本应用即自己通过接口的操作，需防回环。
-// 签名：有赞云团队给出的推送验签步骤 —— 先 URLDecode msg，再 MD5(client_id + 解码后 msg + client_secret)，
-// 与 body.sign 或 Event-Sign 头比对。只用这一种算法，不做多方案宽松通过。
+// Event-Sign 由路由验证完整正文；旧 body.sign 仅作隔离的只读提示。
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { IngestResult } from "./youzan-asset-inbox.server";
 
@@ -33,6 +32,10 @@ export type Out = { status: number; body: Record<string, unknown>; result?: Inge
 export const fail = (status: number, code: string): Out => ({ status, body: { code: status, message: code } });
 
 export const md5hex = (s: string) => createHash("md5").update(s, "utf8").digest("hex");
+
+export function assetEventKey(type: string, id: string, protocol: "event_sign" | "legacy_body_sign") {
+  return `${protocol}:${createHash("sha256").update(`${type}\n${id}`).digest("hex")}`;
+}
 
 export function signOk(decoded: string, sign: unknown, clientId: string, secret: string) {
   if (typeof sign !== "string" || !/^[0-9a-fA-F]{32}$/.test(sign)) return false;
@@ -132,7 +135,7 @@ export async function handlePointsMessage(
   try {
     const r = await deps.store.ingest({
       kdt_id: kdtId,
-      event_id: uniqueId,
+      event_id: assetEventKey("POINTS", uniqueId, protocol),
       msg_type: "POINTS",
       // 指纹只覆盖解码后的 msg 原文；sendCount/外层字段变化不影响事件身份。
       payload_hash: createHash("sha256").update(`POINTS\n${decoded}`, "utf8").digest("hex"),

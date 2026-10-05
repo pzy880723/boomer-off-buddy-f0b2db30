@@ -6,10 +6,10 @@
 // - 官方无事件唯一 id：事件身份 = sha256(店铺+type+券id+status+version+order_no+event_time)；
 //   同身份内容不同 → 冲突，由数据库阻断待人工检查；
 // - 会员身份只认外层 yz_open_id；没有就 blocked，绝不凭手机号建会员。
-// 签名与 POINTS 相同：MD5(client_id + 解码后 msg + client_secret)。
+// Event-Sign 由路由验证完整正文；旧 body.sign 提示使用独立去重空间。
 import { createHash } from "node:crypto";
 import {
-  decodeYouzanMsg, fail, isPlainBody, maskMobile, scalarStr, signOk, strictClientId,
+  assetEventKey, decodeYouzanMsg, fail, isPlainBody, maskMobile, scalarStr, signOk, strictClientId,
   type Out, type PointsDeps, type PointsIngest,
 } from "./youzan-points-message.server";
 
@@ -102,7 +102,7 @@ export async function handleCouponMessage(
   try {
     const r = await deps.store.ingest({
       kdt_id: kdtId,
-      event_id: eventId,
+      event_id: assetEventKey(TYPE, eventId, protocol),
       msg_type: TYPE,
       // 内容指纹覆盖解码后 msg 原文 + 外层 yz_open_id；sendCount 不影响。
       payload_hash: createHash("sha256").update(`${TYPE}\n${yzOpenId}\n${decoded}`, "utf8").digest("hex"),

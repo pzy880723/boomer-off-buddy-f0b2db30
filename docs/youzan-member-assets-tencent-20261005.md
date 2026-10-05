@@ -6,19 +6,19 @@ ERP remains the member master and audit owner. This change receives points and b
 
 ## Implemented
 
-- Raw-body Event-Sign validation with no fallback after a failed header signature. Legacy signatures remain blocked read-only hints, including after an operator requeues them.
+- Raw-body Event-Sign validation with no fallback after a failed header signature. Legacy signatures remain blocked read-only hints, including after an operator requeues them. Separate authentication namespaces prevent a legacy hint suppressing a verified delivery.
 - Durable inbox deduplication, conflicting-payload blocking, lease fencing, retry and manual requeue.
 - Points queries use the active chain headquarters token, verified ERP/Youzan identity links, the fixed Tencent proxy, an explicit timeout, and exact account versions.
-- Observation SQL rejects stale account versions and conflicting balances at the same version. It never writes wallets, coupons or the points ledger.
+- Observation SQL rejects stale account versions, conflicting balances at the same version, and a changed customer owner. It never writes wallets, coupons or the points ledger.
 - The bounded observer reads the existing SQLite identity map in read-only mode. Its host timer processes at most five inbox events per run; candidate servers do not start it.
 - Coupon notifications retain separate take/consume/back/revert events. Automatic coupon observation stays blocked until a trusted voucher-code mapping and a supported authoritative query are connected.
 
 ## Verification Before Release
 
-- 99 Youzan server/client tests passed, including the existing image integration tests.
-- Nine PGlite SQL tests passed against migrations 0024-0030: deduplication, conflict, stale lease, requeue, role grants, RLS, exact large versions, same-version conflicts and late older responses.
+- 101 Youzan server/client/release tests passed, including the existing image integration tests.
+- Ten PGlite SQL tests passed against migrations 0024-0031: deduplication, conflict, stale lease, requeue, role grants, RLS, exact large versions, same-version conflicts, late older responses and identity ownership conflicts.
 - Tencent read-only probe: one existing mapped active ERP member successfully queried through the fixed proxy. Redemption policy and earning-rule endpoints responded successfully. No points, coupons or local wallets were changed.
-- Full local `tsc --noEmit` is blocked by dependencies absent from the reused local node_modules: pinyin-pro, canvas-confetti and @electric-sql/pglite. This is not a claim of a clean full-project type check. Tencent candidate build and route probes must be checked separately.
+- Full local `tsc --noEmit` is blocked by dependencies absent from the reused local node_modules: pinyin-pro, canvas-confetti and @electric-sql/pglite. Tencent's full type check also reports missing PGlite and an existing storefront-shops test type error. This is not a claim of a clean full-project type check. Tencent candidate build succeeded; the actual production points adapter also returned a valid exact-version observation in a read-only probe. Route probes must be checked separately.
 
 ## Release And Rollback
 

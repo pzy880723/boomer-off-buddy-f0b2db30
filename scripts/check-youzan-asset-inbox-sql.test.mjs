@@ -25,7 +25,7 @@ before(async () => {
   for (const name of ['0024_youzan_member_asset_inbox', '0025_youzan_asset_inbox_fencing',
     '0026_youzan_asset_inbox_points_envelope', '0027_youzan_asset_inbox_coupon_events',
     '0028_youzan_member_asset_observations', '0029_youzan_asset_tables_tighten_grants',
-    '0030_youzan_points_observation_version_guard']) {
+    '0030_youzan_points_observation_version_guard', '0031_youzan_observation_identity_guard']) {
     await db.exec(await readFile(new URL(`../drizzle/migrations/${name}.sql`, import.meta.url), 'utf8'));
   }
 });
@@ -101,10 +101,10 @@ test('SQL RLS hides inbox from shop users and allows headquarters read-only', as
   await db.exec('RESET ROLE');
 });
 
-async function observe(row, expected = 0, time = Date.now(), point = 10, version = '9007199254740999') {
+async function observe(row, expected = 0, time = Date.now(), point = 10, version = '9007199254740999', customer = '00000000-0000-0000-0000-000000000003') {
   return (await db.query(`SELECT public.youzan_asset_observation_record($1,$2,1,'test-member','points','',
-    '00000000-0000-0000-0000-000000000003',$3,$4,$5,'youzan_fixed_proxy_readonly') AS result`,
-    [row.id, row.claim_token, JSON.stringify({ point, points_account_version: version }), new Date(time).toISOString(), expected])).rows[0].result;
+    $6,$3,$4,$5,'youzan_fixed_proxy_readonly') AS result`,
+    [row.id, row.claim_token, JSON.stringify({ point, points_account_version: version }), new Date(time).toISOString(), expected, customer])).rows[0].result;
 }
 test('SQL observations honor lease, version and newer observation timestamps', async () => {
   const time = Date.now() - 10000;
@@ -149,4 +149,16 @@ test('SQL observation RPCs and tables have explicit service-only write permissio
       assert.equal((await db.query('SELECT has_table_privilege($1,$2,$3) AS allowed', [role, table, action])).rows[0].allowed, false);
     }
   }
+});
+
+test('SQL changed customer ownership is blocked for both equal and newer account versions', async () => {
+  await ingest('owner-a');
+  assert.equal((await observe(await claim())).result, 'recorded');
+  for (const version of ['9007199254740999', '9007199254741000']) {
+    await ingest(`owner-b-${version}`);
+    assert.equal((await observe(await claim(), 1, Date.now(), 10, version, '00000000-0000-0000-0000-000000000004')).result, 'identity_conflict');
+  }
+  const snapshot = (await db.query('SELECT customer_id,row_version FROM youzan_member_asset_observations')).rows[0];
+  assert.equal(snapshot.customer_id, '00000000-0000-0000-0000-000000000003');
+  assert.equal(snapshot.row_version, 1);
 });
