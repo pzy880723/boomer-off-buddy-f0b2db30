@@ -169,6 +169,13 @@
       "when": 1791185666062,
       "tag": "0023_membership_plan_points_audit",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791189330207,
+      "tag": "0024_youzan_member_asset_inbox",
+      "breakpoints": true
     }
   ]
 }
