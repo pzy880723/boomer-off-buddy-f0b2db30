@@ -134,6 +134,13 @@
       "when": 1791172211277,
       "tag": "0018_youzan_shops_gcj02_coords",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791172690077,
+      "tag": "0019_youzan_shops_coord_system_strict_and_touch",
+      "breakpoints": true
     }
   ]
 }
