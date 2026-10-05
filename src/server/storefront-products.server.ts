@@ -1,14 +1,9 @@
 import { supabaseAdmin } from "../integrations/supabase/client.server";
 import { signSkuImagePaths } from "../lib/sku-image-resolver.server";
-import { DERIVATIVE_WIDTHS, signDerivativeUrls } from "./media-derivative.server";
-
-/** 列表 / 购物车 / 订单默认展示图：真实 480px 衍生图，失败为 null（不回退原图）。 */
-export const thumbnailDerivativeSigner = (paths: readonly string[]) =>
-  signDerivativeUrls(paths, DERIVATIVE_WIDTHS.thumbnail);
-
-/** 详情轮播与放大预览：真实 960px 衍生图，失败为 null（不回退原图）。 */
-export const previewDerivativeSigner = (paths: readonly string[]) =>
-  signDerivativeUrls(paths, DERIVATIVE_WIDTHS.preview);
+import { signDerivativeUrls } from "./media-derivative.server";
+import { resolveListingImageSources } from "./listing-image-source";
+import { collectStorefrontPages } from "./storefront-filters";
+import { tencentDerivative, loadTencentMediaManifest } from "./storefront-tencent-media.server";
 
 export type StorefrontProductQuery = {
   q: string | null;
@@ -16,6 +11,9 @@ export type StorefrontProductQuery = {
   brand_ids: string[];
   facet_codes: string[];
   location_id: string | null;
+  min_price: number | null;
+  max_price: number | null;
+  condition_grades: string[];
   sort: "newest" | "price_asc" | "price_desc" | "relevance";
   page: number;
   page_size: number;
@@ -36,13 +34,14 @@ export type StorefrontListing = {
   product_type: "custom" | "standard" | "bundle";
   published_at: string | null;
   location: { id: string; name: string; kind: string } | null;
+  sku?: {image_jobs: Array<{status: string; source_bucket: string; source_path: string; target_path: string | null; updated_at: string}>} & Partial<StorefrontJoinedSku> | null;
 };
 
 export type ImageSigner = (paths: readonly string[]) => Promise<(string | null)[]>;
 
 export async function resolveStorefrontListingImages(
   listing: StorefrontListing,
-  signer: ImageSigner = signSkuImagePaths,
+  signer: (paths: readonly string[]) => Promise<(string | null)[]> = signSkuImagePaths,
 ): Promise<StorefrontListing> {
   const paths = (listing.image_paths ?? []).filter(Boolean);
   if (paths.length === 0) return listing;
@@ -82,15 +81,15 @@ export type StorefrontProduct = ReturnType<typeof buildStorefrontProduct>;
 /**
  * 只对“当前页”的商品签名：原图桶级批量 + 可选 480px 缩略图。
  * - image_url / image_urls 契约不变（原图签名）
- * - thumbnail_url 为新增可选字段；缩略图签名失败回退原图 URL
+ * - thumbnail_url 只返回真实衍生图；失败为 null，绝不回退原图
  */
 export async function signStorefrontProductImages(
   products: StorefrontProduct[],
   listingsById: Map<string, StorefrontListing>,
-  options: { thumbnail?: boolean; signer?: ImageSigner; thumbnailSigner?: ImageSigner } = {},
+  options: { thumbnail?: boolean; signer?: ImageSigner; thumbnailSigner?: ImageSigner; originals?: boolean; tencentManifest?: Awaited<ReturnType<typeof loadTencentMediaManifest>> } = {},
 ): Promise<StorefrontProduct[]> {
   const signer = options.signer ?? signSkuImagePaths;
-  const thumbnailSigner = options.thumbnailSigner ?? thumbnailDerivativeSigner;
+  const thumbnailSigner = options.thumbnailSigner ?? signDerivativeUrls;
   const pageListings = products.map(
     (product) =>
       listingsById.get(product.id) ?? {
@@ -109,28 +108,34 @@ export async function signStorefrontProductImages(
         published_at: null,
         location: null,
       },
-  );
-  const resolved = await resolveStorefrontListingsImagesBatch(pageListings, signer);
-  // 封面衍生图来源：优先原始存储路径，其次历史绝对 URL（由衍生签名器自行解回安全 bucket/path）
-  const coverPaths = pageListings.map(
-    (listing) => (listing.image_paths ?? []).find(Boolean) ?? listing.cover_url ?? "",
-  );
-  let thumbs: (string | null)[] = [];
-  if (options.thumbnail) {
+  ).map(resolveListingImageSources);
+  const coverPaths = pageListings.map((listing) => (listing.image_paths ?? []).find(Boolean) ?? listing.cover_url ?? listing.image_urls?.[0] ?? "");
+  const thumbnails = async (): Promise<(string | null)[]> => {
+    if (!options.thumbnail) return [];
     try {
-      thumbs = await thumbnailSigner(coverPaths);
+      const ready = coverPaths.map(path => tencentDerivative(path, 640, options.tencentManifest ?? null));
+      const missing = coverPaths.map((path, index) => ({ path, index })).filter(row => !ready[row.index]);
+      if (missing.length) {
+        const fallback = await thumbnailSigner(missing.map(row => row.path));
+        missing.forEach((row, index) => { ready[row.index] = fallback[index] ?? null; });
+      }
+      return ready;
     } catch {
-      thumbs = [];
+      return [];
     }
-  }
+  };
+  const [resolved, thumbs] = await Promise.all([
+    options.originals === false ? Promise.resolve(pageListings) : resolveStorefrontListingsImagesBatch(pageListings, signer),
+    thumbnails(),
+  ]);
   return products.map((product, i) => {
     const listing = resolved[i];
-    const image_url = listing.cover_url ?? product.image_url;
-    const image_urls = listing.image_urls ?? product.image_urls;
+    const image_url = options.originals === false ? null : listing.cover_url ?? product.image_url;
+    const image_urls = options.originals === false ? [] : listing.image_urls ?? product.image_urls;
     const base = { ...product, image_url, image_urls };
     if (!options.thumbnail) return base;
-    // 衍生图不可用时为 null：前端占位，绝不让原图冒充缩略图
-    return { ...base, thumbnail_url: thumbs[i] ?? null };
+    return { ...base, thumbnail_url: thumbs[i] ?? null,
+      ...(options.originals === false ? { preview_url: tencentDerivative(coverPaths[i], 1280, options.tencentManifest ?? null) } : {}) };
   });
 }
 
@@ -153,6 +158,14 @@ type StorefrontFacet = {
   code: string;
   name: string;
   confidence: number | null;
+};
+
+type StorefrontJoinedSku = StorefrontSku & {
+  status: string;
+  is_display: boolean;
+  brand_id: string | null;
+  brand: StorefrontBrand | null;
+  facet_links: Array<{ confidence: number | null; facet: Omit<StorefrontFacet, "confidence"> | null }>;
 };
 
 function collectList(params: URLSearchParams, key: string): string[] {
@@ -189,6 +202,11 @@ export function parseStorefrontProductQuery(url: URL): StorefrontProductQuery {
     brand_ids: collectList(url.searchParams, "brand_ids"),
     facet_codes: collectList(url.searchParams, "facet_codes"),
     location_id: url.searchParams.get("location_id")?.trim() || null,
+    min_price: url.searchParams.has("min_price") && url.searchParams.get("min_price")?.trim() !== "" && Number.isFinite(Number(url.searchParams.get("min_price"))) && Number(url.searchParams.get("min_price")) >= 0
+      ? Number(url.searchParams.get("min_price")) : null,
+    max_price: url.searchParams.has("max_price") && url.searchParams.get("max_price")?.trim() !== "" && Number.isFinite(Number(url.searchParams.get("max_price"))) && Number(url.searchParams.get("max_price")) >= 0
+      ? Number(url.searchParams.get("max_price")) : null,
+    condition_grades: collectList(url.searchParams, "condition_grades"),
     sort,
     page: positiveInt(url.searchParams.get("page"), 1, 100000),
     page_size: positiveInt(url.searchParams.get("page_size"), 20, 50),
@@ -232,145 +250,46 @@ export function buildStorefrontProduct(input: {
   };
 }
 
-export type StorefrontImagePreview = {
-  /** 与原图一一对应的签名原图 URL（仅供用户主动“查看原图”使用） */
-  image_url: string;
-  /** 960px 压缩预览 URL；无法生成衍生图时为 null（前端占位，绝不回退原图） */
-  preview_url: string | null;
-};
-
-/**
- * 详情页单商品装配：先 signImages:false 富化并确认可售（stock >= 1），
- * 再对这一个商品签一次原图 + 一次 960 预览 + 一次 480 缩略图。
- *
- * 关键不变量：
- * - 原图只签一次，按“原始路径下标”保留 path → signed URL 关联，中间失败只丢那一张。
- * - preview_url 与 image_previews[i].image_url 一一对应，且必须是真实缩放结果；
- *   任何转换失败返回 null，绝不用原图冒充。
- * - image_url / image_urls / 顺序 / 数量 / 库存 / 价格契约不变（原图仅供主动查看原图）。
- * 不可售（无 SKU / stock < 1）返回 null，由路由映射为 404。
- */
-export async function buildStorefrontProductDetail(
-  listing: StorefrontListing,
-  options: {
-    signer?: ImageSigner;
-    /** 960px 预览签名器 */
-    thumbnailSigner?: ImageSigner;
-    /** 480px 缩略图签名器（列表/购物车同一档位） */
-    coverThumbnailSigner?: ImageSigner;
-    /** 测试注入用：默认 enrichStorefrontListings(signImages:false) */
-    enrich?: (
-      listings: StorefrontListing[],
-      options: { signImages?: boolean },
-    ) => Promise<StorefrontProduct[]>;
-  } = {},
-): Promise<
-  | (StorefrontProduct & {
-      thumbnail_url?: string | null;
-      image_previews: StorefrontImagePreview[];
-    })
-  | null
-> {
-  const enrich = options.enrich ?? enrichStorefrontListings;
-  const products = await enrich([listing], { signImages: false });
-  const product = products[0];
-  if (!product || product.stock < 1) return null;
-
-  const signer = options.signer ?? signSkuImagePaths;
-  const previewSigner = options.thumbnailSigner ?? previewDerivativeSigner;
-  const coverSigner =
-    options.coverThumbnailSigner ?? options.thumbnailSigner ?? thumbnailDerivativeSigner;
-
-  const safeSign = async (signFn: ImageSigner, values: readonly string[]) => {
-    if (values.length === 0) return [] as (string | null)[];
-    try {
-      return await signFn(values);
-    } catch {
-      return [] as (string | null)[];
-    }
-  };
-
-  const rawPaths = (listing.image_paths ?? []).filter(Boolean);
-
-  // 无存储路径：只能用历史绝对 URL 作为衍生源（能解回本项目/腾讯存储才有衍生图，否则 null）
-  if (rawPaths.length === 0) {
-    const originals = product.image_urls ?? [];
-    const previews = await safeSign(previewSigner, originals);
-    const covers = await safeSign(coverSigner, originals.slice(0, 1));
-    return {
-      ...product,
-      thumbnail_url: covers[0] ?? null,
-      image_previews: originals.map((url, i) => ({
-        image_url: url,
-        preview_url: previews[i] ?? null,
-      })),
-    };
-  }
-
-  // 原图：一次签名，按下标保留与 rawPaths 的关联
-  const signedOriginals = await signer(rawPaths);
-  const kept: Array<{ path: string; imageUrl: string }> = [];
-  rawPaths.forEach((path, i) => {
-    const url = signedOriginals[i];
-    if (url) kept.push({ path, imageUrl: url });
-  });
-
-  if (kept.length === 0) {
-    const originals = product.image_urls ?? [];
-    const previews = await safeSign(previewSigner, originals);
-    const covers = await safeSign(coverSigner, originals.slice(0, 1));
-    return {
-      ...product,
-      thumbnail_url: covers[0] ?? null,
-      image_previews: originals.map((url, i) => ({
-        image_url: url,
-        preview_url: previews[i] ?? null,
-      })),
-    };
-  }
-
-  const keptPaths = kept.map((entry) => entry.path);
-  const previews = await safeSign(previewSigner, keptPaths);
-  const covers = await safeSign(coverSigner, keptPaths.slice(0, 1));
-
-  const image_previews: StorefrontImagePreview[] = kept.map((entry, i) => ({
-    image_url: entry.imageUrl,
-    preview_url: previews[i] ?? null,
-  }));
-
-  return {
-    ...product,
-    image_url: image_previews[0].image_url,
-    image_urls: image_previews.map((preview) => preview.image_url),
-    thumbnail_url: covers[0] ?? null,
-    image_previews,
-  };
+export function storefrontBatches<T>(items: T[]): T[][] {
+  const batches: T[][] = [];
+  for (let i=0; i<items.length; i+=100) batches.push(items.slice(i,i+100));
+  return batches;
 }
 
-/**
- * 元数据富化（分类/品牌/facets/可售库存）。
- * signImages=true（默认，详情页沿用）：桶级批量签名原图；
- * signImages=false：不做任何签名，留给调用方在筛选/分页之后对当前页调用 signStorefrontProductImages。
- */
-export async function enrichStorefrontListings(
-  listings: StorefrontListing[],
-  options: { signImages?: boolean } = {},
-) {
-  if (options.signImages !== false) {
-    listings = await resolveStorefrontListingsImagesBatch(listings);
+type StorefrontCategoryRow = { id: string; code: string; name: string; parent_id: string | null };
+
+export function loadStorefrontCategories(): Promise<StorefrontCategoryRow[]> {
+  return collectStorefrontPages(async (offset, limit) => {
+    const { data, error } = await supabaseAdmin.from("inv_categories" as never)
+      .select("id, code, name, parent_id").order("id", { ascending: true }).range(offset, offset + limit - 1);
+    if (error) throw new Error(error.message);
+    return (data ?? []) as unknown as StorefrontCategoryRow[];
+  });
+}
+
+export async function enrichStorefrontListings(listings: StorefrontListing[], options: { signImages?: boolean; categoryMetadata?: Promise<StorefrontCategoryRow[]>; useListingMetadata?: boolean } = {}): Promise<ReturnType<typeof buildStorefrontProduct>[]> {
+  if (options.useListingMetadata) listings = listings.filter(listing =>
+    listing.sku?.id === listing.sku_id && listing.sku.status === "active" && listing.sku.is_display === true,
+  );
+  if (listings.length>100) {
+    const categoryMetadata = options.categoryMetadata ?? loadStorefrontCategories();
+    return (await Promise.all(storefrontBatches(listings).map(batch=>enrichStorefrontListings(batch, { ...options, categoryMetadata })))).flat();
   }
+  if (options.signImages !== false) listings = await resolveStorefrontListingsImagesBatch(listings);
   const skuIds = [...new Set(listings.map((listing) => listing.sku_id).filter(Boolean))];
   if (skuIds.length === 0) return [];
+  const joinedSkus = options.useListingMetadata
+    ? [...new Map(listings.map(listing => [listing.sku_id, listing.sku as StorefrontJoinedSku])).values()]
+    : null;
 
-  const [skuResult, facetResult, availabilityResult] = await Promise.all([
-    // 与腾讯分支 525acd6 对齐：隐藏 / 非 active SKU 不进入公开商品（在 total/分页计算之前排除）
-    supabaseAdmin
+  const [skuResult, facetResult, availabilityResult, categoryRows] = await Promise.all([
+    joinedSkus ? Promise.resolve({ data: joinedSkus, error: null }) : supabaseAdmin
       .from("inv_skus")
-      .select("id, category, brand_id, keywords, stock_qty")
+      .select("id, category, brand_id, keywords, stock_qty, brand:inv_brands!inv_skus_brand_id_fkey(id,name,name_original,logo_url)")
       .eq("status", "active")
       .eq("is_display", true)
       .in("id", skuIds),
-    supabaseAdmin
+    joinedSkus ? Promise.resolve({ data: joinedSkus.flatMap(sku => (sku.facet_links ?? []).map(link => ({ ...link, sku_id: sku.id }))), error: null }) : supabaseAdmin
       .from("inv_sku_facets" as never)
       .select("sku_id, confidence, facet:inv_facets(code, name, dimension)")
       .in("sku_id", skuIds),
@@ -380,52 +299,17 @@ export async function enrichStorefrontListings(
         p_listing_ids: listings.map((listing) => listing.id),
       } as never,
     ),
+    options.categoryMetadata ?? loadStorefrontCategories(),
   ]);
   if (skuResult.error) throw new Error(skuResult.error.message);
   if (facetResult.error) throw new Error(facetResult.error.message);
   if (availabilityResult.error) throw new Error(availabilityResult.error.message);
 
   const skus = (skuResult.data ?? []) as unknown as Array<
-    StorefrontSku & { brand_id: string | null }
+    StorefrontSku & { brand_id: string | null; brand: StorefrontBrand | null }
   >;
-  const categoryCodes = [...new Set(skus.map((sku) => sku.category).filter(Boolean))] as string[];
-  const brandIds = [...new Set(skus.map((sku) => sku.brand_id).filter(Boolean))] as string[];
-  const [categoryResult, brandResult] = await Promise.all([
-    categoryCodes.length
-      ? supabaseAdmin
-          .from("inv_categories" as never)
-          .select("id, code, name, parent_id")
-          .in("code", categoryCodes)
-      : Promise.resolve({ data: [], error: null }),
-    brandIds.length
-      ? supabaseAdmin
-          .from("inv_brands" as never)
-          .select("id, name, name_original, logo_url")
-          .in("id", brandIds)
-      : Promise.resolve({ data: [], error: null }),
-  ]);
-  if (categoryResult.error) throw new Error(categoryResult.error.message);
-  if (brandResult.error) throw new Error(brandResult.error.message);
-
-  const categoryRows = (categoryResult.data ?? []) as unknown as Array<{
-    id: string;
-    code: string;
-    name: string;
-    parent_id: string | null;
-  }>;
-  const parentIds = [
-    ...new Set(categoryRows.map((row) => row.parent_id).filter(Boolean)),
-  ] as string[];
-  const parentResult = parentIds.length
-    ? await supabaseAdmin
-        .from("inv_categories" as never)
-        .select("id, name")
-        .in("id", parentIds)
-    : { data: [], error: null };
-  if (parentResult.error) throw new Error(parentResult.error.message);
-
   const parentNames = new Map(
-    ((parentResult.data ?? []) as unknown as Array<{ id: string; name: string }>).map((row) => [
+    categoryRows.map((row) => [
       row.id,
       row.name,
     ]),
@@ -439,9 +323,6 @@ export async function enrichStorefrontListings(
         parent_name: row.parent_id ? (parentNames.get(row.parent_id) ?? null) : null,
       },
     ]),
-  );
-  const brands = new Map(
-    ((brandResult.data ?? []) as unknown as StorefrontBrand[]).map((row) => [row.id, row]),
   );
   const skuMap = new Map(skus.map((row) => [row.id, row]));
   const availability = new Map(
@@ -473,7 +354,7 @@ export async function enrichStorefrontListings(
         listing,
         sku,
         category: sku.category ? (categories.get(sku.category) ?? null) : null,
-        brand: sku.brand_id ? (brands.get(sku.brand_id) ?? null) : null,
+        brand: sku.brand ?? null,
         facets: facets.get(sku.id) ?? [],
         availableQty: availability.get(listing.id) ?? 0,
       }),

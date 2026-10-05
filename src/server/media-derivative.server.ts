@@ -18,6 +18,8 @@ import {
   parseStorageRef,
   type StorageRef,
 } from "@/lib/media-derivative";
+import { createImageSignatureCache } from "./image-signature-cache";
+const derivativeSignatureCache = createImageSignatureCache();
 
 export { DERIVATIVE_WIDTHS };
 
@@ -51,6 +53,7 @@ function tencentRenderVerifiedFromEnv(): boolean {
 }
 
 async function defaultSignPrimary(ref: StorageRef, width: number): Promise<string | null> {
+  return derivativeSignatureCache.get(`${primaryOriginFromEnv()}/${ref.bucket}/${ref.path}:${width}:${DERIVATIVE_QUALITY}:${DERIVATIVE_RESIZE}`, async () => {
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data, error } = await supabaseAdmin.storage
@@ -63,6 +66,7 @@ async function defaultSignPrimary(ref: StorageRef, width: number): Promise<strin
   } catch {
     return null;
   }
+  });
 }
 
 /**
