@@ -232,6 +232,13 @@
       "when": 1791199859245,
       "tag": "0032_youzan_points_operations",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1791201057715,
+      "tag": "0033_store_qr_dianping_split",
+      "breakpoints": true
     }
   ]
 }
