@@ -42,6 +42,8 @@ const save = (s: State) => {
   const fd = openSync(`${path}.tmp`, "w", 0o600);
   try { writeFileSync(fd, JSON.stringify(s)); fsyncSync(fd); } finally { closeSync(fd); }
   renameSync(`${path}.tmp`, path);
+  const parent = openSync("/var/lib/boomer-off", "r");
+  try { fsyncSync(parent); } finally { closeSync(parent); }
 };
 if (stage === "prepare" && !existsSync(path)) {
   assert.equal(await balance(), 0); assert.equal(await wallet(), 3000);
@@ -102,5 +104,7 @@ if (!s.completed.includes(stage)) {
   assert.equal(await wallet(), s.localBaseline);
   s.completed.push(stage); delete s.started; save(s);
 }
-console.log(JSON.stringify({stage,completed:s.completed,remoteBalance:await balance(),erpBalance:await wallet(),
+const finalBalance = await balance();
+if (stage === "verify") assert.equal(finalBalance, s.baseline, "remote_baseline_not_restored");
+console.log(JSON.stringify({stage,completed:s.completed,remoteBalance:finalBalance,erpBalance:await wallet(),
   otherMembersTouched:0,couponMutations:0,realPayments:0}));
