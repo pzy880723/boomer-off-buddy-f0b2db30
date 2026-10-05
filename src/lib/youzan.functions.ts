@@ -28,7 +28,7 @@ type ShopRow = {
   shop_name: string;
   role: "hq" | "branch";
   parent_kdt_id: number | null;
-  status: string;
+  status: string | null;
   access_token: string | null;
   refresh_token: string | null;
   token_expires_at: string | null;
