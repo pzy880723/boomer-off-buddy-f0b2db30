@@ -12,6 +12,9 @@ export type ShopSourceRow = {
   status: string | null;
   address: string | null;
   image_url: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  coord_system: string | null;
   location: { id: string; name: string | null; kind: string | null; is_active: boolean } | null;
 };
 
@@ -23,8 +26,9 @@ export type PublicShop = {
   address: string | null;
   image_url: string | null;
   business_hours: null;
-  latitude: null;
-  longitude: null;
+  latitude: number | null;
+  longitude: number | null;
+  coord_system: "gcj02" | null;
 };
 
 /**
@@ -52,6 +56,25 @@ export function isPublicShopRow(row: ShopSourceRow): boolean {
   return loc.is_active === true;
 }
 
+/** 坐标仅在成对、有限、中国范围内且坐标系为 gcj02 时公开；否则一律 null，不猜测。 */
+function publicCoords(
+  row: ShopSourceRow,
+): { latitude: number | null; longitude: number | null; coord_system: "gcj02" | null } {
+  const lat = row.latitude == null ? NaN : Number(row.latitude);
+  const lng = row.longitude == null ? NaN : Number(row.longitude);
+  const valid =
+    Number.isFinite(lat) &&
+    Number.isFinite(lng) &&
+    lat >= 3 &&
+    lat <= 54 &&
+    lng >= 73 &&
+    lng <= 136 &&
+    row.coord_system === "gcj02";
+  return valid
+    ? { latitude: lat, longitude: lng, coord_system: "gcj02" }
+    : { latitude: null, longitude: null, coord_system: null };
+}
+
 /** 字段白名单映射；image_url 由调用方注入签名结果（缺图/失败为 null）。 */
 export function toPublicShop(row: ShopSourceRow, signedImageUrl: string | null): PublicShop {
   return {
@@ -62,8 +85,7 @@ export function toPublicShop(row: ShopSourceRow, signedImageUrl: string | null):
     address: row.address ?? null,
     image_url: signedImageUrl,
     business_hours: null,
-    latitude: null,
-    longitude: null,
+    ...publicCoords(row),
   };
 }
 
