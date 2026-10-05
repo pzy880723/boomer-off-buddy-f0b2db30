@@ -63,6 +63,18 @@ export const Route = createFileRoute("/api/public/hooks/youzan-message")({
           return Response.json(out.body, { status: out.status });
         }
 
+        // COUPON_CUSTOMER_PROMOTION（买家优惠券/码事件）：只进会员资产收件箱，不改券资产。
+        // 商家活动类型 COUPON_PROMOTION 本轮不分流（活动 id 不是用户券）。
+        if (payload.type === "COUPON_CUSTOMER_PROMOTION") {
+          const { handleCouponMessage } = await import("@/server/youzan-coupon-message.server");
+          const { productionPointsDeps } = await import("@/server/youzan-points-message.server");
+          const out = await handleCouponMessage(
+            { body: payload as Record<string, unknown>, headerSign: request.headers.get("event-sign") },
+            await productionPointsDeps(),
+          );
+          return Response.json(out.body, { status: out.status });
+        }
+
         // 有赞平台"验证订阅 URL"时会发一个 test=1 的空消息，回 { code:0, msg:"success" } 即可
         if (payload.test === "1" || payload.test === "true") {
           return Response.json({ code: 0, msg: "success" });

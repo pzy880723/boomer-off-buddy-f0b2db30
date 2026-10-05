@@ -13,7 +13,7 @@ import type { IngestResult } from "./youzan-asset-inbox.server";
 export type PointsIngest = {
   kdt_id: number;
   event_id: string; // msg.unique_id
-  msg_type: "POINTS";
+  msg_type: "POINTS" | "COUPON_CUSTOMER_PROMOTION";
   payload_hash: string;
   payload: Record<string, unknown>;
   biz_id: string | null; // 外层 id
@@ -29,12 +29,12 @@ export type PointsDeps = {
   isActiveShop(kdtId: number): Promise<boolean>;
 };
 
-type Out = { status: number; body: Record<string, unknown>; result?: IngestResult };
-const fail = (status: number, code: string): Out => ({ status, body: { code: status, message: code } });
+export type Out = { status: number; body: Record<string, unknown>; result?: IngestResult };
+export const fail = (status: number, code: string): Out => ({ status, body: { code: status, message: code } });
 
-const md5hex = (s: string) => createHash("md5").update(s, "utf8").digest("hex");
+export const md5hex = (s: string) => createHash("md5").update(s, "utf8").digest("hex");
 
-function signOk(decoded: string, sign: unknown, clientId: string, secret: string) {
+export function signOk(decoded: string, sign: unknown, clientId: string, secret: string) {
   if (typeof sign !== "string" || !/^[0-9a-fA-F]{32}$/.test(sign)) return false;
   const expected = createHash("md5").update(`${clientId}${decoded}${secret}`, "utf8").digest();
   return timingSafeEqual(Buffer.from(sign, "hex"), expected);
@@ -50,10 +50,10 @@ export function decodeYouzanMsg(msg: unknown): string | null {
   }
 }
 
-const scalarStr = (v: unknown) =>
+export const scalarStr = (v: unknown) =>
   typeof v === "string" ? v.trim() : typeof v === "number" && Number.isSafeInteger(v) ? String(v) : "";
 
-function maskMobile(v: unknown) {
+export function maskMobile(v: unknown) {
   const s = typeof v === "string" ? v : "";
   return s.length >= 7 ? `${s.slice(0, 3)}****${s.slice(-4)}` : s ? "****" : s;
 }
