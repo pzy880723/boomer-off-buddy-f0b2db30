@@ -150,7 +150,7 @@ test("请求体上限：Content-Length 与流式累计均 413", async () => {
 });
 
 const U = "0f8fad5b-d9cb-469f-a165-70867728950e";
-const row = (purpose: string, folder: string, loc = LOC) => ({ purpose, target_url: null, image_bucket: "store-qr", image_path: `${loc}/${folder}/${U}.png`, status: "active", version: 1, updated_at: purpose });
+const row = (purpose: string, folder: string, loc = LOC): any => ({ purpose, target_url: null, image_bucket: "store-qr", image_path: `${loc}/${folder}/${U}.png`, status: "active", version: 1, updated_at: purpose });
 
 test("点评双用途独立：打卡与评价各自返回，不互相替用", async () => {
   const only = async (rows: any[]) => ((await printStoreQr(deps({ list: async () => rows }).d, "u", { action: "get", location_id: LOC })) as any).body.channels.map((c: any) => c.channel);
