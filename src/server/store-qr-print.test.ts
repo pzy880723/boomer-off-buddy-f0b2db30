@@ -188,7 +188,8 @@ test("文案规则：赠品/领取语仅允许打卡卡；评价卡必须中性�
   for (const bad of ["有礼", "礼品", "赠", "送", "领", "奖", "9图", "100字"]) assert.ok(!review.includes(bad), bad);
   assert.ok(review.includes("诚邀您点评"));
   assert.ok(review.includes("欢迎分享真实体验"));
-  const checkin = CHANNEL_LABELS.dianping_checkin ?? {};
+  const checkin = CHANNEL_LABELS.dianping_checkin;
+  assert.ok(checkin);
   assert.equal(checkin.title, "收藏打卡送冰箱贴");
   assert.equal(checkin.caption, "完成收藏打卡后，到收银台领取");
 });
