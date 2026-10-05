@@ -141,10 +141,10 @@ test("save（真实解码）：header-only 拒绝不上传；真实 PNG/JPEG 原
 });
 
 test("请求体上限：Content-Length 与流式累计均 413", async () => {
-  const { readJsonCapped } = await import("../routes/api/public/handheld/print.store-qr").catch(() => ({ readJsonCapped: null as any }));
-  if (!readJsonCapped) return;
+  const { readJsonCapped, TOO_LARGE } = await import("./store-qr-print.server");
   const big = new Request("http://x", { method: "POST", body: "x".repeat(50), headers: { "content-type": "application/json" } });
-  assert.equal(typeof (await readJsonCapped(big, 10)), "symbol");
+  assert.equal(await readJsonCapped(big, 10), TOO_LARGE);
+  assert.equal(await readJsonCapped(new Request("http://x", { method: "POST", body: "x".repeat(50) }), 10), TOO_LARGE);
   const okReq = new Request("http://x", { method: "POST", body: JSON.stringify({ a: 1 }) });
   assert.deepEqual(await readJsonCapped(okReq, 1000), { a: 1 });
 });
