@@ -50,7 +50,14 @@ after(() => db.close());
 test("real pos_points_rules returns 100/100, cap 1, enabled unchanged after the rate migration", async () => {
   const root = new URL("../../../", import.meta.url);
   await db.exec(await readFile(new URL("tests/sql/pos-points-fixture.sql", root), "utf8"));
-  await db.exec(await readFile(new URL("supabase/migrations/20261002174301_pos_points_redemption.sql", root), "utf8"));
+  const mig = await readFile(new URL("supabase/migrations/20261002174301_pos_points_redemption.sql", root), "utf8");
+  const start = mig.indexOf("CREATE OR REPLACE FUNCTION public.pos_points_rules(");
+  await db.exec(`ALTER TABLE commerce_membership_plans
+    ADD COLUMN points_redemption_enabled boolean NOT NULL DEFAULT false,
+    ADD COLUMN points_redemption_points_per_unit integer CHECK (points_redemption_points_per_unit > 0),
+    ADD COLUMN points_redemption_unit_fen integer CHECK (points_redemption_unit_fen > 0),
+    ADD COLUMN updated_at timestamptz DEFAULT now();`);
+  await db.exec(mig.slice(start, mig.indexOf("$$;", start) + 3));
   await db.exec(`
     INSERT INTO commerce_customers VALUES ('00000000-0000-0000-0000-000000000002','active');
     INSERT INTO pos_customer_wallets(customer_id,points) VALUES ('00000000-0000-0000-0000-000000000002',3000);
