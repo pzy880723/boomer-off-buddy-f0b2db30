@@ -77,12 +77,15 @@ if (!s.completed.includes(stage)) {
     s.results[stage] = result; save(s);
     assert.ok(r.ok && j.code === 200 && j.success === true && (result as {confirmed:boolean}).confirmed, "seed_unconfirmed_stop");
   } else if (stage === "replay") {
+    const original = s.results.debit as {kind:string;operationId:string};
+    assert.equal(original.kind, "succeeded"); assert.equal(original.operationId, s.debitId);
     const op: PointsOperation = { id:s.debitId!,customer_id:s.customerId,kdt_id:s.headId,source_kdt_id:s.sourceId,yz_open_id:s.yzId,points:1,kind:"debit" };
     const execute = createYouzanPointsOperation({writesEnabled:()=>true,customerAllowed:id=>id===s.customerId,
       proxyConfigured:()=>true,resolveHeadquartersToken:async()=>head.access_token!,fetchImpl:youzanFetch});
     result = await execute(op);
     s.results[stage] = result; save(s);
-    assert.equal((result as {kind:string}).kind, "succeeded", "remote_duplicate_unconfirmed_stop");
+    const replay = result as {kind:string;reason?:string};
+    assert.ok(replay.kind === "succeeded" || (replay.kind === "unknown" && replay.reason === "remote_operation_duplicate"), "remote_duplicate_unconfirmed_stop");
   } else if (stage !== "verify") {
     const r = await runProductionPointsOperation({operationKey:`canary:${s.runId}:${stage}`,customerId:s.customerId,
       sourceKdtId:s.sourceId,kind:stage==="refund"?"refund":"debit",points:1,

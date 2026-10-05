@@ -45,7 +45,9 @@ export function createReadOnlyYouzan({ proxyUrl, proxyToken, accessToken, fetchI
       if (!response.ok) throw Error();
       const envelope = await response.json();
       if (!Number.isInteger(envelope.status) || envelope.status < 200 || envelope.status >= 300) throw Error();
-      json = JSON.parse(envelope.body ?? Buffer.from(envelope.bodyBase64 ?? '', 'base64').toString());
+      json = JSON.parse(envelope.body ?? Buffer.from(envelope.bodyBase64 ?? '', 'base64').toString(),
+        (key, value, context) => key === 'points_account_version' && typeof value === 'number' && context?.source
+          ? context.source : value);
     } catch {
       throw Error('youzan_read_unavailable');
     }

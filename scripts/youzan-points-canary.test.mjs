@@ -198,3 +198,15 @@ test('seed response loss resumes the persisted seed ID rather than granting a se
   assert.equal(f.remote, 1); assert.equal(f.local, 3000);
   assert.deepEqual(f.state().completed, ['prepare', 'seed']);
 });
+test('explicit remote duplicate is valid replay evidence only after the original confirmed debit', async () => {
+  const f = fixture();
+  for (const stage of ['prepare','seed','debit']) await run(f, stage);
+  f.replay = async () => ({kind:'unknown',reason:'remote_operation_duplicate'});
+  await run(f, 'replay');
+  assert.equal(f.remote, 0);
+  assert.equal(f.state().completed.at(-1), 'replay');
+  const g = fixture();
+  for (const stage of ['prepare','seed','debit']) await run(g, stage);
+  g.replay = async () => ({kind:'unknown',reason:'remote_result_unconfirmed'});
+  await assert.rejects(run(g, 'replay'), /remote_duplicate_unconfirmed_stop/);
+});

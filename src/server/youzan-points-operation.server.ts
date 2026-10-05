@@ -75,6 +75,10 @@ export function createYouzanPointsOperation(deps: PointsOperationDeps) {
       );
       if (response.ok) {
         const json = await response.json();
+        // Duplicate is not proof of success for an operation whose first result was lost.
+        if (json?.code === 142100106 && json.success === false) {
+          return { kind: "unknown", reason: "remote_operation_duplicate" };
+        }
         if (json?.code === 200 && json.success === true && !json.error_response && !json.gw_err_resp &&
           (json.data?.is_success === true || json.data?.is_success === "true")) {
           return { kind: "succeeded" };

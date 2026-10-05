@@ -28,9 +28,18 @@ test("versions preserve int64 precision and invalid balances never become observ
   const result = await mk({}, { code: 200, data: { point: 0, points_account_version: "9007199254740999" } }).f(q);
   assert.equal(result.kind, "ok");
   if (result.kind === "ok") assert.equal(result.observed.points_account_version, "9007199254740999");
-  for (const data of [{ point: -1, points_account_version: 2 }, { point: 3, points_account_version: -1 },
-    { point: 3, points_account_version: 9007199254740992 }]) {
+  for (const data of [{ point: -1, points_account_version: 2 }, { point: 3, points_account_version: -1 }]) {
     assert.equal((await mk({}, { code: 200, data }).f(q)).kind, "blocked");
+  }
+});
+test("unquoted provider int64 versions retain every original digit", async () => {
+  const f = mk({fetchImpl:async()=>new Response('{"success":true,"code":200,"data":{"point":1,"points_account_version":1234567890123456789}}')}).f;
+  const r = await f(q);
+  assert.equal(r.kind, "ok");
+  if (r.kind === "ok") assert.equal(r.observed.points_account_version, "1234567890123456789");
+  for (const version of ["1.5", "1e18", "12345678901234567890"]) {
+    const invalid = mk({fetchImpl:async()=>new Response(`{"code":200,"data":{"point":1,"points_account_version":${version}}}`)}).f;
+    assert.equal((await invalid(q)).kind, "blocked");
   }
 });
 

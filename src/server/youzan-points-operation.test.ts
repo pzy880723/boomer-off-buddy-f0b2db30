@@ -84,6 +84,10 @@ test("boolean success is also accepted, auth/token errors never leak secrets", a
   assert.deepEqual(await createYouzanPointsOperation(deps)(operation), { kind: "blocked", reason: "headquarters_token_unavailable" });
   assert.equal(calls.length, 0);
 });
+test("provider duplicate code remains unconfirmed unless caller already has a successful operation", async () => {
+  const {run} = setup({code:142100106,success:false,message:"duplicate"});
+  assert.deepEqual(await run(operation), {kind:"unknown",reason:"remote_operation_duplicate"});
+});
 
 test("operation processing claims before dispatch and only returns success after fenced persistence", async () => {
   const events: string[] = [];

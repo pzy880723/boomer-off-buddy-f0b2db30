@@ -53,7 +53,10 @@ export function createYouzanPointsQuery(deps: PointsQueryDeps) {
     if (!res.ok) return { kind: "blocked", reason: "youzan_query_rejected" };
     let j: Record<string, unknown>;
     try {
-      j = (await res.json()) as Record<string, unknown>;
+      // Node 22 exposes the original JSON primitive, before int64 precision is lost.
+      j = JSON.parse(await res.text(), (key: string, value: unknown, context?: { source: string }) =>
+        key === "points_account_version" && typeof value === "number" && context?.source
+          ? context.source : value) as Record<string, unknown>;
     } catch {
       return { kind: "unavailable" };
     }

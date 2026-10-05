@@ -40,6 +40,12 @@ test('read calls use the fixed proxy and preserve successful data', async () => 
     } });
   assert.deepEqual(await read('youzan.crm.customer.points.get', '1.0.0', { user: { account_id: 'mapped-id', account_type: 5 } }), { point: 8 });
 });
+test('read client preserves unquoted int64 account versions from provider bytes', async () => {
+  const read = createReadOnlyYouzan({ proxyUrl: 'https://proxy.test', proxyToken: 'private', accessToken: 'private',
+    fetchImpl: async () => Response.json({status:200,body:'{"code":200,"data":{"point":1,"points_account_version":1234567890123456789}}'}) });
+  assert.deepEqual(parsePoints(await read('youzan.crm.customer.points.get','1.0.0',{})),
+    {points:1,accountVersion:'1234567890123456789'});
+});
 test('L-chain coupon activity and claim-log discovery are read-only allowed methods', async () => {
   const read = createReadOnlyYouzan({ proxyUrl: 'https://proxy.test', proxyToken: 'private', accessToken: 'private',
     fetchImpl: async () => Response.json({ status: 200, body: JSON.stringify({ code: 200, success: true, data: {} }) }) });
