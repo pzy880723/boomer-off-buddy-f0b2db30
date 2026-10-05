@@ -1,3 +1,4 @@
+import { diffOfflinePayload, OfflineEntryConflictError, type OfflinePayload } from "@/lib/offline-sales-contract";
 // 门店日目标 / 日销售汇总 / 线下补录 的服务端实现。
 // 契约要点：
 // - 金额一律整数分；日期一律 Asia/Shanghai 自然日。
@@ -386,14 +387,24 @@ export async function createOfflineEntry(input: OfflineEntryInput, actor: ActorC
     throw new Error("除口头申报外，必须提供来源凭证编号或凭证图片");
   }
 
-  // 幂等：同门店同 client_op_id 直接回放既有记录
-  const { data: existing } = await db()
-    .from("store_offline_sales_entries")
-    .select("*")
-    .eq("location_id", input.locationId)
-    .eq("client_op_id", input.clientOpId)
-    .maybeSingle();
-  if (existing) {
+  const payload: OfflinePayload = {
+    business_date: input.businessDate,
+    channel: input.channel,
+    amount_fen: input.amountFen,
+    order_count: input.orderCount ?? 1,
+    evidence_type: input.evidenceType,
+    evidence_ref: input.evidenceRef ?? null,
+    evidence_url: input.evidenceUrl ?? null,
+    youzan_exclusion_basis: input.youzanExclusionBasis,
+    youzan_excluded_tids: input.youzanExcludedTids ?? [],
+    note: input.note ?? null,
+  };
+
+  // 幂等：同门店同 client_op_id —— 载荷一致回放，不一致 409
+  const replay = async (existing: Record<string, unknown> & { id: string; business_date: string }) => {
+    const diff = diffOfflinePayload(existing as Partial<OfflinePayload>, payload);
+    // 审计表 action CHECK 只允许既有动作；冲突直接 409，不写伪"回放"审计
+    if (diff.length) throw new OfflineEntryConflictError(diff);
     await db().from("store_offline_sales_audit_logs").insert({
       entry_id: existing.id,
       location_id: input.locationId,
@@ -406,29 +417,39 @@ export async function createOfflineEntry(input: OfflineEntryInput, actor: ActorC
       client_op_id: input.clientOpId,
     });
     return { entry: existing, replayed: true };
-  }
+  };
+  const findExisting = async () =>
+    (
+      await db()
+        .from("store_offline_sales_entries")
+        .select("*")
+        .eq("location_id", input.locationId)
+        .eq("client_op_id", input.clientOpId)
+        .maybeSingle()
+    ).data;
+
+  const existing = await findExisting();
+  if (existing) return replay(existing);
 
   const { data: entry, error } = await db()
     .from("store_offline_sales_entries")
     .insert({
       location_id: input.locationId,
-      business_date: input.businessDate,
-      channel: input.channel,
-      amount_fen: input.amountFen,
-      order_count: input.orderCount ?? 1,
-      evidence_type: input.evidenceType,
-      evidence_ref: input.evidenceRef ?? null,
-      evidence_url: input.evidenceUrl ?? null,
-      youzan_exclusion_basis: input.youzanExclusionBasis,
-      youzan_excluded_tids: input.youzanExcludedTids ?? [],
-      note: input.note ?? null,
+      ...payload,
       client_op_id: input.clientOpId,
       created_by: actor.actorId,
       updated_by: actor.actorId,
     })
     .select("*")
     .single();
-  if (error) throw new Error(error.message);
+  if (error) {
+    // 并发同 op 抢写：UNIQUE(location_id, client_op_id) 拒绝第二条 → 按回放/冲突处理
+    if (error.code === "23505") {
+      const raced = await findExisting();
+      if (raced) return replay(raced);
+    }
+    throw new Error(error.message);
+  }
 
   await db().from("store_offline_sales_audit_logs").insert({
     entry_id: entry.id,

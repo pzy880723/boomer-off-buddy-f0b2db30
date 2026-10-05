@@ -53,6 +53,8 @@ export function buildQuoteInput(args: {
   groupOutstandingQuantity: number;
   /** 同组运费已被其它缺货预留/退掉 → 本次按 goods-only。 */
   groupShippingReserved?: boolean;
+  /** 本行此前已真正处理的缺货数量。 */
+  itemProcessedQuantity?: number;
 }): QuoteInput {
   const items: QuoteOrderItem[] = args.items.map((row) => ({
     id: row.id,
@@ -70,5 +72,6 @@ export function buildQuoteInput(args: {
     payment_refunded_fen: args.paymentRefundedFen,
     group_outstanding_quantity: args.groupOutstandingQuantity,
     group_shipping_reserved: args.groupShippingReserved ?? false,
+    item_processed_quantity: args.itemProcessedQuantity ?? 0,
   };
 }

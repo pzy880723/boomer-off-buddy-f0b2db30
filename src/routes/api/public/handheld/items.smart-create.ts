@@ -1,3 +1,4 @@
+import { createServerTiming } from "@/lib/server-timing";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   HANDHELD_CORS,
@@ -83,6 +84,14 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
     handlers: {
       OPTIONS: async () => new Response(null, { status: 204, headers: HANDHELD_CORS }),
       POST: async ({ request }) => {
+        const timing = createServerTiming();
+        return timing.apply(await handleSmartCreate(request, timing));
+      },
+    },
+  },
+});
+
+async function handleSmartCreate(request: Request, timing: ReturnType<typeof createServerTiming>): Promise<Response> {
         const auth = await authenticateDevice(request);
         if (!auth.ok) return auth.response;
 
@@ -99,6 +108,7 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
           return err("No target location (device unbound and no location_id given)", 400);
         if (!(await userCanAccessLocation(session.user_id, locationId)))
           return err("Location not accessible", 403, { code: "location_forbidden" });
+        timing.mark("auth");
 
         const incomingPaths: string[] = [];
         for (const p of body.image_storage_paths ?? []) {
@@ -127,26 +137,33 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
             if (replay) return jsonReplay(replay);
           }
         }
-        try {
-          await assertActiveLeafCategory(body.category);
-        } catch (e) {
-          return err((e as Error).message, existingOp ? 500 : 422, { code: "validation_error" });
-        }
-        let manualFacets: Awaited<ReturnType<typeof resolveManualProductFacets>> | null = null;
-        if (body.facet_codes !== undefined || body.tags !== undefined) {
-          try {
-            manualFacets = await resolveManualProductFacets({
-              categoryCode: body.category,
-              facetCodes: body.facet_codes,
-              legacyTags: body.tags,
-            });
-          } catch (e) {
-            return err((e as Error).message, existingOp ? 500 : 422, { code: "validation_error" });
-          }
-        }
-        let confirmedBrand: Awaited<ReturnType<typeof resolveConfirmedListingBrand>>;
-        try { confirmedBrand = await resolveConfirmedListingBrand(body); }
-        catch (e) { return err((e as Error).message, existingOp ? 500 : 422, { code: "brand_confirmation_required" }); }
+        timing.mark("idempotency");
+        // 只读校验并行（类目 / 标签 / 品牌 / 库位）；报错优先级与原串行顺序一致。
+        const [catR, facetsR, brandR, locR] = await Promise.allSettled([
+          assertActiveLeafCategory(body.category),
+          body.facet_codes !== undefined || body.tags !== undefined
+            ? resolveManualProductFacets({
+                categoryCode: body.category,
+                facetCodes: body.facet_codes,
+                legacyTags: body.tags,
+              })
+            : Promise.resolve(null),
+          resolveConfirmedListingBrand(body),
+          supabaseAdmin
+            .from("inv_locations")
+            .select("id, name, kind, shop_id, is_active")
+            .eq("id", locationId)
+            .maybeSingle(),
+        ]);
+        if (catR.status === "rejected")
+          return err((catR.reason as Error).message, existingOp ? 500 : 422, { code: "validation_error" });
+        if (facetsR.status === "rejected")
+          return err((facetsR.reason as Error).message, existingOp ? 500 : 422, { code: "validation_error" });
+        if (brandR.status === "rejected")
+          return err((brandR.reason as Error).message, existingOp ? 500 : 422, { code: "brand_confirmation_required" });
+        const manualFacets = facetsR.value;
+        const confirmedBrand = brandR.value;
+        // IP 可能新建记录，保持在只读校验全部通过之后串行执行。
         let resolvedIp: Awaited<ReturnType<typeof resolveOrCreateConfirmedIp>>;
         try {
           resolvedIp = await resolveOrCreateConfirmedIp({
@@ -156,11 +173,9 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
         } catch (e) {
           return err((e as Error).message, existingOp ? 500 : 422, { code: "ip_confirmation_required" });
         }
-        const { data: loc } = await supabaseAdmin
-          .from("inv_locations")
-          .select("id, name, kind, shop_id, is_active")
-          .eq("id", locationId)
-          .maybeSingle();
+        if (locR.status === "rejected") throw locR.reason;
+        const loc = locR.value.data;
+        timing.mark("validate");
         if (!loc || !loc.is_active) return err("Location not found or disabled", 404);
 
         const hasRecognition = !!body.recognition_request_id;
@@ -173,6 +188,7 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
         // SKU 建档 + EPC 绑定 + 一次入库 + 有赞发布 outbox + 幂等行：同一数据库事务。
         // 同 (device, client_op_id) 重试只得到原 SKU；user / location / 载荷不同返回 409。
         const firstHttp = incomingPaths.find((p) => /^https?:\/\//i.test(p)) ?? null;
+        timing.mark("pre_commit");
         const commit = await supabaseAdmin.rpc("handheld_smart_create_commit" as never, {
           p_device_id: auth.device.id,
           p_user_id: session.user_id,
@@ -400,8 +416,7 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
           if (done.error) console.error("[handheld smart-create] 保存幂等响应失败", done.error);
         }
         if (imageProcessing.queued > 0) triggerListingImageWorker(imageProcessing.queued);
+        timing.mark("finalize");
         return ok(responseBody);
-      },
-    },
-  },
-});
+}
+

@@ -206,3 +206,46 @@ test("该组已发货 → 旧的含运费报价必须重算为 goods-only", () =
   assert.ok(quote.refund_goods_fen > 0);
   assert.equal(quote.can_confirm, true);
 });
+
+/** 分批缺货：同一行 quantity=2 分两次各报 1。 */
+function splitFacts(qty: number, lineTotal: number, total: number) {
+  return baseFacts({
+    order: {
+      total_amount: total,
+      shipping_fee: 10,
+      courier_quote_snapshot: { groups: [{ location_id: LOC, shipping_fee_fen: 1000 }] },
+    },
+    items: [{ id: ITEM_A, location_id: LOC, quantity: qty, line_total: lineTotal }],
+  });
+}
+
+test("分批缺货 qty=2 两次各 1：第二次（第一次已处理）退剩余商品额 + 整组运费", () => {
+  const facts = splitFacts(2, 100, 110);
+  const first = computeQuoteFromFacts(facts, { shortageId: "s1", orderItemId: ITEM_A, locationId: LOC, quantity: 1 });
+  assert.equal(first.refund_goods_fen, 5000);
+  assert.equal(first.refund_shipping_fen, 0);
+  facts.shortages = [sibling({ id: "s1", quantity: 1, status: "customer_accepted", refund_intent_id: "i1", refund_state: "queued" })];
+  facts.intents = [];
+  const second = computeQuoteFromFacts(facts, { shortageId: "s2", orderItemId: ITEM_A, locationId: LOC, quantity: 1 });
+  assert.equal(second.refund_goods_fen, 5000);
+  assert.equal(second.refund_shipping_fen, 1000);
+  assert.equal(second.can_confirm, true);
+});
+
+test("分批缺货 qty=3 不可整除：三次各 1 合计恰为行分摊额，不多退", () => {
+  const facts = splitFacts(3, 1, 11); // 商品 100 分 → 34/33/33
+  const got: number[] = [];
+  for (const id of ["s1", "s2", "s3"]) {
+    const q = computeQuoteFromFacts(facts, { shortageId: id, orderItemId: ITEM_A, locationId: LOC, quantity: 1 });
+    got.push(q.refund_goods_fen);
+    facts.shortages = [...facts.shortages, sibling({ id, quantity: 1, status: "customer_accepted", refund_intent_id: `i-${id}`, refund_state: "queued" })];
+  }
+  assert.deepEqual(got, [34, 33, 33]);
+});
+
+test("分批缺货：兄弟仅待客户确认不算已处理，第二次仍不退运费", () => {
+  const facts = splitFacts(2, 100, 110);
+  facts.shortages = [sibling({ id: "s1", quantity: 1 })];
+  const q = computeQuoteFromFacts(facts, { shortageId: "s2", orderItemId: ITEM_A, locationId: LOC, quantity: 1 });
+  assert.equal(q.refund_shipping_fen, 0);
+});

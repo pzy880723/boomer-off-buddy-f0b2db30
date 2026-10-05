@@ -8006,6 +8006,56 @@ export type Database = {
           },
         ]
       }
+      store_qr_configs: {
+        Row: {
+          created_at: string
+          id: string
+          image_bucket: string | null
+          image_path: string | null
+          location_id: string
+          purpose: string
+          status: string
+          target_url: string | null
+          updated_at: string
+          updated_by: string | null
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_bucket?: string | null
+          image_path?: string | null
+          location_id: string
+          purpose: string
+          status?: string
+          target_url?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_bucket?: string | null
+          image_path?: string | null
+          location_id?: string
+          purpose?: string
+          status?: string
+          target_url?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_qr_configs_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       store_target_audit_logs: {
         Row: {
           action: string
