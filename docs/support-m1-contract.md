@@ -36,3 +36,16 @@
 - 顾客发送改走 `support_customer_post_message`（行锁事务）：会话关闭后不能再插入新消息；同一 op 但内容不同也返回冲突。商城接口的错误码改为与业务码对应的状态码（不再一律 404）。
 - 商品上下文：只接受 `published` 状态的商品；context 只存/返回 type、id、title、price、order_no、sku_code，去掉 image_url 和 cover_url（历史会话的 image_url 在输出时剔除）。
 - `run-support-escalation.mjs`：15 秒超时（AbortSignal.timeout）；阈值必须是 10–3600 的整数；会校验响应格式；只输出 `{escalated, checked_at}`，不打印会话 id 和原始错误内容。
+
+## 队列与分页（2026-10-05 14:xx，无迁移）
+- 生产服务的 SUPABASE_URL 指向 Lovable 内嵌库；0001–0034 都已应用在这个库上，不需要在腾讯重复执行，也不另建腾讯数据库。
+- 会话列表新增 `queue = unclaimed | mine | escalated | closed | all`，不传时默认 `all`，兼容旧客户端。队列筛选、门店范围、游标都在数据库里、在 limit 之前执行。
+  - unclaimed：open/pending 且未领取
+  - mine：open/pending 且主接待人是登录者本人（用服务端拿到的登录 ID）
+  - escalated：open/pending 且已升级
+  - closed：已关闭
+- 排序固定为 `updated_at desc, id desc`。`next_cursor` 是 `"<updated_at>|<id>"` 不透明字符串，原样传回即可；同一 updated_at 的会话不会被漏掉。游标非法时返回 400 `invalid_cursor`。
+- 网页 ServerFn：`listSupportConversationsFn({queue?, cursor?, limit?})`（limit 1–100，默认 50），不传参数也能用；返回值新增 `next_cursor`、`queue`。
+- 手持：`GET /api/public/handheld/support/conversations?queue=&cursor=&limit=&location_id=&status=`，返回值新增 `queue`。
+- 会话详情（员工和顾客两端）只返回最近 500 条消息，按时间正序排列，并带 `has_more`。`has_more=true` 表示还有更早的消息没返回，这一版不提供完整历史。
+- 回填核查：未关闭会话中，waiting_since 为空、但最后一条顾客公开消息晚于最后一条员工公开消息的，数量为 0，所以不需要回填迁移。
