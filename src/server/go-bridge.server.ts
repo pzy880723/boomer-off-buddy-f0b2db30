@@ -534,9 +534,23 @@ export async function goTraced(
 ): Promise<Response> {
   const requestId = crypto.randomUUID();
   const timer = createServerTiming();
+  console.log(JSON.stringify({ evt: "go_api_start", route, request_id: requestId }));
   let res: Response;
   try {
-    res = await run(timer);
+    res = await run({
+      mark(name: string) {
+        timer.mark(name);
+        console.log(
+          JSON.stringify({
+            evt: "go_api_stage",
+            route,
+            request_id: requestId,
+            stage: name,
+            timing: timer.header(),
+          }),
+        );
+      },
+    });
   } catch (e) {
     res = onError(e);
   }
