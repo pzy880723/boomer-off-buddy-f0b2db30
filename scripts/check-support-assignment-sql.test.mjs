@@ -48,6 +48,7 @@ before(async () => {
   `);
   await db.exec(await migrationSql('_support_assignment_m1.sql', 'SUPPORT_M1_SQL'));
   await db.exec(await migrationSql('_support_m1_hardening.sql', 'SUPPORT_M1B_SQL'));
+  await db.exec(await migrationSql('_support_conversation_stats.sql', 'SUPPORT_STATS_SQL'));
 });
 beforeEach(() => db.exec(`RESET ROLE; DELETE FROM support_messages; DELETE FROM support_participants; DELETE FROM support_conversations;
   INSERT INTO support_conversations (id, location_id, customer_id) VALUES ('${CONV}','${L1}','${CUST}');`));
@@ -202,6 +203,58 @@ test('anon and authenticated cannot execute RPCs', async () => {
     await db.exec(`SET ROLE ${role}`);
     await assert.rejects(db.query('SELECT public.support_escalate_overdue(60,180)'), /permission denied/);
     await assert.rejects(db.query('SELECT public.support_update_assignment($1,$2,$3,$4)', [CONV, HQ, 'claim', 0]), /permission denied/);
+    await db.exec('RESET ROLE');
+  }
+});
+
+const CONV2 = '00000000-0000-0000-0000-0000000000d2';
+const stats = async (user, ids, readAt = null) =>
+  (await db.query('SELECT * FROM public.support_conversation_stats($1,$2::uuid[],$3)', [user, ids, readAt])).rows;
+const msg = (conv, type, at, internal = false) => db.query(
+  `INSERT INTO support_messages (conversation_id, sender_type, sender_name, body, internal, created_at) VALUES ($1,$2,'x','b',$3,$4)`,
+  [conv, type, internal, at]);
+
+test('stats: exact unread = customer messages after own last_read_at (no row cap), last customer time; per staff', async () => {
+  await db.query(`INSERT INTO support_conversations (id, location_id) VALUES ('${CONV2}','${L1}')`);
+  await db.query(`INSERT INTO support_messages (conversation_id, sender_type, sender_name, body, created_at)
+    SELECT '${CONV}','customer','x','b', timestamptz '2026-10-05 10:00+00' + (g || ' seconds')::interval FROM generate_series(1,1500) g`);
+  await msg(CONV, 'staff', '2026-10-05 12:00+00');
+  await msg(CONV2, 'staff', '2026-10-05 12:00+00');
+  await db.query(`INSERT INTO support_participants (conversation_id, user_id, participant_role, last_read_at) VALUES ('${CONV}','${S1}','store_staff','2026-10-05 10:05+00')`);
+  const rows = Object.fromEntries((await stats(S1, [CONV, CONV2])).map((r) => [r.conversation_id, r]));
+  assert.equal(Number(rows[CONV].unread_count), 1500 - 300);
+  assert.equal(new Date(rows[CONV].last_customer_message_at).toISOString(), '2026-10-05T10:25:00.000Z');
+  assert.equal(Number(rows[CONV2].unread_count), 0);
+  assert.equal(rows[CONV2].last_customer_message_at, null);
+  const other = Object.fromEntries((await stats(S1B, [CONV])).map((r) => [r.conversation_id, r]));
+  assert.equal(Number(other[CONV].unread_count), 1500, 'never-read participant sees all customer messages');
+});
+
+test('stats with p_read_at uses the same watermark as the parallel read mark (no stale unread)', async () => {
+  await msg(CONV, 'customer', '2026-10-05 10:00+00');
+  await msg(CONV, 'customer', '2026-10-05 11:00+00');
+  const [r] = await stats(S1, [CONV], '2026-10-05 11:30+00');
+  assert.equal(Number(r.unread_count), 0);
+});
+
+test('mark_read is monotonic and never overwrites participant_role/display_name', async () => {
+  await db.query(`INSERT INTO support_participants (conversation_id, user_id, participant_role, display_name, last_read_at) VALUES ('${CONV}','${S1}','hq_agent','新角色','2026-10-05 12:00+00')`);
+  const mark = async (at) => (await db.query('SELECT public.support_mark_read($1,$2,$3,$4,$5) r', [CONV, S1, 'store_staff', '旧名', at])).rows[0].r;
+  await mark('2026-10-05 11:00+00');
+  let [p] = (await db.query(`SELECT participant_role, display_name, last_read_at FROM support_participants WHERE user_id='${S1}'`)).rows;
+  assert.equal(p.participant_role, 'hq_agent');
+  assert.equal(p.display_name, '新角色');
+  assert.equal(new Date(p.last_read_at).toISOString(), '2026-10-05T12:00:00.000Z');
+  await mark('2026-10-05 13:00+00');
+  [p] = (await db.query(`SELECT last_read_at FROM support_participants WHERE user_id='${S1}'`)).rows;
+  assert.equal(new Date(p.last_read_at).toISOString(), '2026-10-05T13:00:00.000Z');
+});
+
+test('anon/authenticated cannot execute stats or mark_read', async () => {
+  for (const role of ['anon', 'authenticated']) {
+    await db.exec(`SET ROLE ${role}`);
+    await assert.rejects(stats(S1, [CONV]), /permission denied/);
+    await assert.rejects(db.query('SELECT public.support_mark_read($1,$2,$3,$4,now())', [CONV, S1, 'store_staff', 'x']), /permission denied/);
     await db.exec('RESET ROLE');
   }
 });
