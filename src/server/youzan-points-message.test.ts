@@ -181,3 +181,19 @@ test("hook 只把 POINTS 分流到收件箱，且位于旧验签之前；交易/
   assert.ok(src.includes('type === "TRADE_TradePaid"'));
   assert.ok(src.includes('type === "REFUND_RefundSuccess"'));
 });
+
+test("POINTS client_id 严格标量 / body null 数组 400", async () => {
+  const { handlePointsMessage: h } = await import("./youzan-points-message.server");
+  const d = { store: { ingest: async () => ({ result: "accepted" as const, id: "x" }) }, creds: { clientId: "c", clientSecret: "s" }, isActiveShop: async () => true };
+  assert.equal((await h({ body: null as never }, d)).status, 400);
+  assert.equal((await h({ body: [] as never }, d)).status, 400);
+  const raw = JSON.stringify({ unique_id: "u1", yz_open_id: "o" });
+  const sign = createHash("md5").update(`c${raw}s`).digest("hex");
+  const r = await h({ body: { type: "POINTS", kdt_id: 1, msg: encodeURIComponent(raw), sign, client_id: { x: 1 } } }, d);
+  assert.equal(r.status, 401);
+});
+
+test("hook：JSON null/数组直接 400", () => {
+  const src = readFileSync(new URL("../routes/api/public/hooks/youzan-message.ts", import.meta.url), "utf8");
+  assert.match(src, /Array\.isArray\(payload\)/);
+});
