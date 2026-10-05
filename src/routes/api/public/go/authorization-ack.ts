@@ -9,28 +9,31 @@ import {
   authzJson,
   confirmAuthorizationReceipt,
 } from "@/server/go-authorization.server";
+import { goTraced } from "@/server/go-bridge.server";
 
 export const Route = createFileRoute("/api/public/go/authorization-ack")({
   server: {
     handlers: {
       OPTIONS: () => new Response(null, { status: 204, headers: GO_AUTHZ_CORS }),
       POST: async ({ request }) => {
-        try {
-          const identity = await authenticateGoIdentity(request);
-          const result = await confirmAuthorizationReceipt(identity);
-          return authzJson({
-            ok: true,
-            data: {
-              erp_user_id: identity.erpUserId,
-              scope_version: result.snapshot.scope_version,
-              receipt_status: result.receipt_status,
-              confirmed_events: result.confirmed,
-              authorization: result.snapshot,
-            },
-          });
-        } catch (e) {
-          return authzError(e);
-        }
+        return goTraced(
+          "authorization_ack",
+          async (timing) => {
+            const identity = await authenticateGoIdentity(request, timing);
+            const result = await confirmAuthorizationReceipt(identity, new Date(), timing);
+            return authzJson({
+              ok: true,
+              data: {
+                erp_user_id: identity.erpUserId,
+                scope_version: result.snapshot.scope_version,
+                receipt_status: result.receipt_status,
+                confirmed_events: result.confirmed,
+                authorization: result.snapshot,
+              },
+            });
+          },
+          authzError,
+        );
       },
     },
   },

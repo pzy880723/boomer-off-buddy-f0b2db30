@@ -530,6 +530,7 @@ export function goError(e: unknown) {
 export async function goTraced(
   route: string,
   run: (timing: { mark: (name: string) => void }) => Promise<Response>,
+  onError: (e: unknown) => Response = goError,
 ): Promise<Response> {
   const requestId = crypto.randomUUID();
   const timer = createServerTiming();
@@ -537,7 +538,7 @@ export async function goTraced(
   try {
     res = await run(timer);
   } catch (e) {
-    res = goError(e);
+    res = onError(e);
   }
   let out = res;
   if ((res.headers.get("content-type") ?? "").includes("application/json")) {

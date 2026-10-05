@@ -81,20 +81,30 @@ export type GoIdentity = {
  * 只核验身份：固定 GO issuer 实际 auth.getUser(token) + 无参可信 RPC 拿唯一 canonical erp_user_id。
  * 不解析 scope_context / shop_context 的排班状态，不因旧上下文阻断刷新。
  */
-export async function authenticateGoIdentity(request: Request): Promise<GoIdentity> {
+export async function authenticateGoIdentity(
+  request: Request,
+  timing?: { mark: (name: string) => void },
+): Promise<GoIdentity> {
   const env = goEnvironment();
   if (!env) throw new GoScopeError("go_bridge_not_configured", "GO 桥接尚未配置", 503);
 
   const token = bearerToken(request);
   if (!token) throw new GoScopeError("missing_token", "缺少 GO 访问令牌", 401);
 
-  const { data: userData, error: userErr } = await goClient(env).auth.getUser(token);
+  // 固定 issuer 实时核验 token 与本人 token 调无参可信 RPC 互不依赖 → 并行；
+  // 判定顺序不变：先 token 有效性，再 RPC，且 RPC user 必须等于 getUser 的 user。不缓存。
+  const [userRes, rpcRes] = await Promise.all([
+    goClient(env).auth.getUser(token),
+    goClient(env, token).rpc(GO_SCOPE_RPC),
+  ]);
+  timing?.mark("go_verify");
+  const { data: userData, error: userErr } = userRes;
   if (userErr || !userData?.user) {
     throw new GoScopeError("invalid_go_token", "GO 访问令牌无效或已过期", 401);
   }
   const goUserId = userData.user.id;
 
-  const { data: raw, error: rpcErr } = await goClient(env, token).rpc(GO_SCOPE_RPC);
+  const { data: raw, error: rpcErr } = rpcRes;
   if (rpcErr) throw new GoScopeError("go_scope_unavailable", "GO 身份服务暂时不可用", 503);
 
   const first = Array.isArray(raw) ? raw[0] : raw;
@@ -173,10 +183,21 @@ async function readStoredSnapshot(erpUserId: string): Promise<AuthorizationSnaps
 export async function confirmAuthorizationReceipt(
   identity: GoIdentity,
   now = new Date(),
+  timing?: { mark: (name: string) => void },
 ): Promise<{ snapshot: AuthorizationSnapshot; confirmed: number; receipt_status: string }> {
-  const snapshot = await readStoredSnapshot(identity.erpUserId);
-
-  const { data: raw, error } = await goClient(identity.env, identity.token).rpc(GO_RECEIPT_RPC);
+  // ERP 已下发快照与 GO 可信回执互不依赖 → 并行读取；判定顺序不变（快照错误优先）。
+  // 最终确认仍由 go_authorization_ack 在同一把锁下复核版本与授权事实。
+  const [snapRes, receiptRes] = await Promise.all([
+    readStoredSnapshot(identity.erpUserId).then(
+      (v) => ({ ok: true as const, v }),
+      (e: unknown) => ({ ok: false as const, e }),
+    ),
+    goClient(identity.env, identity.token).rpc(GO_RECEIPT_RPC),
+  ]);
+  timing?.mark("snapshot_receipt");
+  if (!snapRes.ok) throw snapRes.e;
+  const snapshot = snapRes.v;
+  const { data: raw, error } = receiptRes;
   if (error) throw new GoScopeError("go_receipt_unavailable", "GO 回执服务暂时不可用", 503);
 
   const receipt = parseGoReceiptPayload(raw, {
@@ -195,6 +216,7 @@ export async function confirmAuthorizationReceipt(
       p_link_status: receipt.linkStatus,
     } as never,
   );
+  timing?.mark("ack");
   if (ackErr) throw new GoScopeError("authorization_ack_failed", "授权回执写入失败", 503);
 
   const result = (ack ?? {}) as { ok?: boolean; code?: string; confirmed?: number };
