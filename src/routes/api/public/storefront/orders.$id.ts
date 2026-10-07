@@ -4,7 +4,7 @@ import {
   STOREFRONT_CORS,
   authenticateStorefrontCustomer,
   storefrontError,
-  storefrontJson,
+  storefrontPrivateJson,
 } from "@/server/storefront-auth.server";
 import { withOrderItemThumbnails } from "@/server/storefront-order-detail-media.server";
 import { resolveStorefrontOrderId } from "@/server/storefront-orders.server";
@@ -67,7 +67,7 @@ export const Route = createFileRoute("/api/public/storefront/orders/$id")({
           return storefrontError("Pickup lookup failed", 500);
         }
         const detail = await withOrderItemThumbnails(data);
-        return storefrontJson({ ok: true, data: { ...(detail as object), fulfillment_method: (data as { fulfillment_method?: string }).fulfillment_method === "pickup" ? "pickup" : "express", pickups } });
+        return storefrontPrivateJson({ ok: true, data: { ...(detail as object), fulfillment_method: (data as { fulfillment_method?: string }).fulfillment_method === "pickup" ? "pickup" : "express", pickups } });
       },
     },
   },

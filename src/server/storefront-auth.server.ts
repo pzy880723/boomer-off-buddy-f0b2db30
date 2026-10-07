@@ -19,6 +19,15 @@ export function storefrontJson(body: unknown, init: ResponseInit = {}) {
   });
 }
 
+// 含顾客私有数据（自提凭证、订单信息）的响应：禁止代理/浏览器缓存。
+export function storefrontPrivateJson(body: unknown, init: ResponseInit = {}) {
+  const { headers: initHeaders, ...rest } = init;
+  return storefrontJson(body, {
+    ...rest,
+    headers: { ...(initHeaders || {}), "Cache-Control": "private, no-store" },
+  });
+}
+
 export function storefrontError(message: string, status = 400, code?: string) {
   return storefrontJson({ ok: false, error: message, ...(code ? { code } : {}) }, { status });
 }
