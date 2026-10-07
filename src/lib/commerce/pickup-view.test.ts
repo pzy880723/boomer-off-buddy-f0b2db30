@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { buildCustomerPickups, parsePickupInput, pickupResultMessage, pickupCreateGuard } from "./pickup-view";
+import { buildCustomerPickups, parsePickupInput, pickupResultMessage, pickupCreateGuard, buildPickupListProjection } from "./pickup-view";
 
 const L1 = "a0000000-0000-4000-8000-000000000001";
 const base = {
@@ -114,4 +114,18 @@ describe("pickup hardening", () => {
     assert.equal(pickupContactPhone(""), null);
     assert.equal(pickupContactPhone("not-a-phone"), null);
   });
+});
+
+test("白名单外子单状态（exception/unknown）不给凭证", () => {
+  for (const st of ["exception", "weird"]) {
+    const r = buildCustomerPickups({ order: { fulfillment_method: "pickup", payment_status: "paid", order_status: "paid" },
+      fulfillments: [{ id: "f", location_id: "l", status: st, store_name: null, store_address: null }],
+      codes: [{ fulfillment_id: "f", code: "0123", qr_token: "a".repeat(64), status: "active", redeemed_at: null }],
+      refundActive: false, shortageFulfillmentIds: [] });
+    assert.equal(r[0].status, "blocked"); assert.equal(r[0].code, null); assert.equal(r[0].qr_payload, null);
+    const l = buildPickupListProjection({ order: { fulfillment_method: "pickup", payment_status: "paid", order_status: "paid" },
+      fulfillments: [{ id: "f", location_id: "l", status: st, handed_over_at: null }], storeName: () => null,
+      refundActive: false, shortageFulfillmentIds: [] });
+    assert.equal(l[0].status, "blocked");
+  }
 });
