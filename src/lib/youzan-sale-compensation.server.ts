@@ -62,6 +62,10 @@ export async function compensateRecentYouzanSales(d: CompensationDeps, opts: {
       if (!sale || !isYouzanSaleStatus(row.status) || !isYouzanSaleStatus(sale.status) || refundState(row.raw) !== 0) { out.skipped++; continue; }
       let pending = 0;
       const base = d.adapter();
+      if (!(await base.findLocationId(row.shop_id))) {
+        out.noLocation += sale.items.reduce((n, i) => n + i.quantity, 0);
+        continue;
+      }
       const adapter: YouzanSaleAdapter = opts.dryRun
         ? { ...base, commitSale: async (i) => { out.planned.push({ tid: row.tid, sourceOrderId: i.sourceOrderId, skuId: i.skuId, locationId: i.locationId }); return { ok: true, idempotent: true }; } }
         : base;
