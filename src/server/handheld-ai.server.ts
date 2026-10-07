@@ -122,7 +122,7 @@ export async function aiPrepareListingImage(input: {
   image_url?: string;
   image_base64?: string;
   instruction?: string;
-}): Promise<{ b64: string; mime: string }> {
+}): Promise<{ b64: string; mime: string; preserved_original?: true }> {
   // Download the trusted original once and share the same inline bytes with detection and generation,
   // so the gateway never fetches signed URLs itself.
   const source = await loadOriginalImage(input.image_url
@@ -133,7 +133,8 @@ export async function aiPrepareListingImage(input: {
   const dataUrl = `data:${sniffImageMime(source)};base64,${source.toString("base64")}`;
 
   if (await measurementProtectionRequired(dataUrl, getKey())) {
-    return squareOriginalImage(source);
+    // Measurement evidence: pad only, flag so clients never claim an AI retouch happened.
+    return { ...(await squareOriginalImage(source)), preserved_original: true };
   }
 
   const body = {

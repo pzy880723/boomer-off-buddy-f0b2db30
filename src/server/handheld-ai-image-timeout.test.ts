@@ -8,7 +8,7 @@ const stubs: Record<string, string> = {
   "@/integrations/supabase/client.server": "export const supabaseAdmin = {};",
   "@/server/product-recognition.server": "export const recognizeProductFromImages = () => {};",
   "./listing-image-safety.server":
-    "export const measurementProtectionRequired = async () => false; export const loadOriginalImage = async (image) => { if (!image.startsWith('data:image/')) throw new Error('Original image must use trusted storage'); return Buffer.from(image.slice(image.indexOf(',') + 1), 'base64'); }; export const squareOriginalImage = () => {}; export const withImageStage = (stage, run) => run().catch((e) => { e.stage = stage; throw e; });",
+    "export const measurementProtectionRequired = async () => globalThis.__ruler === true; export const loadOriginalImage = async (image) => { if (!image.startsWith('data:image/')) throw new Error('Original image must use trusted storage'); return Buffer.from(image.slice(image.indexOf(',') + 1), 'base64'); }; export const squareOriginalImage = async (b) => ({ b64: b.toString(\'base64\'), mime: \'image/png\' }); export const withImageStage = (stage, run) => run().catch((e) => { e.stage = stage; throw e; });",
 };
 const bundle = await build({
   entryPoints: ["src/server/handheld-ai.server.ts"],
@@ -90,4 +90,24 @@ test("other missing-image finish reasons are diagnosed without leaking", () => {
   assert.equal(missingImageError("stop"), "图像生成服务未返回图片（stop），原图保留");
   assert.equal(missingImageError(undefined), "图像生成服务未返回图片（unknown），原图保留");
   assert.equal(missingImageError("evil https://x?token=1"), "图像生成服务未返回图片（unknown），原图保留");
+});
+
+test("real ruler branch flags preserved_original and returns original pixels untouched", async () => {
+  (globalThis as any).__ruler = true;
+  let called = false;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => { called = true; throw new Error("must not generate"); };
+  try {
+    const out = await aiPrepareListingImage({ image_base64: PNG });
+    assert.deepEqual(out, { b64: PNG, mime: "image/png", preserved_original: true });
+    assert.equal(called, false);
+  } finally { globalThis.fetch = originalFetch; (globalThis as any).__ruler = false; }
+});
+
+test("non-protected branch keeps original return shape without preserved_original", async () => {
+  await withFetch({ choices: [{ message: { images: [{ image_url: { url: "data:image/png;base64,QUJD" } }] } }] }, async () => {
+    const out = await aiPrepareListingImage({ image_base64: PNG });
+    assert.deepEqual(out, { mime: "image/png", b64: "QUJD" });
+    assert.equal("preserved_original" in out, false);
+  });
 });
