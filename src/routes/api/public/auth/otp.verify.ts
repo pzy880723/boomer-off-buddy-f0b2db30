@@ -2,6 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
 import { createHash } from "node:crypto";
 import { PHONE_REGEX, phoneToEmail } from "@/lib/auth-config";
+import { staffAvatarPath, staffDisplayName } from "@/lib/staff-profile";
+import { signStaffAvatar } from "@/server/staff-profile.server";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -166,11 +168,8 @@ export const Route = createFileRoute("/api/public/auth/otp/verify")({
             (authedUser.user_metadata?.phone as string | undefined) ??
             authedUser.phone ??
             phone,
-          display_name:
-            (authedUser.user_metadata?.display_name as string | undefined) ??
-            (authedUser.user_metadata?.name as string | undefined) ??
-            (authedUser.user_metadata?.full_name as string | undefined) ??
-            null,
+          display_name: staffDisplayName(authedUser.user_metadata),
+          avatar_url: await signStaffAvatar(staffAvatarPath(authedUser.user_metadata, authedUser.id)),
           roles,
         };
 

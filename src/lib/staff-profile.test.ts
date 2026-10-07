@@ -1,11 +1,20 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { staffDisplayName, staffAvatarPath, validateAvatarBytes, STAFF_AVATAR_MAX_BYTES } from "./staff-profile";
+import { staffDisplayName, staffAvatarPath, validateAvatarBytes, STAFF_AVATAR_MAX_BYTES, canMaintainStaffProfiles } from "./staff-profile";
+import { SUPER_ADMIN_PHONES, phoneToEmail } from "./auth-config";
 
 const U = "a0000000-0000-4000-8000-000000000001";
+test("员工不能伪造个人 metadata 手机号取得账号维护权限", () => {
+  const phone = SUPER_ADMIN_PHONES[0];
+  assert.equal(canMaintainStaffProfiles({ email: "staff@example.test", user_metadata: { phone } }), false);
+  assert.equal(canMaintainStaffProfiles({ email: phoneToEmail(phone) }), true);
+  assert.equal(canMaintainStaffProfiles({ phone }), true);
+});
 test("姓名取 metadata.name，不用技术邮箱", () => {
   assert.equal(staffDisplayName({ name: " 张三 ", display_name: "x" }), "张三");
   assert.equal(staffDisplayName({ name: "13800000000@users.local" }), null);
+  assert.equal(staffDisplayName({ name: "13800000000@user.local" }), null);
+  assert.equal(staffDisplayName({ name: "13800000000" }), null);
   assert.equal(staffDisplayName({}), null);
   assert.equal(staffDisplayName(null), null);
 });

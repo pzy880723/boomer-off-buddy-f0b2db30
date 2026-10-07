@@ -1,0 +1,13 @@
+src/lib/admin-users.functions.ts
+src/lib/staff-profile.ts
+src/lib/staff-profile.test.ts
+src/server/staff-profile.server.ts
+src/routes/admin.users.tsx
+src/routes/__root.tsx
+src/routes/api/public/account/profile.ts
+src/routes/api/public/go/profile.ts
+src/routes/api/public/handheld/auth.bootstrap.ts
+src/routes/api/public/handheld/auth.login.ts
+src/routes/api/public/handheld/auth.me.ts
+src/routes/api/public/auth/otp.verify.ts
+scripts/deploy-staff-profile-20261007.sh

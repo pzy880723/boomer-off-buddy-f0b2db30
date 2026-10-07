@@ -3,12 +3,11 @@ import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
-  isSuperAdminPhone,
   PHONE_REGEX,
   phoneToEmail,
   emailToPhone,
 } from "./auth-config";
-import { STAFF_AVATAR_BUCKET, STAFF_AVATAR_MAX_BYTES, staffAvatarPath, validateAvatarBytes } from "./staff-profile";
+import { STAFF_AVATAR_BUCKET, STAFF_AVATAR_MAX_BYTES, staffAvatarPath, validateAvatarBytes, canMaintainStaffProfiles } from "./staff-profile";
 
 function admin() {
   const url = process.env.SUPABASE_URL!;
@@ -23,8 +22,7 @@ async function assertSuperAdmin(context: { supabase: { auth: { getUser: () => Pr
   const { data, error } = await context.supabase.auth.getUser();
   if (error || !data?.user) throw new Error("未登录");
   const u = data.user;
-  const phone = emailToPhone(u.email) || u.phone || u.user_metadata?.phone;
-  if (!isSuperAdminPhone(phone)) throw new Error("无权操作：仅超级管理员可管理账号");
+  if (!canMaintainStaffProfiles(u)) throw new Error("无权操作：仅超级管理员可管理账号");
   return u;
 }
 

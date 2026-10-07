@@ -1,5 +1,12 @@
 // 员工资料（姓名/头像）纯函数：canonical 为 Auth user_metadata.name 与 avatar_path。
 // 不使用 @users.local 技术邮箱或手机号充当姓名。
+import { emailToPhone, isSuperAdminPhone } from "./auth-config";
+
+export function canMaintainStaffProfiles(user: { email?: string | null; phone?: string | null; user_metadata?: Record<string, unknown> }): boolean {
+  // Only Auth-owned identity fields count; user_metadata is employee-editable.
+  return isSuperAdminPhone(emailToPhone(user.email) || user.phone);
+}
+
 export const STAFF_AVATAR_BUCKET = "staff-avatars";
 export const STAFF_AVATAR_MAX_BYTES = 2 * 1024 * 1024;
 export const STAFF_AVATAR_MIME = ["image/png", "image/jpeg", "image/webp"] as const;
@@ -10,7 +17,7 @@ export function staffDisplayName(meta: Record<string, unknown> | null | undefine
     const v = meta?.[k];
     if (typeof v === "string") {
       const t = v.trim();
-      if (t && !t.endsWith("@users.local")) return t;
+      if (t && !t.includes("@") && !/^1\d{10}$/.test(t)) return t;
     }
   }
   return null;

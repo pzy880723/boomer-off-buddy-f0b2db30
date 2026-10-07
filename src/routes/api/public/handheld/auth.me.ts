@@ -31,12 +31,16 @@ export const Route = createFileRoute("/api/public/handheld/auth/me")({
           roles: string[];
         };
         if (session) {
-          const { data: roleRows } = await supabaseAdmin
+          const { data: roleRows, error: roleError } = await supabaseAdmin
             .from("user_roles" as never)
             .select("role")
             .eq("user_id", session.user_id);
+          if (roleError) return err("账号资料暂不可用，请重试", 503);
           const roles = ((roleRows as { role: string }[] | null) ?? []).map((r) => r.role);
-          const profile = await loadStaffProfile(session.user_id).catch(() => null);
+          let profile;
+          try { profile = await loadStaffProfile(session.user_id); }
+          catch { return err("账号资料暂不可用，请重试", 503); }
+          if (!profile) return err("Invalid session token", 401, { code: "unauthorized" });
           user = {
             user_id: session.user_id,
             email: session.email,
