@@ -56,6 +56,25 @@ export function authenticatePush(
   return { ok: true, auth: { protocol: "event_sign" }, body };
 }
 
+/**
+ * TRADE_* 推送鉴权：有 Event-Sign 头只验原始 body（不回退）；无头才验 legacy body.sign。
+ * 推送仅作为触发提示，扣减前仍以 trade.get 详情或已入库订单为准。
+ */
+export function authorizeTradePush(
+  p: ParsedPush,
+  creds: { clientId: string; clientSecret: string },
+): { ok: true; auth: PushAuth; body: Record<string, unknown> } | { ok: false; out: Out } {
+  const r = authenticatePush(p, creds);
+  if (!r.ok || r.auth.protocol === "event_sign") return r;
+  const sign = typeof r.body.sign === "string" ? r.body.sign : "";
+  const msg = typeof r.body.msg === "string" ? r.body.msg : "";
+  let decoded = msg;
+  try { decoded = decodeURIComponent(msg); } catch { /* keep raw */ }
+  const valid = md5Equal(sign, `${creds.clientId}${msg}${creds.clientSecret}`) ||
+    (decoded !== msg && md5Equal(sign, `${creds.clientId}${decoded}${creds.clientSecret}`));
+  return valid ? r : { ok: false, out: fail(401, "invalid_sign") };
+}
+
 export type AssetPushDeps = Parameters<typeof import("./youzan-points-message.server").handlePointsMessage>[1];
 
 /** POINTS / COUPON_CUSTOMER_PROMOTION 分流；其它 type 返回 null 交回旧逻辑。 */
