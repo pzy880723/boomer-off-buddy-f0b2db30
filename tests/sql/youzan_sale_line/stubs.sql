@@ -1,4 +1,4 @@
-create role service_role; create role anon; create role authenticated;
+do $$ begin perform 1 from pg_roles where rolname='service_role'; if not found then create role service_role; end if; perform 1 from pg_roles where rolname='anon'; if not found then create role anon; end if; perform 1 from pg_roles where rolname='authenticated'; if not found then create role authenticated; end if; end $$;
 create table public.inv_skus(id uuid primary key, stock_qty int not null default 0, inventory_policy text not null default 'tracked');
 create table public.inventory_sale_events(id uuid primary key default gen_random_uuid(), source_channel text, source_shop_id uuid,
   source_order_id text, event_type text, event_version bigint, sku_id uuid, epc text, raw_payload jsonb, status text, error text,
