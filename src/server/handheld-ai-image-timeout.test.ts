@@ -8,7 +8,7 @@ const stubs: Record<string, string> = {
   "@/integrations/supabase/client.server": "export const supabaseAdmin = {};",
   "@/server/product-recognition.server": "export const recognizeProductFromImages = () => {};",
   "./listing-image-safety.server":
-    "export const measurementProtectionRequired = async () => false; export const loadOriginalImage = async (image) => { if (!image.startsWith("data:image/")) throw new Error("Original image must use trusted storage"); return Buffer.from(image.slice(image.indexOf(",") + 1), "base64"); }; export const squareOriginalImage = () => {}; export const withImageStage = (stage, run) => run().catch((e) => { e.stage = stage; throw e; });",
+    "export const measurementProtectionRequired = async () => false; export const loadOriginalImage = async (image) => { if (!image.startsWith('data:image/')) throw new Error('Original image must use trusted storage'); return Buffer.from(image.slice(image.indexOf(',') + 1), 'base64'); }; export const squareOriginalImage = () => {}; export const withImageStage = (stage, run) => run().catch((e) => { e.stage = stage; throw e; });",
 };
 const bundle = await build({
   entryPoints: ["src/server/handheld-ai.server.ts"],
