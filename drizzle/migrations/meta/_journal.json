@@ -288,6 +288,13 @@
       "when": 1791372398163,
       "tag": "0040_store_pickup",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1791372741328,
+      "tag": "0041_store_pickup_revoke_client",
+      "breakpoints": true
     }
   ]
 }
