@@ -35,6 +35,7 @@ import {
   LibraryBig,
   WalletCards,
   Target,
+  Printer,
   type LucideIcon,
 } from "lucide-react";
 import { useAuthSession } from "@/hooks/use-auth-session";
@@ -89,6 +90,7 @@ type NavTo =
   | "/orders/dispatch"
   | "/orders/wholesale"
   | "/operations/content"
+  | "/operations/card-print"
   | "/operations/official-knowledge"
   | "/knowledge"
   | "/settings"
@@ -167,6 +169,7 @@ const groups: NavGroup[] = [
     label: "运营",
     items: [
       { title: "资讯管理", url: "/operations/content", icon: Newspaper },
+      { title: "卡片打印", url: "/operations/card-print", icon: Printer },
       { title: "官方知识", url: "/operations/official-knowledge", icon: LibraryBig },
       { title: "内部知识库", url: "/knowledge", icon: BookOpen },
     ],
