@@ -267,6 +267,13 @@
       "when": 1791365991518,
       "tag": "0037_custom_print_cards",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1791366193467,
+      "tag": "0038_custom_print_cards_revoke_client",
+      "breakpoints": true
     }
   ]
 }
