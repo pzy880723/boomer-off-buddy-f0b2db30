@@ -27,6 +27,11 @@ const offlineTrade = {
 };
 
 describe("youzan sale reconciliation", () => {
+  test("variant codes exclude shared group codes so a standard line cannot block a later custom sale", () => {
+    const trade = structuredClone(offlineTrade);
+    Object.assign(trade.full_order_info.orders[0], { item_no: "SHARED-GROUP", item_barcode: "GROUP-BARCODE", sku_barcode: "VARIANT-BARCODE" });
+    assert.deepEqual(extractYouzanSale(trade)?.items[0].lookupCodes, ["BM260117240727666", "P260117140786910", "VARIANT-BARCODE"]);
+  });
   test("refunded orders and lines never deduct stock", async () => {
     for (const lineOnly of [false, true]) {
       const trade = structuredClone(offlineTrade);

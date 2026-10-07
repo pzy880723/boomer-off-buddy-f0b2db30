@@ -124,23 +124,18 @@ export function extractYouzanSale(trade: unknown): YouzanSale | null {
     const oidRaw = item.oid ?? item.order_item_id ?? item.orderItemId;
     const oid = oidRaw !== undefined && oidRaw !== null && /^[A-Za-z0-9_-]{1,64}$/.test(String(oidRaw)) ? String(oidRaw) : null;
     const lineRefund = Number(item.refund_state ?? item.item_refund_state ?? 0);
+    const skuCodes = uniqueStrings([item.sku_no, item.skuNo, item.outer_sku_id, item.outerSkuId, item.sku_barcode, item.skuBarcode]);
     items.push({
       ...(oid ? { oid } : {}),
       ...(lineRefund ? { refundState: Number.isFinite(lineRefund) ? lineRefund : 1 } : {}),
       itemId,
       quantity,
       remoteSkuId,
-      lookupCodes: uniqueStrings([
-        item.sku_no,
-        item.skuNo,
-        item.outer_sku_id,
-        item.outerSkuId,
+      lookupCodes: skuCodes.length ? skuCodes : uniqueStrings([
         item.item_no,
         item.itemNo,
         item.outer_item_id,
         item.outerItemId,
-        item.sku_barcode,
-        item.skuBarcode,
         item.item_barcode,
         item.itemBarcode,
       ]),
