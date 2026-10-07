@@ -71,3 +71,19 @@ test('私桶原码隔离、旧dianping目录仅review、停用不签名、不发
   assert.deepEqual(result, [{ channel: 'dianping_review', image_url: 'https://example.test/image', updated_at: 'test' }]);
   assert.equal('image_path' in result[0], false);
 });
+test('扫码模板清单按门店渠道路径校验并与静态目录合并', async () => {
+  const { parseQrTemplateManifest, mergeCatalog } = await import('./contract');
+  const row = { id: `qr-${loc}-wechat`, type_id: 'qr-wechat', name: '微信', category: 'qr', enabled: true, orientation: 'landscape', width_mm: 90, height_mm: 30, image_path: `/print-presets/qr-templates/${loc}-wechat.pdf`, thumbnail_path: `/print-presets/qr-templates/${loc}-wechat.png`, channel: 'wechat', location_id: loc, qr_box: { x_mm: 63.8, y_mm: 1, size_mm: 25.8 } };
+  const qr = parseQrTemplateManifest({ version: 1, presets: [row] });
+  assert.equal(mergeCatalog([base()], qr).length, 2);
+  assert.throws(() => parseQrTemplateManifest({ version: 1, presets: [{ ...row, image_path: '/print-presets/qr-templates/other.pdf' }] }));
+  assert.throws(() => parseQrTemplateManifest({ version: 1, presets: [{ ...row, location_id: undefined }] }));
+  assert.throws(() => mergeCatalog(qr, qr));
+  assert.throws(() => resolveSelection(qr, [{ id: row.id, quantity: 1 }], loc, ['xiaohongshu']));
+});
+test('私桶原码路径正则匹配普通 .png/.jpg，拒绝伪扩展', async () => {
+  const id = '0f8fad5b-d9cb-469f-a165-70867728950e';
+  const mk = (path: string) => ({ purpose: 'xiaohongshu', status: 'active', image_bucket: 'store-qr', image_path: path, updated_at: 't' });
+  for (const [path, ok] of [[`${loc}/xiaohongshu/${id}.png`, 1], [`${loc}/xiaohongshu/${id}.jpg`, 1], [`${loc}/xiaohongshu/${id}xpng`, 0], [`${loc}/xiaohongshu/${id}\\.png`, 0]] as const)
+    assert.equal((await projectQr([mk(path)], loc, async () => 'u')).length, ok, path);
+});
