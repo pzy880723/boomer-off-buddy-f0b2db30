@@ -50,7 +50,12 @@ import {
   resetUserPasswordFn,
   deleteUserFn,
   updateUserNameFn,
+  setUserAvatarFn,
+  removeUserAvatarFn,
 } from "@/lib/admin-users.functions";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { blobToBase64, compressImage } from "@/lib/image-upload";
+import { STAFF_AVATAR_MAX_BYTES } from "@/lib/staff-profile";
 import {
   listUserScopesFn,
   setUserLocationsFn,
@@ -213,7 +218,10 @@ function AdminUsersContent() {
                   return (
                     <TableRow key={u.id}>
                       <TableCell className="font-medium">
-                        {u.name ?? <span className="text-muted-foreground">—</span>}
+                        <div className="flex items-center gap-2">
+                          <AvatarEditor userId={u.id} name={u.name} avatarUrl={u.avatar_url} />
+                          {u.name ?? <span className="text-muted-foreground">—</span>}
+                        </div>
                       </TableCell>
                       <TableCell>
                         {u.phone ? (
@@ -890,5 +898,82 @@ function ScopeButton({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function AvatarEditor({ userId, name, avatarUrl }: { userId: string; name: string | null; avatarUrl: string | null }) {
+  const qc = useQueryClient();
+  const setFn = useServerFn(setUserAvatarFn);
+  const removeFn = useServerFn(removeUserAvatarFn);
+  const [busy, setBusy] = useState(false);
+  const inputId = `avatar-${userId}`;
+
+  async function onFile(file: File | undefined) {
+    if (!file) return;
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      toast.error("头像仅支持 PNG / JPG / WEBP");
+      return;
+    }
+    setBusy(true);
+    try {
+      const { blob } = await compressImage(file, file.name);
+      if (blob.size > STAFF_AVATAR_MAX_BYTES) throw new Error("头像不能超过 2MB");
+      await setFn({ data: { userId, base64: await blobToBase64(blob) } });
+      toast.success("头像已更新");
+      qc.invalidateQueries({ queryKey: ["admin-users"] });
+      qc.invalidateQueries({ queryKey: ["account-profile"] });
+    } catch (e) {
+      toast.error((e as Error)?.message ?? "头像更新失败");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onRemove() {
+    setBusy(true);
+    try {
+      await removeFn({ data: { userId } });
+      toast.success("头像已移除");
+      qc.invalidateQueries({ queryKey: ["admin-users"] });
+      qc.invalidateQueries({ queryKey: ["account-profile"] });
+    } catch (e) {
+      toast.error((e as Error)?.message ?? "移除失败");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="group relative">
+      <label htmlFor={inputId} className="cursor-pointer" title="更换头像">
+        <Avatar className="h-8 w-8">
+          {avatarUrl && <AvatarImage src={avatarUrl} alt={name ?? "头像"} />}
+          <AvatarFallback className="text-xs">
+            {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : (name?.[0] ?? "员")}
+          </AvatarFallback>
+        </Avatar>
+      </label>
+      <input
+        id={inputId}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        className="hidden"
+        disabled={busy}
+        onChange={(e) => {
+          void onFile(e.target.files?.[0]);
+          e.target.value = "";
+        }}
+      />
+      {avatarUrl && !busy && (
+        <button
+          type="button"
+          onClick={onRemove}
+          className="absolute -right-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] leading-none text-destructive-foreground group-hover:flex"
+          title="移除头像"
+        >
+          ×
+        </button>
+      )}
+    </div>
   );
 }

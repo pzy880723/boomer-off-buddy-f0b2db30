@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { staffAvatarPath, staffDisplayName } from "@/lib/staff-profile";
+import { signStaffAvatar } from "@/server/staff-profile.server";
 import { createClient } from "@supabase/supabase-js";
 import {
   HANDHELD_CORS,
@@ -164,11 +166,8 @@ export const Route = createFileRoute("/api/public/handheld/auth/bootstrap")({
           .eq("user_id", user.id);
         const roles = ((roleRows as { role: string }[] | null) ?? []).map((r) => r.role);
 
-        const displayName =
-          (user.user_metadata?.display_name as string | undefined) ??
-          (user.user_metadata?.name as string | undefined) ??
-          (user.user_metadata?.full_name as string | undefined) ??
-          null;
+        const displayName = staffDisplayName(user.user_metadata);
+        const avatarUrl = await signStaffAvatar(staffAvatarPath(user.user_metadata, user.id));
 
         return ok({
           device_token: deviceToken,
@@ -193,6 +192,7 @@ export const Route = createFileRoute("/api/public/handheld/auth/bootstrap")({
             email: user.email ?? null,
             phone: (user.user_metadata?.phone as string | undefined) ?? user.phone ?? null,
             display_name: displayName,
+            avatar_url: avatarUrl,
             roles,
           },
           locations,
