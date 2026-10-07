@@ -1618,6 +1618,132 @@ export type Database = {
           },
         ]
       }
+      commerce_pickup_audit: {
+        Row: {
+          action: string
+          actor_user_id: string
+          created_at: string
+          fulfillment_id: string | null
+          id: string
+          idempotency_key: string | null
+          location_id: string | null
+          method: string | null
+          order_id: string | null
+          pickup_code_id: string | null
+          response: Json
+          result: string
+          success: boolean
+        }
+        Insert: {
+          action: string
+          actor_user_id: string
+          created_at?: string
+          fulfillment_id?: string | null
+          id?: string
+          idempotency_key?: string | null
+          location_id?: string | null
+          method?: string | null
+          order_id?: string | null
+          pickup_code_id?: string | null
+          response?: Json
+          result: string
+          success: boolean
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string
+          created_at?: string
+          fulfillment_id?: string | null
+          id?: string
+          idempotency_key?: string | null
+          location_id?: string | null
+          method?: string | null
+          order_id?: string | null
+          pickup_code_id?: string | null
+          response?: Json
+          result?: string
+          success?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_pickup_audit_pickup_code_id_fkey"
+            columns: ["pickup_code_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_pickup_codes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commerce_pickup_codes: {
+        Row: {
+          code: string
+          created_at: string
+          fulfillment_id: string
+          id: string
+          location_id: string
+          order_id: string
+          qr_token: string
+          redeem_idempotency_key: string | null
+          redeemed_at: string | null
+          redeemed_by: string | null
+          status: string
+          updated_at: string
+          void_reason: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          fulfillment_id: string
+          id?: string
+          location_id: string
+          order_id: string
+          qr_token: string
+          redeem_idempotency_key?: string | null
+          redeemed_at?: string | null
+          redeemed_by?: string | null
+          status?: string
+          updated_at?: string
+          void_reason?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          fulfillment_id?: string
+          id?: string
+          location_id?: string
+          order_id?: string
+          qr_token?: string
+          redeem_idempotency_key?: string | null
+          redeemed_at?: string | null
+          redeemed_by?: string | null
+          status?: string
+          updated_at?: string
+          void_reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_pickup_codes_fulfillment_id_fkey"
+            columns: ["fulfillment_id"]
+            isOneToOne: true
+            referencedRelation: "fulfillments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_pickup_codes_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_pickup_codes_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commerce_points_ledger: {
         Row: {
           balance_after: number
@@ -9736,6 +9862,21 @@ export type Database = {
         }
         Returns: Json
       }
+      commerce_create_ordinary_pickup_order: {
+        Args: {
+          p_app_id: string
+          p_customer_id: string
+          p_customer_note: string
+          p_idempotency_key: string
+          p_items: Json
+          p_merchant_id: string
+          p_owned_location_ids: string[]
+          p_quote_snapshot: Json
+          p_recipient_name: string
+          p_recipient_phone: string
+        }
+        Returns: Json
+      }
       commerce_listing_availability: {
         Args: { p_listing_ids: string[] }
         Returns: {
@@ -9860,6 +10001,38 @@ export type Database = {
         Args: { p_payment_id: string }
         Returns: number
       }
+      commerce_pickup_actor_can: {
+        Args: { p_actor: string; p_location_id: string }
+        Returns: boolean
+      }
+      commerce_pickup_block_reason: {
+        Args: { p_fulfillment_id: string; p_order_id: string }
+        Returns: string
+      }
+      commerce_pickup_issue_codes: {
+        Args: { p_order_id: string }
+        Returns: number
+      }
+      commerce_pickup_mark_ready: {
+        Args: {
+          p_actor_user_id: string
+          p_fulfillment_id: string
+          p_idempotency_key: string
+          p_location_id: string
+        }
+        Returns: Json
+      }
+      commerce_pickup_redeem: {
+        Args: {
+          p_actor_user_id: string
+          p_code: string
+          p_expected_fulfillment_id?: string
+          p_idempotency_key: string
+          p_location_id: string
+          p_qr_payload: string
+        }
+        Returns: Json
+      }
       commerce_prepare_ordinary_payment: {
         Args: {
           p_customer_id: string
@@ -9880,6 +10053,15 @@ export type Database = {
       }
       commerce_quote_checkout: {
         Args: { p_coupon_id: string; p_customer_id: string; p_items: Json }
+        Returns: Json
+      }
+      commerce_quote_checkout_v2: {
+        Args: {
+          p_coupon_id: string
+          p_customer_id: string
+          p_fulfillment_method?: string
+          p_items: Json
+        }
         Returns: Json
       }
       commerce_quote_store_shipping: { Args: { p_items: Json }; Returns: Json }

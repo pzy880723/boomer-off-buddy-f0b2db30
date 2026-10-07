@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { listCommerceOrders, type CommerceOrderAdminRow } from "@/lib/commerce-operations.functions";
+import { PickupRedeemDialog } from "@/components/orders/pickup-redeem-dialog";
+import { PickupRowActions } from "@/components/orders/pickup-row-actions";
 import { onlineOrderState, type OnlineOrderView } from "@/lib/commerce/online-order-presentation";
 
 export const Route = createFileRoute("/orders/online")({
@@ -55,6 +57,16 @@ const fulfillmentLabel: Record<string, string> = {
   exception: "异常",
 };
 
+const pickupLabel: Record<string, string> = {
+  unallocated: "自提 · 待备货",
+  allocated: "自提 · 待备货",
+  picking: "自提 · 备货中",
+  picked: "自提 · 待提货",
+  packed: "自提 · 待提货",
+  handover_ready: "自提 · 待提货",
+  handed_over: "自提 · 已提货",
+};
+
 function OnlineOrdersPage() {
   const listFn = useServerFn(listCommerceOrders);
   const [view, setView] = useState<OrderView>("all");
@@ -80,11 +92,14 @@ function OnlineOrdersPage() {
         description="客户一次下单；系统按商品来源门店拆分履约任务，由各门店拣货、打包和发货。"
         meta={<span>当前 {filtered.length} 单 · 全部 {rows.length} 单</span>}
         actions={
+          <div className="flex items-center gap-2">
+          <PickupRedeemDialog onDone={() => void query.refetch()} />
           <Button asChild size="sm" variant="outline">
             <Link to="/inventory/devices">
               <Smartphone className="mr-1.5 h-3.5 w-3.5" /> 履约终端
             </Link>
           </Button>
+          </div>
         }
       />
 
@@ -131,7 +146,7 @@ function OnlineOrdersPage() {
               <TableRow key={row.id}>
                 <TableCell>
                   <div className="font-mono text-xs">{row.order_no}</div>
-                  <div className="mt-1.5"><StatusBadge tone="neutral">{row.source_label}</StatusBadge></div>
+                  <div className="mt-1.5 flex gap-1"><StatusBadge tone="neutral">{row.source_label}</StatusBadge>{row.fulfillment_method === "pickup" && <StatusBadge tone="neutral">门店自提</StatusBadge>}</div>
                 </TableCell>
                 <TableCell>
                   <div className="max-w-72 space-y-1">
@@ -150,7 +165,17 @@ function OnlineOrdersPage() {
                     {row.fulfillments.map((fulfillment) => (
                       <div key={fulfillment.id} className="flex items-center gap-2 text-xs">
                         <span className="min-w-20 truncate">{fulfillment.location?.name ?? "未知门店"}</span>
-                        <StatusBadge>{row.payment_status === "refunded" && fulfillment.status !== "handed_over" ? "已退款 · 停止履约" : fulfillmentLabel[fulfillment.status] ?? fulfillment.status}</StatusBadge>
+                        <StatusBadge>{row.payment_status === "refunded" && fulfillment.status !== "handed_over" ? "已退款 · 停止履约" : row.fulfillment_method === "pickup" ? (pickupLabel[fulfillment.status] ?? fulfillmentLabel[fulfillment.status] ?? fulfillment.status) : fulfillmentLabel[fulfillment.status] ?? fulfillment.status}</StatusBadge>
+                        {row.fulfillment_method === "pickup" && (
+                          <PickupRowActions
+                            fulfillmentId={fulfillment.id}
+                            locationId={fulfillment.location_id}
+                            storeName={fulfillment.location?.name ?? null}
+                            status={fulfillment.status}
+                            blocked={row.payment_status !== "paid" || row.order_status === "cancelled" || row.order_status === "closed"}
+                            onChanged={() => void query.refetch()}
+                          />
+                        )}
                       </div>
                     ))}
                     {row.fulfillments.length === 0 && <span className="text-xs text-muted-foreground">{row.payment_status === "refunded" ? "已退款 · 无需履约" : row.order_status === "cancelled" || row.order_status === "closed" ? "无需履约" : "付款后生成"}</span>}

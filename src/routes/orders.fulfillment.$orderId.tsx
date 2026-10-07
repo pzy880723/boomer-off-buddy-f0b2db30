@@ -18,6 +18,7 @@ import {
   type StoreSubOrder,
   type StoreSubOrderItem,
 } from "@/lib/fulfillment-shortage.functions";
+import { PickupRowActions } from "@/components/orders/pickup-row-actions";
 
 export const Route = createFileRoute("/orders/fulfillment/$orderId")({
   head: () => ({
@@ -53,7 +54,7 @@ function FulfillmentDetailPage() {
       />
       {isLoading ? <p className="text-muted-foreground text-sm">加载中…</p> : null}
       {(data?.shops ?? []).map((shop) => (
-        <ShopCard key={shop.fulfillment_id} shop={shop} orderId={orderId} />
+        <ShopCard key={shop.fulfillment_id} shop={shop} orderId={orderId} pickup={data?.fulfillment_method === "pickup"} />
       ))}
       {!isLoading && (data?.shops ?? []).length === 0 ? (
         <p className="text-muted-foreground text-sm">该订单暂无门店子单。</p>
@@ -62,7 +63,7 @@ function FulfillmentDetailPage() {
   );
 }
 
-function ShopCard({ shop, orderId }: { shop: StoreSubOrder; orderId: string }) {
+function ShopCard({ shop, orderId, pickup }: { shop: StoreSubOrder; orderId: string; pickup: boolean }) {
   const queryClient = useQueryClient();
   const ship = useServerFn(manualShipStoreSubOrder);
   const report = useServerFn(reportStoreShortage);
@@ -165,6 +166,18 @@ function ShopCard({ shop, orderId }: { shop: StoreSubOrder; orderId: string }) {
           ))}
         </div>
 
+        {pickup ? (
+          <div className="flex items-center justify-between rounded-md border p-3">
+            <span className="text-sm text-muted-foreground">门店自提：备货完成后，顾客到店出示提货码核销。</span>
+            <PickupRowActions
+              fulfillmentId={shop.fulfillment_id}
+              locationId={shop.location_id}
+              storeName={shop.store_name}
+              status={shop.status}
+              onChanged={() => void invalidate()}
+            />
+          </div>
+        ) : (
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="space-y-1">
             <Label htmlFor={`provider-${shop.fulfillment_id}`}>快递公司</Label>
@@ -194,6 +207,7 @@ function ShopCard({ shop, orderId }: { shop: StoreSubOrder; orderId: string }) {
             </Button>
           </div>
         </div>
+        )}
 
         {shortageFor ? (
           <div className="space-y-3 rounded-md border border-dashed p-3">
