@@ -1,0 +1,4 @@
+# Support conversation rules
+- Support conversations: external replies only by primary_agent_id with matching assignment_version, enforced inside DB RPCs (support_update_assignment / support_staff_post_message) in one transaction; internal notes open to any authorized collaborator. Why: prevents race between old owner and HQ takeover.
+- Support context location is derived server-side (order lines → single store else HQ null; product → listing location); open conversations dedupe on customer_id + context_key. Why: client-provided store is untrusted.
+- Support message presentation is resolved after conversation authorization using each sender's conversation participant role, customer-owned avatar, linked shop image, and server-controlled HQ metadata; GET and POST share an explicit safe projection. Why: prevents historical-owner substitution and disclosure of private URLs or staff identifiers to customers.
