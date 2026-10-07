@@ -126,3 +126,37 @@ describe("youzan sale reconciliation", () => {
     assert.equal(result.processed, 0);
   });
 });
+
+describe("stable order-line idempotency", () => {
+  const trade = (orders: unknown[]) => ({
+    full_order_info: {
+      order_info: { tid: "E1", status: "TRADE_SUCCESS", offline_id: 212291308 },
+      source_info: { is_offline_order: true },
+      orders,
+    },
+  });
+  const a = { oid: "3170827559510736957", item_id: 6480588312, sku_id: 0, outer_sku_id: "2002535897511", num: 1 };
+  const b = { oid: "3170827559510736955", item_id: 6411694159, sku_id: 26247576379, outer_sku_id: "2000047289374", num: 2 };
+  async function keys(orders: unknown[]) {
+    const commits: Array<{ sourceOrderId: string; legacySourceOrderId: string | null; skuId: string }> = [];
+    await processYouzanSale({ trade: trade(orders), shopId: "shop", adapter: {
+      findLocationId: async () => "loc",
+      findSkuId: async ({ itemId }) => `sku-${itemId}`,
+      commitSale: async (i) => { commits.push(i as never); return { ok: true }; },
+    } });
+    return commits;
+  }
+  test("keys use the Youzan line oid, so line reordering cannot shift deductions", async () => {
+    const one = await keys([a, b]);
+    const two = await keys([b, a]);
+    const bySku = (c: typeof one) => Object.fromEntries(c.map((x) => [`${x.skuId}:${x.sourceOrderId}`, true]));
+    assert.deepEqual(bySku(one), bySku(two));
+    assert.deepEqual(one.map((c) => c.sourceOrderId), [
+      "E1#oid:3170827559510736957#0", "E1#oid:3170827559510736955#0", "E1#oid:3170827559510736955#1",
+    ]);
+  });
+  test("each unit also carries the legacy positional key so already-processed lines are not deducted twice", async () => {
+    const c = await keys([a, b]);
+    assert.deepEqual(c.map((x) => x.legacySourceOrderId), ["E1#0#0", "E1#1#0", "E1#1#1"]);
+  });
+});

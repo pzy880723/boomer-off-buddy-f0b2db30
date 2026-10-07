@@ -3,6 +3,8 @@ export type YouzanSaleItem = {
   quantity: number;
   remoteSkuId: number | null;
   lookupCodes: string[];
+  /** 有赞订单商品行 oid：稳定幂等键来源（行顺序变化不影响）。 */
+  oid?: string;
 };
 
 export type YouzanSale = {
@@ -27,6 +29,8 @@ export type YouzanSaleAdapter = {
     locationId: string | null;
     sourceChannel: YouzanSale["sourceChannel"];
     sourceOrderId: string;
+    /** 旧版按行下标生成的键；已按旧键扣过的单位不得再扣。 */
+    legacySourceOrderId: string | null;
     rawPayload: Record<string, unknown>;
   }): Promise<{ ok: boolean; idempotent?: boolean; error?: string }>;
 };
@@ -115,7 +119,10 @@ export function extractYouzanSale(trade: unknown): YouzanSale | null {
     const quantity = Math.max(0, Math.trunc(Number(item.num ?? item.quantity ?? item.count ?? 0)));
     if (!Number.isFinite(itemId) || itemId <= 0 || quantity <= 0) continue;
     const remoteSkuId = Number(item.sku_id ?? item.skuId ?? 0) || null;
+    const oidRaw = item.oid ?? item.order_item_id ?? item.orderItemId;
+    const oid = oidRaw !== undefined && oidRaw !== null && /^[A-Za-z0-9_-]{1,64}$/.test(String(oidRaw)) ? String(oidRaw) : null;
     items.push({
+      ...(oid ? { oid } : {}),
       itemId,
       quantity,
       remoteSkuId,
@@ -185,19 +192,22 @@ export async function processYouzanSale(input: {
     }
 
     for (let unitIndex = 0; unitIndex < item.quantity; unitIndex += 1) {
-      const sourceOrderId = `${sale.tid}#${lineIndex}#${unitIndex}`;
+      const legacyKey = `${sale.tid}#${lineIndex}#${unitIndex}`;
+      const sourceOrderId = item.oid ? `${sale.tid}#oid:${item.oid}#${unitIndex}` : legacyKey;
       const committed = await input.adapter.commitSale({
         skuId,
         shopId: input.shopId,
         locationId,
         sourceChannel: sale.sourceChannel,
         sourceOrderId,
+        legacySourceOrderId: item.oid ? legacyKey : null,
         rawPayload: {
           tid: sale.tid,
           item_id: item.itemId,
           remote_sku_id: item.remoteSkuId,
           quantity: item.quantity,
           line_index: lineIndex,
+          oid: item.oid ?? null,
           unit_index: unitIndex,
         },
       });

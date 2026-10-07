@@ -14,7 +14,6 @@
 //   4. inv_apply_movement 扣/加库存
 //   5. 记 log 到 youzan_sync_logs
 import { createFileRoute } from "@tanstack/react-router";
-import { createHash } from "crypto";
 import { reconcileYouzanTradeSale } from "@/lib/youzan-sale.functions";
 import { extractYouzanSale } from "@/lib/youzan-sale.server";
 
@@ -54,20 +53,24 @@ export const Route = createFileRoute("/api/public/hooks/youzan-message")({
           return Response.json({ code: 0, msg: "success" });
         }
 
-        // ===== 验签 =====
-        const clientId = process.env.YOUZAN_CLIENT_ID ?? "";
-        const clientSecret = process.env.YOUZAN_CLIENT_SECRET ?? "";
-        const expected = createHash("md5")
-          .update(`${clientId}${payload.msg ?? ""}${clientSecret}`)
-          .digest("hex");
-        if (!payload.sign || payload.sign.toLowerCase() !== expected.toLowerCase()) {
-          return Response.json({ code: 401, message: "invalid sign" }, { status: 401 });
-        }
+        // ===== 验签 =====（Event-Sign 头只验原始 body；无头才验 legacy body.sign）
+        const { authorizeTradePush } = await import("@/server/youzan-push-auth.server");
+        const authz = authorizeTradePush(parsed, {
+          clientId: process.env.YOUZAN_CLIENT_ID ?? "",
+          clientSecret: process.env.YOUZAN_CLIENT_SECRET ?? "",
+        });
+        if (!authz.ok) return Response.json(authz.out.body, { status: authz.out.status });
+        const pushProtocol = authz.auth.protocol;
 
         // ===== 处理业务 =====
         let event: Record<string, unknown> = {};
         try {
-          event = payload.msg ? (JSON.parse(payload.msg) as Record<string, unknown>) : {};
+          const m = payload.msg as unknown;
+          if (typeof m === "string" && m) {
+            let text = m;
+            try { text = decodeURIComponent(m); } catch { /* raw */ }
+            event = JSON.parse(text) as Record<string, unknown>;
+          } else if (m && typeof m === "object") event = m as Record<string, unknown>;
         } catch {
           /* keep empty */
         }
@@ -82,9 +85,10 @@ export const Route = createFileRoute("/api/public/hooks/youzan-message")({
             .insert({
               action: "message_push",
               status: "running",
-              message: `type=${payload.type ?? "?"} kdt=${payload.kdt_id ?? "?"}`,
-              raw: { payload, event } as never,
+              // youzan_sync_logs 无 raw 列：旧代码带 raw 导致插入静默失败、推送不留痕。
+              message: `type=${payload.type ?? "?"} kdt=${payload.kdt_id ?? "?"} protocol=${pushProtocol}`,
               kdt_id: payload.kdt_id ?? null,
+              started_at: new Date().toISOString(),
             } as never)
             .select("id")
             .single();

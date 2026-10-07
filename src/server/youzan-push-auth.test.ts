@@ -141,3 +141,26 @@ test("JSON null / 数组 → 400；非资产 type 交回旧逻辑", async () => 
   const t = `{"type":"trade_TradeSuccess"}`;
   assert.equal((await send(req(t, signed(t)))).out, null);
 });
+
+test("trade pushes with Event-Sign are verified on the raw body, legacy only via body.sign", async () => {
+  const { authorizeTradePush } = await import("./youzan-push-auth.server");
+  const body = JSON.stringify({ type: "TRADE_TradeSuccess", kdt_id: 212291308, msg: "%7B%22tid%22%3A%22E1%22%7D" });
+  const creds = { clientId: CID, clientSecret: SECRET };
+  const ok = authorizeTradePush({ raw: body, body: JSON.parse(body), headers: new Headers(signed(body)) }, creds);
+  assert.equal(ok.ok, true);
+  const bad = authorizeTradePush({ raw: body, body: JSON.parse(body), headers: new Headers({ "Event-Sign": md5("x") }) }, creds);
+  assert.equal(bad.ok, false);
+  // Event-Sign present but wrong must not fall back to a valid legacy body.sign
+  const withLegacy = { ...JSON.parse(body), sign: md5(`${CID}${decodeURIComponent(JSON.parse(body).msg)}${SECRET}`) };
+  assert.equal(authorizeTradePush({ raw: JSON.stringify(withLegacy), body: withLegacy, headers: new Headers({ "Event-Sign": md5("x") }) }, creds).ok, false);
+  assert.equal(authorizeTradePush({ raw: JSON.stringify(withLegacy), body: withLegacy, headers: new Headers() }, creds).ok, true);
+  const noSign = JSON.parse(body);
+  assert.equal(authorizeTradePush({ raw: body, body: noSign, headers: new Headers() }, creds).ok, false);
+});
+
+test("message_push log insert only uses real youzan_sync_logs columns", async () => {
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("../routes/api/public/hooks/youzan-message.ts", import.meta.url), "utf8");
+  const insert = src.slice(src.indexOf('action: "message_push"') - 200, src.indexOf('action: "message_push"') + 400);
+  assert.doesNotMatch(insert, /\braw:/, "youzan_sync_logs has no raw column; insert silently failed so pushes left no log");
+});
