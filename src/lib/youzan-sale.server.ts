@@ -5,6 +5,8 @@ export type YouzanSaleItem = {
   lookupCodes: string[];
   /** 有赞订单商品行 oid：稳定幂等键来源（行顺序变化不影响）。 */
   oid?: string;
+  /** 行级退款状态（0=无退款）；缺省视为 0。 */
+  refundState?: number;
 };
 
 export type YouzanSale = {
@@ -121,8 +123,10 @@ export function extractYouzanSale(trade: unknown): YouzanSale | null {
     const remoteSkuId = Number(item.sku_id ?? item.skuId ?? 0) || null;
     const oidRaw = item.oid ?? item.order_item_id ?? item.orderItemId;
     const oid = oidRaw !== undefined && oidRaw !== null && /^[A-Za-z0-9_-]{1,64}$/.test(String(oidRaw)) ? String(oidRaw) : null;
+    const lineRefund = Number(item.refund_state ?? item.item_refund_state ?? 0);
     items.push({
       ...(oid ? { oid } : {}),
+      ...(lineRefund ? { refundState: Number.isFinite(lineRefund) ? lineRefund : 1 } : {}),
       itemId,
       quantity,
       remoteSkuId,
@@ -156,7 +160,10 @@ export async function processYouzanSale(input: {
   trade: unknown;
   shopId: string;
   adapter: YouzanSaleAdapter;
+  /** 可选逐单位闸门：返回 "commit" 才调用事务，否则按原因计数跳过（不写事件、不改库存）。 */
+  gate?: (ctx: { lineIndex: number; unitIndex: number; item: YouzanSaleItem; skuId: string; locationId: string | null; sourceOrderId: string; legacyKey: string }) => Promise<string>;
 }): Promise<{
+  gated: Record<string, number>;
   tid: string;
   processed: number;
   idempotent: number;
@@ -171,6 +178,7 @@ export async function processYouzanSale(input: {
     idempotent: 0,
     unmatched: 0,
     failed: 0,
+    gated: {} as Record<string, number>,
   };
   if (!isYouzanSaleStatus(sale.status)) return result;
   const locationId = await input.adapter.findLocationId(input.shopId);
@@ -194,6 +202,10 @@ export async function processYouzanSale(input: {
     for (let unitIndex = 0; unitIndex < item.quantity; unitIndex += 1) {
       const legacyKey = `${sale.tid}#${lineIndex}#${unitIndex}`;
       const sourceOrderId = item.oid ? `${sale.tid}#oid:${item.oid}#${unitIndex}` : legacyKey;
+      if (input.gate) {
+        const verdict = await input.gate({ lineIndex, unitIndex, item, skuId, locationId, sourceOrderId, legacyKey });
+        if (verdict !== "commit") { result.gated[verdict] = (result.gated[verdict] ?? 0) + 1; continue; }
+      }
       const committed = await input.adapter.commitSale({
         skuId,
         shopId: input.shopId,
