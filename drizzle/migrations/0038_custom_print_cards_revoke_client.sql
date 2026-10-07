@@ -1,0 +1,1 @@
+REVOKE ALL ON public.custom_print_cards FROM anon, authenticated;

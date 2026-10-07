@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { runListingImageWorker } from "@/server/handheld-listing-image-jobs.server";
+import { processCustomCardJobs } from "@/server/custom-print-cards.server";
+import { customCardDeps } from "@/server/custom-print-cards-db.server";
 
 export const Route = createFileRoute("/api/public/hooks/listing-image-worker")({
   server: {
@@ -23,7 +25,17 @@ export const Route = createFileRoute("/api/public/hooks/listing-image-worker")({
           // Empty body uses the conservative default.
         }
         try {
-          const data = await runListingImageWorker(limit);
+          const listing = await runListingImageWorker(limit);
+          // 自定义打印卡片文案作业：独立计数，基础设施错误不影响上架图结果。
+          let custom_cards: unknown = { skipped: true };
+          if ((process.env.CUSTOM_PRINT_CARD_JOBS_ENABLED ?? "true") === "true") {
+            try {
+              custom_cards = await processCustomCardJobs(customCardDeps(), limit);
+            } catch {
+              custom_cards = { error: "custom_card_worker_failed" };
+            }
+          }
+          const data = { ...listing, custom_cards };
           if (data.failed) {
             return Response.json({ ok: false, code: "worker_failed", data }, { status: 500 });
           }
