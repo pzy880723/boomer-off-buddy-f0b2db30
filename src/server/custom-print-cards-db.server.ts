@@ -80,26 +80,52 @@ export function customCardDeps(): CustomCardDeps {
       const key = process.env.LOVABLE_API_KEY;
       if (!key) throw new Error("AI not configured");
       const text = `【主题】${topic}\n【补充说明】${instructions || "无"}\n【版式】${formats.join("/")}`;
-      const content: unknown[] = [{ type: "text", text }];
-      if (image) content.push({ type: "image_url", image_url: { url: `data:${image.mime};base64,${image.b64}` } });
-      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const content: unknown[] = [{ type: "input_text", text }];
+      if (image) content.push({ type: "input_image", image_url: `data:${image.mime};base64,${image.b64}` });
+      const res = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
         method: "POST",
-        signal: AbortSignal.timeout(45_000),
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        headers: {
+          Authorization: `Bearer ${key}`, "Lovable-API-Key": key,
+          "Content-Type": "application/json", "X-Lovable-AIG-SDK": "fetch",
+        },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [{ role: "system", content: GENERATION_PROMPT }, { role: "user", content }],
-          tools: [{ type: "function", function: { name: "card_copy", parameters: {
+          model: "openai/gpt-6-astra",
+          stream: true,
+          store: false,
+          reasoning: { effort: "low" },
+          instructions: GENERATION_PROMPT,
+          input: [{ role: "user", content }],
+          text: { format: { type: "json_schema", name: "card_copy", strict: true, schema: {
             type: "object", additionalProperties: false, required: ["title", "headline", "body"],
             properties: { title: { type: "string" }, headline: { type: "string" }, body: { type: "string" } },
-          } } }],
-          tool_choice: { type: "function", function: { name: "card_copy" } },
+          } } },
         }),
       });
-      if (!res.ok) { await res.body?.cancel().catch(() => undefined); throw new Error(`AI gateway ${res.status}`); }
-      const j = await res.json();
-      const args = j?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
-      return typeof args === "string" ? JSON.parse(args) : null;
+      if (!res.ok || !res.body) { await res.body?.cancel().catch(() => undefined); throw new Error(`AI gateway ${res.status}`); }
+      // SSE：累积 output_text 增量；不记录任何上游内容。
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "", out = "", failed = false;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let i;
+        while ((i = buf.indexOf("\n")) >= 0) {
+          const line = buf.slice(0, i).trim();
+          buf = buf.slice(i + 1);
+          if (!line.startsWith("data:")) continue;
+          const data = line.slice(5).trim();
+          if (!data || data === "[DONE]") continue;
+          try {
+            const ev = JSON.parse(data);
+            if (ev.type === "response.output_text.delta") out += ev.delta ?? "";
+            else if (ev.type === "response.failed" || ev.type === "error") failed = true;
+          } catch { /* ignore partial */ }
+        }
+      }
+      if (failed) throw new Error("AI gateway 500");
+      return out ? JSON.parse(out) : null;
     },
   };
 }
