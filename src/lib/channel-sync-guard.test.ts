@@ -48,3 +48,15 @@ test("dead_letter or unfinished tasks never close the sale loop", () => {
   assert.equal(canMarkSold([{ action: "set_stock_zero", status: "succeeded" }, { action: "delist", status: "running" }]), false);
   assert.equal(canMarkSold([{ action: "set_stock_zero", status: "succeeded" }]), false);
 });
+
+test("zeroing and delisting use the same ownership guards in every active branch", () => {
+  for (const shopId of ["shop-xtd", "shop-citic", "shop-wenzhou"]) {
+    for (const action of ZEROING_ACTIONS) {
+      const scoped = { ...task, shop_id: shopId, action };
+      const facts = { ...sold, listing: { sku_id: task.sku_id, shop_id: shopId } };
+      assert.equal(evaluateZeroingTask(scoped, facts).verdict, "proceed");
+      assert.equal(evaluateZeroingTask(scoped, { ...facts, stockQty: 1 }).verdict, "supersede");
+      assert.equal(evaluateZeroingTask(scoped, { ...facts, listing: { ...facts.listing, shop_id: "other-shop" } }).verdict, "block");
+    }
+  }
+});

@@ -140,4 +140,35 @@ describe("bounded recent Youzan sale compensation", () => {
     assert.deepEqual(commits, []);
     assert.deepEqual(r.planned, [{ tid: "DRY", sourceOrderId: "DRY#oid:DRY-1#0", skuId: "sku-custom", locationId: "loc-xtd" }]);
   });
+
+  test("all three branches use their own order identity, location and custom stock", async () => {
+    const shops = [
+      { id: "shop-xtd", kdt: 212291308, location: "loc-xtd" },
+      { id: "shop-citic", kdt: 187395218, location: "loc-citic" },
+      { id: "shop-wenzhou", kdt: 178113306, location: "loc-wenzhou" },
+    ];
+    const rows = shops.map((shop, i) => order(`BRANCH${i}`, "2026-10-06T12:00:00Z", {
+      shop_id: shop.id, order_info: { offline_id: shop.kdt },
+    }));
+    const f = deps(rows);
+    const received: Array<{ shop: string; location: string | null; sku: string }> = [];
+    f.d.locationQty = async (sku, location) => shops.some(s => location === s.location && sku === `sku-${s.id}`) ? 1 : 0;
+    f.d.adapter = () => ({
+      findLocationId: async (shopId, kdt) => {
+        const shop = shops.find(s => s.id === shopId);
+        assert.ok(shop);
+        if (kdt !== undefined) assert.equal(kdt, shop.kdt);
+        return shop.location;
+      },
+      findSkuId: async ({ shopId }) => `sku-${shopId}`,
+      commitSale: async input => {
+        received.push({ shop: input.shopId, location: input.locationId, sku: input.skuId });
+        return { ok: true };
+      },
+    });
+    const r = await compensateRecentYouzanSales(f.d, { now: NOW });
+    assert.equal(r.failed, 0);
+    assert.equal(r.committed, 3);
+    assert.deepEqual(received, shops.map(s => ({ shop: s.id, location: s.location, sku: `sku-${s.id}` })));
+  });
 });
