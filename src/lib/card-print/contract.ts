@@ -12,7 +12,7 @@ export const Preset = z.object({
   channel: z.enum(channels).optional(), location_id: z.string().uuid().optional(),
   qr_box: z.object({ x_mm: z.number().nonnegative(), y_mm: z.number().nonnegative(), size_mm: z.number().positive() }).strict().optional(),
 }).strict().superRefine((p, ctx) => {
-  if (p.category === 'qr' && (!p.channel || !p.qr_box)) ctx.addIssue({ code: 'custom', message: '扫码卡须提供独立用途与原版二维码位置' });
+  if (p.category === 'qr' && (!p.channel || !p.qr_box || !p.location_id)) ctx.addIssue({ code: 'custom', message: '扫码卡须提供独立用途与原版二维码位置' });
   if (p.category !== 'qr' && (p.channel || p.qr_box)) ctx.addIssue({ code: 'custom', message: '非扫码卡不能绑定二维码' });
   if (p.qr_box && (p.qr_box.x_mm + p.qr_box.size_mm > p.width_mm || p.qr_box.y_mm + p.qr_box.size_mm > p.height_mm)) ctx.addIssue({ code: 'custom', message: '二维码位置超出卡片' });
 });
@@ -37,6 +37,29 @@ export function parseNativeManifest(input: unknown): CardPreset[] {
     category: nativeCategory[p.category], enabled: true, orientation: p.widthMM >= p.heightMM ? 'landscape' : 'portrait',
     width_mm: p.widthMM, height_mm: p.heightMM, image_path: nativeAsset(p.file), thumbnail_path: nativeAsset(p.thumbnail),
   }));
+}
+export const QR_TEMPLATE_MANIFEST_PATH = '/print-presets/qr-templates.json';
+export function parseQrTemplateManifest(input: unknown): CardPreset[] {
+  const presets = Manifest.parse(input).presets;
+  for (const p of presets) {
+    const base = `/print-presets/qr-templates/${p.location_id}-${p.channel}`;
+    if (p.category !== 'qr' || !p.location_id || p.image_path !== `${base}.pdf` || (p.thumbnail_path && p.thumbnail_path !== `${base}.png`)) throw new Error('扫码模板路径或门店不符');
+  }
+  return presets.map(p => ({ ...p, thumbnail_path: p.thumbnail_path ?? `/print-presets/qr-templates/${p.location_id}-${p.channel}.png` }));
+}
+export function mergeCatalog(statics: CardPreset[], qr: CardPreset[]): CardPreset[] {
+  const all = [...statics, ...qr];
+  if (new Set(all.map(p => p.id)).size !== all.length) throw new Error('预设 ID 重复');
+  return all;
+}
+export async function loadCatalog(origin: string): Promise<CardPreset[]> {
+  const read = async (path: string) => {
+    const r = await fetch(sameOriginUrl(path, origin), { cache: 'no-store', signal: AbortSignal.timeout(15000) });
+    if (!r.ok) throw new Error('预设清单暂时不可访问');
+    return r.json();
+  };
+  const [statics, qr] = await Promise.all([read(PRESET_MANIFEST_PATH), read(QR_TEMPLATE_MANIFEST_PATH)]);
+  return mergeCatalog(parseNativeManifest(statics), parseQrTemplateManifest(qr));
 }
 export function assertQrLocation(actual: string | null, selected: string): void {
   if (!selected || actual !== selected) throw new Error('二维码返回门店与所选门店不一致');
