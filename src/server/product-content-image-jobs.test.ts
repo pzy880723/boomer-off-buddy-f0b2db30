@@ -29,6 +29,7 @@ const stubs: Record<string, string> = {
     })}
   };`,
   "@/server/handheld-ai.server": `export const aiPrepareListingImage=async input=>{const s=globalThis.__contentJobs;s.prepared.push(input);if(s.fail)throw new Error('ruler service failed');return {b64:'cHJvdGVjdGVk',mime:'image/png'};};`,
+  "@/server/listing-image-safety.server": `export const safeImageJobError=e=>((e&&e.stage?"["+e.stage+"] ":"")+(e instanceof Error?e.message:String(e))).slice(0,1000);`,
 };
 const bundle = await build({
   entryPoints: ["src/server/handheld-listing-image-jobs.server.ts"],

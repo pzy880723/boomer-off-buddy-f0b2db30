@@ -2,7 +2,7 @@ import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import sharp from "sharp";
-import { requiresOriginalMeasurementPixels, squareOriginalImage, loadOriginalImage, measurementProtectionRequired } from "./listing-image-safety.server.ts";
+import { requiresOriginalMeasurementPixels, squareOriginalImage, loadOriginalImage, measurementProtectionRequired, safeImageJobError, withImageStage } from "./listing-image-safety.server.ts";
 
 test("ambiguous or missing ruler detection rejects instead of reporting prepared pixels", () => {
   for (const value of [null, {}, { confidence: 1 }, { measurement_tool: "false", confidence: 1 }, { measurement_tool: false, confidence: 0.9 }]) {
@@ -222,4 +222,13 @@ test("oversized inline base64 is rejected without calling AI", async () => {
   globalThis.fetch = async () => { calls++; return new Response("x"); };
   await assert.rejects(module.exports.aiPrepareListingImage({ image_base64: Buffer.alloc(20_000_001, 1).toString("base64") }), /too large/i);
   assert.equal(calls, 0);
+});
+
+test("job error persists safe stage prefix without URLs or payloads", async () => {
+  const timeout = await withImageStage("image_generation", async () => { throw new DOMException("signal timed out https://s.test/storage/v1/x?token=abc", "TimeoutError"); }).catch((e) => e);
+  const out = safeImageJobError(timeout);
+  assert.match(out, /^\[image_generation\] TimeoutError: signal timed out \[url\]$/);
+  const det = await withImageStage("measurement_detection", async () => { throw new Error("bad data:image/png;base64,AAAA"); }).catch((e) => e);
+  assert.equal(safeImageJobError(det), "[measurement_detection] bad [data]");
+  assert.equal(safeImageJobError(new Error("plain")), "plain");
 });

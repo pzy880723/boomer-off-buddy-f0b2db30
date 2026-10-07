@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { aiPrepareListingImage } from "@/server/handheld-ai.server";
+import { safeImageJobError } from "@/server/listing-image-safety.server";
 
 type ImageRef = {
   bucket: "sku-raw" | "sku-listing";
@@ -63,7 +64,7 @@ async function processContentImageJob(job: ContentImageJob): Promise<void> {
     );
     targetPath = `sku-listing/${path}`;
   } catch (error) {
-    failure = (error instanceof Error ? error.message : String(error)).slice(0, 1000);
+    failure = safeImageJobError(error);
   }
   // A crashed completion is recovered by lease expiry; only the current token may apply.
   const result = await supabaseAdmin.rpc(
@@ -130,7 +131,7 @@ async function processJob(job: JobRow): Promise<string> {
     );
     targetPath = `sku-listing/${path}`;
   } catch (error) {
-    failure = (error instanceof Error ? error.message : String(error)).slice(0, 1000);
+    failure = safeImageJobError(error);
   }
   // The transaction fences ownership before applying pixels and completing the job.
   const result = await supabaseAdmin.rpc("handheld_listing_image_finish" as never, {
