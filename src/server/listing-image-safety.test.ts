@@ -99,6 +99,7 @@ const bundle = await build({ entryPoints: ["src/server/handheld-ai.server.ts"], 
     b.onLoad({ filter: /.*/, namespace: "stub" }, (a: any) => ({ contents: stubs[a.path], loader: "js" }));
   } }] });
 const module = { exports: {} as any };
+const pngDataUrl = async () => `data:image/png;base64,${(await sharp({ create: { width: 4, height: 4, channels: 3, background: "blue" } }).png().toBuffer()).toString("base64")}`;
 new Function("require", "module", "exports", bundle.outputFiles[0].text)(require, module, module.exports);
 
 test("preparation cannot return a successful image when detection is unavailable", async () => {
@@ -137,7 +138,7 @@ test("confident no-tool detection still reaches the image editing provider", asy
     assert.deepEqual(body.modalities, ["image", "text"]);
     return Response.json({ choices: [{ message: { images: [{ image_url: { url: "data:image/png;base64,ZWRpdGVk" } }] } }] });
   };
-  assert.deepEqual(await module.exports.aiPrepareListingImage({ image_url: "https://fixture.test/image" }), { b64: "ZWRpdGVk", mime: "image/png" });
+  assert.deepEqual(await module.exports.aiPrepareListingImage({ image_base64: await pngDataUrl() }), { b64: "ZWRpdGVk", mime: "image/png" });
   assert.deepEqual(models, ["google/gemini-2.5-flash", "google/gemini-3.1-flash-image"]);
 });
 
@@ -167,7 +168,7 @@ test("image generation HTTP error is stage-marked and never echoes upstream text
   globalThis.fetch = async () => (++n === 1
     ? Response.json({ choices: [{ message: { content: '{"measurement_tool":false,"confidence":1}' } }] })
     : new Response("https://x.test/sign?token=leak data:image/png;base64,AAAA", { status: 500 }));
-  await assert.rejects(module.exports.aiPrepareListingImage({ image_url: "https://fixture.test/image" }), (e: any) => {
+  await assert.rejects(module.exports.aiPrepareListingImage({ image_base64: await pngDataUrl() }), (e: any) => {
     assert.equal(e.stage, "image_generation"); assert.match(e.message, /500/); assert.doesNotMatch(e.message, /token|base64/); return true;
   });
 });
@@ -180,6 +181,45 @@ test("listing prompt removes platform watermarks and price tags while keeping pr
     text = JSON.parse(String(init?.body)).messages[0].content[0].text;
     return Response.json({ choices: [{ message: { images: [{ image_url: { url: "data:image/png;base64,ZQ==" } }] } }] });
   };
-  await module.exports.aiPrepareListingImage({ image_url: "https://fixture.test/image" });
+  await module.exports.aiPrepareListingImage({ image_base64: await pngDataUrl() });
   for (const word of ["闲鱼", "水印", "价签|价格牌", "商标", "真实瑕疵", "刻度"]) assert.match(text, new RegExp(word));
+});
+
+test("trusted signed URL is downloaded once and the same inline data URI feeds detection and generation", async () => {
+  process.env.LOVABLE_API_KEY = "fixture";
+  const prevUrl = process.env.SUPABASE_URL;
+  process.env.SUPABASE_URL = "https://storage.fixture.test";
+  const png = await sharp({ create: { width: 4, height: 4, channels: 3, background: "green" } }).png().toBuffer();
+  const expected = `data:image/png;base64,${png.toString("base64")}`;
+  let downloads = 0;
+  const sent: string[] = [];
+  try {
+    globalThis.fetch = async (url, init) => {
+      if (String(url).startsWith("https://storage.fixture.test/")) { downloads++; return new Response(png); }
+      const body = JSON.parse(String(init?.body));
+      const image = body.messages[0].content.find((c: any) => c.type === "image_url").image_url.url;
+      sent.push(image);
+      return sent.length === 1
+        ? Response.json({ choices: [{ message: { content: '{"measurement_tool":false,"confidence":1}' } }] })
+        : Response.json({ choices: [{ message: { images: [{ image_url: { url: "data:image/png;base64,ZQ==" } }] } }] });
+    };
+    await module.exports.aiPrepareListingImage({ image_url: "https://storage.fixture.test/storage/v1/object/sign/sku-raw/a.png?token=secret" });
+    assert.equal(downloads, 1);
+    assert.deepEqual(sent, [expected, expected]);
+    assert.ok(sent.every(u => !u.includes("token=")));
+  } finally { if (prevUrl === undefined) delete process.env.SUPABASE_URL; else process.env.SUPABASE_URL = prevUrl; }
+});
+test("untrusted image URL is rejected before any AI or download request", async () => {
+  process.env.LOVABLE_API_KEY = "fixture";
+  let calls = 0;
+  globalThis.fetch = async () => { calls++; return new Response("x"); };
+  await assert.rejects(module.exports.aiPrepareListingImage({ image_url: "https://evil.test/storage/v1/object/a.png" }), /trusted storage/);
+  assert.equal(calls, 0);
+});
+test("oversized inline base64 is rejected without calling AI", async () => {
+  process.env.LOVABLE_API_KEY = "fixture";
+  let calls = 0;
+  globalThis.fetch = async () => { calls++; return new Response("x"); };
+  await assert.rejects(module.exports.aiPrepareListingImage({ image_base64: Buffer.alloc(20_000_001, 1).toString("base64") }), /too large/i);
+  assert.equal(calls, 0);
 });
