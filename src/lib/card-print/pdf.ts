@@ -19,7 +19,6 @@ export async function createCardPdf(cards: CardPreset[], qr: QrImage[], origin: 
   doc.setTitle('BOOMER OFF · A4 cards');
   const originals = new Map<string, PDFEmbeddedPage | PDFImage>();
   for (const p of cards) {
-    if (p.category === 'qr') continue;
     if (!originals.has(p.image_path)) {
       const bytes = await imageBytes(sameOriginUrl(p.image_path, origin));
       if (p.image_path.toLowerCase().endsWith('.pdf')) {
