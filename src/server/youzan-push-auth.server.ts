@@ -90,3 +90,9 @@ export async function dispatchAssetPush(p: ParsedPush, deps: AssetPushDeps): Pro
   const { handleCouponMessage } = await import("./youzan-coupon-message.server");
   return handleCouponMessage({ body: a.body, auth: a.auth }, deps);
 }
+
+/** 交易推送最终响应：业务失败返回非成功让平台重试（失败日志已持久化）；成功与验签口径不变。 */
+export function tradePushResponse(failure: unknown): Response {
+  if (failure == null) return Response.json({ code: 0, msg: "success" });
+  return Response.json({ code: 500, msg: "business processing failed, please retry" }, { status: 500 });
+}
