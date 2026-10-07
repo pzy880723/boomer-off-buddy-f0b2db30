@@ -109,20 +109,31 @@ const SYSTEM_LISTING_IMAGE = `把这张中古杂货实物图修整成上架主�
 - 如果有尺子、卷尺、尺寸刻度，不得重绘、删除或修改刻度，保留原始测量证据
 - 严禁添加任何文字、水印、贴纸`;
 
+function sniffImageMime(bytes: Buffer): string {
+  if (bytes[0] === 0xff && bytes[1] === 0xd8) return "image/jpeg";
+  if (bytes[0] === 0x89 && bytes[1] === 0x50) return "image/png";
+  if (bytes.subarray(0, 4).toString("ascii") === "RIFF" && bytes.subarray(8, 12).toString("ascii") === "WEBP") return "image/webp";
+  if (bytes.subarray(4, 12).toString("ascii").startsWith("ftyphei")) return "image/heic";
+  throw new Error("Unsupported original image format");
+}
+
 /** Returns base64 PNG (no data: prefix). */
 export async function aiPrepareListingImage(input: {
   image_url?: string;
   image_base64?: string;
   instruction?: string;
 }): Promise<{ b64: string; mime: string }> {
-  const dataUrl = input.image_url
+  // Download the trusted original once and share the same inline bytes with detection and generation,
+  // so the gateway never fetches signed URLs itself.
+  const source = await loadOriginalImage(input.image_url
     ? input.image_url
     : input.image_base64?.startsWith("data:")
       ? input.image_base64
-      : `data:image/jpeg;base64,${input.image_base64}`;
+      : `data:image/jpeg;base64,${input.image_base64 ?? ""}`);
+  const dataUrl = `data:${sniffImageMime(source)};base64,${source.toString("base64")}`;
 
   if (await measurementProtectionRequired(dataUrl, getKey())) {
-    return squareOriginalImage(await loadOriginalImage(dataUrl));
+    return squareOriginalImage(source);
   }
 
   const body = {

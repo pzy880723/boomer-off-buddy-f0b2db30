@@ -8,7 +8,7 @@ const stubs: Record<string, string> = {
   "@/integrations/supabase/client.server": "export const supabaseAdmin = {};",
   "@/server/product-recognition.server": "export const recognizeProductFromImages = () => {};",
   "./listing-image-safety.server":
-    "export const measurementProtectionRequired = async () => false; export const loadOriginalImage = () => {}; export const squareOriginalImage = () => {}; export const withImageStage = (stage, run) => run().catch((e) => { e.stage = stage; throw e; });",
+    "export const measurementProtectionRequired = async () => false; export const loadOriginalImage = async () => Buffer.from([0xff,0xd8,0xff,0xe0]); export const squareOriginalImage = () => {}; export const withImageStage = (stage, run) => run().catch((e) => { e.stage = stage; throw e; });",
 };
 const bundle = await build({
   entryPoints: ["src/server/handheld-ai.server.ts"],
