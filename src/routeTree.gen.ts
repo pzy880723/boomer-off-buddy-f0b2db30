@@ -42,6 +42,7 @@ import { Route as MInboundRouteImport } from './routes/m.inbound'
 import { Route as MParcelsRouteImport } from './routes/m.parcels'
 import { Route as MPhotoSearchRouteImport } from './routes/m.photo-search'
 import { Route as MScanRouteImport } from './routes/m.scan'
+import { Route as OperationsCardPrintRouteImport } from './routes/operations.card-print'
 import { Route as OperationsContentRouteImport } from './routes/operations.content'
 import { Route as OperationsOfficialKnowledgeRouteImport } from './routes/operations.official-knowledge'
 import { Route as OrdersAfterSalesRouteImport } from './routes/orders.after-sales'
@@ -454,6 +455,11 @@ const MScanRoute = MScanRouteImport.update({
   id: '/scan',
   path: '/scan',
   getParentRoute: () => MRoute,
+} as any)
+const OperationsCardPrintRoute = OperationsCardPrintRouteImport.update({
+  id: '/operations/card-print',
+  path: '/operations/card-print',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const OperationsContentRoute = OperationsContentRouteImport.update({
   id: '/operations/content',
@@ -1893,6 +1899,7 @@ export interface FileRoutesByFullPath {
   '/m/parcels': typeof MParcelsRoute
   '/m/photo-search': typeof MPhotoSearchRoute
   '/m/scan': typeof MScanRoute
+  '/operations/card-print': typeof OperationsCardPrintRoute
   '/operations/content': typeof OperationsContentRouteWithChildren
   '/operations/official-knowledge': typeof OperationsOfficialKnowledgeRouteWithChildren
   '/orders/after-sales': typeof OrdersAfterSalesRoute
@@ -2170,6 +2177,7 @@ export interface FileRoutesByTo {
   '/m/parcels': typeof MParcelsRoute
   '/m/photo-search': typeof MPhotoSearchRoute
   '/m/scan': typeof MScanRoute
+  '/operations/card-print': typeof OperationsCardPrintRoute
   '/operations/content': typeof OperationsContentRouteWithChildren
   '/operations/official-knowledge': typeof OperationsOfficialKnowledgeRouteWithChildren
   '/orders/after-sales': typeof OrdersAfterSalesRoute
@@ -2449,6 +2457,7 @@ export interface FileRoutesById {
   '/m/parcels': typeof MParcelsRoute
   '/m/photo-search': typeof MPhotoSearchRoute
   '/m/scan': typeof MScanRoute
+  '/operations/card-print': typeof OperationsCardPrintRoute
   '/operations/content': typeof OperationsContentRouteWithChildren
   '/operations/official-knowledge': typeof OperationsOfficialKnowledgeRouteWithChildren
   '/orders/after-sales': typeof OrdersAfterSalesRoute
@@ -2732,6 +2741,7 @@ export interface FileRouteTypes {
     | '/m/parcels'
     | '/m/photo-search'
     | '/m/scan'
+    | '/operations/card-print'
     | '/operations/content'
     | '/operations/official-knowledge'
     | '/orders/after-sales'
@@ -3009,6 +3019,7 @@ export interface FileRouteTypes {
     | '/m/parcels'
     | '/m/photo-search'
     | '/m/scan'
+    | '/operations/card-print'
     | '/operations/content'
     | '/operations/official-knowledge'
     | '/orders/after-sales'
@@ -3287,6 +3298,7 @@ export interface FileRouteTypes {
     | '/m/parcels'
     | '/m/photo-search'
     | '/m/scan'
+    | '/operations/card-print'
     | '/operations/content'
     | '/operations/official-knowledge'
     | '/orders/after-sales'
@@ -3565,6 +3577,7 @@ export interface RootRouteChildren {
   InventorySkusRoute: typeof InventorySkusRouteWithChildren
   InventoryTransfersRoute: typeof InventoryTransfersRoute
   InventoryUnclaimedRoute: typeof InventoryUnclaimedRoute
+  OperationsCardPrintRoute: typeof OperationsCardPrintRoute
   OperationsContentRoute: typeof OperationsContentRouteWithChildren
   OperationsOfficialKnowledgeRoute: typeof OperationsOfficialKnowledgeRouteWithChildren
   PurchaseDomesticRoute: typeof PurchaseDomesticRouteWithChildren
@@ -3944,6 +3957,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/m/scan'
       preLoaderRoute: typeof MScanRouteImport
       parentRoute: typeof MRoute
+    }
+    '/operations/card-print': {
+      id: '/operations/card-print'
+      path: '/operations/card-print'
+      fullPath: '/operations/card-print'
+      preLoaderRoute: typeof OperationsCardPrintRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/operations/content': {
       id: '/operations/content'
@@ -6406,6 +6426,7 @@ const rootRouteChildren: RootRouteChildren = {
   InventorySkusRoute: InventorySkusRouteWithChildren,
   InventoryTransfersRoute: InventoryTransfersRoute,
   InventoryUnclaimedRoute: InventoryUnclaimedRoute,
+  OperationsCardPrintRoute: OperationsCardPrintRoute,
   OperationsContentRoute: OperationsContentRouteWithChildren,
   OperationsOfficialKnowledgeRoute:
     OperationsOfficialKnowledgeRouteWithChildren,

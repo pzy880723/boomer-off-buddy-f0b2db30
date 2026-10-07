@@ -1,4 +1,6 @@
 # Architecture rules
+- PC card printing uses a same-origin, strictly validated asset manifest and original images; eligibility is rechecked before output and A4 PDF is generated client-side. Why: preserves native designs, blocks retired presets and avoids new database permissions.
+- PC QR reads use authenticated server functions with the handheld role/location and private-object path semantics, without borrowing device credentials. Why: web users have no device token and original QR assets must remain store-isolated.
 - Youzan push callbacks: when the Event-Sign header is present, verify MD5(client_id + raw HTTP body + client_secret) only, with no fallback to body.sign. Header-less legacy body.sign messages are read-only hints and stay blocked. Why: only the raw body is covered by the current official signature.
 - Youzan member-asset notifications only trigger read-only re-queries into youzan_member_asset_observations. They never write wallets, coupons or the points ledger. Why: the outer fields are unsigned and the ERP is the single ledger.
 - Support conversations: external replies only by primary_agent_id with matching assignment_version, enforced inside DB RPCs (support_update_assignment / support_staff_post_message) in one transaction; internal notes open to any authorized collaborator. Why: prevents race between old owner and HQ takeover.
