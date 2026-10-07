@@ -7,12 +7,14 @@ const SALE_STATUSES = ["TRADE_PAID", "TRADE_SUCCESS", "WAIT_SELLER_SEND_GOODS", 
 
 export function compensationDeps(): CompensationDeps {
   return {
-    listOrders: async ({ since, limit }) => {
-      const { data, error } = await supabaseAdmin.from("youzan_orders")
+    listOrders: async ({ since, limit, tids }) => {
+      let q = supabaseAdmin.from("youzan_orders")
         .select("tid,shop_id,status,pay_time,raw")
         .gte("pay_time", since).in("status", SALE_STATUSES)
         .not("shop_id", "is", null)
         .order("pay_time", { ascending: true }).limit(limit);
+      if (tids?.length) q = q.in("tid", tids);
+      const { data, error } = await q;
       if (error) throw new Error(`读取近期订单失败：${error.message}`);
       return (data ?? []) as never;
     },

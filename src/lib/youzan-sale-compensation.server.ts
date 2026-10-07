@@ -14,7 +14,7 @@ export const MAX_WINDOW_HOURS = 72;
 
 export type CandidateOrder = { tid: string; shop_id: string; status: string | null; pay_time: string; raw: unknown };
 export type CompensationDeps = {
-  listOrders(q: { since: string; limit: number }): Promise<CandidateOrder[]>;
+  listOrders(q: { since: string; limit: number; tids?: string[] }): Promise<CandidateOrder[]>;
   /** tid → 已存在的 paid 销售事件数（任意状态，含 oversold）。 */
   committedUnits(tids: string[]): Promise<Record<string, number>>;
   adapter(): YouzanSaleAdapter;
@@ -28,12 +28,12 @@ function refundState(raw: unknown): number {
 }
 
 export async function compensateRecentYouzanSales(d: CompensationDeps, opts: {
-  now?: Date; windowHours?: number; limit?: number; dryRun?: boolean;
+  now?: Date; windowHours?: number; limit?: number; dryRun?: boolean; /** 定点补偿：仍受时间窗与 floor 约束。 */ tids?: string[];
 } = {}) {
   const now = opts.now ?? new Date();
   const hours = Math.max(1, Math.min(opts.windowHours ?? 48, MAX_WINDOW_HOURS));
   const since = new Date(Math.max(now.getTime() - hours * 3600_000, Date.parse(SALE_COMPENSATION_FLOOR))).toISOString();
-  const rows = await d.listOrders({ since, limit: Math.max(1, Math.min(opts.limit ?? 200, 500)) });
+  const rows = await d.listOrders({ since, limit: Math.max(1, Math.min(opts.limit ?? 200, 500)), ...(opts.tids?.length ? { tids: opts.tids } : {}) });
   const done = await d.committedUnits(rows.map((r) => r.tid));
   const out = { since, scanned: rows.length, skipped: 0, already: 0, committed: 0, idempotent: 0, unmatched: 0, failed: 0, planned: [] as PlannedLine[] };
   for (const row of rows) {

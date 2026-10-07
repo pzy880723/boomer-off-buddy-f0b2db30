@@ -76,3 +76,15 @@ describe("bounded recent Youzan sale compensation", () => {
     assert.deepEqual(r.planned, [{ tid: "DRY", sourceOrderId: "DRY#oid:DRY-1#0", skuId: "sku-nara", locationId: "loc-xtd" }]);
   });
 });
+
+test("targeted tids still obey the window and floor", async () => {
+  const seen: Array<{ since: string; tids?: string[] }> = [];
+  const r = await compensateRecentYouzanSales({
+    listOrders: async (q) => { seen.push(q); return []; },
+    committedUnits: async () => ({}),
+    adapter: () => { throw new Error("unused"); },
+  }, { now: NOW, tids: ["E2026"], windowHours: 72 });
+  assert.deepEqual(seen[0].tids, ["E2026"]);
+  assert.ok(seen[0].since >= SALE_COMPENSATION_FLOOR);
+  assert.equal(r.scanned, 0);
+});

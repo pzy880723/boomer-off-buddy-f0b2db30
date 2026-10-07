@@ -1,5 +1,5 @@
 // POST /api/public/hooks/youzan-sale-compensation  （service-role Bearer；定时器调用）
-// body: { window_hours?: 1..72, limit?: 1..500, dry_run?: boolean }
+// body: { window_hours?: 1..72, limit?: 1..500, dry_run?: boolean, tids?: string[≤20] }
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 
@@ -7,6 +7,7 @@ const Body = z.object({
   window_hours: z.number().int().min(1).max(72).optional(),
   limit: z.number().int().min(1).max(500).optional(),
   dry_run: z.boolean().optional(),
+  tids: z.array(z.string().regex(/^[A-Za-z0-9_-]{6,64}$/)).min(1).max(20).optional(),
 }).strict();
 
 export const Route = createFileRoute("/api/public/hooks/youzan-sale-compensation")({
@@ -31,7 +32,7 @@ export const Route = createFileRoute("/api/public/hooks/youzan-sale-compensation
           const { compensateRecentYouzanSales } = await import("@/lib/youzan-sale-compensation.server");
           const { compensationDeps } = await import("@/lib/youzan-sale-compensation-db.server");
           const data = await compensateRecentYouzanSales(compensationDeps(), {
-            windowHours: body.window_hours, limit: body.limit, dryRun: body.dry_run,
+            windowHours: body.window_hours, limit: body.limit, dryRun: body.dry_run, tids: body.tids,
           });
           return Response.json({ ok: data.failed === 0, data }, { status: data.failed ? 500 : 200 });
         } catch {
