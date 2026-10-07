@@ -7,7 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { readCardPrintContext } from '@/lib/card-print.functions';
-import { loadCatalog, assertQrLocation, permitted, resolveSelection, sameOriginUrl, type CardPreset, type Selection } from '@/lib/card-print/contract';
+import { loadCatalog, assertQrLocation, permitted, resolveSelection, cardSpecifications, matchesSpecification, type CardPreset, type Selection } from '@/lib/card-print/contract';
 import type { QrImage } from '@/lib/card-print/qr-policy';
 
 const categoryNames: Record<CardPreset['category'], string> = { qr: '扫码入口', store_notice: '店铺提示', ip: 'IP', brand: '品牌', category: '品类', import_origin: '进口来源', product: '商品推荐' };
@@ -18,7 +18,7 @@ export function CardPrintWorkspace() {
   const [selection, setSelection] = useState<Selection[]>([]);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
-  const [orientation, setOrientation] = useState('all');
+  const [specification, setSpecification] = useState('all');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [pdfUrl, setPdfUrl] = useState('');
@@ -56,7 +56,7 @@ export function CardPrintWorkspace() {
     finally { setBusy(false); }
   }
   const images: QrImage[] = context.data?.channels ?? [];
-  const visible = presets.filter(p => (category === 'all' || p.category === category) && (orientation === 'all' || p.orientation === orientation) && p.name.toLowerCase().includes(search.toLowerCase()) && (!p.location_id || p.location_id === locationId));
+  const visible = presets.filter(p => (category === 'all' || p.category === category) && matchesSpecification(p, specification) && p.name.toLowerCase().includes(search.toLowerCase()) && (!p.location_id || p.location_id === locationId));
   const missingQr = (p: CardPreset) => p.category === 'qr' && !images.some(c => c.channel === p.channel);
   return <div className="mx-auto w-full max-w-7xl space-y-6 p-4 md:p-6">
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -70,7 +70,7 @@ export function CardPrintWorkspace() {
     {(error || context.error) && <p role="alert" className="text-sm text-destructive">{error || '门店或二维码读取失败，请重试。'}</p>}
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <section className="min-w-0 space-y-4" aria-label="预设选择">
-        <div className="flex flex-wrap gap-2"><div className="relative min-w-0 flex-1"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input aria-label="搜索预设" className="pl-9" value={search} onChange={e => setSearch(e.target.value)} placeholder="搜索预设" /></div><Select value={category} onValueChange={setCategory}><SelectTrigger className="w-36" aria-label="预设类别"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">全部类别</SelectItem>{Object.entries(categoryNames).map(([key, name]) => <SelectItem key={key} value={key}>{name}</SelectItem>)}</SelectContent></Select><Select value={orientation} onValueChange={setOrientation}><SelectTrigger className="w-28" aria-label="横竖规格"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">全部规格</SelectItem><SelectItem value="landscape">横版</SelectItem><SelectItem value="portrait">竖版</SelectItem></SelectContent></Select></div>
+        <div className="flex flex-wrap gap-2"><div className="relative min-w-0 flex-1"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input aria-label="搜索预设" className="pl-9" value={search} onChange={e => setSearch(e.target.value)} placeholder="搜索预设" /></div><Select value={category} onValueChange={setCategory}><SelectTrigger className="w-36" aria-label="预设类别"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">全部类别</SelectItem>{Object.entries(categoryNames).map(([key, name]) => <SelectItem key={key} value={key}>{name}</SelectItem>)}</SelectContent></Select><Select value={specification} onValueChange={setSpecification}><SelectTrigger className="w-56 max-w-full" aria-label="卡片规格"><SelectValue /></SelectTrigger><SelectContent>{cardSpecifications.map(spec => <SelectItem key={spec.value} value={spec.value}>{spec.label}</SelectItem>)}</SelectContent></Select></div>
         {!visible.length && <div className="border-y py-12 text-center text-sm text-muted-foreground">{presets.length ? '暂无匹配预设' : '暂无已接入的预设原图'}</div>}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {visible.map(p => {

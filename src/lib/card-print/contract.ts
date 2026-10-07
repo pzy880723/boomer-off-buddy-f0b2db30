@@ -71,7 +71,19 @@ export function permitted(p: CardPreset): boolean {
   if (!p.enabled) return false;
   if (p.category === 'qr' || p.category === 'store_notice') return p.orientation === 'landscape' && p.width_mm === 90 && p.height_mm === 30;
   if (p.category === 'product') return p.width_mm === 60 && p.height_mm === 90 && p.orientation === 'portrait';
+  if (p.width_mm === 80 && p.height_mm === 40) return p.orientation === 'landscape' && (p.category === 'ip' || p.category === 'category');
   return p.orientation === (p.width_mm >= p.height_mm ? 'landscape' : 'portrait');
+}
+export const cardSpecifications = [
+  { value: 'all', label: '全部规格' },
+  { value: 'hook', label: '挂钩卡 80×40mm', width: 80, height: 40 },
+  { value: 'shelf', label: '货架横卡 90×30mm', width: 90, height: 30 },
+  { value: 'standing', label: '介绍立牌 80×120mm', width: 80, height: 120 },
+] as const;
+export function matchesSpecification(p: CardPreset, specification: string): boolean {
+  const spec = cardSpecifications.find(s => s.value === specification);
+  if (!spec) return false;
+  return spec.value === 'all' || (p.width_mm === spec.width && p.height_mm === spec.height);
 }
 export type Selection = { id: string; quantity: number };
 export const SelectionSchema = z.array(z.object({ id: z.string(), quantity: z.number().int().min(1).max(100) }).strict()).max(200);
@@ -91,6 +103,16 @@ export function resolveSelection(presets: CardPreset[], input: unknown, location
 }
 export type Placement = { preset: CardPreset; x: number; y: number; width: number; height: number; rotated: boolean };
 export function packA4(cards: CardPreset[]): Placement[][] {
+  if (cards.length && cards.every(p => p.width_mm === 80 && p.height_mm === 40)) {
+    if (cards.some(p => !permitted(p))) throw new Error('禁止输出停用卡片');
+    const pages: Placement[][] = [];
+    for (let offset = 0; offset < cards.length; offset += 17) {
+      pages.push(cards.slice(offset, offset + 17).map((preset, index) => index < 14
+        ? { preset, x: 5 + Math.floor(index / 7) * 80, y: 5 + index % 7 * 40, width: 80, height: 40, rotated: false }
+        : { preset, x: 165, y: 5 + (index - 14) * 80, width: 40, height: 80, rotated: true }));
+    }
+    return pages;
+  }
   // Integer millimetres are not assumed: all positions remain in physical mm.
   const pages: Placement[][] = [];
   const pending = [...cards].sort((a, b) => b.width_mm * b.height_mm - a.width_mm * a.height_mm);

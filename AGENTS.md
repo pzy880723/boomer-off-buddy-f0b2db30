@@ -1,5 +1,6 @@
 # Architecture rules
 - PC card printing adapts the native same-origin array manifest and embeds original single-card PDF pages without rasterization; eligibility is rechecked before output. Why: preserves embedded fonts and approved layouts while blocking retired presets without new permissions.
+- Card specification filtering uses exact manifest dimensions; homogeneous hook-card selections use a dedicated physical packing branch, while mixed selections retain the general packer. Why: avoids orientation-based misclassification and preserves existing mixed-layout behavior.
 - PC QR reads use authenticated server functions with the handheld role/location and private-object path semantics, without borrowing device credentials. Why: web users have no device token and original QR assets must remain store-isolated.
 - Youzan push callbacks: when the Event-Sign header is present, verify MD5(client_id + raw HTTP body + client_secret) only, with no fallback to body.sign. Header-less legacy body.sign messages are read-only hints and stay blocked. Why: only the raw body is covered by the current official signature.
 - Youzan member-asset notifications only trigger read-only re-queries into youzan_member_asset_observations. They never write wallets, coupons or the points ledger. Why: the outer fields are unsigned and the ERP is the single ledger.

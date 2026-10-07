@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Manifest, Preset, permitted, packA4, resolveSelection, sameOriginUrl, channels, parseNativeManifest, assertQrLocation, type CardPreset } from './contract';
+import { Manifest, Preset, permitted, packA4, resolveSelection, sameOriginUrl, channels, parseNativeManifest, assertQrLocation, matchesSpecification, type CardPreset } from './contract';
 import { projectQr } from './qr-policy';
 const loc = '11111111-1111-4111-8111-111111111111';
 const base = (extra: Partial<CardPreset> = {}): CardPreset => ({ id: 'one', type_id: 'one', name: 'test', category: 'store_notice', enabled: true, orientation: 'landscape', width_mm: 90, height_mm: 30, image_path: '/cards/one.png', ...extra });
@@ -61,6 +61,43 @@ test('193预设合成拼版零间距、原尺寸、无重叠且都在A4范围内
 test('混合横竖尺寸旋转不改变成品面积', () => {
   const cards = [base({ category: 'brand', width_mm: 120, height_mm: 80 }), base({ category: 'ip', orientation: 'portrait', width_mm: 80, height_mm: 120 }), base({ category: 'product', orientation: 'portrait', width_mm: 60, height_mm: 90 })];
   assert.equal(packA4(cards).flat().length, 3);
+});
+const hook = (extra: Partial<CardPreset> = {}) => base({ category: 'ip', width_mm: 80, height_mm: 40, ...extra });
+test('实际宽高独立匹配挂钩、货架、立牌；全部保留其他既有尺寸', () => {
+  const rows = [hook(), base(), base({ category: 'ip', width_mm: 80, height_mm: 120, orientation: 'portrait' }), base({ category: 'brand', width_mm: 120, height_mm: 80 }), base({ category: 'product', width_mm: 60, height_mm: 90, orientation: 'portrait' })];
+  for (const [spec, index] of [['hook', 0], ['shelf', 1], ['standing', 2]] as const) assert.deepEqual(rows.filter(p => matchesSpecification(p, spec)), [rows[index]]);
+  assert.deepEqual(rows.filter(p => matchesSpecification(p, 'all')), rows);
+  assert.equal(matchesSpecification(hook({ orientation: 'portrait' }), 'hook'), true); // filtering uses dimensions, eligibility separately checks orientation
+  assert.equal(matchesSpecification(base({ width_mm: 40, height_mm: 80 }), 'hook'), false);
+  assert.equal(matchesSpecification(hook(), 'unknown'), false);
+});
+test('80×40仅IP品类可用，扫码提示、品牌进口来源商品和停用在输出时拒绝', () => {
+  for (const category of ['ip', 'category'] as const) assert.ok(permitted(hook({ category })));
+  for (const p of [hook({ enabled: false }), hook({ orientation: 'portrait' }), ...(['qr', 'store_notice', 'brand', 'import_origin', 'product'] as const).map(category => hook({ category }))]) {
+    assert.equal(permitted(p), false);
+    assert.throws(() => resolveSelection([p], [{ id: p.id, quantity: 1 }], loc, [...channels]));
+    assert.throws(() => packA4([p]));
+  }
+});
+test('纯80×40每页17：准确坐标、旋转、零间距、数量、边界、不重叠与尺寸', () => {
+  for (const count of [0, 1, 14, 15, 17, 18, 34, 35, 88]) {
+    const cards = Array.from({ length: count }, (_, i) => hook({ id: String(i), category: i % 2 ? 'category' : 'ip' }));
+    const pages = packA4(cards);
+    assert.equal(pages.length, Math.ceil(count / 17));
+    assert.equal(pages.flat().length, count);
+    assert.equal(new Set(pages.flat().map(p => p.preset.id)).size, count);
+    assert.deepEqual(pages.map(p => p.length), Array.from({ length: Math.ceil(count / 17) }, (_, i) => Math.min(17, count - i * 17)));
+    for (const page of pages) for (const [i, a] of page.entries()) {
+      assert.deepEqual([a.x, a.y, a.width, a.height, a.rotated], i < 14 ? [5 + Math.floor(i / 7) * 80, 5 + i % 7 * 40, 80, 40, false] : [165, 5 + (i - 14) * 80, 40, 80, true]);
+      assert.equal(a.width * a.height, a.preset.width_mm * a.preset.height_mm);
+      assert.ok(a.x >= 5 && a.y >= 5 && a.x + a.width <= 205 && a.y + a.height <= 285);
+      for (const b of page.slice(i + 1)) assert.ok(a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y);
+    }
+  }
+});
+test('混合挂钩与货架沿用既有排版而非17张专用格', () => {
+  const pages = packA4([hook(), base()]);
+  assert.deepEqual(pages[0]?.map(p => [p.preset.category, p.x, p.y, p.width, p.height, p.rotated]), [['ip', 5, 5, 80, 40, false], ['store_notice', 85, 5, 90, 30, false]]);
 });
 test('私桶原码隔离、旧dianping目录仅review、停用不签名、不发路径', async () => {
   const id = '0f8fad5b-d9cb-469f-a165-70867728950e';
