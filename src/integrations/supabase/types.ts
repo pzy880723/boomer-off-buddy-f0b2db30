@@ -9632,6 +9632,47 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      claim_channel_sync_tasks_v2: {
+        Args: {
+          p_action?: string
+          p_lease_seconds?: number
+          p_limit?: number
+          p_sku_id?: string
+          p_worker_id: string
+        }
+        Returns: {
+          action: string
+          attempts: number
+          channel: string
+          channel_listing_id: string | null
+          claimed_at: string | null
+          completed_at: string | null
+          created_at: string
+          dedupe_key: string
+          id: string
+          inventory_version: number
+          last_error: string | null
+          lease_expires_at: string | null
+          max_attempts: number
+          next_run_at: string
+          priority: number
+          request_payload: Json
+          response_preview: string | null
+          shop_id: string | null
+          sku_id: string
+          status: string
+          target_stock: number | null
+          trace_id: string | null
+          updated_at: string
+          worker_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "channel_sync_outbox"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       commerce_admin_adjust_membership: {
         Args: {
           p_action: string
@@ -10250,6 +10291,16 @@ export type Database = {
       custom_transfer_reserved: {
         Args: { p_location: string; p_sku: string }
         Returns: number
+      }
+      finish_channel_sync_task: {
+        Args: {
+          p_error?: string
+          p_id: string
+          p_next_run_at?: string
+          p_status: string
+          p_worker_id: string
+        }
+        Returns: boolean
       }
       fulfillment_bind_tote: {
         Args: {

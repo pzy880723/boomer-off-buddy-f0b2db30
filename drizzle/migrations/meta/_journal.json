@@ -302,6 +302,13 @@
       "when": 1791373359506,
       "tag": "0042_commit_youzan_sale_line_v2",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1791373533716,
+      "tag": "0043_channel_sync_fencing",
+      "breakpoints": true
     }
   ]
 }
