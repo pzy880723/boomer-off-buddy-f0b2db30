@@ -164,3 +164,14 @@ test("message_push log insert only uses real youzan_sync_logs columns", async ()
   const insert = src.slice(src.indexOf('action: "message_push"') - 200, src.indexOf('action: "message_push"') + 400);
   assert.doesNotMatch(insert, /\braw:/, "youzan_sync_logs has no raw column; insert silently failed so pushes left no log");
 });
+
+test("trade push business failure is non-success so the platform retries; success stays code 0", async () => {
+  const { tradePushResponse } = await import("./youzan-push-auth.server");
+  const ok = tradePushResponse(null);
+  assert.equal(ok.status, 200);
+  assert.deepEqual(await ok.json(), { code: 0, msg: "success" });
+  const bad = tradePushResponse(new Error("库存扣减未完成"));
+  assert.equal(bad.status, 500);
+  const body = await bad.json() as { code: number };
+  assert.notEqual(body.code, 0);
+});
