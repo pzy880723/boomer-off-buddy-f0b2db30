@@ -48,14 +48,33 @@ export async function loadOriginalImage(image: string): Promise<Buffer> {
   return Buffer.concat(chunks);
 }
 
+export const MEASUREMENT_DETECTION_PROMPT = '只判断图中是否有放在商品旁边、用于测量商品尺寸的外部独立测量工具：尺子、卷尺、卡尺、测量垫。' +
+  '以下属于商品本身，不算测量工具：唱臂及其刻度、收音机频率表/调谐刻度、旋钮或仪表刻度、钟表盘、装饰网格或格纹、印刷的型号/年份/文字。' +
+  '仅返回 JSON {"measurement_tool":true/false,"confidence":0至1}。看到外部测量工具但不确定是否用于测量时返回 true。';
+
+/** Marks the failing stage without changing the error type (TimeoutError stays TimeoutError) or adding sensitive text. */
+export function withImageStage<T>(stage: "measurement_detection" | "image_generation", run: () => Promise<T>): Promise<T> {
+  return run().catch((error: unknown) => {
+    if (error && typeof error === "object") {
+      try { Object.defineProperty(error, "stage", { value: stage, enumerable: true, configurable: true }); } catch { /* frozen */ }
+      throw error;
+    }
+    throw Object.assign(new Error(`${stage} failed`), { stage });
+  });
+}
+
 export async function measurementProtectionRequired(image: string, key: string): Promise<boolean> {
+  return withImageStage("measurement_detection", () => detectMeasurement(image, key));
+}
+
+async function detectMeasurement(image: string, key: string): Promise<boolean> {
   // Upstream latency varies; background detection does not block the listing UI.
   const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST", signal: AbortSignal.timeout(60_000),
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({ model: "google/gemini-2.5-flash", max_tokens: 512, response_format: { type: "json_object" },
       messages: [{ role: "user", content: [
-        { type: "text", text: '图中是否有用于测量商品的尺子、卷尺、卡尺、网格测量垫或带尺寸刻度的工具？仅返回 JSON {"measurement_tool":true/false,"confidence":0至1}。不确定时返回 true。' },
+        { type: "text", text: MEASUREMENT_DETECTION_PROMPT },
         { type: "image_url", image_url: { url: image } },
       ] }],
     }),

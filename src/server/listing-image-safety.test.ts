@@ -140,3 +140,46 @@ test("confident no-tool detection still reaches the image editing provider", asy
   assert.deepEqual(await module.exports.aiPrepareListingImage({ image_url: "https://fixture.test/image" }), { b64: "ZWRpdGVk", mime: "image/png" });
   assert.deepEqual(models, ["google/gemini-2.5-flash", "google/gemini-3.1-flash-image"]);
 });
+
+test("detector only protects external measuring tools, excluding product scales like tonearms and radio dials", async () => {
+  let prompt = "";
+  globalThis.fetch = async (_url, init) => {
+    prompt = JSON.parse(String(init?.body)).messages[0].content[0].text;
+    return Response.json({ choices: [{ message: { content: '{"measurement_tool":false,"confidence":0.99}' } }] });
+  };
+  assert.equal(await measurementProtectionRequired("https://fixture.test/image", "fixture"), false);
+  for (const tool of ["尺子", "卷尺", "卡尺", "测量垫", "外部"]) assert.match(prompt, new RegExp(tool));
+  for (const part of ["唱臂", "频率", "旋钮", "装饰网格", "型号", "年份"]) assert.match(prompt, new RegExp(part));
+  assert.match(prompt, /不算测量工具/);
+});
+test("measurement failure keeps TimeoutError type and adds a safe stage marker", async () => {
+  const controller = new AbortController();
+  AbortSignal.timeout = () => controller.signal;
+  globalThis.fetch = async (_url, init) => { controller.abort(new DOMException("deadline", "TimeoutError")); init?.signal?.throwIfAborted(); throw Error("x"); };
+  await assert.rejects(measurementProtectionRequired("https://fixture.test/image?token=secret", "fixture"), (e: any) => {
+    assert.equal(e.name, "TimeoutError"); assert.equal(e.stage, "measurement_detection");
+    assert.doesNotMatch(String(e.message), /token=secret/); return true;
+  });
+});
+test("image generation HTTP error is stage-marked and never echoes upstream text", async () => {
+  process.env.LOVABLE_API_KEY = "fixture";
+  let n = 0;
+  globalThis.fetch = async () => (++n === 1
+    ? Response.json({ choices: [{ message: { content: '{"measurement_tool":false,"confidence":1}' } }] })
+    : new Response("https://x.test/sign?token=leak data:image/png;base64,AAAA", { status: 500 }));
+  await assert.rejects(module.exports.aiPrepareListingImage({ image_url: "https://fixture.test/image" }), (e: any) => {
+    assert.equal(e.stage, "image_generation"); assert.match(e.message, /500/); assert.doesNotMatch(e.message, /token|base64/); return true;
+  });
+});
+test("listing prompt removes platform watermarks and price tags while keeping product marks", async () => {
+  process.env.LOVABLE_API_KEY = "fixture";
+  let text = "";
+  let n = 0;
+  globalThis.fetch = async (_url, init) => {
+    if (++n === 1) return Response.json({ choices: [{ message: { content: '{"measurement_tool":false,"confidence":1}' } }] });
+    text = JSON.parse(String(init?.body)).messages[0].content[0].text;
+    return Response.json({ choices: [{ message: { images: [{ image_url: { url: "data:image/png;base64,ZQ==" } }] } }] });
+  };
+  await module.exports.aiPrepareListingImage({ image_url: "https://fixture.test/image" });
+  for (const word of ["闲鱼", "水印", "价签|价格牌", "商标", "真实瑕疵", "刻度"]) assert.match(text, new RegExp(word));
+});

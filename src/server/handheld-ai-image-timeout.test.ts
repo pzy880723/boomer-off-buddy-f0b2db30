@@ -8,7 +8,7 @@ const stubs: Record<string, string> = {
   "@/integrations/supabase/client.server": "export const supabaseAdmin = {};",
   "@/server/product-recognition.server": "export const recognizeProductFromImages = () => {};",
   "./listing-image-safety.server":
-    "export const measurementProtectionRequired = async () => false; export const loadOriginalImage = () => {}; export const squareOriginalImage = () => {};",
+    "export const measurementProtectionRequired = async () => false; export const loadOriginalImage = () => {}; export const squareOriginalImage = () => {}; export const withImageStage = (stage, run) => run().catch((e) => { e.stage = stage; throw e; });",
 };
 const bundle = await build({
   entryPoints: ["src/server/handheld-ai.server.ts"],
@@ -55,6 +55,7 @@ test("image generation uses a 60s abort deadline and propagates timeouts for dur
     };
     await assert.rejects(aiPrepareListingImage({ image_url: "https://example.test/image" }), {
       name: "TimeoutError",
+      stage: "image_generation",
     });
     assert.deepEqual(deadlines, [60_000]);
   } finally {
