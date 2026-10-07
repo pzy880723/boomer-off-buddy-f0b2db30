@@ -5,7 +5,7 @@ import { AiListingImageReq } from "@/lib/handheld/schemas";
 import { aiPrepareListingImage } from "@/server/handheld-ai.server";
 import { safeImageJobError } from "@/server/listing-image-safety.server";
 
-export const PRESERVED_ORIGINAL_WARNING = "检测到测量尺子/刻度，为保护测量证据仅补边为正方形，没有进行 AI 重修";
+const PRESERVED_ORIGINAL_WARNING = "检测到测量尺子/刻度，为保护测量证据仅补边为正方形，没有进行 AI 重修";
 
 export const Route = createFileRoute("/api/public/handheld/ai/prepare-listing-image")({
   server: {
