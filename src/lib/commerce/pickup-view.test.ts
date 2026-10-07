@@ -69,3 +69,26 @@ describe("order create guard", () => {
     assert.equal(pickupCreateGuard({ fulfillment_method: "express", courier_service_code: "PLATFORM_RECOMMENDED", shipping_address: { a: 1 } }), null);
   });
 });
+
+describe("order list pickup projection", () => {
+  test("list exposes only per-store status and redeemed time, never codes or tokens", async () => {
+    const { buildPickupListProjection } = await import("./pickup-view");
+    const rows = buildPickupListProjection({
+      order: { fulfillment_method: "pickup", payment_status: "paid", order_status: "processing" },
+      fulfillments: [
+        { id: "f1", location_id: "L1", status: "allocated", handed_over_at: null },
+        { id: "f2", location_id: "L2", status: "handover_ready", handed_over_at: null },
+        { id: "f3", location_id: "L3", status: "handed_over", handed_over_at: "2026-10-07T12:00:00Z" },
+        { id: "f4", location_id: "L4", status: "picked", handed_over_at: null },
+      ],
+      storeName: (id) => `店${id}`,
+      refundActive: false,
+      shortageFulfillmentIds: ["f4"],
+    });
+    assert.deepEqual(rows.map((r) => r.status), ["preparing", "ready", "redeemed", "blocked"]);
+    assert.equal(rows[2].redeemed_at, "2026-10-07T12:00:00Z");
+    const json = JSON.stringify(rows);
+    assert.doesNotMatch(json, /code|qr|token/);
+    assert.deepEqual(buildPickupListProjection({ order: { fulfillment_method: "shipping", payment_status: "paid", order_status: "processing" }, fulfillments: [], storeName: () => null, refundActive: false, shortageFulfillmentIds: [] }), []);
+  });
+});
