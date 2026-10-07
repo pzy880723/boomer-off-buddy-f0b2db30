@@ -88,6 +88,33 @@ export async function pushStockToYouzan(
   }
   const branchToken = await ensureAccessToken(branchShop);
 
+  // A prior delist may remove the branch channel identity. An authoritative
+  // zero warehouse read can close this task without re-publishing the item.
+  if (targetStock === 0) {
+    const { data: sku, error: skuError } = await supabase.from("inv_skus").select("sku_scope").eq("id", link.sku_id).single();
+    if (skuError) throw new Error(skuError.message);
+    if (sku.sku_scope === "custom") {
+      const hq = await getHqShop();
+      const { data: hqLink, error: hqError } = await supabase.from("sku_youzan_links").select("yz_item_id")
+        .eq("sku_id", link.sku_id).eq("shop_id", hq.id).single();
+      if (hqError) throw new Error(hqError.message);
+      const warehouseCode = String((branchShop as { warehouse_code?: string }).warehouse_code ?? "");
+      const accessToken = await ensureAccessToken(hq);
+      const master = await findHqSpuById(accessToken, Number(hqLink.yz_item_id));
+      if (!warehouseCode || !master?.skuCode) throw new Error("售出商品的门店仓库或规格映射缺失");
+      const checked = await callYouzanApiVerbose({ accessToken,
+        method: "youzan.retail.open.query.warehousestock", version: "1.0.0",
+        params: { warehouse_code: warehouseCode, sku_codes: [master.skuCode] }, timeoutMs: 20_000 });
+      const rows = Array.isArray(checked.payload) ? checked.payload as Array<Record<string, unknown>> : [];
+      const row = rows.find(r => r.sku_code === master.skuCode);
+      if (!row) throw new Error("有赞仓库未返回目标规格库存");
+      if (Number(row.stock_num) === 0) {
+        await beforeWrite?.();
+        return;
+      }
+    }
+  }
+
   // Step 1: 确保拿到分店真实 item_id / sku_id
   const resolved = await resolveBranchItemIds(link, branchShop, branchToken);
 

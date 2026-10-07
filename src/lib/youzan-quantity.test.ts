@@ -25,6 +25,16 @@ test("channel stock jobs use the document-managed stock path and recheck before 
   assert.match(sync, /await beforeWrite\?\.\(\);\s*const result = await callYouzanApiVerbose\(\{ accessToken,\s*method: "youzan.retail.open.stock.adjust"/);
 });
 
+test("a sold branch item already removed from sale can finish from verified zero warehouse stock", () => {
+  const source = readFileSync(new URL("./youzan-sync.functions.ts", import.meta.url), "utf8");
+  const helper = source.slice(source.indexOf("export async function pushStockToYouzan"), source.indexOf("// resolveBranchItemIds"));
+  const early = helper.slice(0, helper.indexOf("const resolved ="));
+  assert.match(early, /targetStock === 0/);
+  assert.match(early, /youzan.retail.open.query.warehousestock/);
+  assert.match(early, /Number\(row\.stock_num\) === 0/);
+  assert.match(early, /await beforeWrite\?\.\(\);\s*return;/);
+});
+
 test("document-managed stock is an absolute scoped quantity, never an increment", () => {
   const params = buildWarehouseStockAdjustment({ warehouseCode: "MD00003", skuCode: "BM528690012347", quantity: 1, operationId: "ERPtest", createTime: "2026-09-24 12:00:00" });
   assert.equal(params.warehouse_code, "MD00003");
