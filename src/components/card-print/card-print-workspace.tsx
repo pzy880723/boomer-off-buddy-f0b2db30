@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useServerFn } from '@tanstack/react-start';
 import { useQuery } from '@tanstack/react-query';
-import { Download, Printer, RefreshCw, Search } from 'lucide-react';
+import { Download, Minus, Plus, Printer, RefreshCw, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -30,6 +30,17 @@ export function CardPrintWorkspace() {
   useEffect(() => () => { if (pdfUrl) URL.revokeObjectURL(pdfUrl); }, [pdfUrl]);
   const clearPreview = () => { setPdfUrl(''); setPages(0); };
   const updateSelection = (next: Selection[]) => { clearPreview(); setSelection(next); };
+  const [qtyDrafts, setQtyDrafts] = useState<Record<string, string>>({});
+  // Commit a quantity edit: empty/invalid input keeps the existing value, everything else clamps into 1..100.
+  const commitQty = (id: string, raw: string) => {
+    setQtyDrafts(d => { if (!(id in d)) return d; const next = { ...d }; delete next[id]; return next; });
+    const current = selection.find(s => s.id === id);
+    if (!current) return;
+    const n = Number.parseInt(raw, 10);
+    if (!Number.isFinite(n) || n < 1) return;
+    const clamped = Math.min(100, n);
+    if (clamped !== current.quantity) updateSelection(selection.map(s => s.id === id ? { ...s, quantity: clamped } : s));
+  };
   async function loadManifest() {
     setBusy(true); setError(''); clearPreview(); setSelection([]); setPresets([]);
     try {
@@ -77,7 +88,7 @@ export function CardPrintWorkspace() {
             const selected = selection.find(s => s.id === p.id), missing = missingQr(p);
             return <div key={p.id} className="overflow-hidden rounded-md border bg-card">
               <div className="flex h-36 items-center justify-center bg-muted p-3"><div className="relative max-h-full max-w-full" style={{ aspectRatio: `${p.width_mm}/${p.height_mm}`, height: p.width_mm >= p.height_mm ? undefined : '100%', width: p.width_mm >= p.height_mm ? '100%' : undefined }}><img src={p.thumbnail_path ?? p.image_path} alt={p.name} className="h-full w-full object-contain" />{p.qr_box && (() => { const code = images.find(c => c.channel === p.channel); return code ? <img src={code.image_url} alt="" className="absolute" style={{ left: `${p.qr_box.x_mm / p.width_mm * 100}%`, top: `${p.qr_box.y_mm / p.height_mm * 100}%`, width: `${p.qr_box.size_mm / p.width_mm * 100}%`, height: `${p.qr_box.size_mm / p.height_mm * 100}%` }} /> : null; })()}</div></div>
-              <div className="space-y-2 p-3"><label className="flex items-start gap-2"><Checkbox aria-label={`选择${p.name}`} checked={!!selected} disabled={!locationId || missing || busy} onCheckedChange={checked => updateSelection(checked ? [...selection, { id: p.id, quantity: 1 }] : selection.filter(s => s.id !== p.id))} /><span className="min-w-0 break-words text-sm font-medium">{p.name}</span></label><div className="flex items-center justify-between gap-2"><span className="text-xs text-muted-foreground">{p.width_mm}×{p.height_mm}mm · {p.orientation === 'landscape' ? '横版' : '竖版'}</span>{selected && <Input aria-label={`${p.name}数量`} type="number" min={1} max={100} className="h-7 w-16" value={selected.quantity} onChange={e => updateSelection(selection.map(s => s.id === p.id ? { ...s, quantity: Number(e.target.value) } : s))} />}</div>{missing && <p className="text-xs text-warning">门店缺码 / 未启用</p>}</div>
+              <div className="space-y-2 p-3"><label className="flex items-start gap-2"><Checkbox aria-label={`选择${p.name}`} checked={!!selected} disabled={!locationId || missing || busy} onCheckedChange={checked => updateSelection(checked ? [...selection, { id: p.id, quantity: 1 }] : selection.filter(s => s.id !== p.id))} /><span className="min-w-0 break-words text-sm font-medium">{p.name}</span></label><div className="flex items-center justify-between gap-2"><span className="text-xs text-muted-foreground">{p.width_mm}×{p.height_mm}mm · {p.orientation === 'landscape' ? '横版' : '竖版'}</span>{selected && <div className="flex items-center gap-1"><Button variant="outline" size="icon" className="h-7 w-7 shrink-0" aria-label={`减少${p.name}数量`} disabled={selected.quantity <= 1} onClick={() => commitQty(p.id, String(selected.quantity - 1))}><Minus /></Button><Input aria-label={`${p.name}数量`} type="number" min={1} max={100} inputMode="numeric" className="h-7 w-14 text-center font-bold" value={qtyDrafts[p.id] ?? String(selected.quantity)} onChange={e => { const raw = e.target.value; setQtyDrafts(d => ({ ...d, [p.id]: raw })); const n = Number.parseInt(raw, 10); if (Number.isFinite(n) && n >= 1) updateSelection(selection.map(s => s.id === p.id ? { ...s, quantity: Math.min(100, n) } : s)); }} onBlur={e => commitQty(p.id, e.target.value)} /><Button variant="outline" size="icon" className="h-7 w-7 shrink-0" aria-label={`增加${p.name}数量`} disabled={selected.quantity >= 100} onClick={() => commitQty(p.id, String(selected.quantity + 1))}><Plus /></Button></div>}</div>{missing && <p className="text-xs text-warning">门店缺码 / 未启用</p>}</div>
             </div>;
           })}
         </div>
