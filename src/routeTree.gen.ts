@@ -200,6 +200,7 @@ import { Route as ApiPublicHandheldOrdersIdRouteImport } from './routes/api/publ
 import { Route as ApiPublicHandheldParcelsIdRouteImport } from './routes/api/public/handheld/parcels.$id'
 import { Route as ApiPublicHandheldParcelsCountsRouteImport } from './routes/api/public/handheld/parcels.counts'
 import { Route as ApiPublicHandheldPrintJobsLeaseRouteImport } from './routes/api/public/handheld/print-jobs.lease'
+import { Route as ApiPublicHandheldPrintCustomCardsRouteImport } from './routes/api/public/handheld/print.custom-cards'
 import { Route as ApiPublicHandheldPrintStoreQrRouteImport } from './routes/api/public/handheld/print.store-qr'
 import { Route as ApiPublicHandheldProductsLookupRouteImport } from './routes/api/public/handheld/products.lookup'
 import { Route as ApiPublicHandheldRfidEpcRouteImport } from './routes/api/public/handheld/rfid.$epc'
@@ -266,6 +267,7 @@ import { Route as ApiPublicHandheldItemsUploadImageMultipartRouteImport } from '
 import { Route as ApiPublicHandheldLabelTemplatesIdSetDefaultRouteImport } from './routes/api/public/handheld/label-templates.$id.set-default'
 import { Route as ApiPublicHandheldNotificationsIdReadRouteImport } from './routes/api/public/handheld/notifications.$id.read'
 import { Route as ApiPublicHandheldPrintJobsIdAckRouteImport } from './routes/api/public/handheld/print-jobs.$id.ack'
+import { Route as ApiPublicHandheldPrintCustomCardsIdRouteImport } from './routes/api/public/handheld/print.custom-cards.$id'
 import { Route as ApiPublicHandheldSupportConversationsIdRouteImport } from './routes/api/public/handheld/support.conversations.$id'
 import { Route as ApiPublicHandheldTransfersIdConfirmRouteImport } from './routes/api/public/handheld/transfers.$id.confirm'
 import { Route as ApiPublicHandheldTransfersIdScanRouteImport } from './routes/api/public/handheld/transfers.$id.scan'
@@ -285,6 +287,7 @@ import { Route as ApiPublicStorefrontShortagesIdConfirmRefundRouteImport } from 
 import { Route as ApiPublicStorefrontShortagesIdRespondRouteImport } from './routes/api/public/storefront/shortages.$id.respond'
 import { Route as ApiPublicStorefrontSupportConversationsIdRouteImport } from './routes/api/public/storefront/support.conversations.$id'
 import { Route as ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteImport } from './routes/api/public/handheld/parcels.items.$itemId.pack-pieces'
+import { Route as ApiPublicHandheldPrintCustomCardsIdPublishRouteImport } from './routes/api/public/handheld/print.custom-cards.$id.publish'
 import { Route as ApiPublicHandheldSupportConversationsIdAssignmentRouteImport } from './routes/api/public/handheld/support.conversations.$id.assignment'
 import { Route as ApiPublicPosOrdersIdReturnsPreviewRouteImport } from './routes/api/public/pos/orders.$id.returns.preview'
 import { Route as ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateImageRouteImport } from './routes/api/public/handheld/parcels.items.$itemId.pack-pieces.estimate-image'
@@ -1337,6 +1340,12 @@ const ApiPublicHandheldPrintJobsLeaseRoute =
     path: '/api/public/handheld/print-jobs/lease',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHandheldPrintCustomCardsRoute =
+  ApiPublicHandheldPrintCustomCardsRouteImport.update({
+    id: '/api/public/handheld/print/custom-cards',
+    path: '/api/public/handheld/print/custom-cards',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHandheldPrintStoreQrRoute =
   ApiPublicHandheldPrintStoreQrRouteImport.update({
     id: '/api/public/handheld/print/store-qr',
@@ -1727,6 +1736,12 @@ const ApiPublicHandheldPrintJobsIdAckRoute =
     path: '/api/public/handheld/print-jobs/$id/ack',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHandheldPrintCustomCardsIdRoute =
+  ApiPublicHandheldPrintCustomCardsIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => ApiPublicHandheldPrintCustomCardsRoute,
+  } as any)
 const ApiPublicHandheldSupportConversationsIdRoute =
   ApiPublicHandheldSupportConversationsIdRouteImport.update({
     id: '/$id',
@@ -1840,6 +1855,12 @@ const ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute =
     id: '/items/$itemId/pack-pieces',
     path: '/items/$itemId/pack-pieces',
     getParentRoute: () => ApiPublicHandheldParcelsRoute,
+  } as any)
+const ApiPublicHandheldPrintCustomCardsIdPublishRoute =
+  ApiPublicHandheldPrintCustomCardsIdPublishRouteImport.update({
+    id: '/publish',
+    path: '/publish',
+    getParentRoute: () => ApiPublicHandheldPrintCustomCardsIdRoute,
   } as any)
 const ApiPublicHandheldSupportConversationsIdAssignmentRoute =
   ApiPublicHandheldSupportConversationsIdAssignmentRouteImport.update({
@@ -2058,6 +2079,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/parcels/$id': typeof ApiPublicHandheldParcelsIdRoute
   '/api/public/handheld/parcels/counts': typeof ApiPublicHandheldParcelsCountsRoute
   '/api/public/handheld/print-jobs/lease': typeof ApiPublicHandheldPrintJobsLeaseRoute
+  '/api/public/handheld/print/custom-cards': typeof ApiPublicHandheldPrintCustomCardsRouteWithChildren
   '/api/public/handheld/print/store-qr': typeof ApiPublicHandheldPrintStoreQrRoute
   '/api/public/handheld/products/lookup': typeof ApiPublicHandheldProductsLookupRoute
   '/api/public/handheld/rfid/$epc': typeof ApiPublicHandheldRfidEpcRoute
@@ -2124,6 +2146,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/label-templates/$id/set-default': typeof ApiPublicHandheldLabelTemplatesIdSetDefaultRoute
   '/api/public/handheld/notifications/$id/read': typeof ApiPublicHandheldNotificationsIdReadRoute
   '/api/public/handheld/print-jobs/$id/ack': typeof ApiPublicHandheldPrintJobsIdAckRoute
+  '/api/public/handheld/print/custom-cards/$id': typeof ApiPublicHandheldPrintCustomCardsIdRouteWithChildren
   '/api/public/handheld/support/conversations/$id': typeof ApiPublicHandheldSupportConversationsIdRouteWithChildren
   '/api/public/handheld/transfers/$id/confirm': typeof ApiPublicHandheldTransfersIdConfirmRoute
   '/api/public/handheld/transfers/$id/scan': typeof ApiPublicHandheldTransfersIdScanRoute
@@ -2143,6 +2166,7 @@ export interface FileRoutesByFullPath {
   '/api/public/storefront/shortages/$id/respond': typeof ApiPublicStorefrontShortagesIdRespondRoute
   '/api/public/storefront/support/conversations/$id': typeof ApiPublicStorefrontSupportConversationsIdRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteWithChildren
+  '/api/public/handheld/print/custom-cards/$id/publish': typeof ApiPublicHandheldPrintCustomCardsIdPublishRoute
   '/api/public/handheld/support/conversations/$id/assignment': typeof ApiPublicHandheldSupportConversationsIdAssignmentRoute
   '/api/public/pos/orders/$id/returns/preview': typeof ApiPublicPosOrdersIdReturnsPreviewRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-image': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateImageRoute
@@ -2333,6 +2357,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/parcels/$id': typeof ApiPublicHandheldParcelsIdRoute
   '/api/public/handheld/parcels/counts': typeof ApiPublicHandheldParcelsCountsRoute
   '/api/public/handheld/print-jobs/lease': typeof ApiPublicHandheldPrintJobsLeaseRoute
+  '/api/public/handheld/print/custom-cards': typeof ApiPublicHandheldPrintCustomCardsRouteWithChildren
   '/api/public/handheld/print/store-qr': typeof ApiPublicHandheldPrintStoreQrRoute
   '/api/public/handheld/products/lookup': typeof ApiPublicHandheldProductsLookupRoute
   '/api/public/handheld/rfid/$epc': typeof ApiPublicHandheldRfidEpcRoute
@@ -2399,6 +2424,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/label-templates/$id/set-default': typeof ApiPublicHandheldLabelTemplatesIdSetDefaultRoute
   '/api/public/handheld/notifications/$id/read': typeof ApiPublicHandheldNotificationsIdReadRoute
   '/api/public/handheld/print-jobs/$id/ack': typeof ApiPublicHandheldPrintJobsIdAckRoute
+  '/api/public/handheld/print/custom-cards/$id': typeof ApiPublicHandheldPrintCustomCardsIdRouteWithChildren
   '/api/public/handheld/support/conversations/$id': typeof ApiPublicHandheldSupportConversationsIdRouteWithChildren
   '/api/public/handheld/transfers/$id/confirm': typeof ApiPublicHandheldTransfersIdConfirmRoute
   '/api/public/handheld/transfers/$id/scan': typeof ApiPublicHandheldTransfersIdScanRoute
@@ -2418,6 +2444,7 @@ export interface FileRoutesByTo {
   '/api/public/storefront/shortages/$id/respond': typeof ApiPublicStorefrontShortagesIdRespondRoute
   '/api/public/storefront/support/conversations/$id': typeof ApiPublicStorefrontSupportConversationsIdRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteWithChildren
+  '/api/public/handheld/print/custom-cards/$id/publish': typeof ApiPublicHandheldPrintCustomCardsIdPublishRoute
   '/api/public/handheld/support/conversations/$id/assignment': typeof ApiPublicHandheldSupportConversationsIdAssignmentRoute
   '/api/public/pos/orders/$id/returns/preview': typeof ApiPublicPosOrdersIdReturnsPreviewRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-image': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateImageRoute
@@ -2616,6 +2643,7 @@ export interface FileRoutesById {
   '/api/public/handheld/parcels/$id': typeof ApiPublicHandheldParcelsIdRoute
   '/api/public/handheld/parcels/counts': typeof ApiPublicHandheldParcelsCountsRoute
   '/api/public/handheld/print-jobs/lease': typeof ApiPublicHandheldPrintJobsLeaseRoute
+  '/api/public/handheld/print/custom-cards': typeof ApiPublicHandheldPrintCustomCardsRouteWithChildren
   '/api/public/handheld/print/store-qr': typeof ApiPublicHandheldPrintStoreQrRoute
   '/api/public/handheld/products/lookup': typeof ApiPublicHandheldProductsLookupRoute
   '/api/public/handheld/rfid/$epc': typeof ApiPublicHandheldRfidEpcRoute
@@ -2682,6 +2710,7 @@ export interface FileRoutesById {
   '/api/public/handheld/label-templates/$id/set-default': typeof ApiPublicHandheldLabelTemplatesIdSetDefaultRoute
   '/api/public/handheld/notifications/$id/read': typeof ApiPublicHandheldNotificationsIdReadRoute
   '/api/public/handheld/print-jobs/$id/ack': typeof ApiPublicHandheldPrintJobsIdAckRoute
+  '/api/public/handheld/print/custom-cards/$id': typeof ApiPublicHandheldPrintCustomCardsIdRouteWithChildren
   '/api/public/handheld/support/conversations/$id': typeof ApiPublicHandheldSupportConversationsIdRouteWithChildren
   '/api/public/handheld/transfers/$id/confirm': typeof ApiPublicHandheldTransfersIdConfirmRoute
   '/api/public/handheld/transfers/$id/scan': typeof ApiPublicHandheldTransfersIdScanRoute
@@ -2701,6 +2730,7 @@ export interface FileRoutesById {
   '/api/public/storefront/shortages/$id/respond': typeof ApiPublicStorefrontShortagesIdRespondRoute
   '/api/public/storefront/support/conversations/$id': typeof ApiPublicStorefrontSupportConversationsIdRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteWithChildren
+  '/api/public/handheld/print/custom-cards/$id/publish': typeof ApiPublicHandheldPrintCustomCardsIdPublishRoute
   '/api/public/handheld/support/conversations/$id/assignment': typeof ApiPublicHandheldSupportConversationsIdAssignmentRoute
   '/api/public/pos/orders/$id/returns/preview': typeof ApiPublicPosOrdersIdReturnsPreviewRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-image': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesEstimateImageRoute
@@ -2900,6 +2930,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/parcels/$id'
     | '/api/public/handheld/parcels/counts'
     | '/api/public/handheld/print-jobs/lease'
+    | '/api/public/handheld/print/custom-cards'
     | '/api/public/handheld/print/store-qr'
     | '/api/public/handheld/products/lookup'
     | '/api/public/handheld/rfid/$epc'
@@ -2966,6 +2997,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/label-templates/$id/set-default'
     | '/api/public/handheld/notifications/$id/read'
     | '/api/public/handheld/print-jobs/$id/ack'
+    | '/api/public/handheld/print/custom-cards/$id'
     | '/api/public/handheld/support/conversations/$id'
     | '/api/public/handheld/transfers/$id/confirm'
     | '/api/public/handheld/transfers/$id/scan'
@@ -2985,6 +3017,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/shortages/$id/respond'
     | '/api/public/storefront/support/conversations/$id'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces'
+    | '/api/public/handheld/print/custom-cards/$id/publish'
     | '/api/public/handheld/support/conversations/$id/assignment'
     | '/api/public/pos/orders/$id/returns/preview'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-image'
@@ -3175,6 +3208,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/parcels/$id'
     | '/api/public/handheld/parcels/counts'
     | '/api/public/handheld/print-jobs/lease'
+    | '/api/public/handheld/print/custom-cards'
     | '/api/public/handheld/print/store-qr'
     | '/api/public/handheld/products/lookup'
     | '/api/public/handheld/rfid/$epc'
@@ -3241,6 +3275,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/label-templates/$id/set-default'
     | '/api/public/handheld/notifications/$id/read'
     | '/api/public/handheld/print-jobs/$id/ack'
+    | '/api/public/handheld/print/custom-cards/$id'
     | '/api/public/handheld/support/conversations/$id'
     | '/api/public/handheld/transfers/$id/confirm'
     | '/api/public/handheld/transfers/$id/scan'
@@ -3260,6 +3295,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/shortages/$id/respond'
     | '/api/public/storefront/support/conversations/$id'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces'
+    | '/api/public/handheld/print/custom-cards/$id/publish'
     | '/api/public/handheld/support/conversations/$id/assignment'
     | '/api/public/pos/orders/$id/returns/preview'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-image'
@@ -3457,6 +3493,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/parcels/$id'
     | '/api/public/handheld/parcels/counts'
     | '/api/public/handheld/print-jobs/lease'
+    | '/api/public/handheld/print/custom-cards'
     | '/api/public/handheld/print/store-qr'
     | '/api/public/handheld/products/lookup'
     | '/api/public/handheld/rfid/$epc'
@@ -3523,6 +3560,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/label-templates/$id/set-default'
     | '/api/public/handheld/notifications/$id/read'
     | '/api/public/handheld/print-jobs/$id/ack'
+    | '/api/public/handheld/print/custom-cards/$id'
     | '/api/public/handheld/support/conversations/$id'
     | '/api/public/handheld/transfers/$id/confirm'
     | '/api/public/handheld/transfers/$id/scan'
@@ -3542,6 +3580,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/shortages/$id/respond'
     | '/api/public/storefront/support/conversations/$id'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces'
+    | '/api/public/handheld/print/custom-cards/$id/publish'
     | '/api/public/handheld/support/conversations/$id/assignment'
     | '/api/public/pos/orders/$id/returns/preview'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces/estimate-image'
@@ -3678,6 +3717,7 @@ export interface RootRouteChildren {
   ApiPublicHandheldItemsUploadImageRoute: typeof ApiPublicHandheldItemsUploadImageRouteWithChildren
   ApiPublicHandheldLocationSwitchRoute: typeof ApiPublicHandheldLocationSwitchRoute
   ApiPublicHandheldPrintJobsLeaseRoute: typeof ApiPublicHandheldPrintJobsLeaseRoute
+  ApiPublicHandheldPrintCustomCardsRoute: typeof ApiPublicHandheldPrintCustomCardsRouteWithChildren
   ApiPublicHandheldPrintStoreQrRoute: typeof ApiPublicHandheldPrintStoreQrRoute
   ApiPublicHandheldRfidEpcRoute: typeof ApiPublicHandheldRfidEpcRoute
   ApiPublicHandheldRfidBatchStockInRoute: typeof ApiPublicHandheldRfidBatchStockInRoute
@@ -5064,6 +5104,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldPrintJobsLeaseRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/handheld/print/custom-cards': {
+      id: '/api/public/handheld/print/custom-cards'
+      path: '/api/public/handheld/print/custom-cards'
+      fullPath: '/api/public/handheld/print/custom-cards'
+      preLoaderRoute: typeof ApiPublicHandheldPrintCustomCardsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/handheld/print/store-qr': {
       id: '/api/public/handheld/print/store-qr'
       path: '/api/public/handheld/print/store-qr'
@@ -5526,6 +5573,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldPrintJobsIdAckRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/handheld/print/custom-cards/$id': {
+      id: '/api/public/handheld/print/custom-cards/$id'
+      path: '/$id'
+      fullPath: '/api/public/handheld/print/custom-cards/$id'
+      preLoaderRoute: typeof ApiPublicHandheldPrintCustomCardsIdRouteImport
+      parentRoute: typeof ApiPublicHandheldPrintCustomCardsRoute
+    }
     '/api/public/handheld/support/conversations/$id': {
       id: '/api/public/handheld/support/conversations/$id'
       path: '/$id'
@@ -5658,6 +5712,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/public/handheld/parcels/items/$itemId/pack-pieces'
       preLoaderRoute: typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteImport
       parentRoute: typeof ApiPublicHandheldParcelsRoute
+    }
+    '/api/public/handheld/print/custom-cards/$id/publish': {
+      id: '/api/public/handheld/print/custom-cards/$id/publish'
+      path: '/publish'
+      fullPath: '/api/public/handheld/print/custom-cards/$id/publish'
+      preLoaderRoute: typeof ApiPublicHandheldPrintCustomCardsIdPublishRouteImport
+      parentRoute: typeof ApiPublicHandheldPrintCustomCardsIdRoute
     }
     '/api/public/handheld/support/conversations/$id/assignment': {
       id: '/api/public/handheld/support/conversations/$id/assignment'
@@ -6312,6 +6373,36 @@ const ApiPublicHandheldItemsUploadImageRouteWithChildren =
     ApiPublicHandheldItemsUploadImageRouteChildren,
   )
 
+interface ApiPublicHandheldPrintCustomCardsIdRouteChildren {
+  ApiPublicHandheldPrintCustomCardsIdPublishRoute: typeof ApiPublicHandheldPrintCustomCardsIdPublishRoute
+}
+
+const ApiPublicHandheldPrintCustomCardsIdRouteChildren: ApiPublicHandheldPrintCustomCardsIdRouteChildren =
+  {
+    ApiPublicHandheldPrintCustomCardsIdPublishRoute:
+      ApiPublicHandheldPrintCustomCardsIdPublishRoute,
+  }
+
+const ApiPublicHandheldPrintCustomCardsIdRouteWithChildren =
+  ApiPublicHandheldPrintCustomCardsIdRoute._addFileChildren(
+    ApiPublicHandheldPrintCustomCardsIdRouteChildren,
+  )
+
+interface ApiPublicHandheldPrintCustomCardsRouteChildren {
+  ApiPublicHandheldPrintCustomCardsIdRoute: typeof ApiPublicHandheldPrintCustomCardsIdRouteWithChildren
+}
+
+const ApiPublicHandheldPrintCustomCardsRouteChildren: ApiPublicHandheldPrintCustomCardsRouteChildren =
+  {
+    ApiPublicHandheldPrintCustomCardsIdRoute:
+      ApiPublicHandheldPrintCustomCardsIdRouteWithChildren,
+  }
+
+const ApiPublicHandheldPrintCustomCardsRouteWithChildren =
+  ApiPublicHandheldPrintCustomCardsRoute._addFileChildren(
+    ApiPublicHandheldPrintCustomCardsRouteChildren,
+  )
+
 interface ApiPublicHandheldSupportConversationsIdRouteChildren {
   ApiPublicHandheldSupportConversationsIdAssignmentRoute: typeof ApiPublicHandheldSupportConversationsIdAssignmentRoute
 }
@@ -6551,6 +6642,8 @@ const rootRouteChildren: RootRouteChildren = {
     ApiPublicHandheldItemsUploadImageRouteWithChildren,
   ApiPublicHandheldLocationSwitchRoute: ApiPublicHandheldLocationSwitchRoute,
   ApiPublicHandheldPrintJobsLeaseRoute: ApiPublicHandheldPrintJobsLeaseRoute,
+  ApiPublicHandheldPrintCustomCardsRoute:
+    ApiPublicHandheldPrintCustomCardsRouteWithChildren,
   ApiPublicHandheldPrintStoreQrRoute: ApiPublicHandheldPrintStoreQrRoute,
   ApiPublicHandheldRfidEpcRoute: ApiPublicHandheldRfidEpcRoute,
   ApiPublicHandheldRfidBatchStockInRoute:
