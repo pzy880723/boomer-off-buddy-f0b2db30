@@ -1,4 +1,4 @@
-import { PDFDocument, degrees, rgb, type PDFEmbeddedPage, type PDFImage } from 'pdf-lib';
+import { PDFDocument, PDFEmbeddedPage, degrees, rgb, type PDFImage } from 'pdf-lib';
 import { packA4, sameOriginUrl, type CardPreset } from './contract';
 import type { QrImage } from './qr-policy';
 const mm = (n: number) => n * 72 / 25.4;
@@ -45,9 +45,8 @@ export async function createCardPdf(cards: CardPreset[], qr: QrImage[], origin: 
       if (!original) throw new Error('预设原图缺失');
       const x = mm(c.x), y = mm(297 - c.y - c.height);
       const placement = c.rotated ? { x: x + mm(c.width), y, width: mm(c.preset.width_mm), height: mm(c.preset.height_mm), rotate: degrees(90) } : { x, y, width: mm(c.width), height: mm(c.height) };
-      if ('embed' in original && 'ref' in original && !('scaleToFit' in original)) page.drawPage(original as PDFEmbeddedPage, placement);
-      else if (original.constructor.name === 'PDFEmbeddedPage') page.drawPage(original as PDFEmbeddedPage, placement);
-      else page.drawImage(original as PDFImage, placement);
+      if (original instanceof PDFEmbeddedPage) page.drawPage(original, placement);
+      else page.drawImage(original, placement);
       const box = c.preset.qr_box, code = c.preset.channel ? codes.get(c.preset.channel) : undefined;
       if (box && code) {
         const qx = c.rotated ? box.y_mm : box.x_mm;

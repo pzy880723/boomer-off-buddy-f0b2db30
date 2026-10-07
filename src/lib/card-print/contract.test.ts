@@ -1,9 +1,21 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Manifest, Preset, permitted, packA4, resolveSelection, sameOriginUrl, channels, type CardPreset } from './contract';
+import { Manifest, Preset, permitted, packA4, resolveSelection, sameOriginUrl, channels, parseNativeManifest, assertQrLocation, type CardPreset } from './contract';
 import { projectQr } from './qr-policy';
 const loc = '11111111-1111-4111-8111-111111111111';
 const base = (extra: Partial<CardPreset> = {}): CardPreset => ({ id: 'one', type_id: 'one', name: 'test', category: 'store_notice', enabled: true, orientation: 'landscape', width_mm: 90, height_mm: 30, image_path: '/cards/one.png', ...extra });
+test('原生数组清单保留PDF和缩略图路径，提示竖版拒绝，非法路径和跨店响应拒绝', () => {
+  const row = { id: 'native', title: '原版', subtitle: '', category: '店铺提示', widthMM: 90, heightMM: 30, file: 'native.pdf', thumbnail: 'native.png', pairID: null };
+  const [card] = parseNativeManifest([row]);
+  assert.equal(card?.image_path, '/print-presets/native.pdf');
+  assert.equal(card?.thumbnail_path, '/print-presets/native.png');
+  assert.equal(parseNativeManifest([{ ...row, widthMM: 80, heightMM: 120 }]).filter(permitted).length, 0);
+  assert.throws(() => parseNativeManifest([{ ...row, file: '../other.pdf' }]));
+  assert.throws(() => parseNativeManifest([row, row]));
+  assert.throws(() => assertQrLocation(null, loc));
+  assert.throws(() => assertQrLocation('other', loc));
+  assertQrLocation(loc, loc);
+});
 test('扫码六用途和提示仅90×30，历史停用和竖牌在输出时同样拒绝', () => {
   for (const category of ['qr', 'store_notice'] as const) {
     for (const p of [base({ category, orientation: 'portrait', width_mm: 80, height_mm: 120 }), base({ category, enabled: false }), base({ category, width_mm: 91 })]) {
