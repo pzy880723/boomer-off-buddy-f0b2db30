@@ -35,10 +35,10 @@ export type StoreSubOrder = {
 export const getOrderStoreSubOrders = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ orderId: z.string().uuid() }).parse(input))
-  .handler(async ({ data }): Promise<{ order_no: string | null; shops: StoreSubOrder[] }> => {
+  .handler(async ({ data }): Promise<{ order_no: string | null; fulfillment_method: string; shops: StoreSubOrder[] }> => {
     const { data: order } = await supabaseAdmin
       .from("commerce_orders" as never)
-      .select("id, order_no")
+      .select("id, order_no, fulfillment_method")
       .eq("id", data.orderId)
       .maybeSingle();
     if (!order) throw new Error("订单不存在");
@@ -89,6 +89,7 @@ export const getOrderStoreSubOrders = createServerFn({ method: "GET" })
 
     return {
       order_no: (order as { order_no: string | null }).order_no ?? null,
+      fulfillment_method: (order as { fulfillment_method?: string }).fulfillment_method ?? "shipping",
       shops: rows.map((row) => {
         const shipment = [...row.shipments].sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
         return {
@@ -140,6 +141,15 @@ export const manualShipStoreSubOrder = createServerFn({ method: "POST" })
       .eq("idempotency_key", data.clientOpId)
       .maybeSingle();
     if (existing) return { ok: true as const, replayed: true, shipment: existing };
+    // 自提子单只能经提货码核销交付，不能用手工发货绕过。
+    const { data: fOrder } = await supabaseAdmin
+      .from("fulfillments" as never)
+      .select("order:commerce_orders!inner(fulfillment_method)")
+      .eq("id", data.fulfillmentId)
+      .maybeSingle();
+    if ((fOrder as { order?: { fulfillment_method?: string } } | null)?.order?.fulfillment_method === "pickup") {
+      throw new Error("门店自提订单请使用提货码核销，不能登记快递发货");
+    }
 
     const { data: items } = await supabaseAdmin
       .from("fulfillment_items" as never)
