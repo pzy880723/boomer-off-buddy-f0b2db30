@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { buildCustomerPickups, parsePickupInput, pickupResultMessage, pickupCreateGuard } from "./pickup-view";
+import { buildCustomerPickups, parsePickupInput, pickupResultMessage, pickupCreateGuard, buildPickupListProjection } from "./pickup-view";
 
 const L1 = "a0000000-0000-4000-8000-000000000001";
 const base = {
