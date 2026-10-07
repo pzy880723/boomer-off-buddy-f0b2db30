@@ -1,8 +1,8 @@
 // GET /api/public/go/profile — 已核验 GO 身份 → 已验证 ERP 映射 → ERP Auth 资料（只读）。
 // 不接收客户端 ERP ID，不按手机号绑定，不涉及排班/权限。
 import { createFileRoute } from "@tanstack/react-router";
-import { GO_CORS, goTraced } from "@/server/go-bridge.server";
-import { GoScopeError, authenticateGoIdentity } from "@/server/go-authorization.server";
+import { GO_CORS, GoScopeError, goTraced } from "@/server/go-bridge.server";
+import { authenticateGoIdentity } from "@/server/go-authorization.server";
 import { loadStaffProfile } from "@/server/staff-profile.server";
 
 const noStore = (body: unknown, status = 200) =>
