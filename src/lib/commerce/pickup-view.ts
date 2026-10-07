@@ -14,6 +14,15 @@ export type CustomerPickup = {
 const READY = new Set(["picked", "packed", "handover_ready"]);
 const PAID_ONLY = new Set(["paid", "refund_pending", "partially_refunded", "refunded"]);
 
+/** 与 DB commerce_pickup_block_reason 一致：取消、关闭、售后中均阻断。 */
+export const PICKUP_BLOCKED_ORDER_STATUSES = new Set(["cancelled", "closed", "after_sale"]);
+
+/** 自提联系电话只取已验证账号手机号；无效/未绑定返回 null（拒绝自提）。 */
+export function pickupContactPhone(verified: string | null | undefined): string | null {
+  const v = (verified ?? "").trim();
+  return /^\+?[0-9]{6,20}$/.test(v) ? v : null;
+}
+
 export function buildCustomerPickups(input: {
   order: { fulfillment_method: string | null; payment_status: string; order_status: string };
   fulfillments: Array<{ id: string; location_id: string | null; status: string; store_name: string | null; store_address: string | null }>;
@@ -23,7 +32,7 @@ export function buildCustomerPickups(input: {
 }): CustomerPickup[] {
   const { order } = input;
   if (order.fulfillment_method !== "pickup" || !PAID_ONLY.has(order.payment_status)) return [];
-  const orderBlocked = order.payment_status !== "paid" || ["cancelled", "closed"].includes(order.order_status) || input.refundActive;
+  const orderBlocked = order.payment_status !== "paid" || PICKUP_BLOCKED_ORDER_STATUSES.has(order.order_status) || input.refundActive;
   const byF = new Map(input.codes.map((c) => [c.fulfillment_id, c]));
   return input.fulfillments.map((f) => {
     const c = byF.get(f.id);
@@ -54,6 +63,7 @@ const MESSAGES: Record<string, string> = {
   refund_blocked: "订单退款处理中或已退款，不能交付",
   shortage_blocked: "子单有缺货待顾客确认，不能交付",
   cancelled: "订单已取消或已关闭，不能交付",
+  after_sale_blocked: "订单售后处理中，不能交付",
   unpaid: "订单未付款，不能交付",
   forbidden: "你没有该门店的核销权限",
   rate_limited: "输错次数过多，已暂时锁定，请稍后再试或改用扫码",
@@ -89,7 +99,7 @@ export function buildPickupListProjection(input: {
 }): PickupListItem[] {
   const { order } = input;
   if (order.fulfillment_method !== "pickup" || !PAID_ONLY.has(order.payment_status)) return [];
-  const orderBlocked = order.payment_status !== "paid" || ["cancelled", "closed"].includes(order.order_status) || input.refundActive;
+  const orderBlocked = order.payment_status !== "paid" || PICKUP_BLOCKED_ORDER_STATUSES.has(order.order_status) || input.refundActive;
   return input.fulfillments.map((f) => {
     const status: PickupStatus = f.status === "handed_over" ? "redeemed"
       : orderBlocked || input.shortageFulfillmentIds.includes(f.id) ? "blocked"

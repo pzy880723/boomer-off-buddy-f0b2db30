@@ -10,6 +10,8 @@ $PSQL -q -f tests/sql/pickup/stubs.sql >/dev/null
 mig=${PICKUP_MIGRATION:-}; [ -n "$mig" ] || mig=$(ls drizzle/migrations/*_store_pickup.sql 2>/dev/null | head -1 || true)
 [ -n "$mig" ] || { echo "FAIL store pickup migration missing"; exit 1; }
 $PSQL -q -f "$mig" >/dev/null
-for extra in drizzle/migrations/*_store_pickup_revoke_client.sql; do [ -f "$extra" ] && $PSQL -q -f "$extra" >/dev/null; done
+for extra in drizzle/migrations/*_store_pickup_revoke_client.sql drizzle/migrations/*_store_pickup_hardening.sql; do [ -f "$extra" ] && $PSQL -q -f "$extra" >/dev/null; done
 $PSQL -q -f tests/sql/pickup/cases.sql 2>&1 | grep -o 'PASS .*\|ERROR.*'
 bash tests/sql/pickup/concurrency.sh
+$PSQL -q -f tests/sql/pickup/hardening_cases.sql 2>&1 | grep -o 'PASS .*\|ERROR.*'
+bash tests/sql/pickup/hardening_concurrency.sh

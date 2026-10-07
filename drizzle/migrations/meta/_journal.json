@@ -309,6 +309,13 @@
       "when": 1791373533716,
       "tag": "0043_channel_sync_fencing",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1791373867907,
+      "tag": "0044_store_pickup_hardening",
+      "breakpoints": true
     }
   ]
 }

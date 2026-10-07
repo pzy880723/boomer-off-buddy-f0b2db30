@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { normalizeCourierChoice } from "@/lib/commerce/order-policy";
-import { pickupCreateGuard } from "@/lib/commerce/pickup-view";
+import { pickupContactPhone, pickupCreateGuard } from "@/lib/commerce/pickup-view";
 import { normalizeStorefrontOrderItems } from "@/lib/commerce/storefront-order-request";
 import { ordinaryPaymentPolicy } from "@/server/ordinary-payment-config";
 import { recordOrderOrigin } from "@/server/order-origin.server";
@@ -31,7 +31,8 @@ const CreateOrderBody = z
       .optional(),
     listing_ids: z.array(z.string().uuid()).min(1).max(50).optional(),
     recipient_name: z.string().trim().min(1).max(80),
-    recipient_phone: z.string().trim().min(6).max(30),
+    // 快递必填；自提忽略此字段，电话只取已验证账号手机号。
+    recipient_phone: z.string().trim().min(6).max(30).optional(),
     shipping_address: z.record(z.string(), z.unknown()),
     courier_service_code: z.string().trim().min(1).max(80),
     courier_service_name: z.string().trim().max(120).optional(),
@@ -85,6 +86,13 @@ export const Route = createFileRoute("/api/public/storefront/orders")({
         const guard = pickupCreateGuard(body);
         if (guard) return storefrontError("自提订单参数不正确", 422, guard);
         const pickup = body.fulfillment_method === "pickup";
+        const pickupPhone = pickup ? pickupContactPhone(auth.customer.phone) : null;
+        if (pickup && !pickupPhone) {
+          return storefrontError("请先绑定并验证手机号后再选择门店自提", 422, "pickup_phone_required");
+        }
+        if (!pickup && !body.recipient_phone) {
+          return storefrontError("请填写收货人手机号", 422, "recipient_phone_required");
+        }
         let courier = { provider: "platform", serviceCode: "STORE_PICKUP" };
         if (!pickup) {
           try {
@@ -109,7 +117,7 @@ export const Route = createFileRoute("/api/public/storefront/orders")({
               p_idempotency_key: idempotencyKey,
               p_items: items,
               p_recipient_name: body.recipient_name,
-              p_recipient_phone: body.recipient_phone,
+              p_recipient_phone: pickupPhone,
               p_quote_snapshot: body.courier_quote_snapshot ?? null,
               p_customer_note: body.customer_note ?? null,
               p_merchant_id: paymentPolicy.merchantId,

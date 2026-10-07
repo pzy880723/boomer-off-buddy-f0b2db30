@@ -92,3 +92,26 @@ describe("order list pickup projection", () => {
     assert.deepEqual(buildPickupListProjection({ order: { fulfillment_method: "shipping", payment_status: "paid", order_status: "processing" }, fulfillments: [], storeName: () => null, refundActive: false, shortageFulfillmentIds: [] }), []);
   });
 });
+
+describe("pickup hardening", () => {
+  test("after_sale orders are blocked in both detail and list without refund/shortage rows", async () => {
+    const { buildPickupListProjection } = await import("./pickup-view");
+    const [p] = buildCustomerPickups({ ...base, order: { ...base.order, order_status: "after_sale" } });
+    assert.equal(p.status, "blocked");
+    assert.equal(p.code, null);
+    const [l] = buildPickupListProjection({
+      order: { fulfillment_method: "pickup", payment_status: "paid", order_status: "after_sale" },
+      fulfillments: [{ id: "f1", location_id: "L1", status: "handover_ready", handed_over_at: null }],
+      storeName: () => null, refundActive: false, shortageFulfillmentIds: [],
+    });
+    assert.equal(l.status, "blocked");
+  });
+  test("pickup contact phone comes only from the verified account phone", async () => {
+    const { pickupContactPhone } = await import("./pickup-view");
+    assert.equal(pickupContactPhone("13800138000"), "13800138000");
+    assert.equal(pickupContactPhone("+8613800138000"), "+8613800138000");
+    assert.equal(pickupContactPhone(null), null);
+    assert.equal(pickupContactPhone(""), null);
+    assert.equal(pickupContactPhone("not-a-phone"), null);
+  });
+});
