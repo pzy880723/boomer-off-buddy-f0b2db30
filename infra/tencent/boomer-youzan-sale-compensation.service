@@ -1,0 +1,16 @@
+[Unit]
+Description=BOOMER bounded recent Youzan sale compensation (idempotent stock deduction)
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/var/www/boomer-erp/current
+EnvironmentFile=/var/www/boomer-erp/current/.env
+Environment=ERP_PORT=3005
+ExecStart=/usr/bin/node /var/www/boomer-erp/current/scripts/run-youzan-sale-compensation.mjs
+TimeoutStartSec=300
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true

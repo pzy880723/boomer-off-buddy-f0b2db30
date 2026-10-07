@@ -1,0 +1,12 @@
+# Template only: enable after YOUZAN_SALE_COMPENSATION_ENABLED=true and a reviewed dry run.
+[Unit]
+Description=Compensate recent Youzan sales every 2 minutes without overlap
+
+[Timer]
+OnBootSec=120
+OnUnitInactiveSec=120s
+AccuracySec=10
+Unit=boomer-youzan-sale-compensation.service
+
+[Install]
+WantedBy=timers.target
