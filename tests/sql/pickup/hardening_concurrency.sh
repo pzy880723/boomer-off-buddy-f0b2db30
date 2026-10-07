@@ -16,6 +16,6 @@ $P -qAt -c "select test_mark_paid('$oid', array['$B']::uuid[])" >/dev/null
 row=$($P -qAt -F' ' -c "select qr_token, fulfillment_id from commerce_pickup_codes where order_id='$oid'")
 tok=${row% *}; fid=${row#* }
 $P -qAt -c "select commerce_pickup_mark_ready('$SB','$B','$fid','rl-ready-1')" >/dev/null
-r=$($P -qAt -c "select commerce_pickup_redeem('$SB','$B','BOOMER_PICKUP:$tok',null,'rl-qr-1')->>'result'")
+r=$($P -qAt -c "select commerce_pickup_redeem('$SB','$B','BOOMER_PICKUP:$tok',null,'rl-qr-key-1')->>'result'")
 [ "$r" = "redeemed" ] && echo "PASS QR not limited by code failures" || { echo "FAIL QR after code limit: $r"; fail=1; }
 exit $fail
