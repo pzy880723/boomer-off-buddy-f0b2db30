@@ -9992,6 +9992,18 @@ export type Database = {
         }
         Returns: Json
       }
+      commit_youzan_sale_line: {
+        Args: {
+          p_legacy_order_id?: string
+          p_location_id?: string
+          p_raw_payload?: Json
+          p_sku_id: string
+          p_source_channel: string
+          p_source_order_id: string
+          p_source_shop_id?: string
+        }
+        Returns: Json
+      }
       custom_print_card_claim: {
         Args: { p_lease_seconds?: number; p_limit: number }
         Returns: {
