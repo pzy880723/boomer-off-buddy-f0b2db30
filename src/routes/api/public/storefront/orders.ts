@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { normalizeCourierChoice } from "@/lib/commerce/order-policy";
+import { pickupCreateGuard } from "@/lib/commerce/pickup-view";
 import { normalizeStorefrontOrderItems } from "@/lib/commerce/storefront-order-request";
 import { ordinaryPaymentPolicy } from "@/server/ordinary-payment-config";
 import { recordOrderOrigin } from "@/server/order-origin.server";
@@ -38,6 +39,8 @@ const CreateOrderBody = z
     courier_quote_snapshot: z.record(z.string(), z.unknown()).optional(),
     customer_note: z.string().trim().max(500).optional(),
     source_platform: z.enum(["miniapp", "app", "web"]).optional(),
+    // 门店自提：pickup 时 courier_service_code 必须为 STORE_PICKUP、shipping_address 为 {}；默认 express 保持原合同。
+    fulfillment_method: z.enum(["express", "pickup"]).default("express"),
   })
   .refine((body) => body.items || body.listing_ids, {
     message: "items or listing_ids is required",
@@ -79,20 +82,41 @@ export const Route = createFileRoute("/api/public/storefront/orders")({
         } catch (error) {
           return storefrontError(error instanceof Error ? error.message : String(error), 400);
         }
-        let courier;
-        try {
-          courier = normalizeCourierChoice(body.courier_service_code);
-        } catch (error) {
-          return storefrontError(error instanceof Error ? error.message : String(error), 422);
+        const guard = pickupCreateGuard(body);
+        if (guard) return storefrontError("自提订单参数不正确", 422, guard);
+        const pickup = body.fulfillment_method === "pickup";
+        let courier = { provider: "platform", serviceCode: "STORE_PICKUP" };
+        if (!pickup) {
+          try {
+            courier = normalizeCourierChoice(body.courier_service_code);
+          } catch (error) {
+            return storefrontError(error instanceof Error ? error.message : String(error), 422);
+          }
         }
         let paymentPolicy;
         try { paymentPolicy = ordinaryPaymentPolicy(process.env); }
         catch { return storefrontError("支付配置暂不可用", 503); }
         const ordinary = paymentPolicy.mode === "ordinary_wechat";
+        if (pickup && paymentPolicy.mode !== "ordinary_wechat") {
+          return storefrontError("门店自提暂未开放，请稍后重试", 503, "checkout_not_enabled");
+        }
         if (!ordinary && body.courier_quote_snapshot?.version === "per_store_99_cross_299_v1") {
           return storefrontError("普通商城结算尚未开放，请稍后重试", 503, "checkout_not_enabled");
         }
-        const { data, error } = await supabaseAdmin.rpc(
+        const { data, error } = pickup && paymentPolicy.mode === "ordinary_wechat"
+          ? await supabaseAdmin.rpc("commerce_create_ordinary_pickup_order" as never, {
+              p_customer_id: auth.customer.id,
+              p_idempotency_key: idempotencyKey,
+              p_items: items,
+              p_recipient_name: body.recipient_name,
+              p_recipient_phone: body.recipient_phone,
+              p_quote_snapshot: body.courier_quote_snapshot ?? null,
+              p_customer_note: body.customer_note ?? null,
+              p_merchant_id: paymentPolicy.merchantId,
+              p_app_id: paymentPolicy.appId,
+              p_owned_location_ids: paymentPolicy.ownedLocationIds,
+            } as never)
+          : await supabaseAdmin.rpc(
           (ordinary ? "commerce_create_ordinary_order" : "commerce_create_order_v2") as never,
           {
             ...(paymentPolicy.mode === "ordinary_wechat" ? {
@@ -126,12 +150,22 @@ export const Route = createFileRoute("/api/public/storefront/orders")({
           if (/ordinary express delivery only/i.test(error.message)) {
             return storefrontError("目前仅支持普通快递配送", 422, "delivery_unavailable");
           }
+          if (/idempotency key used by another fulfillment method/i.test(error.message)) {
+            return storefrontError("同一下单请求不能更换配送方式，请重新下单", 409, "fulfillment_method_conflict");
+          }
+          if (/pickup contact required/i.test(error.message)) {
+            return storefrontError("请填写提货人姓名和手机号", 422, "pickup_contact_required");
+          }
           const conflict = /not available|out of stock|duplicate/i.test(error.message);
           return storefrontError(
             error.message,
             conflict ? 409 : 500,
             conflict ? "stock_conflict" : undefined,
           );
+        }
+        const createdMethod = (data as unknown as { fulfillment_method?: string } | null)?.fulfillment_method;
+        if (!pickup && createdMethod === "pickup") {
+          return storefrontError("同一下单请求不能更换配送方式，请重新下单", 409, "fulfillment_method_conflict");
         }
         try {
           await recordOrderOrigin({rpc: (name, args) => supabaseAdmin.rpc(name as never, args as never)}, {
