@@ -195,7 +195,7 @@ test("trusted signed URL is downloaded once and the same inline data URI feeds d
   const sent: string[] = [];
   try {
     globalThis.fetch = async (url, init) => {
-      if (String(url).startsWith("https://storage.fixture.test/")) { downloads++; return new Response(png); }
+      if (String(url).startsWith("https://storage.fixture.test/")) { downloads++; return new Response(new Uint8Array(png)); }
       const body = JSON.parse(String(init?.body));
       const image = body.messages[0].content.find((c: any) => c.type === "image_url").image_url.url;
       sent.push(image);
