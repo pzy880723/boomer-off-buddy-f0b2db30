@@ -213,10 +213,12 @@ export const SAFE_ERRORS = {
   busy: "AI 文案服务繁忙，请稍后重新生成",
   quota: "AI 文案服务额度不足，请联系总部",
   unavailable: "AI 文案服务暂时不可用，请稍后重新生成",
+  timeout: "AI 文案生成超时，请重新生成",
 } as const;
 
 function safeGenerationError(e: unknown): string {
   const m = e instanceof Error ? e.message : "";
+  if ((e as { kind?: string })?.kind === "timeout") return SAFE_ERRORS.timeout;
   if (/\b429\b/.test(m)) return SAFE_ERRORS.busy;
   if (/\b402\b/.test(m)) return SAFE_ERRORS.quota;
   return SAFE_ERRORS.unavailable;
