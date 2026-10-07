@@ -67,10 +67,10 @@ export function CardPrintWorkspace() {
   return <div className="mx-auto w-full max-w-7xl space-y-6 p-4 md:p-6">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div><h1 className="text-2xl font-semibold">卡片打印</h1><p className="mt-1 text-sm text-muted-foreground">BOOMER OFF · A4 · 100%实际大小</p></div>
-      <Select value={locationId} onValueChange={id => { setLocationId(id); updateSelection([]); setError(''); }}><SelectTrigger className="w-56" aria-label="打印门店"><SelectValue placeholder="选择门店" /></SelectTrigger><SelectContent>{context.data?.locations.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent></Select>
+      <Select disabled={busy} value={locationId} onValueChange={id => { setLocationId(id); updateSelection([]); setError(''); }}><SelectTrigger className="w-56" aria-label="打印门店"><SelectValue placeholder="选择门店" /></SelectTrigger><SelectContent>{context.data?.locations.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent></Select>
     </div>
     <div className="flex flex-wrap items-center gap-2 border-y py-4">
-      <Input aria-label="预设清单路径" className="min-w-0 flex-1 md:max-w-lg" value={manifestPath} onChange={e => setManifestPath(e.target.value)} placeholder="腾讯同域预设清单路径" />
+      <Input disabled={busy} aria-label="预设清单路径" className="min-w-0 flex-1 md:max-w-lg" value={manifestPath} onChange={e => { setManifestPath(e.target.value); updateSelection([]); setPresets([]); }} placeholder="腾讯同域预设清单路径" />
       <Button variant="outline" disabled={busy || !manifestPath} onClick={loadManifest}><RefreshCw />载入预设</Button>
       <span className="text-sm text-muted-foreground">{presets.length ? `${presets.length} 个可用预设` : '预设原图待接入'}</span>
     </div>
