@@ -76,10 +76,11 @@ export type LinkRow = {
 //   3) 显式 hqSpuIdGuard：branch link.yz_item_id 不能等于 HQ SPU id
 //      （若等于说明是脏数据、当初把 HQ SPU id 当作 branch item_id 写进来了）
 // ============================================================
-async function pushStockToYouzan(
+export async function pushStockToYouzan(
   link: LinkRow,
   targetStock: number,
   clientSeq: string,
+  beforeWrite?: () => Promise<void>,
 ): Promise<void> {
   const branchShop = await getShopById(link.shop_id);
   if ((branchShop as { role?: string }).role !== "branch") {
@@ -101,6 +102,7 @@ async function pushStockToYouzan(
   const hqSpuId = Number(hqLink?.yz_item_id ?? 0) || undefined;
 
   try {
+    await beforeWrite?.();
     await pushYouzanQuantityUpdate({
       branchShop,
       itemId: resolved.item_id,
@@ -126,6 +128,7 @@ async function pushStockToYouzan(
       createTime: new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 19).replace("T", " "),
     });
     try {
+      await beforeWrite?.();
       const result = await callYouzanApiVerbose({ accessToken,
         method: "youzan.retail.open.stock.adjust", version: "3.0.0", params, timeoutMs: 20_000 });
       assertYouzanStockWriteSucceeded(result.payload);

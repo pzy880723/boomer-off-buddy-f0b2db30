@@ -14,12 +14,12 @@ import {
   callYouzanApiVerbose,
   ensureAccessToken,
   explainYouzanError,
-  pushYouzanQuantityUpdate,
 } from "@/lib/youzan.functions";
 import { buildBranchItemShelfRequest } from "@/lib/youzan-offline-products.server";
 import { verifyListingCore } from "@/lib/omnichannel-publish.functions";
 import { canMarkSold, evaluateZeroingTask, isServiceBearer, ZEROING_ACTIONS } from "@/lib/channel-sync-guard";
 import { z } from "zod";
+import { pushStockToYouzan, type LinkRow } from "@/lib/youzan-sync.functions";
 
 const DEFAULT_LEASE_SECONDS = 300;
 const DEFAULT_LIMIT = 5;
@@ -44,6 +44,7 @@ type OutboxTask = {
   attempts: number;
   max_attempts: number;
   inventory_version: number;
+  worker_id: string;
   request_payload: Record<string, unknown>;
 };
 type Admin = Awaited<typeof import("@/integrations/supabase/client.server")>["supabaseAdmin"];
@@ -176,6 +177,11 @@ async function loadZeroingFacts(task: OutboxTask, sb: Admin) {
 
 async function recheckBeforeWrite(task: OutboxTask, sb: Admin) {
   if (!ZEROING_ACTIONS.has(task.action)) return;
+  const { data: lease, error } = await sb.from("channel_sync_outbox")
+    .select("worker_id,status,lease_expires_at").eq("id", task.id).single();
+  const expiry = Date.parse(lease?.lease_expires_at ?? "");
+  if (error || lease?.worker_id !== task.worker_id || lease.status !== "running" ||
+      !Number.isFinite(expiry) || expiry < Date.now() + 25_000) throw new TaskBlocked("渠道写入前租约已失效或不足");
   const decision = evaluateZeroingTask(task, await loadZeroingFacts(task, sb));
   if (decision.verdict !== "proceed") throw new TaskBlocked(decision.reason);
 }
@@ -262,7 +268,6 @@ async function handleSetStock(
 
   // 未 verify → 先 verify
   let itemId = Number(l.external_item_id ?? 0);
-  let skuId = Number(l.external_sku_id ?? 0);
   if (!itemId) {
     if (!task.channel_listing_id) throw new Error("缺 listing id");
     await verifyListingCore(task.channel_listing_id);
@@ -272,7 +277,6 @@ async function handleSetStock(
       .eq("id", task.channel_listing_id)
       .maybeSingle();
     itemId = Number((refreshed as { external_item_id?: string } | null)?.external_item_id ?? 0);
-    skuId = Number((refreshed as { external_sku_id?: string } | null)?.external_sku_id ?? 0);
     if (!itemId) throw new Error("verify 未获得 item_id");
   }
 
@@ -282,18 +286,13 @@ async function handleSetStock(
     .eq("id", l.shop_id)
     .maybeSingle();
   if (!branch) throw new Error("门店不存在");
-  const hqSpuIdGuard = Number(l.external_spu_id ?? 0) || undefined;
   // 只推分店线下门店销售库存（channel=1）；网店由 ERP 自研，不再往有赞网店同步
   // 严格禁止 item_id == HQ SPU id：allowSameAsHqSpu 已下线；如触发说明 listing 未 verify 到真实分店 id
-  await recheckBeforeWrite(task, sb);
-  await pushYouzanQuantityUpdate({
-    branchShop: branch as unknown as Parameters<typeof pushYouzanQuantityUpdate>[0]["branchShop"],
-    itemId,
-    skuId: skuId || itemId,
-    quantity: target,
-    hqSpuIdGuard,
-    channel: 1,
-  });
+  const { data: link, error: linkError } = await sb.from("sku_youzan_links").select("*")
+    .eq("sku_id", task.sku_id).eq("shop_id", l.shop_id).single();
+  if (linkError || !link) throw new Error("渠道商品缺少对应门店库存映射");
+  await pushStockToYouzan(link as LinkRow, target, `channel-task:${task.id}`,
+    () => recheckBeforeWrite(task, sb));
 
 
 

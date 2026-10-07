@@ -15,6 +15,16 @@ test("a successful gateway envelope is not proof that stock changed", () => {
   assert.doesNotThrow(() => assertYouzanStockWriteSucceeded({ success: true }));
 });
 
+test("channel stock jobs use the document-managed stock path and recheck before external writes", () => {
+  const worker = readFileSync(new URL("../routes/api/public/hooks/channel-sync-worker.ts", import.meta.url), "utf8");
+  const sync = readFileSync(new URL("./youzan-sync.functions.ts", import.meta.url), "utf8");
+  assert.match(worker, /await pushStockToYouzan\(/);
+  assert.match(worker, /\(\) => recheckBeforeWrite\(task, sb\)/);
+  assert.match(sync, /export async function pushStockToYouzan/);
+  assert.ok(sync.indexOf("await beforeWrite?.();") < sync.indexOf("await pushYouzanQuantityUpdate({"));
+  assert.match(sync, /await beforeWrite\?\.\(\);\s*const result = await callYouzanApiVerbose\(\{ accessToken,\s*method: "youzan.retail.open.stock.adjust"/);
+});
+
 test("document-managed stock is an absolute scoped quantity, never an increment", () => {
   const params = buildWarehouseStockAdjustment({ warehouseCode: "MD00003", skuCode: "BM528690012347", quantity: 1, operationId: "ERPtest", createTime: "2026-09-24 12:00:00" });
   assert.equal(params.warehouse_code, "MD00003");

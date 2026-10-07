@@ -2,8 +2,8 @@
 # Run as root on Tencent after the scoped overlay and SQL have been reviewed.
 set -euo pipefail
 base=/var/www/boomer-erp
-old=$base/releases/store-pickup-1894d89-20261007
-release=$base/releases/sale-compensation-v2-20261007
+old=$base/releases/sale-compensation-v2-20261007
+release=$base/releases/sale-compensation-v3-20261007
 candidate=boomer-sale-recovery-candidate
 workers=/etc/boomer-erp/workers.env
 case "${1:-}" in build|publish|rollback) mode=$1 ;; *) exit 2 ;; esac

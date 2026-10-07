@@ -15,7 +15,7 @@ test('candidate cannot enable sale compensation or outgoing channel jobs', () =>
 });
 test('publish verifies candidate and retains a tested rollback to the exact preceding release', () => {
   const code = readFileSync(file, 'utf8');
-  assert.match(code, /store-pickup-1894d89-20261007/);
+  assert.match(code, /sale-compensation-v2-20261007/);
   assert.match(code, /trap cleanup EXIT/);
   assert.match(code, /start_live "\$old"/);
   assert.match(code, /sha256sum --check --status \.sale-ready\.sha256/);
