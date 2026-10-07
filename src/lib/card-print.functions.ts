@@ -16,7 +16,7 @@ export const readCardPrintContext = createServerFn({ method: 'GET' })
       const perms = await context.supabase.from('user_location_perms').select('location_id').eq('user_id', context.userId);
       if (perms.error) throw new Error('无法核对门店权限');
       ids = perms.data.map(p => p.location_id);
-      if (!ids.length) return { locations: [], channels: [] };
+      if (!ids.length) return { locations: [], channels: [], location_id: null, can_manage: false, can_switch: false };
       if (data.location_id && !ids.includes(data.location_id)) throw new Error('无权读取此门店');
     }
     const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
@@ -24,7 +24,7 @@ export const readCardPrintContext = createServerFn({ method: 'GET' })
     if (ids) query = query.in('id', ids);
     const stores = await query;
     if (stores.error) throw new Error('无法读取门店');
-    if (!data.location_id) return { locations: stores.data, channels: [] };
+    if (!data.location_id) return { locations: stores.data, channels: [], location_id: null, can_manage: rolesResult.data.some(r => r.role === 'super_admin'), can_switch: hq };
     if (!stores.data.some(s => s.id === data.location_id)) throw new Error('门店已停用或不可访问');
     const rows = await supabaseAdmin.from('store_qr_configs').select('purpose,status,image_bucket,image_path,updated_at').eq('location_id', data.location_id);
     if (rows.error) throw new Error('无法读取门店二维码');
@@ -32,5 +32,5 @@ export const readCardPrintContext = createServerFn({ method: 'GET' })
       const signed = await supabaseAdmin.storage.from('store-qr').createSignedUrl(path, 300);
       return signed.error ? null : signed.data.signedUrl;
     });
-    return { locations: stores.data, channels: images };
+    return { locations: stores.data, channels: images, location_id: data.location_id, can_manage: rolesResult.data.some(r => r.role === 'super_admin'), can_switch: hq };
   });

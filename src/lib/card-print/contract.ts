@@ -3,11 +3,12 @@ import { z } from 'zod';
 export const channels = ['xiaohongshu', 'wechat', 'dianping_checkin', 'dianping_review', 'identify', 'miniprogram'] as const;
 export type PrintChannel = typeof channels[number];
 export const categories = ['qr', 'store_notice', 'ip', 'brand', 'category', 'import_origin', 'product'] as const;
-const assetPath = z.string().regex(/^\/(?!\/)[^?#\\]+\.(png|jpg|jpeg)$/i, '预设图片必须为同域 PNG/JPEG 原图路径');
+const assetPath = z.string().regex(/^\/(?!\/)[^?#\\]+\.(pdf|png|jpg|jpeg)$/i, '预设必须为同域 PDF/PNG/JPEG 原稿路径');
 export const Preset = z.object({
   id: z.string().min(1).max(120), type_id: z.string().min(1).max(120), name: z.string().min(1).max(120),
   category: z.enum(categories), enabled: z.boolean(), orientation: z.enum(['landscape', 'portrait']),
   width_mm: z.number().positive().max(200), height_mm: z.number().positive().max(280), image_path: assetPath,
+  thumbnail_path: z.string().optional(), subtitle: z.string().optional(),
   channel: z.enum(channels).optional(), location_id: z.string().uuid().optional(),
   qr_box: z.object({ x_mm: z.number().nonnegative(), y_mm: z.number().nonnegative(), size_mm: z.number().positive() }).strict().optional(),
 }).strict().superRefine((p, ctx) => {
@@ -16,6 +17,30 @@ export const Preset = z.object({
   if (p.qr_box && (p.qr_box.x_mm + p.qr_box.size_mm > p.width_mm || p.qr_box.y_mm + p.qr_box.size_mm > p.height_mm)) ctx.addIssue({ code: 'custom', message: '二维码位置超出卡片' });
 });
 export type CardPreset = z.infer<typeof Preset>;
+export const PRESET_MANIFEST_PATH = '/print-presets/print-presets.json';
+const nativeCategory = { IP: 'ip', 品牌: 'brand', 品类: 'category', 进口来源: 'import_origin', 店铺提示: 'store_notice' } as const;
+const NativePreset = z.object({
+  id: z.string().min(1), title: z.string().min(1), subtitle: z.string(),
+  category: z.enum(['IP', '品牌', '品类', '进口来源', '店铺提示']),
+  widthMM: z.number().positive().max(200), heightMM: z.number().positive().max(280),
+  file: z.string().min(1), thumbnail: z.string().min(1), pairID: z.string().nullable(),
+}).strict();
+function nativeAsset(file: string): string {
+  const path = `/print-presets/${file}`;
+  if (file.startsWith('/') || file.includes('\\') || file.split('/').some(s => s === '..' || s === '.') || /[?#%]/.test(file)) throw new Error('非法预设资源路径');
+  return path;
+}
+export function parseNativeManifest(input: unknown): CardPreset[] {
+  const rows = z.array(NativePreset).max(1000).parse(input);
+  if (new Set(rows.map(p => p.id)).size !== rows.length) throw new Error('预设 ID 重复');
+  return rows.map(p => Preset.parse({ id: p.id, type_id: p.pairID || p.id, name: p.title, subtitle: p.subtitle,
+    category: nativeCategory[p.category], enabled: true, orientation: p.widthMM >= p.heightMM ? 'landscape' : 'portrait',
+    width_mm: p.widthMM, height_mm: p.heightMM, image_path: nativeAsset(p.file), thumbnail_path: nativeAsset(p.thumbnail),
+  }));
+}
+export function assertQrLocation(actual: string | null, selected: string): void {
+  if (!selected || actual !== selected) throw new Error('二维码返回门店与所选门店不一致');
+}
 export const Manifest = z.object({ version: z.literal(1), presets: z.array(Preset).max(1000) }).strict().superRefine((m, ctx) => {
   if (new Set(m.presets.map(p => p.id)).size !== m.presets.length) ctx.addIssue({ code: 'custom', message: '预设 ID 重复' });
 });

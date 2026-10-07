@@ -1,4 +1,4 @@
-import { PDFDocument, degrees, rgb } from 'pdf-lib';
+import { PDFDocument, degrees, rgb, type PDFEmbeddedPage, type PDFImage } from 'pdf-lib';
 import { packA4, sameOriginUrl, type CardPreset } from './contract';
 import type { QrImage } from './qr-policy';
 const mm = (n: number) => n * 72 / 25.4;
@@ -17,9 +17,20 @@ async function embed(doc: PDFDocument, bytes: Uint8Array) {
 export async function createCardPdf(cards: CardPreset[], qr: QrImage[], origin: string): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   doc.setTitle('BOOMER OFF · A4 cards');
-  const originals = new Map<string, Awaited<ReturnType<typeof embed>>>();
+  const originals = new Map<string, PDFEmbeddedPage | PDFImage>();
   for (const p of cards) {
-    if (!originals.has(p.image_path)) originals.set(p.image_path, await embed(doc, await imageBytes(sameOriginUrl(p.image_path, origin))));
+    if (p.category === 'qr') continue;
+    if (!originals.has(p.image_path)) {
+      const bytes = await imageBytes(sameOriginUrl(p.image_path, origin));
+      if (p.image_path.toLowerCase().endsWith('.pdf')) {
+        const source = await PDFDocument.load(bytes);
+        const first = source.getPage(0);
+        if (source.getPageCount() !== 1 || Math.abs(first.getWidth() - mm(p.width_mm)) > 1 || Math.abs(first.getHeight() - mm(p.height_mm)) > 1) throw new Error('原版PDF尺寸与清单不一致，禁止缩放输出');
+        const [embedded] = await doc.embedPdf(source, [0]);
+        if (!embedded) throw new Error('原版PDF无法嵌入');
+        originals.set(p.image_path, embedded);
+      } else originals.set(p.image_path, await embed(doc, bytes));
+    }
   }
   const codes = new Map<string, Awaited<ReturnType<typeof embed>>>();
   for (const channel of new Set(cards.flatMap(p => p.channel ? [p.channel] : []))) {
@@ -33,7 +44,10 @@ export async function createCardPdf(cards: CardPreset[], qr: QrImage[], origin: 
       const original = originals.get(c.preset.image_path);
       if (!original) throw new Error('预设原图缺失');
       const x = mm(c.x), y = mm(297 - c.y - c.height);
-      page.drawImage(original, c.rotated ? { x: x + mm(c.width), y, width: mm(c.preset.width_mm), height: mm(c.preset.height_mm), rotate: degrees(90) } : { x, y, width: mm(c.width), height: mm(c.height) });
+      const placement = c.rotated ? { x: x + mm(c.width), y, width: mm(c.preset.width_mm), height: mm(c.preset.height_mm), rotate: degrees(90) } : { x, y, width: mm(c.width), height: mm(c.height) };
+      if ('embed' in original && 'ref' in original && !('scaleToFit' in original)) page.drawPage(original as PDFEmbeddedPage, placement);
+      else if (original.constructor.name === 'PDFEmbeddedPage') page.drawPage(original as PDFEmbeddedPage, placement);
+      else page.drawImage(original as PDFImage, placement);
       const box = c.preset.qr_box, code = c.preset.channel ? codes.get(c.preset.channel) : undefined;
       if (box && code) {
         const qx = c.rotated ? box.y_mm : box.x_mm;
