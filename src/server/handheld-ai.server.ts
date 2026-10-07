@@ -3,7 +3,7 @@
 // 走 Lovable AI Gateway，无需单独 key。
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { recognizeProductFromImages } from "@/server/product-recognition.server";
-import { loadOriginalImage, measurementProtectionRequired, squareOriginalImage } from "./listing-image-safety.server";
+import { loadOriginalImage, measurementProtectionRequired, squareOriginalImage, withImageStage } from "./listing-image-safety.server";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1";
 
@@ -105,7 +105,7 @@ const SYSTEM_LISTING_IMAGE = `把这张中古杂货实物图修整成上架主�
 - 背景统一为干净浅灰底
 - 校正角度，修正白平衡和曝光
 - 严禁改 logo、文字、瑕疵、颜色、配件数量
-- 清除商品外部附加的售价贴纸、价格牌；不得删除商品本体印刷、型号、生产标记或真实瑕疵
+- 清除照片平台叠加的闲鱼等平台账号水印、平台标识叠字，以及商品外部附加的售价贴纸、价格牌；保留商品本身的商标、印刷文字和真实瑕疵；不得删除商品本体印刷、型号、生产标记或真实瑕疵
 - 如果有尺子、卷尺、尺寸刻度，不得重绘、删除或修改刻度，保留原始测量证据
 - 严禁添加任何文字、水印、贴纸`;
 
@@ -143,6 +143,10 @@ export async function aiPrepareListingImage(input: {
     modalities: ["image", "text"],
   };
 
+  return withImageStage("image_generation", () => generateListingImage(body));
+}
+
+async function generateListingImage(body: unknown): Promise<{ b64: string; mime: string }> {
   const res = await fetch(`${GATEWAY}/chat/completions`, {
     method: "POST",
     signal: AbortSignal.timeout(60_000),
@@ -154,8 +158,9 @@ export async function aiPrepareListingImage(input: {
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    const t = await res.text().catch(() => "");
-    throw new Error(`AI gateway ${res.status}: ${t.slice(0, 300)}`);
+    await res.body?.cancel().catch(() => undefined);
+    // Upstream text may echo signed URLs or image payloads; only the status is reported.
+    throw new Error(`AI gateway ${res.status}`);
   }
   const j = await res.json();
   // OpenRouter image response shape: choices[0].message.images[0].image_url.url (data: URL)
