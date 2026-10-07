@@ -7,6 +7,7 @@ import {
   ok,
 } from "@/server/handheld-auth.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { loadStaffProfile } from "@/server/staff-profile.server";
 
 export const Route = createFileRoute("/api/public/handheld/auth/me")({
   server: {
@@ -26,6 +27,7 @@ export const Route = createFileRoute("/api/public/handheld/auth/me")({
           user_id: string;
           email: string | null;
           display_name: string | null;
+          avatar_url: string | null;
           roles: string[];
         };
         if (session) {
@@ -34,10 +36,12 @@ export const Route = createFileRoute("/api/public/handheld/auth/me")({
             .select("role")
             .eq("user_id", session.user_id);
           const roles = ((roleRows as { role: string }[] | null) ?? []).map((r) => r.role);
+          const profile = await loadStaffProfile(session.user_id).catch(() => null);
           user = {
             user_id: session.user_id,
             email: session.email,
-            display_name: null,
+            display_name: profile?.display_name ?? null,
+            avatar_url: profile?.avatar_url ?? null,
             roles,
           };
         }
