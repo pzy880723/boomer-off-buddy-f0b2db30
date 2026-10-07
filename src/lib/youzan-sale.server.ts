@@ -18,7 +18,7 @@ export type YouzanSale = {
 };
 
 export type YouzanSaleAdapter = {
-  findLocationId(shopId: string): Promise<string | null>;
+  findLocationId(shopId: string, targetKdtId?: number | null): Promise<string | null>;
   findSkuId(input: {
     shopId: string;
     itemId: number;
@@ -181,13 +181,21 @@ export async function processYouzanSale(input: {
     gated: {} as Record<string, number>,
   };
   if (!isYouzanSaleStatus(sale.status)) return result;
-  const locationId = await input.adapter.findLocationId(input.shopId);
+  const root = asRecord(input.trade);
+  const fullOrder = asRecord(root?.full_order_info) ?? asRecord(root?.fullOrderInfo) ?? root;
+  const orderInfo = asRecord(fullOrder?.order_info) ?? asRecord(fullOrder?.orderInfo);
+  if (Number(orderInfo?.refund_state ?? root?.refund_state ?? 0) !== 0) return result;
+  const locationId = await input.adapter.findLocationId(input.shopId, sale.targetKdtId);
   if (sale.sourceChannel === "youzan_branch_offline" && !locationId) {
     throw new Error("销售门店未绑定库位，已停止库存扣减");
   }
 
   for (let lineIndex = 0; lineIndex < sale.items.length; lineIndex += 1) {
     const item = sale.items[lineIndex];
+    if (item.refundState) {
+      result.gated.lineRefunded = (result.gated.lineRefunded ?? 0) + item.quantity;
+      continue;
+    }
     const skuId = await input.adapter.findSkuId({
       shopId: input.shopId,
       itemId: item.itemId,

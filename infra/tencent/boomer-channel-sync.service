@@ -1,0 +1,16 @@
+[Unit]
+Description=BOOMER sale stock zero and delisting outbox consumer
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/var/www/boomer-erp/current
+EnvironmentFile=/var/www/boomer-erp/current/.env
+Environment=ERP_PORT=3005
+ExecStart=/usr/bin/node /var/www/boomer-erp/current/scripts/run-channel-sync.mjs
+TimeoutStartSec=500
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true

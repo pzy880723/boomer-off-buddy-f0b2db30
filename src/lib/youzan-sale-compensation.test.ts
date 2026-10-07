@@ -47,6 +47,21 @@ function deps(rows: ReturnType<typeof order>[], opts: {
 }
 
 describe("bounded recent Youzan sale compensation", () => {
+  test("reuses one adapter across the window so repeated standard SKU reads are cached", async () => {
+    const f = deps([order("ONE", "2026-10-06T12:00:00Z"), order("TWO", "2026-10-06T13:00:00Z")]);
+    const original = f.d.adapter;
+    let factories = 0;
+    f.d.adapter = () => { factories++; return original(); };
+    await compensateRecentYouzanSales(f.d, { now: NOW });
+    assert.equal(factories, 1);
+  });
+
+  test("rejects an out-of-window or future row even if the database adapter returns it", async () => {
+    const f = deps([]);
+    f.d.listOrdersPage = async () => [order("OLD", "2026-09-20T00:00:00Z"), order("FUTURE", "2026-10-08T00:00:00Z")];
+    await compensateRecentYouzanSales(f.d, { now: NOW });
+    assert.deepEqual(f.commits, []);
+  });
   test("window clamped to 72h and floor; history imports never deduct", async () => {
     const { d, commits, seenSince } = deps([order("OLD", "2026-09-20T00:00:00Z"), order("RECENT", "2026-10-06T14:04:14Z")]);
     const r = await compensateRecentYouzanSales(d, { now: NOW, windowHours: 500 });

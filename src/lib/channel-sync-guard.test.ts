@@ -37,6 +37,11 @@ test("read failures or wrong listing ownership → block (no write, not success)
   assert.equal(evaluateZeroingTask(task, { ...sold, listing: { sku_id: "s1", shop_id: "shop2" } }).verdict, "block");
 });
 
+test("incomplete display/version facts fail closed rather than authorizing a write", () => {
+  assert.equal(evaluateZeroingTask(task, { ...sold, sku: { ...sold.sku, is_display: null } }).verdict, "block");
+  assert.equal(evaluateZeroingTask(task, { ...sold, sku: { ...sold.sku, inventory_version: NaN } }).verdict, "block");
+});
+
 test("dead_letter or unfinished tasks never close the sale loop", () => {
   assert.equal(canMarkSold([{ action: "set_stock_zero", status: "succeeded" }, { action: "delist", status: "succeeded" }]), true);
   assert.equal(canMarkSold([{ action: "set_stock_zero", status: "succeeded" }, { action: "delist", status: "dead_letter" }]), false);

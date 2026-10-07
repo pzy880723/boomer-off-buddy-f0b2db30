@@ -27,6 +27,28 @@ const offlineTrade = {
 };
 
 describe("youzan sale reconciliation", () => {
+  test("refunded orders and lines never deduct stock", async () => {
+    for (const lineOnly of [false, true]) {
+      const trade = structuredClone(offlineTrade);
+      Object.assign(lineOnly ? trade.full_order_info.orders[0] : trade.full_order_info.order_info, { refund_state: 2 });
+      const result = await processYouzanSale({ trade, shopId: "shop-1", adapter: {
+        findLocationId: async () => "loc-1",
+        findSkuId: async () => { throw Error("must not resolve refunded stock"); },
+        commitSale: async () => { throw Error("must not deduct refunded stock"); },
+      } });
+      assert.equal(result.processed, 0);
+    }
+  });
+  test("passes the real sale store id into location resolution and refuses a mismatch", async () => {
+    await assert.rejects(processYouzanSale({ trade: offlineTrade, shopId: "wrong-shop", adapter: {
+      findLocationId: async (_shop, kdt) => {
+        assert.equal(kdt, 187395218);
+        throw Error("销售门店与订单不一致");
+      },
+      findSkuId: async () => { throw Error("must not resolve a mismatched order"); },
+      commitSale: async () => { throw Error("must not commit a mismatched order"); },
+    } }), /销售门店与订单不一致/);
+  });
   test("unpaid or cancelled trades cannot deduct stock", async () => {
     for (const status of ["WAIT_BUYER_PAY", "TRADE_CLOSED", ""]) {
       const trade = structuredClone(offlineTrade);

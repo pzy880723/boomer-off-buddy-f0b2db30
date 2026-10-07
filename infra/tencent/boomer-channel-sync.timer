@@ -1,0 +1,11 @@
+[Unit]
+Description=BOOMER sale channel sync minute timer
+
+[Timer]
+OnBootSec=1min
+OnUnitInactiveSec=60s
+AccuracySec=5s
+Unit=boomer-channel-sync.service
+
+[Install]
+WantedBy=timers.target

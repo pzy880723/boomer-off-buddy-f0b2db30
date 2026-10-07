@@ -45,3 +45,22 @@ test('candidate never consumes production jobs even if PM2 inherits enabled flag
 test('explicit production maintenance disable overrides persistent configuration', () => {
   assert.deepEqual(launch('3005', 'false'), { release: 'false', item: 'true' });
 });
+
+for (const port of ['3005', '3006']) {
+  test(`sale/channel/order recovery flags are fenced on port ${port}`, () => {
+    const root = mkdtempSync(join(tmpdir(), 'erp-sale-flags-'));
+    const flags = ['YOUZAN_ORDER_SYNC_WORKER_ENABLED', 'YOUZAN_SALE_COMPENSATION_ENABLED', 'CHANNEL_SYNC_WORKER_ENABLED'];
+    try {
+      mkdirSync(join(root, '.output/server'), { recursive: true });
+      writeFileSync(join(root, '.env'), flags.map(x => `${x}=true`).join('\n') + '\n');
+      writeFileSync(join(root, 'workers.env'), flags.map(x => `${x}=true`).join('\n') + '\n');
+      writeFileSync(join(root, '.output/nitro.json'), JSON.stringify({ preset: 'node-server' }));
+      writeFileSync(join(root, '.output/server/index.mjs'), `console.log(JSON.stringify(${JSON.stringify(flags)}.map(x=>process.env[x])));`);
+      const env = { ...process.env, APP_DIR: root, ERP_PORT: port, ERP_WORKER_ENV_FILE: join(root, 'workers.env') };
+      for (const flag of flags) env[flag] = port === '3005' ? 'false' : 'true';
+      const result = spawnSync('bash', [resolve('scripts/run-tencent-erp.sh')], { env, encoding: 'utf8' });
+      assert.equal(result.status, 0, result.stderr);
+      assert.deepEqual(JSON.parse(result.stdout), ['false', 'false', 'false']);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+}

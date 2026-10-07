@@ -19,11 +19,19 @@ import {
 import { buildBranchItemShelfRequest } from "@/lib/youzan-offline-products.server";
 import { verifyListingCore } from "@/lib/omnichannel-publish.functions";
 import { canMarkSold, evaluateZeroingTask, isServiceBearer, ZEROING_ACTIONS } from "@/lib/channel-sync-guard";
+import { z } from "zod";
 
-const DEFAULT_LEASE_SECONDS = 60;
-const DEFAULT_LIMIT = 20;
+const DEFAULT_LEASE_SECONDS = 300;
+const DEFAULT_LIMIT = 5;
 const BACKOFF_STEPS_MS = [5_000, 15_000, 60_000, 5 * 60_000, 15 * 60_000, 60 * 60_000];
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const Body = z.object({
+  limit: z.number().int().min(1).max(5).optional(),
+  lease_seconds: z.literal(300).optional(),
+  worker_id: z.string().regex(/^[A-Za-z0-9_.:-]{1,40}$/).optional(),
+  sku_id: z.string().regex(UUID_RE).optional(),
+  action: z.string().regex(/^[a-z_]{1,40}$/).optional(),
+}).strict();
 
 type OutboxTask = {
   id: string;
@@ -49,15 +57,16 @@ export const Route = createFileRoute("/api/public/hooks/channel-sync-worker")({
         if (!isServiceBearer(request.headers.get("authorization"), process.env.SUPABASE_SERVICE_ROLE_KEY ?? "")) {
           return Response.json({ error: "unauthorized" }, { status: 401 });
         }
-        let body: { limit?: number; lease_seconds?: number; worker_id?: string; sku_id?: string; action?: string } = {};
-        try { body = (await request.json()) as typeof body; } catch { /* empty body ok */ }
-        if (body.sku_id !== undefined && !UUID_RE.test(String(body.sku_id))) return Response.json({ error: "invalid sku_id" }, { status: 400 });
-        if (body.action !== undefined && !/^[a-z_]{1,40}$/.test(String(body.action))) return Response.json({ error: "invalid action" }, { status: 400 });
+        if (process.env.CHANNEL_SYNC_WORKER_ENABLED !== "true") {
+          return Response.json({ ok: false, code: "worker_disabled" }, { status: 503 });
+        }
+        let body: z.infer<typeof Body>;
+        try { const text = await request.text(); body = Body.parse(text ? JSON.parse(text) : {}); }
+        catch { return Response.json({ ok: false, code: "validation_error" }, { status: 422 }); }
 
-        const workerId = (typeof body.worker_id === "string" && /^[A-Za-z0-9_.:-]{1,80}$/.test(body.worker_id) ? body.worker_id : null)
-          ?? `w-${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
-        const limit = Math.max(1, Math.min(100, body.limit ?? DEFAULT_LIMIT));
-        const leaseSeconds = Math.max(15, Math.min(300, body.lease_seconds ?? DEFAULT_LEASE_SECONDS));
+        const workerId = `${body.worker_id ?? "w"}-${crypto.randomUUID()}`;
+        const limit = body.limit ?? DEFAULT_LIMIT;
+        const leaseSeconds = body.lease_seconds ?? DEFAULT_LEASE_SECONDS;
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { data: tasks, error } = await supabaseAdmin.rpc("claim_channel_sync_tasks_v2", {
@@ -97,9 +106,14 @@ export const Route = createFileRoute("/api/public/hooks/channel-sync-worker")({
               }
             }
 
+            const { data: lease, error: leaseError } = await supabaseAdmin.from("channel_sync_outbox")
+              .select("worker_id,status,lease_expires_at").eq("id", task.id).single();
+            const expiresAt = Date.parse(lease?.lease_expires_at ?? "");
+            if (leaseError || lease?.worker_id !== workerId || lease.status !== "running" ||
+                !Number.isFinite(expiresAt) || expiresAt < Date.now() + 40_000) {
+              throw new TaskBlocked("租约不足或已失效，未执行渠道写入");
+            }
             await dispatch(task, supabaseAdmin);
-            await finish(task, "succeeded", null);
-            if (ZEROING_ACTIONS.has(task.action)) await maybeMarkSold(task.sku_id, supabaseAdmin);
             if (task.action === "restore_after_return") {
               const { error: ue } = await supabaseAdmin.from("inv_skus")
                 .update({ sales_state: "active", updated_at: new Date().toISOString() } as never).eq("id", task.sku_id);
@@ -112,6 +126,8 @@ export const Route = createFileRoute("/api/public/hooks/channel-sync-worker")({
                 .eq("id", task.channel_listing_id);
               if (le) throw new Error(`listing 版本写入失败：${le.message}`);
             }
+            await finish(task, "succeeded", null);
+            if (ZEROING_ACTIONS.has(task.action)) await maybeMarkSold(task.sku_id, supabaseAdmin);
             results.push({ id: task.id, action: task.action, ok: true, status: "succeeded" });
           } catch (e) {
             const msg = e instanceof TaskBlocked ? `blocked: ${e.message}` : explainYouzanError(e);
@@ -149,7 +165,7 @@ async function loadZeroingFacts(task: OutboxTask, sb: Admin) {
   const locs = (locR.data ?? []) as { id: string }[];
   if (!locR.error && locs.length === 1) {
     const st = await sb.from("inv_stocks").select("qty").eq("sku_id", task.sku_id).eq("location_id", locs[0].id).maybeSingle();
-    if (!st.error) stockQty = Number((st.data as { qty?: number } | null)?.qty ?? 0);
+    if (!st.error && st.data) stockQty = Number((st.data as { qty: number }).qty);
   }
   return {
     sku: skuR.error ? null : (skuR.data as { inventory_version: number; sales_state: string | null; is_display: boolean | null } | null),
@@ -158,15 +174,27 @@ async function loadZeroingFacts(task: OutboxTask, sb: Admin) {
   };
 }
 
+async function recheckBeforeWrite(task: OutboxTask, sb: Admin) {
+  if (!ZEROING_ACTIONS.has(task.action)) return;
+  const decision = evaluateZeroingTask(task, await loadZeroingFacts(task, sb));
+  if (decision.verdict !== "proceed") throw new TaskBlocked(decision.reason);
+}
+
 // 售出闭环：清零与下架均成功、无未完成或 dead_letter 任务、sku 仍 sold_syncing 且库存 0。
 async function maybeMarkSold(skuId: string, sb: Admin) {
   const { data: tasks, error } = await sb.from("channel_sync_outbox").select("action, status").eq("sku_id", skuId)
     .in("action", ["set_stock_zero", "delist"]);
   if (error) throw new Error(`读取售出任务失败：${error.message}`);
   if (!canMarkSold((tasks ?? []) as { action: string; status: string }[])) return;
+  const { data: sku, error: se } = await sb.from("inv_skus").select("inventory_version, sales_state, is_display").eq("id", skuId).maybeSingle();
+  if (se) throw new Error(`读取售出商品失败：${se.message}`);
+  if (!sku || sku.sales_state !== "sold_syncing" || sku.is_display !== false) return;
+  const { data: stocks, error: ste } = await sb.from("inv_stocks").select("qty").eq("sku_id", skuId);
+  if (ste) throw new Error(`读取真实库存失败：${ste.message}`);
+  if (!stocks?.length || stocks.some((s) => Number(s.qty) !== 0)) return;
   const { error: ue } = await sb.from("inv_skus")
     .update({ sales_state: "sold", updated_at: new Date().toISOString() } as never)
-    .eq("id", skuId).eq("sales_state", "sold_syncing").lte("stock_qty", 0);
+    .eq("id", skuId).eq("sales_state", "sold_syncing").eq("inventory_version", sku.inventory_version).eq("is_display", false).lte("stock_qty", 0);
   if (ue) throw new Error(`售出状态写入失败：${ue.message}`);
 }
 
@@ -257,6 +285,7 @@ async function handleSetStock(
   const hqSpuIdGuard = Number(l.external_spu_id ?? 0) || undefined;
   // 只推分店线下门店销售库存（channel=1）；网店由 ERP 自研，不再往有赞网店同步
   // 严格禁止 item_id == HQ SPU id：allowSameAsHqSpu 已下线；如触发说明 listing 未 verify 到真实分店 id
+  await recheckBeforeWrite(task, sb);
   await pushYouzanQuantityUpdate({
     branchShop: branch as unknown as Parameters<typeof pushYouzanQuantityUpdate>[0]["branchShop"],
     itemId,
@@ -313,6 +342,7 @@ async function handleShelfChange(
     itemId: Number(l.external_item_id),
     online,
   });
+  await recheckBeforeWrite(task, sb);
   await callYouzanApiVerbose({
     accessToken: branchToken,
     ...request,

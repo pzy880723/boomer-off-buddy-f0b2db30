@@ -121,7 +121,8 @@ export const Route = createFileRoute("/api/public/hooks/youzan-message")({
                 } catch (e) {
                   console.warn("[youzan-message] trade.get 补拉失败：", e);
                 }
-                const trade = detail ?? event;
+                if (!detail) throw new Error("无法取得最新订单详情，等待重试，未执行库存扣减");
+                const trade = detail;
                 const extracted = extractYouzanSale(trade);
                 if (!extracted || extracted.items.length === 0) {
                   throw new Error("订单详情缺少商品行，未执行库存扣减");

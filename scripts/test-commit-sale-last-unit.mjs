@@ -52,6 +52,7 @@ before(async () => {
     FOR EACH ROW EXECUTE FUNCTION tg_shop_movement_enqueue();`);
   await db.exec(await sql("20260804190000_commit_sale_location_stock.sql"));
   await db.exec(await sql(migrationName));
+  await db.exec(await readFile(new URL('../drizzle/migrations/0042_commit_youzan_sale_line_v2.sql', import.meta.url), 'utf8'));
 });
 beforeEach(async () => {
   await db.exec(`RESET ROLE;
@@ -72,6 +73,38 @@ const sale = (order = "order-1", location = id(2)) => rows(
   "SELECT commit_sale($1,'youzan',$2,$3,'sale','EPC',$4,'{\"test\":true}') AS result",
   [id(1),order,id(20),location],
 ).then(r => r[0].result);
+const youzanSale = (key, legacy = null, item = 11) => rows(
+  "SELECT commit_youzan_sale_line($1,'youzan_branch_offline',$2,$3,$4,$5,jsonb_build_object('item_id',$6::int,'unit_index',0)) AS result",
+  [id(1),key,legacy,id(20),id(2),item],
+).then(r => r[0].result);
+
+test('real commit_sale wrapper recognises a reordered legacy sale after restocking, without a second debit', async () => {
+  assert.equal((await youzanSale('T1#0#0')).ok, true);
+  await db.exec("UPDATE inv_stocks SET qty=1; UPDATE inv_skus SET is_display=true,sales_state='active'");
+  const repeat = await youzanSale('T1#oid:A#0','T1#1#0');
+  assert.equal(repeat.ok,true); assert.equal(repeat.idempotent,true);
+  assert.equal((await rows('SELECT qty FROM inv_stocks'))[0].qty,1);
+  assert.equal((await rows('SELECT * FROM inv_stock_movements')).length,1);
+});
+test('real commit_sale wrapper rejects ambiguous old lines instead of deducting another unit', async () => {
+  await db.query(`INSERT INTO inventory_sale_events(source_channel,source_order_id,event_type,sku_id,raw_payload,status)
+    VALUES('youzan_branch_offline','T2#0#0','paid',$1,'{"item_id":11}','processed'),
+          ('youzan_branch_offline','T2#1#0','paid',$1,'{"item_id":11}','processed')`,[id(1)]);
+  const result = await youzanSale('T2#oid:A#0','T2#2#0');
+  assert.equal(result.ok,false); assert.equal(result.error,'ambiguous_legacy');
+  assert.equal((await rows('SELECT qty FROM inv_stocks'))[0].qty,1);
+  assert.equal((await rows('SELECT * FROM inv_stock_movements')).length,0);
+});
+test('real wrapper retries an oversold event with one audited debit and then remains idempotent', async () => {
+  await db.exec('UPDATE inv_stocks SET qty=0');
+  assert.equal((await youzanSale('T3#oid:A#0')).ok,false);
+  await db.exec('UPDATE inv_stocks SET qty=1');
+  assert.equal((await youzanSale('T3#oid:A#0')).ok,true);
+  assert.equal((await youzanSale('T3#oid:A#0')).idempotent,true);
+  assert.equal((await rows('SELECT qty FROM inv_stocks'))[0].qty,0);
+  assert.equal((await rows('SELECT * FROM inv_stock_movements')).length,1);
+  assert.equal((await rows("SELECT * FROM inventory_sale_events WHERE source_order_id='T3#oid:A#0~retry1' AND status='oversold'")).length,1);
+});
 
 test("last custom unit atomically hides SKU, sells listing, zeros source and queues all-channel delist", async () => {
   const result = await sale(); assert.equal(result.ok, true);

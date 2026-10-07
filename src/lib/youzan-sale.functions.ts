@@ -16,7 +16,7 @@ async function findSkuByCode(codes: string[]): Promise<string | null> {
     .from("inv_skus")
     .select("id")
     .or(filters.join(","))
-    .limit(1)
+    .limit(2)
     .maybeSingle();
   if (error) throw new Error(`按商品编码匹配库存失败：${error.message}`);
   return data?.id ?? null;
@@ -24,9 +24,20 @@ async function findSkuByCode(codes: string[]): Promise<string | null> {
 
 export function createSupabaseYouzanSaleAdapter(): YouzanSaleAdapter {
   const locationCache = new Map<string, string | null>();
+  const shopKdtCache = new Map<string, number>();
   const skuCache = new Map<string, string | null>();
   return {
-    async findLocationId(shopId) {
+    async findLocationId(shopId, targetKdtId) {
+      if (targetKdtId !== undefined) {
+        if (!targetKdtId) throw new Error("订单缺少销售门店编号，已停止库存扣减");
+        if (!shopKdtCache.has(shopId)) {
+          const { data: shop, error: shopError } = await supabaseAdmin.from("youzan_shops")
+            .select("kdt_id").eq("id", shopId).maybeSingle();
+          if (shopError) throw new Error("查询销售门店失败，已停止库存扣减");
+          shopKdtCache.set(shopId, Number(shop?.kdt_id ?? 0));
+        }
+        if (shopKdtCache.get(shopId) !== targetKdtId) throw new Error("销售门店与订单不一致，已停止库存扣减");
+      }
       if (locationCache.has(shopId)) return locationCache.get(shopId) ?? null;
       const { data, error } = await supabaseAdmin
         .from("inv_locations")
@@ -48,11 +59,9 @@ export function createSupabaseYouzanSaleAdapter(): YouzanSaleAdapter {
         .eq("shop_id", shopId)
         .eq("external_item_id", String(itemId));
       if (remoteSkuId) {
-        listingQuery = listingQuery.or(
-          `external_item_id.eq.${itemId},external_sku_id.eq.${remoteSkuId}`,
-        );
+        listingQuery = listingQuery.eq("external_sku_id", String(remoteSkuId));
       }
-      const { data: listing, error: listingError } = await listingQuery.limit(1).maybeSingle();
+      const { data: listing, error: listingError } = await listingQuery.limit(2).maybeSingle();
       if (listingError) throw new Error(`查询渠道商品映射失败：${listingError.message}`);
       if (listing?.sku_id) {
         skuCache.set(cacheKey, listing.sku_id);
@@ -65,9 +74,9 @@ export function createSupabaseYouzanSaleAdapter(): YouzanSaleAdapter {
         .eq("shop_id", shopId)
         .eq("yz_item_id", itemId);
       if (remoteSkuId) {
-        legacyQuery = legacyQuery.or(`yz_item_id.eq.${itemId},yz_sku_id.eq.${remoteSkuId}`);
+        legacyQuery = legacyQuery.eq("yz_sku_id", remoteSkuId);
       }
-      const { data: legacy, error: legacyError } = await legacyQuery.limit(1).maybeSingle();
+      const { data: legacy, error: legacyError } = await legacyQuery.limit(2).maybeSingle();
       if (legacyError) throw new Error(`查询有赞商品映射失败：${legacyError.message}`);
       if (legacy?.sku_id) {
         skuCache.set(cacheKey, legacy.sku_id);

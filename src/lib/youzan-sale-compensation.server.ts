@@ -50,6 +50,7 @@ export async function compensateRecentYouzanSales(d: CompensationDeps, opts: {
     notCustom: 0, noLocation: 0, noStock: 0, versionConflict: 0, lineRefunded: 0, planned: [] as PlannedLine[],
   };
   const metaCache = new Map<string, SkuMeta | undefined>();
+  const base = d.adapter();
   let after: { pay_time: string; tid: string } | undefined;
 
   for (;;) {
@@ -59,9 +60,10 @@ export async function compensateRecentYouzanSales(d: CompensationDeps, opts: {
     for (const row of rows) {
       out.scanned++;
       const sale = extractYouzanSale(row.raw);
-      if (!sale || !isYouzanSaleStatus(row.status) || !isYouzanSaleStatus(sale.status) || refundState(row.raw) !== 0) { out.skipped++; continue; }
+      const paidAt = Date.parse(row.pay_time);
+      if (!Number.isFinite(paidAt) || paidAt < Date.parse(since) || paidAt > now.getTime() ||
+          !sale || sale.tid !== row.tid || !isYouzanSaleStatus(row.status) || !isYouzanSaleStatus(sale.status) || refundState(row.raw) !== 0) { out.skipped++; continue; }
       let pending = 0;
-      const base = d.adapter();
       if (!(await base.findLocationId(row.shop_id))) {
         out.noLocation += sale.items.reduce((n, i) => n + i.quantity, 0);
         continue;

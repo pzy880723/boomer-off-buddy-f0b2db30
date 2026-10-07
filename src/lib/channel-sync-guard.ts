@@ -23,6 +23,8 @@ export type ZeroingVerdict = { verdict: "proceed" | "supersede" | "block"; reaso
 
 export function evaluateZeroingTask(task: ZeroingTask, f: ZeroingFacts): ZeroingVerdict {
   if (!f.sku) return { verdict: "block", reason: "sku 读取失败" };
+  if (!Number.isSafeInteger(Number(f.sku.inventory_version)) || !Number.isSafeInteger(Number(task.inventory_version)) ||
+      typeof f.sku.is_display !== "boolean") return { verdict: "block", reason: "sku 版本或展示状态不完整" };
   if (f.stockQty === null || !Number.isFinite(f.stockQty)) return { verdict: "block", reason: "门店库存读取失败或门店无库位" };
   if (!task.channel_listing_id || !f.listing) return { verdict: "block", reason: "listing 读取失败" };
   if (f.listing.sku_id !== task.sku_id || !task.shop_id || f.listing.shop_id !== task.shop_id) {
