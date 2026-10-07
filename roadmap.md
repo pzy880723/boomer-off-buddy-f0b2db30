@@ -79,4 +79,4 @@
 - [x] location_id 校验 / 游标分页 / is_mine / last_customer_message_at / q 搜索 / 缓存与并行
 - [x] 门店映射 3 条已按用户指定写入（outbox pending）
 - [x] authorization / ack 并行读取 + 追踪
-- [ ] 修图故障：测量检测误判唱臂/频率刻度、平台水印清除、错误阶段标记（保留TimeoutError，日志脱敏），不改超时/生产/迁移
+- [x] 修图故障：测量检测误判唱臂/频率刻度、平台水印清除、错误阶段标记（保留TimeoutError，日志脱敏），不改超时/生产/迁移
