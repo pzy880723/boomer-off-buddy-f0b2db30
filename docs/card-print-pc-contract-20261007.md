@@ -12,7 +12,9 @@
 选择门店 → 载入同域预设清单 → 勾选与数量 → A4 零间距 PDF 预览 → PDF 下载或浏览器打印。
 A4 210×297mm，四周最少5mm，底部留校验尺；卡片之间0间距，可旋转拼版。细边框、内侧裁切角标、50mm校验尺。打印选择100%实际大小，无日常单卡/A5导出。
 
-## Codex 静态资源交接（尚未收到实际路径/清单）
+## Codex 静态资源交接（2026-10-07补充已接入）
+固定读取 `/print-presets/print-presets.json`，不再要求输入路径。采用数组 `{id,title,subtitle,category,widthMM,heightMM,file,thumbnail,pairID}`，category 为 IP/品牌/品类/进口来源/店铺提示；资源与缩略图均位于 `/print-presets/`。清单不包含扫码卡。原版单卡PDF通过pdf-lib嵌入A4，保留字体和版式，验证单页与成品尺寸，不重新绘图。
+下方旧 version=1 示例仅说明内部历史类型，已不作为外部接入合同。
 网页清单路径输入不预填猜测 URL，只允许当前 ERP 同域 `/...` 路径；最近输入路径保存在浏览器，不保存二维码或权限。
 请把原生同一套原图及清单发布在腾讯 ERP 同域；无需数据库配置。网页读取以下 JSON，图片仅 PNG/JPEG 原图：
 
@@ -48,6 +50,7 @@ A4 210×297mm，四周最少5mm，底部留校验尺；卡片之间0间距，可
 ## API / 权限
 公开 handheld `POST /api/public/handheld/print/store-qr` 未改；它必须有设备token，网页不能伪造设备token。
 新增内部只读 server function `readCardPrintContext({location_id?})`：网页登录授权，实时 user_roles + user_location_perms，只有有效 shop 门店；HQ可读所有营业门店，员工只能已授权门店。使用既有私桶与300秒原图链接，路径隔离及旧dianping目录仅评价码的语义与 handheld 相同。不返回桶/路径，不写配置、不创建设备，不借码、不输出假码。
+PC函数增加 `location_id`、`can_manage`、`can_switch`，每次输出必须核对返回门店与所选一致。普通门店账号单店自动固定，总部使用服务端授权门店列表切换；无权限或多店但非总部且无唯一绑定的账号不擅自选店。忽略旧 dianping 渠道别名。
 无 migration、无新增表/RLS/GRANT、无公开 API 合同变化。
 
 ## 发布和验收边界
