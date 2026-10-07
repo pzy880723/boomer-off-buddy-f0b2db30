@@ -8,6 +8,7 @@ import {
 } from "@/server/storefront-auth.server";
 import { withOrderItemThumbnails } from "@/server/storefront-order-detail-media.server";
 import { resolveStorefrontOrderId } from "@/server/storefront-orders.server";
+import { loadCustomerPickups } from "@/server/storefront-pickups.server";
 
 export const Route = createFileRoute("/api/public/storefront/orders/$id")({
   server: {
@@ -58,7 +59,15 @@ export const Route = createFileRoute("/api/public/storefront/orders/$id")({
         if (error) return storefrontError(error.message, 500);
         if (!data) return storefrontError("Order not found", 404);
         // 展示图一律压缩衍生图；无法安全转换为 null（不回退原图）。归属过滤保持不变。
-        return storefrontJson({ ok: true, data: await withOrderItemThumbnails(data) });
+        // 归属已由 customer_id 过滤确认；自提凭证只在此处按状态下发。
+        let pickups;
+        try {
+          pickups = await loadCustomerPickups(data as never);
+        } catch {
+          return storefrontError("Pickup lookup failed", 500);
+        }
+        const detail = await withOrderItemThumbnails(data);
+        return storefrontJson({ ok: true, data: { ...(detail as object), fulfillment_method: (data as { fulfillment_method?: string }).fulfillment_method ?? "shipping", pickups } });
       },
     },
   },
