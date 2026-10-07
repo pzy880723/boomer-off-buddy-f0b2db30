@@ -14,7 +14,6 @@
 //   4. inv_apply_movement 扣/加库存
 //   5. 记 log 到 youzan_sync_logs
 import { createFileRoute } from "@tanstack/react-router";
-import { createHash } from "crypto";
 import { reconcileYouzanTradeSale } from "@/lib/youzan-sale.functions";
 import { extractYouzanSale } from "@/lib/youzan-sale.server";
 
