@@ -80,13 +80,13 @@ export function createSupabaseYouzanSaleAdapter(): YouzanSaleAdapter {
     },
 
     async commitSale(input) {
-      const { data, error } = await supabaseAdmin.rpc("commit_sale", {
+      // 同事务：先查旧下标键，再按稳定 oid 键调用 commit_sale（门店库位隔离、幂等）。
+      const { data, error } = await supabaseAdmin.rpc("commit_youzan_sale_line" as never, {
         p_sku_id: input.skuId,
         p_source_channel: input.sourceChannel,
         p_source_order_id: input.sourceOrderId,
+        p_legacy_order_id: input.legacySourceOrderId,
         p_source_shop_id: input.shopId,
-        p_event_type: "paid",
-        p_epc: null,
         p_location_id: input.locationId,
         p_raw_payload: input.rawPayload,
       } as never);
