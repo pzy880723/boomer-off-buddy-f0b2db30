@@ -6,3 +6,4 @@ create table public.channel_sync_outbox(id uuid primary key default gen_random_u
  attempts int default 0, max_attempts int default 8, next_run_at timestamptz default now(), worker_id text, claimed_at timestamptz,
  lease_expires_at timestamptz, request_payload jsonb default '{}', response_preview text, trace_id text, last_error text,
  created_at timestamptz default now(), updated_at timestamptz default now(), completed_at timestamptz);
+create function public.claim_channel_sync_tasks(text,integer,integer) returns int language sql as 'select 1';
