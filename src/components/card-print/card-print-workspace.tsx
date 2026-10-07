@@ -7,7 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { readCardPrintContext } from '@/lib/card-print.functions';
-import { PRESET_MANIFEST_PATH, parseNativeManifest, assertQrLocation, permitted, resolveSelection, sameOriginUrl, type CardPreset, type Selection } from '@/lib/card-print/contract';
+import { loadCatalog, assertQrLocation, permitted, resolveSelection, sameOriginUrl, type CardPreset, type Selection } from '@/lib/card-print/contract';
 import type { QrImage } from '@/lib/card-print/qr-policy';
 
 const categoryNames: Record<CardPreset['category'], string> = { qr: '扫码入口', store_notice: '店铺提示', ip: 'IP', brand: '品牌', category: '品类', import_origin: '进口来源', product: '商品推荐' };
@@ -18,6 +18,7 @@ export function CardPrintWorkspace() {
   const [selection, setSelection] = useState<Selection[]>([]);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
+  const [orientation, setOrientation] = useState('all');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [pdfUrl, setPdfUrl] = useState('');
@@ -32,10 +33,7 @@ export function CardPrintWorkspace() {
   async function loadManifest() {
     setBusy(true); setError(''); clearPreview(); setSelection([]); setPresets([]);
     try {
-      const url = sameOriginUrl(PRESET_MANIFEST_PATH, window.location.origin);
-      const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(15000) });
-      if (!response.ok) throw new Error('预设清单尚未提供或暂时不可访问');
-      setPresets(parseNativeManifest(await response.json()).filter(permitted));
+      setPresets((await loadCatalog(window.location.origin)).filter(permitted));
     } catch { setError('预设清单无法读取或格式不符，未载入任何卡片。'); }
     finally { setBusy(false); }
   }
@@ -45,9 +43,7 @@ export function CardPrintWorkspace() {
       // Always re-read authorization and active codes before every output, never reuse a saved signed URL.
       const fresh = await readContext({ data: { location_id: locationId } });
       assertQrLocation(fresh.location_id, locationId);
-      const response = await fetch(sameOriginUrl(PRESET_MANIFEST_PATH, window.location.origin), { cache: 'no-store', signal: AbortSignal.timeout(15000) });
-      if (!response.ok) throw new Error('无法重新核对预设启用状态');
-      const current = parseNativeManifest(await response.json());
+      const current = await loadCatalog(window.location.origin);
       const cards = resolveSelection(current, selection, locationId, fresh.channels.map(c => c.channel));
       const { createCardPdf } = await import('@/lib/card-print/pdf');
       const { packA4 } = await import('@/lib/card-print/contract');
@@ -60,7 +56,7 @@ export function CardPrintWorkspace() {
     finally { setBusy(false); }
   }
   const images: QrImage[] = context.data?.channels ?? [];
-  const visible = presets.filter(p => (category === 'all' || p.category === category) && p.name.toLowerCase().includes(search.toLowerCase()) && (!p.location_id || p.location_id === locationId));
+  const visible = presets.filter(p => (category === 'all' || p.category === category) && (orientation === 'all' || p.orientation === orientation) && p.name.toLowerCase().includes(search.toLowerCase()) && (!p.location_id || p.location_id === locationId));
   const missingQr = (p: CardPreset) => p.category === 'qr' && !images.some(c => c.channel === p.channel);
   return <div className="mx-auto w-full max-w-7xl space-y-6 p-4 md:p-6">
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -74,13 +70,13 @@ export function CardPrintWorkspace() {
     {(error || context.error) && <p role="alert" className="text-sm text-destructive">{error || '门店或二维码读取失败，请重试。'}</p>}
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <section className="min-w-0 space-y-4" aria-label="预设选择">
-        <div className="flex flex-wrap gap-2"><div className="relative min-w-0 flex-1"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input aria-label="搜索预设" className="pl-9" value={search} onChange={e => setSearch(e.target.value)} placeholder="搜索预设" /></div><Select value={category} onValueChange={setCategory}><SelectTrigger className="w-36" aria-label="预设类别"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">全部类别</SelectItem>{Object.entries(categoryNames).map(([key, name]) => <SelectItem key={key} value={key}>{name}</SelectItem>)}</SelectContent></Select></div>
+        <div className="flex flex-wrap gap-2"><div className="relative min-w-0 flex-1"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input aria-label="搜索预设" className="pl-9" value={search} onChange={e => setSearch(e.target.value)} placeholder="搜索预设" /></div><Select value={category} onValueChange={setCategory}><SelectTrigger className="w-36" aria-label="预设类别"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">全部类别</SelectItem>{Object.entries(categoryNames).map(([key, name]) => <SelectItem key={key} value={key}>{name}</SelectItem>)}</SelectContent></Select><Select value={orientation} onValueChange={setOrientation}><SelectTrigger className="w-28" aria-label="横竖规格"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">全部规格</SelectItem><SelectItem value="landscape">横版</SelectItem><SelectItem value="portrait">竖版</SelectItem></SelectContent></Select></div>
         {!visible.length && <div className="border-y py-12 text-center text-sm text-muted-foreground">{presets.length ? '暂无匹配预设' : '暂无已接入的预设原图'}</div>}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {visible.map(p => {
             const selected = selection.find(s => s.id === p.id), missing = missingQr(p);
             return <div key={p.id} className="overflow-hidden rounded-md border bg-card">
-              <div className="flex h-36 items-center justify-center bg-muted p-3"><img src={p.thumbnail_path ?? p.image_path} alt={p.name} className="max-h-full max-w-full object-contain" /></div>
+              <div className="flex h-36 items-center justify-center bg-muted p-3"><div className="relative max-h-full max-w-full" style={{ aspectRatio: `${p.width_mm}/${p.height_mm}`, height: p.width_mm >= p.height_mm ? undefined : '100%', width: p.width_mm >= p.height_mm ? '100%' : undefined }}><img src={p.thumbnail_path ?? p.image_path} alt={p.name} className="h-full w-full object-contain" />{p.qr_box && (() => { const code = images.find(c => c.channel === p.channel); return code ? <img src={code.image_url} alt="" className="absolute" style={{ left: `${p.qr_box.x_mm / p.width_mm * 100}%`, top: `${p.qr_box.y_mm / p.height_mm * 100}%`, width: `${p.qr_box.size_mm / p.width_mm * 100}%`, height: `${p.qr_box.size_mm / p.height_mm * 100}%` }} /> : null; })()}</div></div>
               <div className="space-y-2 p-3"><label className="flex items-start gap-2"><Checkbox aria-label={`选择${p.name}`} checked={!!selected} disabled={!locationId || missing || busy} onCheckedChange={checked => updateSelection(checked ? [...selection, { id: p.id, quantity: 1 }] : selection.filter(s => s.id !== p.id))} /><span className="min-w-0 break-words text-sm font-medium">{p.name}</span></label><div className="flex items-center justify-between gap-2"><span className="text-xs text-muted-foreground">{p.width_mm}×{p.height_mm}mm · {p.orientation === 'landscape' ? '横版' : '竖版'}</span>{selected && <Input aria-label={`${p.name}数量`} type="number" min={1} max={100} className="h-7 w-16" value={selected.quantity} onChange={e => updateSelection(selection.map(s => s.id === p.id ? { ...s, quantity: Number(e.target.value) } : s))} />}</div>{missing && <p className="text-xs text-warning">门店缺码 / 未启用</p>}</div>
             </div>;
           })}

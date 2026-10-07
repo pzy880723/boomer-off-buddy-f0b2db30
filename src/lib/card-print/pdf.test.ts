@@ -23,7 +23,7 @@ test('单卡PDF直接嵌入A4、重复原尺寸拼版、拒绝多页和错误尺
     original.addPage();
     const multi = await original.save();
     globalThis.fetch = async () => new Response(Uint8Array.from(multi));
-    await assert.rejects(createCardPdf([p], [], 'https://erp.test'), /尺寸/);
+    await assert.rejects(createCardPdf([p], [], 'https://erp.test'), /单页/);
   } finally {
     globalThis.fetch = fetchBefore;
     if (locationBefore) Object.defineProperty(globalThis, 'location', locationBefore);

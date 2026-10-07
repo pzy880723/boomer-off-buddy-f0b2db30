@@ -23,8 +23,9 @@ export async function createCardPdf(cards: CardPreset[], qr: QrImage[], origin: 
       const bytes = await imageBytes(sameOriginUrl(p.image_path, origin));
       if (p.image_path.toLowerCase().endsWith('.pdf')) {
         const source = await PDFDocument.load(bytes);
+        if (source.getPageCount() !== 1) throw new Error('原版PDF必须为单页');
         const first = source.getPage(0);
-        if (source.getPageCount() !== 1 || Math.abs(first.getWidth() - mm(p.width_mm)) > 1 || Math.abs(first.getHeight() - mm(p.height_mm)) > 1) throw new Error('原版PDF尺寸与清单不一致，禁止缩放输出');
+        if ( Math.abs(first.getWidth() - mm(p.width_mm)) > 1 || Math.abs(first.getHeight() - mm(p.height_mm)) > 1) throw new Error('原版PDF尺寸与清单不一致，禁止缩放输出');
         const [embedded] = await doc.embedPdf(source, [0]);
         if (!embedded) throw new Error('原版PDF无法嵌入');
         originals.set(p.image_path, embedded);
