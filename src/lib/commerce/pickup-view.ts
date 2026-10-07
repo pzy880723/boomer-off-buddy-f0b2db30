@@ -12,6 +12,7 @@ export type CustomerPickup = {
 };
 
 const READY = new Set(["picked", "packed", "handover_ready"]);
+const PREPARING = new Set(["unallocated", "allocated", "picking", "packing"]);
 const PAID_ONLY = new Set(["paid", "refund_pending", "partially_refunded", "refunded"]);
 
 /** 与 DB commerce_pickup_block_reason 一致：取消、关闭、售后中均阻断。 */
@@ -42,6 +43,7 @@ export function buildCustomerPickups(input: {
     if (!c || c.status !== "active" || orderBlocked || input.shortageFulfillmentIds.includes(f.id)) {
       return { ...base, status: "blocked" as const };
     }
+    if (!READY.has(f.status) && !PREPARING.has(f.status)) return { ...base, status: "blocked" as const };
     return { ...base, status: READY.has(f.status) ? ("ready" as const) : ("preparing" as const),
       code: c.code, qr_payload: `BOOMER_PICKUP:${c.qr_token}` };
   });
@@ -103,7 +105,7 @@ export function buildPickupListProjection(input: {
   return input.fulfillments.map((f) => {
     const status: PickupStatus = f.status === "handed_over" ? "redeemed"
       : orderBlocked || input.shortageFulfillmentIds.includes(f.id) ? "blocked"
-      : READY.has(f.status) ? "ready" : "preparing";
+      : READY.has(f.status) ? "ready" : PREPARING.has(f.status) ? "preparing" : "blocked";
     return { fulfillment_id: f.id, location_id: f.location_id, store_name: input.storeName(f.location_id), status,
       redeemed_at: status === "redeemed" ? f.handed_over_at : null };
   });

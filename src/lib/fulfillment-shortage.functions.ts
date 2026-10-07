@@ -142,12 +142,15 @@ export const manualShipStoreSubOrder = createServerFn({ method: "POST" })
       .maybeSingle();
     if (existing) return { ok: true as const, replayed: true, shipment: existing };
     // 自提子单只能经提货码核销交付，不能用手工发货绕过。
-    const { data: fOrder } = await supabaseAdmin
+    const { data: fOrder, error: fOrderError } = await supabaseAdmin
       .from("fulfillments" as never)
       .select("order:commerce_orders!inner(fulfillment_method)")
       .eq("id", data.fulfillmentId)
       .maybeSingle();
-    if ((fOrder as { order?: { fulfillment_method?: string } } | null)?.order?.fulfillment_method === "pickup") {
+    const method = (fOrder as { order?: { fulfillment_method?: string | null } } | null)?.order?.fulfillment_method;
+    // 查询失败或父订单缺失时一律不写入，避免绕过自提保护。
+    if (fOrderError || !method) throw new Error("无法确认订单履约方式，已停止登记发货");
+    if (method === "pickup") {
       throw new Error("门店自提订单请使用提货码核销，不能登记快递发货");
     }
 
