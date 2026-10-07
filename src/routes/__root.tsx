@@ -20,7 +20,8 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Toaster } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useQuery } from "@tanstack/react-query";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -317,9 +318,24 @@ function UserMenu() {
   const router = useRouter();
   const { session } = useAuthSession();
   const phone = resolveUserPhone(session?.user) ?? "";
-  const email = session?.user?.email ?? "";
-  const displayName = phone || email || "管理员";
-  const initial = phone ? phone.slice(-1) : email ? email[0]!.toUpperCase() : "管";
+  const token = session?.access_token ?? null;
+  // 服务端实时读取管理员维护的 canonical 资料，不信 JWT 内陈旧 metadata；员工不能在此修改。
+  const profile = useQuery({
+    queryKey: ["account-profile", session?.user?.id ?? null],
+    enabled: !!token,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const res = await fetch("/api/public/account/profile", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return null;
+      const body = (await res.json()) as { data?: { display_name: string | null; avatar_url: string | null } };
+      return body.data ?? null;
+    },
+  });
+  const displayName = profile.data?.display_name || "未设置姓名";
+  const avatarUrl = profile.data?.avatar_url ?? null;
+  const initial = profile.data?.display_name?.[0] ?? "员";
   const isAdmin = isSuperAdminPhone(phone);
   const [pwdOpen, setPwdOpen] = useState(false);
   const mustChange = !!session?.user?.user_metadata?.must_change_password;
@@ -334,6 +350,7 @@ function UserMenu() {
       <DropdownMenuTrigger asChild>
         <button className="flex items-center gap-2 rounded-md p-1 transition-colors hover:bg-muted">
           <Avatar className="h-8 w-8">
+            {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
             <AvatarFallback className="bg-gradient-brand text-xs font-medium text-primary-foreground">
               {initial}
             </AvatarFallback>
