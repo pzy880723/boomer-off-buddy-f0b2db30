@@ -17,14 +17,21 @@ export function compensationDeps(): CompensationDeps {
       return (data ?? []) as never;
     },
     committedUnits: async (tids) => {
-      const out: Record<string, number> = {};
-      for (const tid of tids) {
-        const { count, error } = await supabaseAdmin.from("inventory_sale_events")
-          .select("id", { count: "exact", head: true })
+      // 一次性按 tid 批量读取事件键（分批 50），避免逐单查询拖慢定时任务。
+      const out: Record<string, number> = Object.fromEntries(tids.map((t) => [t, 0]));
+      for (let i = 0; i < tids.length; i += 50) {
+        const part = tids.slice(i, i + 50);
+        const { data, error } = await supabaseAdmin.from("inventory_sale_events")
+          .select("source_order_id")
           .in("source_channel", ["youzan_branch_offline", "youzan_online"])
-          .eq("event_type", "paid").like("source_order_id", `${tid}#%`);
+          .eq("event_type", "paid")
+          .or(part.map((t) => `source_order_id.like.${t}#*`).join(","))
+          .limit(5000);
         if (error) throw new Error(`读取销售事件失败：${error.message}`);
-        out[tid] = count ?? 0;
+        for (const r of (data ?? []) as { source_order_id: string }[]) {
+          const tid = r.source_order_id.split("#")[0];
+          if (tid in out) out[tid]++;
+        }
       }
       return out;
     },
