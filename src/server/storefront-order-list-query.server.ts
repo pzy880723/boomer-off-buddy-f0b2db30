@@ -16,6 +16,8 @@ import {
   type StoreInfo,
 } from "./storefront-order-list.server";
 
+import { buildPickupListProjection } from "@/lib/commerce/pickup-view";
+
 export class OrderListError extends Error {
   status: number;
   constructor(message: string, status = 500) {
@@ -26,9 +28,9 @@ export class OrderListError extends Error {
 
 /** 字段白名单：不选地址、手机号、EPC、支付快照、结算快照、备注。 */
 export const ORDER_LIST_SELECT = [
-  "id, order_no, order_status, payment_status, total_amount, shipping_fee, discount_total, currency, courier_provider, courier_service_code, paid_at, created_at, courier_quote_snapshot",
+  "id, order_no, order_status, payment_status, fulfillment_method, total_amount, shipping_fee, discount_total, currency, courier_provider, courier_service_code, paid_at, created_at, courier_quote_snapshot",
   "items:commerce_order_items(id, location_id, title_snapshot, image_snapshot, unit_price, quantity, line_total, listing_id, sku_id, sku:inv_skus(image_paths, image_url), listing:commerce_listings(image_paths, cover_url))",
-  "fulfillments(location_id, status)",
+  "fulfillments(id, location_id, status, handed_over_at)",
 ].join(", ");
 
 /** 计数取数：只取判定状态所需的最小列，不取金额/快照/地址/图片。 */
@@ -139,9 +141,38 @@ export async function listStorefrontOrders(options: {
   const signed = paths.length > 0 ? await signPaths(paths) : [];
   const images = buildImageMap(refs, paths, signed);
 
+  // 自提：只投影按门店的安全状态（准备/可提/已核销时间/阻断），列表绝不返回提货码、令牌或二维码。
+  const pickupIds = (page.rows as unknown as Array<{ id: string; fulfillment_method?: string }>)
+    .filter((r) => r.fulfillment_method === "pickup").map((r) => r.id);
+  const refundOrders = new Set<string>();
+  const shortageFs = new Set<string>();
+  if (pickupIds.length > 0) {
+    const [rf, ri, sh] = await Promise.all([
+      client.from("commerce_refunds").select("order_id").in("order_id", pickupIds).in("status", ["pending", "processing", "succeeded"]),
+      client.from("commerce_refund_intents").select("order_id").in("order_id", pickupIds).in("state", ["queued", "processing", "manual_review", "succeeded"]),
+      client.from("fulfillment_shortages").select("fulfillment_id").in("order_id", pickupIds).in("status", ["pending_customer", "customer_accepted"]),
+    ]);
+    for (const x of [rf, ri, sh]) if (x.error) throw new OrderListError(x.error.message, 500);
+    for (const r of [...(rf.data ?? []), ...(ri.data ?? [])] as { order_id: string }[]) refundOrders.add(r.order_id);
+    for (const r of (sh.data ?? []) as { fulfillment_id: string }[]) shortageFs.add(r.fulfillment_id);
+  }
   return {
     ok: true,
-    data: page.rows.map((row) => buildOrderListItem(row, { stores, images })),
+    data: page.rows.map((row) => {
+      const r = row as unknown as { id: string; fulfillment_method?: string; payment_status: string; order_status: string;
+        fulfillments?: Array<{ id: string; location_id: string | null; status: string; handed_over_at: string | null }> };
+      return {
+        ...buildOrderListItem(row, { stores, images }),
+        fulfillment_method: r.fulfillment_method === "pickup" ? "pickup" : "express",
+        pickups: buildPickupListProjection({
+          order: { fulfillment_method: r.fulfillment_method ?? null, payment_status: r.payment_status, order_status: r.order_status },
+          fulfillments: r.fulfillments ?? [],
+          storeName: (id) => (id ? stores.get(id)?.store_name ?? null : null),
+          refundActive: refundOrders.has(r.id),
+          shortageFulfillmentIds: [...shortageFs],
+        }),
+      };
+    }),
     has_more: page.hasMore,
     next_cursor: page.nextCursor,
   };

@@ -77,3 +77,24 @@ export function pickupCreateGuard(b: { fulfillment_method: "express" | "pickup";
   }
   return code === "STORE_PICKUP" ? "store_pickup_requires_pickup_method" : null;
 }
+
+/** 订单列表用：按门店的安全状态投影，绝不包含提货码、令牌或二维码。 */
+export type PickupListItem = { fulfillment_id: string; location_id: string | null; store_name: string | null; status: PickupStatus; redeemed_at: string | null };
+export function buildPickupListProjection(input: {
+  order: { fulfillment_method: string | null; payment_status: string; order_status: string };
+  fulfillments: Array<{ id: string; location_id: string | null; status: string; handed_over_at: string | null }>;
+  storeName: (locationId: string | null) => string | null;
+  refundActive: boolean;
+  shortageFulfillmentIds: string[];
+}): PickupListItem[] {
+  const { order } = input;
+  if (order.fulfillment_method !== "pickup" || !PAID_ONLY.has(order.payment_status)) return [];
+  const orderBlocked = order.payment_status !== "paid" || ["cancelled", "closed"].includes(order.order_status) || input.refundActive;
+  return input.fulfillments.map((f) => {
+    const status: PickupStatus = f.status === "handed_over" ? "redeemed"
+      : orderBlocked || input.shortageFulfillmentIds.includes(f.id) ? "blocked"
+      : READY.has(f.status) ? "ready" : "preparing";
+    return { fulfillment_id: f.id, location_id: f.location_id, store_name: input.storeName(f.location_id), status,
+      redeemed_at: status === "redeemed" ? f.handed_over_at : null };
+  });
+}
