@@ -260,6 +260,13 @@
       "when": 1791224879085,
       "tag": "0036_youzan_order_claim_fairness",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1791365991518,
+      "tag": "0037_custom_print_cards",
+      "breakpoints": true
     }
   ]
 }

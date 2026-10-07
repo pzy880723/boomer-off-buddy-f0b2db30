@@ -2054,6 +2054,86 @@ export type Database = {
           },
         ]
       }
+      custom_print_cards: {
+        Row: {
+          attempts: number
+          client_op_id: string
+          content: Json | null
+          created_at: string
+          created_by: string
+          error: string | null
+          formats: string[]
+          id: string
+          instructions: string
+          job_token: string | null
+          lease_until: string | null
+          location_id: string
+          published_at: string | null
+          published_by: string | null
+          reference_device_id: string | null
+          reference_image_path: string | null
+          state: string
+          status: string
+          topic: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          attempts?: number
+          client_op_id: string
+          content?: Json | null
+          created_at?: string
+          created_by: string
+          error?: string | null
+          formats: string[]
+          id?: string
+          instructions?: string
+          job_token?: string | null
+          lease_until?: string | null
+          location_id: string
+          published_at?: string | null
+          published_by?: string | null
+          reference_device_id?: string | null
+          reference_image_path?: string | null
+          state?: string
+          status?: string
+          topic: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          attempts?: number
+          client_op_id?: string
+          content?: Json | null
+          created_at?: string
+          created_by?: string
+          error?: string | null
+          formats?: string[]
+          id?: string
+          instructions?: string
+          job_token?: string | null
+          lease_until?: string | null
+          location_id?: string
+          published_at?: string | null
+          published_by?: string | null
+          reference_device_id?: string | null
+          reference_image_path?: string | null
+          state?: string
+          status?: string
+          topic?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_print_cards_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       domestic_bulk_order_lines: {
         Row: {
           created_at: string
@@ -9911,6 +9991,38 @@ export type Database = {
           p_source_shop_id?: string
         }
         Returns: Json
+      }
+      custom_print_card_claim: {
+        Args: { p_lease_seconds?: number; p_limit: number }
+        Returns: {
+          attempts: number
+          client_op_id: string
+          content: Json | null
+          created_at: string
+          created_by: string
+          error: string | null
+          formats: string[]
+          id: string
+          instructions: string
+          job_token: string | null
+          lease_until: string | null
+          location_id: string
+          published_at: string | null
+          published_by: string | null
+          reference_device_id: string | null
+          reference_image_path: string | null
+          state: string
+          status: string
+          topic: string
+          updated_at: string
+          version: number
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "custom_print_cards"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       custom_transfer_can_access: {
         Args: { p_location: string; p_user: string }
