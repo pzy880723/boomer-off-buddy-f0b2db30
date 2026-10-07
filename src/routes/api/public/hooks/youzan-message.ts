@@ -76,6 +76,7 @@ export const Route = createFileRoute("/api/public/hooks/youzan-message")({
         }
 
         let logId: string | null = null;
+        let businessFailure: unknown = null;
         try {
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -160,11 +161,13 @@ export const Route = createFileRoute("/api/public/hooks/youzan-message")({
               } as never)
               .eq("id", logId);
           }
-          // 业务异常已持久化；仍确认接收，轮询同步会再次幂等对账。
+          // 业务异常已持久化到 youzan_sync_logs；返回非成功让有赞重试（扣减按稳定键幂等）。
           console.error("[youzan-message]", e);
+          businessFailure = e;
         }
 
-        return Response.json({ code: 0, msg: "success" });
+        const { tradePushResponse } = await import("@/server/youzan-push-auth.server");
+        return tradePushResponse(businessFailure);
       },
     },
   },

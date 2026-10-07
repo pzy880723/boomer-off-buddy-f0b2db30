@@ -100,6 +100,7 @@ describe("youzan sale reconciliation", () => {
       idempotent: 0,
       unmatched: 0,
       failed: 0,
+      gated: {},
     });
     assert.deepEqual(
       commits.map((row) => row.sourceOrderId),
