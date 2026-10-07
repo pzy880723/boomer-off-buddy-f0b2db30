@@ -58,6 +58,7 @@ function fake(opts: { roles?: Record<string, string[]>; access?: Record<string, 
       return true;
     },
     loadReference: async () => ({ mime: "image/jpeg", b64: "AAAA" }),
+    verifyReference: async () => true,
     generate: async () => ({ title: "卡通袜子", headline: "可爱图案每天好心情", body: "柔软舒适的卡通图案袜子，搭配日常穿搭更添趣味。" }),
   };
   if (opts.publishThrows) {
@@ -154,9 +155,9 @@ describe("custom print cards", () => {
   test("content edits enforce limits and do not force regeneration", async () => {
     const { deps } = env();
     const card = await readyCard(deps);
-    const tooLong = await patchCard(deps, staff, card.id, { location_id: LOC_A, expected_version: card.version, content: { title: "字".repeat(19), headline: "", body: "" } });
+    const tooLong = await patchCard(deps, staff, card.id, { location_id: LOC_A, expected_version: card.version, content: { title: "字".repeat(19), headline: "好", body: "好" } });
     assert.equal(tooLong.status, 422);
-    const ok = await patchCard(deps, staff, card.id, { location_id: LOC_A, expected_version: card.version, content: { title: "袜子", headline: "", body: "" } });
+    const ok = await patchCard(deps, staff, card.id, { location_id: LOC_A, expected_version: card.version, content: { title: " 袜子 ", headline: "好", body: "好" } });
     assert.equal(ok.status, 200);
     assert.equal((ok as any).body.status, "ready");
     assert.equal((ok as any).body.content.title, "袜子");
@@ -210,13 +211,58 @@ describe("custom print cards", () => {
     const { deps, rows } = env();
     const c = (await createCard(deps, staff, body) as any).body;
     let release!: () => void;
-    deps.generate = async () => { await new Promise<void>((r) => (release = r)); return { title: "旧", headline: "", body: "" }; };
+    deps.generate = async () => { await new Promise<void>((r) => (release = r)); return { title: "旧", headline: "好", body: "好" }; };
     const run = processCustomCardJobs(deps, 5);
     await new Promise((r) => setTimeout(r, 5));
     const cur = rows.get(c.id)!;
-    await patchCard(deps, staff, c.id, { location_id: LOC_A, expected_version: cur.version, content: { title: "人工", headline: "", body: "" } });
+    await patchCard(deps, staff, c.id, { location_id: LOC_A, expected_version: cur.version, content: { title: "人工", headline: "好", body: "好" } });
     release();
     await run;
     assert.equal(rows.get(c.id)!.content!.title, "人工");
+  });
+
+  test("worker rejects empty, whitespace-only and over-long content; edits too", async () => {
+    for (const bad of [
+      { title: "袜子", headline: "", body: "好" },
+      { title: "袜子", headline: "   ", body: "好" },
+      { title: " ", headline: "好", body: "好" },
+      { title: "袜子", headline: "好", body: "字".repeat(91) },
+      { title: "袜子", headline: "字".repeat(21), body: "好" },
+    ]) {
+      const { deps, rows } = env();
+      deps.generate = async () => bad;
+      const c = (await createCard(deps, staff, body) as any).body;
+      await processCustomCardJobs(deps, 1);
+      assert.equal(rows.get(c.id)!.status, "failed", JSON.stringify(bad));
+      assert.equal(rows.get(c.id)!.content, null);
+    }
+    const { deps } = env();
+    const card = await readyCard(deps);
+    const r = await patchCard(deps, staff, card.id, { location_id: LOC_A, expected_version: card.version, content: { title: "袜子", headline: "  ", body: "好" } });
+    assert.equal(r.status, 422);
+  });
+
+  test("worker claims one card at a time so unstarted cards hold no lease", async () => {
+    const { deps } = env();
+    for (let i = 0; i < 3; i++) await createCard(deps, staff, { ...body, client_op_id: crypto.randomUUID() });
+    const orig = deps.claim;
+    const sizes: number[] = [];
+    let inFlight = 0, claimedWhileBusy = 0;
+    deps.claim = async (n) => { sizes.push(n); if (inFlight) claimedWhileBusy++; return orig(n); };
+    const gen = deps.generate;
+    deps.generate = async (i) => { inFlight++; await new Promise((r) => setTimeout(r, 2)); inFlight--; return gen(i); };
+    const res = await processCustomCardJobs(deps, 6);
+    assert.deepEqual(sizes, [1, 1, 1, 1]);
+    assert.equal(claimedWhileBusy, 0);
+    assert.equal(res.ready, 3);
+    const two = env();
+    for (let i = 0; i < 3; i++) await createCard(two.deps, staff, { ...body, client_op_id: crypto.randomUUID() });
+    assert.equal((await processCustomCardJobs(two.deps, 2)).claimed, 2);
+  });
+
+  test("reference must exist and be a real image", async () => {
+    const { deps } = env();
+    deps.verifyReference = async () => false;
+    assert.equal((await createCard(deps, staff, { ...body, reference_image_path: REF })).status, 422);
   });
 });

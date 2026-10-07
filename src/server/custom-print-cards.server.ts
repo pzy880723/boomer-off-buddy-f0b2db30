@@ -45,6 +45,8 @@ export type CustomCardDeps = {
   claim(limit: number): Promise<CardRow[]>;
   finish(id: string, jobToken: string, claimedVersion: number, patch: Patch): Promise<boolean>;
   loadReference(path: string): Promise<{ mime: string; b64: string }>;
+  /** 对象存在且为受支持图片（按内容识别 MIME）。 */
+  verifyReference(path: string): Promise<boolean>;
   generate(input: { topic: string; instructions: string; formats: CardFormat[]; image: { mime: string; b64: string } | null }): Promise<unknown>;
 };
 
@@ -52,10 +54,11 @@ export const LIMITS = { title: 18, headline: 20, body: 90 } as const;
 const len = (s: string) => Array.from(s).length;
 const uuid = z.string().uuid();
 const formats = z.array(z.enum(["portrait", "landscape"])).min(1).max(2).refine((a) => new Set(a).size === a.length, "duplicate_format");
+const field = (max: number, code: string) => z.string().transform((v) => v.trim())
+  .refine((v) => v.length > 0, `${code}_empty`).refine((v) => len(v) <= max, `${code}_too_long`);
+/** 可打印内容：三个字段 trim 后均非空且不超长。 */
 const contentSchema = z.object({
-  title: z.string().refine((s) => len(s) <= LIMITS.title, "title_too_long"),
-  headline: z.string().refine((s) => len(s) <= LIMITS.headline, "headline_too_long"),
-  body: z.string().refine((s) => len(s) <= LIMITS.body, "body_too_long"),
+  title: field(18, "title"), headline: field(20, "headline"), body: field(90, "body"),
 }).strict();
 const topic = z.string().trim().min(1).max(120);
 const instructions = z.string().max(500);
@@ -114,6 +117,7 @@ export async function createCard(d: CustomCardDeps, a: Actor, raw: unknown): Pro
   const b = p.data;
   if (!(await d.canAccess(a.userId, b.location_id))) return fail(403, "location_forbidden");
   if (b.reference_image_path && !isOwnedReferencePath(b.reference_image_path, a.deviceId)) return fail(403, "reference_forbidden");
+  if (b.reference_image_path && !(await d.verifyReference(b.reference_image_path))) return fail(422, "reference_invalid");
   const row: NewRow = {
     location_id: b.location_id, topic: b.topic, instructions: b.instructions, formats: b.formats,
     reference_image_path: b.reference_image_path ?? null, reference_device_id: b.reference_image_path ? a.deviceId : null,
@@ -149,6 +153,7 @@ export async function patchCard(d: CustomCardDeps, a: Actor, id: string, raw: un
     if (b.reference_image_path === null) { patch.reference_image_path = null; patch.reference_device_id = null; }
     else if (b.reference_image_path !== r.reference_image_path) {
       if (!isOwnedReferencePath(b.reference_image_path, a.deviceId)) return fail(403, "reference_forbidden");
+      if (!(await d.verifyReference(b.reference_image_path))) return fail(422, "reference_invalid");
       patch.reference_image_path = b.reference_image_path; patch.reference_device_id = a.deviceId;
     }
   }
@@ -208,26 +213,30 @@ export const SAFE_ERRORS = {
   busy: "AI 文案服务繁忙，请稍后重新生成",
   quota: "AI 文案服务额度不足，请联系总部",
   unavailable: "AI 文案服务暂时不可用，请稍后重新生成",
+  timeout: "AI 文案生成超时，请重新生成",
 } as const;
 
 function safeGenerationError(e: unknown): string {
   const m = e instanceof Error ? e.message : "";
+  if ((e as { kind?: string })?.kind === "timeout") return SAFE_ERRORS.timeout;
   if (/\b429\b/.test(m)) return SAFE_ERRORS.busy;
   if (/\b402\b/.test(m)) return SAFE_ERRORS.quota;
   return SAFE_ERRORS.unavailable;
 }
 
 function clampContent(raw: unknown): CardContent | null {
-  const p = z.object({ title: z.string(), headline: z.string(), body: z.string() }).safeParse(raw);
-  if (!p.success) return null;
-  const c = { title: p.data.title.trim(), headline: p.data.headline.trim(), body: p.data.body.trim() };
-  return contentSchema.safeParse(c).success && c.title ? c : null;
+  const p = contentSchema.safeParse(raw);
+  return p.success ? p.data : null;
 }
 
 export async function processCustomCardJobs(d: CustomCardDeps, limit: number) {
-  const jobs = await d.claim(Math.max(1, Math.min(limit, 6)));
-  let ready = 0, failed = 0, stale = 0;
-  for (const job of jobs) {
+  // 每次只领取 1 张并立即处理：尚未执行的卡不会提前占用租约而过期被重复领取。
+  const max = Math.max(1, Math.min(limit, 6));
+  let claimed = 0, ready = 0, failed = 0, stale = 0;
+  for (let i = 0; i < max; i++) {
+    const [job] = await d.claim(1);
+    if (!job) break;
+    claimed++;
     let patch: Patch;
     try {
       let image: { mime: string; b64: string } | null = null;
@@ -250,11 +259,12 @@ export async function processCustomCardJobs(d: CustomCardDeps, limit: number) {
     else if (patch.status === "ready") ready++;
     else failed++;
   }
-  return { claimed: jobs.length, ready, failed, stale };
+  return { claimed, ready, failed, stale };
 }
 
 export const GENERATION_PROMPT =
   "你为二手中古杂货店写打印卡片短文案。只能使用【主题】【补充说明】和参考照片中肉眼可直接确认的内容。" +
   "禁止编造：品牌、型号、年份/年代、产地、材质成分、真伪/授权、限量/稀有/孤品等稀缺性，除非这些词已出现在主题或补充说明中。" +
   `输出：title 不超过${LIMITS.title}字（商品/主题名），headline 不超过${LIMITS.headline}字（一句吸引人但有依据的短句），body 不超过${LIMITS.body}字（简短介绍外观、用途、氛围）。` +
-  "全部中文，不要价格、不要表情符号、不要英文。";
+  "全部中文，不要价格、不要表情符号、不要英文。" +
+  "若附有参考照片：照片只用于描述可见的外观、颜色、图案和用途；不得根据画面风格、磨损或印刷推测年份/年代、品牌、产地、材质或稀缺性。";
