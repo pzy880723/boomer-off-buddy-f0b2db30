@@ -1,6 +1,27 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { runChannelSync } from './run-channel-sync.mjs';
+import { mkdtempSync, symlinkSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
+
+test('systemd entry through current symlink actually invokes both stock and delist', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'boomer-channel-symlink-'));
+  try {
+    const entry = join(dir, 'current.mjs');
+    const preload = join(dir, 'fixture.mjs');
+    symlinkSync(fileURLToPath(new URL('./run-channel-sync.mjs', import.meta.url)), entry);
+    writeFileSync(preload, 'globalThis.fetch = async () => Response.json({ok:true,claimed:0,results:[]});');
+    const r = spawnSync(process.execPath, ['--import', preload, entry], { encoding:'utf8', env:{...process.env,SUPABASE_SERVICE_ROLE_KEY:'fixture-key',ERP_PORT:'3005'} });
+    assert.equal(r.status, 0, r.stderr);
+    const output = JSON.parse(r.stdout.trim());
+    assert.equal(output.ok, true);
+    assert.deepEqual(output.results.map(x => x.action), ['set_stock_zero','delist']);
+    assert.ok(!r.stdout.includes('fixture-key'));
+  } finally { rmSync(dir, {recursive:true,force:true}); }
+});
 test('runner only requests bounded sale actions and checks every task result', async () => {
   const calls = [];
   const result = await runChannelSync({ token: 'fixture-key' }, async (url, init) => {

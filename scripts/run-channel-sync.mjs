@@ -1,5 +1,6 @@
 // Tencent localhost only. Credentials stay in environment and request headers.
 import { pathToFileURL } from 'node:url';
+import { realpathSync } from 'node:fs';
 import assert from 'node:assert/strict';
 
 export async function runChannelSync({ token, port = '3005', skuId, action }, request = fetch) {
@@ -23,7 +24,7 @@ export async function runChannelSync({ token, port = '3005', skuId, action }, re
   }
   return { ok: results.every(x => x.ok), results };
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   try {
     const result = await runChannelSync({ token: process.env.SUPABASE_SERVICE_ROLE_KEY, port: process.env.ERP_PORT,
       skuId: process.env.CANARY_SKU_ID, action: process.env.CANARY_ACTION });
