@@ -157,6 +157,12 @@ export async function aiPrepareListingImage(input: {
   return withImageStage("image_generation", () => generateListingImage(body));
 }
 
+/** Safe diagnostic for a 200 response without image; never echoes model content. */
+export function missingImageError(finishReason: unknown): string {
+  const reason = typeof finishReason === "string" && /^[a-z_]{1,40}$/.test(finishReason) ? finishReason : "unknown";
+  return `图像生成服务未返回图片（${reason}），原图保留`;
+}
+
 async function generateListingImage(body: unknown): Promise<{ b64: string; mime: string }> {
   const res = await fetch(`${GATEWAY}/chat/completions`, {
     method: "POST",
@@ -179,7 +185,7 @@ async function generateListingImage(body: unknown): Promise<{ b64: string; mime:
     j?.choices?.[0]?.message?.images?.[0]?.image_url?.url ??
     j?.choices?.[0]?.message?.content?.[0]?.image_url?.url;
   if (!url || !url.startsWith("data:")) {
-    throw new Error("AI gateway did not return an image");
+    throw new Error(missingImageError(j?.choices?.[0]?.finish_reason));
   }
   const m = url.match(/^data:([^;]+);base64,(.+)$/);
   if (!m) throw new Error("Unsupported image data URL");

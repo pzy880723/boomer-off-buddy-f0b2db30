@@ -63,6 +63,19 @@ export function withImageStage<T>(stage: "measurement_detection" | "image_genera
   });
 }
 
+/** Persistable job error: stage prefix + sanitized message, no URLs/data payloads. */
+export function safeImageJobError(error: unknown): string {
+  const stage = error && typeof error === "object" && typeof (error as { stage?: unknown }).stage === "string"
+    && /^[a-z_]{1,40}$/.test((error as { stage: string }).stage) ? (error as { stage: string }).stage : null;
+  const name = error instanceof Error && error.name && error.name !== "Error" ? `${error.name}: ` : "";
+  const raw = error instanceof Error ? error.message : String(error);
+  const message = raw
+    .replace(/data:[^\s,]*,[A-Za-z0-9+/=]+/g, "[data]")
+    .replace(/https?:\/\/\S+/g, "[url]")
+    .replace(/[?&](token|sig|signature|X-Amz-[A-Za-z]+)=\S+/gi, "[redacted]");
+  return `${stage ? `[${stage}] ` : ""}${name}${message}`.slice(0, 1000);
+}
+
 export async function measurementProtectionRequired(image: string, key: string): Promise<boolean> {
   return withImageStage("measurement_detection", () => detectMeasurement(image, key));
 }
