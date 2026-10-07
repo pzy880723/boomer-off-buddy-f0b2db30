@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useServerFn } from '@tanstack/react-start';
 import { useQuery } from '@tanstack/react-query';
-import { Download, Printer, RefreshCw, Search } from 'lucide-react';
+import { Download, Minus, Plus, Printer, RefreshCw, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -30,6 +30,17 @@ export function CardPrintWorkspace() {
   useEffect(() => () => { if (pdfUrl) URL.revokeObjectURL(pdfUrl); }, [pdfUrl]);
   const clearPreview = () => { setPdfUrl(''); setPages(0); };
   const updateSelection = (next: Selection[]) => { clearPreview(); setSelection(next); };
+  const [qtyDrafts, setQtyDrafts] = useState<Record<string, string>>({});
+  // Commit a quantity edit: empty/invalid input keeps the existing value, everything else clamps into 1..100.
+  const commitQty = (id: string, raw: string) => {
+    setQtyDrafts(d => { if (!(id in d)) return d; const next = { ...d }; delete next[id]; return next; });
+    const current = selection.find(s => s.id === id);
+    if (!current) return;
+    const n = Number.parseInt(raw, 10);
+    if (!Number.isFinite(n) || n < 1) return;
+    const clamped = Math.min(100, n);
+    if (clamped !== current.quantity) updateSelection(selection.map(s => s.id === id ? { ...s, quantity: clamped } : s));
+  };
   async function loadManifest() {
     setBusy(true); setError(''); clearPreview(); setSelection([]); setPresets([]);
     try {
