@@ -1,0 +1,12 @@
+[Unit]
+Description=BOOMER ERP channel sync worker tick
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/boomer-erp/channel-sync-worker.env
+ExecStart=/opt/boomer-erp/bin/run-channel-sync-worker.sh
+TimeoutStartSec=60
+NoNewPrivileges=true
+PrivateTmp=true
