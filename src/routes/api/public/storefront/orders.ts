@@ -11,6 +11,7 @@ import {
   authenticateStorefrontCustomer,
   storefrontError,
   storefrontJson,
+  storefrontPrivateJson,
 } from "@/server/storefront-auth.server";
 import {
   OrderListError,
@@ -60,7 +61,7 @@ export const Route = createFileRoute("/api/public/storefront/orders")({
             customerId: auth.customer.id,
             url: new URL(request.url),
           });
-          return storefrontJson(payload);
+          return storefrontPrivateJson(payload);
         } catch (error) {
           if (error instanceof OrderListError) return storefrontError(error.message, error.status);
           return storefrontError(error instanceof Error ? error.message : "Order list failed", 500);
