@@ -9,7 +9,7 @@ if (!token || (port !== "3005" && port !== "3006")) {
     const res = await fetch(`http://127.0.0.1:${port}/api/public/hooks/youzan-sale-compensation`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ window_hours: 48, limit: 200 }),
+      body: JSON.stringify({ window_hours: 48, limit: 30 }),
       redirect: "error",
       signal: AbortSignal.timeout(240000),
     });
