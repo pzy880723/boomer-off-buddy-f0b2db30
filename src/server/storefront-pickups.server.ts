@@ -1,10 +1,13 @@
 // 顾客订单详情的自提凭证：仅在调用方已确认订单归属后使用；凭证不写日志。
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { buildCustomerPickups, type CustomerPickup } from "@/lib/commerce/pickup-view";
+import { qrPngDataUrl } from "@/server/qr-png.server";
+
+export type CustomerPickupWithImage = CustomerPickup & { qr_image: string | null };
 
 type OrderLike = { id: string; fulfillment_method: string | null; payment_status: string; order_status: string };
 
-export async function loadCustomerPickups(order: OrderLike): Promise<CustomerPickup[]> {
+export async function loadCustomerPickups(order: OrderLike): Promise<CustomerPickupWithImage[]> {
   if (order.fulfillment_method !== "pickup") return [];
   const db = supabaseAdmin as unknown as { from: (t: string) => any };
   const [f, c, r, ri, s] = await Promise.all([
@@ -15,7 +18,7 @@ export async function loadCustomerPickups(order: OrderLike): Promise<CustomerPic
     db.from("fulfillment_shortages").select("fulfillment_id").eq("order_id", order.id).in("status", ["pending_customer", "customer_accepted"]),
   ]);
   for (const x of [f, c, r, ri, s]) if (x.error) throw new Error("pickup lookup failed");
-  return buildCustomerPickups({
+  const pickups = buildCustomerPickups({
     order,
     fulfillments: (f.data ?? []).map((row: any) => ({
       id: row.id, location_id: row.location_id, status: row.status,
@@ -26,4 +29,6 @@ export async function loadCustomerPickups(order: OrderLike): Promise<CustomerPic
     refundActive: (r.data ?? []).length > 0 || (ri.data ?? []).length > 0,
     shortageFulfillmentIds: (s.data ?? []).map((x: { fulfillment_id: string }) => x.fulfillment_id),
   });
+  // 二维码内容是 qr_payload（不可猜测令牌），不是 4 位码；只对可提货凭证生成。
+  return Promise.all(pickups.map(async (p) => ({ ...p, qr_image: p.qr_payload ? await qrPngDataUrl(p.qr_payload) : null })));
 }
