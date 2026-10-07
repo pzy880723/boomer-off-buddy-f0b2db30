@@ -104,11 +104,13 @@ import { Route as PurchaseJapanParcelNewRouteImport } from './routes/purchase.ja
 import { Route as ApiInternalMediaParcelUploadRouteImport } from './routes/api/internal/media/parcel-upload'
 import { Route as ApiInternalPaymentsReconcileRouteImport } from './routes/api/internal/payments.reconcile'
 import { Route as ApiInternalRefundsRunRouteImport } from './routes/api/internal/refunds.run'
+import { Route as ApiPublicAccountProfileRouteImport } from './routes/api/public/account/profile'
 import { Route as ApiPublicContentIdRouteImport } from './routes/api/public/content/$id'
 import { Route as ApiPublicContentFeedRouteImport } from './routes/api/public/content/feed'
 import { Route as ApiPublicGoAuthorizationRouteImport } from './routes/api/public/go/authorization'
 import { Route as ApiPublicGoAuthorizationAckRouteImport } from './routes/api/public/go/authorization-ack'
 import { Route as ApiPublicGoDailySummaryRouteImport } from './routes/api/public/go/daily-summary'
+import { Route as ApiPublicGoProfileRouteImport } from './routes/api/public/go/profile'
 import { Route as ApiPublicGoScopeSyncRouteImport } from './routes/api/public/go/scope-sync'
 import { Route as ApiPublicGoSessionRouteImport } from './routes/api/public/go/session'
 import { Route as ApiPublicHandheldCustomTransfersRouteImport } from './routes/api/public/handheld/custom-transfers'
@@ -782,6 +784,11 @@ const ApiInternalRefundsRunRoute = ApiInternalRefundsRunRouteImport.update({
   path: '/api/internal/refunds/run',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicAccountProfileRoute = ApiPublicAccountProfileRouteImport.update({
+  id: '/api/public/account/profile',
+  path: '/api/public/account/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicContentIdRoute = ApiPublicContentIdRouteImport.update({
   id: '/api/public/content/$id',
   path: '/api/public/content/$id',
@@ -807,6 +814,11 @@ const ApiPublicGoAuthorizationAckRoute =
 const ApiPublicGoDailySummaryRoute = ApiPublicGoDailySummaryRouteImport.update({
   id: '/api/public/go/daily-summary',
   path: '/api/public/go/daily-summary',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicGoProfileRoute = ApiPublicGoProfileRouteImport.update({
+  id: '/api/public/go/profile',
+  path: '/api/public/go/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicGoScopeSyncRoute = ApiPublicGoScopeSyncRouteImport.update({
@@ -1990,11 +2002,13 @@ export interface FileRoutesByFullPath {
   '/api/internal/media/parcel-upload': typeof ApiInternalMediaParcelUploadRoute
   '/api/internal/payments/reconcile': typeof ApiInternalPaymentsReconcileRoute
   '/api/internal/refunds/run': typeof ApiInternalRefundsRunRoute
+  '/api/public/account/profile': typeof ApiPublicAccountProfileRoute
   '/api/public/content/$id': typeof ApiPublicContentIdRouteWithChildren
   '/api/public/content/feed': typeof ApiPublicContentFeedRoute
   '/api/public/go/authorization': typeof ApiPublicGoAuthorizationRoute
   '/api/public/go/authorization-ack': typeof ApiPublicGoAuthorizationAckRoute
   '/api/public/go/daily-summary': typeof ApiPublicGoDailySummaryRoute
+  '/api/public/go/profile': typeof ApiPublicGoProfileRoute
   '/api/public/go/scope-sync': typeof ApiPublicGoScopeSyncRoute
   '/api/public/go/session': typeof ApiPublicGoSessionRoute
   '/api/public/handheld/custom-transfers': typeof ApiPublicHandheldCustomTransfersRoute
@@ -2269,11 +2283,13 @@ export interface FileRoutesByTo {
   '/api/internal/media/parcel-upload': typeof ApiInternalMediaParcelUploadRoute
   '/api/internal/payments/reconcile': typeof ApiInternalPaymentsReconcileRoute
   '/api/internal/refunds/run': typeof ApiInternalRefundsRunRoute
+  '/api/public/account/profile': typeof ApiPublicAccountProfileRoute
   '/api/public/content/$id': typeof ApiPublicContentIdRouteWithChildren
   '/api/public/content/feed': typeof ApiPublicContentFeedRoute
   '/api/public/go/authorization': typeof ApiPublicGoAuthorizationRoute
   '/api/public/go/authorization-ack': typeof ApiPublicGoAuthorizationAckRoute
   '/api/public/go/daily-summary': typeof ApiPublicGoDailySummaryRoute
+  '/api/public/go/profile': typeof ApiPublicGoProfileRoute
   '/api/public/go/scope-sync': typeof ApiPublicGoScopeSyncRoute
   '/api/public/go/session': typeof ApiPublicGoSessionRoute
   '/api/public/handheld/custom-transfers': typeof ApiPublicHandheldCustomTransfersRoute
@@ -2556,11 +2572,13 @@ export interface FileRoutesById {
   '/api/internal/media/parcel-upload': typeof ApiInternalMediaParcelUploadRoute
   '/api/internal/payments/reconcile': typeof ApiInternalPaymentsReconcileRoute
   '/api/internal/refunds/run': typeof ApiInternalRefundsRunRoute
+  '/api/public/account/profile': typeof ApiPublicAccountProfileRoute
   '/api/public/content/$id': typeof ApiPublicContentIdRouteWithChildren
   '/api/public/content/feed': typeof ApiPublicContentFeedRoute
   '/api/public/go/authorization': typeof ApiPublicGoAuthorizationRoute
   '/api/public/go/authorization-ack': typeof ApiPublicGoAuthorizationAckRoute
   '/api/public/go/daily-summary': typeof ApiPublicGoDailySummaryRoute
+  '/api/public/go/profile': typeof ApiPublicGoProfileRoute
   '/api/public/go/scope-sync': typeof ApiPublicGoScopeSyncRoute
   '/api/public/go/session': typeof ApiPublicGoSessionRoute
   '/api/public/handheld/custom-transfers': typeof ApiPublicHandheldCustomTransfersRoute
@@ -2844,11 +2862,13 @@ export interface FileRouteTypes {
     | '/api/internal/media/parcel-upload'
     | '/api/internal/payments/reconcile'
     | '/api/internal/refunds/run'
+    | '/api/public/account/profile'
     | '/api/public/content/$id'
     | '/api/public/content/feed'
     | '/api/public/go/authorization'
     | '/api/public/go/authorization-ack'
     | '/api/public/go/daily-summary'
+    | '/api/public/go/profile'
     | '/api/public/go/scope-sync'
     | '/api/public/go/session'
     | '/api/public/handheld/custom-transfers'
@@ -3123,11 +3143,13 @@ export interface FileRouteTypes {
     | '/api/internal/media/parcel-upload'
     | '/api/internal/payments/reconcile'
     | '/api/internal/refunds/run'
+    | '/api/public/account/profile'
     | '/api/public/content/$id'
     | '/api/public/content/feed'
     | '/api/public/go/authorization'
     | '/api/public/go/authorization-ack'
     | '/api/public/go/daily-summary'
+    | '/api/public/go/profile'
     | '/api/public/go/scope-sync'
     | '/api/public/go/session'
     | '/api/public/handheld/custom-transfers'
@@ -3409,11 +3431,13 @@ export interface FileRouteTypes {
     | '/api/internal/media/parcel-upload'
     | '/api/internal/payments/reconcile'
     | '/api/internal/refunds/run'
+    | '/api/public/account/profile'
     | '/api/public/content/$id'
     | '/api/public/content/feed'
     | '/api/public/go/authorization'
     | '/api/public/go/authorization-ack'
     | '/api/public/go/daily-summary'
+    | '/api/public/go/profile'
     | '/api/public/go/scope-sync'
     | '/api/public/go/session'
     | '/api/public/handheld/custom-transfers'
@@ -3647,11 +3671,13 @@ export interface RootRouteChildren {
   ApiInternalMediaParcelUploadRoute: typeof ApiInternalMediaParcelUploadRoute
   ApiInternalPaymentsReconcileRoute: typeof ApiInternalPaymentsReconcileRoute
   ApiInternalRefundsRunRoute: typeof ApiInternalRefundsRunRoute
+  ApiPublicAccountProfileRoute: typeof ApiPublicAccountProfileRoute
   ApiPublicContentIdRoute: typeof ApiPublicContentIdRouteWithChildren
   ApiPublicContentFeedRoute: typeof ApiPublicContentFeedRoute
   ApiPublicGoAuthorizationRoute: typeof ApiPublicGoAuthorizationRoute
   ApiPublicGoAuthorizationAckRoute: typeof ApiPublicGoAuthorizationAckRoute
   ApiPublicGoDailySummaryRoute: typeof ApiPublicGoDailySummaryRoute
+  ApiPublicGoProfileRoute: typeof ApiPublicGoProfileRoute
   ApiPublicGoScopeSyncRoute: typeof ApiPublicGoScopeSyncRoute
   ApiPublicGoSessionRoute: typeof ApiPublicGoSessionRoute
   ApiPublicHandheldCustomTransfersRoute: typeof ApiPublicHandheldCustomTransfersRoute
@@ -4446,6 +4472,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiInternalRefundsRunRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/account/profile': {
+      id: '/api/public/account/profile'
+      path: '/api/public/account/profile'
+      fullPath: '/api/public/account/profile'
+      preLoaderRoute: typeof ApiPublicAccountProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/content/$id': {
       id: '/api/public/content/$id'
       path: '/api/public/content/$id'
@@ -4479,6 +4512,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/go/daily-summary'
       fullPath: '/api/public/go/daily-summary'
       preLoaderRoute: typeof ApiPublicGoDailySummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/go/profile': {
+      id: '/api/public/go/profile'
+      path: '/api/public/go/profile'
+      fullPath: '/api/public/go/profile'
+      preLoaderRoute: typeof ApiPublicGoProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/go/scope-sync': {
@@ -6557,11 +6597,13 @@ const rootRouteChildren: RootRouteChildren = {
   ApiInternalMediaParcelUploadRoute: ApiInternalMediaParcelUploadRoute,
   ApiInternalPaymentsReconcileRoute: ApiInternalPaymentsReconcileRoute,
   ApiInternalRefundsRunRoute: ApiInternalRefundsRunRoute,
+  ApiPublicAccountProfileRoute: ApiPublicAccountProfileRoute,
   ApiPublicContentIdRoute: ApiPublicContentIdRouteWithChildren,
   ApiPublicContentFeedRoute: ApiPublicContentFeedRoute,
   ApiPublicGoAuthorizationRoute: ApiPublicGoAuthorizationRoute,
   ApiPublicGoAuthorizationAckRoute: ApiPublicGoAuthorizationAckRoute,
   ApiPublicGoDailySummaryRoute: ApiPublicGoDailySummaryRoute,
+  ApiPublicGoProfileRoute: ApiPublicGoProfileRoute,
   ApiPublicGoScopeSyncRoute: ApiPublicGoScopeSyncRoute,
   ApiPublicGoSessionRoute: ApiPublicGoSessionRoute,
   ApiPublicHandheldCustomTransfersRoute: ApiPublicHandheldCustomTransfersRoute,
