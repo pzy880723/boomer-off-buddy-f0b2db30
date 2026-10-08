@@ -64,3 +64,11 @@ test("db errors map to stable API codes", () => {
   assert.deepEqual(mapFankuangDbError("fankuang basket empty"), { status: 404, code: "basket_empty" });
   assert.equal(mapFankuangDbError("something else"), null);
 });
+
+test("review 2026-10-08: new gift db errors map to stable API codes", () => {
+  assert.deepEqual(mapFankuangDbError("fankuang gift sku invalid"), { status: 503, code: "gift_sku_invalid" });
+  assert.deepEqual(mapFankuangDbError("fankuang gift requires paid order"), { status: 422, code: "gift_requires_paid_items" });
+  assert.deepEqual(mapFankuangDbError("fankuang gift count mismatch"), { status: 400, code: "gift_invalid" });
+  assert.deepEqual(mapFankuangDbError("fankuang missing create argument p_recipient_name"), { status: 500, code: "gift_checkout_misconfigured" });
+  assert.deepEqual(mapFankuangDbError("fankuang create function overloaded commerce_create_ordinary_order"), { status: 500, code: "gift_checkout_misconfigured" });
+});
