@@ -34,7 +34,7 @@ export function requestedGiftCount(v: { gift_entitlement_ids?: string[]; gift_co
 }
 
 export function paidItemQuantity(body: {
-  items?: Array<{ quantity: number }>;
+  items?: Array<{ quantity: number; listing_id?: string }>;
   listing_ids?: string[];
 }): number {
   if (body.items) return body.items.reduce((sum, i) => sum + i.quantity, 0);
