@@ -59,6 +59,16 @@ function projectAliases(snapshot, projectIds) {
   return aliases;
 }
 
+export function partitionProjectAttachments(projects, attachments) {
+  const projectIds = new Set(projects.map(project => project.legacyId));
+  const linked = [];
+  const orphaned = [];
+  for (const attachment of attachments) {
+    (projectIds.has(attachment.projectLegacyId) ? linked : orphaned).push(attachment);
+  }
+  return { linked, orphaned };
+}
+
 export function transformBoomerOpenSnapshot(snapshot, storage) {
   const projects = (snapshot.projects ?? []).map((project) => ({
     legacyId: String(project.id),

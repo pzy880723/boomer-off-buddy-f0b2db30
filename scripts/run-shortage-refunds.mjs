@@ -2,7 +2,9 @@
 // 生产执行默认关闭（SHORTAGE_REFUND_WORKER_ENABLED=true 才会真正调用支付通道）。
 const token = process.env.SHORTAGE_REFUND_WORKER_TOKEN;
 const base = process.env.SHORTAGE_REFUND_WORKER_URL ?? 'http://127.0.0.1:3005';
-if (!token || token.length < 32) {
+if ((process.env.SHORTAGE_REFUND_WORKER_ENABLED ?? '').trim() !== 'true') {
+  console.log(JSON.stringify({ ok: true, skipped: true, code: 'refund_worker_disabled' }));
+} else if (!token || token.length < 32) {
   console.error('Shortage refund worker is not configured');
   process.exitCode = 1;
 } else {

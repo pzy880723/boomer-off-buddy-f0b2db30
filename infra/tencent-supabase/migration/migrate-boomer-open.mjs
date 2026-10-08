@@ -2,7 +2,7 @@ import process from "node:process";
 
 import pg from "pg";
 
-import { transformBoomerOpenSnapshot } from "./boomer-open-transform.mjs";
+import { partitionProjectAttachments, transformBoomerOpenSnapshot } from "./boomer-open-transform.mjs";
 import {
   readSyncState,
   snapshotDigest,
@@ -37,20 +37,12 @@ async function main() {
   const digest = snapshotDigest(snapshot);
   const stateFile = process.env.SYNC_STATE_FILE?.trim();
   const dryRun = process.env.DRY_RUN !== "false";
-  if (
-    !dryRun &&
-    process.env.FORCE_SYNC !== "true" &&
-    stateFile &&
-    (await readSyncState(stateFile)) === digest
-  ) {
-    console.log(JSON.stringify({ mode: "no-change", digest }, null, 2));
-    return;
-  }
-
   const transformed = transformBoomerOpenSnapshot(snapshot, {
     bucket: required("BOOMER_OPEN_COS_BUCKET"),
     region: process.env.BOOMER_OPEN_COS_REGION || "ap-shanghai",
   });
+  const { linked, orphaned } = partitionProjectAttachments(transformed.projects, transformed.attachments);
+  transformed.attachments = linked;
 
   const summary = {
     projects: transformed.projects.length,
@@ -69,6 +61,7 @@ async function main() {
     ),
     costs: transformed.costs.length,
     attachments: transformed.attachments.length,
+    quarantinedAttachments: orphaned.length,
     contractAnalyses: transformed.attachments.filter(
       (attachment) => attachment.contractAnalysis,
     ).length,
@@ -76,6 +69,23 @@ async function main() {
 
   if (dryRun) {
     console.log(JSON.stringify({ mode: "dry-run", ...summary }, null, 2));
+    return;
+  }
+
+  // Keep complete source records privately; never guess a replacement store or discard files.
+  if (orphaned.length) {
+    if (!stateFile) throw new Error("SYNC_STATE_FILE is required to preserve orphan attachments");
+    const ids = new Set(orphaned.map(attachment => attachment.legacyId));
+    const quarantinePath = `${stateFile}.quarantine/${digest}.json`;
+    await writeSyncState(quarantinePath, JSON.stringify({
+      sourceDigest: digest,
+      reason: "missing_source_project",
+      attachments: (snapshot.attachments ?? []).filter(attachment => ids.has(String(attachment.id))),
+    }));
+    console.warn(JSON.stringify({ code: "orphan_attachments_preserved", count: orphaned.length, quarantinePath }));
+  }
+  if (process.env.FORCE_SYNC !== "true" && stateFile && (await readSyncState(stateFile)) === digest) {
+    console.log(JSON.stringify({ mode: "no-change", digest, quarantinedAttachments: orphaned.length }, null, 2));
     return;
   }
 
@@ -292,8 +302,8 @@ async function main() {
             dateOnly(analysis.contractEndDate),
             analysis.monthlyRent ?? null,
             analysis.rentPaymentTerms ?? null,
-            analysis.keyTerms ?? [],
-            analysis.riskFlags ?? [],
+            JSON.stringify(analysis.keyTerms ?? []),
+            JSON.stringify(analysis.riskFlags ?? []),
             analysis.summary ?? null,
             analysis.error ?? null,
             analysis,

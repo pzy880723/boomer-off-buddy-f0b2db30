@@ -1,7 +1,24 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { transformBoomerOpenSnapshot } from "./boomer-open-transform.mjs";
+import * as transform from "./boomer-open-transform.mjs";
+const { partitionProjectAttachments, transformBoomerOpenSnapshot } = transform;
+
+test("orphan attachments are preserved separately and never assigned to another project", () => {
+  assert.equal(typeof partitionProjectAttachments, "function", "provide explicit orphan partitioning");
+  const valid = { legacyId: "file-current", projectLegacyId: "current" };
+  const orphan = { legacyId: "file-old", projectLegacyId: "retired", contractAnalysis: { keyTerms: ["保留"] } };
+  const result = partitionProjectAttachments([{ legacyId: "current" }], [valid, orphan]);
+  assert.deepEqual(result.linked, [valid]);
+  assert.deepEqual(result.orphaned, [orphan]);
+  assert.equal(result.orphaned[0], orphan);
+});
+
+test("all orphan attachments remain recoverable even if there are no source projects", () => {
+  assert.equal(typeof partitionProjectAttachments, "function", "provide explicit orphan partitioning");
+  const files = [{ legacyId: "file", projectLegacyId: "deleted" }];
+  assert.deepEqual(partitionProjectAttachments([], files), { linked: [], orphaned: files });
+});
 
 test("normalizes BOOMER OPEN projects while preserving source documents", () => {
   const result = transformBoomerOpenSnapshot(
