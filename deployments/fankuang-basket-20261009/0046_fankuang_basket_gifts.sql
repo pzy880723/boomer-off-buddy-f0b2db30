@@ -528,7 +528,8 @@ DROP TRIGGER IF EXISTS commerce_fankuang_gift_order_state ON public.commerce_ord
 CREATE TRIGGER commerce_fankuang_gift_order_state AFTER UPDATE OF payment_status, order_status ON public.commerce_orders
   FOR EACH ROW EXECUTE FUNCTION public.commerce_fankuang_gift_order_state();
 
-xt; BEGIN
+-- 函数仅 service_role 可执行
+DO $$ DECLARE f text; BEGIN
   FOREACH f IN ARRAY ARRAY[
     'commerce_fankuang_gift_probability()', 'commerce_fankuang_draw_wins()', 'commerce_fankuang_today()',
     'commerce_fankuang_gift_sku_id()', 'commerce_fankuang_require_gift_sku()', 'commerce_fankuang_seen(uuid,date,uuid)', 'commerce_fankuang_gift_order_response(jsonb,uuid,boolean)', 'commerce_fankuang_listing_available(uuid)', 'commerce_fankuang_rebuild_round(date)',
