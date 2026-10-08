@@ -190,6 +190,21 @@
               "minimum": 1,
               "maximum": 50
             }
+          },
+          {
+            "in": "query",
+            "name": "fankuang",
+            "schema": {
+              "description": "1/true 只返回有效参与翻筐乐的商品；过滤在分页前，total 不含被排除商品",
+              "type": "string",
+              "enum": [
+                "0",
+                "1",
+                "true",
+                "false"
+              ]
+            },
+            "description": "1/true 只返回有效参与翻筐乐的商品；过滤在分页前，total 不含被排除商品"
           }
         ],
         "responses": {
@@ -2653,6 +2668,23 @@
                           "description": "true 时标准商品不跟踪物理库存，所有 Vintage 门店持续可售",
                           "type": "boolean"
                         },
+                        "fankuang_override": {
+                          "default": null,
+                          "description": "翻筐乐人工覆盖：null 按售价自动（<=49.9），true/false 人工指定",
+                          "anyOf": [
+                            {
+                              "type": "boolean"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "in_fankuang": {
+                          "default": false,
+                          "description": "有效参与翻筐乐；标准/不限量/组包商品恒为 false",
+                          "type": "boolean"
+                        },
                         "total_stock_qty": {
                           "type": "integer",
                           "minimum": -9007199254740991,
@@ -2716,6 +2748,8 @@
                         "image_processing_status",
                         "notes",
                         "is_unlimited_stock",
+                        "fankuang_override",
+                        "in_fankuang",
                         "total_stock_qty",
                         "stocks",
                         "status",
@@ -9167,6 +9201,21 @@
                             "is_unlimited_stock": {
                               "type": "boolean"
                             },
+                            "fankuang_override": {
+                              "anyOf": [
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "翻筐乐人工覆盖：null 按售价自动（<=49.9），true/false 人工指定"
+                            },
+                            "in_fankuang": {
+                              "type": "boolean",
+                              "description": "有效参与翻筐乐；标准/不限量/组包商品恒为 false"
+                            },
                             "sku_code": {
                               "anyOf": [
                                 {
@@ -9471,6 +9520,8 @@
                             "can_edit",
                             "can_delete",
                             "is_unlimited_stock",
+                            "fankuang_override",
+                            "in_fankuang",
                             "sku_code",
                             "barcode",
                             "epc",
@@ -9727,6 +9778,17 @@
                       "minLength": 1,
                       "maxLength": 2048
                     }
+                  },
+                  "fankuang_override": {
+                    "description": "加入翻筐乐：true/false 人工覆盖，null 恢复按售价自动（<=49.9）；省略保持原值",
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   }
                 },
                 "required": [
@@ -9771,7 +9833,8 @@
                               "price_tier",
                               "notes",
                               "grade",
-                              "image_paths"
+                              "image_paths",
+                              "fankuang_override"
                             ]
                           }
                         },
@@ -19048,6 +19111,17 @@
             "default": false,
             "type": "boolean"
           },
+          "fankuang_override": {
+            "description": "加入翻筐乐：省略或 null 按售价自动（<=49.9 参与），true/false 人工覆盖；标准商品忽略",
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "grade": {
             "anyOf": [
               {
@@ -19931,6 +20005,10 @@
             "minimum": 0,
             "maximum": 9007199254740991
           },
+          "in_fankuang": {
+            "type": "boolean",
+            "description": "是否参与翻筐乐（人工开关优先，否则售价<=49.9）"
+          },
           "condition_grade": {
             "anyOf": [
               {
@@ -19976,6 +20054,7 @@
           "image_url",
           "image_urls",
           "stock",
+          "in_fankuang",
           "condition_grade",
           "location",
           "published_at"
@@ -20857,6 +20936,23 @@
             "description": "true 时标准商品不跟踪物理库存，所有 Vintage 门店持续可售",
             "type": "boolean"
           },
+          "fankuang_override": {
+            "default": null,
+            "description": "翻筐乐人工覆盖：null 按售价自动（<=49.9），true/false 人工指定",
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "in_fankuang": {
+            "default": false,
+            "description": "有效参与翻筐乐；标准/不限量/组包商品恒为 false",
+            "type": "boolean"
+          },
           "total_stock_qty": {
             "type": "integer",
             "minimum": -9007199254740991,
@@ -20917,6 +21013,8 @@
           "image_processing_status",
           "notes",
           "is_unlimited_stock",
+          "fankuang_override",
+          "in_fankuang",
           "total_stock_qty",
           "stocks",
           "status",

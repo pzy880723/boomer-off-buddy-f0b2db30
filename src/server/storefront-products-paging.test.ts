@@ -163,7 +163,7 @@ describe("storefront list paging + page-only image signing", () => {
     const filterIdx = listRoute.indexOf("product.stock > 0");
     // 翻筐乐过滤 + total + 切页统一在 filterFankuangBeforePaging 内完成（分页前过滤）。
     const totalIdx = listRoute.indexOf("filterFankuangBeforePaging(");
-    const sliceIdx = listRoute.indexOf("query.page_size,");
+    const sliceIdx = listRoute.indexOf("query.page_size,", totalIdx);
     const signIdx = listRoute.indexOf("signStorefrontProductImages(pageProducts");
     assert.ok(
       enrichIdx < filterIdx && filterIdx < totalIdx && totalIdx < sliceIdx && sliceIdx < signIdx,
