@@ -18,7 +18,7 @@ INSERT INTO inv_stocks VALUES (md5('x1')::uuid,'10000000-0000-4000-8000-00000000
  (md5('x3')::uuid,'10000000-0000-4000-8000-000000000001',1),(md5('x4')::uuid,'10000000-0000-4000-8000-000000000001',0);
 INSERT INTO commerce_listings(sku_id, location_id) SELECT id, '10000000-0000-4000-8000-000000000001' FROM inv_skus WHERE id IN (md5('x1')::uuid,md5('x2')::uuid,md5('x3')::uuid,md5('x4')::uuid);
 -- 标准赠礼 SKU（不建库存）+ 一个误发布的赠礼 listing
-INSERT INTO inv_skus(id, is_custom_price, price_tier) VALUES ('99999999-0000-4000-8000-000000000001', false, 0);
+INSERT INTO inv_skus(id, is_custom_price, price_tier, inventory_policy) VALUES ('99999999-0000-4000-8000-000000000001', false, 0, 'unlimited');
 INSERT INTO app_settings(key,value) VALUES ('fankuang_gift_sku_id', '{"sku_id":"99999999-0000-4000-8000-000000000001"}');
 INSERT INTO commerce_listings(id, sku_id, location_id) VALUES ('99999999-0000-4000-8000-0000000000aa','99999999-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000001');
 
@@ -99,7 +99,8 @@ DO $$ DECLARE base jsonb; r jsonb; ok boolean; ids uuid[]; a uuid := md5('lst2')
   SELECT array_agg(id ORDER BY created_at) INTO ids FROM commerce_fankuang_gift_entitlements WHERE customer_id='c0000000-0000-4000-8000-000000000001';
   ASSERT cardinality(ids) = 2, 'two entitlements ready';
   base := jsonb_build_object('p_customer_id','c0000000-0000-4000-8000-000000000001','p_recipient_name','张三','p_recipient_phone','13800000000',
-    'p_shipping_address','{}'::jsonb,'p_courier_provider','sf','p_courier_service_code','SF','p_shipping_fee',0,
+    'p_shipping_address','{}'::jsonb,'p_courier_provider','sf','p_courier_service_code','SF','p_courier_service_name',NULL,'p_shipping_fee',0,
+    'p_quote_snapshot',NULL,'p_customer_note',NULL,
     'p_merchant_id','m','p_app_id','a','p_owned_location_ids', jsonb_build_array('10000000-0000-4000-8000-000000000001'));
   -- 付费 1 件、要 2 个赠礼 → 拒绝且订单回滚
   BEGIN r := commerce_create_order_with_fankuang_gifts('commerce_create_ordinary_order',
@@ -144,7 +145,7 @@ DO $$ DECLARE base jsonb; r jsonb; ok boolean; ids uuid[]; a uuid := md5('lst2')
   -- 自提下单 + 付款消耗
   r := commerce_create_order_with_fankuang_gifts('commerce_create_ordinary_pickup_order',
       jsonb_build_object('p_customer_id','c0000000-0000-4000-8000-000000000001','p_idempotency_key','k3','p_recipient_name','张三','p_recipient_phone','13800000000',
-        'p_merchant_id','m','p_app_id','a','p_items', jsonb_build_array(jsonb_build_object('listing_id',a,'quantity',3))), NULL, 1);
+        'p_quote_snapshot',NULL,'p_customer_note',NULL,'p_owned_location_ids',NULL,'p_merchant_id','m','p_app_id','a','p_items', jsonb_build_array(jsonb_build_object('listing_id',a,'quantity',3))), NULL, 1);
   ASSERT (SELECT count(*) FROM commerce_fankuang_gift_entitlements WHERE order_id=(r->>'id')::uuid) = 1, 'count-only pick';
   ASSERT (SELECT location_id FROM commerce_order_gift_allocations WHERE order_id=(r->>'id')::uuid) = '10000000-0000-4000-8000-000000000001', 'single store order gift from that store';
   UPDATE commerce_orders SET payment_status='paid', paid_at=now() WHERE id=(r->>'id')::uuid;
