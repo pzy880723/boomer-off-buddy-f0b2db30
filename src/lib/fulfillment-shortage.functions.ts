@@ -29,6 +29,8 @@ export type StoreSubOrder = {
   store_name: string | null;
   tracking_no: string | null;
   provider: string | null;
+  /** 翻筐乐赠礼盲盒件数（随本门店子单一起配货，不另起配送） */
+  gift_quantity: number;
   items: StoreSubOrderItem[];
 };
 
@@ -87,6 +89,18 @@ export const getOrderStoreSubOrders = createServerFn({ method: "GET" })
       declared.set(row.fulfillment_item_id, (declared.get(row.fulfillment_item_id) ?? 0) + row.quantity);
     }
 
+    // 翻筐乐赠礼盲盒：按门店分配数量（候选迁移 0046 未应用时表不存在，按 0 处理）。
+    const { data: giftRows, error: giftError } = await supabaseAdmin
+      .from("commerce_order_gift_allocations" as never)
+      .select("location_id, quantity")
+      .eq("order_id", data.orderId);
+    const giftByLocation = new Map<string, number>();
+    if (!giftError) {
+      for (const row of (giftRows as { location_id: string; quantity: number }[] | null) ?? []) {
+        giftByLocation.set(row.location_id, (giftByLocation.get(row.location_id) ?? 0) + row.quantity);
+      }
+    }
+
     return {
       order_no: (order as { order_no: string | null }).order_no ?? null,
       fulfillment_method: (order as { fulfillment_method?: string }).fulfillment_method ?? "shipping",
@@ -100,6 +114,7 @@ export const getOrderStoreSubOrders = createServerFn({ method: "GET" })
           store_name: row.location?.name ?? null,
           tracking_no: shipment?.tracking_no ?? null,
           provider: shipment?.provider ?? null,
+          gift_quantity: row.location_id ? giftByLocation.get(row.location_id) ?? 0 : 0,
           items: row.items.map((item) => {
             const declaredQty = declared.get(item.id) ?? 0;
             const snapshot = item.order_item_id ? titleById.get(item.order_item_id) : undefined;

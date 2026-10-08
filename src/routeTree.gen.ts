@@ -237,6 +237,10 @@ import { Route as ApiPublicPosPaymentsMicropayRouteImport } from './routes/api/p
 import { Route as ApiPublicPosPaymentsQrOrderRouteImport } from './routes/api/public/pos/payments.qr-order'
 import { Route as ApiPublicPosProductsLookupRouteImport } from './routes/api/public/pos/products.lookup'
 import { Route as ApiPublicPosShiftsOpenRouteImport } from './routes/api/public/pos/shifts.open'
+import { Route as ApiPublicStorefrontFankuangBasketRouteImport } from './routes/api/public/storefront/fankuang.basket'
+import { Route as ApiPublicStorefrontFankuangFlipRouteImport } from './routes/api/public/storefront/fankuang.flip'
+import { Route as ApiPublicStorefrontFankuangGiftBalanceRouteImport } from './routes/api/public/storefront/fankuang.gift-balance'
+import { Route as ApiPublicStorefrontFankuangSessionRouteImport } from './routes/api/public/storefront/fankuang.session'
 import { Route as ApiPublicStorefrontMembershipAccountRouteImport } from './routes/api/public/storefront/membership.account'
 import { Route as ApiPublicStorefrontMembershipConsumptionRecordsRouteImport } from './routes/api/public/storefront/membership.consumption-records'
 import { Route as ApiPublicStorefrontMembershipCouponsRouteImport } from './routes/api/public/storefront/membership.coupons'
@@ -1557,6 +1561,30 @@ const ApiPublicPosShiftsOpenRoute = ApiPublicPosShiftsOpenRouteImport.update({
   path: '/api/public/pos/shifts/open',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicStorefrontFankuangBasketRoute =
+  ApiPublicStorefrontFankuangBasketRouteImport.update({
+    id: '/api/public/storefront/fankuang/basket',
+    path: '/api/public/storefront/fankuang/basket',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicStorefrontFankuangFlipRoute =
+  ApiPublicStorefrontFankuangFlipRouteImport.update({
+    id: '/api/public/storefront/fankuang/flip',
+    path: '/api/public/storefront/fankuang/flip',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicStorefrontFankuangGiftBalanceRoute =
+  ApiPublicStorefrontFankuangGiftBalanceRouteImport.update({
+    id: '/api/public/storefront/fankuang/gift-balance',
+    path: '/api/public/storefront/fankuang/gift-balance',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicStorefrontFankuangSessionRoute =
+  ApiPublicStorefrontFankuangSessionRouteImport.update({
+    id: '/api/public/storefront/fankuang/session',
+    path: '/api/public/storefront/fankuang/session',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicStorefrontMembershipAccountRoute =
   ApiPublicStorefrontMembershipAccountRouteImport.update({
     id: '/api/public/storefront/membership/account',
@@ -2135,6 +2163,10 @@ export interface FileRoutesByFullPath {
   '/api/public/pos/payments/qr-order': typeof ApiPublicPosPaymentsQrOrderRoute
   '/api/public/pos/products/lookup': typeof ApiPublicPosProductsLookupRoute
   '/api/public/pos/shifts/open': typeof ApiPublicPosShiftsOpenRoute
+  '/api/public/storefront/fankuang/basket': typeof ApiPublicStorefrontFankuangBasketRoute
+  '/api/public/storefront/fankuang/flip': typeof ApiPublicStorefrontFankuangFlipRoute
+  '/api/public/storefront/fankuang/gift-balance': typeof ApiPublicStorefrontFankuangGiftBalanceRoute
+  '/api/public/storefront/fankuang/session': typeof ApiPublicStorefrontFankuangSessionRoute
   '/api/public/storefront/membership/account': typeof ApiPublicStorefrontMembershipAccountRoute
   '/api/public/storefront/membership/consumption-records': typeof ApiPublicStorefrontMembershipConsumptionRecordsRoute
   '/api/public/storefront/membership/coupons': typeof ApiPublicStorefrontMembershipCouponsRoute
@@ -2416,6 +2448,10 @@ export interface FileRoutesByTo {
   '/api/public/pos/payments/qr-order': typeof ApiPublicPosPaymentsQrOrderRoute
   '/api/public/pos/products/lookup': typeof ApiPublicPosProductsLookupRoute
   '/api/public/pos/shifts/open': typeof ApiPublicPosShiftsOpenRoute
+  '/api/public/storefront/fankuang/basket': typeof ApiPublicStorefrontFankuangBasketRoute
+  '/api/public/storefront/fankuang/flip': typeof ApiPublicStorefrontFankuangFlipRoute
+  '/api/public/storefront/fankuang/gift-balance': typeof ApiPublicStorefrontFankuangGiftBalanceRoute
+  '/api/public/storefront/fankuang/session': typeof ApiPublicStorefrontFankuangSessionRoute
   '/api/public/storefront/membership/account': typeof ApiPublicStorefrontMembershipAccountRoute
   '/api/public/storefront/membership/consumption-records': typeof ApiPublicStorefrontMembershipConsumptionRecordsRoute
   '/api/public/storefront/membership/coupons': typeof ApiPublicStorefrontMembershipCouponsRoute
@@ -2705,6 +2741,10 @@ export interface FileRoutesById {
   '/api/public/pos/payments/qr-order': typeof ApiPublicPosPaymentsQrOrderRoute
   '/api/public/pos/products/lookup': typeof ApiPublicPosProductsLookupRoute
   '/api/public/pos/shifts/open': typeof ApiPublicPosShiftsOpenRoute
+  '/api/public/storefront/fankuang/basket': typeof ApiPublicStorefrontFankuangBasketRoute
+  '/api/public/storefront/fankuang/flip': typeof ApiPublicStorefrontFankuangFlipRoute
+  '/api/public/storefront/fankuang/gift-balance': typeof ApiPublicStorefrontFankuangGiftBalanceRoute
+  '/api/public/storefront/fankuang/session': typeof ApiPublicStorefrontFankuangSessionRoute
   '/api/public/storefront/membership/account': typeof ApiPublicStorefrontMembershipAccountRoute
   '/api/public/storefront/membership/consumption-records': typeof ApiPublicStorefrontMembershipConsumptionRecordsRoute
   '/api/public/storefront/membership/coupons': typeof ApiPublicStorefrontMembershipCouponsRoute
@@ -2995,6 +3035,10 @@ export interface FileRouteTypes {
     | '/api/public/pos/payments/qr-order'
     | '/api/public/pos/products/lookup'
     | '/api/public/pos/shifts/open'
+    | '/api/public/storefront/fankuang/basket'
+    | '/api/public/storefront/fankuang/flip'
+    | '/api/public/storefront/fankuang/gift-balance'
+    | '/api/public/storefront/fankuang/session'
     | '/api/public/storefront/membership/account'
     | '/api/public/storefront/membership/consumption-records'
     | '/api/public/storefront/membership/coupons'
@@ -3276,6 +3320,10 @@ export interface FileRouteTypes {
     | '/api/public/pos/payments/qr-order'
     | '/api/public/pos/products/lookup'
     | '/api/public/pos/shifts/open'
+    | '/api/public/storefront/fankuang/basket'
+    | '/api/public/storefront/fankuang/flip'
+    | '/api/public/storefront/fankuang/gift-balance'
+    | '/api/public/storefront/fankuang/session'
     | '/api/public/storefront/membership/account'
     | '/api/public/storefront/membership/consumption-records'
     | '/api/public/storefront/membership/coupons'
@@ -3564,6 +3612,10 @@ export interface FileRouteTypes {
     | '/api/public/pos/payments/qr-order'
     | '/api/public/pos/products/lookup'
     | '/api/public/pos/shifts/open'
+    | '/api/public/storefront/fankuang/basket'
+    | '/api/public/storefront/fankuang/flip'
+    | '/api/public/storefront/fankuang/gift-balance'
+    | '/api/public/storefront/fankuang/session'
     | '/api/public/storefront/membership/account'
     | '/api/public/storefront/membership/consumption-records'
     | '/api/public/storefront/membership/coupons'
@@ -3788,6 +3840,10 @@ export interface RootRouteChildren {
   ApiPublicPosPaymentsMicropayRoute: typeof ApiPublicPosPaymentsMicropayRoute
   ApiPublicPosPaymentsQrOrderRoute: typeof ApiPublicPosPaymentsQrOrderRoute
   ApiPublicPosShiftsOpenRoute: typeof ApiPublicPosShiftsOpenRoute
+  ApiPublicStorefrontFankuangBasketRoute: typeof ApiPublicStorefrontFankuangBasketRoute
+  ApiPublicStorefrontFankuangFlipRoute: typeof ApiPublicStorefrontFankuangFlipRoute
+  ApiPublicStorefrontFankuangGiftBalanceRoute: typeof ApiPublicStorefrontFankuangGiftBalanceRoute
+  ApiPublicStorefrontFankuangSessionRoute: typeof ApiPublicStorefrontFankuangSessionRoute
   ApiPublicStorefrontMembershipAccountRoute: typeof ApiPublicStorefrontMembershipAccountRoute
   ApiPublicStorefrontMembershipConsumptionRecordsRoute: typeof ApiPublicStorefrontMembershipConsumptionRecordsRoute
   ApiPublicStorefrontMembershipCouponsRoute: typeof ApiPublicStorefrontMembershipCouponsRoute
@@ -5403,6 +5459,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicPosShiftsOpenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/storefront/fankuang/basket': {
+      id: '/api/public/storefront/fankuang/basket'
+      path: '/api/public/storefront/fankuang/basket'
+      fullPath: '/api/public/storefront/fankuang/basket'
+      preLoaderRoute: typeof ApiPublicStorefrontFankuangBasketRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/storefront/fankuang/flip': {
+      id: '/api/public/storefront/fankuang/flip'
+      path: '/api/public/storefront/fankuang/flip'
+      fullPath: '/api/public/storefront/fankuang/flip'
+      preLoaderRoute: typeof ApiPublicStorefrontFankuangFlipRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/storefront/fankuang/gift-balance': {
+      id: '/api/public/storefront/fankuang/gift-balance'
+      path: '/api/public/storefront/fankuang/gift-balance'
+      fullPath: '/api/public/storefront/fankuang/gift-balance'
+      preLoaderRoute: typeof ApiPublicStorefrontFankuangGiftBalanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/storefront/fankuang/session': {
+      id: '/api/public/storefront/fankuang/session'
+      path: '/api/public/storefront/fankuang/session'
+      fullPath: '/api/public/storefront/fankuang/session'
+      preLoaderRoute: typeof ApiPublicStorefrontFankuangSessionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/storefront/membership/account': {
       id: '/api/public/storefront/membership/account'
       path: '/api/public/storefront/membership/account'
@@ -6748,6 +6832,13 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicPosPaymentsMicropayRoute: ApiPublicPosPaymentsMicropayRoute,
   ApiPublicPosPaymentsQrOrderRoute: ApiPublicPosPaymentsQrOrderRoute,
   ApiPublicPosShiftsOpenRoute: ApiPublicPosShiftsOpenRoute,
+  ApiPublicStorefrontFankuangBasketRoute:
+    ApiPublicStorefrontFankuangBasketRoute,
+  ApiPublicStorefrontFankuangFlipRoute: ApiPublicStorefrontFankuangFlipRoute,
+  ApiPublicStorefrontFankuangGiftBalanceRoute:
+    ApiPublicStorefrontFankuangGiftBalanceRoute,
+  ApiPublicStorefrontFankuangSessionRoute:
+    ApiPublicStorefrontFankuangSessionRoute,
   ApiPublicStorefrontMembershipAccountRoute:
     ApiPublicStorefrontMembershipAccountRoute,
   ApiPublicStorefrontMembershipConsumptionRecordsRoute:
