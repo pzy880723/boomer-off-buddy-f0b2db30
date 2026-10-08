@@ -4,6 +4,12 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { normalizeCourierChoice } from "@/lib/commerce/order-policy";
 import { pickupContactPhone, pickupCreateGuard } from "@/lib/commerce/pickup-view";
 import { normalizeStorefrontOrderItems } from "@/lib/commerce/storefront-order-request";
+import {
+  GiftOrderFields,
+  mapFankuangDbError,
+  paidItemQuantity,
+  requestedGiftCount,
+} from "@/lib/commerce/fankuang-gift";
 import { ordinaryPaymentPolicy } from "@/server/ordinary-payment-config";
 import { recordOrderOrigin } from "@/server/order-origin.server";
 import {
@@ -73,8 +79,10 @@ export const Route = createFileRoute("/api/public/storefront/orders")({
         const idempotencyKey = request.headers.get("idempotency-key")?.trim();
         if (!idempotencyKey) return storefrontError("Missing Idempotency-Key", 400);
         let body: z.infer<typeof CreateOrderBody>;
+        let rawBody: unknown;
         try {
-          body = CreateOrderBody.parse(await request.json());
+          rawBody = await request.json();
+          body = CreateOrderBody.parse(rawBody);
         } catch (error) {
           return storefrontError(`Invalid request: ${String(error)}`, 400);
         }
@@ -86,6 +94,15 @@ export const Route = createFileRoute("/api/public/storefront/orders")({
         }
         const guard = pickupCreateGuard(body);
         if (guard) return storefrontError("自提订单参数不正确", 422, guard);
+        const giftParsed = GiftOrderFields.safeParse({
+          gift_entitlement_ids: (rawBody as Record<string, unknown>)?.gift_entitlement_ids,
+          gift_count: (rawBody as Record<string, unknown>)?.gift_count,
+        });
+        if (!giftParsed.success) return storefrontError("赠礼参数不正确", 400, "gift_invalid");
+        const gifts = giftParsed.data;
+        if (requestedGiftCount(gifts) > paidItemQuantity(body)) {
+          return storefrontError("赠礼数量不能超过付费商品件数，请减少赠礼或加购商品", 422, "gift_exceeds_paid_items");
+        }
         const pickup = body.fulfillment_method === "pickup";
         const pickupPhone = pickup ? pickupContactPhone(auth.customer.phone) : null;
         if (pickup && !pickupPhone) {
@@ -112,8 +129,11 @@ export const Route = createFileRoute("/api/public/storefront/orders")({
         if (!ordinary && body.courier_quote_snapshot?.version === "per_store_99_cross_299_v1") {
           return storefrontError("普通商城结算尚未开放，请稍后重试", 503, "checkout_not_enabled");
         }
-        const { data, error } = pickup && paymentPolicy.mode === "ordinary_wechat"
-          ? await supabaseAdmin.rpc("commerce_create_ordinary_pickup_order" as never, {
+        const createFn = pickup && paymentPolicy.mode === "ordinary_wechat"
+          ? "commerce_create_ordinary_pickup_order"
+          : ordinary ? "commerce_create_ordinary_order" : "commerce_create_order_v2";
+        const createArgs: Record<string, unknown> = pickup && paymentPolicy.mode === "ordinary_wechat"
+          ? {
               p_customer_id: auth.customer.id,
               p_idempotency_key: idempotencyKey,
               p_items: items,
@@ -124,10 +144,8 @@ export const Route = createFileRoute("/api/public/storefront/orders")({
               p_merchant_id: paymentPolicy.merchantId,
               p_app_id: paymentPolicy.appId,
               p_owned_location_ids: paymentPolicy.ownedLocationIds,
-            } as never)
-          : await supabaseAdmin.rpc(
-          (ordinary ? "commerce_create_ordinary_order" : "commerce_create_order_v2") as never,
-          {
+            }
+          : {
             ...(paymentPolicy.mode === "ordinary_wechat" ? {
               p_customer_id: auth.customer.id,
               p_merchant_id: paymentPolicy.merchantId, p_app_id: paymentPolicy.appId,
@@ -144,9 +162,28 @@ export const Route = createFileRoute("/api/public/storefront/orders")({
             p_shipping_fee: body.shipping_fee,
             p_quote_snapshot: body.courier_quote_snapshot ?? null,
             p_customer_note: body.customer_note ?? null,
-          } as never,
-        );
+          };
+        // 翻筐乐赠礼：与原下单函数在同一数据库事务内原子预占（候选迁移 0046）。
+        const withGifts = gifts.gift_entitlement_ids !== undefined || gifts.gift_count !== undefined;
+        if (withGifts && !ordinary) {
+          return storefrontError("赠礼结算暂未开放", 503, "gift_checkout_not_enabled");
+        }
+        const { data, error } = withGifts
+          ? await supabaseAdmin.rpc("commerce_create_order_with_fankuang_gifts" as never, {
+              p_create_function: createFn,
+              p_args: createArgs,
+              p_gift_entitlement_ids: gifts.gift_entitlement_ids ?? null,
+              p_gift_count: requestedGiftCount(gifts),
+            } as never)
+          : await supabaseAdmin.rpc(createFn as never, createArgs as never);
         if (error) {
+          const giftError = mapFankuangDbError(error.message);
+          if (giftError) {
+            const hint = giftError.code === "gift_exceeds_paid_items"
+              ? "赠礼数量不能超过付费商品件数，请减少赠礼或加购商品"
+              : error.message;
+            return storefrontError(hint, giftError.status, giftError.code);
+          }
           if (/zero payable order not supported/i.test(error.message)) {
             return storefrontError("当前支付通道不支持零元订单，请更换优惠券或联系客服", 422, "zero_payable_unsupported");
           }
