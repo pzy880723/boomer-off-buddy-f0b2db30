@@ -200,6 +200,7 @@ export function parseStorefrontProductQuery(url: URL): StorefrontProductQuery {
     sort,
     page: positiveInt(url.searchParams.get("page"), 1, 100000),
     page_size: positiveInt(url.searchParams.get("page_size"), 20, 50),
+    fankuang: ["1", "true"].includes(url.searchParams.get("fankuang") ?? ""),
   };
 }
 
