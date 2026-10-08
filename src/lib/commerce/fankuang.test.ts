@@ -80,3 +80,15 @@ test("same op is stable and a changed override produces a conflicting fingerprin
   assert.equal(legacy, smartCreateFingerprint({ name: "x", price_tier: 10, fankuang_override: undefined }, loc));
   assert.notEqual(legacy, smartCreateFingerprint({ name: "x", price_tier: 10, fankuang_override: false }, loc));
 });
+
+test("all listings of one SKU honor the same manual enrollment", () => {
+  const sku = { ...custom, price_tier: 199, fankuang_override: true };
+  const listings = ["shop-a", "shop-b"].map(location => ({
+    location, in_fankuang: isInFankuang(sku),
+  }));
+  assert.deepEqual(listings.map(row => row.in_fankuang), [true, true]);
+  assert.equal(filterFankuangBeforePaging(listings, true, 1, 20).total, 2);
+  assert.deepEqual(["shop-a", "shop-b"].map(() => isInFankuang({
+    ...sku, price_tier: 9.9, fankuang_override: false,
+  })), [false, false]);
+});

@@ -1,0 +1,609 @@
+diff --git a/src/components/inventory/custom-sku-dialog.tsx b/src/components/inventory/custom-sku-dialog.tsx
+index cc6bb4a..a154392 100644
+--- a/src/components/inventory/custom-sku-dialog.tsx
++++ b/src/components/inventory/custom-sku-dialog.tsx
+@@ -17,6 +17,7 @@ import { SkuMetaFields, emptySkuMeta, type SkuMetaState } from "./sku-meta-field
+ import { DefaultShopsSelector } from "./default-shops-selector";
+ import { SmartSkuCapture } from "./smart-sku-capture";
+ import { Sparkles } from "lucide-react";
++import { FankuangSwitch } from "./fankuang-switch";
+ 
+ export function CustomSkuForm({
+   meta,
+@@ -24,12 +25,16 @@ export function CustomSkuForm({
+   price,
+   setPrice,
+   mobile,
++  fankuang,
++  setFankuang,
+ }: {
+   meta: SkuMetaState;
+   setMeta: (s: SkuMetaState) => void;
+   price: string;
+   setPrice: (v: string) => void;
+   mobile?: boolean;
++  fankuang?: boolean | null;
++  setFankuang?: (v: boolean | null) => void;
+ }) {
+   useEffect(() => {
+     if (!price && meta.aiSuggestedPrice != null) {
+@@ -59,6 +64,9 @@ export function CustomSkuForm({
+           </p>
+         )}
+       </div>
++      {setFankuang && (
++        <FankuangSwitch price={price} value={fankuang ?? null} onChange={setFankuang} />
++      )}
+     </div>
+   );
+ }
+@@ -70,6 +78,7 @@ export function useCustomSkuMutation(onDone: (res?: { sku: { id: string; epc: st
+       meta: SkuMetaState;
+       price: string;
+       default_shop_ids: string[];
++      fankuang_override?: boolean | null;
+     }) => {
+       const { meta, price, default_shop_ids } = input;
+       if (!meta.category || !meta.name.trim()) throw new Error("类目 / 品名 必填");
+@@ -91,6 +100,7 @@ export function useCustomSkuMutation(onDone: (res?: { sku: { id: string; epc: st
+           ai_suggested_price: meta.aiSuggestedPrice,
+           price: Math.round(p * 100) / 100,
+           default_shop_ids,
++          fankuang_override: input.fankuang_override ?? null,
+         },
+       });
+     },
+@@ -113,11 +123,13 @@ export function CustomSkuDialog({
+ }) {
+   const [meta, setMeta] = useState<SkuMetaState>(emptySkuMeta);
+   const [price, setPrice] = useState("");
++  const [fankuang, setFankuang] = useState<boolean | null>(null);
+   const [smartOpen, setSmartOpen] = useState(false);
+   const [defaultShopIds, setDefaultShopIds] = useState<string[]>([]);
+   const reset = () => {
+     setMeta(emptySkuMeta);
+     setPrice("");
++    setFankuang(null);
+     setSmartOpen(false);
+     setDefaultShopIds([]);
+   };
+@@ -156,7 +168,14 @@ export function CustomSkuDialog({
+               拍照自动识别分类和商品字段
+             </Button>
+           )}
+-          <CustomSkuForm meta={meta} setMeta={setMeta} price={price} setPrice={setPrice} />
++          <CustomSkuForm
++            meta={meta}
++            setMeta={setMeta}
++            price={price}
++            setPrice={setPrice}
++            fankuang={fankuang}
++            setFankuang={setFankuang}
++          />
+           <DefaultShopsSelector value={defaultShopIds} onChange={setDefaultShopIds} />
+         </div>
+         <DialogFooter>
+@@ -164,7 +183,7 @@ export function CustomSkuDialog({
+             取消
+           </Button>
+           <Button
+-            onClick={() => mut.mutate({ meta, price, default_shop_ids: defaultShopIds })}
++            onClick={() => mut.mutate({ meta, price, default_shop_ids: defaultShopIds, fankuang_override: fankuang })}
+             disabled={mut.isPending}
+           >
+             {mut.isPending ? "创建中…" : "创建并生成 EPC"}
+diff --git a/src/components/inventory/fankuang-switch.tsx b/src/components/inventory/fankuang-switch.tsx
+new file mode 100644
+index 0000000..770ad0c
+--- /dev/null
++++ b/src/components/inventory/fankuang-switch.tsx
+@@ -0,0 +1,45 @@
++import { Switch } from "@/components/ui/switch";
++import { Label } from "@/components/ui/label";
++import { fankuangDefaultForPrice } from "@/lib/commerce/fankuang";
++
++/** 售价下方一行「加入翻筐乐」开关：null 跟随售价（<=49.9 开），点击后成为人工覆盖。 */
++export function FankuangSwitch({
++  price,
++  value,
++  onChange,
++  disabled,
++}: {
++  price: string | number;
++  value: boolean | null;
++  onChange: (v: boolean | null) => void;
++  disabled?: boolean;
++}) {
++  const auto = fankuangDefaultForPrice(price);
++  const checked = value ?? auto;
++  return (
++    <div className="flex items-center justify-between gap-3">
++      <div className="min-w-0">
++        <Label htmlFor="fankuang-switch">加入翻筐乐</Label>
++        <p className="text-xs text-muted-foreground">
++          {value === null ? "按售价自动（≤49.9 元默认加入）" : "已人工设置"}
++          {value !== null && (
++            <button
++              type="button"
++              className="ml-2 underline underline-offset-2"
++              onClick={() => onChange(null)}
++              disabled={disabled}
++            >
++              恢复自动
++            </button>
++          )}
++        </p>
++      </div>
++      <Switch
++        id="fankuang-switch"
++        checked={checked}
++        disabled={disabled}
++        onCheckedChange={(v) => onChange(v)}
++      />
++    </div>
++  );
++}
+diff --git a/src/components/inventory/sku-edit-dialog.tsx b/src/components/inventory/sku-edit-dialog.tsx
+index 3ad30f2..0b050b9 100644
+--- a/src/components/inventory/sku-edit-dialog.tsx
++++ b/src/components/inventory/sku-edit-dialog.tsx
+@@ -12,6 +12,7 @@ import {
+ import { Button } from "@/components/ui/button";
+ import { Input } from "@/components/ui/input";
+ import { Label } from "@/components/ui/label";
++import { FankuangSwitch } from "./fankuang-switch";
+ import { SkuMetaFields, emptySkuMeta, type SkuMetaState } from "./sku-meta-fields";
+ import { updateSku } from "@/lib/inventory.functions";
+ import type { SkuRow } from "@/lib/inventory.helpers";
+@@ -32,6 +33,9 @@ export function SkuEditDialog({
+     ...emptySkuMeta,
+   });
+   const [price, setPrice] = useState("");
++  const [fankuang, setFankuang] = useState<boolean | null>(null);
++  const fankuangEligible =
++    !!sku && sku.is_custom_price && sku.kind === "single" && sku.inventory_policy !== "unlimited";
+ 
+   const isStandard = !!sku && sku.kind === "single" && !sku.is_custom_price;
+   const priceEditable = !!sku && !isStandard;
+@@ -49,6 +53,7 @@ export function SkuEditDialog({
+         grade: (sku as { grade?: string | null }).grade ?? "",
+       });
+       setPrice(String(sku.price_tier ?? ""));
++      setFankuang(sku.fankuang_override ?? null);
+     }
+   }, [sku, open]);
+ 
+@@ -69,6 +74,10 @@ export function SkuEditDialog({
+         if (!Number.isFinite(p) || p <= 0) throw new Error("请输入合法售价");
+         patch.price_tier = Math.round(p * 100) / 100;
+       }
++      // 只在人工改动时提交，未改动不抹掉原覆盖值。
++      if (fankuangEligible && fankuang !== (sku.fankuang_override ?? null)) {
++        patch.fankuang_override = fankuang;
++      }
+       return fn({ data: { id: sku.id, patch: patch as never } });
+     },
+     onSuccess: () => {
+@@ -111,6 +120,9 @@ export function SkuEditDialog({
+               disabled={!priceEditable}
+             />
+           </div>
++          {fankuangEligible && (
++            <FankuangSwitch price={price} value={fankuang} onChange={setFankuang} />
++          )}
+         </div>
+         <DialogFooter>
+           <Button variant="ghost" onClick={() => onOpenChange(false)}>
+diff --git a/src/integrations/supabase/types.ts b/src/integrations/supabase/types.ts
+index b507646..5664bb3 100644
+--- a/src/integrations/supabase/types.ts
++++ b/src/integrations/supabase/types.ts
+@@ -4645,6 +4645,7 @@ export type Database = {
+           default_shop_ids: string[]
+           discount_eligible: boolean
+           epc: string
++          fankuang_override: boolean | null
+           grade: string | null
+           id: string
+           image_paths: string[]
+@@ -4691,6 +4692,7 @@ export type Database = {
+           default_shop_ids?: string[]
+           discount_eligible?: boolean
+           epc: string
++          fankuang_override?: boolean | null
+           grade?: string | null
+           id?: string
+           image_paths?: string[]
+@@ -4737,6 +4739,7 @@ export type Database = {
+           default_shop_ids?: string[]
+           discount_eligible?: boolean
+           epc?: string
++          fankuang_override?: boolean | null
+           grade?: string | null
+           id?: string
+           image_paths?: string[]
+diff --git a/src/lib/commerce/fankuang.ts b/src/lib/commerce/fankuang.ts
+new file mode 100644
+index 0000000..6634d6f
+--- /dev/null
++++ b/src/lib/commerce/fankuang.ts
+@@ -0,0 +1,46 @@
++/**
++ * 翻筐乐参与规则（纯函数，ERP / 手持 / 商城共用）。
++ * fankuang_override: NULL = 按售价自动（<= 49.9 参与），true / false = 人工覆盖（优先于价格）。
++ * 仅库存跟踪的自定义单件可参与；标准 / 不限量 / 组包商品恒为 false。
++ */
++export const FANKUANG_PRICE_MAX = 49.9;
++
++export function fankuangDefaultForPrice(price: number | string | null | undefined): boolean {
++  const p = Number(price);
++  return Number.isFinite(p) && p > 0 && Math.round(p * 100) <= Math.round(FANKUANG_PRICE_MAX * 100);
++}
++
++export type FankuangSkuLike = {
++  is_custom_price?: boolean | null;
++  inventory_policy?: string | null;
++  kind?: string | null;
++  price_tier?: number | string | null;
++  fankuang_override?: boolean | null;
++};
++
++export function isFankuangEligibleSku(sku: FankuangSkuLike): boolean {
++  return (
++    sku.is_custom_price === true &&
++    (sku.inventory_policy ?? "tracked") !== "unlimited" &&
++    (sku.kind ?? "single") === "single"
++  );
++}
++
++export function isInFankuang(sku: FankuangSkuLike): boolean {
++  if (!isFankuangEligibleSku(sku)) return false;
++  if (sku.fankuang_override === true) return true;
++  if (sku.fankuang_override === false) return false;
++  return fankuangDefaultForPrice(sku.price_tier);
++}
++
++/** 在分页前过滤，total 只统计参与项。 */
++export function filterFankuangBeforePaging<T extends { in_fankuang: boolean }>(
++  items: readonly T[],
++  onlyFankuang: boolean,
++  page: number,
++  pageSize: number,
++): { total: number; page: T[] } {
++  const filtered = onlyFankuang ? items.filter((i) => i.in_fankuang) : [...items];
++  const start = (page - 1) * pageSize;
++  return { total: filtered.length, page: filtered.slice(start, start + pageSize) };
++}
+diff --git a/src/lib/handheld/item-edit-schemas.ts b/src/lib/handheld/item-edit-schemas.ts
+index fb7ec3e..3b1545a 100644
+--- a/src/lib/handheld/item-edit-schemas.ts
++++ b/src/lib/handheld/item-edit-schemas.ts
+@@ -30,6 +30,9 @@ export const ItemPatchReq = z
+     description: z.string().max(2000).nullable().optional(),
+     condition_grade: z.enum(["N", "S", "A", "B", "C", "J"]).nullable().optional(),
+     image_paths: z.array(imagePath).max(20).refine(v => new Set(v).size === v.length, "图片不能重复").optional(),
++    fankuang_override: z.boolean().nullable().optional().describe(
++      "加入翻筐乐：true/false 人工覆盖，null 恢复按售价自动（<=49.9）；省略保持原值",
++    ),
+   })
+   .strict()
+   .refine(
+@@ -37,7 +40,8 @@ export const ItemPatchReq = z
+       b.name !== undefined ||
+       b.price_tier !== undefined ||
+       b.description !== undefined ||
+-      b.condition_grade !== undefined || b.image_paths !== undefined,
++      b.condition_grade !== undefined || b.image_paths !== undefined ||
++      b.fankuang_override !== undefined,
+     { message: "至少修改一个字段" },
+   );
+ 
+@@ -55,7 +59,7 @@ export const ItemPatchRes = env(
+   z.object({
+     sku_id: uuid,
+     updated_at: z.string(),
+-    changed_fields: z.array(z.enum(["name", "price_tier", "notes", "grade", "image_paths"])),
++    changed_fields: z.array(z.enum(["name", "price_tier", "notes", "grade", "image_paths", "fankuang_override"])),
+     replayed: z.boolean(),
+     youzan_sync_queued: z.number().int().describe("已持久化的有赞改名/改价任务数（异步，由腾讯 worker 执行）"),
+   }),
+diff --git a/src/lib/handheld/schemas.ts b/src/lib/handheld/schemas.ts
+index 6831297..e76cded 100644
+--- a/src/lib/handheld/schemas.ts
++++ b/src/lib/handheld/schemas.ts
+@@ -227,6 +227,12 @@ export const ProductItemSchema = z
+     is_unlimited_stock: z.boolean().default(false).meta({
+       description: "true 时标准商品不跟踪物理库存，所有 Vintage 门店持续可售",
+     }),
++    fankuang_override: z.boolean().nullable().default(null).meta({
++      description: "翻筐乐人工覆盖：null 按售价自动（<=49.9），true/false 人工指定",
++    }),
++    in_fankuang: z.boolean().default(false).meta({
++      description: "有效参与翻筐乐；标准/不限量/组包商品恒为 false",
++    }),
+     total_stock_qty: z.number().int(),
+     stocks: z.array(ProductStockSchema),
+     status: z.string(),
+@@ -839,6 +845,9 @@ export const SmartCreateReq = z
+       .meta({ description: "IP 未匹配时，店员确认后才允许创建待审核 IP" }),
+     price_tier: ItemPriceYuan.meta({ description: "售价，以元为单位，0.01–999999.99，最多两位小数" }),
+     is_custom_price: z.boolean().default(false),
++    fankuang_override: z.boolean().nullable().optional().meta({
++      description: "加入翻筐乐：省略或 null 按售价自动（<=49.9 参与），true/false 人工覆盖；标准商品忽略",
++    }),
+     grade: z.enum(["N", "S", "A", "B", "C", "J"]).nullable().optional(),
+     notes: z.string().nullable().optional(),
+     image_url: z
+@@ -1082,6 +1091,12 @@ export const SkuDetailRes = okEnvelope(
+       .boolean()
+       .meta({ description: "仅表示有删除权限（总部），不保证无业务引用；DELETE 可能返回 409 delete_blocked" }),
+     is_unlimited_stock: z.boolean(),
++    fankuang_override: z.boolean().nullable().meta({
++      description: "翻筐乐人工覆盖：null 按售价自动（<=49.9），true/false 人工指定",
++    }),
++    in_fankuang: z.boolean().meta({
++      description: "有效参与翻筐乐；标准/不限量/组包商品恒为 false",
++    }),
+     sku_code: z.string().nullable(),
+     barcode: z.string().nullable(),
+     epc: z.string(),
+@@ -1733,6 +1748,9 @@ export const StorefrontProductsQuery = z
+     sort: z.enum(["newest", "price_asc", "price_desc", "relevance"]).optional(),
+     page: z.coerce.number().int().min(1).default(1),
+     page_size: z.coerce.number().int().min(1).max(50).default(20),
++    fankuang: z.enum(["0", "1", "true", "false"]).optional().meta({
++      description: "1/true 只返回有效参与翻筐乐的商品；过滤在分页前，total 不含被排除商品",
++    }),
+   })
+   .meta({ id: "StorefrontProductsQuery" });
+ 
+@@ -1785,6 +1803,7 @@ export const StorefrontProductSchema = z
+     image_url: z.string().nullable(),
+     image_urls: z.array(z.string()),
+     stock: z.number().int().min(0),
++    in_fankuang: z.boolean().meta({ description: "是否参与翻筐乐（人工开关优先，否则售价<=49.9）" }),
+     condition_grade: z.string().nullable(),
+     location: StorefrontLocationSchema.nullable(),
+     published_at: z.string().nullable(),
+diff --git a/src/lib/inventory.functions.ts b/src/lib/inventory.functions.ts
+index 542cc50..ff9a39c 100644
+--- a/src/lib/inventory.functions.ts
++++ b/src/lib/inventory.functions.ts
+@@ -265,6 +265,7 @@ export const createCustomSku = createServerFn({ method: "POST" })
+   .inputValidator((input: unknown) =>
+     MetaInput.extend({
+       price: z.number().positive().max(99999.9),
++      fankuang_override: z.boolean().nullable().optional(),
+     }).parse(input),
+   )
+   .handler(async ({ data, context }) => {
+@@ -277,6 +278,7 @@ export const createCustomSku = createServerFn({ method: "POST" })
+       price_tier: Math.round(data.price * 100) / 100,
+       is_custom_price: true,
+       inventory_policy: "tracked",
++      fankuang_override: data.fankuang_override ?? null,
+       kind: "single" as const,
+       pack_pieces: null,
+       bundle_items: [],
+@@ -403,6 +405,7 @@ export const updateSku = createServerFn({ method: "POST" })
+             grade: z.enum(["N", "S", "A", "B", "C", "J"]).nullable().optional(),
+             status: z.enum(["active", "archived"]).optional(),
+             price_tier: z.number().positive().max(99999.9).optional(),
++            fankuang_override: z.boolean().nullable().optional(),
+           })
+           .strict(),
+       })
+diff --git a/src/lib/inventory.helpers.ts b/src/lib/inventory.helpers.ts
+index 509270e..484c733 100644
+--- a/src/lib/inventory.helpers.ts
++++ b/src/lib/inventory.helpers.ts
+@@ -105,6 +105,8 @@ export type SkuRow = {
+   sku_code: string | null;
+   price_tier: number;
+   is_custom_price: boolean;
++  inventory_policy?: string | null;
++  fankuang_override?: boolean | null;
+   kind: string;
+   pack_pieces: number | null;
+   bundle_items: unknown;
+diff --git a/src/routes/api/public/handheld/items.$id.ts b/src/routes/api/public/handheld/items.$id.ts
+index a60aaeb..195f1c0 100644
+--- a/src/routes/api/public/handheld/items.$id.ts
++++ b/src/routes/api/public/handheld/items.$id.ts
+@@ -104,6 +104,8 @@ export const Route = createFileRoute("/api/public/handheld/items/$id")({
+             product_type: item.product_type,
+             editable: item.editable,
+             is_unlimited_stock: item.is_unlimited_stock,
++            fankuang_override: item.fankuang_override,
++            in_fankuang: item.in_fankuang,
+             sku_code: sku.sku_code,
+             barcode: sku.barcode ?? null,
+             epc: sku.epc,
+diff --git a/src/routes/api/public/handheld/items.smart-create.ts b/src/routes/api/public/handheld/items.smart-create.ts
+index 161a06d..a49ea7f 100644
+--- a/src/routes/api/public/handheld/items.smart-create.ts
++++ b/src/routes/api/public/handheld/items.smart-create.ts
+@@ -186,6 +186,7 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create")(
+             price_tier: body.price_tier,
+             is_custom_price: body.is_custom_price,
+             inventory_policy: body.is_custom_price ? "tracked" : "unlimited",
++            fankuang_override: body.is_custom_price ? (body.fankuang_override ?? null) : null,
+             epc: generateEpc(body.category, body.price_tier),
+             sku_code: generateSkuCode(body.category, "single"),
+             image_paths: incomingPaths,
+diff --git a/src/routes/api/public/storefront/products.ts b/src/routes/api/public/storefront/products.ts
+index 42c26fc..5694f10 100644
+--- a/src/routes/api/public/storefront/products.ts
++++ b/src/routes/api/public/storefront/products.ts
+@@ -7,6 +7,7 @@ import {
+ import { loadStorefrontCatalog } from "@/server/storefront-catalog.server";
+ import { filterStorefrontProducts } from "@/server/storefront-filters";
+ import { loadTencentMediaManifest } from "@/server/storefront-tencent-media.server";
++import { filterFankuangBeforePaging } from "@/lib/commerce/fankuang";
+ 
+ export const Route = createFileRoute("/api/public/storefront/products")({
+   server: {
+@@ -26,9 +27,9 @@ export const Route = createFileRoute("/api/public/storefront/products")({
+             if (query.sort === "relevance") return (catalog.rank.get(right.sku_id) ?? 0) - (catalog.rank.get(left.sku_id) ?? 0);
+             return String(right.published_at ?? "").localeCompare(String(left.published_at ?? ""));
+           });
+-          const total = availableProducts.length;
+-          const start = (query.page - 1) * query.page_size;
+-          const pageProducts = availableProducts.slice(start, start + query.page_size);
++          const { total, page: pageProducts } = filterFankuangBeforePaging(
++            availableProducts, query.fankuang, query.page, query.page_size,
++          );
+           const products = await signStorefrontProductImages(pageProducts, catalog.listingsById, { thumbnail: true, originals: !tencent, tencentManifest: manifest });
+           return storefrontJson({
+             ok: true,
+diff --git a/src/routes/m.skus.index.tsx b/src/routes/m.skus.index.tsx
+index 2c1a5cb..7879d1f 100644
+--- a/src/routes/m.skus.index.tsx
++++ b/src/routes/m.skus.index.tsx
+@@ -295,10 +295,12 @@ function MNewCustomSkuSheet({
+ }) {
+   const [meta, setMeta] = useState<SkuMetaState>(emptySkuMeta);
+   const [price, setPrice] = useState("");
++  const [fankuang, setFankuang] = useState<boolean | null>(null);
+   const [smartOpen, setSmartOpen] = useState(false);
+   const reset = () => {
+     setMeta(emptySkuMeta);
+     setPrice("");
++    setFankuang(null);
+     setSmartOpen(false);
+   };
+   const mut = useCustomSkuMutation(() => {
+@@ -337,12 +339,13 @@ function MNewCustomSkuSheet({
+               智能新建（拍照自动识别类目 / 品名 / 描述）
+             </Button>
+           )}
+-          <CustomSkuForm meta={meta} setMeta={setMeta} price={price} setPrice={setPrice} mobile />
++          <CustomSkuForm meta={meta} setMeta={setMeta} price={price} setPrice={setPrice}
++            fankuang={fankuang} setFankuang={setFankuang} mobile />
+         </div>
+         <SheetFooter className="fixed inset-x-0 bottom-0 border-t bg-background p-3 pb-[calc(env(safe-area-inset-bottom)+12px)]">
+           <Button
+             className="w-full"
+-            onClick={() => mut.mutate({ meta, price, default_shop_ids: [] })}
++            onClick={() => mut.mutate({ meta, price, default_shop_ids: [], fankuang_override: fankuang })}
+             disabled={mut.isPending}
+           >
+             {mut.isPending ? "创建中…" : "创建并生成 EPC"}
+diff --git a/src/server/handheld-item-edit.server.ts b/src/server/handheld-item-edit.server.ts
+index 70a9124..eef1cf2 100644
+--- a/src/server/handheld-item-edit.server.ts
++++ b/src/server/handheld-item-edit.server.ts
+@@ -69,6 +69,7 @@ export async function handleItemPatch(request: Request, deviceId: string, skuId:
+   if (b.description !== undefined) patch.notes = b.description;
+   if (b.condition_grade !== undefined) patch.grade = b.condition_grade;
+   if (b.image_paths !== undefined) patch.image_paths = b.image_paths;
++  if (b.fankuang_override !== undefined) patch.fankuang_override = b.fankuang_override;
+   const { data, error } = await supabaseAdmin.rpc("handheld_item_update" as never, {
+     p_device_id: deviceId,
+     p_user_id: session.user_id,
+diff --git a/src/server/handheld-products.server.ts b/src/server/handheld-products.server.ts
+index 279a939..e81b93d 100644
+--- a/src/server/handheld-products.server.ts
++++ b/src/server/handheld-products.server.ts
+@@ -1,3 +1,4 @@
++import { isInFankuang } from "@/lib/commerce/fankuang";
+ import { supabaseAdmin } from "@/integrations/supabase/client.server";
+ import { err, resolveSessionUser, type DeviceContext } from "@/server/handheld-auth.server";
+ import {
+@@ -43,6 +44,8 @@ export type ProductItem = {
+   image_processing_status: string;
+   notes: string | null;
+   is_unlimited_stock: boolean;
++  fankuang_override: boolean | null;
++  in_fankuang: boolean;
+   total_stock_qty: number;
+   stocks: {
+     location_id: string;
+@@ -60,7 +63,7 @@ export type ProductItem = {
+ };
+ 
+ const SKU_COLS =
+-  "id, sku_code, barcode, epc, name, category, price_tier, grade, image_url, image_paths, image_processing_status, notes, status, is_display, kind, is_custom_price, inventory_policy, stock_qty, created_at, updated_at";
++  "id, sku_code, barcode, epc, name, category, price_tier, grade, image_url, image_paths, image_processing_status, notes, status, is_display, kind, is_custom_price, inventory_policy, fankuang_override, stock_qty, created_at, updated_at";
+ export function productQuery(exactCount = false) {
+   return supabaseAdmin
+     .from("inv_skus")
+@@ -324,6 +327,8 @@ export function buildProductItems(skus: Sku[], inventory: Inventory): ProductIte
+       image_processing_status: s.image_processing_status ?? "idle",
+       notes: s.notes,
+       is_unlimited_stock: unlimited,
++      fankuang_override: (s as { fankuang_override?: boolean | null }).fankuang_override ?? null,
++      in_fankuang: isInFankuang(s as never),
+       total_stock_qty: total,
+       stocks,
+       status: s.status,
+diff --git a/src/server/storefront-catalog.server.ts b/src/server/storefront-catalog.server.ts
+index e76e1c7..504ce47 100644
+--- a/src/server/storefront-catalog.server.ts
++++ b/src/server/storefront-catalog.server.ts
+@@ -24,7 +24,7 @@ export const loadStorefrontCatalog = createStorefrontScopeCache(async (scope) =>
+   const skuBatches: Array<string[] | null> = directPublished ? [null] : storefrontBatches(skuIds);
+   const [batches, categoryRows] = await Promise.all([Promise.all(skuBatches.map(batch => collectStorefrontPages(async (offset, limit) => {
+     let db = supabaseAdmin.from("commerce_listings" as never).select(
+-      "id, sku_id, location_id, title, description, cover_url, image_urls, image_paths, price, compare_at_price, condition_grade, product_type, published_at, location:inv_locations!location_id(id,name,kind),sku:inv_skus!sku_id(id,category,status,is_display,brand_id,keywords,stock_qty,brand:inv_brands!inv_skus_brand_id_fkey(id,name,name_original,logo_url),facet_links:inv_sku_facets!inv_sku_facets_sku_id_fkey(confidence,facet:inv_facets!inv_sku_facets_facet_id_fkey(code,name,dimension)),image_jobs:inv_listing_image_jobs(status,source_bucket,source_path,target_path,updated_at))",
++      "id, sku_id, location_id, title, description, cover_url, image_urls, image_paths, price, compare_at_price, condition_grade, product_type, published_at, location:inv_locations!location_id(id,name,kind),sku:inv_skus!sku_id(id,category,status,is_display,brand_id,keywords,stock_qty,price_tier,is_custom_price,inventory_policy,kind,fankuang_override,brand:inv_brands!inv_skus_brand_id_fkey(id,name,name_original,logo_url),facet_links:inv_sku_facets!inv_sku_facets_sku_id_fkey(confidence,facet:inv_facets!inv_sku_facets_facet_id_fkey(code,name,dimension)),image_jobs:inv_listing_image_jobs(status,source_bucket,source_path,target_path,updated_at))",
+     ).eq("status", "published").order("id", { ascending: true }).range(offset, offset + limit - 1);
+     if (batch) db = db.in("sku_id", batch);
+     if (scope.location_id) db = db.eq("location_id", scope.location_id);
+diff --git a/src/server/storefront-products.server.ts b/src/server/storefront-products.server.ts
+index e9ded3b..1f8c203 100644
+--- a/src/server/storefront-products.server.ts
++++ b/src/server/storefront-products.server.ts
+@@ -4,6 +4,7 @@ import { signDerivativeUrls } from "./media-derivative.server";
+ import { resolveListingImageSources } from "./listing-image-source";
+ import { collectStorefrontPages } from "./storefront-filters";
+ import { tencentDerivative, loadTencentMediaManifest } from "./storefront-tencent-media.server";
++import { isInFankuang } from "../lib/commerce/fankuang";
+ 
+ export type StorefrontProductQuery = {
+   q: string | null;
+@@ -17,6 +18,7 @@ export type StorefrontProductQuery = {
+   sort: "newest" | "price_asc" | "price_desc" | "relevance";
+   page: number;
+   page_size: number;
++  fankuang: boolean;
+ };
+ 
+ export type StorefrontListing = {
+@@ -144,6 +146,11 @@ type StorefrontSku = {
+   category: string | null;
+   keywords: string[] | null;
+   stock_qty: number | null;
++  price_tier?: number | null;
++  is_custom_price?: boolean | null;
++  inventory_policy?: string | null;
++  kind?: string | null;
++  fankuang_override?: boolean | null;
+ };
+ 
+ type StorefrontBrand = {
+@@ -210,6 +217,7 @@ export function parseStorefrontProductQuery(url: URL): StorefrontProductQuery {
+     sort,
+     page: positiveInt(url.searchParams.get("page"), 1, 100000),
+     page_size: positiveInt(url.searchParams.get("page_size"), 20, 50),
++    fankuang: ["1", "true"].includes(url.searchParams.get("fankuang") ?? ""),
+   };
+ }
+ 
+@@ -244,6 +252,7 @@ export function buildStorefrontProduct(input: {
+     product_type: listing.product_type,
+     available_qty: Math.max(0, Number(availableQty) || 0),
+     stock: Math.max(0, Number(availableQty) || 0),
++    in_fankuang: isInFankuang({ ...sku, price_tier: sku.price_tier ?? listing.price }),
+     condition_grade: listing.condition_grade,
+     location: listing.location,
+     published_at: listing.published_at,
+@@ -285,7 +294,7 @@ export async function enrichStorefrontListings(listings: StorefrontListing[], op
+   const [skuResult, facetResult, availabilityResult, categoryRows] = await Promise.all([
+     joinedSkus ? Promise.resolve({ data: joinedSkus, error: null }) : supabaseAdmin
+       .from("inv_skus")
+-      .select("id, category, brand_id, keywords, stock_qty, brand:inv_brands!inv_skus_brand_id_fkey(id,name,name_original,logo_url)")
++      .select("id, category, brand_id, keywords, stock_qty, price_tier, is_custom_price, inventory_policy, kind, fankuang_override, brand:inv_brands!inv_skus_brand_id_fkey(id,name,name_original,logo_url)")
+       .eq("status", "active")
+       .eq("is_display", true)
+       .in("id", skuIds),

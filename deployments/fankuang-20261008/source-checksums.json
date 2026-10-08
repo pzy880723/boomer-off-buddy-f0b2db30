@@ -1,0 +1,91 @@
+{
+  "baseline": "staff-profile-20261007",
+  "migration": "0045_fankuang_override",
+  "files": [
+    {
+      "path": "src/components/inventory/custom-sku-dialog.tsx",
+      "before": "236feada74f844c58f7cf2b86bdbcdf0da2de99642ffef7641ec16e8d17abd14",
+      "after": "bcd6ecfbcdd32b979f5ab348dfc26a2de7a641afff89585e9245a19f639f26c6"
+    },
+    {
+      "path": "src/components/inventory/fankuang-switch.tsx",
+      "before": null,
+      "after": "0d5fc3d79cabd61f457c082e4fa14da91e15f21d63c3b29feec3acbb8f91157d"
+    },
+    {
+      "path": "src/components/inventory/sku-edit-dialog.tsx",
+      "before": "5a205605b854f5136f8f5f1ea5dc98a31e359d7d33a44a64c19a3f70d868967e",
+      "after": "9da3c60a0d17046dd583ad2a145f0f8123310fca759d81419a904988bdeaccf0"
+    },
+    {
+      "path": "src/integrations/supabase/types.ts",
+      "before": "b9f0c3d94306fa6c6b59d11b90321f000ae8e2606ee8faa10f94e5e3316738bc",
+      "after": "c7fc3e351100dcb45184635291228b0a70df41fead15ddb0fe0c6666ed1ec82d"
+    },
+    {
+      "path": "src/lib/commerce/fankuang.ts",
+      "before": null,
+      "after": "68a7cd36331332164a4f70aa8a12523ad414b44948285ba417e26d552a127fb4"
+    },
+    {
+      "path": "src/lib/handheld/item-edit-schemas.ts",
+      "before": "ec6f33ae9b01f3d60e750d10926cbfb4fca587fd93ca0b0a65a53b8d631a9ee4",
+      "after": "95c4bfeef40b8651144615c1da182cbfbe3266e249f1e88dbcfc18881823844c"
+    },
+    {
+      "path": "src/lib/handheld/schemas.ts",
+      "before": "a486974f10f9c8393b90faa94e58512edbadbaf37969f5c1d0685577bfcef075",
+      "after": "365b2a2e5f5ae9ef2c85bf7e1d6db0e207efaf32fbbb41c19bb7f52a486acf68"
+    },
+    {
+      "path": "src/lib/inventory.functions.ts",
+      "before": "c2f95b53515c460e0958f8409158f841ee7df04856b6d9fe8bdfa9b07313d533",
+      "after": "4da5e0bda69db7b08fec6f698c02747ca5fed2e26cd26ae4d7c7736e7597221d"
+    },
+    {
+      "path": "src/lib/inventory.helpers.ts",
+      "before": "ea2aed59a64916255d1ae8c858c1cac4d5432b5a4982ec8217022fbb5abb4075",
+      "after": "daf00da0e7efb3333e3232d6b604aa04e7d4daf78159b6ede78c6e2277147434"
+    },
+    {
+      "path": "src/routes/api/public/handheld/items.$id.ts",
+      "before": "dc7ff4948a72c4e680ad951ac357e3a23123e2f3ace52b50152e17ad555c8240",
+      "after": "70e62be15478343ef91dc4afb9de8acf3814d6525ffe48f0ab51312b4a60ca1c"
+    },
+    {
+      "path": "src/routes/api/public/handheld/items.smart-create.ts",
+      "before": "1f163d64f49e8080c8893c608120287133ada7682b5bad5756f50197785468b2",
+      "after": "e50bc2ff82939f1e31e9047ade6c210c0a15c6c55b39db4b3c8074d2b93ae1d1"
+    },
+    {
+      "path": "src/routes/api/public/storefront/products.ts",
+      "before": "19351908ce14412a6bd10226b8e0f88aebf209ba04f48d04654af9483b3cef61",
+      "after": "a894a4dc7bb30521a9bbd8067f16bcf82d5a34f6da99d5440dd47fdd9e95ea01"
+    },
+    {
+      "path": "src/routes/m.skus.index.tsx",
+      "before": "169e8a9df3e38988e1bdcd128c8ea6092ba84a7696ed742c51be2ea8e908b61a",
+      "after": "9e5568e5a95288eb95f92cbf17b1e63129bd69a476572f2eeb03d37eb01a2a7b"
+    },
+    {
+      "path": "src/server/handheld-item-edit.server.ts",
+      "before": "93c0321f7262a5b373819021f09682c213ca0d7db6c3c28dbd088530260eaebf",
+      "after": "3d6fd815b4155ed79a55713b5d2bb73a3ef751720ca70e0fda9acfddc1d429e4"
+    },
+    {
+      "path": "src/server/handheld-products.server.ts",
+      "before": "2dfe281ad7a5049f6d4ed8dae04ce9d5a88138c5e7bc00193119fd3ab5d9e8ff",
+      "after": "f40c08e4925fe774408ab5d890387d1adf81c1eccd226de0727f209be20d2823"
+    },
+    {
+      "path": "src/server/storefront-catalog.server.ts",
+      "before": "737e4cb73e493d5663c3734810bab2d9f486a18765420869eb606afeae384f8f",
+      "after": "7aee2a443375097bab89c3866a7586285a6779273141aba75c8a5482e50b1e2e"
+    },
+    {
+      "path": "src/server/storefront-products.server.ts",
+      "before": "ce5849a609cdbf2a4b4d5c980ecccba7eccff9979da10de21d52ba67efae28ee",
+      "after": "8ed79c8c91285cd3f46176573760b781d9d899f8aa91d4eddb2948b2784c9678"
+    }
+  ]
+}

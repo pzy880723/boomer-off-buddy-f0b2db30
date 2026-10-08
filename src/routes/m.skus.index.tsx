@@ -295,10 +295,12 @@ function MNewCustomSkuSheet({
 }) {
   const [meta, setMeta] = useState<SkuMetaState>(emptySkuMeta);
   const [price, setPrice] = useState("");
+  const [fankuang, setFankuang] = useState<boolean | null>(null);
   const [smartOpen, setSmartOpen] = useState(false);
   const reset = () => {
     setMeta(emptySkuMeta);
     setPrice("");
+    setFankuang(null);
     setSmartOpen(false);
   };
   const mut = useCustomSkuMutation(() => {
@@ -337,12 +339,13 @@ function MNewCustomSkuSheet({
               智能新建（拍照自动识别类目 / 品名 / 描述）
             </Button>
           )}
-          <CustomSkuForm meta={meta} setMeta={setMeta} price={price} setPrice={setPrice} mobile />
+          <CustomSkuForm meta={meta} setMeta={setMeta} price={price} setPrice={setPrice}
+            fankuang={fankuang} setFankuang={setFankuang} mobile />
         </div>
         <SheetFooter className="fixed inset-x-0 bottom-0 border-t bg-background p-3 pb-[calc(env(safe-area-inset-bottom)+12px)]">
           <Button
             className="w-full"
-            onClick={() => mut.mutate({ meta, price, default_shop_ids: [] })}
+            onClick={() => mut.mutate({ meta, price, default_shop_ids: [], fankuang_override: fankuang })}
             disabled={mut.isPending}
           >
             {mut.isPending ? "创建中…" : "创建并生成 EPC"}
