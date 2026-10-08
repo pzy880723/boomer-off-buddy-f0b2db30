@@ -20,6 +20,8 @@ export type StorefrontProductQuery = {
   sort: "newest" | "price_asc" | "price_desc" | "relevance";
   page: number;
   page_size: number;
+  /** fankuang=1：只返回有效参与翻筐乐的商品（分页前过滤）。 */
+  fankuang: boolean;
 };
 
 export type StorefrontListing = {
