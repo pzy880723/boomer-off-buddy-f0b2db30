@@ -1,27 +1,33 @@
-# 只读核查结论：翻筐乐复用透明抠图（listing cfab8314 / sku 6b80ec84）
+# 只读审查：「加入翻筐乐」开关（不改代码、不迁移、不发布）
 
-结论：这件商品没有透明背景版本。上架修图只把背景换成浅灰底，没有抠图。
+## 一、上一项核查结论（透明抠图）
+listing cfab8314 / sku 6b80ec84 没有透明版本。两张已修复图片 sku-listing/gallery/6b80ec84-…/{5de49fc1-…,bb40fdee-…}/….png 都是真 PNG，但 colorType=2（RGB，没有 alpha 通道），1024×1024，透明和半透明像素都是 0，四角为浅灰（约 215,216,215）。修图提示词（src/server/handheld-ai.server.ts 的 SYSTEM_LISTING_IMAGE）要求「背景统一为干净浅灰底」，只换背景，不抠图。存储里也没有任何 cutout 或 mask 对象和字段。要复用透明图，需要另外授权新建抠图任务。
 
-## 实际数据（已脱敏，没有签名链接）
-- inv_skus.image_paths（2 张，修图状态 succeeded，任务完成于 2026-10-04）：
-  - sku-listing/gallery/6b80ec84-…/5de49fc1-…/2e8985e1-….png（原图 sku-raw/2026-10-04/fdcfb9d6-…/519e0fbd-….jpg）
-  - sku-listing/gallery/6b80ec84-…/bb40fdee-…/33b93580-….png（原图 sku-raw/2026-10-04/fdcfb9d6-…/0f657072-….jpg）
-- 存储里这个 SKU 只有上面两个对象（image/png，约 1.17MB 和 1.31MB），没有 cutout、mask 或透明版本。
-- inv_skus 只有 image_url、image_paths、image_processing_status、image_processing_updated_at 这几个图片相关字段，没有任何抠图或 mask 字段。
+## 二、现有字段（数据库实际读回）
+- inv_skus：price_tier numeric、is_custom_price boolean 默认 false、ai_suggested_price；没有任何翻筐乐、标签或 flag 类字段。
+- commerce_listings：price、compare_at_price；同样没有相关字段。
+- 本仓库搜索不到「翻筐乐」或「价格<50」的筛选逻辑。小程序的「价格<50 OR 标签」不在这个仓库（Tencent 或小程序侧），这里看不到原实现。
 
-## 透明度实测（逐像素检查，不靠后缀判断）
-- 两张图都是真 PNG，但 colorType=2（RGB，没有透明通道），尺寸 1024×1024。
-- 透明像素和半透明像素都是 0 / 1048576。
-- 四角像素：215,216,215 和 201,210,212 一带，属于浅灰底，alpha 都是 255。
-- 所以腾讯那边的灰底 JPG 和原始数据一致，不是转换时丢了透明度。
+## 三、函数签名（数据库实际读回）
+- handheld_item_update(p_device_id uuid, p_user_id uuid, p_client_op_id text, p_location_id uuid, p_sku_id uuid, p_expected_updated_at timestamptz, p_patch jsonb, p_fingerprint text) → jsonb。来源迁移 0015_handheld_item_edit_delete_v2 和 0016_handheld_item_images。p_patch 白名单为 name、price_tier、notes、grade、image_paths（0016 第 40 行），其他键会被拒绝。函数会写 commerce_listings。
+- handheld_smart_create_commit(p_device_id, p_user_id, p_client_op_id, p_fingerprint, p_location_id uuid, p_reuse boolean, p_sku jsonb, p_epcs text[], p_note text, p_release_shop_id uuid) → jsonb。来源迁移 0012_handheld_smart_create_idempotency。从 p_sku 读取 is_custom_price、inventory_policy，写入 inv_skus；不写 listing。handheld_smart_create_complete(p_op_id uuid, p_response jsonb) 只回写响应。
+- search_inv_skus(p_query, p_primary_category, p_brand_ids uuid[], p_facet_codes text[], p_limit int, p_offset int) → TABLE(sku_id, search_rank)。
+- 最新迁移编号为 0044_store_pickup_hardening，新迁移应为 0045。
 
-## 修图流程追踪
-- src/server/handheld-ai.server.ts：SYSTEM_LISTING_IMAGE 提示词明确要求「背景统一为干净浅灰底」，使用 gemini-3.1-flash-image 生成 1:1 图片，不会输出透明背景。检测到尺子时只补边成正方形（preserved_original），同样不透明。
-- 调用方：src/server/handheld-listing-image-jobs.server.ts（prepareImage → sku-listing/gallery 或 content 目录）、src/routes/api/public/handheld/ai.prepare-listing-image.ts。
-- 衍生图：src/lib/media-derivative.ts + src/server/media-derivative.server.ts，只做缩放，不处理透明度。
+## 四、现有入口
+- PC 编辑：src/components/inventory/sku-edit-dialog.tsx 调用 updateSku（src/lib/inventory.functions.ts）。新建自定义商品：custom-sku-dialog.tsx。页面入口：inventory.skus.index.tsx、inventory.skus.$id.tsx、m.skus.$id.tsx。
+- 上架同步：src/server/commerce-listing.server.ts 的 upsertCustomListingForSku，只处理 is_custom_price、非 unlimited、single，标准商品跳过（已满足「标准商品不进线上商城」）。
+- 手持端：item-edit-schemas.ts 的 ItemPatchReq 为 strict 模式；handheld-item-edit.server.ts 负责把请求转成 patch。smart-create 的入参是 SmartCreateReq（src/lib/handheld/schemas）。
+- 商城列表：src/routes/api/public/storefront/products.ts。流程为 search_inv_skus（上限 500）→ commerce_listings published → 富化 → 过滤 stock>0 → 计算 total → 切页，过滤已经发生在分页之前。查询参数由 parseStorefrontProductQuery 解析（storefront-products.server.ts:176），目前没有翻筐乐参数。详情页为 products.$id.ts。
+- OpenAPI：src/lib/handheld/openapi.ts:401/415（StorefrontProductsQuery / StorefrontProductsRes / StorefrontProductRes）。
 
-## 推荐复用接口（目前不存在，需要另外授权才能做）
-- 现在没有可以直接复用的透明抠图接口。如果翻筐乐需要透明图，建议新增一个独立的「抠图」任务：以 sku-raw 原图为输入，输出 PNG 或 WebP（带 alpha）到单独路径，例如 sku-listing/cutout/<sku>/…；先校验 alpha 再落库，不覆盖现有灰底主图，也不影响有赞上架图。
-- 另一种做法：在客户端用灰底图做近似去底。效果不可靠，不建议当作真正的抠图结果。
+## 五、最小改动建议（等 Codex 确认后再实施）
+1. 迁移 0045：在 inv_skus 新增 basket_override boolean NULL（null 表示自动），并加注释说明。有效值计算为 coalesce(basket_override, price_tier <= 49.9)。低价商品显式设为 false 后不会被价格回退重新纳入；高价商品显式设为 true 后不需要标签也能查到。不复制 SKU，不改库存、库位或有赞映射。
+2. 0045 中用 CREATE OR REPLACE 重定义 handheld_item_update，把 basket_override（布尔或 null）加入 p_patch 白名单。handheld_smart_create_commit 从 p_sku 读取该值，并保持现有幂等指纹语义。
+3. PC：updateSku 的 patch 白名单和 sku-edit-dialog、custom-sku-dialog 各加一行开关，标准商品不显示。默认值按售价显示，用户手动切换后才写入显式值。
+4. 手持端：ItemPatchReq、SmartCreateReq、ItemPatchRes 的 changed_fields 加上 basket_override，并同步 OpenAPI。
+5. 商城：在 parseStorefrontProductQuery 增加 basket=1；列表在 stock>0 过滤和分页之前按有效值过滤；列表和详情返回 in_basket 布尔。小程序改为使用 basket=1，不再自行用价格<50 OR 标签判断。
 
-本轮没有改动代码、数据库、库存或订单，也没有部署。
+## 待确认
+- 开关单行放在售价输入框下方（建议）。
+- 字段名称和「49.9 含、50 不含」的边界。
