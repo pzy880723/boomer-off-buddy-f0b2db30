@@ -7,8 +7,9 @@ const { build } = createRequire(require.resolve("vite"))("esbuild");
 const stubs: Record<string, string> = {
   "@/integrations/supabase/client.server": "export const supabaseAdmin = {};",
   "@/server/product-recognition.server": "export const recognizeProductFromImages = () => {};",
+  sharp: "export default () => ({ metadata: async () => ({ orientation: 1 }) });",
   "./listing-image-safety.server":
-    "export const measurementProtectionRequired = async () => globalThis.__ruler === true; export const loadOriginalImage = async (image) => { if (!image.startsWith('data:image/')) throw new Error('Original image must use trusted storage'); return Buffer.from(image.slice(image.indexOf(',') + 1), 'base64'); }; export const squareOriginalImage = async (b) => ({ b64: b.toString(\'base64\'), mime: \'image/png\' }); export const withImageStage = (stage, run) => run().catch((e) => { e.stage = stage; throw e; });",
+    "export const classifyListingImage = async () => ({ measurementTool: globalThis.__ruler === true, closeUp: false }); export const validatePreparedListingImage = async () => {}; export const loadOriginalImage = async (image) => { if (!image.startsWith('data:image/')) throw new Error('Original image must use trusted storage'); return Buffer.from(image.slice(image.indexOf(',') + 1), 'base64'); }; export const withImageStage = (stage, run) => run().catch((e) => { e.stage = stage; throw e; });",
 };
 const bundle = await build({
   entryPoints: ["src/server/handheld-ai.server.ts"],
@@ -92,15 +93,21 @@ test("other missing-image finish reasons are diagnosed without leaking", () => {
   assert.equal(missingImageError("evil https://x?token=1"), "图像生成服务未返回图片（unknown），原图保留");
 });
 
-test("real ruler branch flags preserved_original and returns original pixels untouched", async () => {
+test("ruler photos now reach the editing provider with no rotation and intact measurement rules", async () => {
   (globalThis as any).__ruler = true;
   let called = false;
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = async () => { called = true; throw new Error("must not generate"); };
+  globalThis.fetch = async (_url, init) => {
+    called = true;
+    const prompt = JSON.parse(String(init?.body)).messages[0].content[0].text;
+    assert.match(prompt, /禁止校正角度/);
+    assert.match(prompt, /刻度和数字必须完整保留/);
+    return Response.json({ choices: [{ message: { images: [{ image_url: { url: "data:image/png;base64,ZWRpdGVk" } }] } }] });
+  };
   try {
     const out = await aiPrepareListingImage({ image_base64: PNG });
-    assert.deepEqual(out, { b64: PNG, mime: "image/png", preserved_original: true });
-    assert.equal(called, false);
+    assert.deepEqual(out, { b64: "ZWRpdGVk", mime: "image/png" });
+    assert.equal(called, true);
   } finally { globalThis.fetch = originalFetch; (globalThis as any).__ruler = false; }
 });
 

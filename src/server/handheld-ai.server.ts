@@ -3,7 +3,8 @@
 // 走 Lovable AI Gateway，无需单独 key。
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { recognizeProductFromImages } from "@/server/product-recognition.server";
-import { loadOriginalImage, measurementProtectionRequired, squareOriginalImage, withImageStage } from "./listing-image-safety.server";
+import sharp from "sharp";
+import { loadOriginalImage, classifyListingImage, validatePreparedListingImage, withImageStage } from "./listing-image-safety.server";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1";
 
@@ -106,7 +107,9 @@ const SYSTEM_LISTING_IMAGE = `把这张中古杂货实物图修整成上架主�
 - 校正角度，修正白平衡和曝光
 - 严禁改 logo、文字、瑕疵、颜色、配件数量
 - 清除照片平台叠加的闲鱼等平台账号水印、平台标识叠字，以及商品外部附加的售价贴纸、价格牌；保留商品本身的商标、印刷文字和真实瑕疵；不得删除商品本体印刷、型号、生产标记或真实瑕疵
-- 如果有尺子、卷尺、尺寸刻度，不得重绘、删除或修改刻度，保留原始测量证据
+- 手持拍摄时，清除所有真实人物的手指、手掌、手臂及其投影，不得留在成品中；不要删除商品本身的人物造型、玩偶肢体或印刷图案。仅清理可见手部，不得凭空补造被遮挡的商品细节、文字或尺子刻度
+- 测量图仍须换浅灰背景；尺子、卷尺、尺寸刻度和数字必须完整保留，不得重绘、移动或修改，保持与商品的测量位置关系
+- 特写细节图只轻微修饰曝光与白平衡，保留拍摄角度、透视和细节构图；不得重新摆正或裁掉细节，以补边方式形成正方形
 - 严禁添加任何文字、水印、贴纸`;
 
 function sniffImageMime(bytes: Buffer): string {
@@ -125,17 +128,21 @@ export async function aiPrepareListingImage(input: {
 }): Promise<{ b64: string; mime: string; preserved_original?: true }> {
   // Download the trusted original once and share the same inline bytes with detection and generation,
   // so the gateway never fetches signed URLs itself.
-  const source = await loadOriginalImage(input.image_url
+  let source = await loadOriginalImage(input.image_url
     ? input.image_url
     : input.image_base64?.startsWith("data:")
       ? input.image_base64
       : `data:image/jpeg;base64,${input.image_base64 ?? ""}`);
+  const metadata = await sharp(source, { limitInputPixels: 40_000_000 }).metadata();
+  if (metadata.orientation && metadata.orientation !== 1) source = await sharp(source).rotate().png().toBuffer();
   const dataUrl = `data:${sniffImageMime(source)};base64,${source.toString("base64")}`;
 
-  if (await measurementProtectionRequired(dataUrl, getKey())) {
-    // Measurement evidence: pad only, flag so clients never claim an AI retouch happened.
-    return { ...(await squareOriginalImage(source)), preserved_original: true };
-  }
+  const profile = await classifyListingImage(dataUrl, getKey());
+  const protectedImage = profile.measurementTool || profile.closeUp;
+  const prompt = protectedImage ? SYSTEM_LISTING_IMAGE
+    .replace("主体居中裁切、四周留白均匀", "只补边形成正方形，不裁掉商品细节或测量工具")
+    .replace("校正角度，修正白平衡和曝光", "禁止校正角度、旋转、改变透视或重新摆放商品与尺子，只轻微修正白平衡和曝光")
+    : SYSTEM_LISTING_IMAGE;
 
   const body = {
     model: "google/gemini-3.1-flash-image",
@@ -146,7 +153,7 @@ export async function aiPrepareListingImage(input: {
           {
             type: "text",
             text:
-              SYSTEM_LISTING_IMAGE + (input.instruction ? `\n额外要求：${input.instruction}` : ""),
+              (input.instruction ? `额外要求（不得违反下列实物保护规则）：${input.instruction}\n` : "") + prompt,
           },
           { type: "image_url", image_url: { url: dataUrl } },
         ],
@@ -155,7 +162,9 @@ export async function aiPrepareListingImage(input: {
     modalities: ["image", "text"],
   };
 
-  return withImageStage("image_generation", () => generateListingImage(body));
+  const output = await withImageStage("image_generation", () => generateListingImage(body));
+  await validatePreparedListingImage(dataUrl, `data:${output.mime};base64,${output.b64}`, getKey(), profile);
+  return output;
 }
 
 /** Safe diagnostic for a 200 response without image; never echoes model content. */
