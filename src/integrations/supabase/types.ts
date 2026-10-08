@@ -4851,6 +4851,7 @@ export type Database = {
           default_shop_ids: string[]
           discount_eligible: boolean
           epc: string
+          fankuang_override: boolean | null
           grade: string | null
           id: string
           image_paths: string[]
@@ -4897,6 +4898,7 @@ export type Database = {
           default_shop_ids?: string[]
           discount_eligible?: boolean
           epc: string
+          fankuang_override?: boolean | null
           grade?: string | null
           id?: string
           image_paths?: string[]
@@ -4943,6 +4945,7 @@ export type Database = {
           default_shop_ids?: string[]
           discount_eligible?: boolean
           epc?: string
+          fankuang_override?: boolean | null
           grade?: string | null
           id?: string
           image_paths?: string[]
