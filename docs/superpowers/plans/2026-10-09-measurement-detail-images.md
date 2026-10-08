@@ -12,13 +12,15 @@
 - [x] Run 20 existing durable image-job regression tests and focused strict TypeScript checks. Final combined run: 75 tests passed, zero failures. No full application build or live-image acceptance yet.
 - [ ] Exercise the real gateway on isolated image fixtures, save before/after evidence, inspect boundaries and ruler digits; no product/inventory writes.
 - [ ] Build an isolated Tencent candidate from current live source with only scoped changed files, workers disabled. Verify login and worker guards; retain rollback, publish and recheck public routes.
-- [ ] Commit/push the scoped implementation to GitHub and report verification separately from real photographic acceptance.
+- [x] Commit/push the scoped implementation to GitHub (`0c18f4e`). This is not a production release.
 
 ## Evidence, Incident And Constraints
 
 Native Gemini segmentation probes returned truncated mask payloads; contour probes produced inconsistent/inaccurate coordinates. An isolated BiRefNet-lite CPU probe preserved synthetic ruler pixels but left an unwanted background blob. A later probe did not finish, and SSH/HTTPS/TAT stopped responding. Tencent monitoring reported memory rising to 89.934% at 18:02 UTC; this is evidence of resource pressure, not proof of the outage cause. No production source, symlink, PM2 configuration or database was changed. The CPU approach is abandoned, and its helper/runtime imports have been removed from the application.
 
-ERP instance identified through the existing Tencent API credentials: Lighthouse lhins-ogmfuc6m, ap-shanghai, 4 CPU/8 GiB, 180 GiB system disk. TAT reports Offline; the narrow command to stop only our test helper was rejected because the agent is offline. Server-restart approval requested; no reboot performed yet.
+ERP instance identified through the existing Tencent API credentials: Lighthouse lhins-ogmfuc6m, ap-shanghai, 4 CPU/8 GiB, 180 GiB system disk. TAT reports Offline; the narrow command to stop only our test helper was rejected because the agent is offline. A SOFT reboot was requested during release recovery (request 38902b69-1bdd-4824-acce-1411270a4079). At 18:35 UTC on October 8, DescribeInstances reported RUNNING with RebootInstances FAILED; HTTPS still timed out. Explicit approval for a HARD reboot is pending; none has been issued.
+
+Scoped cloud-canary, deployment and rollback scripts are prepared but have not run against the server. Three release-script checks pass locally, including candidate/public manifest checks before/after the production switch. They do not prove server build, gateway compatibility or publication. No production source, database or release symlink has been changed for this release.
 
 Cloud comparison is probabilistic, not pixel-level proof or a guarantee of accuracy. Real photographic samples with ruler ticks, a hand holding a ruler/product, and detail marks need visual acceptance before release. Never invent hidden markings or production years. Distinguish real human limbs from dolls, sculptures and printed character art. Original images remain available when validation fails.
 
