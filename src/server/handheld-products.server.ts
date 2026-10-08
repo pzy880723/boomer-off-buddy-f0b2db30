@@ -1,3 +1,4 @@
+import { isInFankuang } from "@/lib/commerce/fankuang";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { err, resolveSessionUser, type DeviceContext } from "@/server/handheld-auth.server";
 import {
@@ -43,6 +44,8 @@ export type ProductItem = {
   image_processing_status: string;
   notes: string | null;
   is_unlimited_stock: boolean;
+  fankuang_override: boolean | null;
+  in_fankuang: boolean;
   total_stock_qty: number;
   stocks: {
     location_id: string;
@@ -60,7 +63,7 @@ export type ProductItem = {
 };
 
 const SKU_COLS =
-  "id, sku_code, barcode, epc, name, category, price_tier, grade, image_url, image_paths, image_processing_status, notes, status, is_display, kind, is_custom_price, inventory_policy, stock_qty, created_at, updated_at";
+  "id, sku_code, barcode, epc, name, category, price_tier, grade, image_url, image_paths, image_processing_status, notes, status, is_display, kind, is_custom_price, inventory_policy, fankuang_override, stock_qty, created_at, updated_at";
 export function productQuery(exactCount = false) {
   return supabaseAdmin
     .from("inv_skus")
@@ -324,6 +327,8 @@ export function buildProductItems(skus: Sku[], inventory: Inventory): ProductIte
       image_processing_status: s.image_processing_status ?? "idle",
       notes: s.notes,
       is_unlimited_stock: unlimited,
+      fankuang_override: (s as { fankuang_override?: boolean | null }).fankuang_override ?? null,
+      in_fankuang: isInFankuang(s as never),
       total_stock_qty: total,
       stocks,
       status: s.status,
