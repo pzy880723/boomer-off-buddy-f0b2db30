@@ -99,7 +99,8 @@ DO $$ DECLARE base jsonb; r jsonb; ok boolean; ids uuid[]; a uuid := md5('lst2')
   SELECT array_agg(id ORDER BY created_at) INTO ids FROM commerce_fankuang_gift_entitlements WHERE customer_id='c0000000-0000-4000-8000-000000000001';
   ASSERT cardinality(ids) = 2, 'two entitlements ready';
   base := jsonb_build_object('p_customer_id','c0000000-0000-4000-8000-000000000001','p_recipient_name','张三','p_recipient_phone','13800000000',
-    'p_shipping_address','{}'::jsonb,'p_courier_provider','sf','p_courier_service_code','SF','p_shipping_fee',0,
+    'p_shipping_address','{}'::jsonb,'p_courier_provider','sf','p_courier_service_code','SF','p_courier_service_name',NULL,'p_shipping_fee',0,
+    'p_quote_snapshot',NULL,'p_customer_note',NULL,
     'p_merchant_id','m','p_app_id','a','p_owned_location_ids', jsonb_build_array('10000000-0000-4000-8000-000000000001'));
   -- 付费 1 件、要 2 个赠礼 → 拒绝且订单回滚
   BEGIN r := commerce_create_order_with_fankuang_gifts('commerce_create_ordinary_order',
@@ -144,7 +145,7 @@ DO $$ DECLARE base jsonb; r jsonb; ok boolean; ids uuid[]; a uuid := md5('lst2')
   -- 自提下单 + 付款消耗
   r := commerce_create_order_with_fankuang_gifts('commerce_create_ordinary_pickup_order',
       jsonb_build_object('p_customer_id','c0000000-0000-4000-8000-000000000001','p_idempotency_key','k3','p_recipient_name','张三','p_recipient_phone','13800000000',
-        'p_merchant_id','m','p_app_id','a','p_items', jsonb_build_array(jsonb_build_object('listing_id',a,'quantity',3))), NULL, 1);
+        'p_quote_snapshot',NULL,'p_customer_note',NULL,'p_owned_location_ids',NULL,'p_merchant_id','m','p_app_id','a','p_items', jsonb_build_array(jsonb_build_object('listing_id',a,'quantity',3))), NULL, 1);
   ASSERT (SELECT count(*) FROM commerce_fankuang_gift_entitlements WHERE order_id=(r->>'id')::uuid) = 1, 'count-only pick';
   ASSERT (SELECT location_id FROM commerce_order_gift_allocations WHERE order_id=(r->>'id')::uuid) = '10000000-0000-4000-8000-000000000001', 'single store order gift from that store';
   UPDATE commerce_orders SET payment_status='paid', paid_at=now() WHERE id=(r->>'id')::uuid;
