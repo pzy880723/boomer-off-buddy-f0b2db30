@@ -8,8 +8,8 @@ import {
 } from "./fankuang";
 import { ItemPatchReq } from "../handheld/item-edit-schemas";
 import { SmartCreateReq } from "../handheld/schemas";
-import { itemOpFingerprint } from "../../server/handheld-item-edit.fingerprint";
-import { smartCreateFingerprint } from "../../server/handheld-smart-create.fingerprint";
+import { itemOpFingerprint } from "../../server/handheld-item-edit.server";
+import { smartCreateFingerprint } from "../../server/handheld-smart-create.server";
 
 const custom = { is_custom_price: true, inventory_policy: "tracked", kind: "single" };
 
