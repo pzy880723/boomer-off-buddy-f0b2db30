@@ -8,7 +8,7 @@ export function requiresOriginalMeasurementPixels(value: unknown): boolean {
     throw new Error("Measurement detection result invalid; retry required");
   }
   if (result.measurement_tool) return true;
-  if (result.confidence < 0.95) throw new Error("Measurement detection uncertain; retry required");
+  if (result.confidence < 0.95) return true;
   return false;
 }
 
@@ -56,7 +56,9 @@ export function parseListingImageProfile(value: unknown): ListingImageProfile {
     throw new Error("Measurement/detail image classification invalid; retry required");
   }
   requiresOriginalMeasurementPixels({ measurement_tool: result.measurement_tool || result.close_up, confidence: result.confidence });
-  return { measurementTool: result.measurement_tool, closeUp: result.close_up };
+  // Uncertainty tightens framing and output review instead of stalling retouching.
+  const uncertain = (result.confidence as number) < 0.95;
+  return { measurementTool: result.measurement_tool || uncertain, closeUp: result.close_up || uncertain };
 }
 
 export const MEASUREMENT_DETECTION_PROMPT = '判断图中是否有放在商品旁边、用于测量商品尺寸的外部独立测量工具：尺子、卷尺、卡尺、测量垫。' +

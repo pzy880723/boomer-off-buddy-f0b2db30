@@ -4,8 +4,8 @@ import { createRequire } from "node:module";
 import sharp from "sharp";
 import { requiresOriginalMeasurementPixels, squareOriginalImage, loadOriginalImage, classifyListingImage, safeImageJobError, withImageStage } from "./listing-image-safety.server.ts";
 
-test("ambiguous or missing ruler detection rejects instead of reporting prepared pixels", () => {
-  for (const value of [null, {}, { confidence: 1 }, { measurement_tool: "false", confidence: 1 }, { measurement_tool: false, close_up: false, confidence: 0.9 }]) {
+test("invalid or missing ruler detection rejects instead of reporting prepared pixels", () => {
+  for (const value of [null, {}, { confidence: 1 }, { measurement_tool: "false", confidence: 1 }]) {
     assert.throws(() => requiresOriginalMeasurementPixels(value), /measurement/i);
   }
   assert.equal(requiresOriginalMeasurementPixels({ measurement_tool: false, close_up: false, confidence: 0.99 }), false);
@@ -20,9 +20,9 @@ for (const confidence of [NaN, Infinity, -Infinity, -0.01, 1.01, 99, "0.99", nul
     assert.throws(() => requiresOriginalMeasurementPixels({ measurement_tool: false, close_up: false, confidence }), /measurement/i);
   });
 }
-test("ruler confidence must meet the threshold within the finite unit interval", () => {
+test("low ruler confidence chooses protection within the finite unit interval", () => {
   for (const confidence of [0, 0.949]) {
-    assert.throws(() => requiresOriginalMeasurementPixels({ measurement_tool: false, close_up: false, confidence }), /measurement/i);
+    assert.equal(requiresOriginalMeasurementPixels({ measurement_tool: false, close_up: false, confidence }), true);
   }
   for (const confidence of [0.95, 1]) {
     assert.equal(requiresOriginalMeasurementPixels({ measurement_tool: false, close_up: false, confidence }), false);
@@ -49,6 +49,13 @@ afterEach(() => {
   AbortSignal.timeout = originalTimeout;
   if (originalKey === undefined) delete process.env.LOVABLE_API_KEY;
   else process.env.LOVABLE_API_KEY = originalKey;
+});
+
+test("uncertain valid classification uses protected retouch instead of an endless retry", async () => {
+  globalThis.fetch = async () => Response.json({ choices: [{ message: {
+    content: '{"measurement_tool":false,"close_up":false,"confidence":0.9}',
+  } }] });
+  assert.deepEqual(await classifyListingImage("https://fixture.test/image", "fixture"), { measurementTool: true, closeUp: true });
 });
 
 for (const status of [401, 429, 500]) {

@@ -2,10 +2,11 @@
 set -euo pipefail
 base=/var/www/boomer-erp
 old=$base/releases/fankuang-20261008-v2
-release=$base/releases/listing-retouch-20261009
-candidate=boomer-listing-retouch-candidate
+release=$base/releases/listing-retouch-20261009-v2
+candidate=boomer-listing-retouch-candidate-v2
 archive=/tmp/boomer-listing-retouch-20261009.tar.gz
 case "${1:-}" in build|publish|rollback) mode=$1 ;; *) exit 2 ;; esac
+sudo -n true
 exec 9>/var/lock/boomer-erp-release.lock
 flock -n 9
 ready() {
@@ -29,14 +30,14 @@ verify() {
   timeout 90s node scripts/verify-fankuang-release.mjs "$1"
 }
 verify_manifest() {
-  curl -fsS --max-time 10 "$1/retouch-release.json" | node --input-type=module -e 'let text="";for await(const chunk of process.stdin)text+=chunk;if(JSON.parse(text).release!=="listing-retouch-20261009")process.exit(1);'
+  curl -fsS --max-time 10 "$1/retouch-release.json" | node --input-type=module -e 'let text="";for await(const chunk of process.stdin)text+=chunk;if(JSON.parse(text).release!=="listing-retouch-20261009-v2")process.exit(1);'
 }
 if [[ "$mode" == rollback ]]; then
   [[ "$(readlink -f "$base/current")" == "$release" ]] || exit 1
   pm2 delete boomer-off-buddy >/dev/null
   start_live "$old"
   ready 3005
-  ln -sfn "$old" "$base/current"
+  sudo -n ln -sfn "$old" "$base/current"
   pm2 save >/dev/null
   echo "rollback=$old"
   exit
@@ -47,7 +48,7 @@ if [[ "$mode" == build ]]; then
   [[ "$(awk '/MemAvailable/{print $2}' /proc/meminfo)" -gt 4000000 ]] || { echo 'Insufficient build memory' >&2; exit 1; }
   tar -tzf "$archive" | while IFS= read -r entry; do
     case "$entry" in
-      src/server/handheld-ai.server.ts|src/server/listing-image-safety.server.ts|src/server/handheld-ai-image-timeout.test.ts|src/server/listing-image-safety.test.ts|src/server/listing-image-validation.test.ts|scripts/probe-listing-retouch-20261009.mjs|scripts/deploy-listing-retouch-20261009.sh) ;;
+      src/server/handheld-ai.server.ts|src/server/listing-image-safety.server.ts|src/server/handheld-ai-image-timeout.test.ts|src/server/listing-image-safety.test.ts|src/server/listing-image-validation.test.ts|src/lib/commerce/fankuang-product-list.test.ts|deployments/fankuang-list-20261009/tencent-source.patch|scripts/probe-listing-retouch-20261009.mjs|scripts/deploy-listing-retouch-20261009.sh) ;;
       *) echo "Unexpected archive entry: $entry" >&2; exit 1 ;;
     esac
   done
@@ -55,10 +56,13 @@ if [[ "$mode" == build ]]; then
   cd "$release"
   sha256sum /etc/boomer-erp/workers.env .env > .retouch-environment.sha256
   tar -xzf "$archive" -C "$release"
+  git apply --check deployments/fankuang-list-20261009/tencent-source.patch
+  git apply deployments/fankuang-list-20261009/tencent-source.patch
   node --experimental-strip-types --test --test-reporter=tap src/server/listing-image-validation.test.ts src/server/listing-image-safety.test.ts src/server/handheld-ai-image-timeout.test.ts src/server/product-content-image-jobs.test.ts > /tmp/boomer-listing-retouch-tests.log 2>&1
+  node --experimental-strip-types --test --test-reporter=tap src/server/handheld-products.test.ts src/lib/commerce/fankuang-product-list.test.ts > /tmp/boomer-fankuang-list-tests.log 2>&1
+  node --input-type=module -e 'import fs from "node:fs"; fs.writeFileSync("public/retouch-release.json",JSON.stringify({release:"listing-retouch-20261009-v2",features:["remove-real-hands","preserve-ruler","preserve-detail-angle","cloud-output-review","fankuang-product-list"]}));'
   NODE_OPTIONS=--max-old-space-size=2560 timeout 1200s npm run build:tencent > /tmp/boomer-listing-retouch-build.log 2>&1
   cp -an "$old/.output/public/assets/." .output/public/assets/
-  node --input-type=module -e 'import fs from "node:fs"; fs.writeFileSync(".output/public/retouch-release.json",JSON.stringify({release:"listing-retouch-20261009",features:["remove-real-hands","preserve-ruler","preserve-detail-angle","cloud-output-review"]}));'
   env APP_DIR="$release" ERP_PORT=3006 HANDHELD_RELEASE_WORKER_ENABLED=false \
     HANDHELD_ITEM_SYNC_WORKER_ENABLED=false HANDHELD_LISTING_IMAGE_WORKER_ENABLED=false \
     YOUZAN_STOCK_WORKER_ENABLED=false YOUZAN_IMAGE_REFRESH_WORKER_ENABLED=false \
@@ -85,7 +89,7 @@ cleanup() {
   set +e
   if [[ "$rollback" == 1 ]]; then
     pm2 delete boomer-off-buddy >/dev/null 2>&1
-    if start_live "$old" && ready 3005 && ln -sfn "$old" "$base/current" && pm2 save >/dev/null; then
+    if start_live "$old" && ready 3005 && sudo -n ln -sfn "$old" "$base/current" && pm2 save >/dev/null; then
       echo "Release failed; restored $old" >&2
     else echo "ROLLBACK FAILED; inspect retained release $old" >&2; fi
     status=1
@@ -99,7 +103,7 @@ ready 3005
 verify https://erp.boomeroff.com
 verify_manifest https://erp.boomeroff.com
 sha256sum --check --status .retouch-environment.sha256
-ln -sfn "$release" "$base/current"
+sudo -n ln -sfn "$release" "$base/current"
 pm2 delete "$candidate" >/dev/null
 pm2 save >/dev/null
 rollback=0

@@ -24,5 +24,7 @@ test('release freezes environment and compiled source, preserves rollback and ve
   assert.match(code, /verify https:\/\/erp\.boomeroff\.com/);
   assert.match(code, /verify_manifest http:\/\/127\.0\.0\.1:3006/);
   assert.match(code, /verify_manifest https:\/\/erp\.boomeroff\.com/);
+  assert.match(code, /sudo -n ln -sfn "\$release" "\$base\/current"/);
+  assert.ok(code.indexOf('fs.writeFileSync("public/retouch-release.json"') < code.indexOf('npm run build:tencent'));
   assert.ok(code.indexOf('verify_manifest http://127.0.0.1:3006', code.indexOf('cd "$release"\nsha256sum')) < code.indexOf('trap cleanup EXIT'));
 });
