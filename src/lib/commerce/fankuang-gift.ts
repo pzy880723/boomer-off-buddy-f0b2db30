@@ -33,6 +33,7 @@ export function requestedGiftCount(v: { gift_entitlement_ids?: string[]; gift_co
   return v.gift_count ?? v.gift_entitlement_ids?.length ?? 0;
 }
 
+/** 仅供客户端预估；权威付费件数由数据库按成交单价 unit_price > 0 的非赠礼行计算。 */
 export function paidItemQuantity(body: {
   items?: Array<{ quantity: number; listing_id?: string }>;
   listing_ids?: string[];
@@ -64,6 +65,10 @@ const ERRORS: Array<[RegExp, number, string]> = [
   [/fankuang gift sku not purchasable/i, 422, "gift_sku_not_purchasable"],
   [/fankuang gift idempotency conflict/i, 409, "gift_idempotency_conflict"],
   [/fankuang gift sku not configured/i, 503, "gift_not_configured"],
+  [/fankuang gift sku invalid/i, 503, "gift_sku_invalid"],
+  [/fankuang gift requires paid order/i, 422, "gift_requires_paid_items"],
+  [/fankuang gift count mismatch/i, 400, "gift_invalid"],
+  [/fankuang (missing|unknown) create argument|fankuang create function (overloaded|missing|signature unsupported)/i, 500, "gift_checkout_misconfigured"],
   [/fankuang client op conflict/i, 409, "client_op_conflict"],
   [/fankuang listing not in session/i, 422, "listing_not_in_session"],
   [/fankuang session not found/i, 404, "session_not_found"],
