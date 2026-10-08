@@ -86,3 +86,9 @@
 - [x] 门店映射 3 条已按用户指定写入（outbox pending）
 - [x] authorization / ack 并行读取 + 追踪
 - [x] 修图故障：测量检测误判唱臂/频率刻度、平台水印清除、错误阶段标记（保留TimeoutError，日志脱敏），不改超时/生产/迁移
+
+## 当前任务：翻筐乐开关 fankuang_override（2026-10-08）
+- [x] 迁移 0045：inv_skus.fankuang_override + smart_create_commit / item_update 以线上定义升级
+- [x] 手持 PATCH / smart-create / 列表详情；商城 fankuang=1 分页前过滤 + in_fankuang；OpenAPI
+- [x] PC 新建/编辑一行开关
+- [ ] 腾讯发布与 iOS/Android/小程序（Codex）
