@@ -336,8 +336,10 @@ BEGIN
   FOR r IN SELECT a.name, a.typ, t.typcategory FROM pg_proc p,
            unnest(p.proargnames, p.proargtypes::oid[]) a(name, typ) JOIN pg_type t ON t.oid = a.typ
            WHERE p.oid = v_oid LOOP
-    CONTINUE WHEN NOT (p_args ? r.name);
-    IF r.typ IN ('jsonb'::regtype, 'json'::regtype) THEN
+    IF NOT (p_args ? r.name) THEN
+      -- 与路由一致：未提供的可选参数显式传 NULL
+      v_parts := v_parts || format('%I => NULL::%s', r.name, format_type(r.typ, NULL));
+    ELSIF r.typ IN ('jsonb'::regtype, 'json'::regtype) THEN
       v_parts := v_parts || format('%I => NULLIF($1->%L, ''null''::jsonb)::%s', r.name, r.name, format_type(r.typ, NULL));
     ELSIF r.typcategory = 'A' THEN
       v_parts := v_parts || format('%I => CASE WHEN jsonb_typeof($1->%L) = ''array'' THEN ARRAY(SELECT jsonb_array_elements_text($1->%L))::%s END',
