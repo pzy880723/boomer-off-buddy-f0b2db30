@@ -18,12 +18,12 @@ CREATE TABLE inv_skus (id uuid PRIMARY KEY, status text DEFAULT 'active', is_cus
   price_tier numeric DEFAULT 20, is_display boolean DEFAULT true);
 CREATE TABLE inv_stocks (sku_id uuid, location_id uuid, qty int, PRIMARY KEY (sku_id, location_id));
 CREATE TABLE commerce_listings (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), sku_id uuid, location_id uuid,
-  status text DEFAULT 'published', published_at timestamptz DEFAULT now());
+  status text DEFAULT 'published', price numeric DEFAULT 20, published_at timestamptz DEFAULT now());
 CREATE TABLE commerce_orders (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), customer_id uuid, idempotency_key text UNIQUE,
   payment_status text DEFAULT 'unpaid', order_status text DEFAULT 'pending_payment', paid_at timestamptz,
-  fulfillment_method text DEFAULT 'shipping', created_at timestamptz DEFAULT now());
+  fulfillment_method text DEFAULT 'shipping', total_amount numeric DEFAULT 0, created_at timestamptz DEFAULT now());
 CREATE TABLE commerce_order_items (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), order_id uuid, listing_id uuid,
-  sku_id uuid, location_id uuid, quantity int);
+  sku_id uuid, location_id uuid, quantity int, unit_price numeric);
 CREATE TABLE fulfillments (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), order_id uuid, location_id uuid);
 
 -- 现网下单函数替身：同签名、按幂等键重放；recipient_name='FAIL' 模拟下单失败。
@@ -39,10 +39,12 @@ BEGIN
   IF p_recipient_name='FAIL' THEN RAISE EXCEPTION 'listing not available'; END IF;
   INSERT INTO commerce_orders(customer_id, idempotency_key) VALUES (p_customer_id, p_idempotency_key) RETURNING * INTO o;
   FOR e IN SELECT * FROM jsonb_array_elements(p_items) LOOP
-    INSERT INTO commerce_order_items(order_id, listing_id, sku_id, location_id, quantity)
-    SELECT o.id, l.id, l.sku_id, l.location_id, COALESCE((e->>'quantity')::int,1)
+    INSERT INTO commerce_order_items(order_id, listing_id, sku_id, location_id, quantity, unit_price)
+    SELECT o.id, l.id, l.sku_id, l.location_id, COALESCE((e->>'quantity')::int,1), l.price
     FROM commerce_listings l WHERE l.id=(e->>'listing_id')::uuid;
   END LOOP;
+  UPDATE commerce_orders SET total_amount = (SELECT COALESCE(sum(quantity*unit_price),0) FROM commerce_order_items WHERE order_id=o.id)
+   WHERE id=o.id RETURNING * INTO o;
   RETURN to_jsonb(o);
 END $$;
 CREATE FUNCTION commerce_create_ordinary_pickup_order(p_customer_id uuid, p_idempotency_key text, p_items jsonb,
