@@ -18,7 +18,7 @@ INSERT INTO inv_stocks VALUES (md5('x1')::uuid,'10000000-0000-4000-8000-00000000
  (md5('x3')::uuid,'10000000-0000-4000-8000-000000000001',1),(md5('x4')::uuid,'10000000-0000-4000-8000-000000000001',0);
 INSERT INTO commerce_listings(sku_id, location_id) SELECT id, '10000000-0000-4000-8000-000000000001' FROM inv_skus WHERE id IN (md5('x1')::uuid,md5('x2')::uuid,md5('x3')::uuid,md5('x4')::uuid);
 -- 标准赠礼 SKU（不建库存）+ 一个误发布的赠礼 listing
-INSERT INTO inv_skus(id, is_custom_price, price_tier) VALUES ('99999999-0000-4000-8000-000000000001', false, 0);
+INSERT INTO inv_skus(id, is_custom_price, price_tier, inventory_policy) VALUES ('99999999-0000-4000-8000-000000000001', false, 0, 'unlimited');
 INSERT INTO app_settings(key,value) VALUES ('fankuang_gift_sku_id', '{"sku_id":"99999999-0000-4000-8000-000000000001"}');
 INSERT INTO commerce_listings(id, sku_id, location_id) VALUES ('99999999-0000-4000-8000-0000000000aa','99999999-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000001');
 
