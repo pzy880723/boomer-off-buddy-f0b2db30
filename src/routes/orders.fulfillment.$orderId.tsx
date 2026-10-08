@@ -129,7 +129,10 @@ function ShopCard({ shop, orderId, pickup }: { shop: StoreSubOrder; orderId: str
         <CardTitle className="text-base">
           {shop.store_name ?? "未命名门店"} · {shop.code}
         </CardTitle>
-        <Badge variant="secondary">{shop.status}</Badge>
+        <div className="flex items-center gap-2">
+          {shop.gift_quantity > 0 ? <Badge>翻筐乐赠礼盲盒 ×{shop.gift_quantity}</Badge> : null}
+          <Badge variant="secondary">{shop.status}</Badge>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
