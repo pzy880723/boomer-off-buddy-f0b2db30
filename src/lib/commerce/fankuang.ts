@@ -5,6 +5,9 @@
  */
 export const FANKUANG_PRICE_MAX = 49.9;
 
+// PostgREST applies this condition before ORDER/LIMIT, matching isInFankuang.
+export const FANKUANG_POSTGREST_FILTER = `and(is_custom_price.eq.true,or(kind.is.null,kind.eq.single),or(inventory_policy.is.null,inventory_policy.neq.unlimited),or(fankuang_override.eq.true,and(fankuang_override.is.null,price_tier.gt.0,price_tier.lte.${FANKUANG_PRICE_MAX})))`;
+
 export function fankuangDefaultForPrice(price: number | string | null | undefined): boolean {
   const p = Number(price);
   return Number.isFinite(p) && p > 0 && Math.round(p * 100) <= Math.round(FANKUANG_PRICE_MAX * 100);

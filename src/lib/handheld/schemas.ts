@@ -269,6 +269,7 @@ export const ProductsQuery = z
     location_id: uuidSchema.optional().meta({ description: "明确选择的 ERP 库位，总部账号选择门店时也按该库位筛选" }),
     category: z.string().optional().meta({ description: "分类精确匹配" }),
     has_image: z.enum(["0", "1"]).optional().meta({ description: "仅 custom 生效" }),
+    fankuang: z.enum(["0", "1", "true", "false"]).optional().meta({ description: "1/true 仅翻筐乐商品，分页前过滤；与库位、状态和搜索共同生效" }),
     sort: ProductSortSchema.optional(),
     page: z.coerce.number().int().min(1).default(1),
     page_size: z.coerce.number().int().min(1).max(500).default(50),
@@ -289,7 +290,7 @@ export const ProductsRes = okEnvelope(
         standard: z.number().int(),
         all: z.number().int(),
       })
-      .meta({ description: "当前库位范围内各 type 的角标计数（受 q/category/status/has_image 过滤影响，不受 type 影响）" }),
+      .meta({ description: "当前库位范围内各 type 的角标计数（受 q/category/status/has_image/fankuang 过滤影响，不受 type 影响）" }),
   }),
 );
 

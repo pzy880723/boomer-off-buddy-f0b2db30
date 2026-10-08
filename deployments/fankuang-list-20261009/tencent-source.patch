@@ -1,0 +1,250 @@
+diff --git a/src/components/inventory/product-card.tsx b/src/components/inventory/product-card.tsx
+index 6abf65e8..d02234d4 100644
+--- a/src/components/inventory/product-card.tsx
++++ b/src/components/inventory/product-card.tsx
+@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
+ import { Badge } from "@/components/ui/badge";
+ import { CATEGORY_LABEL, formatPrice, type StandardProductGroup, type SkuRow } from "@/lib/inventory.helpers";
+ import { toThumbUrl } from "@/lib/image";
++import { isInFankuang } from "@/lib/commerce/fankuang";
+ 
+ /** 标准商品卡：聚合多价格档 */
+ export function StandardProductCard({
+@@ -133,6 +134,7 @@ export function SingleSkuCard({
+               <Printer className="h-2.5 w-2.5" />
+               {row.epc}
+             </p>
++            {isInFankuang(row) && <Badge variant="secondary" className="mt-1 text-[10px]">翻筐乐</Badge>}
+             {row.sku_code && (
+               <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">编码：{row.sku_code}</p>
+             )}
+@@ -251,6 +253,7 @@ export function SingleSkuRow({
+             <Printer className="h-2.5 w-2.5" />
+             <span className="font-mono">{row.epc}</span>
+           </p>
++          {isInFankuang(row) && <Badge variant="secondary" className="mt-1 text-[10px]">翻筐乐</Badge>}
+         </div>
+         <Badge className="bg-primary/90 text-primary-foreground tabular-nums">{formatPrice(row.price_tier)}</Badge>
+         <div className="w-20 text-right text-xs tabular-nums">
+diff --git a/src/lib/commerce/fankuang.ts b/src/lib/commerce/fankuang.ts
+index 6634d6f8..8d0ca714 100644
+--- a/src/lib/commerce/fankuang.ts
++++ b/src/lib/commerce/fankuang.ts
+@@ -5,6 +5,9 @@
+  */
+ export const FANKUANG_PRICE_MAX = 49.9;
+ 
++// PostgREST applies this condition before ORDER/LIMIT, matching isInFankuang.
++export const FANKUANG_POSTGREST_FILTER = `and(is_custom_price.eq.true,or(kind.is.null,kind.eq.single),or(inventory_policy.is.null,inventory_policy.neq.unlimited),or(fankuang_override.eq.true,and(fankuang_override.is.null,price_tier.gt.0,price_tier.lte.${FANKUANG_PRICE_MAX})))`;
++
+ export function fankuangDefaultForPrice(price: number | string | null | undefined): boolean {
+   const p = Number(price);
+   return Number.isFinite(p) && p > 0 && Math.round(p * 100) <= Math.round(FANKUANG_PRICE_MAX * 100);
+diff --git a/src/lib/handheld/schemas.ts b/src/lib/handheld/schemas.ts
+index e76cdedb..d92f80d7 100644
+--- a/src/lib/handheld/schemas.ts
++++ b/src/lib/handheld/schemas.ts
+@@ -269,6 +269,7 @@ export const ProductsQuery = z
+     location_id: uuidSchema.optional().meta({ description: "明确选择的 ERP 库位，总部账号选择门店时也按该库位筛选" }),
+     category: z.string().optional().meta({ description: "分类精确匹配" }),
+     has_image: z.enum(["0", "1"]).optional().meta({ description: "仅 custom 生效" }),
++    fankuang: z.enum(["0", "1", "true", "false"]).optional().meta({ description: "1/true 仅翻筐乐商品，分页前过滤；与库位、状态和搜索共同生效" }),
+     sort: ProductSortSchema.optional(),
+     page: z.coerce.number().int().min(1).default(1),
+     page_size: z.coerce.number().int().min(1).max(500).default(50),
+@@ -289,7 +290,7 @@ export const ProductsRes = okEnvelope(
+         standard: z.number().int(),
+         all: z.number().int(),
+       })
+-      .meta({ description: "当前库位范围内各 type 的角标计数（受 q/category/status/has_image 过滤影响，不受 type 影响）" }),
++      .meta({ description: "当前库位范围内各 type 的角标计数（受 q/category/status/has_image/fankuang 过滤影响，不受 type 影响）" }),
+   }),
+ );
+ 
+diff --git a/src/lib/inventory.functions.ts b/src/lib/inventory.functions.ts
+index ff9a39ca..f2afafeb 100644
+--- a/src/lib/inventory.functions.ts
++++ b/src/lib/inventory.functions.ts
+@@ -4,6 +4,7 @@ import { z } from "zod";
+ import { supabaseAdmin } from "@/integrations/supabase/client.server";
+ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+ import { generateEpc, generateSkuCode } from "./inventory.helpers";
++import { FANKUANG_POSTGREST_FILTER } from "./commerce/fankuang";
+ import {
+   assertActiveLeafCategory,
+   attachProductClassificationAuditToSku,
+@@ -100,6 +101,7 @@ export const listSkus = createServerFn({ method: "GET" })
+         kind: z.enum(["single", "pack", "bundle"]).optional(),
+         exclude_kind: z.enum(["single", "pack", "bundle"]).optional(),
+         search: z.string().optional(),
++        fankuang: z.boolean().optional(),
+         limit: z.number().min(1).max(500).default(200),
+       })
+       .parse(input ?? {}),
+@@ -115,6 +117,7 @@ export const listSkus = createServerFn({ method: "GET" })
+     if (data.price_tier != null) q = q.eq("price_tier", data.price_tier);
+     if (data.kind) q = q.eq("kind", data.kind);
+     if (data.exclude_kind) q = q.neq("kind", data.exclude_kind);
++    if (data.fankuang) q = q.or(FANKUANG_POSTGREST_FILTER);
+     if (data.search) {
+       const s = `%${data.search}%`;
+       q = q.or(`name.ilike.${s},epc.ilike.${s},sku_code.ilike.${s},notes.ilike.${s}`);
+diff --git a/src/routes/api/public/handheld/products.ts b/src/routes/api/public/handheld/products.ts
+index d67f404a..547211f5 100644
+--- a/src/routes/api/public/handheld/products.ts
++++ b/src/routes/api/public/handheld/products.ts
+@@ -29,6 +29,7 @@ export const Route = createFileRoute("/api/public/handheld/products")({
+           const category = (params.get("category") || "").trim();
+           const hasImage = params.get("has_image");
+           const sort = (params.get("sort") || "").toLowerCase();
++          const onlyFankuang = ["1", "true"].includes(params.get("fankuang") || "");
+           const page = Math.max(1, Number(params.get("page") || "1") | 0);
+           const pageSize = Math.min(500, Math.max(1, Number(params.get("page_size") || "50") | 0));
+           const inventory = await loadProductInventory(scoped);
+@@ -38,6 +39,7 @@ export const Route = createFileRoute("/api/public/handheld/products")({
+             return result;
+           });
+           let items = buildProductItems(skus, inventory).filter((item) => {
++            if (onlyFankuang && !item.in_fankuang) return false;
+             if (status !== "all" && item.listing_status !== status) return false;
+             if (item.product_type !== "custom") return true;
+             if (hasImage === "1") return item.image_paths.length > 0;
+diff --git a/src/routes/inventory.skus.index.tsx b/src/routes/inventory.skus.index.tsx
+index a7fb4ad1..4c9834c5 100644
+--- a/src/routes/inventory.skus.index.tsx
++++ b/src/routes/inventory.skus.index.tsx
+@@ -30,6 +30,7 @@ import { SkuEditDialog } from "@/components/inventory/sku-edit-dialog";
+ import { listSkus, deleteSku, deleteStandardProduct } from "@/lib/inventory.functions";
+ import { groupStandardSkus, type SkuRow, type StandardProductGroup } from "@/lib/inventory.helpers";
+ import { useSkuCovers, pickCover } from "@/hooks/use-sku-covers";
++import { isInFankuang } from "@/lib/commerce/fankuang";
+ 
+ export const Route = createFileRoute("/inventory/skus/")({
+   head: () => ({
+@@ -50,6 +51,7 @@ function SkusPage() {
+ 
+   const [search, setSearch] = useState("");
+   const [searchInput, setSearchInput] = useState("");
++  const [onlyFankuang, setOnlyFankuang] = useState(false);
+   const [openDialog, setOpenDialog] = useState<DialogKind>(null);
+   const [tab, setTab] = useState<TabKind>("standard");
+   const [view, setView] = useState<ViewMode>(() => {
+@@ -70,14 +72,15 @@ function SkusPage() {
+   };
+ 
+   const q = useQuery({
+-    queryKey: ["inv-skus", search],
+-    queryFn: () => listFn({ data: { search: search || undefined, limit: 500 } }),
++    queryKey: ["inv-skus", search, onlyFankuang],
++    queryFn: () => listFn({ data: { search: search || undefined, limit: 500, fankuang: onlyFankuang } }),
+     staleTime: 5 * 60 * 1000,
+     gcTime: 30 * 60 * 1000,
+     placeholderData: keepPreviousData,
+   });
+ 
+-  const rows = (q.data?.rows ?? []) as SkuRow[];
++  const sourceRows = q.data?.rows;
++  const rows = useMemo(() => ((sourceRows ?? []) as SkuRow[]).filter((r) => !onlyFankuang || isInFankuang(r)), [sourceRows, onlyFankuang]);
+   const { standardGroups, customRows, bundleRows } = useMemo(() => {
+     const std = rows.filter((r) => r.kind === "single" && !r.is_custom_price);
+     const cus = rows.filter((r) => r.kind === "single" && r.is_custom_price);
+@@ -162,6 +165,8 @@ function SkusPage() {
+           </TabsList>
+ 
+           <div className="flex items-center gap-2">
++            <Button size="sm" variant={onlyFankuang ? "default" : "outline"} aria-pressed={onlyFankuang}
++              onClick={() => setOnlyFankuang(!onlyFankuang)}>仅翻筐乐</Button>
+             <div className="relative w-full max-w-xs">
+               <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+               <Input
+@@ -192,12 +197,15 @@ function SkusPage() {
+           </div>
+         </div>
+ 
++        {q.isFetching && <p className="text-xs text-muted-foreground">正在更新商品筛选…</p>}
++        {q.isError && <p role="alert" className="text-xs text-destructive">商品筛选加载失败，当前可能为缓存结果。<Button variant="link" size="sm" onClick={() => q.refetch()}>重试</Button></p>}
++
+         <TabsContent value="standard" className="mt-4">
+           {standardGroups.length === 0 ? (
+             <EmptyState
+               icon={Tags}
+-              title="还没有标准商品"
+-              description="标准商品按类目+品名共享多个价格档,95% 的商品都用这种方式"
++              title={onlyFankuang ? "标准商品不参与翻筐乐" : "还没有标准商品"}
++              description={onlyFankuang ? "请选择自定义商品，或关闭仅翻筐乐筛选" : "标准商品按类目+品名共享多个价格档,95% 的商品都用这种方式"}
+               action={NewMenu}
+             />
+           ) : view === "grid" ? (
+@@ -219,8 +227,8 @@ function SkusPage() {
+           {customRows.length === 0 ? (
+             <EmptyState
+               icon={Sparkles}
+-              title="还没有自定义商品"
+-              description="不能归类到标准价格档的大件商品请用「自定义商品」"
++              title={onlyFankuang ? "没有匹配的翻筐乐商品" : "还没有自定义商品"}
++              description={onlyFankuang ? "请调整搜索条件，或关闭仅翻筐乐筛选" : "不能归类到标准价格档的大件商品请用「自定义商品」"}
+               action={NewMenu}
+             />
+           ) : view === "grid" ? (
+@@ -242,8 +250,8 @@ function SkusPage() {
+           {bundleRows.length === 0 ? (
+             <EmptyState
+               icon={Boxes}
+-              title="还没有组包商品"
+-              description="组包商品引用若干已有 SKU，主要用于批发场景"
++              title={onlyFankuang ? "组包商品不参与翻筐乐" : "还没有组包商品"}
++              description={onlyFankuang ? "请选择自定义商品，或关闭仅翻筐乐筛选" : "组包商品引用若干已有 SKU，主要用于批发场景"}
+               action={NewMenu}
+             />
+           ) : view === "grid" ? (
+diff --git a/src/server/handheld-products.test.ts b/src/server/handheld-products.test.ts
+index 6bd55613..0fe043c0 100644
+--- a/src/server/handheld-products.test.ts
++++ b/src/server/handheld-products.test.ts
+@@ -45,6 +45,7 @@ function sku(id: string, extra: Row = {}): Row {
+     kind: "single",
+     is_custom_price: true,
+     inventory_policy: "tracked",
++    fankuang_override: null,
+     stock_qty: 0,
+     attributes: {},
+     brand_id: null,
+@@ -329,6 +330,29 @@ function ids(body: Row): string[] {
+   return body.data.items.map((it: Row) => it.id).sort();
+ }
+ 
++test("fankuang filters before counts and paging, honors manual choices and never crosses store", async () => {
++  tables.inv_skus.find(r => r.id === "a")!.fankuang_override = false;
++  tables.inv_skus.find(r => r.id === "sold-a")!.fankuang_override = true;
++  const enabled = sku("manual-high", { price_tier: 199, fankuang_override: true });
++  tables.inv_skus.push(enabled);
++  tables.inv_stocks.push({ sku_id: enabled.id, location_id: A, qty: 1 });
++  const first = await call("list", `location_id=${A}&fankuang=1&status=all&page_size=1&sort=price_asc`);
++  assert.equal(first.status, 200);
++  assert.equal(first.body.data.total, 3);
++  assert.deepEqual(first.body.data.counts, { custom: 3, bundle: 0, standard: 0, all: 3 });
++  assert.ok(first.body.data.items.every((r: Row) => r.in_fankuang === true));
++  const second = await call("list", `location_id=${A}&fankuang=true&status=all&page_size=1&page=3&sort=price_asc`);
++  assert.deepEqual(ids(second.body), ["manual-high"]);
++  const selling = await call("list", `location_id=${A}&fankuang=1&status=selling`);
++  assert.deepEqual(ids(selling.body), ["manual-high"]);
++  const bundles = await call("list", `location_id=${A}&fankuang=1&type=bundle`);
++  assert.equal(bundles.body.data.total, 0);
++  const search = await call("list", `location_id=${A}&fankuang=1&q=manual-high`);
++  assert.deepEqual(ids(search.body), ["manual-high"]);
++  const disabled = await call("list", `location_id=${A}&fankuang=0`);
++  assert.ok(ids(disabled.body).includes("a"));
++});
++
+ for (const route of ["list", "lookup", "detail"]) {
+   test(`${route}: legacy authorized is a single-location alias even for HQ`, async () => {
+     const { status, body } = await call(route, "scope=authorized&code=bar-a");
+@@ -778,6 +802,8 @@ test("detail: preserves every existing identity, price, label, image and print f
+     delete data[key];
+   assert.deepEqual(data, {
+     id: "a",
++    fankuang_override: null,
++    in_fankuang: true,
+     can_edit: false,
+     can_delete: false,
+     sku_code: "a",

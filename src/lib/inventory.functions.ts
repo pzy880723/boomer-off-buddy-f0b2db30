@@ -4,6 +4,7 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { generateEpc, generateSkuCode } from "./inventory.helpers";
+import { FANKUANG_POSTGREST_FILTER } from "./commerce/fankuang";
 import {
   assertActiveLeafCategory,
   attachProductClassificationAuditToSku,
@@ -100,6 +101,7 @@ export const listSkus = createServerFn({ method: "GET" })
         kind: z.enum(["single", "pack", "bundle"]).optional(),
         exclude_kind: z.enum(["single", "pack", "bundle"]).optional(),
         search: z.string().optional(),
+        fankuang: z.boolean().optional(),
         limit: z.number().min(1).max(500).default(200),
       })
       .parse(input ?? {}),
@@ -115,6 +117,7 @@ export const listSkus = createServerFn({ method: "GET" })
     if (data.price_tier != null) q = q.eq("price_tier", data.price_tier);
     if (data.kind) q = q.eq("kind", data.kind);
     if (data.exclude_kind) q = q.neq("kind", data.exclude_kind);
+    if (data.fankuang) q = q.or(FANKUANG_POSTGREST_FILTER);
     if (data.search) {
       const s = `%${data.search}%`;
       q = q.or(`name.ilike.${s},epc.ilike.${s},sku_code.ilike.${s},notes.ilike.${s}`);

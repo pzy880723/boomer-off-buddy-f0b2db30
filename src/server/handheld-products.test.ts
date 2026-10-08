@@ -45,6 +45,7 @@ function sku(id: string, extra: Row = {}): Row {
     kind: "single",
     is_custom_price: true,
     inventory_policy: "tracked",
+    fankuang_override: null,
     stock_qty: 0,
     attributes: {},
     brand_id: null,
@@ -328,6 +329,29 @@ async function call(
 function ids(body: Row): string[] {
   return body.data.items.map((it: Row) => it.id).sort();
 }
+
+test("fankuang filters before counts and paging, honors manual choices and never crosses store", async () => {
+  tables.inv_skus.find(r => r.id === "a")!.fankuang_override = false;
+  tables.inv_skus.find(r => r.id === "sold-a")!.fankuang_override = true;
+  const enabled = sku("manual-high", { price_tier: 199, fankuang_override: true });
+  tables.inv_skus.push(enabled);
+  tables.inv_stocks.push({ sku_id: enabled.id, location_id: A, qty: 1 });
+  const first = await call("list", `location_id=${A}&fankuang=1&status=all&page_size=1&sort=price_asc`);
+  assert.equal(first.status, 200);
+  assert.equal(first.body.data.total, 3);
+  assert.deepEqual(first.body.data.counts, { custom: 3, bundle: 0, standard: 0, all: 3 });
+  assert.ok(first.body.data.items.every((r: Row) => r.in_fankuang === true));
+  const second = await call("list", `location_id=${A}&fankuang=true&status=all&page_size=1&page=3&sort=price_asc`);
+  assert.deepEqual(ids(second.body), ["manual-high"]);
+  const selling = await call("list", `location_id=${A}&fankuang=1&status=selling`);
+  assert.deepEqual(ids(selling.body), ["manual-high"]);
+  const bundles = await call("list", `location_id=${A}&fankuang=1&type=bundle`);
+  assert.equal(bundles.body.data.total, 0);
+  const search = await call("list", `location_id=${A}&fankuang=1&q=manual-high`);
+  assert.deepEqual(ids(search.body), ["manual-high"]);
+  const disabled = await call("list", `location_id=${A}&fankuang=0`);
+  assert.ok(ids(disabled.body).includes("a"));
+});
 
 for (const route of ["list", "lookup", "detail"]) {
   test(`${route}: legacy authorized is a single-location alias even for HQ`, async () => {
@@ -778,6 +802,8 @@ test("detail: preserves every existing identity, price, label, image and print f
     delete data[key];
   assert.deepEqual(data, {
     id: "a",
+    fankuang_override: null,
+    in_fankuang: true,
     can_edit: false,
     can_delete: false,
     sku_code: "a",

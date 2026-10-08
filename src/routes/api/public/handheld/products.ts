@@ -29,6 +29,7 @@ export const Route = createFileRoute("/api/public/handheld/products")({
           const category = (params.get("category") || "").trim();
           const hasImage = params.get("has_image");
           const sort = (params.get("sort") || "").toLowerCase();
+          const onlyFankuang = ["1", "true"].includes(params.get("fankuang") || "");
           const page = Math.max(1, Number(params.get("page") || "1") | 0);
           const pageSize = Math.min(500, Math.max(1, Number(params.get("page_size") || "50") | 0));
           const inventory = await loadProductInventory(scoped);
@@ -38,6 +39,7 @@ export const Route = createFileRoute("/api/public/handheld/products")({
             return result;
           });
           let items = buildProductItems(skus, inventory).filter((item) => {
+            if (onlyFankuang && !item.in_fankuang) return false;
             if (status !== "all" && item.listing_status !== status) return false;
             if (item.product_type !== "custom") return true;
             if (hasImage === "1") return item.image_paths.length > 0;

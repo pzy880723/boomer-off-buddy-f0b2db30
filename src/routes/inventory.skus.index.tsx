@@ -30,6 +30,7 @@ import { SkuEditDialog } from "@/components/inventory/sku-edit-dialog";
 import { listSkus, deleteSku, deleteStandardProduct } from "@/lib/inventory.functions";
 import { groupStandardSkus, type SkuRow, type StandardProductGroup } from "@/lib/inventory.helpers";
 import { useSkuCovers, pickCover } from "@/hooks/use-sku-covers";
+import { isInFankuang } from "@/lib/commerce/fankuang";
 
 export const Route = createFileRoute("/inventory/skus/")({
   head: () => ({
@@ -50,6 +51,7 @@ function SkusPage() {
 
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
+  const [onlyFankuang, setOnlyFankuang] = useState(false);
   const [openDialog, setOpenDialog] = useState<DialogKind>(null);
   const [tab, setTab] = useState<TabKind>("standard");
   const [view, setView] = useState<ViewMode>(() => {
@@ -70,14 +72,15 @@ function SkusPage() {
   };
 
   const q = useQuery({
-    queryKey: ["inv-skus", search],
-    queryFn: () => listFn({ data: { search: search || undefined, limit: 500 } }),
+    queryKey: ["inv-skus", search, onlyFankuang],
+    queryFn: () => listFn({ data: { search: search || undefined, limit: 500, fankuang: onlyFankuang } }),
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     placeholderData: keepPreviousData,
   });
 
-  const rows = (q.data?.rows ?? []) as SkuRow[];
+  const sourceRows = q.data?.rows;
+  const rows = useMemo(() => ((sourceRows ?? []) as SkuRow[]).filter((r) => !onlyFankuang || isInFankuang(r)), [sourceRows, onlyFankuang]);
   const { standardGroups, customRows, bundleRows } = useMemo(() => {
     const std = rows.filter((r) => r.kind === "single" && !r.is_custom_price);
     const cus = rows.filter((r) => r.kind === "single" && r.is_custom_price);
@@ -162,6 +165,8 @@ function SkusPage() {
           </TabsList>
 
           <div className="flex items-center gap-2">
+            <Button size="sm" variant={onlyFankuang ? "default" : "outline"} aria-pressed={onlyFankuang}
+              onClick={() => setOnlyFankuang(!onlyFankuang)}>仅翻筐乐</Button>
             <div className="relative w-full max-w-xs">
               <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -192,12 +197,15 @@ function SkusPage() {
           </div>
         </div>
 
+        {q.isFetching && <p className="text-xs text-muted-foreground">正在更新商品筛选…</p>}
+        {q.isError && <p role="alert" className="text-xs text-destructive">商品筛选加载失败，当前可能为缓存结果。<Button variant="link" size="sm" onClick={() => q.refetch()}>重试</Button></p>}
+
         <TabsContent value="standard" className="mt-4">
           {standardGroups.length === 0 ? (
             <EmptyState
               icon={Tags}
-              title="还没有标准商品"
-              description="标准商品按类目+品名共享多个价格档,95% 的商品都用这种方式"
+              title={onlyFankuang ? "标准商品不参与翻筐乐" : "还没有标准商品"}
+              description={onlyFankuang ? "请选择自定义商品，或关闭仅翻筐乐筛选" : "标准商品按类目+品名共享多个价格档,95% 的商品都用这种方式"}
               action={NewMenu}
             />
           ) : view === "grid" ? (
@@ -219,8 +227,8 @@ function SkusPage() {
           {customRows.length === 0 ? (
             <EmptyState
               icon={Sparkles}
-              title="还没有自定义商品"
-              description="不能归类到标准价格档的大件商品请用「自定义商品」"
+              title={onlyFankuang ? "没有匹配的翻筐乐商品" : "还没有自定义商品"}
+              description={onlyFankuang ? "请调整搜索条件，或关闭仅翻筐乐筛选" : "不能归类到标准价格档的大件商品请用「自定义商品」"}
               action={NewMenu}
             />
           ) : view === "grid" ? (
@@ -242,8 +250,8 @@ function SkusPage() {
           {bundleRows.length === 0 ? (
             <EmptyState
               icon={Boxes}
-              title="还没有组包商品"
-              description="组包商品引用若干已有 SKU，主要用于批发场景"
+              title={onlyFankuang ? "组包商品不参与翻筐乐" : "还没有组包商品"}
+              description={onlyFankuang ? "请选择自定义商品，或关闭仅翻筐乐筛选" : "组包商品引用若干已有 SKU，主要用于批发场景"}
               action={NewMenu}
             />
           ) : view === "grid" ? (

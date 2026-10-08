@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CATEGORY_LABEL, formatPrice, type StandardProductGroup, type SkuRow } from "@/lib/inventory.helpers";
 import { toThumbUrl } from "@/lib/image";
+import { isInFankuang } from "@/lib/commerce/fankuang";
 
 /** 标准商品卡：聚合多价格档 */
 export function StandardProductCard({
@@ -133,6 +134,7 @@ export function SingleSkuCard({
               <Printer className="h-2.5 w-2.5" />
               {row.epc}
             </p>
+            {isInFankuang(row) && <Badge variant="secondary" className="mt-1 text-[10px]">翻筐乐</Badge>}
             {row.sku_code && (
               <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">编码：{row.sku_code}</p>
             )}
@@ -251,6 +253,7 @@ export function SingleSkuRow({
             <Printer className="h-2.5 w-2.5" />
             <span className="font-mono">{row.epc}</span>
           </p>
+          {isInFankuang(row) && <Badge variant="secondary" className="mt-1 text-[10px]">翻筐乐</Badge>}
         </div>
         <Badge className="bg-primary/90 text-primary-foreground tabular-nums">{formatPrice(row.price_tier)}</Badge>
         <div className="w-20 text-right text-xs tabular-nums">
