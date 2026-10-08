@@ -265,6 +265,7 @@ export const createCustomSku = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     MetaInput.extend({
       price: z.number().positive().max(99999.9),
+      fankuang_override: z.boolean().nullable().optional(),
     }).parse(input),
   )
   .handler(async ({ data, context }) => {
@@ -277,6 +278,7 @@ export const createCustomSku = createServerFn({ method: "POST" })
       price_tier: Math.round(data.price * 100) / 100,
       is_custom_price: true,
       inventory_policy: "tracked",
+      fankuang_override: data.fankuang_override ?? null,
       kind: "single" as const,
       pack_pieces: null,
       bundle_items: [],
@@ -403,6 +405,7 @@ export const updateSku = createServerFn({ method: "POST" })
             grade: z.enum(["N", "S", "A", "B", "C", "J"]).nullable().optional(),
             status: z.enum(["active", "archived"]).optional(),
             price_tier: z.number().positive().max(99999.9).optional(),
+            fankuang_override: z.boolean().nullable().optional(),
           })
           .strict(),
       })

@@ -161,8 +161,9 @@ describe("storefront list paging + page-only image signing", () => {
     assert.match(listRoute, /enrichStorefrontListings\(listings, \{ signImages: false \}\)/);
     const enrichIdx = listRoute.indexOf("signImages: false");
     const filterIdx = listRoute.indexOf("product.stock > 0");
-    const totalIdx = listRoute.indexOf("const total = availableProducts.length");
-    const sliceIdx = listRoute.indexOf(".slice(start, start + query.page_size)");
+    // 翻筐乐过滤 + total + 切页统一在 filterFankuangBeforePaging 内完成（分页前过滤）。
+    const totalIdx = listRoute.indexOf("filterFankuangBeforePaging(");
+    const sliceIdx = listRoute.indexOf("query.page_size,", totalIdx);
     const signIdx = listRoute.indexOf("signStorefrontProductImages(pageProducts");
     assert.ok(
       enrichIdx < filterIdx && filterIdx < totalIdx && totalIdx < sliceIdx && sliceIdx < signIdx,
@@ -186,7 +187,7 @@ describe("storefront list paging + page-only image signing", () => {
     // 路由里 total 在 enrich 之后才计算，因此被过滤掉的 SKU 不会计入 total
     assert.ok(
       listRoute.indexOf("enrichStorefrontListings(") <
-        listRoute.indexOf("const total = availableProducts.length"),
+        listRoute.indexOf("filterFankuangBeforePaging("),
     );
   });
 

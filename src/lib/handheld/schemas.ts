@@ -227,6 +227,12 @@ export const ProductItemSchema = z
     is_unlimited_stock: z.boolean().default(false).meta({
       description: "true 时标准商品不跟踪物理库存，所有 Vintage 门店持续可售",
     }),
+    fankuang_override: z.boolean().nullable().default(null).meta({
+      description: "翻筐乐人工覆盖：null 按售价自动（<=49.9），true/false 人工指定",
+    }),
+    in_fankuang: z.boolean().default(false).meta({
+      description: "有效参与翻筐乐；标准/不限量/组包商品恒为 false",
+    }),
     total_stock_qty: z.number().int(),
     stocks: z.array(ProductStockSchema),
     status: z.string(),
@@ -839,6 +845,9 @@ export const SmartCreateReq = z
       .meta({ description: "IP 未匹配时，店员确认后才允许创建待审核 IP" }),
     price_tier: ItemPriceYuan.meta({ description: "售价，以元为单位，0.01–999999.99，最多两位小数" }),
     is_custom_price: z.boolean().default(false),
+    fankuang_override: z.boolean().nullable().optional().meta({
+      description: "加入翻筐乐：省略或 null 按售价自动（<=49.9 参与），true/false 人工覆盖；标准商品忽略",
+    }),
     grade: z.enum(["N", "S", "A", "B", "C", "J"]).nullable().optional(),
     notes: z.string().nullable().optional(),
     image_url: z
@@ -1082,6 +1091,12 @@ export const SkuDetailRes = okEnvelope(
       .boolean()
       .meta({ description: "仅表示有删除权限（总部），不保证无业务引用；DELETE 可能返回 409 delete_blocked" }),
     is_unlimited_stock: z.boolean(),
+    fankuang_override: z.boolean().nullable().meta({
+      description: "翻筐乐人工覆盖：null 按售价自动（<=49.9），true/false 人工指定",
+    }),
+    in_fankuang: z.boolean().meta({
+      description: "有效参与翻筐乐；标准/不限量/组包商品恒为 false",
+    }),
     sku_code: z.string().nullable(),
     barcode: z.string().nullable(),
     epc: z.string(),
@@ -1733,6 +1748,9 @@ export const StorefrontProductsQuery = z
     sort: z.enum(["newest", "price_asc", "price_desc", "relevance"]).optional(),
     page: z.coerce.number().int().min(1).default(1),
     page_size: z.coerce.number().int().min(1).max(50).default(20),
+    fankuang: z.enum(["0", "1", "true", "false"]).optional().meta({
+      description: "1/true 只返回有效参与翻筐乐的商品；过滤在分页前，total 不含被排除商品",
+    }),
   })
   .meta({ id: "StorefrontProductsQuery" });
 
@@ -1785,6 +1803,7 @@ export const StorefrontProductSchema = z
     image_url: z.string().nullable(),
     image_urls: z.array(z.string()),
     stock: z.number().int().min(0),
+    in_fankuang: z.boolean().meta({ description: "是否参与翻筐乐（人工开关优先，否则售价<=49.9）" }),
     condition_grade: z.string().nullable(),
     location: StorefrontLocationSchema.nullable(),
     published_at: z.string().nullable(),

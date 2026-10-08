@@ -105,6 +105,8 @@ export type SkuRow = {
   sku_code: string | null;
   price_tier: number;
   is_custom_price: boolean;
+  inventory_policy?: string | null;
+  fankuang_override?: boolean | null;
   kind: string;
   pack_pieces: number | null;
   bundle_items: unknown;

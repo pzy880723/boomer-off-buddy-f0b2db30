@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "../integrations/supabase/client.server";
 import { signSkuImagePaths } from "../lib/sku-image-resolver.server";
 import { DERIVATIVE_WIDTHS, signDerivativeUrls } from "./media-derivative.server";
+import { isInFankuang } from "../lib/commerce/fankuang";
 
 /** 列表 / 购物车 / 订单默认展示图：真实 480px 衍生图，失败为 null（不回退原图）。 */
 export const thumbnailDerivativeSigner = (paths: readonly string[]) =>
@@ -19,6 +20,8 @@ export type StorefrontProductQuery = {
   sort: "newest" | "price_asc" | "price_desc" | "relevance";
   page: number;
   page_size: number;
+  /** fankuang=1：只返回有效参与翻筐乐的商品（分页前过滤）。 */
+  fankuang: boolean;
 };
 
 export type StorefrontListing = {
@@ -139,6 +142,11 @@ type StorefrontSku = {
   category: string | null;
   keywords: string[] | null;
   stock_qty: number | null;
+  price_tier?: number | null;
+  is_custom_price?: boolean | null;
+  inventory_policy?: string | null;
+  kind?: string | null;
+  fankuang_override?: boolean | null;
 };
 
 type StorefrontBrand = {
@@ -192,6 +200,7 @@ export function parseStorefrontProductQuery(url: URL): StorefrontProductQuery {
     sort,
     page: positiveInt(url.searchParams.get("page"), 1, 100000),
     page_size: positiveInt(url.searchParams.get("page_size"), 20, 50),
+    fankuang: ["1", "true"].includes(url.searchParams.get("fankuang") ?? ""),
   };
 }
 
@@ -226,6 +235,7 @@ export function buildStorefrontProduct(input: {
     product_type: listing.product_type,
     available_qty: Math.max(0, Number(availableQty) || 0),
     stock: Math.max(0, Number(availableQty) || 0),
+    in_fankuang: isInFankuang({ ...sku, price_tier: sku.price_tier ?? listing.price }),
     condition_grade: listing.condition_grade,
     location: listing.location,
     published_at: listing.published_at,
@@ -366,7 +376,7 @@ export async function enrichStorefrontListings(
     // 与腾讯分支 525acd6 对齐：隐藏 / 非 active SKU 不进入公开商品（在 total/分页计算之前排除）
     supabaseAdmin
       .from("inv_skus")
-      .select("id, category, brand_id, keywords, stock_qty")
+      .select("id, category, brand_id, keywords, stock_qty, price_tier, is_custom_price, inventory_policy, kind, fankuang_override")
       .eq("status", "active")
       .eq("is_display", true)
       .in("id", skuIds),

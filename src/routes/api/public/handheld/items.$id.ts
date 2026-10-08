@@ -104,6 +104,8 @@ export const Route = createFileRoute("/api/public/handheld/items/$id")({
             product_type: item.product_type,
             editable: item.editable,
             is_unlimited_stock: item.is_unlimited_stock,
+            fankuang_override: item.fankuang_override,
+            in_fankuang: item.in_fankuang,
             sku_code: sku.sku_code,
             barcode: sku.barcode ?? null,
             epc: sku.epc,

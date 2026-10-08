@@ -7,6 +7,7 @@ import {
   signStorefrontProductImages,
   type StorefrontListing,
 } from "@/server/storefront-products.server";
+import { filterFankuangBeforePaging } from "@/lib/commerce/fankuang";
 
 export const Route = createFileRoute("/api/public/storefront/products")({
   server: {
@@ -69,9 +70,13 @@ export const Route = createFileRoute("/api/public/storefront/products")({
           const availableProducts = (
             await enrichStorefrontListings(listings, { signImages: false })
           ).filter((product) => product.stock > 0);
-          const total = availableProducts.length;
-          const start = (query.page - 1) * query.page_size;
-          const pageProducts = availableProducts.slice(start, start + query.page_size);
+          // 翻筐乐过滤在分页前完成，total 不含被排除商品，高价人工 true 不会遗漏。
+          const { total, page: pageProducts } = filterFankuangBeforePaging(
+            availableProducts,
+            query.fankuang,
+            query.page,
+            query.page_size,
+          );
           const listingsById = new Map(listings.map((listing) => [listing.id, listing]));
           const products = await signStorefrontProductImages(pageProducts, listingsById, {
             thumbnail: true,

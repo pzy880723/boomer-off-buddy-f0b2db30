@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FankuangSwitch } from "./fankuang-switch";
 import { SkuMetaFields, emptySkuMeta, type SkuMetaState } from "./sku-meta-fields";
 import { updateSku } from "@/lib/inventory.functions";
 import type { SkuRow } from "@/lib/inventory.helpers";
@@ -32,6 +33,9 @@ export function SkuEditDialog({
     ...emptySkuMeta,
   });
   const [price, setPrice] = useState("");
+  const [fankuang, setFankuang] = useState<boolean | null>(null);
+  const fankuangEligible =
+    !!sku && sku.is_custom_price && sku.kind === "single" && sku.inventory_policy !== "unlimited";
 
   const isStandard = !!sku && sku.kind === "single" && !sku.is_custom_price;
   const priceEditable = !!sku && !isStandard;
@@ -49,6 +53,7 @@ export function SkuEditDialog({
         grade: (sku as { grade?: string | null }).grade ?? "",
       });
       setPrice(String(sku.price_tier ?? ""));
+      setFankuang(sku.fankuang_override ?? null);
     }
   }, [sku, open]);
 
@@ -68,6 +73,10 @@ export function SkuEditDialog({
         const p = Number(price);
         if (!Number.isFinite(p) || p <= 0) throw new Error("请输入合法售价");
         patch.price_tier = Math.round(p * 100) / 100;
+      }
+      // 只在人工改动时提交，未改动不抹掉原覆盖值。
+      if (fankuangEligible && fankuang !== (sku.fankuang_override ?? null)) {
+        patch.fankuang_override = fankuang;
       }
       return fn({ data: { id: sku.id, patch: patch as never } });
     },
@@ -111,6 +120,9 @@ export function SkuEditDialog({
               disabled={!priceEditable}
             />
           </div>
+          {fankuangEligible && (
+            <FankuangSwitch price={price} value={fankuang} onChange={setFankuang} />
+          )}
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>

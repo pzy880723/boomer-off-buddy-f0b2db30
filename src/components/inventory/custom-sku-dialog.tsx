@@ -17,6 +17,7 @@ import { SkuMetaFields, emptySkuMeta, type SkuMetaState } from "./sku-meta-field
 import { DefaultShopsSelector } from "./default-shops-selector";
 import { SmartSkuCapture } from "./smart-sku-capture";
 import { Sparkles } from "lucide-react";
+import { FankuangSwitch } from "./fankuang-switch";
 
 export function CustomSkuForm({
   meta,
@@ -24,12 +25,16 @@ export function CustomSkuForm({
   price,
   setPrice,
   mobile,
+  fankuang,
+  setFankuang,
 }: {
   meta: SkuMetaState;
   setMeta: (s: SkuMetaState) => void;
   price: string;
   setPrice: (v: string) => void;
   mobile?: boolean;
+  fankuang?: boolean | null;
+  setFankuang?: (v: boolean | null) => void;
 }) {
   useEffect(() => {
     if (!price && meta.aiSuggestedPrice != null) {
@@ -59,6 +64,9 @@ export function CustomSkuForm({
           </p>
         )}
       </div>
+      {setFankuang && (
+        <FankuangSwitch price={price} value={fankuang ?? null} onChange={setFankuang} />
+      )}
     </div>
   );
 }
@@ -70,6 +78,7 @@ export function useCustomSkuMutation(onDone: (res?: { sku: { id: string; epc: st
       meta: SkuMetaState;
       price: string;
       default_shop_ids: string[];
+      fankuang_override?: boolean | null;
     }) => {
       const { meta, price, default_shop_ids } = input;
       if (!meta.category || !meta.name.trim()) throw new Error("类目 / 品名 必填");
@@ -91,6 +100,7 @@ export function useCustomSkuMutation(onDone: (res?: { sku: { id: string; epc: st
           ai_suggested_price: meta.aiSuggestedPrice,
           price: Math.round(p * 100) / 100,
           default_shop_ids,
+          fankuang_override: input.fankuang_override ?? null,
         },
       });
     },
@@ -113,11 +123,13 @@ export function CustomSkuDialog({
 }) {
   const [meta, setMeta] = useState<SkuMetaState>(emptySkuMeta);
   const [price, setPrice] = useState("");
+  const [fankuang, setFankuang] = useState<boolean | null>(null);
   const [smartOpen, setSmartOpen] = useState(false);
   const [defaultShopIds, setDefaultShopIds] = useState<string[]>([]);
   const reset = () => {
     setMeta(emptySkuMeta);
     setPrice("");
+    setFankuang(null);
     setSmartOpen(false);
     setDefaultShopIds([]);
   };
@@ -156,7 +168,14 @@ export function CustomSkuDialog({
               拍照自动识别分类和商品字段
             </Button>
           )}
-          <CustomSkuForm meta={meta} setMeta={setMeta} price={price} setPrice={setPrice} />
+          <CustomSkuForm
+            meta={meta}
+            setMeta={setMeta}
+            price={price}
+            setPrice={setPrice}
+            fankuang={fankuang}
+            setFankuang={setFankuang}
+          />
           <DefaultShopsSelector value={defaultShopIds} onChange={setDefaultShopIds} />
         </div>
         <DialogFooter>
@@ -164,7 +183,7 @@ export function CustomSkuDialog({
             取消
           </Button>
           <Button
-            onClick={() => mut.mutate({ meta, price, default_shop_ids: defaultShopIds })}
+            onClick={() => mut.mutate({ meta, price, default_shop_ids: defaultShopIds, fankuang_override: fankuang })}
             disabled={mut.isPending}
           >
             {mut.isPending ? "创建中…" : "创建并生成 EPC"}
