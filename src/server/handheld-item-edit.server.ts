@@ -69,6 +69,7 @@ export async function handleItemPatch(request: Request, deviceId: string, skuId:
   if (b.description !== undefined) patch.notes = b.description;
   if (b.condition_grade !== undefined) patch.grade = b.condition_grade;
   if (b.image_paths !== undefined) patch.image_paths = b.image_paths;
+  if (b.fankuang_override !== undefined) patch.fankuang_override = b.fankuang_override;
   const { data, error } = await supabaseAdmin.rpc("handheld_item_update" as never, {
     p_device_id: deviceId,
     p_user_id: session.user_id,

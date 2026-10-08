@@ -839,6 +839,9 @@ export const SmartCreateReq = z
       .meta({ description: "IP 未匹配时，店员确认后才允许创建待审核 IP" }),
     price_tier: ItemPriceYuan.meta({ description: "售价，以元为单位，0.01–999999.99，最多两位小数" }),
     is_custom_price: z.boolean().default(false),
+    fankuang_override: z.boolean().nullable().optional().meta({
+      description: "加入翻筐乐：省略或 null 按售价自动（<=49.9 参与），true/false 人工覆盖；标准商品忽略",
+    }),
     grade: z.enum(["N", "S", "A", "B", "C", "J"]).nullable().optional(),
     notes: z.string().nullable().optional(),
     image_url: z

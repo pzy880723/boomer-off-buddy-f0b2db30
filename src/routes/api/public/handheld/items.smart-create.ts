@@ -202,6 +202,8 @@ async function handleSmartCreate(request: Request, timing: ReturnType<typeof cre
             price_tier: body.price_tier,
             is_custom_price: body.is_custom_price,
             inventory_policy: body.is_custom_price ? "tracked" : "unlimited",
+            // 标准商品不参与翻筐乐：忽略客户端值；省略/null 表示按售价自动。
+            fankuang_override: body.is_custom_price ? (body.fankuang_override ?? null) : null,
             epc: generateEpc(body.category, body.price_tier),
             sku_code: generateSkuCode(body.category, "single"),
             image_paths: incomingPaths,
