@@ -213,7 +213,7 @@ test("legacy gallery jobs still apply their SKU result and refresh status after 
 
 function legacyOnly() {
   state.jobs = [];
-  state.legacyJobs = [{ id: "legacy", sku_id: "sku", source_bucket: "sku-raw", source_path: "gallery.jpg", source_index: 0, attempts: 1, claim_token: "owner" }];
+  state.legacyJobs = [{ id: "legacy", sku_id: "sku", source_bucket: "sku-raw", source_path: "gallery.jpg", source_index: 0, attempts: 1, claim_token: "owner", ai_actor_user_id: "u1", ai_policy_version: "2026-10-09-v1" }];
 }
 test("legacy completion failure is visible and leaves recovery to the lease", async () => {
   legacyOnly(); state.legacyFinishError = true;
