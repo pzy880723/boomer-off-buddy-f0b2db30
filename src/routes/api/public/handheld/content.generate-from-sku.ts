@@ -28,13 +28,10 @@ export const Route = createFileRoute("/api/public/handheld/content/generate-from
         if (replay) return jsonReplay(replay);
 
         try {
-          const data = await generateEditorialForSku(
-            {
-              skuId: body.sku_id,
-              publish: body.publish,
-            },
-            auth.guard,
-          );
+          const data = await generateEditorialForSku({
+            skuId: body.sku_id,
+            publish: body.publish,
+          }, auth.guard);
           await recordOp({
             deviceId: auth.device.id,
             clientOpId: body.client_op_id,
