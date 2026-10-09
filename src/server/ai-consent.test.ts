@@ -106,7 +106,7 @@ async function bundle(entry: string, stubs: Record<string, string>, real: string
   const out = await build({
     entryPoints: [entry], bundle: true, write: false, platform: "node", format: "esm",
     plugins: [{ name: "stubs", setup(b: any) {
-      b.onResolve({ filter: /^(@\/|\.\/product-classification\.server$)/ }, (a: any) => real.includes(a.path)
+      b.onResolve({ filter: /^(@\/|@tanstack\/react-router$|\.\/product-classification\.server$)/ }, (a: any) => real.includes(a.path)
         ? { path: require.resolve(a.path.replace(/^@\//, "/dev-server/src/") + ".ts") }
         : { path: a.path, namespace: "stub" });
       b.onLoad({ filter: /.*/, namespace: "stub" }, (a: any) => {
