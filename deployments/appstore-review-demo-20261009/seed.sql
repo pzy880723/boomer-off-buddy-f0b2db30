@@ -27,7 +27,8 @@ BEGIN
     RAISE EXCEPTION 'review seed: target has too many auth users; looks like a production instance';
   END IF;
   IF EXISTS (SELECT 1 FROM public.inv_locations WHERE name NOT LIKE '演示%')
-     OR EXISTS (SELECT 1 FROM public.inv_skus WHERE name NOT LIKE '演示%')
+     -- generic standard catalog rows (category x price tier) from the repo migrations are allowed
+     OR EXISTS (SELECT 1 FROM public.inv_skus WHERE name NOT LIKE '演示%' AND coalesce(sku_scope, '') <> 'standard')
      OR EXISTS (SELECT 1 FROM public.commerce_orders WHERE coalesce(metadata->>'demo', '') <> 'true')
      OR EXISTS (SELECT 1 FROM public.youzan_shops) THEN
     RAISE EXCEPTION 'review seed: target database contains non-demo data; refusing';
