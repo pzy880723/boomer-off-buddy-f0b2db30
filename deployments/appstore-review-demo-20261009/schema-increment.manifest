@@ -1,6 +1,5 @@
 # Incremental schema for the App Store review DEMO instance only (base: supabase/migrations up to 20260731070000).
 # Never apply to production or the existing migration-target instance. Format: <action> <path>  # note
-apply supabase/migrations/20260731070000_store_development_domain.sql
 apply supabase/migrations/20260801121530_store_payment_subjects.sql
 skip supabase/migrations/20260801135327_2a007400-1593-486c-9d10-235dbf78d416.sql  # identical copy of 20260801121530_store_payment_subjects.sql
 apply supabase/migrations/20260802131754_de80a51c-e3f0-4b11-8cc2-c223a1cfbc0e.sql

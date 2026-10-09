@@ -16,7 +16,7 @@ BASE_SKIP="20260518050115_394bc137-409c-4957-9902-799abee9515d.sql 2026051805210
 20260708130015_7a6b4978-6305-45ef-ba59-88be306ec588.sql 20260708130120_074f31b9-052c-4c3d-ab91-7eda3cda52b0.sql
 20260715153000_product_facets_and_brands.sql 20260719110000_harden_aigc_sso_permissions.sql
 20260728073853_a0065c38-703a-42b2-a619-f6caaa78fb15.sql 20260713090000_commerce_fulfillment_core.sql"
-for f in $(ls supabase/migrations | awk '$0 <= "20260731070000"'); do
+for f in $(ls supabase/migrations | awk 'substr($0,1,14) <= "20260731070000"'); do
   [[ " $BASE_SKIP " == *"$f"* ]] && continue
   src=supabase/migrations/$f
   if [[ $f == 20260704153607_* ]]; then src=$(mktemp); head -n 56 supabase/migrations/$f > "$src"; fi
