@@ -10,6 +10,13 @@ import {
 } from "@/server/handheld-auth.server";
 import { BootstrapReq } from "@/lib/handheld/schemas";
 import { phoneToEmail, PHONE_REGEX } from "@/lib/auth-config";
+import {
+  REVIEW_ENVIRONMENT,
+  REVIEW_TOKEN_PREFIX,
+  genReviewDeviceToken,
+  isReviewIsolated,
+  reviewIsolationViolations,
+} from "@/server/review-isolation.mjs";
 
 function genDeviceCode() {
   // HH-XXXXXXXX
@@ -92,12 +99,16 @@ export const Route = createFileRoute("/api/public/handheld/auth/bootstrap")({
         if (existing) {
           deviceId = (existing as any).id as string;
           deviceToken = (existing as any).token as string;
+          if (demo && !deviceToken.startsWith(REVIEW_TOKEN_PREFIX)) {
+            deviceToken = genReviewDeviceToken();
+            patch.token = deviceToken;
+          }
           await supabaseAdmin
             .from("inv_handheld_devices" as never)
             .update(patch as never)
             .eq("id", deviceId);
         } else {
-          deviceToken = genToken();
+          deviceToken = demo ? genReviewDeviceToken() : genToken();
           const label =
             body.device_label ||
             ((user.user_metadata?.name as string | undefined) ?? user.email ?? "手持设备");
@@ -177,6 +188,7 @@ export const Route = createFileRoute("/api/public/handheld/auth/bootstrap")({
         const avatarUrl = await signStaffAvatar(staffAvatarPath(user.user_metadata, user.id));
 
         return ok({
+          ...(demo ? { environment: REVIEW_ENVIRONMENT } : {}),
           device_token: deviceToken,
           device: {
             id: deviceId,
