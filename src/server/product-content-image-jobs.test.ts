@@ -28,10 +28,12 @@ const stubs: Record<string, string> = {
       upload:async(path,bytes,options)=>{const s=globalThis.__contentJobs;s.uploads.push({bucket,path,bytes,options});return {error:null};}
     })}
   };`,
-  "@/server/handheld-ai.server": `export const aiPrepareListingImage=async input=>{const s=globalThis.__contentJobs;s.prepared.push(input);if(s.fail)throw new Error('ruler service failed');return {b64:'cHJvdGVjdGVk',mime:'image/png'};};`,
+  "@/server/handheld-ai.server": `export const aiPrepareListingImage=async (input,guard)=>{const s=globalThis.__contentJobs;await guard.check('image_generation');s.prepared.push(input);if(s.fail)throw new Error('ruler service failed');return {b64:'cHJvdGVjdGVk',mime:'image/png'};};`,
   "@/server/ai-consent.server": `export const dbConsentStore=()=>({get:async()=>true});`,
   "@/server/ai-consent-core": `export const QUEUED_AI_DENIED_ERROR='ai_consent_missing';export const QUEUED_AI_UNAVAILABLE_ERROR='ai_consent_unavailable';
-    export const queuedAiDecision=async(s,j)=>j.ai_actor_user_id?((await s.get())?'allowed':'denied'):'denied';`,
+    export const queuedAiDecision=async(s,j)=>j.ai_actor_user_id?((await s.get())?'allowed':'denied'):'denied';
+    export const isAiConsentRevoked=e=>!!e&&e.code==='ai_consent_revoked';
+    export const handheldAiGuard=(s,a)=>({kind:'handheld_staff',check:async(stage)=>{const d=await queuedAiDecision(s,{ai_actor_user_id:a.userId});if(d!=='allowed'){const e=new Error(d);e.code='ai_consent_revoked';e.reason=d;throw e;}}});`,
   "@/server/listing-image-safety.server": `export const safeImageJobError=e=>((e&&e.stage?"["+e.stage+"] ":"")+(e instanceof Error?e.message:String(e))).slice(0,1000);`,
 };
 const bundle = await build({
