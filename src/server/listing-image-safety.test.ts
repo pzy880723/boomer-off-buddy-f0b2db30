@@ -119,7 +119,7 @@ test("preparation cannot return a successful image when detection is unavailable
   const source = await sharp({ create: { width: 8, height: 4, channels: 3, background: "red" } }).png().toBuffer();
   let calls = 0;
   globalThis.fetch = async () => { calls++; return new Response("unavailable", { status: 503 }); };
-  await assert.rejects(module.exports.aiPrepareListingImage({ image_base64: `data:image/png;base64,${source.toString("base64")}` }));
+  await assert.rejects(module.exports.aiPrepareListingImage({ image_base64: `data:image/png;base64,${source.toString("base64")}` }, allowHandheldGuard));
   assert.equal(calls, 1, "No image-generation or source-download fallback may follow detection failure");
 });
 
@@ -141,7 +141,7 @@ test("measurement preparation retouches background and hands instead of returnin
     }
     return jsonMessage(validChecks);
   };
-  const output = await module.exports.aiPrepareListingImage({ image_base64: `data:image/png;base64,${source.toString("base64")}` });
+  const output = await module.exports.aiPrepareListingImage({ image_base64: `data:image/png;base64,${source.toString("base64")}` }, allowHandheldGuard);
   assert.equal(calls, 3);
   assert.deepEqual(output, { b64: "ZWRpdGVk", mime: "image/png" });
   assert.equal((output as { preserved_original?: true }).preserved_original, undefined);
@@ -228,7 +228,7 @@ test("EXIF orientation is normalized before classification, generation and sourc
     if (++calls === 1) return jsonMessage({ measurement_tool: false, close_up: true, confidence: 1 });
     return calls === 2 ? generatedImage() : jsonMessage(validChecks);
   };
-  const result = await module.exports.aiPrepareListingImage({ image_base64: `data:image/jpeg;base64,${source.toString("base64")}` });
+  const result = await module.exports.aiPrepareListingImage({ image_base64: `data:image/jpeg;base64,${source.toString("base64")}` }, allowHandheldGuard);
   assert.deepEqual(result, { b64: "ZWRpdGVk", mime: "image/png" });
   assert.equal(calls, 3);
 });
