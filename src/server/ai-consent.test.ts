@@ -88,6 +88,7 @@ test("retry with different ai_processing_allowed keeps the same product fingerpr
     "@/integrations/supabase/client.server": "export const supabaseAdmin = {};",
     "@/lib/product-classification": "export const findSanrioBrandCandidate = () => null;",
     "@/lib/product-taxonomy": "export const matchBrandCandidate = () => null; export const normalizeLookupText = s => s;",
+    "./product-classification.server": "export const loadActiveProductBrands = async () => []; export const loadActiveProductIps = async () => [];",
   });
   const base = { name: "屋", category: "toy", price_tier: 159, client_op_id: "c1" };
   const a = smartCreateFingerprint({ ...base, ai_processing_allowed: true }, "loc");
@@ -105,7 +106,7 @@ async function bundle(entry: string, stubs: Record<string, string>, real: string
   const out = await build({
     entryPoints: [entry], bundle: true, write: false, platform: "node", format: "esm",
     plugins: [{ name: "stubs", setup(b: any) {
-      b.onResolve({ filter: /^@\// }, (a: any) => real.includes(a.path)
+      b.onResolve({ filter: /^(@\/|\.\/product-classification\.server$)/ }, (a: any) => real.includes(a.path)
         ? { path: require.resolve(a.path.replace(/^@\//, "/dev-server/src/") + ".ts") }
         : { path: a.path, namespace: "stub" });
       b.onLoad({ filter: /.*/, namespace: "stub" }, (a: any) => {
