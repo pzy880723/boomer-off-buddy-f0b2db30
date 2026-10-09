@@ -25,6 +25,9 @@ const stubs: Record<string, string> = {
     export const signDerivativeUrls=async(paths,width)=>{const s=globalThis.__productContent;
       s.derivatives.push({paths,width}); if(s.derivativeFail) throw new Error('render');
       return paths.map((_,i)=>s.derivativeUrls[i]??null);};`,
+  "@/server/ai-consent.server": `export const aiConsentBlock=async()=>null;
+    export const sessionAiGuard=()=>({kind:'handheld_staff',check:async()=>{}});
+    export const aiConsentErrorResponse=()=>null;`,
   "@/server/handheld-listing-image-jobs.server": `export const triggerListingImageWorker=()=>{globalThis.__productContent.triggers++;};`,
   "@/server/product-era-research.server": `export const researchProductRelease=async input=>{
     const s=globalThis.__productContent;s.researchCalls.push(input);return s.research(input);};`,
