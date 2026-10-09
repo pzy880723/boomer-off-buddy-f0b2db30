@@ -14,6 +14,7 @@ export const CUSTOM_CARD_MESSAGES: Record<string, string> = {
   client_op_conflict: "重复提交的内容不一致，请重新加载后再创建",
   not_ready: "卡片文案尚未生成完成，请等待生成成功后再发布",
   validation_error: "请检查内容：主题1–120字，标题≤18字、短句≤20字、正文≤90字且都不能为空",
+  ai_consent_required: "AI 处理未授权：请在 App「设置 › AI 授权」中同意后再生成；手动填写内容仍可打印",
   internal_error: "服务暂时不可用，请稍后重试",
 };
 export const customCardMessage = (code: string) => CUSTOM_CARD_MESSAGES[code] ?? CUSTOM_CARD_MESSAGES.internal_error;

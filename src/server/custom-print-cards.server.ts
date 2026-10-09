@@ -224,6 +224,8 @@ export const SAFE_ERRORS = {
   quota: "AI 文案服务额度不足，请联系总部",
   unavailable: "AI 文案服务暂时不可用，请稍后重新生成",
   timeout: "AI 文案生成超时，请重新生成",
+  consent: "AI 授权未开启或已撤回，未生成文案；可手动填写内容后打印",
+  consentUnavailable: "AI 授权状态暂不可读，请稍后重新生成",
 } as const;
 
 function safeGenerationError(e: unknown): string {
