@@ -24,3 +24,15 @@ recognize-item/title/prepare-listing-image/generate-from-sku 以前只校验设�
 
 ## 老客户端升级
 没有授权记录就视为拒绝。老 App 不会调用授权接口，发布后 AI 入口会返回 403 + 中文提示，手动上架、浏览、收银、打印不受影响。建议先上架 1.1.39 原生授权页，再发布后端，或二者同时发布；不要加"默认同意"的开关。
+
+## 2026-10-09 验收修复（outbound guard / 详情图事务绑定 / 回退语法）
+
+- 每一次真实 AI 出站（以及 Firecrawl 年代研究）前都执行 `beforeAiOutbound` / `beforeHandheldAiOutbound`，guard 为必填参数，无默认放行：
+  - 上架修图：加载原图前、classify 前、generate 前、validate 前各查一次（`handheld-ai.server.ts`、`listing-image-safety.server.ts`）。
+  - 识别：每次模型尝试前（含重试），在 try 外抛出，不会降级成兜底结果（`product-recognition.server.ts`）。
+  - 标题、简介、商品卡（含审核失败重写）、详情生成故事与年代研究、自定义卡片（参考图加载之后、网关请求前）。
+  - 队列 worker 用任务原 actor + policy 构造 guard；中途撤回 → `ai_consent_missing`，读不到 → `ai_consent_unavailable`，原图保留。
+  - PC ERP `recognizeProductFromImages` 显式传 `webErpAiGuard()`；手持专用模块拒绝 web guard。
+  - 请求中途撤回时接口返回与入口一致的 403 `ai_consent_required` / 503 `consent_unavailable`。
+- 详情图任务：迁移 `0047_content_image_job_actor.sql`（已应用）新增 `handheld_product_content(..., p_ai_policy_version text)` 重载，在同一事务的 INSERT/重新排队语句里写入 actor + policy；删除原事务后批量 stamp。旧 5 参函数保留不变（旧调用产生的无 actor 任务永远不送 AI）。
+- 0046 回退注释改为每表一条语句，`tests/sql/content_image_actor/run.sh` 实际执行两份回退语句验证。
