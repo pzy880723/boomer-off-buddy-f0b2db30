@@ -3,6 +3,7 @@
  * 所有密钥只从服务端 secrets 读取，绝不返回 APP、不写数据库、不打日志。
  * 未配置时返回 configured=false，路由照常上线并回 503 payment_not_configured。
  */
+import { isReviewIsolated } from "./review-isolation.mjs";
 import {
   fromMinorUnits,
   mapAlipayResponse,
@@ -102,6 +103,7 @@ export type AlipayConfig = {
 };
 
 export function wechatConfig(): WechatConfig | { configured: false; missing: string[] } {
+  if (isReviewIsolated()) return { configured: false, missing: ["review_isolated"] };
   const values = {
     mchId: process.env["WECHAT_PAY_MCHID"],
     serialNo: process.env["WECHAT_PAY_SERIAL_NO"],
@@ -119,6 +121,7 @@ export function wechatConfig(): WechatConfig | { configured: false; missing: str
 }
 
 export function alipayConfig(): AlipayConfig | { configured: false; missing: string[] } {
+  if (isReviewIsolated()) return { configured: false, missing: ["review_isolated"] };
   const values = {
     appId: process.env["ALIPAY_APP_ID"],
     privateKey: process.env["ALIPAY_PRIVATE_KEY"],

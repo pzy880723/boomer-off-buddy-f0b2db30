@@ -1,4 +1,5 @@
 import { KeyObject, createPrivateKey, createPublicKey, createDecipheriv, randomBytes, sign, verify } from "node:crypto";
+import { assertNoExternalWrite } from "./review-isolation.mjs";
 
 export interface WeChatPayConfig {
   appId: string; merchantId: string; certificateSerial: string;
@@ -62,6 +63,7 @@ export function createWeChatPayClient({
   appId, merchantId, certificateSerial, privateKey, wechatPublicKey,
   wechatPublicKeyId, apiV3Key, notifyUrl, refundNotifyUrl, fetchImpl = fetch,
 }: WeChatPayConfig) {
+  assertNoExternalWrite("wechat_pay");
   text(appId, "AppID", /^[A-Za-z0-9_-]+$/);
   text(merchantId, "merchant ID", /^\d+$/);
   text(certificateSerial, "certificate serial", /^[A-Fa-f0-9]+$/);

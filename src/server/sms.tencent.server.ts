@@ -1,6 +1,7 @@
 // 腾讯云短信 SendSms —— 纯 fetch + TC3-HMAC-SHA256 签名，无 SDK，Worker 友好。
 // 文档: https://cloud.tencent.com/document/product/382/55981
 import { createHash, createHmac } from "node:crypto";
+import { assertNoExternalWrite } from "./review-isolation.mjs";
 
 const ENDPOINT = "sms.tencentcloudapi.com";
 const SERVICE = "sms";
@@ -28,6 +29,7 @@ export async function sendOtpSms(
   code: string,
   ttlMinutes = 5,
 ): Promise<SendOtpResult> {
+  assertNoExternalWrite("sms");
   const secretId = process.env.TENCENTCLOUD_SECRET_ID;
   const secretKey = process.env.TENCENTCLOUD_SECRET_KEY;
   const sdkAppId = process.env.TENCENT_SMS_SDK_APP_ID;

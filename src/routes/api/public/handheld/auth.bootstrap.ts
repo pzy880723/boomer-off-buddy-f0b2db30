@@ -31,6 +31,13 @@ export const Route = createFileRoute("/api/public/handheld/auth/bootstrap")({
     handlers: {
       OPTIONS: async () => new Response(null, { status: 204, headers: HANDHELD_CORS }),
       POST: async ({ request }) => {
+        const demo = isReviewIsolated();
+        if (demo) {
+          const violations = reviewIsolationViolations();
+          if (violations.length) {
+            return err("Demo instance misconfigured", 503, { code: "review_isolation_violation", violations });
+          }
+        }
         let body: ReturnType<typeof BootstrapReq.parse>;
         try {
           body = BootstrapReq.parse(await request.json());
