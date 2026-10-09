@@ -1,8 +1,18 @@
 // Recognition: revocation between model attempts must abort before the next request.
 import assert from "node:assert/strict";
+import { createRequire } from "node:module";
 import { describe, test } from "node:test";
 import { AI_POLICY_VERSION, handheldAiGuard, isAiConsentRevoked, type ConsentStore } from "./ai-guard.ts";
-import { runProductRecognition } from "./product-recognition.server.ts";
+
+const require = createRequire(import.meta.url);
+const { build } = createRequire(require.resolve("vite"))("esbuild");
+const bundled = await build({
+  entryPoints: ["src/server/product-recognition.server.ts"],
+  bundle: true, write: false, platform: "node", format: "esm",
+});
+const { runProductRecognition } = await import(
+  `data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString("base64")}`
+);
 
 function toggleStore(initial: boolean) {
   const state = { allowed: initial };
