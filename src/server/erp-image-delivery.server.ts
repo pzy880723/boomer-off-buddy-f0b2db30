@@ -107,8 +107,8 @@ export const readERPImage = createImageReader(async (bucket, path) => {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!origin || !key) throw new Error("Image storage unavailable");
   const url = new URL(
-    `/storage/v1/object/authenticated/${bucket}/${path.split("/").map(encodeURIComponent).join("/")}`,
-    origin,
+    `storage/v1/object/authenticated/${bucket}/${path.split("/").map(encodeURIComponent).join("/")}`,
+    `${origin.replace(/\/+$/, "")}/`,
   );
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${key}`, apikey: key },

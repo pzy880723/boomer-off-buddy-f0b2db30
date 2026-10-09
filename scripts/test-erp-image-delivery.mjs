@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import sharp from 'sharp';
-import {createImageReader, receiptPhotoURL, verifyReceiptPhotoURL} from '../src/server/erp-image-delivery.server.ts';
+import {createImageReader, readERPImage, receiptPhotoURL, verifyReceiptPhotoURL} from '../src/server/erp-image-delivery.server.ts';
 const path='11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222/33333333-3333-4333-8333-333333333333.jpg';
 test('private receipt grants bind path, size and expiry; cannot access arbitrary objects',()=>{
  const url=new URL(receiptPhotoURL(path,480,'key','https://erp.example',100000));
@@ -32,4 +32,23 @@ test('failed downloads are not cached as a successful or permanently broken imag
  const read=createImageReader(async()=>{if(++calls===1)throw Error('timeout');return image});
  await assert.rejects(read('sku-listing','test.png',480));
  assert.ok((await read('sku-listing','test.png',480)).length);assert.equal(calls,2);
+});
+test('configured storage path prefix is preserved without changing root-host URLs', async t => {
+ const image=await sharp({create:{width:5,height:5,channels:3,background:'white'}}).png().toBuffer();
+ const originalURL=process.env.SUPABASE_URL, originalKey=process.env.SUPABASE_SERVICE_ROLE_KEY;
+ t.after(()=>{
+  if(originalURL===undefined)delete process.env.SUPABASE_URL;else process.env.SUPABASE_URL=originalURL;
+  if(originalKey===undefined)delete process.env.SUPABASE_SERVICE_ROLE_KEY;else process.env.SUPABASE_SERVICE_ROLE_KEY=originalKey;
+ });
+ const requests=[];
+ t.mock.method(globalThis,'fetch',async url=>{requests.push(String(url));return new Response(image)});
+ process.env.SUPABASE_SERVICE_ROLE_KEY='test-only-service-key';
+ for(const [origin,path] of [['https://erp.example/review-data','demo/prefix.png'],['https://storage.example/','demo/root.png']]) {
+  process.env.SUPABASE_URL=origin;
+  await readERPImage('sku-raw',path,480);
+ }
+ assert.deepEqual(requests,[
+  'https://erp.example/review-data/storage/v1/object/authenticated/sku-raw/demo/prefix.png',
+  'https://storage.example/storage/v1/object/authenticated/sku-raw/demo/root.png',
+ ]);
 });

@@ -1,0 +1,101 @@
+name: boomer-review
+services:
+  db:
+    image: supabase/postgres:17.6.1.136
+    restart: unless-stopped
+    mem_limit: 768m
+    environment:
+      POSTGRES_HOST: /var/run/postgresql
+      PGPORT: 5432
+      POSTGRES_PORT: 5432
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: postgres
+      POSTGRES_DB: postgres
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXP: 3600
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+      - ./init/roles.sql:/docker-entrypoint-initdb.d/init-scripts/99-roles.sql:ro
+      - ./init/jwt.sql:/docker-entrypoint-initdb.d/init-scripts/99-jwt.sql:ro
+      - db-config:/etc/postgresql-custom
+    command: [postgres, -c, config_file=/etc/postgresql/postgresql.conf, -c, shared_buffers=128MB, -c, max_connections=40]
+    healthcheck:
+      test: [CMD, pg_isready, -U, postgres, -h, localhost]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [isolated]
+  auth:
+    image: supabase/gotrue:v2.189.0
+    restart: unless-stopped
+    mem_limit: 192m
+    depends_on:
+      db: {condition: service_healthy}
+    ports: ["127.0.0.1:3810:9999"]
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: https://erp.boomeroff.com/review-data/auth/v1
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:5432/postgres
+      GOTRUE_SITE_URL: https://erp.boomeroff.com
+      GOTRUE_DISABLE_SIGNUP: "true"
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_EXP: 3600
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      GOTRUE_JWT_ISSUER: https://erp.boomeroff.com/review-data/auth/v1
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_EXTERNAL_PHONE_ENABLED: "false"
+      GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED: "false"
+      GOTRUE_MAILER_AUTOCONFIRM: "false"
+    networks: [isolated, api]
+  rest:
+    image: postgrest/postgrest:v14.12
+    restart: unless-stopped
+    mem_limit: 192m
+    depends_on:
+      db: {condition: service_healthy}
+    ports: ["127.0.0.1:3811:3000"]
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@db:5432/postgres
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_MAX_ROWS: 1000
+      PGRST_DB_POOL: 10
+    networks: [isolated, api]
+  storage:
+    image: supabase/storage-api:v1.60.4
+    restart: unless-stopped
+    mem_limit: 384m
+    depends_on:
+      db: {condition: service_healthy}
+      rest: {condition: service_started}
+    ports: ["127.0.0.1:3812:5000"]
+    environment:
+      ANON_KEY: ${ANON_KEY}
+      SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      AUTH_JWT_SECRET: ${JWT_SECRET}
+      POSTGREST_URL: http://rest:3000
+      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@db:5432/postgres
+      STORAGE_PUBLIC_URL: https://erp.boomeroff.com/review-data
+      STORAGE_BACKEND: file
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      FILE_SIZE_LIMIT: 12582912
+      GLOBAL_S3_BUCKET: review
+      TENANT_ID: review
+      REGION: local
+      ENABLE_IMAGE_TRANSFORMATION: "false"
+      REQUEST_ALLOW_X_FORWARDED_PATH: "true"
+      DB_POOL_MAX: 10
+    volumes: ["./data/storage:/var/lib/storage"]
+    networks: [isolated, api]
+networks:
+  isolated:
+    internal: true
+  api:
+volumes:
+  db-config:
