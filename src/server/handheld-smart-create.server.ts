@@ -128,9 +128,9 @@ function canonical(value: unknown): unknown {
   return value;
 }
 
-/** 载荷指纹：排除 client_op_id，键排序，含目标库位；签名 URL 需先规范化再传入。 */
+/** 载荷指纹：排除 client_op_id 与 ai_processing_allowed（AI 开关不改变商品业务身份），键排序，含目标库位；签名 URL 需先规范化再传入。 */
 export function smartCreateFingerprint(body: Record<string, unknown>, locationId: string): string {
-  const { client_op_id: _ignored, ...rest } = body;
+  const { client_op_id: _ignored, ai_processing_allowed: _aiFlag, ...rest } = body;
   return createHash("sha256")
     .update(JSON.stringify(canonical({ ...rest, location_id: locationId })))
     .digest("hex");

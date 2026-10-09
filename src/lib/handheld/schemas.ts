@@ -884,6 +884,13 @@ export const SmartCreateReq = z
       .boolean()
       .default(false)
       .meta({ description: "默认 false，APP 给开关；true 时入库存同步队列" }),
+    ai_processing_allowed: z
+      .boolean()
+      .optional()
+      .meta({
+        description:
+          "false：只保存原图与商品，不排队 AI 修图；true/缺省：仍以服务端 /privacy/ai-consent 当前政策版本授权为准。不参与幂等指纹。",
+      }),
     client_op_id: ClientOpId.optional(),
   })
   .meta({ id: "SmartCreateReq" });

@@ -28,6 +28,8 @@ import {
   resolveOrCreateConfirmedIp,
   resolveManualProductFacets,
 } from "@/server/product-classification.server";
+import { dbConsentStore } from "@/server/ai-consent.server";
+import { AI_POLICY_VERSION, isAiAllowed, smartCreateWantsAi } from "@/server/ai-consent-core";
 import {
   enqueueListingImageJobs,
   triggerListingImageWorker,
@@ -324,14 +326,30 @@ async function handleSmartCreate(request: Request, timing: ReturnType<typeof cre
             | "retryable_failed";
           queued: number;
         } = { status: "idle", queued: 0 };
-        try {
-          imageProcessing = await enqueueListingImageJobs({
-            skuId,
-            images: body.image_storage_paths ?? [],
-          });
-        } catch (e) {
-          console.error("[handheld smart-create] 创建图片优化任务失败", e);
-          imageProcessing = { status: "retryable_failed", queued: 0 };
+        // AI 修图只在客户端未拒绝 且 数据库当前政策版本授权为 true 时排队；原图与商品照常保存。
+        let aiProcessing: "queued_or_idle" | "skipped_by_client" | "consent_required" | "consent_unavailable" =
+          "queued_or_idle";
+        if (!smartCreateWantsAi(body.ai_processing_allowed)) aiProcessing = "skipped_by_client";
+        else {
+          try {
+            if (!(await isAiAllowed(dbConsentStore(), session.user_id, AI_POLICY_VERSION)))
+              aiProcessing = "consent_required";
+          } catch {
+            aiProcessing = "consent_unavailable";
+          }
+        }
+        if (aiProcessing === "queued_or_idle") {
+          try {
+            imageProcessing = await enqueueListingImageJobs({
+              skuId,
+              images: body.image_storage_paths ?? [],
+              aiActorUserId: session.user_id,
+              aiPolicyVersion: AI_POLICY_VERSION,
+            });
+          } catch (e) {
+            console.error("[handheld smart-create] 创建图片优化任务失败", e);
+            imageProcessing = { status: "retryable_failed", queued: 0 };
+          }
         }
 
         // 有赞发布已在上面同一事务写入持久化 outbox，由腾讯固定出口 worker 异步执行，不阻塞上架返回。
@@ -406,6 +424,7 @@ async function handleSmartCreate(request: Request, timing: ReturnType<typeof cre
           }),
           youzan_sync_status: syncStatus,
           image_processing: imageProcessing,
+          ai_processing: aiProcessing === "queued_or_idle" ? "allowed" : aiProcessing,
           storefront_listing_id: storefrontListingId,
           storefront_status: storefrontStatus,
         };

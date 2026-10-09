@@ -12,6 +12,8 @@ import { signSkuImagePaths } from "@/lib/sku-image-resolver.server";
 import { DERIVATIVE_WIDTHS, signDerivativeUrls } from "@/server/media-derivative.server";
 import { triggerListingImageWorker } from "@/server/handheld-listing-image-jobs.server";
 import { err, ok, resolveSessionUser, type DeviceContext } from "@/server/handheld-auth.server";
+import { aiConsentBlock } from "@/server/ai-consent.server";
+import { AI_POLICY_VERSION } from "@/server/ai-consent-core";
 import { researchProductRelease } from "@/server/product-era-research.server";
 
 type ContentSnapshot = {
@@ -162,6 +164,11 @@ export async function handleProductContent(
     const body = parsed.data;
     const locationId = body.location_id ?? device.location_id;
     if (!locationId) return err("Location required", 422, { code: "validation_error" });
+    // AI preview needs current-version consent; manual save/publish never does.
+    if (body.action === "generate") {
+      const blocked = await aiConsentBlock(session.user_id);
+      if (blocked) return blocked;
+    }
     // SQL applies existing item edit authorization before every read, preview and replay.
     const { data, error } = await supabaseAdmin.rpc(
       "handheld_product_content" as never,
@@ -174,7 +181,12 @@ export async function handleProductContent(
       } as never,
     );
     if (error) return rpcError(error);
-    if (body.action === "save" && body.publish) triggerListingImageWorker();
+    if (body.action === "save" && body.publish) {
+      // Stamp the publishing actor on newly queued detail-image jobs; the worker re-checks
+      // this actor's consent before every AI call (unstamped jobs never reach AI).
+      await stampContentImageJobs(skuId, session.user_id);
+      triggerListingImageWorker();
+    }
     const snapshot = data as unknown as ContentSnapshot;
     let preview: ProductContentBlock[] | undefined;
     if (body.action === "generate") {
@@ -218,4 +230,13 @@ export async function loadPublishedProductContent(skuId: string): Promise<{
       signDerivativeUrls(paths, DERIVATIVE_WIDTHS.preview),
     ),
   };
+}
+
+async function stampContentImageJobs(skuId: string, userId: string): Promise<void> {
+  const { error } = await (supabaseAdmin.from("inv_product_content_image_jobs" as never) as any)
+    .update({ ai_actor_user_id: userId, ai_policy_version: AI_POLICY_VERSION })
+    .eq("sku_id", skuId)
+    .eq("status", "queued")
+    .is("ai_actor_user_id", null);
+  if (error) console.error("[product-content] stamp AI actor failed");
 }
