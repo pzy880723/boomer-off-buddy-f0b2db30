@@ -18,7 +18,7 @@ const stubs: Record<string, string> = {
     export const resolveSessionUser=async()=>globalThis.__summaryRoute.session;
     export const ok=(data)=>Response.json({ok:true,data});
     export const err=(message,status,extra)=>Response.json({ok:false,error:message,...extra},{status});`,
-  "@/server/ai-consent.server": `export const aiConsentBlock=async()=>globalThis.__summaryRoute.consentBlock??null;`,
+  "@/server/ai-consent.server": `export const aiConsentBlock=async()=>globalThis.__summaryRoute.consentBlock??null;export const sessionAiGuard=()=>({kind:'handheld_staff',check:async()=>{}});export const aiConsentErrorResponse=()=>null;`,
   "@/server/listing-summary.server": `export const SummaryInput = { safeParse(b) {
       if (!b || typeof b.name !== "string") return { success: false };
       const name = b.name.trim();

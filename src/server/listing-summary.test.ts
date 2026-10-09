@@ -1,3 +1,4 @@
+import { allowHandheldGuard, allowWebGuard } from "./ai-guard-fixtures.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
@@ -29,7 +30,7 @@ test("有效输入生成简介：请求含 low reasoning 与全部资料，返�
     tags: ["粉色", "收纳"],
     description: "三丽鸥花小兔主题收纳盒",
   });
-  const description = await generateListingSummary(input, send, "k");
+  const description = await generateListingSummary(input, allowHandheldGuard, send, "k");
   assert.equal(description, "粉嫩花小兔收纳盒，文具小物一盒收好，桌面瞬间清爽。");
   assert.equal(seen.model, "openai/gpt-6-astra");
   assert.deepEqual(seen.reasoning, { effort: "low" });
@@ -55,17 +56,17 @@ test("长度与数量限制：name>120、tags>10、description>500、未知字�
 
 test("AI HTTP 失败直接抛错（不假成功）", async () => {
   await assert.rejects(
-    generateListingSummary({ name: "收纳盒" }, fakeSend("oops", 500), "k"),
+    generateListingSummary({ name: "收纳盒" }, allowHandheldGuard, fakeSend("oops", 500), "k"),
     /ai_http_error_500/,
   );
 });
 
 test("AI 返回空白或非 JSON 直接抛错", async () => {
   await assert.rejects(
-    generateListingSummary({ name: "收纳盒" }, fakeSend(okPayload("   ")), "k"),
+    generateListingSummary({ name: "收纳盒" }, allowHandheldGuard, fakeSend(okPayload("   ")), "k"),
     /ai_empty_output|ai_invalid_output/,
   );
-  await assert.rejects(generateListingSummary({ name: "收纳盒" }, fakeSend("not json"), "k"));
+  await assert.rejects(generateListingSummary({ name: "收纳盒" }, allowHandheldGuard, fakeSend("not json"), "k"));
 });
 
 test("无密钥直接抛错，不发请求", async () => {
@@ -74,7 +75,7 @@ test("无密钥直接抛错，不发请求", async () => {
     called = true;
     return new Response("{}", { status: 200 });
   }) as never;
-  await assert.rejects(generateListingSummary({ name: "收纳盒" }, send, ""), /ai_not_configured/);
+  await assert.rejects(generateListingSummary({ name: "收纳盒" }, allowHandheldGuard, send, ""), /ai_not_configured/);
   assert.equal(called, false);
 });
 

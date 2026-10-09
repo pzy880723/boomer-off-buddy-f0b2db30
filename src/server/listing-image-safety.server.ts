@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import { beforeAiOutbound, type AiOutboundGuard } from "./ai-guard.ts";
 
 export function requiresOriginalMeasurementPixels(value: unknown): boolean {
   if (!value || typeof value !== "object") throw new Error("Measurement detection result unavailable; retry required");
@@ -90,12 +91,13 @@ export function safeImageJobError(error: unknown): string {
   return `${stage ? `[${stage}] ` : ""}${name}${message}`.slice(0, 1000);
 }
 
-export async function classifyListingImage(image: string, key: string): Promise<ListingImageProfile> {
-  return withImageStage("measurement_detection", () => detectMeasurement(image, key));
+export async function classifyListingImage(image: string, key: string, guard: AiOutboundGuard): Promise<ListingImageProfile> {
+  return withImageStage("measurement_detection", () => detectMeasurement(image, key, guard));
 }
 
-async function detectMeasurement(image: string, key: string): Promise<ListingImageProfile> {
+async function detectMeasurement(image: string, key: string, guard: AiOutboundGuard): Promise<ListingImageProfile> {
   // Upstream latency varies; background detection does not block the listing UI.
+  await beforeAiOutbound(guard, "measurement_detection");
   const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST", signal: AbortSignal.timeout(60_000),
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -112,8 +114,9 @@ async function detectMeasurement(image: string, key: string): Promise<ListingIma
   return parseListingImageProfile(JSON.parse(payload.choices?.[0]?.message?.content ?? "{}"));
 }
 
-export async function validatePreparedListingImage(source: string, output: string, key: string, profile: ListingImageProfile): Promise<void> {
+export async function validatePreparedListingImage(source: string, output: string, key: string, profile: ListingImageProfile, guard: AiOutboundGuard): Promise<void> {
   return withImageStage("image_validation", async () => {
+    await beforeAiOutbound(guard, "image_validation");
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST", signal: AbortSignal.timeout(45_000),
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },

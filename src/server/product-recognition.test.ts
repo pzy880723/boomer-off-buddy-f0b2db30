@@ -1,3 +1,4 @@
+import { allowHandheldGuard, allowWebGuard } from "./ai-guard-fixtures.ts";
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
@@ -114,7 +115,7 @@ describe("shared product recognition core", () => {
       ip_name: "凯蒂猫", attributes: { brand: null },
     };
     let brandPrompt = "";
-    const result = await runProductRecognition({ images: ["front"], source: "handheld" }, {
+    const result = await runProductRecognition({ aiGuard: allowWebGuard, images: ["front"], source: "handheld" }, {
       ...depsFor(async (call) => {
         brandPrompt = call.brandPrompt;
         return { model: "test-vision", raw };
@@ -136,7 +137,7 @@ describe("shared product recognition core", () => {
 
   test("new recognition does not promote unsupported eras into the handheld description", async () => {
     for (const era of [null, "Heisei", "约1980-1990年代"]) {
-      const result = await runProductRecognition({ images: ["front"], source: "handheld" }, depsFor(async () => ({
+      const result = await runProductRecognition({ aiGuard: allowWebGuard, images: ["front"], source: "handheld" }, depsFor(async () => ({
         model: "test-vision", raw: { category_code: "toy_character_figure", confidence: 0.9,
           name: "角色玩偶", description: "角色玩偶挂件。", attributes: { era } },
       }), []));
@@ -188,7 +189,7 @@ describe("shared product recognition core", () => {
     let attempts = 0;
     const audits: ProductRecognitionAuditInput[] = [];
     const result = await runProductRecognition(
-      { images: ["data:image/jpeg;base64,abc"], source: "handheld" },
+      { aiGuard: allowWebGuard, images: ["data:image/jpeg;base64,abc"], source: "handheld" },
       depsFor(async () => {
         attempts++;
         throw new DOMException("recognition timed out", "TimeoutError");
@@ -201,7 +202,7 @@ describe("shared product recognition core", () => {
   test("handheld retries at most once and forwards the source and every angle", async () => {
     let attempts = 0;
     const images = ["front", "back", "side", "detail", "label", "damage"];
-    await runProductRecognition({ images, source: "handheld" }, depsFor(async (input) => {
+    await runProductRecognition({ aiGuard: allowWebGuard, images, source: "handheld" }, depsFor(async (input) => {
       attempts++;
       assert.equal(input.source, "handheld");
       assert.deepEqual(input.images, images);
@@ -213,7 +214,7 @@ describe("shared product recognition core", () => {
   test("recognizes European porcelain against the live taxonomy and persists an audit", async () => {
     const audits: ProductRecognitionAuditInput[] = [];
     const result = await runProductRecognition(
-      { images: ["data:image/jpeg;base64,abc"], source: "erp" },
+      { aiGuard: allowWebGuard, images: ["data:image/jpeg;base64,abc"], source: "erp" },
       depsFor(async ({ taxonomyPrompt, facetPrompt, brandPrompt }) => {
         assert.match(taxonomyPrompt, /porcelain_europe \| 瓷器 > 欧洲瓷器/);
         assert.match(facetPrompt, /origin_uk \| origin \| 英国/);
@@ -261,7 +262,7 @@ describe("shared product recognition core", () => {
   test("normalizes an invented category into the automatic fallback", async () => {
     const audits: ProductRecognitionAuditInput[] = [];
     const result = await runProductRecognition(
-      { images: ["https://img.example/item.jpg"], source: "handheld" },
+      { aiGuard: allowWebGuard, images: ["https://img.example/item.jpg"], source: "handheld" },
       depsFor(
         async () => ({
           model: "test-vision",
@@ -284,7 +285,7 @@ describe("shared product recognition core", () => {
     const audits: ProductRecognitionAuditInput[] = [];
     let attempts = 0;
     const result = await runProductRecognition(
-      { images: ["data:image/jpeg;base64,abc"], source: "erp" },
+      { aiGuard: allowWebGuard, images: ["data:image/jpeg;base64,abc"], source: "erp" },
       depsFor(async () => {
         attempts += 1;
         if (attempts < 3) throw new Error("temporary gateway error");
@@ -308,7 +309,7 @@ describe("shared product recognition core", () => {
     const audits: ProductRecognitionAuditInput[] = [];
     let attempts = 0;
     const result = await runProductRecognition(
-      { images: ["data:image/jpeg;base64,abc"], source: "erp" },
+      { aiGuard: allowWebGuard, images: ["data:image/jpeg;base64,abc"], source: "erp" },
       depsFor(async () => {
         attempts += 1;
         throw new Error("gateway unavailable");
@@ -368,7 +369,7 @@ describe("handheld recognition performance policy", () => {
     const raw = { category_code: "toy_character_figure", confidence: 0.9, name: "软胶怪兽" };
     for (const source of ["handheld", "erp"] as const) {
       await runProductRecognition(
-        { images: ["data:image/jpeg;base64,abc"], source },
+        { aiGuard: allowWebGuard, images: ["data:image/jpeg;base64,abc"], source },
         depsFor(async (call) => {
           seen.push({ source: call.source, timeoutMs: call.timeoutMs });
           return { model: resolveProductRecognitionModel(call.source, {}), raw };
@@ -387,7 +388,7 @@ describe("handheld recognition performance policy", () => {
     const audits: ProductRecognitionAuditInput[] = [];
     let attempts = 0;
     const result = await runProductRecognition(
-      { images: ["data:image/jpeg;base64,abc"], source: "handheld" },
+      { aiGuard: allowWebGuard, images: ["data:image/jpeg;base64,abc"], source: "handheld" },
       depsFor(async () => {
         attempts += 1;
         throw new Error("gateway unavailable");
@@ -402,7 +403,7 @@ describe("handheld recognition performance policy", () => {
     const audits: ProductRecognitionAuditInput[] = [];
     let attempts = 0;
     const result = await runProductRecognition(
-      { images: ["data:image/jpeg;base64,abc"], source: "handheld" },
+      { aiGuard: allowWebGuard, images: ["data:image/jpeg;base64,abc"], source: "handheld" },
       depsFor(async () => {
         attempts += 1;
         throw new Error("AI recognition timed out after 25000ms");
@@ -439,7 +440,7 @@ describe("handheld recognition performance policy", () => {
     const audits: ProductRecognitionAuditInput[] = [];
     let calls = 0;
     const era_estimate = { start_decade: 1990, end_decade: 2000, clues: [{ image_index: 1, detail: "旧式包装商标与型号版式，可能为该系列早期版本" }] };
-    const result = await runProductRecognition({ images: ["front"], source: "handheld" }, depsFor(async () => {
+    const result = await runProductRecognition({ aiGuard: allowWebGuard, images: ["front"], source: "handheld" }, depsFor(async () => {
       calls++;
       return { model: "test-vision", raw: { category_code: "toy_character_figure", confidence: 0.95, description: "凯蒂猫挂件。1990年代出品。", date_markings: [], era_estimate } };
     }, audits));
@@ -458,7 +459,7 @@ describe("handheld recognition performance policy", () => {
       { description: "挂件。上世纪九十年代出品。", era_estimate: estimate, date_markings: [], expected: "挂件；约1990—2000年代（推测）。" },
     ];
     for (const { expected, ...raw } of cases) {
-      const result = await runProductRecognition({ images: ["front"], source: "handheld" }, depsFor(async () => ({ model: "test-vision", raw: { category_code: "toy_character_figure", confidence: 0.95, ...raw } }), []));
+      const result = await runProductRecognition({ aiGuard: allowWebGuard, images: ["front"], source: "handheld" }, depsFor(async () => ({ model: "test-vision", raw: { category_code: "toy_character_figure", confidence: 0.95, ...raw } }), []));
       assert.equal(result.description, expected);
     }
   });
@@ -467,7 +468,7 @@ describe("handheld recognition performance policy", () => {
     const audits: ProductRecognitionAuditInput[] = [];
     let calls = 0;
     const markings = [{ text: "©1975,2020 SANRIO", years: [1975,2020], kind: "copyright", image_index: 3 }];
-    const result = await runProductRecognition({ images: ["front", "back", "tag"], source: "handheld" }, depsFor(async (input) => {
+    const result = await runProductRecognition({ aiGuard: allowWebGuard, images: ["front", "back", "tag"], source: "handheld" }, depsFor(async (input) => {
       calls++;
       assert.deepEqual(input.images, ["front", "back", "tag"]);
       return { model: "test-vision", raw: { category_code: "toy_character_figure", confidence: 0.95, name: "凯蒂猫挂件", description: "凯蒂猫挂件。1975年生产。", attributes: { era: "Heisei" }, date_markings: markings } };
@@ -483,7 +484,7 @@ describe("handheld recognition performance policy", () => {
     assert.equal(audits[0].status, "completed");
   });
   test("date evidence cannot cite beyond the actual supplied image count", async () => {
-    const result = await runProductRecognition({ images: ["front"], source: "handheld" }, depsFor(async () => ({ model: "test-vision", raw: { category_code: "toy_character_figure", confidence: 0.95, attributes: { era: "2020年" }, date_markings: [{ text: "MFG 2020", years: [2020], kind: "manufacturing", image_index: 2 }] } }), []));
+    const result = await runProductRecognition({ aiGuard: allowWebGuard, images: ["front"], source: "handheld" }, depsFor(async () => ({ model: "test-vision", raw: { category_code: "toy_character_figure", confidence: 0.95, attributes: { era: "2020年" }, date_markings: [{ text: "MFG 2020", years: [2020], kind: "manufacturing", image_index: 2 }] } }), []));
     assert.equal(result.attributes.era, null);
     assert.deepEqual(result.attributes.date_markings, []);
     assert.equal(result.status, "auto_classified");
@@ -491,7 +492,7 @@ describe("handheld recognition performance policy", () => {
   });
   test("qualified date is still displayed after a wholly incorrect description is removed", async () => {
     for (const description of ["1975年生产的凯蒂猫挂件。", "１９７５年制造凯蒂猫挂件。"]) {
-      const result = await runProductRecognition({ images: ["tag"], source: "handheld" }, depsFor(async () => ({ model: "test-vision", raw: { category_code: "toy_character_figure", confidence: 0.95, description, date_markings: [{ text: "©1975,2020 SANRIO", years: [1975,2020], kind: "copyright", image_index: 1 }] } }), []));
+      const result = await runProductRecognition({ aiGuard: allowWebGuard, images: ["tag"], source: "handheld" }, depsFor(async () => ({ model: "test-vision", raw: { category_code: "toy_character_figure", confidence: 0.95, description, date_markings: [{ text: "©1975,2020 SANRIO", years: [1975,2020], kind: "copyright", image_index: 1 }] } }), []));
       assert.equal(result.description, "2020年（版权标注）。");
     }
   });

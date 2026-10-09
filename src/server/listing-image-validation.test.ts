@@ -1,6 +1,7 @@
 import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
 import { validatePreparedListingImage } from "./listing-image-safety.server.ts";
+import { allowHandheldGuard, allowWebGuard } from "./ai-guard-fixtures.ts";
 
 const originalFetch = globalThis.fetch;
 const originalTimeout = AbortSignal.timeout;
@@ -19,18 +20,18 @@ test("source and output are compared for hand removal, ruler evidence and detail
     for (const word of ["手指", "手掌", "手臂", "玩偶", "刻度", "数字", "角度", "浅灰"]) assert.match(text, new RegExp(word));
     return Response.json({ choices: [{ message: { content: JSON.stringify(valid) } }] });
   };
-  await validatePreparedListingImage("data:image/png;base64,c291cmNl", "data:image/png;base64,b3V0cHV0", "test", profile);
+  await validatePreparedListingImage("data:image/png;base64,c291cmNl", "data:image/png;base64,b3V0cHV0", "test", profile, allowHandheldGuard);
 });
 for (const field of ["hands_removed", "product_preserved", "gray_background", "measurement_preserved", "detail_preserved"]) {
   test(`${field}=false cannot be reported as a completed retouch`, async () => {
     globalThis.fetch = async () => Response.json({ choices: [{ message: { content: JSON.stringify({ ...valid, [field]: false }) } }] });
-    await assert.rejects(validatePreparedListingImage("source", "output", "test", profile), (e: any) => e.stage === "image_validation");
+    await assert.rejects(validatePreparedListingImage("source", "output", "test", profile, allowHandheldGuard), (e: any) => e.stage === "image_validation");
   });
 }
 for (const confidence of [0.94, 1.1, "1", null]) {
   test(`invalid/uncertain validation confidence ${confidence} retains original for retry`, async () => {
     globalThis.fetch = async () => Response.json({ choices: [{ message: { content: JSON.stringify({ ...valid, confidence }) } }] });
-    await assert.rejects(validatePreparedListingImage("source", "output", "test", profile));
+    await assert.rejects(validatePreparedListingImage("source", "output", "test", profile, allowHandheldGuard));
   });
 }
 test("truncated or unavailable validation fails without leaking upstream text", async () => {
@@ -38,7 +39,7 @@ test("truncated or unavailable validation fails without leaking upstream text", 
     Response.json({ choices: [{ finish_reason: "length", message: { content: JSON.stringify(valid) } }] }),
     Response.json({ choices: [{ message: { content: "{}" } }] })]) {
     globalThis.fetch = async () => response;
-    await assert.rejects(validatePreparedListingImage("source", "output", "test", profile), (e: any) => {
+    await assert.rejects(validatePreparedListingImage("source", "output", "test", profile, allowHandheldGuard), (e: any) => {
       assert.equal(e.stage, "image_validation"); assert.doesNotMatch(e.message, /private|secret/); return true;
     });
   }
@@ -51,6 +52,6 @@ test("validation timeout stays a retryable staged TimeoutError", async () => {
     init?.signal?.throwIfAborted();
     throw Error("Expected abort");
   };
-  await assert.rejects(validatePreparedListingImage("source", "output", "test", profile),
+  await assert.rejects(validatePreparedListingImage("source", "output", "test", profile, allowHandheldGuard),
     { name: "TimeoutError", stage: "image_validation" });
 });

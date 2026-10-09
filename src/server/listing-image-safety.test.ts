@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import sharp from "sharp";
 import { requiresOriginalMeasurementPixels, squareOriginalImage, loadOriginalImage, classifyListingImage, safeImageJobError, withImageStage } from "./listing-image-safety.server.ts";
+import { allowHandheldGuard, allowWebGuard } from "./ai-guard-fixtures.ts";
 
 test("invalid or missing ruler detection rejects instead of reporting prepared pixels", () => {
   for (const value of [null, {}, { confidence: 1 }, { measurement_tool: "false", confidence: 1 }]) {
@@ -55,13 +56,13 @@ test("uncertain valid classification uses protected retouch instead of an endles
   globalThis.fetch = async () => Response.json({ choices: [{ message: {
     content: '{"measurement_tool":false,"close_up":false,"confidence":0.9}',
   } }] });
-  assert.deepEqual(await classifyListingImage("https://fixture.test/image", "fixture"), { measurementTool: true, closeUp: true });
+  assert.deepEqual(await classifyListingImage("https://fixture.test/image", "fixture", allowHandheldGuard), { measurementTool: true, closeUp: true });
 });
 
 for (const status of [401, 429, 500]) {
   test(`measurement HTTP ${status} rejects for retry without leaking response text`, async () => {
     globalThis.fetch = async () => new Response("private upstream response", { status });
-    await assert.rejects(classifyListingImage("https://fixture.test/image", "fixture"), error => {
+    await assert.rejects(classifyListingImage("https://fixture.test/image", "fixture", allowHandheldGuard), error => {
       assert.match(String(error), new RegExp(`measurement.*${status}`, "i"));
       assert.doesNotMatch(String(error), /private upstream response/);
       return true;
@@ -76,7 +77,7 @@ test("background measurement uses a 60s deadline and propagates timeouts for ret
     init?.signal?.throwIfAborted();
     throw Error("expected abort");
   };
-  await assert.rejects(classifyListingImage("https://fixture.test/image", "fixture"), { name: "TimeoutError" });
+  await assert.rejects(classifyListingImage("https://fixture.test/image", "fixture", allowHandheldGuard), { name: "TimeoutError" });
 });
 test("measurement request reserves at least 512 tokens for reasoning and strict JSON output", async () => {
   globalThis.fetch = async (_url, init) => {
@@ -85,12 +86,12 @@ test("measurement request reserves at least 512 tokens for reasoning and strict 
     assert.deepEqual(body.response_format, { type: "json_object" });
     return Response.json({ choices: [{ message: { content: '{"measurement_tool":false,"close_up":false,"confidence":1}' } }] });
   };
-  assert.deepEqual(await classifyListingImage("https://fixture.test/image", "fixture"), { measurementTool: false, closeUp: false });
+  assert.deepEqual(await classifyListingImage("https://fixture.test/image", "fixture", allowHandheldGuard), { measurementTool: false, closeUp: false });
 });
 for (const body of ["not json", JSON.stringify({ choices: [{ message: { content: "not json" } }] }), JSON.stringify({ choices: [{ finish_reason: "length", message: { content: "Here is the" } }] }), "{}"]) {
   test(`malformed detector response rejects: ${body}`, async () => {
     globalThis.fetch = async () => new Response(body);
-    await assert.rejects(classifyListingImage("https://fixture.test/image", "fixture"));
+    await assert.rejects(classifyListingImage("https://fixture.test/image", "fixture", allowHandheldGuard));
   });
 }
 
@@ -118,7 +119,7 @@ test("preparation cannot return a successful image when detection is unavailable
   const source = await sharp({ create: { width: 8, height: 4, channels: 3, background: "red" } }).png().toBuffer();
   let calls = 0;
   globalThis.fetch = async () => { calls++; return new Response("unavailable", { status: 503 }); };
-  await assert.rejects(module.exports.aiPrepareListingImage({ image_base64: `data:image/png;base64,${source.toString("base64")}` }));
+  await assert.rejects(module.exports.aiPrepareListingImage({ image_base64: `data:image/png;base64,${source.toString("base64")}` }, allowHandheldGuard));
   assert.equal(calls, 1, "No image-generation or source-download fallback may follow detection failure");
 });
 
@@ -140,7 +141,7 @@ test("measurement preparation retouches background and hands instead of returnin
     }
     return jsonMessage(validChecks);
   };
-  const output = await module.exports.aiPrepareListingImage({ image_base64: `data:image/png;base64,${source.toString("base64")}` });
+  const output = await module.exports.aiPrepareListingImage({ image_base64: `data:image/png;base64,${source.toString("base64")}` }, allowHandheldGuard);
   assert.equal(calls, 3);
   assert.deepEqual(output, { b64: "ZWRpdGVk", mime: "image/png" });
   assert.equal((output as { preserved_original?: true }).preserved_original, undefined);
@@ -159,7 +160,7 @@ test("confident no-tool detection still reaches the image editing provider", asy
     assert.deepEqual(body.modalities, ["image", "text"]);
     return Response.json({ choices: [{ message: { images: [{ image_url: { url: "data:image/png;base64,ZWRpdGVk" } }] } }] });
   };
-  assert.deepEqual(await module.exports.aiPrepareListingImage({ image_base64: await pngDataUrl() }), { b64: "ZWRpdGVk", mime: "image/png" });
+  assert.deepEqual(await module.exports.aiPrepareListingImage({ image_base64: await pngDataUrl() }, allowHandheldGuard), { b64: "ZWRpdGVk", mime: "image/png" });
   assert.deepEqual(models, ["google/gemini-2.5-flash", "google/gemini-3.1-flash-image", "google/gemini-2.5-flash"]);
 });
 
@@ -182,7 +183,7 @@ test("close-up detail prompt protects camera angle even when extra instructions 
     }
     return jsonMessage(validChecks);
   };
-  const result = await module.exports.aiPrepareListingImage({ image_base64: source.toString("base64"), instruction: "请优化角度" });
+  const result = await module.exports.aiPrepareListingImage({ image_base64: source.toString("base64"), instruction: "请优化角度" }, allowHandheldGuard);
   assert.equal(calls, 3);
   assert.deepEqual(result, { b64: "ZWRpdGVk", mime: "image/png" });
 });
@@ -193,7 +194,7 @@ test("protected image generation failure propagates without an unchanged-origina
   globalThis.fetch = async () => (++calls === 1
     ? Response.json({ choices: [{ message: { content: '{"measurement_tool":true,"close_up":false,"confidence":1}' } }] })
     : new Response("private upstream", { status: 503 }));
-  await assert.rejects(module.exports.aiPrepareListingImage({ image_base64: await pngDataUrl() }), (error: any) => {
+  await assert.rejects(module.exports.aiPrepareListingImage({ image_base64: await pngDataUrl() }, allowHandheldGuard), (error: any) => {
     assert.equal(error.stage, "image_generation");
     assert.match(error.message, /503/);
     assert.doesNotMatch(error.message, /private upstream/);
@@ -210,7 +211,7 @@ test("remaining hands in output fail validation rather than replacing the source
     if (calls === 2) return generatedImage();
     return jsonMessage({ ...validChecks, hands_removed: false });
   };
-  await assert.rejects(module.exports.aiPrepareListingImage({ image_base64: await pngDataUrl() }),
+  await assert.rejects(module.exports.aiPrepareListingImage({ image_base64: await pngDataUrl() }, allowHandheldGuard),
     (error: any) => error.stage === "image_validation");
   assert.equal(calls, 3);
 });
@@ -227,7 +228,7 @@ test("EXIF orientation is normalized before classification, generation and sourc
     if (++calls === 1) return jsonMessage({ measurement_tool: false, close_up: true, confidence: 1 });
     return calls === 2 ? generatedImage() : jsonMessage(validChecks);
   };
-  const result = await module.exports.aiPrepareListingImage({ image_base64: `data:image/jpeg;base64,${source.toString("base64")}` });
+  const result = await module.exports.aiPrepareListingImage({ image_base64: `data:image/jpeg;base64,${source.toString("base64")}` }, allowHandheldGuard);
   assert.deepEqual(result, { b64: "ZWRpdGVk", mime: "image/png" });
   assert.equal(calls, 3);
 });
@@ -238,7 +239,7 @@ test("detector only protects external measuring tools, excluding product scales 
     prompt = JSON.parse(String(init?.body)).messages[0].content[0].text;
     return Response.json({ choices: [{ message: { content: '{"measurement_tool":false,"close_up":false,"confidence":0.99}' } }] });
   };
-  assert.deepEqual(await classifyListingImage("https://fixture.test/image", "fixture"), { measurementTool: false, closeUp: false });
+  assert.deepEqual(await classifyListingImage("https://fixture.test/image", "fixture", allowHandheldGuard), { measurementTool: false, closeUp: false });
   for (const tool of ["尺子", "卷尺", "卡尺", "测量垫", "外部"]) assert.match(prompt, new RegExp(tool));
   for (const part of ["唱臂", "频率", "旋钮", "装饰网格", "型号", "年份"]) assert.match(prompt, new RegExp(part));
   assert.match(prompt, /不算测量工具/);
@@ -247,7 +248,7 @@ test("measurement failure keeps TimeoutError type and adds a safe stage marker",
   const controller = new AbortController();
   AbortSignal.timeout = () => controller.signal;
   globalThis.fetch = async (_url, init) => { controller.abort(new DOMException("deadline", "TimeoutError")); init?.signal?.throwIfAborted(); throw Error("x"); };
-  await assert.rejects(classifyListingImage("https://fixture.test/image?token=secret", "fixture"), (e: any) => {
+  await assert.rejects(classifyListingImage("https://fixture.test/image?token=secret", "fixture", allowHandheldGuard), (e: any) => {
     assert.equal(e.name, "TimeoutError"); assert.equal(e.stage, "measurement_detection");
     assert.doesNotMatch(String(e.message), /token=secret/); return true;
   });
@@ -258,7 +259,7 @@ test("image generation HTTP error is stage-marked and never echoes upstream text
   globalThis.fetch = async () => (++n === 1
     ? Response.json({ choices: [{ message: { content: '{"measurement_tool":false,"close_up":false,"confidence":1}' } }] })
     : new Response("https://x.test/sign?token=leak data:image/png;base64,AAAA", { status: 500 }));
-  await assert.rejects(module.exports.aiPrepareListingImage({ image_base64: await pngDataUrl() }), (e: any) => {
+  await assert.rejects(module.exports.aiPrepareListingImage({ image_base64: await pngDataUrl() }, allowHandheldGuard), (e: any) => {
     assert.equal(e.stage, "image_generation"); assert.match(e.message, /500/); assert.doesNotMatch(e.message, /token|base64/); return true;
   });
 });
@@ -272,7 +273,7 @@ test("listing prompt removes platform watermarks and price tags while keeping pr
     text = JSON.parse(String(init?.body)).messages[0].content[0].text;
     return Response.json({ choices: [{ message: { images: [{ image_url: { url: "data:image/png;base64,ZQ==" } }] } }] });
   };
-  await module.exports.aiPrepareListingImage({ image_base64: await pngDataUrl() });
+  await module.exports.aiPrepareListingImage({ image_base64: await pngDataUrl() }, allowHandheldGuard);
   for (const word of ["闲鱼", "水印", "价签|价格牌", "商标", "真实瑕疵", "刻度", "手指", "手掌", "手臂"]) assert.match(text, new RegExp(word));
 });
 
@@ -295,7 +296,7 @@ test("trusted signed URL is downloaded once and the same inline data URI feeds d
         ? Response.json({ choices: [{ message: { content: '{"measurement_tool":false,"close_up":false,"confidence":1}' } }] })
         : Response.json({ choices: [{ message: { images: [{ image_url: { url: "data:image/png;base64,ZQ==" } }] } }] });
     };
-    await module.exports.aiPrepareListingImage({ image_url: "https://storage.fixture.test/storage/v1/object/sign/sku-raw/a.png?token=secret" });
+    await module.exports.aiPrepareListingImage({ image_url: "https://storage.fixture.test/storage/v1/object/sign/sku-raw/a.png?token=secret" }, allowHandheldGuard);
     assert.equal(downloads, 1);
     assert.deepEqual(sent, [expected, expected, expected]);
     assert.ok(sent.every(u => !u.includes("token=")));
@@ -305,14 +306,14 @@ test("untrusted image URL is rejected before any AI or download request", async 
   process.env.LOVABLE_API_KEY = "fixture";
   let calls = 0;
   globalThis.fetch = async () => { calls++; return new Response("x"); };
-  await assert.rejects(module.exports.aiPrepareListingImage({ image_url: "https://evil.test/storage/v1/object/a.png" }), /trusted storage/);
+  await assert.rejects(module.exports.aiPrepareListingImage({ image_url: "https://evil.test/storage/v1/object/a.png" }, allowHandheldGuard), /trusted storage/);
   assert.equal(calls, 0);
 });
 test("oversized inline base64 is rejected without calling AI", async () => {
   process.env.LOVABLE_API_KEY = "fixture";
   let calls = 0;
   globalThis.fetch = async () => { calls++; return new Response("x"); };
-  await assert.rejects(module.exports.aiPrepareListingImage({ image_base64: Buffer.alloc(20_000_001, 1).toString("base64") }), /too large/i);
+  await assert.rejects(module.exports.aiPrepareListingImage({ image_base64: Buffer.alloc(20_000_001, 1).toString("base64") }, allowHandheldGuard), /too large/i);
   assert.equal(calls, 0);
 });
 

@@ -209,6 +209,7 @@ export const recognizeSkuFromPhotos = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     try {
       const { recognizeProductFromImages } = await import("@/server/product-recognition.server");
+      const { webErpAiGuard } = await import("@/server/ai-consent-core");
       const fields = await recognizeProductFromImages({
         images: data.images.map((image) =>
           image.base64.startsWith("data:")
@@ -217,6 +218,8 @@ export const recognizeSkuFromPhotos = createServerFn({ method: "POST" })
         ),
         source: "erp",
         created_by: context.userId,
+        // PC ERP path: authorized by web role middleware, never by handheld consent.
+        aiGuard: webErpAiGuard(),
       });
       return { ok: true as const, fields };
     } catch (e) {

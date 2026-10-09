@@ -330,6 +330,13 @@
       "when": 1791559283096,
       "tag": "0046_handheld_ai_consent",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1791560976295,
+      "tag": "0047_content_image_job_actor",
+      "breakpoints": true
     }
   ]
 }
