@@ -18,12 +18,14 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as MRouteImport } from './routes/m'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as PosRouteImport } from './routes/pos'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ProductBrandsRouteImport } from './routes/product-brands'
 import { Route as ProductCategoriesRouteImport } from './routes/product-categories'
 import { Route as ProductFacetsRouteImport } from './routes/product-facets'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ShopMgmtRouteImport } from './routes/shop-mgmt'
 import { Route as StoreRouteImport } from './routes/store'
+import { Route as SupportRouteImport } from './routes/support'
 import { Route as YouzanRouteImport } from './routes/youzan'
 import { Route as AdminApiIntegrationRouteImport } from './routes/admin.api-integration'
 import { Route as AdminChannelSyncRouteImport } from './routes/admin.channel-sync'
@@ -345,6 +347,11 @@ const PosRoute = PosRouteImport.update({
   path: '/pos',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProductBrandsRoute = ProductBrandsRouteImport.update({
   id: '/product-brands',
   path: '/product-brands',
@@ -373,6 +380,11 @@ const ShopMgmtRoute = ShopMgmtRouteImport.update({
 const StoreRoute = StoreRouteImport.update({
   id: '/store',
   path: '/store',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SupportRoute = SupportRouteImport.update({
+  id: '/support',
+  path: '/support',
   getParentRoute: () => rootRouteImport,
 } as any)
 const YouzanRoute = YouzanRouteImport.update({
@@ -1944,12 +1956,14 @@ export interface FileRoutesByFullPath {
   '/m': typeof MRouteWithChildren
   '/orders': typeof OrdersRouteWithChildren
   '/pos': typeof PosRoute
+  '/privacy': typeof PrivacyRoute
   '/product-brands': typeof ProductBrandsRoute
   '/product-categories': typeof ProductCategoriesRoute
   '/product-facets': typeof ProductFacetsRoute
   '/settings': typeof SettingsRoute
   '/shop-mgmt': typeof ShopMgmtRouteWithChildren
   '/store': typeof StoreRouteWithChildren
+  '/support': typeof SupportRoute
   '/youzan': typeof YouzanRouteWithChildren
   '/admin/api-integration': typeof AdminApiIntegrationRoute
   '/admin/channel-sync': typeof AdminChannelSyncRoute
@@ -2235,11 +2249,13 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/orders': typeof OrdersRouteWithChildren
   '/pos': typeof PosRoute
+  '/privacy': typeof PrivacyRoute
   '/product-brands': typeof ProductBrandsRoute
   '/product-categories': typeof ProductCategoriesRoute
   '/product-facets': typeof ProductFacetsRoute
   '/settings': typeof SettingsRoute
   '/shop-mgmt': typeof ShopMgmtRouteWithChildren
+  '/support': typeof SupportRoute
   '/youzan': typeof YouzanRouteWithChildren
   '/admin/api-integration': typeof AdminApiIntegrationRoute
   '/admin/channel-sync': typeof AdminChannelSyncRoute
@@ -2522,12 +2538,14 @@ export interface FileRoutesById {
   '/m': typeof MRouteWithChildren
   '/orders': typeof OrdersRouteWithChildren
   '/pos': typeof PosRoute
+  '/privacy': typeof PrivacyRoute
   '/product-brands': typeof ProductBrandsRoute
   '/product-categories': typeof ProductCategoriesRoute
   '/product-facets': typeof ProductFacetsRoute
   '/settings': typeof SettingsRoute
   '/shop-mgmt': typeof ShopMgmtRouteWithChildren
   '/store': typeof StoreRouteWithChildren
+  '/support': typeof SupportRoute
   '/youzan': typeof YouzanRouteWithChildren
   '/admin/api-integration': typeof AdminApiIntegrationRoute
   '/admin/channel-sync': typeof AdminChannelSyncRoute
@@ -2816,12 +2834,14 @@ export interface FileRouteTypes {
     | '/m'
     | '/orders'
     | '/pos'
+    | '/privacy'
     | '/product-brands'
     | '/product-categories'
     | '/product-facets'
     | '/settings'
     | '/shop-mgmt'
     | '/store'
+    | '/support'
     | '/youzan'
     | '/admin/api-integration'
     | '/admin/channel-sync'
@@ -3107,11 +3127,13 @@ export interface FileRouteTypes {
     | '/login'
     | '/orders'
     | '/pos'
+    | '/privacy'
     | '/product-brands'
     | '/product-categories'
     | '/product-facets'
     | '/settings'
     | '/shop-mgmt'
+    | '/support'
     | '/youzan'
     | '/admin/api-integration'
     | '/admin/channel-sync'
@@ -3393,12 +3415,14 @@ export interface FileRouteTypes {
     | '/m'
     | '/orders'
     | '/pos'
+    | '/privacy'
     | '/product-brands'
     | '/product-categories'
     | '/product-facets'
     | '/settings'
     | '/shop-mgmt'
     | '/store'
+    | '/support'
     | '/youzan'
     | '/admin/api-integration'
     | '/admin/channel-sync'
@@ -3686,12 +3710,14 @@ export interface RootRouteChildren {
   MRoute: typeof MRouteWithChildren
   OrdersRoute: typeof OrdersRouteWithChildren
   PosRoute: typeof PosRoute
+  PrivacyRoute: typeof PrivacyRoute
   ProductBrandsRoute: typeof ProductBrandsRoute
   ProductCategoriesRoute: typeof ProductCategoriesRoute
   ProductFacetsRoute: typeof ProductFacetsRoute
   SettingsRoute: typeof SettingsRoute
   ShopMgmtRoute: typeof ShopMgmtRouteWithChildren
   StoreRoute: typeof StoreRouteWithChildren
+  SupportRoute: typeof SupportRoute
   YouzanRoute: typeof YouzanRouteWithChildren
   AdminApiIntegrationRoute: typeof AdminApiIntegrationRoute
   AdminChannelSyncRoute: typeof AdminChannelSyncRoute
@@ -3926,6 +3952,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PosRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/product-brands': {
       id: '/product-brands'
       path: '/product-brands'
@@ -3966,6 +3999,13 @@ declare module '@tanstack/react-router' {
       path: '/store'
       fullPath: '/store'
       preLoaderRoute: typeof StoreRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/support': {
+      id: '/support'
+      path: '/support'
+      fullPath: '/support'
+      preLoaderRoute: typeof SupportRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/youzan': {
@@ -6643,12 +6683,14 @@ const rootRouteChildren: RootRouteChildren = {
   MRoute: MRouteWithChildren,
   OrdersRoute: OrdersRouteWithChildren,
   PosRoute: PosRoute,
+  PrivacyRoute: PrivacyRoute,
   ProductBrandsRoute: ProductBrandsRoute,
   ProductCategoriesRoute: ProductCategoriesRoute,
   ProductFacetsRoute: ProductFacetsRoute,
   SettingsRoute: SettingsRoute,
   ShopMgmtRoute: ShopMgmtRouteWithChildren,
   StoreRoute: StoreRouteWithChildren,
+  SupportRoute: SupportRoute,
   YouzanRoute: YouzanRouteWithChildren,
   AdminApiIntegrationRoute: AdminApiIntegrationRoute,
   AdminChannelSyncRoute: AdminChannelSyncRoute,
