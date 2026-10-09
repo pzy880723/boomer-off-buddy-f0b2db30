@@ -1,3 +1,4 @@
+import { beforeHandheldAiOutbound, type AiOutboundGuard } from "./ai-guard.ts";
 // 拍照上架确认页「刷新简介」：只依据当前确认资料生成 20~40 字中文简介。
 // 只读：不接收图片、不触发识别、不写 SKU/库存/发布状态。
 import { z } from "zod";
@@ -71,10 +72,12 @@ export function buildSummaryUserMessage(input: SummaryInput): string {
 
 export async function generateListingSummary(
   input: SummaryInput,
+  guard: AiOutboundGuard,
   send: typeof fetch = fetch,
   apiKey = process.env.LOVABLE_API_KEY,
 ): Promise<string> {
   if (!apiKey) throw new Error("ai_not_configured");
+  await beforeHandheldAiOutbound(guard, "listing_summary");
   const res = await send("https://ai.gateway.lovable.dev/v1/responses", {
     method: "POST",
     signal: AbortSignal.timeout(20_000),

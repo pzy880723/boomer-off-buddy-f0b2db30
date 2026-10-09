@@ -1,3 +1,4 @@
+import { beforeHandheldAiOutbound, type AiOutboundGuard } from "./ai-guard.ts";
 // 自定义卡片 AI 文案：Responses SSE。总时限覆盖 fetch + 读流；只认 response.completed；限制缓冲。
 import { GENERATION_PROMPT, type CardFormat } from "@/server/custom-print-cards.server";
 
@@ -56,8 +57,11 @@ export async function generateCardCopy(opts: {
   input: { topic: string; instructions: string; formats: CardFormat[]; image: { mime: string; b64: string } | null };
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
+  /** Required; re-checked right before the gateway request. */
+  guard: AiOutboundGuard;
 }): Promise<unknown> {
   const { input } = opts;
+  await beforeHandheldAiOutbound(opts.guard, "custom_card_copy");
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? AI_TOTAL_TIMEOUT_MS);
   try {

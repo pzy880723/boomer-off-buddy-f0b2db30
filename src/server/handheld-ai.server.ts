@@ -4,6 +4,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { recognizeProductFromImages } from "@/server/product-recognition.server";
 import sharp from "sharp";
+import { beforeHandheldAiOutbound, type AiOutboundGuard } from "./ai-guard.ts";
 import { loadOriginalImage, classifyListingImage, validatePreparedListingImage, withImageStage } from "./listing-image-safety.server";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1";
@@ -51,7 +52,8 @@ export async function aiRecognizeItem(input: {
   image_storage_paths?: Array<{ bucket: "sku-raw" | "sku-listing"; storage_path: string }>;
   primary_index?: number;
   hint?: string;
-}) {
+}, guard: AiOutboundGuard) {
+  await beforeHandheldAiOutbound(guard, "recognition_entry");
   // 收集所有图片来源，统一转成 { url } 数组，最多 6 张
   const sources: Array<{ image_url?: string; image_base64?: string }> = [];
   if (input.image_storage_paths && input.image_storage_paths.length > 0) {
@@ -78,6 +80,7 @@ export async function aiRecognizeItem(input: {
   }
 
   const out = await recognizeProductFromImages({
+    aiGuard: guard,
     images: capped.map(toDataUrl),
     source: "handheld",
     hint: input.hint,
@@ -125,7 +128,9 @@ export async function aiPrepareListingImage(input: {
   image_url?: string;
   image_base64?: string;
   instruction?: string;
-}): Promise<{ b64: string; mime: string; preserved_original?: true }> {
+}, guard: AiOutboundGuard): Promise<{ b64: string; mime: string; preserved_original?: true }> {
+  // Handheld-only: a web guard is never accepted; every AI stage re-checks the original actor.
+  await beforeHandheldAiOutbound(guard, "load_original");
   // Download the trusted original once and share the same inline bytes with detection and generation,
   // so the gateway never fetches signed URLs itself.
   let source = await loadOriginalImage(input.image_url
@@ -137,7 +142,7 @@ export async function aiPrepareListingImage(input: {
   if (metadata.orientation && metadata.orientation !== 1) source = await sharp(source).rotate().png().toBuffer();
   const dataUrl = `data:${sniffImageMime(source)};base64,${source.toString("base64")}`;
 
-  const profile = await classifyListingImage(dataUrl, getKey());
+  const profile = await classifyListingImage(dataUrl, getKey(), guard);
   const protectedImage = profile.measurementTool || profile.closeUp;
   const prompt = protectedImage ? SYSTEM_LISTING_IMAGE
     .replace("主体居中裁切、四周留白均匀", "只补边形成正方形，不裁掉商品细节或测量工具")
@@ -162,8 +167,8 @@ export async function aiPrepareListingImage(input: {
     modalities: ["image", "text"],
   };
 
-  const output = await withImageStage("image_generation", () => generateListingImage(body));
-  await validatePreparedListingImage(dataUrl, `data:${output.mime};base64,${output.b64}`, getKey(), profile);
+  const output = await withImageStage("image_generation", () => generateListingImage(body, guard));
+  await validatePreparedListingImage(dataUrl, `data:${output.mime};base64,${output.b64}`, getKey(), profile, guard);
   return output;
 }
 
@@ -173,7 +178,8 @@ export function missingImageError(finishReason: unknown): string {
   return `图像生成服务未返回图片（${reason}），原图保留`;
 }
 
-async function generateListingImage(body: unknown): Promise<{ b64: string; mime: string }> {
+async function generateListingImage(body: unknown, guard: AiOutboundGuard): Promise<{ b64: string; mime: string }> {
+  await beforeHandheldAiOutbound(guard, "image_generation");
   const res = await fetch(`${GATEWAY}/chat/completions`, {
     method: "POST",
     signal: AbortSignal.timeout(60_000),

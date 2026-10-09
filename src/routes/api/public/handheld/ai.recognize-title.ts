@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { requireAiActor } from "@/server/ai-consent.server";
+import { aiConsentErrorResponse, requireAiActor } from "@/server/ai-consent.server";
 import { HANDHELD_CORS, ok, err } from "@/server/handheld-auth.server";
 import { AiTitleReq } from "@/lib/handheld/schemas";
 import { recognizeProductTitle } from "@/server/product-title.server";
@@ -12,8 +12,8 @@ export const Route = createFileRoute("/api/public/handheld/ai/recognize-title")(
       if (!auth.ok) return auth.response;
       const body = AiTitleReq.safeParse(await request.json().catch(() => null));
       if (!body.success) return err("Invalid image", 400, { code: "validation_error" });
-      try { return ok({ name: await recognizeProductTitle(body.data.image_base64) }); }
-      catch { return err("快速标题暂不可用，完整识别继续进行", 503); }
+      try { return ok({ name: await recognizeProductTitle(body.data.image_base64, auth.guard) }); }
+      catch (e) { return aiConsentErrorResponse(e) ?? err("快速标题暂不可用，完整识别继续进行", 503); }
     },
   } },
 });

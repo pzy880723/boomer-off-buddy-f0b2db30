@@ -1,3 +1,4 @@
+import { allowHandheldGuard, allowWebGuard } from "./ai-guard-fixtures.ts";
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
@@ -251,7 +252,7 @@ describe("custom print cards", () => {
     let inFlight = 0, claimedWhileBusy = 0;
     deps.claim = async (n) => { sizes.push(n); if (inFlight) claimedWhileBusy++; return orig(n); };
     const gen = deps.generate;
-    deps.generate = async (i) => { inFlight++; await new Promise((r) => setTimeout(r, 2)); inFlight--; return gen(i); };
+    deps.generate = async (i, g) => { inFlight++; await new Promise((r) => setTimeout(r, 2)); inFlight--; return gen(i, g); };
     const res = await processCustomCardJobs(deps, 6);
     assert.deepEqual(sizes, [1, 1, 1, 1]);
     assert.equal(claimedWhileBusy, 0);
@@ -280,7 +281,7 @@ describe("custom print cards AI consent", () => {
     const f = fake({ access: { staff: [LOC_A] }, denyAi: deny });
     let calls = 0;
     const gen = f.deps.generate;
-    f.deps.generate = async (i) => { calls++; return gen(i); };
+    f.deps.generate = async (i, g) => { calls++; return gen(i, g); };
     const c = await createCard(f.deps, staff, body);
     assert.equal(c.status, 202);
     const row = [...f.rows.values()][0];
@@ -290,6 +291,19 @@ describe("custom print cards AI consent", () => {
     const out = await processCustomCardJobs(f.deps, 2);
     assert.equal(out.failed, 1);
     assert.equal(calls, 0);
+    assert.match([...f.rows.values()][0].error ?? "", /授权/);
+  });
+  test("revoked while the reference loads: the gateway request is never sent", async () => {
+    const deny: string[] = [];
+    const f = fake({ access: { staff: [LOC_A] }, denyAi: deny });
+    let sent = 0;
+    f.deps.loadReference = async () => { deny.push("staff"); return { mime: "image/jpeg", b64: "AAAA" }; };
+    f.deps.generate = async (_i, g) => { await g.check("custom_card_copy"); sent++; return {}; };
+    const c = await createCard(f.deps, staff, { ...body, reference_image_path: REF });
+    assert.equal(c.status, 202);
+    const out = await processCustomCardJobs(f.deps, 1);
+    assert.equal(out.failed, 1);
+    assert.equal(sent, 0);
     assert.match([...f.rows.values()][0].error ?? "", /授权/);
   });
   test("manual content patch is never blocked by missing consent", async () => {

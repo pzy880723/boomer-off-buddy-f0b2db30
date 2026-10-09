@@ -1,5 +1,9 @@
 -- Handheld AI processing consent (App Store 1.1.39). Additive only.
--- Rollback: DROP TABLE public.handheld_ai_consents; ALTER TABLE public.inv_listing_image_jobs, public.inv_product_content_image_jobs, public.custom_print_cards DROP COLUMN ai_actor_user_id, DROP COLUMN ai_policy_version;
+-- Rollback (one statement per table; verified by tests/sql/content_image_actor/run.sh):
+--   DROP TABLE IF EXISTS public.handheld_ai_consents;
+--   ALTER TABLE public.inv_listing_image_jobs DROP COLUMN IF EXISTS ai_actor_user_id, DROP COLUMN IF EXISTS ai_policy_version;
+--   ALTER TABLE public.inv_product_content_image_jobs DROP COLUMN IF EXISTS ai_actor_user_id, DROP COLUMN IF EXISTS ai_policy_version;
+--   ALTER TABLE public.custom_print_cards DROP COLUMN IF EXISTS ai_actor_user_id, DROP COLUMN IF EXISTS ai_policy_version;
 CREATE TABLE IF NOT EXISTS public.handheld_ai_consents (
   user_id uuid NOT NULL,
   policy_version text NOT NULL CHECK (policy_version ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}-v[0-9]+$'),

@@ -6,7 +6,7 @@
  * - AI 文案仅可写参考信息能证明的内容；品牌/年份/材质/稀缺性无依据即拦截。
  */
 import { z } from "zod";
-import { AI_POLICY_VERSION } from "@/server/ai-consent-core";
+import { AI_POLICY_VERSION, AiConsentRevokedError, isAiConsentRevoked, type AiOutboundGuard } from "./ai-guard.ts";
 
 export type CardFormat = "portrait" | "landscape";
 export type CardContent = { title: string; headline: string; body: string };
@@ -52,7 +52,8 @@ export type CustomCardDeps = {
   verifyReference(path: string): Promise<boolean>;
   /** Authoritative consent (actor + exact policy version). Throws when unreadable. */
   aiAllowed(userId: string | null | undefined, policyVersion: string | null | undefined): Promise<boolean>;
-  generate(input: { topic: string; instructions: string; formats: CardFormat[]; image: { mime: string; b64: string } | null }): Promise<unknown>;
+  /** guard MUST be checked immediately before the outbound AI request. */
+  generate(input: { topic: string; instructions: string; formats: CardFormat[]; image: { mime: string; b64: string } | null }, guard: AiOutboundGuard): Promise<unknown>;
 };
 
 export const LIMITS = { title: 18, headline: 20, body: 90 } as const;
@@ -241,6 +242,18 @@ function clampContent(raw: unknown): CardContent | null {
   return p.success ? p.data : null;
 }
 
+function jobAiGuard(d: CustomCardDeps, job: CardRow): AiOutboundGuard {
+  return {
+    kind: "handheld_staff",
+    async check(stage) {
+      let allowed = false;
+      try { allowed = await d.aiAllowed(job.ai_actor_user_id, job.ai_policy_version); }
+      catch { throw new AiConsentRevokedError("unavailable", stage); }
+      if (!allowed) throw new AiConsentRevokedError("denied", stage);
+    },
+  };
+}
+
 export async function processCustomCardJobs(d: CustomCardDeps, limit: number) {
   // 每次只领取 1 张并立即处理：尚未执行的卡不会提前占用租约而过期被重复领取。
   const max = Math.max(1, Math.min(limit, 6));
@@ -261,9 +274,15 @@ export async function processCustomCardJobs(d: CustomCardDeps, limit: number) {
         try { image = await d.loadReference(job.reference_image_path); }
         catch { throw Object.assign(new Error("ref"), { safe: SAFE_ERRORS.reference }); }
       }
+      // Original actor + policy, re-read immediately before the gateway request (after the reference load).
+      const guard = jobAiGuard(d, job);
       let raw: unknown;
-      try { raw = await d.generate({ topic: job.topic, instructions: job.instructions, formats: job.formats, image }); }
-      catch (e) { throw Object.assign(new Error("gen"), { safe: safeGenerationError(e) }); }
+      try { raw = await d.generate({ topic: job.topic, instructions: job.instructions, formats: job.formats, image }, guard); }
+      catch (e) {
+        if (isAiConsentRevoked(e))
+          throw Object.assign(new Error("consent"), { safe: e.reason === "denied" ? SAFE_ERRORS.consent : SAFE_ERRORS.consentUnavailable });
+        throw Object.assign(new Error("gen"), { safe: safeGenerationError(e) });
+      }
       const content = clampContent(raw);
       if (!content) throw Object.assign(new Error("fmt"), { safe: SAFE_ERRORS.format });
       if (unsupportedClaims(content, `${job.topic}\n${job.instructions}`).length) throw Object.assign(new Error("claims"), { safe: SAFE_ERRORS.claims });

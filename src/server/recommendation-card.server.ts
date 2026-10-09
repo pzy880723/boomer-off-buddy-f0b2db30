@@ -1,3 +1,4 @@
+import { beforeHandheldAiOutbound, isAiConsentRevoked, type AiOutboundGuard } from "./ai-guard.ts";
 /**
  * 原生 App 商品推荐卡只读生成（不落库、不改商品、不碰价格标签）。
  * 依赖注入，便于测试越权与 AI 失败。
@@ -101,6 +102,7 @@ export async function buildRecommendationCard(
       if (fallback) console.warn("recommendation_card_ai_review_failed", { attempt: 2, code: fallback });
     }
   } catch (e) {
+    if (isAiConsentRevoked(e)) throw e; // revocation is a 403, never a silent fallback
     fallback = e instanceof CardAiError ? e.code : "ai_unavailable";
     ai = null;
     console.warn("recommendation_card_ai_fallback", { code: fallback, status: e instanceof CardAiError ? (e.status ?? null) : null });
@@ -124,9 +126,10 @@ const RETRY_HINT: Record<string, string> = {
   ai_invalid_output: "上次输出字段或长度不合规：card_title 2-18字符、headline ≤14、keywords 2-3个≤6字、intro ≤65、highlights 用分号连接总长 ≤55，不得有其他字段。",
 };
 
-export async function generateCardCopy(facts: CardFacts, retry?: { reason: string }): Promise<unknown> {
+export async function generateCardCopy(facts: CardFacts, retry: { reason: string } | undefined, guard: AiOutboundGuard): Promise<unknown> {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new CardAiError("ai_not_configured");
+  await beforeHandheldAiOutbound(guard, "recommendation_card");
   let res: Response;
   try {
   res = await fetch("https://ai.gateway.lovable.dev/v1/responses", {

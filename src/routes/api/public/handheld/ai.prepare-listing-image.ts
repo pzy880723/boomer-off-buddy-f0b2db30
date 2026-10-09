@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { requireAiActor } from "@/server/ai-consent.server";
+import { aiConsentErrorResponse, requireAiActor } from "@/server/ai-consent.server";
 import { HANDHELD_CORS, ok, err } from "@/server/handheld-auth.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { AiListingImageReq } from "@/lib/handheld/schemas";
@@ -23,7 +23,7 @@ export const Route = createFileRoute("/api/public/handheld/ai/prepare-listing-im
         }
 
         try {
-          const { b64, mime, preserved_original } = await aiPrepareListingImage(body);
+          const { b64, mime, preserved_original } = await aiPrepareListingImage(body, auth.guard);
           const buf = Buffer.from(b64, "base64");
           const ext = mime.includes("png") ? "png" : mime.includes("webp") ? "webp" : "jpg";
           const path = `${new Date().toISOString().slice(0, 10)}/${auth.device.id}/${crypto.randomUUID()}.${ext}`;
@@ -42,6 +42,8 @@ export const Route = createFileRoute("/api/public/handheld/ai/prepare-listing-im
             warning: preserved_original === true ? PRESERVED_ORIGINAL_WARNING : null,
           });
         } catch (e) {
+          const denied = aiConsentErrorResponse(e);
+          if (denied) return denied;
           return err(`AI image edit failed: ${safeImageJobError(e)}`, 502);
         }
       },

@@ -9,7 +9,7 @@ import {
   ok,
   resolveSessionUser,
 } from "@/server/handheld-auth.server";
-import { aiConsentBlock } from "@/server/ai-consent.server";
+import { aiConsentBlock, aiConsentErrorResponse, sessionAiGuard } from "@/server/ai-consent.server";
 import { SummaryInput, generateListingSummary } from "@/server/listing-summary.server";
 
 export const Route = createFileRoute("/api/public/handheld/ai/generate-summary")({
@@ -26,9 +26,11 @@ export const Route = createFileRoute("/api/public/handheld/ai/generate-summary")
         const blocked = await aiConsentBlock(session.user_id);
         if (blocked) return blocked;
         try {
-          const description = await generateListingSummary(body.data);
+          const description = await generateListingSummary(body.data, sessionAiGuard(session.user_id));
           return ok({ description });
-        } catch {
+        } catch (e) {
+          const denied = aiConsentErrorResponse(e);
+          if (denied) return denied;
           return err("简介生成失败，请稍后重试", 503);
         }
       },

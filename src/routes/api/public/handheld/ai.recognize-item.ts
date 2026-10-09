@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { requireAiActor } from "@/server/ai-consent.server";
+import { aiConsentErrorResponse, requireAiActor } from "@/server/ai-consent.server";
 import { HANDHELD_CORS, ok, err } from "@/server/handheld-auth.server";
 import { AiRecognizeReq } from "@/lib/handheld/schemas";
 import { aiRecognizeItem } from "@/server/handheld-ai.server";
@@ -18,9 +18,11 @@ export const Route = createFileRoute("/api/public/handheld/ai/recognize-item")({
           return err("Invalid body", 400, { code: "validation_error", detail: String(e) });
         }
         try {
-          const out = await aiRecognizeItem(body);
+          const out = await aiRecognizeItem(body, auth.guard);
           return ok(out);
         } catch (e) {
+          const denied = aiConsentErrorResponse(e);
+          if (denied) return denied;
           return err(`AI recognition failed: ${(e as Error).message}`, 502);
         }
       },
