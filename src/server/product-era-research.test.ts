@@ -3,6 +3,7 @@ import { afterEach, beforeEach, test } from "node:test";
 import { researchProductRelease } from "./product-era-research.server.ts";
 import { ProductContentBlocks } from "../lib/product-content.ts";
 import { readFileSync } from "node:fs";
+import { allowHandheldGuard, allowWebGuard } from "./ai-guard-fixtures.ts";
 
 const url = "https://www.sony.com/en/SonyInfo/News/Press/199907/99-059/";
 const excerpt = "The first model, 'TPS-L2', was introduced on July 1st, 1979.";
@@ -28,7 +29,7 @@ afterEach(() => {
 });
 
 test("official model release excerpt becomes a save-compatible cited preview, never a production date", async () => {
-  const blocks = await researchProductRelease(sku);
+  const blocks = await researchProductRelease(sku, allowHandheldGuard);
   assert.equal(blocks.length, 1);
   assert.equal(blocks[0].type, "facts");
   const text = blocks[0].text;
@@ -62,7 +63,7 @@ for (const input of [
   { name: "TPS-L2", brand: "Unknown maker" },
 ])
   test(`no lookup without one specific model and supported confirmed brand: ${input.name}`, async () => {
-    assert.deepEqual(await researchProductRelease(input), []);
+    assert.deepEqual(await researchProductRelease(input, allowHandheldGuard), []);
     assert.equal(calls.length, 0);
   });
 
@@ -90,7 +91,7 @@ for (const sourceUrl of [
         ],
       },
     };
-    assert.deepEqual(await researchProductRelease(sku), []);
+    assert.deepEqual(await researchProductRelease(sku, allowHandheldGuard), []);
   });
 
 for (const description of [
@@ -117,7 +118,7 @@ for (const description of [
         web: [{ url, title: "1979", description: excerpt, markdown: description, metadata }],
       },
     };
-    assert.deepEqual(await researchProductRelease(sku), []);
+    assert.deepEqual(await researchProductRelease(sku, allowHandheldGuard), []);
   });
 
 test("markdown evidence works but metadata publication year is not evidence", async () => {
@@ -133,12 +134,12 @@ test("markdown evidence works but metadata publication year is not evidence", as
       ],
     },
   };
-  assert.equal((await researchProductRelease(sku)).length, 1);
+  assert.equal((await researchProductRelease(sku, allowHandheldGuard)).length, 1);
   payload = {
     success: true,
     data: { web: [{ url, title: "TPS-L2 1979", metadata: { publishedTime: "1979-07-01" } }] },
   };
-  assert.deepEqual(await researchProductRelease(sku), []);
+  assert.deepEqual(await researchProductRelease(sku, allowHandheldGuard), []);
 });
 
 test("conflicting official release years are omitted rather than arbitrarily chosen", async () => {
@@ -155,17 +156,17 @@ test("conflicting official release years are omitted rather than arbitrarily cho
       ],
     },
   };
-  assert.deepEqual(await researchProductRelease(sku), []);
+  assert.deepEqual(await researchProductRelease(sku, allowHandheldGuard), []);
 });
 
 test("search description is discovery only and cannot establish an official record", async () => {
   payload = { success: true, data: { web: [{ url, description: excerpt, metadata }] } };
-  assert.deepEqual(await researchProductRelease(sku), []);
+  assert.deepEqual(await researchProductRelease(sku, allowHandheldGuard), []);
 });
 test("untrusted redirect and unavailable body cannot inherit search URL trust", async () => {
   for (const metadata of [{ sourceURL: "https://evil.test/" }, { statusCode: 404 }]) {
     payload = { success: true, data: { web: [{ url, markdown: excerpt, metadata }] } };
-    assert.deepEqual(await researchProductRelease(sku), []);
+    assert.deepEqual(await researchProductRelease(sku, allowHandheldGuard), []);
   }
 });
 test("research has its own eight second abort budget", async () => {
@@ -176,7 +177,7 @@ test("research has its own eight second abort budget", async () => {
     return timeout(ms);
   };
   try {
-    await researchProductRelease(sku);
+    await researchProductRelease(sku, allowHandheldGuard);
     assert.deepEqual(deadlines, [8000]);
   } finally {
     AbortSignal.timeout = timeout;
@@ -186,7 +187,7 @@ test("research has its own eight second abort budget", async () => {
 test("release record does not promote a regional release into the first/global release", async () => {
   const regional = "TPS-L2 was released in 1980 in the United States.";
   payload = { success: true, data: { web: [{ url, markdown: regional, metadata }] } };
-  const blocks = await researchProductRelease(sku);
+  const blocks = await researchProductRelease(sku, allowHandheldGuard);
   assert.equal(blocks.length, 1);
   assert.match(blocks[0].text, /^型号发布记录：1980年/);
   assert.ok(blocks[0].text.includes(regional));
@@ -202,14 +203,14 @@ for (const meta of [
 ])
   test("missing/unsafe scraped metadata fails closed", async () => {
     payload = { success: true, data: { web: [{ url, markdown: excerpt, metadata: meta }] } };
-    assert.deepEqual(await researchProductRelease(sku), []);
+    assert.deepEqual(await researchProductRelease(sku, allowHandheldGuard), []);
   });
 test("optional metadata.url is checked when the provider supplies it", async () => {
   payload = {
     success: true,
     data: { web: [{ url, markdown: excerpt, metadata: { ...metadata, url } }] },
   };
-  assert.equal((await researchProductRelease(sku)).length, 1);
+  assert.equal((await researchProductRelease(sku, allowHandheldGuard)).length, 1);
 });
 
 for (const badPayload of [
@@ -219,20 +220,20 @@ for (const badPayload of [
 ])
   test("invalid provider payload skips research", async () => {
     payload = badPayload;
-    assert.deepEqual(await researchProductRelease(sku), []);
+    assert.deepEqual(await researchProductRelease(sku, allowHandheldGuard), []);
   });
 
 test("missing key, provider failure and timeout skip without exposing errors", async () => {
   delete process.env.FIRECRAWL_API_KEY;
-  assert.deepEqual(await researchProductRelease(sku), []);
+  assert.deepEqual(await researchProductRelease(sku, allowHandheldGuard), []);
   assert.equal(calls.length, 0);
   process.env.FIRECRAWL_API_KEY = "test-only";
   globalThis.fetch = async () => new Response("private provider error", { status: 429 });
-  assert.deepEqual(await researchProductRelease(sku), []);
+  assert.deepEqual(await researchProductRelease(sku, allowHandheldGuard), []);
   globalThis.fetch = async () => {
     throw new DOMException("secret", "TimeoutError");
   };
-  assert.deepEqual(await researchProductRelease(sku), []);
+  assert.deepEqual(await researchProductRelease(sku, allowHandheldGuard), []);
 });
 
 test("evidence text passes the unchanged deployed SQL block validator, HTTP links remain rejected", async () => {
@@ -256,7 +257,7 @@ test("evidence text passes the unchanged deployed SQL block validator, HTTP link
     assert.ok(fail && validate);
     await db.exec(fail[0]);
     await db.exec(validate[0]);
-    const blocks = await researchProductRelease(sku);
+    const blocks = await researchProductRelease(sku, allowHandheldGuard);
     assert.equal(blocks.length, 1);
     await db.query("SELECT public.product_content_validate_blocks($1::jsonb)", [
       JSON.stringify(blocks),

@@ -9,7 +9,10 @@ import {
 import {
   AI_CONSENT_MESSAGE,
   AI_POLICY_VERSION,
+  handheldAiGuard,
   isAiAllowed,
+  isAiConsentRevoked,
+  type AiOutboundGuard,
   type ConsentStore,
 } from "@/server/ai-consent-core";
 
@@ -55,7 +58,7 @@ export async function aiConsentBlock(userId: string, store: ConsentStore = dbCon
 
 /** Device + employee session + current-version consent. */
 export async function requireAiActor(request: Request): Promise<
-  | { ok: true; device: DeviceContext; userId: string }
+  | { ok: true; device: DeviceContext; userId: string; guard: AiOutboundGuard }
   | { ok: false; response: Response }
 > {
   const auth = await authenticateDevice(request);
@@ -64,5 +67,18 @@ export async function requireAiActor(request: Request): Promise<
   if (!session) return { ok: false, response: err("Employee session required", 401, { code: "session_required" }) };
   const blocked = await aiConsentBlock(session.user_id);
   if (blocked) return { ok: false, response: blocked };
-  return { ok: true, device: auth.device, userId: session.user_id };
+  return { ok: true, device: auth.device, userId: session.user_id, guard: sessionAiGuard(session.user_id) };
+}
+
+/** Guard bound to the verified session user and the current policy version. */
+export function sessionAiGuard(userId: string): AiOutboundGuard {
+  return handheldAiGuard(dbConsentStore(), { userId, policyVersion: AI_POLICY_VERSION });
+}
+
+/** Maps a mid-flight revocation to the same 403/503 the entry check returns. */
+export function aiConsentErrorResponse(error: unknown): Response | null {
+  if (!isAiConsentRevoked(error)) return null;
+  return error.reason === "denied"
+    ? aiConsentDeniedResponse()
+    : err("授权状态暂不可用，请稍后重试", 503, { code: "consent_unavailable" });
 }

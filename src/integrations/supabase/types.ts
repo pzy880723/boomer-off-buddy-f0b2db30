@@ -10639,16 +10639,28 @@ export type Database = {
         Args: { p_sku_id: string }
         Returns: undefined
       }
-      handheld_product_content: {
-        Args: {
-          p_device_id: string
-          p_location_id: string
-          p_request: Json
-          p_sku_id: string
-          p_user_id: string
-        }
-        Returns: Json
-      }
+      handheld_product_content:
+        | {
+            Args: {
+              p_device_id: string
+              p_location_id: string
+              p_request: Json
+              p_sku_id: string
+              p_user_id: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_ai_policy_version: string
+              p_device_id: string
+              p_location_id: string
+              p_request: Json
+              p_sku_id: string
+              p_user_id: string
+            }
+            Returns: Json
+          }
       handheld_release_outbox_claim: {
         Args: { p_lease_seconds: number; p_limit: number }
         Returns: {

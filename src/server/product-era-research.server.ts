@@ -1,3 +1,4 @@
+import { beforeHandheldAiOutbound, type AiOutboundGuard } from "./ai-guard.ts";
 import { randomUUID } from "node:crypto";
 
 export type ReleaseFactBlock = { id: string; type: "facts"; text: string };
@@ -64,7 +65,7 @@ function releaseExcerpts(
 export async function researchProductRelease(input: {
   name: string;
   brand: string | null;
-}): Promise<ReleaseFactBlock[]> {
+}, guard: AiOutboundGuard): Promise<ReleaseFactBlock[]> {
   const maker = MAKERS.find((entry) =>
     entry.aliases.includes(input.brand?.trim().toLowerCase() ?? ""),
   );
@@ -78,6 +79,8 @@ export async function researchProductRelease(input: {
   const apiKey = process.env.FIRECRAWL_API_KEY;
   if (!maker || models.length !== 1 || !apiKey) return [];
   const model = models[0];
+  // Third-party research is part of handheld AI detail generation: re-check right before sending.
+  await beforeHandheldAiOutbound(guard, "era_research");
   try {
     const response = await fetch("https://api.firecrawl.dev/v2/search", {
       method: "POST",

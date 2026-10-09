@@ -85,10 +85,10 @@ export function customCardDeps(): CustomCardDeps {
       if (!mime) throw new Error("reference not an image");
       return { mime, b64: Buffer.from(bytes).toString("base64") };
     },
-    generate: async (input) => {
+    generate: async (input, guard) => {
       const key = process.env.LOVABLE_API_KEY;
       if (!key) throw new Error("AI not configured");
-      return generateCardCopy({ key, input });
+      return generateCardCopy({ key, input, guard });
     },
   };
 }

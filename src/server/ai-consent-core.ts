@@ -2,25 +2,13 @@
 // A staff user may use AI only when an explicit allowed=true row exists for the
 // CURRENT policy version. Missing row, older version or read failure => no AI.
 import { z } from "zod";
+import { AI_POLICY_VERSION, isAiAllowed, type ConsentStore } from "./ai-guard.ts";
+export * from "./ai-guard.ts";
 
-export const AI_POLICY_VERSION = "2026-10-09-v1" as const;
 
-export type ConsentStore = {
-  get(userId: string, policyVersion: string): Promise<boolean | null>;
-  set(userId: string, policyVersion: string, allowed: boolean, deviceId: string | null): Promise<boolean>;
-};
 
 export const AI_CONSENT_MESSAGE = "AI 处理未授权：请在 App「设置 › AI 授权」中同意后重试；手动录入、浏览、收银和打印不受影响";
 
-/** Authoritative check. Throws only when the store itself fails (callers must fail closed). */
-export async function isAiAllowed(
-  store: ConsentStore,
-  userId: string | null | undefined,
-  policyVersion: string | null | undefined,
-): Promise<boolean> {
-  if (!userId || policyVersion !== AI_POLICY_VERSION) return false;
-  return (await store.get(userId, policyVersion)) === true;
-}
 
 export const ConsentBody = z
   .object({ allowed: z.boolean(), policy_version: z.string().min(1).max(64) })
@@ -63,22 +51,10 @@ export async function handleConsentRead(input: { store: ConsentStore; userId: st
   }
 }
 
-/** Queue-side decision made right before each real AI call. */
-export async function queuedAiDecision(
-  store: ConsentStore,
-  job: { ai_actor_user_id?: string | null; ai_policy_version?: string | null },
-): Promise<"allowed" | "denied" | "unavailable"> {
-  try {
-    return (await isAiAllowed(store, job.ai_actor_user_id, job.ai_policy_version)) ? "allowed" : "denied";
-  } catch {
-    return "unavailable";
-  }
-}
 
-export const QUEUED_AI_DENIED_ERROR = "ai_consent_missing: AI 授权未开启或已撤回，已保留原图";
-export const QUEUED_AI_UNAVAILABLE_ERROR = "ai_consent_unavailable: 授权状态暂不可读，稍后重试";
 
 /** smart-create: false => never queue; true/undefined => still requires DB consent. */
 export function smartCreateWantsAi(flag: boolean | undefined): boolean {
   return flag !== false;
 }
+

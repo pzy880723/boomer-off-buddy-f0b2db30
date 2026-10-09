@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { CardAiError, generateCardCopy, readCompletedOutput } from "./custom-print-cards-ai.server";
 import { customCardMessage } from "./custom-print-cards-http.server";
+import { allowHandheldGuard, allowWebGuard } from "./ai-guard-fixtures.ts";
 
 const enc = new TextEncoder();
 function sse(events: unknown[], opts: { hang?: boolean } = {}) {
@@ -40,18 +41,18 @@ describe("custom card AI stream", () => {
     const s = sse([delta("{")], { hang: true });
     const fetchImpl = (async () => new Response(s.stream, { status: 200 })) as unknown as typeof fetch;
     const t0 = Date.now();
-    await assert.rejects(generateCardCopy({ key: "k", input, fetchImpl, timeoutMs: 50 }), (e: CardAiError) => e.kind === "timeout");
+    await assert.rejects(generateCardCopy({ guard: allowHandheldGuard, key: "k", input, fetchImpl, timeoutMs: 50 }), (e: CardAiError) => e.kind === "timeout");
     assert.ok(Date.now() - t0 < 2000);
     assert.ok(s.wasCancelled());
   });
   test("deadline also covers a hanging fetch", async () => {
     const fetchImpl = ((_u: string, init: RequestInit) => new Promise((_, rej) =>
       init.signal!.addEventListener("abort", () => rej(new Error("aborted"))))) as unknown as typeof fetch;
-    await assert.rejects(generateCardCopy({ key: "k", input, fetchImpl, timeoutMs: 30 }), (e: CardAiError) => e.kind === "timeout");
+    await assert.rejects(generateCardCopy({ guard: allowHandheldGuard, key: "k", input, fetchImpl, timeoutMs: 30 }), (e: CardAiError) => e.kind === "timeout");
   });
   test("HTTP error reports status only", async () => {
     const fetchImpl = (async () => new Response("secret https://x?token=1", { status: 500 })) as unknown as typeof fetch;
-    await assert.rejects(generateCardCopy({ key: "k", input, fetchImpl }), (e: Error) => e.message === "AI gateway 500");
+    await assert.rejects(generateCardCopy({ guard: allowHandheldGuard, key: "k", input, fetchImpl }), (e: Error) => e.message === "AI gateway 500");
   });
   test("chinese actionable messages per code", () => {
     assert.match(customCardMessage("version_conflict"), /退出编辑.*重新加载/);

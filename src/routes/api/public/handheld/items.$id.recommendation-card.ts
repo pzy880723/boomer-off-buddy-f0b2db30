@@ -12,7 +12,7 @@ import {
 } from "@/server/handheld-auth.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { signSkuImagePaths } from "@/lib/sku-image-resolver.server";
-import { aiConsentBlock } from "@/server/ai-consent.server";
+import { aiConsentBlock, aiConsentErrorResponse, sessionAiGuard } from "@/server/ai-consent.server";
 import { buildRecommendationCard, generateCardCopy } from "@/server/recommendation-card.server";
 
 const Body = z.object({ location_id: z.string().uuid().optional() }).strict();
@@ -35,6 +35,7 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/recommendat
 
           const blocked = await aiConsentBlock(session.user_id);
           if (blocked) return blocked;
+          const guard = sessionAiGuard(session.user_id);
           const result = await buildRecommendationCard(
             {
               canAccessLocation: userCanAccessLocation,
@@ -76,13 +77,15 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/recommendat
                 if (error) throw error;
                 return data?.description ?? null;
               },
-              generate: generateCardCopy,
+              generate: (facts, retry) => generateCardCopy(facts, retry, guard),
             },
             { userId: session.user_id, locationId, skuId: params.id },
           );
           if (!result.ok) return err(result.code, result.status, { code: result.code });
           return ok(result.card);
-        } catch {
+        } catch (e) {
+          const denied = aiConsentErrorResponse(e);
+          if (denied) return denied;
           return err("Recommendation card unavailable", 500, { code: "internal_error" });
         }
       },

@@ -12,7 +12,8 @@ import { signSkuImagePaths } from "@/lib/sku-image-resolver.server";
 import { DERIVATIVE_WIDTHS, signDerivativeUrls } from "@/server/media-derivative.server";
 import { triggerListingImageWorker } from "@/server/handheld-listing-image-jobs.server";
 import { err, ok, resolveSessionUser, type DeviceContext } from "@/server/handheld-auth.server";
-import { aiConsentBlock } from "@/server/ai-consent.server";
+import { aiConsentBlock, aiConsentErrorResponse, sessionAiGuard } from "@/server/ai-consent.server";
+import { beforeHandheldAiOutbound, type AiOutboundGuard } from "@/server/ai-consent-core";
 import { AI_POLICY_VERSION } from "@/server/ai-consent-core";
 import { researchProductRelease } from "@/server/product-era-research.server";
 
@@ -57,7 +58,7 @@ async function signBlocks(
   );
 }
 
-async function generateBlocks(skuId: string): Promise<ProductContentBlock[]> {
+async function generateBlocks(skuId: string, guard: AiOutboundGuard): Promise<ProductContentBlock[]> {
   const { data: sku, error } = await supabaseAdmin
     .from("inv_skus")
     .select("name, category, grade, weight_g, brand_id, ip_id")
@@ -83,7 +84,9 @@ async function generateBlocks(skuId: string): Promise<ProductContentBlock[]> {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("AI gateway not configured");
   // Optional research runs beside story generation. Neither external text nor citations enter the LLM.
-  const research = researchProductRelease({ name: facts.name, brand: facts.brand }).catch(() => []);
+  // Both outbound calls re-check the session actor's consent right before sending.
+  await beforeHandheldAiOutbound(guard, "product_content_story");
+  const research = researchProductRelease({ name: facts.name, brand: facts.brand }, guard).catch(() => []);
   const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
     signal: AbortSignal.timeout(25_000),
@@ -178,13 +181,12 @@ export async function handleProductContent(
         p_location_id: locationId,
         p_sku_id: skuId,
         p_request: body,
+        // Detail-image jobs are bound to this session actor + policy inside the same transaction.
+        p_ai_policy_version: AI_POLICY_VERSION,
       } as never,
     );
     if (error) return rpcError(error);
     if (body.action === "save" && body.publish) {
-      // Stamp the publishing actor on newly queued detail-image jobs; the worker re-checks
-      // this actor's consent before every AI call (unstamped jobs never reach AI).
-      await stampContentImageJobs(skuId, session.user_id);
       triggerListingImageWorker();
     }
     const snapshot = data as unknown as ContentSnapshot;
@@ -193,9 +195,11 @@ export async function handleProductContent(
       try {
         preview = mergeProductContentPreview(
           body.blocks ?? snapshot.draft_blocks,
-          await generateBlocks(skuId),
+          await generateBlocks(skuId, sessionAiGuard(session.user_id)),
         );
-      } catch {
+      } catch (e) {
+        const denied = aiConsentErrorResponse(e);
+        if (denied) return denied;
         return err("AI preview unavailable; your draft is unchanged", 502, {
           code: "generation_failed",
         });
@@ -230,13 +234,4 @@ export async function loadPublishedProductContent(skuId: string): Promise<{
       signDerivativeUrls(paths, DERIVATIVE_WIDTHS.preview),
     ),
   };
-}
-
-async function stampContentImageJobs(skuId: string, userId: string): Promise<void> {
-  const { error } = await (supabaseAdmin.from("inv_product_content_image_jobs" as never) as any)
-    .update({ ai_actor_user_id: userId, ai_policy_version: AI_POLICY_VERSION })
-    .eq("sku_id", skuId)
-    .eq("status", "queued")
-    .is("ai_actor_user_id", null);
-  if (error) console.error("[product-content] stamp AI actor failed");
 }

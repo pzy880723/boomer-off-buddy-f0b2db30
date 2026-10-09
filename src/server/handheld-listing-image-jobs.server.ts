@@ -2,6 +2,9 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { aiPrepareListingImage } from "@/server/handheld-ai.server";
 import { safeImageJobError } from "@/server/listing-image-safety.server";
 import {
+  handheldAiGuard,
+  isAiConsentRevoked,
+  type AiOutboundGuard,
   QUEUED_AI_DENIED_ERROR,
   QUEUED_AI_UNAVAILABLE_ERROR,
   queuedAiDecision,
@@ -27,6 +30,20 @@ async function consentFailure(job: AiActor): Promise<string | null> {
   }
   if (decision === "allowed") return null;
   return decision === "denied" ? QUEUED_AI_DENIED_ERROR : QUEUED_AI_UNAVAILABLE_ERROR;
+}
+
+/** Bound to the job's ORIGINAL actor + policy; re-read before every AI stage inside the pipeline. */
+async function jobGuard(job: AiActor): Promise<AiOutboundGuard> {
+  return handheldAiGuard(await consentStoreFactory(), {
+    userId: job.ai_actor_user_id,
+    policyVersion: job.ai_policy_version,
+  });
+}
+
+function jobFailure(error: unknown): string {
+  if (isAiConsentRevoked(error))
+    return error.reason === "denied" ? QUEUED_AI_DENIED_ERROR : QUEUED_AI_UNAVAILABLE_ERROR;
+  return safeImageJobError(error);
 }
 
 type ImageRef = {
@@ -56,12 +73,13 @@ async function prepareImage(
   sourceBucket: string,
   sourcePath: string,
   targetStem: string,
+  guard: AiOutboundGuard,
 ): Promise<string> {
   const signed = await supabaseAdmin.storage
     .from(sourceBucket)
     .createSignedUrl(sourcePath, 60 * 60);
   if (signed.error) throw new Error(signed.error.message);
-  const prepared = await aiPrepareListingImage({ image_url: signed.data.signedUrl });
+  const prepared = await aiPrepareListingImage({ image_url: signed.data.signedUrl }, guard);
   const extension = prepared.mime.includes("png")
     ? "png"
     : prepared.mime.includes("webp")
@@ -88,10 +106,11 @@ async function processContentImageJob(job: ContentImageJob): Promise<void> {
       job.source_path.slice(0, slash),
       job.source_path.slice(slash + 1),
       `content/${job.sku_id}/${job.id}/${job.claim_token}`,
+      await jobGuard(job),
     );
     targetPath = `sku-listing/${path}`;
   } catch (error) {
-    failure = safeImageJobError(error);
+    failure = jobFailure(error);
   }
   // A crashed completion is recovered by lease expiry; only the current token may apply.
   const result = await supabaseAdmin.rpc(
@@ -160,10 +179,11 @@ async function processJob(job: JobRow): Promise<string> {
       job.source_bucket,
       job.source_path,
       `gallery/${job.sku_id}/${job.id}/${job.claim_token}`,
+      await jobGuard(job),
     );
     targetPath = `sku-listing/${path}`;
   } catch (error) {
-    failure = safeImageJobError(error);
+    failure = jobFailure(error);
   }
   // The transaction fences ownership before applying pixels and completing the job.
   const result = await supabaseAdmin.rpc("handheld_listing_image_finish" as never, {

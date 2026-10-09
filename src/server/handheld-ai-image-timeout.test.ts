@@ -1,3 +1,4 @@
+import { allowHandheldGuard } from "./ai-guard-fixtures.ts";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { test } from "node:test";
@@ -56,7 +57,7 @@ test("image generation uses a 60s abort deadline and propagates timeouts for dur
       init?.signal?.throwIfAborted();
       throw new Error("Expected abort");
     };
-    await assert.rejects(aiPrepareListingImage({ image_base64: PNG }), {
+    await assert.rejects(aiPrepareListingImage({ image_base64: PNG }, allowHandheldGuard), {
       name: "TimeoutError",
       stage: "image_generation",
     });
@@ -78,7 +79,7 @@ async function withFetch(response: unknown, run: () => Promise<void>) {
 
 test("content_filter 200 without image fails with safe error and no original returned", async () => {
   await withFetch({ choices: [{ finish_reason: "content_filter", message: { role: "assistant", content: "SECRET https://x.test/a?token=1" } }] }, async () => {
-    await assert.rejects(aiPrepareListingImage({ image_base64: PNG }), (e: any) => {
+    await assert.rejects(aiPrepareListingImage({ image_base64: PNG }, allowHandheldGuard), (e: any) => {
       assert.equal(e.message, "图像生成服务未返回图片（content_filter），原图保留");
       assert.equal(e.stage, "image_generation");
       assert.ok(!e.message.includes("SECRET") && !e.message.includes("token"));
@@ -105,7 +106,7 @@ test("ruler photos now reach the editing provider with no rotation and intact me
     return Response.json({ choices: [{ message: { images: [{ image_url: { url: "data:image/png;base64,ZWRpdGVk" } }] } }] });
   };
   try {
-    const out = await aiPrepareListingImage({ image_base64: PNG });
+    const out = await aiPrepareListingImage({ image_base64: PNG }, allowHandheldGuard);
     assert.deepEqual(out, { b64: "ZWRpdGVk", mime: "image/png" });
     assert.equal(called, true);
   } finally { globalThis.fetch = originalFetch; (globalThis as any).__ruler = false; }
@@ -113,7 +114,7 @@ test("ruler photos now reach the editing provider with no rotation and intact me
 
 test("non-protected branch keeps original return shape without preserved_original", async () => {
   await withFetch({ choices: [{ message: { images: [{ image_url: { url: "data:image/png;base64,QUJD" } }] } }] }, async () => {
-    const out = await aiPrepareListingImage({ image_base64: PNG });
+    const out = await aiPrepareListingImage({ image_base64: PNG }, allowHandheldGuard);
     assert.deepEqual(out, { mime: "image/png", b64: "QUJD" });
     assert.equal("preserved_original" in out, false);
   });

@@ -1,3 +1,4 @@
+import { beforeAiOutbound, type AiOutboundGuard } from "./ai-guard.ts";
 import {
   activeLeafCategories,
   findSanrioBrandCandidate,
@@ -49,6 +50,8 @@ export function isRecognitionTimeoutError(error: unknown): boolean {
 }
 
 export type ProductRecognitionInput = {
+  /** Required: checked right before every model attempt (no default-allow path). */
+  aiGuard: AiOutboundGuard;
   images: string[];
   source: ProductRecognitionSource;
   hint?: string | null;
@@ -186,6 +189,8 @@ export async function runProductRecognition(
   let raw: RawProductRecognition | null = null;
   let lastError: Error | null = null;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    // Outside the try: a revoked/unreadable consent must abort, never degrade to a fallback result.
+    await beforeAiOutbound(input.aiGuard, "product_recognition");
     try {
       const response = await deps.callModel({
         images,
