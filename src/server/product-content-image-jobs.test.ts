@@ -112,6 +112,8 @@ test("content claim failure does not suppress successful legacy outcomes", async
       source_bucket: "sku-raw",
       source_path: "gallery.jpg",
       source_index: 0,
+      ai_actor_user_id: "u1",
+      ai_policy_version: "2026-10-09-v1",
       attempts: 0,
     },
   ];
@@ -195,6 +197,8 @@ test("legacy gallery jobs still apply their SKU result and refresh status after 
       source_bucket: "sku-raw",
       source_path: "date/device/gallery.jpg",
       source_index: 0,
+      ai_actor_user_id: "u1",
+      ai_policy_version: "2026-10-09-v1",
       attempts: 0,
       claim_token: "legacy-claim",
     },
