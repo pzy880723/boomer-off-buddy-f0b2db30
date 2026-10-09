@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { requireAiActor } from "@/server/ai-consent.server";
+import { aiConsentErrorResponse, requireAiActor } from "@/server/ai-consent.server";
 import { HANDHELD_CORS, ok, err } from "@/server/handheld-auth.server";
 import { ContentGenerateReq } from "@/lib/handheld/schemas";
 import { replayIfPresent, recordOp, jsonReplay } from "@/server/handheld-idempotency.server";
@@ -31,7 +31,7 @@ export const Route = createFileRoute("/api/public/handheld/content/generate-from
           const data = await generateEditorialForSku({
             skuId: body.sku_id,
             publish: body.publish,
-          });
+          }, auth.guard);
           await recordOp({
             deviceId: auth.device.id,
             clientOpId: body.client_op_id,
@@ -41,6 +41,8 @@ export const Route = createFileRoute("/api/public/handheld/content/generate-from
           });
           return ok(data);
         } catch (e) {
+          const blocked = aiConsentErrorResponse(e);
+          if (blocked) return blocked;
           return err(`生成达人文案失败：${(e as Error).message}`, 502);
         }
       },

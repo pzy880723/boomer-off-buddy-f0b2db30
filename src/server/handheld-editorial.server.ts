@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getPublicOrigin, resolvePublicSkuImageUrls } from "@/lib/sku-media";
+import { beforeHandheldAiOutbound, type AiOutboundGuard } from "./ai-guard.ts";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const MODEL = "google/gemini-3.6-flash";
@@ -28,10 +29,13 @@ export type GenerateEditorialResult = {
  * 根据一个自定义商品（SKU）的识别结果 + 多图，生成 1 篇达人文案并挂到「发现」。
  * 幂等：同一 sku 只会有一篇（slug 唯一），重复调用返回已有内容。
  */
-export async function generateEditorialForSku(args: {
-  skuId: string;
-  publish: boolean;
-}): Promise<GenerateEditorialResult> {
+export async function generateEditorialForSku(
+  args: {
+    skuId: string;
+    publish: boolean;
+  },
+  guard: AiOutboundGuard,
+): Promise<GenerateEditorialResult> {
   const { data: sku, error } = await supabaseAdmin
     .from("inv_skus")
     .select(
@@ -104,6 +108,7 @@ export async function generateEditorialForSku(args: {
   const content: Array<Record<string, unknown>> = [{ type: "text", text: prompt }];
   for (const url of images) content.push({ type: "image_url", image_url: { url } });
 
+  await beforeHandheldAiOutbound(guard, "editorial_generation");
   const res = await fetch(GATEWAY, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
