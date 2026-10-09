@@ -80,7 +80,11 @@ const { Route } = await load("src/routes/api/public/handheld/items.smart-create.
   "@/server/product-classification.server": `export const assertActiveLeafCategory = async () => {}; export const attachProductClassificationAuditToSku = async () => {};
     export const replaceManualProductFacets = async () => {}; export const resolveOrCreateConfirmedIp = async () => ({ id: null, name: null, status: 'none' });
     export const resolveManualProductFacets = async () => null;`,
-  "@/server/handheld-listing-image-jobs.server": "export const enqueueListingImageJobs = async () => ({ status: 'idle', queued: 0 }); export const triggerListingImageWorker = () => {};",
+  "@/server/handheld-listing-image-jobs.server": "export const enqueueListingImageJobs = async (i) => { globalThis.__sc.state.enqueued.push(i); return { status: 'queued', queued: 1 }; }; export const triggerListingImageWorker = () => {};",
+  "@/server/ai-consent.server": "export const dbConsentStore = () => ({ get: async (u, v) => { if (globalThis.__sc.state.consentThrows) throw Error('down'); return globalThis.__sc.state.consent[u + ':' + v] ?? null; } });",
+  "@/server/ai-consent-core": `export const AI_POLICY_VERSION = "2026-10-09-v1";
+    export const isAiAllowed = async (s, u, v) => !!u && v === AI_POLICY_VERSION && (await s.get(u, v)) === true;
+    export const smartCreateWantsAi = f => f !== false;`,
 });
 const { runHandheldReleaseWorker } = await load("src/server/handheld-release-outbox.server.ts", {
   "@/integrations/supabase/client.server": adminStub,
@@ -91,6 +95,7 @@ const { runHandheldReleaseWorker } = await load("src/server/handheld-release-out
 beforeEach(() => {
   state.legacy = null; state.failedTable = null;
   state.rpcs = []; state.finish = []; state.releaseCalls = 0;
+  (state as any).enqueued = []; (state as any).consent = {}; (state as any).consentThrows = false;
   state.tables = { inv_locations: { id: "loc", name: "新天地", kind: "shop", shop_id: "shop", is_active: true }, inv_skus: { status: "active", image_paths: [], barcode: "200" }, inv_stocks: { qty: 1 } };
   state.commit = () => ({ data: { op_id: "op", replayed: false, op_status: "committed", sku_id: "s1", sku_code: "S", epc: "E", bound_epcs: 0, stock_qty: 1, response: null } });
   state.release = async () => ({ ok: true });
@@ -163,4 +168,48 @@ test("temporary database read failure retries rather than permanently cancelling
   const result = await runHandheldReleaseWorker(1, deps);
   assert.equal(state.releaseCalls, 0);
   assert.deepEqual(result.outcomes.map((o: any) => o.status), ["failed"]);
+});
+
+// ---- AI consent (2026-10-09-v1) ----
+const withImage = (extra: object = {}) => ({ client_op_id: "c2", category: "toy", name: "屋", price_tier: 159,
+  image_storage_paths: [{ bucket: "sku-raw", storage_path: "2026-10-09/dev/a.jpg" }], ...extra });
+
+test("ai_processing_allowed=false saves product and original image but never queues AI", async () => {
+  (state as any).consent = { "u1:2026-10-09-v1": true };
+  const res = await post(withImage({ ai_processing_allowed: false }));
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.data.ai_processing, "skipped_by_client");
+  assert.equal((state as any).enqueued.length, 0);
+  assert.ok(state.rpcs.some((r) => r.name === "handheld_smart_create_commit"));
+});
+
+test("ai_processing_allowed=true still requires DB consent; missing consent saves without AI", async () => {
+  const res = await post(withImage({ ai_processing_allowed: true }));
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).data.ai_processing, "consent_required");
+  assert.equal((state as any).enqueued.length, 0);
+});
+
+test("old client without the flag and without consent is NOT treated as consent", async () => {
+  const res = await post(withImage());
+  assert.equal((await res.json()).data.ai_processing, "consent_required");
+  assert.equal((state as any).enqueued.length, 0);
+});
+
+test("consent read failure saves product, skips AI and reports unavailable (no fake success)", async () => {
+  (state as any).consentThrows = true;
+  const res = await post(withImage({ ai_processing_allowed: true }));
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).data.ai_processing, "consent_unavailable");
+  assert.equal((state as any).enqueued.length, 0);
+});
+
+test("with consent the queue carries the session actor and policy version", async () => {
+  (state as any).consent = { "u1:2026-10-09-v1": true };
+  const res = await post(withImage({ ai_processing_allowed: true }));
+  assert.equal((await res.json()).data.ai_processing, "allowed");
+  assert.equal((state as any).enqueued.length, 1);
+  assert.equal((state as any).enqueued[0].aiActorUserId, "u1");
+  assert.equal((state as any).enqueued[0].aiPolicyVersion, "2026-10-09-v1");
 });
