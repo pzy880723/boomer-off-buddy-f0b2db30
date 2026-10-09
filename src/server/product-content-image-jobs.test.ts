@@ -29,6 +29,9 @@ const stubs: Record<string, string> = {
     })}
   };`,
   "@/server/handheld-ai.server": `export const aiPrepareListingImage=async input=>{const s=globalThis.__contentJobs;s.prepared.push(input);if(s.fail)throw new Error('ruler service failed');return {b64:'cHJvdGVjdGVk',mime:'image/png'};};`,
+  "@/server/ai-consent.server": `export const dbConsentStore=()=>({get:async()=>true});`,
+  "@/server/ai-consent-core": `export const QUEUED_AI_DENIED_ERROR='ai_consent_missing';export const QUEUED_AI_UNAVAILABLE_ERROR='ai_consent_unavailable';
+    export const queuedAiDecision=async(s,j)=>j.ai_actor_user_id?((await s.get())?'allowed':'denied'):'denied';`,
   "@/server/listing-image-safety.server": `export const safeImageJobError=e=>((e&&e.stage?"["+e.stage+"] ":"")+(e instanceof Error?e.message:String(e))).slice(0,1000);`,
 };
 const bundle = await build({
@@ -60,6 +63,8 @@ const job = {
   block_id: "detail",
   claim_token: "claim",
   attempts: 1,
+  ai_actor_user_id: "u1",
+  ai_policy_version: "2026-10-09-v1",
 };
 beforeEach(() => {
   process.env.HANDHELD_LISTING_IMAGE_WORKER_ENABLED = "true";
@@ -107,6 +112,8 @@ test("content claim failure does not suppress successful legacy outcomes", async
       source_bucket: "sku-raw",
       source_path: "gallery.jpg",
       source_index: 0,
+      ai_actor_user_id: "u1",
+      ai_policy_version: "2026-10-09-v1",
       attempts: 0,
     },
   ];
@@ -190,6 +197,8 @@ test("legacy gallery jobs still apply their SKU result and refresh status after 
       source_bucket: "sku-raw",
       source_path: "date/device/gallery.jpg",
       source_index: 0,
+      ai_actor_user_id: "u1",
+      ai_policy_version: "2026-10-09-v1",
       attempts: 0,
       claim_token: "legacy-claim",
     },
@@ -208,7 +217,7 @@ test("legacy gallery jobs still apply their SKU result and refresh status after 
 
 function legacyOnly() {
   state.jobs = [];
-  state.legacyJobs = [{ id: "legacy", sku_id: "sku", source_bucket: "sku-raw", source_path: "gallery.jpg", source_index: 0, attempts: 1, claim_token: "owner" }];
+  state.legacyJobs = [{ id: "legacy", sku_id: "sku", source_bucket: "sku-raw", source_path: "gallery.jpg", source_index: 0, attempts: 1, claim_token: "owner", ai_actor_user_id: "u1", ai_policy_version: "2026-10-09-v1" }];
 }
 test("legacy completion failure is visible and leaves recovery to the lease", async () => {
   legacyOnly(); state.legacyFinishError = true;

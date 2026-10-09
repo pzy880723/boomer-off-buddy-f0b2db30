@@ -143,7 +143,7 @@ test("measurement preparation retouches background and hands instead of returnin
   const output = await module.exports.aiPrepareListingImage({ image_base64: `data:image/png;base64,${source.toString("base64")}` });
   assert.equal(calls, 3);
   assert.deepEqual(output, { b64: "ZWRpdGVk", mime: "image/png" });
-  assert.equal(output.preserved_original, undefined);
+  assert.equal((output as { preserved_original?: true }).preserved_original, undefined);
 });
 
 test("confident no-tool detection still reaches the image editing provider", async () => {

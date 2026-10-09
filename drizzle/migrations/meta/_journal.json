@@ -323,6 +323,13 @@
       "when": 1791431709081,
       "tag": "0045_fankuang_override",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1791559283096,
+      "tag": "0046_handheld_ai_consent",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { HANDHELD_CORS, authenticateDevice, ok, err } from "@/server/handheld-auth.server";
+import { requireAiActor } from "@/server/ai-consent.server";
+import { HANDHELD_CORS, ok, err } from "@/server/handheld-auth.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { AiListingImageReq } from "@/lib/handheld/schemas";
 import { aiPrepareListingImage } from "@/server/handheld-ai.server";
@@ -12,7 +13,7 @@ export const Route = createFileRoute("/api/public/handheld/ai/prepare-listing-im
     handlers: {
       OPTIONS: async () => new Response(null, { status: 204, headers: HANDHELD_CORS }),
       POST: async ({ request }) => {
-        const auth = await authenticateDevice(request);
+        const auth = await requireAiActor(request);
         if (!auth.ok) return auth.response;
         let body: { image_url?: string; image_base64?: string; instruction?: string };
         try {

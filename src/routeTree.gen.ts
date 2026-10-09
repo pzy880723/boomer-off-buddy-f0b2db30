@@ -207,6 +207,7 @@ import { Route as ApiPublicHandheldParcelsCountsRouteImport } from './routes/api
 import { Route as ApiPublicHandheldPrintJobsLeaseRouteImport } from './routes/api/public/handheld/print-jobs.lease'
 import { Route as ApiPublicHandheldPrintCustomCardsRouteImport } from './routes/api/public/handheld/print.custom-cards'
 import { Route as ApiPublicHandheldPrintStoreQrRouteImport } from './routes/api/public/handheld/print.store-qr'
+import { Route as ApiPublicHandheldPrivacyAiConsentRouteImport } from './routes/api/public/handheld/privacy.ai-consent'
 import { Route as ApiPublicHandheldProductsLookupRouteImport } from './routes/api/public/handheld/products.lookup'
 import { Route as ApiPublicHandheldRfidEpcRouteImport } from './routes/api/public/handheld/rfid.$epc'
 import { Route as ApiPublicHandheldRfidBatchStockInRouteImport } from './routes/api/public/handheld/rfid.batch-stock-in'
@@ -1387,6 +1388,12 @@ const ApiPublicHandheldPrintStoreQrRoute =
     path: '/api/public/handheld/print/store-qr',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHandheldPrivacyAiConsentRoute =
+  ApiPublicHandheldPrivacyAiConsentRouteImport.update({
+    id: '/api/public/handheld/privacy/ai-consent',
+    path: '/api/public/handheld/privacy/ai-consent',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHandheldProductsLookupRoute =
   ApiPublicHandheldProductsLookupRouteImport.update({
     id: '/lookup',
@@ -2145,6 +2152,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/print-jobs/lease': typeof ApiPublicHandheldPrintJobsLeaseRoute
   '/api/public/handheld/print/custom-cards': typeof ApiPublicHandheldPrintCustomCardsRouteWithChildren
   '/api/public/handheld/print/store-qr': typeof ApiPublicHandheldPrintStoreQrRoute
+  '/api/public/handheld/privacy/ai-consent': typeof ApiPublicHandheldPrivacyAiConsentRoute
   '/api/public/handheld/products/lookup': typeof ApiPublicHandheldProductsLookupRoute
   '/api/public/handheld/rfid/$epc': typeof ApiPublicHandheldRfidEpcRoute
   '/api/public/handheld/rfid/batch-stock-in': typeof ApiPublicHandheldRfidBatchStockInRoute
@@ -2432,6 +2440,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/print-jobs/lease': typeof ApiPublicHandheldPrintJobsLeaseRoute
   '/api/public/handheld/print/custom-cards': typeof ApiPublicHandheldPrintCustomCardsRouteWithChildren
   '/api/public/handheld/print/store-qr': typeof ApiPublicHandheldPrintStoreQrRoute
+  '/api/public/handheld/privacy/ai-consent': typeof ApiPublicHandheldPrivacyAiConsentRoute
   '/api/public/handheld/products/lookup': typeof ApiPublicHandheldProductsLookupRoute
   '/api/public/handheld/rfid/$epc': typeof ApiPublicHandheldRfidEpcRoute
   '/api/public/handheld/rfid/batch-stock-in': typeof ApiPublicHandheldRfidBatchStockInRoute
@@ -2727,6 +2736,7 @@ export interface FileRoutesById {
   '/api/public/handheld/print-jobs/lease': typeof ApiPublicHandheldPrintJobsLeaseRoute
   '/api/public/handheld/print/custom-cards': typeof ApiPublicHandheldPrintCustomCardsRouteWithChildren
   '/api/public/handheld/print/store-qr': typeof ApiPublicHandheldPrintStoreQrRoute
+  '/api/public/handheld/privacy/ai-consent': typeof ApiPublicHandheldPrivacyAiConsentRoute
   '/api/public/handheld/products/lookup': typeof ApiPublicHandheldProductsLookupRoute
   '/api/public/handheld/rfid/$epc': typeof ApiPublicHandheldRfidEpcRoute
   '/api/public/handheld/rfid/batch-stock-in': typeof ApiPublicHandheldRfidBatchStockInRoute
@@ -3023,6 +3033,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/print-jobs/lease'
     | '/api/public/handheld/print/custom-cards'
     | '/api/public/handheld/print/store-qr'
+    | '/api/public/handheld/privacy/ai-consent'
     | '/api/public/handheld/products/lookup'
     | '/api/public/handheld/rfid/$epc'
     | '/api/public/handheld/rfid/batch-stock-in'
@@ -3310,6 +3321,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/print-jobs/lease'
     | '/api/public/handheld/print/custom-cards'
     | '/api/public/handheld/print/store-qr'
+    | '/api/public/handheld/privacy/ai-consent'
     | '/api/public/handheld/products/lookup'
     | '/api/public/handheld/rfid/$epc'
     | '/api/public/handheld/rfid/batch-stock-in'
@@ -3604,6 +3616,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/print-jobs/lease'
     | '/api/public/handheld/print/custom-cards'
     | '/api/public/handheld/print/store-qr'
+    | '/api/public/handheld/privacy/ai-consent'
     | '/api/public/handheld/products/lookup'
     | '/api/public/handheld/rfid/$epc'
     | '/api/public/handheld/rfid/batch-stock-in'
@@ -3837,6 +3850,7 @@ export interface RootRouteChildren {
   ApiPublicHandheldPrintJobsLeaseRoute: typeof ApiPublicHandheldPrintJobsLeaseRoute
   ApiPublicHandheldPrintCustomCardsRoute: typeof ApiPublicHandheldPrintCustomCardsRouteWithChildren
   ApiPublicHandheldPrintStoreQrRoute: typeof ApiPublicHandheldPrintStoreQrRoute
+  ApiPublicHandheldPrivacyAiConsentRoute: typeof ApiPublicHandheldPrivacyAiConsentRoute
   ApiPublicHandheldRfidEpcRoute: typeof ApiPublicHandheldRfidEpcRoute
   ApiPublicHandheldRfidBatchStockInRoute: typeof ApiPublicHandheldRfidBatchStockInRoute
   ApiPublicHandheldRfidBindItemRoute: typeof ApiPublicHandheldRfidBindItemRoute
@@ -5273,6 +5287,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/handheld/print/store-qr'
       fullPath: '/api/public/handheld/print/store-qr'
       preLoaderRoute: typeof ApiPublicHandheldPrintStoreQrRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/privacy/ai-consent': {
+      id: '/api/public/handheld/privacy/ai-consent'
+      path: '/api/public/handheld/privacy/ai-consent'
+      fullPath: '/api/public/handheld/privacy/ai-consent'
+      preLoaderRoute: typeof ApiPublicHandheldPrivacyAiConsentRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/handheld/products/lookup': {
@@ -6836,6 +6857,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHandheldPrintCustomCardsRoute:
     ApiPublicHandheldPrintCustomCardsRouteWithChildren,
   ApiPublicHandheldPrintStoreQrRoute: ApiPublicHandheldPrintStoreQrRoute,
+  ApiPublicHandheldPrivacyAiConsentRoute:
+    ApiPublicHandheldPrivacyAiConsentRoute,
   ApiPublicHandheldRfidEpcRoute: ApiPublicHandheldRfidEpcRoute,
   ApiPublicHandheldRfidBatchStockInRoute:
     ApiPublicHandheldRfidBatchStockInRoute,

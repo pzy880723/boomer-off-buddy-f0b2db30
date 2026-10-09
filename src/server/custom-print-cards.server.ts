@@ -6,6 +6,7 @@
  * - AI 文案仅可写参考信息能证明的内容；品牌/年份/材质/稀缺性无依据即拦截。
  */
 import { z } from "zod";
+import { AI_POLICY_VERSION } from "@/server/ai-consent-core";
 
 export type CardFormat = "portrait" | "landscape";
 export type CardContent = { title: string; headline: string; body: string };
@@ -25,13 +26,15 @@ export type CardRow = {
   client_op_id: string;
   created_by: string;
   job_token?: string | null;
+  ai_actor_user_id?: string | null;
+  ai_policy_version?: string | null;
   created_at: string;
   updated_at: string;
 };
 export type Card = Pick<CardRow, "id" | "location_id" | "topic" | "instructions" | "formats" | "reference_image_path" | "content" | "state" | "status" | "error" | "version" | "created_at" | "updated_at">;
 export type Actor = { userId: string; deviceId: string };
-type NewRow = Pick<CardRow, "location_id" | "topic" | "instructions" | "formats" | "reference_image_path" | "reference_device_id" | "client_op_id" | "created_by">;
-type Patch = Partial<Pick<CardRow, "topic" | "instructions" | "formats" | "reference_image_path" | "reference_device_id" | "content" | "state" | "status" | "error">> & { published_by?: string; job_token?: null; attempts?: number };
+type NewRow = Pick<CardRow, "location_id" | "topic" | "instructions" | "formats" | "reference_image_path" | "reference_device_id" | "client_op_id" | "created_by" | "ai_actor_user_id" | "ai_policy_version">;
+type Patch = Partial<Pick<CardRow, "topic" | "instructions" | "formats" | "reference_image_path" | "reference_device_id" | "content" | "state" | "status" | "error">> & { published_by?: string; job_token?: null; attempts?: number; ai_actor_user_id?: string; ai_policy_version?: string };
 
 export type CustomCardDeps = {
   roles(userId: string): Promise<string[]>;
@@ -47,6 +50,8 @@ export type CustomCardDeps = {
   loadReference(path: string): Promise<{ mime: string; b64: string }>;
   /** 对象存在且为受支持图片（按内容识别 MIME）。 */
   verifyReference(path: string): Promise<boolean>;
+  /** Authoritative consent (actor + exact policy version). Throws when unreadable. */
+  aiAllowed(userId: string | null | undefined, policyVersion: string | null | undefined): Promise<boolean>;
   generate(input: { topic: string; instructions: string; formats: CardFormat[]; image: { mime: string; b64: string } | null }): Promise<unknown>;
 };
 
@@ -118,10 +123,12 @@ export async function createCard(d: CustomCardDeps, a: Actor, raw: unknown): Pro
   if (!(await d.canAccess(a.userId, b.location_id))) return fail(403, "location_forbidden");
   if (b.reference_image_path && !isOwnedReferencePath(b.reference_image_path, a.deviceId)) return fail(403, "reference_forbidden");
   if (b.reference_image_path && !(await d.verifyReference(b.reference_image_path))) return fail(422, "reference_invalid");
+  if (!(await d.aiAllowed(a.userId, AI_POLICY_VERSION))) return fail(403, "ai_consent_required");
   const row: NewRow = {
     location_id: b.location_id, topic: b.topic, instructions: b.instructions, formats: b.formats,
     reference_image_path: b.reference_image_path ?? null, reference_device_id: b.reference_image_path ? a.deviceId : null,
     client_op_id: b.client_op_id, created_by: a.userId,
+    ai_actor_user_id: a.userId, ai_policy_version: AI_POLICY_VERSION,
   };
   const { card, created } = await d.insertIdempotent(row);
   if (!created) {
@@ -158,7 +165,10 @@ export async function patchCard(d: CustomCardDeps, a: Actor, id: string, raw: un
     }
   }
   if (b.content) { patch.content = b.content; patch.status = "ready"; patch.error = null; patch.job_token = null; }
-  else if (b.regenerate) { patch.status = "queued"; patch.error = null; patch.job_token = null; patch.attempts = 0; }
+  else if (b.regenerate) {
+    if (!(await d.aiAllowed(a.userId, AI_POLICY_VERSION))) return fail(403, "ai_consent_required");
+    patch.ai_actor_user_id = a.userId; patch.ai_policy_version = AI_POLICY_VERSION;
+    patch.status = "queued"; patch.error = null; patch.job_token = null; patch.attempts = 0; }
   else if (r.status === "queued" || r.status === "processing") { patch.status = "queued"; patch.job_token = null; }
   const next = await d.updateCas(id, b.expected_version, patch, r.state);
   return next ? { status: 200, body: toCard(next) } : fail(409, "version_conflict");
@@ -214,6 +224,8 @@ export const SAFE_ERRORS = {
   quota: "AI 文案服务额度不足，请联系总部",
   unavailable: "AI 文案服务暂时不可用，请稍后重新生成",
   timeout: "AI 文案生成超时，请重新生成",
+  consent: "AI 授权未开启或已撤回，未生成文案；可手动填写内容后打印",
+  consentUnavailable: "AI 授权状态暂不可读，请稍后重新生成",
 } as const;
 
 function safeGenerationError(e: unknown): string {
@@ -239,6 +251,11 @@ export async function processCustomCardJobs(d: CustomCardDeps, limit: number) {
     claimed++;
     let patch: Patch;
     try {
+      // Re-check the queued actor's consent right before the AI call (revocation wins).
+      let allowed = false;
+      try { allowed = await d.aiAllowed(job.ai_actor_user_id, job.ai_policy_version); }
+      catch { throw Object.assign(new Error("consent"), { safe: SAFE_ERRORS.consentUnavailable }); }
+      if (!allowed) throw Object.assign(new Error("consent"), { safe: SAFE_ERRORS.consent });
       let image: { mime: string; b64: string } | null = null;
       if (job.reference_image_path) {
         try { image = await d.loadReference(job.reference_image_path); }

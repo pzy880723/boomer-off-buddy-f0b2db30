@@ -12,7 +12,7 @@ const OTHER_DEV = "44444444-4444-4444-8444-444444444444";
 const OP = "55555555-5555-4555-8555-555555555555";
 const REF = `2026-10-07/${DEV}/66666666-6666-4666-8666-666666666666.jpg`;
 
-function fake(opts: { roles?: Record<string, string[]>; access?: Record<string, string[]>; publishThrows?: boolean } = {}) {
+function fake(opts: { roles?: Record<string, string[]>; access?: Record<string, string[]>; publishThrows?: boolean; denyAi?: string[] } = {}) {
   const rows = new Map<string, CardRow>();
   let n = 0;
   const now = () => new Date(1_700_000_000_000 + n++ * 1000).toISOString();
@@ -59,6 +59,7 @@ function fake(opts: { roles?: Record<string, string[]>; access?: Record<string, 
     },
     loadReference: async () => ({ mime: "image/jpeg", b64: "AAAA" }),
     verifyReference: async () => true,
+    aiAllowed: async (u, v) => !!u && v === "2026-10-09-v1" && !(opts.denyAi ?? []).includes(u),
     generate: async () => ({ title: "卡通袜子", headline: "可爱图案每天好心情", body: "柔软舒适的卡通图案袜子，搭配日常穿搭更添趣味。" }),
   };
   if (opts.publishThrows) {
@@ -264,5 +265,42 @@ describe("custom print cards", () => {
     const { deps } = env();
     deps.verifyReference = async () => false;
     assert.equal((await createCard(deps, staff, { ...body, reference_image_path: REF })).status, 422);
+  });
+});
+
+describe("custom print cards AI consent", () => {
+  test("create without consent is 403 and nothing is queued", async () => {
+    const f = fake({ access: { staff: [LOC_A] }, denyAi: ["staff"] });
+    const r = await createCard(f.deps, staff, body);
+    assert.equal((r as any).code, "ai_consent_required");
+    assert.equal(f.rows.size, 0);
+  });
+  test("consent revoked after enqueue: worker fails the card without calling AI", async () => {
+    const deny: string[] = [];
+    const f = fake({ access: { staff: [LOC_A] }, denyAi: deny });
+    let calls = 0;
+    const gen = f.deps.generate;
+    f.deps.generate = async (i) => { calls++; return gen(i); };
+    const c = await createCard(f.deps, staff, body);
+    assert.equal(c.status, 202);
+    const row = [...f.rows.values()][0];
+    assert.equal(row.ai_actor_user_id, "staff");
+    assert.equal(row.ai_policy_version, "2026-10-09-v1");
+    deny.push("staff");
+    const out = await processCustomCardJobs(f.deps, 2);
+    assert.equal(out.failed, 1);
+    assert.equal(calls, 0);
+    assert.match([...f.rows.values()][0].error ?? "", /授权/);
+  });
+  test("manual content patch is never blocked by missing consent", async () => {
+    const deny: string[] = [];
+    const f = fake({ access: { staff: [LOC_A] }, denyAi: deny });
+    const c: any = await createCard(f.deps, staff, body);
+    deny.push("staff");
+    const p = await patchCard(f.deps, staff, c.body.id, { location_id: LOC_A, expected_version: c.body.version,
+      content: { title: "手写标题", headline: "手写短句", body: "手写正文内容" } });
+    assert.equal(p.status, 200);
+    const regen = await patchCard(f.deps, staff, c.body.id, { location_id: LOC_A, expected_version: (p as any).body.version, regenerate: true });
+    assert.equal((regen as any).code, "ai_consent_required");
   });
 });

@@ -12,6 +12,7 @@ import {
 } from "@/server/handheld-auth.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { signSkuImagePaths } from "@/lib/sku-image-resolver.server";
+import { aiConsentBlock } from "@/server/ai-consent.server";
 import { buildRecommendationCard, generateCardCopy } from "@/server/recommendation-card.server";
 
 const Body = z.object({ location_id: z.string().uuid().optional() }).strict();
@@ -32,6 +33,8 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/recommendat
           const locationId = parsed.data.location_id ?? auth.device.location_id;
           if (!locationId) return err("Location required", 422, { code: "validation_error" });
 
+          const blocked = await aiConsentBlock(session.user_id);
+          if (blocked) return blocked;
           const result = await buildRecommendationCard(
             {
               canAccessLocation: userCanAccessLocation,

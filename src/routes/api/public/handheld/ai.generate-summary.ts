@@ -9,6 +9,7 @@ import {
   ok,
   resolveSessionUser,
 } from "@/server/handheld-auth.server";
+import { aiConsentBlock } from "@/server/ai-consent.server";
 import { SummaryInput, generateListingSummary } from "@/server/listing-summary.server";
 
 export const Route = createFileRoute("/api/public/handheld/ai/generate-summary")({
@@ -22,6 +23,8 @@ export const Route = createFileRoute("/api/public/handheld/ai/generate-summary")
         if (!session) return err("Employee session required", 401, { code: "session_required" });
         const body = SummaryInput.safeParse(await request.json().catch(() => null));
         if (!body.success) return err("Invalid request", 422, { code: "validation_error" });
+        const blocked = await aiConsentBlock(session.user_id);
+        if (blocked) return blocked;
         try {
           const description = await generateListingSummary(body.data);
           return ok({ description });

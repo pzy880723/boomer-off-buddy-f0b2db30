@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { HANDHELD_CORS, authenticateDevice, ok, err } from "@/server/handheld-auth.server";
+import { requireAiActor } from "@/server/ai-consent.server";
+import { HANDHELD_CORS, ok, err } from "@/server/handheld-auth.server";
 import { ContentGenerateReq } from "@/lib/handheld/schemas";
 import { replayIfPresent, recordOp, jsonReplay } from "@/server/handheld-idempotency.server";
 import { generateEditorialForSku } from "@/server/handheld-editorial.server";
@@ -9,7 +10,7 @@ export const Route = createFileRoute("/api/public/handheld/content/generate-from
     handlers: {
       OPTIONS: async () => new Response(null, { status: 204, headers: HANDHELD_CORS }),
       POST: async ({ request }) => {
-        const auth = await authenticateDevice(request);
+        const auth = await requireAiActor(request);
         if (!auth.ok) return auth.response;
 
         let body: ReturnType<typeof ContentGenerateReq.parse>;

@@ -2,10 +2,12 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { loadUserRoles, userCanAccessLocation } from "@/server/handheld-auth.server";
 import { generateCardCopy } from "@/server/custom-print-cards-ai.server";
+import { dbConsentStore } from "@/server/ai-consent.server";
+import { isAiAllowed } from "@/server/ai-consent-core";
 import { type CardRow, type CustomCardDeps } from "@/server/custom-print-cards.server";
 
 const T = "custom_print_cards" as never;
-const COLS = "id,location_id,topic,instructions,formats,reference_image_path,reference_device_id,content,state,status,error,version,client_op_id,created_by,job_token,created_at,updated_at";
+const COLS = "id,location_id,topic,instructions,formats,reference_image_path,reference_device_id,content,state,status,error,version,client_op_id,created_by,job_token,ai_actor_user_id,ai_policy_version,created_at,updated_at";
 const MAX_REF_BYTES = 20 * 1024 * 1024;
 const db = () => supabaseAdmin.from(T) as any;
 
@@ -20,6 +22,7 @@ function sniff(b: Uint8Array): string | null {
 export function customCardDeps(): CustomCardDeps {
   return {
     roles: loadUserRoles,
+    aiAllowed: (userId, version) => isAiAllowed(dbConsentStore(), userId, version),
     canAccess: userCanAccessLocation,
     list: async ({ state, location_id }) => {
       let q = db().select(COLS).eq("state", state).order("updated_at", { ascending: false }).limit(500);

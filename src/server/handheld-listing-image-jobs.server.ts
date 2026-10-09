@@ -1,13 +1,40 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { aiPrepareListingImage } from "@/server/handheld-ai.server";
 import { safeImageJobError } from "@/server/listing-image-safety.server";
+import {
+  QUEUED_AI_DENIED_ERROR,
+  QUEUED_AI_UNAVAILABLE_ERROR,
+  queuedAiDecision,
+  type ConsentStore,
+} from "@/server/ai-consent-core";
+
+type AiActor = { ai_actor_user_id?: string | null; ai_policy_version?: string | null };
+
+let consentStoreFactory: () => Promise<ConsentStore> = async () =>
+  (await import("@/server/ai-consent.server")).dbConsentStore();
+/** Test seam only. */
+export function __setConsentStoreFactory(f: () => Promise<ConsentStore>) {
+  consentStoreFactory = f;
+}
+
+/** Re-read the original actor's consent right before the AI call. Null = go ahead. */
+async function consentFailure(job: AiActor): Promise<string | null> {
+  let decision: "allowed" | "denied" | "unavailable";
+  try {
+    decision = await queuedAiDecision(await consentStoreFactory(), job);
+  } catch {
+    decision = "unavailable";
+  }
+  if (decision === "allowed") return null;
+  return decision === "denied" ? QUEUED_AI_DENIED_ERROR : QUEUED_AI_UNAVAILABLE_ERROR;
+}
 
 type ImageRef = {
   bucket: "sku-raw" | "sku-listing";
   storage_path: string;
 };
 
-type JobRow = {
+type JobRow = AiActor & {
   id: string;
   sku_id: string;
   source_bucket: "sku-raw" | "sku-listing";
@@ -17,7 +44,7 @@ type JobRow = {
   claim_token: string;
 };
 
-type ContentImageJob = {
+type ContentImageJob = AiActor & {
   id: string;
   sku_id: string;
   block_id: string;
@@ -54,8 +81,8 @@ async function prepareImage(
 
 async function processContentImageJob(job: ContentImageJob): Promise<void> {
   let targetPath: string | null = null;
-  let failure: string | null = null;
-  try {
+  let failure: string | null = await consentFailure(job);
+  if (!failure) try {
     const slash = job.source_path.indexOf("/");
     const path = await prepareImage(
       job.source_path.slice(0, slash),
@@ -89,6 +116,9 @@ function cleanStoragePath(bucket: string, path: string): string {
 export async function enqueueListingImageJobs(input: {
   skuId: string;
   images: ImageRef[];
+  /** Original actor + policy version; the worker re-checks consent before each AI call. */
+  aiActorUserId: string;
+  aiPolicyVersion: string;
 }): Promise<{ queued: number; status: "idle" | "queued" }> {
   const rows = input.images
     .map((image, index) => ({ image, index }))
@@ -98,6 +128,8 @@ export async function enqueueListingImageJobs(input: {
       source_bucket: image.bucket,
       source_path: cleanStoragePath(image.bucket, image.storage_path),
       source_index: index,
+      ai_actor_user_id: input.aiActorUserId,
+      ai_policy_version: input.aiPolicyVersion,
       target_bucket: "sku-listing",
       status: "queued",
       next_run_at: new Date().toISOString(),
@@ -122,8 +154,8 @@ export async function enqueueListingImageJobs(input: {
 
 async function processJob(job: JobRow): Promise<string> {
   let targetPath: string | null = null;
-  let failure: string | null = null;
-  try {
+  let failure: string | null = await consentFailure(job);
+  if (!failure) try {
     const path = await prepareImage(
       job.source_bucket,
       job.source_path,

@@ -2182,6 +2182,8 @@ export type Database = {
       }
       custom_print_cards: {
         Row: {
+          ai_actor_user_id: string | null
+          ai_policy_version: string | null
           attempts: number
           client_op_id: string
           content: Json | null
@@ -2205,6 +2207,8 @@ export type Database = {
           version: number
         }
         Insert: {
+          ai_actor_user_id?: string | null
+          ai_policy_version?: string | null
           attempts?: number
           client_op_id: string
           content?: Json | null
@@ -2228,6 +2232,8 @@ export type Database = {
           version?: number
         }
         Update: {
+          ai_actor_user_id?: string | null
+          ai_policy_version?: string | null
           attempts?: number
           client_op_id?: string
           content?: Json | null
@@ -3336,6 +3342,33 @@ export type Database = {
           },
         ]
       }
+      handheld_ai_consents: {
+        Row: {
+          allowed: boolean
+          created_at: string
+          decided_at: string
+          device_id: string | null
+          policy_version: string
+          user_id: string
+        }
+        Insert: {
+          allowed: boolean
+          created_at?: string
+          decided_at?: string
+          device_id?: string | null
+          policy_version: string
+          user_id: string
+        }
+        Update: {
+          allowed?: boolean
+          created_at?: string
+          decided_at?: string
+          device_id?: string | null
+          policy_version?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       handheld_item_audit: {
         Row: {
           action: string
@@ -4374,6 +4407,8 @@ export type Database = {
       }
       inv_listing_image_jobs: {
         Row: {
+          ai_actor_user_id: string | null
+          ai_policy_version: string | null
           attempts: number
           claim_token: string | null
           completed_at: string | null
@@ -4394,6 +4429,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ai_actor_user_id?: string | null
+          ai_policy_version?: string | null
           attempts?: number
           claim_token?: string | null
           completed_at?: string | null
@@ -4414,6 +4451,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ai_actor_user_id?: string | null
+          ai_policy_version?: string | null
           attempts?: number
           claim_token?: string | null
           completed_at?: string | null
@@ -4524,6 +4563,8 @@ export type Database = {
       }
       inv_product_content_image_jobs: {
         Row: {
+          ai_actor_user_id: string | null
+          ai_policy_version: string | null
           attempts: number
           block_id: string
           claim_token: string | null
@@ -4539,6 +4580,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ai_actor_user_id?: string | null
+          ai_policy_version?: string | null
           attempts?: number
           block_id: string
           claim_token?: string | null
@@ -4554,6 +4597,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ai_actor_user_id?: string | null
+          ai_policy_version?: string | null
           attempts?: number
           block_id?: string
           claim_token?: string | null
@@ -10233,6 +10278,8 @@ export type Database = {
       custom_print_card_claim: {
         Args: { p_lease_seconds?: number; p_limit: number }
         Returns: {
+          ai_actor_user_id: string | null
+          ai_policy_version: string | null
           attempts: number
           client_op_id: string
           content: Json | null
@@ -10551,6 +10598,8 @@ export type Database = {
       handheld_listing_image_claim: {
         Args: { p_limit?: number }
         Returns: {
+          ai_actor_user_id: string | null
+          ai_policy_version: string | null
           attempts: number
           claim_token: string | null
           completed_at: string | null
@@ -10876,6 +10925,8 @@ export type Database = {
       product_content_image_claim: {
         Args: { p_limit: number }
         Returns: {
+          ai_actor_user_id: string | null
+          ai_policy_version: string | null
           attempts: number
           block_id: string
           claim_token: string | null

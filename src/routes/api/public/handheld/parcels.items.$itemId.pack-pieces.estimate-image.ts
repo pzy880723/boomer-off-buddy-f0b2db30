@@ -8,6 +8,7 @@ import { HANDHELD_CORS, ok } from "@/server/handheld-auth.server";
 import { errCode } from "@/lib/handheld/errors";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSuperAdmin } from "./parcels";
+import { aiConsentBlock } from "@/server/ai-consent.server";
 import { toThumbUrl } from "@/lib/image";
 import { generateText, Output } from "ai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
@@ -57,6 +58,8 @@ export const Route = createFileRoute(
         const apiKey = process.env.LOVABLE_API_KEY;
         if (!apiKey) return errCode("internal_error", "LOVABLE_API_KEY not configured");
 
+        const blocked = await aiConsentBlock(g.user.user_id);
+        if (blocked) return blocked;
         try {
           const gateway = createOpenAICompatible({
             name: "lovable",
