@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 import { beforeEach, test } from "node:test";
 import {
   AI_POLICY_VERSION,
@@ -107,7 +108,7 @@ async function bundle(entry: string, stubs: Record<string, string>, real: string
     entryPoints: [entry], bundle: true, write: false, platform: "node", format: "esm",
     plugins: [{ name: "stubs", setup(b: any) {
       b.onResolve({ filter: /^(@\/|@tanstack\/react-router$|\.\/product-classification\.server$)/ }, (a: any) => real.includes(a.path)
-        ? { path: require.resolve(a.path.replace(/^@\//, "/dev-server/src/") + ".ts") }
+        ? { path: fileURLToPath(new URL(a.path.replace(/^@\/server\//, "./") + ".ts", import.meta.url)) }
         : { path: a.path, namespace: "stub" });
       b.onLoad({ filter: /.*/, namespace: "stub" }, (a: any) => {
         assert.ok(stubs[a.path] !== undefined, `unhandled import ${a.path}`);
