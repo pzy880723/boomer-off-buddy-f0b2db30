@@ -1,48 +1,35 @@
-# 翻筐乐（100件一筐 + 1%赠礼盲盒）只读核查结果与最小变更点
+# iPhone App Store 首发前只读核查结果（不改代码、不部署）
 
-本文件仅为只读核查结论，未改代码/数据库，未发布。批准后也只会按授权另行实施。
+工作副本 HEAD：`50d4c49b9b842ac73da92b81d80d60382a80940d`（GitHub main 已知为 88549ad5，以 Codex 本地核对为准）。
 
-## 1. 当前版本
-- 工作副本 HEAD：`a9b99c3252af802286ab9d1be36a4f21c3a6e855`（Complete Fankuang enrollment clients and Tencent release verification），工作区干净。
-- 最新迁移：`drizzle/migrations/0045_fankuang_override.sql`（journal 已登记）。`supabase/migrations/` 为旧历史（最后 20261003140000），不再新增。
+## 1) AI 出站路径
+所有 AI 调用都只发往 `https://ai.gateway.lovable.dev/v1`（Lovable AI 网关），代码里没有直连 OpenAI 或 Google 的地址。模型 ID 显示的上游厂商是 Google Gemini 和 OpenAI。
+- 拍照识别：`src/server/product-recognition.server.ts:340`（gemini-2.5-pro/flash），`src/server/product-title.server.ts:11`（gemini-2.5-flash，可用 env HANDHELD_PRODUCT_RECOGNITION_MODEL 覆盖），`src/lib/mobile.functions.ts:353`
+- 图片修整：`src/server/handheld-ai.server.ts:9/148`（gemini-3.1-flash-image），成品复核在 `src/server/listing-image-safety.server.ts:99,117`（gemini-2.5-flash），`src/lib/sku-image.functions.ts:16`（gemini-2.5-flash-image）
+- 文案：`src/server/listing-summary.server.ts:78`、`src/server/recommendation-card.server.ts:132`、`src/server/custom-print-cards-ai.server.ts:69`（openai/gpt-6-astra，走 /responses），`src/server/product-content.server.ts:85`、`src/server/handheld-editorial.server.ts:4`
+- 其他 AI 路径（多数只在后台网页使用）：`src/lib/ai.functions.ts`、`recognize.functions.ts`、`meruki-parse.functions.ts`、`domestic-recognize.functions.ts`、`tariff.functions.ts`、`translate.functions.ts`、`pack-pieces.functions.ts`，以及两个 `handheld/parcels.items.$itemId.pack-pieces.estimate-*` 接口
+- 其他非 AI 第三方：腾讯云短信 `src/server/sms.tencent.server.ts:5`；有赞（经固定出口代理）
+- 需要业务确认：网关及上游厂商的数据保留、是否用于训练、处理所在地区，代码里都看不出来。工作区当前的保留政策里，Google/OpenAI 在 chat/responses 上未列为允许保留，但这只是工作区设置，不能代替合同条款。
 
-## 2. 后端实现与主库判断
-- 服务端：TanStack Start server routes，消费者接口在 `src/routes/api/public/storefront/*`。
-- 数据访问：路由通过 `supabaseAdmin.rpc(...)`（Supabase/PostgREST 客户端）调用 SQL 函数；Drizzle 仅作迁移运行器（`drizzle/schema.ts` 为空，仅"do not edit"注释，无 Drizzle ORM 查询）。
-- 是否以 Tencent PostgreSQL+Drizzle 为实际生产主库：仓库内无法证实。代码层面无直连 `DATABASE_URL`/`drizzle(...)` 的读写路径，访问方式仍是 Supabase 客户端；腾讯侧实际连接哪个库需 Codex 在腾讯环境读回环境变量指向（不输出值）确认。未验证。
+## 2) 数据存放位置
+- 业务数据库与登录：原 Lovable Cloud 数据库（`tencent-media-client.server.ts` 注释写明"主业务库 + auth 仍在 Lovable"）。旧腾讯 Web 也连这个库（之前已只读核实）。
+- 原图：存储桶 `sku-raw`。处理图：`sku-listing`（`ai.prepare-listing-image.ts:29`，签名链接 7 天有效，但文件本身没有删除逻辑）。另有桶 `shop-images`、`transfer-receipts`、`domestic-order-screenshots`、`domestic-bulk-attachments`。包裹商品图会写到腾讯 COS 背后的存储 `parcel-item-images`（公开桶，`src/server/tencent-media-client.server.ts`）。
+- 员工设备 install_id 和设备名：表 `inv_handheld_devices`，按 (owner_user_id, install_id) 写入或更新（`src/routes/api/public/handheld/auth.bootstrap.ts:66-110`）。
+- 客服文字：表 `support_messages` / `support_conversations`（规则见 `src/server/AGENTS.md`）。
+- 扫码支付：`pos_payment_attempts`（qr_content、code_url、expires_at，`src/server/pos-payment.server.ts:54,349`）；线上支付在 `commerce_payments`，其中 payment_payload 在 `src/routes/api/public/storefront/payments.ts`。
+- 订单与审计：`commerce_orders`、`commerce_order_items`，以及多张 `*_audit` / `*_audit_logs` 表。
+- 删除与保留规则：代码里没有找到针对上述数据的定期清理或删除任务。expires_at 只控制有效期，到期后不删数据。实际保留多久、有没有备份（腾讯备份脚本 `infra/tencent-supabase/ops/backup.sh` 的范围未核实）都需要业务确认。不能说成"不保留"。
 
-## 3. 赠礼 SKU / 库存
-- 全仓 `src`、`drizzle/migrations` 搜索 gift / 赠礼 / 盲盒 / blind_box：无业务实现（仅 mock-data 与调拨对话框的无关文字）。无赠礼 SKU、赠礼库存、中奖记账表。
-- 翻筐乐现状仅有 `inv_skus.fankuang_override` + `src/lib/commerce/fankuang.ts`（有效参与判定）和商城 `fankuang=1` 分页前过滤；无"筐"、每日重排、冻结快照、喜好表。
+## 3) 公开支持页 / 隐私页
+`src/routes` 里没有 privacy、support、terms、contact 页面，代码里也没找到公司客服邮箱或电话。目前不存在可公开的 ERP 隐私或支持页面，真实公司联系方式需要业务提供。
 
-## 4. 订单/报价结构
-- 下单：`src/routes/api/public/storefront/orders.ts`
-  - 输入：`items` 或 `listing_ids`（二选一）、`fulfillment_method: 'express'|'pickup'`（默认 express）、优惠券、收货信息、幂等键；经 `src/lib/commerce/storefront-order-request.ts` 的 `normalizeStorefrontOrderItems` 归一。
-  - 原子写入位置：DB RPC `commerce_create_ordinary_order`（快递）/ `commerce_create_ordinary_pickup_order`（自提，0040/0044），数据库内重算价格/券/库存/方式并幂等；随后 `recordOrderOrigin`。
-  - 错误码：`coupon_unavailable` 409、`fulfillment_method_conflict` 409。
-- 详情/列表：`orders.$id.ts`、`orders.ts` GET（`storefrontPrivateJson`，no-store）。
-- shipping-quote：本仓库无该路由文件，仅为腾讯专属 overlay（调用 `commerce_quote_checkout`/v2，pickup_v1 零运费）。输入输出以腾讯基线为准，本仓库不能覆盖。
-- 商品：`products.ts` / `products.$id.ts`（返回 `in_fankuang`）。
+## 4) 审核 / 演示门店与最小权限账号
+- 已有的权限能力：角色枚举 `app_role`（super_admin / hq_operator / store_manager / store_staff / warehouse_staff），存在 `user_roles`；门店隔离靠 `user_location_perms`（`src/server/handheld-auth.server.ts:177,249`）；后台账号管理在 `src/lib/admin-users.functions.ts`、`src/routes/admin.users.tsx`。
+- 没有找到专门隔离的审核或演示门店、演示数据开关或审核账号机制。技术上可以用"单独门店 + store_staff + 只授权该门店"组合出来，但可能会影响有赞同步、库存和报表，需要业务确认；本轮没有创建任何东西。
 
-## 5. 预计最小变更点（未实施）
-数据层（新增迁移 0046+，不改已应用文件）：
-- `commerce_fankuang_baskets`（日期、筐号、Asia/Shanghai 业务日、seed）与 `commerce_fankuang_basket_slots`（筐、位次、listing/sku），00:00 上海时区重排由腾讯 systemd timer 调 RPC 生成；售出/下架空位按新上架补位。
-- `commerce_fankuang_sessions`（顾客、筐、快照 listing 列表、状态）实现"翻完前冻结"。
-- `commerce_fankuang_preferences`（个人隐藏/喜好，只过滤本人视图）。
-- `commerce_fankuang_flips`（顾客、session、listing、client_op 唯一）+ 抽奖结果在 RPC 内服务端随机一次落库，重复请求返回原结果，防刷新重抽；仅"真实有效商品"首次翻动计入。
-- `commerce_gift_entitlements`（中奖赠礼额度、状态、绑定订单）。
-- 赠礼 SKU：在 `inv_skus` 用标准商品承载（需字段或配置标识为赠礼盲盒 SKU），消费者端只显示盲盒，不暴露具体商品。
-- 下单 RPC 扩展：`commerce_create_ordinary_order` / pickup 版及 `commerce_quote_checkout_v2` 新增可选 `p_gift_count`；校验 赠礼数 ≤ 付费件数（含特价清仓）且 ≤ 可用中奖额度，不满足返回 409 `gift_exceeds_paid_items`（提示减赠礼或加购）；赠礼行写入 `commerce_order_items`（单价0、标记赠礼），走原库存/配货链路，ERP 配货可见赠礼 SKU 数量。须以 `pg_get_functiondef` 当前定义为基准扩展，保留券/运费快照/幂等。
-
-接口层：
-- 新增 `storefront/fankuang.basket.ts`（取今日筐/冻结快照）、`fankuang.flip.ts`（POST，client_op 幂等，返回是否中奖）、`fankuang.preferences.ts`、`gifts.ts`（可用赠礼额度）。
-- `orders.ts` 输入加 `gift_count`；腾讯 shipping-quote overlay 由 Codex 对应加字段。
-- ERP 配货页显示赠礼行（现有订单明细组件加标记）。
-
-## 6. 需确认的问题（实施前）
-- 赠礼盲盒 SKU 由谁建、库存从哪个门店扣；跨店订单赠礼分配到哪个子单。
-- "真实有效翻动"的判定（停留时长/去重口径），以及每日中奖上限。
-- 冻结快照中途商品被他人买走时如何展示。
-
-## 技术约束
-- 不改旧内嵌库数据，不造假库存/订单/付款，不写有赞，不部署腾讯；Lovable 预览不等于腾讯上线。
+## 待业务确认
+1. Lovable AI 网关和 Google/OpenAI 的数据保留、训练用途和处理地区条款
+2. 生产数据库归属（Lovable Cloud 还是腾讯）以及它在哪个地区
+3. 各类数据的保留期限、删除流程和备份范围
+4. 公开隐私政策和支持页面的托管地址，以及公司对外联系渠道
+5. 审核演示门店是否建立，以及怎样与有赞、报表隔离
