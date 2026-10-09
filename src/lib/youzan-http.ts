@@ -1,3 +1,5 @@
+import { assertNoExternalWrite } from "@/server/review-isolation.mjs";
+
 type ProxyEnvelope = {
   status?: number;
   statusText?: string;
@@ -89,6 +91,7 @@ export function getYouzanOutboundStatus(): YouzanOutboundStatus {
 }
 
 export async function youzanFetch(targetUrl: string, init: RequestInit = {}): Promise<Response> {
+  assertNoExternalWrite("youzan");
   assertYouzanUrl(targetUrl);
   const proxyUrl = getProxyUrl();
   if (!proxyUrl) return fetch(targetUrl, init);

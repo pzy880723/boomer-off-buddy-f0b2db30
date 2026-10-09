@@ -76,6 +76,15 @@ if [[ "$BIND_PORT" != 3005 ]]; then
 fi
 set +a
 
+if [[ "${BOOMER_REVIEW_ISOLATED:-}" == "true" ]]; then
+  # App Store demo instance: refuse to boot against production data or real channels.
+  node "$APP_DIR/scripts/assert-review-isolation.mjs"
+  export HANDHELD_RELEASE_WORKER_ENABLED=false HANDHELD_ITEM_SYNC_WORKER_ENABLED=false
+  export HANDHELD_LISTING_IMAGE_WORKER_ENABLED=false YOUZAN_STOCK_WORKER_ENABLED=false
+  export YOUZAN_IMAGE_REFRESH_WORKER_ENABLED=false YOUZAN_ORDER_SYNC_WORKER_ENABLED=false
+  export YOUZAN_SALE_COMPENSATION_ENABLED=false CHANNEL_SYNC_WORKER_ENABLED=false
+fi
+
 cd "$APP_DIR"
 if [[ "$IS_NODE_SERVER" == 1 ]]; then
   export NODE_ENV=production HOST="$BIND_HOST" PORT="$BIND_PORT" NITRO_HOST="$BIND_HOST" NITRO_PORT="$BIND_PORT"
