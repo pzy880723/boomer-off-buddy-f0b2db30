@@ -25,7 +25,7 @@ done
 echo "PASS baseline replay to 20260731070000"
 # Schema-only target: remove every row.
 $P -q -c "do \$\$ declare t text; begin for t in select format('public.%I',relname) from pg_class where relnamespace='public'::regnamespace and relkind='r' loop execute 'truncate '||t||' cascade'; end loop; end \$\$" -c "truncate auth.users cascade"
-HQ=$(cat /proc/sys/kernel/random/uuid); ST=$(cat /proc/sys/kernel/random/uuid)
+HQ=$(python3 -c "import uuid;print(uuid.uuid4())"); ST=$(python3 -c "import uuid;print(uuid.uuid4())")
 $P -q -c "insert into auth.users(id,email,raw_user_meta_data) values ('$HQ','demo-hq@review.invalid','{\"name\":\"演示总部账号\"}'),('$ST','demo-staff@review.invalid','{\"name\":\"演示店员\"}')"
 URL="postgresql:///$DB?host=/tmp&port=${SHORTAGE_TEST_PGPORT:-55432}&user=postgres"
 for round in 1 2; do
