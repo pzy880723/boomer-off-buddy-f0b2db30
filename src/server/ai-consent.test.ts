@@ -9,7 +9,6 @@ import {
   queuedAiDecision,
   type ConsentStore,
 } from "./ai-consent-core.ts";
-import { smartCreateFingerprint } from "./handheld-smart-create.server.ts";
 
 const require = createRequire(import.meta.url);
 const { build } = createRequire(require.resolve("vite"))("esbuild");
@@ -84,7 +83,12 @@ test("queued jobs: null actor (legacy) and wrong version are denied", async () =
   assert.equal(await queuedAiDecision(store, { ai_actor_user_id: "me", ai_policy_version: AI_POLICY_VERSION }), "allowed");
 });
 
-test("retry with different ai_processing_allowed keeps the same product fingerprint (no duplicate SKU)", () => {
+test("retry with different ai_processing_allowed keeps the same product fingerprint (no duplicate SKU)", async () => {
+  const { smartCreateFingerprint } = await bundle("src/server/handheld-smart-create.server.ts", {
+    "@/integrations/supabase/client.server": "export const supabaseAdmin = {};",
+    "@/lib/product-classification": "export const findSanrioBrandCandidate = () => null;",
+    "@/lib/product-taxonomy": "export const matchBrandCandidate = () => null; export const normalizeLookupText = s => s;",
+  });
   const base = { name: "屋", category: "toy", price_tier: 159, client_op_id: "c1" };
   const a = smartCreateFingerprint({ ...base, ai_processing_allowed: true }, "loc");
   const b = smartCreateFingerprint({ ...base, ai_processing_allowed: false, client_op_id: "c2" }, "loc");
@@ -162,10 +166,12 @@ const route = await bundle("src/routes/api/public/handheld/ai.recognize-item.ts"
     export const resolveSessionUser = async () => globalThis.__aiq.session;
     export const ok = d => Response.json({ ok: true, data: d });
     export const err = (m, s, x = {}) => Response.json({ ok: false, error: m, ...x }, { status: s });`,
-  "@/integrations/supabase/client.server": "export const supabaseAdmin = {};",
+  "@/integrations/supabase/client.server": `export const supabaseAdmin = { from: () => { const f = {}; const q = {
+    select: () => q, eq: (k, v) => { f[k] = v; return q; },
+    maybeSingle: async () => { const a = globalThis.__aiq.consent[f.user_id + ':' + f.policy_version];
+      return { data: a === undefined ? null : { allowed: a }, error: null }; } }; return q; } };`,
   "@/lib/handheld/schemas": "export const AiRecognizeReq = { parse: v => v };",
   "@/server/handheld-ai.server": "export const aiRecognizeItem = async () => { globalThis.__aiq.prepared++; return { name: 'x' }; };",
-  "@/server/ai-consent.server": undefined as never,
 }, ["@/server/ai-consent-core", "@/server/ai-consent.server"]);
 const call = () => route.Route.server.handlers.POST({ request: new Request("https://x", { method: "POST", body: "{}" }) });
 
