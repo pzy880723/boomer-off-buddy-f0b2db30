@@ -8399,6 +8399,125 @@ export type Database = {
         }
         Relationships: []
       }
+      storefront_engagement_quota: {
+        Row: {
+          customer_id: string
+          event_count: number
+          quota_day: string
+        }
+        Insert: {
+          customer_id: string
+          event_count?: number
+          quota_day: string
+        }
+        Update: {
+          customer_id?: string
+          event_count?: number
+          quota_day?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "storefront_engagement_quota_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      storefront_product_favorites: {
+        Row: {
+          created_at: string
+          customer_id: string
+          listing_id: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          listing_id: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          listing_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "storefront_product_favorites_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "storefront_product_favorites_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      storefront_product_opens: {
+        Row: {
+          created_at: string
+          customer_id: string
+          listing_id: string
+          open_day: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          listing_id: string
+          open_day: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          listing_id?: string
+          open_day?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "storefront_product_opens_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "storefront_product_opens_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      storefront_search_term_hits: {
+        Row: {
+          created_at: string
+          hit_day: string
+          label: string
+          term_key: string
+          visitor_key: string
+        }
+        Insert: {
+          created_at?: string
+          hit_day: string
+          label: string
+          term_key: string
+          visitor_key: string
+        }
+        Update: {
+          created_at?: string
+          hit_day?: string
+          label?: string
+          term_key?: string
+          visitor_key?: string
+        }
+        Relationships: []
+      }
       support_agents: {
         Row: {
           created_at: string
@@ -11063,6 +11182,33 @@ export type Database = {
           p_quote: Json
           p_reason: string
           p_reported_by: string
+        }
+        Returns: Json
+      }
+      storefront_hot_search_terms: {
+        Args: { p_limit?: number; p_window_days?: number }
+        Returns: {
+          label: string
+          searchers: number
+          term_key: string
+        }[]
+      }
+      storefront_product_engagement_counts: {
+        Args: { p_listing_ids: string[] }
+        Returns: {
+          favorite_count: number
+          listing_id: string
+          view_count: number
+        }[]
+      }
+      storefront_record_engagement: {
+        Args: {
+          p_action: string
+          p_customer_id: string
+          p_label: string
+          p_listing_id: string
+          p_term_key: string
+          p_visitor_key: string
         }
         Returns: Json
       }

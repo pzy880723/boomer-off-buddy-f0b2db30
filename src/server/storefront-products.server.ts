@@ -17,7 +17,7 @@ export type StorefrontProductQuery = {
   brand_ids: string[];
   facet_codes: string[];
   location_id: string | null;
-  sort: "newest" | "price_asc" | "price_desc" | "relevance";
+  sort: "newest" | "price_asc" | "price_desc" | "relevance" | "popular";
   page: number;
   page_size: number;
   /** fankuang=1：只返回有效参与翻筐乐的商品（分页前过滤）。 */
@@ -87,11 +87,11 @@ export type StorefrontProduct = ReturnType<typeof buildStorefrontProduct>;
  * - image_url / image_urls 契约不变（原图签名）
  * - thumbnail_url 为新增可选字段；缩略图签名失败回退原图 URL
  */
-export async function signStorefrontProductImages(
-  products: StorefrontProduct[],
+export async function signStorefrontProductImages<P extends StorefrontProduct>(
+  products: P[],
   listingsById: Map<string, StorefrontListing>,
   options: { thumbnail?: boolean; signer?: ImageSigner; thumbnailSigner?: ImageSigner } = {},
-): Promise<StorefrontProduct[]> {
+): Promise<P[]> {
   const signer = options.signer ?? signSkuImagePaths;
   const thumbnailSigner = options.thumbnailSigner ?? thumbnailDerivativeSigner;
   const pageListings = products.map(
@@ -183,7 +183,7 @@ function positiveInt(value: string | null, fallback: number, max: number): numbe
 
 export function parseStorefrontProductQuery(url: URL): StorefrontProductQuery {
   const sortValue = url.searchParams.get("sort");
-  const sort = ["newest", "price_asc", "price_desc", "relevance"].includes(sortValue ?? "")
+  const sort = ["newest", "price_asc", "price_desc", "relevance", "popular"].includes(sortValue ?? "")
     ? (sortValue as StorefrontProductQuery["sort"])
     : url.searchParams.get("q")
       ? "relevance"
