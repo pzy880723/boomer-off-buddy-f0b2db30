@@ -1,23 +1,27 @@
-# App Store 剩余两项只读核查结果（未改任何代码/数据/账号）
+# 只读核查结果：热门搜索/排行、客服通知、商品原图
 
-## 1) 受限审核账号 / 非生产环境
-- 结论：不存在。user_roles 只有 4 条 super_admin，没有 store_staff / store_manager 等受限角色账号；任何现有账号交给 Apple 都是总部全权限。
-- 无独立非生产环境：preview 与正式共用同一个 Lovable Cloud 实例；仓库没有 staging/review 配置。101.34.236.101 是缺自提表的恢复库，且是生产数据副本，不能当审核环境。
-- 最少落地（不开发新系统）：
-  1. 新建一个独立 Lovable Cloud 项目（或独立分支项目）作为审核后端，只跑现有迁移，不导入生产数据。
-  2. 只在该环境里放演示门店/商品，建一个 store_staff 账号并只授权该门店（user_location_perms）。
-  3. 不配置有赞 token/代理、不配置腾讯短信与支付密钥，让外部写入天然失败关闭。
-  4. App 审核包指向该后端地址（需要 App 支持切换 API 基址，或单独构建审核包）。
-- 阻塞：App 是否能按构建切换后端地址未核实；手机号 OTP 登录依赖腾讯短信，审核环境需改用固定测试验证码或密码登录，需业务决定。
+当前提交：`7b1adb4aba37d3a3e8f78f0c9154cdaa4c5999b0`（Lovable 内嵌后端，不代表腾讯生产已发布）。本轮未修改代码或数据。
 
-## 2) 旧客户端与发布顺序
-- 需要授权的手持 AI 入口（8 个）：ai.recognize-item / recognize-title / prepare-listing-image / generate-summary、content.generate-from-sku、items/:id/recommendation-card、pack-pieces estimate-image / estimate-title。smart-create 在未授权时不排队 AI，指纹不受影响；其余接口（登录、浏览、手动上架、收银、打印）不需要授权。
-- 现状：handheld_ai_consents 0 条，所以新后端一上线所有设备的 AI 都会返回 403。已登记的活跃设备版本有 0.2.0×2、1.0、1.1.20、e2e，记录里没有 56/57 的版本号（设备表里 app_version 可能没更新）。
-- 建议顺序（不默认同意）：
-  1. 先把 57 发给员工 iPhone 和 Android，在授权页让每个员工本人点同意。
-  2. 查 handheld_ai_consents 是否已覆盖实际在用账号。
-  3. 再发布腾讯后端 guard。56 及旧 Android 届时只有 AI 返回 403，非 AI 业务不受影响；提示升级即可。
-- 0047 已实际应用：handheld_product_content 的 5 参版本（uuid,uuid,uuid,uuid,jsonb）和 6 参版本（多一个 text）都在，权限只有 postgres 和 service_role。
+## 1. 热门搜索与热门商品排行
+- **没有**真实的搜索词次数/人数榜，也**没有**商品点击打开或收藏人数统计。
+- 数据库里只有支付、物流、销售、打印四类事件表，没有搜索、浏览、点击、收藏相关表。
+- `src/routes/api/public/storefront/products.ts` 只调用 `search_inv_skus` 返回搜索结果，不记录搜索词。`products.$id.ts` 不记录打开次数。
+- 内容收藏/点赞（`src/routes/api/public/content/$id.bookmark.ts`、`$id.like.ts`）只针对文章内容，不针对商品。
+- 结论：不能拿现有数据做热门榜，否则就是伪造。
 
-## 问题
-- 审核环境要单独起一个新后端加审核构建，还是先用 TestFlight 内部测试，推迟公开审核？
+## 2. 小程序客服是否连到 ERP 和安卓工作机
+- 创建会话：`src/routes/api/public/storefront/support.conversations.ts` 调用 `ensureCustomerConversation`（`src/server/support.server.ts` 第716行），写入 `support_conversations`，channel=native。顾客消息由 `postCustomerMessage`（第839行）写入 `support_messages`。这些数据会进入 ERP 和手持机的客服列表（`/api/public/handheld/support/conversations`，按门店权限过滤，总部可看全部）。
+- 聚合数据：5 个会话（全部 native）、6 条消息。
+- **不会**生成手持机通知：support 表上只有更新时间、touch、等待状态三个触发器，代码里也没有写入通知表；`inv_handheld_notifications` 当前共 0 行。
+- 安卓获取通知的方式：只能轮询 `GET /api/public/handheld/notifications`（设备+员工双重鉴权；可见范围为本人、本设备、有权限的门店或全局广播；字段包括 kind/ref_type/ref_id）。
+- 主动推送（极光/FCM/个推）：设置和代码中都**不存在**。
+
+## 3. 商品原图链接
+- 私有桶签名链接有效期为 24 小时（`src/server/media-derivative.server.ts` 第24行、`src/lib/sku-image-resolver.server.ts` 第18行）。`image_urls`/`image_previews` 过期后需要重新请求商品详情来刷新，目前没有单独的“查看原图并刷新”接口。
+- `/api/public/media/sku/$` 是公开、不限期的代理，能读取 sku-raw/sku-listing 两个桶的任意文件，等于变相公开私有桶，不建议给小程序使用。
+- 腾讯原图：仓库里有腾讯存储切换路径，但实际开关和地域无法从这里核实。
+
+## 最小修改建议（需另行批准）
+1. 新增 `storefront_search_events`、`storefront_product_events`（open/favorite）表，记录匿名或顾客 ID，仅服务端可写；做每日聚合 RPC，并新增 `GET /storefront/search/hot`、`/products/hot`。商品收藏需要单独一张收藏表。
+2. 在 `ensureCustomerConversation`/`postCustomerMessage` 成功后，写入 `inv_handheld_notifications`（kind=`support_message`，location_id=会话门店，ref_type=`support_conversation`），手持机继续轮询。主动推送需要另外接入厂商并配置密钥。
+3. 新增需要鉴权的 `GET /storefront/products/:id/original-image?index=` 接口，在核验商品已上架后返回短期签名原图链接；同时把公开的 sku 代理限制为只能访问已上架商品的图片。
