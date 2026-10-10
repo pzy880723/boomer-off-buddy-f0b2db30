@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { STOREFRONT_CORS, storefrontError, storefrontJson } from "@/server/storefront-auth.server";
 import { loadPublishedProductContent } from "@/server/product-content.server";
+import { loadEngagementCounts } from "@/server/storefront-engagement.server";
 import {
   buildStorefrontProductDetail,
   type StorefrontListing,
@@ -30,7 +31,8 @@ export const Route = createFileRoute("/api/public/storefront/products/$id")({
             return storefrontError("Product not available", 404);
           }
           const content = await loadPublishedProductContent(product.sku_id);
-          return storefrontJson({ ok: true, data: { ...product,
+          const counts = (await loadEngagementCounts([product.id])).get(product.id) ?? { view_count: 0, favorite_count: 0 };
+          return storefrontJson({ ok: true, data: { ...product, ...counts,
             detail_content: content?.published_blocks ?? [],
             detail_content_version: content?.version ?? 0,
           } });

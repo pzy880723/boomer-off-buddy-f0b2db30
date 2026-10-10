@@ -17,7 +17,7 @@ export type StorefrontProductQuery = {
   brand_ids: string[];
   facet_codes: string[];
   location_id: string | null;
-  sort: "newest" | "price_asc" | "price_desc" | "relevance";
+  sort: "newest" | "price_asc" | "price_desc" | "relevance" | "popular";
   page: number;
   page_size: number;
   /** fankuang=1：只返回有效参与翻筐乐的商品（分页前过滤）。 */
@@ -183,7 +183,7 @@ function positiveInt(value: string | null, fallback: number, max: number): numbe
 
 export function parseStorefrontProductQuery(url: URL): StorefrontProductQuery {
   const sortValue = url.searchParams.get("sort");
-  const sort = ["newest", "price_asc", "price_desc", "relevance"].includes(sortValue ?? "")
+  const sort = ["newest", "price_asc", "price_desc", "relevance", "popular"].includes(sortValue ?? "")
     ? (sortValue as StorefrontProductQuery["sort"])
     : url.searchParams.get("q")
       ? "relevance"

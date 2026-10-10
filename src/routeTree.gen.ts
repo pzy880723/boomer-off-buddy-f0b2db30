@@ -163,6 +163,8 @@ import { Route as ApiPublicPosStandardCatalogRouteImport } from './routes/api/pu
 import { Route as ApiPublicSsoAigcExchangeRouteImport } from './routes/api/public/sso/aigc-exchange'
 import { Route as ApiPublicSsoAigcTicketRouteImport } from './routes/api/public/sso/aigc-ticket'
 import { Route as ApiPublicStorefrontAfterSalesSummaryRouteImport } from './routes/api/public/storefront/after-sales-summary'
+import { Route as ApiPublicStorefrontDiscoveryRouteImport } from './routes/api/public/storefront/discovery'
+import { Route as ApiPublicStorefrontEngagementRouteImport } from './routes/api/public/storefront/engagement'
 import { Route as ApiPublicStorefrontNotificationsRouteImport } from './routes/api/public/storefront/notifications'
 import { Route as ApiPublicStorefrontOrdersRouteImport } from './routes/api/public/storefront/orders'
 import { Route as ApiPublicStorefrontPaymentsRouteImport } from './routes/api/public/storefront/payments'
@@ -1127,6 +1129,18 @@ const ApiPublicStorefrontAfterSalesSummaryRoute =
   ApiPublicStorefrontAfterSalesSummaryRouteImport.update({
     id: '/api/public/storefront/after-sales-summary',
     path: '/api/public/storefront/after-sales-summary',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicStorefrontDiscoveryRoute =
+  ApiPublicStorefrontDiscoveryRouteImport.update({
+    id: '/api/public/storefront/discovery',
+    path: '/api/public/storefront/discovery',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicStorefrontEngagementRoute =
+  ApiPublicStorefrontEngagementRouteImport.update({
+    id: '/api/public/storefront/engagement',
+    path: '/api/public/storefront/engagement',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicStorefrontNotificationsRoute =
@@ -2108,6 +2122,8 @@ export interface FileRoutesByFullPath {
   '/api/public/sso/aigc-exchange': typeof ApiPublicSsoAigcExchangeRoute
   '/api/public/sso/aigc-ticket': typeof ApiPublicSsoAigcTicketRoute
   '/api/public/storefront/after-sales-summary': typeof ApiPublicStorefrontAfterSalesSummaryRoute
+  '/api/public/storefront/discovery': typeof ApiPublicStorefrontDiscoveryRoute
+  '/api/public/storefront/engagement': typeof ApiPublicStorefrontEngagementRoute
   '/api/public/storefront/notifications': typeof ApiPublicStorefrontNotificationsRouteWithChildren
   '/api/public/storefront/orders': typeof ApiPublicStorefrontOrdersRouteWithChildren
   '/api/public/storefront/payments': typeof ApiPublicStorefrontPaymentsRouteWithChildren
@@ -2396,6 +2412,8 @@ export interface FileRoutesByTo {
   '/api/public/sso/aigc-exchange': typeof ApiPublicSsoAigcExchangeRoute
   '/api/public/sso/aigc-ticket': typeof ApiPublicSsoAigcTicketRoute
   '/api/public/storefront/after-sales-summary': typeof ApiPublicStorefrontAfterSalesSummaryRoute
+  '/api/public/storefront/discovery': typeof ApiPublicStorefrontDiscoveryRoute
+  '/api/public/storefront/engagement': typeof ApiPublicStorefrontEngagementRoute
   '/api/public/storefront/notifications': typeof ApiPublicStorefrontNotificationsRouteWithChildren
   '/api/public/storefront/orders': typeof ApiPublicStorefrontOrdersRouteWithChildren
   '/api/public/storefront/payments': typeof ApiPublicStorefrontPaymentsRouteWithChildren
@@ -2692,6 +2710,8 @@ export interface FileRoutesById {
   '/api/public/sso/aigc-exchange': typeof ApiPublicSsoAigcExchangeRoute
   '/api/public/sso/aigc-ticket': typeof ApiPublicSsoAigcTicketRoute
   '/api/public/storefront/after-sales-summary': typeof ApiPublicStorefrontAfterSalesSummaryRoute
+  '/api/public/storefront/discovery': typeof ApiPublicStorefrontDiscoveryRoute
+  '/api/public/storefront/engagement': typeof ApiPublicStorefrontEngagementRoute
   '/api/public/storefront/notifications': typeof ApiPublicStorefrontNotificationsRouteWithChildren
   '/api/public/storefront/orders': typeof ApiPublicStorefrontOrdersRouteWithChildren
   '/api/public/storefront/payments': typeof ApiPublicStorefrontPaymentsRouteWithChildren
@@ -2989,6 +3009,8 @@ export interface FileRouteTypes {
     | '/api/public/sso/aigc-exchange'
     | '/api/public/sso/aigc-ticket'
     | '/api/public/storefront/after-sales-summary'
+    | '/api/public/storefront/discovery'
+    | '/api/public/storefront/engagement'
     | '/api/public/storefront/notifications'
     | '/api/public/storefront/orders'
     | '/api/public/storefront/payments'
@@ -3277,6 +3299,8 @@ export interface FileRouteTypes {
     | '/api/public/sso/aigc-exchange'
     | '/api/public/sso/aigc-ticket'
     | '/api/public/storefront/after-sales-summary'
+    | '/api/public/storefront/discovery'
+    | '/api/public/storefront/engagement'
     | '/api/public/storefront/notifications'
     | '/api/public/storefront/orders'
     | '/api/public/storefront/payments'
@@ -3572,6 +3596,8 @@ export interface FileRouteTypes {
     | '/api/public/sso/aigc-exchange'
     | '/api/public/sso/aigc-ticket'
     | '/api/public/storefront/after-sales-summary'
+    | '/api/public/storefront/discovery'
+    | '/api/public/storefront/engagement'
     | '/api/public/storefront/notifications'
     | '/api/public/storefront/orders'
     | '/api/public/storefront/payments'
@@ -3818,6 +3844,8 @@ export interface RootRouteChildren {
   ApiPublicSsoAigcExchangeRoute: typeof ApiPublicSsoAigcExchangeRoute
   ApiPublicSsoAigcTicketRoute: typeof ApiPublicSsoAigcTicketRoute
   ApiPublicStorefrontAfterSalesSummaryRoute: typeof ApiPublicStorefrontAfterSalesSummaryRoute
+  ApiPublicStorefrontDiscoveryRoute: typeof ApiPublicStorefrontDiscoveryRoute
+  ApiPublicStorefrontEngagementRoute: typeof ApiPublicStorefrontEngagementRoute
   ApiPublicStorefrontNotificationsRoute: typeof ApiPublicStorefrontNotificationsRouteWithChildren
   ApiPublicStorefrontOrdersRoute: typeof ApiPublicStorefrontOrdersRouteWithChildren
   ApiPublicStorefrontPaymentsRoute: typeof ApiPublicStorefrontPaymentsRouteWithChildren
@@ -4979,6 +5007,20 @@ declare module '@tanstack/react-router' {
       path: '/api/public/storefront/after-sales-summary'
       fullPath: '/api/public/storefront/after-sales-summary'
       preLoaderRoute: typeof ApiPublicStorefrontAfterSalesSummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/storefront/discovery': {
+      id: '/api/public/storefront/discovery'
+      path: '/api/public/storefront/discovery'
+      fullPath: '/api/public/storefront/discovery'
+      preLoaderRoute: typeof ApiPublicStorefrontDiscoveryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/storefront/engagement': {
+      id: '/api/public/storefront/engagement'
+      path: '/api/public/storefront/engagement'
+      fullPath: '/api/public/storefront/engagement'
+      preLoaderRoute: typeof ApiPublicStorefrontEngagementRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/storefront/notifications': {
@@ -6813,6 +6855,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicSsoAigcTicketRoute: ApiPublicSsoAigcTicketRoute,
   ApiPublicStorefrontAfterSalesSummaryRoute:
     ApiPublicStorefrontAfterSalesSummaryRoute,
+  ApiPublicStorefrontDiscoveryRoute: ApiPublicStorefrontDiscoveryRoute,
+  ApiPublicStorefrontEngagementRoute: ApiPublicStorefrontEngagementRoute,
   ApiPublicStorefrontNotificationsRoute:
     ApiPublicStorefrontNotificationsRouteWithChildren,
   ApiPublicStorefrontOrdersRoute: ApiPublicStorefrontOrdersRouteWithChildren,

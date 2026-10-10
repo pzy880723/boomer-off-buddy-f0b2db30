@@ -8,6 +8,8 @@ import {
   type StorefrontListing,
 } from "@/server/storefront-products.server";
 import { filterFankuangBeforePaging } from "@/lib/commerce/fankuang";
+import { sortByPopular } from "@/lib/commerce/storefront-engagement";
+import { loadEngagementCounts, withCounts } from "@/server/storefront-engagement.server";
 
 export const Route = createFileRoute("/api/public/storefront/products")({
   server: {
@@ -67,9 +69,12 @@ export const Route = createFileRoute("/api/public/storefront/products")({
         });
         try {
           // 先富化元数据 + 可售库存（不签名）→ 过滤已售 → 计算 total → 切页 → 只对本页签名
-          const availableProducts = (
+          const inStock = (
             await enrichStorefrontListings(listings, { signImages: false })
           ).filter((product) => product.stock > 0);
+          // 真实互动计数（近30天打开人数 / 当前有效收藏人数），popular 在全量在售范围内排序后再分页。
+          const counted = withCounts(inStock, await loadEngagementCounts(inStock.map((p) => p.id)));
+          const availableProducts = query.sort === "popular" ? sortByPopular(counted) : counted;
           // 翻筐乐过滤在分页前完成，total 不含被排除商品，高价人工 true 不会遗漏。
           const { total, page: pageProducts } = filterFankuangBeforePaging(
             availableProducts,
