@@ -1,0 +1,33 @@
+\set ON_ERROR_STOP 1
+INSERT INTO commerce_customers VALUES ('00000000-0000-0000-0000-0000000000c1'),('00000000-0000-0000-0000-0000000000c2');
+INSERT INTO commerce_listings VALUES ('00000000-0000-0000-0000-0000000000a1','published'),('00000000-0000-0000-0000-0000000000a2','draft');
+SET ROLE service_role;
+DO $$ DECLARE r jsonb; c1 uuid:='00000000-0000-0000-0000-0000000000c1'; c2 uuid:='00000000-0000-0000-0000-0000000000c2'; a1 uuid:='00000000-0000-0000-0000-0000000000a1'; v record; BEGIN
+  r := storefront_record_engagement(c1,'open',a1,null,null,null); ASSERT (r->>'recorded')::bool;
+  r := storefront_record_engagement(c1,'open',a1,null,null,null); ASSERT NOT (r->>'recorded')::bool AND r->>'reason'='already_counted_today';
+  PERFORM storefront_record_engagement(c2,'open',a1,null,null,null);
+  r := storefront_record_engagement(c1,'favorite',a1,null,null,null); ASSERT (r->>'recorded')::bool;
+  r := storefront_record_engagement(c1,'favorite',a1,null,null,null); ASSERT NOT (r->>'recorded')::bool AND (r->>'active')::bool;
+  SELECT * INTO v FROM storefront_product_engagement_counts(ARRAY[a1]); ASSERT v.view_count=2 AND v.favorite_count=1, 'counts';
+  r := storefront_record_engagement(c1,'unfavorite',a1,null,null,null); ASSERT (r->>'recorded')::bool;
+  r := storefront_record_engagement(c1,'unfavorite',a1,null,null,null); ASSERT NOT (r->>'recorded')::bool;
+  SELECT * INTO v FROM storefront_product_engagement_counts(ARRAY[a1]); ASSERT v.favorite_count=0, 'cancel';
+  r := storefront_record_engagement(c1,'open','00000000-0000-0000-0000-0000000000a2',null,null,null); ASSERT r->>'reason'='product_unavailable';
+  PERFORM storefront_record_engagement(c1,'search',null,'brand:b1','中古',repeat('a',64));
+  PERFORM storefront_record_engagement(c1,'search',null,'brand:b1','中古',repeat('a',64));
+  PERFORM storefront_record_engagement(c2,'search',null,'brand:b1','中古',repeat('b',64));
+  SELECT * INTO v FROM storefront_hot_search_terms(30,10); ASSERT v.term_key='brand:b1' AND v.searchers=2, 'search dedupe';
+  BEGIN PERFORM storefront_record_engagement(c1,'search',null,'free text 13800138000','x',repeat('c',64)); ASSERT false, 'bad key accepted';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE storefront_engagement_quota SET event_count=500;
+  r := storefront_record_engagement(c1,'open',a1,null,null,null); ASSERT r->>'reason'='rate_limited';
+  RAISE NOTICE 'PASS behavior';
+END $$;
+RESET ROLE;
+SET ROLE anon;
+DO $$ BEGIN PERFORM 1 FROM storefront_product_favorites; RAISE EXCEPTION 'anon could read'; EXCEPTION WHEN insufficient_privilege THEN RAISE NOTICE 'PASS anon read denied'; END $$;
+DO $$ BEGIN PERFORM storefront_record_engagement(gen_random_uuid(),'open',gen_random_uuid(),null,null,null); RAISE EXCEPTION 'anon rpc'; EXCEPTION WHEN insufficient_privilege THEN RAISE NOTICE 'PASS anon rpc denied'; END $$;
+RESET ROLE;
+SET ROLE authenticated;
+DO $$ BEGIN INSERT INTO storefront_product_opens VALUES (gen_random_uuid(),gen_random_uuid(),current_date); RAISE EXCEPTION 'auth write'; EXCEPTION WHEN insufficient_privilege THEN RAISE NOTICE 'PASS authenticated write denied'; END $$;
+RESET ROLE;
