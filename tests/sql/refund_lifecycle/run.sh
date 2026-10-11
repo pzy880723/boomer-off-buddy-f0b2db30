@@ -9,8 +9,8 @@ export PSQL=/tmp/psql.sh D=tests/sql/refund_lifecycle
 PGDB=postgres $PSQL -q -c "drop database if exists refund_lifecycle_test" -c "create database refund_lifecycle_test" >/dev/null
 export PGDB=refund_lifecycle_test
 for f in $D/prelude.sql $D/live_schema.sql $D/live_functions.sql; do $PSQL -q -f $f >/dev/null || { echo "FAIL load $f"; exit 1; }; done
-fix=${LIFECYCLE_FIX_MIGRATION-$(ls drizzle/migrations/*_refund_lifecycle_guard.sql 2>/dev/null | head -1)}
-if [ -n "$fix" ]; then $PSQL -q -f "$fix" >/dev/null || { echo "FAIL fix migration"; exit 1; }; else echo "NOTE fix migration absent (RED run)"; fi
+fix=${LIFECYCLE_FIX_MIGRATION-$(ls drizzle/migrations/*_refund_lifecycle_guard.sql drizzle/migrations/*_settlement_aftersale_pickup_eligibility.sql 2>/dev/null)}
+if [ -n "$fix" ]; then for m in $fix; do $PSQL -q -f "$m" >/dev/null || { echo "FAIL fix migration $m"; exit 1; }; done; else echo "NOTE fix migration absent (RED run)"; fi
 $PSQL -q -f $D/fixtures.sql >/dev/null || { echo "FAIL fixtures"; exit 1; }
 pass=0; fail=0
 for c in $D/cases/*.sql; do
