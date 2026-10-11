@@ -2,6 +2,8 @@
 // 可见范围 = 定向给本人 OR 定向给本设备 OR 本人有权限的库位 OR 全局广播。
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { loadUserRoles } from "@/server/handheld-auth.server";
+import { parseListCursor } from "@/server/handheld-notifications-cursor";
+export { parseChangeCursor, parseListCursor } from "@/server/handheld-notifications-cursor";
 
 export type NotificationItem = {
   id: string;
@@ -126,14 +128,21 @@ export async function listNotifications(input: {
   limit: number;
   cursor?: string | null;
   unreadOnly?: boolean;
-}): Promise<{ items: NotificationItem[]; next_cursor: string | null }> {
+}): Promise<{ items: NotificationItem[]; next_cursor: string | null; next_page_cursor: string | null }> {
   let query = supabaseAdmin
     .from("inv_handheld_notifications" as never)
     .select(SELECT)
     .or(buildVisibilityFilter(input.scope))
     .order("ts", { ascending: false })
     .limit(input.limit + 1);
-  if (input.cursor) query = query.lt("ts", input.cursor);
+  // 兼容：旧游标=纯 ts（保持原 lt 语义）；新游标 "ts|id" 走 (ts,id) 复合键，同 ts 不漏行。
+  const composite = input.cursor ? parseListCursor(input.cursor) : null;
+  query = query.order("id", { ascending: false });
+  if (composite) {
+    query = query.or(`ts.lt.${composite.ts},and(ts.eq.${composite.ts},id.lt.${composite.id})`);
+  } else if (input.cursor) {
+    query = query.lt("ts", input.cursor);
+  }
   const { data, error } = await query;
   if (error) throw new Error(error.message);
   const rows = ((data as unknown as RawRow[]) ?? []).slice();
@@ -141,7 +150,12 @@ export async function listNotifications(input: {
   const page = hasMore ? rows.slice(0, input.limit) : rows;
   let items = await decorate(page, input.scope);
   if (input.unreadOnly) items = items.filter((item) => !item.is_read);
-  return { items, next_cursor: hasMore ? (page[page.length - 1]?.ts ?? null) : null };
+  const last = page[page.length - 1];
+  return {
+    items,
+    next_cursor: hasMore ? (last?.ts ?? null) : null,
+    next_page_cursor: hasMore && last ? `${last.ts}|${last.id}` : null,
+  };
 }
 
 export async function listNotificationsSince(input: {
@@ -163,6 +177,49 @@ export async function listNotificationsSince(input: {
   const serverTs =
     items.length > 0 ? items[items.length - 1].ts : (input.since ?? new Date().toISOString());
   return { items, server_ts: serverTs };
+}
+
+/**
+ * 可靠增量：返回 (change_xid, change_seq) 大于游标、且所有更早事务均已结束的变更。
+ * 同一消息的 handled/voided/已读 变化会以最新状态再次下发；客户端按 id upsert，
+ * 只在首次见到 action_status=null 且未读的 order_paid 时播报。
+ */
+export async function listNotificationChanges(input: {
+  scope: NotificationScope;
+  cursor: { xid: string; seq: number } | "latest";
+  limit: number;
+}): Promise<{ items: (NotificationItem & { change_cursor: string })[]; next_cursor: string; has_more: boolean; server_ts: string }> {
+  // 持久补偿：每次增量拉取先尽力补写近 7 天缺失的付款提醒（唯一索引防重；失败不影响读取）。
+  try {
+    await supabaseAdmin.rpc("handheld_notify_reconcile" as never, { p_days: 7, p_limit: 50 } as never);
+  } catch {
+    /* best effort */
+  }
+  const serverTs = new Date().toISOString();
+  if (input.cursor === "latest") {
+    const { data, error } = await supabaseAdmin.rpc("handheld_notifications_watermark" as never);
+    if (error) throw new Error(error.message);
+    return { items: [], next_cursor: `v2:${data as unknown as string}:0`, has_more: false, server_ts: serverTs };
+  }
+  const { data, error } = await supabaseAdmin.rpc("handheld_notifications_changes" as never, {
+    p_user_id: input.scope.user_id,
+    p_device_id: input.scope.device_id,
+    p_location_ids: input.scope.location_ids,
+    p_after_xid: input.cursor.xid,
+    p_after_seq: input.cursor.seq,
+    p_limit: input.limit,
+  } as never);
+  if (error) throw new Error(error.message);
+  const rows = (data as unknown as (RawRow & { change_xid: string; change_seq: number })[]) ?? [];
+  const items = await decorate(rows, input.scope);
+  const withCursor = items.map((item, i) => ({ ...item, change_cursor: `v2:${rows[i].change_xid}:${rows[i].change_seq}` }));
+  const last = rows[rows.length - 1];
+  return {
+    items: withCursor,
+    next_cursor: last ? `v2:${last.change_xid}:${last.change_seq}` : `v2:${input.cursor.xid}:${input.cursor.seq}`,
+    has_more: rows.length >= input.limit,
+    server_ts: serverTs,
+  };
 }
 
 export async function countUnread(scope: NotificationScope): Promise<number> {

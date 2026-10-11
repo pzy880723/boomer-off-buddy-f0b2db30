@@ -36,6 +36,7 @@ export const Route = createFileRoute("/api/public/handheld/notifications")({
           return ok({
             items: page.items,
             next_cursor: page.next_cursor,
+            next_page_cursor: page.next_page_cursor,
             scope: describeScope(scope),
           });
         } catch (error) {

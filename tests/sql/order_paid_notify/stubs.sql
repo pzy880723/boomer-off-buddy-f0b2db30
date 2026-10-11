@@ -22,3 +22,4 @@ CREATE TABLE public.fulfillments (
   location_id uuid REFERENCES public.inv_locations(id), status text DEFAULT 'allocated'
 );
 CREATE TABLE public.commerce_order_items (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), order_id uuid, location_id uuid, is_gift boolean DEFAULT false);
+CREATE TABLE public.handheld_notification_reads (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), notification_id uuid REFERENCES public.inv_handheld_notifications(id) ON DELETE CASCADE, user_id uuid NOT NULL, read_at timestamptz DEFAULT now(), created_at timestamptz DEFAULT now(), UNIQUE(notification_id,user_id));
