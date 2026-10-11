@@ -2,6 +2,8 @@
 // 可见范围 = 定向给本人 OR 定向给本设备 OR 本人有权限的库位 OR 全局广播。
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { loadUserRoles } from "@/server/handheld-auth.server";
+import { parseListCursor } from "@/server/handheld-notifications-cursor";
+export { parseChangeCursor, parseListCursor } from "@/server/handheld-notifications-cursor";
 
 export type NotificationItem = {
   id: string;
@@ -175,20 +177,6 @@ export async function listNotificationsSince(input: {
   const serverTs =
     items.length > 0 ? items[items.length - 1].ts : (input.since ?? new Date().toISOString());
   return { items, server_ts: serverTs };
-}
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-export function parseListCursor(cursor: string): { ts: string; id: string } | null {
-  const [ts, id, extra] = cursor.split("|");
-  if (extra !== undefined || !ts || !id || !UUID_RE.test(id) || Number.isNaN(Date.parse(ts))) return null;
-  return { ts: new Date(ts).toISOString(), id };
-}
-
-/** 变更游标 "v2:<xid>:<seq>"；"latest" 表示从当前水位开始（不回放历史）。 */
-export function parseChangeCursor(cursor: string): { xid: string; seq: number } | "latest" | null {
-  if (cursor === "latest") return "latest";
-  const m = /^v2:(\d{1,20}):(\d{1,19})$/.exec(cursor);
-  return m ? { xid: m[1], seq: Number(m[2]) } : null;
 }
 
 /**

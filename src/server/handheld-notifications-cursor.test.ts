@@ -1,16 +1,15 @@
-import { describe, expect, it } from "vitest";
-import { parseChangeCursor, parseListCursor } from "./handheld-notifications.server";
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { parseChangeCursor, parseListCursor } from "./handheld-notifications-cursor";
 
-describe("notification cursors", () => {
-  it("parses v2 change cursor and latest", () => {
-    expect(parseChangeCursor("latest")).toBe("latest");
-    expect(parseChangeCursor("v2:812:44")).toEqual({ xid: "812", seq: 44 });
-    for (const bad of ["v2:x:1", "v1:1:1", "v2:1", "2026-01-01T00:00:00Z", "v2:1:1;drop"]) expect(parseChangeCursor(bad)).toBeNull();
-  });
-  it("parses composite list cursor; legacy ts stays legacy", () => {
-    expect(parseListCursor("2026-01-01T00:00:00.000Z|00000000-0000-0000-0000-0000000000a1")).toEqual({
-      ts: "2026-01-01T00:00:00.000Z", id: "00000000-0000-0000-0000-0000000000a1" });
-    expect(parseListCursor("2026-01-01T00:00:00.000Z")).toBeNull();
-    expect(parseListCursor("2026-01-01T00:00:00Z|x),or(id.gt.0")).toBeNull();
-  });
+test("parses v2 change cursor and latest", () => {
+  assert.equal(parseChangeCursor("latest"), "latest");
+  assert.deepEqual(parseChangeCursor("v2:812:44"), { xid: "812", seq: 44 });
+  for (const bad of ["v2:x:1", "v1:1:1", "v2:1", "2026-01-01T00:00:00Z", "v2:1:1;drop"]) assert.equal(parseChangeCursor(bad), null);
+});
+test("parses composite list cursor; legacy ts stays legacy", () => {
+  assert.deepEqual(parseListCursor("2026-01-01T00:00:00.000Z|00000000-0000-0000-0000-0000000000a1"), {
+    ts: "2026-01-01T00:00:00.000Z", id: "00000000-0000-0000-0000-0000000000a1" });
+  assert.equal(parseListCursor("2026-01-01T00:00:00.000Z"), null);
+  assert.equal(parseListCursor("2026-01-01T00:00:00Z|x),or(id.gt.0"), null);
 });
