@@ -1214,6 +1214,7 @@ export const NotificationKind = z.enum([
   "youzan_sync_failed",
   "unclaimed_epc_pending",
   "system",
+  "order_paid",
 ]);
 
 export const NotificationsSinceQuery = z
