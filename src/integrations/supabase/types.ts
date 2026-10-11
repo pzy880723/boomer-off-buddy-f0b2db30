@@ -10382,6 +10382,14 @@ export type Database = {
         Args: { p_customer_id: string; p_items: Json }
         Returns: Json
       }
+      commerce_storefront_pickup_eligibility: {
+        Args: { p_order_ids: string[] }
+        Returns: {
+          block_reason: string
+          fulfillment_id: string
+          order_id: string
+        }[]
+      }
       commerce_transition_after_sale: {
         Args: {
           p_after_sale_id: string
