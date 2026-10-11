@@ -4114,6 +4114,8 @@ export type Database = {
         Row: {
           action_status: string | null
           audience: string
+          change_seq: number | null
+          change_xid: unknown
           device_id: string | null
           id: string
           kind: string
@@ -4128,6 +4130,8 @@ export type Database = {
         Insert: {
           action_status?: string | null
           audience?: string
+          change_seq?: number | null
+          change_xid?: unknown
           device_id?: string | null
           id?: string
           kind: string
@@ -4142,6 +4146,8 @@ export type Database = {
         Update: {
           action_status?: string | null
           audience?: string
+          change_seq?: number | null
+          change_xid?: unknown
           device_id?: string | null
           id?: string
           kind?: string
@@ -10770,8 +10776,39 @@ export type Database = {
         Args: { p_sku_id: string }
         Returns: undefined
       }
+      handheld_notifications_changes: {
+        Args: {
+          p_after_seq: number
+          p_after_xid: string
+          p_device_id: string
+          p_limit?: number
+          p_location_ids: string[]
+          p_user_id: string
+        }
+        Returns: {
+          action_status: string
+          change_seq: number
+          change_xid: string
+          device_id: string
+          id: string
+          kind: string
+          location_id: string
+          payload: Json
+          ref_id: string
+          ref_type: string
+          safe_xmin: string
+          title: string
+          ts: string
+          user_id: string
+        }[]
+      }
+      handheld_notifications_watermark: { Args: never; Returns: string }
       handheld_notify_order_paid: {
         Args: { p_order_id: string }
+        Returns: number
+      }
+      handheld_notify_reconcile: {
+        Args: { p_days?: number; p_limit?: number }
         Returns: number
       }
       handheld_product_content:
