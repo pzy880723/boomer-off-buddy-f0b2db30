@@ -9,10 +9,12 @@ export const PickupRedeemBody = z
 export const PickupReadyBody = z.object({ fulfillment_id: z.string().uuid(), idempotency_key: Idem }).strict().meta({ id: "HandheldPickupReadyReq" });
 export const ManualShipBody = z
   .object({
-    provider: z.enum(["sf", "cainiao"]),
+    provider: z.enum(["sf", "cainiao", "manual"]),
+    carrier_label: z.string().trim().min(1).max(40).optional(),
     tracking_no: z.string().trim().regex(/^[A-Za-z0-9-]{4,64}$/),
     client_op_id: z.string().trim().regex(/^[A-Za-z0-9_-]{6,80}$/),
     lines: z.array(z.object({ fulfillment_item_id: z.string().uuid(), quantity: z.number().int().min(1).max(99999) }).strict()).min(1).max(200),
   })
   .strict()
+  .refine((b) => b.provider !== "manual" || !!b.carrier_label, { message: "carrier_label required for manual", path: ["carrier_label"] })
   .meta({ id: "HandheldManualShipReq" });

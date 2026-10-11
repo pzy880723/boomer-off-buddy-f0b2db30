@@ -72,6 +72,23 @@ test("body schemas reject client actor/location fields", () => {
   assert.equal(ManualShipBody.safeParse({ provider: "ems", tracking_no: "SF1234", client_op_id: "op-12345678", lines: [{ fulfillment_item_id: I, quantity: 1 }] }).success, false);
 });
 
+test("carrier normalization keeps other couriers as manual labels", async () => {
+  const { normalizeShipProvider } = await import("./handheld-fulfillment-actions.ts");
+  assert.deepEqual(normalizeShipProvider("顺丰"), { provider: "sf", carrierLabel: null });
+  assert.deepEqual(normalizeShipProvider("CAINIAO"), { provider: "cainiao", carrierLabel: null });
+  assert.deepEqual(normalizeShipProvider(" 中通快递 "), { provider: "manual", carrierLabel: "中通快递" });
+  assert.equal(normalizeShipProvider(""), null);
+  assert.equal(ManualShipBody.safeParse({ provider: "manual", tracking_no: "ZT1234", client_op_id: "op-12345678", lines: [{ fulfillment_item_id: I, quantity: 1 }] }).success, false);
+  assert.equal(ManualShipBody.safeParse({ provider: "manual", carrier_label: "中通快递", tracking_no: "ZT1234", client_op_id: "op-12345678", lines: [{ fulfillment_item_id: I, quantity: 1 }] }).success, true);
+  const ok = fakeRpc({ ok: true, result: "shipped", carrier_label: "中通快递" });
+  await manualShip(ok.rpc, { actorUserId: U, locationId: L, fulfillmentId: F, provider: "manual", carrierLabel: "中通快递", trackingNo: "ZT1234", lines: [{ fulfillmentItemId: I, quantity: 1 }], idempotencyKey: "op-12345678" });
+  assert.equal(ok.calls[0].args.p_carrier_label, "中通快递");
+  for (const [result, status] of [["lines_incomplete", 422], ["shortage_blocked", 409], ["invalid_carrier_label", 400], ["nothing_to_ship", 409]] as const) {
+    const f = fakeRpc({ ok: false, result });
+    assert.equal((await manualShip(f.rpc, { actorUserId: U, locationId: null, fulfillmentId: F, provider: "sf", trackingNo: "SF1234", lines: [{ fulfillmentItemId: I, quantity: 1 }], idempotencyKey: "op-12345678" })).status, status, result);
+  }
+});
+
 test("manual ship uses the single DB RPC and maps results", async () => {
   const ok = fakeRpc({ ok: true, result: "shipped", shipment_id: "s", replayed: false });
   const r = await manualShip(ok.rpc, { actorUserId: U, locationId: L, fulfillmentId: F, provider: "sf", trackingNo: "SF1234", lines: [{ fulfillmentItemId: I, quantity: 1 }], idempotencyKey: "op-12345678" });

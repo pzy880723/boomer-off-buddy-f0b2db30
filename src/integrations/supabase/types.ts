@@ -7356,6 +7356,7 @@ export type Database = {
       shipments: {
         Row: {
           booked_at: string | null
+          carrier_label: string | null
           created_at: string
           delivered_at: string | null
           fulfillment_id: string
@@ -7368,6 +7369,7 @@ export type Database = {
           pickup_window: Json | null
           provider: string
           provider_order_no: string | null
+          request_fingerprint: string | null
           service_code: string
           status: string
           tracking_no: string | null
@@ -7375,6 +7377,7 @@ export type Database = {
         }
         Insert: {
           booked_at?: string | null
+          carrier_label?: string | null
           created_at?: string
           delivered_at?: string | null
           fulfillment_id: string
@@ -7387,6 +7390,7 @@ export type Database = {
           pickup_window?: Json | null
           provider: string
           provider_order_no?: string | null
+          request_fingerprint?: string | null
           service_code: string
           status?: string
           tracking_no?: string | null
@@ -7394,6 +7398,7 @@ export type Database = {
         }
         Update: {
           booked_at?: string | null
+          carrier_label?: string | null
           created_at?: string
           delivered_at?: string | null
           fulfillment_id?: string
@@ -7406,6 +7411,7 @@ export type Database = {
           pickup_window?: Json | null
           provider?: string
           provider_order_no?: string | null
+          request_fingerprint?: string | null
           service_code?: string
           status?: string
           tracking_no?: string | null
@@ -10099,18 +10105,32 @@ export type Database = {
           product_type: string
         }[]
       }
-      commerce_manual_ship_fulfillment: {
-        Args: {
-          p_actor_user_id: string
-          p_fulfillment_id: string
-          p_idempotency_key: string
-          p_lines: Json
-          p_location_id: string
-          p_provider: string
-          p_tracking_no: string
-        }
-        Returns: Json
-      }
+      commerce_manual_ship_fulfillment:
+        | {
+            Args: {
+              p_actor_user_id: string
+              p_fulfillment_id: string
+              p_idempotency_key: string
+              p_lines: Json
+              p_location_id: string
+              p_provider: string
+              p_tracking_no: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_actor_user_id: string
+              p_carrier_label: string
+              p_fulfillment_id: string
+              p_idempotency_key: string
+              p_lines: Json
+              p_location_id: string
+              p_provider: string
+              p_tracking_no: string
+            }
+            Returns: Json
+          }
       commerce_mark_order_paid: {
         Args: {
           p_order_id: string
