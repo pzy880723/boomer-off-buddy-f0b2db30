@@ -207,6 +207,8 @@ import { Route as ApiPublicHandheldNotificationsSinceRouteImport } from './route
 import { Route as ApiPublicHandheldOrdersIdRouteImport } from './routes/api/public/handheld/orders.$id'
 import { Route as ApiPublicHandheldParcelsIdRouteImport } from './routes/api/public/handheld/parcels.$id'
 import { Route as ApiPublicHandheldParcelsCountsRouteImport } from './routes/api/public/handheld/parcels.counts'
+import { Route as ApiPublicHandheldPickupReadyRouteImport } from './routes/api/public/handheld/pickup.ready'
+import { Route as ApiPublicHandheldPickupRedeemRouteImport } from './routes/api/public/handheld/pickup.redeem'
 import { Route as ApiPublicHandheldPrintJobsLeaseRouteImport } from './routes/api/public/handheld/print-jobs.lease'
 import { Route as ApiPublicHandheldPrintCustomCardsRouteImport } from './routes/api/public/handheld/print.custom-cards'
 import { Route as ApiPublicHandheldPrintStoreQrRouteImport } from './routes/api/public/handheld/print.store-qr'
@@ -264,6 +266,7 @@ import { Route as ApiPublicStorefrontShortagesIdRouteImport } from './routes/api
 import { Route as ApiPublicStorefrontSupportConversationsRouteImport } from './routes/api/public/storefront/support.conversations'
 import { Route as ApiPublicHandheldFulfillmentsIdBindToteRouteImport } from './routes/api/public/handheld/fulfillments.$id.bind-tote'
 import { Route as ApiPublicHandheldFulfillmentsIdClaimRouteImport } from './routes/api/public/handheld/fulfillments.$id.claim'
+import { Route as ApiPublicHandheldFulfillmentsIdManualShipRouteImport } from './routes/api/public/handheld/fulfillments.$id.manual-ship'
 import { Route as ApiPublicHandheldFulfillmentsIdPickCompleteRouteImport } from './routes/api/public/handheld/fulfillments.$id.pick-complete'
 import { Route as ApiPublicHandheldFulfillmentsIdPickScanRouteImport } from './routes/api/public/handheld/fulfillments.$id.pick-scan'
 import { Route as ApiPublicHandheldFulfillmentsIdShortageRouteImport } from './routes/api/public/handheld/fulfillments.$id.shortage'
@@ -1391,6 +1394,18 @@ const ApiPublicHandheldParcelsCountsRoute =
     path: '/counts',
     getParentRoute: () => ApiPublicHandheldParcelsRoute,
   } as any)
+const ApiPublicHandheldPickupReadyRoute =
+  ApiPublicHandheldPickupReadyRouteImport.update({
+    id: '/api/public/handheld/pickup/ready',
+    path: '/api/public/handheld/pickup/ready',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldPickupRedeemRoute =
+  ApiPublicHandheldPickupRedeemRouteImport.update({
+    id: '/api/public/handheld/pickup/redeem',
+    path: '/api/public/handheld/pickup/redeem',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHandheldPrintJobsLeaseRoute =
   ApiPublicHandheldPrintJobsLeaseRouteImport.update({
     id: '/api/public/handheld/print-jobs/lease',
@@ -1725,6 +1740,12 @@ const ApiPublicHandheldFulfillmentsIdClaimRoute =
   ApiPublicHandheldFulfillmentsIdClaimRouteImport.update({
     id: '/claim',
     path: '/claim',
+    getParentRoute: () => ApiPublicHandheldFulfillmentsIdRoute,
+  } as any)
+const ApiPublicHandheldFulfillmentsIdManualShipRoute =
+  ApiPublicHandheldFulfillmentsIdManualShipRouteImport.update({
+    id: '/manual-ship',
+    path: '/manual-ship',
     getParentRoute: () => ApiPublicHandheldFulfillmentsIdRoute,
   } as any)
 const ApiPublicHandheldFulfillmentsIdPickCompleteRoute =
@@ -2173,6 +2194,8 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/orders/$id': typeof ApiPublicHandheldOrdersIdRoute
   '/api/public/handheld/parcels/$id': typeof ApiPublicHandheldParcelsIdRoute
   '/api/public/handheld/parcels/counts': typeof ApiPublicHandheldParcelsCountsRoute
+  '/api/public/handheld/pickup/ready': typeof ApiPublicHandheldPickupReadyRoute
+  '/api/public/handheld/pickup/redeem': typeof ApiPublicHandheldPickupRedeemRoute
   '/api/public/handheld/print-jobs/lease': typeof ApiPublicHandheldPrintJobsLeaseRoute
   '/api/public/handheld/print/custom-cards': typeof ApiPublicHandheldPrintCustomCardsRouteWithChildren
   '/api/public/handheld/print/store-qr': typeof ApiPublicHandheldPrintStoreQrRoute
@@ -2230,6 +2253,7 @@ export interface FileRoutesByFullPath {
   '/api/public/storefront/support/conversations': typeof ApiPublicStorefrontSupportConversationsRouteWithChildren
   '/api/public/handheld/fulfillments/$id/bind-tote': typeof ApiPublicHandheldFulfillmentsIdBindToteRoute
   '/api/public/handheld/fulfillments/$id/claim': typeof ApiPublicHandheldFulfillmentsIdClaimRoute
+  '/api/public/handheld/fulfillments/$id/manual-ship': typeof ApiPublicHandheldFulfillmentsIdManualShipRoute
   '/api/public/handheld/fulfillments/$id/pick-complete': typeof ApiPublicHandheldFulfillmentsIdPickCompleteRoute
   '/api/public/handheld/fulfillments/$id/pick-scan': typeof ApiPublicHandheldFulfillmentsIdPickScanRoute
   '/api/public/handheld/fulfillments/$id/shortage': typeof ApiPublicHandheldFulfillmentsIdShortageRoute
@@ -2464,6 +2488,8 @@ export interface FileRoutesByTo {
   '/api/public/handheld/orders/$id': typeof ApiPublicHandheldOrdersIdRoute
   '/api/public/handheld/parcels/$id': typeof ApiPublicHandheldParcelsIdRoute
   '/api/public/handheld/parcels/counts': typeof ApiPublicHandheldParcelsCountsRoute
+  '/api/public/handheld/pickup/ready': typeof ApiPublicHandheldPickupReadyRoute
+  '/api/public/handheld/pickup/redeem': typeof ApiPublicHandheldPickupRedeemRoute
   '/api/public/handheld/print-jobs/lease': typeof ApiPublicHandheldPrintJobsLeaseRoute
   '/api/public/handheld/print/custom-cards': typeof ApiPublicHandheldPrintCustomCardsRouteWithChildren
   '/api/public/handheld/print/store-qr': typeof ApiPublicHandheldPrintStoreQrRoute
@@ -2521,6 +2547,7 @@ export interface FileRoutesByTo {
   '/api/public/storefront/support/conversations': typeof ApiPublicStorefrontSupportConversationsRouteWithChildren
   '/api/public/handheld/fulfillments/$id/bind-tote': typeof ApiPublicHandheldFulfillmentsIdBindToteRoute
   '/api/public/handheld/fulfillments/$id/claim': typeof ApiPublicHandheldFulfillmentsIdClaimRoute
+  '/api/public/handheld/fulfillments/$id/manual-ship': typeof ApiPublicHandheldFulfillmentsIdManualShipRoute
   '/api/public/handheld/fulfillments/$id/pick-complete': typeof ApiPublicHandheldFulfillmentsIdPickCompleteRoute
   '/api/public/handheld/fulfillments/$id/pick-scan': typeof ApiPublicHandheldFulfillmentsIdPickScanRoute
   '/api/public/handheld/fulfillments/$id/shortage': typeof ApiPublicHandheldFulfillmentsIdShortageRoute
@@ -2763,6 +2790,8 @@ export interface FileRoutesById {
   '/api/public/handheld/orders/$id': typeof ApiPublicHandheldOrdersIdRoute
   '/api/public/handheld/parcels/$id': typeof ApiPublicHandheldParcelsIdRoute
   '/api/public/handheld/parcels/counts': typeof ApiPublicHandheldParcelsCountsRoute
+  '/api/public/handheld/pickup/ready': typeof ApiPublicHandheldPickupReadyRoute
+  '/api/public/handheld/pickup/redeem': typeof ApiPublicHandheldPickupRedeemRoute
   '/api/public/handheld/print-jobs/lease': typeof ApiPublicHandheldPrintJobsLeaseRoute
   '/api/public/handheld/print/custom-cards': typeof ApiPublicHandheldPrintCustomCardsRouteWithChildren
   '/api/public/handheld/print/store-qr': typeof ApiPublicHandheldPrintStoreQrRoute
@@ -2820,6 +2849,7 @@ export interface FileRoutesById {
   '/api/public/storefront/support/conversations': typeof ApiPublicStorefrontSupportConversationsRouteWithChildren
   '/api/public/handheld/fulfillments/$id/bind-tote': typeof ApiPublicHandheldFulfillmentsIdBindToteRoute
   '/api/public/handheld/fulfillments/$id/claim': typeof ApiPublicHandheldFulfillmentsIdClaimRoute
+  '/api/public/handheld/fulfillments/$id/manual-ship': typeof ApiPublicHandheldFulfillmentsIdManualShipRoute
   '/api/public/handheld/fulfillments/$id/pick-complete': typeof ApiPublicHandheldFulfillmentsIdPickCompleteRoute
   '/api/public/handheld/fulfillments/$id/pick-scan': typeof ApiPublicHandheldFulfillmentsIdPickScanRoute
   '/api/public/handheld/fulfillments/$id/shortage': typeof ApiPublicHandheldFulfillmentsIdShortageRoute
@@ -3063,6 +3093,8 @@ export interface FileRouteTypes {
     | '/api/public/handheld/orders/$id'
     | '/api/public/handheld/parcels/$id'
     | '/api/public/handheld/parcels/counts'
+    | '/api/public/handheld/pickup/ready'
+    | '/api/public/handheld/pickup/redeem'
     | '/api/public/handheld/print-jobs/lease'
     | '/api/public/handheld/print/custom-cards'
     | '/api/public/handheld/print/store-qr'
@@ -3120,6 +3152,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/support/conversations'
     | '/api/public/handheld/fulfillments/$id/bind-tote'
     | '/api/public/handheld/fulfillments/$id/claim'
+    | '/api/public/handheld/fulfillments/$id/manual-ship'
     | '/api/public/handheld/fulfillments/$id/pick-complete'
     | '/api/public/handheld/fulfillments/$id/pick-scan'
     | '/api/public/handheld/fulfillments/$id/shortage'
@@ -3354,6 +3387,8 @@ export interface FileRouteTypes {
     | '/api/public/handheld/orders/$id'
     | '/api/public/handheld/parcels/$id'
     | '/api/public/handheld/parcels/counts'
+    | '/api/public/handheld/pickup/ready'
+    | '/api/public/handheld/pickup/redeem'
     | '/api/public/handheld/print-jobs/lease'
     | '/api/public/handheld/print/custom-cards'
     | '/api/public/handheld/print/store-qr'
@@ -3411,6 +3446,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/support/conversations'
     | '/api/public/handheld/fulfillments/$id/bind-tote'
     | '/api/public/handheld/fulfillments/$id/claim'
+    | '/api/public/handheld/fulfillments/$id/manual-ship'
     | '/api/public/handheld/fulfillments/$id/pick-complete'
     | '/api/public/handheld/fulfillments/$id/pick-scan'
     | '/api/public/handheld/fulfillments/$id/shortage'
@@ -3652,6 +3688,8 @@ export interface FileRouteTypes {
     | '/api/public/handheld/orders/$id'
     | '/api/public/handheld/parcels/$id'
     | '/api/public/handheld/parcels/counts'
+    | '/api/public/handheld/pickup/ready'
+    | '/api/public/handheld/pickup/redeem'
     | '/api/public/handheld/print-jobs/lease'
     | '/api/public/handheld/print/custom-cards'
     | '/api/public/handheld/print/store-qr'
@@ -3709,6 +3747,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/support/conversations'
     | '/api/public/handheld/fulfillments/$id/bind-tote'
     | '/api/public/handheld/fulfillments/$id/claim'
+    | '/api/public/handheld/fulfillments/$id/manual-ship'
     | '/api/public/handheld/fulfillments/$id/pick-complete'
     | '/api/public/handheld/fulfillments/$id/pick-scan'
     | '/api/public/handheld/fulfillments/$id/shortage'
@@ -3889,6 +3928,8 @@ export interface RootRouteChildren {
   ApiPublicHandheldItemsSmartCreateRoute: typeof ApiPublicHandheldItemsSmartCreateRoute
   ApiPublicHandheldItemsUploadImageRoute: typeof ApiPublicHandheldItemsUploadImageRouteWithChildren
   ApiPublicHandheldLocationSwitchRoute: typeof ApiPublicHandheldLocationSwitchRoute
+  ApiPublicHandheldPickupReadyRoute: typeof ApiPublicHandheldPickupReadyRoute
+  ApiPublicHandheldPickupRedeemRoute: typeof ApiPublicHandheldPickupRedeemRoute
   ApiPublicHandheldPrintJobsLeaseRoute: typeof ApiPublicHandheldPrintJobsLeaseRoute
   ApiPublicHandheldPrintCustomCardsRoute: typeof ApiPublicHandheldPrintCustomCardsRouteWithChildren
   ApiPublicHandheldPrintStoreQrRoute: typeof ApiPublicHandheldPrintStoreQrRoute
@@ -5331,6 +5372,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldParcelsCountsRouteImport
       parentRoute: typeof ApiPublicHandheldParcelsRoute
     }
+    '/api/public/handheld/pickup/ready': {
+      id: '/api/public/handheld/pickup/ready'
+      path: '/api/public/handheld/pickup/ready'
+      fullPath: '/api/public/handheld/pickup/ready'
+      preLoaderRoute: typeof ApiPublicHandheldPickupReadyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/pickup/redeem': {
+      id: '/api/public/handheld/pickup/redeem'
+      path: '/api/public/handheld/pickup/redeem'
+      fullPath: '/api/public/handheld/pickup/redeem'
+      preLoaderRoute: typeof ApiPublicHandheldPickupRedeemRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/handheld/print-jobs/lease': {
       id: '/api/public/handheld/print-jobs/lease'
       path: '/api/public/handheld/print-jobs/lease'
@@ -5728,6 +5783,13 @@ declare module '@tanstack/react-router' {
       path: '/claim'
       fullPath: '/api/public/handheld/fulfillments/$id/claim'
       preLoaderRoute: typeof ApiPublicHandheldFulfillmentsIdClaimRouteImport
+      parentRoute: typeof ApiPublicHandheldFulfillmentsIdRoute
+    }
+    '/api/public/handheld/fulfillments/$id/manual-ship': {
+      id: '/api/public/handheld/fulfillments/$id/manual-ship'
+      path: '/manual-ship'
+      fullPath: '/api/public/handheld/fulfillments/$id/manual-ship'
+      preLoaderRoute: typeof ApiPublicHandheldFulfillmentsIdManualShipRouteImport
       parentRoute: typeof ApiPublicHandheldFulfillmentsIdRoute
     }
     '/api/public/handheld/fulfillments/$id/pick-complete': {
@@ -6272,6 +6334,7 @@ const ApiPublicContentIdRouteWithChildren =
 interface ApiPublicHandheldFulfillmentsIdRouteChildren {
   ApiPublicHandheldFulfillmentsIdBindToteRoute: typeof ApiPublicHandheldFulfillmentsIdBindToteRoute
   ApiPublicHandheldFulfillmentsIdClaimRoute: typeof ApiPublicHandheldFulfillmentsIdClaimRoute
+  ApiPublicHandheldFulfillmentsIdManualShipRoute: typeof ApiPublicHandheldFulfillmentsIdManualShipRoute
   ApiPublicHandheldFulfillmentsIdPickCompleteRoute: typeof ApiPublicHandheldFulfillmentsIdPickCompleteRoute
   ApiPublicHandheldFulfillmentsIdPickScanRoute: typeof ApiPublicHandheldFulfillmentsIdPickScanRoute
   ApiPublicHandheldFulfillmentsIdShortageRoute: typeof ApiPublicHandheldFulfillmentsIdShortageRoute
@@ -6285,6 +6348,8 @@ const ApiPublicHandheldFulfillmentsIdRouteChildren: ApiPublicHandheldFulfillment
       ApiPublicHandheldFulfillmentsIdBindToteRoute,
     ApiPublicHandheldFulfillmentsIdClaimRoute:
       ApiPublicHandheldFulfillmentsIdClaimRoute,
+    ApiPublicHandheldFulfillmentsIdManualShipRoute:
+      ApiPublicHandheldFulfillmentsIdManualShipRoute,
     ApiPublicHandheldFulfillmentsIdPickCompleteRoute:
       ApiPublicHandheldFulfillmentsIdPickCompleteRoute,
     ApiPublicHandheldFulfillmentsIdPickScanRoute:
@@ -6920,6 +6985,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHandheldItemsUploadImageRoute:
     ApiPublicHandheldItemsUploadImageRouteWithChildren,
   ApiPublicHandheldLocationSwitchRoute: ApiPublicHandheldLocationSwitchRoute,
+  ApiPublicHandheldPickupReadyRoute: ApiPublicHandheldPickupReadyRoute,
+  ApiPublicHandheldPickupRedeemRoute: ApiPublicHandheldPickupRedeemRoute,
   ApiPublicHandheldPrintJobsLeaseRoute: ApiPublicHandheldPrintJobsLeaseRoute,
   ApiPublicHandheldPrintCustomCardsRoute:
     ApiPublicHandheldPrintCustomCardsRouteWithChildren,

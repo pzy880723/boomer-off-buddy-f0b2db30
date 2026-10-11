@@ -351,6 +351,13 @@
       "when": 1791699589098,
       "tag": "0049_order_paid_handheld_notify",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1791700009862,
+      "tag": "0050_manual_ship_fulfillment",
+      "breakpoints": true
     }
   ]
 }
