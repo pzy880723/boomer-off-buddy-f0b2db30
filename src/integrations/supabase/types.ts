@@ -10758,6 +10758,10 @@ export type Database = {
         Args: { p_sku_id: string }
         Returns: undefined
       }
+      handheld_notify_order_paid: {
+        Args: { p_order_id: string }
+        Returns: number
+      }
       handheld_product_content:
         | {
             Args: {
