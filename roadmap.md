@@ -92,3 +92,11 @@
 - [x] 手持 PATCH / smart-create / 列表详情；商城 fankuang=1 分页前过滤 + in_fankuang；OpenAPI
 - [x] PC 新建/编辑一行开关
 - [ ] 腾讯发布与 iOS/Android/小程序（Codex）
+
+## 当前任务：订单/客服多机通知（2026-10-11）
+- [x] 阶段1 已付款订单→门店手持提醒（0049，已应用 Lovable Cloud）
+- [ ] 阶段2 快递手工单号对手持开放（ERP 网页已有 manualShipStoreSubOrder）
+- [ ] 阶段3 手持机自提核销/备货接口
+- [ ] 同城人工配送补运费（流程已批准；待退款会计/支付回调契约）
+- [ ] 系统推送（待选推送服务商与凭证）
+- [ ] 腾讯发布（Codex）
