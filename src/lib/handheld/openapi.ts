@@ -627,7 +627,7 @@ X-Session-Token: <操作员 session token>
       post: {
         tags: ["盘点"],
         summary: "上传盘点扫描",
-        description: "可多次调用，按 (stocktake_id, epc) 去重。未识别的 EPC 在返回里单独列出。",
+        description: "需员工会话且有设备库位权限、盘点单 scanning。按 (stocktake_id, epc) 去重；accepted 只计本次 EPC 中已持久化且关联有效 SKU 的行，旧空 SKU 记录在 EPC 已绑定后补关联；未关联 EPC 列入 unknown。",
         requestBody: jsonBody(StocktakeScanReq),
         responses: { "200": jsonRes("OK", StocktakeScanRes), ...ERROR_RESPONSES },
       },

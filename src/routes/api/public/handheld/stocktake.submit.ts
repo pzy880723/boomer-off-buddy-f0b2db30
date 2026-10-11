@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type { z } from "zod";
-import { HANDHELD_CORS, authenticateDevice, ok, err } from "@/server/handheld-auth.server";
+import { HANDHELD_CORS, authenticateDevice, resolveSessionUser, ok, err } from "@/server/handheld-auth.server";
+import { requireStaffAtDeviceLocation } from "@/server/handheld-fulfillment.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { StocktakeSubmitReq as Body } from "@/lib/handheld/schemas";
 
@@ -11,6 +12,8 @@ export const Route = createFileRoute("/api/public/handheld/stocktake/submit")({
       POST: async ({ request }) => {
         const auth = await authenticateDevice(request);
         if (!auth.ok) return auth.response;
+        const staff = await requireStaffAtDeviceLocation(auth.device, await resolveSessionUser(request));
+        if (!staff.ok) return staff.response;
         let body: z.infer<typeof Body>;
         try {
           body = Body.parse(await request.json());
@@ -24,8 +27,8 @@ export const Route = createFileRoute("/api/public/handheld/stocktake/submit")({
           .eq("id", body.stocktake_id)
           .maybeSingle();
         if (!st) return err("Not found", 404);
-        if (st.location_id !== auth.device.location_id) return err("Location mismatch", 403);
-        if (st.status !== "scanning") return err(`Already ${st.status}`, 409);
+        if (st.location_id !== staff.locationId) return err("Location mismatch", 403, { code: "location_forbidden" });
+        if (st.status !== "scanning") return err(`Already ${st.status}`, 409, { code: "stocktake_closed" });
 
         // Build lines = group scans by sku_id, compare against inv_stocks at that location.
         const { data: scans } = await supabaseAdmin

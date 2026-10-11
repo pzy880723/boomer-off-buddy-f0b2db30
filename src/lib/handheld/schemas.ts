@@ -440,9 +440,10 @@ export const StocktakeScanReq = z
 
 export const StocktakeScanRes = okEnvelope(
   z.object({
-    received: z.number().int(),
+    received: z.number().int().meta({ description: "本次去重后的 EPC 数" }),
+    accepted: z.number().int().meta({ description: "本次 EPC 中已持久化且关联有效 SKU 的数量" }),
     unknown_count: z.number().int(),
-    unknown: z.array(epcSchema),
+    unknown: z.array(epcSchema).meta({ description: "未持久化或未关联 SKU 的 EPC（含 inv_epcs 存在但 sku_id 为空）" }),
     participants: z.array(StocktakeParticipant).default([]),
   }),
 );

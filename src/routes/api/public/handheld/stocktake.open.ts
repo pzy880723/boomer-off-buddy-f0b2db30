@@ -3,10 +3,11 @@ import type { z } from "zod";
 import {
   HANDHELD_CORS,
   authenticateDevice,
-  requireLocation,
+  resolveSessionUser,
   ok,
   err,
 } from "@/server/handheld-auth.server";
+import { requireStaffAtDeviceLocation } from "@/server/handheld-fulfillment.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { StocktakeOpenReq as Body } from "@/lib/handheld/schemas";
 
@@ -24,8 +25,8 @@ export const Route = createFileRoute("/api/public/handheld/stocktake/open")({
       POST: async ({ request }) => {
         const auth = await authenticateDevice(request);
         if (!auth.ok) return auth.response;
-        const need = requireLocation(auth.device);
-        if (!need.ok) return need.response;
+        const staff = await requireStaffAtDeviceLocation(auth.device, await resolveSessionUser(request));
+        if (!staff.ok) return staff.response;
 
         let payload: z.infer<typeof Body> = {};
         try {
@@ -38,7 +39,7 @@ export const Route = createFileRoute("/api/public/handheld/stocktake/open")({
         const { data: existing } = await supabaseAdmin
           .from("stocktakes")
           .select("id, code, status, opened_at")
-          .eq("location_id", auth.device.location_id!)
+          .eq("location_id", staff.locationId)
           .eq("status", "scanning")
           .order("opened_at", { ascending: false })
           .limit(1)
@@ -50,7 +51,7 @@ export const Route = createFileRoute("/api/public/handheld/stocktake/open")({
           .from("stocktakes")
           .insert({
             code: code(),
-            location_id: auth.device.location_id!,
+            location_id: staff.locationId,
             status: "scanning",
             notes: payload.name ?? null,
           })
