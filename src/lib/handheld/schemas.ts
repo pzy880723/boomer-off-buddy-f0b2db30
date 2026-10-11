@@ -1223,7 +1223,11 @@ export const NotificationsSinceQuery = z
       .string()
       .datetime()
       .optional()
-      .meta({ description: "上次拉取的 server_ts；空=最近 50 条" }),
+      .meta({ description: "旧模式：上次拉取的 server_ts；空=最近 50 条（不含状态变更，可能漏同 ts/晚提交）" }),
+    cursor: z
+      .string()
+      .optional()
+      .meta({ description: "可靠增量模式：'latest' 取起始游标，之后传回 next_cursor（v2:<xid>:<seq>）；优先于 ts" }),
     limit: z.coerce.number().int().min(1).max(200).default(50),
   })
   .meta({ id: "NotificationsSinceQuery" });

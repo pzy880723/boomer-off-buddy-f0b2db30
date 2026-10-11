@@ -9,6 +9,8 @@ import {
 import {
   describeScope,
   listNotificationsSince,
+  listNotificationChanges,
+  parseChangeCursor,
   resolveNotificationScope,
 } from "@/server/handheld-notifications.server";
 import { NotificationsSinceQuery } from "@/lib/handheld/schemas";
@@ -34,12 +36,21 @@ export const Route = createFileRoute("/api/public/handheld/notifications/since")
           return err("Invalid query", 400, { code: "validation_error", detail: String(e) });
         }
 
+        const rawCursor = url.searchParams.get("cursor");
+        const changeCursor = rawCursor ? parseChangeCursor(rawCursor) : null;
+        if (rawCursor && !changeCursor) {
+          return err("Invalid cursor", 400, { code: "validation_error" });
+        }
         const scope = await resolveNotificationScope({
           userId: session.user_id,
           deviceId: auth.device.id,
           deviceLocationId: auth.device.location_id,
         });
         try {
+          if (changeCursor) {
+            const page = await listNotificationChanges({ scope, cursor: changeCursor, limit: q.limit });
+            return ok({ ...page, scope: describeScope(scope) });
+          }
           const page = await listNotificationsSince({ scope, since: q.ts, limit: q.limit });
           return ok({ ...page, scope: describeScope(scope) });
         } catch (error) {
