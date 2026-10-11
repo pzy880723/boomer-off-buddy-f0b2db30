@@ -26,8 +26,17 @@ INSERT INTO fulfillment_items(id,fulfillment_id,expected_qty,picked_qty) VALUES
  ('00000000-0000-0000-0000-000000000171','00000000-0000-0000-0000-0000000001f7',1,1);
 INSERT INTO fulfillment_shortages(fulfillment_id,fulfillment_item_id,quantity,status,refund_state) VALUES
  ('00000000-0000-0000-0000-0000000001f4','00000000-0000-0000-0000-000000000141',1,'pending_customer','awaiting_confirmation'),
- ('00000000-0000-0000-0000-0000000001f5','00000000-0000-0000-0000-000000000151',1,'customer_accepted','refund_completed'),
+ ('00000000-0000-0000-0000-0000000001f5','00000000-0000-0000-0000-000000000151',1,'customer_accepted','succeeded'),
  ('00000000-0000-0000-0000-0000000001f6','00000000-0000-0000-0000-000000000161',1,'customer_accepted','refund_pending');
+-- g5 缺货清算的真实证据链（意图 succeeded → 退款 succeeded，金额一致）；g5 订单经部分退款
+UPDATE commerce_orders SET payment_status='partially_refunded' WHERE id='00000000-0000-0000-0000-0000000001a5';
+INSERT INTO commerce_payments(id,order_id,status,amount) VALUES ('00000000-0000-0000-0000-0000000005a5','00000000-0000-0000-0000-0000000001a5','partially_refunded',20);
+INSERT INTO commerce_refunds(id,order_id,payment_id,after_sale_id,status,amount) VALUES ('00000000-0000-0000-0000-0000000005b5','00000000-0000-0000-0000-0000000001a5','00000000-0000-0000-0000-0000000005a5','00000000-0000-0000-0000-0000000005c5','succeeded',10);
+INSERT INTO commerce_refund_intents(id,shortage_id,order_id,payment_id,after_sale_id,refund_id,amount_fen,state)
+  SELECT '00000000-0000-0000-0000-0000000005d5', id, '00000000-0000-0000-0000-0000000001a5', '00000000-0000-0000-0000-0000000005a5','00000000-0000-0000-0000-0000000005c5','00000000-0000-0000-0000-0000000005b5',1000,'succeeded'
+    FROM fulfillment_shortages WHERE fulfillment_id='00000000-0000-0000-0000-0000000001f5';
+UPDATE fulfillment_shortages SET order_id='00000000-0000-0000-0000-0000000001a5', refund_intent_id='00000000-0000-0000-0000-0000000005d5', refund_total_fen=1000 WHERE fulfillment_id='00000000-0000-0000-0000-0000000001f5';
+UPDATE fulfillment_shortages s SET order_id=f.order_id FROM fulfillments f WHERE f.id=s.fulfillment_id AND s.order_id IS NULL;
 SET ROLE service_role;
 -- 红测 1：有效行 + 不存在行 → 必须整体失败、首行 picked_qty 不变
 DO $$ DECLARE r jsonb; n int; hq uuid:='00000000-0000-0000-0000-0000000001e2'; BEGIN

@@ -10097,6 +10097,18 @@ export type Database = {
         }
         Returns: Json
       }
+      commerce_fulfillment_block: {
+        Args: { p_fulfillment_id: string }
+        Returns: string
+      }
+      commerce_fulfillment_pick_facts: {
+        Args: { p_fulfillment_id: string }
+        Returns: Json
+      }
+      commerce_item_cleared_shortage_qty: {
+        Args: { p_fulfillment_item_id: string }
+        Returns: number
+      }
       commerce_listing_availability: {
         Args: { p_listing_ids: string[] }
         Returns: {
@@ -10243,6 +10255,10 @@ export type Database = {
         Args: { p_order_item_id: string; p_payment_id: string }
         Returns: number
       }
+      commerce_order_settlement_block: {
+        Args: { p_order_id: string }
+        Returns: string
+      }
       commerce_payment_reserved_fen: {
         Args: { p_payment_id: string }
         Returns: number
@@ -10357,6 +10373,10 @@ export type Database = {
           p_state: string
         }
         Returns: Json
+      }
+      commerce_shortage_refund_cleared: {
+        Args: { p_shortage_id: string }
+        Returns: boolean
       }
       commerce_storefront_coupon_options: {
         Args: { p_customer_id: string; p_items: Json }

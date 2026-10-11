@@ -12,6 +12,8 @@ $PSQL -q -f tests/sql/manual_ship/stubs.sql >/dev/null
 $PSQL -q -v ON_ERROR_STOP=1 -f "$mig" >/dev/null || { echo "FAIL migration apply"; exit 1; }
 mig2=${MANUAL_SHIP_V2_MIGRATION-$(ls drizzle/migrations/*_manual_ship_reliability.sql 2>/dev/null | head -1)}
 if [ -n "$mig2" ]; then $PSQL -q -v ON_ERROR_STOP=1 -f "$mig2" >/dev/null || { echo "FAIL v2 migration apply"; exit 1; }; else echo "NOTE v2 migration absent (RED run)"; fi
+mig3=${LIFECYCLE_FIX_MIGRATION-$(ls drizzle/migrations/*_refund_lifecycle_guard.sql 2>/dev/null | head -1)}
+[ -n "$mig3" ] && { $PSQL -q -v ON_ERROR_STOP=1 -f "$mig3" >/dev/null || { echo "FAIL lifecycle migration apply"; exit 1; }; }
 out=$($PSQL -q -v ON_ERROR_STOP=1 -f tests/sql/manual_ship/cases.sql 2>&1); rc=$?
 echo "$out" | grep -o 'PASS .*\|ERROR.*\|FAIL.*'
 pass=$(echo "$out" | grep -c PASS)
