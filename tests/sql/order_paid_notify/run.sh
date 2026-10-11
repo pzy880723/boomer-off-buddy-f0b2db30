@@ -4,7 +4,7 @@ set -uo pipefail
 cd "$(dirname "$0")/../../.."
 bash tests/sql/harness/setup.sh >/dev/null
 export PSQL=/tmp/psql.sh
-mig=$(ls drizzle/migrations/*_order_paid_handheld_notify.sql 2>/dev/null | head -1)
+mig=${ORDER_PAID_MIGRATION:-}; [ -n "$mig" ] || mig=$(ls drizzle/migrations/*_order_paid_handheld_notify.sql 2>/dev/null | head -1)
 [ -n "$mig" ] || { echo "FAIL migration missing"; exit 1; }
 PGDB=postgres $PSQL -q -c "drop database if exists order_paid_test" -c "create database order_paid_test" >/dev/null
 export PGDB=order_paid_test
