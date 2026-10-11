@@ -10,25 +10,33 @@ type OrderLike = { id: string; fulfillment_method: string | null; payment_status
 export async function loadCustomerPickups(order: OrderLike): Promise<CustomerPickupWithImage[]> {
   if (order.fulfillment_method !== "pickup") return [];
   const db = supabaseAdmin as unknown as { from: (t: string) => any };
-  const [f, c, r, ri, s] = await Promise.all([
+  const [f, c] = await Promise.all([
     db.from("fulfillments").select("id,location_id,status,location:inv_locations!location_id(name,shop:youzan_shops!shop_id(shop_name,address))").eq("order_id", order.id),
     db.from("commerce_pickup_codes").select("fulfillment_id,code,qr_token,status,redeemed_at").eq("order_id", order.id),
-    db.from("commerce_refunds").select("id").eq("order_id", order.id).in("status", ["pending", "processing", "succeeded"]).limit(1),
-    db.from("commerce_refund_intents").select("id").eq("order_id", order.id).in("state", ["queued", "processing", "manual_review", "succeeded"]).limit(1),
-    db.from("fulfillment_shortages").select("fulfillment_id").eq("order_id", order.id).in("status", ["pending_customer", "customer_accepted"]),
   ]);
-  for (const x of [f, c, r, ri, s]) if (x.error) throw new Error("pickup lookup failed");
+  for (const x of [f, c]) if (x.error) throw new Error("pickup lookup failed");
+  const eligibility = await loadPickupEligibility([order.id]);
   const pickups = buildCustomerPickups({
     order,
-    fulfillments: (f.data ?? []).map((row: any) => ({
-      id: row.id, location_id: row.location_id, status: row.status,
-      store_name: row.location?.shop?.shop_name ?? row.location?.name ?? null,
-      store_address: row.location?.shop?.address ?? null,
-    })),
+    fulfillments: ((f.data ?? []) as Array<{ id: string; location_id: string | null; status: string;
+      location: { name: string | null; shop: { shop_name: string | null; address: string | null } | null } | null }>).map((x) => ({
+      id: x.id, location_id: x.location_id, status: x.status,
+      store_name: x.location?.shop?.shop_name ?? x.location?.name ?? null, store_address: x.location?.shop?.address ?? null })),
     codes: c.data ?? [],
-    refundActive: (r.data ?? []).length > 0 || (ri.data ?? []).length > 0,
-    shortageFulfillmentIds: (s.data ?? []).map((x: { fulfillment_id: string }) => x.fulfillment_id),
+    eligibility,
   });
-  // 二维码内容是 qr_payload（不可猜测令牌），不是 4 位码；只对可提货凭证生成。
   return Promise.all(pickups.map(async (p) => ({ ...p, qr_image: p.qr_payload ? await qrPngDataUrl(p.qr_payload) : null })));
+}
+
+/** 服务端权威清算资格（与手持备货/核销同一数据库判定）。RPC 失败返回 null → 调用方全部失败关闭，不输出凭证。 */
+export async function loadPickupEligibility(orderIds: string[]): Promise<Map<string, string | null> | null> {
+  if (orderIds.length === 0) return new Map();
+  const db = supabaseAdmin as unknown as { rpc: (fn: string, args: unknown) => Promise<{ data: unknown; error: unknown }> };
+  try {
+    const { data, error } = await db.rpc("commerce_storefront_pickup_eligibility", { p_order_ids: orderIds });
+    if (error || !Array.isArray(data)) return null;
+    return new Map((data as Array<{ fulfillment_id: string; block_reason: string | null }>).map((r) => [r.fulfillment_id, r.block_reason ?? null]));
+  } catch {
+    return null;
+  }
 }
