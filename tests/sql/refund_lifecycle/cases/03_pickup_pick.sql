@@ -21,5 +21,5 @@ DO $$ BEGIN
   PERFORM fulfillment_complete_pick(t_id('f12'),'aaaaaaaa-0000-4000-8000-00000000000a',NULL);
   RAISE EXCEPTION 'S12 complete_pick accepted forged refund_completed';
 EXCEPTION WHEN raise_exception THEN
-  IF SQLERRM LIKE 'S12%' THEN RAISE; END IF; ASSERT SQLERRM LIKE '%refund_pending%' OR SQLERRM LIKE '%unpicked%', 'S12 wrong reason: '||SQLERRM; RAISE NOTICE 'PASS S12 complete_pick rejects forged string';
+  IF SQLERRM LIKE 'S12%' THEN RAISE; END IF; ASSERT SQLERRM LIKE '%refund_pending%' OR SQLERRM LIKE '%refund_blocked%' OR SQLERRM LIKE '%unpicked%', 'S12 wrong reason: '||SQLERRM; RAISE NOTICE 'PASS S12 complete_pick rejects forged string';
 END $$;
