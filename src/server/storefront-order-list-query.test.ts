@@ -301,3 +301,36 @@ test("计数读取失败必须抛错，不能当成 0 单", async () => {
     OrderListError,
   );
 });
+
+test("运行时归属：顾客 A 读不到顾客 B 的订单，B 的游标拿给 A 也只翻 A 自己的数据", async () => {
+  const { encodeOrderCursor } = await import("./storefront-order-list.server");
+  // 模拟数据库：只按请求里实际出现的 customer_id 过滤（缺失过滤则返回全部，以暴露漏过滤）。
+  const owned = [
+    ...Array.from({ length: 3 }, (_, i) => ({ ...orderRow(i), customer_id: CUSTOMER })),
+    ...Array.from({ length: 3 }, (_, i) => ({ ...orderRow(50 + i), customer_id: OTHER })),
+  ];
+  const { client, urls } = mockClient((url) => {
+    if (!url.includes("/commerce_orders")) return [];
+    const m = url.match(/customer_id=eq\.([0-9a-f-]{36})/);
+    return m ? owned.filter((r) => r.customer_id === m[1]) : owned;
+  });
+  const listAs = (customerId: string, qs = "") =>
+    listStorefrontOrders({ client: client as never, customerId, url: new URL(`https://x.test/api/public/storefront/orders${qs}`), signPaths });
+
+  const a = await listAs(CUSTOMER);
+  const ids = new Set(owned.filter((r) => r.customer_id === OTHER).map((r) => r.id));
+  assert.equal(a.data.length, 3);
+  assert.ok(a.data.every((o) => !ids.has((o as { id: string }).id)), "A must never see B's orders");
+
+  const foreignCursor = encodeOrderCursor(owned.find((r) => r.customer_id === OTHER)!);
+  urls.length = 0;
+  const a2 = await listAs(CUSTOMER, `?cursor=${encodeURIComponent(foreignCursor)}`);
+  const orderUrls = urls.filter((u) => u.includes("/commerce_orders"));
+  assert.ok(orderUrls.length > 0 && orderUrls.every((u) => u.includes(`customer_id=eq.${CUSTOMER}`) && !u.includes(OTHER)));
+  assert.ok(a2.data.every((o) => !ids.has((o as { id: string }).id)), "foreign cursor must not leak B's orders");
+
+  urls.length = 0;
+  const n = await countStorefrontOrders({ client: client as never, customerId: CUSTOMER, url: new URL("https://x.test/c") } as never);
+  assert.ok(urls.filter((u) => u.includes("/commerce_orders")).every((u) => u.includes(`customer_id=eq.${CUSTOMER}`)));
+  assert.notEqual(JSON.stringify(n), undefined);
+});
