@@ -119,7 +119,9 @@ describe("handheld AI classification contract", () => {
     assert.match(worker, /sku-listing/);
     assert.match(worker, /processing/);
     assert.match(worker, /retryable_failed/);
-    assert.match(worker, /\.select\("id"\)\s*\.maybeSingle\(\)/);
+    // 认领已从乐观 update+select 改为数据库租约 RPC + claim_token 回写（只有当前 token 可完成）。
+    assert.match(worker, /rpc\("handheld_listing_image_claim"/);
+    assert.match(worker, /p_claim_token: job\.claim_token/);
     assert.match(workerRoute, /runListingImageWorker/);
     assert.match(workerRoute, /SUPABASE_SERVICE_ROLE_KEY/);
     assert.match(workerRoute, /Bearer \$\{serviceRoleKey\}/);

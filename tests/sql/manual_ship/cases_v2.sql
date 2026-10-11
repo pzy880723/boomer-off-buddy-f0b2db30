@@ -32,7 +32,7 @@ DO $$ DECLARE r jsonb; n int; s text; hq uuid:='00000000-0000-0000-0000-00000000
   r := commerce_manual_ship_fulfillment(hq,NULL,'00000000-0000-0000-0000-0000000001f4','sf','SFT401','[{"fulfillment_item_id":"00000000-0000-0000-0000-000000000141","quantity":1}]','v2-pending');
   ASSERT r->>'result'='shortage_blocked', 'pending '||r::text;
   r := commerce_manual_ship_fulfillment(hq,NULL,'00000000-0000-0000-0000-0000000001f6','sf','SFT601','[{"fulfillment_item_id":"00000000-0000-0000-0000-000000000161","quantity":1}]','v2-refunding');
-  ASSERT r->>'result'='shortage_blocked', 'refunding '||r::text;
+  ASSERT r->>'result' IN ('shortage_blocked','refund_blocked'), 'refunding '||r::text;
   -- 缺货已同意且退款完成 → 应发量=2-1=1；发 1 成功，发 2 超量
   r := commerce_manual_ship_fulfillment(hq,NULL,'00000000-0000-0000-0000-0000000001f5','sf','SFT501','[{"fulfillment_item_id":"00000000-0000-0000-0000-000000000151","quantity":2}]','v2-short-over');
   ASSERT r->>'result'='qty_exceeded', 'approved shortage over '||r::text;

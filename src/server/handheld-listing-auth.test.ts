@@ -21,13 +21,18 @@ const context = {
 (globalThis as any).__listingAuthTest = context;
 const stubs: Record<string, string> = {
   "@tanstack/react-router": "export const createFileRoute = () => options => options;",
+  // 路由新增的计时与 AI 授权依赖：鉴权失败/分类前即返回，任何 AI 授权查询都视为越界。
+  "@/lib/server-timing": "export const createServerTiming = () => ({ mark() {}, apply: response => response });",
+  "@/server/ai-consent.server": "export const dbConsentStore = () => {throw Error('unexpected consent lookup')};",
+  "@/server/ai-consent-core": "export const AI_POLICY_VERSION = 'test'; export const isAiAllowed = () => {throw Error('unexpected consent check')}; export const smartCreateWantsAi = () => {throw Error('unexpected AI branch')};",
   "@/server/handheld-auth.server": `export const { authenticateDevice, resolveSessionUser, userCanAccessLocation, err } = globalThis.__listingAuthTest; export const HANDHELD_CORS = {}; export const ok = () => {};`,
-  "@/integrations/supabase/client.server": "export const supabaseAdmin = new Proxy({}, {get(){throw Error('unexpected database access')}});",
+  // 路由并行预读（Promise.allSettled）会构造查询；任何查询执行都异步拒绝，绝不返回数据。
+  "@/integrations/supabase/client.server": "const q = new Proxy(function(){}, {get: (_t, k) => k === 'then' ? undefined : (k === 'maybeSingle' || k === 'single') ? async () => {throw Error('unexpected database access')} : () => q, apply: () => q}); export const supabaseAdmin = { from: () => q, rpc: async () => {throw Error('unexpected database access')} };",
   "@/lib/handheld/schemas": "export const SmartCreateReq = {parse: value => value};",
   "@/lib/inventory.helpers": "export const generateEpc = () => {}; export const generateSkuCode = () => {};",
   "@/server/handheld-print.server": "export const buildPrintPayload = () => {};",
   "@/server/handheld-idempotency.server": "export const replayIfPresent = () => {throw Error('unexpected replay')}; export const recordOp = () => {}; export const jsonReplay = () => {};",
-  "@/server/handheld-smart-create.server": "export const getSmartCreateReleaseTarget = () => {}; export const resolveConfirmedListingBrand = () => {throw Error('unexpected brand write')}; export const persistSmartCreateBrand = () => {}; export const shouldReuseSmartCreateSku = () => {}; export const smartCreateFingerprint = () => \"fp\";",
+  "@/server/handheld-smart-create.server": "export const getSmartCreateReleaseTarget = () => {}; export const resolveConfirmedListingBrand = async () => {throw Error('unexpected brand write')}; export const persistSmartCreateBrand = () => {}; export const shouldReuseSmartCreateSku = () => {}; export const smartCreateFingerprint = () => \"fp\";",
   "@/server/product-classification.server": "export const {assertActiveLeafCategory} = globalThis.__listingAuthTest; export const attachProductClassificationAuditToSku = () => {}; export const replaceManualProductFacets = () => {}; export const resolveOrCreateConfirmedIp = () => {throw Error('unexpected IP write')}; export const resolveManualProductFacets = () => {};",
   "@/server/handheld-listing-image-jobs.server": "export const enqueueListingImageJobs = () => {}; export const triggerListingImageWorker = () => {};",
   "@/lib/youzan-offline-products.functions": "export const releaseSkuToOfflineShopsCore = () => {throw Error('unexpected publish')};",

@@ -173,10 +173,11 @@ describe("pick guard safety regressions", () => {
     shortages: [],
   };
   const accepted = {
+    id: "s1",
     fulfillment_item_id: "i1",
     quantity: 1,
     status: "customer_accepted",
-    refund_state: "refund_completed",
+    refund_state: "succeeded",
   };
 
   it("blocks an empty item result", () => {
@@ -204,13 +205,14 @@ describe("pick guard safety regressions", () => {
     });
   }
 
-  for (const refund_state of ["refund_completed", "not_required"]) {
+  for (const refund_state of ["succeeded"]) {
     for (const picked_qty of [0, 1, 2]) {
-      it(`${refund_state}: a one-unit shortage still requires two of three units (picked ${picked_qty})`, () => {
+      it(`${refund_state}+DB evidence: a one-unit shortage still requires two of three units (picked ${picked_qty})`, () => {
         const guard = computePickGuard({
           ...base,
           items: [{ id: "i1", expected_qty: 3, picked_qty }],
           shortages: [{ ...accepted, refund_state }],
+          clearedShortageIds: ["s1"],
         });
         assert.equal(guard.can_complete_pick, picked_qty === 2);
         assert.equal(guard.unpicked_line_count, picked_qty === 2 ? 0 : 1);
@@ -222,10 +224,35 @@ describe("pick guard safety regressions", () => {
         ...base,
         items: [{ id: "i1", expected_qty: 3, picked_qty: 0 }],
         shortages: [{ ...accepted, quantity: 3, refund_state }],
+        clearedShortageIds: ["s1"],
       });
       assert.equal(guard.can_complete_pick, true);
     });
   }
+
+  for (const refund_state of ["refund_completed", "not_required", "succeeded"]) {
+    it(`${refund_state} string without DB refund evidence never discounts or passes`, () => {
+      const guard = computePickGuard({
+        ...base,
+        items: [{ id: "i1", expected_qty: 3, picked_qty: 2 }],
+        shortages: [{ ...accepted, refund_state }],
+        clearedShortageIds: [],
+      });
+      assert.equal(guard.can_complete_pick, false);
+    });
+  }
+
+  it("order-level refund block (e.g. non-shortage partial refund) blocks even when lines are picked", () => {
+    const guard = computePickGuard({ ...base, items: [{ id: "i1", expected_qty: 1, picked_qty: 1 }], shortages: [], clearedShortageIds: [], settlementBlock: "refund_blocked" });
+    assert.equal(guard.can_complete_pick, false);
+    assert.ok(guard.blocked_reasons.includes("refund_pending"));
+  });
+
+  it("fails closed when refund facts cannot be loaded", () => {
+    const guard = computePickGuard({ ...base, items: [{ id: "i1", expected_qty: 1, picked_qty: 1 }], shortages: [], clearedShortageIds: null });
+    assert.equal(guard.can_complete_pick, false);
+    assert.ok(guard.blocked_reasons.includes("refund_facts_load_failed"));
+  });
 
   for (const refund_state of ["refund_pending", null, "refunded"]) {
     it(`does not discount accepted quantities with uncleared refund state ${refund_state}`, () => {
@@ -246,7 +273,8 @@ describe("pick guard safety regressions", () => {
         { id: "i1", expected_qty: 3, picked_qty: 1 },
         { id: "i2", expected_qty: 2, picked_qty: 1 },
       ],
-      shortages: [accepted, { ...accepted, refund_state: "not_required" }],
+      shortages: [accepted, { ...accepted, id: "s2" }],
+      clearedShortageIds: ["s1", "s2"],
     });
     assert.equal(guard.can_complete_pick, false);
     assert.equal(guard.unpicked_line_count, 1);

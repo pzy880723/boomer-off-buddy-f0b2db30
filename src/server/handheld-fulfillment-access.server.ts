@@ -74,6 +74,7 @@ export function evaluateFulfillmentAccess(input: {
 }
 
 export type ShortageRow = {
+  id?: string;
   fulfillment_item_id: string;
   quantity: number;
   status: string;
@@ -87,6 +88,11 @@ export type PickGuardInput = {
   shortages: ShortageRow[] | null;
   itemQueryError?: unknown;
   shortageQueryError?: unknown;
+  /** 数据库 commerce_fulfillment_pick_facts 返回的真实退款证据（意图+退款 succeeded 且金额一致）。缺省=无已清算缺货。 */
+  clearedShortageIds?: string[] | null;
+  /** 数据库 commerce_order_settlement_block：订单级清算阻断（refund_blocked/after_sale_blocked/unpaid…）。 */
+  settlementBlock?: string | null;
+  factsQueryError?: unknown;
 };
 
 export type PickGuard = {
@@ -110,16 +116,21 @@ export function computePickGuard(input: PickGuardInput): PickGuard {
   const pendingCustomer = shortages.filter((s) => s.status === "pending_customer").length;
   if (pendingCustomer > 0) reasons.push("shortage_pending_customer");
 
-  const refundPending = shortages.filter((s) => s.refund_state === "refund_pending").length;
-  if (refundPending > 0) reasons.push("refund_pending");
+  if (input.factsQueryError || input.clearedShortageIds === null) reasons.push("refund_facts_load_failed");
+  const cleared = new Set(input.clearedShortageIds ?? []);
+  const UNSETTLED = ["refund_pending", "queued", "processing", "failed", "manual_review"];
+  const refundPending = shortages.filter(
+    (s) => UNSETTLED.includes(s.refund_state ?? "") || (s.status === "customer_accepted" && !(s.id && cleared.has(s.id))),
+  ).length;
+  if (refundPending > 0 || input.settlementBlock === "refund_blocked") reasons.push("refund_pending");
+  if (input.settlementBlock && !["refund_blocked", "cancelled"].includes(input.settlementBlock)) {
+    reasons.push(input.settlementBlock);
+  }
 
-  // Only customer-confirmed, refund-cleared quantities reduce the work on a line.
+  // 只有数据库确认的真实清算（意图+退款成功且金额一致）才核减应拣量；refund_state 字符串本身不作数。
   const approvedQuantities = new Map<string, number>();
   for (const shortage of shortages) {
-    if (
-      shortage.status === "customer_accepted" &&
-      (shortage.refund_state === "refund_completed" || shortage.refund_state === "not_required")
-    ) {
+    if (shortage.status === "customer_accepted" && shortage.id && cleared.has(shortage.id)) {
       approvedQuantities.set(
         shortage.fulfillment_item_id,
         (approvedQuantities.get(shortage.fulfillment_item_id) ?? 0) + shortage.quantity,
@@ -243,6 +254,7 @@ export async function loadPickGuard(context: FulfillmentContext): Promise<{
   const [
     { data: itemRows, error: itemQueryError },
     { data: shortageRows, error: shortageQueryError },
+    { data: facts, error: factsQueryError },
   ] = await Promise.all([
     supabaseAdmin
       .from("fulfillment_items" as never)
@@ -250,10 +262,12 @@ export async function loadPickGuard(context: FulfillmentContext): Promise<{
       .eq("fulfillment_id", context.id),
     supabaseAdmin
       .from("fulfillment_shortages" as never)
-      .select("fulfillment_item_id, quantity, status, refund_state, created_at")
+      .select("id, fulfillment_item_id, quantity, status, refund_state, created_at")
       .eq("fulfillment_id", context.id)
       .order("created_at", { ascending: true }),
+    supabaseAdmin.rpc("commerce_fulfillment_pick_facts" as never, { p_fulfillment_id: context.id } as never),
   ]);
+  const f = facts as { settlement_block?: string | null; cleared_shortage_ids?: string[] } | null;
   const items = itemRows as unknown as PickGuardInput["items"];
   const shortages = shortageRows as unknown as PickGuardInput["shortages"];
   const shortageByItem = new Map<string, { status: string; refund_state: string | null }>();
@@ -272,6 +286,9 @@ export async function loadPickGuard(context: FulfillmentContext): Promise<{
     shortages,
     itemQueryError,
     shortageQueryError,
+    factsQueryError: factsQueryError ?? (f ? null : "missing"),
+    clearedShortageIds: f ? (f.cleared_shortage_ids ?? []) : null,
+    settlementBlock: f?.settlement_block ?? null,
   });
   return { guard, shortageByItem };
 }
