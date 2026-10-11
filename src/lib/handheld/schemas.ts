@@ -1245,7 +1245,9 @@ export const NotificationItem = z
 export const NotificationsSinceRes = okEnvelope(
   z.object({
     items: z.array(NotificationItem),
-    server_ts: z.string().datetime().meta({ description: "下次请求把它当成 ts" }),
+    server_ts: z.string().datetime().meta({ description: "旧模式：下次请求把它当成 ts" }),
+    next_cursor: z.string().optional().meta({ description: "cursor 模式：下次原样传回" }),
+    has_more: z.boolean().optional().meta({ description: "cursor 模式：true 时立即继续拉取" }),
   }),
 );
 
