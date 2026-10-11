@@ -17,6 +17,7 @@ import {
 } from "./storefront-order-list.server";
 
 import { buildPickupListProjection } from "@/lib/commerce/pickup-view";
+import { loadPickupEligibility } from "@/server/storefront-pickups.server";
 
 export class OrderListError extends Error {
   status: number;
@@ -144,18 +145,8 @@ export async function listStorefrontOrders(options: {
   // 自提：只投影按门店的安全状态（准备/可提/已核销时间/阻断），列表绝不返回提货码、令牌或二维码。
   const pickupIds = (page.rows as unknown as Array<{ id: string; fulfillment_method?: string }>)
     .filter((r) => r.fulfillment_method === "pickup").map((r) => r.id);
-  const refundOrders = new Set<string>();
-  const shortageFs = new Set<string>();
-  if (pickupIds.length > 0) {
-    const [rf, ri, sh] = await Promise.all([
-      client.from("commerce_refunds").select("order_id").in("order_id", pickupIds).in("status", ["pending", "processing", "succeeded"]),
-      client.from("commerce_refund_intents").select("order_id").in("order_id", pickupIds).in("state", ["queued", "processing", "manual_review", "succeeded"]),
-      client.from("fulfillment_shortages").select("fulfillment_id").in("order_id", pickupIds).in("status", ["pending_customer", "customer_accepted"]),
-    ]);
-    for (const x of [rf, ri, sh]) if (x.error) throw new OrderListError(x.error.message, 500);
-    for (const r of [...(rf.data ?? []), ...(ri.data ?? [])] as { order_id: string }[]) refundOrders.add(r.order_id);
-    for (const r of (sh.data ?? []) as { fulfillment_id: string }[]) shortageFs.add(r.fulfillment_id);
-  }
+  // 每个子单资格由数据库统一判定；失败关闭（全部 blocked），列表不因此报错。
+  const eligibility = pickupIds.length > 0 ? await loadPickupEligibility(pickupIds) : new Map<string, string | null>();
   return {
     ok: true,
     data: page.rows.map((row) => {
@@ -168,8 +159,7 @@ export async function listStorefrontOrders(options: {
           order: { fulfillment_method: r.fulfillment_method ?? null, payment_status: r.payment_status, order_status: r.order_status },
           fulfillments: r.fulfillments ?? [],
           storeName: (id) => (id ? stores.get(id)?.store_name ?? null : null),
-          refundActive: refundOrders.has(r.id),
-          shortageFulfillmentIds: [...shortageFs],
+          eligibility,
         }),
       };
     }),

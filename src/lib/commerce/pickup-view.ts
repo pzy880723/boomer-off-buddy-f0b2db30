@@ -9,7 +9,19 @@ export type CustomerPickup = {
   code: string | null;
   qr_payload: string | null;
   redeemed_at: string | null;
+  /** 服务端权威：数据库 commerce_pickup_block_reason 为 NULL 才为 true；查询失败/缺失一律 false。 */
+  settlement_eligible: boolean;
+  /** 不可交付原因（refund_blocked/after_sale_blocked/shortage_blocked/unpaid/cancelled/unavailable…），可交付为 null。 */
+  block_reason: string | null;
 };
+
+/** 每个子单的数据库清算资格：值为 block_reason（null=可交付）；整表 null 或缺键=失败关闭。 */
+export type PickupEligibility = ReadonlyMap<string, string | null> | null;
+export function eligibilityOf(e: PickupEligibility, fulfillmentId: string): { settlement_eligible: boolean; block_reason: string | null } {
+  if (!e || !e.has(fulfillmentId)) return { settlement_eligible: false, block_reason: "unavailable" };
+  const r = e.get(fulfillmentId) ?? null;
+  return { settlement_eligible: r === null, block_reason: r };
+}
 
 const READY = new Set(["picked", "packed", "handover_ready"]);
 const PREPARING = new Set(["unallocated", "allocated", "picking", "packing"]);
@@ -28,19 +40,19 @@ export function buildCustomerPickups(input: {
   order: { fulfillment_method: string | null; payment_status: string; order_status: string };
   fulfillments: Array<{ id: string; location_id: string | null; status: string; store_name: string | null; store_address: string | null }>;
   codes: Array<{ fulfillment_id: string; code: string; qr_token: string; status: string; redeemed_at: string | null }>;
-  refundActive: boolean;
-  shortageFulfillmentIds: string[];
+  eligibility: PickupEligibility;
 }): CustomerPickup[] {
   const { order } = input;
   if (order.fulfillment_method !== "pickup" || !PAID_ONLY.has(order.payment_status)) return [];
-  const orderBlocked = order.payment_status !== "paid" || PICKUP_BLOCKED_ORDER_STATUSES.has(order.order_status) || input.refundActive;
+  const orderBlocked = PICKUP_BLOCKED_ORDER_STATUSES.has(order.order_status);
   const byF = new Map(input.codes.map((c) => [c.fulfillment_id, c]));
   return input.fulfillments.map((f) => {
     const c = byF.get(f.id);
+    const el = eligibilityOf(input.eligibility, f.id);
     const base = { fulfillment_id: f.id, location_id: f.location_id, store_name: f.store_name, store_address: f.store_address,
-      code: null, qr_payload: null, redeemed_at: c?.redeemed_at ?? null };
+      code: null, qr_payload: null, redeemed_at: c?.redeemed_at ?? null, ...el };
     if (c?.status === "redeemed" || f.status === "handed_over") return { ...base, status: "redeemed" as const };
-    if (!c || c.status !== "active" || orderBlocked || input.shortageFulfillmentIds.includes(f.id)) {
+    if (!c || c.status !== "active" || orderBlocked || !el.settlement_eligible) {
       return { ...base, status: "blocked" as const };
     }
     if (!READY.has(f.status) && !PREPARING.has(f.status)) return { ...base, status: "blocked" as const };
@@ -91,22 +103,23 @@ export function pickupCreateGuard(b: { fulfillment_method: "express" | "pickup";
 }
 
 /** 订单列表用：按门店的安全状态投影，绝不包含提货码、令牌或二维码。 */
-export type PickupListItem = { fulfillment_id: string; location_id: string | null; store_name: string | null; status: PickupStatus; redeemed_at: string | null };
+export type PickupListItem = { fulfillment_id: string; location_id: string | null; store_name: string | null; status: PickupStatus; redeemed_at: string | null;
+  settlement_eligible: boolean; block_reason: string | null };
 export function buildPickupListProjection(input: {
   order: { fulfillment_method: string | null; payment_status: string; order_status: string };
   fulfillments: Array<{ id: string; location_id: string | null; status: string; handed_over_at: string | null }>;
   storeName: (locationId: string | null) => string | null;
-  refundActive: boolean;
-  shortageFulfillmentIds: string[];
+  eligibility: PickupEligibility;
 }): PickupListItem[] {
   const { order } = input;
   if (order.fulfillment_method !== "pickup" || !PAID_ONLY.has(order.payment_status)) return [];
-  const orderBlocked = order.payment_status !== "paid" || PICKUP_BLOCKED_ORDER_STATUSES.has(order.order_status) || input.refundActive;
+  const orderBlocked = PICKUP_BLOCKED_ORDER_STATUSES.has(order.order_status);
   return input.fulfillments.map((f) => {
+    const el = eligibilityOf(input.eligibility, f.id);
     const status: PickupStatus = f.status === "handed_over" ? "redeemed"
-      : orderBlocked || input.shortageFulfillmentIds.includes(f.id) ? "blocked"
+      : orderBlocked || !el.settlement_eligible ? "blocked"
       : READY.has(f.status) ? "ready" : PREPARING.has(f.status) ? "preparing" : "blocked";
     return { fulfillment_id: f.id, location_id: f.location_id, store_name: input.storeName(f.location_id), status,
-      redeemed_at: status === "redeemed" ? f.handed_over_at : null };
+      redeemed_at: status === "redeemed" ? f.handed_over_at : null, ...el };
   });
 }
