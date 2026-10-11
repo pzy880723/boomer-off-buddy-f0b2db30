@@ -149,68 +149,22 @@ export const manualShipStoreSubOrder = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
-    const { data: existing } = await supabaseAdmin
-      .from("shipments" as never)
-      .select("id, provider, tracking_no")
-      .eq("idempotency_key", data.clientOpId)
-      .maybeSingle();
-    if (existing) return { ok: true as const, replayed: true, shipment: existing };
-    // 自提子单只能经提货码核销交付，不能用手工发货绕过。
-    const { data: fOrder, error: fOrderError } = await supabaseAdmin
-      .from("fulfillments" as never)
-      .select("order:commerce_orders!inner(fulfillment_method)")
-      .eq("id", data.fulfillmentId)
-      .maybeSingle();
-    const method = (fOrder as { order?: { fulfillment_method?: string | null } } | null)?.order?.fulfillment_method;
-    // 查询失败或父订单缺失时一律不写入，避免绕过自提保护。
-    if (fOrderError || !method) throw new Error("无法确认订单履约方式，已停止登记发货");
-    if (method === "pickup") {
-      throw new Error("门店自提订单请使用提货码核销，不能登记快递发货");
-    }
-
-    const { data: items } = await supabaseAdmin
-      .from("fulfillment_items" as never)
-      .select("id, expected_qty, picked_qty")
-      .eq("fulfillment_id", data.fulfillmentId);
-    const byId = new Map(
-      ((items as { id: string; expected_qty: number; picked_qty: number }[] | null) ?? []).map((row) => [row.id, row]),
-    );
-    for (const line of data.lines) {
-      const row = byId.get(line.fulfillmentItemId);
-      if (!row) throw new Error("发货明细与子单不符");
-      if (line.quantity > (row.expected_qty ?? 0) - (row.picked_qty ?? 0)) {
-        throw new Error("本次发货数量超过待发数量");
-      }
-    }
-
-    const { data: shipment, error } = await supabaseAdmin
-      .from("shipments" as never)
-      .insert({
-        fulfillment_id: data.fulfillmentId,
-        provider: data.provider,
-        status: "booked",
-        tracking_no: data.trackingNo,
-        idempotency_key: data.clientOpId,
-        booked_at: new Date().toISOString(),
-      } as never)
-      .select("id, provider, tracking_no")
-      .single();
-    if (error) throw new Error(error.message);
-
-    for (const line of data.lines) {
-      const row = byId.get(line.fulfillmentItemId)!;
-      await supabaseAdmin
-        .from("fulfillment_items" as never)
-        .update({ picked_qty: (row.picked_qty ?? 0) + line.quantity, picked_at: new Date().toISOString() } as never)
-        .eq("id", line.fulfillmentItemId);
-    }
-    await supabaseAdmin
-      .from("fulfillments" as never)
-      .update({ status: "handed_over", handed_over_at: new Date().toISOString() } as never)
-      .eq("id", data.fulfillmentId);
-
-    return { ok: true as const, replayed: false, shipment };
+  .handler(async ({ data, context }) => {
+    // 与手持共用同一事务 RPC：门店权限、付款/售后/自提、数量与幂等全部在数据库内一次完成。
+    const { manualShip, normalizeShipProvider } = await import("@/server/handheld-fulfillment-actions");
+    const provider = normalizeShipProvider(data.provider);
+    if (!provider) throw new Error("仅支持顺丰或菜鸟（可填写 顺丰/SF 或 菜鸟/CAINIAO）");
+    const res = await manualShip(supabaseAdmin.rpc.bind(supabaseAdmin) as never, {
+      actorUserId: context.userId,
+      locationId: null,
+      fulfillmentId: data.fulfillmentId,
+      provider,
+      trackingNo: data.trackingNo,
+      lines: data.lines,
+      idempotencyKey: data.clientOpId,
+    });
+    if (!res.body.ok) throw new Error(String(res.body.message));
+    return { ok: true as const, replayed: res.body.replayed === true, shipment: res.body.shipment as { id: string; provider: string; tracking_no: string } };
   });
 
 export const reportStoreShortage = createServerFn({ method: "POST" })

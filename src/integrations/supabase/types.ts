@@ -10093,6 +10093,18 @@ export type Database = {
           product_type: string
         }[]
       }
+      commerce_manual_ship_fulfillment: {
+        Args: {
+          p_actor_user_id: string
+          p_fulfillment_id: string
+          p_idempotency_key: string
+          p_lines: Json
+          p_location_id: string
+          p_provider: string
+          p_tracking_no: string
+        }
+        Returns: Json
+      }
       commerce_mark_order_paid: {
         Args: {
           p_order_id: string

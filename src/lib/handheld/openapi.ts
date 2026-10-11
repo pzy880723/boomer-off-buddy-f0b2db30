@@ -6,6 +6,7 @@ import { createDocument, type ZodOpenApiObject } from "zod-openapi";
 import * as z from "zod";
 import { CustomTransferRequest, CustomTransferResponseSchema } from "../custom-transfer-contract";
 import { ProductContentRequest } from "../product-content";
+import { ManualShipBody, PickupReadyBody, PickupRedeemBody } from "./fulfillment-actions-schema";
 import {
   ItemDeleteReq,
   ItemDeleteRes,
@@ -1172,6 +1173,35 @@ X-Session-Token: <操作员 session token>
         summary: "申请面单（v1.11，未接入 provider）",
         description:
           "当前返回 `carrier_not_configured` 或 `carrier_not_implemented`，均带 `waybill_available:false`；同样按目标子单库位授权且订单取消/关闭禁止写。",
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/fulfillments/{id}/manual-ship": {
+      post: {
+        tags: ["履约"],
+        summary: "手工登记快递单号（v1.14，与 ERP 网页同一事务）",
+        description:
+          "需设备 token + 员工会话；子单必须属于设备库位且员工有该库位权限（否则 403 `forbidden`/`location_forbidden`）。仅已付款快递订单：`pickup_order`/`unpaid`/`refund_blocked`/`cancelled`/`after_sale_blocked`/`invalid_status` 均 409。同 `client_op_id` 同内容重放返回 `replayed:true`；同编号不同内容 409 `idempotency_conflict`；子单已登记 409 `already_shipped`；明细不符/超量 422 `invalid_lines`/`qty_exceeded`；404 `not_found`；503 结果未知请用同一 `client_op_id` 重试。只记录运单号，不生成物流轨迹。",
+        requestBody: jsonBody(ManualShipBody),
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/pickup/redeem": {
+      post: {
+        tags: ["自提"],
+        summary: "自提核销（扫码或4位码，v1.14）",
+        description:
+          "`input` 为 `BOOMER_PICKUP:<64位hex>` 二维码或 4 位数字码；库位取设备绑定，权限/状态/锁全部在数据库内校验。200 `redeemed`（重放 `replayed:true`）；400 `invalid_input`；403 `forbidden`/`wrong_location`；404 `not_found`；409 `already_redeemed`/`not_ready`/`refund_blocked`/`shortage_blocked`/`after_sale_blocked`/`cancelled`/`unpaid`/`fulfillment_mismatch`；429 `rate_limited`（4位码连续错误锁定，扫码不受限）；503 结果未知请用同一 `idempotency_key` 重试。",
+        requestBody: jsonBody(PickupRedeemBody),
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/pickup/ready": {
+      post: {
+        tags: ["自提"],
+        summary: "自提备货完成（v1.14）",
+        description: "200 `ready`/`already_ready`；403 `forbidden`；404 `not_found`；409 `not_pickup`/`exception`/`refund_blocked`/`shortage_blocked`/`cancelled`/`unpaid`；503 可用同一 `idempotency_key` 重试。",
+        requestBody: jsonBody(PickupReadyBody),
         responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
       },
     },

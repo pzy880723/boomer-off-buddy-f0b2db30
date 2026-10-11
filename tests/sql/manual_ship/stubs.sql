@@ -1,0 +1,13 @@
+DO $$ BEGIN CREATE ROLE anon NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE ROLE authenticated NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE ROLE service_role NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+CREATE TABLE public.inv_locations (id uuid PRIMARY KEY, kind text DEFAULT 'shop', is_active boolean DEFAULT true);
+CREATE TABLE public.user_roles (user_id uuid, role text);
+CREATE TABLE public.user_location_perms (user_id uuid, location_id uuid);
+CREATE TABLE public.commerce_orders (id uuid PRIMARY KEY, payment_status text, order_status text, fulfillment_method text);
+CREATE TABLE public.fulfillments (id uuid PRIMARY KEY, order_id uuid, location_id uuid, status text, handed_over_at timestamptz, updated_at timestamptz);
+CREATE TABLE public.fulfillment_items (id uuid PRIMARY KEY, fulfillment_id uuid, expected_qty int, picked_qty int DEFAULT 0, picked_at timestamptz);
+CREATE TABLE public.shipments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), fulfillment_id uuid UNIQUE, provider text CHECK (provider IN ('sf','cainiao')),
+  service_code text, status text, tracking_no text, idempotency_key text UNIQUE, booked_at timestamptz, created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now());
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO service_role;
