@@ -1,24 +1,11 @@
 // 手持/网页共用的履约动作：自提备货/核销（既有 RPC）与手工录快递单号（单一事务 RPC）。
 // actor 只来自已验证员工会话，库位只来自设备绑定；客户端不得传 user_id/location_id。
-import { z } from "zod";
 import { parsePickupInput, pickupResultMessage } from "@/lib/commerce/pickup-view";
 
 export type Rpc = (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }>;
 export type ActionResponse = { status: number; body: Record<string, unknown> & { ok: boolean } };
 
-const Idem = z.string().regex(/^[A-Za-z0-9_-]{8,100}$/);
-export const PickupRedeemBody = z
-  .object({ input: z.string().max(200), idempotency_key: Idem, expected_fulfillment_id: z.string().uuid().optional() })
-  .strict();
-export const PickupReadyBody = z.object({ fulfillment_id: z.string().uuid(), idempotency_key: Idem }).strict();
-export const ManualShipBody = z
-  .object({
-    provider: z.enum(["sf", "cainiao"]),
-    tracking_no: z.string().trim().regex(/^[A-Za-z0-9-]{4,64}$/),
-    client_op_id: z.string().trim().regex(/^[A-Za-z0-9_-]{6,80}$/),
-    lines: z.array(z.object({ fulfillment_item_id: z.string().uuid(), quantity: z.number().int().min(1).max(99999) }).strict()).min(1).max(200),
-  })
-  .strict();
+export { PickupRedeemBody, PickupReadyBody, ManualShipBody } from "@/lib/handheld/fulfillment-actions-schema";
 
 /** 网页旧输入框为自由文本：只认顺丰/菜鸟的常见写法，其余拒绝（数据库约束仅 sf/cainiao）。 */
 export function normalizeShipProvider(raw: string): "sf" | "cainiao" | null {
