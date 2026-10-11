@@ -26,6 +26,7 @@ export const Route = createFileRoute("/api/public/handheld/fulfillments/$id/manu
           trackingNo: b.tracking_no,
           lines: b.lines.map((l) => ({ fulfillmentItemId: l.fulfillment_item_id, quantity: l.quantity })),
           idempotencyKey: b.client_op_id,
+          carrierLabel: b.provider === "manual" ? (b.carrier_label ?? null) : null,
         });
         return Response.json(res.body.ok ? { ok: true, data: res.body } : { ...res.body, code: res.body.result }, { status: res.status, headers: HANDHELD_CORS });
       },

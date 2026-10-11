@@ -7,12 +7,17 @@ export type ActionResponse = { status: number; body: Record<string, unknown> & {
 
 export { PickupRedeemBody, PickupReadyBody, ManualShipBody } from "@/lib/handheld/fulfillment-actions-schema";
 
-/** 网页旧输入框为自由文本：只认顺丰/菜鸟的常见写法，其余拒绝（数据库约束仅 sf/cainiao）。 */
-export function normalizeShipProvider(raw: string): "sf" | "cainiao" | null {
-  const v = raw.trim().toLowerCase();
-  if (["sf", "顺丰", "顺丰速运", "sf express"].includes(v)) return "sf";
-  if (["cainiao", "菜鸟", "菜鸟裹裹"].includes(v)) return "cainiao";
-  return null;
+/**
+ * 网页旧输入框为自由文本：顺丰/菜鸟的常见写法映射到对应 provider；其余承运商（中通/圆通/韵达…）
+ * 原样作为 carrier_label，以 provider=manual 仅登记单号。绝不把其它快递映射成菜鸟。
+ */
+export function normalizeShipProvider(raw: string): { provider: "sf" | "cainiao" | "manual"; carrierLabel: string | null } | null {
+  const label = raw.trim();
+  const v = label.toLowerCase();
+  if (!label || label.length > 40 || /[\u0000-\u001f\u007f]/.test(label)) return null;
+  if (["sf", "顺丰", "顺丰速运", "sf express"].includes(v)) return { provider: "sf", carrierLabel: null };
+  if (["cainiao", "菜鸟", "菜鸟裹裹"].includes(v)) return { provider: "cainiao", carrierLabel: null };
+  return { provider: "manual", carrierLabel: label };
 }
 
 const PICKUP_STATUS: Record<string, number> = {
@@ -26,7 +31,8 @@ export function pickupHttpStatus(result: string): number {
 
 const SHIP_STATUS: Record<string, number> = {
   shipped: 200, invalid_provider: 400, invalid_tracking_no: 400, invalid_idempotency_key: 400,
-  forbidden: 403, location_forbidden: 403, not_found: 404, invalid_lines: 422, qty_exceeded: 422,
+  invalid_carrier_label: 400, forbidden: 403, location_forbidden: 403, not_found: 404,
+  invalid_lines: 422, qty_exceeded: 422, lines_incomplete: 422, nothing_to_ship: 409, shortage_blocked: 409,
 };
 export const SHIP_MESSAGES: Record<string, string> = {
   shipped: "已登记发货", forbidden: "你没有该门店的发货权限", location_forbidden: "该子单不属于本设备门店",
@@ -35,7 +41,9 @@ export const SHIP_MESSAGES: Record<string, string> = {
   cancelled: "订单已取消或关闭", after_sale_blocked: "订单售后处理中，不能发货",
   invalid_status: "子单当前状态不能登记发货", already_shipped: "该子单已登记过发货",
   idempotency_conflict: "同一操作编号已用于不同的发货内容", invalid_lines: "发货明细与子单不符",
-  qty_exceeded: "本次发货数量超过待发数量", invalid_provider: "仅支持顺丰或菜鸟",
+  qty_exceeded: "发货数量超过该行应发数量", invalid_provider: "承运商类型无效（sf / cainiao / manual）",
+  invalid_carrier_label: "请填写快递公司名称（1–40 字）", lines_incomplete: "须一次登记整单全部应发商品及数量",
+  nothing_to_ship: "该子单没有应发商品", shortage_blocked: "存在待顾客确认或退款未完成的缺货，暂不能发货",
   invalid_tracking_no: "运单号格式不正确", invalid_idempotency_key: "操作编号格式不正确",
 };
 
@@ -93,13 +101,14 @@ export async function manualShip(
   i: {
     actorUserId: string; locationId: string | null; fulfillmentId: string; provider: string;
     trackingNo: string; lines: Array<{ fulfillmentItemId: string; quantity: number }>; idempotencyKey: string;
+    carrierLabel?: string | null;
   },
 ): Promise<ActionResponse> {
   const { data, error } = await rpc("commerce_manual_ship_fulfillment", {
     p_actor_user_id: i.actorUserId, p_location_id: i.locationId, p_fulfillment_id: i.fulfillmentId,
     p_provider: i.provider, p_tracking_no: i.trackingNo,
     p_lines: i.lines.map((l) => ({ fulfillment_item_id: l.fulfillmentItemId, quantity: l.quantity })),
-    p_idempotency_key: i.idempotencyKey,
+    p_idempotency_key: i.idempotencyKey, p_carrier_label: i.carrierLabel ?? null,
   });
   if (error) return rpcFailure();
   const r = (data ?? {}) as Record<string, unknown>;
@@ -109,7 +118,7 @@ export async function manualShip(
     status: ok ? 200 : (SHIP_STATUS[result] ?? 409),
     body: {
       ok, result, message: SHIP_MESSAGES[result] ?? "登记发货失败",
-      ...(ok ? { replayed: r.replayed === true, shipment: { id: r.shipment_id, fulfillment_id: r.fulfillment_id, provider: r.provider, tracking_no: r.tracking_no, status: "booked" } } : {}),
+      ...(ok ? { replayed: r.replayed === true, shipment: { id: r.shipment_id, fulfillment_id: r.fulfillment_id, provider: r.provider, carrier_label: r.carrier_label ?? null, tracking_no: r.tracking_no, status: "booked" } } : {}),
     },
   };
 }

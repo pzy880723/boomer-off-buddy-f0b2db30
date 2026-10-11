@@ -152,13 +152,14 @@ export const manualShipStoreSubOrder = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     // 与手持共用同一事务 RPC：门店权限、付款/售后/自提、数量与幂等全部在数据库内一次完成。
     const { manualShip, normalizeShipProvider } = await import("@/server/handheld-fulfillment-actions");
-    const provider = normalizeShipProvider(data.provider);
-    if (!provider) throw new Error("仅支持顺丰或菜鸟（可填写 顺丰/SF 或 菜鸟/CAINIAO）");
+    const carrier = normalizeShipProvider(data.provider);
+    if (!carrier) throw new Error("请填写快递公司名称（1–40 字）");
     const res = await manualShip(supabaseAdmin.rpc.bind(supabaseAdmin) as never, {
       actorUserId: context.userId,
       locationId: null,
       fulfillmentId: data.fulfillmentId,
-      provider,
+      provider: carrier.provider,
+      carrierLabel: carrier.carrierLabel,
       trackingNo: data.trackingNo,
       lines: data.lines,
       idempotencyKey: data.clientOpId,

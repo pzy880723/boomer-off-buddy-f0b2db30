@@ -372,6 +372,13 @@
       "when": 1791700523761,
       "tag": "0052_handheld_notify_reliability_v2",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1791701039187,
+      "tag": "0053_manual_ship_reliability",
+      "breakpoints": true
     }
   ]
 }
