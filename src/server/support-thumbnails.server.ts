@@ -3,7 +3,7 @@
 // only for orders re-verified as owned by this customer. HQ / no image → null (client shows brand logo).
 import { resolveItemImageRef } from "./storefront-order-list.server";
 
-type Row = { id: unknown; order_id?: unknown; context?: unknown };
+type Row = { id?: unknown; order_id?: unknown; context?: unknown; [key: string]: unknown };
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type QueryClient = { from: (table: string) => any };
 export type ThumbnailDeps = { client?: QueryClient; sign?: (paths: readonly string[]) => Promise<(string | null)[]> };
