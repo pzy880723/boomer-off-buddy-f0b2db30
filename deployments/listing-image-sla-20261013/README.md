@@ -1,4 +1,4 @@
-# Photo touch-up SLA (0059, candidate, NOT applied)
+# Photo touch-up SLA (0059, APPLIED 2026-10-13 as drizzle/migrations/0059_listing_image_sla.sql)
 
 The Lovable Cloud DB (sxddfcoiaboqcmeviykl) is the production DB that Tencent workers use, so applying this
 changes live scheduling at once. Apply only after approval. Apply it through the migration tool, then remove this copy.

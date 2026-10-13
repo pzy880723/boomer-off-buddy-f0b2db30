@@ -1,13 +1,7 @@
--- 0059 候选：拍照上架修图 ≤5 分钟 SLA 调度（非破坏性，仅 CREATE OR REPLACE 函数，签名不变）。
--- 回滚：重放当前线上 handheld_listing_image_claim / handheld_listing_image_finish /
---       product_content_image_claim / product_content_image_finish 定义（见 README 中的 pg_get_functiondef 备份）。
--- 变化：
---  * lease 5min → 4min（与 worker 240s deadline 对齐），claim_token / 版本栅栏 / SKU→job 锁序不变。
---  * 重试退避 30/300/1800/7200s → 10/30/60/60s（上限 60s），次数上限仍 5。
---  * 永久错误立即 permanent_failed：p_error 以 'permanent:' 或 'ai_consent_missing' 开头。不以保留原图冒充成功。
---  * 认领顺序：按 SKU 组（组内最早 created_at）→ source_index（主图 0 优先）→ id，同组 6 张一起被认领。
---  * 超 5 分钟且已尝试 ≥2 次：认领时明确 permanent_failed 'sla_exceeded_5min'。
---  * 图库优先：仍有到期/可回收的图库任务时，详情图 claim 返回空。
+-- 0059：拍照上架修图 ≤5 分钟 SLA 调度（非破坏性，仅 CREATE OR REPLACE 四个函数，签名不变）。
+-- 回滚：重放私有备份 /mnt/documents/.lovable/backups/pre-0059-listing-image-functions-20261013.sql（sha256 f702dc39…cb30）。
+-- lease 4min；重试 10/30/60/60s、上限5次；'permanent:'/'ai_consent_missing' 立即失败；SKU组→主图序认领；
+-- 超5分钟且已试≥2次 → permanent_failed 'sla_exceeded_5min'；详情图 finish 以 clock_timestamp() 判 lease（含 NULL）；图库优先于详情。
 CREATE OR REPLACE FUNCTION public.handheld_listing_image_claim(p_limit integer DEFAULT 2)
  RETURNS SETOF public.inv_listing_image_jobs LANGUAGE plpgsql SET search_path TO '' AS $function$
 DECLARE v_candidate record; v_job public.inv_listing_image_jobs; v_sku public.inv_skus; v_error text;
@@ -34,7 +28,6 @@ BEGIN
       WHEN NOT coalesce((v_job.source_bucket||'/'||v_job.source_path)=ANY(v_sku.image_paths),false)
         THEN 'source_removed_not_applied'
       WHEN v_job.attempts>=5 THEN 'worker_lease_expired_or_attempt_limit'
-      -- 5 分钟 SLA：已试过 ≥2 次且超时的任务明确失败（保留原图，待人工/补偿重跑），不再静默转圈。
       WHEN v_job.attempts>=2 AND v_job.created_at<now()-interval '5 minutes' THEN 'sla_exceeded_5min' ELSE NULL END;
     IF v_error IS NOT NULL THEN
       UPDATE public.inv_listing_image_jobs SET status='permanent_failed',last_error=v_error,
@@ -113,7 +106,6 @@ BEGIN
          LATERAL jsonb_array_elements(c.published_blocks) b
         WHERE c.sku_id=j.sku_id AND s.status='active' AND s.kind='single' AND s.is_custom_price
           AND b->>'type'='image' AND b->>'id'=j.block_id AND b->>'storage_path'=j.source_path);
-  -- 图库优先：仍有到期或可回收的图库任务时本轮不认领详情图。
   IF EXISTS (SELECT 1 FROM public.inv_listing_image_jobs g
       WHERE (g.status IN ('queued','retryable_failed') AND g.next_run_at<=now())
          OR (g.status='processing' AND coalesce(g.lease_until,'-infinity'::timestamptz)<=now())) THEN
@@ -143,7 +135,8 @@ BEGIN
   SELECT * INTO v_sku FROM public.inv_skus WHERE id=v_job.sku_id FOR UPDATE;
   SELECT * INTO v_job FROM public.inv_product_content_image_jobs WHERE id=p_id FOR UPDATE;
   IF NOT FOUND OR v_job.status<>'processing' OR p_claim_token IS NULL
-     OR v_job.claim_token IS DISTINCT FROM p_claim_token OR v_job.lease_until<now() THEN RETURN 'stale'; END IF;
+     OR v_job.claim_token IS DISTINCT FROM p_claim_token OR v_job.lease_until IS NULL
+     OR v_job.lease_until<=clock_timestamp() THEN RETURN 'stale'; END IF;
   SELECT * INTO v_content FROM public.inv_product_content WHERE sku_id=v_job.sku_id FOR UPDATE;
   IF NOT FOUND OR v_sku.status IS DISTINCT FROM 'active' OR v_sku.kind IS DISTINCT FROM 'single'
      OR NOT coalesce(v_sku.is_custom_price,false) THEN
