@@ -27,7 +27,8 @@ export async function squareOriginalImage(bytes: Buffer): Promise<{ b64: string;
 /** Per-photo end-to-end budget (download, detection, generation, validation share one signal). */
 export const LISTING_IMAGE_BUDGET_MS = 120_000;
 export const DETECTION_TIMEOUT_MS = 12_000;
-export const GENERATION_TIMEOUT_MS = 90_000;
+export const GENERATION_TIMEOUT_MS = 40_000;
+export const FALLBACK_GENERATION_TIMEOUT_MS = 60_000;
 export const VALIDATION_TIMEOUT_MS = 20_000;
 /** Analysis work copy long edge; generation keeps the full original input. */
 export const ANALYSIS_LONG_EDGE = 1024;
