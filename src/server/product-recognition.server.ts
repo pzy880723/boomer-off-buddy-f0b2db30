@@ -1,4 +1,10 @@
 import { beforeAiOutbound, type AiOutboundGuard } from "./ai-guard.ts";
+import { listingAiFetch } from "./listing-ai-transport.server.ts";
+import { normalizeAutoProductTitle } from "../lib/product-title-text.ts";
+
+/** Fixed user-facing warning when the model itself failed; the raw error stays in the private audit only. */
+export const RECOGNITION_FAILED_WARNING = "AI 识别暂时不可用，请手动填写商品信息或稍后重试";
+const AUTO_NAME_FALLBACK = "未命名中古商品";
 import {
   activeLeafCategories,
   findSanrioBrandCandidate,
@@ -109,6 +115,8 @@ export type ProductRecognitionResult = NormalizedProductRecognition & {
   model: string;
   prompt_version: string;
   taxonomy_version: string;
+  /** True only when model execution failed (no raw result); low-confidence success is false. */
+  recognition_failed: boolean;
 };
 
 function taxonomyVersion(
@@ -217,10 +225,14 @@ export async function runProductRecognition(
   const modelResult: RawProductRecognition = raw ?? {
     category_code: "ai_low_confidence",
     confidence: 0,
-    name: "未命名中古商品",
-    warning: `AI 识别暂时不可用：${lastError?.message ?? "未知错误"}`,
+    name: AUTO_NAME_FALLBACK,
+    warning: input.source === "handheld" ? RECOGNITION_FAILED_WARNING : `AI 识别暂时不可用：${lastError?.message ?? "未知错误"}`,
   };
   const normalized = normalizeProductRecognition(modelResult, categories, { facets, brands, ips }, { imageCount: images.length });
+  if (input.source === "handheld") {
+    // Automatic handheld names are capped before the audit stores the normalized result.
+    normalized.name = normalizeAutoProductTitle(normalized.name) || AUTO_NAME_FALLBACK;
+  }
   if (input.source === "handheld" && !failed) {
     const era = normalized.attributes.era;
     if (era && !normalized.description?.includes(era)) {
@@ -262,6 +274,7 @@ export async function runProductRecognition(
     model,
     prompt_version: PRODUCT_RECOGNITION_PROMPT_VERSION,
     taxonomy_version: version,
+    recognition_failed: failed,
   };
 }
 
@@ -342,15 +355,7 @@ ${buildEraInstruction(input.source)}`;
     },
     ...input.images.map((url) => ({ type: "image_url", image_url: { url } })),
   ];
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    ...(handheld ? { signal: AbortSignal.timeout(input.timeoutMs ?? HANDHELD_RECOGNITION_TIMEOUT_MS) } : {}),
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "X-Lovable-AIG-SDK": "vercel-ai-sdk",
-    },
-    body: JSON.stringify({
+  const body = JSON.stringify({
       model,
       ...(handheld ? { max_tokens: HANDHELD_RECOGNITION_MAX_TOKENS } : {}),
       messages: [
@@ -358,8 +363,17 @@ ${buildEraInstruction(input.source)}`;
         { role: "user", content: userContent },
       ],
       response_format: { type: "json_object" },
-    }),
-  });
+    });
+  // Handheld goes through the controlled listing AI transport (fixed private relay when configured);
+  // ERP/migration keeps the legacy direct gateway route unchanged.
+  const response = handheld
+    ? await listingAiFetch(body, apiKey, AbortSignal.timeout(input.timeoutMs ?? HANDHELD_RECOGNITION_TIMEOUT_MS),
+        { "X-Lovable-AIG-SDK": "vercel-ai-sdk" })
+    : await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", "X-Lovable-AIG-SDK": "vercel-ai-sdk" },
+        body,
+      });
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
     throw new Error(`AI gateway ${response.status}: ${detail.slice(0, 300)}`);
