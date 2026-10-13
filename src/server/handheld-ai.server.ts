@@ -5,9 +5,9 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { recognizeProductFromImages } from "@/server/product-recognition.server";
 import sharp from "sharp";
 import { beforeHandheldAiOutbound, type AiOutboundGuard } from "./ai-guard.ts";
+import { listingAiFetch } from "./listing-ai-transport.server";
 import { loadOriginalImage, classifyListingImage, validatePreparedListingImage, assertListingImagePixels, withImageStage, analysisCopy, stageSignal, PermanentImageError, LISTING_IMAGE_BUDGET_MS, GENERATION_TIMEOUT_MS, FALLBACK_GENERATION_TIMEOUT_MS } from "./listing-image-safety.server";
 
-const GATEWAY = "https://ai.gateway.lovable.dev/v1";
 
 function getKey(): string {
   const k = process.env.LOVABLE_API_KEY;
@@ -228,16 +228,8 @@ async function generateWithFallback(body: Record<string, unknown>, guard: AiOutb
 async function generateListingImage(body: unknown, guard: AiOutboundGuard, budget: AbortSignal | undefined, deadlineMs: number): Promise<{ b64: string; mime: string }> {
   // Every outbound call (primary and fallback) re-checks consent.
   await beforeHandheldAiOutbound(guard, "image_generation");
-  const res = await fetch(`${GATEWAY}/chat/completions`, {
-    method: "POST",
-    signal: stageSignal(deadlineMs, budget),
-    headers: {
-      Authorization: `Bearer ${getKey()}`,
-      "Content-Type": "application/json",
-      "X-Lovable-AIG-SDK": "vercel-ai-sdk",
-    },
-    body: JSON.stringify(body),
-  });
+  const res = await listingAiFetch(JSON.stringify(body), getKey(), stageSignal(deadlineMs, budget),
+    { "X-Lovable-AIG-SDK": "vercel-ai-sdk" });
   if (!res.ok) {
     await res.body?.cancel().catch(() => undefined);
     // Upstream text may echo signed URLs or image payloads; only the status is reported.

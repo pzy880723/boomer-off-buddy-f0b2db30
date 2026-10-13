@@ -136,6 +136,7 @@ import { Route as ApiPublicHooksCommerceReleaseExpiredRouteImport } from './rout
 import { Route as ApiPublicHooksCustomPrintCardWorkerRouteImport } from './routes/api/public/hooks/custom-print-card-worker'
 import { Route as ApiPublicHooksHandheldItemSyncWorkerRouteImport } from './routes/api/public/hooks/handheld-item-sync-worker'
 import { Route as ApiPublicHooksHandheldReleaseWorkerRouteImport } from './routes/api/public/hooks/handheld-release-worker'
+import { Route as ApiPublicHooksListingAiRelayRouteImport } from './routes/api/public/hooks/listing-ai-relay'
 import { Route as ApiPublicHooksListingImageWorkerRouteImport } from './routes/api/public/hooks/listing-image-worker'
 import { Route as ApiPublicHooksTestPublishWithStockRouteImport } from './routes/api/public/hooks/test-publish-with-stock'
 import { Route as ApiPublicHooksYouzanCategoryGroupsSyncRouteImport } from './routes/api/public/hooks/youzan-category-groups-sync'
@@ -978,6 +979,12 @@ const ApiPublicHooksHandheldReleaseWorkerRoute =
   ApiPublicHooksHandheldReleaseWorkerRouteImport.update({
     id: '/api/public/hooks/handheld-release-worker',
     path: '/api/public/hooks/handheld-release-worker',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksListingAiRelayRoute =
+  ApiPublicHooksListingAiRelayRouteImport.update({
+    id: '/api/public/hooks/listing-ai-relay',
+    path: '/api/public/hooks/listing-ai-relay',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicHooksListingImageWorkerRoute =
@@ -2130,6 +2137,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/custom-print-card-worker': typeof ApiPublicHooksCustomPrintCardWorkerRoute
   '/api/public/hooks/handheld-item-sync-worker': typeof ApiPublicHooksHandheldItemSyncWorkerRoute
   '/api/public/hooks/handheld-release-worker': typeof ApiPublicHooksHandheldReleaseWorkerRoute
+  '/api/public/hooks/listing-ai-relay': typeof ApiPublicHooksListingAiRelayRoute
   '/api/public/hooks/listing-image-worker': typeof ApiPublicHooksListingImageWorkerRoute
   '/api/public/hooks/test-publish-with-stock': typeof ApiPublicHooksTestPublishWithStockRoute
   '/api/public/hooks/youzan-category-groups-sync': typeof ApiPublicHooksYouzanCategoryGroupsSyncRoute
@@ -2425,6 +2433,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/custom-print-card-worker': typeof ApiPublicHooksCustomPrintCardWorkerRoute
   '/api/public/hooks/handheld-item-sync-worker': typeof ApiPublicHooksHandheldItemSyncWorkerRoute
   '/api/public/hooks/handheld-release-worker': typeof ApiPublicHooksHandheldReleaseWorkerRoute
+  '/api/public/hooks/listing-ai-relay': typeof ApiPublicHooksListingAiRelayRoute
   '/api/public/hooks/listing-image-worker': typeof ApiPublicHooksListingImageWorkerRoute
   '/api/public/hooks/test-publish-with-stock': typeof ApiPublicHooksTestPublishWithStockRoute
   '/api/public/hooks/youzan-category-groups-sync': typeof ApiPublicHooksYouzanCategoryGroupsSyncRoute
@@ -2728,6 +2737,7 @@ export interface FileRoutesById {
   '/api/public/hooks/custom-print-card-worker': typeof ApiPublicHooksCustomPrintCardWorkerRoute
   '/api/public/hooks/handheld-item-sync-worker': typeof ApiPublicHooksHandheldItemSyncWorkerRoute
   '/api/public/hooks/handheld-release-worker': typeof ApiPublicHooksHandheldReleaseWorkerRoute
+  '/api/public/hooks/listing-ai-relay': typeof ApiPublicHooksListingAiRelayRoute
   '/api/public/hooks/listing-image-worker': typeof ApiPublicHooksListingImageWorkerRoute
   '/api/public/hooks/test-publish-with-stock': typeof ApiPublicHooksTestPublishWithStockRoute
   '/api/public/hooks/youzan-category-groups-sync': typeof ApiPublicHooksYouzanCategoryGroupsSyncRoute
@@ -3032,6 +3042,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/custom-print-card-worker'
     | '/api/public/hooks/handheld-item-sync-worker'
     | '/api/public/hooks/handheld-release-worker'
+    | '/api/public/hooks/listing-ai-relay'
     | '/api/public/hooks/listing-image-worker'
     | '/api/public/hooks/test-publish-with-stock'
     | '/api/public/hooks/youzan-category-groups-sync'
@@ -3327,6 +3338,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/custom-print-card-worker'
     | '/api/public/hooks/handheld-item-sync-worker'
     | '/api/public/hooks/handheld-release-worker'
+    | '/api/public/hooks/listing-ai-relay'
     | '/api/public/hooks/listing-image-worker'
     | '/api/public/hooks/test-publish-with-stock'
     | '/api/public/hooks/youzan-category-groups-sync'
@@ -3629,6 +3641,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/custom-print-card-worker'
     | '/api/public/hooks/handheld-item-sync-worker'
     | '/api/public/hooks/handheld-release-worker'
+    | '/api/public/hooks/listing-ai-relay'
     | '/api/public/hooks/listing-image-worker'
     | '/api/public/hooks/test-publish-with-stock'
     | '/api/public/hooks/youzan-category-groups-sync'
@@ -3883,6 +3896,7 @@ export interface RootRouteChildren {
   ApiPublicHooksCustomPrintCardWorkerRoute: typeof ApiPublicHooksCustomPrintCardWorkerRoute
   ApiPublicHooksHandheldItemSyncWorkerRoute: typeof ApiPublicHooksHandheldItemSyncWorkerRoute
   ApiPublicHooksHandheldReleaseWorkerRoute: typeof ApiPublicHooksHandheldReleaseWorkerRoute
+  ApiPublicHooksListingAiRelayRoute: typeof ApiPublicHooksListingAiRelayRoute
   ApiPublicHooksListingImageWorkerRoute: typeof ApiPublicHooksListingImageWorkerRoute
   ApiPublicHooksTestPublishWithStockRoute: typeof ApiPublicHooksTestPublishWithStockRoute
   ApiPublicHooksYouzanCategoryGroupsSyncRoute: typeof ApiPublicHooksYouzanCategoryGroupsSyncRoute
@@ -4886,6 +4900,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/hooks/handheld-release-worker'
       fullPath: '/api/public/hooks/handheld-release-worker'
       preLoaderRoute: typeof ApiPublicHooksHandheldReleaseWorkerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/listing-ai-relay': {
+      id: '/api/public/hooks/listing-ai-relay'
+      path: '/api/public/hooks/listing-ai-relay'
+      fullPath: '/api/public/hooks/listing-ai-relay'
+      preLoaderRoute: typeof ApiPublicHooksListingAiRelayRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/listing-image-worker': {
@@ -6932,6 +6953,7 @@ const rootRouteChildren: RootRouteChildren = {
     ApiPublicHooksHandheldItemSyncWorkerRoute,
   ApiPublicHooksHandheldReleaseWorkerRoute:
     ApiPublicHooksHandheldReleaseWorkerRoute,
+  ApiPublicHooksListingAiRelayRoute: ApiPublicHooksListingAiRelayRoute,
   ApiPublicHooksListingImageWorkerRoute: ApiPublicHooksListingImageWorkerRoute,
   ApiPublicHooksTestPublishWithStockRoute:
     ApiPublicHooksTestPublishWithStockRoute,
