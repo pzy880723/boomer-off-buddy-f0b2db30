@@ -203,7 +203,9 @@ test("close-up detail prompt protects camera angle even when extra instructions 
     if (calls === 2) {
       const text = body.messages[0].content[0].text;
       assert.match(text, /禁止校正角度、旋转、改变透视/);
-      assert.match(text, /只补边形成正方形/);
+      assert.match(text, /完整保留主体，不裁掉商品细节或测量工具/);
+      assert.match(text, /允许收紧已清理的背景空白，并等比放大主体后补边形成正方形/);
+      assert.doesNotMatch(text, /只补边形成正方形/);
       assert.ok(text.indexOf("请优化角度") < text.indexOf("禁止校正角度"));
       assert.doesNotMatch(text, /主体居中裁切|校正角度，修正白平衡/);
       return generatedImage();
@@ -386,4 +388,23 @@ test("retouch prompt keeps bagged product, fixes 70-85% framing and forbids blan
   const prompt = src.slice(src.indexOf("const SYSTEM_LISTING_IMAGE"), src.indexOf("`;", src.indexOf("const SYSTEM_LISTING_IMAGE")));
   for (const w of ["70%-85%", "绝不能输出空背景", "不删除袋内商品本体", "用文字说明原因且不输出图片", "不能用空背景或纯灰图冒充成品", "保留拍摄角度"])
     assert.match(prompt, new RegExp(w));
+});
+
+test("conservative detection fallback keeps angle/ruler protection but allows tightening blank background", async () => {
+  process.env.LOVABLE_API_KEY = "fixture";
+  let calls = 0;
+  globalThis.fetch = async (_url, init) => {
+    calls++;
+    if (calls === 1) return new Response("unavailable", { status: 503 }); // detector 5xx -> CONSERVATIVE_PROFILE
+    if (calls === 2) {
+      const text = JSON.parse(String(init?.body)).messages[0].content[1]?.text ?? JSON.parse(String(init?.body)).messages[0].content[0].text;
+      for (const w of [/禁止校正角度、旋转、改变透视或重新摆放商品与尺子/, /刻度和数字必须完整保留/, /允许收紧已清理的背景空白/, /等比放大主体后补边形成正方形/, /不裁掉商品细节或测量工具/])
+        assert.match(text, w);
+      assert.doesNotMatch(text, /只补边形成正方形|主体居中裁切/);
+      return Response.json({ choices: [{ message: { images: [{ image_url: { url: `data:image/png;base64,${GOOD_B64}` } }] } }] });
+    }
+    return jsonMessage(validChecks);
+  };
+  await module.exports.aiPrepareListingImage({ image_base64: await pngDataUrl() }, allowHandheldGuard);
+  assert.equal(calls, 3);
 });

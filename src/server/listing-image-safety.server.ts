@@ -253,7 +253,7 @@ export function retryInstructionFromError(lastError: unknown): string | undefine
 }
 
 /** Pixel gate thresholds (real pixels, independent of any model JSON). */
-export const PIXEL_MIN_SIDE = 768;
+export const PIXEL_MIN_SIDE = 1000;
 export const PIXEL_MAX_SIDE = 2048;
 export const MIN_SUBJECT_LONG_EDGE = 0.5;
 const GRID = 256;

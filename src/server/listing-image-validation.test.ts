@@ -137,6 +137,8 @@ test("pixel gate: normal product framing (~75% long edge) passes", async () => {
 test("pixel gate: non-square, too small or undecodable outputs are rejected", async () => {
   await assert.rejects(assertListingImagePixels(await canvas(1024, 768, { w: 700, h: 600 })), /fields=canvas_square/);
   await assert.rejects(assertListingImagePixels(await canvas(512, 512, { w: 380, h: 380 })), /fields=canvas_square/);
+  // Production requires at least 1000px (true 1K); a 960px square is not accepted.
+  await assert.rejects(assertListingImagePixels(await canvas(960, 960, { w: 720, h: 600 })), /fields=canvas_square/);
   await assert.rejects(assertListingImagePixels("ZWRpdGVk"), /fields=product_present/);
 });
 test("pixel gate: dark/non-gray background is rejected", async () => {
