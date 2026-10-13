@@ -194,7 +194,14 @@ export const ImageProcessingStatusSchema = z.enum([
   "succeeded",
   "partial_failed",
   "retryable_failed",
+  "failed",
+  "partial_failed_terminal",
 ]);
+
+/** 仅这些状态需要客户端继续轮询；未知或终止状态（failed/partial_failed_terminal 等）一律停止。 */
+export function imageProcessingShouldPoll(status: unknown): boolean {
+  return status === "queued" || status === "processing" || status === "retryable_failed";
+}
 
 export const ProductItemSchema = z
   .object({
@@ -944,6 +951,8 @@ export const SmartCreateRes = okEnvelope(
         "succeeded",
         "partial_failed",
         "retryable_failed",
+        "failed",
+        "partial_failed_terminal",
       ]),
       queued: z.number().int().nonnegative(),
     }),

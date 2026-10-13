@@ -323,7 +323,9 @@ async function handleSmartCreate(request: Request, timing: ReturnType<typeof cre
             | "processing"
             | "succeeded"
             | "partial_failed"
-            | "retryable_failed";
+            | "retryable_failed"
+            | "failed"
+            | "partial_failed_terminal";
           queued: number;
         } = { status: "idle", queued: 0 };
         // AI 修图只在客户端未拒绝 且 数据库当前政策版本授权为 true 时排队；原图与商品照常保存。
