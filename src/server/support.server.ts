@@ -19,6 +19,7 @@ import {
   assertConversationLocation,
   type MessageWindow,
 } from "@/lib/support-message-window";
+import { customerServiceName, toCustomerConversationListItem, type LocationNameMap } from "@/lib/support-customer-dto";
 
 export type SupportContext = { [key: string]: string | number | boolean | null } | null;
 
@@ -701,12 +702,23 @@ export async function runSupportEscalation(unclaimedSeconds = 60, replySeconds =
 export async function listCustomerConversations(customerId: string) {
   const { data, error } = await supabaseAdmin
     .from("support_conversations" as never)
-    .select("id,title,status,location_id,order_id,last_message_at,last_message_preview,updated_at")
+    .select("id,title,status,location_id,order_id,last_message_at,last_message_preview,updated_at,context")
     .eq("customer_id", customerId)
     .order("updated_at", { ascending: false })
     .limit(50);
   if (error) throw new Error(error.message);
-  return (data ?? []) as unknown as Array<Record<string, unknown>>;
+  const rows = (data ?? []) as unknown as Array<Record<string, unknown>>;
+  // Rows are already scoped to this customer; one batched read for store names (no N+1).
+  const locations = await loadCustomerLocationNames(rows.map((r) => r.location_id));
+  return rows.map((row) => toCustomerConversationListItem(row, locations));
+}
+
+async function loadCustomerLocationNames(ids: unknown[]): Promise<LocationNameMap> {
+  const locationIds = [...new Set(ids.filter((id): id is string => typeof id === "string" && id.length > 0))];
+  if (!locationIds.length) return new Map();
+  const { data, error } = await supabaseAdmin.from("inv_locations").select("id,name").in("id", locationIds);
+  if (error) throw new Error(error.message);
+  return new Map(((data ?? []) as { id: string; name: string | null }[]).map((l) => [l.id, { name: l.name }]));
 }
 
 /**
@@ -827,6 +839,8 @@ export async function getCustomerConversation(customerId: string, conversationId
         location_id: conversation.location_id,
         context: safeContext(conversation.context),
         updated_at: conversation.updated_at,
+        service_name: customerServiceName(conversation.location_id,
+          await loadCustomerLocationNames([conversation.location_id])),
       },
       // 客户永远看不到内部备注
        ...(await loadMessages(conversation, false)),
