@@ -11,6 +11,7 @@ import {
   applyRequestedLocation,
   effectiveLocationIds,
 } from "@/server/handheld-notifications.server";
+import { parseUnreadCounts } from "@/lib/handheld/unread-counts";
 
 /**
  * GET /api/public/handheld/notifications/unread-counts?location_id=<当前库位>
@@ -47,10 +48,12 @@ export const Route = createFileRoute("/api/public/handheld/notifications/unread-
           p_include_unlocated: scope.is_hq && !scope.filter_location_id,
         });
         if (error) return err(`unread_counts_failed: ${error.message}`, 500);
-        const d = (data ?? {}) as Record<string, number>;
-        const n = (k: string) => Math.max(0, Number(d[k] ?? 0) | 0);
-        const counts = { customers: n("customers"), internal: n("internal"), orders: n("orders"), system: n("system") };
-        return ok({ ...counts, total: counts.customers + counts.internal + counts.orders + counts.system });
+        const parsed = parseUnreadCounts(data);
+        if (!parsed.ok) {
+          console.error(`unread_counts_contract_error: ${parsed.reason}`);
+          return err("Unread counts violated contract", 500, { code: "unread_counts_contract_error", reason: parsed.reason });
+        }
+        return ok(parsed.data);
       },
     },
   },
