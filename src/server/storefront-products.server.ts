@@ -260,6 +260,10 @@ export type StorefrontImagePreview = {
  * - image_url / image_urls / 顺序 / 数量 / 库存 / 价格契约不变（原图仅供主动查看原图）。
  * 不可售（无 SKU / stock < 1）返回 null，由路由映射为 404。
  */
+/** Listing statuses readable on the detail page once published. draft/hidden are never readable. */
+export const STOREFRONT_DETAIL_READABLE_STATUSES = ["published", "reserved", "sold", "archived"] as const;
+export type StorefrontAvailability = "available" | "sold_out" | "reserved" | "off_shelf";
+
 export async function buildStorefrontProductDetail(
   listing: StorefrontListing,
   options: {
@@ -271,20 +275,42 @@ export async function buildStorefrontProductDetail(
     /** 测试注入用：默认 enrichStorefrontListings(signImages:false) */
     enrich?: (
       listings: StorefrontListing[],
-      options: { signImages?: boolean },
+      options: { signImages?: boolean; historical?: boolean },
     ) => Promise<StorefrontProduct[]>;
   } = {},
 ): Promise<
   | (StorefrontProduct & {
       thumbnail_url?: string | null;
       image_previews: StorefrontImagePreview[];
+      purchasable: boolean;
+      availability: StorefrontAvailability;
+      listing_status: string;
     })
   | null
 > {
   const enrich = options.enrich ?? enrichStorefrontListings;
-  const products = await enrich([listing], { signImages: false });
-  const product = products[0];
-  if (!product || product.stock < 1) return null;
+  const listingStatus = String((listing as { status?: unknown }).status ?? "published");
+  if (!(STOREFRONT_DETAIL_READABLE_STATUSES as readonly string[]).includes(listingStatus)) return null;
+  // Non-live statuses must prove they were once published (route also filters published_at IS NOT NULL).
+  if (listingStatus !== "published" && !listing.published_at) return null;
+  // Purchasable path is unchanged: published + active/displayed SKU + real stock.
+  const live = listingStatus === "published" ? (await enrich([listing], { signImages: false }))[0] : undefined;
+  let product: StorefrontProduct;
+  let availability: StorefrontAvailability;
+  if (live && live.stock >= 1) {
+    product = live;
+    availability = "available";
+  } else {
+    // Read-only history: SKU must still exist (active/archived); stock is forced to 0.
+    const hist = live ?? (await enrich([listing], { signImages: false, historical: true }))[0];
+    if (!hist) return null;
+    product = { ...hist, stock: 0, available_qty: 0 };
+    availability = listingStatus === "reserved" ? "reserved"
+      : listingStatus === "archived" ? "off_shelf"
+      : listingStatus === "sold" ? "sold_out"
+      : live ? "sold_out" : "off_shelf";
+  }
+  const meta = { purchasable: availability === "available", availability, listing_status: listingStatus };
 
   const signer = options.signer ?? signSkuImagePaths;
   const previewSigner = options.thumbnailSigner ?? previewDerivativeSigner;
@@ -309,6 +335,7 @@ export async function buildStorefrontProductDetail(
     const covers = await safeSign(coverSigner, originals.slice(0, 1));
     return {
       ...product,
+      ...meta,
       thumbnail_url: covers[0] ?? null,
       image_previews: originals.map((url, i) => ({
         image_url: url,
@@ -331,6 +358,7 @@ export async function buildStorefrontProductDetail(
     const covers = await safeSign(coverSigner, originals.slice(0, 1));
     return {
       ...product,
+      ...meta,
       thumbnail_url: covers[0] ?? null,
       image_previews: originals.map((url, i) => ({
         image_url: url,
@@ -350,6 +378,7 @@ export async function buildStorefrontProductDetail(
 
   return {
     ...product,
+    ...meta,
     image_url: image_previews[0].image_url,
     image_urls: image_previews.map((preview) => preview.image_url),
     thumbnail_url: covers[0] ?? null,
@@ -364,8 +393,9 @@ export async function buildStorefrontProductDetail(
  */
 export async function enrichStorefrontListings(
   listings: StorefrontListing[],
-  options: { signImages?: boolean } = {},
+  options: { signImages?: boolean; historical?: boolean } = {},
 ) {
+  const historical = options.historical === true;
   if (options.signImages !== false) {
     listings = await resolveStorefrontListingsImagesBatch(listings);
   }
@@ -374,12 +404,15 @@ export async function enrichStorefrontListings(
 
   const [skuResult, facetResult, availabilityResult] = await Promise.all([
     // 与腾讯分支 525acd6 对齐：隐藏 / 非 active SKU 不进入公开商品（在 total/分页计算之前排除）
-    supabaseAdmin
-      .from("inv_skus")
-      .select("id, category, brand_id, keywords, stock_qty, price_tier, is_custom_price, inventory_policy, kind, fankuang_override")
-      .eq("status", "active")
-      .eq("is_display", true)
-      .in("id", skuIds),
+    (() => {
+      // Historical (detail read-only) drops only the display gate; SKU must exist with a known status.
+      let skuQuery = supabaseAdmin
+        .from("inv_skus")
+        .select("id, category, brand_id, keywords, stock_qty, price_tier, is_custom_price, inventory_policy, kind, fankuang_override")
+        .in("status", historical ? ["active", "archived"] : ["active"]);
+      if (!historical) skuQuery = skuQuery.eq("is_display", true);
+      return skuQuery.in("id", skuIds);
+    })(),
     supabaseAdmin
       .from("inv_sku_facets" as never)
       .select("sku_id, confidence, facet:inv_facets(code, name, dimension)")
