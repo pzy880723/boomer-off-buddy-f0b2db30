@@ -189,11 +189,12 @@ export async function validatePreparedListingImage(source: string, output: strin
         response_format: { type: "json_object" }, messages: [{ role: "user", content: [
           { type: "text", text: '第一张为原图，第二张为修图成品。逐项对比，不确定即返回 false。' +
             'hands_removed：成品不得出现真实人物手指、手掌、手臂和投影；不要把商品玩偶肢体或印刷人物当真人手。' +
-            'product_preserved：商品可见文字、商标、颜色、配件数量、真实瑕疵和形状未被改造，未凭空添加被手遮住的文字或细节。' +
-            'gray_background：非商品区域是干净浅灰背景，无原桌面、人物、水印或价格标签残留。' +
+            'product_preserved：商品本身及包装的可见文字、商标、印刷图案、生产标记、颜色、配件数量、真实瑕疵和形状未被改造，未凭空添加被手遮住的文字或细节；清除外贴售价牌/价签和平台水印属于允许操作，不算违规。' +
+            'external_labels_removed：成品不得残留任何外部附加的售价贴纸、价格牌、价签（包括贴在透明包装、挂卡、包装纸板上的，如“¥12.9 BOOMER”），也不得残留平台水印或叠字；原图没有这些则填 true。' +
+            'gray_background：非商品区域是干净浅灰背景，无原桌面、人物残留（本项不代替 external_labels_removed）。' +
             `measurement_preserved：${profile.measurementTool ? '若原图有外部测量工具（尺子等），成品中必须完整保留且可读，刻度、数字、单位和与商品的测量位置关系与原图相同，未重绘或臆造；若原图没有外部测量工具则填 true，不能要求成品添加尺子。' : '本图无外部测量工具，填 true。'}` +
             `detail_preserved：${profile.closeUp ? '特写角度、透视和原有细节构图未改变，未裁掉细节，只补边成正方形。' : '非特写图，填 true。'}` +
-            '仅返回 JSON {"hands_removed":bool,"product_preserved":bool,"gray_background":bool,"measurement_preserved":bool,"detail_preserved":bool,"confidence":0至1}。' },
+            '仅返回 JSON {"hands_removed":bool,"product_preserved":bool,"gray_background":bool,"measurement_preserved":bool,"detail_preserved":bool,"external_labels_removed":bool,"confidence":0至1}。' },
           { type: "image_url", image_url: { url: source } },
           { type: "image_url", image_url: { url: output } },
         ] }] }),
@@ -203,10 +204,19 @@ export async function validatePreparedListingImage(source: string, output: strin
     const payload = await response.json();
     if (payload.choices?.[0]?.finish_reason === "length") throw new Error("Image validation truncated; original retained");
     const result = JSON.parse(payload.choices?.[0]?.message?.content ?? "{}");
-    const required = ["hands_removed", "product_preserved", "gray_background", "measurement_preserved", "detail_preserved"];
-    if (typeof result.confidence !== "number" || !Number.isFinite(result.confidence) || result.confidence < 0.95 || result.confidence > 1
-      || required.some(field => result[field] !== true)) {
-      throw new Error("修图检查未通过：手部、背景或实物细节不符合要求，原图保留，请重修");
-    }
+    const failedFields = VALIDATION_FIELDS.filter(field => result?.[field] !== true);
+    const confidenceOk = typeof result?.confidence === "number" && Number.isFinite(result.confidence)
+      && result.confidence >= 0.95 && result.confidence <= 1;
+    if (!confidenceOk || failedFields.length) throw new Error(validationFailureMessage(failedFields, result?.confidence));
   });
+}
+
+export const VALIDATION_FIELDS = ["hands_removed", "product_preserved", "gray_background", "measurement_preserved",
+  "detail_preserved", "external_labels_removed"] as const;
+
+/** Safe failure text: only fixed field names and a numeric confidence, never model text, images or URLs. */
+export function validationFailureMessage(failedFields: readonly string[], confidence: unknown): string {
+  const fields = failedFields.filter((f): f is string => (VALIDATION_FIELDS as readonly string[]).includes(f));
+  const conf = typeof confidence === "number" && Number.isFinite(confidence) ? confidence.toFixed(2) : "invalid";
+  return `修图检查未通过（fields=${fields.join(",") || "none"}; confidence=${conf}），原图保留，请重修`;
 }

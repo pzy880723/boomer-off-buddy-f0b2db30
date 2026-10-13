@@ -131,7 +131,7 @@ const module = { exports: {} as any };
 const pngDataUrl = async () => `data:image/png;base64,${(await sharp({ create: { width: 4, height: 4, channels: 3, background: "blue" } }).png().toBuffer()).toString("base64")}`;
 new Function("require", "module", "exports", bundle.outputFiles[0].text)(require, module, module.exports);
 const validChecks = { hands_removed: true, product_preserved: true, gray_background: true,
-  measurement_preserved: true, detail_preserved: true, confidence: 1 };
+  measurement_preserved: true, detail_preserved: true, external_labels_removed: true, confidence: 1 };
 const jsonMessage = (value: unknown) => Response.json({ choices: [{ message: { content: JSON.stringify(value) } }] });
 const generatedImage = () => Response.json({ choices: [{ message: { images: [{ image_url: { url: "data:image/png;base64,ZWRpdGVk" } }] } }] });
 
@@ -346,4 +346,9 @@ test("job error persists safe stage prefix without URLs or payloads", async () =
   const det = await withImageStage("measurement_detection", async () => { throw new Error("bad data:image/png;base64,AAAA"); }).catch((e) => e);
   assert.equal(safeImageJobError(det), "[measurement_detection] bad [data]");
   assert.equal(safeImageJobError(new Error("plain")), "plain");
+});
+test("retouch prompt removes external price stickers even on clear packaging while keeping product print", async () => {
+  const src = (await import("node:fs")).readFileSync("src/server/handheld-ai.server.ts", "utf8");
+  const prompt = src.slice(src.indexOf("const SYSTEM_LISTING_IMAGE"), src.indexOf("`;", src.indexOf("const SYSTEM_LISTING_IMAGE")));
+  for (const word of ["透明包装", "挂卡", "包装纸板", "外贴价签不是商品本身", "保留商品本身的商标"]) assert.match(prompt, new RegExp(word));
 });

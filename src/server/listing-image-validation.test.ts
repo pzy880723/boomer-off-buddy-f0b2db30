@@ -7,7 +7,7 @@ const originalFetch = globalThis.fetch;
 const originalTimeout = AbortSignal.timeout;
 afterEach(() => { globalThis.fetch = originalFetch; AbortSignal.timeout = originalTimeout; });
 const valid = { hands_removed: true, product_preserved: true, gray_background: true,
-  measurement_preserved: true, detail_preserved: true, confidence: 1 };
+  measurement_preserved: true, detail_preserved: true, external_labels_removed: true, confidence: 1 };
 const profile = { measurementTool: true, closeUp: true };
 
 test("source and output are compared for hand removal, ruler evidence and detail angle", async () => {
@@ -22,7 +22,7 @@ test("source and output are compared for hand removal, ruler evidence and detail
   };
   await validatePreparedListingImage("data:image/png;base64,c291cmNl", "data:image/png;base64,b3V0cHV0", "test", profile, allowHandheldGuard);
 });
-for (const field of ["hands_removed", "product_preserved", "gray_background", "measurement_preserved", "detail_preserved"]) {
+for (const field of ["hands_removed", "product_preserved", "gray_background", "measurement_preserved", "detail_preserved", "external_labels_removed"]) {
   test(`${field}=false cannot be reported as a completed retouch`, async () => {
     globalThis.fetch = async () => Response.json({ choices: [{ message: { content: JSON.stringify({ ...valid, [field]: false }) } }] });
     await assert.rejects(validatePreparedListingImage("source", "output", "test", profile, allowHandheldGuard), (e: any) => e.stage === "image_validation");
@@ -63,4 +63,29 @@ test("conservative ruler profile does not require adding a ruler to photos witho
     return Response.json({ choices: [{ message: { content: JSON.stringify(valid) } }] });
   };
   await validatePreparedListingImage("source", "output", "test", { measurementTool: true, closeUp: true }, allowHandheldGuard);
+});
+test("leftover external price sticker fails even when gray_background=true, with safe field-level error", async () => {
+  globalThis.fetch = async (_url, init) => {
+    const text = JSON.parse(String(init?.body)).messages[0].content[0].text;
+    assert.match(text, /external_labels_removed/); assert.match(text, /透明包装/); assert.match(text, /不算违规/);
+    return Response.json({ choices: [{ message: { content: JSON.stringify({ ...valid, external_labels_removed: false,
+      confidence: 0.97, note: "SECRET https://x.test/a?token=1 13800000000" }) } }] });
+  };
+  await assert.rejects(validatePreparedListingImage("source", "output", "test", profile, allowHandheldGuard), (e: any) => {
+    assert.equal(e.stage, "image_validation");
+    assert.equal(e.message, "修图检查未通过（fields=external_labels_removed; confidence=0.97），原图保留，请重修");
+    assert.doesNotMatch(e.message, /SECRET|https|token|138/);
+    return true;
+  });
+});
+test("missing external_labels_removed field is a failure, not a pass", async () => {
+  const { external_labels_removed: _drop, ...noLabel } = valid;
+  globalThis.fetch = async () => Response.json({ choices: [{ message: { content: JSON.stringify(noLabel) } }] });
+  await assert.rejects(validatePreparedListingImage("source", "output", "test", profile, allowHandheldGuard),
+    /fields=external_labels_removed; confidence=1.00/);
+});
+test("low confidence failure names confidence without passing", async () => {
+  globalThis.fetch = async () => Response.json({ choices: [{ message: { content: JSON.stringify({ ...valid, confidence: 0.94 }) } }] });
+  await assert.rejects(validatePreparedListingImage("source", "output", "test", profile, allowHandheldGuard),
+    /fields=none; confidence=0.94/);
 });
