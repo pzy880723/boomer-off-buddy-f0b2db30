@@ -111,7 +111,8 @@ for (const body of ["not json", JSON.stringify({ choices: [{ message: { content:
 test("consent revoked before detection still fails closed", async () => {
   let called = false;
   globalThis.fetch = async () => { called = true; return new Response("{}"); };
-  await assert.rejects(classifyListingImage("https://fixture.test/image", "fixture", allowWebGuard));
+  const denied = { kind: "handheld_staff", async check() { throw Object.assign(new Error("ai_consent_missing"), { name: "AiConsentRevoked" }); } } as typeof allowHandheldGuard;
+  await assert.rejects(classifyListingImage("https://fixture.test/image", "fixture", denied));
   assert.equal(called, false);
 });
 
@@ -134,13 +135,13 @@ const validChecks = { hands_removed: true, product_preserved: true, gray_backgro
 const jsonMessage = (value: unknown) => Response.json({ choices: [{ message: { content: JSON.stringify(value) } }] });
 const generatedImage = () => Response.json({ choices: [{ message: { images: [{ image_url: { url: "data:image/png;base64,ZWRpdGVk" } }] } }] });
 
-test("preparation cannot return a successful image when detection is unavailable", async () => {
+test("detection 5xx continues under conservative protection but a failing generation never returns the original", async () => {
   process.env.LOVABLE_API_KEY = "fixture";
   const source = await sharp({ create: { width: 8, height: 4, channels: 3, background: "red" } }).png().toBuffer();
   let calls = 0;
   globalThis.fetch = async () => { calls++; return new Response("unavailable", { status: 503 }); };
   await assert.rejects(module.exports.aiPrepareListingImage({ image_base64: `data:image/png;base64,${source.toString("base64")}` }, allowHandheldGuard));
-  assert.equal(calls, 1, "No image-generation or source-download fallback may follow detection failure");
+  assert.equal(calls, 2, "Detection then protected generation only; no unchanged-original fallback");
 });
 
 test("measurement preparation retouches background and hands instead of returning an unchanged original", async () => {
@@ -264,11 +265,10 @@ test("detector only protects external measuring tools, excluding product scales 
   for (const part of ["唱臂", "频率", "旋钮", "装饰网格", "型号", "年份"]) assert.match(prompt, new RegExp(part));
   assert.match(prompt, /不算测量工具/);
 });
-test("measurement failure keeps TimeoutError type and adds a safe stage marker", async () => {
+test("shared-budget expiry during measurement keeps TimeoutError type and adds a safe stage marker", async () => {
   const controller = new AbortController();
-  AbortSignal.timeout = () => controller.signal;
   globalThis.fetch = async (_url, init) => { controller.abort(new DOMException("deadline", "TimeoutError")); init?.signal?.throwIfAborted(); throw Error("x"); };
-  await assert.rejects(classifyListingImage("https://fixture.test/image?token=secret", "fixture", allowHandheldGuard), (e: any) => {
+  await assert.rejects(classifyListingImage("https://fixture.test/image?token=secret", "fixture", allowHandheldGuard, controller.signal), (e: any) => {
     assert.equal(e.name, "TimeoutError"); assert.equal(e.stage, "measurement_detection");
     assert.doesNotMatch(String(e.message), /token=secret/); return true;
   });
@@ -318,7 +318,9 @@ test("trusted signed URL is downloaded once and the same inline data URI feeds d
     };
     await module.exports.aiPrepareListingImage({ image_url: "https://storage.fixture.test/storage/v1/object/sign/sku-raw/a.png?token=secret" }, allowHandheldGuard);
     assert.equal(downloads, 1);
-    assert.deepEqual(sent, [expected, expected, expected]);
+    // Generation gets the full original; detection/validation get the reduced JPEG analysis copy.
+    assert.equal(sent[1], expected);
+    assert.ok(sent[0].startsWith("data:image/jpeg;base64,") && sent[2].startsWith("data:image/jpeg;base64,"));
     assert.ok(sent.every(u => !u.includes("token=")));
   } finally { if (prevUrl === undefined) delete process.env.SUPABASE_URL; else process.env.SUPABASE_URL = prevUrl; }
 });
