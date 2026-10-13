@@ -85,42 +85,48 @@ beforeEach(() => {
     finishError: undefined,
     legacyFinishError: false,
     legacyFinishStatus: undefined,
+    contentFinishStatus: undefined,
   });
 });
-test("content finishes while the legacy queue is still blocked", async () => {
+const galleryJob = {
+  id: "legacy", sku_id: "sku", source_bucket: "sku-raw", source_path: "gallery.jpg", source_index: 0,
+  ai_actor_user_id: "u1", ai_policy_version: "2026-10-09-v1", attempts: 0,
+};
+test("gallery runs first; claimed gallery jobs skip detail claim this round", async () => {
+  state.legacyJobs = [galleryJob];
+  assert.deepEqual(await worker.runListingImageWorker(6), { processed: 1 });
+  assert.ok(!state.calls.some((call: any) => call.name === "product_content_image_claim"));
+});
+test("concurrent hook + timer share one single-flight batch (cap 6, no doubling)", async () => {
   let release!: () => void;
-  state.legacyGate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  const pending = worker.runListingImageWorker(2);
-  try {
-    await new Promise((resolve) => setImmediate(resolve));
-    assert.ok(state.calls.some((call: any) => call.name === "product_content_image_finish"));
-  } finally {
-    release();
-    await pending;
+  state.legacyGate = new Promise<void>((resolve) => { release = resolve; });
+  state.legacyJobs = Array.from({ length: 6 }, (_, i) => ({ ...galleryJob, id: `g${i}`, source_index: i }));
+  const a = worker.runListingImageWorker(6);
+  const b = worker.runListingImageWorker(6);
+  release();
+  const [ra, rb] = await Promise.all([a, b]);
+  assert.deepEqual(ra, { processed: 6 });
+  assert.equal(ra, rb);
+  assert.equal(state.calls.filter((c: any) => c.name === "handheld_listing_image_claim").length, 1);
+  assert.equal(state.prepared.length, 6);
+});
+test("detail retryable/permanent/stale/cancelled are never counted as success", async () => {
+  for (const [status, expected] of [
+    ["retryable_failed", { processed: 0, failed: 1 }], ["permanent_failed", { processed: 0, failed: 1 }],
+    ["stale", { processed: 0 }], ["cancelled", { processed: 0 }],
+  ] as const) {
+    state.contentFinishStatus = status;
+    assert.deepEqual(await worker.runListingImageWorker(6), expected, status);
   }
+  state.contentFinishStatus = undefined;
 });
 test("legacy queue failure does not suppress successful content outcomes", async () => {
   state.legacyError = true;
   assert.deepEqual(await worker.runListingImageWorker(2), { processed: 1, failed: 1 });
 });
-test("content claim failure does not suppress successful legacy outcomes", async () => {
+test("content claim failure is counted as failure when gallery is empty", async () => {
   state.claimError = true;
-  state.legacyJobs = [
-    {
-      id: "legacy",
-      sku_id: "sku",
-      source_bucket: "sku-raw",
-      source_path: "gallery.jpg",
-      source_index: 0,
-      ai_actor_user_id: "u1",
-      ai_policy_version: "2026-10-09-v1",
-      attempts: 0,
-    },
-  ];
-  assert.deepEqual(await worker.runListingImageWorker(2), { processed: 1, failed: 1 });
-  assert.ok(state.calls.some((call: any) => call.name === "handheld_listing_image_finish"));
+  assert.deepEqual(await worker.runListingImageWorker(2), { processed: 0, failed: 1 });
 });
 test("one content completion error retains sibling completion counts", async () => {
   state.jobs = [{ ...job, id: "bad" }, job];
@@ -228,7 +234,7 @@ test("legacy completion failure is visible and leaves recovery to the lease", as
 });
 test("legacy preparation errors are durably finished as failures, never raw-success", async () => {
   legacyOnly(); state.fail = true;
-  assert.deepEqual(await worker.runListingImageWorker(2), { processed: 1, failed: 1 });
+  assert.deepEqual(await worker.runListingImageWorker(2), { processed: 0, failed: 1 });
   const finish = state.calls.find((c: any) => c.name === "handheld_listing_image_finish");
   assert.equal(finish.args.p_target_path, null);
   assert.match(finish.args.p_error, /ruler service failed/);
@@ -236,7 +242,7 @@ test("legacy preparation errors are durably finished as failures, never raw-succ
 });
 test("removed source completion is reported as failed rather than successful", async () => {
   legacyOnly(); state.legacyFinishStatus = "permanent_failed";
-  assert.deepEqual(await worker.runListingImageWorker(2), { processed: 1, failed: 1 });
+  assert.deepEqual(await worker.runListingImageWorker(2), { processed: 0, failed: 1 });
 });
 test("stale owner cannot report a completed legacy job", async () => {
   legacyOnly(); state.legacyFinishStatus = "stale";
