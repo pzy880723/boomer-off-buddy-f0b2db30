@@ -127,7 +127,7 @@ const worker = await bundle("src/server/handheld-listing-image-jobs.server.ts", 
     storage: { from: () => ({ createSignedUrl: async () => ({ data: { signedUrl: 'https://raw' }, error: null }),
       upload: async () => ({ error: null }) }) } };`,
   "@/server/handheld-ai.server": `export const aiPrepareListingImage = async () => { globalThis.__aiq.prepared++; return { b64: 'AA==', mime: 'image/png' }; };`,
-  "@/server/listing-image-safety.server": `export const safeImageJobError = e => String(e && e.message || e);`,
+  "@/server/listing-image-safety.server": `export const safeImageJobError = e => String(e && e.message || e); export const retryInstructionFromError = () => undefined;`,
   "@/server/ai-consent.server": consentStoreStub,
 }, ["@/server/ai-consent-core"]);
 

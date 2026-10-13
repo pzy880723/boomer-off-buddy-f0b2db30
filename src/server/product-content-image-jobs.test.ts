@@ -34,7 +34,7 @@ const stubs: Record<string, string> = {
     export const queuedAiDecision=async(s,j)=>j.ai_actor_user_id?((await s.get())?'allowed':'denied'):'denied';
     export const isAiConsentRevoked=e=>!!e&&e.code==='ai_consent_revoked';
     export const handheldAiGuard=(s,a)=>({kind:'handheld_staff',check:async(stage)=>{const d=await queuedAiDecision(s,{ai_actor_user_id:a.userId});if(d!=='allowed'){const e=new Error(d);e.code='ai_consent_revoked';e.reason=d;throw e;}}});`,
-  "@/server/listing-image-safety.server": `export const safeImageJobError=e=>((e&&e.stage?"["+e.stage+"] ":"")+(e instanceof Error?e.message:String(e))).slice(0,1000);`,
+  "@/server/listing-image-safety.server": `export const safeImageJobError=e=>((e&&e.stage?"["+e.stage+"] ":"")+(e instanceof Error?e.message:String(e))).slice(0,1000); export const retryInstructionFromError=e=>typeof e==="string"&&e.includes("fields=outer_bag_removed")?"FIXED_HINT_outer_bag":undefined;`,
 };
 const bundle = await build({
   entryPoints: ["src/server/handheld-listing-image-jobs.server.ts"],
@@ -252,4 +252,18 @@ test("stale owner cannot report a completed legacy job", async () => {
 test("unrecognized legacy completion response is not accepted", async () => {
   legacyOnly(); state.legacyFinishStatus = "unexpected";
   assert.deepEqual(await worker.runListingImageWorker(2), { processed: 0, failed: 1 });
+});
+
+test("gallery and detail retries pass only the fixed hint derived from last_error", async () => {
+  const leak = "修图检查未通过（fields=outer_bag_removed; confidence=0.97） https://x.test/a?token=1 13800000000";
+  state.legacyJobs = [{ ...galleryJob, last_error: leak }];
+  await worker.runListingImageWorker(6);
+  state.legacyJobs = [];
+  state.jobs = [{ ...job, last_error: leak }];
+  await worker.runListingImageWorker(6);
+  assert.equal(state.prepared.length, 2);
+  for (const p of state.prepared) {
+    assert.equal(p.instruction, "FIXED_HINT_outer_bag");
+    assert.doesNotMatch(JSON.stringify(p), /token|13800000000|x\.test\/a/);
+  }
 });
