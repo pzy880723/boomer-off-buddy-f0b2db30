@@ -5,6 +5,12 @@ import sharp from "sharp";
 import { requiresOriginalMeasurementPixels, squareOriginalImage, loadOriginalImage, classifyListingImage, safeImageJobError, withImageStage } from "./listing-image-safety.server.ts";
 import { allowHandheldGuard, allowWebGuard } from "./ai-guard-fixtures.ts";
 
+/** Realistic retouch output: 1024 light-gray canvas with a centered product occupying ~75% of the long edge. */
+const GOOD_B64 = (await sharp({ create: { width: 1024, height: 1024, channels: 3, background: "#ececec" } })
+  .composite([{ input: await sharp({ create: { width: 760, height: 620, channels: 3, background: "#b03a2e" } }).png().toBuffer(), left: 132, top: 202 }])
+  .png().toBuffer()).toString("base64");
+const GRAY_B64 = (await sharp({ create: { width: 1024, height: 1024, channels: 3, background: "#ececec" } }).png().toBuffer()).toString("base64");
+
 test("invalid or missing ruler detection rejects instead of reporting prepared pixels", () => {
   for (const value of [null, {}, { confidence: 1 }, { measurement_tool: "false", confidence: 1 }]) {
     assert.throws(() => requiresOriginalMeasurementPixels(value), /measurement/i);
@@ -130,10 +136,10 @@ const bundle = await build({ entryPoints: ["src/server/handheld-ai.server.ts"], 
 const module = { exports: {} as any };
 const pngDataUrl = async () => `data:image/png;base64,${(await sharp({ create: { width: 4, height: 4, channels: 3, background: "blue" } }).png().toBuffer()).toString("base64")}`;
 new Function("require", "module", "exports", bundle.outputFiles[0].text)(require, module, module.exports);
-const validChecks = { hands_removed: true, product_preserved: true, gray_background: true,
+const validChecks = { product_present: true, product_scale: true, hands_removed: true, product_preserved: true, gray_background: true,
   measurement_preserved: true, detail_preserved: true, external_labels_removed: true, outer_bag_removed: true, confidence: 1 };
 const jsonMessage = (value: unknown) => Response.json({ choices: [{ message: { content: JSON.stringify(value) } }] });
-const generatedImage = () => Response.json({ choices: [{ message: { images: [{ image_url: { url: "data:image/png;base64,ZWRpdGVk" } }] } }] });
+const generatedImage = () => Response.json({ choices: [{ message: { images: [{ image_url: { url: `data:image/png;base64,${GOOD_B64}` } }] } }] });
 
 test("detection 5xx continues under conservative protection but a failing generation never returns the original", async () => {
   process.env.LOVABLE_API_KEY = "fixture";
@@ -164,7 +170,7 @@ test("measurement preparation retouches background and hands instead of returnin
   };
   const output = await module.exports.aiPrepareListingImage({ image_base64: `data:image/png;base64,${source.toString("base64")}` }, allowHandheldGuard);
   assert.equal(calls, 3);
-  assert.deepEqual(output, { b64: "ZWRpdGVk", mime: "image/png" });
+  assert.deepEqual(output, { b64: GOOD_B64, mime: "image/png" });
   assert.equal((output as { preserved_original?: true }).preserved_original, undefined);
 });
 
@@ -179,9 +185,9 @@ test("confident no-tool detection still reaches the image editing provider", asy
     }
     if (models.length === 3) return jsonMessage(validChecks);
     assert.deepEqual(body.modalities, ["image", "text"]);
-    return Response.json({ choices: [{ message: { images: [{ image_url: { url: "data:image/png;base64,ZWRpdGVk" } }] } }] });
+    return Response.json({ choices: [{ message: { images: [{ image_url: { url: `data:image/png;base64,${GOOD_B64}` } }] } }] });
   };
-  assert.deepEqual(await module.exports.aiPrepareListingImage({ image_base64: await pngDataUrl() }, allowHandheldGuard), { b64: "ZWRpdGVk", mime: "image/png" });
+  assert.deepEqual(await module.exports.aiPrepareListingImage({ image_base64: await pngDataUrl() }, allowHandheldGuard), { b64: GOOD_B64, mime: "image/png" });
   assert.deepEqual(models, ["google/gemini-2.5-flash", "google/gemini-3.1-flash-image", "google/gemini-2.5-flash"]);
 });
 
@@ -206,7 +212,7 @@ test("close-up detail prompt protects camera angle even when extra instructions 
   };
   const result = await module.exports.aiPrepareListingImage({ image_base64: source.toString("base64"), instruction: "请优化角度" }, allowHandheldGuard);
   assert.equal(calls, 3);
-  assert.deepEqual(result, { b64: "ZWRpdGVk", mime: "image/png" });
+  assert.deepEqual(result, { b64: GOOD_B64, mime: "image/png" });
 });
 
 test("protected image generation failure propagates without an unchanged-original success fallback", async () => {
@@ -250,7 +256,7 @@ test("EXIF orientation is normalized before classification, generation and sourc
     return calls === 2 ? generatedImage() : jsonMessage(validChecks);
   };
   const result = await module.exports.aiPrepareListingImage({ image_base64: `data:image/jpeg;base64,${source.toString("base64")}` }, allowHandheldGuard);
-  assert.deepEqual(result, { b64: "ZWRpdGVk", mime: "image/png" });
+  assert.deepEqual(result, { b64: GOOD_B64, mime: "image/png" });
   assert.equal(calls, 3);
 });
 
@@ -291,7 +297,7 @@ test("listing prompt removes platform watermarks and price tags while keeping pr
     if (++n === 1) return Response.json({ choices: [{ message: { content: '{"measurement_tool":false,"close_up":false,"confidence":1}' } }] });
     if (n === 3) return jsonMessage(validChecks);
     text = JSON.parse(String(init?.body)).messages[0].content[0].text;
-    return Response.json({ choices: [{ message: { images: [{ image_url: { url: "data:image/png;base64,ZQ==" } }] } }] });
+    return Response.json({ choices: [{ message: { images: [{ image_url: { url: `data:image/png;base64,${GOOD_B64}` } }] } }] });
   };
   await module.exports.aiPrepareListingImage({ image_base64: await pngDataUrl() }, allowHandheldGuard);
   for (const word of ["闲鱼", "水印", "价签|价格牌", "商标", "真实瑕疵", "刻度", "手指", "手掌", "手臂"]) assert.match(text, new RegExp(word));
@@ -314,7 +320,7 @@ test("trusted signed URL is downloaded once and the same inline data URI feeds d
       if (sent.length === 3) return jsonMessage(validChecks);
       return sent.length === 1
         ? Response.json({ choices: [{ message: { content: '{"measurement_tool":false,"close_up":false,"confidence":1}' } }] })
-        : Response.json({ choices: [{ message: { images: [{ image_url: { url: "data:image/png;base64,ZQ==" } }] } }] });
+        : Response.json({ choices: [{ message: { images: [{ image_url: { url: `data:image/png;base64,${GOOD_B64}` } }] } }] });
     };
     await module.exports.aiPrepareListingImage({ image_url: "https://storage.fixture.test/storage/v1/object/sign/sku-raw/a.png?token=secret" }, allowHandheldGuard);
     assert.equal(downloads, 1);
@@ -357,4 +363,27 @@ test("retouch prompt removes outer clear bags but keeps product boxes/cards and 
   const prompt = src.slice(src.indexOf("const SYSTEM_LISTING_IMAGE"), src.indexOf("`;", src.indexOf("const SYSTEM_LISTING_IMAGE")));
   for (const w of ["【必须去除】", "外层的透明包装袋", "封口", "褶皱", "反光", "【商品本体必须保留】", "盒子、挂卡",
     "透明手提袋", "不得把商品本体当作外袋删除", "不得凭空补画", "刻度和数字必须完整保留", "保留拍摄角度"]) assert.match(prompt, new RegExp(w));
+});
+
+test("pure gray generated canvas is rejected by real pixels even when model JSON says all true", async () => {
+  process.env.LOVABLE_API_KEY = "fixture";
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    if (calls === 1) return jsonMessage({ measurement_tool: false, close_up: false, confidence: 0.99 });
+    if (calls === 2) return Response.json({ choices: [{ message: { images: [{ image_url: { url: `data:image/png;base64,${GRAY_B64}` } }] } }] });
+    return jsonMessage(validChecks);
+  };
+  await assert.rejects(module.exports.aiPrepareListingImage({ image_base64: await pngDataUrl() }, allowHandheldGuard), (e: any) => {
+    assert.equal(e.stage, "image_validation");
+    assert.match(e.message, /fields=product_present; confidence=invalid/);
+    return true;
+  });
+  assert.equal(calls, 2, "model validation must not be able to override the pixel gate");
+});
+test("retouch prompt keeps bagged product, fixes 70-85% framing and forbids blank output", async () => {
+  const src = (await import("node:fs")).readFileSync("src/server/handheld-ai.server.ts", "utf8");
+  const prompt = src.slice(src.indexOf("const SYSTEM_LISTING_IMAGE"), src.indexOf("`;", src.indexOf("const SYSTEM_LISTING_IMAGE")));
+  for (const w of ["70%-85%", "绝不能输出空背景", "不删除袋内商品本体", "用文字说明原因且不输出图片", "不能用空背景或纯灰图冒充成品", "保留拍摄角度"])
+    assert.match(prompt, new RegExp(w));
 });

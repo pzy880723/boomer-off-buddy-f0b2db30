@@ -269,7 +269,7 @@ const LINE_MIN_PIXELS = 3;
  */
 export async function assertListingImagePixels(b64: string): Promise<void> {
   return withImageStage("image_validation", async () => {
-    const fail = (fields: string[]) => { throw new Error(validationFailureMessage(fields, undefined)); };
+    const fail = (fields: string[]): never => { throw new Error(validationFailureMessage(fields, undefined)); };
     let width = 0, height = 0, raw: Buffer;
     try {
       const input = sharp(Buffer.from(b64, "base64"), { limitInputPixels: 40_000_000 });
