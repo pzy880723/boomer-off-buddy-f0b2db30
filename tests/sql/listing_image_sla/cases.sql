@@ -58,7 +58,7 @@ DO $$ DECLARE j record; s text; BEGIN
   UPDATE inv_skus SET image_paths=array_remove(image_paths,'sku-raw/a4') WHERE id='a0000000-0000-4000-8000-000000000001';
   INSERT INTO storage.objects VALUES ('sku-listing','gallery/a0000000-0000-4000-8000-000000000001/'||j.id||'/'||j.claim_token||'.png');
   ASSERT handheld_listing_image_finish(j.id, j.claim_token, 'sku-listing/gallery/a0000000-0000-4000-8000-000000000001/'||j.id||'/'||j.claim_token||'.png', NULL)='permanent_failed', 'S6 edited';
-  ASSERT NOT ('sku-listing/gallery/a0000000-0000-4000-8000-000000000001/'||j.id||'/'||j.claim_token||'.png' = ANY((SELECT image_paths FROM inv_skus WHERE id='a0000000-0000-4000-8000-000000000001'))), 'S6 overwrote';
+  ASSERT NOT (SELECT ('sku-listing/gallery/a0000000-0000-4000-8000-000000000001/'||j.id||'/'||j.claim_token||'.png') = ANY(image_paths) FROM inv_skus WHERE id='a0000000-0000-4000-8000-000000000001'), 'S6 overwrote';
   RAISE NOTICE 'PASS S6 stale token rejected; staff edit not overwritten';
   -- S7 成功应用→image_paths 更新（触发商城/有赞同步的同一列）
   SELECT * INTO j FROM inv_listing_image_jobs WHERE source_path='a5';
