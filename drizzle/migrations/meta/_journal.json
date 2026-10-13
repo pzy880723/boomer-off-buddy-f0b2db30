@@ -400,6 +400,13 @@
       "when": 1791885822524,
       "tag": "0056_handheld_notify_scope",
       "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1791886278542,
+      "tag": "0057_handheld_unread_counts",
+      "breakpoints": true
     }
   ]
 }

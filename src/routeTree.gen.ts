@@ -204,6 +204,7 @@ import { Route as ApiPublicHandheldLabelTemplatesIdRouteImport } from './routes/
 import { Route as ApiPublicHandheldLocationSwitchRouteImport } from './routes/api/public/handheld/location.switch'
 import { Route as ApiPublicHandheldNotificationsReadAllRouteImport } from './routes/api/public/handheld/notifications.read-all'
 import { Route as ApiPublicHandheldNotificationsSinceRouteImport } from './routes/api/public/handheld/notifications.since'
+import { Route as ApiPublicHandheldNotificationsUnreadCountsRouteImport } from './routes/api/public/handheld/notifications.unread-counts'
 import { Route as ApiPublicHandheldOrdersIdRouteImport } from './routes/api/public/handheld/orders.$id'
 import { Route as ApiPublicHandheldParcelsIdRouteImport } from './routes/api/public/handheld/parcels.$id'
 import { Route as ApiPublicHandheldParcelsCountsRouteImport } from './routes/api/public/handheld/parcels.counts'
@@ -1376,6 +1377,12 @@ const ApiPublicHandheldNotificationsSinceRoute =
     path: '/since',
     getParentRoute: () => ApiPublicHandheldNotificationsRoute,
   } as any)
+const ApiPublicHandheldNotificationsUnreadCountsRoute =
+  ApiPublicHandheldNotificationsUnreadCountsRouteImport.update({
+    id: '/unread-counts',
+    path: '/unread-counts',
+    getParentRoute: () => ApiPublicHandheldNotificationsRoute,
+  } as any)
 const ApiPublicHandheldOrdersIdRoute =
   ApiPublicHandheldOrdersIdRouteImport.update({
     id: '/$id',
@@ -2191,6 +2198,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/location/switch': typeof ApiPublicHandheldLocationSwitchRoute
   '/api/public/handheld/notifications/read-all': typeof ApiPublicHandheldNotificationsReadAllRoute
   '/api/public/handheld/notifications/since': typeof ApiPublicHandheldNotificationsSinceRoute
+  '/api/public/handheld/notifications/unread-counts': typeof ApiPublicHandheldNotificationsUnreadCountsRoute
   '/api/public/handheld/orders/$id': typeof ApiPublicHandheldOrdersIdRoute
   '/api/public/handheld/parcels/$id': typeof ApiPublicHandheldParcelsIdRoute
   '/api/public/handheld/parcels/counts': typeof ApiPublicHandheldParcelsCountsRoute
@@ -2485,6 +2493,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/location/switch': typeof ApiPublicHandheldLocationSwitchRoute
   '/api/public/handheld/notifications/read-all': typeof ApiPublicHandheldNotificationsReadAllRoute
   '/api/public/handheld/notifications/since': typeof ApiPublicHandheldNotificationsSinceRoute
+  '/api/public/handheld/notifications/unread-counts': typeof ApiPublicHandheldNotificationsUnreadCountsRoute
   '/api/public/handheld/orders/$id': typeof ApiPublicHandheldOrdersIdRoute
   '/api/public/handheld/parcels/$id': typeof ApiPublicHandheldParcelsIdRoute
   '/api/public/handheld/parcels/counts': typeof ApiPublicHandheldParcelsCountsRoute
@@ -2787,6 +2796,7 @@ export interface FileRoutesById {
   '/api/public/handheld/location/switch': typeof ApiPublicHandheldLocationSwitchRoute
   '/api/public/handheld/notifications/read-all': typeof ApiPublicHandheldNotificationsReadAllRoute
   '/api/public/handheld/notifications/since': typeof ApiPublicHandheldNotificationsSinceRoute
+  '/api/public/handheld/notifications/unread-counts': typeof ApiPublicHandheldNotificationsUnreadCountsRoute
   '/api/public/handheld/orders/$id': typeof ApiPublicHandheldOrdersIdRoute
   '/api/public/handheld/parcels/$id': typeof ApiPublicHandheldParcelsIdRoute
   '/api/public/handheld/parcels/counts': typeof ApiPublicHandheldParcelsCountsRoute
@@ -3090,6 +3100,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/location/switch'
     | '/api/public/handheld/notifications/read-all'
     | '/api/public/handheld/notifications/since'
+    | '/api/public/handheld/notifications/unread-counts'
     | '/api/public/handheld/orders/$id'
     | '/api/public/handheld/parcels/$id'
     | '/api/public/handheld/parcels/counts'
@@ -3384,6 +3395,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/location/switch'
     | '/api/public/handheld/notifications/read-all'
     | '/api/public/handheld/notifications/since'
+    | '/api/public/handheld/notifications/unread-counts'
     | '/api/public/handheld/orders/$id'
     | '/api/public/handheld/parcels/$id'
     | '/api/public/handheld/parcels/counts'
@@ -3685,6 +3697,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/location/switch'
     | '/api/public/handheld/notifications/read-all'
     | '/api/public/handheld/notifications/since'
+    | '/api/public/handheld/notifications/unread-counts'
     | '/api/public/handheld/orders/$id'
     | '/api/public/handheld/parcels/$id'
     | '/api/public/handheld/parcels/counts'
@@ -5351,6 +5364,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldNotificationsSinceRouteImport
       parentRoute: typeof ApiPublicHandheldNotificationsRoute
     }
+    '/api/public/handheld/notifications/unread-counts': {
+      id: '/api/public/handheld/notifications/unread-counts'
+      path: '/unread-counts'
+      fullPath: '/api/public/handheld/notifications/unread-counts'
+      preLoaderRoute: typeof ApiPublicHandheldNotificationsUnreadCountsRouteImport
+      parentRoute: typeof ApiPublicHandheldNotificationsRoute
+    }
     '/api/public/handheld/orders/$id': {
       id: '/api/public/handheld/orders/$id'
       path: '/$id'
@@ -6418,6 +6438,7 @@ const ApiPublicHandheldLabelTemplatesRouteWithChildren =
 interface ApiPublicHandheldNotificationsRouteChildren {
   ApiPublicHandheldNotificationsReadAllRoute: typeof ApiPublicHandheldNotificationsReadAllRoute
   ApiPublicHandheldNotificationsSinceRoute: typeof ApiPublicHandheldNotificationsSinceRoute
+  ApiPublicHandheldNotificationsUnreadCountsRoute: typeof ApiPublicHandheldNotificationsUnreadCountsRoute
   ApiPublicHandheldNotificationsIdReadRoute: typeof ApiPublicHandheldNotificationsIdReadRoute
 }
 
@@ -6427,6 +6448,8 @@ const ApiPublicHandheldNotificationsRouteChildren: ApiPublicHandheldNotification
       ApiPublicHandheldNotificationsReadAllRoute,
     ApiPublicHandheldNotificationsSinceRoute:
       ApiPublicHandheldNotificationsSinceRoute,
+    ApiPublicHandheldNotificationsUnreadCountsRoute:
+      ApiPublicHandheldNotificationsUnreadCountsRoute,
     ApiPublicHandheldNotificationsIdReadRoute:
       ApiPublicHandheldNotificationsIdReadRoute,
   }
