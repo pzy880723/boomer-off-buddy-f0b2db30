@@ -156,7 +156,7 @@ export async function aiPrepareListingImage(input: {
   const profile = await classifyListingImage(await analysisCopy(dataUrl), getKey(), guard, budget);
   const protectedImage = profile.measurementTool || profile.closeUp;
   const prompt = protectedImage ? SYSTEM_LISTING_IMAGE
-    .replace("主体居中裁切、四周留白均匀，商品主体长边占画面70%-85%", "只补边形成正方形，不裁掉商品细节或测量工具，商品与测量工具在画面中的比例不得缩小")
+    .replace("主体居中裁切、四周留白均匀，商品主体长边占画面70%-85%", "完整保留主体，不裁掉商品细节或测量工具；允许收紧已清理的背景空白，并等比放大主体后补边形成正方形")
     .replace("校正角度，修正白平衡和曝光", "禁止校正角度、旋转、改变透视或重新摆放商品与尺子，只轻微修正白平衡和曝光")
     : SYSTEM_LISTING_IMAGE;
 
