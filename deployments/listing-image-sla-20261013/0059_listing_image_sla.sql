@@ -6,6 +6,7 @@
 --  * 重试退避 30/300/1800/7200s → 10/30/60/60s（上限 60s），次数上限仍 5。
 --  * 永久错误立即 permanent_failed：p_error 以 'permanent:' 或 'ai_consent_missing' 开头。不以保留原图冒充成功。
 --  * 认领顺序：按 SKU 组（组内最早 created_at）→ source_index（主图 0 优先）→ id，同组 6 张一起被认领。
+--  * 超 5 分钟且已尝试 ≥2 次：认领时明确 permanent_failed 'sla_exceeded_5min'。
 --  * 图库优先：仍有到期/可回收的图库任务时，详情图 claim 返回空。
 CREATE OR REPLACE FUNCTION public.handheld_listing_image_claim(p_limit integer DEFAULT 2)
  RETURNS SETOF public.inv_listing_image_jobs LANGUAGE plpgsql SET search_path TO '' AS $function$
@@ -32,7 +33,9 @@ BEGIN
       WHEN v_sku.status IS DISTINCT FROM 'active' THEN 'sku_not_active'
       WHEN NOT coalesce((v_job.source_bucket||'/'||v_job.source_path)=ANY(v_sku.image_paths),false)
         THEN 'source_removed_not_applied'
-      WHEN v_job.attempts>=5 THEN 'worker_lease_expired_or_attempt_limit' ELSE NULL END;
+      WHEN v_job.attempts>=5 THEN 'worker_lease_expired_or_attempt_limit'
+      -- 5 分钟 SLA：已试过 ≥2 次且超时的任务明确失败（保留原图，待人工/补偿重跑），不再静默转圈。
+      WHEN v_job.attempts>=2 AND v_job.created_at<now()-interval '5 minutes' THEN 'sla_exceeded_5min' ELSE NULL END;
     IF v_error IS NOT NULL THEN
       UPDATE public.inv_listing_image_jobs SET status='permanent_failed',last_error=v_error,
         claim_token=NULL,lease_until=NULL,locked_at=NULL,locked_by=NULL,updated_at=now()

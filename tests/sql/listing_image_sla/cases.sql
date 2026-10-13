@@ -87,3 +87,10 @@ DO $$ DECLARE j record; i int; s text; BEGIN
   ASSERT EXISTS (SELECT 1 FROM handheld_listing_image_claim(6) WHERE source_path='a1'), 'S9 reclaim';
   RAISE NOTICE 'PASS S9 expired lease reclaimed with new token';
 END $$;
+DO $$ BEGIN
+  -- S10 超 5 分钟且已试 2 次：明确失败，不再认领
+  UPDATE inv_listing_image_jobs SET status='retryable_failed', attempts=2, next_run_at=now()-interval '1s', created_at=now()-interval '6 min' WHERE source_path='a1';
+  ASSERT NOT EXISTS (SELECT 1 FROM handheld_listing_image_claim(6) WHERE source_path='a1'), 'S10 claimed';
+  ASSERT (SELECT status||'/'||last_error FROM inv_listing_image_jobs WHERE source_path='a1')='permanent_failed/sla_exceeded_5min', 'S10 status';
+  RAISE NOTICE 'PASS S10 >5min after 2 attempts fails explicitly (sla_exceeded_5min)';
+END $$;
