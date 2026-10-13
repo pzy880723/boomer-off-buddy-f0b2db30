@@ -14,7 +14,17 @@ const options = (f) => ({ secret, storageOrigin, fetch: f });
 
 test('TLS termination behind Nginx must still issue HTTPS to iPhone', () => {
   assert.equal(uploadRelayURL('http://erp.boomeroff.com/api/public/handheld/items/upload-image'), 'https://erp.boomeroff.com/api/public/handheld/items/upload-image');
-  assert.equal(uploadRelayURL('http://127.0.0.1:3006/any'), 'http://127.0.0.1:3006/api/public/handheld/items/upload-image');
+  const fixed = 'https://erp.boomeroff.com/api/public/handheld/items/upload-image';
+  for (const upstream of ['http://127.0.0.1:3005/api/public/handheld/items/upload-image', 'http://localhost:3005/x',
+    'http://[::1]:3005/x', 'https://evil.example/x']) assert.equal(uploadRelayURL(upstream), fixed, upstream);
+});
+
+test('upload_url never derives from request origin/Host/X-Forwarded-Host', async () => {
+  const route = await readFile(new URL('../src/routes/api/public/handheld/items.upload-image.ts', import.meta.url), 'utf8');
+  const relay = await readFile(new URL('../src/server/handheld-upload-relay.server.ts', import.meta.url), 'utf8');
+  assert.doesNotMatch(route, /new URL\(request\.url\)\.origin/);
+  assert.doesNotMatch(route + relay, /headers\.get\(["'](x-forwarded-host|host)["']/i);
+  assert.match(route, /HANDHELD_PUBLIC_ORIGIN\}\/api\/public\/handheld\/items\/upload-image\/multipart/);
 });
 
 test('signed upload uses ERP relay and keeps the existing PUT/header contract', async () => {
