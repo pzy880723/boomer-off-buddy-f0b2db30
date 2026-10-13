@@ -94,3 +94,16 @@ DO $$ BEGIN
   ASSERT (SELECT status||'/'||last_error FROM inv_listing_image_jobs WHERE source_path='a1')='permanent_failed/sla_exceeded_5min', 'S10 status';
   RAISE NOTICE 'PASS S10 >5min after 2 attempts fails explicitly (sla_exceeded_5min)';
 END $$;
+DO $$ DECLARE j record; BEGIN
+  -- S11 详情图 finish：lease 在事务开始后过期（模拟锁等待）→ stale，不写内容
+  UPDATE inv_listing_image_jobs SET status='succeeded' WHERE status<>'succeeded';
+  INSERT INTO inv_product_content_image_jobs(id,sku_id,block_id,source_path) VALUES ('c0000000-0000-4000-8000-000000000002','a0000000-0000-4000-8000-000000000001','blk','x')
+    ON CONFLICT DO NOTHING;
+  UPDATE inv_product_content_image_jobs SET status='processing',attempts=1,claim_token='d0000000-0000-4000-8000-000000000001',
+    lease_until=clock_timestamp()-interval '1 millisecond' WHERE block_id='blk';
+  ASSERT product_content_image_finish((SELECT id FROM inv_product_content_image_jobs WHERE block_id='blk' LIMIT 1),'d0000000-0000-4000-8000-000000000001',NULL,'x')='stale', 'S11 expired after txn start';
+  UPDATE inv_product_content_image_jobs SET lease_until=NULL WHERE block_id='blk';
+  ASSERT product_content_image_finish((SELECT id FROM inv_product_content_image_jobs WHERE block_id='blk' LIMIT 1),'d0000000-0000-4000-8000-000000000001',NULL,'x')='stale', 'S11 null lease';
+  ASSERT (SELECT published_blocks->0->>'storage_path' FROM inv_product_content WHERE sku_id='a0000000-0000-4000-8000-000000000001')='x', 'S11 content written';
+  RAISE NOTICE 'PASS S11 detail finish rejects lease expired during lock wait or NULL lease';
+END $$;

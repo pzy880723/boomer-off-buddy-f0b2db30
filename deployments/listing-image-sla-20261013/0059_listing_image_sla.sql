@@ -7,6 +7,7 @@
 --  * 永久错误立即 permanent_failed：p_error 以 'permanent:' 或 'ai_consent_missing' 开头。不以保留原图冒充成功。
 --  * 认领顺序：按 SKU 组（组内最早 created_at）→ source_index（主图 0 优先）→ id，同组 6 张一起被认领。
 --  * 超 5 分钟且已尝试 ≥2 次：认领时明确 permanent_failed 'sla_exceeded_5min'。
+--  * 详情图 finish 以 clock_timestamp() 判 lease 过期（含 NULL），锁等待后过期一律 stale。
 --  * 图库优先：仍有到期/可回收的图库任务时，详情图 claim 返回空。
 CREATE OR REPLACE FUNCTION public.handheld_listing_image_claim(p_limit integer DEFAULT 2)
  RETURNS SETOF public.inv_listing_image_jobs LANGUAGE plpgsql SET search_path TO '' AS $function$
@@ -143,7 +144,9 @@ BEGIN
   SELECT * INTO v_sku FROM public.inv_skus WHERE id=v_job.sku_id FOR UPDATE;
   SELECT * INTO v_job FROM public.inv_product_content_image_jobs WHERE id=p_id FOR UPDATE;
   IF NOT FOUND OR v_job.status<>'processing' OR p_claim_token IS NULL
-     OR v_job.claim_token IS DISTINCT FROM p_claim_token OR v_job.lease_until<now() THEN RETURN 'stale'; END IF;
+     OR v_job.claim_token IS DISTINCT FROM p_claim_token OR v_job.lease_until IS NULL
+     -- 锁等待可能越过 lease：用实时时钟而非事务起点 now() 判 stale，过期绝不写结果。
+     OR v_job.lease_until<=clock_timestamp() THEN RETURN 'stale'; END IF;
   SELECT * INTO v_content FROM public.inv_product_content WHERE sku_id=v_job.sku_id FOR UPDATE;
   IF NOT FOUND OR v_sku.status IS DISTINCT FROM 'active' OR v_sku.kind IS DISTINCT FROM 'single'
      OR NOT coalesce(v_sku.is_custom_price,false) THEN
