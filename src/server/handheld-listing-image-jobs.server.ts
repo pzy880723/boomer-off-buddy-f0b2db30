@@ -59,6 +59,7 @@ type JobRow = AiActor & {
   source_index: number;
   attempts: number;
   claim_token: string;
+  last_error?: string | null;
 };
 
 type ContentImageJob = AiActor & {
@@ -67,6 +68,7 @@ type ContentImageJob = AiActor & {
   block_id: string;
   source_path: string;
   claim_token: string;
+  last_error?: string | null;
 };
 
 async function prepareImage(
@@ -74,12 +76,14 @@ async function prepareImage(
   sourcePath: string,
   targetStem: string,
   guard: AiOutboundGuard,
+  lastError?: string | null,
 ): Promise<string> {
   const signed = await supabaseAdmin.storage
     .from(sourceBucket)
     .createSignedUrl(sourcePath, 60 * 60);
   if (signed.error) throw new Error(signed.error.message);
-  const prepared = await aiPrepareListingImage({ image_url: signed.data.signedUrl }, guard);
+  const prepared = await aiPrepareListingImage(
+    { image_url: signed.data.signedUrl, instruction: retryInstructionFromError(lastError) }, guard);
   const extension = prepared.mime.includes("png")
     ? "png"
     : prepared.mime.includes("webp")
@@ -107,6 +111,7 @@ async function processContentImageJob(job: ContentImageJob): Promise<string> {
       job.source_path.slice(slash + 1),
       `content/${job.sku_id}/${job.id}/${job.claim_token}`,
       await jobGuard(job),
+      job.last_error,
     );
     targetPath = `sku-listing/${path}`;
   } catch (error) {
@@ -185,6 +190,7 @@ async function processJob(job: JobRow): Promise<string> {
       job.source_path,
       `gallery/${job.sku_id}/${job.id}/${job.claim_token}`,
       await jobGuard(job),
+      job.last_error,
     );
     targetPath = `sku-listing/${path}`;
   } catch (error) {
