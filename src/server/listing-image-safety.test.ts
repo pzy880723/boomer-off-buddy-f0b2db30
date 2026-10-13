@@ -141,7 +141,7 @@ test("detection 5xx continues under conservative protection but a failing genera
   let calls = 0;
   globalThis.fetch = async () => { calls++; return new Response("unavailable", { status: 503 }); };
   await assert.rejects(module.exports.aiPrepareListingImage({ image_base64: `data:image/png;base64,${source.toString("base64")}` }, allowHandheldGuard));
-  assert.equal(calls, 2, "Detection then protected generation only; no unchanged-original fallback");
+  assert.equal(calls, 3, "Detection, primary, one 2.5 fallback; no unchanged-original fallback");
 });
 
 test("measurement preparation retouches background and hands instead of returning an unchanged original", async () => {
@@ -221,7 +221,7 @@ test("protected image generation failure propagates without an unchanged-origina
     assert.doesNotMatch(error.message, /private upstream/);
     return true;
   });
-  assert.equal(calls, 2);
+  assert.equal(calls, 3); // primary 503 + one fallback 503, still rejected
 });
 
 test("remaining hands in output fail validation rather than replacing the source image", async () => {

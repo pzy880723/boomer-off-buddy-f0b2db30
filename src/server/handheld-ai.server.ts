@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { recognizeProductFromImages } from "@/server/product-recognition.server";
 import sharp from "sharp";
 import { beforeHandheldAiOutbound, type AiOutboundGuard } from "./ai-guard.ts";
-import { loadOriginalImage, classifyListingImage, validatePreparedListingImage, withImageStage, analysisCopy, stageSignal, PermanentImageError, LISTING_IMAGE_BUDGET_MS, GENERATION_TIMEOUT_MS } from "./listing-image-safety.server";
+import { loadOriginalImage, classifyListingImage, validatePreparedListingImage, withImageStage, analysisCopy, stageSignal, PermanentImageError, LISTING_IMAGE_BUDGET_MS, GENERATION_TIMEOUT_MS, FALLBACK_GENERATION_TIMEOUT_MS } from "./listing-image-safety.server";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1";
 
@@ -151,7 +151,7 @@ export async function aiPrepareListingImage(input: {
     : SYSTEM_LISTING_IMAGE;
 
   const body = {
-    model: "google/gemini-3.1-flash-image",
+    model: PRIMARY_IMAGE_MODEL,
     messages: [
       {
         role: "user",
@@ -170,7 +170,7 @@ export async function aiPrepareListingImage(input: {
     image_config: { image_size: "1K", aspect_ratio: "1:1" },
   };
 
-  const output = await withImageStage("image_generation", () => generateListingImage(body, guard, budget));
+  const output = await withImageStage("image_generation", () => generateWithFallback(body, guard, budget));
   await validatePreparedListingImage(dataUrl, `data:${output.mime};base64,${output.b64}`, getKey(), profile, guard, budget);
   budget.throwIfAborted(); // total deadline passed: never report success
   return output;
@@ -182,11 +182,43 @@ export function missingImageError(finishReason: unknown): string {
   return `图像生成服务未返回图片（${reason}），原图保留`;
 }
 
-async function generateListingImage(body: unknown, guard: AiOutboundGuard, budget?: AbortSignal): Promise<{ b64: string; mime: string }> {
+export const PRIMARY_IMAGE_MODEL = "google/gemini-3.1-flash-image";
+export const FALLBACK_IMAGE_MODEL = "google/gemini-2.5-flash-image";
+
+/** Only transient transport failures of the primary call may fall back; never auth, 429, content filter or expired budget. */
+export function isFallbackEligible(error: unknown, budget: AbortSignal): boolean {
+  if (budget.aborted) return false;
+  const e = error as { name?: string; status?: number } | null;
+  if (!e) return false;
+  if (e.name === "TimeoutError" || e.name === "TypeError") return true;
+  return e.status === 502 || e.status === 503 || e.status === 504;
+}
+
+async function generateWithFallback(body: Record<string, unknown>, guard: AiOutboundGuard, budget: AbortSignal): Promise<{ b64: string; mime: string }> {
+  const started = Date.now();
+  try {
+    const out = await generateListingImage(body, guard, budget, GENERATION_TIMEOUT_MS);
+    console.info(JSON.stringify({ evt: "listing_image_generation", model: PRIMARY_IMAGE_MODEL, ok: true, ms: Date.now() - started }));
+    return out;
+  } catch (error) {
+    const kind = (error as { name?: string })?.name ?? "Error";
+    if (!isFallbackEligible(error, budget)) throw error;
+    console.warn(JSON.stringify({ evt: "listing_image_generation", model: PRIMARY_IMAGE_MODEL, ok: false, kind, ms: Date.now() - started, fallback: FALLBACK_IMAGE_MODEL }));
+    const fbStart = Date.now();
+    // Same full original input and prompt; 2.5 accepts aspect_ratio only.
+    const out = await generateListingImage({ ...body, model: FALLBACK_IMAGE_MODEL, image_config: { aspect_ratio: "1:1" } },
+      guard, budget, FALLBACK_GENERATION_TIMEOUT_MS);
+    console.info(JSON.stringify({ evt: "listing_image_generation", model: FALLBACK_IMAGE_MODEL, ok: true, ms: Date.now() - fbStart }));
+    return out;
+  }
+}
+
+async function generateListingImage(body: unknown, guard: AiOutboundGuard, budget: AbortSignal | undefined, deadlineMs: number): Promise<{ b64: string; mime: string }> {
+  // Every outbound call (primary and fallback) re-checks consent.
   await beforeHandheldAiOutbound(guard, "image_generation");
   const res = await fetch(`${GATEWAY}/chat/completions`, {
     method: "POST",
-    signal: stageSignal(GENERATION_TIMEOUT_MS, budget),
+    signal: stageSignal(deadlineMs, budget),
     headers: {
       Authorization: `Bearer ${getKey()}`,
       "Content-Type": "application/json",
@@ -198,7 +230,7 @@ async function generateListingImage(body: unknown, guard: AiOutboundGuard, budge
     await res.body?.cancel().catch(() => undefined);
     // Upstream text may echo signed URLs or image payloads; only the status is reported.
     if (res.status === 401 || res.status === 403) throw new PermanentImageError(`AI gateway ${res.status}`);
-    throw new Error(`AI gateway ${res.status}`);
+    throw Object.assign(new Error(`AI gateway ${res.status}`), { status: res.status });
   }
   const j = await res.json();
   // OpenRouter image response shape: choices[0].message.images[0].image_url.url (data: URL)
