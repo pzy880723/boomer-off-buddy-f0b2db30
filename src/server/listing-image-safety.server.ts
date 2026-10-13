@@ -24,7 +24,44 @@ export async function squareOriginalImage(bytes: Buffer): Promise<{ b64: string;
   return { b64: padded.toString("base64"), mime: "image/png" };
 }
 
-export async function loadOriginalImage(image: string): Promise<Buffer> {
+/** Per-photo end-to-end budget (download, detection, generation, validation share one signal). */
+export const LISTING_IMAGE_BUDGET_MS = 120_000;
+export const DETECTION_TIMEOUT_MS = 12_000;
+export const GENERATION_TIMEOUT_MS = 90_000;
+export const VALIDATION_TIMEOUT_MS = 20_000;
+/** Analysis work copy long edge; generation keeps the full original input. */
+export const ANALYSIS_LONG_EDGE = 1024;
+
+/** Detection fallback: uncertain photos are retouched under ruler + close-up protection, never shipped as-is. */
+export const CONSERVATIVE_PROFILE: ListingImageProfile = Object.freeze({ measurementTool: true, closeUp: true });
+
+/** Stage deadline that never outlives the shared per-photo budget. */
+export function stageSignal(ms: number, budget?: AbortSignal): AbortSignal {
+  const own = AbortSignal.timeout(ms);
+  return budget ? AbortSignal.any([own, budget]) : own;
+}
+
+/** Errors that must not be retried (auth/denial). Persisted as `permanent: ...` so the DB fails the job at once. */
+export class PermanentImageError extends Error {
+  constructor(message: string) { super(`permanent: ${message}`); this.name = "PermanentImageError"; }
+}
+
+/** Downscaled JPEG data URL for detection/validation only; the original pixels are never altered. */
+export async function analysisCopy(dataUrl: string): Promise<string> {
+  const comma = dataUrl.indexOf(",");
+  if (!dataUrl.startsWith("data:image/") || comma < 0) return dataUrl;
+  try {
+    const bytes = Buffer.from(dataUrl.slice(comma + 1), "base64");
+    const out = await sharp(bytes, { limitInputPixels: 40_000_000 }).rotate()
+      .resize({ width: ANALYSIS_LONG_EDGE, height: ANALYSIS_LONG_EDGE, fit: "inside", withoutEnlargement: true })
+      .flatten({ background: "#ffffff" }).jpeg({ quality: 85 }).toBuffer();
+    return `data:image/jpeg;base64,${out.toString("base64")}`;
+  } catch {
+    return dataUrl;
+  }
+}
+
+export async function loadOriginalImage(image: string, budget?: AbortSignal): Promise<Buffer> {
   if (image.startsWith("data:image/")) {
     const comma = image.indexOf(",");
     const bytes = Buffer.from(image.slice(comma + 1), "base64");
@@ -37,7 +74,7 @@ export async function loadOriginalImage(image: string): Promise<Buffer> {
   if (url.protocol !== "https:" || !allowed.includes(url.origin) || !url.pathname.startsWith("/storage/v1/")) {
     throw new Error("Original image must use trusted storage");
   }
-  const response = await fetch(url, { signal: AbortSignal.timeout(15_000), redirect: "error" });
+  const response = await fetch(url, { signal: stageSignal(15_000, budget), redirect: "error" });
   if (!response.ok || !response.body) throw new Error("Original image unavailable");
   const chunks: Uint8Array[] = [];
   let size = 0;
@@ -88,37 +125,65 @@ export function safeImageJobError(error: unknown): string {
     .replace(/data:[^\s,]*,[A-Za-z0-9+/=]+/g, "[data]")
     .replace(/https?:\/\/\S+/g, "[url]")
     .replace(/[?&](token|sig|signature|X-Amz-[A-Za-z]+)=\S+/gi, "[redacted]");
+  if (message.startsWith("permanent: ")) return `permanent: ${stage ? `[${stage}] ` : ""}${message.slice(11)}`.slice(0, 1000);
   return `${stage ? `[${stage}] ` : ""}${name}${message}`.slice(0, 1000);
 }
 
-export async function classifyListingImage(image: string, key: string, guard: AiOutboundGuard): Promise<ListingImageProfile> {
-  return withImageStage("measurement_detection", () => detectMeasurement(image, key, guard));
+export async function classifyListingImage(image: string, key: string, guard: AiOutboundGuard, budget?: AbortSignal): Promise<ListingImageProfile> {
+  return withImageStage("measurement_detection", () => detectMeasurement(image, key, guard, budget));
 }
 
-async function detectMeasurement(image: string, key: string, guard: AiOutboundGuard): Promise<ListingImageProfile> {
-  // Upstream latency varies; background detection does not block the listing UI.
+async function detectMeasurement(image: string, key: string, guard: AiOutboundGuard, budget?: AbortSignal): Promise<ListingImageProfile> {
+  // Consent/guard failures propagate (fail closed); only detector uncertainty falls back to protection.
   await beforeAiOutbound(guard, "measurement_detection");
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST", signal: AbortSignal.timeout(60_000),
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "google/gemini-2.5-flash", max_tokens: 512, response_format: { type: "json_object" },
-      messages: [{ role: "user", content: [
-        { type: "text", text: MEASUREMENT_DETECTION_PROMPT },
-        { type: "image_url", image_url: { url: image } },
-      ] }],
-    }),
-  });
-  if (!response.ok) throw new Error(`Measurement detection HTTP ${response.status}; retry required`);
-  const payload = await response.json();
-  if (payload.choices?.[0]?.finish_reason === "length") throw new Error("Measurement classification truncated; retry required");
-  return parseListingImageProfile(JSON.parse(payload.choices?.[0]?.message?.content ?? "{}"));
+  let response: Response;
+  try {
+    response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST", signal: stageSignal(DETECTION_TIMEOUT_MS, budget),
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "google/gemini-2.5-flash", max_tokens: 512, reasoning: { max_tokens: 0 },
+        response_format: { type: "json_object" },
+        messages: [{ role: "user", content: [
+          { type: "text", text: MEASUREMENT_DETECTION_PROMPT },
+          { type: "image_url", image_url: { url: image } },
+        ] }],
+      }),
+    });
+  } catch (error) {
+    // The shared budget expiring is a real failure, not detector uncertainty.
+    if (budget?.aborted) throw error;
+    if (error instanceof TypeError || (error as { name?: string })?.name === "TimeoutError") return CONSERVATIVE_PROFILE;
+    throw error;
+  }
+  if (response.status === 401 || response.status === 403) {
+    await response.body?.cancel().catch(() => undefined);
+    throw new PermanentImageError(`Measurement detection HTTP ${response.status}`);
+  }
+  if (response.status >= 500) {
+    await response.body?.cancel().catch(() => undefined);
+    return CONSERVATIVE_PROFILE;
+  }
+  if (!response.ok) {
+    await response.body?.cancel().catch(() => undefined);
+    throw new Error(`Measurement detection HTTP ${response.status}; retry required`);
+  }
+  try {
+    const payload = await response.json();
+    if (payload.choices?.[0]?.finish_reason === "length") return CONSERVATIVE_PROFILE;
+    return parseListingImageProfile(JSON.parse(payload.choices?.[0]?.message?.content ?? "{}"));
+  } catch (error) {
+    if (budget?.aborted) throw error;
+    return CONSERVATIVE_PROFILE;
+  }
 }
 
-export async function validatePreparedListingImage(source: string, output: string, key: string, profile: ListingImageProfile, guard: AiOutboundGuard): Promise<void> {
+export async function validatePreparedListingImage(source: string, output: string, key: string, profile: ListingImageProfile, guard: AiOutboundGuard, budget?: AbortSignal): Promise<void> {
   return withImageStage("image_validation", async () => {
     await beforeAiOutbound(guard, "image_validation");
+    // Compare reduced analysis copies; the shipped output is not altered.
+    [source, output] = await Promise.all([analysisCopy(source), analysisCopy(output)]);
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST", signal: AbortSignal.timeout(45_000),
+      method: "POST", signal: stageSignal(VALIDATION_TIMEOUT_MS, budget),
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({ model: "google/gemini-2.5-flash", max_tokens: 1024, reasoning: { max_tokens: 0 },
         response_format: { type: "json_object" }, messages: [{ role: "user", content: [
@@ -133,6 +198,7 @@ export async function validatePreparedListingImage(source: string, output: strin
           { type: "image_url", image_url: { url: output } },
         ] }] }),
     });
+    if (response.status === 401 || response.status === 403) throw new PermanentImageError(`Image validation HTTP ${response.status}`);
     if (!response.ok) throw new Error(`Image validation HTTP ${response.status}; original retained, retry required`);
     const payload = await response.json();
     if (payload.choices?.[0]?.finish_reason === "length") throw new Error("Image validation truncated; original retained");
