@@ -46,7 +46,7 @@ test("truncated or unavailable validation fails without leaking upstream text", 
 });
 test("validation timeout stays a retryable staged TimeoutError", async () => {
   const controller = new AbortController();
-  AbortSignal.timeout = ms => { assert.equal(ms, 45_000); return controller.signal; };
+  AbortSignal.timeout = ms => { assert.equal(ms, 20_000); return controller.signal; };
   globalThis.fetch = async (_url, init) => {
     controller.abort(new DOMException("Validation deadline", "TimeoutError"));
     init?.signal?.throwIfAborted();

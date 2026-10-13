@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { recognizeProductFromImages } from "@/server/product-recognition.server";
 import sharp from "sharp";
 import { beforeHandheldAiOutbound, type AiOutboundGuard } from "./ai-guard.ts";
-import { loadOriginalImage, classifyListingImage, validatePreparedListingImage, withImageStage } from "./listing-image-safety.server";
+import { loadOriginalImage, classifyListingImage, validatePreparedListingImage, withImageStage, analysisCopy, stageSignal, PermanentImageError, LISTING_IMAGE_BUDGET_MS, GENERATION_TIMEOUT_MS } from "./listing-image-safety.server";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1";
 
@@ -128,7 +128,7 @@ export async function aiPrepareListingImage(input: {
   image_url?: string;
   image_base64?: string;
   instruction?: string;
-}, guard: AiOutboundGuard): Promise<{ b64: string; mime: string; preserved_original?: true }> {
+}, guard: AiOutboundGuard, budget: AbortSignal = AbortSignal.timeout(LISTING_IMAGE_BUDGET_MS)): Promise<{ b64: string; mime: string; preserved_original?: true }> {
   // Handheld-only: a web guard is never accepted; every AI stage re-checks the original actor.
   await beforeHandheldAiOutbound(guard, "load_original");
   // Download the trusted original once and share the same inline bytes with detection and generation,
@@ -137,12 +137,13 @@ export async function aiPrepareListingImage(input: {
     ? input.image_url
     : input.image_base64?.startsWith("data:")
       ? input.image_base64
-      : `data:image/jpeg;base64,${input.image_base64 ?? ""}`);
+      : `data:image/jpeg;base64,${input.image_base64 ?? ""}`, budget);
   const metadata = await sharp(source, { limitInputPixels: 40_000_000 }).metadata();
   if (metadata.orientation && metadata.orientation !== 1) source = await sharp(source).rotate().png().toBuffer();
   const dataUrl = `data:${sniffImageMime(source)};base64,${source.toString("base64")}`;
 
-  const profile = await classifyListingImage(dataUrl, getKey(), guard);
+  // Detection reads a 1024px JPEG work copy; generation still receives the full original.
+  const profile = await classifyListingImage(await analysisCopy(dataUrl), getKey(), guard, budget);
   const protectedImage = profile.measurementTool || profile.closeUp;
   const prompt = protectedImage ? SYSTEM_LISTING_IMAGE
     .replace("主体居中裁切、四周留白均匀", "只补边形成正方形，不裁掉商品细节或测量工具")
@@ -165,10 +166,12 @@ export async function aiPrepareListingImage(input: {
       },
     ],
     modalities: ["image", "text"],
+    // Square 1K standard listing image (not 512).
+    image_config: { image_size: "1K", aspect_ratio: "1:1" },
   };
 
-  const output = await withImageStage("image_generation", () => generateListingImage(body, guard));
-  await validatePreparedListingImage(dataUrl, `data:${output.mime};base64,${output.b64}`, getKey(), profile, guard);
+  const output = await withImageStage("image_generation", () => generateListingImage(body, guard, budget));
+  await validatePreparedListingImage(dataUrl, `data:${output.mime};base64,${output.b64}`, getKey(), profile, guard, budget);
   return output;
 }
 
@@ -178,11 +181,11 @@ export function missingImageError(finishReason: unknown): string {
   return `图像生成服务未返回图片（${reason}），原图保留`;
 }
 
-async function generateListingImage(body: unknown, guard: AiOutboundGuard): Promise<{ b64: string; mime: string }> {
+async function generateListingImage(body: unknown, guard: AiOutboundGuard, budget?: AbortSignal): Promise<{ b64: string; mime: string }> {
   await beforeHandheldAiOutbound(guard, "image_generation");
   const res = await fetch(`${GATEWAY}/chat/completions`, {
     method: "POST",
-    signal: AbortSignal.timeout(60_000),
+    signal: stageSignal(GENERATION_TIMEOUT_MS, budget),
     headers: {
       Authorization: `Bearer ${getKey()}`,
       "Content-Type": "application/json",
@@ -193,6 +196,7 @@ async function generateListingImage(body: unknown, guard: AiOutboundGuard): Prom
   if (!res.ok) {
     await res.body?.cancel().catch(() => undefined);
     // Upstream text may echo signed URLs or image payloads; only the status is reported.
+    if (res.status === 401 || res.status === 403) throw new PermanentImageError(`AI gateway ${res.status}`);
     throw new Error(`AI gateway ${res.status}`);
   }
   const j = await res.json();
