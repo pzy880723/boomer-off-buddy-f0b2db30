@@ -709,6 +709,9 @@ export const AiRecognizeRes = okEnvelope(
     model: z.string(),
     prompt_version: z.string(),
     taxonomy_version: z.string(),
+    recognition_failed: z.boolean().default(false).meta({
+      description: "仅模型执行失败时为 true（返回的是安全兜底名，不能当作识别完成）；低置信度成功为 false",
+    }),
     raw: z.unknown().optional(),
   }),
 );
