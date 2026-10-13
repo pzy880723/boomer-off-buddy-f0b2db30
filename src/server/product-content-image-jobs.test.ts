@@ -17,7 +17,7 @@ const stubs: Record<string, string> = {
       if(name==='handheld_listing_image_finish')return {data:s.legacyFinishStatus??(args.p_error?'retryable_failed':'succeeded'),error:s.legacyFinishError?{message:'legacy completion unavailable'}:null};
       if(name==='product_content_image_finish' && args.p_id===s.finishError) return {data:null,error:{message:'completion unavailable'}};
       if(name==='product_content_image_claim' && s.claimError) return {data:null,error:{message:'claim unavailable'}};
-      return name==='product_content_image_claim'?{data:s.jobs,error:null}:{data:'succeeded',error:null};},
+      return name==='product_content_image_claim'?{data:s.jobs,error:null}:{data:(name==='product_content_image_finish'&&s.contentFinishStatus)?s.contentFinishStatus:'succeeded',error:null};},
     from:table=>{const s=globalThis.__contentJobs;let update=null;const q={select:()=>q,in:()=>q,lte:()=>q,order:()=>q,
       update:value=>{update=value;s.writes.push({table,value});return q;},eq:()=>q,
       maybeSingle:async()=>({data:{id:'legacy'},error:null}),
