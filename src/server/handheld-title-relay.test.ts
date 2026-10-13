@@ -63,7 +63,9 @@ describe("quick title", () => {
 });
 
 const cats = [{ id: "c", code: "toy", name: "玩具", parent_id: null, is_active: true, level: 1 },
-  { id: "d", code: "toy_figure", name: "手办", parent_id: "c", is_active: true, level: 2 }];
+  { id: "d", code: "toy_figure", name: "手办", parent_id: "c", is_active: true, level: 2 },
+  { id: "s", code: "system", name: "系统", parent_id: null, is_active: true, level: 1 },
+  { id: "l", code: "ai_low_confidence", name: "待人工确认", parent_id: "s", is_active: true, level: 2 }];
 function deps(callModel: any, audits: any[] = []) {
   return { loadCategories: async () => cats as any, callModel, saveAudit: async (a: any) => { audits.push(a); return { id: "00000000-0000-4000-8000-000000000001" }; }, sleep: async () => {} };
 }
