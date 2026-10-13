@@ -97,7 +97,7 @@ async function prepareImage(
   return targetPath;
 }
 
-async function processContentImageJob(job: ContentImageJob): Promise<void> {
+async function processContentImageJob(job: ContentImageJob): Promise<string> {
   let targetPath: string | null = null;
   let failure: string | null = await consentFailure(job);
   if (!failure) try {
@@ -123,6 +123,11 @@ async function processContentImageJob(job: ContentImageJob): Promise<void> {
     } as never,
   );
   if (result.error) throw new Error(`Complete detail image job: ${result.error.message}`);
+  const status = String(result.data);
+  if (!["succeeded", "retryable_failed", "permanent_failed", "stale", "cancelled"].includes(status)) {
+    throw new Error("Unexpected detail image completion status");
+  }
+  return status;
 }
 
 function cleanStoragePath(bucket: string, path: string): string {
@@ -197,18 +202,22 @@ async function processJob(job: JobRow): Promise<string> {
   return status;
 }
 
-type BatchResult = { processed: number; failed: number };
+type BatchResult = { claimed: number; processed: number; failed: number };
+
+function tally(outcomes: PromiseSettledResult<string>[]): BatchResult {
+  return {
+    claimed: outcomes.length,
+    processed: outcomes.filter((o) => o.status === "fulfilled" && o.value === "succeeded").length,
+    failed: outcomes.filter((o) => o.status === "rejected" ||
+      (o.status === "fulfilled" && ["retryable_failed", "permanent_failed"].includes(o.value))).length,
+  };
+}
 
 async function runLegacyImageBatch(limit: number): Promise<BatchResult> {
   const result = await supabaseAdmin.rpc("handheld_listing_image_claim" as never, { p_limit: limit } as never);
   if (result.error) throw new Error(`读取图片任务失败：${result.error.message}`);
   const jobs = (result.data ?? []) as unknown as JobRow[];
-  const outcomes = await Promise.allSettled(jobs.map(processJob));
-  return {
-    processed: outcomes.filter((outcome) => outcome.status === "fulfilled" && outcome.value !== "stale").length,
-    failed: outcomes.filter((outcome) => outcome.status === "rejected" ||
-      (outcome.status === "fulfilled" && ["retryable_failed", "permanent_failed"].includes(outcome.value))).length,
-  };
+  return tally(await Promise.allSettled(jobs.map(processJob)));
 }
 
 async function runContentImageBatch(limit: number): Promise<BatchResult> {
@@ -220,32 +229,45 @@ async function runContentImageBatch(limit: number): Promise<BatchResult> {
   );
   if (contentJobs.error) throw new Error(`Claim detail image jobs: ${contentJobs.error.message}`);
   const claimed = (contentJobs.data ?? []) as unknown as ContentImageJob[];
-  const outcomes = await Promise.allSettled(claimed.map(processContentImageJob));
-  return {
-    processed: outcomes.filter((outcome) => outcome.status === "fulfilled").length,
-    failed: outcomes.filter((outcome) => outcome.status === "rejected").length,
-  };
+  return tally(await Promise.allSettled(claimed.map(processContentImageJob)));
 }
 
-export async function runListingImageWorker(limit = 2): Promise<{ processed: number; failed?: number }> {
-  if ((process.env.HANDHELD_LISTING_IMAGE_WORKER_ENABLED ?? "true") !== "true")
-    return { processed: 0 };
-  const boundedLimit = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 6)) : 2;
-  // Each queue claims and completes independently, even when the other queue stalls or fails.
-  const batches = await Promise.allSettled([
-    runLegacyImageBatch(boundedLimit),
-    runContentImageBatch(boundedLimit),
-  ]);
+type WorkerResult = { processed: number; failed?: number };
+// Process-wide single flight: hooks and the timer share one batch, so at most 6 images run at once.
+let activeBatch: Promise<WorkerResult> | null = null;
+
+async function runBatchOnce(limit: number): Promise<WorkerResult> {
   let processed = 0;
   let failed = 0;
-  for (const batch of batches) {
-    if (batch.status === "rejected") failed += 1;
-    else {
-      processed += batch.value.processed;
-      failed += batch.value.failed;
+  let galleryClaimed = 0;
+  try {
+    const gallery = await runLegacyImageBatch(limit);
+    galleryClaimed = gallery.claimed;
+    processed += gallery.processed;
+    failed += gallery.failed;
+  } catch {
+    failed += 1;
+  }
+  // Gallery first; detail images only run when no gallery job was claimed (or gallery claim failed).
+  if (galleryClaimed === 0) {
+    try {
+      const detail = await runContentImageBatch(limit);
+      processed += detail.processed;
+      failed += detail.failed;
+    } catch {
+      failed += 1;
     }
   }
   return { processed, ...(failed ? { failed } : {}) };
+}
+
+export async function runListingImageWorker(limit = 2): Promise<WorkerResult> {
+  if ((process.env.HANDHELD_LISTING_IMAGE_WORKER_ENABLED ?? "true") !== "true")
+    return { processed: 0 };
+  const boundedLimit = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 6)) : 2;
+  if (activeBatch) return activeBatch;
+  activeBatch = runBatchOnce(boundedLimit).finally(() => { activeBatch = null; });
+  return activeBatch;
 }
 
 export function triggerListingImageWorker(limit = 2): void {

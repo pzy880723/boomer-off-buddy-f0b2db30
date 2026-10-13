@@ -191,7 +191,7 @@ export async function validatePreparedListingImage(source: string, output: strin
             'hands_removed：成品不得出现真实人物手指、手掌、手臂和投影；不要把商品玩偶肢体或印刷人物当真人手。' +
             'product_preserved：商品可见文字、商标、颜色、配件数量、真实瑕疵和形状未被改造，未凭空添加被手遮住的文字或细节。' +
             'gray_background：非商品区域是干净浅灰背景，无原桌面、人物、水印或价格标签残留。' +
-            `measurement_preserved：${profile.measurementTool ? '尺子完整保留且可读，刻度、数字、单位和与商品的测量位置关系与原图相同，未重绘或臆造。' : '本图无外部测量工具，填 true。'}` +
+            `measurement_preserved：${profile.measurementTool ? '若原图有外部测量工具（尺子等），成品中必须完整保留且可读，刻度、数字、单位和与商品的测量位置关系与原图相同，未重绘或臆造；若原图没有外部测量工具则填 true，不能要求成品添加尺子。' : '本图无外部测量工具，填 true。'}` +
             `detail_preserved：${profile.closeUp ? '特写角度、透视和原有细节构图未改变，未裁掉细节，只补边成正方形。' : '非特写图，填 true。'}` +
             '仅返回 JSON {"hands_removed":bool,"product_preserved":bool,"gray_background":bool,"measurement_preserved":bool,"detail_preserved":bool,"confidence":0至1}。' },
           { type: "image_url", image_url: { url: source } },
