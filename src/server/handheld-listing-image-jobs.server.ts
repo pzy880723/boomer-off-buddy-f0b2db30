@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { aiPrepareListingImage } from "@/server/handheld-ai.server";
-import { safeImageJobError } from "@/server/listing-image-safety.server";
+import { safeImageJobError, retryInstructionFromError } from "@/server/listing-image-safety.server";
 import {
   handheldAiGuard,
   isAiConsentRevoked,
