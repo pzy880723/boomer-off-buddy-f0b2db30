@@ -12,10 +12,13 @@ $PSQL -q -f tests/sql/order_paid_notify/stubs.sql >/dev/null
 $PSQL -q -v ON_ERROR_STOP=1 -f "$mig" >/dev/null || { echo "FAIL migration apply"; exit 1; }
 mig2=${RELIABILITY_MIGRATION-$(ls drizzle/migrations/*_handheld_notify_reliability_v2.sql 2>/dev/null | head -1)}
 if [ -n "$mig2" ]; then $PSQL -q -v ON_ERROR_STOP=1 -f "$mig2" >/dev/null || { echo "FAIL reliability migration apply"; exit 1; }; else echo "NOTE reliability migration absent (RED run)"; fi
+mig3=${SCOPE_MIGRATION-$(ls drizzle/migrations/*_handheld_notify_scope.sql 2>/dev/null | head -1)}
+if [ -n "$mig3" ]; then $PSQL -q -v ON_ERROR_STOP=1 -f "$mig3" >/dev/null || { echo "FAIL scope migration apply"; exit 1; }; fi
 out=$($PSQL -q -v ON_ERROR_STOP=1 -f tests/sql/order_paid_notify/cases.sql 2>&1); rc=$?
 echo "$out" | grep -o 'PASS .*\|ERROR.*\|FAIL.*'
 out2=$($PSQL -q -v ON_ERROR_STOP=1 -f tests/sql/order_paid_notify/reliability.sql 2>&1); rc2=$?
 echo "$out2" | grep -o 'PASS .*\|ERROR.*\|FAIL.*'
 out3=$(PSQL=$PSQL bash tests/sql/order_paid_notify/late_commit.sh 2>&1); rc3=$?; echo "$out3" | grep -o 'PASS.*\|FAIL.*\|ERROR.*'
-n=$(printf '%s\n%s\n%s\n' "$out" "$out2" "$out3" | grep -c 'PASS')
-[ $rc -eq 0 ] && [ $rc2 -eq 0 ] && [ $rc3 -eq 0 ] && [ "$n" -eq 11 ] && echo "ALL PASS ($n)" || { echo "SOME FAILED ($n/11)"; exit 1; }
+out4=$($PSQL -q -v ON_ERROR_STOP=1 -f tests/sql/order_paid_notify/scope.sql 2>&1); rc4=$?; echo "$out4" | grep -o 'PASS .*\|ERROR.*\|FAIL.*'
+n=$(printf '%s\n%s\n%s\n%s\n' "$out" "$out2" "$out3" "$out4" | grep -c 'PASS')
+[ $rc -eq 0 ] && [ $rc2 -eq 0 ] && [ $rc3 -eq 0 ] && [ $rc4 -eq 0 ] && [ "$n" -eq 13 ] && echo "ALL PASS ($n)" || { echo "SOME FAILED ($n/13)"; exit 1; }

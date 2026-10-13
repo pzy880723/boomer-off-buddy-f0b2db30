@@ -30,7 +30,7 @@ describe("消息可见范围", () => {
     });
     assert.match(filter, /user_id\.eq\.u1/);
     assert.match(filter, /device_id\.eq\.d1/);
-    assert.match(filter, /and\(user_id\.is\.null,device_id\.is\.null,location_id\.is\.null\)/);
+    assert.match(filter, /and\(or\(location_id\.is\.null\),or\(user_id\.eq\.u1,and\(user_id\.is\.null,device_id\.is\.null\)/);
     assert.ok(!filter.includes("location_id.in."));
   });
 

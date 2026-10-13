@@ -393,6 +393,13 @@
       "when": 1791703629737,
       "tag": "0055_settlement_aftersale_pickup_eligibility",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1791885822524,
+      "tag": "0056_handheld_notify_scope",
+      "breakpoints": true
     }
   ]
 }
