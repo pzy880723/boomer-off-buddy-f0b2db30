@@ -113,3 +113,26 @@ describe("full recognition", () => {
     assert.equal(calls, 0);
   });
 });
+
+describe("title budget and naming rules (2026-10-13 follow-up)", () => {
+  test("quick title uses a bounded 12s budget and makes exactly one request on failure", async () => {
+    const t = await import("./product-title.server.ts");
+    assert.equal(t.PRODUCT_TITLE_TIMEOUT_MS, 12_000);
+    let calls = 0, signal: AbortSignal | undefined;
+    await assert.rejects(t.recognizeProductTitle("YWJj", allow, async (_u, init) => { calls++; signal = init?.signal ?? undefined; return new Response("x", { status: 503 }); }, "gw"), /503/);
+    assert.equal(calls, 1);
+    assert.ok(signal && !signal.aborted);
+  });
+  test("quick + handheld full prompts: role/IP + shape/material + object, no aliases/descriptions/dates", () => {
+    const full = rec.buildEraInstruction("handheld");
+    for (const p of [PRODUCT_TITLE_PROMPT, full]) {
+      assert.match(p, /Hello Kitty橘色挂件/);
+      assert.match(p, /美乐蒂粉色抽拉包/);
+      assert.match(p, /别名/);
+      assert.match(p, /可爱/);
+      assert.match(p, /简介/);
+      assert.match(p, /12.{0,3}20/);
+    }
+    assert.doesNotMatch(rec.buildEraInstruction("erp"), /Hello Kitty橘色挂件/);
+  });
+});

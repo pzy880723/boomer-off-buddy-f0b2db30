@@ -303,6 +303,7 @@ export function buildEraInstruction(source: ProductRecognitionSource): string {
 attributes.era、description、evidence 与 date_markings 必须一致，简介不能残留Heisei或错误的“1975年生产”；不要用era标签库别名代替日期证据。没有真实检索结果时不得声称已联网核实。`;
   if (source !== "handheld") return shared;
   return `${shared}
+手持端 name 目标 12-20 个字、最多 24 个字。命名规则：标题=可确认的角色/IP + 显著造型/颜色/材质 + 物件名或可核实型号，例如“Hello Kitty橘色挂件”“美乐蒂粉色抽拉包”。同一名称不要重复中英文别名；不要写“可爱”“适合…”等描述，不要罗列配件或组件；日期、年代与故事写进简介，不进标题。
 手持端输出请精简：description 控制在 20-30 字的一句话介绍，日期若出现须保留生产/版权/标签性质；evidence 最多 3 条、keywords 最多 5 个、alternative_categories 最多 2 个、clarification_requests 最多 2 条。不要输出任何多余解释。`;
 }
 
