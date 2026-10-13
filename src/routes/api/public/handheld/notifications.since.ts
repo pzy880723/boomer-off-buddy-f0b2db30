@@ -12,6 +12,7 @@ import {
   listNotificationChanges,
   parseChangeCursor,
   resolveNotificationScope,
+  applyRequestedLocation,
 } from "@/server/handheld-notifications.server";
 import { NotificationsSinceQuery } from "@/lib/handheld/schemas";
 
@@ -41,11 +42,18 @@ export const Route = createFileRoute("/api/public/handheld/notifications/since")
         if (rawCursor && !changeCursor) {
           return err("Invalid cursor", 400, { code: "validation_error" });
         }
-        const scope = await resolveNotificationScope({
+        const baseScope = await resolveNotificationScope({
           userId: session.user_id,
           deviceId: auth.device.id,
           deviceLocationId: auth.device.location_id,
         });
+        const scoped = applyRequestedLocation(baseScope, new URL(request.url).searchParams.get("location_id"));
+        if (!scoped.ok) {
+          return scoped.code === "validation_error"
+            ? err("Invalid location_id", 400, { code: "validation_error" })
+            : err("Location not authorized for this account", 403, { code: "location_forbidden" });
+        }
+        const scope = scoped.scope;
         try {
           if (changeCursor) {
             const page = await listNotificationChanges({ scope, cursor: changeCursor, limit: q.limit });

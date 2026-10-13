@@ -25,7 +25,29 @@ export type NotificationScope = {
   device_location_id: string | null;
   location_ids: string[];
   is_hq: boolean;
+  /** 显式当前门店（已校验授权）；设置后所有查询只看该店 + 本人/本设备/全局。 */
+  filter_location_id?: string | null;
 };
+
+/** 查询实际使用的门店集合：显式门店优先，否则账号全部授权门店。 */
+export function effectiveLocationIds(scope: NotificationScope): string[] {
+  return scope.filter_location_id ? [scope.filter_location_id] : scope.location_ids;
+}
+
+/**
+ * 校验显式 location_id：必须是 UUID 且在账号授权范围内（总部=全部启用门店）。
+ * 未传返回原 scope（兼容旧客户端）。普通员工无法借参数扩大范围。
+ */
+export function applyRequestedLocation(
+  scope: NotificationScope,
+  raw: string | null | undefined,
+): { ok: true; scope: NotificationScope } | { ok: false; code: "validation_error" | "location_forbidden" } {
+  const v = (raw ?? "").trim();
+  if (!v) return { ok: true, scope };
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)) return { ok: false, code: "validation_error" };
+  if (!scope.location_ids.includes(v.toLowerCase()) && !scope.location_ids.includes(v)) return { ok: false, code: "location_forbidden" };
+  return { ok: true, scope: { ...scope, filter_location_id: scope.location_ids.includes(v) ? v : v.toLowerCase() } };
+}
 
 type RawRow = {
   id: string;
@@ -72,17 +94,16 @@ export async function resolveNotificationScope(input: {
   };
 }
 
-/** PostgREST 的 or() 过滤串：只在查询层过滤，不在内存里裁剪整页。 */
+/**
+ * PostgREST 的 or() 过滤串（只在查询层过滤，不在内存里裁剪整页）。与 DB handheld_notifications_changes 同一规则：
+ * 门店为空或在有效门店内；且 定向本人 OR (未定向用户 且 设备为空或为本设备)。
+ * 同店但定向给其他员工/设备的通知不可见。
+ */
 export function buildVisibilityFilter(scope: NotificationScope): string {
-  const clauses = [
-    `user_id.eq.${scope.user_id}`,
-    `device_id.eq.${scope.device_id}`,
-    "and(user_id.is.null,device_id.is.null,location_id.is.null)",
-  ];
-  if (scope.location_ids.length > 0) {
-    clauses.push(`location_id.in.(${scope.location_ids.join(",")})`);
-  }
-  return clauses.join(",");
+  const locs = effectiveLocationIds(scope);
+  const loc = locs.length > 0 ? `location_id.is.null,location_id.in.(${locs.join(",")})` : "location_id.is.null";
+  const who = `user_id.eq.${scope.user_id},and(user_id.is.null,device_id.is.null),and(user_id.is.null,device_id.eq.${scope.device_id})`;
+  return `and(or(${loc}),or(${who}))`;
 }
 
 async function decorate(rows: RawRow[], scope: NotificationScope): Promise<NotificationItem[]> {
@@ -204,7 +225,7 @@ export async function listNotificationChanges(input: {
   const { data, error } = await supabaseAdmin.rpc("handheld_notifications_changes" as never, {
     p_user_id: input.scope.user_id,
     p_device_id: input.scope.device_id,
-    p_location_ids: input.scope.location_ids,
+    p_location_ids: effectiveLocationIds(input.scope),
     p_after_xid: input.cursor.xid,
     p_after_seq: input.cursor.seq,
     p_limit: input.limit,
@@ -302,6 +323,7 @@ export async function markAllNotificationsRead(
 }
 
 export function describeScope(scope: NotificationScope): string {
+  if (scope.filter_location_id) return scope.is_hq ? "hq_single_location" : "single_location";
   if (scope.is_hq) return "hq_all_locations";
   return scope.location_ids.length > 0 ? `locations:${scope.location_ids.length}` : "personal_only";
 }
