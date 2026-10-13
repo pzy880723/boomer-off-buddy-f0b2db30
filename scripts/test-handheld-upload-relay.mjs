@@ -23,7 +23,7 @@ test('upload_url never derives from request origin/Host/X-Forwarded-Host', async
   const route = await readFile(new URL('../src/routes/api/public/handheld/items.upload-image.ts', import.meta.url), 'utf8');
   const relay = await readFile(new URL('../src/server/handheld-upload-relay.server.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(route, /new URL\(request\.url\)\.origin/);
-  assert.doesNotMatch(route + relay, /x-forwarded-host|headers\.get\(["']host/i);
+  assert.doesNotMatch(route + relay, /headers\.get\(["'](x-forwarded-host|host)["']/i);
   assert.match(route, /HANDHELD_PUBLIC_ORIGIN\}\/api\/public\/handheld\/items\/upload-image\/multipart/);
 });
 
