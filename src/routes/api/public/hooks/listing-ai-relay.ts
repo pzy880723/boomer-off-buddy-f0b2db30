@@ -71,7 +71,7 @@ export const Route = createFileRoute("/api/public/hooks/listing-ai-relay")({
         let upstream: Response;
         try {
           upstream = await fetch(UPSTREAM, {
-            method: "POST", redirect: "error",
+            method: "POST", redirect: "manual", // Workers reject "error"; any 3xx is refused below
             signal: AbortSignal.any([AbortSignal.timeout(UPSTREAM_TIMEOUT_MS), request.signal]),
             headers: { Authorization: `Bearer ${gatewayKey}`, "Content-Type": "application/json", "X-Lovable-AIG-SDK": "fetch" },
             body: text,
@@ -82,6 +82,10 @@ export const Route = createFileRoute("/api/public/hooks/listing-ai-relay")({
           return deny(name === "TimeoutError" ? 504 : 502, name === "TimeoutError" ? "upstream_timeout" : "upstream_unreachable");
         }
         console.info(JSON.stringify({ evt: "listing_ai_relay", model: parsed.model, status: upstream.status, ms: Date.now() - started }));
+        if (upstream.status >= 300 && upstream.status < 400) {
+          await upstream.body?.cancel().catch(() => undefined);
+          return deny(502, "upstream_redirect_refused");
+        }
         const headers = new Headers(NO_STORE);
         headers.set("Content-Type", upstream.headers.get("content-type") ?? "application/json");
         for (const [k, v] of upstream.headers) if (k.toLowerCase().startsWith("x-lovable-aig-")) headers.set(k, v);
