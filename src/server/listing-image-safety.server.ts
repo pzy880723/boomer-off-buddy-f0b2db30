@@ -1,4 +1,6 @@
-import sharp from "sharp";
+import type SharpFn from "sharp";
+// Native module loaded on first image use only, so non-image routes can cold-start without it.
+const loadSharp = async (): Promise<typeof SharpFn> => (await import("sharp")).default;
 import { beforeAiOutbound, type AiOutboundGuard } from "./ai-guard.ts";
 import { listingAiFetch } from "./listing-ai-transport.server.ts";
 
@@ -16,11 +18,11 @@ export function requiresOriginalMeasurementPixels(value: unknown): boolean {
 
 export async function squareOriginalImage(bytes: Buffer): Promise<{ b64: string; mime: string }> {
   // Only orient and pad. Never regenerate ruler ticks or upscale the photographed object.
-  const { data, info } = await sharp(bytes, { limitInputPixels: 40_000_000 }).rotate().png().toBuffer({ resolveWithObject: true });
+  const { data, info } = await (await loadSharp())(bytes, { limitInputPixels: 40_000_000 }).rotate().png().toBuffer({ resolveWithObject: true });
   const side = Math.max(info.width, info.height);
   const horizontal = side - info.width;
   const vertical = side - info.height;
-  const padded = await sharp(data).extend({ left: Math.floor(horizontal / 2), right: Math.ceil(horizontal / 2),
+  const padded = await (await loadSharp())(data).extend({ left: Math.floor(horizontal / 2), right: Math.ceil(horizontal / 2),
     top: Math.floor(vertical / 2), bottom: Math.ceil(vertical / 2), background: "#f4f4f4" }).png().toBuffer();
   return { b64: padded.toString("base64"), mime: "image/png" };
 }
@@ -54,7 +56,7 @@ export async function analysisCopy(dataUrl: string): Promise<string> {
   if (!dataUrl.startsWith("data:image/") || comma < 0) return dataUrl;
   try {
     const bytes = Buffer.from(dataUrl.slice(comma + 1), "base64");
-    const out = await sharp(bytes, { limitInputPixels: 40_000_000 }).rotate()
+    const out = await (await loadSharp())(bytes, { limitInputPixels: 40_000_000 }).rotate()
       .resize({ width: ANALYSIS_LONG_EDGE, height: ANALYSIS_LONG_EDGE, fit: "inside", withoutEnlargement: true })
       .flatten({ background: "#ffffff" }).jpeg({ quality: 85 }).toBuffer();
     return `data:image/jpeg;base64,${out.toString("base64")}`;
@@ -265,7 +267,7 @@ export async function assertListingImagePixels(b64: string): Promise<void> {
     const fail = (fields: string[]): never => { throw new Error(validationFailureMessage(fields, undefined)); };
     let width = 0, height = 0, raw: Buffer;
     try {
-      const input = sharp(Buffer.from(b64, "base64"), { limitInputPixels: 40_000_000 });
+      const input = (await loadSharp())(Buffer.from(b64, "base64"), { limitInputPixels: 40_000_000 });
       const meta = await input.metadata();
       width = meta.width ?? 0; height = meta.height ?? 0;
       raw = await input.flatten({ background: "#ffffff" }).resize(GRID, GRID, { fit: "fill" }).removeAlpha().raw().toBuffer();

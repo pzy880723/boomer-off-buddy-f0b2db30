@@ -6,7 +6,9 @@
  *   DB 失败时只清理本次新对象；旧对象从不删除（其他版本可能仍引用）。
  */
 import { z } from "zod";
-import sharp from "sharp";
+import type SharpFn from "sharp";
+// Native module loaded on first image use only, so non-image routes can cold-start without it.
+const loadSharp = async (): Promise<typeof SharpFn> => (await import("sharp")).default;
 import type { QrRow } from "./store-qr.server";
 
 export const QR_BUCKET = "store-qr";
@@ -18,7 +20,7 @@ export const QR_MAX_BODY_BYTES = Math.ceil(QR_MAX_BYTES / 3) * 4 + 4096;
 /** 完整解码校验（不修改原字节）；格式须与魔数一致，像素总量受限。 */
 export async function decodeCheck(bytes: Uint8Array, mime: "image/png" | "image/jpeg"): Promise<boolean> {
   try {
-    const img = sharp(bytes, { limitInputPixels: QR_MAX_PIXELS, failOn: "truncated" });
+    const img = (await loadSharp())(bytes, { limitInputPixels: QR_MAX_PIXELS, failOn: "truncated" });
     const meta = await img.metadata();
     if ((mime === "image/png" ? "png" : "jpeg") !== meta.format) return false;
     if (!meta.width || !meta.height) return false;

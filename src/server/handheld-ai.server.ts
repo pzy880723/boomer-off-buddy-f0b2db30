@@ -3,7 +3,9 @@
 // 走 Lovable AI Gateway，无需单独 key。
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { recognizeProductFromImages } from "@/server/product-recognition.server";
-import sharp from "sharp";
+import type SharpFn from "sharp";
+// Native module loaded on first image use only, so non-image routes can cold-start without it.
+const loadSharp = async (): Promise<typeof SharpFn> => (await import("sharp")).default;
 import { beforeHandheldAiOutbound, type AiOutboundGuard } from "./ai-guard.ts";
 import { listingAiFetch } from "./listing-ai-transport.server";
 import { loadOriginalImage, classifyListingImage, validatePreparedListingImage, assertListingImagePixels, withImageStage, analysisCopy, stageSignal, PermanentImageError, LISTING_IMAGE_BUDGET_MS, GENERATION_TIMEOUT_MS, FALLBACK_GENERATION_TIMEOUT_MS } from "./listing-image-safety.server";
@@ -148,8 +150,8 @@ export async function aiPrepareListingImage(input: {
     : input.image_base64?.startsWith("data:")
       ? input.image_base64
       : `data:image/jpeg;base64,${input.image_base64 ?? ""}`, budget);
-  const metadata = await sharp(source, { limitInputPixels: 40_000_000 }).metadata();
-  if (metadata.orientation && metadata.orientation !== 1) source = await sharp(source).rotate().png().toBuffer();
+  const metadata = await (await loadSharp())(source, { limitInputPixels: 40_000_000 }).metadata();
+  if (metadata.orientation && metadata.orientation !== 1) source = await (await loadSharp())(source).rotate().png().toBuffer();
   const dataUrl = `data:${sniffImageMime(source)};base64,${source.toString("base64")}`;
 
   // Detection reads a 1024px JPEG work copy; generation still receives the full original.

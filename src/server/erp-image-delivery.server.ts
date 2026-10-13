@@ -1,5 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import sharp from "sharp";
+import type SharpFn from "sharp";
+// Native module loaded on first image use only, so non-image routes can cold-start without it.
+const loadSharp = async (): Promise<typeof SharpFn> => (await import("sharp")).default;
 
 const widths = [0, 480, 1600];
 const buckets = ["sku-raw", "sku-listing", "transfer-receipts"];
@@ -77,7 +79,7 @@ export function createImageReader(download: (bucket: string, path: string) => Pr
       const original = await download(bucket, path);
       if (!original.length || original.length > 12 * 1024 * 1024)
         throw new Error("Invalid image size");
-      const image = sharp(original, { limitInputPixels: 40_000_000 }).rotate();
+      const image = (await loadSharp())(original, { limitInputPixels: 40_000_000 }).rotate();
       const bytes = width
         ? await image
             .resize({ width, height: width, fit: "inside", withoutEnlargement: true })
