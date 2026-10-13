@@ -1,5 +1,6 @@
 import sharp from "sharp";
 import { beforeAiOutbound, type AiOutboundGuard } from "./ai-guard.ts";
+import { listingAiFetch } from "./listing-ai-transport.server.ts";
 
 export function requiresOriginalMeasurementPixels(value: unknown): boolean {
   if (!value || typeof value !== "object") throw new Error("Measurement detection result unavailable; retry required");
@@ -139,17 +140,13 @@ async function detectMeasurement(image: string, key: string, guard: AiOutboundGu
   await beforeAiOutbound(guard, "measurement_detection");
   let response: Response;
   try {
-    response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST", signal: stageSignal(DETECTION_TIMEOUT_MS, budget),
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "google/gemini-2.5-flash", max_tokens: 512, reasoning: { max_tokens: 0 },
+    response = await listingAiFetch(JSON.stringify({ model: "google/gemini-2.5-flash", max_tokens: 512, reasoning: { max_tokens: 0 },
         response_format: { type: "json_object" },
         messages: [{ role: "user", content: [
           { type: "text", text: MEASUREMENT_DETECTION_PROMPT },
           { type: "image_url", image_url: { url: image } },
         ] }],
-      }),
-    });
+      }), key, stageSignal(DETECTION_TIMEOUT_MS, budget));
   } catch (error) {
     // The shared budget expiring is a real failure, not detector uncertainty.
     if (budget?.aborted) throw error;
@@ -183,10 +180,7 @@ export async function validatePreparedListingImage(source: string, output: strin
     await beforeAiOutbound(guard, "image_validation");
     // Compare reduced analysis copies; the shipped output is not altered.
     [source, output] = await Promise.all([analysisCopy(source), analysisCopy(output)]);
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST", signal: stageSignal(VALIDATION_TIMEOUT_MS, budget),
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "google/gemini-2.5-flash", max_tokens: 1024, reasoning: { max_tokens: 0 },
+    const response = await listingAiFetch(JSON.stringify({ model: "google/gemini-2.5-flash", max_tokens: 1024, reasoning: { max_tokens: 0 },
         response_format: { type: "json_object" }, messages: [{ role: "user", content: [
           { type: "text", text: '第一张为原图，第二张为修图成品。逐项对比，不确定即返回 false。' +
             'hands_removed：成品不得出现真实人物手指、手掌、手臂和投影；不要把商品玩偶肢体或印刷人物当真人手。' +
@@ -201,8 +195,7 @@ export async function validatePreparedListingImage(source: string, output: strin
             '仅返回 JSON {"product_present":bool,"product_scale":bool,"hands_removed":bool,"product_preserved":bool,"gray_background":bool,"measurement_preserved":bool,"detail_preserved":bool,"external_labels_removed":bool,"outer_bag_removed":bool,"confidence":0至1}。' },
           { type: "image_url", image_url: { url: source } },
           { type: "image_url", image_url: { url: output } },
-        ] }] }),
-    });
+        ] }] }), key, stageSignal(VALIDATION_TIMEOUT_MS, budget));
     if (response.status === 401 || response.status === 403) throw new PermanentImageError(`Image validation HTTP ${response.status}`);
     if (!response.ok) throw new Error(`Image validation HTTP ${response.status}; original retained, retry required`);
     const payload = await response.json();
