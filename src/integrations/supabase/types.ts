@@ -10824,6 +10824,10 @@ export type Database = {
         Args: { p_sku_id: string }
         Returns: undefined
       }
+      handheld_notification_category: {
+        Args: { p_kind: string }
+        Returns: string
+      }
       handheld_notifications_changes: {
         Args: {
           p_after_seq: number

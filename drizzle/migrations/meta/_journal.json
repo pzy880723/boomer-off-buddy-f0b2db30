@@ -407,6 +407,13 @@
       "when": 1791886278542,
       "tag": "0057_handheld_unread_counts",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1791886670601,
+      "tag": "0058_handheld_unread_counts_categories",
+      "breakpoints": true
     }
   ]
 }
