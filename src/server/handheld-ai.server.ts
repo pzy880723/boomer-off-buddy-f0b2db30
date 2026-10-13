@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { recognizeProductFromImages } from "@/server/product-recognition.server";
 import sharp from "sharp";
 import { beforeHandheldAiOutbound, type AiOutboundGuard } from "./ai-guard.ts";
-import { loadOriginalImage, classifyListingImage, validatePreparedListingImage, withImageStage, analysisCopy, stageSignal, PermanentImageError, LISTING_IMAGE_BUDGET_MS, GENERATION_TIMEOUT_MS, FALLBACK_GENERATION_TIMEOUT_MS } from "./listing-image-safety.server";
+import { loadOriginalImage, classifyListingImage, validatePreparedListingImage, assertListingImagePixels, withImageStage, analysisCopy, stageSignal, PermanentImageError, LISTING_IMAGE_BUDGET_MS, GENERATION_TIMEOUT_MS, FALLBACK_GENERATION_TIMEOUT_MS } from "./listing-image-safety.server";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1";
 
@@ -105,13 +105,14 @@ export async function aiRecognizeItem(input: {
 }
 
 const SYSTEM_LISTING_IMAGE = `把这张中古杂货实物图修整成上架主图：
-- 输出必须是 1:1 正方形（1024x1024），主体居中裁切、四周留白均匀
+- 输出必须是 1:1 正方形（1024x1024），主体居中裁切、四周留白均匀，商品主体长边占画面70%-85%
+- 绝不能输出空背景、纯灰图或缩得很小的商品；画面中必须完整清晰地保留商品本体
 - 背景统一为干净浅灰底
 - 校正角度，修正白平衡和曝光
 【必须去除】
 - 背景杂物、原桌面与环境
 - 手持拍摄时清除所有真实人物的手指、手掌、手臂及其投影；不要删除商品本身的人物造型、玩偶肢体或印刷图案
-- 商品外层的透明包装袋（OPP袋、自封袋、塑料外袋），连同袋边、封口、褶皱和反光一起去掉，露出袋内商品
+- 商品外层的透明包装袋（OPP袋、自封袋、塑料外袋），连同袋边、封口、褶皱和反光一起去掉，露出袋内商品；去袋只去袋，不删除袋内商品本体
 - 商品外部附加的售价贴纸、价格牌、价签（如“¥12.9 BOOMER”），即使贴在透明包装、挂卡或包装纸板上也必须去掉；外贴价签不是商品本身
 - 照片平台叠加的闲鱼等平台账号水印、平台标识叠字
 【商品本体必须保留】
@@ -121,6 +122,7 @@ const SYSTEM_LISTING_IMAGE = `把这张中古杂货实物图修整成上架主�
 - 被手、袋子或价签遮挡而看不见的细节不得凭空补画；只自然补全底色，不臆造文字、图案或尺子刻度
 - 测量图仍须换浅灰背景；尺子、卷尺、尺寸刻度和数字必须完整保留，不得重绘、移动或修改，保持与商品的测量位置关系
 - 特写细节图只轻微修饰曝光与白平衡，保留拍摄角度、透视和细节构图；不得重新摆正或裁掉细节，以补边方式形成正方形
+- 若被遮挡的信息无法辨认，用文字说明原因且不输出图片；不能用空背景或纯灰图冒充成品
 - 严禁添加任何文字、水印、贴纸`;
 
 function sniffImageMime(bytes: Buffer): string {
@@ -154,7 +156,7 @@ export async function aiPrepareListingImage(input: {
   const profile = await classifyListingImage(await analysisCopy(dataUrl), getKey(), guard, budget);
   const protectedImage = profile.measurementTool || profile.closeUp;
   const prompt = protectedImage ? SYSTEM_LISTING_IMAGE
-    .replace("主体居中裁切、四周留白均匀", "只补边形成正方形，不裁掉商品细节或测量工具")
+    .replace("主体居中裁切、四周留白均匀，商品主体长边占画面70%-85%", "只补边形成正方形，不裁掉商品细节或测量工具，商品与测量工具在画面中的比例不得缩小")
     .replace("校正角度，修正白平衡和曝光", "禁止校正角度、旋转、改变透视或重新摆放商品与尺子，只轻微修正白平衡和曝光")
     : SYSTEM_LISTING_IMAGE;
 
@@ -179,6 +181,8 @@ export async function aiPrepareListingImage(input: {
   };
 
   const output = await withImageStage("image_generation", () => generateWithFallback(body, guard, budget));
+  // Real-pixel gate first: blank/gray canvases or tiny subjects never reach (or pass on) model JSON.
+  await assertListingImagePixels(output.b64);
   await validatePreparedListingImage(dataUrl, `data:${output.mime};base64,${output.b64}`, getKey(), profile, guard, budget);
   budget.throwIfAborted(); // total deadline passed: never report success
   return output;

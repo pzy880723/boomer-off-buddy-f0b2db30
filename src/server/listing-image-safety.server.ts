@@ -190,13 +190,15 @@ export async function validatePreparedListingImage(source: string, output: strin
         response_format: { type: "json_object" }, messages: [{ role: "user", content: [
           { type: "text", text: '第一张为原图，第二张为修图成品。逐项对比，不确定即返回 false。' +
             'hands_removed：成品不得出现真实人物手指、手掌、手臂和投影；不要把商品玩偶肢体或印刷人物当真人手。' +
-            'product_preserved：商品本身及包装的可见文字、商标、印刷图案、生产标记、颜色、配件数量、真实瑕疵和形状未被改造，未凭空添加被手遮住的文字或细节；清除外贴售价牌/价签、平台水印以及外层透明包装袋属于允许操作，不算违规；但若商品本身是透明袋/透明材质被删掉则判 false。' +
+            'product_present：成品中必须清晰可见完整的商品本体，不能是空背景、纯灰图或只剩阴影/袋子轮廓；原图袋中商品在成品中必须仍然存在。' +
+            `product_scale：${profile.measurementTool || profile.closeUp ? '本图为测量/特写保护图，只补边成正方形，商品（含测量工具）在画面中的比例不得比原图缩小，且主体长边至少占画面一半。' : '商品主体居中，主体长边约占画面70%-85%，至少占画面一半，不能是缩在中间的小主体。'}` +
+            'product_preserved：商品本体必须完整可见、未被删掉或截断；清除外层透明袋时不得删掉袋中商品；商品本身及包装的可见文字、商标、印刷图案、生产标记、颜色、配件数量、真实瑕疵和形状未被改造，未凭空添加被手遮住的文字或细节；清除外贴售价牌/价签、平台水印以及外层透明包装袋属于允许操作，不算违规；但若商品本身是透明袋/透明材质被删掉则判 false。' +
             'outer_bag_removed：成品不得残留商品外层的透明包装袋（OPP袋、自封袋、塑料外袋）及其袋边、封口、褶皱或反光；原图没有外层透明袋则填 true；商品本身为透明袋/透明材质时不算外袋。' +
             'external_labels_removed：成品不得残留任何外部附加的售价贴纸、价格牌、价签（包括贴在透明包装、挂卡、包装纸板上的，如“¥12.9 BOOMER”），也不得残留平台水印或叠字；原图没有这些则填 true。' +
             'gray_background：非商品区域是干净浅灰背景，无原桌面、人物残留（本项不代替 external_labels_removed）。' +
             `measurement_preserved：${profile.measurementTool ? '若原图有外部测量工具（尺子等），成品中必须完整保留且可读，刻度、数字、单位和与商品的测量位置关系与原图相同，未重绘或臆造；若原图没有外部测量工具则填 true，不能要求成品添加尺子。' : '本图无外部测量工具，填 true。'}` +
             `detail_preserved：${profile.closeUp ? '特写角度、透视和原有细节构图未改变，未裁掉细节，只补边成正方形。' : '非特写图，填 true。'}` +
-            '仅返回 JSON {"hands_removed":bool,"product_preserved":bool,"gray_background":bool,"measurement_preserved":bool,"detail_preserved":bool,"external_labels_removed":bool,"outer_bag_removed":bool,"confidence":0至1}。' },
+            '仅返回 JSON {"product_present":bool,"product_scale":bool,"hands_removed":bool,"product_preserved":bool,"gray_background":bool,"measurement_preserved":bool,"detail_preserved":bool,"external_labels_removed":bool,"outer_bag_removed":bool,"confidence":0至1}。' },
           { type: "image_url", image_url: { url: source } },
           { type: "image_url", image_url: { url: output } },
         ] }] }),
@@ -213,18 +215,25 @@ export async function validatePreparedListingImage(source: string, output: strin
   });
 }
 
-export const VALIDATION_FIELDS = ["hands_removed", "product_preserved", "gray_background", "measurement_preserved",
+export const VALIDATION_FIELDS = ["product_present", "product_scale", "hands_removed", "product_preserved", "gray_background", "measurement_preserved",
   "detail_preserved", "external_labels_removed", "outer_bag_removed"] as const;
 
 /** Safe failure text: only fixed field names and a numeric confidence, never model text, images or URLs. */
+/** Fields reportable in safe failure text: model checks plus the pixel-only canvas check. */
+export const REPORTABLE_FIELDS = [...VALIDATION_FIELDS, "canvas_square"] as const;
+type ReportableField = (typeof REPORTABLE_FIELDS)[number];
+
 export function validationFailureMessage(failedFields: readonly string[], confidence: unknown): string {
-  const fields = failedFields.filter((f): f is string => (VALIDATION_FIELDS as readonly string[]).includes(f));
+  const fields = failedFields.filter((f): f is string => (REPORTABLE_FIELDS as readonly string[]).includes(f));
   const conf = typeof confidence === "number" && Number.isFinite(confidence) ? confidence.toFixed(2) : "invalid";
   return `修图检查未通过（fields=${fields.join(",") || "none"}; confidence=${conf}），原图保留，请重修`;
 }
 
 /** Fixed retry hints per known failed field. Only whitelisted field names from last_error are read. */
-const RETRY_HINTS: Record<(typeof VALIDATION_FIELDS)[number], string> = {
+const RETRY_HINTS: Record<ReportableField, string> = {
+  product_present: "上次成品里商品本体消失、只剩背景，本次必须完整保留画面中（含袋中）的商品本体，只换背景，绝不输出空背景。",
+  product_scale: "上次商品主体过小，本次商品主体居中且长边占画面70%-85%，不得缩小商品。",
+  canvas_square: "上次成品不是合适尺寸的正方形，本次必须输出1024x1024的1:1正方形。",
   hands_removed: "上次修图仍残留真人手指/手掌/手臂或投影，本次必须彻底去除真人手部。",
   product_preserved: "上次修图改动了商品实物，本次不得改动商品本体的文字、商标、颜色、形状、配件和真实瑕疵。",
   gray_background: "上次背景不干净，本次背景必须是干净浅灰底，去除桌面和杂物。",
@@ -238,7 +247,66 @@ export function retryInstructionFromError(lastError: unknown): string | undefine
   if (typeof lastError !== "string") return undefined;
   const m = lastError.match(/fields=([a-z_,]{1,200})/);
   if (!m) return undefined;
-  const known = [...new Set(m[1].split(","))].filter((f): f is (typeof VALIDATION_FIELDS)[number] =>
-    (VALIDATION_FIELDS as readonly string[]).includes(f));
+  const known = [...new Set(m[1].split(","))].filter((f): f is ReportableField =>
+    (REPORTABLE_FIELDS as readonly string[]).includes(f));
   return known.length ? known.map(f => RETRY_HINTS[f]).join("") : undefined;
+}
+
+/** Pixel gate thresholds (real pixels, independent of any model JSON). */
+export const PIXEL_MIN_SIDE = 768;
+export const PIXEL_MAX_SIDE = 2048;
+export const MIN_SUBJECT_LONG_EDGE = 0.5;
+const GRID = 256;
+const CORNER = 8;
+const FG_DELTA = 20;
+const MIN_FG_FRACTION = 0.02;
+const LINE_MIN_PIXELS = 3;
+
+/**
+ * Real-pixel defence before model validation: the output must be a properly sized 1:1 canvas with a
+ * consistent light corner background, a non-empty foreground, and a subject bounding box whose long edge
+ * covers at least half the canvas. Model JSON alone can never pass a blank/gray or tiny-subject image.
+ */
+export async function assertListingImagePixels(b64: string): Promise<void> {
+  return withImageStage("image_validation", async () => {
+    const fail = (fields: string[]) => { throw new Error(validationFailureMessage(fields, undefined)); };
+    let width = 0, height = 0, raw: Buffer;
+    try {
+      const input = sharp(Buffer.from(b64, "base64"), { limitInputPixels: 40_000_000 });
+      const meta = await input.metadata();
+      width = meta.width ?? 0; height = meta.height ?? 0;
+      raw = await input.flatten({ background: "#ffffff" }).resize(GRID, GRID, { fit: "fill" }).removeAlpha().raw().toBuffer();
+    } catch {
+      return fail(["product_present"]);
+    }
+    if (width !== height || width < PIXEL_MIN_SIDE || width > PIXEL_MAX_SIDE) fail(["canvas_square"]);
+    const px = (x: number, y: number) => { const i = (y * GRID + x) * 3; return [raw[i], raw[i + 1], raw[i + 2]]; };
+    const cornerMean = (x0: number, y0: number) => {
+      const sum = [0, 0, 0];
+      for (let y = y0; y < y0 + CORNER; y++) for (let x = x0; x < x0 + CORNER; x++) px(x, y).forEach((v, c) => { sum[c] += v; });
+      return sum.map(v => v / (CORNER * CORNER));
+    };
+    const corners = [cornerMean(0, 0), cornerMean(GRID - CORNER, 0), cornerMean(0, GRID - CORNER), cornerMean(GRID - CORNER, GRID - CORNER)];
+    const bg = [0, 1, 2].map(c => corners.reduce((a, k) => a + k[c], 0) / 4);
+    const cornersConsistent = corners.every(k => k.every((v, c) => Math.abs(v - bg[c]) <= 24));
+    const lightGray = Math.min(...bg) >= 170 && Math.max(...bg) - Math.min(...bg) <= 30;
+    if (!cornersConsistent || !lightGray) fail(["gray_background"]);
+    const rows = new Array<number>(GRID).fill(0), cols = new Array<number>(GRID).fill(0);
+    let fg = 0;
+    for (let y = 0; y < GRID; y++) for (let x = 0; x < GRID; x++) {
+      const p = px(x, y);
+      if (Math.max(Math.abs(p[0] - bg[0]), Math.abs(p[1] - bg[1]), Math.abs(p[2] - bg[2])) > FG_DELTA) { fg++; rows[y]++; cols[x]++; }
+    }
+    if (fg / (GRID * GRID) < MIN_FG_FRACTION) fail(["product_present"]);
+    const span = (counts: number[]) => {
+      const first = counts.findIndex(n => n >= LINE_MIN_PIXELS);
+      if (first < 0) return 0;
+      let last = first;
+      counts.forEach((n, i) => { if (n >= LINE_MIN_PIXELS) last = i; });
+      return last - first + 1;
+    };
+    const longEdge = Math.max(span(rows), span(cols)) / GRID;
+    if (longEdge === 0) fail(["product_present"]);
+    if (longEdge < MIN_SUBJECT_LONG_EDGE) fail(["product_scale"]);
+  });
 }
