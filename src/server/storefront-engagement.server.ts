@@ -5,6 +5,7 @@ import {
   type EngagementInput,
   type VocabularyTerm,
 } from "@/lib/commerce/storefront-engagement";
+import { buildDiscoveryTerms, countAvailableTags } from "@/lib/commerce/storefront-discovery";
 
 export type EngagementCounts = { view_count: number; favorite_count: number };
 type Db = typeof supabaseAdmin;
@@ -79,16 +80,44 @@ export function withCounts<T extends { id: string }>(items: readonly T[], counts
   return items.map((item) => ({ ...item, ...(counts.get(item.id) ?? { view_count: 0, favorite_count: 0 }) }));
 }
 
+const LISTING_PAGE = 1000;
+
+/** All currently purchasable products, using the same published + enrich + stock>0 path as the list. */
+export async function loadAvailableProductsForDiscovery(db: Db = supabaseAdmin) {
+  const { enrichStorefrontListings } = await import("./storefront-products.server");
+  const listings: unknown[] = [];
+  for (let from = 0; ; from += LISTING_PAGE) {
+    // Paged reads so counting never truncates at the default 1000-row cap.
+    const { data, error } = await db.from("commerce_listings" as never)
+      .select("id, sku_id, location_id, title, description, cover_url, image_urls, image_paths, price, compare_at_price, condition_grade, product_type, published_at, location:inv_locations!location_id(id,name,kind)")
+      .eq("status", "published").order("id").range(from, from + LISTING_PAGE - 1);
+    if (error) throw new Error(error.message);
+    listings.push(...(data ?? []));
+    if (!data || data.length < LISTING_PAGE) break;
+  }
+  if (!listings.length) return [];
+  const enriched = await enrichStorefrontListings(listings as never, { signImages: false });
+  return enriched.filter((product) => product.stock > 0);
+}
+
 export async function loadDiscovery(db: Db = supabaseAdmin) {
-  const { data, error } = await db.rpc("storefront_hot_search_terms" as never, {
-    p_window_days: ENGAGEMENT_WINDOW_DAYS,
-    p_limit: 10,
-  } as never);
-  if (error) throw new Error(error.message);
-  const rows = (data ?? []) as Array<{ term_key: string; label: string }>;
+  const [hotRes, products, catRes] = await Promise.all([
+    db.rpc("storefront_hot_search_terms" as never, { p_window_days: ENGAGEMENT_WINDOW_DAYS, p_limit: 20 } as never),
+    loadAvailableProductsForDiscovery(db),
+    db.from("inv_categories" as never).select("code, parent:inv_categories!parent_id(code)"),
+  ]);
+  if (hotRes.error) throw new Error(hotRes.error.message);
+  if (catRes.error) throw new Error(catRes.error.message);
+  const parents = new Map(((catRes.data ?? []) as Array<{ code: string; parent: { code: string } | null }>)
+    .map((c) => [c.code, c.parent?.code ?? null]));
+  const counts = countAvailableTags(products as never, parents);
+  const terms = buildDiscoveryTerms((hotRes.data ?? []) as Array<{ term_key: string; label: string; searchers: number }>, counts);
+  const fromSearch = terms.some((t) => t.search_count !== null);
+  const fromInventory = terms.some((t) => t.search_count === null);
   return {
-    source: rows.length ? ("actual" as const) : ("preset" as const),
-    terms: rows.map((r) => ({ key: r.term_key, label: r.label, query: r.label })),
+    source: !terms.length ? ("preset" as const) : fromSearch && fromInventory ? ("mixed" as const) : fromSearch ? ("actual" as const) : ("inventory" as const),
+    terms,
     window_days: ENGAGEMENT_WINDOW_DAYS,
+    available_product_total: products.length,
   };
 }

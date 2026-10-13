@@ -219,7 +219,7 @@ describe("storefront product detail handler", () => {
     );
   });
 
-  test("returns null for out-of-stock or missing products so the route answers 404", async () => {
+  test("out-of-stock published product is read-only (stock 0, not purchasable); missing stays 404", async () => {
     const outOfStock = await buildStorefrontProductDetail(listing, {
       enrich: async () => [
         buildStorefrontProduct({
@@ -231,11 +231,13 @@ describe("storefront product detail handler", () => {
           availableQty: 0,
         }),
       ],
-      signer: async () => {
-        throw new Error("must not sign unavailable products");
-      },
+      signer: async (paths) => paths.map(() => null),
+      thumbnailSigner: async (paths) => paths.map(() => null),
     });
-    assert.equal(outOfStock, null);
+    // 2026-10-13: once-published sold-out items stay readable for support/order history.
+    assert.equal(outOfStock?.stock, 0);
+    assert.equal(outOfStock?.purchasable, false);
+    assert.equal(outOfStock?.availability, "sold_out");
 
     const missing = await buildStorefrontProductDetail(listing, {
       enrich: async () => [],
@@ -409,17 +411,14 @@ describe("storefront detail image_previews contract", () => {
     ]);
   });
 
-  test("never signs galleries for sold or hidden products", async () => {
+  test("sold products are read-only with stock 0; hidden/missing SKUs never sign galleries", async () => {
     const sold = await buildStorefrontProductDetail(threePhotoListing, {
       enrich: enrichFor(threePhotoListing, 0),
-      signer: async () => {
-        throw new Error("must not sign sold products");
-      },
-      thumbnailSigner: async () => {
-        throw new Error("must not sign sold products");
-      },
+      signer: async (paths) => paths.map(() => null),
+      thumbnailSigner: async (paths) => paths.map(() => null),
     });
-    assert.equal(sold, null);
+    assert.equal(sold?.stock, 0);
+    assert.equal(sold?.purchasable, false);
 
     const hidden = await buildStorefrontProductDetail(threePhotoListing, {
       // 隐藏 / 非 active SKU 在 enrich 阶段已被排除 → 空数组

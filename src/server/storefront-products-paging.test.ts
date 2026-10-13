@@ -182,7 +182,7 @@ describe("storefront list paging + page-only image signing", () => {
     const body = server.slice(enrichIdx);
     assert.match(
       body,
-      /\.from\("inv_skus"\)[\s\S]*?\.eq\("status", "active"\)[\s\S]*?\.eq\("is_display", true\)[\s\S]*?\.in\("id", skuIds\)/,
+      /\.from\("inv_skus"\)[\s\S]*?\.in\("status", historical \? \["active", "archived"\] : \["active"\]\)[\s\S]*?if \(!historical\) skuQuery = skuQuery\.eq\("is_display", true\)[\s\S]*?\.in\("id", skuIds\)/,
     );
     // 路由里 total 在 enrich 之后才计算，因此被过滤掉的 SKU 不会计入 total
     assert.ok(
