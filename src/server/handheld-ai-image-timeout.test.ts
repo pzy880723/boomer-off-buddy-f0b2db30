@@ -120,3 +120,16 @@ test("non-protected branch keeps original return shape without preserved_origina
     assert.equal("preserved_original" in out, false);
   });
 });
+
+test("total 120s budget expiring after validation never returns success", async () => {
+  const budget = new AbortController();
+  const originalFetch = globalThis.fetch;
+  process.env.LOVABLE_API_KEY = "test-only";
+  globalThis.fetch = async () => {
+    budget.abort(new DOMException("Photo budget", "TimeoutError"));
+    return Response.json({ choices: [{ message: { images: [{ image_url: { url: "data:image/png;base64,QUJD" } }] } }] });
+  };
+  try {
+    await assert.rejects(aiPrepareListingImage({ image_base64: PNG }, allowHandheldGuard, budget.signal), { name: "TimeoutError" });
+  } finally { globalThis.fetch = originalFetch; }
+});

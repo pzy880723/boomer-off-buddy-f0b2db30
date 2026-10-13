@@ -55,3 +55,12 @@ test("validation timeout stays a retryable staged TimeoutError", async () => {
   await assert.rejects(validatePreparedListingImage("source", "output", "test", profile, allowHandheldGuard),
     { name: "TimeoutError", stage: "image_validation" });
 });
+test("conservative ruler profile does not require adding a ruler to photos without one", async () => {
+  globalThis.fetch = async (_url, init) => {
+    const text = JSON.parse(String(init?.body)).messages[0].content[0].text;
+    assert.match(text, /若原图有外部测量工具/);
+    assert.match(text, /原图没有外部测量工具则填 true，不能要求成品添加尺子/);
+    return Response.json({ choices: [{ message: { content: JSON.stringify(valid) } }] });
+  };
+  await validatePreparedListingImage("source", "output", "test", { measurementTool: true, closeUp: true }, allowHandheldGuard);
+});
