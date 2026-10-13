@@ -7,6 +7,7 @@ import * as z from "zod";
 import { CustomTransferRequest, CustomTransferResponseSchema } from "../custom-transfer-contract";
 import { ProductContentRequest } from "../product-content";
 import { ManualShipBody, PickupReadyBody, PickupRedeemBody } from "./fulfillment-actions-schema";
+import { UnreadCountsData } from "./unread-counts";
 import {
   ItemDeleteReq,
   ItemDeleteRes,
@@ -978,6 +979,23 @@ X-Session-Token: <操作员 session token>
           "推荐 APP 每 30s 轮询一次；首次不传 `ts`，之后用上次响应的 `server_ts`。只下发给本设备 / 本库位 / 全局的事件。",
         requestParams: { query: NotificationsSinceQuery },
         responses: { "200": jsonRes("OK", NotificationsSinceRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/notifications/unread-counts": {
+      get: {
+        tags: ["通知"],
+        summary: "未读角标数字（全量数据库计数）",
+        description:
+          "需要设备 token + 员工 session。query `location_id` 可选，必须在账号授权门店内（格式错 400 validation_error，越权 403 location_forbidden）；不传时为账号全部授权门店，总部另含无门店通用咨询。" +
+          "data:{customers,internal,orders,system,total} 均为非负整数，total=四类之和。customers=该店全部客服会话中晚于本人 support participant last_read_at 的顾客消息数（打开会话 GET 即自然更新）。" +
+          "其余三类=本人可见且未读的 inv_handheld_notifications；kind 先 lowercase 并把 . - 转为 _，按精确或 `前缀_` 分类：customer/conversation/support/inquiry→不计（避免与 customers 重复）；" +
+          "order/refund/fulfillment/shipment/shortage/pickup→orders；internal/announcement/transfer/stocktake→internal；其余→system。单条 POST notifications/{id}/read 只减对应类别。" +
+          "计数结果不满足契约时返回 500 code=unread_counts_contract_error，不会以 0 代替。",
+        requestParams: { query: z.object({ location_id: z.string().uuid().optional() }) },
+        responses: {
+          "200": jsonRes("OK", z.object({ ok: z.literal(true), data: UnreadCountsData })),
+          ...ERROR_RESPONSES,
+        },
       },
     },
     "/api/public/handheld/notifications/{id}/read": {

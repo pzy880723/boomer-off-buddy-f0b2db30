@@ -42,3 +42,15 @@ DO $$ DECLARE r jsonb; BEGIN
      AND NOT has_function_privilege('anon','handheld_unread_counts(uuid,uuid,uuid[],boolean)','EXECUTE'), 'UC4 grants';
   RAISE NOTICE 'PASS UC4 service_role only';
 END $$;
+-- UC5 分类合约：lowercase + . - → _，前缀匹配
+INSERT INTO inv_handheld_notifications(kind,location_id) SELECT k,'5c000000-0000-4000-8000-00000000000c' FROM unnest(ARRAY[
+ 'refund_succeeded','Fulfillment.Picked','pickup-ready','shipment_created','shortage','ORDER','orders_x',
+ 'customer_message','Conversation.New','inquiry','support-escalated',
+ 'announcement','Internal.Note','transfer_incoming','stocktake-assigned',
+ 'unclaimed_epc_pending','youzan_sync_failed','system','refundish']) k;
+DO $$ DECLARE r jsonb; BEGIN
+  r := handheld_unread_counts('5a000000-0000-4000-8000-000000000001','5d000000-0000-4000-8000-000000000001',ARRAY['5c000000-0000-4000-8000-00000000000c']::uuid[],false);
+  -- orders 6 (orders_x/refundish 非前缀→system)；customers 类通知不计；internal 4；system 5 + 全局 system 1 = 6；另个人 stocktake_assigned 1 → internal 5
+  ASSERT r = '{"customers":0,"internal":5,"orders":6,"system":6,"total":17}'::jsonb, 'UC5 classification: '||r::text;
+  RAISE NOTICE 'PASS UC5 normalized prefix classification';
+END $$;
