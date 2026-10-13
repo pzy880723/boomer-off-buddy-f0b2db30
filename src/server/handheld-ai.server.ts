@@ -8,7 +8,6 @@ import { beforeHandheldAiOutbound, type AiOutboundGuard } from "./ai-guard.ts";
 import { listingAiFetch } from "./listing-ai-transport.server";
 import { loadOriginalImage, classifyListingImage, validatePreparedListingImage, assertListingImagePixels, withImageStage, analysisCopy, stageSignal, PermanentImageError, LISTING_IMAGE_BUDGET_MS, GENERATION_TIMEOUT_MS, FALLBACK_GENERATION_TIMEOUT_MS } from "./listing-image-safety.server";
 
-const GATEWAY = "https://ai.gateway.lovable.dev/v1";
 
 function getKey(): string {
   const k = process.env.LOVABLE_API_KEY;
