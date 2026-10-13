@@ -19,6 +19,7 @@ import {
   assertConversationLocation,
   type MessageWindow,
 } from "@/lib/support-message-window";
+import { loadConversationThumbnails } from "@/server/support-thumbnails.server";
 import { customerServiceName, toCustomerConversationListItem, type LocationNameMap } from "@/lib/support-customer-dto";
 
 export type SupportContext = { [key: string]: string | number | boolean | null } | null;
@@ -709,8 +710,11 @@ export async function listCustomerConversations(customerId: string) {
   if (error) throw new Error(error.message);
   const rows = (data ?? []) as unknown as Array<Record<string, unknown>>;
   // Rows are already scoped to this customer; one batched read for store names (no N+1).
-  const locations = await loadCustomerLocationNames(rows.map((r) => r.location_id));
-  return rows.map((row) => toCustomerConversationListItem(row, locations));
+  const [locations, thumbnails] = await Promise.all([
+    loadCustomerLocationNames(rows.map((r) => r.location_id)),
+    loadConversationThumbnails(rows, customerId),
+  ]);
+  return rows.map((row) => toCustomerConversationListItem(row, locations, thumbnails));
 }
 
 async function loadCustomerLocationNames(ids: unknown[]): Promise<LocationNameMap> {

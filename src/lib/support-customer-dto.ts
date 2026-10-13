@@ -24,23 +24,27 @@ export function customerServiceName(locationId: string | null | undefined, locat
 
 export const CUSTOMER_LIST_FIELDS = [
   "id", "title", "status", "location_id", "order_id", "last_message_at", "last_message_preview",
-  "updated_at", "context", "service_name",
+  "updated_at", "context", "service_name", "thumbnail_url",
 ] as const;
 
 export type CustomerConversationListItem = {
   id: string; title: string | null; status: string | null; location_id: string | null; order_id: string | null;
   last_message_at: string | null; last_message_preview: string | null; updated_at: string | null;
   context: SafeCustomerContext; service_name: string;
+  /** Derivative-only thumbnail resolved server-side; null → client brand-logo fallback. */
+  thumbnail_url: string | null;
 };
 
 const str = (v: unknown) => (typeof v === "string" ? v : null);
 
-export function toCustomerConversationListItem(row: Record<string, unknown>, locations: LocationNameMap): CustomerConversationListItem {
+export function toCustomerConversationListItem(row: Record<string, unknown>, locations: LocationNameMap,
+  thumbnails: ReadonlyMap<string, string | null> = new Map()): CustomerConversationListItem {
   const locationId = str(row.location_id);
   return {
     id: String(row.id), title: str(row.title), status: str(row.status), location_id: locationId,
     order_id: str(row.order_id), last_message_at: str(row.last_message_at),
     last_message_preview: str(row.last_message_preview), updated_at: str(row.updated_at),
     context: customerSafeContext(row.context), service_name: customerServiceName(locationId, locations),
+    thumbnail_url: thumbnails.get(String(row.id)) ?? null,
   };
 }
