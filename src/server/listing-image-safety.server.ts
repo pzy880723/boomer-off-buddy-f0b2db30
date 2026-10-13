@@ -190,12 +190,13 @@ export async function validatePreparedListingImage(source: string, output: strin
         response_format: { type: "json_object" }, messages: [{ role: "user", content: [
           { type: "text", text: '第一张为原图，第二张为修图成品。逐项对比，不确定即返回 false。' +
             'hands_removed：成品不得出现真实人物手指、手掌、手臂和投影；不要把商品玩偶肢体或印刷人物当真人手。' +
-            'product_preserved：商品本身及包装的可见文字、商标、印刷图案、生产标记、颜色、配件数量、真实瑕疵和形状未被改造，未凭空添加被手遮住的文字或细节；清除外贴售价牌/价签和平台水印属于允许操作，不算违规。' +
+            'product_preserved：商品本身及包装的可见文字、商标、印刷图案、生产标记、颜色、配件数量、真实瑕疵和形状未被改造，未凭空添加被手遮住的文字或细节；清除外贴售价牌/价签、平台水印以及外层透明包装袋属于允许操作，不算违规；但若商品本身是透明袋/透明材质被删掉则判 false。' +
+            'outer_bag_removed：成品不得残留商品外层的透明包装袋（OPP袋、自封袋、塑料外袋）及其袋边、封口、褶皱或反光；原图没有外层透明袋则填 true；商品本身为透明袋/透明材质时不算外袋。' +
             'external_labels_removed：成品不得残留任何外部附加的售价贴纸、价格牌、价签（包括贴在透明包装、挂卡、包装纸板上的，如“¥12.9 BOOMER”），也不得残留平台水印或叠字；原图没有这些则填 true。' +
             'gray_background：非商品区域是干净浅灰背景，无原桌面、人物残留（本项不代替 external_labels_removed）。' +
             `measurement_preserved：${profile.measurementTool ? '若原图有外部测量工具（尺子等），成品中必须完整保留且可读，刻度、数字、单位和与商品的测量位置关系与原图相同，未重绘或臆造；若原图没有外部测量工具则填 true，不能要求成品添加尺子。' : '本图无外部测量工具，填 true。'}` +
             `detail_preserved：${profile.closeUp ? '特写角度、透视和原有细节构图未改变，未裁掉细节，只补边成正方形。' : '非特写图，填 true。'}` +
-            '仅返回 JSON {"hands_removed":bool,"product_preserved":bool,"gray_background":bool,"measurement_preserved":bool,"detail_preserved":bool,"external_labels_removed":bool,"confidence":0至1}。' },
+            '仅返回 JSON {"hands_removed":bool,"product_preserved":bool,"gray_background":bool,"measurement_preserved":bool,"detail_preserved":bool,"external_labels_removed":bool,"outer_bag_removed":bool,"confidence":0至1}。' },
           { type: "image_url", image_url: { url: source } },
           { type: "image_url", image_url: { url: output } },
         ] }] }),
@@ -213,11 +214,31 @@ export async function validatePreparedListingImage(source: string, output: strin
 }
 
 export const VALIDATION_FIELDS = ["hands_removed", "product_preserved", "gray_background", "measurement_preserved",
-  "detail_preserved", "external_labels_removed"] as const;
+  "detail_preserved", "external_labels_removed", "outer_bag_removed"] as const;
 
 /** Safe failure text: only fixed field names and a numeric confidence, never model text, images or URLs. */
 export function validationFailureMessage(failedFields: readonly string[], confidence: unknown): string {
   const fields = failedFields.filter((f): f is string => (VALIDATION_FIELDS as readonly string[]).includes(f));
   const conf = typeof confidence === "number" && Number.isFinite(confidence) ? confidence.toFixed(2) : "invalid";
   return `修图检查未通过（fields=${fields.join(",") || "none"}; confidence=${conf}），原图保留，请重修`;
+}
+
+/** Fixed retry hints per known failed field. Only whitelisted field names from last_error are read. */
+const RETRY_HINTS: Record<(typeof VALIDATION_FIELDS)[number], string> = {
+  hands_removed: "上次修图仍残留真人手指/手掌/手臂或投影，本次必须彻底去除真人手部。",
+  product_preserved: "上次修图改动了商品实物，本次不得改动商品本体的文字、商标、颜色、形状、配件和真实瑕疵。",
+  gray_background: "上次背景不干净，本次背景必须是干净浅灰底，去除桌面和杂物。",
+  measurement_preserved: "上次尺子刻度或位置被改动，本次尺子刻度、数字和位置必须与原图完全一致。",
+  detail_preserved: "上次特写角度或构图被改动，本次只轻修曝光，不改角度和构图。",
+  external_labels_removed: "上次仍残留外贴价签或平台水印，本次必须彻底去除外贴价签、价格牌和水印。",
+  outer_bag_removed: "上次仍残留外层透明包装袋，本次必须彻底去除外层透明袋及袋边、封口、褶皱和反光（商品本身为透明材质时保留）。",
+};
+
+export function retryInstructionFromError(lastError: unknown): string | undefined {
+  if (typeof lastError !== "string") return undefined;
+  const m = lastError.match(/fields=([a-z_,]{1,200})/);
+  if (!m) return undefined;
+  const known = [...new Set(m[1].split(","))].filter((f): f is (typeof VALIDATION_FIELDS)[number] =>
+    (VALIDATION_FIELDS as readonly string[]).includes(f));
+  return known.length ? known.map(f => RETRY_HINTS[f]).join("") : undefined;
 }

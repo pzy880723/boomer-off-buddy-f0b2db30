@@ -131,7 +131,7 @@ const module = { exports: {} as any };
 const pngDataUrl = async () => `data:image/png;base64,${(await sharp({ create: { width: 4, height: 4, channels: 3, background: "blue" } }).png().toBuffer()).toString("base64")}`;
 new Function("require", "module", "exports", bundle.outputFiles[0].text)(require, module, module.exports);
 const validChecks = { hands_removed: true, product_preserved: true, gray_background: true,
-  measurement_preserved: true, detail_preserved: true, external_labels_removed: true, confidence: 1 };
+  measurement_preserved: true, detail_preserved: true, external_labels_removed: true, outer_bag_removed: true, confidence: 1 };
 const jsonMessage = (value: unknown) => Response.json({ choices: [{ message: { content: JSON.stringify(value) } }] });
 const generatedImage = () => Response.json({ choices: [{ message: { images: [{ image_url: { url: "data:image/png;base64,ZWRpdGVk" } }] } }] });
 
@@ -351,4 +351,10 @@ test("retouch prompt removes external price stickers even on clear packaging whi
   const src = (await import("node:fs")).readFileSync("src/server/handheld-ai.server.ts", "utf8");
   const prompt = src.slice(src.indexOf("const SYSTEM_LISTING_IMAGE"), src.indexOf("`;", src.indexOf("const SYSTEM_LISTING_IMAGE")));
   for (const word of ["透明包装", "挂卡", "包装纸板", "外贴价签不是商品本身", "保留商品本身的商标"]) assert.match(prompt, new RegExp(word));
+});
+test("retouch prompt removes outer clear bags but keeps product boxes/cards and transparent-material products", async () => {
+  const src = (await import("node:fs")).readFileSync("src/server/handheld-ai.server.ts", "utf8");
+  const prompt = src.slice(src.indexOf("const SYSTEM_LISTING_IMAGE"), src.indexOf("`;", src.indexOf("const SYSTEM_LISTING_IMAGE")));
+  for (const w of ["【必须去除】", "外层的透明包装袋", "封口", "褶皱", "反光", "【商品本体必须保留】", "盒子、挂卡",
+    "透明手提袋", "不得把商品本体当作外袋删除", "不得凭空补画", "刻度和数字必须完整保留", "保留拍摄角度"]) assert.match(prompt, new RegExp(w));
 });

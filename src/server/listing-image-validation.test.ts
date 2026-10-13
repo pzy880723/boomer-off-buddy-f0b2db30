@@ -1,13 +1,13 @@
 import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
-import { validatePreparedListingImage } from "./listing-image-safety.server.ts";
+import { validatePreparedListingImage, retryInstructionFromError } from "./listing-image-safety.server.ts";
 import { allowHandheldGuard, allowWebGuard } from "./ai-guard-fixtures.ts";
 
 const originalFetch = globalThis.fetch;
 const originalTimeout = AbortSignal.timeout;
 afterEach(() => { globalThis.fetch = originalFetch; AbortSignal.timeout = originalTimeout; });
 const valid = { hands_removed: true, product_preserved: true, gray_background: true,
-  measurement_preserved: true, detail_preserved: true, external_labels_removed: true, confidence: 1 };
+  measurement_preserved: true, detail_preserved: true, external_labels_removed: true, outer_bag_removed: true, confidence: 1 };
 const profile = { measurementTool: true, closeUp: true };
 
 test("source and output are compared for hand removal, ruler evidence and detail angle", async () => {
@@ -22,7 +22,7 @@ test("source and output are compared for hand removal, ruler evidence and detail
   };
   await validatePreparedListingImage("data:image/png;base64,c291cmNl", "data:image/png;base64,b3V0cHV0", "test", profile, allowHandheldGuard);
 });
-for (const field of ["hands_removed", "product_preserved", "gray_background", "measurement_preserved", "detail_preserved", "external_labels_removed"]) {
+for (const field of ["hands_removed", "product_preserved", "gray_background", "measurement_preserved", "detail_preserved", "external_labels_removed", "outer_bag_removed"]) {
   test(`${field}=false cannot be reported as a completed retouch`, async () => {
     globalThis.fetch = async () => Response.json({ choices: [{ message: { content: JSON.stringify({ ...valid, [field]: false }) } }] });
     await assert.rejects(validatePreparedListingImage("source", "output", "test", profile, allowHandheldGuard), (e: any) => e.stage === "image_validation");
@@ -88,4 +88,29 @@ test("low confidence failure names confidence without passing", async () => {
   globalThis.fetch = async () => Response.json({ choices: [{ message: { content: JSON.stringify({ ...valid, confidence: 0.94 }) } }] });
   await assert.rejects(validatePreparedListingImage("source", "output", "test", profile, allowHandheldGuard),
     /fields=none; confidence=0.94/);
+});
+test("leftover outer clear bag fails strictly; real transparent-bag products are protected in the prompt", async () => {
+  globalThis.fetch = async (_url, init) => {
+    const text = JSON.parse(String(init?.body)).messages[0].content[0].text;
+    assert.match(text, /outer_bag_removed/); assert.match(text, /原图没有外层透明袋则填 true/);
+    assert.match(text, /商品本身为透明袋\/透明材质时不算外袋/); assert.match(text, /外层透明包装袋属于允许操作/);
+    return Response.json({ choices: [{ message: { content: JSON.stringify({ ...valid, outer_bag_removed: false, confidence: 0.98 }) } }] });
+  };
+  await assert.rejects(validatePreparedListingImage("source", "output", "test", profile, allowHandheldGuard),
+    /fields=outer_bag_removed; confidence=0.98/);
+});
+test("missing outer_bag_removed is a failure", async () => {
+  const { outer_bag_removed: _d, ...rest } = valid;
+  globalThis.fetch = async () => Response.json({ choices: [{ message: { content: JSON.stringify(rest) } }] });
+  await assert.rejects(validatePreparedListingImage("source", "output", "test", profile, allowHandheldGuard), /fields=outer_bag_removed/);
+});
+test("retry instruction uses only whitelisted fixed hints, deduped, unknown/free text ignored", () => {
+  const hint = retryInstructionFromError("修图检查未通过（fields=outer_bag_removed,external_labels_removed,outer_bag_removed,evil_field; confidence=0.97） https://x.test/?token=1 13800000000");
+  assert.ok(hint);
+  assert.match(hint!, /外层透明袋/); assert.match(hint!, /外贴价签/);
+  assert.equal(hint!.match(/外层透明袋/g)!.length, 1);
+  assert.doesNotMatch(hint!, /evil|https|token|138|confidence/);
+  assert.match(retryInstructionFromError("fields=product_preserved; confidence=0.99")!, /不得改动商品本体/);
+  for (const e of [null, undefined, "[image_generation] TimeoutError", "fields=evil; confidence=1", "fields=none; confidence=0.5", 42])
+    assert.equal(retryInstructionFromError(e), undefined);
 });
