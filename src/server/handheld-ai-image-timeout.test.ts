@@ -10,7 +10,7 @@ const stubs: Record<string, string> = {
   "@/server/product-recognition.server": "export const recognizeProductFromImages = () => {};",
   sharp: "export default () => ({ metadata: async () => ({ orientation: 1 }) });",
   "./listing-image-safety.server":
-    "export const classifyListingImage = async () => ({ measurementTool: globalThis.__ruler === true, closeUp: false }); export const validatePreparedListingImage = async () => {}; export const loadOriginalImage = async (image) => { if (!image.startsWith('data:image/')) throw new Error('Original image must use trusted storage'); return Buffer.from(image.slice(image.indexOf(',') + 1), 'base64'); }; export const withImageStage = (stage, run) => run().catch((e) => { e.stage = stage; throw e; });",
+    "export const classifyListingImage = async () => ({ measurementTool: globalThis.__ruler === true, closeUp: false }); export const validatePreparedListingImage = async () => {}; export const loadOriginalImage = async (image) => { if (!image.startsWith('data:image/')) throw new Error('Original image must use trusted storage'); return Buffer.from(image.slice(image.indexOf(',') + 1), 'base64'); }; export const withImageStage = (stage, run) => run().catch((e) => { e.stage = stage; throw e; }); export const analysisCopy = async (u) => u; export const stageSignal = (ms, b) => { const s = AbortSignal.timeout(ms); return b ? AbortSignal.any([s, b]) : s; }; export class PermanentImageError extends Error { constructor(m) { super('permanent: ' + m); } } export const LISTING_IMAGE_BUDGET_MS = 120000; export const GENERATION_TIMEOUT_MS = 90000;",
 };
 const bundle = await build({
   entryPoints: ["src/server/handheld-ai.server.ts"],
@@ -38,7 +38,7 @@ const { aiPrepareListingImage, missingImageError } = await import(
   `data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString("base64")}`
 );
 
-test("image generation uses a 60s abort deadline and propagates timeouts for durable retry", async () => {
+test("image generation uses a 90s deadline inside the 120s photo budget and propagates timeouts for durable retry", async () => {
   const originalFetch = globalThis.fetch;
   const originalTimeout = AbortSignal.timeout;
   const originalKey = process.env.LOVABLE_API_KEY;
@@ -51,7 +51,8 @@ test("image generation uses a 60s abort deadline and propagates timeouts for dur
       return controller.signal;
     };
     globalThis.fetch = async (_input, init) => {
-      assert.equal(init?.signal, controller.signal);
+      const body = JSON.parse(String(init?.body));
+      assert.deepEqual(body.image_config, { image_size: "1K", aspect_ratio: "1:1" });
       assert.ok(String(init?.body).includes(`data:image/png;base64,${PNG}`), "real PNG reached generation");
       controller.abort(new DOMException("Image request timed out", "TimeoutError"));
       init?.signal?.throwIfAborted();
@@ -61,7 +62,7 @@ test("image generation uses a 60s abort deadline and propagates timeouts for dur
       name: "TimeoutError",
       stage: "image_generation",
     });
-    assert.deepEqual(deadlines, [60_000]);
+    assert.deepEqual(deadlines, [120_000, 90_000]);
   } finally {
     globalThis.fetch = originalFetch;
     AbortSignal.timeout = originalTimeout;
