@@ -82,8 +82,9 @@ async function prepareImage(
     .from(sourceBucket)
     .createSignedUrl(sourcePath, 60 * 60);
   if (signed.error) throw new Error(signed.error.message);
+  const instruction = retryInstructionFromError(lastError);
   const prepared = await aiPrepareListingImage(
-    { image_url: signed.data.signedUrl, instruction: retryInstructionFromError(lastError) }, guard);
+    instruction ? { image_url: signed.data.signedUrl, instruction } : { image_url: signed.data.signedUrl }, guard);
   const extension = prepared.mime.includes("png")
     ? "png"
     : prepared.mime.includes("webp")
