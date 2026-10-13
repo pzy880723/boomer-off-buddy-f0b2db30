@@ -421,6 +421,13 @@
       "when": 1791887695561,
       "tag": "0059_listing_image_sla",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1791887780296,
+      "tag": "0060_listing_image_sla_no_kill",
+      "breakpoints": true
     }
   ]
 }

@@ -10824,6 +10824,17 @@ export type Database = {
         Args: { p_sku_id: string }
         Returns: undefined
       }
+      handheld_listing_image_sla_overdue: {
+        Args: { p_minutes?: number }
+        Returns: {
+          age_seconds: number
+          attempts: number
+          job_id: string
+          last_error: string
+          sku_id: string
+          status: string
+        }[]
+      }
       handheld_notification_category: {
         Args: { p_kind: string }
         Returns: string
