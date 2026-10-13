@@ -128,3 +128,51 @@ BEGIN
     FROM due WHERE j.id=due.id RETURNING j.*;
 END;
 $function$;
+
+CREATE OR REPLACE FUNCTION public.product_content_image_finish(p_id uuid, p_claim_token uuid, p_target_path text, p_error text)
+ RETURNS text LANGUAGE plpgsql SET search_path TO '' AS $function$
+DECLARE
+  v_job public.inv_product_content_image_jobs; v_sku public.inv_skus; v_content public.inv_product_content;
+  v_draft jsonb; v_published jsonb; v_status text; v_prefix text;
+BEGIN
+  SELECT * INTO v_job FROM public.inv_product_content_image_jobs WHERE id=p_id;
+  IF NOT FOUND THEN RETURN 'stale'; END IF;
+  SELECT * INTO v_sku FROM public.inv_skus WHERE id=v_job.sku_id FOR UPDATE;
+  SELECT * INTO v_job FROM public.inv_product_content_image_jobs WHERE id=p_id FOR UPDATE;
+  IF NOT FOUND OR v_job.status<>'processing' OR p_claim_token IS NULL
+     OR v_job.claim_token IS DISTINCT FROM p_claim_token OR v_job.lease_until<now() THEN RETURN 'stale'; END IF;
+  SELECT * INTO v_content FROM public.inv_product_content WHERE sku_id=v_job.sku_id FOR UPDATE;
+  IF NOT FOUND OR v_sku.status IS DISTINCT FROM 'active' OR v_sku.kind IS DISTINCT FROM 'single'
+     OR NOT coalesce(v_sku.is_custom_price,false) THEN
+    v_status := 'cancelled';
+  ELSIF p_error IS NOT NULL THEN
+    v_status := CASE WHEN v_job.attempts>=5 OR p_error LIKE 'permanent:%' OR p_error LIKE 'ai_consent_missing%'
+      THEN 'permanent_failed' ELSE 'retryable_failed' END;
+  ELSE
+    v_prefix := 'sku-listing/content/'||v_job.sku_id::text||'/'||v_job.id::text||'/'||p_claim_token::text;
+    IF p_target_path IS NULL OR p_target_path NOT IN (v_prefix||'.png',v_prefix||'.jpg',v_prefix||'.webp')
+       OR NOT EXISTS (SELECT 1 FROM storage.objects WHERE bucket_id='sku-listing'
+                       AND name=substring(p_target_path FROM length('sku-listing/')+1)) THEN
+      PERFORM public.handheld_item_fail('validation_error','Invalid optimized content image');
+    END IF;
+    SELECT coalesce(jsonb_agg(CASE WHEN b->>'type'='image' AND b->>'id'=v_job.block_id
+      AND b->>'storage_path'=v_job.source_path THEN jsonb_set(b,'{storage_path}',to_jsonb(p_target_path)) ELSE b END ORDER BY ord),'[]')
+      INTO v_draft FROM jsonb_array_elements(v_content.draft_blocks) WITH ORDINALITY blocks(b,ord);
+    SELECT coalesce(jsonb_agg(CASE WHEN b->>'type'='image' AND b->>'id'=v_job.block_id
+      AND b->>'storage_path'=v_job.source_path THEN jsonb_set(b,'{storage_path}',to_jsonb(p_target_path)) ELSE b END ORDER BY ord),'[]')
+      INTO v_published FROM jsonb_array_elements(v_content.published_blocks) WITH ORDINALITY blocks(b,ord);
+    IF v_draft IS DISTINCT FROM v_content.draft_blocks OR v_published IS DISTINCT FROM v_content.published_blocks THEN
+      UPDATE public.inv_product_content SET draft_blocks=v_draft,published_blocks=v_published,
+        version=version+1,published_version=CASE WHEN v_published IS DISTINCT FROM v_content.published_blocks
+          THEN version+1 ELSE published_version END,updated_at=now() WHERE sku_id=v_job.sku_id;
+      v_status := 'succeeded';
+    ELSE v_status := 'cancelled'; END IF;
+  END IF;
+  UPDATE public.inv_product_content_image_jobs SET status=v_status,lease_until=NULL,
+    target_path=CASE WHEN p_error IS NULL THEN p_target_path ELSE target_path END,
+    last_error=left(p_error,1000),updated_at=now(),
+    next_run_at=now()+make_interval(secs=>CASE v_job.attempts WHEN 1 THEN 10 WHEN 2 THEN 30 ELSE 60 END)
+   WHERE id=p_id;
+  RETURN v_status;
+END;
+$function$;
