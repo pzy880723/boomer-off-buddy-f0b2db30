@@ -10967,6 +10967,15 @@ export type Database = {
         Args: { p_op_id: string; p_response: Json }
         Returns: undefined
       }
+      handheld_unread_counts: {
+        Args: {
+          p_device_id: string
+          p_include_unlocated?: boolean
+          p_location_ids: string[]
+          p_user_id: string
+        }
+        Returns: Json
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
