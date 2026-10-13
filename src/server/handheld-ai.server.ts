@@ -172,6 +172,7 @@ export async function aiPrepareListingImage(input: {
 
   const output = await withImageStage("image_generation", () => generateListingImage(body, guard, budget));
   await validatePreparedListingImage(dataUrl, `data:${output.mime};base64,${output.b64}`, getKey(), profile, guard, budget);
+  budget.throwIfAborted(); // total deadline passed: never report success
   return output;
 }
 

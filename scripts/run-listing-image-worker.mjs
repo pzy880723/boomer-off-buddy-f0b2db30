@@ -9,9 +9,9 @@ if (!token || (port !== "3005" && port !== "3006")) {
     const response = await fetch(`http://127.0.0.1:${port}/api/public/hooks/listing-image-worker`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ limit: 2 }),
+      body: JSON.stringify({ limit: 6 }),
       redirect: "error",
-      signal: AbortSignal.timeout(240000),
+      signal: AbortSignal.timeout(150000),
     });
     const data = await response.json();
     const count = data?.data?.processed;

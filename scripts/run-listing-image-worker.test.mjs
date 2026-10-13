@@ -43,9 +43,9 @@ for (const port of [undefined, "3005", "3006"])
     assert.equal(url, `http://127.0.0.1:${port ?? "3005"}/api/public/hooks/listing-image-worker`);
     assert.equal(init.method, "POST");
     assert.equal(init.headers.Authorization, `Bearer ${secret}`);
-    assert.deepEqual(JSON.parse(init.body), { limit: 2 });
+    assert.deepEqual(JSON.parse(init.body), { limit: 6 });
     assert.equal(init.redirect, "error");
-    assert.deepEqual(result.timeouts, [240000]);
+    assert.deepEqual(result.timeouts, [150000]);
     assert.ok(init.signal instanceof AbortSignal);
     assert.deepEqual(JSON.parse(result.logs[0]), {
       ok: true,
@@ -162,10 +162,10 @@ test("systemd units use current release, protected env, bounded oneshot and recu
     service,
     /ExecStart=\/usr\/bin\/node \/var\/www\/boomer-erp\/current\/scripts\/run-listing-image-worker\.mjs/,
   );
-  assert.match(service, /TimeoutStartSec=250/);
+  assert.match(service, /TimeoutStartSec=160/);
   assert.match(service, /NoNewPrivileges=true/);
   assert.match(timer, /OnBootSec=90/);
-  assert.match(timer, /OnUnitInactiveSec=60s/);
+  assert.match(timer, /OnUnitInactiveSec=10s/);
   assert.match(timer, /Unit=boomer-listing-image\.service/);
   assert.match(timer, /WantedBy=timers.target/);
 });
