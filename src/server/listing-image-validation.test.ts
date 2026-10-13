@@ -1,12 +1,13 @@
 import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
-import { validatePreparedListingImage, retryInstructionFromError } from "./listing-image-safety.server.ts";
+import sharp from "sharp";
+import { validatePreparedListingImage, retryInstructionFromError, assertListingImagePixels } from "./listing-image-safety.server.ts";
 import { allowHandheldGuard, allowWebGuard } from "./ai-guard-fixtures.ts";
 
 const originalFetch = globalThis.fetch;
 const originalTimeout = AbortSignal.timeout;
 afterEach(() => { globalThis.fetch = originalFetch; AbortSignal.timeout = originalTimeout; });
-const valid = { hands_removed: true, product_preserved: true, gray_background: true,
+const valid = { product_present: true, product_scale: true, hands_removed: true, product_preserved: true, gray_background: true,
   measurement_preserved: true, detail_preserved: true, external_labels_removed: true, outer_bag_removed: true, confidence: 1 };
 const profile = { measurementTool: true, closeUp: true };
 
@@ -22,7 +23,7 @@ test("source and output are compared for hand removal, ruler evidence and detail
   };
   await validatePreparedListingImage("data:image/png;base64,c291cmNl", "data:image/png;base64,b3V0cHV0", "test", profile, allowHandheldGuard);
 });
-for (const field of ["hands_removed", "product_preserved", "gray_background", "measurement_preserved", "detail_preserved", "external_labels_removed", "outer_bag_removed"]) {
+for (const field of ["product_present", "product_scale", "hands_removed", "product_preserved", "gray_background", "measurement_preserved", "detail_preserved", "external_labels_removed", "outer_bag_removed"]) {
   test(`${field}=false cannot be reported as a completed retouch`, async () => {
     globalThis.fetch = async () => Response.json({ choices: [{ message: { content: JSON.stringify({ ...valid, [field]: false }) } }] });
     await assert.rejects(validatePreparedListingImage("source", "output", "test", profile, allowHandheldGuard), (e: any) => e.stage === "image_validation");
@@ -113,4 +114,46 @@ test("retry instruction uses only whitelisted fixed hints, deduped, unknown/free
   assert.match(retryInstructionFromError("fields=product_preserved; confidence=0.99")!, /不得改动商品本体/);
   for (const e of [null, undefined, "[image_generation] TimeoutError", "fields=evil; confidence=1", "fields=none; confidence=0.5", 42])
     assert.equal(retryInstructionFromError(e), undefined);
+});
+
+const canvas = async (w: number, h: number, subject?: { w: number; h: number; color?: string }) => {
+  let img = sharp({ create: { width: w, height: h, channels: 3, background: "#ececec" } });
+  if (subject) img = img.composite([{ input: await sharp({ create: { width: subject.w, height: subject.h, channels: 3,
+    background: subject.color ?? "#3a5fb0" } }).png().toBuffer(), left: Math.floor((w - subject.w) / 2), top: Math.floor((h - subject.h) / 2) }]);
+  return (await img.png().toBuffer()).toString("base64");
+};
+test("pixel gate: pure gray canvas is rejected as product_present", async () => {
+  await assert.rejects(assertListingImagePixels(await canvas(1024, 1024)), (e: any) => {
+    assert.equal(e.stage, "image_validation"); assert.match(e.message, /fields=product_present; confidence=invalid/); return true;
+  });
+});
+test("pixel gate: tiny centered subject is rejected as product_scale", async () => {
+  await assert.rejects(assertListingImagePixels(await canvas(1024, 1024, { w: 300, h: 260 })), /fields=product_scale; confidence=invalid/);
+});
+test("pixel gate: normal product framing (~75% long edge) passes", async () => {
+  await assertListingImagePixels(await canvas(1024, 1024, { w: 770, h: 560 }));
+  await assertListingImagePixels(await canvas(1024, 1024, { w: 420, h: 820, color: "#d8c9a0" }));
+});
+test("pixel gate: non-square, too small or undecodable outputs are rejected", async () => {
+  await assert.rejects(assertListingImagePixels(await canvas(1024, 768, { w: 700, h: 600 })), /fields=canvas_square/);
+  await assert.rejects(assertListingImagePixels(await canvas(512, 512, { w: 380, h: 380 })), /fields=canvas_square/);
+  await assert.rejects(assertListingImagePixels("ZWRpdGVk"), /fields=product_present/);
+});
+test("pixel gate: dark/non-gray background is rejected", async () => {
+  const dark = (await sharp({ create: { width: 1024, height: 1024, channels: 3, background: "#202020" } }).png().toBuffer()).toString("base64");
+  await assert.rejects(assertListingImagePixels(dark), /fields=gray_background/);
+});
+test("validation prompt requires product_present/product_scale and keeps the bagged product", async () => {
+  globalThis.fetch = async (_url, init) => {
+    const text = JSON.parse(String(init?.body)).messages[0].content[0].text;
+    for (const w of ["product_present", "product_scale", "纯灰图", "袋中商品", "商品本体必须完整可见", "70%-85%"]) assert.match(text, new RegExp(w));
+    return Response.json({ choices: [{ message: { content: JSON.stringify(valid) } }] });
+  };
+  await validatePreparedListingImage("source", "output", "test", { measurementTool: false, closeUp: false }, allowHandheldGuard);
+});
+test("retry hints for product_present/product_scale are fixed and never ask to delete anything", () => {
+  const hint = retryInstructionFromError("[image_validation] fields=product_present,product_scale; confidence=invalid")!;
+  assert.match(hint, /空背景/); assert.match(hint, /70%-85%/);
+  assert.doesNotMatch(hint, /删除|去除|删掉/);
+  assert.match(retryInstructionFromError("fields=canvas_square; confidence=invalid")!, /1024x1024/);
 });
