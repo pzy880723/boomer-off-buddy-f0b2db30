@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { HANDHELD_CORS, authenticateDevice, ok, err } from "@/server/handheld-auth.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { UploadImageReq } from "@/lib/handheld/schemas";
-import { createUploadRelayGrant, relayImageUpload, uploadRelayURL } from "@/server/handheld-upload-relay.server";
+import { createUploadRelayGrant, HANDHELD_PUBLIC_ORIGIN, relayImageUpload, uploadRelayURL } from "@/server/handheld-upload-relay.server";
 
 const UPLOAD_CORS = {
   ...HANDHELD_CORS,
@@ -40,8 +40,7 @@ export const Route = createFileRoute("/api/public/handheld/items/upload-image")(
         // 否则会返回 500 {"error":"Object not found"}。APP 上传完成后调
         // POST /items/sign-read-url 拿 read URL。
         if (body.mode === "multipart") {
-          const origin = new URL(request.url).origin;
-          const upload_url = `${origin}/api/public/handheld/items/upload-image/multipart?path=${encodeURIComponent(path)}&bucket=${encodeURIComponent(body.bucket)}`;
+          const upload_url = `${HANDHELD_PUBLIC_ORIGIN}/api/public/handheld/items/upload-image/multipart?path=${encodeURIComponent(path)}&bucket=${encodeURIComponent(body.bucket)}`;
           return ok({
             storage_path: path,
             upload_url,

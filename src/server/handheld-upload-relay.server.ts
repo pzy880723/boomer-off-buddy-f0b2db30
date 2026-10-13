@@ -4,11 +4,15 @@ const MAX_BYTES = 12 * 1024 * 1024;
 const TTL_MS = 30 * 60 * 1000;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
 
-export function uploadRelayURL(requestURL: string) {
-  const url = new URL("/api/public/handheld/items/upload-image", requestURL);
-  // Nginx terminates TLS; the upstream Request may still carry http.
-  if (!["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)) url.protocol = "https:";
-  return url.toString();
+/** 手机唯一可达的受信任 ERP 外网入口（TLS 由 Nginx 终止）。 */
+export const HANDHELD_PUBLIC_ORIGIN = "https://erp.boomeroff.com";
+
+/**
+ * 上传地址固定为受信任外网 HTTPS 入口：上游 request.url 在 Nitro 后会变成 loopback（127.0.0.1:3005），
+ * Host / X-Forwarded-Host 可被伪造，均不参与拼接。参数仅为兼容旧调用签名。
+ */
+export function uploadRelayURL(_requestURL?: string) {
+  return `${HANDHELD_PUBLIC_ORIGIN}/api/public/handheld/items/upload-image`;
 }
 
 function signature(payload: string, secret: string) {
