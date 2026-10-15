@@ -62,8 +62,7 @@ DO $$ BEGIN PERFORM commerce_points_record_order_refund('erp:o3', NULL, 'r3a', 5
 SELECT t_assert(true, 'fail-closed: inactive/mismatch/alias/refund-key conflicts');
 
 -- 10 账本与钱包一致；客户端角色无执行权
-SELECT t_assert((SELECT sum(delta) FROM commerce_points_ledger) + 10 - 173 - 99 - 50 - 40
-  = (SELECT points FROM pos_customer_wallets) - 173 - 99 - 50 - 40 + 10 - 87 + 87 - 10 + (SELECT sum(delta) FROM commerce_points_ledger) - (SELECT sum(delta) FROM commerce_points_ledger), 'ledger sanity');
+SELECT t_assert((SELECT balance_after FROM commerce_points_ledger ORDER BY created_at DESC, delta DESC LIMIT 1) = (SELECT points FROM pos_customer_wallets WHERE customer_id='11111111-1111-4111-8111-111111111111'), 'ledger balance matches wallet');
 SELECT t_assert(NOT has_function_privilege('authenticated','commerce_points_record_order_paid(text,text[],uuid,text,bigint,boolean,boolean,timestamptz,text)','EXECUTE')
   AND NOT has_function_privilege('anon','commerce_points_record_order_refund(text,text[],text,bigint)','EXECUTE')
   AND has_function_privilege('service_role','commerce_points_record_order_paid(text,text[],uuid,text,bigint,boolean,boolean,timestamptz,text)','EXECUTE')
