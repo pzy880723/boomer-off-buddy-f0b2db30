@@ -77,10 +77,12 @@ export const productionProjectionStore: ProjectionStore = {
     if (error) throw Error("points_projection_write_failed");
     return data as { result: string; inserted: number };
   },
-  async listLogs(customerId, limit, before) {
+  async listLogs(customerId, limit, before, w) {
     let q = (await admin()).from("youzan_points_log_entries")
       .select("id,amount,balance_after,description,occurred_at,expires_at")
       .eq("customer_id", customerId)
+      .eq("kdt_id", w.kdtId).eq("yz_open_id", w.yzOpenId)
+      .gte("occurred_at", w.start).lte("occurred_at", w.end)
       .order("occurred_at", { ascending: false }).order("id", { ascending: false }).limit(limit);
     if (before) q = q.or(`occurred_at.lt.${before.occurredAt},and(occurred_at.eq.${before.occurredAt},id.lt.${before.id})`);
     const { data, error } = await q;

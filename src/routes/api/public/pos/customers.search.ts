@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { posPointsFromView } from "@/server/youzan-points-projection.server";
+import { productionPointsProjection } from "@/server/youzan-points-projection-production.server";
 import { POS_CORS, authenticatePosUser, posError, posJson } from "@/server/pos-auth.server";
 
 export const Route = createFileRoute("/api/public/pos/customers/search")({
@@ -36,19 +38,18 @@ export const Route = createFileRoute("/api/public/pos/customers/search")({
                 .select("customer_id,points,store_credit,member_level")
                 .in("customer_id", ids);
         if (walletError) return posError(walletError.message, 500);
-        // 列表只读已存有赞投影（不逐个实时请求有赞）；未同步显示 null，不用本地积分或 0 代替。
-        const { data: projections, error: projectionError } =
-          ids.length === 0
-            ? { data: [], error: null }
-            : await supabaseAdmin
-                .from("youzan_points_projection")
-                .select("customer_id,balance,balance_synced_at")
-                .in("customer_id", ids);
-        if (projectionError) return posError("积分同步状态暂不可用", 500);
-        const youzanMap = new Map(
-          (projections ?? []).filter((p) => p.balance_synced_at && p.balance != null)
-            .map((p) => [p.customer_id, Number(p.balance)]),
-        );
+        // 列表走与账户一致的受信读模型（sync:false 不逐个请求有赞）；身份/状态无法校验时显示 null，不用本地积分或 0 代替。
+        const youzanMap = new Map<string, ReturnType<typeof posPointsFromView>>();
+        try {
+          const projection = ids.length ? await productionPointsProjection() : null;
+          if (projection) {
+            for (const customer of customers) {
+              youzanMap.set(customer.id, posPointsFromView(await projection.accountPoints(customer.id, { sync: false })));
+            }
+          }
+        } catch {
+          youzanMap.clear();
+        }
         const walletMap = new Map(
           (
             (wallets ?? []) as unknown as Array<{
@@ -66,7 +67,8 @@ export const Route = createFileRoute("/api/public/pos/customers/search")({
               ...customer,
               wallet: {
                 ...(walletMap.get(customer.id) ?? { store_credit: 0, member_level: "普通会员" }),
-                points: youzanMap.get(customer.id) ?? null,
+                points: youzanMap.get(customer.id)?.points ?? null,
+                points_sync_status: youzanMap.get(customer.id)?.points_sync_status ?? "unavailable",
                 points_source: "youzan",
               },
             })),
