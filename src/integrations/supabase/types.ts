@@ -1852,6 +1852,72 @@ export type Database = {
           },
         ]
       }
+      commerce_points_earning_settlements: {
+        Row: {
+          created_at: string
+          customer_id: string
+          debt_after: number
+          debt_before: number
+          debt_delta: number
+          delta: number
+          earning_order_id: string
+          goods_refund_fen: number
+          id: string
+          order_version: number
+          points_after: number
+          points_before: number
+          points_delta: number
+          target_points: number
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          debt_after: number
+          debt_before: number
+          debt_delta: number
+          delta: number
+          earning_order_id: string
+          goods_refund_fen: number
+          id?: string
+          order_version: number
+          points_after: number
+          points_before: number
+          points_delta: number
+          target_points: number
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          debt_after?: number
+          debt_before?: number
+          debt_delta?: number
+          delta?: number
+          earning_order_id?: string
+          goods_refund_fen?: number
+          id?: string
+          order_version?: number
+          points_after?: number
+          points_before?: number
+          points_delta?: number
+          target_points?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_points_earning_settlements_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_points_earning_settlements_earning_order_id_fkey"
+            columns: ["earning_order_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_points_earning_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commerce_points_ledger: {
         Row: {
           balance_after: number

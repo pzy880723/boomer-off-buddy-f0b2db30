@@ -442,6 +442,13 @@
       "when": 1792024600843,
       "tag": "0062_points_earning_ledger",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1792024893405,
+      "tag": "0063_points_earning_hardening",
+      "breakpoints": true
     }
   ]
 }
