@@ -200,7 +200,10 @@ const POINTS_SYNC_BUDGET_MS = 5000;
 /** 打开账户时同步有赞余额（有界等待）；超时/失败返回已存投影与真实状态，绝不回退本地或 0。 */
 export async function loadYouzanAccountPoints(customerId: string) {
   const { productionPointsProjection, withBudget } = await import("@/server/youzan-points-projection-production.server");
-  const projection = await productionPointsProjection();
+  let projection;
+  try { projection = await productionPointsProjection(); } catch {
+    return { source: "youzan" as const, balance: null, status: "failed" as const, synced_at: null, reason: "points_projection_unavailable" };
+  }
   const synced = await withBudget(projection.accountPoints(customerId, { sync: true }), POINTS_SYNC_BUDGET_MS);
   if (synced !== "timeout") return synced;
   const stored = await projection.accountPoints(customerId, { sync: false });
