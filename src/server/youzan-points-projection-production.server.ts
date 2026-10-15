@@ -51,7 +51,7 @@ const iso = (ms: number) => new Date(ms).toISOString();
 export const productionProjectionStore: ProjectionStore = {
   async read(customerId) {
     const { data, error } = await (await admin()).from("youzan_points_projection")
-      .select("customer_id,kdt_id,yz_open_id,balance,points_account_version,balance_synced_at,balance_failed_at,balance_failure,log_synced_at,log_failed_at,log_failure")
+      .select("customer_id,kdt_id,yz_open_id,balance,points_account_version,balance_synced_at,balance_failed_at,balance_failure,log_synced_at,log_window_start,log_failed_at,log_failure")
       .eq("customer_id", customerId).maybeSingle();
     if (error) throw Error("points_projection_read_failed");
     return data ? ({ ...data, points_account_version: data.points_account_version == null ? null : String(data.points_account_version) } as unknown as ProjectionRow) : null;
@@ -108,7 +108,7 @@ export async function productionPointsProjection() {
       if (r.kind === "blocked") return { kind: "blocked", reason: r.reason };
       return { kind: "unavailable" };
     },
-    logsEnabled: () => process.env.YOUZAN_POINTS_LOG_ENABLED === "true",
+    logsEnabled: () => process.env.YOUZAN_POINTS_LOG_DISABLED !== "true",
     queryLogs: logQuery,
   });
 }

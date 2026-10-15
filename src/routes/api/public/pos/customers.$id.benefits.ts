@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { calculatePointsRedemption } from "@/lib/pos/points-policy";
 import { loadPointsRules } from "@/lib/pos/points-policy.server";
 import { loadYouzanAccountPoints } from "@/lib/membership/membership-repository.server";
+import { toPointsContract } from "@/server/youzan-points-projection.server";
 import { POS_CORS, authenticatePosUser, posError, posJson } from "@/server/pos-auth.server";
 
 export const Route = createFileRoute("/api/public/pos/customers/$id/benefits")({
@@ -57,9 +58,9 @@ export const Route = createFileRoute("/api/public/pos/customers/$id/benefits")({
           ok: true,
           data: {
             customer,
-            youzan_points: youzanPoints,
+            youzan_points: toPointsContract(youzanPoints),
             points_redemption: { ...points, requires_cart_preview: true },
-            wallet: { ...baseWallet, points: youzanPoints.balance, points_source: "youzan", points_status: youzanPoints.status },
+            wallet: { ...baseWallet, points: youzanPoints.balance, points_source: "youzan", points_status: toPointsContract(youzanPoints).sync_status },
             coupons: coupons ?? [],
           },
         });
