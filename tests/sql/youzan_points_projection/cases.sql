@@ -23,11 +23,11 @@ SELECT t_assert(t_bal(120, '7', '2026-10-15 01:05:00+00') = 'applied', 'newer ve
 SELECT t_assert(t_bal(0, '5', '2026-10-15 01:06:00+00') = 'stale', 'older version stale even if later');
 SELECT t_assert((SELECT balance FROM youzan_points_projection WHERE customer_id='11111111-1111-4111-8111-111111111111') = 120, 'stale did not overwrite');
 SELECT t_assert(t_bal(120, '7', '2026-10-15 01:07:00+00') = 'same_version', 'same version confirms');
-SELECT t_assert(t_bal(999, '7', '2026-10-15 01:08:00+00') = 'version_conflict'
-  AND (SELECT balance FROM youzan_points_projection WHERE customer_id='11111111-1111-4111-8111-111111111111') = 120, 'same version different point rejected');
+SELECT t_assert(t_bal(999, '7', '2026-10-15 01:08:00+00') = 'version_conflict', 'conflict result');
+SELECT t_assert((SELECT balance FROM youzan_points_projection WHERE customer_id='11111111-1111-4111-8111-111111111111') = 120, 'same version different point rejected');
 -- int64 精度
-SELECT t_assert(t_bal(121, '9007199254740999', '2026-10-15 01:09:00+00') = 'applied'
-  AND (SELECT points_account_version::text FROM youzan_points_projection WHERE customer_id='11111111-1111-4111-8111-111111111111') = '9007199254740999', 'int64 version exact');
+SELECT t_assert(t_bal(121, '9007199254740999', '2026-10-15 01:09:00+00') = 'applied', 'int64 applied');
+SELECT t_assert((SELECT points_account_version::text FROM youzan_points_projection WHERE customer_id='11111111-1111-4111-8111-111111111111') = '9007199254740999', 'int64 version exact');
 
 -- 3 失败只打标记，保留上次有赞数据；旧失败不覆盖更新的成功
 SELECT youzan_points_projection_record_failure('11111111-1111-4111-8111-111111111111','balance','youzan_read_unavailable','2026-10-15 01:10:00+00');
@@ -36,10 +36,10 @@ SELECT t_assert((SELECT balance = 121 AND balance_failure = 'youzan_read_unavail
 SELECT youzan_points_projection_record_failure('11111111-1111-4111-8111-111111111111','balance','older_failure','2026-10-15 01:00:00+00');
 SELECT t_assert((SELECT balance_failure FROM youzan_points_projection WHERE customer_id='11111111-1111-4111-8111-111111111111') = 'youzan_read_unavailable', 'older failure ignored');
 -- 失败前的旧请求返回成功：数据接受，但失败时间仍晚于成功时间（状态保持失败）
-SELECT t_assert(t_bal(122, '9007199254741000', '2026-10-15 01:09:30+00') = 'applied'
-  AND (SELECT balance_failed_at > balance_synced_at FROM youzan_points_projection WHERE customer_id='11111111-1111-4111-8111-111111111111'), 'older success does not clear newer failure');
-SELECT t_assert(t_bal(122, '9007199254741000', '2026-10-15 01:11:00+00') = 'same_version'
-  AND (SELECT balance_synced_at > balance_failed_at FROM youzan_points_projection WHERE customer_id='11111111-1111-4111-8111-111111111111'), 'newer success clears failure');
+SELECT t_assert(t_bal(122, '9007199254741000', '2026-10-15 01:09:30+00') = 'applied', 'older success applied');
+SELECT t_assert((SELECT balance_failed_at > balance_synced_at FROM youzan_points_projection WHERE customer_id='11111111-1111-4111-8111-111111111111'), 'older success does not clear newer failure');
+SELECT t_assert(t_bal(122, '9007199254741000', '2026-10-15 01:11:00+00') = 'same_version', 'newer same version');
+SELECT t_assert((SELECT balance_synced_at > balance_failed_at FROM youzan_points_projection WHERE customer_id='11111111-1111-4111-8111-111111111111'), 'newer success clears failure');
 -- 无投影客户的失败：不伪造余额
 SELECT youzan_points_projection_record_failure('22222222-2222-4222-8222-222222222222','balance','youzan_read_unavailable',now());
 SELECT t_assert((SELECT balance IS NULL AND yz_open_id IS NULL FROM youzan_points_projection WHERE customer_id='22222222-2222-4222-8222-222222222222'), 'failure without data has null balance');
@@ -60,8 +60,8 @@ SELECT t_assert((youzan_points_projection_record_logs('11111111-1111-4111-8111-1
   '2026-10-08 00:00:00+00','2026-10-15 01:20:00+00')->>'inserted')::int = 2, 'logs inserted');
 SELECT t_assert((youzan_points_projection_record_logs('11111111-1111-4111-8111-111111111111',100,'YZ-A',
   '[{"entry_key":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","amount":11,"balance_after":122,"description":"消费送积分","occurred_at":1760490000}]'::jsonb,
-  '2026-10-08 00:00:00+00','2026-10-15 01:21:00+00')->>'inserted')::int = 0
-  AND (SELECT count(*) FROM youzan_points_log_entries) = 2, 'log replay dedupe');
+  '2026-10-08 00:00:00+00','2026-10-15 01:21:00+00')->>'inserted')::int = 0, 'replay inserted 0');
+SELECT t_assert((SELECT count(*) FROM youzan_points_log_entries) = 2, 'log replay dedupe');
 SELECT t_assert(youzan_points_projection_record_logs('11111111-1111-4111-8111-111111111111',100,'YZ-OTHER','[]'::jsonb,
   '2026-10-08 00:00:00+00','2026-10-15 01:22:00+00')->>'result' = 'identity_conflict', 'log identity conflict');
 SELECT youzan_points_projection_record_failure('11111111-1111-4111-8111-111111111111','log','youzan_read_unavailable','2026-10-15 01:23:00+00');
