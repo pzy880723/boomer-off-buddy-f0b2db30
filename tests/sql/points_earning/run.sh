@@ -4,11 +4,12 @@ set -euo pipefail
 cd "$(dirname "$0")/../../.."
 bash tests/sql/harness/setup.sh >/dev/null
 P=/tmp/psql.sh; DB=points_earn_test
-MIG=${MIGRATION:-$(ls drizzle/migrations/*_points_earning_ledger.sql | tail -1)}
+MIGS=${MIGRATIONS:-$(ls drizzle/migrations/*_points_earning_*.sql)}
 PGDB=postgres $P -c "drop database if exists $DB" -c "create database $DB" >/dev/null
 PGDB=$DB $P -q -f tests/sql/points_earning/stubs.sql
-PGDB=$DB $P -q -v ON_ERROR_STOP=1 -f "$MIG"
+for m in $MIGS; do PGDB=$DB $P -q -v ON_ERROR_STOP=1 -f "$m"; done
 PGDB=$DB $P -q -f tests/sql/points_earning/cases.sql 2>&1 | grep -oE '(PASS|FAIL|ERROR).*'
+PGDB=$DB $P -q -f tests/sql/points_earning/cases_hardening.sql 2>&1 | grep -oE '(PASS|FAIL|ERROR).*'
 # 并发：同一单 8 路同时 paid（含有赞别名），只入账一次
 PGDB=$DB $P -q -c "insert into commerce_customers values ('33333333-3333-4333-8333-333333333333','active')"
 for i in $(seq 1 8); do
