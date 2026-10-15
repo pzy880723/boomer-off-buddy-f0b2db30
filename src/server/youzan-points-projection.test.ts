@@ -10,6 +10,7 @@ import {
   type LogEntryInput,
 } from "./youzan-points-projection.server";
 import { createYouzanPointsLogQuery } from "./youzan-points-log-query.server";
+import { toPointsContract, toLedgerSync, toLegacyLedgerRows } from "./youzan-points-projection.server";
 
 const A = "11111111-1111-4111-8111-111111111111";
 const B = "22222222-2222-4222-8222-222222222222";
@@ -203,16 +204,17 @@ test("entry key 稳定且区分字段", () => {
   assert.match(logEntryKey(e), /^[0-9a-f]{64}$/);
 });
 
-test("日志查询适配器：官方 changelog.search 4.0.1，只读、固定出口、7天窗口、is_do_ext_point=false", async () => {
+test("日志查询适配器：官方 changelog.search 4.0.2，只读、固定出口、data 嵌套、is_do_ext_point=false", async () => {
   const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
   const q = createYouzanPointsLogQuery({
     proxyConfigured: () => true,
     getAccessToken: async () => "TOK",
-    fetchImpl: async (url, init) => { calls.push({ url, body: JSON.parse(String(init.body)) }); return Response.json({ code: 200, success: true, paginator: { total_count: 1 }, items: [{ amount: -100, current: 0, description: "积分抵现", created_at: 1760490000 }] }); },
+    fetchImpl: async (url, init) => { calls.push({ url, body: JSON.parse(String(init.body)) }); return Response.json({ code: 200, success: true, data: { paginator: { total_count: 1 }, items: [{ amount: -100, current: 0, description: "积分抵现", created_at: 1760490000 }] } }); },
   });
   const r = await q({ customerId: A, kdtId: 100, yzOpenId: "YZ-A" }, { page: 1, beginAt: Date.parse("2026-10-08T00:00:00Z"), endAt: Date.parse("2026-10-15T00:00:00Z") });
   assert.equal(r.kind, "ok");
-  assert.match(calls[0].url, /youzan\.crm\.customer\.points\.changelog\.search\/4\.0\.1\?access_token=TOK$/);
+  if (r.kind === "ok") assert.equal(r.items[0].amount, -100);
+  assert.match(calls[0].url, /youzan\.crm\.customer\.points\.changelog\.search\/4\.0\.2\?access_token=TOK$/);
   assert.deepEqual(calls[0].body.user, { account_id: "YZ-A", account_type: 5 });
   assert.equal(calls[0].body.is_do_ext_point, false);
   assert.equal(calls[0].body.page_size, 50);
@@ -228,4 +230,28 @@ test("对外路由只用登录顾客身份，不接收 phone/customer_id 参数"
     assert.match(src, /auth\.customer\.id/);
     assert.doesNotMatch(src, /searchParams\.get\(["'](phone|customer_id|customerId)/);
   }
+});
+
+test("前端契约：points.sync_status 映射，失败不回退、缺映射不返回 0", () => {
+  const base = { source: "youzan" as const, synced_at: "2026-10-15T05:00:00.000Z", reason: null };
+  assert.deepEqual(toPointsContract({ ...base, balance: 0, status: "ok" }),
+    { source: "youzan", balance: 0, sync_status: "synced", last_synced_at: base.synced_at, reason: null });
+  assert.equal(toPointsContract({ ...base, balance: 250, status: "failed" }).sync_status, "stale");
+  assert.equal(toPointsContract({ ...base, balance: null, status: "failed" }).sync_status, "unavailable");
+  const missing = toPointsContract({ source: "youzan", balance: null, status: "mapping_missing", synced_at: null, reason: "youzan_member_not_linked" });
+  assert.equal(missing.balance, null);
+  assert.equal(missing.sync_status, "unavailable");
+  assert.equal(toPointsContract({ ...base, balance: 5, status: "pending" }).sync_status, "pending");
+});
+
+test("账本 data 保持旧数组字段，points_sync 标明最近窗口而非全历史", () => {
+  const rows = toLegacyLedgerRows([{ id: "x", amount: -100, balance_after: 0, description: "抵现", occurred_at: "2026-10-15T00:00:00.000Z", expires_at: null }]);
+  assert.deepEqual(Object.keys(rows[0]).slice(0, 6), ["id", "delta", "source_type", "source_id", "balance_after", "created_at"]);
+  assert.equal(rows[0].delta, -100);
+  assert.equal(rows[0].source_type, "youzan");
+  const sync = toLedgerSync({ source: "youzan", status: "ok", synced_at: "2026-10-15T05:00:00.000Z", reason: null, window_days: 30,
+    window_start: "2026-09-15T05:01:00.000Z", items: [], next_cursor: null }, null);
+  assert.equal(sync.log.sync_status, "synced");
+  assert.equal(sync.log.range.full_history, false);
+  assert.equal(sync.log.range.days, 30);
 });
