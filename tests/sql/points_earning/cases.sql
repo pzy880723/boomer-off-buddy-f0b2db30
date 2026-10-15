@@ -1,7 +1,7 @@
 \set ON_ERROR_STOP on
 INSERT INTO commerce_customers VALUES ('11111111-1111-4111-8111-111111111111','active'),('22222222-2222-4222-8222-222222222222','inactive');
 CREATE FUNCTION t_paid(k text, aliases text[], fen bigint, complete boolean, pc boolean) RETURNS jsonb LANGUAGE sql AS $$
-  SELECT commerce_points_record_order_paid(k, aliases, '11111111-1111-4111-8111-111111111111', split_part(k, ':', 1), fen, complete, pc, now(), 'paid_goods_1yuan_1pt_v1') $$;
+  SELECT commerce_points_record_order_paid(k, aliases, '11111111-1111-4111-8111-111111111111', split_part(k, ':', 1), fen, complete, pc, '2026-10-15 00:00:00+00', 'paid_goods_1yuan_1pt_v1') $$;
 CREATE FUNCTION t_bal() RETURNS text LANGUAGE sql AS $$
   SELECT points || '/' || points_debt FROM pos_customer_wallets WHERE customer_id='11111111-1111-4111-8111-111111111111' $$;
 CREATE FUNCTION t_assert(ok boolean, name text) RETURNS void LANGUAGE plpgsql AS $$
@@ -39,8 +39,9 @@ SELECT t_assert((t_paid('erp:o4', NULL, 4000, true, false)->>'granted_points')::
 -- 7 积分兑换券：整单 0 分（含现金补付）；之后不能被改回赚分
 SELECT t_paid('erp:o5', NULL, 20000, true, true);
 SELECT t_assert( (SELECT granted_points FROM commerce_points_earning_orders WHERE canonical_key='erp:o5') = 0, 'points coupon order earns 0');
-SELECT t_paid('erp:o5', NULL, 20000, true, false);
-SELECT t_assert( (SELECT granted_points FROM commerce_points_earning_orders WHERE canonical_key='erp:o5') = 0, 'points coupon order not re-earnable');
+DO $$ BEGIN PERFORM t_paid('erp:o5', NULL, 20000, true, false);
+  RAISE EXCEPTION 'FAIL coupon flip'; EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'points_paid_fact_conflict' THEN RAISE; END IF; END $$;
+SELECT t_assert((t_paid('erp:o5', NULL, 20000, true, true)->>'duplicate')::boolean AND  (SELECT granted_points FROM commerce_points_earning_orders WHERE canonical_key='erp:o5') = 0, 'points coupon order not re-earnable');
 
 -- 8 先花掉积分再退款 → 负积分债务；新入账先还债
 UPDATE pos_customer_wallets SET points = 10 WHERE customer_id='11111111-1111-4111-8111-111111111111';
