@@ -435,6 +435,13 @@
       "when": 1791897279912,
       "tag": "0061_listing_image_terminal_status",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1792024600843,
+      "tag": "0062_points_earning_ledger",
+      "breakpoints": true
     }
   ]
 }

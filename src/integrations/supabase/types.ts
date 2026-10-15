@@ -1744,6 +1744,114 @@ export type Database = {
           },
         ]
       }
+      commerce_points_earning_order_keys: {
+        Row: {
+          earning_order_id: string
+          order_key: string
+        }
+        Insert: {
+          earning_order_id: string
+          order_key: string
+        }
+        Update: {
+          earning_order_id?: string
+          order_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_points_earning_order_keys_earning_order_id_fkey"
+            columns: ["earning_order_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_points_earning_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commerce_points_earning_orders: {
+        Row: {
+          canonical_key: string
+          created_at: string
+          customer_id: string | null
+          goods_paid_fen: number | null
+          granted_points: number
+          hold_reason: string | null
+          id: string
+          paid_at: string | null
+          rule_version: string | null
+          source: string | null
+          status: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          canonical_key: string
+          created_at?: string
+          customer_id?: string | null
+          goods_paid_fen?: number | null
+          granted_points?: number
+          hold_reason?: string | null
+          id?: string
+          paid_at?: string | null
+          rule_version?: string | null
+          source?: string | null
+          status?: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          canonical_key?: string
+          created_at?: string
+          customer_id?: string | null
+          goods_paid_fen?: number | null
+          granted_points?: number
+          hold_reason?: string | null
+          id?: string
+          paid_at?: string | null
+          rule_version?: string | null
+          source?: string | null
+          status?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_points_earning_orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commerce_points_earning_refunds: {
+        Row: {
+          created_at: string
+          earning_order_id: string
+          goods_refund_fen: number
+          refund_key: string
+        }
+        Insert: {
+          created_at?: string
+          earning_order_id: string
+          goods_refund_fen: number
+          refund_key: string
+        }
+        Update: {
+          created_at?: string
+          earning_order_id?: string
+          goods_refund_fen?: number
+          refund_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_points_earning_refunds_earning_order_id_fkey"
+            columns: ["earning_order_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_points_earning_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commerce_points_ledger: {
         Row: {
           balance_after: number
@@ -6363,6 +6471,7 @@ export type Database = {
           membership_policy_version: number
           metadata: Json
           points: number
+          points_debt: number
           store_credit: number
           updated_at: string
         }
@@ -6374,6 +6483,7 @@ export type Database = {
           membership_policy_version?: number
           metadata?: Json
           points?: number
+          points_debt?: number
           store_credit?: number
           updated_at?: string
         }
@@ -6385,6 +6495,7 @@ export type Database = {
           membership_policy_version?: number
           metadata?: Json
           points?: number
+          points_debt?: number
           store_credit?: number
           updated_at?: string
         }
@@ -10292,6 +10403,58 @@ export type Database = {
           p_idempotency_key: string
           p_location_id: string
           p_qr_payload: string
+        }
+        Returns: Json
+      }
+      commerce_points_earning_enabled: { Args: never; Returns: boolean }
+      commerce_points_earning_lock_order: {
+        Args: { p_alias_keys: string[]; p_canonical_key: string }
+        Returns: {
+          canonical_key: string
+          created_at: string
+          customer_id: string | null
+          goods_paid_fen: number | null
+          granted_points: number
+          hold_reason: string | null
+          id: string
+          paid_at: string | null
+          rule_version: string | null
+          source: string | null
+          status: string
+          updated_at: string
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "commerce_points_earning_orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      commerce_points_earning_settle: {
+        Args: { p_order_id: string }
+        Returns: Json
+      }
+      commerce_points_record_order_paid: {
+        Args: {
+          p_alias_keys: string[]
+          p_canonical_key: string
+          p_customer_id: string
+          p_discount_detail_complete: boolean
+          p_goods_paid_fen: number
+          p_paid_at: string
+          p_points_coupon_used: boolean
+          p_rule_version: string
+          p_source: string
+        }
+        Returns: Json
+      }
+      commerce_points_record_order_refund: {
+        Args: {
+          p_alias_keys: string[]
+          p_canonical_key: string
+          p_goods_refund_fen: number
+          p_refund_key: string
         }
         Returns: Json
       }
