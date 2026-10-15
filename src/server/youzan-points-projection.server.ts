@@ -23,7 +23,9 @@ export interface ProjectionStore {
   recordBalance(a: { customerId: string; kdtId: number; yzOpenId: string; point: number; version: string; startedAt: number }): Promise<BalanceResult>;
   recordFailure(a: { customerId: string; kind: "balance" | "log"; reason: string; attemptedAt: number }): Promise<void>;
   recordLogs(a: { customerId: string; kdtId: number; yzOpenId: string; entries: LogEntryInput[]; windowStart: number; startedAt: number }): Promise<{ result: string; inserted: number }>;
-  listLogs(customerId: string, limit: number, before?: { occurredAt: string; id: string }): Promise<LogView[]>;
+  /** window：当前成功同步窗口 + 身份；只返回窗口内且属于该身份的镜像行（历史行保留不删）。 */
+  listLogs(customerId: string, limit: number, before: { occurredAt: string; id: string } | undefined,
+    window: { start: string; end: string; kdtId: number; yzOpenId: string }): Promise<LogView[]>;
 }
 
 export type MemberResolution = { kind: "found"; customerId: string; kdtId: number; yzOpenId: string } | { kind: "missing" } | { kind: "conflict" } | { kind: "unavailable" };
@@ -58,6 +60,12 @@ export type LedgerView = {
   synced_at: string | null; reason: string | null; window_days: number; window_start: string | null;
   items: LogView[]; next_cursor: string | null;
 };
+
+/** POS 列表：只展示受信、最近一次成功的余额；失败/待同步/身份异常一律 null。 */
+export function posPointsFromView(v: AccountPointsView): { points: number | null; points_sync_status: SyncStatus } {
+  const c = toPointsContract(v);
+  return { points: c.sync_status === "synced" ? c.balance : null, points_sync_status: c.sync_status };
+}
 
 export type SyncStatus = "synced" | "stale" | "unavailable" | "pending";
 /** 前端契约：points:{source,balance,sync_status,last_synced_at,reason}。失败不回退：有旧值→stale，无值→unavailable。 */
@@ -187,8 +195,12 @@ export function createPointsProjection(store: ProjectionStore, deps: ProjectionD
         const [occurredAt, id] = opts.cursor.split("|");
         if (occurredAt && !Number.isNaN(Date.parse(occurredAt)) && /^[0-9a-f-]{1,64}$/i.test(id ?? "")) before = { occurredAt, id };
       }
-      const [row, items] = await Promise.all([store.read(customerId), store.listLogs(customerId, limit, before)]);
+      const row = await store.read(customerId);
       if (identityConflict(row, m)) return { ...base, status: "mapping_missing", synced_at: null, reason: "identity_conflict", items: [], next_cursor: null };
+      // 仅当前成功窗口 [log_window_start, log_synced_at]；无窗口/无身份 → 不展示任何镜像行。
+      const items = row?.log_window_start && row.log_synced_at && row.yz_open_id && row.kdt_id != null
+        ? await store.listLogs(customerId, limit, before, { start: row.log_window_start, end: row.log_synced_at, kdtId: Number(row.kdt_id), yzOpenId: row.yz_open_id })
+        : [];
       const last = items.length === limit ? items[items.length - 1] : null;
       const next_cursor = last ? `${last.occurred_at}|${last.id}` : null;
       if (!enabled) return { ...base, status: "permission_unverified", synced_at: null, reason: "youzan_points_log_not_enabled", items, next_cursor };
