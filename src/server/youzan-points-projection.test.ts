@@ -60,15 +60,18 @@ function memStore() {
       let inserted = 0;
       for (const e of a.entries) {
         if (logs.some(l => l.customer_id === a.customerId && l.entry_key === e.entry_key)) continue;
-        logs.push({ ...e, customer_id: a.customerId, id: `log-${logs.length}` }); inserted++;
+        logs.push({ ...e, customer_id: a.customerId, kdt_id: a.kdtId, yz_open_id: a.yzOpenId, id: `log-${logs.length}` } as never); inserted++;
       }
       Object.assign(r, { kdt_id: a.kdtId, yz_open_id: a.yzOpenId }); // 与 SQL record_logs 一致
       r.log_synced_at = new Date(a.startedAt).toISOString();
+      r.log_window_start = new Date(a.windowStart).toISOString(); // 与 SQL record_logs 一致
       return { result: "recorded", inserted };
     },
-    async listLogs(c, limit) {
+    async listLogs(c, limit, before, w) {
       calls.push(`list:${c}`);
-      return logs.filter(l => l.customer_id === c).sort((x, y) => y.occurred_at - x.occurred_at).slice(0, limit)
+      // 镜像 production：按当前成功窗口 + 身份过滤（未传窗口时模拟旧实现：不过滤）
+      return logs.filter(l => l.customer_id === c && (!w || ((l as never as { yz_open_id: string }).yz_open_id === w.yzOpenId
+          && l.occurred_at * 1000 >= Date.parse(w.start) && l.occurred_at * 1000 <= Date.parse(w.end)))).sort((x, y) => y.occurred_at - x.occurred_at).slice(0, limit)
         .map(l => ({ id: l.id, amount: l.amount, balance_after: l.balance_after, description: l.description,
           occurred_at: new Date(l.occurred_at * 1000).toISOString(), expires_at: null }));
     },
@@ -382,4 +385,45 @@ test("同一 yz_open_id 但 kdt 不同也视为身份冲突", async () => {
   const p = createPointsProjection(store, deps({ resolveMember: async () => ({ kind: "found", customerId: A, kdtId: 200, yzOpenId: "YZ-A" }) }));
   assertHiddenBalance(await p.accountPoints(A, { sync: false }));
   assertHiddenLedger(await p.ledger(A, { sync: false }));
+});
+
+// ---- 日志只展示当前成功同步窗口；POS 搜索走受信读模型 ----
+test("日志只返回当前成功窗口内记录；窗口外历史保留但不展示", async () => {
+  const { store, logs } = memStore();
+  let items: Array<{ amount: number; current: number; description: string; created_at: number; biz_value: string }> =
+    [{ amount: 5, current: 5, description: "旧", created_at: Math.floor((clock - 86400_000) / 1000), biz_value: "o" }];
+  const p = createPointsProjection(store, deps({ queryLogs: async () => ({ kind: "ok", items, totalCount: items.length }) }));
+  assert.equal((await p.ledger(A, { sync: true })).items.length, 1);
+  clock += 40 * 86400_000; items = [];
+  const later = await p.ledger(A, { sync: true });
+  assert.equal(later.status, "ok");
+  assert.deepEqual(later.items, []); assert.equal(later.next_cursor, null);
+  assert.equal(logs.length, 1, "历史审计行保留");
+  assert.equal((await p.ledger(A, { sync: false, cursor: "2030-01-01T00:00:00.000Z|log-0" })).items.length, 0, "翻页同样受窗口约束");
+});
+
+test("没有成功窗口时不返回任何镜像日志", async () => {
+  const { store, rows } = memStore();
+  const p = createPointsProjection(store, deps({ queryLogs: async () => ({ kind: "ok", items: [{ amount: 1, current: 1, description: "x", created_at: Math.floor(clock / 1000), biz_value: "b" }], totalCount: 1 }) }));
+  await p.ledger(A, { sync: true });
+  rows.get(A)!.log_window_start = null;
+  const v = await p.ledger(A, { sync: false });
+  assert.deepEqual(v.items, []); assert.equal(v.next_cursor, null);
+});
+
+test("POS 展示只接受受信且最近成功的余额", async () => {
+  const { posPointsFromView } = await import("./youzan-points-projection.server");
+  assert.deepEqual(posPointsFromView({ source: "youzan", balance: 30, status: "ok", synced_at: "t", reason: null }), { points: 30, points_sync_status: "synced" });
+  for (const v of [
+    { source: "youzan", balance: 30, status: "failed", synced_at: "t", reason: "x" },
+    { source: "youzan", balance: null, status: "mapping_missing", synced_at: null, reason: "identity_conflict" },
+    { source: "youzan", balance: 30, status: "pending", synced_at: "t", reason: "member_link_unavailable" },
+  ] as const) assert.equal(posPointsFromView(v as never).points, null);
+});
+
+test("POS 搜索不再裸读投影表，复用受信 accountPoints(sync:false)", () => {
+  const src = readFileSync(new URL("../routes/api/public/pos/customers.search.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(src, /from\("youzan_points_projection"\)/);
+  assert.match(src, /accountPoints\(customer\.id, \{ sync: false \}\)/);
+  assert.match(src, /posPointsFromView/);
 });
