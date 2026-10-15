@@ -75,7 +75,7 @@ export async function getMembershipAccount(customerId: string) {
     entitlement,
     usage,
     pointsBalance: walletResult.balance,
-    points: walletResult,
+    points: (await import("@/server/youzan-points-projection.server")).toPointsContract(walletResult),
     couponCount: couponResult.count ?? 0,
   });
 }
@@ -214,11 +214,18 @@ export async function loadYouzanAccountPoints(customerId: string) {
 export async function listMembershipPointsLedger(customerId: string, opts: { cursor?: string | null; limit?: number } = {}) {
   const { productionPointsProjection, withBudget } = await import("@/server/youzan-points-projection-production.server");
   const projection = await productionPointsProjection();
+  const { toLedgerSync, toLegacyLedgerRows } = await import("@/server/youzan-points-projection.server");
   const sync = !opts.cursor;
-  const view = await withBudget(projection.ledger(customerId, { sync, ...opts }), POINTS_SYNC_BUDGET_MS);
-  if (view !== "timeout") return view;
-  const stored = await projection.ledger(customerId, { sync: false, ...opts });
-  return stored.status === "ok" ? { ...stored, status: "pending" as const, reason: "youzan_sync_in_progress" } : stored;
+  const [ledger, balance] = await Promise.all([
+    withBudget(projection.ledger(customerId, { sync, ...opts }), POINTS_SYNC_BUDGET_MS),
+    loadYouzanAccountPoints(customerId),
+  ]);
+  let view = ledger;
+  if (view === "timeout") {
+    const stored = await projection.ledger(customerId, { sync: false, ...opts });
+    view = stored.status === "ok" ? { ...stored, status: "pending" as const, reason: "youzan_sync_in_progress" } : stored;
+  }
+  return { rows: toLegacyLedgerRows(view.items), points_sync: toLedgerSync(view, balance) };
 }
 
 export async function listMembershipConsumptionRecords(customerId: string) {

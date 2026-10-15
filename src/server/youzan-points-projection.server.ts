@@ -11,7 +11,7 @@ export type ProjectionRow = {
   customer_id: string; kdt_id: number | null; yz_open_id: string | null;
   balance: number | null; points_account_version: string | null;
   balance_synced_at: string | null; balance_failed_at: string | null; balance_failure: string | null;
-  log_synced_at: string | null; log_failed_at: string | null; log_failure: string | null;
+  log_synced_at: string | null; log_window_start?: string | null; log_failed_at: string | null; log_failure: string | null;
 };
 export type LogEntryInput = { entry_key: string; amount: number; balance_after: number | null; description: string | null;
   occurred_at: number; expires_at: number | null; biz_value: string | null };
@@ -37,7 +37,7 @@ export type ProjectionDeps = {
   now?: () => number;
 };
 
-export const LOG_WINDOW_DAYS = 7;
+export const LOG_WINDOW_DAYS = 30;
 const LOG_MAX_PAGES = 6;
 const REASON = /^[a-z0-9_]{1,60}$/;
 const reason = (r: string) => (REASON.test(r) ? r : "youzan_read_failed");
@@ -54,8 +54,33 @@ export type AccountPointsView = {
 };
 export type LedgerView = {
   source: "youzan"; status: "ok" | "failed" | "pending" | "mapping_missing" | "permission_unverified";
-  synced_at: string | null; reason: string | null; window_days: number; items: LogView[]; next_cursor: string | null;
+  synced_at: string | null; reason: string | null; window_days: number; window_start: string | null;
+  items: LogView[]; next_cursor: string | null;
 };
+
+export type SyncStatus = "synced" | "stale" | "unavailable" | "pending";
+/** 前端契约：points:{source,balance,sync_status,last_synced_at,reason}。失败不回退：有旧值→stale，无值→unavailable。 */
+export function toPointsContract(v: AccountPointsView) {
+  const sync_status: SyncStatus = v.status === "ok" ? "synced" : v.status === "pending" ? "pending"
+    : v.balance !== null ? "stale" : "unavailable";
+  return { source: "youzan" as const, balance: v.balance, sync_status, last_synced_at: v.synced_at, reason: v.reason };
+}
+/** 账本 data 保持旧数组字段（id,delta,source_type,source_id,balance_after,created_at），只多 description/expires_at。 */
+export function toLegacyLedgerRows(items: LogView[]) {
+  return items.map(i => ({ id: i.id, delta: i.amount, source_type: "youzan", source_id: null, balance_after: i.balance_after,
+    created_at: i.occurred_at, description: i.description, expires_at: i.expires_at }));
+}
+export function toLedgerSync(l: LedgerView, balance: AccountPointsView | null) {
+  const log_status: SyncStatus = l.status === "ok" ? "synced" : l.status === "pending" ? "pending"
+    : l.status === "failed" && l.synced_at ? "stale" : "unavailable";
+  return {
+    source: "youzan" as const,
+    balance: balance ? toPointsContract(balance) : null,
+    log: { sync_status: log_status, last_synced_at: l.synced_at, reason: l.reason,
+      range: { kind: "recent_window", days: l.window_days, begin_at: l.window_start, end_at: l.synced_at, full_history: false } },
+    next_cursor: l.next_cursor,
+  };
+}
 
 function balanceView(row: ProjectionRow | null, mapped: boolean): AccountPointsView {
   if (!mapped) return { source: "youzan", balance: null, status: "mapping_missing", synced_at: null, reason: "youzan_member_not_linked" };
@@ -124,7 +149,7 @@ export function createPointsProjection(store: ProjectionStore, deps: ProjectionD
       return view;
     },
     async ledger(customerId: string, opts: { sync: boolean; limit?: number; cursor?: string | null }): Promise<LedgerView> {
-      const base = { source: "youzan" as const, window_days: LOG_WINDOW_DAYS };
+      const base = { source: "youzan" as const, window_days: LOG_WINDOW_DAYS, window_start: null as string | null };
       const m = await member(customerId);
       if (m.kind === "missing" || m.kind === "conflict") return { ...base, status: "mapping_missing", synced_at: null, reason: "youzan_member_not_linked", items: [], next_cursor: null };
       const enabled = deps.logsEnabled();
@@ -142,7 +167,7 @@ export function createPointsProjection(store: ProjectionStore, deps: ProjectionD
       const synced = row?.log_synced_at ? Date.parse(row.log_synced_at) : null;
       const failed = row?.log_failed_at ? Date.parse(row.log_failed_at) : null;
       const isFailed = m.kind === "unavailable" || (failed !== null && (synced === null || failed > synced));
-      return { ...base, status: isFailed ? "failed" : synced === null ? "pending" : "ok", synced_at: row?.log_synced_at ?? null,
+      return { ...base, window_start: row?.log_window_start ?? null, status: isFailed ? "failed" : synced === null ? "pending" : "ok", synced_at: row?.log_synced_at ?? null,
         reason: m.kind === "unavailable" ? "member_link_unavailable" : isFailed ? row?.log_failure ?? null : null, items, next_cursor };
     },
     /** 补偿刷新：只刷新已映射的顾客（由受信定时任务调用）。 */

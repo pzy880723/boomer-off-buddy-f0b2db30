@@ -1,10 +1,10 @@
-// 有赞官方积分日志只读适配器：youzan.crm.customer.points.changelog.search/4.0.1
-// 官方文档 doc.youzanyun.com/detail/API/0/3374：查询 30 天内、单次跨度 ≤7 天、每页最多 50 条；
-// 「支持业务」列出单店与连锁 D，未列连锁 L —— 因此生产默认关闭（YOUZAN_POINTS_LOG_ENABLED），
-// 未获真实 code=200 前在接口上显示 permission_unverified，绝不伪造日志。
+// 有赞官方积分日志只读适配器：youzan.crm.customer.points.changelog.search/4.0.2
+// 官方文档 doc.youzanyun.com/detail/API/0/3410：begin/end 跨度 <31 天、每页最多 50 条，返回 data.items/data.paginator。
+// 目录「支持业务」未列连锁 L，但 2026-10-15 腾讯固定出口对 HQ 两个可信映射实测 code=200，故默认启用；
+// YOUZAN_POINTS_LOG_DISABLED=true 可紧急关闭（关闭时显示 unavailable，绝不伪造日志）。
 // 只读；必须经 youzanFetch 固定出口；is_do_ext_point=false。
 export const POINTS_LOG_API = "youzan.crm.customer.points.changelog.search";
-export const POINTS_LOG_VERSION = "4.0.1";
+export const POINTS_LOG_VERSION = "4.0.2";
 export const POINTS_LOG_PAGE_SIZE = 50;
 
 export type LogMember = { customerId: string; kdtId: number; yzOpenId: string };
@@ -57,7 +57,7 @@ export function createYouzanPointsLogQuery(deps: Deps) {
       const code = int((j?.gw_err_resp as Record<string, unknown> | undefined)?.err_code ?? j?.code);
       return { kind: "blocked", reason: code ? `youzan_rejected_${code}`.slice(0, 60) : "youzan_query_rejected" };
     }
-    // 4.0.1 顶层 items/paginator；4.0.2 在 data 下。两者都按官方字段读取。
+    // 4.0.2 在 data 下（4.0.1 为顶层），两者都按官方字段读取。
     const body = (j.data && typeof j.data === "object" ? j.data : j) as Record<string, unknown>;
     if (!Array.isArray(body.items)) return { kind: "blocked", reason: "log_response_incomplete" };
     const items: RawLogItem[] = [];
