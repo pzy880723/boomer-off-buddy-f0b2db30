@@ -41,7 +41,7 @@ export async function getMembershipAccount(customerId: string) {
         .eq("is_active", true)
         .single(),
       // 积分只读有赞权威投影；本地自主钱包（含历史测试积分）不再参与顾客展示。
-      loadYouzanAccountPoints(customerId, projection),
+      loadYouzanAccountPoints(customerId),
       supabaseAdmin
         .from("commerce_recognition_usage_daily" as never)
         .select("used,allowance")

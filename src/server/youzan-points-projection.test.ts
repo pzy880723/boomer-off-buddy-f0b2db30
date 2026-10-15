@@ -194,6 +194,7 @@ test("日志分页、去重、只存官方字段；失败保留已有记录", as
   await p.ledger(A, { sync: true });
   assert.equal(logs.length, 60, "replay dedupe");
   fail = true;
+  clock += 31_000;
   const failed = await p.ledger(A, { sync: true });
   assert.equal(failed.status, "failed");
   assert.equal(failed.items.length, 50);
