@@ -17,7 +17,10 @@ export const Route = createFileRoute("/api/public/storefront/membership/points-l
         try {
           return storefrontJson({
             ok: true,
-            data: await listMembershipPointsLedger(auth.customer.id),
+            data: await listMembershipPointsLedger(auth.customer.id, {
+              cursor: new URL(request.url).searchParams.get("cursor"),
+              limit: Number(new URL(request.url).searchParams.get("limit")) || undefined,
+            }),
           });
         } catch (error) {
           return storefrontError(error instanceof Error ? error.message : String(error), 500);
