@@ -112,6 +112,7 @@ import { Route as ApiPublicContentFeedRouteImport } from './routes/api/public/co
 import { Route as ApiPublicGoAuthorizationRouteImport } from './routes/api/public/go/authorization'
 import { Route as ApiPublicGoAuthorizationAckRouteImport } from './routes/api/public/go/authorization-ack'
 import { Route as ApiPublicGoDailySummaryRouteImport } from './routes/api/public/go/daily-summary'
+import { Route as ApiPublicGoLeaderboardRouteImport } from './routes/api/public/go/leaderboard'
 import { Route as ApiPublicGoProfileRouteImport } from './routes/api/public/go/profile'
 import { Route as ApiPublicGoScopeSyncRouteImport } from './routes/api/public/go/scope-sync'
 import { Route as ApiPublicGoSessionRouteImport } from './routes/api/public/go/session'
@@ -840,6 +841,11 @@ const ApiPublicGoAuthorizationAckRoute =
 const ApiPublicGoDailySummaryRoute = ApiPublicGoDailySummaryRouteImport.update({
   id: '/api/public/go/daily-summary',
   path: '/api/public/go/daily-summary',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicGoLeaderboardRoute = ApiPublicGoLeaderboardRouteImport.update({
+  id: '/api/public/go/leaderboard',
+  path: '/api/public/go/leaderboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicGoProfileRoute = ApiPublicGoProfileRouteImport.update({
@@ -2120,6 +2126,7 @@ export interface FileRoutesByFullPath {
   '/api/public/go/authorization': typeof ApiPublicGoAuthorizationRoute
   '/api/public/go/authorization-ack': typeof ApiPublicGoAuthorizationAckRoute
   '/api/public/go/daily-summary': typeof ApiPublicGoDailySummaryRoute
+  '/api/public/go/leaderboard': typeof ApiPublicGoLeaderboardRoute
   '/api/public/go/profile': typeof ApiPublicGoProfileRoute
   '/api/public/go/scope-sync': typeof ApiPublicGoScopeSyncRoute
   '/api/public/go/session': typeof ApiPublicGoSessionRoute
@@ -2417,6 +2424,7 @@ export interface FileRoutesByTo {
   '/api/public/go/authorization': typeof ApiPublicGoAuthorizationRoute
   '/api/public/go/authorization-ack': typeof ApiPublicGoAuthorizationAckRoute
   '/api/public/go/daily-summary': typeof ApiPublicGoDailySummaryRoute
+  '/api/public/go/leaderboard': typeof ApiPublicGoLeaderboardRoute
   '/api/public/go/profile': typeof ApiPublicGoProfileRoute
   '/api/public/go/scope-sync': typeof ApiPublicGoScopeSyncRoute
   '/api/public/go/session': typeof ApiPublicGoSessionRoute
@@ -2722,6 +2730,7 @@ export interface FileRoutesById {
   '/api/public/go/authorization': typeof ApiPublicGoAuthorizationRoute
   '/api/public/go/authorization-ack': typeof ApiPublicGoAuthorizationAckRoute
   '/api/public/go/daily-summary': typeof ApiPublicGoDailySummaryRoute
+  '/api/public/go/leaderboard': typeof ApiPublicGoLeaderboardRoute
   '/api/public/go/profile': typeof ApiPublicGoProfileRoute
   '/api/public/go/scope-sync': typeof ApiPublicGoScopeSyncRoute
   '/api/public/go/session': typeof ApiPublicGoSessionRoute
@@ -3028,6 +3037,7 @@ export interface FileRouteTypes {
     | '/api/public/go/authorization'
     | '/api/public/go/authorization-ack'
     | '/api/public/go/daily-summary'
+    | '/api/public/go/leaderboard'
     | '/api/public/go/profile'
     | '/api/public/go/scope-sync'
     | '/api/public/go/session'
@@ -3325,6 +3335,7 @@ export interface FileRouteTypes {
     | '/api/public/go/authorization'
     | '/api/public/go/authorization-ack'
     | '/api/public/go/daily-summary'
+    | '/api/public/go/leaderboard'
     | '/api/public/go/profile'
     | '/api/public/go/scope-sync'
     | '/api/public/go/session'
@@ -3629,6 +3640,7 @@ export interface FileRouteTypes {
     | '/api/public/go/authorization'
     | '/api/public/go/authorization-ack'
     | '/api/public/go/daily-summary'
+    | '/api/public/go/leaderboard'
     | '/api/public/go/profile'
     | '/api/public/go/scope-sync'
     | '/api/public/go/session'
@@ -3885,6 +3897,7 @@ export interface RootRouteChildren {
   ApiPublicGoAuthorizationRoute: typeof ApiPublicGoAuthorizationRoute
   ApiPublicGoAuthorizationAckRoute: typeof ApiPublicGoAuthorizationAckRoute
   ApiPublicGoDailySummaryRoute: typeof ApiPublicGoDailySummaryRoute
+  ApiPublicGoLeaderboardRoute: typeof ApiPublicGoLeaderboardRoute
   ApiPublicGoProfileRoute: typeof ApiPublicGoProfileRoute
   ApiPublicGoScopeSyncRoute: typeof ApiPublicGoScopeSyncRoute
   ApiPublicGoSessionRoute: typeof ApiPublicGoSessionRoute
@@ -4746,6 +4759,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/go/daily-summary'
       fullPath: '/api/public/go/daily-summary'
       preLoaderRoute: typeof ApiPublicGoDailySummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/go/leaderboard': {
+      id: '/api/public/go/leaderboard'
+      path: '/api/public/go/leaderboard'
+      fullPath: '/api/public/go/leaderboard'
+      preLoaderRoute: typeof ApiPublicGoLeaderboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/go/profile': {
@@ -6943,6 +6963,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicGoAuthorizationRoute: ApiPublicGoAuthorizationRoute,
   ApiPublicGoAuthorizationAckRoute: ApiPublicGoAuthorizationAckRoute,
   ApiPublicGoDailySummaryRoute: ApiPublicGoDailySummaryRoute,
+  ApiPublicGoLeaderboardRoute: ApiPublicGoLeaderboardRoute,
   ApiPublicGoProfileRoute: ApiPublicGoProfileRoute,
   ApiPublicGoScopeSyncRoute: ApiPublicGoScopeSyncRoute,
   ApiPublicGoSessionRoute: ApiPublicGoSessionRoute,
