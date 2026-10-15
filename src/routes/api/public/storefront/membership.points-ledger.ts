@@ -7,11 +7,18 @@ import {
   storefrontJson,
 } from "@/server/storefront-auth.server";
 
+// 私有积分/账户数据：禁止任何代理或浏览器缓存。
+function privateNoStore(res: Response) {
+  res.headers.set("Cache-Control", "private, no-store");
+  res.headers.set("Vary", "Authorization");
+  return res;
+}
+
 export const Route = createFileRoute("/api/public/storefront/membership/points-ledger")({
   server: {
     handlers: {
       OPTIONS: async () => new Response(null, { status: 204, headers: STOREFRONT_CORS }),
-      GET: async ({ request }) => {
+      GET: async ({ request }) => privateNoStore(await (async () => {
         const auth = await authenticateStorefrontCustomer(request);
         if (!auth.ok) return auth.response;
         try {
@@ -25,7 +32,7 @@ export const Route = createFileRoute("/api/public/storefront/membership/points-l
         } catch (error) {
           return storefrontError(error instanceof Error ? error.message : String(error), 500);
         }
-      },
+      })()),
     },
   },
 });
