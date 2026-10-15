@@ -1,4 +1,4 @@
-import { test } from "vitest";
+import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildPaidFact } from "./points-earning";
 import { recordPaidOrderPoints } from "@/server/points-earning.server";
