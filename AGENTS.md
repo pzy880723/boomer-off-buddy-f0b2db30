@@ -1,5 +1,5 @@
 # Architecture rules
-- Support conversation rules live in src/server/AGENTS.md.
+- Support conversation and points-earning rules live in src/server/AGENTS.md.
 - PC card printing adapts the native same-origin array manifest and embeds original single-card PDF pages without rasterization; eligibility is rechecked before output. Why: preserves embedded fonts and approved layouts while blocking retired presets without new permissions.
 - Card specification filtering uses exact manifest dimensions; homogeneous hook-card selections use a dedicated physical packing branch, while mixed selections retain the general packer. Why: avoids orientation-based misclassification and preserves existing mixed-layout behavior.
 - PC QR reads use authenticated server functions with the handheld role/location and private-object path semantics, without borrowing device credentials. Why: web users have no device token and original QR assets must remain store-isolated.
