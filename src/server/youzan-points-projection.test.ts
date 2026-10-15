@@ -322,3 +322,64 @@ test("账户与积分记录接口声明 private, no-store", () => {
   const repo = readFileSync(new URL("../lib/membership/membership-repository.server.ts", import.meta.url), "utf8");
   assert.match(repo, /loadYouzanAccountPoints\(customerId, projection\)/, "积分记录须与余额共享同一投影实例");
 });
+
+// ---- 可信映射变更（YZ-A → YZ-B）后绝不展示旧身份数据 ----
+async function seededA() {
+  const s = memStore();
+  const pA = createPointsProjection(s.store, deps({ queryBalance: async () => ({ kind: "ok", point: 880, version: "3" }),
+    queryLogs: async () => ({ kind: "ok", items: [{ amount: 10, current: 880, description: "A", created_at: 1760000000, biz_value: "x" }], totalCount: 1 }) }));
+  await pA.accountPoints(A, { sync: true });
+  await pA.ledger(A, { sync: true });
+  assert.equal(s.rows.get(A)!.yz_open_id, "YZ-A");
+  return s;
+}
+const toB = (o: Partial<ProjectionDeps> = {}) => deps({ resolveMember: async () => ({ kind: "found", customerId: A, kdtId: 100, yzOpenId: "YZ-B" }), ...o });
+const assertHiddenBalance = (v: { balance: number | null; status: string; reason: string | null }) => {
+  assert.equal(v.balance, null); assert.equal(v.status, "mapping_missing"); assert.equal(v.reason, "identity_conflict");
+  assert.equal(toPointsContract(v as never).sync_status, "unavailable");
+};
+const assertHiddenLedger = (l: { items: unknown[]; next_cursor: string | null; status: string; reason: string | null }) => {
+  assert.deepEqual(l.items, []); assert.equal(l.next_cursor, null); assert.equal(l.status, "mapping_missing"); assert.equal(l.reason, "identity_conflict");
+};
+
+test("映射改为 YZ-B：余额 sync=true（有赞成功/拒绝/不可用）均不返回 A 旧余额", async () => {
+  for (const q of [async () => ({ kind: "ok", point: 5, version: "9" }), async () => ({ kind: "blocked", reason: "x" }), async () => ({ kind: "unavailable" })] as ProjectionDeps["queryBalance"][]) {
+    const { store, rows } = await seededA();
+    assertHiddenBalance(await createPointsProjection(store, toB({ queryBalance: q })).accountPoints(A, { sync: true }));
+    assert.equal(rows.get(A)!.balance, 880, "不删除历史");
+  }
+});
+
+test("映射改为 YZ-B：sync=false 与 30 秒新鲜窗口不得绕过", async () => {
+  const { store } = await seededA();
+  const p = createPointsProjection(store, toB());
+  assertHiddenBalance(await p.accountPoints(A, { sync: false }));
+  assertHiddenLedger(await p.ledger(A, { sync: false }));
+});
+
+test("映射改为 YZ-B：日志首屏、cursor 翻页、日志拉取成功/失败都不返回 A 旧记录", async () => {
+  for (const q of [async () => ({ kind: "ok", items: [], totalCount: 0 }), async () => ({ kind: "unavailable" })] as NonNullable<ProjectionDeps["queryLogs"]>[]) {
+    const { store } = await seededA();
+    const p = createPointsProjection(store, toB({ queryLogs: q }));
+    assertHiddenLedger(await p.ledger(A, { sync: true }));
+    assertHiddenLedger(await p.ledger(A, { sync: false, cursor: "2026-10-01T00:00:00.000Z|log-9" }));
+  }
+});
+
+test("同步过程中被并发写回旧映射：以最终读取的行为准仍隐藏", async () => {
+  const s = memStore();
+  const p = createPointsProjection(s.store, toB({ queryBalance: async () => {
+    Object.assign(s.rows.get(A) ?? (s.rows.set(A, { customer_id: A, kdt_id: null, yz_open_id: null, balance: null, points_account_version: null,
+      balance_synced_at: null, balance_failed_at: null, balance_failure: null, log_synced_at: null, log_failed_at: null, log_failure: null }), s.rows.get(A)!),
+      { kdt_id: 100, yz_open_id: "YZ-A", balance: 777, points_account_version: "99", balance_synced_at: new Date(clock).toISOString() });
+    return { kind: "ok", point: 1, version: "1" };
+  } }));
+  assertHiddenBalance(await p.accountPoints(A, { sync: true }));
+});
+
+test("同一 yz_open_id 但 kdt 不同也视为身份冲突", async () => {
+  const { store } = await seededA();
+  const p = createPointsProjection(store, deps({ resolveMember: async () => ({ kind: "found", customerId: A, kdtId: 200, yzOpenId: "YZ-A" }) }));
+  assertHiddenBalance(await p.accountPoints(A, { sync: false }));
+  assertHiddenLedger(await p.ledger(A, { sync: false }));
+});
