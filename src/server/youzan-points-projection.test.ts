@@ -62,6 +62,7 @@ function memStore() {
         if (logs.some(l => l.customer_id === a.customerId && l.entry_key === e.entry_key)) continue;
         logs.push({ ...e, customer_id: a.customerId, id: `log-${logs.length}` }); inserted++;
       }
+      Object.assign(r, { kdt_id: a.kdtId, yz_open_id: a.yzOpenId }); // 与 SQL record_logs 一致
       r.log_synced_at = new Date(a.startedAt).toISOString();
       return { result: "recorded", inserted };
     },
@@ -104,6 +105,7 @@ test("同步失败保留上次有赞余额并标记失败，绝不回退本地�
   }));
   assert.equal((await p.accountPoints(A, { sync: true })).balance, 250);
   fail = true;
+  clock += 31_000; // 超过 30 秒复用窗口才会真实刷新
   const v = await p.accountPoints(A, { sync: true });
   assert.equal(v.balance, 250);
   assert.equal(v.status, "failed");
