@@ -15,8 +15,8 @@ async function activeShops(): Promise<Shop[]> {
   return (data ?? []) as Shop[];
 }
 
-export async function resolveTrustedYouzanMember(customerId: string): Promise<MemberResolution> {
-  const shops = await activeShops();
+export async function resolveTrustedYouzanMember(customerId: string, loadShops: () => Promise<Shop[]> = activeShops): Promise<MemberResolution> {
+  const shops = await loadShops();
   const heads = shops.filter(s => s.role === "hq");
   if (heads.length !== 1) return { kind: "unavailable" };
   const hq = Number(heads[0].kdt_id);
@@ -94,14 +94,17 @@ export async function productionPointsProjection() {
   const { createYouzanPointsLogQuery } = await import("./youzan-points-log-query.server");
   const { youzanFetch } = await import("@/lib/youzan-http");
   const pointsQuery = await productionPointsQuery();
+  // 单个投影实例（一次请求）内共享 shops 读取。
+  let shopsOnce: Promise<Shop[]> | null = null;
+  const shops = () => (shopsOnce ??= activeShops());
   const proxyConfigured = () => /^https?:\/\//i.test(process.env.YOUZAN_PROXY_URL?.trim() ?? "");
   const logQuery = createYouzanPointsLogQuery({
     proxyConfigured,
     fetchImpl: (u, i) => youzanFetch(u, i),
-    async getAccessToken(kdtId) { return selectPointsHeadquarters(await activeShops(), kdtId)?.access_token ?? null; },
+    async getAccessToken(kdtId) { return selectPointsHeadquarters(await shops(), kdtId)?.access_token ?? null; },
   });
   return createPointsProjection(productionProjectionStore, {
-    resolveMember: resolveTrustedYouzanMember,
+    resolveMember: (customerId) => resolveTrustedYouzanMember(customerId, shops),
     async queryBalance(m) {
       const r = await pointsQuery({ kdtId: m.kdtId, yzOpenId: m.yzOpenId, assetKind: "points", assetKey: "" });
       if (r.kind === "ok") return { kind: "ok", point: Number(r.observed.point), version: String(r.observed.points_account_version) };

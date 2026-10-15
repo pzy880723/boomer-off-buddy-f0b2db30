@@ -198,10 +198,13 @@ export async function listMembershipCoupons(customerId: string) {
 const POINTS_SYNC_BUDGET_MS = 5000;
 
 /** 打开账户时同步有赞余额（有界等待）；超时/失败返回已存投影与真实状态，绝不回退本地或 0。 */
-export async function loadYouzanAccountPoints(customerId: string) {
+export async function loadYouzanAccountPoints(
+  customerId: string,
+  shared?: Awaited<ReturnType<typeof import("@/server/youzan-points-projection-production.server").productionPointsProjection>>,
+) {
   const { productionPointsProjection, withBudget } = await import("@/server/youzan-points-projection-production.server");
-  let projection;
-  try { projection = await productionPointsProjection(); } catch {
+  let projection = shared;
+  if (!projection) try { projection = await productionPointsProjection(); } catch {
     return { source: "youzan" as const, balance: null, status: "failed" as const, synced_at: null, reason: "points_projection_unavailable" };
   }
   const synced = await withBudget(projection.accountPoints(customerId, { sync: true }), POINTS_SYNC_BUDGET_MS);
@@ -218,7 +221,7 @@ export async function listMembershipPointsLedger(customerId: string, opts: { cur
   const sync = !opts.cursor;
   const [ledger, balance] = await Promise.all([
     withBudget(projection.ledger(customerId, { sync, ...opts }), POINTS_SYNC_BUDGET_MS),
-    loadYouzanAccountPoints(customerId),
+    loadYouzanAccountPoints(customerId, projection),
   ]);
   let view = ledger;
   if (view === "timeout") {

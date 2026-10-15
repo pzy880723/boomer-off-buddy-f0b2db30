@@ -38,6 +38,7 @@ export type ProjectionDeps = {
 };
 
 export const LOG_WINDOW_DAYS = 30;
+export const PROJECTION_FRESH_MS = 30_000;
 const LOG_MAX_PAGES = 6;
 const REASON = /^[a-z0-9_]{1,60}$/;
 const reason = (r: string) => (REASON.test(r) ? r : "youzan_read_failed");
@@ -94,10 +95,26 @@ function balanceView(row: ProjectionRow | null, mapped: boolean): AccountPointsV
 
 export function createPointsProjection(store: ProjectionStore, deps: ProjectionDeps) {
   const now = deps.now ?? Date.now;
-
-  async function member(customerId: string) {
-    try { return await deps.resolveMember(customerId); } catch { return { kind: "unavailable" } as const; }
+  // 同一投影实例（一次请求）内共享可信身份解析，避免重复查 shops / 映射库。
+  const members = new Map<string, Promise<MemberResolution>>();
+  function member(customerId: string): Promise<MemberResolution> {
+    let p = members.get(customerId);
+    if (!p) {
+      p = deps.resolveMember(customerId).catch(() => ({ kind: "unavailable" }) as const);
+      members.set(customerId, p);
+    }
+    return p;
   }
+  // 只复用 30 秒内、同一可信身份、最近一次为成功（无更新失败）的有赞投影；其余一律真实刷新。
+  const sameIdentity = (row: ProjectionRow | null, m: Extract<MemberResolution, { kind: "found" }>) =>
+    !!row && row.yz_open_id === m.yzOpenId && Number(row.kdt_id) === m.kdtId;
+  const freshAt = (synced: string | null | undefined, failed: string | null | undefined) => {
+    if (!synced) return false;
+    const s = Date.parse(synced);
+    if (failed && Date.parse(failed) >= s) return false;
+    const age = now() - s;
+    return age >= 0 && age < PROJECTION_FRESH_MS;
+  };
 
   async function syncBalance(m: Extract<MemberResolution, { kind: "found" }>) {
     const startedAt = now();
@@ -142,8 +159,11 @@ export function createPointsProjection(store: ProjectionStore, deps: ProjectionD
     async accountPoints(customerId: string, opts: { sync: boolean }): Promise<AccountPointsView> {
       const m = await member(customerId);
       if (m.kind === "missing" || m.kind === "conflict") return balanceView(null, false);
-      if (m.kind === "found" && opts.sync) await syncBalance(m);
-      const row = await store.read(customerId);
+      let row = await store.read(customerId);
+      if (m.kind === "found" && opts.sync) {
+        const fresh = sameIdentity(row, m) && row!.balance != null && freshAt(row!.balance_synced_at, row!.balance_failed_at);
+        if (!fresh) { await syncBalance(m); row = await store.read(customerId); }
+      }
       const view = balanceView(row, true);
       if (m.kind === "unavailable") return { ...view, status: view.balance === null ? "pending" : "failed", reason: "member_link_unavailable" };
       return view;
@@ -153,7 +173,10 @@ export function createPointsProjection(store: ProjectionStore, deps: ProjectionD
       const m = await member(customerId);
       if (m.kind === "missing" || m.kind === "conflict") return { ...base, status: "mapping_missing", synced_at: null, reason: "youzan_member_not_linked", items: [], next_cursor: null };
       const enabled = deps.logsEnabled();
-      if (m.kind === "found" && opts.sync && enabled) await syncLogs(m);
+      if (m.kind === "found" && opts.sync && enabled) {
+        const prev = await store.read(customerId);
+        if (!(sameIdentity(prev, m) && freshAt(prev!.log_synced_at, prev!.log_failed_at))) await syncLogs(m);
+      }
       const limit = Math.min(Math.max(opts.limit ?? 50, 1), 50);
       let before: { occurredAt: string; id: string } | undefined;
       if (opts.cursor) {

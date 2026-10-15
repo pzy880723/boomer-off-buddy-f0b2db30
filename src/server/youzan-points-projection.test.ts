@@ -62,6 +62,7 @@ function memStore() {
         if (logs.some(l => l.customer_id === a.customerId && l.entry_key === e.entry_key)) continue;
         logs.push({ ...e, customer_id: a.customerId, id: `log-${logs.length}` }); inserted++;
       }
+      Object.assign(r, { kdt_id: a.kdtId, yz_open_id: a.yzOpenId }); // 与 SQL record_logs 一致
       r.log_synced_at = new Date(a.startedAt).toISOString();
       return { result: "recorded", inserted };
     },
@@ -104,6 +105,7 @@ test("同步失败保留上次有赞余额并标记失败，绝不回退本地�
   }));
   assert.equal((await p.accountPoints(A, { sync: true })).balance, 250);
   fail = true;
+  clock += 31_000; // 超过 30 秒复用窗口才会真实刷新
   const v = await p.accountPoints(A, { sync: true });
   assert.equal(v.balance, 250);
   assert.equal(v.status, "failed");
@@ -192,6 +194,7 @@ test("日志分页、去重、只存官方字段；失败保留已有记录", as
   await p.ledger(A, { sync: true });
   assert.equal(logs.length, 60, "replay dedupe");
   fail = true;
+  clock += 31_000;
   const failed = await p.ledger(A, { sync: true });
   assert.equal(failed.status, "failed");
   assert.equal(failed.items.length, 50);
@@ -254,4 +257,68 @@ test("账本 data 保持旧数组字段，points_sync 标明最近窗口而非�
   assert.equal(sync.log.sync_status, "synced");
   assert.equal(sync.log.range.full_history, false);
   assert.equal(sync.log.range.days, 30);
+});
+
+// ---- 30 秒可信投影复用 / 单请求共享身份解析 / 私有缓存头 ----
+test("30 秒内已同步余额直接复用，不重复查有赞；超过 30 秒真实刷新", async () => {
+  const { store } = memStore();
+  let n = 0;
+  const p = createPointsProjection(store, deps({ queryBalance: async () => { n++; return { kind: "ok", point: 12, version: String(n) }; } }));
+  assert.equal((await p.accountPoints(A, { sync: true })).balance, 12);
+  const again = await p.accountPoints(A, { sync: true });
+  assert.equal(n, 1);
+  assert.equal(again.status, "ok");
+  clock += 31_000;
+  await p.accountPoints(A, { sync: true });
+  assert.equal(n, 2);
+});
+
+test("失败/从未同步/版本冲突不复用，按真实刷新执行", async () => {
+  const { store } = memStore();
+  let n = 0, mode: "ok" | "fail" | "conflict" = "fail";
+  const p = createPointsProjection(store, deps({ queryBalance: async () => {
+    n++;
+    if (mode === "fail") return { kind: "unavailable" };
+    return { kind: "ok", point: mode === "conflict" ? 99 : 5, version: "7" };
+  } }));
+  await p.accountPoints(A, { sync: true });
+  await p.accountPoints(A, { sync: true });
+  assert.equal(n, 2, "从未成功不得复用");
+  mode = "ok"; await p.accountPoints(A, { sync: true });
+  mode = "conflict"; const c = await p.accountPoints(A, { sync: true }); // 30 秒内仍 ok → 复用，不查
+  assert.equal(n, 3); assert.equal(c.balance, 5);
+  clock += 31_000; await p.accountPoints(A, { sync: true }); // 冲突 → 记录失败
+  const after = await p.accountPoints(A, { sync: true });
+  assert.equal(n, 5, "冲突后的失败状态不得复用");
+  assert.equal(after.status, "failed");
+});
+
+test("30 秒内日志首次读取后复用，不反复全月拉取；cursor 合同不变", async () => {
+  const { store } = memStore();
+  let q = 0;
+  const p = createPointsProjection(store, deps({ queryLogs: async () => { q++; return { kind: "ok", items: [], totalCount: 0 }; } }));
+  const first = await p.ledger(A, { sync: true });
+  assert.equal(q, 1); assert.equal(first.status, "ok");
+  const second = await p.ledger(A, { sync: true });
+  assert.equal(q, 1); assert.equal(second.status, "ok"); assert.equal(second.next_cursor, null);
+  clock += 31_000; await p.ledger(A, { sync: true });
+  assert.equal(q, 2);
+});
+
+test("同一投影实例内可信身份解析只做一次", async () => {
+  const { store } = memStore();
+  let r = 0;
+  const p = createPointsProjection(store, deps({ resolveMember: async () => { r++; return { kind: "found", customerId: A, kdtId: 100, yzOpenId: "YZ-A" }; } }));
+  await Promise.all([p.ledger(A, { sync: true }), p.accountPoints(A, { sync: true })]);
+  await p.accountPoints(A, { sync: false });
+  assert.equal(r, 1);
+});
+
+test("账户与积分记录接口声明 private, no-store", () => {
+  for (const f of ["membership.account.ts", "membership.points-ledger.ts"]) {
+    const src = readFileSync(new URL(`../routes/api/public/storefront/${f}`, import.meta.url), "utf8");
+    assert.match(src, /private, no-store/);
+  }
+  const repo = readFileSync(new URL("../lib/membership/membership-repository.server.ts", import.meta.url), "utf8");
+  assert.match(repo, /loadYouzanAccountPoints\(customerId, projection\)/, "积分记录须与余额共享同一投影实例");
 });
