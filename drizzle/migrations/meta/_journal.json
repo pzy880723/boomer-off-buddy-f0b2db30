@@ -456,6 +456,13 @@
       "when": 1792041788663,
       "tag": "0064_youzan_points_projection",
       "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1792041849150,
+      "tag": "0065_youzan_points_projection_tables",
+      "breakpoints": true
     }
   ]
 }
