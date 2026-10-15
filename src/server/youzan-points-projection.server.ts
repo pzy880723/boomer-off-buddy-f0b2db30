@@ -108,6 +108,9 @@ export function createPointsProjection(store: ProjectionStore, deps: ProjectionD
   // 只复用 30 秒内、同一可信身份、最近一次为成功（无更新失败）的有赞投影；其余一律真实刷新。
   const sameIdentity = (row: ProjectionRow | null, m: Extract<MemberResolution, { kind: "found" }>) =>
     !!row && row.yz_open_id === m.yzOpenId && Number(row.kdt_id) === m.kdtId;
+  // 已存行绑定了别的可信身份（yz_open_id/kdt 任一不同）→ 绝不展示旧身份的余额或日志。
+  const identityConflict = (row: ProjectionRow | null, m: MemberResolution) =>
+    m.kind === "found" && !!row && (row.yz_open_id != null || row.kdt_id != null) && !sameIdentity(row, m);
   const freshAt = (synced: string | null | undefined, failed: string | null | undefined) => {
     if (!synced) return false;
     const s = Date.parse(synced);
@@ -164,6 +167,7 @@ export function createPointsProjection(store: ProjectionStore, deps: ProjectionD
         const fresh = sameIdentity(row, m) && row!.balance != null && freshAt(row!.balance_synced_at, row!.balance_failed_at);
         if (!fresh) { await syncBalance(m); row = await store.read(customerId); }
       }
+      if (identityConflict(row, m)) return { source: "youzan", balance: null, status: "mapping_missing", synced_at: null, reason: "identity_conflict" };
       const view = balanceView(row, true);
       if (m.kind === "unavailable") return { ...view, status: view.balance === null ? "pending" : "failed", reason: "member_link_unavailable" };
       return view;
@@ -184,6 +188,7 @@ export function createPointsProjection(store: ProjectionStore, deps: ProjectionD
         if (occurredAt && !Number.isNaN(Date.parse(occurredAt)) && /^[0-9a-f-]{1,64}$/i.test(id ?? "")) before = { occurredAt, id };
       }
       const [row, items] = await Promise.all([store.read(customerId), store.listLogs(customerId, limit, before)]);
+      if (identityConflict(row, m)) return { ...base, status: "mapping_missing", synced_at: null, reason: "identity_conflict", items: [], next_cursor: null };
       const last = items.length === limit ? items[items.length - 1] : null;
       const next_cursor = last ? `${last.occurred_at}|${last.id}` : null;
       if (!enabled) return { ...base, status: "permission_unverified", synced_at: null, reason: "youzan_points_log_not_enabled", items, next_cursor };
