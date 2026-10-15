@@ -9625,6 +9625,51 @@ export type Database = {
           },
         ]
       }
+      youzan_points_log_entries: {
+        Row: {
+          amount: number
+          balance_after: number | null
+          biz_value: string | null
+          customer_id: string
+          description: string | null
+          entry_key: string
+          expires_at: string | null
+          first_synced_at: string
+          id: string
+          kdt_id: number
+          occurred_at: string
+          yz_open_id: string
+        }
+        Insert: {
+          amount: number
+          balance_after?: number | null
+          biz_value?: string | null
+          customer_id: string
+          description?: string | null
+          entry_key: string
+          expires_at?: string | null
+          first_synced_at?: string
+          id?: string
+          kdt_id: number
+          occurred_at: string
+          yz_open_id: string
+        }
+        Update: {
+          amount?: number
+          balance_after?: number | null
+          biz_value?: string | null
+          customer_id?: string
+          description?: string | null
+          entry_key?: string
+          expires_at?: string | null
+          first_synced_at?: string
+          id?: string
+          kdt_id?: number
+          occurred_at?: string
+          yz_open_id?: string
+        }
+        Relationships: []
+      }
       youzan_points_operations: {
         Row: {
           attempts: number
@@ -9696,6 +9741,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      youzan_points_projection: {
+        Row: {
+          balance: number | null
+          balance_failed_at: string | null
+          balance_failure: string | null
+          balance_synced_at: string | null
+          created_at: string
+          customer_id: string
+          kdt_id: number | null
+          log_failed_at: string | null
+          log_failure: string | null
+          log_synced_at: string | null
+          log_window_start: string | null
+          points_account_version: number | null
+          row_version: number
+          updated_at: string
+          yz_open_id: string | null
+        }
+        Insert: {
+          balance?: number | null
+          balance_failed_at?: string | null
+          balance_failure?: string | null
+          balance_synced_at?: string | null
+          created_at?: string
+          customer_id: string
+          kdt_id?: number | null
+          log_failed_at?: string | null
+          log_failure?: string | null
+          log_synced_at?: string | null
+          log_window_start?: string | null
+          points_account_version?: number | null
+          row_version?: number
+          updated_at?: string
+          yz_open_id?: string | null
+        }
+        Update: {
+          balance?: number | null
+          balance_failed_at?: string | null
+          balance_failure?: string | null
+          balance_synced_at?: string | null
+          created_at?: string
+          customer_id?: string
+          kdt_id?: number | null
+          log_failed_at?: string | null
+          log_failure?: string | null
+          log_synced_at?: string | null
+          log_window_start?: string | null
+          points_account_version?: number | null
+          row_version?: number
+          updated_at?: string
+          yz_open_id?: string | null
+        }
+        Relationships: []
       }
       youzan_shops: {
         Row: {
@@ -11855,6 +11954,63 @@ export type Database = {
         Args: {
           o: Database["public"]["Tables"]["youzan_points_operations"]["Row"]
           p_idempotent: boolean
+        }
+        Returns: Json
+      }
+      youzan_points_projection_lock: {
+        Args: { p_customer_id: string }
+        Returns: {
+          balance: number | null
+          balance_failed_at: string | null
+          balance_failure: string | null
+          balance_synced_at: string | null
+          created_at: string
+          customer_id: string
+          kdt_id: number | null
+          log_failed_at: string | null
+          log_failure: string | null
+          log_synced_at: string | null
+          log_window_start: string | null
+          points_account_version: number | null
+          row_version: number
+          updated_at: string
+          yz_open_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "youzan_points_projection"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      youzan_points_projection_record_balance: {
+        Args: {
+          p_customer_id: string
+          p_kdt_id: number
+          p_point: number
+          p_started_at: string
+          p_version: string
+          p_yz_open_id: string
+        }
+        Returns: Json
+      }
+      youzan_points_projection_record_failure: {
+        Args: {
+          p_attempted_at: string
+          p_customer_id: string
+          p_kind: string
+          p_reason: string
+        }
+        Returns: Json
+      }
+      youzan_points_projection_record_logs: {
+        Args: {
+          p_customer_id: string
+          p_entries: Json
+          p_kdt_id: number
+          p_started_at: string
+          p_window_start: string
+          p_yz_open_id: string
         }
         Returns: Json
       }

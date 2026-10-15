@@ -115,12 +115,12 @@ type PosCustomer = {
   phone: string | null;
   nickname: string | null;
   avatar_url: string | null;
-  wallet?: { points: number; store_credit: number; member_level: string };
+  wallet?: { points: number | null; store_credit: number; member_level: string };
 };
 type CustomerBenefits = {
   points_redemption?: PointsRedemption;
   customer: PosCustomer;
-  wallet: { points: number; store_credit: number; member_level: string };
+  wallet: { points: number | null; store_credit: number; member_level: string };
   coupons: Array<{
     id: string;
     code: string;
@@ -1443,7 +1443,7 @@ export function PosPage() {
                 </span>
                 <span className="ml-auto text-xs text-[#667085]">
                   {selectedCustomer.wallet?.points == null
-                    ? "暂无积分"
+                    ? "有赞积分待同步"
                     : `${selectedCustomer.wallet.points} 积分`}
                 </span>
               </>
@@ -1998,7 +1998,7 @@ export function PosPage() {
                   </div>
                   <div className="text-right text-xs text-[#667085]">
                     <p>{customer.wallet?.member_level ?? "普通会员"}</p>
-                    <p className="mt-1">{customer.wallet?.points ?? 0} 积分</p>
+                    <p className="mt-1">{customer.wallet?.points == null ? "有赞积分待同步" : `${customer.wallet.points} 积分`}</p>
                   </div>
                 </button>
               ))
@@ -2036,7 +2036,9 @@ export function PosPage() {
               <h3 className="text-sm font-semibold">积分抵扣</h3>
               <span className="text-xs text-[#667085]">
                 {selectedCustomer
-                  ? `可用 ${pointsQuote?.available_points ?? selectedCustomer.wallet?.points ?? 0} 积分`
+                  ? selectedCustomer.wallet?.points == null && pointsQuote?.available_points == null
+                    ? "有赞积分待同步"
+                    : `可用 ${pointsQuote?.available_points ?? selectedCustomer.wallet?.points} 积分`
                   : "请先选择会员"}
               </span>
             </div>

@@ -40,11 +40,8 @@ export async function getMembershipAccount(customerId: string) {
         .eq("code", "free")
         .eq("is_active", true)
         .single(),
-      supabaseAdmin
-        .from("pos_customer_wallets" as never)
-        .select("points")
-        .eq("customer_id", customerId)
-        .maybeSingle(),
+      // 积分只读有赞权威投影；本地自主钱包（含历史测试积分）不再参与顾客展示。
+      loadYouzanAccountPoints(customerId),
       supabaseAdmin
         .from("commerce_recognition_usage_daily" as never)
         .select("used,allowance")
@@ -61,7 +58,6 @@ export async function getMembershipAccount(customerId: string) {
 
   if (entitlementResult.error) fail(entitlementResult.error, "Membership entitlement unavailable");
   if (freePlanResult.error) fail(freePlanResult.error, "Free membership policy unavailable");
-  if (walletResult.error) fail(walletResult.error, "Membership wallet unavailable");
   if (usageResult.error) fail(usageResult.error, "Recognition usage unavailable");
   if (couponResult.error) fail(couponResult.error, "Membership coupons unavailable");
 
@@ -72,14 +68,14 @@ export async function getMembershipAccount(customerId: string) {
     plan: Record<string, unknown> | null;
   } | null;
   const freePlan = freePlanResult.data as unknown as Record<string, unknown>;
-  const wallet = walletResult.data as unknown as { points: number } | null;
   const usage = usageResult.data as unknown as { used: number; allowance: number } | null;
 
   return presentMembershipAccount({
     plan: (entitlement?.plan ?? freePlan) as never,
     entitlement,
     usage,
-    pointsBalance: wallet?.points ?? 0,
+    pointsBalance: walletResult.balance,
+    points: walletResult,
     couponCount: couponResult.count ?? 0,
   });
 }
@@ -199,15 +195,30 @@ export async function listMembershipCoupons(customerId: string) {
   }));
 }
 
-export async function listMembershipPointsLedger(customerId: string) {
-  const { data, error } = await supabaseAdmin
-    .from("commerce_points_ledger" as never)
-    .select("id,delta,source_type,source_id,balance_after,created_at")
-    .eq("customer_id", customerId)
-    .order("created_at", { ascending: false })
-    .limit(200);
-  if (error) fail(error, "Points ledger unavailable");
-  return data ?? [];
+const POINTS_SYNC_BUDGET_MS = 5000;
+
+/** 打开账户时同步有赞余额（有界等待）；超时/失败返回已存投影与真实状态，绝不回退本地或 0。 */
+export async function loadYouzanAccountPoints(customerId: string) {
+  const { productionPointsProjection, withBudget } = await import("@/server/youzan-points-projection-production.server");
+  let projection;
+  try { projection = await productionPointsProjection(); } catch {
+    return { source: "youzan" as const, balance: null, status: "failed" as const, synced_at: null, reason: "points_projection_unavailable" };
+  }
+  const synced = await withBudget(projection.accountPoints(customerId, { sync: true }), POINTS_SYNC_BUDGET_MS);
+  if (synced !== "timeout") return synced;
+  const stored = await projection.accountPoints(customerId, { sync: false });
+  return stored.status === "ok" ? { ...stored, status: "pending" as const, reason: "youzan_sync_in_progress" } : stored;
+}
+
+/** 积分记录：只返回有赞官方日志镜像；分页 cursor；状态与余额独立。 */
+export async function listMembershipPointsLedger(customerId: string, opts: { cursor?: string | null; limit?: number } = {}) {
+  const { productionPointsProjection, withBudget } = await import("@/server/youzan-points-projection-production.server");
+  const projection = await productionPointsProjection();
+  const sync = !opts.cursor;
+  const view = await withBudget(projection.ledger(customerId, { sync, ...opts }), POINTS_SYNC_BUDGET_MS);
+  if (view !== "timeout") return view;
+  const stored = await projection.ledger(customerId, { sync: false, ...opts });
+  return stored.status === "ok" ? { ...stored, status: "pending" as const, reason: "youzan_sync_in_progress" } : stored;
 }
 
 export async function listMembershipConsumptionRecords(customerId: string) {

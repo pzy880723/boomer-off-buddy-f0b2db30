@@ -146,6 +146,7 @@ import { Route as ApiPublicHooksYouzanFixChannelRouteImport } from './routes/api
 import { Route as ApiPublicHooksYouzanImageRefreshWorkerRouteImport } from './routes/api/public/hooks/youzan-image-refresh-worker'
 import { Route as ApiPublicHooksYouzanMessageRouteImport } from './routes/api/public/hooks/youzan-message'
 import { Route as ApiPublicHooksYouzanOrderSyncRouteImport } from './routes/api/public/hooks/youzan-order-sync'
+import { Route as ApiPublicHooksYouzanPointsRefreshRouteImport } from './routes/api/public/hooks/youzan-points-refresh'
 import { Route as ApiPublicHooksYouzanReconcileRouteImport } from './routes/api/public/hooks/youzan-reconcile'
 import { Route as ApiPublicHooksYouzanRelistRouteImport } from './routes/api/public/hooks/youzan-relist'
 import { Route as ApiPublicHooksYouzanSaleCompensationRouteImport } from './routes/api/public/hooks/youzan-sale-compensation'
@@ -1039,6 +1040,12 @@ const ApiPublicHooksYouzanOrderSyncRoute =
   ApiPublicHooksYouzanOrderSyncRouteImport.update({
     id: '/api/public/hooks/youzan-order-sync',
     path: '/api/public/hooks/youzan-order-sync',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksYouzanPointsRefreshRoute =
+  ApiPublicHooksYouzanPointsRefreshRouteImport.update({
+    id: '/api/public/hooks/youzan-points-refresh',
+    path: '/api/public/hooks/youzan-points-refresh',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicHooksYouzanReconcileRoute =
@@ -2147,6 +2154,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/youzan-image-refresh-worker': typeof ApiPublicHooksYouzanImageRefreshWorkerRoute
   '/api/public/hooks/youzan-message': typeof ApiPublicHooksYouzanMessageRoute
   '/api/public/hooks/youzan-order-sync': typeof ApiPublicHooksYouzanOrderSyncRoute
+  '/api/public/hooks/youzan-points-refresh': typeof ApiPublicHooksYouzanPointsRefreshRoute
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
   '/api/public/hooks/youzan-relist': typeof ApiPublicHooksYouzanRelistRoute
   '/api/public/hooks/youzan-sale-compensation': typeof ApiPublicHooksYouzanSaleCompensationRoute
@@ -2443,6 +2451,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/youzan-image-refresh-worker': typeof ApiPublicHooksYouzanImageRefreshWorkerRoute
   '/api/public/hooks/youzan-message': typeof ApiPublicHooksYouzanMessageRoute
   '/api/public/hooks/youzan-order-sync': typeof ApiPublicHooksYouzanOrderSyncRoute
+  '/api/public/hooks/youzan-points-refresh': typeof ApiPublicHooksYouzanPointsRefreshRoute
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
   '/api/public/hooks/youzan-relist': typeof ApiPublicHooksYouzanRelistRoute
   '/api/public/hooks/youzan-sale-compensation': typeof ApiPublicHooksYouzanSaleCompensationRoute
@@ -2747,6 +2756,7 @@ export interface FileRoutesById {
   '/api/public/hooks/youzan-image-refresh-worker': typeof ApiPublicHooksYouzanImageRefreshWorkerRoute
   '/api/public/hooks/youzan-message': typeof ApiPublicHooksYouzanMessageRoute
   '/api/public/hooks/youzan-order-sync': typeof ApiPublicHooksYouzanOrderSyncRoute
+  '/api/public/hooks/youzan-points-refresh': typeof ApiPublicHooksYouzanPointsRefreshRoute
   '/api/public/hooks/youzan-reconcile': typeof ApiPublicHooksYouzanReconcileRoute
   '/api/public/hooks/youzan-relist': typeof ApiPublicHooksYouzanRelistRoute
   '/api/public/hooks/youzan-sale-compensation': typeof ApiPublicHooksYouzanSaleCompensationRoute
@@ -3052,6 +3062,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-image-refresh-worker'
     | '/api/public/hooks/youzan-message'
     | '/api/public/hooks/youzan-order-sync'
+    | '/api/public/hooks/youzan-points-refresh'
     | '/api/public/hooks/youzan-reconcile'
     | '/api/public/hooks/youzan-relist'
     | '/api/public/hooks/youzan-sale-compensation'
@@ -3348,6 +3359,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-image-refresh-worker'
     | '/api/public/hooks/youzan-message'
     | '/api/public/hooks/youzan-order-sync'
+    | '/api/public/hooks/youzan-points-refresh'
     | '/api/public/hooks/youzan-reconcile'
     | '/api/public/hooks/youzan-relist'
     | '/api/public/hooks/youzan-sale-compensation'
@@ -3651,6 +3663,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/youzan-image-refresh-worker'
     | '/api/public/hooks/youzan-message'
     | '/api/public/hooks/youzan-order-sync'
+    | '/api/public/hooks/youzan-points-refresh'
     | '/api/public/hooks/youzan-reconcile'
     | '/api/public/hooks/youzan-relist'
     | '/api/public/hooks/youzan-sale-compensation'
@@ -3906,6 +3919,7 @@ export interface RootRouteChildren {
   ApiPublicHooksYouzanImageRefreshWorkerRoute: typeof ApiPublicHooksYouzanImageRefreshWorkerRoute
   ApiPublicHooksYouzanMessageRoute: typeof ApiPublicHooksYouzanMessageRoute
   ApiPublicHooksYouzanOrderSyncRoute: typeof ApiPublicHooksYouzanOrderSyncRoute
+  ApiPublicHooksYouzanPointsRefreshRoute: typeof ApiPublicHooksYouzanPointsRefreshRoute
   ApiPublicHooksYouzanReconcileRoute: typeof ApiPublicHooksYouzanReconcileRoute
   ApiPublicHooksYouzanRelistRoute: typeof ApiPublicHooksYouzanRelistRoute
   ApiPublicHooksYouzanSaleCompensationRoute: typeof ApiPublicHooksYouzanSaleCompensationRoute
@@ -4970,6 +4984,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/hooks/youzan-order-sync'
       fullPath: '/api/public/hooks/youzan-order-sync'
       preLoaderRoute: typeof ApiPublicHooksYouzanOrderSyncRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/youzan-points-refresh': {
+      id: '/api/public/hooks/youzan-points-refresh'
+      path: '/api/public/hooks/youzan-points-refresh'
+      fullPath: '/api/public/hooks/youzan-points-refresh'
+      preLoaderRoute: typeof ApiPublicHooksYouzanPointsRefreshRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/youzan-reconcile': {
@@ -6967,6 +6988,8 @@ const rootRouteChildren: RootRouteChildren = {
     ApiPublicHooksYouzanImageRefreshWorkerRoute,
   ApiPublicHooksYouzanMessageRoute: ApiPublicHooksYouzanMessageRoute,
   ApiPublicHooksYouzanOrderSyncRoute: ApiPublicHooksYouzanOrderSyncRoute,
+  ApiPublicHooksYouzanPointsRefreshRoute:
+    ApiPublicHooksYouzanPointsRefreshRoute,
   ApiPublicHooksYouzanReconcileRoute: ApiPublicHooksYouzanReconcileRoute,
   ApiPublicHooksYouzanRelistRoute: ApiPublicHooksYouzanRelistRoute,
   ApiPublicHooksYouzanSaleCompensationRoute:

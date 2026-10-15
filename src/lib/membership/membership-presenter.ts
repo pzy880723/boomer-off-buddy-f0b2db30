@@ -48,7 +48,9 @@ export function presentMembershipAccount(input: {
   plan?: PlanRow | null;
   entitlement?: EntitlementRow | null;
   usage?: { used: number; allowance: number } | null;
-  pointsBalance: number;
+  pointsBalance: number | null;
+  /** 有赞权威积分投影（source/status/synced_at）；提供时整体替代 balance-only 结构。 */
+  points?: { balance: number | null; [k: string]: unknown };
   couponCount: number;
 }) {
   const plan = input.plan ?? FREE_PLAN;
@@ -67,7 +69,7 @@ export function presentMembershipAccount(input: {
       daily_limit: allowance,
       remaining: Math.max(0, allowance - used),
     },
-    points: { balance: input.pointsBalance },
+    points: input.points ?? { balance: input.pointsBalance },
     coupon_count: input.couponCount,
     can_sell: false,
     expires_at: input.entitlement?.expires_at ?? null,

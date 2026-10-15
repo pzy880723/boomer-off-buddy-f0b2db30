@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { calculatePointsRedemption } from "@/lib/pos/points-policy";
 import { loadPointsRules } from "@/lib/pos/points-policy.server";
+import { loadYouzanAccountPoints } from "@/lib/membership/membership-repository.server";
 import { POS_CORS, authenticatePosUser, posError, posJson } from "@/server/pos-auth.server";
 
 export const Route = createFileRoute("/api/public/pos/customers/$id/benefits")({
@@ -47,17 +48,18 @@ export const Route = createFileRoute("/api/public/pos/customers/$id/benefits")({
         } catch {
           return posError("积分规则暂时不可用", 503, "points_policy_unavailable");
         }
+        // 积分以有赞为唯一权威：门店界面显示有赞余额；本地自主钱包积分不再展示。
+        const youzanPoints = await loadYouzanAccountPoints(params.id);
+        const baseWallet = (wallet as Record<string, unknown> | null) ?? {
+          customer_id: params.id, store_credit: 0, member_level: "普通会员",
+        };
         return posJson({
           ok: true,
           data: {
             customer,
+            youzan_points: youzanPoints,
             points_redemption: { ...points, requires_cart_preview: true },
-            wallet: wallet ?? {
-              customer_id: params.id,
-              points: 0,
-              store_credit: 0,
-              member_level: "普通会员",
-            },
+            wallet: { ...baseWallet, points: youzanPoints.balance, points_source: "youzan", points_status: youzanPoints.status },
             coupons: coupons ?? [],
           },
         });

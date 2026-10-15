@@ -36,6 +36,19 @@ export const Route = createFileRoute("/api/public/pos/customers/search")({
                 .select("customer_id,points,store_credit,member_level")
                 .in("customer_id", ids);
         if (walletError) return posError(walletError.message, 500);
+        // 列表只读已存有赞投影（不逐个实时请求有赞）；未同步显示 null，不用本地积分或 0 代替。
+        const { data: projections, error: projectionError } =
+          ids.length === 0
+            ? { data: [], error: null }
+            : await supabaseAdmin
+                .from("youzan_points_projection")
+                .select("customer_id,balance,balance_synced_at")
+                .in("customer_id", ids);
+        if (projectionError) return posError("积分同步状态暂不可用", 500);
+        const youzanMap = new Map(
+          (projections ?? []).filter((p) => p.balance_synced_at && p.balance != null)
+            .map((p) => [p.customer_id, Number(p.balance)]),
+        );
         const walletMap = new Map(
           (
             (wallets ?? []) as unknown as Array<{
@@ -51,10 +64,10 @@ export const Route = createFileRoute("/api/public/pos/customers/search")({
           data: {
             items: customers.map((customer) => ({
               ...customer,
-              wallet: walletMap.get(customer.id) ?? {
-                points: 0,
-                store_credit: 0,
-                member_level: "普通会员",
+              wallet: {
+                ...(walletMap.get(customer.id) ?? { store_credit: 0, member_level: "普通会员" }),
+                points: youzanMap.get(customer.id) ?? null,
+                points_source: "youzan",
               },
             })),
           },
