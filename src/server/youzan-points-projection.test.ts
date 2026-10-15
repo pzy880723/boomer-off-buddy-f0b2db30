@@ -185,7 +185,7 @@ test("余额与日志状态独立；日志未开通权限 → permission_unverif
 
 test("日志分页、去重、只存官方字段；失败保留已有记录", async () => {
   const { store, logs } = memStore();
-  const page = (n: number) => Array.from({ length: n }, (_, i) => ({ amount: i + 1, current: 100 + i, description: `d${i} 13812345678`, created_at: 1760490000 + i }));
+  const page = (n: number) => Array.from({ length: n }, (_, i) => ({ amount: i + 1, current: 100 + i, description: `d${i} 13812345678`, created_at: Math.floor(clock / 1000) - 3600 + i }));
   let fail = false;
   const p = createPointsProjection(store, deps({
     queryLogs: async (_m, q) => (fail ? { kind: "unavailable" } : q.page === 1 ? { kind: "ok", items: page(50), totalCount: 60 } : { kind: "ok", items: page(60).slice(50), totalCount: 60 }),
