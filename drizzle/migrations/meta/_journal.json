@@ -568,6 +568,13 @@
       "when": 1792218233836,
       "tag": "0080_listing_readiness_image_plan_display",
       "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1792218313230,
+      "tag": "0081_listing_readiness_image_plan_display_fix",
+      "breakpoints": true
     }
   ]
 }

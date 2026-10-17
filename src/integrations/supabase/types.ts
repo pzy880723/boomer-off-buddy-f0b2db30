@@ -591,6 +591,7 @@ export type Database = {
           image_paths: Json
           image_urls: Json
           location_id: string
+          pending_display: Json | null
           price: number
           product_type: string
           published_at: string | null
@@ -614,6 +615,7 @@ export type Database = {
           image_paths?: Json
           image_urls?: Json
           location_id: string
+          pending_display?: Json | null
           price: number
           product_type?: string
           published_at?: string | null
@@ -637,6 +639,7 @@ export type Database = {
           image_paths?: Json
           image_urls?: Json
           location_id?: string
+          pending_display?: Json | null
           price?: number
           product_type?: string
           published_at?: string | null
@@ -6055,7 +6058,11 @@ export type Database = {
           content_sources: Json
           content_status: string
           created_at: string
+          image_ai_actor: string | null
+          image_ai_policy: string | null
           image_input_revision: number
+          image_plan: string | null
+          image_plan_at: string | null
           image_revision: number | null
           image_status: string
           images_settled: boolean
@@ -6073,7 +6080,11 @@ export type Database = {
           content_sources?: Json
           content_status?: string
           created_at?: string
+          image_ai_actor?: string | null
+          image_ai_policy?: string | null
           image_input_revision?: number
+          image_plan?: string | null
+          image_plan_at?: string | null
           image_revision?: number | null
           image_status?: string
           images_settled?: boolean
@@ -6091,7 +6102,11 @@ export type Database = {
           content_sources?: Json
           content_status?: string
           created_at?: string
+          image_ai_actor?: string | null
+          image_ai_policy?: string | null
           image_input_revision?: number
+          image_plan?: string | null
+          image_plan_at?: string | null
           image_revision?: number | null
           image_status?: string
           images_settled?: boolean
@@ -11805,6 +11820,23 @@ export type Database = {
         }
         Returns: Json
       }
+      handheld_smart_create_commit_v2: {
+        Args: {
+          p_ai_policy: string
+          p_client_op_id: string
+          p_device_id: string
+          p_epcs: string[]
+          p_fingerprint: string
+          p_image_plan: string
+          p_location_id: string
+          p_note: string
+          p_release_shop_id: string
+          p_reuse: boolean
+          p_sku: Json
+          p_user_id: string
+        }
+        Returns: Json
+      }
       handheld_smart_create_complete: {
         Args: { p_op_id: string; p_response: Json }
         Returns: undefined
@@ -11873,6 +11905,19 @@ export type Database = {
       inv_sku_delete_blocker: { Args: { p_sku_id: string }; Returns: string }
       inv_sku_is_hq_actor: { Args: never; Returns: boolean }
       inventory_delete_unused_sku: { Args: { p_sku_id: string }; Returns: Json }
+      listing_readiness_apply_image_plan: {
+        Args: {
+          p_actor: string
+          p_plan: string
+          p_policy: string
+          p_sku: string
+        }
+        Returns: Json
+      }
+      listing_readiness_apply_pending_display: {
+        Args: { p_listing: string }
+        Returns: undefined
+      }
       listing_readiness_bump: {
         Args: { p_images: boolean; p_paths: string[]; p_sku: string }
         Returns: undefined
@@ -11890,6 +11935,14 @@ export type Database = {
         Args: { p_sku: string }
         Returns: undefined
       }
+      listing_readiness_pending_consent: {
+        Args: { p_limit?: number }
+        Returns: {
+          actor: string
+          policy: string
+          sku_id: string
+        }[]
+      }
       listing_readiness_publish_content: {
         Args: {
           p_blocks: Json
@@ -11902,6 +11955,15 @@ export type Database = {
       }
       listing_readiness_refresh: { Args: { p_sku: string }; Returns: Json }
       listing_readiness_release: { Args: { p_sku: string }; Returns: number }
+      listing_readiness_resolve_consent: {
+        Args: {
+          p_actor: string
+          p_decision: string
+          p_policy: string
+          p_sku: string
+        }
+        Returns: Json
+      }
       listing_readiness_retry: { Args: { p_sku: string }; Returns: Json }
       measurement_asset_register: {
         Args: {
