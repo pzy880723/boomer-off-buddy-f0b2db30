@@ -163,6 +163,20 @@ export const Route = createFileRoute("/api/public/storefront/orders")({
               p_app_id: paymentPolicy.appId,
               p_owned_location_ids: paymentPolicy.ownedLocationIds,
             }
+          : flash && paymentPolicy.mode === "ordinary_wechat"
+            ? {
+                p_customer_id: auth.customer.id,
+                p_idempotency_key: idempotencyKey,
+                p_items: items,
+                p_recipient_name: body.recipient_name,
+                p_recipient_phone: body.recipient_phone,
+                p_shipping_address: body.shipping_address,
+                p_quote_snapshot: body.courier_quote_snapshot ?? null,
+                p_customer_note: body.customer_note ?? null,
+                p_merchant_id: paymentPolicy.merchantId,
+                p_app_id: paymentPolicy.appId,
+                p_owned_location_ids: paymentPolicy.ownedLocationIds,
+              }
           : {
             ...(paymentPolicy.mode === "ordinary_wechat" ? {
               p_customer_id: auth.customer.id,
