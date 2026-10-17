@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { normalizeCourierChoice } from "@/lib/commerce/order-policy";
-import { pickupContactPhone, pickupCreateGuard } from "@/lib/commerce/pickup-view";
+import { flashCreateGuard, pickupContactPhone, pickupCreateGuard } from "@/lib/commerce/pickup-view";
 import { normalizeStorefrontOrderItems } from "@/lib/commerce/storefront-order-request";
 import {
   GiftOrderFields,
@@ -48,7 +48,8 @@ const CreateOrderBody = z
     customer_note: z.string().trim().max(500).optional(),
     source_platform: z.enum(["miniapp", "app", "web"]).optional(),
     // 门店自提：pickup 时 courier_service_code 必须为 STORE_PICKUP、shipping_address 为 {}；默认 express 保持原合同。
-    fulfillment_method: z.enum(["express", "pickup"]).default("express"),
+    // 同城闪送到付：flash 时 courier_service_code 必须为 SHANSONG_COD、shipping_fee 为 0、地址电话必填。
+    fulfillment_method: z.enum(["express", "pickup", "flash"]).default("express"),
   })
   .refine((body) => body.items || body.listing_ids, {
     message: "items or listing_ids is required",
