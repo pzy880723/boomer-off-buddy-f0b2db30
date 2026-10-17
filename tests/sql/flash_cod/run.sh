@@ -5,7 +5,7 @@ cd "$(dirname "$0")/../../.."
 bash tests/sql/harness/setup.sh >/dev/null
 export PSQL=/tmp/psql.sh
 mig=${FLASH_COD_MIGRATION:-}; if [ -n "$mig" ] && [ ! -f "$mig" ]; then mig=; fi
-[ -n "$mig" ] || mig=$(ls drizzle/migrations/*_flash_cod_delivery.sql 2>/dev/null | head -1)
+[ -n "$mig" ] || mig=$(ls drizzle/migrations/*_flash_cod_delivery.sql drizzle/migrations/*_flash_cod_cross_store.sql 2>/dev/null)
 PGDB=postgres $PSQL -q -c "drop database if exists flash_cod_test" -c "create database flash_cod_test" >/dev/null
 export PGDB=flash_cod_test
 $PSQL -q -f tests/sql/flash_cod/stubs.sql >/dev/null
