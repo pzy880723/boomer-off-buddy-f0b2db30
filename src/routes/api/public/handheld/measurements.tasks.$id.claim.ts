@@ -8,7 +8,7 @@ import {
 import { errCode } from "@/lib/handheld/errors";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { claimTaskProduction } from "@/server/product-measurement-production.server";
-import { loadMeasurementActor } from "@/lib/measurement.functions";
+import { loadMeasurementActor } from "@/server/measurement-actor.server";
 import { actorCanAccessLocation } from "@/server/product-measurement.server";
 
 /** POST /api/public/handheld/measurements/tasks/{id}/claim — 领取尺寸待办 */

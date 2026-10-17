@@ -13,7 +13,7 @@ import {
   loadSkuStockRows,
   saveMeasurementProduction,
 } from "@/server/product-measurement-production.server";
-import { loadMeasurementActor } from "@/lib/measurement.functions";
+import { loadMeasurementActor } from "@/server/measurement-actor.server";
 import {
   measurementLocationAccess,
   validateMeasurementInput,
