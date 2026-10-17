@@ -10,7 +10,7 @@ PGDB=postgres $PSQL -q -c "drop database if exists flash_cod_test" -c "create da
 export PGDB=flash_cod_test
 $PSQL -q -f tests/sql/flash_cod/stubs.sql >/dev/null
 if [ -n "$mig" ]; then
-  $PSQL -q -v ON_ERROR_STOP=1 -f "$mig" >/dev/null || { echo "FAIL migration apply"; exit 1; }
+  $PSQL -q -v ON_ERROR_STOP=1 $(for m in $mig; do echo -f "$m"; done) >/dev/null || { echo "FAIL migration apply"; exit 1; }
 else
   echo "NOTE flash migration absent (RED run)"
 fi
