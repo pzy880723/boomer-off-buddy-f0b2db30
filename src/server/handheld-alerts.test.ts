@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { alertFields } from "./handheld-alerts";
 
 const base = { is_read: false, action_status: null, ref_type: null, ref_id: null, payload: {} };
