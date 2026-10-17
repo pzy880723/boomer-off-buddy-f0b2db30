@@ -1,3 +1,4 @@
+import { labelFacets } from "@/lib/attribute-labels";
 import { supabaseAdmin } from "../integrations/supabase/client.server";
 import { signSkuImagePaths } from "../lib/sku-image-resolver.server";
 import { DERIVATIVE_WIDTHS, signDerivativeUrls } from "./media-derivative.server";
