@@ -91,7 +91,7 @@ const MESSAGES: Record<string, string> = {
 };
 export const pickupResultMessage = (r: string) => MESSAGES[r] ?? "操作失败，请稍后重试";
 
-export function pickupCreateGuard(b: { fulfillment_method: "express" | "pickup"; courier_service_code: string; shipping_address: Record<string, unknown> }):
+export function pickupCreateGuard(b: { fulfillment_method: "express" | "pickup" | "flash"; courier_service_code: string; shipping_address: Record<string, unknown> }):
   null | "pickup_courier_invalid" | "pickup_address_must_be_empty" | "store_pickup_requires_pickup_method" {
   const code = b.courier_service_code.trim().toUpperCase();
   if (b.fulfillment_method === "pickup") {
@@ -100,6 +100,25 @@ export function pickupCreateGuard(b: { fulfillment_method: "express" | "pickup";
     return null;
   }
   return code === "STORE_PICKUP" ? "store_pickup_requires_pickup_method" : null;
+}
+
+/** 同城闪送到付：必须 SHANSONG_COD、平台运费 0、收货姓名/手机号/地址齐全；单店约束由数据库报价权威判定。 */
+export function flashCreateGuard(b: {
+  fulfillment_method: "express" | "pickup" | "flash";
+  courier_service_code: string;
+  shipping_fee: number;
+  recipient_phone?: string;
+  shipping_address: Record<string, unknown>;
+}): null | "flash_courier_invalid" | "flash_fee_must_be_zero" | "flash_address_required" | "flash_phone_required" | "flash_requires_flash_method" {
+  const code = b.courier_service_code.trim().toUpperCase();
+  if (b.fulfillment_method !== "flash") {
+    return code === "SHANSONG_COD" ? "flash_requires_flash_method" : null;
+  }
+  if (code !== "SHANSONG_COD") return "flash_courier_invalid";
+  if (b.shipping_fee !== 0) return "flash_fee_must_be_zero";
+  if (Object.keys(b.shipping_address ?? {}).length === 0) return "flash_address_required";
+  if (!/^[0-9+ -]{6,30}$/.test((b.recipient_phone ?? "").trim())) return "flash_phone_required";
+  return null;
 }
 
 /** 订单列表用：按门店的安全状态投影，绝不包含提货码、令牌或二维码。 */
