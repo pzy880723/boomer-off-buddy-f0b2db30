@@ -67,7 +67,8 @@ export const Route = createFileRoute("/api/public/storefront/orders/$id")({
           return storefrontError("Pickup lookup failed", 500);
         }
         const detail = await withOrderItemThumbnails(data);
-        return storefrontPrivateJson({ ok: true, data: { ...(detail as object), fulfillment_method: (data as { fulfillment_method?: string }).fulfillment_method === "pickup" ? "pickup" : "express", pickups } });
+        const method = (data as { fulfillment_method?: string }).fulfillment_method;
+        return storefrontPrivateJson({ ok: true, data: { ...(detail as object), fulfillment_method: method === "pickup" || method === "flash" ? method : "express", pickups } });
       },
     },
   },

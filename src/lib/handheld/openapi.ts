@@ -6,7 +6,7 @@ import { createDocument, type ZodOpenApiObject } from "zod-openapi";
 import * as z from "zod";
 import { CustomTransferRequest, CustomTransferResponseSchema } from "../custom-transfer-contract";
 import { ProductContentRequest } from "../product-content";
-import { ManualShipBody, PickupReadyBody, PickupRedeemBody } from "./fulfillment-actions-schema";
+import { FlashDeliverBody, ManualShipBody, PickupReadyBody, PickupRedeemBody } from "./fulfillment-actions-schema";
 import { UnreadCountsData } from "./unread-counts";
 import {
   ItemDeleteReq,
@@ -1201,6 +1201,16 @@ X-Session-Token: <操作员 session token>
         description:
           "需设备 token + 员工会话；子单必须属于设备库位且员工有该库位权限（否则 403 `forbidden`/`location_forbidden`）。仅已付款快递订单：`pickup_order`/`unpaid`/`refund_blocked`/`cancelled`/`after_sale_blocked`/`invalid_status` 均 409。同 `client_op_id` 同内容重放返回 `replayed:true`；同编号不同内容 409 `idempotency_conflict`；子单已登记 409 `already_shipped`；明细不符/超量 422 `invalid_lines`/`qty_exceeded`；404 `not_found`；503 结果未知请用同一 `client_op_id` 重试。只记录运单号，不生成物流轨迹。\n\n**0053 整单合同**：`lines` 必须一次覆盖子单全部应发行，每行 `quantity` = expected_qty − 已核准缺货（customer_accepted 且退款 refund_completed/not_required），缺/少行 422 `lines_incomplete`，重复行或他单行 422 `invalid_lines`；存在待顾客确认/退款未完成的缺货 409 `shortage_blocked`；全部核减为 0 时 409 `nothing_to_ship`。已拣数量不会重复累加（只补齐到应发量）。任一校验失败不写任何数量/单号/状态。幂等指纹 = provider + carrier_label + 单号(大写) + 按行排序后的明细数量，乱序同内容可重放。`provider`: `sf`/`cainiao`（电子面单承运商名称固定）或 `manual`（必须带 `carrier_label` 1–40 字，如“中通快递”，仅手工登记，不代表已接电子面单）；缺名称 400 `invalid_carrier_label`。成功返回 `shipment.carrier_label`。",
         requestBody: jsonBody(ManualShipBody),
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+    },
+    "/api/public/handheld/fulfillments/{id}/flash-deliver": {
+      post: {
+        tags: ["履约"],
+        summary: "同城闪送到付登记送达（v1.15，与 ERP 网页同一事务）",
+        description:
+          "仅 `fulfillment_method='flash'` 的子单：人工登记送达，**不需要也不接受快递单号**；配送费由顾客与门店客服约定后到付，系统不代收。授权/付款/售后/缺货/明细/幂等与 manual-ship 同一套数据库内校验：403 `forbidden`/`location_forbidden`；409 `not_flash_order`（非闪送单请用 manual-ship）/`unpaid`/`refund_blocked`/`cancelled`/`after_sale_blocked`/`invalid_status`/`already_shipped`/`idempotency_conflict`/`nothing_to_ship`/`shortage_blocked`；422 `invalid_lines`/`qty_exceeded`/`lines_incomplete`；400 `invalid_idempotency_key`/`invalid_note`。同 `client_op_id` 同内容重放 `replayed:true`。成功返回 `delivered` 与 `shipment`（provider=`flash`、service_code=`SHANSONG_COD`、tracking_no=null）。快递订单反过来：manual-ship 对闪送单返回 409 `flash_order`，禁止伪造快递单号。",
+        requestBody: jsonBody(FlashDeliverBody),
         responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
       },
     },

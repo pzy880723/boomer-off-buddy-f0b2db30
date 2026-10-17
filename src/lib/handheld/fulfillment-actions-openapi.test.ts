@@ -13,3 +13,10 @@ test("handheld pickup + manual-ship contract documented", () => {
   // 旧接口仍在
   assert.ok(doc.paths?.["/api/public/handheld/fulfillments/{id}/waybill"]?.get);
 });
+
+test("handheld flash-deliver contract documented", () => {
+  const doc = buildHandheldOpenApi();
+  const flash = doc.paths?.["/api/public/handheld/fulfillments/{id}/flash-deliver"]?.post;
+  assert.ok(flash?.requestBody, "requestBody");
+  for (const k of ["not_flash_order", "flash_order", "SHANSONG_COD", "replayed", "shortage_blocked", "location_forbidden"]) assert.match(String(flash?.description), new RegExp(k));
+});

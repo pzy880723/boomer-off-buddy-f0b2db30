@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { buildCustomerPickups, parsePickupInput, pickupResultMessage, pickupCreateGuard, buildPickupListProjection } from "./pickup-view";
+import { buildCustomerPickups, parsePickupInput, pickupResultMessage, pickupCreateGuard, flashCreateGuard, buildPickupListProjection } from "./pickup-view";
 
 const L1 = "a0000000-0000-4000-8000-000000000001";
 const base = {
@@ -67,6 +67,18 @@ describe("order create guard", () => {
     assert.equal(pickupCreateGuard({ fulfillment_method: "pickup", courier_service_code: "STORE_PICKUP", shipping_address: { city: "x" } }), "pickup_address_must_be_empty");
     assert.equal(pickupCreateGuard({ fulfillment_method: "express", courier_service_code: "STORE_PICKUP", shipping_address: {} }), "store_pickup_requires_pickup_method");
     assert.equal(pickupCreateGuard({ fulfillment_method: "express", courier_service_code: "PLATFORM_RECOMMENDED", shipping_address: { a: 1 } }), null);
+  });
+  test("flash create guard: SHANSONG_COD + zero fee + address + phone required", () => {
+    const ok = { fulfillment_method: "flash" as const, courier_service_code: "SHANSONG_COD", shipping_fee: 0, recipient_phone: "13800000000", shipping_address: { city: "上海" } };
+    assert.equal(flashCreateGuard(ok), null);
+    assert.equal(flashCreateGuard({ ...ok, courier_service_code: "SF_STANDARD" }), "flash_courier_invalid");
+    assert.equal(flashCreateGuard({ ...ok, shipping_fee: 100 }), "flash_fee_must_be_zero");
+    assert.equal(flashCreateGuard({ ...ok, shipping_address: {} }), "flash_address_required");
+    assert.equal(flashCreateGuard({ ...ok, recipient_phone: "" }), "flash_phone_required");
+    assert.equal(flashCreateGuard({ ...ok, recipient_phone: "abc" }), "flash_phone_required");
+    // 非 flash 方式不得借用 SHANSONG_COD 下单
+    assert.equal(flashCreateGuard({ ...ok, fulfillment_method: "express" as const }), "flash_requires_flash_method");
+    assert.equal(flashCreateGuard({ ...ok, fulfillment_method: "pickup" as const, courier_service_code: "STORE_PICKUP" }), null);
   });
 });
 

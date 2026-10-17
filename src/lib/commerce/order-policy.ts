@@ -62,12 +62,14 @@ export function deriveOrderStatus(
 }
 
 export function normalizeCourierChoice(raw: string): {
-  provider: "sf" | "cainiao" | "platform";
+  provider: "sf" | "cainiao" | "platform" | "flash";
   serviceCode: string;
 } {
   const serviceCode = raw.trim().toUpperCase();
   if (serviceCode.startsWith("SF_")) return { provider: "sf", serviceCode };
   if (serviceCode.startsWith("CAINIAO_")) return { provider: "cainiao", serviceCode };
+  // 同城闪送到付：平台运费恒 0，实际配送费由顾客与门店客服线下约定并到付，系统不代收。
+  if (serviceCode === "SHANSONG_COD") return { provider: "flash", serviceCode };
   if (serviceCode === "PLATFORM_RECOMMENDED") {
     return { provider: "platform", serviceCode };
   }

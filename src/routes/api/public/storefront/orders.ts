@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { normalizeCourierChoice } from "@/lib/commerce/order-policy";
-import { pickupContactPhone, pickupCreateGuard } from "@/lib/commerce/pickup-view";
+import { flashCreateGuard, pickupContactPhone, pickupCreateGuard } from "@/lib/commerce/pickup-view";
 import { normalizeStorefrontOrderItems } from "@/lib/commerce/storefront-order-request";
 import {
   GiftOrderFields,
@@ -48,7 +48,8 @@ const CreateOrderBody = z
     customer_note: z.string().trim().max(500).optional(),
     source_platform: z.enum(["miniapp", "app", "web"]).optional(),
     // 门店自提：pickup 时 courier_service_code 必须为 STORE_PICKUP、shipping_address 为 {}；默认 express 保持原合同。
-    fulfillment_method: z.enum(["express", "pickup"]).default("express"),
+    // 同城闪送到付：flash 时 courier_service_code 必须为 SHANSONG_COD、shipping_fee 为 0、地址电话必填。
+    fulfillment_method: z.enum(["express", "pickup", "flash"]).default("express"),
   })
   .refine((body) => body.items || body.listing_ids, {
     message: "items or listing_ids is required",
@@ -94,6 +95,17 @@ export const Route = createFileRoute("/api/public/storefront/orders")({
         }
         const guard = pickupCreateGuard(body);
         if (guard) return storefrontError("自提订单参数不正确", 422, guard);
+        const flashGuard = flashCreateGuard(body);
+        if (flashGuard) {
+          const msg = flashGuard === "flash_fee_must_be_zero"
+            ? "同城闪送平台运费为 0，配送费由顾客与门店客服约定后到付"
+            : flashGuard === "flash_address_required"
+              ? "同城闪送请填写完整收货地址"
+              : flashGuard === "flash_phone_required"
+                ? "同城闪送请填写收货人手机号"
+                : "闪送订单参数不正确";
+          return storefrontError(msg, 422, flashGuard);
+        }
         const giftParsed = GiftOrderFields.safeParse({
           gift_entitlement_ids: (rawBody as Record<string, unknown>)?.gift_entitlement_ids,
           gift_count: (rawBody as Record<string, unknown>)?.gift_count,
@@ -104,6 +116,7 @@ export const Route = createFileRoute("/api/public/storefront/orders")({
           return storefrontError("赠礼数量不能超过付费商品件数，请减少赠礼或加购商品", 422, "gift_exceeds_paid_items");
         }
         const pickup = body.fulfillment_method === "pickup";
+        const flash = body.fulfillment_method === "flash";
         const pickupPhone = pickup ? pickupContactPhone(auth.customer.phone) : null;
         if (pickup && !pickupPhone) {
           return storefrontError("请先绑定并验证手机号后再选择门店自提", 422, "pickup_phone_required");
@@ -126,12 +139,17 @@ export const Route = createFileRoute("/api/public/storefront/orders")({
         if (pickup && paymentPolicy.mode !== "ordinary_wechat") {
           return storefrontError("门店自提暂未开放，请稍后重试", 503, "checkout_not_enabled");
         }
+        if (flash && paymentPolicy.mode !== "ordinary_wechat") {
+          return storefrontError("同城闪送暂未开放，请稍后重试", 503, "checkout_not_enabled");
+        }
         if (!ordinary && body.courier_quote_snapshot?.version === "per_store_99_cross_299_v1") {
           return storefrontError("普通商城结算尚未开放，请稍后重试", 503, "checkout_not_enabled");
         }
         const createFn = pickup && paymentPolicy.mode === "ordinary_wechat"
           ? "commerce_create_ordinary_pickup_order"
-          : ordinary ? "commerce_create_ordinary_order" : "commerce_create_order_v2";
+          : flash && paymentPolicy.mode === "ordinary_wechat"
+            ? "commerce_create_ordinary_flash_order"
+            : ordinary ? "commerce_create_ordinary_order" : "commerce_create_order_v2";
         const createArgs: Record<string, unknown> = pickup && paymentPolicy.mode === "ordinary_wechat"
           ? {
               p_customer_id: auth.customer.id,
@@ -145,6 +163,20 @@ export const Route = createFileRoute("/api/public/storefront/orders")({
               p_app_id: paymentPolicy.appId,
               p_owned_location_ids: paymentPolicy.ownedLocationIds,
             }
+          : flash && paymentPolicy.mode === "ordinary_wechat"
+            ? {
+                p_customer_id: auth.customer.id,
+                p_idempotency_key: idempotencyKey,
+                p_items: items,
+                p_recipient_name: body.recipient_name,
+                p_recipient_phone: body.recipient_phone,
+                p_shipping_address: body.shipping_address,
+                p_quote_snapshot: body.courier_quote_snapshot ?? null,
+                p_customer_note: body.customer_note ?? null,
+                p_merchant_id: paymentPolicy.merchantId,
+                p_app_id: paymentPolicy.appId,
+                p_owned_location_ids: paymentPolicy.ownedLocationIds,
+              }
           : {
             ...(paymentPolicy.mode === "ordinary_wechat" ? {
               p_customer_id: auth.customer.id,
@@ -196,6 +228,12 @@ export const Route = createFileRoute("/api/public/storefront/orders")({
           if (/ordinary express delivery only/i.test(error.message)) {
             return storefrontError("目前仅支持普通快递配送", 422, "delivery_unavailable");
           }
+          if (/flash requires single store/i.test(error.message)) {
+            return storefrontError("同城闪送暂只支持同一门店的商品，请分开下单或选择快递/自提", 422, "flash_single_store_required");
+          }
+          if (/flash recipient required|flash address required/i.test(error.message)) {
+            return storefrontError("同城闪送请填写收货人姓名、手机号和完整地址", 422, "flash_contact_required");
+          }
           if (/idempotency key used by another fulfillment method/i.test(error.message)) {
             return storefrontError("同一下单请求不能更换配送方式，请重新下单", 409, "fulfillment_method_conflict");
           }
@@ -210,7 +248,8 @@ export const Route = createFileRoute("/api/public/storefront/orders")({
           );
         }
         const createdMethod = (data as unknown as { fulfillment_method?: string } | null)?.fulfillment_method;
-        if (!pickup && createdMethod === "pickup") {
+        const expectedMethod = pickup ? "pickup" : flash ? "flash" : null;
+        if ((expectedMethod && createdMethod !== expectedMethod) || (!expectedMethod && createdMethod === "pickup")) {
           return storefrontError("同一下单请求不能更换配送方式，请重新下单", 409, "fulfillment_method_conflict");
         }
         try {

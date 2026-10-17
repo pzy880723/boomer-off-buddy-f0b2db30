@@ -154,7 +154,7 @@ export async function listStorefrontOrders(options: {
         fulfillments?: Array<{ id: string; location_id: string | null; status: string; handed_over_at: string | null }> };
       return {
         ...buildOrderListItem(row, { stores, images }),
-        fulfillment_method: r.fulfillment_method === "pickup" ? "pickup" : "express",
+        fulfillment_method: r.fulfillment_method === "pickup" || r.fulfillment_method === "flash" ? r.fulfillment_method : "express",
         pickups: buildPickupListProjection({
           order: { fulfillment_method: r.fulfillment_method ?? null, payment_status: r.payment_status, order_status: r.order_status },
           fulfillments: r.fulfillments ?? [],

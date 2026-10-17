@@ -276,6 +276,7 @@ import { Route as ApiPublicStorefrontShortagesIdRouteImport } from './routes/api
 import { Route as ApiPublicStorefrontSupportConversationsRouteImport } from './routes/api/public/storefront/support.conversations'
 import { Route as ApiPublicHandheldFulfillmentsIdBindToteRouteImport } from './routes/api/public/handheld/fulfillments.$id.bind-tote'
 import { Route as ApiPublicHandheldFulfillmentsIdClaimRouteImport } from './routes/api/public/handheld/fulfillments.$id.claim'
+import { Route as ApiPublicHandheldFulfillmentsIdFlashDeliverRouteImport } from './routes/api/public/handheld/fulfillments.$id.flash-deliver'
 import { Route as ApiPublicHandheldFulfillmentsIdManualShipRouteImport } from './routes/api/public/handheld/fulfillments.$id.manual-ship'
 import { Route as ApiPublicHandheldFulfillmentsIdPickCompleteRouteImport } from './routes/api/public/handheld/fulfillments.$id.pick-complete'
 import { Route as ApiPublicHandheldFulfillmentsIdPickScanRouteImport } from './routes/api/public/handheld/fulfillments.$id.pick-scan'
@@ -1813,6 +1814,12 @@ const ApiPublicHandheldFulfillmentsIdClaimRoute =
     path: '/claim',
     getParentRoute: () => ApiPublicHandheldFulfillmentsIdRoute,
   } as any)
+const ApiPublicHandheldFulfillmentsIdFlashDeliverRoute =
+  ApiPublicHandheldFulfillmentsIdFlashDeliverRouteImport.update({
+    id: '/flash-deliver',
+    path: '/flash-deliver',
+    getParentRoute: () => ApiPublicHandheldFulfillmentsIdRoute,
+  } as any)
 const ApiPublicHandheldFulfillmentsIdManualShipRoute =
   ApiPublicHandheldFulfillmentsIdManualShipRouteImport.update({
     id: '/manual-ship',
@@ -2358,6 +2365,7 @@ export interface FileRoutesByFullPath {
   '/api/public/storefront/support/conversations': typeof ApiPublicStorefrontSupportConversationsRouteWithChildren
   '/api/public/handheld/fulfillments/$id/bind-tote': typeof ApiPublicHandheldFulfillmentsIdBindToteRoute
   '/api/public/handheld/fulfillments/$id/claim': typeof ApiPublicHandheldFulfillmentsIdClaimRoute
+  '/api/public/handheld/fulfillments/$id/flash-deliver': typeof ApiPublicHandheldFulfillmentsIdFlashDeliverRoute
   '/api/public/handheld/fulfillments/$id/manual-ship': typeof ApiPublicHandheldFulfillmentsIdManualShipRoute
   '/api/public/handheld/fulfillments/$id/pick-complete': typeof ApiPublicHandheldFulfillmentsIdPickCompleteRoute
   '/api/public/handheld/fulfillments/$id/pick-scan': typeof ApiPublicHandheldFulfillmentsIdPickScanRoute
@@ -2666,6 +2674,7 @@ export interface FileRoutesByTo {
   '/api/public/storefront/support/conversations': typeof ApiPublicStorefrontSupportConversationsRouteWithChildren
   '/api/public/handheld/fulfillments/$id/bind-tote': typeof ApiPublicHandheldFulfillmentsIdBindToteRoute
   '/api/public/handheld/fulfillments/$id/claim': typeof ApiPublicHandheldFulfillmentsIdClaimRoute
+  '/api/public/handheld/fulfillments/$id/flash-deliver': typeof ApiPublicHandheldFulfillmentsIdFlashDeliverRoute
   '/api/public/handheld/fulfillments/$id/manual-ship': typeof ApiPublicHandheldFulfillmentsIdManualShipRoute
   '/api/public/handheld/fulfillments/$id/pick-complete': typeof ApiPublicHandheldFulfillmentsIdPickCompleteRoute
   '/api/public/handheld/fulfillments/$id/pick-scan': typeof ApiPublicHandheldFulfillmentsIdPickScanRoute
@@ -2982,6 +2991,7 @@ export interface FileRoutesById {
   '/api/public/storefront/support/conversations': typeof ApiPublicStorefrontSupportConversationsRouteWithChildren
   '/api/public/handheld/fulfillments/$id/bind-tote': typeof ApiPublicHandheldFulfillmentsIdBindToteRoute
   '/api/public/handheld/fulfillments/$id/claim': typeof ApiPublicHandheldFulfillmentsIdClaimRoute
+  '/api/public/handheld/fulfillments/$id/flash-deliver': typeof ApiPublicHandheldFulfillmentsIdFlashDeliverRoute
   '/api/public/handheld/fulfillments/$id/manual-ship': typeof ApiPublicHandheldFulfillmentsIdManualShipRoute
   '/api/public/handheld/fulfillments/$id/pick-complete': typeof ApiPublicHandheldFulfillmentsIdPickCompleteRoute
   '/api/public/handheld/fulfillments/$id/pick-scan': typeof ApiPublicHandheldFulfillmentsIdPickScanRoute
@@ -3299,6 +3309,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/support/conversations'
     | '/api/public/handheld/fulfillments/$id/bind-tote'
     | '/api/public/handheld/fulfillments/$id/claim'
+    | '/api/public/handheld/fulfillments/$id/flash-deliver'
     | '/api/public/handheld/fulfillments/$id/manual-ship'
     | '/api/public/handheld/fulfillments/$id/pick-complete'
     | '/api/public/handheld/fulfillments/$id/pick-scan'
@@ -3607,6 +3618,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/support/conversations'
     | '/api/public/handheld/fulfillments/$id/bind-tote'
     | '/api/public/handheld/fulfillments/$id/claim'
+    | '/api/public/handheld/fulfillments/$id/flash-deliver'
     | '/api/public/handheld/fulfillments/$id/manual-ship'
     | '/api/public/handheld/fulfillments/$id/pick-complete'
     | '/api/public/handheld/fulfillments/$id/pick-scan'
@@ -3922,6 +3934,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/support/conversations'
     | '/api/public/handheld/fulfillments/$id/bind-tote'
     | '/api/public/handheld/fulfillments/$id/claim'
+    | '/api/public/handheld/fulfillments/$id/flash-deliver'
     | '/api/public/handheld/fulfillments/$id/manual-ship'
     | '/api/public/handheld/fulfillments/$id/pick-complete'
     | '/api/public/handheld/fulfillments/$id/pick-scan'
@@ -6043,6 +6056,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldFulfillmentsIdClaimRouteImport
       parentRoute: typeof ApiPublicHandheldFulfillmentsIdRoute
     }
+    '/api/public/handheld/fulfillments/$id/flash-deliver': {
+      id: '/api/public/handheld/fulfillments/$id/flash-deliver'
+      path: '/flash-deliver'
+      fullPath: '/api/public/handheld/fulfillments/$id/flash-deliver'
+      preLoaderRoute: typeof ApiPublicHandheldFulfillmentsIdFlashDeliverRouteImport
+      parentRoute: typeof ApiPublicHandheldFulfillmentsIdRoute
+    }
     '/api/public/handheld/fulfillments/$id/manual-ship': {
       id: '/api/public/handheld/fulfillments/$id/manual-ship'
       path: '/manual-ship'
@@ -6620,6 +6640,7 @@ const ApiPublicContentIdRouteWithChildren =
 interface ApiPublicHandheldFulfillmentsIdRouteChildren {
   ApiPublicHandheldFulfillmentsIdBindToteRoute: typeof ApiPublicHandheldFulfillmentsIdBindToteRoute
   ApiPublicHandheldFulfillmentsIdClaimRoute: typeof ApiPublicHandheldFulfillmentsIdClaimRoute
+  ApiPublicHandheldFulfillmentsIdFlashDeliverRoute: typeof ApiPublicHandheldFulfillmentsIdFlashDeliverRoute
   ApiPublicHandheldFulfillmentsIdManualShipRoute: typeof ApiPublicHandheldFulfillmentsIdManualShipRoute
   ApiPublicHandheldFulfillmentsIdPickCompleteRoute: typeof ApiPublicHandheldFulfillmentsIdPickCompleteRoute
   ApiPublicHandheldFulfillmentsIdPickScanRoute: typeof ApiPublicHandheldFulfillmentsIdPickScanRoute
@@ -6634,6 +6655,8 @@ const ApiPublicHandheldFulfillmentsIdRouteChildren: ApiPublicHandheldFulfillment
       ApiPublicHandheldFulfillmentsIdBindToteRoute,
     ApiPublicHandheldFulfillmentsIdClaimRoute:
       ApiPublicHandheldFulfillmentsIdClaimRoute,
+    ApiPublicHandheldFulfillmentsIdFlashDeliverRoute:
+      ApiPublicHandheldFulfillmentsIdFlashDeliverRoute,
     ApiPublicHandheldFulfillmentsIdManualShipRoute:
       ApiPublicHandheldFulfillmentsIdManualShipRoute,
     ApiPublicHandheldFulfillmentsIdPickCompleteRoute:
