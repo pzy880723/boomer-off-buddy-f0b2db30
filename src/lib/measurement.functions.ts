@@ -9,6 +9,8 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { reportMeasurementDiagramInput } from "@/lib/measurement-schemas";
 import {
   actorCanAccessLocation,
+  actorCanReadSkuMeasurement,
+  resolveEditableLocation,
   validateMeasurementInput,
   hasAnyMeasurement,
   type MeasurementActor,
@@ -19,6 +21,7 @@ import {
   getMeasurementAssetProduction,
   listMeasurementTasksProduction,
   loadMeasurementSku,
+  loadSkuStockRows,
   saveMeasurementProduction,
   markMeasurementAssetFailedProduction,
 } from "@/server/product-measurement-production.server";
@@ -108,6 +111,7 @@ export const saveMeasurement = createServerFn({ method: "POST" })
       .object({
         task_id: z.string().uuid().optional(),
         sku_id: z.string().uuid().optional(),
+        location_id: z.string().uuid().optional(),
         expected_revision: z.number().int().min(0),
         client_op_id: z.string().min(8).max(128),
         measurement: measurementInput,
@@ -123,30 +127,34 @@ export const saveMeasurement = createServerFn({ method: "POST" })
 
     let skuId = data.sku_id ?? null;
     const taskId = data.task_id ?? null;
+    let taskLocation: string | null = null;
 
-    if (taskId && !skuId) {
+    if (taskId) {
       const { data: task } = await supabaseAdmin
         .from("product_measurement_tasks" as never)
         .select("id, sku_id, location_id, status")
         .eq("id", taskId)
         .maybeSingle();
-      const row = task as unknown as {
-        id: string;
-        sku_id: string;
-        location_id: string | null;
-        status: string;
-      } | null;
-      // 已结束任务不在这里拒绝：同 op 重试需到达 RPC 做幂等回放；
-      // 无幂等记录的旧任务由 RPC 在锁内拒绝。
-      if (row) skuId = row.sku_id;
+      const row = task as unknown as { id: string; sku_id: string; location_id: string | null } | null;
+      // 已结束任务不在这里拒绝：同 op 重试需到达 RPC 做幂等回放
+      if (row) {
+        skuId = skuId ?? row.sku_id;
+        taskLocation = row.location_id;
+      }
     }
     if (!skuId) throw new Error("缺少商品");
     const sku = await loadMeasurementSku(skuId);
     if (!sku) throw new Error("商品不存在");
 
-    // 鉴权与归属都用 sku 当前门店（商品调走后旧店任务不可再改）
-    if (!actorCanAccessLocation(actor, sku.location_id)) throw new Error("无该门店权限");
-    if (!sku.location_id) throw new Error("商品未绑定门店");
+    // 门店 = inv_stocks 真实正库存（指定 > 任务所在店 > 员工唯一可编辑有货门店）；RPC 锁内再复核
+    const stocks = await loadSkuStockRows(skuId);
+    const resolved = resolveEditableLocation(actor, stocks, data.location_id ?? taskLocation);
+    if (!resolved.ok) {
+      if (resolved.error === "forbidden") throw new Error("无该门店权限");
+      if (resolved.error === "ambiguous") throw new Error("该商品在多个门店有货，请从对应门店的测量待办录入");
+      throw new Error("该门店暂无此商品实物，不能录入尺寸");
+    }
+    const locationId = resolved.locationId;
 
     try {
       return await saveMeasurementProduction({
@@ -155,14 +163,15 @@ export const saveMeasurement = createServerFn({ method: "POST" })
         actorId: actor.userId,
         clientOpId: data.client_op_id,
         expectedRevision: data.expected_revision,
-        locationId: sku.location_id,
+        locationId,
         value: parsed.value,
       });
     } catch (error) {
       const message = (error as Error).message;
       if (message === "revision_conflict") throw new Error("尺寸已被他人更新，请刷新后重试");
       if (message === "op_conflict") throw new Error("同一操作编号提交了不同内容，请换新编号");
-      if (message === "location_mismatch") throw new Error("商品已调离该门店，请刷新后重试");
+      if (message === "location_mismatch") throw new Error("该门店已无此商品实物，请刷新后重试");
+      if (message === "unauthorized_role") throw new Error("无该门店权限");
       if (message === "not_found") throw new Error("任务不存在或已结束");
       throw error;
     }
@@ -182,7 +191,7 @@ export const reportMeasurementDiagram = createServerFn({ method: "POST" })
     const actor = await loadMeasurementActor(context.userId);
     const sku = await loadMeasurementSku(data.sku_id);
     if (!sku) throw new Error("商品不存在");
-    if (!actorCanAccessLocation(actor, sku.location_id)) throw new Error("无该门店权限");
+    if (!actorCanReadSkuMeasurement(actor, await loadSkuStockRows(sku.id))) throw new Error("无该门店权限");
     if (data.revision !== sku.measurement_revision) throw new Error("stale_revision");
     await markMeasurementAssetFailedProduction({
       skuId: data.sku_id,
@@ -202,7 +211,7 @@ export const getMeasurement = createServerFn({ method: "GET" })
     const actor = await loadMeasurementActor(context.userId);
     const sku = await loadMeasurementSku(data.sku_id);
     if (!sku) throw new Error("商品不存在");
-    if (!actorCanAccessLocation(actor, sku.location_id)) throw new Error("无该门店权限");
+    if (!actorCanReadSkuMeasurement(actor, await loadSkuStockRows(sku.id))) throw new Error("无该门店权限");
     const asset = await getMeasurementAssetProduction(data.sku_id, sku.measurement_revision);
     return { sku, asset };
   });
@@ -217,7 +226,7 @@ export const getMeasurementRevision = createServerFn({ method: "GET" })
     const actor = await loadMeasurementActor(context.userId);
     const sku = await loadMeasurementSku(data.sku_id);
     if (!sku) throw new Error("商品不存在");
-    if (!actorCanAccessLocation(actor, sku.location_id)) throw new Error("无该门店权限");
+    if (!actorCanReadSkuMeasurement(actor, await loadSkuStockRows(sku.id))) throw new Error("无该门店权限");
     const active = await findActiveTaskProduction(data.sku_id);
     return { revision: sku.measurement_revision, active_task_id: active?.id ?? null };
   });
