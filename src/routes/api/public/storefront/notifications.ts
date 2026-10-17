@@ -12,6 +12,7 @@ type Row = {
   body: string;
   shortage_id: string | null;
   order_id: string | null;
+  product_id: string | null;
   read_at: string | null;
   created_at: string;
 };
