@@ -116,6 +116,7 @@ export const Route = createFileRoute("/api/public/storefront/orders")({
           return storefrontError("赠礼数量不能超过付费商品件数，请减少赠礼或加购商品", 422, "gift_exceeds_paid_items");
         }
         const pickup = body.fulfillment_method === "pickup";
+        const flash = body.fulfillment_method === "flash";
         const pickupPhone = pickup ? pickupContactPhone(auth.customer.phone) : null;
         if (pickup && !pickupPhone) {
           return storefrontError("请先绑定并验证手机号后再选择门店自提", 422, "pickup_phone_required");
@@ -137,6 +138,9 @@ export const Route = createFileRoute("/api/public/storefront/orders")({
         const ordinary = paymentPolicy.mode === "ordinary_wechat";
         if (pickup && paymentPolicy.mode !== "ordinary_wechat") {
           return storefrontError("门店自提暂未开放，请稍后重试", 503, "checkout_not_enabled");
+        }
+        if (flash && paymentPolicy.mode !== "ordinary_wechat") {
+          return storefrontError("同城闪送暂未开放，请稍后重试", 503, "checkout_not_enabled");
         }
         if (!ordinary && body.courier_quote_snapshot?.version === "per_store_99_cross_299_v1") {
           return storefrontError("普通商城结算尚未开放，请稍后重试", 503, "checkout_not_enabled");
