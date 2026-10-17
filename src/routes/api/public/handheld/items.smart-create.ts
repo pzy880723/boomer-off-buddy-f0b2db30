@@ -272,14 +272,21 @@ async function handleSmartCreate(request: Request, timing: ReturnType<typeof cre
           .maybeSingle();
         if (currentError || !current) return err("Unable to read committed SKU; retry the same operation", 503);
         const existing = ((current?.image_paths as string[] | null) ?? []) as string[];
-        const merged = [...new Set([...existing, ...incomingPaths].filter(Boolean))];
-        if (merged.length !== existing.length || hasRecognition) {
+        // 新建孤品的图片已在建品事务内写入；提交后不得再合并输入原图（worker 可能已把原图替换成处理图）。
+        // 只有标准品复用既有 SKU 时才追加本次照片。
+        const appendPhotos = shouldReuseSmartCreateSku(body.is_custom_price);
+        const merged = appendPhotos ? [...new Set([...existing, ...incomingPaths].filter(Boolean))] : existing;
+        const imagesChanged = merged.length !== existing.length;
+        if (imagesChanged || hasRecognition) {
           const upd = await supabaseAdmin
             .from("inv_skus")
             .update({
-              image_paths: merged,
-              image_url:
-                merged.find((p) => /^https?:\/\//i.test(p)) ?? current?.image_url ?? null,
+              ...(imagesChanged
+                ? {
+                    image_paths: merged,
+                    image_url: merged.find((p) => /^https?:\/\//i.test(p)) ?? current?.image_url ?? null,
+                  }
+                : {}),
               ...(hasRecognition
                 ? {
                     attributes: body.attributes,

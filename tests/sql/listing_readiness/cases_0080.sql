@@ -132,3 +132,20 @@ SELECT t2(NOT has_function_privilege('authenticated','handheld_smart_create_comm
   AND NOT has_function_privilege('anon','listing_readiness_pending_consent(integer)','EXECUTE')
   AND has_function_privilege('service_role','handheld_smart_create_commit_v2(uuid,uuid,text,text,uuid,boolean,jsonb,text[],text,uuid,text,text)','EXECUTE'),
   'P10 new functions service-only');
+
+-- P11 (0082) 明确 ai 计划、首张已完成、第二张原图无任务：不得成功/发布；补入队后完成才放行
+SELECT mk2('a8000000-0000-0000-0000-00000000000b', true, ARRAY['sku-listing/gallery/done.png','sku-raw/missing/second.jpg']);
+UPDATE listing_readiness SET image_plan='ai', image_ai_actor='00000000-0000-0000-0000-0000000000e1', image_ai_policy='2026-10-09-v1', images_settled=true
+ WHERE sku_id='a8000000-0000-0000-0000-00000000000b';
+INSERT INTO inv_listing_image_jobs (sku_id, source_bucket, source_path, status, readiness_revision)
+VALUES ('a8000000-0000-0000-0000-00000000000b','sku-raw','first.jpg','succeeded',1);
+SELECT hold2('a8000000-0000-0000-0000-00000000000b');
+SELECT t2((listing_readiness_refresh('a8000000-0000-0000-0000-00000000000b')->>'image')<>'succeeded', 'P11 ai plan with remaining raw never succeeds');
+SELECT t2(open3('a8000000-0000-0000-0000-00000000000b')=1, 'P11 missing raw auto-queued with persisted actor');
+SELECT t2((pub2('a8000000-0000-0000-0000-00000000000b','x')->>'released')::int=0 AND st2('a8000000-0000-0000-0000-00000000000b')='hidden', 'P11 raw never published');
+UPDATE inv_listing_image_jobs SET status='succeeded' WHERE sku_id='a8000000-0000-0000-0000-00000000000b' AND source_path='missing/second.jpg';
+SELECT t2((listing_readiness_refresh('a8000000-0000-0000-0000-00000000000b')->>'image')='failed', 'P11 job done but raw still in paths stays failed');
+SELECT set_config('boomer.listing_image_apply','1',false);
+UPDATE inv_skus SET image_paths=ARRAY['sku-listing/gallery/done.png','sku-listing/gallery/second.png'] WHERE id='a8000000-0000-0000-0000-00000000000b';
+SELECT set_config('boomer.listing_image_apply','',false);
+SELECT t2((listing_readiness_refresh('a8000000-0000-0000-0000-00000000000b')->>'image')='succeeded', 'P11 succeeds once all raw replaced');
