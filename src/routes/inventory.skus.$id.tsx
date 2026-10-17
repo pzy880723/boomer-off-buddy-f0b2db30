@@ -32,7 +32,7 @@ import {
   formatPrice,
   type SkuKind,
   type SkuRow,
-} , categoryLabel } from "@/lib/inventory.helpers";
+, categoryLabel } from "@/lib/inventory.helpers";
 
 export const Route = createFileRoute("/inventory/skus/$id")({
   component: SkuDetailPage,

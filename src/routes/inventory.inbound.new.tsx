@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/page-header";
 import { lookupSkusByEpcs, submitInbound } from "@/lib/inventory.functions";
-import { CATEGORY_LABEL, formatPrice } , categoryLabel } from "@/lib/inventory.helpers";
+import { CATEGORY_LABEL, formatPrice , categoryLabel } from "@/lib/inventory.helpers";
 
 export const Route = createFileRoute("/inventory/inbound/new")({
   head: () => ({

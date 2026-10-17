@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/page-header";
 import { DataTable } from "@/components/data-table";
 import { getInboundOrder } from "@/lib/inventory.functions";
-import { CATEGORY_LABEL, formatPrice } , categoryLabel } from "@/lib/inventory.helpers";
+import { CATEGORY_LABEL, formatPrice , categoryLabel } from "@/lib/inventory.helpers";
 
 export const Route = createFileRoute("/inventory/inbound/$id")({
   component: InboundDetailPage,
