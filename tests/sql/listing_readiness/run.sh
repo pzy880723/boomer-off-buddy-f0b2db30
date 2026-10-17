@@ -15,6 +15,7 @@ m82=${READINESS_FIX4-$(ls drizzle/migrations/*_listing_readiness_ai_raw_guard.sq
 m83=${READINESS_FIX5-$(ls drizzle/migrations/*_listing_readiness_reuse_photos_fix.sql 2>/dev/null | head -1)}
 mbf=${READINESS_FIX6-$(ls drizzle/migrations/*_product_content_backfill.sql 2>/dev/null | head -1)}
 for m in "$m75" "$m76" "$m78" "$m80" $m82 $m83 $mbf; do $PSQL -q -v ON_ERROR_STOP=1 -f "$m" >/dev/null || { echo "FAIL migration $m"; exit 1; }; done
+PSQL=$PSQL bash tests/sql/listing_readiness/schema_check.sh || { echo "FAIL schema"; exit 1; }
 out=$($PSQL -q -v ON_ERROR_STOP=1 -f tests/sql/listing_readiness/cases.sql -f tests/sql/listing_readiness/cases_0076.sql -f tests/sql/listing_readiness/cases_0080.sql -f tests/sql/listing_readiness/cases_0083.sql -f tests/sql/listing_readiness/cases_backfill.sql 2>&1); rc=$?
 echo "$out" | grep -o 'PASS .*\|ERROR.*\|FAIL.*'
 n=$(echo "$out" | grep -c 'PASS')
