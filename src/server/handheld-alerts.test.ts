@@ -20,3 +20,11 @@ test("handled, paused, voided or read do not alert", () => {
 test("other kinds never alert", () => {
   assert.equal(alertFields({ ...base, kind: "transfer_incoming" }).should_alert, false);
 });
+
+test("exact contract: only action_status === null alerts; empty string and paused do not", () => {
+  const row = { ...base, kind: "measurement_requested", ref_type: "measurement_task", ref_id: "t1" };
+  assert.equal(alertFields({ ...row, action_status: null }).should_alert, true);
+  assert.equal(alertFields({ ...row, action_status: "" }).should_alert, false);
+  assert.equal(alertFields({ ...row, action_status: "paused" }).should_alert, false);
+  assert.equal(alertFields({ ...row, action_status: null, is_read: true }).should_alert, false);
+});
