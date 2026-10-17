@@ -86,9 +86,16 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/measurement
           console.error("[measurement-image] load", (error as Error).message);
           return errCode("internal_error", "Temporarily unavailable");
         }
-        if (!actorCanAccessLocation(actor, body.location_id) || sku.location_id !== body.location_id) {
-          return errCode("unauthorized_role", "No access to this location");
+        // 门店归属以 inv_stocks 为准：只有该店确有正库存才能上传（HQ 也不例外）；登记 RPC 锁内重读
+        let access;
+        try {
+          access = measurementLocationAccess(actor, await loadSkuStockRows(sku.id), body.location_id);
+        } catch (error) {
+          console.error("[measurement-image] stock", (error as Error).message);
+          return errCode("internal_error", "Temporarily unavailable");
         }
+        if (access === "none") return errCode("unauthorized_role", "No access to this location");
+        if (access !== "edit") return errCode("unauthorized_location", "SKU has no stock in this location");
         // 预检（快速失败）；最终以登记 RPC 锁内复核为准
         if (sku.measurement_revision !== body.revision || !sku.measured_at) {
           return errCode("revision_conflict", "Measurement revision mismatch, re-measure first");
