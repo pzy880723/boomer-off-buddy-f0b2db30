@@ -167,3 +167,9 @@ export function groupStandardSkus(rows: SkuRow[]): StandardProductGroup[] {
   }
   return Array.from(groups.values()).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
+
+/** 分类中文名：未知/旧编码（如 porcelain）不外露英文，显示待核对。 */
+export function categoryLabel(code: string | null | undefined): string {
+  if (!code) return "未分类";
+  return (CATEGORY_LABEL as Record<string, string>)[code] ?? (code.startsWith("porcelain") ? "瓷器（待核对产地）" : "其他分类（待核对）");
+}
