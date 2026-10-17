@@ -64,25 +64,25 @@ BEGIN
 
   -- 5 保存：client_op_id/expected_revision 必填 / 冲突拒绝 / 非法值拒绝
   BEGIN
-    PERFORM public.measurement_save(sku1, t, staff, 'op-1', NULL, loc, 10, NULL, NULL, NULL);
+    PERFORM public.measurement_save(sku1, t, staff, 'op-null-rev', loc, 10, NULL, NULL, NULL);
     RAISE EXCEPTION 'FAIL null revision accepted';
   EXCEPTION WHEN OTHERS THEN ASSERT SQLERRM LIKE '%expected_revision_required%', 'required'; END;
   BEGIN
-    PERFORM public.measurement_save(sku1, t, staff, 'op-1', 5, loc, 10, NULL, NULL, NULL);
+    PERFORM public.measurement_save(sku1, t, staff, 'op-0001-save', 5, loc, 10, NULL, NULL, NULL);
     RAISE EXCEPTION 'FAIL wrong revision accepted';
   EXCEPTION WHEN OTHERS THEN ASSERT SQLERRM LIKE '%revision_conflict%', 'conflict'; END;
   BEGIN
-    PERFORM public.measurement_save(sku1, t, staff, 'op-1', 0, loc, -1, NULL, NULL, NULL);
+    PERFORM public.measurement_save(sku1, t, staff, 'op-0001-save', 0, loc, -1, NULL, NULL, NULL);
     RAISE EXCEPTION 'FAIL negative accepted';
   EXCEPTION WHEN OTHERS THEN ASSERT SQLERRM LIKE '%invalid_measurement%', 'invalid'; END;
   BEGIN
-    PERFORM public.measurement_save(sku1, t, staff, 'op-1', 0, loc, NULL, NULL, NULL, NULL);
+    PERFORM public.measurement_save(sku1, t, staff, 'op-0001-save', 0, loc, NULL, NULL, NULL, NULL);
     RAISE EXCEPTION 'FAIL empty accepted';
   EXCEPTION WHEN OTHERS THEN ASSERT SQLERRM LIKE '%empty_measurement%', 'empty'; END;
   RAISE NOTICE 'PASS save validation';
 
   -- 6 正常保存：revision+1、任务完成、手持提醒 handled、两申请者各一条带 product_id 的通知
-  r := public.measurement_save(sku1, t, staff, 'op-1', 0, loc, 12.5, 8, NULL, NULL);
+  r := public.measurement_save(sku1, t, staff, 'op-0001-save', 0, loc, 12.5, 8, NULL, NULL);
   ASSERT (r->>'revision')::int = 1, 'revision bumped';
   ASSERT (r->>'notified')::int = 2, 'both requesters notified';
   ASSERT (r->>'replayed')::boolean = false, 'not replay';
@@ -97,7 +97,7 @@ BEGIN
   RAISE NOTICE 'PASS save completes + notifies';
 
   -- 7 client_op_id 重放：返回原结果，不再改数据、不再通知（即使内容字段不同也按指纹判）
-  r := public.measurement_save(sku1, t, staff, 'op-1', 0, loc, 12.5, 8, NULL, NULL);
+  r := public.measurement_save(sku1, t, staff, 'op-0001-save', 0, loc, 12.5, 8, NULL, NULL);
   ASSERT (r->>'replayed')::boolean = true, 'replayed';
   ASSERT (r->>'revision')::int = 1, 'replay returns original revision';
   SELECT measurement_height_cm INTO h FROM inv_skus WHERE id = sku1;
