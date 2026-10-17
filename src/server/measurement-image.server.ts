@@ -41,7 +41,7 @@ export async function validateMeasurementImage(
 ): Promise<{ ok: true; value: ValidatedMeasurementImage } | { ok: false; error: MeasurementImageError }> {
   if (png.length > MEASUREMENT_IMAGE_MAX_BYTES) return { ok: false, error: "too_large" };
 
-  let meta: sharp.Metadata;
+  let meta: import("sharp").Metadata;
   try {
     meta = await sharp(png).metadata();
   } catch {
