@@ -26,6 +26,7 @@ type State = {
   revision: number;
   mutations: Map<string, { fp: string; result: any }>;
   saveCalls: any[];
+  actorFails: boolean;
 };
 const state = {} as State;
 (globalThis as any).__ms = state;
@@ -37,6 +38,7 @@ beforeEach(() => {
   state.revision = 0;
   state.mutations = new Map();
   state.saveCalls = [];
+  state.actorFails = false;
 });
 
 const fp = (a: any) =>
@@ -50,7 +52,7 @@ const stubs: Record<string, string> = {
     export const authenticateDevice = async () => ({ ok: true, device: { id: "dev" } });
     export const resolveSessionUser = async () => ({ user_id: globalThis.__ms.sessionUser });`,
   "@/integrations/supabase/client.server": "export const supabaseAdmin = new Proxy({}, { get: () => { throw new Error('unexpected direct db'); } });",
-  "@/server/measurement-actor.server": "export const loadMeasurementActor = async () => globalThis.__ms.actor;",
+  "@/server/measurement-actor.server": "export const loadMeasurementActor = async () => globalThis.__ms.actor; export const tryLoadMeasurementActor = async () => globalThis.__ms.actorFails ? null : globalThis.__ms.actor;",
   "@/server/product-measurement-production.server": `
     const fp = ${fp.toString()};
     export const loadMeasurementSku = async (id) => ({ id, measurement_revision: globalThis.__ms.revision, measured_at: null });
@@ -58,7 +60,7 @@ const stubs: Record<string, string> = {
     export const replaySaveProduction = async (a) => {
       const m = globalThis.__ms.mutations.get(a.actorId + "|" + a.clientOpId);
       if (!m) return null;
-      if (m.fp !== fp(a)) throw new Error("op_conflict");
+      if (m.fp !== fp(a) || (a.locationId != null && m.locationId !== a.locationId)) throw new Error("op_conflict");
       return { ...m.result, replayed: true };
     };
     export const saveMeasurementProduction = async (a) => {
@@ -67,7 +69,7 @@ const stubs: Record<string, string> = {
       if (a.expectedRevision !== s.revision) throw new Error("revision_conflict");
       s.revision += 1;
       const result = { revision: s.revision, task_id: null, notified: 0, replayed: false };
-      s.mutations.set(a.actorId + "|" + a.clientOpId, { fp: fp(a), result });
+      s.mutations.set(a.actorId + "|" + a.clientOpId, { fp: fp(a), locationId: a.locationId, result });
       return result;
     };`,
 };
@@ -173,5 +175,31 @@ test("无成功记录的旧请求：调拨后不伪装成功（被当前库存�
   const r = await post(body({ client_op_id: "op-never-0001" }));
   assert.notEqual(r.status, 200);
   assert.equal(r.json.code, "unauthorized_location");
+  assert.equal(state.saveCalls.length, 0);
+});
+
+test("同 op 异 location：409 op_conflict，0 新写（回放带原 location）", async () => {
+  state.stocks = [{ location_id: LOC_A, qty: 1 }, { location_id: LOC_B, qty: 1 }];
+  state.actor = { userId: "staff", roles: ["store_staff"], locationIds: [LOC_A, LOC_B] };
+  assert.equal((await post(body())).status, 200);
+  state.saveCalls = [];
+  const r = await post(body({ location_id: LOC_B }));
+  assert.equal(r.status, 409);
+  assert.equal(r.json.code, "op_conflict");
+  assert.equal(state.saveCalls.length, 0);
+});
+
+test("尺寸 0.001 取整为 0：受控 400 invalid_body，不进 DB", async () => {
+  const r = await post(body({ client_op_id: "op-tiny-0001", measurement: { height_cm: 0.001 } }));
+  assert.equal(r.status, 400);
+  assert.equal(r.json.code, "invalid_body");
+  assert.equal(state.saveCalls.length, 0);
+});
+
+test("员工权限读取失败：受控 500 internal_error，不当作无权限、不写", async () => {
+  state.actorFails = true;
+  const r = await post(body({ client_op_id: "op-actor-0001" }));
+  assert.equal(r.status, 500);
+  assert.equal(r.json.code, "internal_error");
   assert.equal(state.saveCalls.length, 0);
 });
