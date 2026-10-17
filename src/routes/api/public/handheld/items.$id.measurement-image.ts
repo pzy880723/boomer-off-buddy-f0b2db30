@@ -96,7 +96,8 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/measurement
           return errCode("internal_error", "Temporarily unavailable");
         }
         if (access === "none") return errCode("unauthorized_role", "No access to this location");
-        if (access !== "edit") return errCode("unauthorized_location", "SKU has no stock in this location");
+        // 沿用既有契约：无实物与跨店同为 403 unauthorized_role（原生端已处理）
+        if (access !== "edit") return errCode("unauthorized_role", "SKU has no stock in this location");
         // 预检（快速失败）；最终以登记 RPC 锁内复核为准
         if (sku.measurement_revision !== body.revision || !sku.measured_at) {
           return errCode("revision_conflict", "Measurement revision mismatch, re-measure first");
@@ -150,7 +151,6 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/measurement
             case "revision_conflict":
               return errCode("revision_conflict", "Measurement changed during upload, re-measure and retake");
             case "location_mismatch":
-              return errCode("unauthorized_location", "SKU has no stock in this location");
             case "unauthorized_role":
               return errCode("unauthorized_role", "No access to this location");
             case "op_conflict":

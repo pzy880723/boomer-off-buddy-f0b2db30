@@ -21,7 +21,6 @@ const LOC_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 
 type Sku = {
   id: string;
-  location_id: string;
   measurement_height_cm: number | null;
   measurement_width_cm: number | null;
   measurement_diameter_cm: number | null;
@@ -30,6 +29,8 @@ type Sku = {
 };
 type State = {
   sku: Sku | null;
+  /** 真实 inv_stocks 形态：SKU 无门店字段，门店只看库存行 */
+  stocks: Array<{ location_id: string; qty: number }>;
   actor: { userId: string; roles: string[]; locationIds: string[] };
   uploads: string[];
   uploadFail: boolean;
@@ -42,13 +43,13 @@ const state: State = {} as State;
 beforeEach(() => {
   state.sku = {
     id: SKU,
-    location_id: LOC_A,
     measurement_height_cm: 20,
     measurement_width_cm: 10,
     measurement_diameter_cm: null,
     measured_at: "2026-10-17T00:00:00Z",
     measurement_revision: 3,
   };
+  state.stocks = [{ location_id: LOC_A, qty: 1 }];
   state.actor = { userId: "staff", roles: ["store_staff"], locationIds: [LOC_A] };
   state.uploads = [];
   state.uploadFail = false;
@@ -73,6 +74,7 @@ const stubs: Record<string, string> = {
     export const resolveSessionUser = async () => ({ user_id: "staff" });`,
   "@/server/product-measurement-production.server": `
     export const loadMeasurementSku = async () => globalThis.__mi.sku;
+    export const loadSkuStockRows = async () => globalThis.__mi.stocks;
     export const uploadMeasurementDerivativeProduction = async (p) => {
       if (globalThis.__mi.uploadFail) throw new Error("storage_failed");
       globalThis.__mi.uploads.push(p);
@@ -82,12 +84,11 @@ const stubs: Record<string, string> = {
       return globalThis.__mi.register(a);
     };`,
   "@/lib/measurement.functions": "export const loadMeasurementActor = async () => globalThis.__mi.actor;",
-  "@/server/product-measurement.server": `export const actorCanAccessLocation = (actor, loc) =>
-      actor.roles.includes("super_admin") || actor.roles.includes("hq_operator") || (loc != null && actor.locationIds.includes(loc));`,
 };
 const REAL: Record<string, string> = {
   "@/server/measurement-image.server": path.resolve("src/server/measurement-image.server.ts"),
   "@/lib/handheld/errors": path.resolve("src/lib/handheld/errors.ts"),
+  "@/server/product-measurement.server": path.resolve("src/server/product-measurement.server.ts"),
 };
 
 let handlerPromise: Promise<any> | null = null;
@@ -187,9 +188,24 @@ test("跨店 actor：403，不上传不登记", async () => {
   assertNoWrites();
 });
 
-test("SKU 已调店：用旧店 location 上传 403，不上传不登记", async () => {
-  state.sku!.location_id = LOC_B;
+test("SKU 已调店（A0B1）：总部用旧店 A 上传也 403，不上传不登记", async () => {
+  state.stocks = [{ location_id: LOC_A, qty: 0 }, { location_id: LOC_B, qty: 1 }];
   state.actor = { userId: "hq", roles: ["super_admin"], locationIds: [] };
+  const r = await post(body(await transparentPng(100, 200)));
+  assert.equal(r.status, 403);
+  assertNoWrites();
+});
+
+test("A0B1：新店 B 员工上传通过并以 B 登记", async () => {
+  state.stocks = [{ location_id: LOC_A, qty: 0 }, { location_id: LOC_B, qty: 1 }];
+  state.actor = { userId: "staff", roles: ["store_staff"], locationIds: [LOC_B] };
+  const r = await post({ ...body(await transparentPng(100, 200)), location_id: LOC_B });
+  assert.equal(r.status, 200);
+  assert.equal(state.registerCalls[0].locationId, LOC_B);
+});
+
+test("SKU 在该店无任何库存行：403", async () => {
+  state.stocks = [];
   const r = await post(body(await transparentPng(100, 200)));
   assert.equal(r.status, 403);
   assertNoWrites();
