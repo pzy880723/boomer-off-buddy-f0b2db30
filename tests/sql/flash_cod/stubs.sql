@@ -90,4 +90,4 @@ $$;
 CREATE OR REPLACE FUNCTION public.commerce_item_cleared_shortage_qty(p_fulfillment_item_id uuid)
 RETURNS int LANGUAGE sql STABLE SET search_path = public AS $$ SELECT 0 $$;
 
-GRANT SELECT ON ALL TABLES IN SCHEMA public TO service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;
