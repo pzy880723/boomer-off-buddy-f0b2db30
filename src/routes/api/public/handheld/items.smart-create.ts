@@ -30,11 +30,8 @@ import {
   resolveManualProductFacets,
 } from "@/server/product-classification.server";
 import { dbConsentStore } from "@/server/ai-consent.server";
-import { AI_POLICY_VERSION, isAiAllowed, smartCreateWantsAi } from "@/server/ai-consent-core";
-import {
-  enqueueListingImageJobs,
-  triggerListingImageWorker,
-} from "@/server/handheld-listing-image-jobs.server";
+import { AI_POLICY_VERSION, smartCreateWantsAi } from "@/server/ai-consent-core";
+import { triggerListingImageWorker } from "@/server/handheld-listing-image-jobs.server";
 
 const SKU_IMAGE_BUCKETS = new Set(["sku-raw", "sku-listing"]);
 
