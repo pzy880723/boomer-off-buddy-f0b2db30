@@ -11652,6 +11652,7 @@ export type Database = {
         Args: { p_customer_id: string; p_listing_id: string }
         Returns: Json
       }
+      measurement_routing_lock: { Args: never; Returns: undefined }
       measurement_save: {
         Args: {
           p_actor_id: string
@@ -11667,19 +11668,35 @@ export type Database = {
         }
         Returns: Json
       }
-      measurement_save_replay: {
-        Args: {
-          p_actor_id: string
-          p_client_op_id: string
-          p_depth: number
-          p_diameter: number
-          p_expected_revision: number
-          p_height: number
-          p_sku_id: string
-          p_width: number
-        }
-        Returns: Json
-      }
+      measurement_save_replay:
+        | {
+            Args: {
+              p_actor_id: string
+              p_client_op_id: string
+              p_depth: number
+              p_diameter: number
+              p_expected_revision: number
+              p_height: number
+              p_sku_id: string
+              p_width: number
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_actor_id: string
+              p_client_op_id: string
+              p_depth: number
+              p_diameter: number
+              p_expected_revision: number
+              p_height: number
+              p_location_id: string
+              p_sku_id: string
+              p_task_id: string
+              p_width: number
+            }
+            Returns: Json
+          }
       measurement_sku_advisory_lock: {
         Args: { p_sku_id: string }
         Returns: undefined

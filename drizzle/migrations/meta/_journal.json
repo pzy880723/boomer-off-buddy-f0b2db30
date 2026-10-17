@@ -519,6 +519,13 @@
       "when": 1792208103965,
       "tag": "0073_measurement_first_request_lock_replay",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1792208766417,
+      "tag": "0074_measurement_routing_lock_save_location",
+      "breakpoints": true
     }
   ]
 }
