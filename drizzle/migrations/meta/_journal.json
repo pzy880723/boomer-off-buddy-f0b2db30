@@ -617,6 +617,13 @@
       "when": 1792259437874,
       "tag": "0087_flash_cod_delivery",
       "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1792260230695,
+      "tag": "0088_flash_cod_cross_store",
+      "breakpoints": true
     }
   ]
 }
