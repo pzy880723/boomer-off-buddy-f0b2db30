@@ -74,7 +74,7 @@ export interface ValidatedMeasurementImage {
   frontHeightPx: number;
   /** 实测高（cm）/ bbox 高（px）→ 每厘米像素数 */
   pxPerCm: number;
-  /** trim 后的透明 PNG 原图 buffer */
+  /** 按 alpha bbox extract 的透明 PNG（像素尺寸 = bbox.w×bbox.h） */
   trimmedPng: Buffer;
 }
 
@@ -114,13 +114,7 @@ export async function validateMeasurementImage(
     return { ok: false, error: "missing_measurement" };
   }
 
-  // trim 透明边（阈值 10，去掉近透明噪点）
-  const trimmed = await sharp(png).trim({ threshold: 10 }).toBuffer();
-  const tMeta = await sharp(trimmed).metadata();
-  if (!tMeta.width || !tMeta.height) return { ok: false, error: "empty_foreground" };
-
-  // bbox 相对原图：用 trim 前后尺寸差计算（trim 居中裁边近似）
-  // 精确 bbox：对 alpha 通道找非零边界
+  // bbox 只由 alpha>10 扫描得出；素材按同一 bbox extract，不做独立颜色 trim
   const { data, info } = await sharp(png)
     .ensureAlpha()
     .extractChannel(3)
@@ -153,7 +147,10 @@ export async function validateMeasurementImage(
       frontWidthPx: bbox.w,
       frontHeightPx: bbox.h,
       pxPerCm: Math.round((bbox.h / measuredHeight) * 1000) / 1000,
-      trimmedPng: trimmed,
+      trimmedPng: await sharp(png)
+        .extract({ left: bbox.x, top: bbox.y, width: bbox.w, height: bbox.h })
+        .png()
+        .toBuffer(),
     },
   };
 }
