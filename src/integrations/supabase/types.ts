@@ -11607,6 +11607,24 @@ export type Database = {
       inv_sku_delete_blocker: { Args: { p_sku_id: string }; Returns: string }
       inv_sku_is_hq_actor: { Args: never; Returns: boolean }
       inventory_delete_unused_sku: { Args: { p_sku_id: string }; Returns: Json }
+      measurement_asset_register: {
+        Args: {
+          p_actor_id: string
+          p_bbox: Json
+          p_client_op_id: string
+          p_content_hash: string
+          p_front_height_px: number
+          p_front_width_px: number
+          p_height_cm: number
+          p_location_id: string
+          p_preview_path: string
+          p_px_per_cm: number
+          p_revision: number
+          p_sku_id: string
+          p_width_cm: number
+        }
+        Returns: Json
+      }
       measurement_request: {
         Args: { p_customer_id: string; p_listing_id: string }
         Returns: Json

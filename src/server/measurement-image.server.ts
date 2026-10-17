@@ -8,6 +8,55 @@ import sharp from "sharp";
 export const MEASUREMENT_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 export const MEASUREMENT_IMAGE_MAX_PX = 2000;
 export const MEASUREMENT_RATIO_TOLERANCE = 0.03;
+/** 上传 JSON 总请求体上限（5MB PNG 的 base64 ≈ 6.67MB + 少量字段） */
+export const MEASUREMENT_REQUEST_MAX_BYTES = 7 * 1024 * 1024;
+export const MEASUREMENT_BASE64_MAX_LEN = Math.ceil(MEASUREMENT_IMAGE_MAX_BYTES / 3) * 4;
+
+/**
+ * 有上限地读取 JSON 请求体：先看 Content-Length，再流式累计，超过上限立即中止，
+ * 不做无界 request.json() 分配。
+ */
+export async function readJsonBodyLimited(
+  request: Request,
+  maxBytes: number,
+): Promise<{ ok: true; value: unknown } | { ok: false; error: "too_large" | "invalid_json" }> {
+  const declared = request.headers.get("content-length");
+  if (declared != null) {
+    const n = Number(declared);
+    if (!Number.isFinite(n) || n < 0) return { ok: false, error: "invalid_json" };
+    if (n > maxBytes) return { ok: false, error: "too_large" };
+  }
+  if (!request.body) return { ok: false, error: "invalid_json" };
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => {});
+      return { ok: false, error: "too_large" };
+    }
+    chunks.push(value);
+  }
+  try {
+    const text = new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks));
+    return { ok: true, value: JSON.parse(text) };
+  } catch {
+    return { ok: false, error: "invalid_json" };
+  }
+}
+
+/** 严格 base64：仅标准字母表、长度 4 的倍数、填充只在末尾、长度上限；否则 null */
+export function decodeStrictBase64(input: string, maxLen = MEASUREMENT_BASE64_MAX_LEN): Buffer | null {
+  if (input.length === 0 || input.length > maxLen || input.length % 4 !== 0) return null;
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(input)) return null;
+  const buf = Buffer.from(input, "base64");
+  // 回编码一致性，拒绝非规范填充位
+  if (buf.toString("base64") !== input) return null;
+  return buf;
+}
 
 export type MeasurementImageError =
   | "not_png"

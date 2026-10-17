@@ -113,3 +113,12 @@ INSERT INTO public.commerce_customers VALUES
 -- s2 已有实测
 UPDATE public.inv_skus SET measurement_height_cm=10, measured_at=now(), measurement_revision=1
  WHERE id='00000000-0000-0000-0000-000000000002';
+
+-- 权限桩（与生产同名列；role 用 text 足以覆盖 role::text 比较）
+CREATE TABLE public.user_roles (user_id uuid NOT NULL, role text NOT NULL);
+CREATE TABLE public.user_location_perms (user_id uuid NOT NULL, location_id uuid NOT NULL);
+INSERT INTO public.user_location_perms VALUES
+  ('00000000-0000-0000-0000-00000000ff01','00000000-0000-0000-0000-00000000000a');
+INSERT INTO public.user_roles VALUES
+  ('00000000-0000-0000-0000-00000000ff01','store_staff'),
+  ('00000000-0000-0000-0000-00000000ff09','super_admin');

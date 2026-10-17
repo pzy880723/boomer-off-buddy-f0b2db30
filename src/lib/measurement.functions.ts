@@ -6,6 +6,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { reportMeasurementDiagramInput } from "@/lib/measurement-schemas";
 import {
   actorCanAccessLocation,
   validateMeasurementInput,
@@ -19,7 +20,7 @@ import {
   listMeasurementTasksProduction,
   loadMeasurementSku,
   saveMeasurementProduction,
-  upsertMeasurementAssetProduction,
+  markMeasurementAssetFailedProduction,
 } from "@/server/product-measurement-production.server";
 import { loadUserRoles } from "@/server/handheld-auth.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
@@ -168,81 +169,25 @@ export const saveMeasurement = createServerFn({ method: "POST" })
   });
 
 /**
- * 尺寸素材上报（透明分割 worker 调用）。
- * ready 必须：revision 等于当前实测版本 + verified=true（人工确认正视图）+
- * 完整几何 + 实测宽高 + 受控路径（sku-listing 桶 measurements/{sku_id}/ 前缀 PNG）。
- * 拒绝任意外链和他品路径；旧版本一律 stale_revision。
+ * 尺寸素材失败上报（failed-only）。
+ * ready 一律拒绝：唯一 ready 入口是 POST /api/public/handheld/items/{id}/measurement-image
+ * （服务端 PNG 校验 + measurement_asset_register 行锁 CAS）。failed 也不会覆盖已 ready 素材。
  */
 export const reportMeasurementDiagram = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
-    z
-      .object({
-        sku_id: z.string().uuid(),
-        revision: z.number().int().min(0),
-        status: z.enum(["ready", "failed"]),
-        verified: z.boolean().optional(),
-        width_cm: z.number().positive().max(9999.99).nullable().optional(),
-        height_cm: z.number().positive().max(9999.99).nullable().optional(),
-        cutout_preview_path: z.string().max(2048).nullable().optional(),
-        bbox: z
-          .object({
-            x: z.number().min(0),
-            y: z.number().min(0),
-            w: z.number().positive(),
-            h: z.number().positive(),
-          })
-          .nullable()
-          .optional(),
-        front_width_px: z.number().int().positive().nullable().optional(),
-        front_height_px: z.number().int().positive().nullable().optional(),
-        px_per_cm: z.number().positive().nullable().optional(),
-        error: z.string().max(500).nullable().optional(),
-      })
-      .strict()
-      .parse(input),
-  )
+  .inputValidator((input: unknown) => reportMeasurementDiagramInput.parse(input))
   .handler(async ({ data, context }) => {
+    // 双重拒绝：即便绕过 schema，handler 也只接受 failed
+    if ((data as { status: string }).status !== "failed") throw new Error("ready_not_allowed");
     const actor = await loadMeasurementActor(context.userId);
     const sku = await loadMeasurementSku(data.sku_id);
     if (!sku) throw new Error("商品不存在");
     if (!actorCanAccessLocation(actor, sku.location_id)) throw new Error("无该门店权限");
     if (data.revision !== sku.measurement_revision) throw new Error("stale_revision");
-
-    const path = data.cutout_preview_path ?? null;
-    const pathOk =
-      path &&
-      path.startsWith(`sku-listing/measurements/${data.sku_id}/`) &&
-      path.endsWith(".png") &&
-      !path.includes("..") &&
-      !/[?#\s]/.test(path);
-
-    if (data.status === "ready") {
-      const ok =
-        data.verified === true &&
-        pathOk &&
-        data.bbox &&
-        data.front_width_px &&
-        data.front_height_px &&
-        data.px_per_cm &&
-        data.width_cm &&
-        data.height_cm;
-      if (!ok) throw new Error("incomplete_asset");
-    }
-
-    await upsertMeasurementAssetProduction({
-      sku_id: data.sku_id,
+    await markMeasurementAssetFailedProduction({
+      skuId: data.sku_id,
       revision: data.revision,
-      status: data.status,
-      cutout_preview_path: data.status === "ready" ? path : null,
-      bbox: data.status === "ready" ? (data.bbox ?? null) : null,
-      front_width_px: data.status === "ready" ? (data.front_width_px ?? null) : null,
-      front_height_px: data.status === "ready" ? (data.front_height_px ?? null) : null,
-      px_per_cm: data.status === "ready" ? (data.px_per_cm ?? null) : null,
-      error: data.status === "failed" ? (data.error ?? "unknown") : null,
-      verified: data.status === "ready",
-      width_cm: data.status === "ready" ? (data.width_cm ?? null) : null,
-      height_cm: data.status === "ready" ? (data.height_cm ?? null) : null,
+      error: data.error ?? "unknown",
     });
     return { ok: true };
   });
