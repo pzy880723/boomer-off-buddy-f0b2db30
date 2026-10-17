@@ -28,8 +28,8 @@ SELECT t2((SELECT updated_by=content_system_actor() AND updated_by<>'e1000000-00
 SELECT bf_mk('d8600000-0000-0000-0000-000000000002');
 SELECT t2(bf('d8600000-0000-0000-0000-000000000002', NULL)->>'status'='filled', 'U2 backfill insert succeeds');
 SELECT t2((SELECT updated_by=content_system_actor() FROM inv_product_content WHERE sku_id='d8600000-0000-0000-0000-000000000002'), 'U2 backfill row by system actor');
-SELECT t2(product_content_backfill_restore('d8600000-0000-0000-0000-000000000002')->>'status'='restored'
-  AND NOT EXISTS (SELECT 1 FROM inv_product_content WHERE sku_id='d8600000-0000-0000-0000-000000000002'), 'U2 restore removes system row');
+SELECT t2(product_content_backfill_restore('d8600000-0000-0000-0000-000000000002')->>'status'='restored', 'U2 restore ok');
+SELECT t2(NOT EXISTS (SELECT 1 FROM inv_product_content WHERE sku_id='d8600000-0000-0000-0000-000000000002'), 'U2 restore removes system row');
 
 -- U3 存量补齐人工空草稿行：写入身份换成系统，备份保留人工身份，回滚恢复人工 updated_by/updated_at/草稿
 SELECT bf_mk('d8600000-0000-0000-0000-000000000003');
