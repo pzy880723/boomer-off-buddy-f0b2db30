@@ -15,4 +15,4 @@ for m in "$m75" "$m76" "$m78" "$m80"; do $PSQL -q -v ON_ERROR_STOP=1 -f "$m" >/d
 out=$($PSQL -q -v ON_ERROR_STOP=1 -f tests/sql/listing_readiness/cases.sql -f tests/sql/listing_readiness/cases_0076.sql -f tests/sql/listing_readiness/cases_0080.sql 2>&1); rc=$?
 echo "$out" | grep -o 'PASS .*\|ERROR.*\|FAIL.*'
 n=$(echo "$out" | grep -c 'PASS')
-[ $rc -eq 0 ] && [ "$n" -eq 83 ] && echo "ALL PASS ($n)" || { echo "SOME FAILED ($n/83)"; exit 1; }
+[ $rc -eq 0 ] && [ "$n" -eq 86 ] && echo "ALL PASS ($n)" || { echo "SOME FAILED ($n/86)"; exit 1; }
