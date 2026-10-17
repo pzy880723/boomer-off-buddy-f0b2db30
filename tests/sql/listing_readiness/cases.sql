@@ -60,7 +60,7 @@ SELECT t_assert((SELECT version=1 AND published_blocks->0->>'text'='测试杯' F
 
 -- 11 已有人工发布内容：直接复用，不覆盖（零 AI 路径）
 SELECT mk('30000000-0000-0000-0000-000000000003', true);
-INSERT INTO inv_product_content (sku_id, version, published_blocks, published_version) VALUES ('30000000-0000-0000-0000-000000000003', 4, '[{"id":"m","type":"paragraph","text":"人工"}]', 4);
+INSERT INTO inv_product_content (sku_id, version, published_blocks, published_version, updated_by) VALUES ('30000000-0000-0000-0000-000000000003', 4, '[{"id":"m","type":"paragraph","text":"人工"}]', 4, 'e1000000-0000-0000-0000-0000000000aa');
 UPDATE listing_readiness SET images_settled=true WHERE sku_id='30000000-0000-0000-0000-000000000003';
 SELECT list('30000000-0000-0000-0000-000000000003');
 SELECT listing_readiness_refresh('30000000-0000-0000-0000-000000000003');

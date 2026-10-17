@@ -24,15 +24,15 @@ SELECT t2(bf('c1000000-0000-0000-0000-000000000001', NULL)->>'status'='already_f
 
 -- B3 现有非空详情不改
 SELECT bf_mk('c1000000-0000-0000-0000-000000000003');
-INSERT INTO inv_product_content (sku_id, version, draft_blocks, published_blocks, published_version)
-VALUES ('c1000000-0000-0000-0000-000000000003', 4, '[]', '[{"id":"m","type":"paragraph","text":"人工"}]', 4);
+INSERT INTO inv_product_content (sku_id, version, draft_blocks, published_blocks, published_version, updated_by)
+VALUES ('c1000000-0000-0000-0000-000000000003', 4, '[]', '[{"id":"m","type":"paragraph","text":"人工"}]', 4, 'e1000000-0000-0000-0000-0000000000aa');
 SELECT t2(bf('c1000000-0000-0000-0000-000000000003', 4)->>'reason'='has_content'
   AND (SELECT version=4 AND published_blocks->0->>'text'='人工' FROM inv_product_content WHERE sku_id='c1000000-0000-0000-0000-000000000003'),
   'B3 existing non-empty content untouched');
 
 -- B4 人工并发：dry-run 读到无行，执行前人工建了空草稿行 → conflict；读到 version 后再改 → conflict
 SELECT bf_mk('c1000000-0000-0000-0000-000000000004');
-INSERT INTO inv_product_content (sku_id, version, draft_blocks, published_blocks) VALUES ('c1000000-0000-0000-0000-000000000004', 2, '[{"id":"d","type":"paragraph","text":"草稿"}]', '[]');
+INSERT INTO inv_product_content (sku_id, version, draft_blocks, published_blocks, updated_by) VALUES ('c1000000-0000-0000-0000-000000000004', 2, '[{"id":"d","type":"paragraph","text":"草稿"}]', '[]', 'e1000000-0000-0000-0000-0000000000aa');
 SELECT t2(bf('c1000000-0000-0000-0000-000000000004', NULL)->>'status'='conflict', 'B4 CAS: row appeared since dry-run');
 SELECT t2(bf('c1000000-0000-0000-0000-000000000004', 1)->>'status'='conflict', 'B4 CAS: stale version');
 SELECT t2(bf('c1000000-0000-0000-0000-000000000004', 2)->>'status'='filled', 'B4 matching version fills');
