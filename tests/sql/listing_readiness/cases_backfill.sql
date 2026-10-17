@@ -48,8 +48,8 @@ SELECT t2(bf('c1000000-0000-0000-0000-000000000001', NULL)->>'status'='filled', 
 -- B6 补齐后人工编辑 → 回滚拒绝，详情不再把自动来源挂到人工内容上
 UPDATE inv_product_content SET version=version+1, published_version=version+1, published_blocks='[{"id":"m","type":"paragraph","text":"改"}]'
  WHERE sku_id='c1000000-0000-0000-0000-000000000001';
-SELECT t2(product_content_backfill_restore('c1000000-0000-0000-0000-000000000001')->>'status'='edited_since'
-  AND (published_product_content('c1000000-0000-0000-0000-000000000001')->'auto_sources') IS NULL, 'B6 manual edit after fill wins');
+SELECT t2(product_content_backfill_restore('c1000000-0000-0000-0000-000000000001')->>'status'='edited_since', 'B6 restore refused after manual edit');
+SELECT t2((published_product_content('c1000000-0000-0000-0000-000000000001')->'auto_sources') IS NULL, 'B6 manual edit after fill wins');
 SELECT t2(bf('c1000000-0000-0000-0000-000000000001', 2)->>'reason'='has_content', 'B6 no overwrite of later manual edit');
 
 -- B7 跳过：准备中 / 图片任务未完成 / 详情图片任务未完成 / 未公开 / 标准品
