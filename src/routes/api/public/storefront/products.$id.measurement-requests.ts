@@ -19,7 +19,8 @@ function privateNoStore(res: Response) {
  * 首次建任务时生成门店手持提醒，原子完成）。登录必填；重复申请幂等；
  * 已有实测直接返回 completed + 完整 measurement；售罄照常受理，不改库存。
  *
- * 响应：{ ok:true, data:{ status:'pending'|'completed', task_id, requested_at, measurement? } }
+ * 无门店正库存/多店无法确定实物门店：status:'unavailable' + 中文 message，不建任务、不广播、不记申请者。
+ * 响应：{ ok:true, data:{ status:'pending'|'completed'|'unavailable', task_id, requested_at, measurement?, message? } }
  */
 export const Route = createFileRoute("/api/public/storefront/products/$id/measurement-requests")({
   server: {

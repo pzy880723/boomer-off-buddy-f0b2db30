@@ -22,7 +22,7 @@ async function loadStorefrontMeasurement(skuId: string) {
   const { data } = await supabaseAdmin
     .from("inv_skus")
     .select(
-      "id, location_id, measurement_height_cm, measurement_width_cm, measurement_depth_cm, measurement_diameter_cm, measured_at, measurement_revision",
+      "id, measurement_height_cm, measurement_width_cm, measurement_depth_cm, measurement_diameter_cm, measured_at, measurement_revision",
     )
     .eq("id", skuId)
     .maybeSingle();
