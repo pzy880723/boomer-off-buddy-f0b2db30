@@ -94,6 +94,7 @@ const bundled = await build({
     setup(builder: any) {
       const modules: Record<string, string> = {
         "@tanstack/react-router": "export const createFileRoute = () => options => options;",
+  "@/server/listing-readiness.server": "export const advanceListingReadiness=async()=>({status:'legacy'}); export const advanceListingReadinessSafe=async()=>{}; export const currentReadinessRevision=async()=>null; export const sweepListingReadiness=async()=>({checked:0});",
         "@/integrations/supabase/client.server": "export const supabaseAdmin = globalThis.__smartCreateBrandTest.db;",
         "@/server/handheld-auth.server": `
           export const HANDHELD_CORS = {};

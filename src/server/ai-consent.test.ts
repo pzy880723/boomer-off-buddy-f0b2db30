@@ -85,6 +85,7 @@ test("queued jobs: null actor (legacy) and wrong version are denied", async () =
 
 test("retry with different ai_processing_allowed keeps the same product fingerprint (no duplicate SKU)", async () => {
   const { smartCreateFingerprint } = await bundle("src/server/handheld-smart-create.server.ts", {
+  "@/server/listing-readiness.server": "export const advanceListingReadiness=async()=>({status:'legacy'}); export const advanceListingReadinessSafe=async()=>{}; export const currentReadinessRevision=async()=>null; export const sweepListingReadiness=async()=>({checked:0});",
     "@/integrations/supabase/client.server": "export const supabaseAdmin = {};",
     "@/lib/product-classification": "export const findSanrioBrandCandidate = () => null;",
     "@/lib/product-taxonomy": "export const matchBrandCandidate = () => null; export const normalizeLookupText = s => s;",

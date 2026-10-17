@@ -11,6 +11,7 @@ after(() => {
 });
 (globalThis as any).__contentJobs = state;
 const stubs: Record<string, string> = {
+  "@/server/listing-readiness.server": "export const advanceListingReadiness=async()=>({status:'legacy'}); export const advanceListingReadinessSafe=async()=>{}; export const currentReadinessRevision=async()=>null; export const sweepListingReadiness=async()=>({checked:0});",
   "@/integrations/supabase/client.server": `export const supabaseAdmin={
     rpc:async(name,args)=>{const s=globalThis.__contentJobs;s.calls.push({name,args});
       if(name==='handheld_listing_image_claim'){await s.legacyGate;return {data:s.legacyJobs,error:s.legacyError?{message:'legacy unavailable'}:null};}

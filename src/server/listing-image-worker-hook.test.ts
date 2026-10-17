@@ -14,6 +14,7 @@ const originalKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const originalEnabled = process.env.HANDHELD_LISTING_IMAGE_WORKER_ENABLED;
 const stubs: Record<string, string> = {
   "@tanstack/react-router": "export const createFileRoute = () => config => config;",
+  "@/server/listing-readiness.server": "export const advanceListingReadiness=async()=>({status:'legacy'}); export const advanceListingReadinessSafe=async()=>{}; export const currentReadinessRevision=async()=>null; export const sweepListingReadiness=async()=>({checked:0});",
   "@/server/handheld-listing-image-jobs.server": `export const runListingImageWorker=async limit=>{
     globalThis.__imageWorkerHook.limits.push(limit);return globalThis.__imageWorkerHook.result;};`,
 };
