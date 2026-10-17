@@ -55,7 +55,7 @@ function FulfillmentDetailPage() {
       />
       {isLoading ? <p className="text-muted-foreground text-sm">加载中…</p> : null}
       {(data?.shops ?? []).map((shop) => (
-        <ShopCard key={shop.fulfillment_id} shop={shop} orderId={orderId} pickup={data?.fulfillment_method === "pickup"} />
+        <ShopCard key={shop.fulfillment_id} shop={shop} orderId={orderId} pickup={data?.fulfillment_method === "pickup"} flash={data?.fulfillment_method === "flash"} />
       ))}
       {!isLoading && (data?.shops ?? []).length === 0 ? (
         <p className="text-muted-foreground text-sm">该订单暂无门店子单。</p>
@@ -64,9 +64,10 @@ function FulfillmentDetailPage() {
   );
 }
 
-function ShopCard({ shop, orderId, pickup }: { shop: StoreSubOrder; orderId: string; pickup: boolean }) {
+function ShopCard({ shop, orderId, pickup, flash }: { shop: StoreSubOrder; orderId: string; pickup: boolean; flash: boolean }) {
   const queryClient = useQueryClient();
   const ship = useServerFn(manualShipStoreSubOrder);
+  const flashDeliverFn = useServerFn(flashDeliverStoreSubOrder);
   const report = useServerFn(reportStoreShortage);
   const [provider, setProvider] = useState("");
   const [trackingNo, setTrackingNo] = useState("");
