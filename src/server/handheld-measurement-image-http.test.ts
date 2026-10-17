@@ -166,6 +166,7 @@ function assertNoWrites() {
 
 test("合规透明 PNG：先校验→上传 640/1280→登记 RPC，HTTP 用登记结果回 ready", async () => {
   const r = await post(body(await transparentPng(100, 200)));
+  if (r.status !== 200) console.log("DBG", JSON.stringify(r.json));
   assert.equal(r.status, 200);
   assert.equal(state.uploads.length, 2);
   assert.equal(state.registerCalls.length, 1);
