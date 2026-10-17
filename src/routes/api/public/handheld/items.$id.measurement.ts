@@ -89,16 +89,41 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/measurement
 
         const sku = await loadMeasurementSku(params.id);
         if (!sku) return errCode("not_found", "SKU not found");
+        const parsed = validateMeasurementInput(body.measurement);
+        if (!parsed.ok || !hasAnyMeasurement(parsed.value)) {
+          return errCode("invalid_body", "Invalid measurement");
+        }
+
+        // 已成功 op 回放（售出/调拨/版本变化后仍可确认原结果）：只匹配当前 actor + 原 op + 完全一致指纹；
+        // 命中不写库；未命中继续下方全部当前权限/正库存/版本校验
+        try {
+          const replay = await replaySaveProduction({
+            skuId: sku.id,
+            actorId: session.user_id,
+            clientOpId: body.client_op_id,
+            expectedRevision: body.expected_revision,
+            value: parsed.value,
+          });
+          if (replay) {
+            return ok({
+              revision: replay.revision,
+              task_id: replay.task_id,
+              notified: replay.notified,
+              replayed: true,
+            });
+          }
+        } catch (error) {
+          if ((error as Error).message === "op_conflict") {
+            return errCode("op_conflict", "client_op_id reused with different content");
+          }
+          return errCode("internal_error", "Temporarily unavailable");
+        }
+
         const actor = await loadMeasurementActor(session.user_id);
         // 预检（快速失败）；最终以 RPC 在 SKU 锁内重读 inv_stocks 为准
         const access = measurementLocationAccess(actor, await loadSkuStockRows(sku.id), body.location_id);
         if (access === "none") return errCode("unauthorized_role", "No access to this location");
         if (access !== "edit") return errCode("unauthorized_location", "SKU has no stock in this location");
-
-        const parsed = validateMeasurementInput(body.measurement);
-        if (!parsed.ok || !hasAnyMeasurement(parsed.value)) {
-          return errCode("invalid_body", "Invalid measurement");
-        }
 
         // 活跃任务由 RPC 在 sku 行锁内查找（避免申请/保存交错漏完成任务）；
         // op 幂等回放也在锁内，重试同一 POST 返回原结果。
