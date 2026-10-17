@@ -54,6 +54,21 @@ CREATE TABLE public.product_measurement_requesters (
   UNIQUE (task_id, customer_id)
 );
 
+CREATE TABLE public.product_measurement_assets (
+  sku_id uuid NOT NULL REFERENCES public.inv_skus(id),
+  revision integer NOT NULL,
+  status text NOT NULL DEFAULT 'pending',
+  cutout_preview_path text,
+  bbox jsonb,
+  front_width_px integer,
+  front_height_px integer,
+  px_per_cm numeric(10,3),
+  error text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (sku_id, revision)
+);
+
 CREATE TABLE public.inv_handheld_notifications (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   device_id uuid,
