@@ -279,3 +279,22 @@ DO $$ DECLARE r jsonb; p text; n0 int; BEGIN
   ASSERT NOT has_function_privilege('authenticated','public.measurement_save_replay(uuid,uuid,text,integer,numeric,numeric,numeric,numeric)','EXECUTE'), 'replay service only';
   RAISE NOTICE 'PASS completed op replay after sale/transfer/revision change, conflicts rejected';
 END $$;
+
+-- 16 保存回放必须是完全原 body：同 op 异 location → op_conflict（measurement_save 锁内与只读 replay 均拒绝）
+DO $$ DECLARE r jsonb; BEGIN
+  PERFORM test_mk(16,'a','a=1,b=1');
+  r := measurement_save(s(16), null, st('9'), 'op-loc-00001', 0, loc('a'), 20, 10, null, null);
+  ASSERT (r->>'revision')::int = 1, 'saved at A';
+  r := measurement_save(s(16), null, st('9'), 'op-loc-00001', 0, loc('a'), 20, 10, null, null);
+  ASSERT (r->>'replayed')::boolean, 'same location replays';
+  PERFORM test_expect_err(format('select measurement_save(%L,null,%L,%L,0,%L,20,10,null,null)', s(16), st('9'), 'op-loc-00001', loc('b')), 'op_conflict');
+  r := measurement_save_replay(s(16), st('9'), 'op-loc-00001', 0, 20, 10, null, null, loc('a'), null);
+  ASSERT (r->>'replayed')::boolean, 'replay with original location';
+  PERFORM test_expect_err(format('select measurement_save_replay(%L,%L,%L,0,20,10,null,null,%L,null)', s(16), st('9'), 'op-loc-00001', loc('b')), 'op_conflict');
+  -- 无显式 location（web）：只核原 task 上下文
+  r := measurement_save_replay(s(16), st('9'), 'op-loc-00001', 0, 20, 10, null, null, null, null);
+  ASSERT (r->>'replayed')::boolean, 'no-location replay by actor+sku+fingerprint';
+  PERFORM test_expect_err(format('select measurement_save_replay(%L,%L,%L,0,20,10,null,null,null,%L)', s(16), st('9'), 'op-loc-00001', gen_random_uuid()), 'op_conflict');
+  ASSERT measurement_save_replay(s(16), st('1'), 'op-loc-00001', 0, 20, 10, null, null, loc('a'), null) IS NULL, 'other actor NULL';
+  RAISE NOTICE 'PASS save replay compares original location and task context';
+END $$;
