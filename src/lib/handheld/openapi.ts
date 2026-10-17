@@ -1204,6 +1204,16 @@ X-Session-Token: <操作员 session token>
         responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
       },
     },
+    "/api/public/handheld/fulfillments/{id}/flash-deliver": {
+      post: {
+        tags: ["履约"],
+        summary: "同城闪送到付登记送达（v1.15，与 ERP 网页同一事务）",
+        description:
+          "仅 `fulfillment_method='flash'` 的子单：人工登记送达，**不需要也不接受快递单号**；配送费由顾客与门店客服约定后到付，系统不代收。授权/付款/售后/缺货/明细/幂等与 manual-ship 同一套数据库内校验：403 `forbidden`/`location_forbidden`；409 `not_flash_order`（非闪送单请用 manual-ship）/`unpaid`/`refund_blocked`/`cancelled`/`after_sale_blocked`/`invalid_status`/`already_shipped`/`idempotency_conflict`/`nothing_to_ship`/`shortage_blocked`；422 `invalid_lines`/`qty_exceeded`/`lines_incomplete`；400 `invalid_idempotency_key`/`invalid_note`。同 `client_op_id` 同内容重放 `replayed:true`。成功返回 `delivered` 与 `shipment`（provider=`flash`、service_code=`SHANSONG_COD`、tracking_no=null）。快递订单反过来：manual-ship 对闪送单返回 409 `flash_order`，禁止伪造快递单号。",
+        requestBody: jsonBody(FlashDeliverBody),
+        responses: { "200": jsonRes("OK", AnyOkRes), ...ERROR_RESPONSES },
+      },
+    },
     "/api/public/handheld/pickup/redeem": {
       post: {
         tags: ["自提"],

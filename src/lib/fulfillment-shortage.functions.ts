@@ -168,6 +168,35 @@ export const manualShipStoreSubOrder = createServerFn({ method: "POST" })
     return { ok: true as const, replayed: res.body.replayed === true, shipment: res.body.shipment as { id: string; provider: string; tracking_no: string } };
   });
 
+// 同城闪送到付：人工登记送达，无需快递单号；与手持共用同一事务 RPC。
+export const flashDeliverStoreSubOrder = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        fulfillmentId: z.string().uuid(),
+        clientOpId: z.string().trim().min(6).max(80),
+        note: z.string().trim().max(120).optional(),
+        lines: z
+          .array(z.object({ fulfillmentItemId: z.string().uuid(), quantity: z.number().int().min(1) }))
+          .min(1),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { flashDeliver } = await import("@/server/handheld-fulfillment-actions");
+    const res = await flashDeliver(supabaseAdmin.rpc.bind(supabaseAdmin) as never, {
+      actorUserId: context.userId,
+      locationId: null,
+      fulfillmentId: data.fulfillmentId,
+      lines: data.lines,
+      idempotencyKey: data.clientOpId,
+      note: data.note ?? null,
+    });
+    if (!res.body.ok) throw new Error(String(res.body.message));
+    return { ok: true as const, replayed: res.body.replayed === true, shipment: res.body.shipment as { id: string; provider: string } };
+  });
+
 export const reportStoreShortage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
