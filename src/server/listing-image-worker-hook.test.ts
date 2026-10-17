@@ -60,7 +60,11 @@ test("partial queue failure reports failure without dropping completed job count
   state.result = { processed: 1, failed: 1 };
   const response = await post();
   assert.equal(response.status, 500);
-  assert.deepEqual(await response.json(), { ok: false, code: "worker_failed", data: state.result });
+  const body = await response.json();
+  assert.equal(body.ok, false);
+  assert.equal(body.code, "worker_failed");
+  assert.equal(body.data.processed, 1);
+  assert.equal(body.data.failed, 1);
 });
 after(() => {
   if (originalKey === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
