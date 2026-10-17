@@ -512,6 +512,13 @@
       "when": 1792207743791,
       "tag": "0072_measurement_claim_rpc",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1792208103965,
+      "tag": "0073_measurement_first_request_lock_replay",
+      "breakpoints": true
     }
   ]
 }

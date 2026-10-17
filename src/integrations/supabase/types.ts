@@ -11625,6 +11625,17 @@ export type Database = {
         }
         Returns: Json
       }
+      measurement_asset_replay: {
+        Args: {
+          p_actor_id: string
+          p_client_op_id: string
+          p_content_hash: string
+          p_location_id: string
+          p_revision: number
+          p_sku_id: string
+        }
+        Returns: Json
+      }
       measurement_claim: {
         Args: { p_actor_id: string; p_task_id: string }
         Returns: Json
@@ -11655,6 +11666,23 @@ export type Database = {
           p_width: number
         }
         Returns: Json
+      }
+      measurement_save_replay: {
+        Args: {
+          p_actor_id: string
+          p_client_op_id: string
+          p_depth: number
+          p_diameter: number
+          p_expected_revision: number
+          p_height: number
+          p_sku_id: string
+          p_width: number
+        }
+        Returns: Json
+      }
+      measurement_sku_advisory_lock: {
+        Args: { p_sku_id: string }
+        Returns: undefined
       }
       measurement_task_rebalance: {
         Args: { p_sku_id: string }
