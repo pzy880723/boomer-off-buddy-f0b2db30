@@ -127,10 +127,13 @@ BEGIN
   EXCEPTION WHEN OTHERS THEN ASSERT SQLERRM LIKE '%op_conflict%', 'op_conflict raised'; END;
   RAISE NOTICE 'PASS op_conflict on different content';
 
-  -- 11 申请/保存交错：无 task_id 保存仍在锁内完成活跃任务并通知
-  r := public.measurement_request(l4, c1);
+  -- 11 申请/保存交错：无 task_id 保存仍在锁内完成活跃任务并通知（用未实测的新商品）
+  INSERT INTO inv_skus(id, name, location_id) VALUES ('00000000-0000-0000-0000-000000000006', '交错商品', loc);
+  INSERT INTO commerce_listings(id, sku_id, location_id, status, published_at)
+    VALUES ('00000000-0000-0000-0000-000000000016', '00000000-0000-0000-0000-000000000006', loc, 'published', now());
+  r := public.measurement_request('00000000-0000-0000-0000-000000000016', c1);
   t := (r->>'task_id')::uuid;
-  r := public.measurement_save(sku4, NULL, staff, 'op-interleave', 1, loc, 31, 21, NULL, NULL);
+  r := public.measurement_save('00000000-0000-0000-0000-000000000006', NULL, staff, 'op-interleave', 0, loc, 31, 21, NULL, NULL);
   ASSERT (r->>'task_id')::uuid = t, 'save picked up active task inside lock';
   ASSERT (r->>'notified')::int = 1, 'interleaved requester notified';
   RAISE NOTICE 'PASS request/save interleave completes task';
