@@ -498,6 +498,13 @@
       "when": 1792205923936,
       "tag": "0070_measurement_asset_register",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1792207057264,
+      "tag": "0071_measurement_stock_location_fix",
+      "breakpoints": true
     }
   ]
 }
