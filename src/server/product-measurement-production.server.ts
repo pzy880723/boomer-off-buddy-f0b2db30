@@ -113,6 +113,7 @@ export async function saveMeasurementProduction(args: {
       "revision_conflict",
       "op_conflict",
       "location_mismatch",
+      "unauthorized_role",
       "not_found",
       "invalid_measurement",
       "empty_measurement",

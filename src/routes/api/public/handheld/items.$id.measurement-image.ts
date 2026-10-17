@@ -14,7 +14,7 @@ import {
   uploadMeasurementDerivativeProduction,
 } from "@/server/product-measurement-production.server";
 import { loadMeasurementActor } from "@/lib/measurement.functions";
-import { actorCanAccessLocation } from "@/server/product-measurement.server";
+import { measurementLocationAccess } from "@/server/product-measurement.server";
 import {
   MEASUREMENT_REQUEST_MAX_BYTES,
   MEASUREMENT_BASE64_MAX_LEN,
@@ -149,6 +149,7 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/measurement
             case "revision_conflict":
               return errCode("revision_conflict", "Measurement changed during upload, re-measure and retake");
             case "location_mismatch":
+              return errCode("unauthorized_location", "SKU has no stock in this location");
             case "unauthorized_role":
               return errCode("unauthorized_role", "No access to this location");
             case "op_conflict":
