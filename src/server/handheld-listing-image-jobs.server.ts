@@ -1,3 +1,4 @@
+import { advanceListingReadinessSafe, currentReadinessRevision } from "@/server/listing-readiness.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { aiPrepareListingImage } from "@/server/handheld-ai.server";
 import { safeImageJobError, retryInstructionFromError } from "@/server/listing-image-safety.server";
@@ -167,6 +168,9 @@ export async function enqueueListingImageJobs(input: {
     }));
 
   if (rows.length === 0) return { queued: 0, status: "idle" };
+  // 新上架准备：任务绑定当前输入修订，旧修订任务的完成不会让新修订就绪。
+  const readinessRevision = await currentReadinessRevision(input.skuId);
+  for (const row of rows) (row as Record<string, unknown>).readiness_revision = readinessRevision;
   const result = await supabaseAdmin.from("inv_listing_image_jobs" as never).upsert(rows as never, {
     onConflict: "sku_id,source_bucket,source_path",
     ignoreDuplicates: true,
@@ -206,6 +210,8 @@ async function processJob(job: JobRow): Promise<string> {
   if (!["succeeded", "retryable_failed", "permanent_failed", "stale"].includes(status)) {
     throw new Error("Unexpected gallery image completion status");
   }
+  // 真实完成回调：推导准备状态，必要时生成详情并放行（失败不影响图片结果）。
+  if (status !== "stale") await advanceListingReadinessSafe(job.sku_id);
   return status;
 }
 

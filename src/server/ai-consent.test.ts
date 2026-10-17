@@ -85,6 +85,7 @@ test("queued jobs: null actor (legacy) and wrong version are denied", async () =
 
 test("retry with different ai_processing_allowed keeps the same product fingerprint (no duplicate SKU)", async () => {
   const { smartCreateFingerprint } = await bundle("src/server/handheld-smart-create.server.ts", {
+  "@/server/listing-readiness.server": "export const advanceListingReadiness=async()=>({status:'legacy'}); export const advanceListingReadinessSafe=async()=>{}; export const currentReadinessRevision=async()=>null; export const sweepListingReadiness=async()=>({checked:0});",
     "@/integrations/supabase/client.server": "export const supabaseAdmin = {};",
     "@/lib/product-classification": "export const findSanrioBrandCandidate = () => null;",
     "@/lib/product-taxonomy": "export const matchBrandCandidate = () => null; export const normalizeLookupText = s => s;",
@@ -129,6 +130,7 @@ const worker = await bundle("src/server/handheld-listing-image-jobs.server.ts", 
   "@/server/handheld-ai.server": `export const aiPrepareListingImage = async () => { globalThis.__aiq.prepared++; return { b64: 'AA==', mime: 'image/png' }; };`,
   "@/server/listing-image-safety.server": `export const safeImageJobError = e => String(e && e.message || e); export const retryInstructionFromError = () => undefined;`,
   "@/server/ai-consent.server": consentStoreStub,
+  "@/server/listing-readiness.server": "export const advanceListingReadinessSafe=async()=>{}; export const currentReadinessRevision=async()=>null;",
 }, ["@/server/ai-consent-core"]);
 
 beforeEach(() => { q.consent = {}; q.prepared = 0; q.finishes = []; q.jobs = []; });

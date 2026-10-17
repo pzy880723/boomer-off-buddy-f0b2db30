@@ -73,6 +73,7 @@ type NavTo =
   | "/inventory/stocktakes"
   | "/inventory/return-inspection"
   | "/inventory/measurements"
+  | "/inventory/readiness"
   | "/admin/channel-sync"
   | "/shop-mgmt/shops"
   | "/shop-mgmt/commerce"
@@ -130,6 +131,7 @@ const groups: NavGroup[] = [
       { title: "盘点单", url: "/inventory/stocktakes", icon: ClipboardList },
       { title: "退货复检", url: "/inventory/return-inspection", icon: AlertCircle },
       { title: "尺寸待办", url: "/inventory/measurements", icon: Ruler },
+      { title: "上架准备", url: "/inventory/readiness", icon: ClipboardList },
       { title: "待认领 EPC", url: "/inventory/unclaimed", icon: AlertCircle },
       { title: "库位管理", url: "/inventory/locations", icon: Building2 },
       { title: "手持终端", url: "/inventory/devices", icon: Smartphone },

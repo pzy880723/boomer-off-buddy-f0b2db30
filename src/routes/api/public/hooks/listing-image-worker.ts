@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { runListingImageWorker } from "@/server/handheld-listing-image-jobs.server";
 import { processCustomCardJobs } from "@/server/custom-print-cards.server";
+import { sweepListingReadiness } from "@/server/listing-readiness.server";
 import { customCardDeps } from "@/server/custom-print-cards-db.server";
 
 export const Route = createFileRoute("/api/public/hooks/listing-image-worker")({
@@ -35,7 +36,13 @@ export const Route = createFileRoute("/api/public/hooks/listing-image-worker")({
               custom_cards = { error: "custom_card_worker_failed" };
             }
           }
-          const data = { ...listing, custom_cards };
+          let readiness: unknown = { skipped: true };
+          try {
+            readiness = await sweepListingReadiness(20);
+          } catch {
+            readiness = { error: "readiness_sweep_failed" };
+          }
+          const data = { ...listing, custom_cards, readiness };
           if (data.failed) {
             return Response.json({ ok: false, code: "worker_failed", data }, { status: 500 });
           }

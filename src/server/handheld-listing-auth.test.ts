@@ -22,6 +22,7 @@ const context = {
 const stubs: Record<string, string> = {
   "@tanstack/react-router": "export const createFileRoute = () => options => options;",
   // 路由新增的计时与 AI 授权依赖：鉴权失败/分类前即返回，任何 AI 授权查询都视为越界。
+  "@/server/listing-readiness.server": "export const advanceListingReadiness=async()=>({status:'legacy'}); export const advanceListingReadinessSafe=async()=>{}; export const currentReadinessRevision=async()=>null; export const sweepListingReadiness=async()=>({checked:0});",
   "@/lib/server-timing": "export const createServerTiming = () => ({ mark() {}, apply: response => response });",
   "@/server/ai-consent.server": "export const dbConsentStore = () => {throw Error('unexpected consent lookup')};",
   "@/server/ai-consent-core": "export const AI_POLICY_VERSION = 'test'; export const isAiAllowed = () => {throw Error('unexpected consent check')}; export const smartCreateWantsAi = () => {throw Error('unexpected AI branch')};",

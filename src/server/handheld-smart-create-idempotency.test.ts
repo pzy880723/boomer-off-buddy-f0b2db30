@@ -60,6 +60,7 @@ async function load(entry: string, stubs: Record<string, string>) {
 const adminStub = "export const supabaseAdmin = globalThis.__sc.admin;";
 const { Route } = await load("src/routes/api/public/handheld/items.smart-create.ts", {
   "@tanstack/react-router": "export const createFileRoute = () => o => o;",
+  "@/server/listing-readiness.server": "export const advanceListingReadiness=async()=>({status:'legacy'}); export const advanceListingReadinessSafe=async()=>{}; export const currentReadinessRevision=async()=>null; export const sweepListingReadiness=async()=>({checked:0});",
   "@/lib/server-timing": "export const createServerTiming = () => ({ mark() {}, header: () => '', apply: r => { r.headers.set('Server-Timing', 'total;dur=0'); return r; } });",
   "@/server/handheld-auth.server": `export const HANDHELD_CORS = {};
     export const authenticateDevice = async () => ({ ok: true, device: { id: "dev", device_code: "HH", location_id: "loc" } });

@@ -14,6 +14,7 @@ const originalKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const originalEnabled = process.env.HANDHELD_LISTING_IMAGE_WORKER_ENABLED;
 const stubs: Record<string, string> = {
   "@tanstack/react-router": "export const createFileRoute = () => config => config;",
+  "@/server/listing-readiness.server": "export const advanceListingReadiness=async()=>({status:'legacy'}); export const advanceListingReadinessSafe=async()=>{}; export const currentReadinessRevision=async()=>null; export const sweepListingReadiness=async()=>({checked:0});",
   "@/server/handheld-listing-image-jobs.server": `export const runListingImageWorker=async limit=>{
     globalThis.__imageWorkerHook.limits.push(limit);return globalThis.__imageWorkerHook.result;};`,
 };
@@ -59,7 +60,11 @@ test("partial queue failure reports failure without dropping completed job count
   state.result = { processed: 1, failed: 1 };
   const response = await post();
   assert.equal(response.status, 500);
-  assert.deepEqual(await response.json(), { ok: false, code: "worker_failed", data: state.result });
+  const body = await response.json();
+  assert.equal(body.ok, false);
+  assert.equal(body.code, "worker_failed");
+  assert.equal(body.data.processed, 1);
+  assert.equal(body.data.failed, 1);
 });
 after(() => {
   if (originalKey === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;

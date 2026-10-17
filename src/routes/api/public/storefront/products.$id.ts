@@ -87,9 +87,25 @@ export const Route = createFileRoute("/api/public/storefront/products/$id")({
           const content = await loadPublishedProductContent(product.sku_id);
           const counts = (await loadEngagementCounts([product.id])).get(product.id) ?? { view_count: 0, favorite_count: 0 };
           const measurement = await loadStorefrontMeasurement(product.sku_id);
+          const readiness = await supabaseAdmin
+            .from("listing_readiness" as never)
+            .select("content_sources, content_mode")
+            .eq("sku_id", product.sku_id)
+            .maybeSingle();
+          // 只公开来源类型/资料ID/标题/版本，不含提示词或内部字段。
+          const detail_content_sources = (
+            ((readiness.data as { content_sources?: unknown } | null)?.content_sources ?? []) as Array<Record<string, unknown>>
+          ).flatMap((s) =>
+            s.kind === "official_knowledge"
+              ? [{ kind: "official_knowledge", id: String(s.id), type: String(s.type), title: String(s.title ?? ""), version: String(s.version ?? "") }]
+              : s.kind === "sku_facts"
+                ? [{ kind: "sku_facts" }]
+                : [],
+          );
           return storefrontJson({ ok: true, data: { ...product, ...counts,
             detail_content: content?.published_blocks ?? [],
             detail_content_version: content?.version ?? 0,
+            detail_content_sources,
             measurement,
           } });
         } catch (metadataError) {

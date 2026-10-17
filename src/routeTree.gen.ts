@@ -36,6 +36,7 @@ import { Route as InventoryInboundRouteImport } from './routes/inventory.inbound
 import { Route as InventoryLocationsRouteImport } from './routes/inventory.locations'
 import { Route as InventoryMeasurementsRouteImport } from './routes/inventory.measurements'
 import { Route as InventoryProductsRouteImport } from './routes/inventory.products'
+import { Route as InventoryReadinessRouteImport } from './routes/inventory.readiness'
 import { Route as InventoryReturnInspectionRouteImport } from './routes/inventory.return-inspection'
 import { Route as InventorySkusRouteImport } from './routes/inventory.skus'
 import { Route as InventoryTransfersRouteImport } from './routes/inventory.transfers'
@@ -453,6 +454,11 @@ const InventoryMeasurementsRoute = InventoryMeasurementsRouteImport.update({
 const InventoryProductsRoute = InventoryProductsRouteImport.update({
   id: '/inventory/products',
   path: '/inventory/products',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InventoryReadinessRoute = InventoryReadinessRouteImport.update({
+  id: '/inventory/readiness',
+  path: '/inventory/readiness',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InventoryReturnInspectionRoute =
@@ -2098,6 +2104,7 @@ export interface FileRoutesByFullPath {
   '/inventory/locations': typeof InventoryLocationsRoute
   '/inventory/measurements': typeof InventoryMeasurementsRoute
   '/inventory/products': typeof InventoryProductsRouteWithChildren
+  '/inventory/readiness': typeof InventoryReadinessRoute
   '/inventory/return-inspection': typeof InventoryReturnInspectionRoute
   '/inventory/skus': typeof InventorySkusRouteWithChildren
   '/inventory/transfers': typeof InventoryTransfersRoute
@@ -2407,6 +2414,7 @@ export interface FileRoutesByTo {
   '/inventory/locations': typeof InventoryLocationsRoute
   '/inventory/measurements': typeof InventoryMeasurementsRoute
   '/inventory/products': typeof InventoryProductsRouteWithChildren
+  '/inventory/readiness': typeof InventoryReadinessRoute
   '/inventory/return-inspection': typeof InventoryReturnInspectionRoute
   '/inventory/transfers': typeof InventoryTransfersRoute
   '/inventory/unclaimed': typeof InventoryUnclaimedRoute
@@ -2716,6 +2724,7 @@ export interface FileRoutesById {
   '/inventory/locations': typeof InventoryLocationsRoute
   '/inventory/measurements': typeof InventoryMeasurementsRoute
   '/inventory/products': typeof InventoryProductsRouteWithChildren
+  '/inventory/readiness': typeof InventoryReadinessRoute
   '/inventory/return-inspection': typeof InventoryReturnInspectionRoute
   '/inventory/skus': typeof InventorySkusRouteWithChildren
   '/inventory/transfers': typeof InventoryTransfersRoute
@@ -3030,6 +3039,7 @@ export interface FileRouteTypes {
     | '/inventory/locations'
     | '/inventory/measurements'
     | '/inventory/products'
+    | '/inventory/readiness'
     | '/inventory/return-inspection'
     | '/inventory/skus'
     | '/inventory/transfers'
@@ -3339,6 +3349,7 @@ export interface FileRouteTypes {
     | '/inventory/locations'
     | '/inventory/measurements'
     | '/inventory/products'
+    | '/inventory/readiness'
     | '/inventory/return-inspection'
     | '/inventory/transfers'
     | '/inventory/unclaimed'
@@ -3647,6 +3658,7 @@ export interface FileRouteTypes {
     | '/inventory/locations'
     | '/inventory/measurements'
     | '/inventory/products'
+    | '/inventory/readiness'
     | '/inventory/return-inspection'
     | '/inventory/skus'
     | '/inventory/transfers'
@@ -3960,6 +3972,7 @@ export interface RootRouteChildren {
   InventoryLocationsRoute: typeof InventoryLocationsRoute
   InventoryMeasurementsRoute: typeof InventoryMeasurementsRoute
   InventoryProductsRoute: typeof InventoryProductsRouteWithChildren
+  InventoryReadinessRoute: typeof InventoryReadinessRoute
   InventoryReturnInspectionRoute: typeof InventoryReturnInspectionRoute
   InventorySkusRoute: typeof InventorySkusRouteWithChildren
   InventoryTransfersRoute: typeof InventoryTransfersRoute
@@ -4320,6 +4333,13 @@ declare module '@tanstack/react-router' {
       path: '/inventory/products'
       fullPath: '/inventory/products'
       preLoaderRoute: typeof InventoryProductsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inventory/readiness': {
+      id: '/inventory/readiness'
+      path: '/inventory/readiness'
+      fullPath: '/inventory/readiness'
+      preLoaderRoute: typeof InventoryReadinessRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/inventory/return-inspection': {
@@ -7114,6 +7134,7 @@ const rootRouteChildren: RootRouteChildren = {
   InventoryLocationsRoute: InventoryLocationsRoute,
   InventoryMeasurementsRoute: InventoryMeasurementsRoute,
   InventoryProductsRoute: InventoryProductsRouteWithChildren,
+  InventoryReadinessRoute: InventoryReadinessRoute,
   InventoryReturnInspectionRoute: InventoryReturnInspectionRoute,
   InventorySkusRoute: InventorySkusRouteWithChildren,
   InventoryTransfersRoute: InventoryTransfersRoute,
