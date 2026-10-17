@@ -128,7 +128,7 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/measurement
         // 预检（快速失败）；最终以 RPC 在 SKU 锁内重读 inv_stocks 为准
         const access = measurementLocationAccess(actor, await loadSkuStockRows(sku.id), body.location_id);
         if (access === "none") return errCode("unauthorized_role", "No access to this location");
-        if (access !== "edit") return errCode("unauthorized_location", "SKU has no stock in this location");
+        if (access !== "edit") return errCode("unauthorized_role", "SKU has no stock in this location");
 
         // 活跃任务由 RPC 在 sku 行锁内查找（避免申请/保存交错漏完成任务）；
         // op 幂等回放也在锁内，重试同一 POST 返回原结果。
@@ -157,7 +157,7 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/measurement
             return errCode("op_conflict", "client_op_id reused with different content");
           }
           if (message === "location_mismatch") {
-            return errCode("unauthorized_location", "SKU no longer in this location");
+            return errCode("unauthorized_role", "SKU no longer in this location");
           }
           if (message === "unauthorized_role") return errCode("unauthorized_role", "No access to this location");
           if (message === "not_found") return errCode("not_found", "Task not found");

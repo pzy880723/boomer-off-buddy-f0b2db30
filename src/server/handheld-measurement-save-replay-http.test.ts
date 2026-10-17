@@ -27,6 +27,7 @@ type State = {
   mutations: Map<string, { fp: string; result: any }>;
   saveCalls: any[];
   actorFails: boolean;
+  rpcLocationMismatch: boolean;
 };
 const state = {} as State;
 (globalThis as any).__ms = state;
@@ -39,6 +40,7 @@ beforeEach(() => {
   state.mutations = new Map();
   state.saveCalls = [];
   state.actorFails = false;
+  state.rpcLocationMismatch = false;
 });
 
 const fp = (a: any) =>
@@ -66,6 +68,7 @@ const stubs: Record<string, string> = {
     export const saveMeasurementProduction = async (a) => {
       const s = globalThis.__ms;
       s.saveCalls.push(a);
+      if (s.rpcLocationMismatch) throw new Error("location_mismatch");
       if (a.expectedRevision !== s.revision) throw new Error("revision_conflict");
       s.revision += 1;
       const result = { revision: s.revision, task_id: null, notified: 0, replayed: false };
@@ -108,9 +111,12 @@ function loadHandler() {
     const file = path.join(dir, `save-route-${process.pid}.mjs`);
     writeFileSync(file, bundle.outputFiles[0].text);
     const mod = await import(pathToFileURL(file).href);
-    return (mod.Route.options ?? mod.Route).server.handlers.POST;
+    return (mod.Route.options ?? mod.Route).server.handlers;
   })();
   return handlerPromise;
+}
+async function loadGet() {
+  return (await loadHandler()).GET;
 }
 
 function body(extra: Record<string, unknown> = {}) {
@@ -123,7 +129,7 @@ function body(extra: Record<string, unknown> = {}) {
   };
 }
 async function post(payload: unknown) {
-  const handler = await loadHandler();
+  const handler = (await loadHandler()).POST;
   const req = new Request(`http://x/api/public/handheld/items/${SKU}/measurement`, {
     method: "POST",
     body: JSON.stringify(payload),
@@ -165,7 +171,8 @@ test("异 actor 重放他人 op：不知原结果，按当前校验（A 已无�
   state.actor = { userId: "other", roles: ["store_staff"], locationIds: [LOC_A] };
   state.saveCalls = [];
   const r = await post(body());
-  assert.notEqual(r.status, 200);
+  assert.equal(r.status, 403);
+  assert.equal(r.json.code, "unauthorized_role");
   assert.equal(r.json.data, undefined);
   assert.equal(state.saveCalls.length, 0);
 });
@@ -173,8 +180,9 @@ test("异 actor 重放他人 op：不知原结果，按当前校验（A 已无�
 test("无成功记录的旧请求：调拨后不伪装成功（被当前库存校验拒绝）", async () => {
   state.stocks = [{ location_id: LOC_A, qty: 0 }, { location_id: LOC_B, qty: 1 }];
   const r = await post(body({ client_op_id: "op-never-0001" }));
-  assert.notEqual(r.status, 200);
-  assert.equal(r.json.code, "unauthorized_location");
+  // 业务拒绝必须 403（Android 对 401 会刷新后登出）
+  assert.equal(r.status, 403);
+  assert.equal(r.json.code, "unauthorized_role");
   assert.equal(state.saveCalls.length, 0);
 });
 
@@ -202,4 +210,42 @@ test("员工权限读取失败：受控 500 internal_error，不当作无权限�
   assert.equal(r.status, 500);
   assert.equal(r.json.code, "internal_error");
   assert.equal(state.saveCalls.length, 0);
+});
+
+test("无货/跨店业务拒绝统一 403 unauthorized_role（非 401）；RPC 锁内无货也 403", async () => {
+  // 预检：A 无货
+  state.stocks = [{ location_id: LOC_A, qty: 0 }, { location_id: LOC_B, qty: 1 }];
+  let r = await post(body({ client_op_id: "op-403-00001" }));
+  assert.equal(r.status, 403);
+  assert.equal(r.json.code, "unauthorized_role");
+  // 跨店
+  state.stocks = [{ location_id: LOC_B, qty: 1 }];
+  r = await post(body({ client_op_id: "op-403-00002", location_id: LOC_B }));
+  assert.equal(r.status, 403);
+  assert.equal(r.json.code, "unauthorized_role");
+  // 预检通过但 RPC 锁内发现已调走
+  state.stocks = [{ location_id: LOC_A, qty: 1 }];
+  state.rpcLocationMismatch = true;
+  r = await post(body({ client_op_id: "op-403-00003" }));
+  assert.equal(r.status, 403);
+  assert.equal(r.json.code, "unauthorized_role");
+});
+
+test("已成功原请求在无货后重试：仍先回放 200，而非 403", async () => {
+  assert.equal((await post(body())).status, 200);
+  state.stocks = [{ location_id: LOC_A, qty: 0 }, { location_id: LOC_B, qty: 1 }];
+  const r = await post(body());
+  assert.equal(r.status, 200);
+  assert.equal(r.json.data.replayed, true);
+});
+
+test("GET 跨店：403 unauthorized_role（非 401）", async () => {
+  const handler = await loadGet();
+  state.actor = { userId: "staff", roles: ["store_staff"], locationIds: [LOC_B] };
+  const res: Response = await handler({
+    request: new Request(`http://x/api/public/handheld/items/${SKU}/measurement?location_id=${LOC_A}`),
+    params: { id: SKU },
+  });
+  assert.equal(res.status, 403);
+  assert.equal(((await res.json()) as any).code, "unauthorized_role");
 });
