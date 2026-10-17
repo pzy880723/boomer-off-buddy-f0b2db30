@@ -29,8 +29,8 @@ fi
 
 # 并发保存同一 revision：恰好一个成功
 task=$($PSQL -qAt -c "select id from product_measurement_tasks where sku_id='$SKU'")
-$PSQL -q -c "select public.measurement_save('$SKU','$task','$STAFF','op-a',0,10,null,null,null)" >/tmp/ms_a.out 2>&1 &
-$PSQL -q -c "select public.measurement_save('$SKU','$task','$STAFF','op-b',0,20,null,null,null)" >/tmp/ms_b.out 2>&1 &
+$PSQL -q -c "select public.measurement_save('$SKU','$task','$STAFF','op-a',0,'00000000-0000-0000-0000-00000000000a',10,null,null,null)" >/tmp/ms_a.out 2>&1 &
+$PSQL -q -c "select public.measurement_save('$SKU','$task','$STAFF','op-b',0,'00000000-0000-0000-0000-00000000000a',20,null,null,null)" >/tmp/ms_b.out 2>&1 &
 wait
 ok=$(grep -l 'replayed.: false' /tmp/ms_a.out /tmp/ms_b.out 2>/dev/null | wc -l)
 conf=$(grep -l 'revision_conflict' /tmp/ms_a.out /tmp/ms_b.out 2>/dev/null | wc -l)
