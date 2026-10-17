@@ -303,6 +303,7 @@ import { Route as ApiPublicStorefrontMembershipAppleTransactionsRouteImport } fr
 import { Route as ApiPublicStorefrontMembershipRecognitionQuotaReserveRouteImport } from './routes/api/public/storefront/membership.recognition-quota.reserve'
 import { Route as ApiPublicStorefrontNotificationsIdReadRouteImport } from './routes/api/public/storefront/notifications.$id.read'
 import { Route as ApiPublicStorefrontPaymentsCallbackProviderRouteImport } from './routes/api/public/storefront/payments.callback.$provider'
+import { Route as ApiPublicStorefrontProductsIdMeasurementRequestsRouteImport } from './routes/api/public/storefront/products.$id.measurement-requests'
 import { Route as ApiPublicStorefrontShortagesIdConfirmRefundRouteImport } from './routes/api/public/storefront/shortages.$id.confirm-refund'
 import { Route as ApiPublicStorefrontShortagesIdRespondRouteImport } from './routes/api/public/storefront/shortages.$id.respond'
 import { Route as ApiPublicStorefrontSupportConversationsIdRouteImport } from './routes/api/public/storefront/support.conversations.$id'
@@ -1967,6 +1968,12 @@ const ApiPublicStorefrontPaymentsCallbackProviderRoute =
     path: '/callback/$provider',
     getParentRoute: () => ApiPublicStorefrontPaymentsRoute,
   } as any)
+const ApiPublicStorefrontProductsIdMeasurementRequestsRoute =
+  ApiPublicStorefrontProductsIdMeasurementRequestsRouteImport.update({
+    id: '/measurement-requests',
+    path: '/measurement-requests',
+    getParentRoute: () => ApiPublicStorefrontProductsIdRoute,
+  } as any)
 const ApiPublicStorefrontShortagesIdConfirmRefundRoute =
   ApiPublicStorefrontShortagesIdConfirmRefundRouteImport.update({
     id: '/confirm-refund',
@@ -2279,7 +2286,7 @@ export interface FileRoutesByFullPath {
   '/api/public/storefront/payments/reconcile': typeof ApiPublicStorefrontPaymentsReconcileRoute
   '/api/public/storefront/payments/refund': typeof ApiPublicStorefrontPaymentsRefundRoute
   '/api/public/storefront/payments/wechat-notify': typeof ApiPublicStorefrontPaymentsWechatNotifyRoute
-  '/api/public/storefront/products/$id': typeof ApiPublicStorefrontProductsIdRoute
+  '/api/public/storefront/products/$id': typeof ApiPublicStorefrontProductsIdRouteWithChildren
   '/api/public/storefront/shortages/$id': typeof ApiPublicStorefrontShortagesIdRouteWithChildren
   '/api/public/storefront/support/conversations': typeof ApiPublicStorefrontSupportConversationsRouteWithChildren
   '/api/public/handheld/fulfillments/$id/bind-tote': typeof ApiPublicHandheldFulfillmentsIdBindToteRoute
@@ -2317,6 +2324,7 @@ export interface FileRoutesByFullPath {
   '/api/public/storefront/membership/recognition-quota/reserve': typeof ApiPublicStorefrontMembershipRecognitionQuotaReserveRoute
   '/api/public/storefront/notifications/$id/read': typeof ApiPublicStorefrontNotificationsIdReadRoute
   '/api/public/storefront/payments/callback/$provider': typeof ApiPublicStorefrontPaymentsCallbackProviderRoute
+  '/api/public/storefront/products/$id/measurement-requests': typeof ApiPublicStorefrontProductsIdMeasurementRequestsRoute
   '/api/public/storefront/shortages/$id/confirm-refund': typeof ApiPublicStorefrontShortagesIdConfirmRefundRoute
   '/api/public/storefront/shortages/$id/respond': typeof ApiPublicStorefrontShortagesIdRespondRoute
   '/api/public/storefront/support/conversations/$id': typeof ApiPublicStorefrontSupportConversationsIdRoute
@@ -2577,7 +2585,7 @@ export interface FileRoutesByTo {
   '/api/public/storefront/payments/reconcile': typeof ApiPublicStorefrontPaymentsReconcileRoute
   '/api/public/storefront/payments/refund': typeof ApiPublicStorefrontPaymentsRefundRoute
   '/api/public/storefront/payments/wechat-notify': typeof ApiPublicStorefrontPaymentsWechatNotifyRoute
-  '/api/public/storefront/products/$id': typeof ApiPublicStorefrontProductsIdRoute
+  '/api/public/storefront/products/$id': typeof ApiPublicStorefrontProductsIdRouteWithChildren
   '/api/public/storefront/shortages/$id': typeof ApiPublicStorefrontShortagesIdRouteWithChildren
   '/api/public/storefront/support/conversations': typeof ApiPublicStorefrontSupportConversationsRouteWithChildren
   '/api/public/handheld/fulfillments/$id/bind-tote': typeof ApiPublicHandheldFulfillmentsIdBindToteRoute
@@ -2615,6 +2623,7 @@ export interface FileRoutesByTo {
   '/api/public/storefront/membership/recognition-quota/reserve': typeof ApiPublicStorefrontMembershipRecognitionQuotaReserveRoute
   '/api/public/storefront/notifications/$id/read': typeof ApiPublicStorefrontNotificationsIdReadRoute
   '/api/public/storefront/payments/callback/$provider': typeof ApiPublicStorefrontPaymentsCallbackProviderRoute
+  '/api/public/storefront/products/$id/measurement-requests': typeof ApiPublicStorefrontProductsIdMeasurementRequestsRoute
   '/api/public/storefront/shortages/$id/confirm-refund': typeof ApiPublicStorefrontShortagesIdConfirmRefundRoute
   '/api/public/storefront/shortages/$id/respond': typeof ApiPublicStorefrontShortagesIdRespondRoute
   '/api/public/storefront/support/conversations/$id': typeof ApiPublicStorefrontSupportConversationsIdRoute
@@ -2883,7 +2892,7 @@ export interface FileRoutesById {
   '/api/public/storefront/payments/reconcile': typeof ApiPublicStorefrontPaymentsReconcileRoute
   '/api/public/storefront/payments/refund': typeof ApiPublicStorefrontPaymentsRefundRoute
   '/api/public/storefront/payments/wechat-notify': typeof ApiPublicStorefrontPaymentsWechatNotifyRoute
-  '/api/public/storefront/products/$id': typeof ApiPublicStorefrontProductsIdRoute
+  '/api/public/storefront/products/$id': typeof ApiPublicStorefrontProductsIdRouteWithChildren
   '/api/public/storefront/shortages/$id': typeof ApiPublicStorefrontShortagesIdRouteWithChildren
   '/api/public/storefront/support/conversations': typeof ApiPublicStorefrontSupportConversationsRouteWithChildren
   '/api/public/handheld/fulfillments/$id/bind-tote': typeof ApiPublicHandheldFulfillmentsIdBindToteRoute
@@ -2921,6 +2930,7 @@ export interface FileRoutesById {
   '/api/public/storefront/membership/recognition-quota/reserve': typeof ApiPublicStorefrontMembershipRecognitionQuotaReserveRoute
   '/api/public/storefront/notifications/$id/read': typeof ApiPublicStorefrontNotificationsIdReadRoute
   '/api/public/storefront/payments/callback/$provider': typeof ApiPublicStorefrontPaymentsCallbackProviderRoute
+  '/api/public/storefront/products/$id/measurement-requests': typeof ApiPublicStorefrontProductsIdMeasurementRequestsRoute
   '/api/public/storefront/shortages/$id/confirm-refund': typeof ApiPublicStorefrontShortagesIdConfirmRefundRoute
   '/api/public/storefront/shortages/$id/respond': typeof ApiPublicStorefrontShortagesIdRespondRoute
   '/api/public/storefront/support/conversations/$id': typeof ApiPublicStorefrontSupportConversationsIdRoute
@@ -3228,6 +3238,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/membership/recognition-quota/reserve'
     | '/api/public/storefront/notifications/$id/read'
     | '/api/public/storefront/payments/callback/$provider'
+    | '/api/public/storefront/products/$id/measurement-requests'
     | '/api/public/storefront/shortages/$id/confirm-refund'
     | '/api/public/storefront/shortages/$id/respond'
     | '/api/public/storefront/support/conversations/$id'
@@ -3526,6 +3537,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/membership/recognition-quota/reserve'
     | '/api/public/storefront/notifications/$id/read'
     | '/api/public/storefront/payments/callback/$provider'
+    | '/api/public/storefront/products/$id/measurement-requests'
     | '/api/public/storefront/shortages/$id/confirm-refund'
     | '/api/public/storefront/shortages/$id/respond'
     | '/api/public/storefront/support/conversations/$id'
@@ -3831,6 +3843,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/membership/recognition-quota/reserve'
     | '/api/public/storefront/notifications/$id/read'
     | '/api/public/storefront/payments/callback/$provider'
+    | '/api/public/storefront/products/$id/measurement-requests'
     | '/api/public/storefront/shortages/$id/confirm-refund'
     | '/api/public/storefront/shortages/$id/respond'
     | '/api/public/storefront/support/conversations/$id'
@@ -6098,6 +6111,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicStorefrontPaymentsCallbackProviderRouteImport
       parentRoute: typeof ApiPublicStorefrontPaymentsRoute
     }
+    '/api/public/storefront/products/$id/measurement-requests': {
+      id: '/api/public/storefront/products/$id/measurement-requests'
+      path: '/measurement-requests'
+      fullPath: '/api/public/storefront/products/$id/measurement-requests'
+      preLoaderRoute: typeof ApiPublicStorefrontProductsIdMeasurementRequestsRouteImport
+      parentRoute: typeof ApiPublicStorefrontProductsIdRoute
+    }
     '/api/public/storefront/shortages/$id/confirm-refund': {
       id: '/api/public/storefront/shortages/$id/confirm-refund'
       path: '/confirm-refund'
@@ -6699,13 +6719,29 @@ const ApiPublicStorefrontPaymentsRouteWithChildren =
     ApiPublicStorefrontPaymentsRouteChildren,
   )
 
+interface ApiPublicStorefrontProductsIdRouteChildren {
+  ApiPublicStorefrontProductsIdMeasurementRequestsRoute: typeof ApiPublicStorefrontProductsIdMeasurementRequestsRoute
+}
+
+const ApiPublicStorefrontProductsIdRouteChildren: ApiPublicStorefrontProductsIdRouteChildren =
+  {
+    ApiPublicStorefrontProductsIdMeasurementRequestsRoute:
+      ApiPublicStorefrontProductsIdMeasurementRequestsRoute,
+  }
+
+const ApiPublicStorefrontProductsIdRouteWithChildren =
+  ApiPublicStorefrontProductsIdRoute._addFileChildren(
+    ApiPublicStorefrontProductsIdRouteChildren,
+  )
+
 interface ApiPublicStorefrontProductsRouteChildren {
-  ApiPublicStorefrontProductsIdRoute: typeof ApiPublicStorefrontProductsIdRoute
+  ApiPublicStorefrontProductsIdRoute: typeof ApiPublicStorefrontProductsIdRouteWithChildren
 }
 
 const ApiPublicStorefrontProductsRouteChildren: ApiPublicStorefrontProductsRouteChildren =
   {
-    ApiPublicStorefrontProductsIdRoute: ApiPublicStorefrontProductsIdRoute,
+    ApiPublicStorefrontProductsIdRoute:
+      ApiPublicStorefrontProductsIdRouteWithChildren,
   }
 
 const ApiPublicStorefrontProductsRouteWithChildren =
