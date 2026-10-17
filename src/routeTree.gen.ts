@@ -141,6 +141,7 @@ import { Route as ApiPublicHooksHandheldItemSyncWorkerRouteImport } from './rout
 import { Route as ApiPublicHooksHandheldReleaseWorkerRouteImport } from './routes/api/public/hooks/handheld-release-worker'
 import { Route as ApiPublicHooksListingAiRelayRouteImport } from './routes/api/public/hooks/listing-ai-relay'
 import { Route as ApiPublicHooksListingImageWorkerRouteImport } from './routes/api/public/hooks/listing-image-worker'
+import { Route as ApiPublicHooksNewcomerBenefitWorkerRouteImport } from './routes/api/public/hooks/newcomer-benefit-worker'
 import { Route as ApiPublicHooksTestPublishWithStockRouteImport } from './routes/api/public/hooks/test-publish-with-stock'
 import { Route as ApiPublicHooksYouzanCategoryGroupsSyncRouteImport } from './routes/api/public/hooks/youzan-category-groups-sync'
 import { Route as ApiPublicHooksYouzanCleanupRouteImport } from './routes/api/public/hooks/youzan-cleanup'
@@ -261,6 +262,7 @@ import { Route as ApiPublicStorefrontMembershipAccountRouteImport } from './rout
 import { Route as ApiPublicStorefrontMembershipConsumptionRecordsRouteImport } from './routes/api/public/storefront/membership.consumption-records'
 import { Route as ApiPublicStorefrontMembershipCouponsRouteImport } from './routes/api/public/storefront/membership.coupons'
 import { Route as ApiPublicStorefrontMembershipMemberCodeRouteImport } from './routes/api/public/storefront/membership.member-code'
+import { Route as ApiPublicStorefrontMembershipNewcomerBenefitRouteImport } from './routes/api/public/storefront/membership.newcomer-benefit'
 import { Route as ApiPublicStorefrontMembershipOrdersRouteImport } from './routes/api/public/storefront/membership.orders'
 import { Route as ApiPublicStorefrontMembershipPlansRouteImport } from './routes/api/public/storefront/membership.plans'
 import { Route as ApiPublicStorefrontMembershipPointsLedgerRouteImport } from './routes/api/public/storefront/membership.points-ledger'
@@ -1018,6 +1020,12 @@ const ApiPublicHooksListingImageWorkerRoute =
     path: '/api/public/hooks/listing-image-worker',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksNewcomerBenefitWorkerRoute =
+  ApiPublicHooksNewcomerBenefitWorkerRouteImport.update({
+    id: '/api/public/hooks/newcomer-benefit-worker',
+    path: '/api/public/hooks/newcomer-benefit-worker',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksTestPublishWithStockRoute =
   ApiPublicHooksTestPublishWithStockRouteImport.update({
     id: '/api/public/hooks/test-publish-with-stock',
@@ -1721,6 +1729,12 @@ const ApiPublicStorefrontMembershipMemberCodeRoute =
     path: '/api/public/storefront/membership/member-code',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicStorefrontMembershipNewcomerBenefitRoute =
+  ApiPublicStorefrontMembershipNewcomerBenefitRouteImport.update({
+    id: '/api/public/storefront/membership/newcomer-benefit',
+    path: '/api/public/storefront/membership/newcomer-benefit',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicStorefrontMembershipOrdersRoute =
   ApiPublicStorefrontMembershipOrdersRouteImport.update({
     id: '/api/public/storefront/membership/orders',
@@ -2209,6 +2223,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/handheld-release-worker': typeof ApiPublicHooksHandheldReleaseWorkerRoute
   '/api/public/hooks/listing-ai-relay': typeof ApiPublicHooksListingAiRelayRoute
   '/api/public/hooks/listing-image-worker': typeof ApiPublicHooksListingImageWorkerRoute
+  '/api/public/hooks/newcomer-benefit-worker': typeof ApiPublicHooksNewcomerBenefitWorkerRoute
   '/api/public/hooks/test-publish-with-stock': typeof ApiPublicHooksTestPublishWithStockRoute
   '/api/public/hooks/youzan-category-groups-sync': typeof ApiPublicHooksYouzanCategoryGroupsSyncRoute
   '/api/public/hooks/youzan-cleanup': typeof ApiPublicHooksYouzanCleanupRoute
@@ -2329,6 +2344,7 @@ export interface FileRoutesByFullPath {
   '/api/public/storefront/membership/consumption-records': typeof ApiPublicStorefrontMembershipConsumptionRecordsRoute
   '/api/public/storefront/membership/coupons': typeof ApiPublicStorefrontMembershipCouponsRoute
   '/api/public/storefront/membership/member-code': typeof ApiPublicStorefrontMembershipMemberCodeRoute
+  '/api/public/storefront/membership/newcomer-benefit': typeof ApiPublicStorefrontMembershipNewcomerBenefitRoute
   '/api/public/storefront/membership/orders': typeof ApiPublicStorefrontMembershipOrdersRoute
   '/api/public/storefront/membership/plans': typeof ApiPublicStorefrontMembershipPlansRoute
   '/api/public/storefront/membership/points-ledger': typeof ApiPublicStorefrontMembershipPointsLedgerRoute
@@ -2515,6 +2531,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/handheld-release-worker': typeof ApiPublicHooksHandheldReleaseWorkerRoute
   '/api/public/hooks/listing-ai-relay': typeof ApiPublicHooksListingAiRelayRoute
   '/api/public/hooks/listing-image-worker': typeof ApiPublicHooksListingImageWorkerRoute
+  '/api/public/hooks/newcomer-benefit-worker': typeof ApiPublicHooksNewcomerBenefitWorkerRoute
   '/api/public/hooks/test-publish-with-stock': typeof ApiPublicHooksTestPublishWithStockRoute
   '/api/public/hooks/youzan-category-groups-sync': typeof ApiPublicHooksYouzanCategoryGroupsSyncRoute
   '/api/public/hooks/youzan-cleanup': typeof ApiPublicHooksYouzanCleanupRoute
@@ -2635,6 +2652,7 @@ export interface FileRoutesByTo {
   '/api/public/storefront/membership/consumption-records': typeof ApiPublicStorefrontMembershipConsumptionRecordsRoute
   '/api/public/storefront/membership/coupons': typeof ApiPublicStorefrontMembershipCouponsRoute
   '/api/public/storefront/membership/member-code': typeof ApiPublicStorefrontMembershipMemberCodeRoute
+  '/api/public/storefront/membership/newcomer-benefit': typeof ApiPublicStorefrontMembershipNewcomerBenefitRoute
   '/api/public/storefront/membership/orders': typeof ApiPublicStorefrontMembershipOrdersRoute
   '/api/public/storefront/membership/plans': typeof ApiPublicStorefrontMembershipPlansRoute
   '/api/public/storefront/membership/points-ledger': typeof ApiPublicStorefrontMembershipPointsLedgerRoute
@@ -2829,6 +2847,7 @@ export interface FileRoutesById {
   '/api/public/hooks/handheld-release-worker': typeof ApiPublicHooksHandheldReleaseWorkerRoute
   '/api/public/hooks/listing-ai-relay': typeof ApiPublicHooksListingAiRelayRoute
   '/api/public/hooks/listing-image-worker': typeof ApiPublicHooksListingImageWorkerRoute
+  '/api/public/hooks/newcomer-benefit-worker': typeof ApiPublicHooksNewcomerBenefitWorkerRoute
   '/api/public/hooks/test-publish-with-stock': typeof ApiPublicHooksTestPublishWithStockRoute
   '/api/public/hooks/youzan-category-groups-sync': typeof ApiPublicHooksYouzanCategoryGroupsSyncRoute
   '/api/public/hooks/youzan-cleanup': typeof ApiPublicHooksYouzanCleanupRoute
@@ -2949,6 +2968,7 @@ export interface FileRoutesById {
   '/api/public/storefront/membership/consumption-records': typeof ApiPublicStorefrontMembershipConsumptionRecordsRoute
   '/api/public/storefront/membership/coupons': typeof ApiPublicStorefrontMembershipCouponsRoute
   '/api/public/storefront/membership/member-code': typeof ApiPublicStorefrontMembershipMemberCodeRoute
+  '/api/public/storefront/membership/newcomer-benefit': typeof ApiPublicStorefrontMembershipNewcomerBenefitRoute
   '/api/public/storefront/membership/orders': typeof ApiPublicStorefrontMembershipOrdersRoute
   '/api/public/storefront/membership/plans': typeof ApiPublicStorefrontMembershipPlansRoute
   '/api/public/storefront/membership/points-ledger': typeof ApiPublicStorefrontMembershipPointsLedgerRoute
@@ -3144,6 +3164,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/handheld-release-worker'
     | '/api/public/hooks/listing-ai-relay'
     | '/api/public/hooks/listing-image-worker'
+    | '/api/public/hooks/newcomer-benefit-worker'
     | '/api/public/hooks/test-publish-with-stock'
     | '/api/public/hooks/youzan-category-groups-sync'
     | '/api/public/hooks/youzan-cleanup'
@@ -3264,6 +3285,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/membership/consumption-records'
     | '/api/public/storefront/membership/coupons'
     | '/api/public/storefront/membership/member-code'
+    | '/api/public/storefront/membership/newcomer-benefit'
     | '/api/public/storefront/membership/orders'
     | '/api/public/storefront/membership/plans'
     | '/api/public/storefront/membership/points-ledger'
@@ -3450,6 +3472,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/handheld-release-worker'
     | '/api/public/hooks/listing-ai-relay'
     | '/api/public/hooks/listing-image-worker'
+    | '/api/public/hooks/newcomer-benefit-worker'
     | '/api/public/hooks/test-publish-with-stock'
     | '/api/public/hooks/youzan-category-groups-sync'
     | '/api/public/hooks/youzan-cleanup'
@@ -3570,6 +3593,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/membership/consumption-records'
     | '/api/public/storefront/membership/coupons'
     | '/api/public/storefront/membership/member-code'
+    | '/api/public/storefront/membership/newcomer-benefit'
     | '/api/public/storefront/membership/orders'
     | '/api/public/storefront/membership/plans'
     | '/api/public/storefront/membership/points-ledger'
@@ -3763,6 +3787,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/handheld-release-worker'
     | '/api/public/hooks/listing-ai-relay'
     | '/api/public/hooks/listing-image-worker'
+    | '/api/public/hooks/newcomer-benefit-worker'
     | '/api/public/hooks/test-publish-with-stock'
     | '/api/public/hooks/youzan-category-groups-sync'
     | '/api/public/hooks/youzan-cleanup'
@@ -3883,6 +3908,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/membership/consumption-records'
     | '/api/public/storefront/membership/coupons'
     | '/api/public/storefront/membership/member-code'
+    | '/api/public/storefront/membership/newcomer-benefit'
     | '/api/public/storefront/membership/orders'
     | '/api/public/storefront/membership/plans'
     | '/api/public/storefront/membership/points-ledger'
@@ -4028,6 +4054,7 @@ export interface RootRouteChildren {
   ApiPublicHooksHandheldReleaseWorkerRoute: typeof ApiPublicHooksHandheldReleaseWorkerRoute
   ApiPublicHooksListingAiRelayRoute: typeof ApiPublicHooksListingAiRelayRoute
   ApiPublicHooksListingImageWorkerRoute: typeof ApiPublicHooksListingImageWorkerRoute
+  ApiPublicHooksNewcomerBenefitWorkerRoute: typeof ApiPublicHooksNewcomerBenefitWorkerRoute
   ApiPublicHooksTestPublishWithStockRoute: typeof ApiPublicHooksTestPublishWithStockRoute
   ApiPublicHooksYouzanCategoryGroupsSyncRoute: typeof ApiPublicHooksYouzanCategoryGroupsSyncRoute
   ApiPublicHooksYouzanCleanupRoute: typeof ApiPublicHooksYouzanCleanupRoute
@@ -4131,6 +4158,7 @@ export interface RootRouteChildren {
   ApiPublicStorefrontMembershipConsumptionRecordsRoute: typeof ApiPublicStorefrontMembershipConsumptionRecordsRoute
   ApiPublicStorefrontMembershipCouponsRoute: typeof ApiPublicStorefrontMembershipCouponsRoute
   ApiPublicStorefrontMembershipMemberCodeRoute: typeof ApiPublicStorefrontMembershipMemberCodeRoute
+  ApiPublicStorefrontMembershipNewcomerBenefitRoute: typeof ApiPublicStorefrontMembershipNewcomerBenefitRoute
   ApiPublicStorefrontMembershipOrdersRoute: typeof ApiPublicStorefrontMembershipOrdersRoute
   ApiPublicStorefrontMembershipPlansRoute: typeof ApiPublicStorefrontMembershipPlansRoute
   ApiPublicStorefrontMembershipPointsLedgerRoute: typeof ApiPublicStorefrontMembershipPointsLedgerRoute
@@ -5070,6 +5098,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksListingImageWorkerRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/newcomer-benefit-worker': {
+      id: '/api/public/hooks/newcomer-benefit-worker'
+      path: '/api/public/hooks/newcomer-benefit-worker'
+      fullPath: '/api/public/hooks/newcomer-benefit-worker'
+      preLoaderRoute: typeof ApiPublicHooksNewcomerBenefitWorkerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/test-publish-with-stock': {
       id: '/api/public/hooks/test-publish-with-stock'
       path: '/api/public/hooks/test-publish-with-stock'
@@ -5908,6 +5943,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/storefront/membership/member-code'
       fullPath: '/api/public/storefront/membership/member-code'
       preLoaderRoute: typeof ApiPublicStorefrontMembershipMemberCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/storefront/membership/newcomer-benefit': {
+      id: '/api/public/storefront/membership/newcomer-benefit'
+      path: '/api/public/storefront/membership/newcomer-benefit'
+      fullPath: '/api/public/storefront/membership/newcomer-benefit'
+      preLoaderRoute: typeof ApiPublicStorefrontMembershipNewcomerBenefitRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/storefront/membership/orders': {
@@ -7198,6 +7240,8 @@ const rootRouteChildren: RootRouteChildren = {
     ApiPublicHooksHandheldReleaseWorkerRoute,
   ApiPublicHooksListingAiRelayRoute: ApiPublicHooksListingAiRelayRoute,
   ApiPublicHooksListingImageWorkerRoute: ApiPublicHooksListingImageWorkerRoute,
+  ApiPublicHooksNewcomerBenefitWorkerRoute:
+    ApiPublicHooksNewcomerBenefitWorkerRoute,
   ApiPublicHooksTestPublishWithStockRoute:
     ApiPublicHooksTestPublishWithStockRoute,
   ApiPublicHooksYouzanCategoryGroupsSyncRoute:
@@ -7339,6 +7383,8 @@ const rootRouteChildren: RootRouteChildren = {
     ApiPublicStorefrontMembershipCouponsRoute,
   ApiPublicStorefrontMembershipMemberCodeRoute:
     ApiPublicStorefrontMembershipMemberCodeRoute,
+  ApiPublicStorefrontMembershipNewcomerBenefitRoute:
+    ApiPublicStorefrontMembershipNewcomerBenefitRoute,
   ApiPublicStorefrontMembershipOrdersRoute:
     ApiPublicStorefrontMembershipOrdersRoute,
   ApiPublicStorefrontMembershipPlansRoute:

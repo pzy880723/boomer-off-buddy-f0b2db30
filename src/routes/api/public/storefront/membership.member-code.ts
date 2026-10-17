@@ -14,6 +14,13 @@ export const Route = createFileRoute("/api/public/storefront/membership/member-c
       POST: async ({ request }) => {
         const auth = await authenticateStorefrontCustomer(request);
         if (!auth.ok) return auth.response;
+        // 明确入会（取会员码）即登记新人券包：只写登记行、不等发券；失败不影响会员码。
+        try {
+          const { enrollNewcomerIfEnabled } = await import("@/server/newcomer-benefit-production.server");
+          await enrollNewcomerIfEnabled(auth.customer.id, null);
+        } catch {
+          /* 登记失败由下一次取码重试，会员码照常返回 */
+        }
         try {
           return storefrontJson(
             { ok: true, data: await createMembershipCode(auth.customer.id) },

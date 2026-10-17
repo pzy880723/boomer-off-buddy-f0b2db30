@@ -1,3 +1,4 @@
+import { mapMembershipCoupon } from "@/lib/membership/coupon-status";
 import { createHash, randomBytes } from "node:crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { presentMembershipAccount, presentMembershipPlan } from "./membership-presenter";
@@ -176,23 +177,12 @@ export async function reserveRecognitionQuota(customerId: string, requestId: str
 export async function listMembershipCoupons(customerId: string) {
   const { data, error } = await supabaseAdmin
     .from("pos_customer_coupons" as never)
-    .select("id,code,name,value,min_spend,status,created_at,expires_at,metadata")
+    .select("id,code,name,value,min_spend,status,starts_at,created_at,expires_at,metadata,external_provider")
     .eq("customer_id", customerId)
     .order("created_at", { ascending: false });
   if (error) fail(error, "Membership coupons unavailable");
-  return ((data ?? []) as unknown as Array<Record<string, unknown>>).map((row) => ({
-    id: row.id,
-    code: row.code,
-    title: row.name,
-    face_value_fen: Math.round(Number(row.value) * 100),
-    threshold_fen: Math.round(Number(row.min_spend) * 100),
-    issued_at: row.created_at,
-    expires_at: row.expires_at,
-    used_at:
-      row.status === "used"
-        ? ((row.metadata as Record<string, unknown> | null)?.used_at ?? row.created_at)
-        : null,
-  }));
+  const now = Date.now();
+  return ((data ?? []) as unknown as Array<Record<string, unknown>>).map((row) => mapMembershipCoupon(row, now));
 }
 
 const POINTS_SYNC_BUDGET_MS = 5000;

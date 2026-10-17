@@ -1024,6 +1024,169 @@ export type Database = {
         }
         Relationships: []
       }
+      commerce_newcomer_benefit_slots: {
+        Row: {
+          amount_fen: number
+          slot_no: number
+          threshold_fen: number
+          version_id: string
+          youzan_coupon_group_id: string | null
+        }
+        Insert: {
+          amount_fen: number
+          slot_no: number
+          threshold_fen: number
+          version_id: string
+          youzan_coupon_group_id?: string | null
+        }
+        Update: {
+          amount_fen?: number
+          slot_no?: number
+          threshold_fen?: number
+          version_id?: string
+          youzan_coupon_group_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_newcomer_benefit_slots_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_newcomer_benefit_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commerce_newcomer_benefit_versions: {
+        Row: {
+          created_at: string
+          id: string
+          note: string | null
+          status: string
+          updated_at: string
+          validity_days: number
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          note?: string | null
+          status?: string
+          updated_at?: string
+          validity_days: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          note?: string | null
+          status?: string
+          updated_at?: string
+          validity_days?: number
+        }
+        Relationships: []
+      }
+      commerce_newcomer_grant_slots: {
+        Row: {
+          attempts: number
+          claim_token: string | null
+          created_at: string
+          grant_id: string
+          id: string
+          last_error: string | null
+          lease_until: string | null
+          next_run_at: string
+          request_key: string
+          slot_no: number
+          status: string
+          updated_at: string
+          youzan_coupon_id: string | null
+        }
+        Insert: {
+          attempts?: number
+          claim_token?: string | null
+          created_at?: string
+          grant_id: string
+          id?: string
+          last_error?: string | null
+          lease_until?: string | null
+          next_run_at?: string
+          request_key: string
+          slot_no: number
+          status?: string
+          updated_at?: string
+          youzan_coupon_id?: string | null
+        }
+        Update: {
+          attempts?: number
+          claim_token?: string | null
+          created_at?: string
+          grant_id?: string
+          id?: string
+          last_error?: string | null
+          lease_until?: string | null
+          next_run_at?: string
+          request_key?: string
+          slot_no?: number
+          status?: string
+          updated_at?: string
+          youzan_coupon_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_newcomer_grant_slots_grant_id_fkey"
+            columns: ["grant_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_newcomer_grants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commerce_newcomer_grants: {
+        Row: {
+          created_at: string
+          customer_id: string
+          id: string
+          phone_key: string | null
+          source_location_id: string | null
+          status: string
+          updated_at: string
+          version_id: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          id?: string
+          phone_key?: string | null
+          source_location_id?: string | null
+          status?: string
+          updated_at?: string
+          version_id: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          id?: string
+          phone_key?: string | null
+          source_location_id?: string | null
+          status?: string
+          updated_at?: string
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_newcomer_grants_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: true
+            referencedRelation: "commerce_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_newcomer_grants_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_newcomer_benefit_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commerce_order_items: {
         Row: {
           brand_id: string | null
@@ -10827,6 +10990,37 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      commerce_newcomer_claim: {
+        Args: { p_lease_seconds: number; p_limit: number }
+        Returns: {
+          amount_fen: number
+          attempts: number
+          claim_token: string
+          customer_id: string
+          mode: string
+          request_key: string
+          slot_id: string
+          threshold_fen: number
+          validity_days: number
+          youzan_coupon_group_id: string
+        }[]
+      }
+      commerce_newcomer_enroll: {
+        Args: { p_customer: string; p_location: string }
+        Returns: Json
+      }
+      commerce_newcomer_finish: {
+        Args: {
+          p_coupon_id: string
+          p_error: string
+          p_outcome: string
+          p_slot: string
+          p_token: string
+        }
+        Returns: string
+      }
+      commerce_newcomer_retry: { Args: { p_grant: string }; Returns: number }
+      commerce_newcomer_summary: { Args: { p_customer: string }; Returns: Json }
       commerce_order_is_refund_closed: {
         Args: { p_order_id: string }
         Returns: boolean
