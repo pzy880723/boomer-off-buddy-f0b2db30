@@ -11,7 +11,7 @@ export const FACET_DIMENSION_LABELS: Record<string, string> = {
   era: "年代",
   craft: "工艺",
   style: "风格",
-  ip: "IP/作品",
+  ip: "主题/作品",
   character: "角色",
   series: "系列",
   release_method: "发行方式",

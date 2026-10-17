@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/page-header";
 import { lookupSkusByEpcs, submitInbound } from "@/lib/inventory.functions";
-import { CATEGORY_LABEL, formatPrice } from "@/lib/inventory.helpers";
+import { CATEGORY_LABEL, formatPrice , categoryLabel } from "@/lib/inventory.helpers";
 
 export const Route = createFileRoute("/inventory/inbound/new")({
   head: () => ({
@@ -246,7 +246,7 @@ function ScanInboundPage() {
                     {sku.kind === "pack" && <Badge variant="secondary" className="text-[10px]">组包·{sku.pack_pieces ?? "?"}</Badge>}
                   </div>
                   <p className="text-[11px] text-muted-foreground">
-                    {CATEGORY_LABEL[sku.category] ?? sku.category} · {formatPrice(sku.price_tier)}
+                    {categoryLabel(sku.category)} · {formatPrice(sku.price_tier)}
                   </p>
                 </div>
                 <div className="text-right">

@@ -32,6 +32,7 @@ import {
   formatPrice,
   type SkuKind,
   type SkuRow,
+  categoryLabel,
 } from "@/lib/inventory.helpers";
 
 export const Route = createFileRoute("/inventory/skus/$id")({
@@ -116,7 +117,7 @@ function SkuDetailPage() {
           <div className="min-w-0 flex-1 space-y-3">
             <div>
               <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                {CATEGORY_LABEL[sku.category] ?? sku.category} · {SKU_KIND_LABEL[sku.kind as SkuKind] ?? sku.kind}
+                {categoryLabel(sku.category)} · {SKU_KIND_LABEL[sku.kind as SkuKind] ?? sku.kind}
                 {isBundle ? ` · 含 ${bundleChildren.length} 种子项` : ""}
               </p>
               <h1 className="mt-1 text-xl font-bold leading-tight sm:text-2xl">{sku.name}</h1>
@@ -264,7 +265,7 @@ function SkuDetailPage() {
           epc={sku.epc}
           name={sku.name}
           price={Number(sku.price_tier)}
-          category={CATEGORY_LABEL[sku.category] ?? sku.category}
+          category={categoryLabel(sku.category)}
           count={printCount}
         />
       </div>

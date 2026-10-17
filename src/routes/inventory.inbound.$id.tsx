@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/page-header";
 import { DataTable } from "@/components/data-table";
 import { getInboundOrder } from "@/lib/inventory.functions";
-import { CATEGORY_LABEL, formatPrice } from "@/lib/inventory.helpers";
+import { CATEGORY_LABEL, formatPrice , categoryLabel } from "@/lib/inventory.helpers";
 
 export const Route = createFileRoute("/inventory/inbound/$id")({
   component: InboundDetailPage,
@@ -87,7 +87,7 @@ function InboundDetailPage() {
                   <div>
                     <div className="text-sm font-medium">{r.inv_skus.name}</div>
                     <div className="text-[11px] text-muted-foreground">
-                      {CATEGORY_LABEL[r.inv_skus.category] ?? r.inv_skus.category} · {formatPrice(r.inv_skus.price_tier)}
+                      {categoryLabel(r.inv_skus.category)} · {formatPrice(r.inv_skus.price_tier)}
                       {r.inv_skus.kind === "pack" && " · 组包"}
                     </div>
                   </div>
