@@ -547,6 +547,13 @@
       "when": 1792216634345,
       "tag": "0077_listing_readiness_fail_closed_functions",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1792216759949,
+      "tag": "0078_listing_readiness_explicit_settle",
+      "breakpoints": true
     }
   ]
 }
