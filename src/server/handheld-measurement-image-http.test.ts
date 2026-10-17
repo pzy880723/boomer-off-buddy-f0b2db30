@@ -199,7 +199,7 @@ test("SKU 已调店（A0B1）：总部用旧店 A 上传也 403，不上传不�
 test("A0B1：新店 B 员工上传通过并以 B 登记", async () => {
   state.stocks = [{ location_id: LOC_A, qty: 0 }, { location_id: LOC_B, qty: 1 }];
   state.actor = { userId: "staff", roles: ["store_staff"], locationIds: [LOC_B] };
-  const r = await post({ ...body(await transparentPng(100, 200)), location_id: LOC_B });
+  const r = await post(body(await transparentPng(100, 200), { location_id: LOC_B }));
   assert.equal(r.status, 200);
   assert.equal(state.registerCalls[0].locationId, LOC_B);
 });

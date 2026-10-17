@@ -164,3 +164,36 @@ test("尺寸素材缺少抠图或几何时不得标 ready", async () => {
     /incomplete_asset/,
   );
 });
+
+// ---------- 门店归属 = inv_stocks 真实库存 ----------
+import {
+  measurementLocationAccess,
+  resolveEditableLocation,
+  actorCanReadSkuMeasurement,
+} from "./product-measurement.server";
+
+const staffA = { userId: "a", roles: ["store_staff"], locationIds: ["A"] };
+const staffB = { userId: "b", roles: ["store_staff"], locationIds: ["B"] };
+const hq = { userId: "h", roles: ["super_admin"], locationIds: [] };
+
+test("A0B1：A 店只读不可改，B 店可改；总部在 A 也不能改", () => {
+  const stocks = [{ location_id: "A", qty: 0 }, { location_id: "B", qty: 1 }];
+  assert.equal(measurementLocationAccess(staffA, stocks, "A"), "read");
+  assert.equal(measurementLocationAccess(staffB, stocks, "B"), "edit");
+  assert.equal(measurementLocationAccess(hq, stocks, "A"), "read");
+  assert.equal(measurementLocationAccess(staffA, stocks, "B"), "none");
+});
+
+test("无库存行的门店：拒绝（不凭空归属）", () => {
+  assert.equal(measurementLocationAccess(staffA, [], "A"), "none");
+  assert.equal(actorCanReadSkuMeasurement(staffA, [{ location_id: "B", qty: 1 }]), false);
+  assert.equal(actorCanReadSkuMeasurement(staffA, [{ location_id: "A", qty: 0 }]), true);
+});
+
+test("网页保存门店：唯一有货店自动选；多店有货不随机选；无货拒绝", () => {
+  assert.deepEqual(resolveEditableLocation(staffB, [{ location_id: "A", qty: 0 }, { location_id: "B", qty: 1 }], null), { ok: true, locationId: "B" });
+  assert.deepEqual(resolveEditableLocation(hq, [{ location_id: "A", qty: 1 }, { location_id: "B", qty: 1 }], null), { ok: false, error: "ambiguous" });
+  assert.deepEqual(resolveEditableLocation(hq, [{ location_id: "A", qty: 0 }], null), { ok: false, error: "no_stock" });
+  assert.deepEqual(resolveEditableLocation(hq, [{ location_id: "A", qty: 1 }, { location_id: "B", qty: 1 }], "B"), { ok: true, locationId: "B" });
+  assert.deepEqual(resolveEditableLocation(staffA, [{ location_id: "B", qty: 1 }], "B"), { ok: false, error: "forbidden" });
+});
