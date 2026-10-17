@@ -69,16 +69,32 @@ export function SkuEditDialog({
       setFankuang(sku.fankuang_override ?? null);
       setMeasurement({ ...emptyMeasurementFields });
       setMeasurementRevision(null);
-      getMeasurementFn({ data: { sku_id: sku.id } })
+      // 绑定本次打开的 sku：异步返回时若弹窗已切换到别的商品则忽略，避免覆盖新弹窗字段
+      const forSkuId = sku.id;
+      getMeasurementFn({ data: { sku_id: forSkuId } })
         .then((res) => {
-          const s = res.sku as unknown as Record<string, unknown>;
-          setMeasurement({
-            height_cm: s.measurement_height_cm != null ? String(s.measurement_height_cm) : "",
-            width_cm: s.measurement_width_cm != null ? String(s.measurement_width_cm) : "",
-            depth_cm: s.measurement_depth_cm != null ? String(s.measurement_depth_cm) : "",
-            diameter_cm: s.measurement_diameter_cm != null ? String(s.measurement_diameter_cm) : "",
+          setMeasurementRevision((current) => {
+            // 弹窗已切走（revision 被新弹窗重置且当前 sku 不同）时丢弃旧响应
+            return current;
           });
-          setMeasurementRevision((s.measurement_revision as number) ?? 0);
+          setSkuLoaded((loaded) => {
+            if (loaded !== forSkuId) return loaded;
+            const s = res.sku as unknown as Record<string, unknown>;
+            setMeasurement({
+              height_cm: s.measurement_height_cm != null ? String(s.measurement_height_cm) : "",
+              width_cm: s.measurement_width_cm != null ? String(s.measurement_width_cm) : "",
+              depth_cm: s.measurement_depth_cm != null ? String(s.measurement_depth_cm) : "",
+              diameter_cm: s.measurement_diameter_cm != null ? String(s.measurement_diameter_cm) : "",
+            });
+            setOriginalMeasurement({
+              height_cm: s.measurement_height_cm != null ? String(s.measurement_height_cm) : "",
+              width_cm: s.measurement_width_cm != null ? String(s.measurement_width_cm) : "",
+              depth_cm: s.measurement_depth_cm != null ? String(s.measurement_depth_cm) : "",
+              diameter_cm: s.measurement_diameter_cm != null ? String(s.measurement_diameter_cm) : "",
+            });
+            setMeasurementRevision((s.measurement_revision as number) ?? 0);
+            return loaded;
+          });
         })
         .catch(() => {
           // 无权限或读取失败：保持空白，不阻塞其他字段编辑
