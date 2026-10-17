@@ -18,3 +18,12 @@ export const ManualShipBody = z
   .strict()
   .refine((b) => b.provider !== "manual" || !!b.carrier_label, { message: "carrier_label required for manual", path: ["carrier_label"] })
   .meta({ id: "HandheldManualShipReq" });
+// 同城闪送到付：人工登记送达，无快递单号；note 可选（如骑手姓氏/电话尾号），绝不记录为物流轨迹。
+export const FlashDeliverBody = z
+  .object({
+    client_op_id: z.string().trim().regex(/^[A-Za-z0-9_-]{6,80}$/),
+    note: z.string().trim().max(120).optional(),
+    lines: z.array(z.object({ fulfillment_item_id: z.string().uuid(), quantity: z.number().int().min(1).max(99999) }).strict()).min(1).max(200),
+  })
+  .strict()
+  .meta({ id: "HandheldFlashDeliverReq" });

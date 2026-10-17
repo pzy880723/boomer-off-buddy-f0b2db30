@@ -5,7 +5,7 @@ import { parsePickupInput, pickupResultMessage } from "@/lib/commerce/pickup-vie
 export type Rpc = (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }>;
 export type ActionResponse = { status: number; body: Record<string, unknown> & { ok: boolean } };
 
-export { PickupRedeemBody, PickupReadyBody, ManualShipBody } from "@/lib/handheld/fulfillment-actions-schema";
+export { PickupRedeemBody, PickupReadyBody, ManualShipBody, FlashDeliverBody } from "@/lib/handheld/fulfillment-actions-schema";
 
 /**
  * 网页旧输入框为自由文本：顺丰/菜鸟的常见写法映射到对应 provider；其余承运商（中通/圆通/韵达…）
@@ -30,13 +30,16 @@ export function pickupHttpStatus(result: string): number {
 }
 
 const SHIP_STATUS: Record<string, number> = {
-  shipped: 200, invalid_provider: 400, invalid_tracking_no: 400, invalid_idempotency_key: 400,
-  invalid_carrier_label: 400, forbidden: 403, location_forbidden: 403, not_found: 404,
+  shipped: 200, delivered: 200, invalid_provider: 400, invalid_tracking_no: 400, invalid_idempotency_key: 400,
+  invalid_carrier_label: 400, invalid_note: 400, forbidden: 403, location_forbidden: 403, not_found: 404,
   invalid_lines: 422, qty_exceeded: 422, lines_incomplete: 422, nothing_to_ship: 409, shortage_blocked: 409,
 };
 export const SHIP_MESSAGES: Record<string, string> = {
-  shipped: "已登记发货", forbidden: "你没有该门店的发货权限", location_forbidden: "该子单不属于本设备门店",
+  shipped: "已登记发货", delivered: "已登记闪送送达", forbidden: "你没有该门店的发货权限", location_forbidden: "该子单不属于本设备门店",
   not_found: "子单不存在", pickup_order: "门店自提订单请使用提货码核销，不能登记快递发货",
+  flash_order: "同城闪送订单请使用闪送送达登记，不能登记快递单号",
+  not_flash_order: "该子单不是同城闪送订单，请使用快递发货登记",
+  invalid_note: "备注格式不正确（1–120 字）",
   unpaid: "订单未付款，不能发货", refund_blocked: "订单退款处理中或已退款，不能发货",
   cancelled: "订单已取消或关闭", after_sale_blocked: "订单售后处理中，不能发货",
   invalid_status: "子单当前状态不能登记发货", already_shipped: "该子单已登记过发货",
