@@ -11625,6 +11625,14 @@ export type Database = {
         }
         Returns: Json
       }
+      measurement_location_has_stock: {
+        Args: { p_location_id: string; p_sku_id: string }
+        Returns: boolean
+      }
+      measurement_pick_location: {
+        Args: { p_keep: string; p_listing_location: string; p_sku_id: string }
+        Returns: string
+      }
       measurement_request: {
         Args: { p_customer_id: string; p_listing_id: string }
         Returns: Json
@@ -11643,6 +11651,10 @@ export type Database = {
           p_width: number
         }
         Returns: Json
+      }
+      measurement_task_rebalance: {
+        Args: { p_sku_id: string }
+        Returns: string
       }
       pos_complete_return: {
         Args: {

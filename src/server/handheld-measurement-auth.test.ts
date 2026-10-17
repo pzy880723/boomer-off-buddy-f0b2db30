@@ -28,13 +28,14 @@ const stubs: Record<string, string> = {
   "@/integrations/supabase/client.server": `const q = new Proxy(function(){}, { get: (_t, k) => k === 'then' ? undefined : () => q, apply: () => q });
     export const supabaseAdmin = new Proxy({}, { get: () => { globalThis.__measurementAuthTest.dbTouched = true; return q; } });`,
   "@/server/product-measurement-production.server": `export const loadMeasurementSku = async () => { globalThis.__measurementAuthTest.dbTouched = true; return null; };
+    export const loadSkuStockRows = async () => { globalThis.__measurementAuthTest.dbTouched = true; return []; };
     export const saveMeasurementProduction = async () => { throw new Error("unexpected save"); };
     export const listMeasurementTasksProduction = async () => { throw new Error("unexpected list"); };
     export const claimTaskProduction = async () => { throw new Error("unexpected claim"); };
     export const registerMeasurementAssetProduction = async () => { throw new Error("unexpected register"); };
     export const uploadMeasurementDerivativeProduction = async () => { throw new Error("unexpected upload"); };`,
   "@/lib/measurement.functions": "export const loadMeasurementActor = async () => { throw new Error('unexpected actor load') };",
-  "@/server/product-measurement.server": "export const actorCanAccessLocation = () => false; export const validateMeasurementInput = () => ({ ok: false }); export const hasAnyMeasurement = () => false;",
+  "@/server/product-measurement.server": "export const actorCanAccessLocation = () => false; export const measurementLocationAccess = () => 'none'; export const validateMeasurementInput = () => ({ ok: false }); export const hasAnyMeasurement = () => false;",
   "@/server/measurement-image.server": "export const MEASUREMENT_IMAGE_MAX_BYTES = 5242880; export const MEASUREMENT_REQUEST_MAX_BYTES = 7340032; export const MEASUREMENT_BASE64_MAX_LEN = 6990508; export const readJsonBodyLimited = async () => { throw new Error('unexpected body read') }; export const decodeStrictBase64 = () => null; export const validateMeasurementImage = async () => { throw new Error('unexpected image validation') }; export const deriveMeasurementPngs = async () => { throw new Error('unexpected derive') };",
   "node:crypto": "export const createHash = () => ({ update: () => ({ digest: () => '' }) });",
 };

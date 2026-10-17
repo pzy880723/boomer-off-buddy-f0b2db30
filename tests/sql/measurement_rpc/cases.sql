@@ -1,266 +1,209 @@
 \set ON_ERROR_STOP 1
--- 尺寸测量 RPC 行为用例（隔离库）。
-DO $$
-DECLARE
-  r jsonb; r2 jsonb; n int; t uuid; rev int; h numeric;
-  sku1 uuid := '00000000-0000-0000-0000-000000000001';
-  sku4 uuid := '00000000-0000-0000-0000-000000000004';
-  l1 uuid := '00000000-0000-0000-0000-000000000011';
-  l2 uuid := '00000000-0000-0000-0000-000000000012';
-  l3 uuid := '00000000-0000-0000-0000-000000000013';
-  l4 uuid := '00000000-0000-0000-0000-000000000014';
-  loc uuid := '00000000-0000-0000-0000-00000000000a';
-  loc2 uuid := '00000000-0000-0000-0000-00000000000b';
-  c1 uuid := '00000000-0000-0000-0000-000000000021';
-  c2 uuid := '00000000-0000-0000-0000-000000000022';
-  c3 uuid := '00000000-0000-0000-0000-0000000000ff';
-  staff uuid := '00000000-0000-0000-0000-00000000ff01';
-BEGIN
-  INSERT INTO inv_locations(id, name) VALUES (loc2, '二店') ON CONFLICT DO NOTHING;
-  INSERT INTO inv_skus(id, name, location_id) VALUES (sku4, '无任务商品', loc);
-  INSERT INTO commerce_listings(id, sku_id, location_id, status, published_at)
-    VALUES (l4, sku4, loc, 'published', now());
+-- 尺寸测量 RPC 行为用例（隔离库，表结构=实际库裁剪；inv_skus 无 location_id，门店以 inv_stocks 正库存为准）
+-- 员工 st('1')=仅A店，st('2')=仅B店，st('9')=总部
 
-  -- 1 草稿商品不可申请
-  BEGIN
-    PERFORM public.measurement_request(l3, c1);
-    RAISE EXCEPTION 'FAIL draft accepted';
-  EXCEPTION WHEN OTHERS THEN
-    ASSERT SQLERRM LIKE '%not_found%', 'draft must be not_found';
-  END;
-  RAISE NOTICE 'PASS draft rejected';
-
-  -- 2 已有实测：completed + 完整 measurement，不建任务
-  r := public.measurement_request(l2, c1);
-  ASSERT r->>'status' = 'completed', 'measured sku completes';
-  ASSERT (r->'measurement'->>'height_cm')::numeric = 10, 'measurement returned';
-  ASSERT (r->'measurement'->>'revision')::int = 1, 'revision returned';
-  SELECT count(*) INTO n FROM product_measurement_tasks WHERE sku_id <> sku4;
-  ASSERT n = 0, 'no task for measured sku';
-  RAISE NOTICE 'PASS measured returns measurement';
-
-  -- 3 首次申请建任务 + 门店手持提醒（含 sku/listing/product_name，无顾客数据）
-  r := public.measurement_request(l1, c1);
-  ASSERT r->>'status' = 'pending', 'first request pending';
-  t := (r->>'task_id')::uuid;
-  SELECT count(*) INTO n FROM inv_handheld_notifications
-   WHERE kind='measurement_requested' AND ref_type='measurement_task' AND ref_id=t
-     AND location_id=loc
-     AND payload->>'sku_id' = sku1::text AND payload->>'product_name' = '奥特曼软胶'
-     AND payload ? 'customer_id' = false;
-  ASSERT n = 1, 'handheld notification created once';
-  RAISE NOTICE 'PASS request creates task + store notification';
-
-  -- 4 第二用户合并同一任务，不重复建提醒；重复申请幂等
-  r2 := public.measurement_request(l1, c2);
-  ASSERT (r2->>'task_id')::uuid = t, 'merged into same task';
-  SELECT count(*) INTO n FROM inv_handheld_notifications WHERE kind='measurement_requested';
-  ASSERT n = 1, 'no duplicate store notification';
-  r2 := public.measurement_request(l1, c1);
-  ASSERT (r2->>'task_id')::uuid = t, 'repeat request idempotent';
-  SELECT count(*) INTO n FROM product_measurement_requesters WHERE task_id = t;
-  ASSERT n = 2, 'two distinct requesters';
-  RAISE NOTICE 'PASS merge + idempotent request';
-
-  -- 5 保存：client_op_id/expected_revision 必填 / 冲突拒绝 / 非法值拒绝
-  BEGIN
-    PERFORM public.measurement_save(sku1, t, staff, 'op-null-rev', NULL, loc, 10, NULL, NULL, NULL);
-    RAISE EXCEPTION 'FAIL null revision accepted';
-  EXCEPTION WHEN OTHERS THEN ASSERT SQLERRM LIKE '%expected_revision_required%', 'required'; END;
-  BEGIN
-    PERFORM public.measurement_save(sku1, t, staff, 'op-0001-save', 5, loc, 10, NULL, NULL, NULL);
-    RAISE EXCEPTION 'FAIL wrong revision accepted';
-  EXCEPTION WHEN OTHERS THEN ASSERT SQLERRM LIKE '%revision_conflict%', 'conflict'; END;
-  BEGIN
-    PERFORM public.measurement_save(sku1, t, staff, 'op-0001-save', 0, loc, -1, NULL, NULL, NULL);
-    RAISE EXCEPTION 'FAIL negative accepted';
-  EXCEPTION WHEN OTHERS THEN ASSERT SQLERRM LIKE '%invalid_measurement%', 'invalid'; END;
-  BEGIN
-    PERFORM public.measurement_save(sku1, t, staff, 'op-0001-save', 0, loc, NULL, NULL, NULL, NULL);
-    RAISE EXCEPTION 'FAIL empty accepted';
-  EXCEPTION WHEN OTHERS THEN ASSERT SQLERRM LIKE '%empty_measurement%', 'empty'; END;
-  RAISE NOTICE 'PASS save validation';
-
-  -- 6 正常保存：revision+1、任务完成、手持提醒 handled、两申请者各一条带 product_id 的通知
-  r := public.measurement_save(sku1, t, staff, 'op-0001-save', 0, loc, 12.5, 8, NULL, NULL);
-  ASSERT (r->>'revision')::int = 1, 'revision bumped';
-  ASSERT (r->>'notified')::int = 2, 'both requesters notified';
-  ASSERT (r->>'replayed')::boolean = false, 'not replay';
-  SELECT count(*) INTO n FROM commerce_customer_notifications
-   WHERE kind='measurement_completed' AND product_id = l1;
-  ASSERT n = 2, 'customer notifications carry product_id';
-  SELECT count(*) INTO n FROM inv_handheld_notifications
-   WHERE kind='measurement_requested' AND action_status='handled';
-  ASSERT n = 1, 'store notification handled';
-  SELECT measurement_revision INTO rev FROM inv_skus WHERE id = sku1;
-  ASSERT rev = 1, 'sku revision 1';
-  RAISE NOTICE 'PASS save completes + notifies';
-
-  -- 7 client_op_id 重放：返回原结果，不再改数据、不再通知（即使内容字段不同也按指纹判）
-  r := public.measurement_save(sku1, t, staff, 'op-0001-save', 0, loc, 12.5, 8, NULL, NULL);
-  ASSERT (r->>'replayed')::boolean = true, 'replayed';
-  ASSERT (r->>'revision')::int = 1, 'replay returns original revision';
-  SELECT measurement_height_cm INTO h FROM inv_skus WHERE id = sku1;
-  ASSERT h = 12.5, 'replay does not overwrite';
-  SELECT count(*) INTO n FROM commerce_customer_notifications WHERE kind='measurement_completed';
-  ASSERT n = 2, 'replay does not re-notify';
-  RAISE NOTICE 'PASS client_op_id replay';
-
-  -- 8 已完成任务上的新申请：商品已有实测 → completed（不会落入死任务）
-  r := public.measurement_request(l1, c1);
-  ASSERT r->>'status' = 'completed', 'post-save request completes';
-  RAISE NOTICE 'PASS no orphan task after completion';
-
-  -- 9 无任务保存 + 同 op 重放：返回原结果，不重复改数
-  r := public.measurement_save(sku4, NULL, staff, 'op-notask', 0, loc, 30, 20, NULL, NULL);
-  ASSERT (r->>'revision')::int = 1, 'no-task save works';
-  r2 := public.measurement_save(sku4, NULL, staff, 'op-notask', 0, loc, 30, 20, NULL, NULL);
-  ASSERT (r2->>'replayed')::boolean = true AND (r2->>'revision')::int = 1, 'no-task replay returns original';
-  SELECT measurement_revision INTO rev FROM inv_skus WHERE id = sku4;
-  ASSERT rev = 1, 'replay did not bump revision';
-  RAISE NOTICE 'PASS no-task save + replay';
-
-  -- 10 同 op 不同内容：op_conflict（409）
-  BEGIN
-    PERFORM public.measurement_save(sku4, NULL, staff, 'op-notask', 0, loc, 99, 20, NULL, NULL);
-    RAISE EXCEPTION 'FAIL op reuse accepted';
-  EXCEPTION WHEN OTHERS THEN ASSERT SQLERRM LIKE '%op_conflict%', 'op_conflict raised'; END;
-  RAISE NOTICE 'PASS op_conflict on different content';
-
-  -- 11 申请/保存交错：无 task_id 保存仍在锁内完成活跃任务并通知（用未实测的新商品）
-  INSERT INTO inv_skus(id, name, location_id) VALUES ('00000000-0000-0000-0000-000000000006', '交错商品', loc);
-  INSERT INTO commerce_listings(id, sku_id, location_id, status, published_at)
-    VALUES ('00000000-0000-0000-0000-000000000016', '00000000-0000-0000-0000-000000000006', loc, 'published', now());
-  r := public.measurement_request('00000000-0000-0000-0000-000000000016', c1);
-  t := (r->>'task_id')::uuid;
-  r := public.measurement_save('00000000-0000-0000-0000-000000000006', NULL, staff, 'op-interleave', 0, loc, 31, 21, NULL, NULL);
-  ASSERT (r->>'task_id')::uuid = t, 'save picked up active task inside lock';
-  ASSERT (r->>'notified')::int = 1, 'interleaved requester notified';
-  RAISE NOTICE 'PASS request/save interleave completes task';
-
-  -- 12 商品调拨后旧店保存：location_mismatch 拒绝
-  UPDATE inv_skus SET location_id = loc2 WHERE id = sku1;
-  BEGIN
-    PERFORM public.measurement_save(sku1, NULL, staff, 'op-moved', 1, loc, 10, 8, NULL, NULL);
-    RAISE EXCEPTION 'FAIL moved sku accepted';
-  EXCEPTION WHEN OTHERS THEN ASSERT SQLERRM LIKE '%location_mismatch%', 'transferred sku rejected for old location'; END;
-  UPDATE inv_skus SET location_id = loc WHERE id = sku1;
-  RAISE NOTICE 'PASS transferred sku rejected';
-
-  -- 13 通知失败整体回滚：revision 不变、任务仍 pending、无幂等记录
-  CREATE OR REPLACE FUNCTION public.test_fail_notify() RETURNS trigger LANGUAGE plpgsql AS $t$
-  BEGIN
-    IF NEW.customer_id = '00000000-0000-0000-0000-0000000000ff' THEN
-      RAISE EXCEPTION 'simulated notify failure';
-    END IF;
-    RETURN NEW;
-  END $t$;
-  CREATE TRIGGER fail_notify BEFORE INSERT ON commerce_customer_notifications
-    FOR EACH ROW EXECUTE FUNCTION public.test_fail_notify();
-  INSERT INTO commerce_customers(id) VALUES (c3);
-  r := public.measurement_request(l1, c3);  -- sku1 已实测 → completed，改用 sku4 无任务？sku4 已有实测。新建独立商品
-  INSERT INTO inv_skus(id, name, location_id) VALUES ('00000000-0000-0000-0000-000000000005', '回滚商品', loc);
-  INSERT INTO commerce_listings(id, sku_id, location_id, status, published_at)
-    VALUES ('00000000-0000-0000-0000-000000000015', '00000000-0000-0000-0000-000000000005', loc, 'published', now());
-  r := public.measurement_request('00000000-0000-0000-0000-000000000015', c3);
-  t := (r->>'task_id')::uuid;
-  BEGIN
-    PERFORM public.measurement_save('00000000-0000-0000-0000-000000000005', t, staff, 'op-failnotify', 0, loc, 10, 8, NULL, NULL);
-    RAISE EXCEPTION 'FAIL notify failure swallowed';
-  EXCEPTION WHEN OTHERS THEN
-    ASSERT SQLERRM LIKE '%simulated notify failure%', 'notify failure propagated';
-  END;
-  SELECT measurement_revision INTO rev FROM inv_skus WHERE id = '00000000-0000-0000-0000-000000000005';
-  ASSERT rev = 0, 'revision rolled back on notify failure';
-  ASSERT (SELECT status FROM product_measurement_tasks WHERE id = t) = 'pending', 'task rolled back';
-  ASSERT NOT EXISTS (SELECT 1 FROM measurement_mutations WHERE client_op_id = 'op-failnotify'), 'mutation record rolled back';
-  DROP TRIGGER fail_notify ON commerce_customer_notifications;
-  DROP FUNCTION public.test_fail_notify();
-  RAISE NOTICE 'PASS notify failure rolls back';
+-- 0 结构护栏：inv_skus 不得有 location_id
+DO $$ BEGIN
+  ASSERT NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='inv_skus' AND column_name='location_id'), 'inv_skus must not have location_id';
+  RAISE NOTICE 'PASS inv_skus has no location_id';
 END $$;
 
--- 素材登记 RPC（measurement_asset_register）用例
-DO $$
-DECLARE
-  r jsonb; r2 jsonb;
-  s uuid := '00000000-0000-0000-0000-0000000000a6';
-  loc uuid := '00000000-0000-0000-0000-00000000000a';
-  loc2 uuid := '00000000-0000-0000-0000-00000000000b';
-  staff uuid := '00000000-0000-0000-0000-00000000ff01';
-  outsider uuid := '00000000-0000-0000-0000-00000000ff02';
-  hq uuid := '00000000-0000-0000-0000-00000000ff09';
-  bb jsonb := '{"x":0,"y":0,"w":100,"h":200}';
-  h1 text := 'aaaaaaaaaaaaaaaa'; h2 text := 'bbbbbbbbbbbbbbbb';
-  p1 text; p2 text;
-BEGIN
-  INSERT INTO inv_skus(id, name, location_id) VALUES (s, '素材商品', loc);
-  PERFORM public.measurement_save(s, NULL, staff, 'op-asset-save1', 0, loc, 20, 10, NULL, NULL);
-  p1 := 'sku-listing/measurements/' || s || '/1-' || h1 || '-640.png';
-  p2 := 'sku-listing/measurements/' || s || '/1-' || h2 || '-640.png';
+-- 1 草稿不可申请；已测直接 completed
+DO $$ DECLARE r jsonb; BEGIN
+  PERFORM test_mk(90,'a','a=1');
+  UPDATE commerce_listings SET status='draft', published_at=NULL WHERE id=l(90);
+  PERFORM test_expect_err(format('select measurement_request(%L,%L)', l(90), cu(1)), 'not_found');
+  PERFORM test_mk(91,'a','a=1');
+  UPDATE inv_skus SET measurement_height_cm=10, measured_at=now(), measurement_revision=1 WHERE id=s(91);
+  r := measurement_request(l(91), cu(1));
+  ASSERT r->>'status'='completed' AND (r->'measurement'->>'height_cm')::numeric=10, 'measured completes';
+  ASSERT NOT EXISTS (SELECT 1 FROM product_measurement_tasks WHERE sku_id=s(91)), 'no task for measured';
+  RAISE NOTICE 'PASS draft rejected + measured returns completed';
+END $$;
 
-  -- A1 跨店 actor（无该店权限）拒绝，且不落 ready
-  BEGIN
-    PERFORM public.measurement_asset_register(s, outsider, 'op-img-out01', loc, 1, 20, 10, h1, p1, bb, 100, 200, 10);
-    RAISE EXCEPTION 'FAIL outsider registered';
-  EXCEPTION WHEN OTHERS THEN ASSERT SQLERRM LIKE '%unauthorized_role%', 'outsider rejected: ' || SQLERRM; END;
-  ASSERT NOT EXISTS (SELECT 1 FROM product_measurement_assets WHERE sku_id = s), 'no asset after outsider';
-  RAISE NOTICE 'PASS asset register rejects cross-store actor';
+-- 2 A0B1：listing 归 A 但只有 B 有货 → 任务/提醒转 B；A 店员工与总部在 A 都不能保存；B 店保存通过
+DO $$ DECLARE r jsonb; t uuid; BEGIN
+  PERFORM test_mk(1,'a','a=0,b=1');
+  r := measurement_request(l(1), cu(1));
+  ASSERT r->>'status'='pending', 'A0B1 pending';
+  t := (r->>'task_id')::uuid;
+  ASSERT (SELECT location_id FROM product_measurement_tasks WHERE id=t)=loc('b'), 'task at B';
+  ASSERT (SELECT count(*) FROM inv_handheld_notifications WHERE ref_id=t AND location_id=loc('b') AND action_status IS NULL
+          AND kind='measurement_requested' AND payload->>'sku_id'=s(1)::text AND NOT payload ? 'customer_id')=1, 'one notif at B';
+  ASSERT (SELECT count(*) FROM inv_handheld_notifications WHERE ref_id=t AND location_id=loc('a'))=0, 'none at A';
+  PERFORM test_expect_err(format('select measurement_save(%L,null,%L,%L,0,%L,10,5,null,null)', s(1), st('1'), 'op-a0b1-a', loc('a')), 'location_mismatch');
+  PERFORM test_expect_err(format('select measurement_save(%L,null,%L,%L,0,%L,10,5,null,null)', s(1), st('9'), 'op-a0b1-hq', loc('a')), 'location_mismatch');
+  PERFORM test_expect_err(format('select measurement_save(%L,null,%L,%L,0,%L,10,5,null,null)', s(1), st('1'), 'op-a0b1-ab', loc('b')), 'unauthorized_role');
+  r := measurement_save(s(1), null, st('2'), 'op-a0b1-b', 0, loc('b'), 10, 5, null, null);
+  ASSERT (r->>'revision')::int=1 AND (r->>'task_id')::uuid=t AND (r->>'notified')::int=1, 'B save completes task';
+  ASSERT (SELECT action_status FROM inv_handheld_notifications WHERE ref_id=t)='handled', 'notif handled';
+  ASSERT (SELECT count(*) FROM commerce_customer_notifications WHERE customer_id=cu(1) AND kind='measurement_completed')=1, 'customer notified';
+  RAISE NOTICE 'PASS A0B1 old store rejected, new store passes';
+END $$;
 
-  -- A2 旧版本 / 实测宽高不一致 拒绝
-  BEGIN
-    PERFORM public.measurement_asset_register(s, staff, 'op-img-old01', loc, 2, 20, 10, h1,
-      'sku-listing/measurements/' || s || '/2-' || h1 || '-640.png', bb, 100, 200, 10);
-    RAISE EXCEPTION 'FAIL stale revision registered';
-  EXCEPTION WHEN OTHERS THEN ASSERT SQLERRM LIKE '%revision_conflict%', 'wrong revision rejected: ' || SQLERRM; END;
-  BEGIN
-    PERFORM public.measurement_asset_register(s, staff, 'op-img-geo01', loc, 1, 20, 12, h1, p1, bb, 100, 200, 10);
-    RAISE EXCEPTION 'FAIL geometry mismatch registered';
-  EXCEPTION WHEN OTHERS THEN ASSERT SQLERRM LIKE '%revision_conflict%', 'measured size mismatch rejected'; END;
-  ASSERT NOT EXISTS (SELECT 1 FROM product_measurement_assets WHERE sku_id = s), 'no asset after stale';
-  RAISE NOTICE 'PASS asset register rejects stale revision and size mismatch';
+-- 3 A1B1 标准多店：listing 店有货→归 listing 店；listing 店无货且多店有货→不随机串店，unavailable
+DO $$ DECLARE r jsonb; BEGIN
+  PERFORM test_mk(2,'a','a=1,b=1');
+  r := measurement_request(l(2), cu(1));
+  ASSERT (SELECT location_id FROM product_measurement_tasks WHERE id=(r->>'task_id')::uuid)=loc('a'), 'A1B1 stays at listing store A';
+  PERFORM test_mk(3,'c','a=1,b=1');
+  r := measurement_request(l(3), cu(1));
+  ASSERT r->>'status'='unavailable' AND r->>'task_id' IS NULL, 'ambiguous multi-store unavailable';
+  ASSERT NOT EXISTS (SELECT 1 FROM product_measurement_tasks WHERE sku_id=s(3)), 'no task';
+  ASSERT NOT EXISTS (SELECT 1 FROM inv_handheld_notifications WHERE payload->>'sku_id'=s(3)::text), 'no broadcast';
+  RAISE NOTICE 'PASS A1B1 multi-store no misattribution';
+END $$;
 
-  -- A3 他品/非规范路径拒绝
-  BEGIN
-    PERFORM public.measurement_asset_register(s, staff, 'op-img-path1', loc, 1, 20, 10, h1,
-      'sku-listing/measurements/00000000-0000-0000-0000-000000000001/1-' || h1 || '-640.png', bb, 100, 200, 10);
-    RAISE EXCEPTION 'FAIL foreign path registered';
-  EXCEPTION WHEN OTHERS THEN ASSERT SQLERRM LIKE '%invalid_asset%', 'foreign path rejected'; END;
-  RAISE NOTICE 'PASS asset register rejects foreign path';
+-- 4 无正库存：unavailable + 中文提示，不建任务/不广播/不记申请者
+DO $$ DECLARE r jsonb; BEGIN
+  PERFORM test_mk(4,'a','a=0');
+  r := measurement_request(l(4), cu(1));
+  ASSERT r->>'status'='unavailable' AND r->>'message' LIKE '%联系门店%', 'unavailable chinese';
+  ASSERT NOT EXISTS (SELECT 1 FROM product_measurement_tasks WHERE sku_id=s(4)), 'no task';
+  ASSERT NOT EXISTS (SELECT 1 FROM inv_handheld_notifications WHERE payload->>'sku_id'=s(4)::text), 'no notif';
+  ASSERT NOT EXISTS (SELECT 1 FROM product_measurement_requesters r JOIN product_measurement_tasks t ON t.id=r.task_id WHERE t.sku_id=s(4)), 'no requester';
+  RAISE NOTICE 'PASS no stock unavailable without fake notify';
+END $$;
 
-  -- A4 正常登记 → ready；同 op 同图回放；同 op 换图 op_conflict
-  r := public.measurement_asset_register(s, staff, 'op-img-ok001', loc, 1, 20, 10, h1, p1, bb, 100, 200, 10);
-  ASSERT r->>'status' = 'ready' AND (r->>'revision')::int = 1 AND (r->>'replayed')::boolean = false, 'registered';
-  ASSERT (SELECT status = 'ready' AND verified AND cutout_preview_path = p1 FROM product_measurement_assets WHERE sku_id = s AND revision = 1), 'asset ready';
-  r2 := public.measurement_asset_register(s, staff, 'op-img-ok001', loc, 1, 20, 10, h1, p1, bb, 100, 200, 10);
-  ASSERT (r2->>'replayed')::boolean = true AND r2->>'cutout_preview_path' = p1, 'replayed';
-  BEGIN
-    PERFORM public.measurement_asset_register(s, staff, 'op-img-ok001', loc, 1, 20, 10, h2, p2, bb, 100, 200, 10);
-    RAISE EXCEPTION 'FAIL op reuse accepted';
-  EXCEPTION WHEN OTHERS THEN ASSERT SQLERRM LIKE '%op_conflict%', 'op reuse rejected'; END;
-  RAISE NOTICE 'PASS asset register idempotent replay and op_conflict';
+-- 5 同事务调拨 A1→A0、B0→B1：提交时按最终库存转派，申请者不丢、领取清空、一条提醒在 B
+DO $$ DECLARE r jsonb; BEGIN
+  PERFORM test_mk(5,'a','a=1,b=0');
+  r := measurement_request(l(5), cu(1));
+  PERFORM measurement_request(l(5), cu(2));
+  UPDATE product_measurement_tasks SET status='claimed', claimed_by=st('1'), claimed_at=now() WHERE sku_id=s(5);
+END $$;
+BEGIN;
+UPDATE inv_stocks SET qty=0 WHERE sku_id=s(5) AND location_id=loc('a');
+DO $$ BEGIN
+  ASSERT (SELECT location_id FROM product_measurement_tasks WHERE sku_id=s(5) AND status IN ('pending','claimed'))=loc('a'), 'not yet moved mid-txn (deferred)';
+END $$;
+UPDATE inv_stocks SET qty=1 WHERE sku_id=s(5) AND location_id=loc('b');
+COMMIT;
+DO $$ DECLARE t product_measurement_tasks%ROWTYPE; BEGIN
+  SELECT * INTO t FROM product_measurement_tasks WHERE sku_id=s(5) AND status IN ('pending','claimed');
+  ASSERT FOUND, 'task still active';
+  ASSERT t.location_id=loc('b') AND t.status='pending' AND t.claimed_by IS NULL AND t.claimed_at IS NULL, 'moved to B, claim cleared';
+  ASSERT (SELECT count(*) FROM product_measurement_requesters WHERE task_id=t.id)=2, 'requesters kept';
+  ASSERT (SELECT count(*) FROM inv_handheld_notifications WHERE ref_id=t.id)=1, 'one notif';
+  ASSERT (SELECT location_id FROM inv_handheld_notifications WHERE ref_id=t.id)=loc('b'), 'notif at B';
+  ASSERT (SELECT action_status FROM inv_handheld_notifications WHERE ref_id=t.id) IS NULL, 'notif open';
+  RAISE NOTICE 'PASS same-txn transfer A0B1 keeps requesters, one notif at new store';
+END $$;
 
-  -- A5 不同图争抢同 revision：first-write-wins，新 op 换图 image_conflict，原图不被覆盖
-  BEGIN
-    PERFORM public.measurement_asset_register(s, hq, 'op-img-other', loc, 1, 20, 10, h2, p2, bb, 100, 200, 10);
-    RAISE EXCEPTION 'FAIL overwrite accepted';
-  EXCEPTION WHEN OTHERS THEN ASSERT SQLERRM LIKE '%image_conflict%', 'second image rejected: ' || SQLERRM; END;
-  ASSERT (SELECT cutout_preview_path FROM product_measurement_assets WHERE sku_id = s AND revision = 1) = p1, 'first image kept';
-  RAISE NOTICE 'PASS asset register first-write-wins image_conflict';
+-- 6 跨事务无库存：挂起（提醒 paused，不广播），新申请 unavailable；库存到店后转派恢复
+DO $$ DECLARE r jsonb; t uuid; BEGIN
+  PERFORM test_mk(6,'a','a=1');
+  r := measurement_request(l(6), cu(1));
+  t := (r->>'task_id')::uuid;
+END $$;
+UPDATE inv_stocks SET qty=0 WHERE sku_id=s(6) AND location_id=loc('a');
+DO $$ DECLARE r jsonb; t uuid; BEGIN
+  SELECT id INTO t FROM product_measurement_tasks WHERE sku_id=s(6) AND status='pending';
+  ASSERT t IS NOT NULL, 'task suspended not cancelled';
+  ASSERT (SELECT action_status FROM inv_handheld_notifications WHERE ref_id=t)='paused', 'notif paused';
+  ASSERT (SELECT count(*) FROM inv_handheld_notifications WHERE ref_id=t)=1, 'no extra notif';
+  r := measurement_request(l(6), cu(2));
+  ASSERT r->>'status'='unavailable', 'request while suspended unavailable';
+  ASSERT (SELECT count(*) FROM product_measurement_requesters WHERE task_id=t)=1, 'original requester only';
+  PERFORM test_expect_err(format('select measurement_save(%L,null,%L,%L,0,%L,10,5,null,null)', s(6), st('9'), 'op-susp-hq', loc('a')), 'location_mismatch');
+  RAISE NOTICE 'PASS no stock suspends without broadcast';
+END $$;
+INSERT INTO inv_stocks (sku_id, location_id, qty) VALUES (s(6), loc('b'), 1);
+DO $$ DECLARE t uuid; BEGIN
+  SELECT id INTO t FROM product_measurement_tasks WHERE sku_id=s(6) AND status='pending';
+  ASSERT (SELECT location_id FROM product_measurement_tasks WHERE id=t)=loc('b'), 'task moved to B';
+  ASSERT (SELECT location_id FROM inv_handheld_notifications WHERE ref_id=t)=loc('b'), 'notif moved';
+  ASSERT (SELECT action_status FROM inv_handheld_notifications WHERE ref_id=t) IS NULL, 'notif resumed';
+  ASSERT (SELECT count(*) FROM inv_handheld_notifications WHERE ref_id=t)=1, 'still one notif';
+  ASSERT (SELECT count(*) FROM product_measurement_requesters WHERE task_id=t)=1, 'requester kept';
+  RAISE NOTICE 'PASS stock arrives: reassigned + resumed';
+END $$;
 
-  -- A6 商品调店后旧店登记拒绝（HQ actor 通过权限，仍因 location 拒绝）
-  PERFORM public.measurement_save(s, NULL, staff, 'op-asset-save2', 1, loc, 30, 10, NULL, NULL);
-  UPDATE inv_skus SET location_id = loc2 WHERE id = s;
-  BEGIN
-    PERFORM public.measurement_asset_register(s, hq, 'op-img-moved', loc, 2, 30, 10, h1,
-      'sku-listing/measurements/' || s || '/2-' || h1 || '-640.png', bb, 100, 300, 10);
-    RAISE EXCEPTION 'FAIL moved sku registered';
-  EXCEPTION WHEN OTHERS THEN ASSERT SQLERRM LIKE '%location_mismatch%', 'moved sku rejected: ' || SQLERRM; END;
-  BEGIN
-    PERFORM public.measurement_asset_register(s, staff, 'op-img-moved2', loc2, 2, 30, 10, h1,
-      'sku-listing/measurements/' || s || '/2-' || h1 || '-640.png', bb, 100, 300, 10);
-    RAISE EXCEPTION 'FAIL old-store staff registered on new store';
-  EXCEPTION WHEN OTHERS THEN ASSERT SQLERRM LIKE '%unauthorized_role%', 'old-store staff lacks new-store perm'; END;
-  ASSERT NOT EXISTS (SELECT 1 FROM product_measurement_assets WHERE sku_id = s AND revision = 2), 'no rev2 asset';
-  UPDATE inv_skus SET location_id = loc WHERE id = s;
-  RAISE NOTICE 'PASS asset register rejects transferred sku';
+-- 7 同店恢复：A 归零后同店再到货 → 原店恢复
+DO $$ BEGIN PERFORM test_mk(7,'a','a=1'); PERFORM measurement_request(l(7), cu(1)); END $$;
+UPDATE inv_stocks SET qty=0 WHERE sku_id=s(7);
+UPDATE inv_stocks SET qty=2 WHERE sku_id=s(7);
+DO $$ DECLARE t uuid; BEGIN
+  SELECT id INTO t FROM product_measurement_tasks WHERE sku_id=s(7) AND status='pending';
+  ASSERT (SELECT location_id FROM inv_handheld_notifications WHERE ref_id=t)=loc('a')
+     AND (SELECT action_status FROM inv_handheld_notifications WHERE ref_id=t) IS NULL, 'resumed at A';
+  RAISE NOTICE 'PASS same-store restock resumes';
+END $$;
+
+-- 8 合并与幂等申请：同任务一条提醒，两个申请者
+DO $$ DECLARE r1 jsonb; r2 jsonb; BEGIN
+  PERFORM test_mk(8,'a','a=1');
+  r1 := measurement_request(l(8), cu(1));
+  r2 := measurement_request(l(8), cu(2));
+  PERFORM measurement_request(l(8), cu(1));
+  ASSERT r1->>'task_id' = r2->>'task_id', 'merged';
+  ASSERT (SELECT count(*) FROM inv_handheld_notifications WHERE payload->>'sku_id'=s(8)::text)=1, 'one notif';
+  ASSERT (SELECT count(*) FROM product_measurement_requesters WHERE task_id=(r1->>'task_id')::uuid)=2, 'two requesters';
+  RAISE NOTICE 'PASS merge + idempotent request';
+END $$;
+
+-- 9 保存幂等：同 op 同内容回放；同 op 改内容 op_conflict；旧 revision revision_conflict；输入校验
+DO $$ DECLARE r jsonb; BEGIN
+  PERFORM test_mk(9,'a','a=1');
+  r := measurement_save(s(9), null, st('1'), 'op-idem-0001', 0, loc('a'), 12, 6, null, null);
+  ASSERT (r->>'revision')::int=1 AND r->>'task_id' IS NULL, 'no-task save';
+  r := measurement_save(s(9), null, st('1'), 'op-idem-0001', 0, loc('a'), 12, 6, null, null);
+  ASSERT (r->>'replayed')::boolean AND (r->>'revision')::int=1, 'replay';
+  ASSERT (SELECT measurement_revision FROM inv_skus WHERE id=s(9))=1, 'revision not bumped by replay';
+  PERFORM test_expect_err(format('select measurement_save(%L,null,%L,%L,0,%L,13,6,null,null)', s(9), st('1'), 'op-idem-0001', loc('a')), 'op_conflict');
+  PERFORM test_expect_err(format('select measurement_save(%L,null,%L,%L,0,%L,13,6,null,null)', s(9), st('1'), 'op-idem-0002', loc('a')), 'revision_conflict');
+  PERFORM test_expect_err(format('select measurement_save(%L,null,%L,%L,1,%L,-1,6,null,null)', s(9), st('1'), 'op-idem-0003', loc('a')), 'invalid_measurement');
+  PERFORM test_expect_err(format('select measurement_save(%L,null,%L,%L,1,%L,null,null,null,null)', s(9), st('1'), 'op-idem-0004', loc('a')), 'empty_measurement');
+  ASSERT (SELECT location_id FROM measurement_mutations WHERE client_op_id='op-idem-0001')=loc('a'), 'mutation records store';
+  RAISE NOTICE 'PASS save idempotency + conflicts';
+END $$;
+
+-- 10 通知失败整体回滚：尺寸/任务都不变
+CREATE FUNCTION public.test_fail_notif() RETURNS trigger LANGUAGE plpgsql AS $f$ BEGIN RAISE EXCEPTION 'boom_notif'; END $f$;
+CREATE TRIGGER test_fail_notif BEFORE INSERT ON commerce_customer_notifications FOR EACH ROW EXECUTE FUNCTION test_fail_notif();
+DO $$ BEGIN
+  PERFORM test_mk(10,'a','a=1');
+  PERFORM measurement_request(l(10), cu(1));
+  PERFORM test_expect_err(format('select measurement_save(%L,null,%L,%L,0,%L,10,5,null,null)', s(10), st('1'), 'op-rollback-1', loc('a')), 'boom_notif');
+  ASSERT (SELECT measurement_revision FROM inv_skus WHERE id=s(10))=0, 'revision rolled back';
+  ASSERT EXISTS (SELECT 1 FROM product_measurement_tasks WHERE sku_id=s(10) AND status='pending'), 'task still pending';
+  ASSERT NOT EXISTS (SELECT 1 FROM measurement_mutations WHERE client_op_id='op-rollback-1'), 'no mutation';
+  RAISE NOTICE 'PASS notification failure rolls back';
+END $$;
+DROP TRIGGER test_fail_notif ON commerce_customer_notifications;
+
+-- 11 素材登记：真实正库存 + 权限 + 版本 + op 幂等 + first-write-wins
+DO $$ DECLARE r jsonb; p text; p2 text; BEGIN
+  PERFORM test_mk(11,'a','a=0,b=1');
+  PERFORM measurement_save(s(11), null, st('2'), 'op-asset-save', 0, loc('b'), 20, 10, null, null);
+  p  := 'sku-listing/measurements/' || s(11) || '/1-00000000000000aa-640.png';
+  p2 := 'sku-listing/measurements/' || s(11) || '/1-00000000000000bb-640.png';
+  r := measurement_asset_register(s(11), st('2'), 'op-img-00001', loc('b'), 1, 20, 10, '00000000000000aa', p, '{"x":0}', 100, 200, 10);
+  ASSERT r->>'status'='ready' AND r->>'location_id'=loc('b')::text, 'registered at B';
+  r := measurement_asset_register(s(11), st('2'), 'op-img-00001', loc('b'), 1, 20, 10, '00000000000000aa', p, '{"x":0}', 100, 200, 10);
+  ASSERT (r->>'replayed')::boolean, 'replay';
+  PERFORM test_expect_err(format('select measurement_asset_register(%L,%L,%L,%L,1,20,10,%L,%L,''{}'',100,200,10)', s(11), st('2'), 'op-img-00001', loc('b'), '00000000000000bb', p2), 'op_conflict');
+  PERFORM test_expect_err(format('select measurement_asset_register(%L,%L,%L,%L,1,20,10,%L,%L,''{}'',100,200,10)', s(11), st('2'), 'op-img-00002', loc('b'), '00000000000000bb', p2), 'image_conflict');
+  PERFORM test_expect_err(format('select measurement_asset_register(%L,%L,%L,%L,1,20,10,%L,%L,''{}'',100,200,10)', s(11), st('1'), 'op-img-00003', loc('a'), '00000000000000bb', p2), 'location_mismatch');
+  PERFORM test_expect_err(format('select measurement_asset_register(%L,%L,%L,%L,1,20,10,%L,%L,''{}'',100,200,10)', s(11), st('9'), 'op-img-00004', loc('a'), '00000000000000bb', p2), 'location_mismatch');
+  PERFORM test_expect_err(format('select measurement_asset_register(%L,%L,%L,%L,1,20,10,%L,%L,''{}'',100,200,10)', s(11), st('1'), 'op-img-00005', loc('b'), '00000000000000bb', p2), 'unauthorized_role');
+  PERFORM test_expect_err(format('select measurement_asset_register(%L,%L,%L,%L,1,21,10,%L,%L,''{}'',100,200,10)', s(11), st('2'), 'op-img-00006', loc('b'), '00000000000000bb', p2), 'revision_conflict');
+  ASSERT (SELECT cutout_preview_path FROM product_measurement_assets WHERE sku_id=s(11) AND revision=1)=p, 'first write wins';
+  RAISE NOTICE 'PASS asset register stock/permission/idempotency';
+END $$;
+
+-- 12 跨店隐私：调拨后旧店看不到提醒/任务
+DO $$ BEGIN
+  ASSERT NOT EXISTS (SELECT 1 FROM inv_handheld_notifications n JOIN product_measurement_tasks t ON t.id=n.ref_id
+                     WHERE t.sku_id IN (s(1),s(5),s(6)) AND n.location_id=loc('a')), 'old store sees nothing';
+  ASSERT NOT EXISTS (SELECT 1 FROM product_measurement_tasks WHERE sku_id IN (s(5),s(6)) AND location_id=loc('a')), 'no task at A';
+  RAISE NOTICE 'PASS cross-store privacy after transfer';
+END $$;
+
+-- 13 权限：新函数对 anon/authenticated 不可执行
+DO $$ BEGIN
+  ASSERT NOT has_function_privilege('authenticated', 'public.measurement_request(uuid,uuid)', 'EXECUTE'), 'auth no exec request';
+  ASSERT NOT has_function_privilege('anon', 'public.measurement_task_rebalance(uuid)', 'EXECUTE'), 'anon no exec rebalance';
+  ASSERT has_function_privilege('service_role', 'public.measurement_save(uuid,uuid,uuid,text,integer,uuid,numeric,numeric,numeric,numeric)', 'EXECUTE'), 'service exec save';
+  RAISE NOTICE 'PASS grants service_role only';
 END $$;

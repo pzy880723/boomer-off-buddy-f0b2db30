@@ -10,11 +10,12 @@ import { errCode } from "@/lib/handheld/errors";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   loadMeasurementSku,
+  loadSkuStockRows,
   saveMeasurementProduction,
 } from "@/server/product-measurement-production.server";
 import { loadMeasurementActor } from "@/lib/measurement.functions";
 import {
-  actorCanAccessLocation,
+  measurementLocationAccess,
   validateMeasurementInput,
   hasAnyMeasurement,
 } from "@/server/product-measurement.server";
@@ -56,10 +57,11 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/measurement
         const sku = await loadMeasurementSku(params.id);
         if (!sku) return errCode("not_found", "SKU not found");
         const actor = await loadMeasurementActor(session.user_id);
-        if (!actorCanAccessLocation(actor, locationId) || sku.location_id !== locationId) {
-          return errCode("unauthorized_role", "No access to this location");
-        }
+        // 门店归属以 inv_stocks 为准：正库存可编辑；历史零库存行只读已有尺寸
+        const access = measurementLocationAccess(actor, await loadSkuStockRows(sku.id), locationId);
+        if (access === "none") return errCode("unauthorized_role", "No access to this location");
         return ok({
+          can_edit: access === "edit",
           measurement: sku.measured_at
             ? {
                 height_cm: sku.measurement_height_cm,
@@ -88,9 +90,10 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/measurement
         const sku = await loadMeasurementSku(params.id);
         if (!sku) return errCode("not_found", "SKU not found");
         const actor = await loadMeasurementActor(session.user_id);
-        if (!actorCanAccessLocation(actor, body.location_id) || sku.location_id !== body.location_id) {
-          return errCode("unauthorized_role", "No access to this location");
-        }
+        // 预检（快速失败）；最终以 RPC 在 SKU 锁内重读 inv_stocks 为准
+        const access = measurementLocationAccess(actor, await loadSkuStockRows(sku.id), body.location_id);
+        if (access === "none") return errCode("unauthorized_role", "No access to this location");
+        if (access !== "edit") return errCode("unauthorized_location", "SKU has no stock in this location");
 
         const parsed = validateMeasurementInput(body.measurement);
         if (!parsed.ok || !hasAnyMeasurement(parsed.value)) {
@@ -126,6 +129,7 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/measurement
           if (message === "location_mismatch") {
             return errCode("unauthorized_location", "SKU no longer in this location");
           }
+          if (message === "unauthorized_role") return errCode("unauthorized_role", "No access to this location");
           if (message === "not_found") return errCode("not_found", "Task not found");
           throw error;
         }

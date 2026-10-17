@@ -10,11 +10,12 @@ import {
 import { errCode } from "@/lib/handheld/errors";
 import {
   loadMeasurementSku,
+  loadSkuStockRows,
   registerMeasurementAssetProduction,
   uploadMeasurementDerivativeProduction,
 } from "@/server/product-measurement-production.server";
 import { loadMeasurementActor } from "@/lib/measurement.functions";
-import { actorCanAccessLocation } from "@/server/product-measurement.server";
+import { measurementLocationAccess } from "@/server/product-measurement.server";
 import {
   MEASUREMENT_REQUEST_MAX_BYTES,
   MEASUREMENT_BASE64_MAX_LEN,
@@ -86,9 +87,17 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/measurement
           console.error("[measurement-image] load", (error as Error).message);
           return errCode("internal_error", "Temporarily unavailable");
         }
-        if (!actorCanAccessLocation(actor, body.location_id) || sku.location_id !== body.location_id) {
-          return errCode("unauthorized_role", "No access to this location");
+        // 门店归属以 inv_stocks 为准：只有该店确有正库存才能上传（HQ 也不例外）；登记 RPC 锁内重读
+        let access;
+        try {
+          access = measurementLocationAccess(actor, await loadSkuStockRows(sku.id), body.location_id);
+        } catch (error) {
+          console.error("[measurement-image] stock", (error as Error).message);
+          return errCode("internal_error", "Temporarily unavailable");
         }
+        if (access === "none") return errCode("unauthorized_role", "No access to this location");
+        // 沿用既有契约：无实物与跨店同为 403 unauthorized_role（原生端已处理）
+        if (access !== "edit") return errCode("unauthorized_role", "SKU has no stock in this location");
         // 预检（快速失败）；最终以登记 RPC 锁内复核为准
         if (sku.measurement_revision !== body.revision || !sku.measured_at) {
           return errCode("revision_conflict", "Measurement revision mismatch, re-measure first");

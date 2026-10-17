@@ -44,9 +44,9 @@ export function hasAnyMeasurement(v: MeasurementValues): boolean {
 
 // ---------- 存储抽象（生产实现见 product-measurement-production.server.ts） ----------
 
+/** inv_skus 无门店字段：门店归属只看 inv_stocks（见 measurementLocationAccess） */
 export type MeasurementSkuRow = {
   id: string;
-  location_id: string | null;
   measurement_revision: number;
   measured_at: string | null;
   measured_by?: string | null;
@@ -182,7 +182,7 @@ export async function requestMeasurement(
     task = store.createTask({
       sku_id: sku.id,
       listing_id: listing.id,
-      location_id: listing.location_id ?? sku.location_id,
+      location_id: listing.location_id,
       status: "pending",
       claimed_by: null,
       claimed_at: null,
@@ -201,6 +201,49 @@ export type MeasurementActor = {
   roles: string[];
   locationIds: string[];
 };
+
+export type StockRow = { location_id: string; qty: number };
+
+/**
+ * 员工对「SKU × 门店」的权限：员工 scope（HQ 全通）+ 该店 inv_stocks 实际行。
+ * edit = 该店正库存（可测量/保存/上传）；read = 该店有历史零库存行（只读已有尺寸）；none = 拒绝。
+ * HQ 也不得绕过无实物校验。
+ */
+export function measurementLocationAccess(
+  actor: MeasurementActor,
+  stocks: StockRow[],
+  locationId: string | null,
+): "edit" | "read" | "none" {
+  if (!locationId || !actorCanAccessLocation(actor, locationId)) return "none";
+  const row = stocks.find((r) => r.location_id === locationId);
+  if (!row) return "none";
+  return row.qty > 0 ? "edit" : "read";
+}
+
+/** ERP 网页：可读 = HQ 或任一有权限门店存在库存行 */
+export function actorCanReadSkuMeasurement(actor: MeasurementActor, stocks: StockRow[]): boolean {
+  if (actor.roles.includes("super_admin") || actor.roles.includes("hq_operator")) return true;
+  return stocks.some((r) => actor.locationIds.includes(r.location_id));
+}
+
+/**
+ * ERP 网页保存门店：指定则须为 edit；未指定时仅当员工可编辑的正库存门店恰好一个才自动选，
+ * 多店有货不随机选（返回 ambiguous），无货返回 no_stock。
+ */
+export function resolveEditableLocation(
+  actor: MeasurementActor,
+  stocks: StockRow[],
+  requested: string | null,
+): { ok: true; locationId: string } | { ok: false; error: "no_stock" | "ambiguous" | "forbidden" } {
+  if (requested) {
+    const access = measurementLocationAccess(actor, stocks, requested);
+    if (access === "edit") return { ok: true, locationId: requested };
+    return { ok: false, error: access === "none" && !actorCanAccessLocation(actor, requested) ? "forbidden" : "no_stock" };
+  }
+  const editable = stocks.filter((r) => r.qty > 0 && actorCanAccessLocation(actor, r.location_id));
+  if (editable.length === 1) return { ok: true, locationId: editable[0].location_id };
+  return { ok: false, error: editable.length === 0 ? "no_stock" : "ambiguous" };
+}
 
 export function actorCanAccessLocation(actor: MeasurementActor, locationId: string | null): boolean {
   if (actor.roles.includes("super_admin") || actor.roles.includes("hq_operator")) return true;
@@ -233,6 +276,7 @@ export async function completeMeasurement(
     actor: MeasurementActor;
     input: MeasurementInput;
     expectedRevision?: number;
+    locationId?: string | null;
   },
 ): Promise<{ revision: number; task_id: string | null }> {
   const parsed = validateMeasurementInput(args.input);
@@ -248,7 +292,7 @@ export async function completeMeasurement(
   const sku = store.skus.get(skuId);
   if (!sku) throw new Error("not_found");
 
-  const locationId = task?.location_id ?? sku.location_id;
+  const locationId = task?.location_id ?? args.locationId ?? null;
   if (!actorCanAccessLocation(args.actor, locationId)) throw new Error("forbidden");
 
   const revision = store.saveSkuMeasurement(skuId, parsed.value, args.actor.userId, args.expectedRevision);
