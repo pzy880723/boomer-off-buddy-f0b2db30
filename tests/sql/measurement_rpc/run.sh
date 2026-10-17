@@ -4,12 +4,12 @@ set -uo pipefail
 cd "$(dirname "$0")/../../.."
 bash tests/sql/harness/setup.sh >/dev/null
 export PSQL=/tmp/psql.sh
-mig=$(ls drizzle/migrations/*_measurement_rpc.sql 2>/dev/null | head -1)
-[ -n "$mig" ] || { echo "FAIL migration missing"; exit 1; }
+migs=$(ls drizzle/migrations/*_measurement_rpc.sql drizzle/migrations/*_measurement_save_conflict_fix.sql 2>/dev/null)
+[ -n "$migs" ] || { echo "FAIL migration missing"; exit 1; }
 PGDB=postgres $PSQL -q -c "drop database if exists measurement_test" -c "create database measurement_test" >/dev/null
 export PGDB=measurement_test
 $PSQL -q -f tests/sql/measurement_rpc/stubs.sql >/dev/null
-$PSQL -q -v ON_ERROR_STOP=1 -f "$mig" >/dev/null || { echo "FAIL migration apply"; exit 1; }
+for m in $migs; do $PSQL -q -v ON_ERROR_STOP=1 -f "$m" >/dev/null || { echo "FAIL migration apply"; exit 1; }
 out=$($PSQL -q -v ON_ERROR_STOP=1 -f tests/sql/measurement_rpc/cases.sql 2>&1); rc=$?
 echo "$out" | grep -o 'PASS .*\|ERROR.*\|FAIL.*'
 out2=$(PSQL=$PSQL bash tests/sql/measurement_rpc/concurrency.sh 2>&1); rc2=$?
