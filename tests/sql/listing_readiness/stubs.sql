@@ -29,4 +29,5 @@ CREATE TABLE public.inv_product_content (
   updated_by uuid NOT NULL,
   updated_at timestamptz NOT NULL DEFAULT now());
 ALTER TABLE public.commerce_listings ADD CONSTRAINT cl_status_chk CHECK (status = ANY (ARRAY['draft','published','reserved','sold','hidden','archived']));
+ALTER TABLE public.commerce_listings ADD CHECK (price >= 0), ADD CHECK (product_type = ANY (ARRAY['custom','standard','bundle']));
 INSERT INTO inv_locations (id, kind, name) VALUES ('00000000-0000-0000-0000-00000000000a','shop','A店');
