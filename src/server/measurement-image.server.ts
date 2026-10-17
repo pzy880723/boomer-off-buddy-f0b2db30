@@ -1,7 +1,7 @@
 /**
  * 尺寸素材图（透明 PNG）服务端校验与衍生。
  * 原则：不拉伸、不猜尺寸、不伪造；几何必须与已实测尺寸一致（高宽比误差 ≤3%），
- * alpha 必须真实透明，bbox 由实际像素 trim 得出。失败一律拒绝让重拍。
+ * alpha 必须真实透明，bbox 由 alpha>10 扫描得出，素材按同一 bbox extract。失败一律拒绝让重拍。
  */
 import sharp from "sharp";
 
@@ -81,7 +81,7 @@ export interface ValidatedMeasurementImage {
 /**
  * 校验透明 PNG 并提取几何：
  * - 必须是 PNG、≤2000px、有真实 alpha 透明区域；
- * - trim 透明边得前景 bbox；
+ * - alpha>10 扫描得前景 bbox，并按该 bbox extract 素材；
  * - 实测 height 必填，width 缺失时用 diameter 代替；bbox 高宽比与实测比误差 ≤3%。
  */
 export async function validateMeasurementImage(
