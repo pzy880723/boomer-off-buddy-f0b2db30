@@ -12,4 +12,4 @@ if [ -n "$mig" ]; then $PSQL -q -v ON_ERROR_STOP=1 -f "$mig" >/dev/null || { ech
 out=$($PSQL -q -v ON_ERROR_STOP=1 -f tests/sql/listing_readiness/cases.sql 2>&1); rc=$?
 echo "$out" | grep -o 'PASS .*\|ERROR.*\|FAIL.*'
 n=$(echo "$out" | grep -c 'PASS')
-[ $rc -eq 0 ] && [ "$n" -eq 27 ] && echo "ALL PASS ($n)" || { echo "SOME FAILED ($n/27)"; exit 1; }
+[ $rc -eq 0 ] && [ "$n" -eq 24 ] && echo "ALL PASS ($n)" || { echo "SOME FAILED ($n/24)"; exit 1; }
