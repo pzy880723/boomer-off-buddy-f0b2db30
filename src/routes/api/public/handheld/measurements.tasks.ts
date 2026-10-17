@@ -23,13 +23,13 @@ export const Route = createFileRoute("/api/public/handheld/measurements/tasks")(
         const auth = await authenticateDevice(request);
         if (!auth.ok) return auth.response;
         const session = await resolveSessionUser(request);
-        if (!session) return errCode("unauthorized", "Sign in required", 401);
+        if (!session) return errCode("unauthorized", "Sign in required");
         const locationId = new URL(request.url).searchParams.get("location_id");
-        if (!locationId) return errCode("bad_request", "location_id required", 400);
+        if (!locationId) return errCode("invalid_body", "location_id required");
 
         const actor = await loadMeasurementActor(session.user_id);
         if (!actorCanAccessLocation(actor, locationId)) {
-          return errCode("forbidden", "No access to this location", 403);
+          return errCode("unauthorized_role", "No access to this location");
         }
         const items = await listMeasurementTasksProduction({ locationIds: [locationId] });
         return ok({

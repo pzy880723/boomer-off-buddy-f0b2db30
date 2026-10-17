@@ -50,15 +50,15 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/measurement
         const auth = await authenticateDevice(request);
         if (!auth.ok) return auth.response;
         const session = await resolveSessionUser(request);
-        if (!session) return errCode("unauthorized", "Sign in required", 401);
+        if (!session) return errCode("unauthorized", "Sign in required");
         const locationId = new URL(request.url).searchParams.get("location_id");
-        if (!locationId) return errCode("bad_request", "location_id required", 400);
+        if (!locationId) return errCode("invalid_body", "location_id required");
 
         const sku = await loadMeasurementSku(params.id);
         if (!sku) return errCode("not_found", "SKU not found");
         const actor = await loadMeasurementActor(session.user_id);
         if (!actorCanAccessLocation(actor, locationId) || sku.location_id !== locationId) {
-          return errCode("forbidden", "No access to this location", 403);
+          return errCode("unauthorized_role", "No access to this location");
         }
         return ok({
           measurement: sku.measured_at
@@ -77,25 +77,25 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/measurement
         const auth = await authenticateDevice(request);
         if (!auth.ok) return auth.response;
         const session = await resolveSessionUser(request);
-        if (!session) return errCode("unauthorized", "Sign in required", 401);
+        if (!session) return errCode("unauthorized", "Sign in required");
 
         let body: z.infer<typeof postBody>;
         try {
           body = postBody.parse(await request.json());
         } catch {
-          return errCode("bad_request", "Invalid body", 400);
+          return errCode("invalid_body", "Invalid body");
         }
 
         const sku = await loadMeasurementSku(params.id);
         if (!sku) return errCode("not_found", "SKU not found");
         const actor = await loadMeasurementActor(session.user_id);
         if (!actorCanAccessLocation(actor, body.location_id) || sku.location_id !== body.location_id) {
-          return errCode("forbidden", "No access to this location", 403);
+          return errCode("unauthorized_role", "No access to this location");
         }
 
         const parsed = validateMeasurementInput(body.measurement);
         if (!parsed.ok || !hasAnyMeasurement(parsed.value)) {
-          return errCode("bad_request", "Invalid measurement", 400);
+          return errCode("invalid_body", "Invalid measurement");
         }
 
         const active = await findActiveTaskProduction(sku.id);
@@ -117,9 +117,9 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/measurement
         } catch (error) {
           const message = (error as Error).message;
           if (message === "revision_conflict") {
-            return errCode("revision_conflict", "Measurement updated by someone else", 409);
+            return errCode("already_exists", "Measurement updated by someone else");
           }
-          if (message === "not_found") return errCode("not_found", "Task not found", 404);
+          if (message === "not_found") return errCode("not_found", "Task not found");
           throw error;
         }
       },

@@ -5,7 +5,7 @@ import { loadPublishedProductContent } from "@/server/product-content.server";
 import { loadEngagementCounts } from "@/server/storefront-engagement.server";
 import { buildMeasurementPayload } from "@/server/product-measurement.server";
 import { getMeasurementAssetProduction } from "@/server/product-measurement-production.server";
-import { signSkuImagePaths } from "@/lib/sku-image-resolver.server";
+import type { MeasurementAssetRow } from "@/server/product-measurement.server";
 import {
   buildStorefrontProductDetail,
   STOREFRONT_DETAIL_READABLE_STATUSES,
