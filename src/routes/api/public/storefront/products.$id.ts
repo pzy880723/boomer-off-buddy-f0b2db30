@@ -3,11 +3,50 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { STOREFRONT_CORS, storefrontError, storefrontJson } from "@/server/storefront-auth.server";
 import { loadPublishedProductContent } from "@/server/product-content.server";
 import { loadEngagementCounts } from "@/server/storefront-engagement.server";
+import { buildMeasurementPayload } from "@/server/product-measurement.server";
+import { getMeasurementAssetProduction } from "@/server/product-measurement-production.server";
+import { signSkuImagePaths } from "@/lib/sku-image-resolver.server";
 import {
   buildStorefrontProductDetail,
   STOREFRONT_DETAIL_READABLE_STATUSES,
   type StorefrontListing,
 } from "@/server/storefront-products.server";
+
+/**
+ * 商品详情的实测尺寸块：无实测返回 null；素材未就绪时 diagram.status 如实为
+ * pending/failed，cutout_preview_url 为 null，绝不伪造对比图。
+ * 抠图预览走私桶签名（与现有媒体契约一致），普通浏览不回原图。
+ */
+async function loadStorefrontMeasurement(skuId: string) {
+  const { data } = await supabaseAdmin
+    .from("inv_skus")
+    .select(
+      "id, location_id, measurement_height_cm, measurement_width_cm, measurement_depth_cm, measurement_diameter_cm, measured_at, measurement_revision",
+    )
+    .eq("id", skuId)
+    .maybeSingle();
+  const sku = data as unknown as Parameters<typeof buildMeasurementPayload>[0] | null;
+  if (!sku || !sku.measured_at) return null;
+  const asset = await getMeasurementAssetProduction(skuId, sku.measurement_revision);
+  const payload = buildMeasurementPayload(sku, asset);
+  if (!payload) return null;
+  let cutoutPreviewUrl: string | null = null;
+  if (payload.diagram.status === "ready" && payload.diagram.cutout_preview_path) {
+    const [signed] = await signSkuImagePaths([payload.diagram.cutout_preview_path]);
+    cutoutPreviewUrl = signed ?? null;
+  }
+  return {
+    ...payload,
+    diagram: {
+      status: payload.diagram.status,
+      cutout_preview_url: cutoutPreviewUrl,
+      bbox: payload.diagram.status === "ready" ? payload.diagram.bbox : null,
+      front_width_px: payload.diagram.status === "ready" ? payload.diagram.front_width_px : null,
+      front_height_px: payload.diagram.status === "ready" ? payload.diagram.front_height_px : null,
+      px_per_cm: payload.diagram.status === "ready" ? payload.diagram.px_per_cm : null,
+    },
+  };
+}
 
 export const Route = createFileRoute("/api/public/storefront/products/$id")({
   server: {
@@ -36,9 +75,11 @@ export const Route = createFileRoute("/api/public/storefront/products/$id")({
           }
           const content = await loadPublishedProductContent(product.sku_id);
           const counts = (await loadEngagementCounts([product.id])).get(product.id) ?? { view_count: 0, favorite_count: 0 };
+          const measurement = await loadStorefrontMeasurement(product.sku_id);
           return storefrontJson({ ok: true, data: { ...product, ...counts,
             detail_content: content?.published_blocks ?? [],
             detail_content_version: content?.version ?? 0,
+            measurement,
           } });
         } catch (metadataError) {
           return storefrontError(

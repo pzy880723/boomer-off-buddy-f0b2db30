@@ -34,6 +34,7 @@ import { Route as InventoryBatchesRouteImport } from './routes/inventory.batches
 import { Route as InventoryDevicesRouteImport } from './routes/inventory.devices'
 import { Route as InventoryInboundRouteImport } from './routes/inventory.inbound'
 import { Route as InventoryLocationsRouteImport } from './routes/inventory.locations'
+import { Route as InventoryMeasurementsRouteImport } from './routes/inventory.measurements'
 import { Route as InventoryProductsRouteImport } from './routes/inventory.products'
 import { Route as InventoryReturnInspectionRouteImport } from './routes/inventory.return-inspection'
 import { Route as InventorySkusRouteImport } from './routes/inventory.skus'
@@ -303,6 +304,7 @@ import { Route as ApiPublicStorefrontMembershipAppleTransactionsRouteImport } fr
 import { Route as ApiPublicStorefrontMembershipRecognitionQuotaReserveRouteImport } from './routes/api/public/storefront/membership.recognition-quota.reserve'
 import { Route as ApiPublicStorefrontNotificationsIdReadRouteImport } from './routes/api/public/storefront/notifications.$id.read'
 import { Route as ApiPublicStorefrontPaymentsCallbackProviderRouteImport } from './routes/api/public/storefront/payments.callback.$provider'
+import { Route as ApiPublicStorefrontProductsIdMeasurementRequestsRouteImport } from './routes/api/public/storefront/products.$id.measurement-requests'
 import { Route as ApiPublicStorefrontShortagesIdConfirmRefundRouteImport } from './routes/api/public/storefront/shortages.$id.confirm-refund'
 import { Route as ApiPublicStorefrontShortagesIdRespondRouteImport } from './routes/api/public/storefront/shortages.$id.respond'
 import { Route as ApiPublicStorefrontSupportConversationsIdRouteImport } from './routes/api/public/storefront/support.conversations.$id'
@@ -436,6 +438,11 @@ const InventoryInboundRoute = InventoryInboundRouteImport.update({
 const InventoryLocationsRoute = InventoryLocationsRouteImport.update({
   id: '/inventory/locations',
   path: '/inventory/locations',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InventoryMeasurementsRoute = InventoryMeasurementsRouteImport.update({
+  id: '/inventory/measurements',
+  path: '/inventory/measurements',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InventoryProductsRoute = InventoryProductsRouteImport.update({
@@ -1967,6 +1974,12 @@ const ApiPublicStorefrontPaymentsCallbackProviderRoute =
     path: '/callback/$provider',
     getParentRoute: () => ApiPublicStorefrontPaymentsRoute,
   } as any)
+const ApiPublicStorefrontProductsIdMeasurementRequestsRoute =
+  ApiPublicStorefrontProductsIdMeasurementRequestsRouteImport.update({
+    id: '/measurement-requests',
+    path: '/measurement-requests',
+    getParentRoute: () => ApiPublicStorefrontProductsIdRoute,
+  } as any)
 const ApiPublicStorefrontShortagesIdConfirmRefundRoute =
   ApiPublicStorefrontShortagesIdConfirmRefundRouteImport.update({
     id: '/confirm-refund',
@@ -2048,6 +2061,7 @@ export interface FileRoutesByFullPath {
   '/inventory/devices': typeof InventoryDevicesRoute
   '/inventory/inbound': typeof InventoryInboundRouteWithChildren
   '/inventory/locations': typeof InventoryLocationsRoute
+  '/inventory/measurements': typeof InventoryMeasurementsRoute
   '/inventory/products': typeof InventoryProductsRouteWithChildren
   '/inventory/return-inspection': typeof InventoryReturnInspectionRoute
   '/inventory/skus': typeof InventorySkusRouteWithChildren
@@ -2279,7 +2293,7 @@ export interface FileRoutesByFullPath {
   '/api/public/storefront/payments/reconcile': typeof ApiPublicStorefrontPaymentsReconcileRoute
   '/api/public/storefront/payments/refund': typeof ApiPublicStorefrontPaymentsRefundRoute
   '/api/public/storefront/payments/wechat-notify': typeof ApiPublicStorefrontPaymentsWechatNotifyRoute
-  '/api/public/storefront/products/$id': typeof ApiPublicStorefrontProductsIdRoute
+  '/api/public/storefront/products/$id': typeof ApiPublicStorefrontProductsIdRouteWithChildren
   '/api/public/storefront/shortages/$id': typeof ApiPublicStorefrontShortagesIdRouteWithChildren
   '/api/public/storefront/support/conversations': typeof ApiPublicStorefrontSupportConversationsRouteWithChildren
   '/api/public/handheld/fulfillments/$id/bind-tote': typeof ApiPublicHandheldFulfillmentsIdBindToteRoute
@@ -2317,6 +2331,7 @@ export interface FileRoutesByFullPath {
   '/api/public/storefront/membership/recognition-quota/reserve': typeof ApiPublicStorefrontMembershipRecognitionQuotaReserveRoute
   '/api/public/storefront/notifications/$id/read': typeof ApiPublicStorefrontNotificationsIdReadRoute
   '/api/public/storefront/payments/callback/$provider': typeof ApiPublicStorefrontPaymentsCallbackProviderRoute
+  '/api/public/storefront/products/$id/measurement-requests': typeof ApiPublicStorefrontProductsIdMeasurementRequestsRoute
   '/api/public/storefront/shortages/$id/confirm-refund': typeof ApiPublicStorefrontShortagesIdConfirmRefundRoute
   '/api/public/storefront/shortages/$id/respond': typeof ApiPublicStorefrontShortagesIdRespondRoute
   '/api/public/storefront/support/conversations/$id': typeof ApiPublicStorefrontSupportConversationsIdRoute
@@ -2350,6 +2365,7 @@ export interface FileRoutesByTo {
   '/inventory/batches': typeof InventoryBatchesRoute
   '/inventory/devices': typeof InventoryDevicesRoute
   '/inventory/locations': typeof InventoryLocationsRoute
+  '/inventory/measurements': typeof InventoryMeasurementsRoute
   '/inventory/products': typeof InventoryProductsRouteWithChildren
   '/inventory/return-inspection': typeof InventoryReturnInspectionRoute
   '/inventory/transfers': typeof InventoryTransfersRoute
@@ -2577,7 +2593,7 @@ export interface FileRoutesByTo {
   '/api/public/storefront/payments/reconcile': typeof ApiPublicStorefrontPaymentsReconcileRoute
   '/api/public/storefront/payments/refund': typeof ApiPublicStorefrontPaymentsRefundRoute
   '/api/public/storefront/payments/wechat-notify': typeof ApiPublicStorefrontPaymentsWechatNotifyRoute
-  '/api/public/storefront/products/$id': typeof ApiPublicStorefrontProductsIdRoute
+  '/api/public/storefront/products/$id': typeof ApiPublicStorefrontProductsIdRouteWithChildren
   '/api/public/storefront/shortages/$id': typeof ApiPublicStorefrontShortagesIdRouteWithChildren
   '/api/public/storefront/support/conversations': typeof ApiPublicStorefrontSupportConversationsRouteWithChildren
   '/api/public/handheld/fulfillments/$id/bind-tote': typeof ApiPublicHandheldFulfillmentsIdBindToteRoute
@@ -2615,6 +2631,7 @@ export interface FileRoutesByTo {
   '/api/public/storefront/membership/recognition-quota/reserve': typeof ApiPublicStorefrontMembershipRecognitionQuotaReserveRoute
   '/api/public/storefront/notifications/$id/read': typeof ApiPublicStorefrontNotificationsIdReadRoute
   '/api/public/storefront/payments/callback/$provider': typeof ApiPublicStorefrontPaymentsCallbackProviderRoute
+  '/api/public/storefront/products/$id/measurement-requests': typeof ApiPublicStorefrontProductsIdMeasurementRequestsRoute
   '/api/public/storefront/shortages/$id/confirm-refund': typeof ApiPublicStorefrontShortagesIdConfirmRefundRoute
   '/api/public/storefront/shortages/$id/respond': typeof ApiPublicStorefrontShortagesIdRespondRoute
   '/api/public/storefront/support/conversations/$id': typeof ApiPublicStorefrontSupportConversationsIdRoute
@@ -2652,6 +2669,7 @@ export interface FileRoutesById {
   '/inventory/devices': typeof InventoryDevicesRoute
   '/inventory/inbound': typeof InventoryInboundRouteWithChildren
   '/inventory/locations': typeof InventoryLocationsRoute
+  '/inventory/measurements': typeof InventoryMeasurementsRoute
   '/inventory/products': typeof InventoryProductsRouteWithChildren
   '/inventory/return-inspection': typeof InventoryReturnInspectionRoute
   '/inventory/skus': typeof InventorySkusRouteWithChildren
@@ -2883,7 +2901,7 @@ export interface FileRoutesById {
   '/api/public/storefront/payments/reconcile': typeof ApiPublicStorefrontPaymentsReconcileRoute
   '/api/public/storefront/payments/refund': typeof ApiPublicStorefrontPaymentsRefundRoute
   '/api/public/storefront/payments/wechat-notify': typeof ApiPublicStorefrontPaymentsWechatNotifyRoute
-  '/api/public/storefront/products/$id': typeof ApiPublicStorefrontProductsIdRoute
+  '/api/public/storefront/products/$id': typeof ApiPublicStorefrontProductsIdRouteWithChildren
   '/api/public/storefront/shortages/$id': typeof ApiPublicStorefrontShortagesIdRouteWithChildren
   '/api/public/storefront/support/conversations': typeof ApiPublicStorefrontSupportConversationsRouteWithChildren
   '/api/public/handheld/fulfillments/$id/bind-tote': typeof ApiPublicHandheldFulfillmentsIdBindToteRoute
@@ -2921,6 +2939,7 @@ export interface FileRoutesById {
   '/api/public/storefront/membership/recognition-quota/reserve': typeof ApiPublicStorefrontMembershipRecognitionQuotaReserveRoute
   '/api/public/storefront/notifications/$id/read': typeof ApiPublicStorefrontNotificationsIdReadRoute
   '/api/public/storefront/payments/callback/$provider': typeof ApiPublicStorefrontPaymentsCallbackProviderRoute
+  '/api/public/storefront/products/$id/measurement-requests': typeof ApiPublicStorefrontProductsIdMeasurementRequestsRoute
   '/api/public/storefront/shortages/$id/confirm-refund': typeof ApiPublicStorefrontShortagesIdConfirmRefundRoute
   '/api/public/storefront/shortages/$id/respond': typeof ApiPublicStorefrontShortagesIdRespondRoute
   '/api/public/storefront/support/conversations/$id': typeof ApiPublicStorefrontSupportConversationsIdRoute
@@ -2959,6 +2978,7 @@ export interface FileRouteTypes {
     | '/inventory/devices'
     | '/inventory/inbound'
     | '/inventory/locations'
+    | '/inventory/measurements'
     | '/inventory/products'
     | '/inventory/return-inspection'
     | '/inventory/skus'
@@ -3228,6 +3248,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/membership/recognition-quota/reserve'
     | '/api/public/storefront/notifications/$id/read'
     | '/api/public/storefront/payments/callback/$provider'
+    | '/api/public/storefront/products/$id/measurement-requests'
     | '/api/public/storefront/shortages/$id/confirm-refund'
     | '/api/public/storefront/shortages/$id/respond'
     | '/api/public/storefront/support/conversations/$id'
@@ -3261,6 +3282,7 @@ export interface FileRouteTypes {
     | '/inventory/batches'
     | '/inventory/devices'
     | '/inventory/locations'
+    | '/inventory/measurements'
     | '/inventory/products'
     | '/inventory/return-inspection'
     | '/inventory/transfers'
@@ -3526,6 +3548,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/membership/recognition-quota/reserve'
     | '/api/public/storefront/notifications/$id/read'
     | '/api/public/storefront/payments/callback/$provider'
+    | '/api/public/storefront/products/$id/measurement-requests'
     | '/api/public/storefront/shortages/$id/confirm-refund'
     | '/api/public/storefront/shortages/$id/respond'
     | '/api/public/storefront/support/conversations/$id'
@@ -3562,6 +3585,7 @@ export interface FileRouteTypes {
     | '/inventory/devices'
     | '/inventory/inbound'
     | '/inventory/locations'
+    | '/inventory/measurements'
     | '/inventory/products'
     | '/inventory/return-inspection'
     | '/inventory/skus'
@@ -3831,6 +3855,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/membership/recognition-quota/reserve'
     | '/api/public/storefront/notifications/$id/read'
     | '/api/public/storefront/payments/callback/$provider'
+    | '/api/public/storefront/products/$id/measurement-requests'
     | '/api/public/storefront/shortages/$id/confirm-refund'
     | '/api/public/storefront/shortages/$id/respond'
     | '/api/public/storefront/support/conversations/$id'
@@ -3868,6 +3893,7 @@ export interface RootRouteChildren {
   InventoryDevicesRoute: typeof InventoryDevicesRoute
   InventoryInboundRoute: typeof InventoryInboundRouteWithChildren
   InventoryLocationsRoute: typeof InventoryLocationsRoute
+  InventoryMeasurementsRoute: typeof InventoryMeasurementsRoute
   InventoryProductsRoute: typeof InventoryProductsRouteWithChildren
   InventoryReturnInspectionRoute: typeof InventoryReturnInspectionRoute
   InventorySkusRoute: typeof InventorySkusRouteWithChildren
@@ -4213,6 +4239,13 @@ declare module '@tanstack/react-router' {
       path: '/inventory/locations'
       fullPath: '/inventory/locations'
       preLoaderRoute: typeof InventoryLocationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inventory/measurements': {
+      id: '/inventory/measurements'
+      path: '/inventory/measurements'
+      fullPath: '/inventory/measurements'
+      preLoaderRoute: typeof InventoryMeasurementsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/inventory/products': {
@@ -6098,6 +6131,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicStorefrontPaymentsCallbackProviderRouteImport
       parentRoute: typeof ApiPublicStorefrontPaymentsRoute
     }
+    '/api/public/storefront/products/$id/measurement-requests': {
+      id: '/api/public/storefront/products/$id/measurement-requests'
+      path: '/measurement-requests'
+      fullPath: '/api/public/storefront/products/$id/measurement-requests'
+      preLoaderRoute: typeof ApiPublicStorefrontProductsIdMeasurementRequestsRouteImport
+      parentRoute: typeof ApiPublicStorefrontProductsIdRoute
+    }
     '/api/public/storefront/shortages/$id/confirm-refund': {
       id: '/api/public/storefront/shortages/$id/confirm-refund'
       path: '/confirm-refund'
@@ -6699,13 +6739,29 @@ const ApiPublicStorefrontPaymentsRouteWithChildren =
     ApiPublicStorefrontPaymentsRouteChildren,
   )
 
+interface ApiPublicStorefrontProductsIdRouteChildren {
+  ApiPublicStorefrontProductsIdMeasurementRequestsRoute: typeof ApiPublicStorefrontProductsIdMeasurementRequestsRoute
+}
+
+const ApiPublicStorefrontProductsIdRouteChildren: ApiPublicStorefrontProductsIdRouteChildren =
+  {
+    ApiPublicStorefrontProductsIdMeasurementRequestsRoute:
+      ApiPublicStorefrontProductsIdMeasurementRequestsRoute,
+  }
+
+const ApiPublicStorefrontProductsIdRouteWithChildren =
+  ApiPublicStorefrontProductsIdRoute._addFileChildren(
+    ApiPublicStorefrontProductsIdRouteChildren,
+  )
+
 interface ApiPublicStorefrontProductsRouteChildren {
-  ApiPublicStorefrontProductsIdRoute: typeof ApiPublicStorefrontProductsIdRoute
+  ApiPublicStorefrontProductsIdRoute: typeof ApiPublicStorefrontProductsIdRouteWithChildren
 }
 
 const ApiPublicStorefrontProductsRouteChildren: ApiPublicStorefrontProductsRouteChildren =
   {
-    ApiPublicStorefrontProductsIdRoute: ApiPublicStorefrontProductsIdRoute,
+    ApiPublicStorefrontProductsIdRoute:
+      ApiPublicStorefrontProductsIdRouteWithChildren,
   }
 
 const ApiPublicStorefrontProductsRouteWithChildren =
@@ -6933,6 +6989,7 @@ const rootRouteChildren: RootRouteChildren = {
   InventoryDevicesRoute: InventoryDevicesRoute,
   InventoryInboundRoute: InventoryInboundRouteWithChildren,
   InventoryLocationsRoute: InventoryLocationsRoute,
+  InventoryMeasurementsRoute: InventoryMeasurementsRoute,
   InventoryProductsRoute: InventoryProductsRouteWithChildren,
   InventoryReturnInspectionRoute: InventoryReturnInspectionRoute,
   InventorySkusRoute: InventorySkusRouteWithChildren,
