@@ -12,7 +12,7 @@ PGDB=postgres $PSQL -q -c "drop database if exists flash_cod_test" -c "create da
 export PGDB=flash_cod_test
 stubs=tests/sql/flash_cod/stubs.sql
 if [ "${SHIPMENTS_PREPATCH:-}" = "1" ]; then
-  sed "s/ARRAY['sf','cainiao','manual','flash']/ARRAY['sf','cainiao','manual']/" "$stubs" > /tmp/flash_cod_stubs_red2.sql
+  sed "s/,'flash']/]/" "$stubs" > /tmp/flash_cod_stubs_red2.sql
   stubs=/tmp/flash_cod_stubs_red2.sql
 fi
 if [ "${FLASH_V2_PREPATCH:-}" = "1" ]; then
