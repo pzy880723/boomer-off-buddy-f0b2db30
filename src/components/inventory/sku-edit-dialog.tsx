@@ -107,7 +107,21 @@ export function SkuEditDialog({
       if (fankuangEligible && fankuang !== (sku.fankuang_override ?? null)) {
         patch.fankuang_override = fankuang;
       }
-      return fn({ data: { id: sku.id, patch: patch as never } });
+      await fn({ data: { id: sku.id, patch: patch as never } });
+      // 实测尺寸：仅在填写了任意一项时保存（版本 CAS，并发冲突会报错）
+      const parsed = parseMeasurementFields(measurement);
+      if (!parsed.ok) throw new Error(parsed.error);
+      const v = parsed.value;
+      if (v.height_cm != null || v.width_cm != null || v.depth_cm != null || v.diameter_cm != null) {
+        await saveMeasurementFn({
+          data: {
+            sku_id: sku.id,
+            ...(measurementRevision != null ? { expected_revision: measurementRevision } : {}),
+            measurement: v,
+          },
+        });
+      }
+      return { ok: true };
     },
     onSuccess: () => {
       toast.success("已保存");
@@ -152,6 +166,7 @@ export function SkuEditDialog({
           {fankuangEligible && (
             <FankuangSwitch price={price} value={fankuang} onChange={setFankuang} />
           )}
+          <MeasurementFields state={measurement} onChange={setMeasurement} />
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
