@@ -35,15 +35,15 @@ SELECT bf_mk('c1000000-0000-0000-0000-000000000004');
 INSERT INTO inv_product_content (sku_id, version, draft_blocks, published_blocks) VALUES ('c1000000-0000-0000-0000-000000000004', 2, '[{"id":"d","type":"paragraph","text":"草稿"}]', '[]');
 SELECT t2(bf('c1000000-0000-0000-0000-000000000004', NULL)->>'status'='conflict', 'B4 CAS: row appeared since dry-run');
 SELECT t2(bf('c1000000-0000-0000-0000-000000000004', 1)->>'status'='conflict', 'B4 CAS: stale version');
-SELECT t2(bf('c1000000-0000-0000-0000-000000000004', 2)->>'status'='filled'
-  AND (SELECT draft_blocks->0->>'text'='草稿' AND version=3 FROM inv_product_content WHERE sku_id='c1000000-0000-0000-0000-000000000004'),
+SELECT t2(bf('c1000000-0000-0000-0000-000000000004', 2)->>'status'='filled', 'B4 matching version fills');
+SELECT t2((SELECT draft_blocks->0->>'text'='草稿' AND version=3 FROM inv_product_content WHERE sku_id='c1000000-0000-0000-0000-000000000004'),
   'B4 matching version fills, keeps manual draft');
 -- B5 回滚：恢复原行
-SELECT t2(product_content_backfill_restore('c1000000-0000-0000-0000-000000000004')->>'status'='restored'
-  AND (SELECT version=2 AND published_blocks='[]' AND draft_blocks->0->>'text'='草稿' AND auto_sources IS NULL FROM inv_product_content WHERE sku_id='c1000000-0000-0000-0000-000000000004'),
+SELECT t2(product_content_backfill_restore('c1000000-0000-0000-0000-000000000004')->>'status'='restored', 'B5 restore ok');
+SELECT t2((SELECT version=2 AND published_blocks='[]' AND draft_blocks->0->>'text'='草稿' AND auto_sources IS NULL FROM inv_product_content WHERE sku_id='c1000000-0000-0000-0000-000000000004'),
   'B5 restore brings back original row');
-SELECT t2(product_content_backfill_restore('c1000000-0000-0000-0000-000000000001')->>'status'='restored'
-  AND NOT EXISTS (SELECT 1 FROM inv_product_content WHERE sku_id='c1000000-0000-0000-0000-000000000001'), 'B5 restore removes row that did not exist');
+SELECT t2(product_content_backfill_restore('c1000000-0000-0000-0000-000000000001')->>'status'='restored', 'B5 restore new-row ok');
+SELECT t2(NOT EXISTS (SELECT 1 FROM inv_product_content WHERE sku_id='c1000000-0000-0000-0000-000000000001'), 'B5 restore removes row that did not exist');
 SELECT t2(bf('c1000000-0000-0000-0000-000000000001', NULL)->>'status'='filled', 'B5 refill after restore works');
 -- B6 补齐后人工编辑 → 回滚拒绝，详情不再把自动来源挂到人工内容上
 UPDATE inv_product_content SET version=version+1, published_version=version+1, published_blocks='[{"id":"m","type":"paragraph","text":"改"}]'
@@ -60,7 +60,7 @@ SELECT bf_mk('c1000000-0000-0000-0000-000000000008');
 INSERT INTO inv_listing_image_jobs (sku_id, source_bucket, source_path, status) VALUES ('c1000000-0000-0000-0000-000000000008','sku-raw','a.jpg','permanent_failed');
 SELECT t2(bf('c1000000-0000-0000-0000-000000000008', NULL)->>'reason'='image_jobs_unfinished', 'B7 failed image job skipped');
 SELECT bf_mk('c1000000-0000-0000-0000-000000000009');
-INSERT INTO inv_product_content_image_jobs (sku_id, status) VALUES ('c1000000-0000-0000-0000-000000000009','queued');
+INSERT INTO inv_product_content_image_jobs (sku_id, block_id, source_path, status) VALUES ('c1000000-0000-0000-0000-000000000009','b','sku-raw/x.jpg','queued');
 SELECT t2(bf('c1000000-0000-0000-0000-000000000009', NULL)->>'reason'='detail_image_jobs_unfinished', 'B7 detail image job skipped');
 SELECT bf_mk('c1000000-0000-0000-0000-00000000000a');
 UPDATE commerce_listings SET status='hidden' WHERE sku_id='c1000000-0000-0000-0000-00000000000a';
