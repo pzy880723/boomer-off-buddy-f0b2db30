@@ -220,6 +220,7 @@ export async function handleProductContent(
 export async function loadPublishedProductContent(skuId: string): Promise<{
   version: number;
   published_blocks: ProductContentReadBlock[];
+  auto_sources: Array<Record<string, unknown>> | null;
 } | null> {
   const { data, error } = await supabaseAdmin.rpc(
     "published_product_content" as never,
@@ -227,9 +228,10 @@ export async function loadPublishedProductContent(skuId: string): Promise<{
   );
   if (error) throw new Error("Published product content unavailable");
   if (!data) return null;
-  const published = data as unknown as { version: number; published_blocks: unknown };
+  const published = data as unknown as { version: number; published_blocks: unknown; auto_sources?: unknown };
   return {
     version: published.version,
+    auto_sources: Array.isArray(published.auto_sources) ? (published.auto_sources as Array<Record<string, unknown>>) : null,
     published_blocks: await signBlocks(published.published_blocks, (paths) =>
       signDerivativeUrls(paths, DERIVATIVE_WIDTHS.preview),
     ),

@@ -4880,6 +4880,8 @@ export type Database = {
       }
       inv_product_content: {
         Row: {
+          auto_backfill_backup: Json | null
+          auto_sources: Json | null
           draft_blocks: Json
           published_blocks: Json
           published_version: number | null
@@ -4889,6 +4891,8 @@ export type Database = {
           version: number
         }
         Insert: {
+          auto_backfill_backup?: Json | null
+          auto_sources?: Json | null
           draft_blocks?: Json
           published_blocks?: Json
           published_version?: number | null
@@ -4898,6 +4902,8 @@ export type Database = {
           version?: number
         }
         Update: {
+          auto_backfill_backup?: Json | null
+          auto_sources?: Json | null
           draft_blocks?: Json
           published_blocks?: Json
           published_version?: number | null
@@ -12205,6 +12211,24 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      product_content_backfill_apply: {
+        Args: {
+          p_blocks: Json
+          p_builder_version: string
+          p_expected_version: number
+          p_sku: string
+          p_sources: Json
+        }
+        Returns: Json
+      }
+      product_content_backfill_block_reason: {
+        Args: { p_sku: string }
+        Returns: string
+      }
+      product_content_backfill_restore: {
+        Args: { p_sku: string }
+        Returns: Json
       }
       product_content_image_claim: {
         Args: { p_limit: number }
