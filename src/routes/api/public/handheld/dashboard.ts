@@ -9,6 +9,12 @@ import {
 } from "@/server/handheld-auth.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { countUnread, resolveNotificationScope } from "@/server/handheld-notifications.server";
+import {
+  dashboardGate,
+  loadMeasurementTasks,
+  MEASUREMENT_OPEN_STATUSES,
+  type MeasureQuery,
+} from "@/server/handheld-dashboard-measurements";
 
 type DashboardTask = {
   id: string;
@@ -22,7 +28,6 @@ type DashboardTask = {
   target_id: string;
 };
 
-type MeasureRow = { id: string; sku_id: string; status: string; created_at: string; sku: { name: string } | null };
 
 type DashboardItem = {
   id: string;
@@ -100,15 +105,15 @@ export const Route = createFileRoute("/api/public/handheld/dashboard")({
           return err("Missing location_id", 400, { code: "no_location" });
         }
 
-        // Permission check (best-effort; only if session token supplied)
+        // 首页含顾客测量任务：员工会话必填（缺失 401），门店须授权（否则 403）。
         const session = await resolveSessionUser(request);
-        if (session) {
-          const okPerm = await userCanAccessLocation(session.user_id, locationId);
-          if (!okPerm) {
-            return err("You do not have permission to operate this location", 403, {
-              code: "location_forbidden",
-            });
-          }
+        const gate = await dashboardGate(session, (uid) => userCanAccessLocation(uid, locationId));
+        if (!gate.ok) {
+          return err(
+            gate.code === "session_required" ? "Employee session required" : "You do not have permission to operate this location",
+            gate.status,
+            { code: gate.code },
+          );
         }
 
         // ---- 1. stats ----
@@ -202,15 +207,19 @@ export const Route = createFileRoute("/api/public/handheld/dashboard")({
           });
         }
 
-        // 顾客尺寸测量申请：本门店未完成任务（完成/取消后自动消失）。
-        const { data: measureRows } = await supabaseAdmin
-          .from("product_measurement_tasks" as never)
-          .select("id, sku_id, status, created_at, sku:inv_skus!sku_id(name)")
-          .eq("location_id", locationId)
-          .in("status", ["pending", "claimed"])
-          .order("created_at", { ascending: true })
-          .limit(20);
-        for (const m of (measureRows as unknown as MeasureRow[] | null) ?? []) {
+        // 顾客尺寸测量申请：本门店未完成任务（完成/取消后自动消失）；读取失败明确返回 unavailable。
+        const measurement = await loadMeasurementTasks(
+          (loc) =>
+            supabaseAdmin
+              .from("product_measurement_tasks" as never)
+              .select("id, sku_id, status, created_at, sku:inv_skus!sku_id(name)")
+              .eq("location_id", loc)
+              .in("status", [...MEASUREMENT_OPEN_STATUSES])
+              .order("created_at", { ascending: true })
+              .limit(20) as unknown as ReturnType<MeasureQuery>,
+          locationId,
+        );
+        for (const m of measurement.rows) {
           tasks.push({
             id: m.id,
             type: "measurement",
@@ -269,7 +278,7 @@ export const Route = createFileRoute("/api/public/handheld/dashboard")({
 
         // ---- 4. unread notifications（与消息中心同一口径：本人 + 本设备 + 授权库位 + 广播）----
         let unreadCount = 0;
-        if (session) {
+        {
           const notificationScope = await resolveNotificationScope({
             userId: session.user_id,
             deviceId: auth.device.id,
@@ -287,6 +296,7 @@ export const Route = createFileRoute("/api/public/handheld/dashboard")({
           tasks,
           recent_items,
           unread_notifications: unreadCount ?? 0,
+          measurement_tasks_status: measurement.status,
         });
       },
     },
