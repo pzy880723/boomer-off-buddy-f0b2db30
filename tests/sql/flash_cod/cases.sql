@@ -41,7 +41,7 @@ DECLARE v jsonb; v_quote jsonb;
 BEGIN
   v_quote := commerce_quote_checkout_v2('00000000-0000-0000-0000-0000000000c0','[{"listing_id":"00000000-0000-0000-0000-0000000000b1","quantity":1}]',NULL,'flash');
   v := commerce_create_ordinary_flash_order('00000000-0000-0000-0000-0000000000c0','flash-key-1','[{"listing_id":"00000000-0000-0000-0000-0000000000b1","quantity":1}]',
-    '张三','13800000000','{"city":"上海","detail":"新天地"}',v_quote,NULL,'1234567890','wx1234567890abcdef',ARRAY['00000000-0000-0000-0000-00000000000a']);
+    '张三','13800000000','{"city":"上海","detail":"新天地"}',v_quote,NULL,'1234567890','wx1234567890abcdef',ARRAY['00000000-0000-0000-0000-00000000000a']::uuid[]);
   IF v->>'fulfillment_method'='flash' AND v->>'courier_provider'='flash' AND v->>'courier_service_code'='SHANSONG_COD'
      AND coalesce((v->>'shipping_fee')::numeric,0)=0 AND (v->'payment_route'->>'mode')='ordinary_wechat' THEN
     RAISE NOTICE 'PASS F4 flash order created';
@@ -54,7 +54,7 @@ DECLARE v1 jsonb; v2 jsonb; n int;
 BEGIN
   SELECT to_jsonb(o) INTO v1 FROM commerce_orders o WHERE idempotency_key='flash-key-1';
   v2 := commerce_create_ordinary_flash_order('00000000-0000-0000-0000-0000000000c0','flash-key-1','[{"listing_id":"00000000-0000-0000-0000-0000000000b1","quantity":1}]',
-    '张三','13800000000','{"city":"上海","detail":"新天地"}',NULL,NULL,'1234567890','wx1234567890abcdef',ARRAY['00000000-0000-0000-0000-00000000000a']);
+    '张三','13800000000','{"city":"上海","detail":"新天地"}',NULL,NULL,'1234567890','wx1234567890abcdef',ARRAY['00000000-0000-0000-0000-00000000000a']::uuid[]);
   SELECT count(*) INTO n FROM commerce_orders WHERE idempotency_key='flash-key-1';
   IF v1->>'id' = v2->>'id' AND n=1 THEN RAISE NOTICE 'PASS F5 idempotent replay'; ELSE RAISE EXCEPTION 'FAIL F5'; END IF;
 END $$;
@@ -64,7 +64,7 @@ DO $$ BEGIN
   INSERT INTO commerce_orders (customer_id,idempotency_key,source_channel,fulfillment_method,payment_status,order_status,payment_route)
     VALUES ('00000000-0000-0000-0000-0000000000c0','flash-key-2','storefront','shipping','unpaid','pending_payment','{"mode":"ordinary_wechat"}');
   PERFORM commerce_create_ordinary_flash_order('00000000-0000-0000-0000-0000000000c0','flash-key-2','[{"listing_id":"00000000-0000-0000-0000-0000000000b1","quantity":1}]',
-    '张三','13800000000','{"city":"上海"}',NULL,NULL,'1234567890','wx1234567890abcdef',ARRAY['00000000-0000-0000-0000-00000000000a']);
+    '张三','13800000000','{"city":"上海"}',NULL,NULL,'1234567890','wx1234567890abcdef',ARRAY['00000000-0000-0000-0000-00000000000a']::uuid[]);
   RAISE EXCEPTION 'FAIL F6 method switch accepted';
 EXCEPTION WHEN raise_exception THEN
   IF SQLERRM LIKE 'idempotency key used by another fulfillment method%' THEN RAISE NOTICE 'PASS F6 method conflict rejected'; ELSE RAISE; END IF;
@@ -73,7 +73,7 @@ END $$;
 -- F7 篡改运费快照被拒（quote changed）
 DO $$ BEGIN
   PERFORM commerce_create_ordinary_flash_order('00000000-0000-0000-0000-0000000000c0','flash-key-3','[{"listing_id":"00000000-0000-0000-0000-0000000000b1","quantity":1}]',
-    '张三','13800000000','{"city":"上海"}','{"version":"flash_cod_v1","total_fen":1}',NULL,'1234567890','wx1234567890abcdef',ARRAY['00000000-0000-0000-0000-00000000000a']);
+    '张三','13800000000','{"city":"上海"}','{"version":"flash_cod_v1","total_fen":1}',NULL,'1234567890','wx1234567890abcdef',ARRAY['00000000-0000-0000-0000-00000000000a']::uuid[]);
   RAISE EXCEPTION 'FAIL F7 tampered quote accepted';
 EXCEPTION WHEN raise_exception THEN
   IF SQLERRM LIKE 'shipping quote changed%' THEN RAISE NOTICE 'PASS F7 tampered quote rejected'; ELSE RAISE; END IF;
@@ -82,14 +82,14 @@ END $$;
 -- F8 缺地址/缺手机号被拒
 DO $$ BEGIN
   PERFORM commerce_create_ordinary_flash_order('00000000-0000-0000-0000-0000000000c0','flash-key-4','[{"listing_id":"00000000-0000-0000-0000-0000000000b1","quantity":1}]',
-    '张三',NULL,'{"city":"上海"}',NULL,NULL,'1234567890','wx1234567890abcdef',ARRAY['00000000-0000-0000-0000-00000000000a']);
+    '张三',NULL,'{"city":"上海"}',NULL,NULL,'1234567890','wx1234567890abcdef',ARRAY['00000000-0000-0000-0000-00000000000a']::uuid[]);
   RAISE EXCEPTION 'FAIL F8a missing phone accepted';
 EXCEPTION WHEN raise_exception THEN
   IF SQLERRM LIKE 'flash recipient required%' THEN RAISE NOTICE 'PASS F8a phone required'; ELSE RAISE; END IF;
 END $$;
 DO $$ BEGIN
   PERFORM commerce_create_ordinary_flash_order('00000000-0000-0000-0000-0000000000c0','flash-key-5','[{"listing_id":"00000000-0000-0000-0000-0000000000b1","quantity":1}]',
-    '张三','13800000000','{}',NULL,NULL,'1234567890','wx1234567890abcdef',ARRAY['00000000-0000-0000-0000-00000000000a']);
+    '张三','13800000000','{}',NULL,NULL,'1234567890','wx1234567890abcdef',ARRAY['00000000-0000-0000-0000-00000000000a']::uuid[]);
   RAISE EXCEPTION 'FAIL F8b empty address accepted';
 EXCEPTION WHEN raise_exception THEN
   IF SQLERRM LIKE 'flash address required%' THEN RAISE NOTICE 'PASS F8b address required'; ELSE RAISE; END IF;
@@ -98,7 +98,7 @@ END $$;
 -- F9 跨店下单被拒（权威在库内，不依赖前端）
 DO $$ BEGIN
   PERFORM commerce_create_ordinary_flash_order('00000000-0000-0000-0000-0000000000c0','flash-key-6','[{"listing_id":"00000000-0000-0000-0000-0000000000b1","quantity":1},{"listing_id":"00000000-0000-0000-0000-0000000000b2","quantity":1}]',
-    '张三','13800000000','{"city":"上海"}',NULL,NULL,'1234567890','wx1234567890abcdef',ARRAY['00000000-0000-0000-0000-00000000000a','00000000-0000-0000-0000-00000000000b']);
+    '张三','13800000000','{"city":"上海"}',NULL,NULL,'1234567890','wx1234567890abcdef',ARRAY['00000000-0000-0000-0000-00000000000a','00000000-0000-0000-0000-00000000000b']::uuid[]);
   RAISE EXCEPTION 'FAIL F9 cross-store order accepted';
 EXCEPTION WHEN raise_exception THEN
   IF SQLERRM LIKE 'flash requires single store%' THEN RAISE NOTICE 'PASS F9 cross-store order rejected'; ELSE RAISE; END IF;
@@ -182,7 +182,7 @@ END $$;
 DO $$ BEGIN
   EXECUTE 'SET ROLE anon';
   BEGIN
-    PERFORM commerce_create_ordinary_flash_order('00000000-0000-0000-0000-0000000000c0','k','[]','a','13800000000','{}',NULL,NULL,'1234567890','wx1234567890abcdef',ARRAY['00000000-0000-0000-0000-00000000000a']);
+    PERFORM commerce_create_ordinary_flash_order('00000000-0000-0000-0000-0000000000c0','k','[]','a','13800000000','{}',NULL,NULL,'1234567890','wx1234567890abcdef',ARRAY['00000000-0000-0000-0000-00000000000a']::uuid[]);
     RAISE EXCEPTION 'FAIL F15a anon can create';
   EXCEPTION WHEN insufficient_privilege THEN RAISE NOTICE 'PASS F15a anon create denied'; END;
   BEGIN
