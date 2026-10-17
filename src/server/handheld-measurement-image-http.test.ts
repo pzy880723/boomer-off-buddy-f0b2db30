@@ -15,9 +15,9 @@ import sharp from "sharp";
 const require = createRequire(import.meta.url);
 const { build } = createRequire(require.resolve("vite"))("esbuild");
 
-const SKU = "00000000-0000-0000-0000-000000000001";
-const LOC_A = "00000000-0000-0000-0000-00000000000a";
-const LOC_B = "00000000-0000-0000-0000-00000000000b";
+const SKU = "11111111-1111-4111-8111-111111111111";
+const LOC_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const LOC_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 
 type Sku = {
   id: string;
@@ -166,7 +166,6 @@ function assertNoWrites() {
 
 test("合规透明 PNG：先校验→上传 640/1280→登记 RPC，HTTP 用登记结果回 ready", async () => {
   const r = await post(body(await transparentPng(100, 200)));
-  if (r.status !== 200) console.log("DBG", JSON.stringify(r.json));
   assert.equal(r.status, 200);
   assert.equal(state.uploads.length, 2);
   assert.equal(state.registerCalls.length, 1);
