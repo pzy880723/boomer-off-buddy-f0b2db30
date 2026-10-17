@@ -135,6 +135,8 @@ const breadcrumbMap: Record<string, string> = {
   batches: "采购批次",
   transfers: "库存调拨",
   inbound: "RFID 入库",
+  measurements: "尺寸待办",
+  readiness: "上架准备",
   new: "新建",
   import: "导入",
   accounts: "账号管理",
