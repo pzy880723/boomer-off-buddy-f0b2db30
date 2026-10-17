@@ -102,6 +102,27 @@ function ShopCard({ shop, orderId, pickup, flash }: { shop: StoreSubOrder; order
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const flashMutation = useMutation({
+    mutationFn: async () => {
+      const lines = shop.items
+        .map((item) => ({
+          fulfillmentItemId: item.fulfillment_item_id,
+          quantity: Number(quantities[item.fulfillment_item_id] ?? 0),
+        }))
+        .filter((line) => Number.isInteger(line.quantity) && line.quantity > 0);
+      if (lines.length === 0) throw new Error("请填写本次送达数量");
+      return flashDeliverFn({
+        data: { fulfillmentId: shop.fulfillment_id, clientOpId: newOpId(), lines },
+      });
+    },
+    onSuccess: async () => {
+      toast.success("已登记闪送送达");
+      setQuantities({});
+      await invalidate();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   const shortageMutation = useMutation({
     mutationFn: async () => {
       if (!shortageFor) throw new Error("请选择缺货商品");
@@ -181,6 +202,18 @@ function ShopCard({ shop, orderId, pickup, flash }: { shop: StoreSubOrder; order
               status={shop.status}
               onChanged={() => void invalidate()}
             />
+          </div>
+        ) : flash ? (
+          <div className="flex items-center justify-between rounded-md border p-3">
+            <span className="text-sm text-muted-foreground">
+              同城闪送：配送费由顾客与门店客服约定后到付，系统不代收。商品送达顾客后登记送达，无需快递单号。
+            </span>
+            <Button
+              disabled={flashMutation.isPending}
+              onClick={() => flashMutation.mutate()}
+            >
+              登记闪送送达
+            </Button>
           </div>
         ) : (
         <div className="grid gap-3 sm:grid-cols-3">
