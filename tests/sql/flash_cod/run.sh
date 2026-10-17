@@ -17,4 +17,4 @@ fi
 out=$($PSQL -q -f tests/sql/flash_cod/cases.sql 2>&1); rc=$?
 echo "$out" | grep -o 'PASS .*\|ERROR.*\|FAIL.*'
 pass=$(echo "$out" | grep -c 'PASS ')
-[ $rc -eq 0 ] && [ "$pass" -eq 17 ] && echo "ALL PASS ($pass)" || { echo "SOME FAILED ($pass/21)"; exit 1; }
+[ $rc -eq 0 ] && [ "$pass" -eq 21 ] && echo "ALL PASS ($pass)" || { echo "SOME FAILED ($pass/21)"; exit 1; }
