@@ -30,7 +30,7 @@ export const Route = createFileRoute("/api/public/handheld/measurements/tasks/$i
           if (message === "forbidden" || message === "no_stock") {
             return errCode("unauthorized_role", "No access to this task");
           }
-          return errCode("internal", "Claim failed");
+          return errCode("internal_error", "Claim failed");
         }
       },
     },
