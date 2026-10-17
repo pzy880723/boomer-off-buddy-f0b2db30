@@ -6,6 +6,7 @@ import {
   handheldAiGuard,
   isAiConsentRevoked,
   type AiOutboundGuard,
+  AI_POLICY_VERSION,
   QUEUED_AI_DENIED_ERROR,
   QUEUED_AI_UNAVAILABLE_ERROR,
   queuedAiDecision,
@@ -248,6 +249,41 @@ async function runContentImageBatch(limit: number): Promise<BatchResult> {
 }
 
 type WorkerResult = { processed: number; failed?: number };
+
+/**
+ * 建品时授权未明确(pending_consent)的图片计划：按持久化的原员工重读当前政策授权，
+ * true → 入队 AI；明确 false → 使用原图；未答复/读取失败 → 保持待定（不伪造默认授权）。
+ * 补决 RPC 只接受同一原 actor 且仍待定的记录，重复执行幂等。
+ */
+export async function resolvePendingConsentPlans(limit = 20): Promise<{ resolved: number; queued: number }> {
+  const list = await supabaseAdmin.rpc("listing_readiness_pending_consent" as never, { p_limit: limit } as never);
+  if (list.error) throw new Error("Read pending consent plans failed");
+  const rows = (list.data ?? []) as unknown as Array<{ sku_id: string; actor: string }>;
+  if (rows.length === 0) return { resolved: 0, queued: 0 };
+  const store = await consentStoreFactory();
+  let resolved = 0;
+  let queued = 0;
+  for (const row of rows) {
+    let stored: boolean | null;
+    try {
+      stored = await store.get(row.actor, AI_POLICY_VERSION);
+    } catch {
+      continue;
+    }
+    if (stored === null) continue;
+    const res = await supabaseAdmin.rpc("listing_readiness_resolve_consent" as never, {
+      p_sku: row.sku_id, p_actor: row.actor, p_decision: stored ? "ai" : "raw_declined", p_policy: AI_POLICY_VERSION,
+    } as never);
+    if (res.error) continue;
+    const out = res.data as { status?: string; queued?: number } | null;
+    if (out?.status === "ok") {
+      resolved += 1;
+      queued += Number(out.queued ?? 0);
+      await advanceListingReadinessSafe(row.sku_id);
+    }
+  }
+  return { resolved, queued };
+}
 // Process-wide single flight: hooks and the timer share one batch, so at most 6 images run at once.
 let activeBatch: Promise<WorkerResult> | null = null;
 
@@ -255,6 +291,11 @@ async function runBatchOnce(limit: number): Promise<WorkerResult> {
   let processed = 0;
   let failed = 0;
   let galleryClaimed = 0;
+  try {
+    await resolvePendingConsentPlans();
+  } catch {
+    failed += 1;
+  }
   try {
     const gallery = await runLegacyImageBatch(limit);
     galleryClaimed = gallery.claimed;

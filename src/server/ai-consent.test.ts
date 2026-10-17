@@ -101,7 +101,7 @@ test("retry with different ai_processing_allowed keeps the same product fingerpr
 });
 
 // ---------- queue worker: revocation after enqueue ----------
-const q: any = { consent: {}, prepared: 0, finishes: [], jobs: [] };
+const q: any = { consent: {}, prepared: 0, finishes: [], jobs: [], pending: [], resolves: [] };
 (globalThis as any).__aiq = q;
 async function bundle(entry: string, stubs: Record<string, string>, real: string[] = []) {
   const out = await build({
@@ -124,6 +124,8 @@ const worker = await bundle("src/server/handheld-listing-image-jobs.server.ts", 
     rpc: async (name, args) => { const s = globalThis.__aiq;
       if (name === 'handheld_listing_image_claim') return { data: s.jobs.splice(0), error: null };
       if (name === 'product_content_image_claim') return { data: [], error: null };
+      if (name === 'listing_readiness_pending_consent') return { data: s.pending.splice(0), error: null };
+      if (name === 'listing_readiness_resolve_consent') { s.resolves.push(args); return { data: { status: 'ok', queued: args.p_decision === 'ai' ? 1 : 0 }, error: null }; }
       s.finishes.push(args); return { data: args.p_error ? 'retryable_failed' : 'succeeded', error: null }; },
     storage: { from: () => ({ createSignedUrl: async () => ({ data: { signedUrl: 'https://raw' }, error: null }),
       upload: async () => ({ error: null }) }) } };`,
@@ -133,7 +135,7 @@ const worker = await bundle("src/server/handheld-listing-image-jobs.server.ts", 
   "@/server/listing-readiness.server": "export const advanceListingReadinessSafe=async()=>{}; export const currentReadinessRevision=async()=>null;",
 }, ["@/server/ai-consent-core"]);
 
-beforeEach(() => { q.consent = {}; q.prepared = 0; q.finishes = []; q.jobs = []; });
+beforeEach(() => { q.consent = {}; q.prepared = 0; q.finishes = []; q.jobs = []; q.pending = []; q.resolves = []; });
 const job = (extra: object) => ({ id: "j1", sku_id: "s1", source_bucket: "sku-raw", source_path: "a.jpg", source_index: 0,
   attempts: 1, claim_token: "t", ...extra });
 
@@ -159,6 +161,29 @@ test("queued job: actor still consents => exactly one AI call", async () => {
   await worker.runListingImageWorker(2);
   assert.equal(q.prepared, 1);
   assert.equal(q.finishes[0].p_error, null);
+});
+
+// ---------- worker sweep: creation-time unknown consent ----------
+test("sweep: unanswered consent stays pending (no default consent, no raw release)", async () => {
+  q.pending = [{ sku_id: "s1", actor: "u1", policy: AI_POLICY_VERSION }];
+  await worker.resolvePendingConsentPlans();
+  assert.equal(q.resolves.length, 0);
+});
+
+test("sweep: later granted consent queues AI for the ORIGINAL actor only", async () => {
+  q.consent = { [`u1:${AI_POLICY_VERSION}`]: true, [`u2:${AI_POLICY_VERSION}`]: false };
+  q.pending = [{ sku_id: "s1", actor: "u1", policy: AI_POLICY_VERSION }];
+  const r = await worker.resolvePendingConsentPlans();
+  assert.deepEqual(q.resolves, [{ p_sku: "s1", p_actor: "u1", p_decision: "ai", p_policy: AI_POLICY_VERSION }]);
+  assert.equal(r.queued, 1);
+  assert.equal(q.prepared, 0, "sweep itself never calls AI");
+});
+
+test("sweep: explicit stored refusal resolves to original photos", async () => {
+  q.consent = { [`u1:${AI_POLICY_VERSION}`]: false };
+  q.pending = [{ sku_id: "s1", actor: "u1", policy: AI_POLICY_VERSION }];
+  await worker.resolvePendingConsentPlans();
+  assert.equal(q.resolves[0].p_decision, "raw_declined");
 });
 
 // ---------- synchronous AI route ----------
