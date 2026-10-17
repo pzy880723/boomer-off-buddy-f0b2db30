@@ -228,9 +228,6 @@ export const Route = createFileRoute("/api/public/storefront/orders")({
           if (/ordinary express delivery only/i.test(error.message)) {
             return storefrontError("目前仅支持普通快递配送", 422, "delivery_unavailable");
           }
-          if (/flash requires single store/i.test(error.message)) {
-            return storefrontError("同城闪送暂只支持同一门店的商品，请分开下单或选择快递/自提", 422, "flash_single_store_required");
-          }
           if (/flash recipient required|flash address required/i.test(error.message)) {
             return storefrontError("同城闪送请填写收货人姓名、手机号和完整地址", 422, "flash_contact_required");
           }
