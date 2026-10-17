@@ -57,6 +57,6 @@ INSERT INTO inv_skus (id, category, price_tier, name, epc, is_custom_price, imag
 VALUES ('d8600000-0000-0000-0000-000000000005','porcelain',100,'空行杯','d86-5',true,'{}');
 INSERT INTO inv_product_content (sku_id, version, updated_by) VALUES ('d8600000-0000-0000-0000-000000000005', 0, 'e1000000-0000-0000-0000-0000000000aa');
 SELECT t2(listing_readiness_publish_content('d8600000-0000-0000-0000-000000000005', 1,
-  '[{"id":"h","type":"heading","text":"空行杯"}]', '[]', 'template')->>'status'='template'
-  AND (SELECT updated_by=content_system_actor() AND version=1 FROM inv_product_content WHERE sku_id='d8600000-0000-0000-0000-000000000005'),
+  '[{"id":"h","type":"heading","text":"空行杯"}]', '[]', 'template')->>'status'='template', 'U5 readiness template update succeeds');
+SELECT t2((SELECT updated_by=content_system_actor() AND version=1 FROM inv_product_content WHERE sku_id='d8600000-0000-0000-0000-000000000005'),
   'U5 readiness template update by system actor');
