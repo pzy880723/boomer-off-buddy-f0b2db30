@@ -64,7 +64,7 @@ BEGIN
 
   -- 5 保存：client_op_id/expected_revision 必填 / 冲突拒绝 / 非法值拒绝
   BEGIN
-    PERFORM public.measurement_save(sku1, t, staff, 'op-null-rev', loc, 10, NULL, NULL, NULL);
+    PERFORM public.measurement_save(sku1, t, staff, 'op-null-rev', NULL, loc, 10, NULL, NULL, NULL);
     RAISE EXCEPTION 'FAIL null revision accepted';
   EXCEPTION WHEN OTHERS THEN ASSERT SQLERRM LIKE '%expected_revision_required%', 'required'; END;
   BEGIN

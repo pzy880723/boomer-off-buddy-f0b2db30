@@ -29,8 +29,8 @@ fi
 
 # 并发保存同一 revision：恰好一个成功
 task=$($PSQL -qAt -c "select id from product_measurement_tasks where sku_id='$SKU'")
-$PSQL -q -c "select public.measurement_save('$SKU','$task','$STAFF','op-a',0,'00000000-0000-0000-0000-00000000000a',10,null,null,null)" >/tmp/ms_a.out 2>&1 &
-$PSQL -q -c "select public.measurement_save('$SKU','$task','$STAFF','op-b',0,'00000000-0000-0000-0000-00000000000a',20,null,null,null)" >/tmp/ms_b.out 2>&1 &
+$PSQL -q -c "select public.measurement_save('$SKU','$task','$STAFF','op-aaaa-0001',0,'00000000-0000-0000-0000-00000000000a',10,null,null,null)" >/tmp/ms_a.out 2>&1 &
+$PSQL -q -c "select public.measurement_save('$SKU','$task','$STAFF','op-bbbb-0001',0,'00000000-0000-0000-0000-00000000000a',20,null,null,null)" >/tmp/ms_b.out 2>&1 &
 wait
 ok=$(grep -l 'replayed.: false' /tmp/ms_a.out /tmp/ms_b.out 2>/dev/null | wc -l)
 conf=$(grep -l 'revision_conflict' /tmp/ms_a.out /tmp/ms_b.out 2>/dev/null | wc -l)
@@ -49,11 +49,11 @@ SKU2=00000000-0000-0000-0000-000000000032
 L2B=00000000-0000-0000-0000-000000000042
 $PSQL -q -c "INSERT INTO inv_skus(id,name,location_id) VALUES ('$SKU2','同op并发商品','00000000-0000-0000-0000-00000000000a');
              INSERT INTO commerce_listings(id,sku_id,location_id,status,published_at) VALUES ('$L2B','$SKU2','00000000-0000-0000-0000-00000000000a','published',now())" >/dev/null
-$PSQL -q -c "select public.measurement_save('$SKU2',NULL,'$STAFF','op-same',0,'00000000-0000-0000-0000-00000000000a',10,5,null,null)" >/tmp/ms_c.out 2>&1 &
-$PSQL -q -c "select public.measurement_save('$SKU2',NULL,'$STAFF','op-same',0,'00000000-0000-0000-0000-00000000000a',10,5,null,null)" >/tmp/ms_d.out 2>&1 &
+$PSQL -q -c "select public.measurement_save('$SKU2',NULL,'$STAFF','op-same-0001',0,'00000000-0000-0000-0000-00000000000a',10,5,null,null)" >/tmp/ms_c.out 2>&1 &
+$PSQL -q -c "select public.measurement_save('$SKU2',NULL,'$STAFF','op-same-0001',0,'00000000-0000-0000-0000-00000000000a',10,5,null,null)" >/tmp/ms_d.out 2>&1 &
 wait
 rev2=$($PSQL -qAt -c "select measurement_revision from inv_skus where id='$SKU2'")
-muts=$($PSQL -qAt -c "select count(*) from measurement_mutations where client_op_id='op-same'")
+muts=$($PSQL -qAt -c "select count(*) from measurement_mutations where client_op_id='op-same-0001'")
 errs=$(grep -l 'ERROR' /tmp/ms_c.out /tmp/ms_d.out 2>/dev/null | wc -l)
 if [ "$rev2" = "1" ] && [ "$muts" = "1" ] && [ "$errs" = "0" ]; then
   echo "PASS concurrent same op: one real one replay"
