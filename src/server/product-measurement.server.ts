@@ -33,7 +33,10 @@ export function validateMeasurementInput(
     if (typeof raw !== "number" || !Number.isFinite(raw) || raw <= 0 || raw > MAX_CM) {
       return { ok: false, error: `invalid_${key}` };
     }
-    value[key] = Math.round(raw * 100) / 100;
+    // 按库内精度（0.01cm）取整后仍须是可保存的正值，否则受控拒绝（不让 DB check 报 500）
+    const rounded = Math.round(raw * 100) / 100;
+    if (rounded <= 0 || rounded > MAX_CM) return { ok: false, error: `invalid_${key}` };
+    value[key] = rounded;
   }
   return { ok: true, value };
 }

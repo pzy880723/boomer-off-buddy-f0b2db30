@@ -138,6 +138,9 @@ export const saveMeasurement = createServerFn({ method: "POST" })
         clientOpId: data.client_op_id,
         expectedRevision: data.expected_revision,
         value: parsed.value,
+        // 显式 location 按原记录比较；未显式时只核原 task 上下文，不从当前库存推断旧位置
+        locationId: data.location_id ?? null,
+        taskId,
       });
     } catch (error) {
       if ((error as Error).message === "op_conflict") throw new Error("同一操作编号提交了不同内容，请换新编号");

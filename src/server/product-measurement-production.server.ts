@@ -362,6 +362,9 @@ export async function replaySaveProduction(args: {
   clientOpId: string;
   expectedRevision: number;
   value: MeasurementValues;
+  /** 原请求 location（手持端必传）；web 未显式指定时为 null，只核原 task 上下文 */
+  locationId: string | null;
+  taskId: string | null;
 }): Promise<{ revision: number; task_id: string | null; notified: number; replayed: true } | null> {
   const { data, error } = await supabaseAdmin.rpc("measurement_save_replay" as never, {
     p_sku_id: args.skuId,
@@ -372,6 +375,8 @@ export async function replaySaveProduction(args: {
     p_width: args.value.width_cm,
     p_depth: args.value.depth_cm,
     p_diameter: args.value.diameter_cm,
+    p_location_id: args.locationId,
+    p_task_id: args.taskId,
   } as never);
   if (error) {
     if (String(error.message).includes("op_conflict")) throw new Error("op_conflict");

@@ -104,6 +104,8 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/measurement
             clientOpId: body.client_op_id,
             expectedRevision: body.expected_revision,
             value: parsed.value,
+            locationId: body.location_id,
+            taskId: null,
           });
           if (replay) {
             return ok({
