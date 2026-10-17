@@ -1,10 +1,10 @@
 \set ON_ERROR_STOP 1
 -- 0080 回归：未确认原图不得被编辑隐式确认；建品原事务持久化计划并入队；授权补决幂等；已发布展示隔离（读取实际公开字段）。
-CREATE FUNCTION sc3(p_id uuid, p_op text, p_paths text[], p_plan text) RETURNS jsonb LANGUAGE sql AS $$
-  SELECT handheld_smart_create_commit_v2('00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000e1',
+CREATE FUNCTION sc3(p_id uuid, p_op text, p_paths text[], p_plan text) RETURNS jsonb LANGUAGE plpgsql AS $$
+BEGIN RETURN handheld_smart_create_commit_v2('00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000e1',
     p_op, 'fp', '00000000-0000-0000-0000-00000000000a', false,
     jsonb_build_object('id', p_id, 'category', 'porcelain_jp', 'name', '建品', 'image_paths', to_jsonb(p_paths)),
-    '{}', 'n', NULL, p_plan, '2026-10-09-v1') $$;
+    '{}', 'n', NULL, p_plan, '2026-10-09-v1'); END $$;
 CREATE FUNCTION open3(p_id uuid) RETURNS bigint LANGUAGE sql AS $$
   SELECT count(*) FROM inv_listing_image_jobs WHERE sku_id = p_id AND status IN ('queued','processing','retryable_failed') $$;
 CREATE FUNCTION pub_read(p_id uuid) RETURNS jsonb LANGUAGE sql AS $$
