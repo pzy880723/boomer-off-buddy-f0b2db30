@@ -4,14 +4,14 @@ SET ROLE service_role;
 INSERT INTO inv_locations VALUES ('00000000-0000-0000-0000-00000000000a','shop',true),('00000000-0000-0000-0000-00000000000b','shop',true);
 INSERT INTO commerce_customers VALUES ('00000000-0000-0000-0000-0000000000c0','active');
 INSERT INTO inv_skus VALUES ('00000000-0000-0000-0000-0000000000a1','owned',NULL),('00000000-0000-0000-0000-0000000000a2','owned',NULL);
-INSERT INTO commerce_listings VALUES ('00000000-0000-0000-0000-0000000000l1','00000000-0000-0000-0000-00000000000a','00000000-0000-0000-0000-0000000000a1'),
-  ('00000000-0000-0000-0000-0000000000l2','00000000-0000-0000-0000-00000000000b','00000000-0000-0000-0000-0000000000a2');
+INSERT INTO commerce_listings VALUES ('00000000-0000-0000-0000-0000000000b1','00000000-0000-0000-0000-00000000000a','00000000-0000-0000-0000-0000000000a1'),
+  ('00000000-0000-0000-0000-0000000000b2','00000000-0000-0000-0000-00000000000b','00000000-0000-0000-0000-0000000000a2');
 INSERT INTO user_roles VALUES ('00000000-0000-0000-0000-0000000000e2','super_admin');
 
 -- 报价夹具：单店 / 跨店
-INSERT INTO quote_fixtures VALUES (md5('[{"listing_id":"00000000-0000-0000-0000-0000000000l1","quantity":1}]'),
+INSERT INTO quote_fixtures VALUES (md5('[{"listing_id":"00000000-0000-0000-0000-0000000000b1","quantity":1}]'),
   '{"subtotal_fen":5000,"discount_fen":0,"total_fen":5000,"shipping_fee_fen":1200,"coupon":null,"discount_allocations":[],"groups":[{"location_id":"00000000-0000-0000-0000-00000000000a","shipping_fee_fen":1200,"remaining_fen":0}]}');
-INSERT INTO quote_fixtures VALUES (md5('[{"listing_id":"00000000-0000-0000-0000-0000000000l1","quantity":1},{"listing_id":"00000000-0000-0000-0000-0000000000l2","quantity":1}]'),
+INSERT INTO quote_fixtures VALUES (md5('[{"listing_id":"00000000-0000-0000-0000-0000000000b1","quantity":1},{"listing_id":"00000000-0000-0000-0000-0000000000b2","quantity":1}]'),
   '{"subtotal_fen":9000,"discount_fen":0,"total_fen":9000,"shipping_fee_fen":1200,"coupon":null,"discount_allocations":[],"groups":[{"location_id":"00000000-0000-0000-0000-00000000000a","shipping_fee_fen":1200,"remaining_fen":0},{"location_id":"00000000-0000-0000-0000-00000000000b","shipping_fee_fen":0,"remaining_fen":0}]}');
 
 -- F1 单店闪送报价：version/方式/零运费/cod
@@ -19,11 +19,11 @@ SELECT CASE WHEN q->>'version'='flash_cod_v1' AND q->>'fulfillment_method'='flas
    AND q->>'delivery_fee_payment'='cod' AND (q->>'total_fen')::int=5000
    AND (q->'groups'->0->>'shipping_fee_fen')::int=0
   THEN 'PASS F1 flash quote single store' ELSE 'FAIL F1 '||q END FROM (
-  SELECT commerce_quote_checkout_v2('00000000-0000-0000-0000-0000000000c0','[{"listing_id":"00000000-0000-0000-0000-0000000000l1","quantity":1}]',NULL,'flash') q) t;
+  SELECT commerce_quote_checkout_v2('00000000-0000-0000-0000-0000000000c0','[{"listing_id":"00000000-0000-0000-0000-0000000000b1","quantity":1}]',NULL,'flash') q) t;
 
 -- F2 跨店闪送报价被拒绝
 DO $$ BEGIN
-  PERFORM commerce_quote_checkout_v2('00000000-0000-0000-0000-0000000000c0','[{"listing_id":"00000000-0000-0000-0000-0000000000l1","quantity":1},{"listing_id":"00000000-0000-0000-0000-0000000000l2","quantity":1}]',NULL,'flash');
+  PERFORM commerce_quote_checkout_v2('00000000-0000-0000-0000-0000000000c0','[{"listing_id":"00000000-0000-0000-0000-0000000000b1","quantity":1},{"listing_id":"00000000-0000-0000-0000-0000000000b2","quantity":1}]',NULL,'flash');
   RAISE EXCEPTION 'FAIL F2 cross-store flash quote accepted';
 EXCEPTION WHEN raise_exception THEN
   IF SQLERRM LIKE 'flash requires single store%' THEN RAISE NOTICE 'PASS F2 cross-store flash quote rejected'; ELSE RAISE; END IF;
@@ -31,16 +31,16 @@ END $$;
 
 -- F3 express/pickup 报价行为不变
 SELECT CASE WHEN q->>'version' IS NULL AND (q->>'shipping_fee_fen')::int=1200 THEN 'PASS F3a express quote unchanged' ELSE 'FAIL F3a' END FROM (
-  SELECT commerce_quote_checkout_v2('00000000-0000-0000-0000-0000000000c0','[{"listing_id":"00000000-0000-0000-0000-0000000000l1","quantity":1}]',NULL,'express') q) t;
+  SELECT commerce_quote_checkout_v2('00000000-0000-0000-0000-0000000000c0','[{"listing_id":"00000000-0000-0000-0000-0000000000b1","quantity":1}]',NULL,'express') q) t;
 SELECT CASE WHEN q->>'version'='pickup_v1' THEN 'PASS F3b pickup quote unchanged' ELSE 'FAIL F3b' END FROM (
-  SELECT commerce_quote_checkout_v2('00000000-0000-0000-0000-0000000000c0','[{"listing_id":"00000000-0000-0000-0000-0000000000l1","quantity":1}]',NULL,'pickup') q) t;
+  SELECT commerce_quote_checkout_v2('00000000-0000-0000-0000-0000000000c0','[{"listing_id":"00000000-0000-0000-0000-0000000000b1","quantity":1}]',NULL,'pickup') q) t;
 
 -- F4 闪送下单成功：方式/承运商/零运费落库
 DO $$
 DECLARE v jsonb; v_quote jsonb;
 BEGIN
-  v_quote := commerce_quote_checkout_v2('00000000-0000-0000-0000-0000000000c0','[{"listing_id":"00000000-0000-0000-0000-0000000000l1","quantity":1}]',NULL,'flash');
-  v := commerce_create_ordinary_flash_order('00000000-0000-0000-0000-0000000000c0','flash-key-1','[{"listing_id":"00000000-0000-0000-0000-0000000000l1","quantity":1}]',
+  v_quote := commerce_quote_checkout_v2('00000000-0000-0000-0000-0000000000c0','[{"listing_id":"00000000-0000-0000-0000-0000000000b1","quantity":1}]',NULL,'flash');
+  v := commerce_create_ordinary_flash_order('00000000-0000-0000-0000-0000000000c0','flash-key-1','[{"listing_id":"00000000-0000-0000-0000-0000000000b1","quantity":1}]',
     '张三','13800000000','{"city":"上海","detail":"新天地"}',v_quote,NULL,'1234567890','wx1234567890abcdef',ARRAY['00000000-0000-0000-0000-00000000000a']);
   IF v->>'fulfillment_method'='flash' AND v->>'courier_provider'='flash' AND v->>'courier_service_code'='SHANSONG_COD'
      AND coalesce((v->>'shipping_fee')::numeric,0)=0 AND (v->'payment_route'->>'mode')='ordinary_wechat' THEN
@@ -53,7 +53,7 @@ DO $$
 DECLARE v1 jsonb; v2 jsonb; n int;
 BEGIN
   SELECT to_jsonb(o) INTO v1 FROM commerce_orders o WHERE idempotency_key='flash-key-1';
-  v2 := commerce_create_ordinary_flash_order('00000000-0000-0000-0000-0000000000c0','flash-key-1','[{"listing_id":"00000000-0000-0000-0000-0000000000l1","quantity":1}]',
+  v2 := commerce_create_ordinary_flash_order('00000000-0000-0000-0000-0000000000c0','flash-key-1','[{"listing_id":"00000000-0000-0000-0000-0000000000b1","quantity":1}]',
     '张三','13800000000','{"city":"上海","detail":"新天地"}',NULL,NULL,'1234567890','wx1234567890abcdef',ARRAY['00000000-0000-0000-0000-00000000000a']);
   SELECT count(*) INTO n FROM commerce_orders WHERE idempotency_key='flash-key-1';
   IF v1->>'id' = v2->>'id' AND n=1 THEN RAISE NOTICE 'PASS F5 idempotent replay'; ELSE RAISE EXCEPTION 'FAIL F5'; END IF;
@@ -63,7 +63,7 @@ END $$;
 DO $$ BEGIN
   INSERT INTO commerce_orders (customer_id,idempotency_key,source_channel,fulfillment_method,payment_status,order_status,payment_route)
     VALUES ('00000000-0000-0000-0000-0000000000c0','flash-key-2','storefront','shipping','unpaid','pending_payment','{"mode":"ordinary_wechat"}');
-  PERFORM commerce_create_ordinary_flash_order('00000000-0000-0000-0000-0000000000c0','flash-key-2','[{"listing_id":"00000000-0000-0000-0000-0000000000l1","quantity":1}]',
+  PERFORM commerce_create_ordinary_flash_order('00000000-0000-0000-0000-0000000000c0','flash-key-2','[{"listing_id":"00000000-0000-0000-0000-0000000000b1","quantity":1}]',
     '张三','13800000000','{"city":"上海"}',NULL,NULL,'1234567890','wx1234567890abcdef',ARRAY['00000000-0000-0000-0000-00000000000a']);
   RAISE EXCEPTION 'FAIL F6 method switch accepted';
 EXCEPTION WHEN raise_exception THEN
@@ -72,7 +72,7 @@ END $$;
 
 -- F7 篡改运费快照被拒（quote changed）
 DO $$ BEGIN
-  PERFORM commerce_create_ordinary_flash_order('00000000-0000-0000-0000-0000000000c0','flash-key-3','[{"listing_id":"00000000-0000-0000-0000-0000000000l1","quantity":1}]',
+  PERFORM commerce_create_ordinary_flash_order('00000000-0000-0000-0000-0000000000c0','flash-key-3','[{"listing_id":"00000000-0000-0000-0000-0000000000b1","quantity":1}]',
     '张三','13800000000','{"city":"上海"}','{"version":"flash_cod_v1","total_fen":1}',NULL,'1234567890','wx1234567890abcdef',ARRAY['00000000-0000-0000-0000-00000000000a']);
   RAISE EXCEPTION 'FAIL F7 tampered quote accepted';
 EXCEPTION WHEN raise_exception THEN
@@ -81,14 +81,14 @@ END $$;
 
 -- F8 缺地址/缺手机号被拒
 DO $$ BEGIN
-  PERFORM commerce_create_ordinary_flash_order('00000000-0000-0000-0000-0000000000c0','flash-key-4','[{"listing_id":"00000000-0000-0000-0000-0000000000l1","quantity":1}]',
+  PERFORM commerce_create_ordinary_flash_order('00000000-0000-0000-0000-0000000000c0','flash-key-4','[{"listing_id":"00000000-0000-0000-0000-0000000000b1","quantity":1}]',
     '张三',NULL,'{"city":"上海"}',NULL,NULL,'1234567890','wx1234567890abcdef',ARRAY['00000000-0000-0000-0000-00000000000a']);
   RAISE EXCEPTION 'FAIL F8a missing phone accepted';
 EXCEPTION WHEN raise_exception THEN
   IF SQLERRM LIKE 'flash recipient required%' THEN RAISE NOTICE 'PASS F8a phone required'; ELSE RAISE; END IF;
 END $$;
 DO $$ BEGIN
-  PERFORM commerce_create_ordinary_flash_order('00000000-0000-0000-0000-0000000000c0','flash-key-5','[{"listing_id":"00000000-0000-0000-0000-0000000000l1","quantity":1}]',
+  PERFORM commerce_create_ordinary_flash_order('00000000-0000-0000-0000-0000000000c0','flash-key-5','[{"listing_id":"00000000-0000-0000-0000-0000000000b1","quantity":1}]',
     '张三','13800000000','{}',NULL,NULL,'1234567890','wx1234567890abcdef',ARRAY['00000000-0000-0000-0000-00000000000a']);
   RAISE EXCEPTION 'FAIL F8b empty address accepted';
 EXCEPTION WHEN raise_exception THEN
@@ -97,7 +97,7 @@ END $$;
 
 -- F9 跨店下单被拒（权威在库内，不依赖前端）
 DO $$ BEGIN
-  PERFORM commerce_create_ordinary_flash_order('00000000-0000-0000-0000-0000000000c0','flash-key-6','[{"listing_id":"00000000-0000-0000-0000-0000000000l1","quantity":1},{"listing_id":"00000000-0000-0000-0000-0000000000l2","quantity":1}]',
+  PERFORM commerce_create_ordinary_flash_order('00000000-0000-0000-0000-0000000000c0','flash-key-6','[{"listing_id":"00000000-0000-0000-0000-0000000000b1","quantity":1},{"listing_id":"00000000-0000-0000-0000-0000000000b2","quantity":1}]',
     '张三','13800000000','{"city":"上海"}',NULL,NULL,'1234567890','wx1234567890abcdef',ARRAY['00000000-0000-0000-0000-00000000000a','00000000-0000-0000-0000-00000000000b']);
   RAISE EXCEPTION 'FAIL F9 cross-store order accepted';
 EXCEPTION WHEN raise_exception THEN
