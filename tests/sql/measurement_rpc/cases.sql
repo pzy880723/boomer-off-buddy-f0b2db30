@@ -2,7 +2,7 @@
 -- 尺寸测量 RPC 行为用例（隔离库）。
 DO $$
 DECLARE
-  r jsonb; r2 jsonb; n int; t uuid; rev int;
+  r jsonb; r2 jsonb; n int; t uuid; rev int; h numeric;
   sku1 uuid := '00000000-0000-0000-0000-000000000001';
   l1 uuid := '00000000-0000-0000-0000-000000000011';
   l2 uuid := '00000000-0000-0000-0000-000000000012';
@@ -90,8 +90,8 @@ BEGIN
   -- 7 client_op_id 重放：不再改数据、不再通知
   r := public.measurement_save(sku1, t, staff, 'op-1', 1, 99, NULL, NULL, NULL);
   ASSERT (r->>'replayed')::boolean = true, 'replayed';
-  SELECT measurement_height_cm INTO n FROM inv_skus WHERE id = sku1;
-  ASSERT n = 12.5, 'replay does not overwrite';
+  SELECT measurement_height_cm INTO h FROM inv_skus WHERE id = sku1;
+  ASSERT h = 12.5, 'replay does not overwrite';
   SELECT count(*) INTO n FROM commerce_customer_notifications WHERE kind='measurement_completed';
   ASSERT n = 2, 'replay does not re-notify';
   RAISE NOTICE 'PASS client_op_id replay';
