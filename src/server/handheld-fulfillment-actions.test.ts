@@ -101,3 +101,26 @@ test("manual ship uses the single DB RPC and maps results", async () => {
     assert.equal((await manualShip(f.rpc, { actorUserId: U, locationId: null, fulfillmentId: F, provider: "sf", trackingNo: "SF1234", lines: [{ fulfillmentItemId: I, quantity: 1 }], idempotencyKey: "op-12345678" })).status, status, result);
   }
 });
+
+test("flash deliver uses the single DB RPC, never a tracking number, and maps results", async () => {
+  const { flashDeliver, FlashDeliverBody } = await import("./handheld-fulfillment-actions.ts");
+  const ok = fakeRpc({ ok: true, result: "delivered", shipment_id: "s", replayed: false, provider: "flash" });
+  const r = await flashDeliver(ok.rpc, { actorUserId: U, locationId: L, fulfillmentId: F, lines: [{ fulfillmentItemId: I, quantity: 1 }], idempotencyKey: "op-12345678" });
+  assert.equal(r.status, 200);
+  assert.equal(ok.calls[0].fn, "commerce_flash_deliver_fulfillment");
+  assert.equal(ok.calls[0].args.p_actor_user_id, U);
+  assert.equal(ok.calls[0].args.p_location_id, L);
+  assert.deepEqual(ok.calls[0].args.p_lines, [{ fulfillment_item_id: I, quantity: 1 }]);
+  assert.equal("p_tracking_no" in ok.calls[0].args, false);
+  assert.equal((r.body.shipment as { tracking_no: unknown }).tracking_no, null);
+  for (const [result, status] of [["not_flash_order", 409], ["flash_order", 409], ["forbidden", 403], ["location_forbidden", 403], ["not_found", 404], ["unpaid", 409], ["refund_blocked", 409], ["already_shipped", 409], ["idempotency_conflict", 409], ["invalid_lines", 422], ["lines_incomplete", 422], ["shortage_blocked", 409], ["invalid_note", 400], ["invalid_idempotency_key", 400]] as const) {
+    const f = fakeRpc({ ok: false, result });
+    assert.equal((await flashDeliver(f.rpc, { actorUserId: U, locationId: null, fulfillmentId: F, lines: [{ fulfillmentItemId: I, quantity: 1 }], idempotencyKey: "op-12345678" })).status, status, result);
+  }
+  const rpcFail = fakeRpc(null, { message: "boom" });
+  assert.equal((await flashDeliver(rpcFail.rpc, { actorUserId: U, locationId: null, fulfillmentId: F, lines: [{ fulfillmentItemId: I, quantity: 1 }], idempotencyKey: "op-12345678" })).status, 503);
+  // 请求体严格模式：拒绝单号/身份字段
+  assert.equal(FlashDeliverBody.safeParse({ client_op_id: "op-12345678", lines: [{ fulfillment_item_id: I, quantity: 1 }] }).success, true);
+  assert.equal(FlashDeliverBody.safeParse({ client_op_id: "op-12345678", tracking_no: "SF1234", lines: [{ fulfillment_item_id: I, quantity: 1 }] }).success, false);
+  assert.equal(FlashDeliverBody.safeParse({ client_op_id: "op-12345678", user_id: U, lines: [{ fulfillment_item_id: I, quantity: 1 }] }).success, false);
+});
