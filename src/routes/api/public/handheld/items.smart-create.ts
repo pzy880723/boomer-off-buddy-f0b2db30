@@ -1,3 +1,4 @@
+import { advanceListingReadiness } from "@/server/listing-readiness.server";
 import { createServerTiming } from "@/lib/server-timing";
 import { createFileRoute } from "@tanstack/react-router";
 import {
@@ -354,6 +355,14 @@ async function handleSmartCreate(request: Request, timing: ReturnType<typeof cre
           }
         }
 
+        // 新上架准备：图片任务已入队（或无需排队），标记已定并推进一次；未就绪的上架意图保持隐藏。
+        try {
+          await supabaseAdmin.rpc("listing_readiness_mark_images_settled" as never, { p_sku: skuId } as never);
+          await advanceListingReadiness(skuId);
+        } catch (e) {
+          console.error("[handheld smart-create] 上架准备推进失败", (e as Error).message);
+        }
+
         // 有赞发布已在上面同一事务写入持久化 outbox，由腾讯固定出口 worker 异步执行，不阻塞上架返回。
         const syncStatus: "disabled" | "queued" | "unlinked" = releaseShopId
           ? "queued"
@@ -364,10 +373,10 @@ async function handleSmartCreate(request: Request, timing: ReturnType<typeof cre
         // inv_apply_movement atomically publishes eligible custom items. Read
         // the resulting listing here so the API can report the final state.
         let storefrontListingId: string | null = null;
-        let storefrontStatus: "skipped" | "published" | "sold" | "failed" = "skipped";
+        let storefrontStatus: "skipped" | "published" | "processing" | "sold" | "failed" = "skipped";
         const { data: storefrontListing, error: storefrontError } = await supabaseAdmin
           .from("commerce_listings")
-          .select("id, status")
+          .select("id, status, readiness_hold")
           .eq("sku_id", skuId)
           .eq("location_id", locationId)
           .maybeSingle();
@@ -376,7 +385,12 @@ async function handleSmartCreate(request: Request, timing: ReturnType<typeof cre
           console.error("[handheld smart-create] 读取市集上架结果失败", storefrontError);
         } else if (storefrontListing) {
           storefrontListingId = storefrontListing.id;
-          storefrontStatus = storefrontListing.status === "published" ? "published" : "sold";
+          storefrontStatus =
+            storefrontListing.status === "published"
+              ? "published"
+              : (storefrontListing as { readiness_hold?: boolean }).readiness_hold
+                ? "processing"
+                : "sold";
         }
 
         const { data: finalSku, error: finalSkuError } = await supabaseAdmin
