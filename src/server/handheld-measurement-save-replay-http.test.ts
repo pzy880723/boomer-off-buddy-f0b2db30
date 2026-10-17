@@ -7,7 +7,9 @@
  */
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
+import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { test, beforeEach } from "node:test";
 
 const require = createRequire(import.meta.url);
@@ -99,7 +101,11 @@ function loadHandler() {
         },
       ],
     });
-    const mod = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString("base64")}`);
+    const dir = path.resolve("node_modules/.cache/measurement-http-test");
+    mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, `save-route-${process.pid}.mjs`);
+    writeFileSync(file, bundle.outputFiles[0].text);
+    const mod = await import(pathToFileURL(file).href);
     return (mod.Route.options ?? mod.Route).server.handlers.POST;
   })();
   return handlerPromise;
