@@ -31,7 +31,7 @@ const admin = {
   from: (t: string) => chain(t),
   rpc: async (name: string, args: Record<string, unknown>) => {
     state.rpcs.push({ name, args });
-    if (name === "handheld_smart_create_commit") return state.commit();
+    if (name === "handheld_smart_create_commit_v2") return state.commit();
     if (name === "handheld_release_outbox_claim")
       return { data: [{ id: "o1", sku_id: "s1", shop_id: "shop", location_id: "loc", claim_token: "t", attempts: 1 }], error: null };
     if (name === "handheld_release_outbox_finish") {
@@ -109,7 +109,7 @@ test("first submit commits atomically, queues Youzan release and returns without
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.equal(body.data.youzan_sync_status, "queued");
-  const commit = state.rpcs.find((r) => r.name === "handheld_smart_create_commit")!;
+  const commit = state.rpcs.find((r) => r.name === "handheld_smart_create_commit_v2")!;
   assert.equal(commit.args.p_release_shop_id, "shop");
   assert.equal(commit.args.p_user_id, "u1");
   assert.equal(commit.args.p_location_id, "loc");
@@ -175,42 +175,57 @@ test("temporary database read failure retries rather than permanently cancelling
 const withImage = (extra: object = {}) => ({ client_op_id: "c2", category: "toy", name: "屋", price_tier: 159,
   image_storage_paths: [{ bucket: "sku-raw", storage_path: "2026-10-09/dev/a.jpg" }], ...extra });
 
-test("ai_processing_allowed=false saves product and original image but never queues AI", async () => {
+const commitArgs = () => state.rpcs.find((r) => r.name === "handheld_smart_create_commit_v2")!.args;
+const noPostCommitSettle = () =>
+  assert.ok(!state.rpcs.some((r) => r.name === "listing_readiness_mark_images_settled"), "no implicit raw settle after commit");
+
+test("ai_processing_allowed=false: explicit decline persisted in the commit tx, never queues AI", async () => {
   (state as any).consent = { "u1:2026-10-09-v1": true };
   const res = await post(withImage({ ai_processing_allowed: false }));
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.equal(body.data.ai_processing, "skipped_by_client");
+  assert.equal(commitArgs().p_image_plan, "raw_declined");
   assert.equal((state as any).enqueued.length, 0);
-  assert.ok(state.rpcs.some((r) => r.name === "handheld_smart_create_commit"));
+  noPostCommitSettle();
 });
 
-test("ai_processing_allowed=true still requires DB consent; missing consent saves without AI", async () => {
+test("missing consent row is NOT a refusal: plan stays pending_consent for the worker sweep", async () => {
   const res = await post(withImage({ ai_processing_allowed: true }));
   assert.equal(res.status, 200);
   assert.equal((await res.json()).data.ai_processing, "consent_required");
+  assert.equal(commitArgs().p_image_plan, "pending_consent");
+  assert.equal(commitArgs().p_user_id, "u1");
   assert.equal((state as any).enqueued.length, 0);
+  noPostCommitSettle();
 });
 
-test("old client without the flag and without consent is NOT treated as consent", async () => {
+test("stored explicit refusal (allowed=false) uses original photos", async () => {
+  (state as any).consent = { "u1:2026-10-09-v1": false };
   const res = await post(withImage());
   assert.equal((await res.json()).data.ai_processing, "consent_required");
-  assert.equal((state as any).enqueued.length, 0);
+  assert.equal(commitArgs().p_image_plan, "raw_declined");
 });
 
-test("consent read failure saves product, skips AI and reports unavailable (no fake success)", async () => {
+test("consent read failure: pending_consent, reports unavailable (no fake success, no raw release)", async () => {
   (state as any).consentThrows = true;
   const res = await post(withImage({ ai_processing_allowed: true }));
   assert.equal(res.status, 200);
   assert.equal((await res.json()).data.ai_processing, "consent_unavailable");
-  assert.equal((state as any).enqueued.length, 0);
+  assert.equal(commitArgs().p_image_plan, "pending_consent");
+  noPostCommitSettle();
 });
 
-test("with consent the queue carries the session actor and policy version", async () => {
+test("with consent the commit tx carries the session actor and policy; no post-commit enqueue", async () => {
   (state as any).consent = { "u1:2026-10-09-v1": true };
+  state.commit = () => ({ data: { op_id: "op", replayed: false, op_status: "committed", sku_id: "s1", sku_code: "S", epc: "E",
+    bound_epcs: 0, stock_qty: 1, response: null, image_plan: "ai", image_jobs_open: 1 } });
   const res = await post(withImage({ ai_processing_allowed: true }));
-  assert.equal((await res.json()).data.ai_processing, "allowed");
-  assert.equal((state as any).enqueued.length, 1);
-  assert.equal((state as any).enqueued[0].aiActorUserId, "u1");
-  assert.equal((state as any).enqueued[0].aiPolicyVersion, "2026-10-09-v1");
+  const body = await res.json();
+  assert.equal(body.data.ai_processing, "allowed");
+  assert.equal(body.data.image_processing.queued, 1);
+  assert.equal(commitArgs().p_image_plan, "ai");
+  assert.equal(commitArgs().p_user_id, "u1");
+  assert.equal(commitArgs().p_ai_policy, "2026-10-09-v1");
+  assert.equal((state as any).enqueued.length, 0);
 });
