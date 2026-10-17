@@ -2,15 +2,16 @@
 -- handheld_apply_listing_image_result 为真实函数体原样拷贝；refresh_status 仅保留锁序（不影响门禁）。
 CREATE SCHEMA IF NOT EXISTS storage;
 CREATE TABLE IF NOT EXISTS storage.objects (bucket_id text, name text);
-CREATE UNIQUE INDEX inv_listing_image_jobs_sku_id_source_bucket_source_path_key
-  ON public.inv_listing_image_jobs (sku_id, source_bucket, source_path);
 CREATE TABLE public.inv_product_content_image_jobs (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, sku_id uuid NOT NULL,
   block_id text NOT NULL, source_path text NOT NULL CHECK (source_path LIKE 'sku-raw/%'), target_path text,
   status text DEFAULT 'queued' NOT NULL CHECK (status IN ('queued','processing','retryable_failed','permanent_failed','succeeded','cancelled')),
   attempts integer DEFAULT 0 NOT NULL, claim_token uuid, lease_until timestamptz, next_run_at timestamptz DEFAULT now() NOT NULL,
   last_error text, created_at timestamptz DEFAULT now() NOT NULL, updated_at timestamptz DEFAULT now() NOT NULL,
-  ai_actor_user_id uuid, ai_policy_version text);
-CREATE TABLE public.inv_sku_facets (sku_id uuid NOT NULL, facet_id uuid NOT NULL, PRIMARY KEY (sku_id, facet_id));
+  ai_actor_user_id uuid, ai_policy_version text, UNIQUE (sku_id, block_id, source_path));
+CREATE TABLE public.inv_sku_facets (sku_id uuid NOT NULL, facet_id uuid NOT NULL,
+  confidence numeric CHECK (confidence IS NULL OR (confidence >= 0 AND confidence <= 1)),
+  source text DEFAULT 'manual' NOT NULL CHECK (source = ANY (ARRAY['manual','ai','migration','import'])),
+  created_by uuid, created_at timestamptz DEFAULT now() NOT NULL, PRIMARY KEY (sku_id, facet_id));
 CREATE FUNCTION public.handheld_listing_image_refresh_status(p_sku_id uuid) RETURNS void LANGUAGE plpgsql AS $$
 BEGIN PERFORM 1 FROM public.inv_skus WHERE id = p_sku_id FOR UPDATE; END $$;
 CREATE FUNCTION public.handheld_apply_listing_image_result(p_sku_id uuid, p_source_key text, p_target_key text)

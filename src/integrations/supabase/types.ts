@@ -11307,6 +11307,7 @@ export type Database = {
         }
         Returns: Json
       }
+      content_system_actor: { Args: never; Returns: string }
       custom_print_card_claim: {
         Args: { p_lease_seconds?: number; p_limit: number }
         Returns: {
