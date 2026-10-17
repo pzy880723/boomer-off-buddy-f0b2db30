@@ -19,7 +19,7 @@ const state: {
 
 function chain(table: string) {
   const q: any = {
-    select: () => q, eq: () => q, update: () => q, insert: () => q, upsert: () => q,
+    select: () => q, eq: () => q, update: (v: any) => { ((state as any).updates ??= []).push({ table, v }); return q; }, insert: () => q, upsert: () => q,
     maybeSingle: async () => state.failedTable === table
       ? { data: null, error: { message: "database unavailable" } }
       : { data: state.tables[table] ?? null, error: null },
@@ -96,7 +96,7 @@ const { runHandheldReleaseWorker } = await load("src/server/handheld-release-out
 beforeEach(() => {
   state.legacy = null; state.failedTable = null;
   state.rpcs = []; state.finish = []; state.releaseCalls = 0;
-  (state as any).enqueued = []; (state as any).consent = {}; (state as any).consentThrows = false;
+  (state as any).updates = []; (state as any).enqueued = []; (state as any).consent = {}; (state as any).consentThrows = false;
   state.tables = { inv_locations: { id: "loc", name: "新天地", kind: "shop", shop_id: "shop", is_active: true }, inv_skus: { status: "active", image_paths: [], barcode: "200" }, inv_stocks: { qty: 1 } };
   state.commit = () => ({ data: { op_id: "op", replayed: false, op_status: "committed", sku_id: "s1", sku_code: "S", epc: "E", bound_epcs: 0, stock_qty: 1, response: null } });
   state.release = async () => ({ ok: true });
@@ -228,4 +228,29 @@ test("with consent the commit tx carries the session actor and policy; no post-c
   assert.equal(commitArgs().p_user_id, "u1");
   assert.equal(commitArgs().p_ai_policy, "2026-10-09-v1");
   assert.equal((state as any).enqueued.length, 0);
+});
+
+// ---- post-commit photo merge (0082 route fix) ----
+const skuImageWrites = () => (state as any).updates.filter((u: any) => u.table === "inv_skus" && "image_paths" in u.v);
+
+test("new custom SKU: worker already replaced raw → post-commit never re-adds input raw", async () => {
+  state.tables.inv_skus = { status: "active", image_paths: ["sku-listing/gallery/s1/done.png"], barcode: "200" };
+  const res = await post(withImage({ is_custom_price: true }));
+  assert.equal(res.status, 200);
+  assert.equal(skuImageWrites().length, 0);
+  assert.equal(commitArgs().p_reuse, false);
+});
+
+test("new custom SKU with recognition: attribute update still omits image_paths", async () => {
+  state.tables.inv_skus = { status: "active", image_paths: ["sku-listing/gallery/s1/done.png"], barcode: "200" };
+  await post(withImage({ is_custom_price: true, recognition_request_id: "11111111-1111-4111-8111-111111111111" }));
+  assert.equal(skuImageWrites().length, 0);
+});
+
+test("standard reuse keeps appending new photos to the existing SKU", async () => {
+  state.tables.inv_skus = { status: "active", image_paths: ["sku-listing/old.png"], barcode: "200" };
+  await post(withImage({ is_custom_price: false }));
+  const w = skuImageWrites();
+  assert.equal(w.length, 1);
+  assert.deepEqual(w[0].v.image_paths, ["sku-listing/old.png", "sku-raw/2026-10-09/dev/a.jpg"]);
 });
