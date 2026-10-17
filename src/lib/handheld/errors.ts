@@ -20,6 +20,8 @@ export const HANDHELD_ERROR_CODES = {
   already_exists: { status: 409, message: "Resource already exists / conflict" },
   revision_conflict: { status: 409, message: "Resource was updated by someone else, refresh and retry" },
   op_conflict: { status: 409, message: "client_op_id reused with different content" },
+  image_conflict: { status: 409, message: "A different image is already registered for this revision" },
+  payload_too_large: { status: 413, message: "Request body too large" },
   transfer_required: { status: 409, message: "EPC is in another location, transfer required" },
   rate_limited: { status: 429, message: "AI gateway rate limited" },
   ai_credits_exhausted: { status: 402, message: "AI credits exhausted" },

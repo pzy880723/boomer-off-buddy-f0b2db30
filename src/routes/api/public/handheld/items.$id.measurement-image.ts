@@ -8,13 +8,19 @@ import {
   resolveSessionUser,
 } from "@/server/handheld-auth.server";
 import { errCode } from "@/lib/handheld/errors";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { loadMeasurementSku } from "@/server/product-measurement-production.server";
+import {
+  loadMeasurementSku,
+  registerMeasurementAssetProduction,
+  uploadMeasurementDerivativeProduction,
+} from "@/server/product-measurement-production.server";
 import { loadMeasurementActor } from "@/lib/measurement.functions";
 import { actorCanAccessLocation } from "@/server/product-measurement.server";
 import {
-  MEASUREMENT_IMAGE_MAX_BYTES,
+  MEASUREMENT_REQUEST_MAX_BYTES,
+  MEASUREMENT_BASE64_MAX_LEN,
+  decodeStrictBase64,
   deriveMeasurementPngs,
+  readJsonBodyLimited,
   validateMeasurementImage,
 } from "@/server/measurement-image.server";
 
@@ -23,18 +29,29 @@ const postBody = z
     location_id: z.string().uuid(),
     revision: z.number().int().min(1),
     client_op_id: z.string().min(8).max(128),
-    image_png_base64: z.string().min(16),
+    image_png_base64: z.string().min(16).max(MEASUREMENT_BASE64_MAX_LEN),
     verified_front: z.literal(true),
   })
   .strict();
 
+const IMAGE_ERRORS: Record<string, string> = {
+  not_png: "Image must be PNG",
+  too_large: "Image too large (max 5MB)",
+  too_big_dimensions: "Image exceeds 2000px",
+  no_alpha: "Image must have real transparent background",
+  empty_foreground: "No foreground detected",
+  ratio_mismatch: "Image aspect ratio does not match measured size, retake photo",
+  missing_measurement: "Measured height and width required before upload",
+};
+
 /**
  * POST /api/public/handheld/items/{id}/measurement-image
  * 上传商品尺寸素材透明 PNG（客户端 U2NET 抠图 + 人工确认正视图）。
- * 服务端重新校验：PNG ≤5MB ≤2000px、真实 alpha、trim bbox 高宽比与实测比误差 ≤3%、
- * 实测 height/width(缺省用 diameter) 齐全、revision CAS、当前库位鉴权。
- * 通过才生成 640/1280 受控衍生（contenthash 命名，重复同内容幂等），存独立
- * measurements/ 前缀，不改原主图。文字尺寸保存不依赖本接口。
+ * 请求体总上限 7MB（流式计数），base64 严格校验，PNG ≤5MB ≤2000px；
+ * 服务端重新校验真实 alpha、trim bbox 高宽比与实测比误差 ≤3%。
+ * 通过才生成 640/1280 受控衍生（contenthash 命名），存独立 measurements/ 前缀，不改原主图。
+ * ready 只由 measurement_asset_register RPC 在 sku 行锁内登记（复核当前 location/revision/
+ * 实测宽高/actor 权限 + op 指纹）；HTTP 成功只基于登记返回结果。错误只回受控 code。
  */
 export const Route = createFileRoute("/api/public/handheld/items/$id/measurement-image")({
   server: {
@@ -46,25 +63,33 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/measurement
         const session = await resolveSessionUser(request);
         if (!session) return errCode("unauthorized", "Sign in required");
 
-        let body: z.infer<typeof postBody>;
+        const raw = await readJsonBodyLimited(request, MEASUREMENT_REQUEST_MAX_BYTES);
+        if (!raw.ok) {
+          return raw.error === "too_large"
+            ? errCode("payload_too_large", "Request body exceeds 7MB")
+            : errCode("invalid_body", "Invalid body");
+        }
+        const parsed = postBody.safeParse(raw.value);
+        if (!parsed.success) return errCode("invalid_body", "Invalid body");
+        const body = parsed.data;
+
+        const png = decodeStrictBase64(body.image_png_base64);
+        if (!png) return errCode("invalid_body", "image_png_base64 must be strict base64");
+
+        let sku;
+        let actor;
         try {
-          body = postBody.parse(await request.json());
-        } catch {
-          return errCode("invalid_body", "Invalid body");
+          sku = await loadMeasurementSku(params.id);
+          if (!sku) return errCode("not_found", "SKU not found");
+          actor = await loadMeasurementActor(session.user_id);
+        } catch (error) {
+          console.error("[measurement-image] load", (error as Error).message);
+          return errCode("internal_error", "Temporarily unavailable");
         }
-
-        const png = Buffer.from(body.image_png_base64, "base64");
-        if (png.length > MEASUREMENT_IMAGE_MAX_BYTES) {
-          return errCode("invalid_body", "Image too large (max 5MB)");
-        }
-
-        const sku = await loadMeasurementSku(params.id);
-        if (!sku) return errCode("not_found", "SKU not found");
-        const actor = await loadMeasurementActor(session.user_id);
         if (!actorCanAccessLocation(actor, body.location_id) || sku.location_id !== body.location_id) {
           return errCode("unauthorized_role", "No access to this location");
         }
-        // 版本 CAS：几何必须绑定当前实测版本，旧版本不可 ready
+        // 预检（快速失败）；最终以登记 RPC 锁内复核为准
         if (sku.measurement_revision !== body.revision || !sku.measured_at) {
           return errCode("revision_conflict", "Measurement revision mismatch, re-measure first");
         }
@@ -75,74 +100,69 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/measurement
           diameter_cm: sku.measurement_diameter_cm,
         });
         if (!validated.ok) {
-          const messages: Record<string, string> = {
-            not_png: "Image must be PNG",
-            too_large: "Image too large (max 5MB)",
-            too_big_dimensions: "Image exceeds 2000px",
-            no_alpha: "Image must have real transparent background",
-            empty_foreground: "No foreground detected",
-            ratio_mismatch: "Image aspect ratio does not match measured size, retake photo",
-            missing_measurement: "Measured height and width required before upload",
-          };
-          return errCode("validation_error", messages[validated.error]);
+          return errCode("validation_error", IMAGE_ERRORS[validated.error], { reason: validated.error });
         }
 
         const v = validated.value;
+        const heightCm = Number(sku.measurement_height_cm);
+        const widthCm = Number(sku.measurement_width_cm ?? sku.measurement_diameter_cm);
         const hash = createHash("sha256").update(v.trimmedPng).digest("hex").slice(0, 16);
         const base = `measurements/${sku.id}/${body.revision}-${hash}`;
         const path640 = `${base}-640.png`;
         const path1280 = `${base}-1280.png`;
 
-        const { png640, png1280 } = await deriveMeasurementPngs(v.trimmedPng);
-        for (const [path, buf] of [
-          [path640, png640],
-          [path1280, png1280],
-        ] as const) {
-          const { error } = await supabaseAdmin.storage
-            .from("sku-listing")
-            .upload(path, buf, { contentType: "image/png", upsert: true });
-          if (error) return errCode("internal_error", `Upload failed: ${error.message}`);
+        try {
+          const { png640, png1280 } = await deriveMeasurementPngs(v.trimmedPng);
+          await uploadMeasurementDerivativeProduction(path640, png640);
+          await uploadMeasurementDerivativeProduction(path1280, png1280);
+        } catch {
+          return errCode("internal_error", "Image storage failed, retry with same client_op_id");
         }
 
-        // 素材落库：CAS（仅当前 revision）+ 受控路径 + 完整几何；同内容重复上传幂等
-        const widthCm = sku.measurement_width_cm ?? sku.measurement_diameter_cm;
-        const { data: existing } = await supabaseAdmin
-          .from("product_measurement_assets" as never)
-          .select("sku_id, revision")
-          .eq("sku_id", sku.id)
-          .eq("revision", body.revision)
-          .maybeSingle();
-        const row = {
-          sku_id: sku.id,
-          revision: body.revision,
-          status: "ready",
-          cutout_preview_path: `sku-listing/${path640}`,
-          bbox: v.bbox,
-          front_width_px: v.frontWidthPx,
-          front_height_px: v.frontHeightPx,
-          px_per_cm: v.pxPerCm,
-          error: null,
-          verified: true,
-          width_cm: widthCm,
-          height_cm: sku.measurement_height_cm,
-          updated_at: new Date().toISOString(),
-        };
-        const { error: assetError } = existing
-          ? await supabaseAdmin
-              .from("product_measurement_assets" as never)
-              .update(row as never)
-              .eq("sku_id", sku.id)
-              .eq("revision", body.revision)
-          : await supabaseAdmin.from("product_measurement_assets" as never).insert(row as never);
-        if (assetError) return errCode("internal_error", assetError.message);
+        let registered;
+        try {
+          registered = await registerMeasurementAssetProduction({
+            skuId: sku.id,
+            actorId: session.user_id,
+            clientOpId: body.client_op_id,
+            locationId: body.location_id,
+            revision: body.revision,
+            heightCm,
+            widthCm,
+            contentHash: hash,
+            previewPath: `sku-listing/${path640}`,
+            bbox: v.bbox,
+            frontWidthPx: v.frontWidthPx,
+            frontHeightPx: v.frontHeightPx,
+            pxPerCm: v.pxPerCm,
+          });
+        } catch (error) {
+          const code = (error as Error).message;
+          switch (code) {
+            case "revision_conflict":
+              return errCode("revision_conflict", "Measurement changed during upload, re-measure and retake");
+            case "location_mismatch":
+            case "unauthorized_role":
+              return errCode("unauthorized_role", "No access to this location");
+            case "op_conflict":
+              return errCode("op_conflict", "client_op_id reused with a different image");
+            case "image_conflict":
+              return errCode("image_conflict", "Another image is already registered for this revision; re-measure to replace");
+            case "not_found":
+              return errCode("not_found", "SKU not found");
+            default:
+              return errCode("internal_error", "Image registration failed, retry with same client_op_id");
+          }
+        }
 
         return ok({
+          replayed: registered.replayed,
           diagram: {
             status: "ready",
-            revision: body.revision,
+            revision: registered.revision,
             verified: true,
-            width_cm: widthCm,
-            height_cm: sku.measurement_height_cm,
+            width_cm: registered.width_cm,
+            height_cm: registered.height_cm,
             cutout_preview_url: `/api/public/media/measurement/${path640}`,
             cutout_1280_url: `/api/public/media/measurement/${path1280}`,
             bbox: v.bbox,
