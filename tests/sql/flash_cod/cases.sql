@@ -9,9 +9,9 @@ INSERT INTO commerce_listings VALUES ('00000000-0000-0000-0000-0000000000b1','00
 INSERT INTO user_roles VALUES ('00000000-0000-0000-0000-0000000000e2','super_admin');
 
 -- 报价夹具：单店 / 跨店
-INSERT INTO quote_fixtures VALUES (md5('[{"listing_id":"00000000-0000-0000-0000-0000000000b1","quantity":1}]'),
+INSERT INTO quote_fixtures VALUES (md5('[{"listing_id":"00000000-0000-0000-0000-0000000000b1","quantity":1}]'::jsonb::text),
   '{"subtotal_fen":5000,"discount_fen":0,"total_fen":5000,"shipping_fee_fen":1200,"coupon":null,"discount_allocations":[],"groups":[{"location_id":"00000000-0000-0000-0000-00000000000a","shipping_fee_fen":1200,"remaining_fen":0}]}');
-INSERT INTO quote_fixtures VALUES (md5('[{"listing_id":"00000000-0000-0000-0000-0000000000b1","quantity":1},{"listing_id":"00000000-0000-0000-0000-0000000000b2","quantity":1}]'),
+INSERT INTO quote_fixtures VALUES (md5('[{"listing_id":"00000000-0000-0000-0000-0000000000b1","quantity":1},{"listing_id":"00000000-0000-0000-0000-0000000000b2","quantity":1}]'::jsonb::text),
   '{"subtotal_fen":9000,"discount_fen":0,"total_fen":9000,"shipping_fee_fen":1200,"coupon":null,"discount_allocations":[],"groups":[{"location_id":"00000000-0000-0000-0000-00000000000a","shipping_fee_fen":1200,"remaining_fen":0},{"location_id":"00000000-0000-0000-0000-00000000000b","shipping_fee_fen":0,"remaining_fen":0}]}');
 
 -- F1 单店闪送报价：version/方式/零运费/cod
