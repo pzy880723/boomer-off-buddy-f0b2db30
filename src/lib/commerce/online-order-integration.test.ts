@@ -30,6 +30,16 @@ test("create order preserves production checkout guards and records an optional 
   }
 });
 
+test("express replay conflicts with pickup and flash, and payment-not-ready copy is neutral", () => {
+  const route = read("routes/api/public/storefront/orders.ts");
+  assert.match(route, /createdMethod === "pickup" \|\| createdMethod === "flash"/);
+  assert.match(route, /fulfillment_method_conflict/);
+  const payCopy = route.match(/支付服务暂不可用，请稍后重试/g) ?? [];
+  assert.equal(payCopy.length, 2);
+  assert.ok(!route.includes("门店自提暂未开放"));
+  assert.ok(!route.includes("同城闪送暂未开放"));
+});
+
 test("mini-program source is only persisted after validated ordinary payment setup", () => {
   const route = read("routes/api/public/storefront/payments.ts");
   assert.ok(route.indexOf("await recordOrderOrigin") > route.indexOf("await startOrdinaryPayment"));
