@@ -1,3 +1,4 @@
+import { FACET_DIMENSION_LABELS } from "@/lib/attribute-labels";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -51,19 +52,7 @@ export const Route = createFileRoute("/product-facets")({
   component: ProductFacetsPage,
 });
 
-const dimensionLabels: Record<FacetDimension, string> = {
-  object_type: "物件形态",
-  function: "功能用途",
-  origin: "产地",
-  material: "材质",
-  era: "年代",
-  craft: "工艺",
-  style: "风格",
-  ip: "IP/作品",
-  character: "角色",
-  series: "系列",
-  release_method: "发行方式",
-};
+const dimensionLabels = FACET_DIMENSION_LABELS as Record<FacetDimension, string>;
 
 function ProductFacetsPage() {
   const queryClient = useQueryClient();

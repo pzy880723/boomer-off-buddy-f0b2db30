@@ -65,9 +65,10 @@ export const Route = createFileRoute("/api/public/storefront/taxonomy")({
         const brands = (
           (brandResult.data ?? []) as unknown as Array<Record<string, unknown>>
         ).filter((row) => applies((row.category_codes as string[] | null) ?? []));
-        const facets = (
-          (facetResult.data ?? []) as unknown as Array<Record<string, unknown>>
-        ).filter((row) => applies((row.category_codes as string[] | null) ?? []));
+        const facets = labelFacets(
+          ((facetResult.data ?? []) as unknown as Array<Record<string, unknown> & { dimension: string }>)
+            .filter((row) => applies((row.category_codes as string[] | null) ?? [])),
+        );
         // 分类/品牌/facet 不含价格、库存、身份，可短时公共缓存（5 分钟）
         return storefrontJson(
           {
