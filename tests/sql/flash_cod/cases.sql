@@ -18,7 +18,7 @@ INSERT INTO quote_fixtures VALUES (md5('[{"listing_id":"00000000-0000-0000-0000-
 SELECT CASE WHEN q->>'version'='flash_cod_v1' AND q->>'fulfillment_method'='flash' AND (q->>'shipping_fee_fen')::int=0
    AND q->>'delivery_fee_payment'='cod' AND (q->>'total_fen')::int=5000
    AND (q->'groups'->0->>'shipping_fee_fen')::int=0
-  THEN 'PASS F1 flash quote single store' ELSE 'FAIL F1 '||q END FROM (
+  THEN 'PASS F1 flash quote single store' ELSE 'FAIL F1 '||q::text END FROM (
   SELECT commerce_quote_checkout_v2('00000000-0000-0000-0000-0000000000c0','[{"listing_id":"00000000-0000-0000-0000-0000000000b1","quantity":1}]',NULL,'flash') q) t;
 
 -- F2 跨店闪送报价被拒绝
