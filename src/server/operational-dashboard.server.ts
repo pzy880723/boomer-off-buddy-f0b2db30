@@ -180,6 +180,11 @@ export async function loadSalesDashboard(
       "refund_pending",
     ]);
   if (!all) afterQuery = afterQuery.in("location_id", locationIds);
+  let measureQuery = db
+    .from("product_measurement_tasks" as never)
+    .select("id", { head: true, count: "exact" })
+    .in("status", ["pending", "claimed"]);
+  if (!all) measureQuery = measureQuery.in("location_id", locationIds);
   async function unreadSupport() {
     try {
       const conversations = await allRows<{ messages: Array<{ sender_type: string }> }>(
@@ -216,7 +221,7 @@ export async function loadSalesDashboard(
     stockQuery = stockQuery.in("shop_id", shopIds);
     outboxQuery = outboxQuery.in("shop_id", shopIds);
   }
-  const [picking, shipping, shortages, afterSales, support, stockFailures, outboxFailures] =
+  const [picking, shipping, shortages, afterSales, support, stockFailures, outboxFailures, measurements] =
     await Promise.all([
       count("待备货", fulfillmentCount(["unallocated", "allocated", "picking"])),
       count("待发货", fulfillmentCount(["picked", "packing", "packed", "handover_ready"])),
@@ -225,6 +230,7 @@ export async function loadSalesDashboard(
       unreadSupport(),
       !all && !shopIds.length ? 0 : count("库存同步失败", stockQuery),
       !all && !shopIds.length ? 0 : count("渠道同步失败", outboxQuery),
+      count("尺寸待办", measureQuery as unknown as PromiseLike<{ count: number | null; error: { message: string } | null }>),
     ]);
   return {
     ...sales,
@@ -238,6 +244,7 @@ export async function loadSalesDashboard(
       { key: "shortages", label: "缺货待确认", count: shortages, href: "/orders/online" },
       { key: "afterSales", label: "待处理售后", count: afterSales, href: "/orders/after-sales" },
       { key: "support", label: "未回复消息", count: support, href: "/customer-service" },
+      { key: "measurements", label: "尺寸待办", count: measurements, href: "/inventory/measurements" },
       {
         key: "sync",
         label: "同步失败任务",

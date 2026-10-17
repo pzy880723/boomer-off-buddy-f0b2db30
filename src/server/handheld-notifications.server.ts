@@ -3,6 +3,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { loadUserRoles } from "@/server/handheld-auth.server";
 import { parseListCursor } from "@/server/handheld-notifications-cursor";
+import { alertFields } from "@/server/handheld-alerts";
 export { parseChangeCursor, parseListCursor } from "@/server/handheld-notifications-cursor";
 
 export type NotificationItem = {
@@ -17,6 +18,11 @@ export type NotificationItem = {
   location_name: string | null;
   ref_type: string | null;
   ref_id: string | null;
+  /** 原生提醒：未读且未处理的 order_paid / measurement_requested 才为 true。 */
+  should_alert: boolean;
+  alert_kind: "order_paid" | "measurement_requested" | null;
+  measurement_task_id: string | null;
+  sku_id: string | null;
 };
 
 export type NotificationScope = {
@@ -126,19 +132,22 @@ async function decorate(rows: RawRow[], scope: NotificationScope): Promise<Notif
   const locationNames = new Map(
     ((locations as { id: string; name: string }[] | null) ?? []).map((row) => [row.id, row.name]),
   );
-  return rows.map((row) => ({
-    id: row.id,
-    kind: row.kind,
-    title: row.title ?? null,
-    payload: row.payload ?? {},
-    ts: row.ts,
-    is_read: readSet.has(row.id),
-    action_status: row.action_status ?? null,
-    location_id: row.location_id ?? null,
-    location_name: row.location_id ? (locationNames.get(row.location_id) ?? null) : null,
-    ref_type: row.ref_type ?? null,
-    ref_id: row.ref_id ?? null,
-  }));
+  return rows.map((row) => {
+    const item = {
+      id: row.id,
+      kind: row.kind,
+      title: row.title ?? null,
+      payload: row.payload ?? {},
+      ts: row.ts,
+      is_read: readSet.has(row.id),
+      action_status: row.action_status ?? null,
+      location_id: row.location_id ?? null,
+      location_name: row.location_id ? (locationNames.get(row.location_id) ?? null) : null,
+      ref_type: row.ref_type ?? null,
+      ref_id: row.ref_id ?? null,
+    };
+    return { ...item, ...alertFields(item) };
+  });
 }
 
 const SELECT =
