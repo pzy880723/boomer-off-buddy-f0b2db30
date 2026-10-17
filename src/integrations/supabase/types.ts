@@ -5091,6 +5091,13 @@ export type Database = {
           is_display: boolean
           keywords: string[]
           kind: string
+          measured_at: string | null
+          measured_by: string | null
+          measurement_depth_cm: number | null
+          measurement_diameter_cm: number | null
+          measurement_height_cm: number | null
+          measurement_revision: number
+          measurement_width_cm: number | null
           name: string
           notes: string | null
           pack_pieces: number | null
@@ -5138,6 +5145,13 @@ export type Database = {
           is_display?: boolean
           keywords?: string[]
           kind?: string
+          measured_at?: string | null
+          measured_by?: string | null
+          measurement_depth_cm?: number | null
+          measurement_diameter_cm?: number | null
+          measurement_height_cm?: number | null
+          measurement_revision?: number
+          measurement_width_cm?: number | null
           name: string
           notes?: string | null
           pack_pieces?: number | null
@@ -5185,6 +5199,13 @@ export type Database = {
           is_display?: boolean
           keywords?: string[]
           kind?: string
+          measured_at?: string | null
+          measured_by?: string | null
+          measurement_depth_cm?: number | null
+          measurement_diameter_cm?: number | null
+          measurement_height_cm?: number | null
+          measurement_revision?: number
+          measurement_width_cm?: number | null
           name?: string
           notes?: string | null
           pack_pieces?: number | null
@@ -7394,6 +7415,159 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "commerce_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_measurement_assets: {
+        Row: {
+          bbox: Json | null
+          created_at: string
+          cutout_preview_path: string | null
+          error: string | null
+          front_height_px: number | null
+          front_width_px: number | null
+          px_per_cm: number | null
+          revision: number
+          sku_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          bbox?: Json | null
+          created_at?: string
+          cutout_preview_path?: string | null
+          error?: string | null
+          front_height_px?: number | null
+          front_width_px?: number | null
+          px_per_cm?: number | null
+          revision: number
+          sku_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          bbox?: Json | null
+          created_at?: string
+          cutout_preview_path?: string | null
+          error?: string | null
+          front_height_px?: number | null
+          front_width_px?: number | null
+          px_per_cm?: number | null
+          revision?: number
+          sku_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_measurement_assets_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_measurement_requesters: {
+        Row: {
+          created_at: string
+          customer_id: string
+          id: string
+          notified_at: string | null
+          task_id: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          id?: string
+          notified_at?: string | null
+          task_id: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          id?: string
+          notified_at?: string | null
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_measurement_requesters_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_measurement_requesters_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "product_measurement_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_measurement_tasks: {
+        Row: {
+          claimed_at: string | null
+          claimed_by: string | null
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          id: string
+          listing_id: string | null
+          location_id: string | null
+          sku_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          claimed_at?: string | null
+          claimed_by?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          listing_id?: string | null
+          location_id?: string | null
+          sku_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          claimed_at?: string | null
+          claimed_by?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          listing_id?: string | null
+          location_id?: string | null
+          sku_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_measurement_tasks_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_measurement_tasks_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_measurement_tasks_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
             referencedColumns: ["id"]
           },
         ]

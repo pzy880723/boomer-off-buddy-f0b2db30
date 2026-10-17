@@ -463,6 +463,13 @@
       "when": 1792041849150,
       "tag": "0065_youzan_points_projection_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1792204115370,
+      "tag": "0066_product_measurements",
+      "breakpoints": true
     }
   ]
 }
