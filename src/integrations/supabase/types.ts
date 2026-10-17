@@ -594,6 +594,7 @@ export type Database = {
           price: number
           product_type: string
           published_at: string | null
+          readiness_hold: boolean
           sku_id: string
           sold_at: string | null
           status: string
@@ -616,6 +617,7 @@ export type Database = {
           price: number
           product_type?: string
           published_at?: string | null
+          readiness_hold?: boolean
           sku_id: string
           sold_at?: string | null
           status?: string
@@ -638,6 +640,7 @@ export type Database = {
           price?: number
           product_type?: string
           published_at?: string | null
+          readiness_hold?: boolean
           sku_id?: string
           sold_at?: string | null
           status?: string
@@ -4602,6 +4605,7 @@ export type Database = {
           locked_at: string | null
           locked_by: string | null
           next_run_at: string
+          readiness_revision: number | null
           sku_id: string
           source_bucket: string
           source_index: number
@@ -4624,6 +4628,7 @@ export type Database = {
           locked_at?: string | null
           locked_by?: string | null
           next_run_at?: string
+          readiness_revision?: number | null
           sku_id: string
           source_bucket: string
           source_index?: number
@@ -4646,6 +4651,7 @@ export type Database = {
           locked_at?: string | null
           locked_by?: string | null
           next_run_at?: string
+          readiness_revision?: number | null
           sku_id?: string
           source_bucket?: string
           source_index?: number
@@ -5874,6 +5880,65 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "meruki_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      listing_readiness: {
+        Row: {
+          content_mode: string | null
+          content_revision: number | null
+          content_sources: Json
+          content_status: string
+          created_at: string
+          image_revision: number | null
+          image_status: string
+          images_settled: boolean
+          input_revision: number
+          last_error: string | null
+          recognition_revision: number | null
+          recognition_status: string
+          sku_id: string
+          updated_at: string
+        }
+        Insert: {
+          content_mode?: string | null
+          content_revision?: number | null
+          content_sources?: Json
+          content_status?: string
+          created_at?: string
+          image_revision?: number | null
+          image_status?: string
+          images_settled?: boolean
+          input_revision?: number
+          last_error?: string | null
+          recognition_revision?: number | null
+          recognition_status?: string
+          sku_id: string
+          updated_at?: string
+        }
+        Update: {
+          content_mode?: string | null
+          content_revision?: number | null
+          content_sources?: Json
+          content_status?: string
+          created_at?: string
+          image_revision?: number | null
+          image_status?: string
+          images_settled?: boolean
+          input_revision?: number
+          last_error?: string | null
+          recognition_revision?: number | null
+          recognition_status?: string
+          sku_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listing_readiness_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: true
+            referencedRelation: "inv_skus"
             referencedColumns: ["id"]
           },
         ]
@@ -11356,6 +11421,7 @@ export type Database = {
           locked_at: string | null
           locked_by: string | null
           next_run_at: string
+          readiness_revision: number | null
           sku_id: string
           source_bucket: string
           source_index: number
@@ -11607,6 +11673,24 @@ export type Database = {
       inv_sku_delete_blocker: { Args: { p_sku_id: string }; Returns: string }
       inv_sku_is_hq_actor: { Args: never; Returns: boolean }
       inventory_delete_unused_sku: { Args: { p_sku_id: string }; Returns: Json }
+      listing_readiness_is_ready: { Args: { p_sku: string }; Returns: boolean }
+      listing_readiness_mark_images_settled: {
+        Args: { p_sku: string }
+        Returns: undefined
+      }
+      listing_readiness_publish_content: {
+        Args: {
+          p_blocks: Json
+          p_mode: string
+          p_revision: number
+          p_sku: string
+          p_sources: Json
+        }
+        Returns: Json
+      }
+      listing_readiness_refresh: { Args: { p_sku: string }; Returns: Json }
+      listing_readiness_release: { Args: { p_sku: string }; Returns: number }
+      listing_readiness_retry: { Args: { p_sku: string }; Returns: Json }
       measurement_asset_register: {
         Args: {
           p_actor_id: string

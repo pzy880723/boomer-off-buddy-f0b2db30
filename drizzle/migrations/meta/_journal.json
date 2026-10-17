@@ -526,6 +526,13 @@
       "when": 1792208766417,
       "tag": "0074_measurement_routing_lock_save_location",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1792214787998,
+      "tag": "0075_listing_readiness_gate",
+      "breakpoints": true
     }
   ]
 }
