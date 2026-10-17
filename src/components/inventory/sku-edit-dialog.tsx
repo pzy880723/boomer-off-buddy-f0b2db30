@@ -14,7 +14,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FankuangSwitch } from "./fankuang-switch";
 import { SkuMetaFields, emptySkuMeta, type SkuMetaState } from "./sku-meta-fields";
+import {
+  MeasurementFields,
+  emptyMeasurementFields,
+  parseMeasurementFields,
+  type MeasurementFieldState,
+} from "./measurement-fields";
 import { updateSku } from "@/lib/inventory.functions";
+import { getMeasurement, saveMeasurement } from "@/lib/measurement.functions";
 import type { SkuRow } from "@/lib/inventory.helpers";
 
 export function SkuEditDialog({
@@ -29,11 +36,17 @@ export function SkuEditDialog({
   onSaved?: () => void;
 }) {
   const fn = useServerFn(updateSku);
+  const getMeasurementFn = useServerFn(getMeasurement);
+  const saveMeasurementFn = useServerFn(saveMeasurement);
   const [meta, setMeta] = useState<SkuMetaState>({
     ...emptySkuMeta,
   });
   const [price, setPrice] = useState("");
   const [fankuang, setFankuang] = useState<boolean | null>(null);
+  const [measurement, setMeasurement] = useState<MeasurementFieldState>({
+    ...emptyMeasurementFields,
+  });
+  const [measurementRevision, setMeasurementRevision] = useState<number | null>(null);
   const fankuangEligible =
     !!sku && sku.is_custom_price && sku.kind === "single" && sku.inventory_policy !== "unlimited";
 
