@@ -22,6 +22,7 @@ import {
   listMeasurementTasksProduction,
   loadMeasurementSku,
   loadSkuStockRows,
+  replaySaveProduction,
   saveMeasurementProduction,
   markMeasurementAssetFailedProduction,
 } from "@/server/product-measurement-production.server";
@@ -126,6 +127,23 @@ export const saveMeasurement = createServerFn({ method: "POST" })
     if (!skuId) throw new Error("缺少商品");
     const sku = await loadMeasurementSku(skuId);
     if (!sku) throw new Error("商品不存在");
+
+    // 已成功 op 回放：只匹配当前 actor + 原 op + 完全一致指纹，命中直接返回原结果、不写库；
+    // 未命中继续全部当前权限/正库存/版本校验
+    let replay;
+    try {
+      replay = await replaySaveProduction({
+        skuId,
+        actorId: actor.userId,
+        clientOpId: data.client_op_id,
+        expectedRevision: data.expected_revision,
+        value: parsed.value,
+      });
+    } catch (error) {
+      if ((error as Error).message === "op_conflict") throw new Error("同一操作编号提交了不同内容，请换新编号");
+      throw new Error("服务暂时不可用，请稍后再试");
+    }
+    if (replay) return replay;
 
     // 门店 = inv_stocks 真实正库存（指定 > 任务所在店 > 员工唯一可编辑有货门店）；RPC 锁内再复核
     const stocks = await loadSkuStockRows(skuId);

@@ -84,10 +84,19 @@ export interface ValidatedMeasurementImage {
  * - alpha>10 扫描得前景 bbox，并按该 bbox extract 素材；
  * - 实测 height 必填，width 缺失时用 diameter 代替；bbox 高宽比与实测比误差 ≤3%。
  */
-export async function validateMeasurementImage(
+export interface MeasurementForeground {
+  bbox: { x: number; y: number; w: number; h: number };
+  /** 按 alpha bbox extract 的透明 PNG（像素尺寸 = bbox.w×bbox.h），确定性输出，用于 contenthash */
+  trimmedPng: Buffer;
+}
+
+/**
+ * 与实测尺寸无关的前景提取：PNG/尺寸/真实 alpha 校验 + alpha>10 扫描 bbox + 同 bbox extract。
+ * 用于已成功 op 回放（计算 contenthash）与正常校验共用，保证两条路径像素一致。
+ */
+export async function extractMeasurementForeground(
   png: Buffer,
-  measured: { height_cm: number | null; width_cm: number | null; diameter_cm: number | null },
-): Promise<{ ok: true; value: ValidatedMeasurementImage } | { ok: false; error: MeasurementImageError }> {
+): Promise<{ ok: true; value: MeasurementForeground } | { ok: false; error: MeasurementImageError }> {
   if (png.length > MEASUREMENT_IMAGE_MAX_BYTES) return { ok: false, error: "too_large" };
 
   let meta: import("sharp").Metadata;
@@ -108,12 +117,6 @@ export async function validateMeasurementImage(
   const alpha = stats.channels[3];
   if (!alpha || alpha.min > 32) return { ok: false, error: "no_alpha" };
 
-  const measuredHeight = measured.height_cm;
-  const measuredWidth = measured.width_cm ?? measured.diameter_cm;
-  if (measuredHeight == null || measuredWidth == null) {
-    return { ok: false, error: "missing_measurement" };
-  }
-
   // bbox 只由 alpha>10 扫描得出；素材按同一 bbox extract，不做独立颜色 trim
   const { data, info } = await sharp(png)
     .ensureAlpha()
@@ -133,13 +136,29 @@ export async function validateMeasurementImage(
   }
   if (maxX < 0) return { ok: false, error: "empty_foreground" };
   const bbox = { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
+  const trimmedPng = await sharp(png)
+    .extract({ left: bbox.x, top: bbox.y, width: bbox.w, height: bbox.h })
+    .png()
+    .toBuffer();
+  return { ok: true, value: { bbox, trimmedPng } };
+}
 
+/** 前景 bbox 与实测比校验（≤3%），实测 height 必填，width 缺失用 diameter */
+export function checkMeasurementRatio(
+  fg: MeasurementForeground,
+  measured: { height_cm: number | null; width_cm: number | null; diameter_cm: number | null },
+): { ok: true; value: ValidatedMeasurementImage } | { ok: false; error: MeasurementImageError } {
+  const measuredHeight = measured.height_cm;
+  const measuredWidth = measured.width_cm ?? measured.diameter_cm;
+  if (measuredHeight == null || measuredWidth == null) {
+    return { ok: false, error: "missing_measurement" };
+  }
+  const { bbox } = fg;
   const imageRatio = bbox.h / bbox.w;
   const measuredRatio = measuredHeight / measuredWidth;
   if (Math.abs(imageRatio - measuredRatio) / measuredRatio > MEASUREMENT_RATIO_TOLERANCE) {
     return { ok: false, error: "ratio_mismatch" };
   }
-
   return {
     ok: true,
     value: {
@@ -147,12 +166,22 @@ export async function validateMeasurementImage(
       frontWidthPx: bbox.w,
       frontHeightPx: bbox.h,
       pxPerCm: Math.round((bbox.h / measuredHeight) * 1000) / 1000,
-      trimmedPng: await sharp(png)
-        .extract({ left: bbox.x, top: bbox.y, width: bbox.w, height: bbox.h })
-        .png()
-        .toBuffer(),
+      trimmedPng: fg.trimmedPng,
     },
   };
+}
+
+/**
+ * 完整校验 = extractMeasurementForeground + checkMeasurementRatio。
+ * 缺实测时先报 missing_measurement（不必扫描像素）。
+ */
+export async function validateMeasurementImage(
+  png: Buffer,
+  measured: { height_cm: number | null; width_cm: number | null; diameter_cm: number | null },
+): Promise<{ ok: true; value: ValidatedMeasurementImage } | { ok: false; error: MeasurementImageError }> {
+  const fg = await extractMeasurementForeground(png);
+  if (!fg.ok) return fg;
+  return checkMeasurementRatio(fg.value, measured);
 }
 
 /** 生成受控透明 PNG 衍生（640/1280 宽，不放大、不拉伸） */

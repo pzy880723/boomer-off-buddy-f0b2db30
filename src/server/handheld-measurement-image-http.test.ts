@@ -36,6 +36,9 @@ type State = {
   uploadFail: boolean;
   registerCalls: any[];
   register: (args: any) => any;
+  /** 已完成 mutation（模拟 measurement_mutations：actor+op 唯一，指纹 sku/revision/location/hash） */
+  mutations: Map<string, { fp: string; result: any; asset: any }>;
+  sessionUser: string;
 };
 const state: State = {} as State;
 (globalThis as any).__mi = state;
@@ -54,6 +57,8 @@ beforeEach(() => {
   state.uploads = [];
   state.uploadFail = false;
   state.registerCalls = [];
+  state.mutations = new Map();
+  state.sessionUser = "staff";
   state.register = (a) => ({
     status: "ready",
     revision: a.revision,
@@ -71,7 +76,7 @@ const stubs: Record<string, string> = {
     export const json = (body, init) => Response.json(body, init);
     export const ok = (data) => Response.json({ ok: true, data });
     export const authenticateDevice = async () => ({ ok: true, device: { id: "dev" } });
-    export const resolveSessionUser = async () => ({ user_id: "staff" });`,
+    export const resolveSessionUser = async () => ({ user_id: globalThis.__mi.sessionUser });`,
   "@/server/product-measurement-production.server": `
     export const loadMeasurementSku = async () => globalThis.__mi.sku;
     export const loadSkuStockRows = async () => globalThis.__mi.stocks;
@@ -81,7 +86,17 @@ const stubs: Record<string, string> = {
     };
     export const registerMeasurementAssetProduction = async (a) => {
       globalThis.__mi.registerCalls.push(a);
-      return globalThis.__mi.register(a);
+      const r = globalThis.__mi.register(a);
+      globalThis.__mi.mutations.set(a.actorId + "|" + a.clientOpId, {
+        fp: [a.skuId, a.revision, a.locationId, a.contentHash].join("|"), result: r,
+        asset: { bbox: a.bbox, front_width_px: a.frontWidthPx, front_height_px: a.frontHeightPx, px_per_cm: a.pxPerCm } });
+      return r;
+    };
+    export const replayAssetProduction = async (a) => {
+      const m = globalThis.__mi.mutations.get(a.actorId + "|" + a.clientOpId);
+      if (!m) return null;
+      if (m.fp !== [a.skuId, a.revision, a.locationId, a.contentHash].join("|")) throw new Error("op_conflict");
+      return { ...m.result, ...m.asset, replayed: true };
     };`,
   "@/server/measurement-actor.server": "export const loadMeasurementActor = async () => globalThis.__mi.actor;",
 };
@@ -309,5 +324,57 @@ test("非严格 base64：400，不上传不登记", async () => {
     const r = await post(body(png, { image_png_base64: bad }));
     assert.equal(r.status, 400, `rejected: ${bad.slice(0, 10)}`);
   }
+  assertNoWrites();
+});
+
+
+test("已成功上传→丢响应→售出/调拨/版本变化：原 body 重试 200 replayed，0 新上传/登记", async () => {
+  const png = await transparentPng(100, 200);
+  const first = await post(body(png));
+  assert.equal(first.status, 200);
+  state.uploads = [];
+  state.registerCalls = [];
+  // 售出调拨到 B，且实测版本被他人改为 4、尺寸改变
+  state.stocks = [{ location_id: LOC_A, qty: 0 }, { location_id: LOC_B, qty: 1 }];
+  state.sku = { ...state.sku!, measurement_revision: 4, measurement_height_cm: 30 };
+  const again = await post(body(png));
+  assert.equal(again.status, 200);
+  assert.equal(again.json.data.replayed, true);
+  assert.equal(again.json.data.diagram.revision, 3);
+  assert.equal(again.json.data.diagram.cutout_preview_url, first.json.data.diagram.cutout_preview_url);
+  assert.equal(again.json.data.diagram.cutout_1280_url, first.json.data.diagram.cutout_1280_url);
+  assert.deepEqual(again.json.data.diagram.bbox, first.json.data.diagram.bbox);
+  assertNoWrites();
+});
+
+test("同 op 异图：409 op_conflict，不上传不登记", async () => {
+  assert.equal((await post(body(await transparentPng(100, 200)))).status, 200);
+  state.uploads = [];
+  state.registerCalls = [];
+  const r = await post(body(await transparentPng(101, 202)));
+  assert.equal(r.status, 409);
+  assert.equal(r.json.code, "op_conflict");
+  assertNoWrites();
+});
+
+test("异 actor 用他人 op 重放：不知原结果，走当前校验（调店后 403）", async () => {
+  const png = await transparentPng(100, 200);
+  assert.equal((await post(body(png))).status, 200);
+  state.uploads = [];
+  state.registerCalls = [];
+  state.stocks = [{ location_id: LOC_A, qty: 0 }, { location_id: LOC_B, qty: 1 }];
+  state.sessionUser = "other";
+  state.actor = { userId: "other", roles: ["store_staff"], locationIds: [LOC_A] };
+  const r = await post(body(png));
+  assert.equal(r.status, 403);
+  assert.equal(r.json.data, undefined);
+  assertNoWrites();
+});
+
+test("无成功记录的旧请求：版本变化后不能伪装成功（409 revision_conflict）", async () => {
+  state.sku = { ...state.sku!, measurement_revision: 4 };
+  const r = await post(body(await transparentPng(100, 200)));
+  assert.equal(r.status, 409);
+  assert.equal(r.json.code, "revision_conflict");
   assertNoWrites();
 });

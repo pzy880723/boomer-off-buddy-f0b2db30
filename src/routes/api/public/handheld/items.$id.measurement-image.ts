@@ -12,6 +12,7 @@ import {
   loadMeasurementSku,
   loadSkuStockRows,
   registerMeasurementAssetProduction,
+  replayAssetProduction,
   uploadMeasurementDerivativeProduction,
 } from "@/server/product-measurement-production.server";
 import { loadMeasurementActor } from "@/server/measurement-actor.server";
@@ -21,8 +22,9 @@ import {
   MEASUREMENT_BASE64_MAX_LEN,
   decodeStrictBase64,
   deriveMeasurementPngs,
+  checkMeasurementRatio,
+  extractMeasurementForeground,
   readJsonBodyLimited,
-  validateMeasurementImage,
 } from "@/server/measurement-image.server";
 
 const postBody = z
@@ -78,13 +80,61 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/measurement
         if (!png) return errCode("invalid_body", "image_png_base64 must be strict base64");
 
         let sku;
-        let actor;
         try {
           sku = await loadMeasurementSku(params.id);
-          if (!sku) return errCode("not_found", "SKU not found");
-          actor = await loadMeasurementActor(session.user_id);
         } catch (error) {
           console.error("[measurement-image] load", (error as Error).message);
+          return errCode("internal_error", "Temporarily unavailable");
+        }
+        if (!sku) return errCode("not_found", "SKU not found");
+
+        // 与实测无关的前景提取（确定性），先算 contenthash 以便识别已成功的原请求
+        const fg = await extractMeasurementForeground(png);
+        if (!fg.ok) return errCode("validation_error", IMAGE_ERRORS[fg.error], { reason: fg.error });
+        const hash = createHash("sha256").update(fg.value.trimmedPng).digest("hex").slice(0, 16);
+
+        // 已成功 op 回放：只匹配当前 actor + 原 client_op_id + 完全一致指纹（sku/revision/location/contenthash）；
+        // 命中直接返回原结果，不上传、不登记、不改版本；未命中继续下方全部当前校验
+        try {
+          const replay = await replayAssetProduction({
+            skuId: sku.id,
+            actorId: session.user_id,
+            clientOpId: body.client_op_id,
+            locationId: body.location_id,
+            revision: body.revision,
+            contentHash: hash,
+          });
+          if (replay) {
+            const p640 = replay.cutout_preview_path.replace(/^sku-listing\//, "");
+            return ok({
+              replayed: true,
+              diagram: {
+                status: "ready",
+                revision: replay.revision,
+                verified: true,
+                width_cm: replay.width_cm,
+                height_cm: replay.height_cm,
+                cutout_preview_url: `/api/public/media/measurement/${p640}`,
+                cutout_1280_url: `/api/public/media/measurement/${p640.replace(/-640\.png$/, "-1280.png")}`,
+                bbox: replay.bbox,
+                front_width_px: replay.front_width_px,
+                front_height_px: replay.front_height_px,
+                px_per_cm: replay.px_per_cm,
+              },
+            });
+          }
+        } catch (error) {
+          if ((error as Error).message === "op_conflict") {
+            return errCode("op_conflict", "client_op_id reused with a different image");
+          }
+          return errCode("internal_error", "Temporarily unavailable");
+        }
+
+        let actor;
+        try {
+          actor = await loadMeasurementActor(session.user_id);
+        } catch (error) {
+          console.error("[measurement-image] actor", (error as Error).message);
           return errCode("internal_error", "Temporarily unavailable");
         }
         // 门店归属以 inv_stocks 为准：只有该店确有正库存才能上传（HQ 也不例外）；登记 RPC 锁内重读
@@ -103,7 +153,7 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/measurement
           return errCode("revision_conflict", "Measurement revision mismatch, re-measure first");
         }
 
-        const validated = await validateMeasurementImage(png, {
+        const validated = checkMeasurementRatio(fg.value, {
           height_cm: sku.measurement_height_cm,
           width_cm: sku.measurement_width_cm,
           diameter_cm: sku.measurement_diameter_cm,
@@ -115,7 +165,6 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/measurement
         const v = validated.value;
         const heightCm = Number(sku.measurement_height_cm);
         const widthCm = Number(sku.measurement_width_cm ?? sku.measurement_diameter_cm);
-        const hash = createHash("sha256").update(v.trimmedPng).digest("hex").slice(0, 16);
         const base = `measurements/${sku.id}/${body.revision}-${hash}`;
         const path640 = `${base}-640.png`;
         const path1280 = `${base}-1280.png`;

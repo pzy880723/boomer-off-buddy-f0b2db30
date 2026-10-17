@@ -246,3 +246,36 @@ DO $$ DECLARE t uuid; BEGIN
   ASSERT NOT has_function_privilege('authenticated','public.measurement_claim(uuid,uuid)','EXECUTE'), 'claim service only';
   RAISE NOTICE 'PASS claim no-stock/NULL store not bypassable by HQ';
 END $$;
+
+-- 15 成功 op 回放：保存/图片登记成功后售出/调拨/版本变化，同 actor 同指纹只读回放原结果、0 新写；异指纹 op_conflict；异 actor NULL
+DO $$ DECLARE r jsonb; p text; n0 int; BEGIN
+  PERFORM test_mk(15,'a','a=1,b=0');
+  r := measurement_save(s(15), null, st('1'), 'op-rpl-00001', 0, loc('a'), 20, 10, null, null);
+  ASSERT (r->>'revision')::int = 1, 'saved';
+  p := 'sku-listing/measurements/' || s(15)::text || '/1-00000000000000cc-640.png';
+  r := measurement_asset_register(s(15), st('1'), 'op-rpl-img01', loc('a'), 1, 20, 10, '00000000000000cc', p, '{"x":1,"y":2,"w":3,"h":6}', 3, 6, 0.3);
+  ASSERT r->>'status' = 'ready', 'registered';
+  -- 售出调拨 + 他人新版本
+  UPDATE inv_stocks SET qty=0 WHERE sku_id=s(15) AND location_id=loc('a');
+  UPDATE inv_stocks SET qty=1 WHERE sku_id=s(15) AND location_id=loc('b');
+  PERFORM measurement_save(s(15), null, st('2'), 'op-rpl-00002', 1, loc('b'), 30, 10, null, null);
+  SELECT count(*) INTO n0 FROM measurement_mutations;
+  r := measurement_save_replay(s(15), st('1'), 'op-rpl-00001', 0, 20, 10, null, null);
+  ASSERT (r->>'replayed')::boolean AND (r->>'revision')::int = 1, 'save replay returns original';
+  r := measurement_asset_replay(s(15), st('1'), 'op-rpl-img01', loc('a'), 1, '00000000000000cc');
+  ASSERT (r->>'replayed')::boolean AND r->>'cutout_preview_path' = p AND (r->>'front_height_px')::int = 6, 'asset replay returns original';
+  -- 锁内回放顺序：权限已撤销（A 无库存）仍回放原结果，不重写
+  r := measurement_asset_register(s(15), st('1'), 'op-rpl-img01', loc('a'), 1, 20, 10, '00000000000000cc', p, '{"x":1,"y":2,"w":3,"h":6}', 3, 6, 0.3);
+  ASSERT (r->>'replayed')::boolean, 'register replays before stock/revision checks';
+  ASSERT (SELECT count(*) FROM measurement_mutations) = n0, 'replay writes nothing';
+  ASSERT (SELECT measurement_revision FROM inv_skus WHERE id=s(15)) = 2, 'revision unchanged by replay';
+  PERFORM test_expect_err(format('select measurement_save_replay(%L,%L,%L,0,21,10,null,null)', s(15), st('1'), 'op-rpl-00001'), 'op_conflict');
+  PERFORM test_expect_err(format('select measurement_asset_replay(%L,%L,%L,%L,1,%L)', s(15), st('1'), 'op-rpl-img01', loc('a'), '00000000000000dd'), 'op_conflict');
+  PERFORM test_expect_err(format('select measurement_save_replay(%L,%L,%L,0,20,10,null,null)', s(14), st('1'), 'op-rpl-00001'), 'op_conflict');
+  ASSERT measurement_save_replay(s(15), st('9'), 'op-rpl-00001', 0, 20, 10, null, null) IS NULL, 'other actor learns nothing';
+  ASSERT measurement_asset_replay(s(15), st('9'), 'op-rpl-img01', loc('a'), 1, '00000000000000cc') IS NULL, 'other actor asset NULL';
+  -- 无记录旧请求不能伪装成功：新 op 走全部当前校验
+  PERFORM test_expect_err(format('select measurement_save(%L,null,%L,%L,0,%L,20,10,null,null)', s(15), st('1'), 'op-rpl-00003', loc('a')), 'location_mismatch');
+  ASSERT NOT has_function_privilege('authenticated','public.measurement_save_replay(uuid,uuid,text,integer,numeric,numeric,numeric,numeric)','EXECUTE'), 'replay service only';
+  RAISE NOTICE 'PASS completed op replay after sale/transfer/revision change, conflicts rejected';
+END $$;

@@ -349,3 +349,71 @@ export async function uploadMeasurementDerivativeProduction(path: string, png: B
     throw new Error("storage_failed");
   }
 }
+
+
+/**
+ * 已成功 op 回放（只读）：当前 actor + client_op_id 且指纹与原请求完全一致的已完成 mutation。
+ * 命中返回原结果（replayed=true），指纹不同抛 op_conflict，未命中返回 null（调用方继续全部当前校验）。
+ * 不写库、不上传、不改 revision；其他 actor 永远 null（不知结果）。
+ */
+export async function replaySaveProduction(args: {
+  skuId: string;
+  actorId: string;
+  clientOpId: string;
+  expectedRevision: number;
+  value: MeasurementValues;
+}): Promise<{ revision: number; task_id: string | null; notified: number; replayed: true } | null> {
+  const { data, error } = await supabaseAdmin.rpc("measurement_save_replay" as never, {
+    p_sku_id: args.skuId,
+    p_actor_id: args.actorId,
+    p_client_op_id: args.clientOpId,
+    p_expected_revision: args.expectedRevision,
+    p_height: args.value.height_cm,
+    p_width: args.value.width_cm,
+    p_depth: args.value.depth_cm,
+    p_diameter: args.value.diameter_cm,
+  } as never);
+  if (error) {
+    if (String(error.message).includes("op_conflict")) throw new Error("op_conflict");
+    console.error("[measurement_save_replay]", error.message);
+    throw new Error("replay_failed");
+  }
+  return (data as never) ?? null;
+}
+
+export type MeasurementAssetReplay = {
+  status: "ready";
+  revision: number;
+  cutout_preview_path: string;
+  width_cm: number;
+  height_cm: number;
+  bbox: { x: number; y: number; w: number; h: number } | null;
+  front_width_px: number | null;
+  front_height_px: number | null;
+  px_per_cm: number | null;
+  replayed: true;
+};
+
+export async function replayAssetProduction(args: {
+  skuId: string;
+  actorId: string;
+  clientOpId: string;
+  locationId: string;
+  revision: number;
+  contentHash: string;
+}): Promise<MeasurementAssetReplay | null> {
+  const { data, error } = await supabaseAdmin.rpc("measurement_asset_replay" as never, {
+    p_sku_id: args.skuId,
+    p_actor_id: args.actorId,
+    p_client_op_id: args.clientOpId,
+    p_location_id: args.locationId,
+    p_revision: args.revision,
+    p_content_hash: args.contentHash,
+  } as never);
+  if (error) {
+    if (String(error.message).includes("op_conflict")) throw new Error("op_conflict");
+    console.error("[measurement_asset_replay]", error.message);
+    throw new Error("replay_failed");
+  }
+  return (data as never) ?? null;
+}
