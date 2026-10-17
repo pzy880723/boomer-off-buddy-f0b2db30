@@ -178,3 +178,89 @@ BEGIN
   DROP FUNCTION public.test_fail_notify();
   RAISE NOTICE 'PASS notify failure rolls back';
 END $$;
+
+-- 素材登记 RPC（measurement_asset_register）用例
+DO $$
+DECLARE
+  r jsonb; r2 jsonb;
+  s uuid := '00000000-0000-0000-0000-000000000006';
+  loc uuid := '00000000-0000-0000-0000-00000000000a';
+  loc2 uuid := '00000000-0000-0000-0000-00000000000b';
+  staff uuid := '00000000-0000-0000-0000-00000000ff01';
+  outsider uuid := '00000000-0000-0000-0000-00000000ff02';
+  hq uuid := '00000000-0000-0000-0000-00000000ff09';
+  bb jsonb := '{"x":0,"y":0,"w":100,"h":200}';
+  h1 text := 'aaaaaaaaaaaaaaaa'; h2 text := 'bbbbbbbbbbbbbbbb';
+  p1 text; p2 text;
+BEGIN
+  INSERT INTO inv_skus(id, name, location_id) VALUES (s, '素材商品', loc);
+  PERFORM public.measurement_save(s, NULL, staff, 'op-asset-save1', 0, loc, 20, 10, NULL, NULL);
+  p1 := 'sku-listing/measurements/' || s || '/1-' || h1 || '-640.png';
+  p2 := 'sku-listing/measurements/' || s || '/1-' || h2 || '-640.png';
+
+  -- A1 跨店 actor（无该店权限）拒绝，且不落 ready
+  BEGIN
+    PERFORM public.measurement_asset_register(s, outsider, 'op-img-out01', loc, 1, 20, 10, h1, p1, bb, 100, 200, 10);
+    RAISE EXCEPTION 'FAIL outsider registered';
+  EXCEPTION WHEN OTHERS THEN ASSERT SQLERRM LIKE '%unauthorized_role%', 'outsider rejected: ' || SQLERRM; END;
+  ASSERT NOT EXISTS (SELECT 1 FROM product_measurement_assets WHERE sku_id = s), 'no asset after outsider';
+  RAISE NOTICE 'PASS asset register rejects cross-store actor';
+
+  -- A2 旧版本 / 实测宽高不一致 拒绝
+  BEGIN
+    PERFORM public.measurement_asset_register(s, staff, 'op-img-old01', loc, 2, 20, 10, h1,
+      'sku-listing/measurements/' || s || '/2-' || h1 || '-640.png', bb, 100, 200, 10);
+    RAISE EXCEPTION 'FAIL stale revision registered';
+  EXCEPTION WHEN OTHERS THEN ASSERT SQLERRM LIKE '%revision_conflict%', 'wrong revision rejected: ' || SQLERRM; END;
+  BEGIN
+    PERFORM public.measurement_asset_register(s, staff, 'op-img-geo01', loc, 1, 20, 12, h1, p1, bb, 100, 200, 10);
+    RAISE EXCEPTION 'FAIL geometry mismatch registered';
+  EXCEPTION WHEN OTHERS THEN ASSERT SQLERRM LIKE '%revision_conflict%', 'measured size mismatch rejected'; END;
+  ASSERT NOT EXISTS (SELECT 1 FROM product_measurement_assets WHERE sku_id = s), 'no asset after stale';
+  RAISE NOTICE 'PASS asset register rejects stale revision and size mismatch';
+
+  -- A3 他品/非规范路径拒绝
+  BEGIN
+    PERFORM public.measurement_asset_register(s, staff, 'op-img-path1', loc, 1, 20, 10, h1,
+      'sku-listing/measurements/00000000-0000-0000-0000-000000000001/1-' || h1 || '-640.png', bb, 100, 200, 10);
+    RAISE EXCEPTION 'FAIL foreign path registered';
+  EXCEPTION WHEN OTHERS THEN ASSERT SQLERRM LIKE '%invalid_asset%', 'foreign path rejected'; END;
+  RAISE NOTICE 'PASS asset register rejects foreign path';
+
+  -- A4 正常登记 → ready；同 op 同图回放；同 op 换图 op_conflict
+  r := public.measurement_asset_register(s, staff, 'op-img-ok001', loc, 1, 20, 10, h1, p1, bb, 100, 200, 10);
+  ASSERT r->>'status' = 'ready' AND (r->>'revision')::int = 1 AND (r->>'replayed')::boolean = false, 'registered';
+  ASSERT (SELECT status = 'ready' AND verified AND cutout_preview_path = p1 FROM product_measurement_assets WHERE sku_id = s AND revision = 1), 'asset ready';
+  r2 := public.measurement_asset_register(s, staff, 'op-img-ok001', loc, 1, 20, 10, h1, p1, bb, 100, 200, 10);
+  ASSERT (r2->>'replayed')::boolean = true AND r2->>'cutout_preview_path' = p1, 'replayed';
+  BEGIN
+    PERFORM public.measurement_asset_register(s, staff, 'op-img-ok001', loc, 1, 20, 10, h2, p2, bb, 100, 200, 10);
+    RAISE EXCEPTION 'FAIL op reuse accepted';
+  EXCEPTION WHEN OTHERS THEN ASSERT SQLERRM LIKE '%op_conflict%', 'op reuse rejected'; END;
+  RAISE NOTICE 'PASS asset register idempotent replay and op_conflict';
+
+  -- A5 不同图争抢同 revision：first-write-wins，新 op 换图 image_conflict，原图不被覆盖
+  BEGIN
+    PERFORM public.measurement_asset_register(s, hq, 'op-img-other', loc, 1, 20, 10, h2, p2, bb, 100, 200, 10);
+    RAISE EXCEPTION 'FAIL overwrite accepted';
+  EXCEPTION WHEN OTHERS THEN ASSERT SQLERRM LIKE '%image_conflict%', 'second image rejected: ' || SQLERRM; END;
+  ASSERT (SELECT cutout_preview_path FROM product_measurement_assets WHERE sku_id = s AND revision = 1) = p1, 'first image kept';
+  RAISE NOTICE 'PASS asset register first-write-wins image_conflict';
+
+  -- A6 商品调店后旧店登记拒绝（HQ actor 通过权限，仍因 location 拒绝）
+  PERFORM public.measurement_save(s, NULL, staff, 'op-asset-save2', 1, loc, 30, 10, NULL, NULL);
+  UPDATE inv_skus SET location_id = loc2 WHERE id = s;
+  BEGIN
+    PERFORM public.measurement_asset_register(s, hq, 'op-img-moved', loc, 2, 30, 10, h1,
+      'sku-listing/measurements/' || s || '/2-' || h1 || '-640.png', bb, 100, 300, 10);
+    RAISE EXCEPTION 'FAIL moved sku registered';
+  EXCEPTION WHEN OTHERS THEN ASSERT SQLERRM LIKE '%location_mismatch%', 'moved sku rejected: ' || SQLERRM; END;
+  BEGIN
+    PERFORM public.measurement_asset_register(s, staff, 'op-img-moved2', loc2, 2, 30, 10, h1,
+      'sku-listing/measurements/' || s || '/2-' || h1 || '-640.png', bb, 100, 300, 10);
+    RAISE EXCEPTION 'FAIL old-store staff registered on new store';
+  EXCEPTION WHEN OTHERS THEN ASSERT SQLERRM LIKE '%unauthorized_role%', 'old-store staff lacks new-store perm'; END;
+  ASSERT NOT EXISTS (SELECT 1 FROM product_measurement_assets WHERE sku_id = s AND revision = 2), 'no rev2 asset';
+  UPDATE inv_skus SET location_id = loc WHERE id = s;
+  RAISE NOTICE 'PASS asset register rejects transferred sku';
+END $$;

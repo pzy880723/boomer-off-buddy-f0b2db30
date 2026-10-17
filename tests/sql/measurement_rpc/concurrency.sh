@@ -61,3 +61,41 @@ else
   echo "FAIL concurrent same op: rev=$rev2 muts=$muts errs=$errs"
   cat /tmp/ms_c.out /tmp/ms_d.out; exit 1
 fi
+
+# 并发：图片登记 vs 尺寸保存（同一 rev=1）。行锁串行：要么登记 rev1 成功后保存到 rev2（rev2 无素材），
+# 要么保存先行使登记 revision_conflict；任何情况下都不能出现 rev2 的 ready 素材。
+SKU3=00000000-0000-0000-0000-000000000033
+$PSQL -q -c "INSERT INTO inv_skus(id,name,location_id) VALUES ('$SKU3','图片并发商品','00000000-0000-0000-0000-00000000000a')" >/dev/null
+$PSQL -q -c "select public.measurement_save('$SKU3',NULL,'$STAFF','op-img-base01',0,'00000000-0000-0000-0000-00000000000a',20,10,null,null)" >/dev/null
+P="sku-listing/measurements/$SKU3/1-cccccccccccccccc-640.png"
+REG="select public.measurement_asset_register('$SKU3','$STAFF','op-img-conc01','00000000-0000-0000-0000-00000000000a',1,20,10,'cccccccccccccccc','$P','{\"x\":0,\"y\":0,\"w\":10,\"h\":20}',10,20,1)"
+$PSQL -q -c "$REG" >/tmp/mi_a.out 2>&1 &
+$PSQL -q -c "select public.measurement_save('$SKU3',NULL,'$STAFF','op-img-save02',1,'00000000-0000-0000-0000-00000000000a',25,10,null,null)" >/tmp/mi_b.out 2>&1 &
+wait
+rev3=$($PSQL -qAt -c "select measurement_revision from inv_skus where id='$SKU3'")
+ready1=$($PSQL -qAt -c "select count(*) from product_measurement_assets where sku_id='$SKU3' and revision=1 and status='ready'")
+ready2=$($PSQL -qAt -c "select count(*) from product_measurement_assets where sku_id='$SKU3' and revision=2")
+regconf=$(grep -c 'revision_conflict' /tmp/mi_a.out)
+if [ "$rev3" = "2" ] && [ "$ready2" = "0" ] && { [ "$ready1" = "1" ] && [ "$regconf" = "0" ] || [ "$ready1" = "0" ] && [ "$regconf" = "1" ]; }; then
+  echo "PASS concurrent save vs image register serialized"
+else
+  echo "FAIL concurrent save vs register: rev=$rev3 ready1=$ready1 ready2=$ready2 regconf=$regconf"; cat /tmp/mi_a.out /tmp/mi_b.out; exit 1
+fi
+
+# 并发同 op 同图登记：一个真实登记，一个回放，均成功
+SKU4=00000000-0000-0000-0000-000000000034
+$PSQL -q -c "INSERT INTO inv_skus(id,name,location_id) VALUES ('$SKU4','同op图片并发','00000000-0000-0000-0000-00000000000a')" >/dev/null
+$PSQL -q -c "select public.measurement_save('$SKU4',NULL,'$STAFF','op-img-base02',0,'00000000-0000-0000-0000-00000000000a',20,10,null,null)" >/dev/null
+P4="sku-listing/measurements/$SKU4/1-dddddddddddddddd-640.png"
+REG4="select public.measurement_asset_register('$SKU4','$STAFF','op-img-same01','00000000-0000-0000-0000-00000000000a',1,20,10,'dddddddddddddddd','$P4','{\"x\":0,\"y\":0,\"w\":10,\"h\":20}',10,20,1)"
+$PSQL -q -c "$REG4" >/tmp/mi_c.out 2>&1 &
+$PSQL -q -c "$REG4" >/tmp/mi_d.out 2>&1 &
+wait
+errs4=$(grep -l 'ERROR' /tmp/mi_c.out /tmp/mi_d.out 2>/dev/null | wc -l)
+replays=$(grep -l 'replayed.: true' /tmp/mi_c.out /tmp/mi_d.out 2>/dev/null | wc -l)
+muts4=$($PSQL -qAt -c "select count(*) from measurement_mutations where client_op_id='op-img-same01'")
+if [ "$errs4" = "0" ] && [ "$replays" = "1" ] && [ "$muts4" = "1" ]; then
+  echo "PASS concurrent same op image register: one real one replay"
+else
+  echo "FAIL concurrent same op image: errs=$errs4 replays=$replays muts=$muts4"; cat /tmp/mi_c.out /tmp/mi_d.out; exit 1
+fi
