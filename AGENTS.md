@@ -1,5 +1,5 @@
 # Architecture rules
-- Support conversation and points-earning rules live in src/server/AGENTS.md.
+- Support, points-earning and measurement rules live in src/server/AGENTS.md.
 - PC card printing adapts the native same-origin array manifest and embeds original single-card PDF pages without rasterization; eligibility is rechecked before output. Why: preserves embedded fonts and approved layouts while blocking retired presets.
 - Card spec filtering uses exact manifest dimensions; homogeneous hook-card selections use a dedicated packing branch, mixed selections keep the general packer. Why: avoids orientation-based misclassification.
 - PC QR reads use authenticated server functions with handheld role/location and private-object path semantics, never device credentials. Why: web users have no device token and QR assets stay store-isolated.
@@ -13,6 +13,5 @@
 - Staff name/avatar are maintained only by super_admin in PC ERP; canonical source is Auth user_metadata.name + avatar_path in the private staff-avatars bucket (service-role only), signed at read time; handheld/GO/web profile endpoints read live metadata server-side, read-only. Why: shared accounts see one identity; stale JWTs and expired URLs never become truth.
 - Bargain-basket (翻筐乐) eligibility is computed only by src/lib/commerce/fankuang.ts from inv_skus.fankuang_override (NULL=auto by price threshold, explicit boolean wins); only tracked custom single SKUs qualify; storefront filters before paging. Why: one rule for ERP, handheld and storefront.
 - Review demo isolation: src/server/review-isolation.mjs (BOOMER_REVIEW_ISOLATED=true) refuses production data/real channels at boot and blocks external writes. Why: review never touches real systems.
-- Measurements: store = inv_stocks qty>0 only (no inv_skus.location_id); RPCs lock SKU, plain-read stock; request + deferred stock trigger share ONE global routing lock (trade-off: few stores, routing serialized for correctness; trigger never locks SKU/stock); claim via measurement_claim; writes try actor+op+exact-body (incl. location) replay first; ready diagram only via upload + asset_register. Why: no lock cycles/missed moves, lost responses confirmable.
 - New-listing readiness gate: a commerce_listings trigger holds publish transitions (hidden, published_at NULL) until listing_readiness is ready for the current revision; zero-AI template content via revision-CAS RPC, existing content reused; pre-0075 SKUs and live listings untouched. Why: one gate for every write path.
 - Display names for fields/attributes come only from src/lib/attribute-labels.ts; unknown keys hidden. Why: one Chinese dictionary.
