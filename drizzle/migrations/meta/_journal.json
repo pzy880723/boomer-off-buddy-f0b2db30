@@ -575,6 +575,13 @@
       "when": 1792218313230,
       "tag": "0081_listing_readiness_image_plan_display_fix",
       "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1792218834306,
+      "tag": "0082_listing_readiness_ai_raw_guard",
+      "breakpoints": true
     }
   ]
 }
