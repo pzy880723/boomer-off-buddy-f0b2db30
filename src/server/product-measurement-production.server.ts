@@ -70,13 +70,17 @@ export async function requestMeasurementProduction(
   return data as never;
 }
 
-/** 保存实测（事务 RPC：版本 CAS + client_op_id 幂等 + 完成任务 + 通知申请者） */
+/**
+ * 保存实测（事务 RPC：sku 行锁内做 op 幂等回放/指纹校验、版本 CAS、
+ * 当前门店归属校验、锁内查活跃任务、完成任务 + 通知申请者原子完成）。
+ */
 export async function saveMeasurementProduction(args: {
   skuId: string;
   taskId: string | null;
   actorId: string;
   clientOpId: string;
   expectedRevision: number;
+  locationId: string;
   value: MeasurementValues;
 }): Promise<{ revision: number; task_id: string | null; notified: number; replayed: boolean }> {
   const { data, error } = await supabaseAdmin.rpc("measurement_save" as never, {
@@ -85,6 +89,7 @@ export async function saveMeasurementProduction(args: {
     p_actor_id: args.actorId,
     p_client_op_id: args.clientOpId,
     p_expected_revision: args.expectedRevision,
+    p_location_id: args.locationId,
     p_height: args.value.height_cm,
     p_width: args.value.width_cm,
     p_depth: args.value.depth_cm,
@@ -93,10 +98,13 @@ export async function saveMeasurementProduction(args: {
   if (error) {
     for (const code of [
       "revision_conflict",
+      "op_conflict",
+      "location_mismatch",
       "not_found",
       "invalid_measurement",
       "empty_measurement",
       "expected_revision_required",
+      "client_op_id_required",
     ]) {
       if (error.message.includes(code)) throw new Error(code);
     }

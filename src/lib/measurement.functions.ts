@@ -122,9 +122,8 @@ export const saveMeasurement = createServerFn({ method: "POST" })
 
     let skuId = data.sku_id ?? null;
     const taskId = data.task_id ?? null;
-    let locationId: string | null = null;
 
-    if (taskId) {
+    if (taskId && !skuId) {
       const { data: task } = await supabaseAdmin
         .from("product_measurement_tasks" as never)
         .select("id, sku_id, location_id, status")
@@ -136,18 +135,17 @@ export const saveMeasurement = createServerFn({ method: "POST" })
         location_id: string | null;
         status: string;
       } | null;
-      if (!row || row.status === "completed" || row.status === "cancelled") {
-        throw new Error("任务不存在或已结束");
-      }
-      skuId = row.sku_id;
-      locationId = row.location_id;
+      // 已结束任务不在这里拒绝：同 op 重试需到达 RPC 做幂等回放；
+      // 无幂等记录的旧任务由 RPC 在锁内拒绝。
+      if (row) skuId = row.sku_id;
     }
     if (!skuId) throw new Error("缺少商品");
     const sku = await loadMeasurementSku(skuId);
     if (!sku) throw new Error("商品不存在");
-    locationId = locationId ?? sku.location_id;
 
-    if (!actorCanAccessLocation(actor, locationId)) throw new Error("无该门店权限");
+    // 鉴权与归属都用 sku 当前门店（商品调走后旧店任务不可再改）
+    if (!actorCanAccessLocation(actor, sku.location_id)) throw new Error("无该门店权限");
+    if (!sku.location_id) throw new Error("商品未绑定门店");
 
     try {
       return await saveMeasurementProduction({
@@ -156,11 +154,14 @@ export const saveMeasurement = createServerFn({ method: "POST" })
         actorId: actor.userId,
         clientOpId: data.client_op_id,
         expectedRevision: data.expected_revision,
+        locationId: sku.location_id,
         value: parsed.value,
       });
     } catch (error) {
       const message = (error as Error).message;
       if (message === "revision_conflict") throw new Error("尺寸已被他人更新，请刷新后重试");
+      if (message === "op_conflict") throw new Error("同一操作编号提交了不同内容，请换新编号");
+      if (message === "location_mismatch") throw new Error("商品已调离该门店，请刷新后重试");
       if (message === "not_found") throw new Error("任务不存在或已结束");
       throw error;
     }

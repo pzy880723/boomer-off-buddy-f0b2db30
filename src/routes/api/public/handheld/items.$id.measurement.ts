@@ -11,7 +11,6 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   loadMeasurementSku,
   saveMeasurementProduction,
-  findActiveTaskProduction,
 } from "@/server/product-measurement-production.server";
 import { loadMeasurementActor } from "@/lib/measurement.functions";
 import {
@@ -98,14 +97,16 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/measurement
           return errCode("invalid_body", "Invalid measurement");
         }
 
-        const active = await findActiveTaskProduction(sku.id);
+        // 活跃任务由 RPC 在 sku 行锁内查找（避免申请/保存交错漏完成任务）；
+        // op 幂等回放也在锁内，重试同一 POST 返回原结果。
         try {
           const result = await saveMeasurementProduction({
             skuId: sku.id,
-            taskId: active?.id ?? null,
+            taskId: null,
             actorId: session.user_id,
             clientOpId: body.client_op_id,
             expectedRevision: body.expected_revision,
+            locationId: body.location_id,
             value: parsed.value,
           });
           return ok({
@@ -117,7 +118,13 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/measurement
         } catch (error) {
           const message = (error as Error).message;
           if (message === "revision_conflict") {
-            return errCode("already_exists", "Measurement updated by someone else");
+            return errCode("revision_conflict", "Measurement updated by someone else");
+          }
+          if (message === "op_conflict") {
+            return errCode("op_conflict", "client_op_id reused with different content");
+          }
+          if (message === "location_mismatch") {
+            return errCode("unauthorized_location", "SKU no longer in this location");
           }
           if (message === "not_found") return errCode("not_found", "Task not found");
           throw error;

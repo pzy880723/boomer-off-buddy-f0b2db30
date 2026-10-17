@@ -4,7 +4,7 @@ set -uo pipefail
 cd "$(dirname "$0")/../../.."
 bash tests/sql/harness/setup.sh >/dev/null
 export PSQL=/tmp/psql.sh
-migs=$(ls drizzle/migrations/*_measurement_rpc.sql drizzle/migrations/*_measurement_save_conflict_fix.sql 2>/dev/null)
+migs=$(ls drizzle/migrations/*_measurement_rpc.sql drizzle/migrations/*_measurement_save_conflict_fix.sql drizzle/migrations/*_measurement_mutations_idempotency.sql 2>/dev/null)
 [ -n "$migs" ] || { echo "FAIL migration missing"; exit 1; }
 PGDB=postgres $PSQL -q -c "drop database if exists measurement_test" -c "create database measurement_test" >/dev/null
 export PGDB=measurement_test
@@ -17,4 +17,4 @@ echo "$out" | grep -o 'PASS .*\|ERROR.*\|FAIL.*'
 out2=$(PSQL=$PSQL bash tests/sql/measurement_rpc/concurrency.sh 2>&1); rc2=$?
 echo "$out2" | grep -o 'PASS.*\|FAIL.*\|ERROR.*'
 n=$(printf '%s\n%s\n' "$out" "$out2" | grep -c 'PASS')
-[ $rc -eq 0 ] && [ $rc2 -eq 0 ] && [ "$n" -eq 10 ] && echo "ALL PASS ($n)" || { echo "SOME FAILED ($n/10)"; exit 1; }
+[ $rc -eq 0 ] && [ $rc2 -eq 0 ] && [ "$n" -eq 16 ] && echo "ALL PASS ($n)" || { echo "SOME FAILED ($n/16)"; exit 1; }

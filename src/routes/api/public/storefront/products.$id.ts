@@ -49,6 +49,7 @@ async function loadStorefrontMeasurement(skuId: string) {
           width_cm: asset.width_cm,
           height_cm: asset.height_cm,
           cutout_preview_url: `/api/public/media/measurement/${asset.cutout_preview_path!.slice("sku-listing/".length)}`,
+          cutout_1280_url: `/api/public/media/measurement/${asset.cutout_preview_path!.slice("sku-listing/".length).replace(/-640\.png$/, "-1280.png")}`,
           bbox: payload.diagram.bbox,
           front_width_px: payload.diagram.front_width_px,
           front_height_px: payload.diagram.front_height_px,
