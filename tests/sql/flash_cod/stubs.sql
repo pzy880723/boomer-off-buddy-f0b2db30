@@ -86,6 +86,9 @@ $$;
 -- 真实底层函数（pg_get_functiondef 导出原文，不用 stub）
 \i tests/sql/flash_cod/real_create_order_v2.sql
 \i tests/sql/flash_cod/real_mark_ordinary_order_paid.sql
+\i tests/sql/flash_cod/real_assign_customer_trigger.sql
+CREATE TRIGGER commerce_assign_storefront_customer BEFORE INSERT OR UPDATE OF user_id, customer_id, source_channel
+  ON public.commerce_orders FOR EACH ROW EXECUTE FUNCTION public.commerce_assign_storefront_customer();
 
 -- 结算阻断夹具：与真实语义一致的简化版
 CREATE OR REPLACE FUNCTION public.commerce_order_settlement_block(p_order_id uuid)
