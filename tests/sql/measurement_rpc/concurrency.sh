@@ -33,3 +33,14 @@ q "select measurement_request(l(33),cu(2))" >/tmp/ms_e.out 2>&1
 wait
 loc=$(q "select location_id=loc('b') from product_measurement_tasks where sku_id=s(33) and status in ('pending','claimed')"); rq=$(q "select count(*) from product_measurement_requesters r join product_measurement_tasks t on t.id=r.task_id where t.sku_id=s(33)"); nn=$(q "select count(*) from inv_handheld_notifications where payload->>'sku_id'=s(33)::text and action_status is null and location_id=loc('b')")
 [ "$loc" = "t" ] && [ "$rq" = "2" ] && [ "$nn" = "1" ] && echo "PASS transfer concurrent with request keeps requesters" || { echo "FAIL transfer concurrency loc=$loc rq=$rq nn=$nn"; cat /tmp/ms_e.out; exit 1; }
+
+# 领取与调拨竞态：A 员工领取请求被调拨事务（持有 task 锁）阻塞，提交后锁内重查 → A forbidden；B 可领
+q "select test_mk(34,'a','a=1,b=0')" >/dev/null
+t34=$(q "select measurement_request(l(34),cu(1))->>'task_id'")
+$PSQL -qAt -c "begin; update inv_stocks set qty=0 where sku_id=s(34) and location_id=loc('a'); update inv_stocks set qty=1 where sku_id=s(34) and location_id=loc('b'); select measurement_task_rebalance(s(34)); select pg_sleep(0.6); commit;" >/dev/null 2>&1 &
+sleep 0.2
+q "select measurement_claim('$t34', st('1'))" >/tmp/mc_a.out 2>&1
+wait
+b=$(q "select measurement_claim('$t34', st('2'))->>'status'" 2>&1)
+by=$(q "select claimed_by=st('2') from product_measurement_tasks where id='$t34'")
+grep -q forbidden /tmp/mc_a.out && [ "$b" = "claimed" ] && [ "$by" = "t" ] && echo "PASS concurrent claim vs transfer: old store loses" || { echo "FAIL claim race b=$b by=$by"; cat /tmp/mc_a.out; exit 1; }
