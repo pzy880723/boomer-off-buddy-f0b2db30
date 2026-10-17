@@ -147,7 +147,9 @@ export const Route = createFileRoute("/api/public/storefront/orders")({
         }
         const createFn = pickup && paymentPolicy.mode === "ordinary_wechat"
           ? "commerce_create_ordinary_pickup_order"
-          : ordinary ? "commerce_create_ordinary_order" : "commerce_create_order_v2";
+          : flash && paymentPolicy.mode === "ordinary_wechat"
+            ? "commerce_create_ordinary_flash_order"
+            : ordinary ? "commerce_create_ordinary_order" : "commerce_create_order_v2";
         const createArgs: Record<string, unknown> = pickup && paymentPolicy.mode === "ordinary_wechat"
           ? {
               p_customer_id: auth.customer.id,
