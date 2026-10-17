@@ -197,3 +197,12 @@ test("网页保存门店：唯一有货店自动选；多店有货不随机选�
   assert.deepEqual(resolveEditableLocation(hq, [{ location_id: "A", qty: 1 }, { location_id: "B", qty: 1 }], "B"), { ok: true, locationId: "B" });
   assert.deepEqual(resolveEditableLocation(staffA, [{ location_id: "B", qty: 1 }], "B"), { ok: false, error: "forbidden" });
 });
+
+test("尺寸取整后为 0 或超上限：受控拒绝（不交给 DB check）", () => {
+  assert.equal(validateMeasurementInput({ height_cm: 0.001 }).ok, false);
+  assert.equal(validateMeasurementInput({ width_cm: 0.004 }).ok, false);
+  assert.equal(validateMeasurementInput({ depth_cm: 9999.996 }).ok, false);
+  const ok = validateMeasurementInput({ height_cm: 0.005 });
+  assert.equal(ok.ok, true);
+  if (ok.ok) assert.equal(ok.value.height_cm, 0.01);
+});
