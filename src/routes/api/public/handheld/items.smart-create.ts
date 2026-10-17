@@ -265,42 +265,22 @@ async function handleSmartCreate(request: Request, timing: ReturnType<typeof cre
         const boundCount = committed.bound_epcs;
 
         // 以下步骤均为幂等写入；提交后中途失败时，客户端用同一 client_op_id 重试会重放这些步骤。
-        const { data: current, error: currentError } = await supabaseAdmin
-          .from("inv_skus")
-          .select("image_paths, image_url")
-          .eq("id", skuId)
-          .maybeSingle();
-        if (currentError || !current) return err("Unable to read committed SKU; retry the same operation", 503);
-        const existing = ((current?.image_paths as string[] | null) ?? []) as string[];
-        // 新建孤品的图片已在建品事务内写入；提交后不得再合并输入原图（worker 可能已把原图替换成处理图）。
-        // 只有标准品复用既有 SKU 时才追加本次照片。
-        const appendPhotos = shouldReuseSmartCreateSku(body.is_custom_price);
-        const merged = appendPhotos ? [...new Set([...existing, ...incomingPaths].filter(Boolean))] : existing;
-        const imagesChanged = merged.length !== existing.length;
-        if (imagesChanged || hasRecognition) {
+        // 照片（含标准品复用追加）全部由建品事务 handheld_smart_create_commit_v2 写入并按本次员工计划入队；
+        // 提交后绝不再写 image_paths，避免 worker 已处理的原图被复活。这里只补识别属性。
+        if (hasRecognition) {
           const upd = await supabaseAdmin
             .from("inv_skus")
             .update({
-              ...(imagesChanged
-                ? {
-                    image_paths: merged,
-                    image_url: merged.find((p) => /^https?:\/\//i.test(p)) ?? current?.image_url ?? null,
-                  }
-                : {}),
-              ...(hasRecognition
-                ? {
-                    attributes: body.attributes,
-                    category_source: "ai",
-                    category_confidence: body.category_confidence ?? null,
-                    classification_status: body.classification_status ?? "fallback",
-                    ai_suggested_price: body.ai_suggested_price ?? null,
-                    recognition_request_id: body.recognition_request_id,
-                  }
-                : {}),
+              attributes: body.attributes,
+              category_source: "ai",
+              category_confidence: body.category_confidence ?? null,
+              classification_status: body.classification_status ?? "fallback",
+              ai_suggested_price: body.ai_suggested_price ?? null,
+              recognition_request_id: body.recognition_request_id,
               updated_at: new Date().toISOString(),
             } as never)
             .eq("id", skuId);
-          if (upd.error) return err(`Save SKU images failed: ${upd.error.message}`, 500);
+          if (upd.error) return err(`Save SKU attributes failed: ${upd.error.message}`, 500);
         }
 
         if (body.recognition_request_id) {

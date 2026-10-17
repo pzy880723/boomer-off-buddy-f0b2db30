@@ -11905,6 +11905,17 @@ export type Database = {
       inv_sku_delete_blocker: { Args: { p_sku_id: string }; Returns: string }
       inv_sku_is_hq_actor: { Args: never; Returns: boolean }
       inventory_delete_unused_sku: { Args: { p_sku_id: string }; Returns: Json }
+      listing_readiness_append_reuse_photos: {
+        Args: {
+          p_actor: string
+          p_image_url: string
+          p_paths: string[]
+          p_plan: string
+          p_policy: string
+          p_sku: string
+        }
+        Returns: number
+      }
       listing_readiness_apply_image_plan: {
         Args: {
           p_actor: string
