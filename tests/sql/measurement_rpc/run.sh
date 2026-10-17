@@ -17,4 +17,4 @@ echo "$out" | grep -o 'PASS .*\|ERROR.*\|FAIL.*'
 out2=$(PSQL=$PSQL bash tests/sql/measurement_rpc/concurrency.sh 2>&1); rc2=$?
 echo "$out2" | grep -o 'PASS.*\|FAIL.*\|ERROR.*'
 n=$(printf '%s\n%s\n' "$out" "$out2" | grep -c 'PASS')
-[ $rc -eq 0 ] && [ $rc2 -eq 0 ] && [ "$n" -eq 15 ] && echo "ALL PASS ($n)" || { echo "SOME FAILED ($n/15)"; exit 1; }
+[ $rc -eq 0 ] && [ $rc2 -eq 0 ] && [ "$n" -eq 16 ] && echo "ALL PASS ($n)" || { echo "SOME FAILED ($n/16)"; exit 1; }
