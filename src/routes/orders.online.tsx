@@ -67,6 +67,17 @@ const pickupLabel: Record<string, string> = {
   handed_over: "自提 · 已提货",
 };
 
+const flashLabel: Record<string, string> = {
+  unallocated: "闪送到付 · 待备货",
+  allocated: "闪送到付 · 待备货",
+  picking: "闪送到付 · 备货中",
+  picked: "闪送到付 · 待送出",
+  packing: "闪送到付 · 备货中",
+  packed: "闪送到付 · 待送出",
+  handover_ready: "闪送到付 · 待送出",
+  handed_over: "闪送到付 · 已送达",
+};
+
 function OnlineOrdersPage() {
   const listFn = useServerFn(listCommerceOrders);
   const [view, setView] = useState<OrderView>("all");
@@ -146,7 +157,7 @@ function OnlineOrdersPage() {
               <TableRow key={row.id}>
                 <TableCell>
                   <div className="font-mono text-xs">{row.order_no}</div>
-                  <div className="mt-1.5 flex gap-1"><StatusBadge tone="neutral">{row.source_label}</StatusBadge>{row.fulfillment_method === "pickup" && <StatusBadge tone="neutral">门店自提</StatusBadge>}</div>
+                  <div className="mt-1.5 flex gap-1"><StatusBadge tone="neutral">{row.source_label}</StatusBadge>{row.fulfillment_method === "pickup" && <StatusBadge tone="neutral">门店自提</StatusBadge>}{row.fulfillment_method === "flash" && <StatusBadge tone="neutral">同城闪送 · 配送费到付</StatusBadge>}</div>
                 </TableCell>
                 <TableCell>
                   <div className="max-w-72 space-y-1">
@@ -165,7 +176,7 @@ function OnlineOrdersPage() {
                     {row.fulfillments.map((fulfillment) => (
                       <div key={fulfillment.id} className="flex items-center gap-2 text-xs">
                         <span className="min-w-20 truncate">{fulfillment.location?.name ?? "未知门店"}</span>
-                        <StatusBadge>{row.payment_status === "refunded" && fulfillment.status !== "handed_over" ? "已退款 · 停止履约" : row.fulfillment_method === "pickup" ? (pickupLabel[fulfillment.status] ?? fulfillmentLabel[fulfillment.status] ?? fulfillment.status) : fulfillmentLabel[fulfillment.status] ?? fulfillment.status}</StatusBadge>
+                        <StatusBadge>{row.payment_status === "refunded" && fulfillment.status !== "handed_over" ? "已退款 · 停止履约" : row.fulfillment_method === "pickup" ? (pickupLabel[fulfillment.status] ?? fulfillmentLabel[fulfillment.status] ?? fulfillment.status) : row.fulfillment_method === "flash" ? (flashLabel[fulfillment.status] ?? fulfillmentLabel[fulfillment.status] ?? fulfillment.status) : fulfillmentLabel[fulfillment.status] ?? fulfillment.status}</StatusBadge>
                         {row.fulfillment_method === "pickup" && (
                           <PickupRowActions
                             fulfillmentId={fulfillment.id}
