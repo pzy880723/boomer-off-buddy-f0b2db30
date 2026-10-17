@@ -10826,6 +10826,22 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      commerce_create_ordinary_flash_order: {
+        Args: {
+          p_app_id: string
+          p_customer_id: string
+          p_customer_note: string
+          p_idempotency_key: string
+          p_items: Json
+          p_merchant_id: string
+          p_owned_location_ids: string[]
+          p_quote_snapshot: Json
+          p_recipient_name: string
+          p_recipient_phone: string
+          p_shipping_address: Json
+        }
+        Returns: Json
+      }
       commerce_create_ordinary_order: {
         Args: {
           p_app_id: string
@@ -10858,6 +10874,17 @@ export type Database = {
           p_quote_snapshot: Json
           p_recipient_name: string
           p_recipient_phone: string
+        }
+        Returns: Json
+      }
+      commerce_flash_deliver_fulfillment: {
+        Args: {
+          p_actor_user_id: string
+          p_fulfillment_id: string
+          p_idempotency_key: string
+          p_lines: Json
+          p_location_id: string
+          p_note?: string
         }
         Returns: Json
       }
