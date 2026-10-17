@@ -247,10 +247,16 @@ test("new custom SKU with recognition: attribute update still omits image_paths"
   assert.equal(skuImageWrites().length, 0);
 });
 
-test("standard reuse keeps appending new photos to the existing SKU", async () => {
+test("standard reuse: photos go only through the commit transaction, route never writes image_paths", async () => {
   state.tables.inv_skus = { status: "active", image_paths: ["sku-listing/old.png"], barcode: "200" };
   await post(withImage({ is_custom_price: false }));
-  const w = skuImageWrites();
-  assert.equal(w.length, 1);
-  assert.deepEqual(w[0].v.image_paths, ["sku-listing/old.png", "sku-raw/2026-10-09/dev/a.jpg"]);
+  assert.equal(skuImageWrites().length, 0);
+  assert.equal(commitArgs().p_reuse, true);
+  assert.deepEqual((commitArgs().p_sku as { image_paths: string[] }).image_paths, ["sku-raw/2026-10-09/dev/a.jpg"]);
+});
+
+test("standard reuse after worker finished: HTTP follow-up does not resurrect raw", async () => {
+  state.tables.inv_skus = { status: "active", image_paths: ["sku-listing/old.png", "sku-listing/gallery/a.png"], barcode: "200" };
+  await post(withImage({ is_custom_price: false, recognition_request_id: "11111111-1111-4111-8111-111111111111" }));
+  assert.equal(skuImageWrites().length, 0);
 });
