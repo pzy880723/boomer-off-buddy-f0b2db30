@@ -23,7 +23,7 @@ INSERT INTO user_roles (user_id, role) VALUES
   ('00000000-0000-0000-0000-00000000ff09','super_admin');
 
 -- 造商品：sku 名称、listing(location 为 listing 归属)、inv_stocks 分布
-CREATE FUNCTION pg_temp.mk(p_n int, p_listing_loc char, p_stock text) RETURNS void LANGUAGE plpgsql AS $f$
+CREATE FUNCTION public.test_mk(p_n int, p_listing_loc char, p_stock text) RETURNS void LANGUAGE plpgsql AS $f$
 DECLARE s uuid := ('00000000-0000-0000-0000-0000000001' || lpad(p_n::text,2,'0'))::uuid;
         l uuid := ('00000000-0000-0000-0000-0000000002' || lpad(p_n::text,2,'0'))::uuid;
         kv text;
@@ -36,3 +36,18 @@ BEGIN
     VALUES (s, ('00000000-0000-0000-0000-00000000000' || lower(split_part(kv,'=',1)))::uuid, split_part(kv,'=',2)::int);
   END LOOP;
 END $f$;
+
+CREATE FUNCTION public.test_expect_err(p_sql text, p_pat text) RETURNS void LANGUAGE plpgsql AS $f$
+BEGIN
+  BEGIN EXECUTE p_sql;
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE '%' || p_pat || '%' THEN RETURN; END IF;
+    RAISE EXCEPTION 'FAIL expected % got %', p_pat, SQLERRM;
+  END;
+  RAISE EXCEPTION 'FAIL expected % but succeeded: %', p_pat, p_sql;
+END $f$;
+CREATE FUNCTION public.s(n int) RETURNS uuid LANGUAGE sql IMMUTABLE AS $f$ SELECT ('00000000-0000-0000-0000-0000000001' || lpad(n::text,2,'0'))::uuid $f$;
+CREATE FUNCTION public.l(n int) RETURNS uuid LANGUAGE sql IMMUTABLE AS $f$ SELECT ('00000000-0000-0000-0000-0000000002' || lpad(n::text,2,'0'))::uuid $f$;
+CREATE FUNCTION public.loc(c text) RETURNS uuid LANGUAGE sql IMMUTABLE AS $f$ SELECT ('00000000-0000-0000-0000-00000000000' || c)::uuid $f$;
+CREATE FUNCTION public.cu(n int) RETURNS uuid LANGUAGE sql IMMUTABLE AS $f$ SELECT ('00000000-0000-0000-0000-00000000002' || n)::uuid $f$;
+CREATE FUNCTION public.st(c text) RETURNS uuid LANGUAGE sql IMMUTABLE AS $f$ SELECT ('00000000-0000-0000-0000-00000000ff0' || c)::uuid $f$;
