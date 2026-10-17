@@ -47,6 +47,7 @@ UPDATE commerce_newcomer_grant_slots SET lease_until = now() - interval '1 secon
 SELECT count(*) FROM commerce_newcomer_claim(0, 60);
 SELECT t((SELECT count(*)=0 FROM commerce_newcomer_grant_slots WHERE status='dispatching' AND lease_until < now()), 'expired lease never stays dispatching');
 SELECT t((SELECT bool_and(status IN ('unknown','reconciling','succeeded','retry_wait','pending','dispatching')) FROM commerce_newcomer_grant_slots), 'states valid');
+UPDATE commerce_newcomer_grant_slots SET status='unknown', claim_token=NULL, lease_until=NULL, next_run_at = now() + interval '1 hour' WHERE status IN ('unknown','reconciling');
 -- 未发出的 not_found 在写路径上不被接受
 SELECT t(commerce_newcomer_finish(slot_id, claim_token, 'not_found', NULL, NULL)='unknown', 'not_found on dispatch path stays unknown')
   FROM commerce_newcomer_claim(1, 60) WHERE mode='dispatch' LIMIT 1;
