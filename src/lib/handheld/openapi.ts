@@ -6,7 +6,7 @@ import { createDocument, type ZodOpenApiObject } from "zod-openapi";
 import * as z from "zod";
 import { CustomTransferRequest, CustomTransferResponseSchema } from "../custom-transfer-contract";
 import { ProductContentRequest } from "../product-content";
-import { ManualShipBody, PickupReadyBody, PickupRedeemBody } from "./fulfillment-actions-schema";
+import { FlashDeliverBody, ManualShipBody, PickupReadyBody, PickupRedeemBody } from "./fulfillment-actions-schema";
 import { UnreadCountsData } from "./unread-counts";
 import {
   ItemDeleteReq,
