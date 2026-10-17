@@ -17,7 +17,6 @@ import {
 function seed(store: MeasurementStore) {
   store.skus.set("sku1", {
     id: "sku1",
-    location_id: "loc1",
     measurement_revision: 0,
     measured_at: null,
   });
