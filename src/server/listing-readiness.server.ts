@@ -19,7 +19,7 @@ type Refresh = {
   content_revision: number | null;
 };
 
-async function loadAutoContentInput(skuId: string) {
+export async function loadAutoContentInput(skuId: string) {
   const { data: sku, error } = await supabaseAdmin
     .from("inv_skus")
     .select("id, name, category, grade, brand_id, image_url, image_paths")
