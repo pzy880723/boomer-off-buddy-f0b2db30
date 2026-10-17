@@ -275,7 +275,7 @@ DO $$ DECLARE r jsonb; p text; n0 int; BEGIN
   ASSERT measurement_save_replay(s(15), st('9'), 'op-rpl-00001', 0, 20, 10, null, null) IS NULL, 'other actor learns nothing';
   ASSERT measurement_asset_replay(s(15), st('9'), 'op-rpl-img01', loc('a'), 1, '00000000000000cc') IS NULL, 'other actor asset NULL';
   -- 无记录旧请求不能伪装成功：新 op 走全部当前校验
-  PERFORM test_expect_err(format('select measurement_save(%L,null,%L,%L,0,%L,20,10,null,null)', s(15), st('1'), 'op-rpl-00003', loc('a')), 'revision_conflict|location_mismatch');
+  PERFORM test_expect_err(format('select measurement_save(%L,null,%L,%L,0,%L,20,10,null,null)', s(15), st('1'), 'op-rpl-00003', loc('a')), 'location_mismatch');
   ASSERT NOT has_function_privilege('authenticated','public.measurement_save_replay(uuid,uuid,text,integer,numeric,numeric,numeric,numeric)','EXECUTE'), 'replay service only';
   RAISE NOTICE 'PASS completed op replay after sale/transfer/revision change, conflicts rejected';
 END $$;
