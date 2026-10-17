@@ -23,9 +23,9 @@ SELECT hold2('a0000000-0000-0000-0000-000000000001');
 SELECT t2((SELECT listing_readiness_refresh('a0000000-0000-0000-0000-000000000001')->>'image')='pending', 'no 10-minute timeout release');
 SELECT pub2('a0000000-0000-0000-0000-000000000001', 'x');
 SELECT t2(st2('a0000000-0000-0000-0000-000000000001')='hidden', 'unsettled queue stays hidden even with content');
--- A2 已确认排队但原图仍未修（无任务）→ failed，不公开原图
+-- A2 明确确认（不做 AI 修图）后才使用原图；未确认前始终 pending
 UPDATE listing_readiness SET images_settled=true WHERE sku_id='a0000000-0000-0000-0000-000000000001';
-SELECT t2((SELECT listing_readiness_refresh('a0000000-0000-0000-0000-000000000001')->>'image')='failed', 'raw unprocessed image never auto-public');
+SELECT t2((SELECT listing_readiness_refresh('a0000000-0000-0000-0000-000000000001')->>'image')='succeeded', 'original photos only after explicit settle');
 
 -- B 所有新 SKU 建记录：标准品、非自定义都建；无原图的 PC 入口同事务即“排队完成”
 SELECT mk2('b0000000-0000-0000-0000-000000000001', false, ARRAY['sku-listing/gallery/b/1.png']);
