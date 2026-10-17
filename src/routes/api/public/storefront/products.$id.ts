@@ -5,7 +5,7 @@ import { loadPublishedProductContent } from "@/server/product-content.server";
 import { loadEngagementCounts } from "@/server/storefront-engagement.server";
 import { buildMeasurementPayload } from "@/server/product-measurement.server";
 import { getMeasurementAssetProduction } from "@/server/product-measurement-production.server";
-import { signSkuImagePaths } from "@/lib/sku-image-resolver.server";
+import type { MeasurementAssetRow } from "@/server/product-measurement.server";
 import {
   buildStorefrontProductDetail,
   STOREFRONT_DETAIL_READABLE_STATUSES,
@@ -15,7 +15,8 @@ import {
 /**
  * 商品详情的实测尺寸块：无实测返回 null；素材未就绪时 diagram.status 如实为
  * pending/failed，cutout_preview_url 为 null，绝不伪造对比图。
- * 抠图预览走私桶签名（与现有媒体契约一致），普通浏览不回原图。
+ * ready 契约：revision/verified=true/width_cm/height_cm + 受控透明 PNG 衍生 URL
+ * （/api/public/media/measurement/...，服务端校验所属商品与 ready 状态，不回原图、不丢 alpha）。
  */
 async function loadStorefrontMeasurement(skuId: string) {
   const { data } = await supabaseAdmin
@@ -27,24 +28,33 @@ async function loadStorefrontMeasurement(skuId: string) {
     .maybeSingle();
   const sku = data as unknown as Parameters<typeof buildMeasurementPayload>[0] | null;
   if (!sku || !sku.measured_at) return null;
-  const asset = await getMeasurementAssetProduction(skuId, sku.measurement_revision);
+  const asset = (await getMeasurementAssetProduction(skuId, sku.measurement_revision)) as
+    | (MeasurementAssetRow & { verified?: boolean; width_cm?: number | null; height_cm?: number | null })
+    | null;
   const payload = buildMeasurementPayload(sku, asset);
   if (!payload) return null;
-  let cutoutPreviewUrl: string | null = null;
-  if (payload.diagram.status === "ready" && payload.diagram.cutout_preview_path) {
-    const [signed] = await signSkuImagePaths([payload.diagram.cutout_preview_path]);
-    cutoutPreviewUrl = signed ?? null;
-  }
+  const ready =
+    payload.diagram.status === "ready" &&
+    asset?.verified === true &&
+    asset.width_cm != null &&
+    asset.height_cm != null &&
+    asset.cutout_preview_path?.startsWith("sku-listing/measurements/");
   return {
     ...payload,
-    diagram: {
-      status: payload.diagram.status,
-      cutout_preview_url: cutoutPreviewUrl,
-      bbox: payload.diagram.status === "ready" ? payload.diagram.bbox : null,
-      front_width_px: payload.diagram.status === "ready" ? payload.diagram.front_width_px : null,
-      front_height_px: payload.diagram.status === "ready" ? payload.diagram.front_height_px : null,
-      px_per_cm: payload.diagram.status === "ready" ? payload.diagram.px_per_cm : null,
-    },
+    diagram: ready
+      ? {
+          status: "ready" as const,
+          revision: sku.measurement_revision,
+          verified: true,
+          width_cm: asset.width_cm,
+          height_cm: asset.height_cm,
+          cutout_preview_url: `/api/public/media/measurement/${asset.cutout_preview_path!.slice("sku-listing/".length)}`,
+          bbox: payload.diagram.bbox,
+          front_width_px: payload.diagram.front_width_px,
+          front_height_px: payload.diagram.front_height_px,
+          px_per_cm: payload.diagram.px_per_cm,
+        }
+      : { status: payload.diagram.status as "pending" | "failed" },
   };
 }
 

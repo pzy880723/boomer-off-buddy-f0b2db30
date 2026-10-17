@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -46,7 +46,11 @@ export function SkuEditDialog({
   const [measurement, setMeasurement] = useState<MeasurementFieldState>({
     ...emptyMeasurementFields,
   });
+  const [originalMeasurement, setOriginalMeasurement] = useState<MeasurementFieldState>({
+    ...emptyMeasurementFields,
+  });
   const [measurementRevision, setMeasurementRevision] = useState<number | null>(null);
+  const loadedSkuRef = useRef<string | null>(null);
   const fankuangEligible =
     !!sku && sku.is_custom_price && sku.kind === "single" && sku.inventory_policy !== "unlimited";
 
@@ -68,16 +72,23 @@ export function SkuEditDialog({
       setPrice(String(sku.price_tier ?? ""));
       setFankuang(sku.fankuang_override ?? null);
       setMeasurement({ ...emptyMeasurementFields });
+      setOriginalMeasurement({ ...emptyMeasurementFields });
       setMeasurementRevision(null);
-      getMeasurementFn({ data: { sku_id: sku.id } })
+      // 绑定本次打开的 sku：异步返回时若弹窗已切换到别的商品则忽略，避免覆盖新弹窗字段
+      const forSkuId = sku.id;
+      loadedSkuRef.current = forSkuId;
+      getMeasurementFn({ data: { sku_id: forSkuId } })
         .then((res) => {
+          if (loadedSkuRef.current !== forSkuId) return;
           const s = res.sku as unknown as Record<string, unknown>;
-          setMeasurement({
+          const loaded: MeasurementFieldState = {
             height_cm: s.measurement_height_cm != null ? String(s.measurement_height_cm) : "",
             width_cm: s.measurement_width_cm != null ? String(s.measurement_width_cm) : "",
             depth_cm: s.measurement_depth_cm != null ? String(s.measurement_depth_cm) : "",
             diameter_cm: s.measurement_diameter_cm != null ? String(s.measurement_diameter_cm) : "",
-          });
+          };
+          setMeasurement(loaded);
+          setOriginalMeasurement(loaded);
           setMeasurementRevision((s.measurement_revision as number) ?? 0);
         })
         .catch(() => {
@@ -90,6 +101,27 @@ export function SkuEditDialog({
     mutationFn: async () => {
       if (!sku) throw new Error("缺少 SKU");
       if (!meta.name.trim()) throw new Error("品名必填");
+      // 先校验尺寸，非法直接报错——基础商品尚未写入，不会出现"尺寸错但商品已改"
+      const parsed = parseMeasurementFields(measurement);
+      if (!parsed.ok) throw new Error(parsed.error);
+      const measurementChanged =
+        measurement.height_cm !== originalMeasurement.height_cm ||
+        measurement.width_cm !== originalMeasurement.width_cm ||
+        measurement.depth_cm !== originalMeasurement.depth_cm ||
+        measurement.diameter_cm !== originalMeasurement.diameter_cm;
+      const v = parsed.value;
+      if (
+        measurementChanged &&
+        v.height_cm == null &&
+        v.width_cm == null &&
+        v.depth_cm == null &&
+        v.diameter_cm == null
+      ) {
+        throw new Error("不能清空已有实测尺寸；如需修正请填写新的实测值");
+      }
+      if (measurementChanged && measurementRevision == null) {
+        throw new Error("尺寸版本未加载完成，请稍候再保存");
+      }
       const patch: Record<string, unknown> = {
         name: meta.name.trim(),
         sku_code: meta.sku_code.trim() || null,
@@ -108,15 +140,13 @@ export function SkuEditDialog({
         patch.fankuang_override = fankuang;
       }
       await fn({ data: { id: sku.id, patch: patch as never } });
-      // 实测尺寸：仅在填写了任意一项时保存（版本 CAS，并发冲突会报错）
-      const parsed = parseMeasurementFields(measurement);
-      if (!parsed.ok) throw new Error(parsed.error);
-      const v = parsed.value;
-      if (v.height_cm != null || v.width_cm != null || v.depth_cm != null || v.diameter_cm != null) {
+      // 实测尺寸：仅在内容变化时保存（版本 CAS + client_op_id 幂等，并发冲突会报错）
+      if (measurementChanged) {
         await saveMeasurementFn({
           data: {
             sku_id: sku.id,
-            ...(measurementRevision != null ? { expected_revision: measurementRevision } : {}),
+            expected_revision: measurementRevision!,
+            client_op_id: `erp-sku-edit:${sku.id}:${crypto.randomUUID()}`,
             measurement: v,
           },
         });
