@@ -17,7 +17,7 @@ export const Route = createFileRoute("/api/public/storefront/membership/coupons"
         try {
           return storefrontJson({ ok: true, data: await listMembershipCoupons(auth.customer.id) });
         } catch (error) {
-          return storefrontError(error instanceof Error ? error.message : String(error), 500);
+          void error; return storefrontError("会员券暂时无法读取，请稍后重试", 500);
         }
       },
     },
