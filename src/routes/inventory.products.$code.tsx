@@ -34,7 +34,8 @@ import {
   formatPrice,
   groupStandardSkus,
   type SkuRow,
-, categoryLabel } from "@/lib/inventory.helpers";
+  categoryLabel,
+} from "@/lib/inventory.helpers";
 
 export const Route = createFileRoute("/inventory/products/$code")({
   head: () => ({ meta: [{ title: "标准商品详情 · 库存" }] }),
