@@ -46,7 +46,11 @@ export function SkuEditDialog({
   const [measurement, setMeasurement] = useState<MeasurementFieldState>({
     ...emptyMeasurementFields,
   });
+  const [originalMeasurement, setOriginalMeasurement] = useState<MeasurementFieldState>({
+    ...emptyMeasurementFields,
+  });
   const [measurementRevision, setMeasurementRevision] = useState<number | null>(null);
+  const loadedSkuRef = useRef<string | null>(null);
   const fankuangEligible =
     !!sku && sku.is_custom_price && sku.kind === "single" && sku.inventory_policy !== "unlimited";
 
