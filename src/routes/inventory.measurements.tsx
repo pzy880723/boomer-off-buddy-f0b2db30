@@ -31,25 +31,35 @@ export const Route = createFileRoute("/inventory/measurements")({
 type TaskRow = {
   id: string;
   sku_id: string;
+  listing_id: string | null;
   location_id: string | null;
   status: string;
   claimed_by: string | null;
   created_at: string;
   sku_name: string | null;
   location_name: string | null;
+  requester_count: number;
+  measurement_revision: number;
 };
+
+const STATUS_TABS = [
+  { key: "active", label: "待处理", statuses: ["pending", "claimed"] as const },
+  { key: "completed", label: "已完成", statuses: ["completed"] as const },
+] as const;
 
 function MeasurementTasksPage() {
   const listFn = useServerFn(listMeasurementTasks);
   const claimFn = useServerFn(claimMeasurementTaskFn);
   const saveFn = useServerFn(saveMeasurement);
   const queryClient = useQueryClient();
+  const [tab, setTab] = useState<(typeof STATUS_TABS)[number]["key"]>("active");
   const [recording, setRecording] = useState<TaskRow | null>(null);
   const [fields, setFields] = useState<MeasurementFieldState>({ ...emptyMeasurementFields });
 
+  const statuses = STATUS_TABS.find((t) => t.key === tab)!.statuses;
   const query = useQuery({
-    queryKey: ["measurement-tasks"],
-    queryFn: () => listFn({ data: {} }),
+    queryKey: ["measurement-tasks", tab],
+    queryFn: () => listFn({ data: { statuses: [...statuses] } }),
   });
 
   const claimMut = useMutation({
@@ -71,11 +81,20 @@ function MeasurementTasksPage() {
         throw new Error("至少填写一项尺寸");
       }
       return saveFn({
-        data: { task_id: recording.id, measurement: v },
+        data: {
+          task_id: recording.id,
+          expected_revision: recording.measurement_revision,
+          client_op_id: `erp-measurement:${recording.id}:${crypto.randomUUID()}`,
+          measurement: v,
+        },
       });
     },
     onSuccess: (res) => {
-      toast.success(`已保存实测尺寸${res.notified ? `，已通知 ${res.notified} 位顾客` : ""}`);
+      toast.success(
+        res.replayed
+          ? "该任务此前已保存（幂等回放）"
+          : `已保存实测尺寸${res.notified ? `，已通知 ${res.notified} 位顾客` : ""}`,
+      );
       setRecording(null);
       queryClient.invalidateQueries({ queryKey: ["measurement-tasks"] });
     },
@@ -93,9 +112,33 @@ function MeasurementTasksPage() {
         </p>
       </div>
 
+      <div className="flex gap-2">
+        {STATUS_TABS.map((t) => (
+          <Button
+            key={t.key}
+            size="sm"
+            variant={tab === t.key ? "default" : "outline"}
+            onClick={() => setTab(t.key)}
+          >
+            {t.label}
+          </Button>
+        ))}
+      </div>
+
       {query.isLoading && <p className="text-sm text-muted-foreground">加载中…</p>}
-      {!query.isLoading && items.length === 0 && (
-        <p className="text-sm text-muted-foreground">当前没有待测量任务</p>
+      {query.isError && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm">
+          <p className="font-medium text-destructive">待办加载失败</p>
+          <p className="text-xs text-muted-foreground">{(query.error as Error).message}</p>
+          <Button size="sm" variant="outline" className="mt-2" onClick={() => query.refetch()}>
+            重试
+          </Button>
+        </div>
+      )}
+      {!query.isLoading && !query.isError && items.length === 0 && (
+        <p className="text-sm text-muted-foreground">
+          {tab === "active" ? "当前没有待测量任务" : "暂无已完成记录"}
+        </p>
       )}
 
       <div className="space-y-2">
@@ -107,13 +150,13 @@ function MeasurementTasksPage() {
             <div className="min-w-0">
               <p className="truncate text-sm font-medium">{task.sku_name ?? "未知商品"}</p>
               <p className="text-xs text-muted-foreground">
-                {task.location_name ?? "未分配门店"} · 申请于{" "}
+                {task.location_name ?? "未分配门店"} · {task.requester_count} 人申请 ·{" "}
                 {new Date(task.created_at).toLocaleString("zh-CN")}
               </p>
             </div>
             <div className="flex items-center gap-2">
               <Badge variant={task.status === "claimed" ? "secondary" : "outline"}>
-                {task.status === "claimed" ? "已领取" : "待领取"}
+                {task.status === "claimed" ? "已领取" : task.status === "completed" ? "已完成" : "待领取"}
               </Badge>
               {task.status === "pending" && (
                 <Button
@@ -125,15 +168,17 @@ function MeasurementTasksPage() {
                   领取
                 </Button>
               )}
-              <Button
-                size="sm"
-                onClick={() => {
-                  setRecording(task);
-                  setFields({ ...emptyMeasurementFields });
-                }}
-              >
-                录入尺寸
-              </Button>
+              {task.status !== "completed" && (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setRecording(task);
+                    setFields({ ...emptyMeasurementFields });
+                  }}
+                >
+                  录入尺寸
+                </Button>
+              )}
             </div>
           </div>
         ))}
