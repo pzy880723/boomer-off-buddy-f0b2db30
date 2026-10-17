@@ -206,6 +206,7 @@ import { Route as ApiPublicHandheldItemsSmartCreateRouteImport } from './routes/
 import { Route as ApiPublicHandheldItemsUploadImageRouteImport } from './routes/api/public/handheld/items.upload-image'
 import { Route as ApiPublicHandheldLabelTemplatesIdRouteImport } from './routes/api/public/handheld/label-templates.$id'
 import { Route as ApiPublicHandheldLocationSwitchRouteImport } from './routes/api/public/handheld/location.switch'
+import { Route as ApiPublicHandheldMeasurementsTasksRouteImport } from './routes/api/public/handheld/measurements.tasks'
 import { Route as ApiPublicHandheldNotificationsReadAllRouteImport } from './routes/api/public/handheld/notifications.read-all'
 import { Route as ApiPublicHandheldNotificationsSinceRouteImport } from './routes/api/public/handheld/notifications.since'
 import { Route as ApiPublicHandheldNotificationsUnreadCountsRouteImport } from './routes/api/public/handheld/notifications.unread-counts'
@@ -310,6 +311,7 @@ import { Route as ApiPublicStorefrontProductsIdMeasurementRequestsRouteImport } 
 import { Route as ApiPublicStorefrontShortagesIdConfirmRefundRouteImport } from './routes/api/public/storefront/shortages.$id.confirm-refund'
 import { Route as ApiPublicStorefrontShortagesIdRespondRouteImport } from './routes/api/public/storefront/shortages.$id.respond'
 import { Route as ApiPublicStorefrontSupportConversationsIdRouteImport } from './routes/api/public/storefront/support.conversations.$id'
+import { Route as ApiPublicHandheldMeasurementsTasksIdClaimRouteImport } from './routes/api/public/handheld/measurements.tasks.$id.claim'
 import { Route as ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteImport } from './routes/api/public/handheld/parcels.items.$itemId.pack-pieces'
 import { Route as ApiPublicHandheldPrintCustomCardsIdPublishRouteImport } from './routes/api/public/handheld/print.custom-cards.$id.publish'
 import { Route as ApiPublicHandheldSupportConversationsIdAssignmentRouteImport } from './routes/api/public/handheld/support.conversations.$id.assignment'
@@ -1394,6 +1396,12 @@ const ApiPublicHandheldLocationSwitchRoute =
     path: '/api/public/handheld/location/switch',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHandheldMeasurementsTasksRoute =
+  ApiPublicHandheldMeasurementsTasksRouteImport.update({
+    id: '/api/public/handheld/measurements/tasks',
+    path: '/api/public/handheld/measurements/tasks',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHandheldNotificationsReadAllRoute =
   ApiPublicHandheldNotificationsReadAllRouteImport.update({
     id: '/read-all',
@@ -2012,6 +2020,12 @@ const ApiPublicStorefrontSupportConversationsIdRoute =
     path: '/$id',
     getParentRoute: () => ApiPublicStorefrontSupportConversationsRoute,
   } as any)
+const ApiPublicHandheldMeasurementsTasksIdClaimRoute =
+  ApiPublicHandheldMeasurementsTasksIdClaimRouteImport.update({
+    id: '/$id/claim',
+    path: '/$id/claim',
+    getParentRoute: () => ApiPublicHandheldMeasurementsTasksRoute,
+  } as any)
 const ApiPublicHandheldParcelsItemsItemIdPackPiecesRoute =
   ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteImport.update({
     id: '/items/$itemId/pack-pieces',
@@ -2247,6 +2261,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/items/upload-image': typeof ApiPublicHandheldItemsUploadImageRouteWithChildren
   '/api/public/handheld/label-templates/$id': typeof ApiPublicHandheldLabelTemplatesIdRouteWithChildren
   '/api/public/handheld/location/switch': typeof ApiPublicHandheldLocationSwitchRoute
+  '/api/public/handheld/measurements/tasks': typeof ApiPublicHandheldMeasurementsTasksRouteWithChildren
   '/api/public/handheld/notifications/read-all': typeof ApiPublicHandheldNotificationsReadAllRoute
   '/api/public/handheld/notifications/since': typeof ApiPublicHandheldNotificationsSinceRoute
   '/api/public/handheld/notifications/unread-counts': typeof ApiPublicHandheldNotificationsUnreadCountsRoute
@@ -2351,6 +2366,7 @@ export interface FileRoutesByFullPath {
   '/api/public/storefront/shortages/$id/confirm-refund': typeof ApiPublicStorefrontShortagesIdConfirmRefundRoute
   '/api/public/storefront/shortages/$id/respond': typeof ApiPublicStorefrontShortagesIdRespondRoute
   '/api/public/storefront/support/conversations/$id': typeof ApiPublicStorefrontSupportConversationsIdRoute
+  '/api/public/handheld/measurements/tasks/$id/claim': typeof ApiPublicHandheldMeasurementsTasksIdClaimRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteWithChildren
   '/api/public/handheld/print/custom-cards/$id/publish': typeof ApiPublicHandheldPrintCustomCardsIdPublishRoute
   '/api/public/handheld/support/conversations/$id/assignment': typeof ApiPublicHandheldSupportConversationsIdAssignmentRoute
@@ -2549,6 +2565,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/items/upload-image': typeof ApiPublicHandheldItemsUploadImageRouteWithChildren
   '/api/public/handheld/label-templates/$id': typeof ApiPublicHandheldLabelTemplatesIdRouteWithChildren
   '/api/public/handheld/location/switch': typeof ApiPublicHandheldLocationSwitchRoute
+  '/api/public/handheld/measurements/tasks': typeof ApiPublicHandheldMeasurementsTasksRouteWithChildren
   '/api/public/handheld/notifications/read-all': typeof ApiPublicHandheldNotificationsReadAllRoute
   '/api/public/handheld/notifications/since': typeof ApiPublicHandheldNotificationsSinceRoute
   '/api/public/handheld/notifications/unread-counts': typeof ApiPublicHandheldNotificationsUnreadCountsRoute
@@ -2653,6 +2670,7 @@ export interface FileRoutesByTo {
   '/api/public/storefront/shortages/$id/confirm-refund': typeof ApiPublicStorefrontShortagesIdConfirmRefundRoute
   '/api/public/storefront/shortages/$id/respond': typeof ApiPublicStorefrontShortagesIdRespondRoute
   '/api/public/storefront/support/conversations/$id': typeof ApiPublicStorefrontSupportConversationsIdRoute
+  '/api/public/handheld/measurements/tasks/$id/claim': typeof ApiPublicHandheldMeasurementsTasksIdClaimRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteWithChildren
   '/api/public/handheld/print/custom-cards/$id/publish': typeof ApiPublicHandheldPrintCustomCardsIdPublishRoute
   '/api/public/handheld/support/conversations/$id/assignment': typeof ApiPublicHandheldSupportConversationsIdAssignmentRoute
@@ -2859,6 +2877,7 @@ export interface FileRoutesById {
   '/api/public/handheld/items/upload-image': typeof ApiPublicHandheldItemsUploadImageRouteWithChildren
   '/api/public/handheld/label-templates/$id': typeof ApiPublicHandheldLabelTemplatesIdRouteWithChildren
   '/api/public/handheld/location/switch': typeof ApiPublicHandheldLocationSwitchRoute
+  '/api/public/handheld/measurements/tasks': typeof ApiPublicHandheldMeasurementsTasksRouteWithChildren
   '/api/public/handheld/notifications/read-all': typeof ApiPublicHandheldNotificationsReadAllRoute
   '/api/public/handheld/notifications/since': typeof ApiPublicHandheldNotificationsSinceRoute
   '/api/public/handheld/notifications/unread-counts': typeof ApiPublicHandheldNotificationsUnreadCountsRoute
@@ -2963,6 +2982,7 @@ export interface FileRoutesById {
   '/api/public/storefront/shortages/$id/confirm-refund': typeof ApiPublicStorefrontShortagesIdConfirmRefundRoute
   '/api/public/storefront/shortages/$id/respond': typeof ApiPublicStorefrontShortagesIdRespondRoute
   '/api/public/storefront/support/conversations/$id': typeof ApiPublicStorefrontSupportConversationsIdRoute
+  '/api/public/handheld/measurements/tasks/$id/claim': typeof ApiPublicHandheldMeasurementsTasksIdClaimRoute
   '/api/public/handheld/parcels/items/$itemId/pack-pieces': typeof ApiPublicHandheldParcelsItemsItemIdPackPiecesRouteWithChildren
   '/api/public/handheld/print/custom-cards/$id/publish': typeof ApiPublicHandheldPrintCustomCardsIdPublishRoute
   '/api/public/handheld/support/conversations/$id/assignment': typeof ApiPublicHandheldSupportConversationsIdAssignmentRoute
@@ -3170,6 +3190,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/items/upload-image'
     | '/api/public/handheld/label-templates/$id'
     | '/api/public/handheld/location/switch'
+    | '/api/public/handheld/measurements/tasks'
     | '/api/public/handheld/notifications/read-all'
     | '/api/public/handheld/notifications/since'
     | '/api/public/handheld/notifications/unread-counts'
@@ -3274,6 +3295,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/shortages/$id/confirm-refund'
     | '/api/public/storefront/shortages/$id/respond'
     | '/api/public/storefront/support/conversations/$id'
+    | '/api/public/handheld/measurements/tasks/$id/claim'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces'
     | '/api/public/handheld/print/custom-cards/$id/publish'
     | '/api/public/handheld/support/conversations/$id/assignment'
@@ -3472,6 +3494,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/items/upload-image'
     | '/api/public/handheld/label-templates/$id'
     | '/api/public/handheld/location/switch'
+    | '/api/public/handheld/measurements/tasks'
     | '/api/public/handheld/notifications/read-all'
     | '/api/public/handheld/notifications/since'
     | '/api/public/handheld/notifications/unread-counts'
@@ -3576,6 +3599,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/shortages/$id/confirm-refund'
     | '/api/public/storefront/shortages/$id/respond'
     | '/api/public/storefront/support/conversations/$id'
+    | '/api/public/handheld/measurements/tasks/$id/claim'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces'
     | '/api/public/handheld/print/custom-cards/$id/publish'
     | '/api/public/handheld/support/conversations/$id/assignment'
@@ -3781,6 +3805,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/items/upload-image'
     | '/api/public/handheld/label-templates/$id'
     | '/api/public/handheld/location/switch'
+    | '/api/public/handheld/measurements/tasks'
     | '/api/public/handheld/notifications/read-all'
     | '/api/public/handheld/notifications/since'
     | '/api/public/handheld/notifications/unread-counts'
@@ -3885,6 +3910,7 @@ export interface FileRouteTypes {
     | '/api/public/storefront/shortages/$id/confirm-refund'
     | '/api/public/storefront/shortages/$id/respond'
     | '/api/public/storefront/support/conversations/$id'
+    | '/api/public/handheld/measurements/tasks/$id/claim'
     | '/api/public/handheld/parcels/items/$itemId/pack-pieces'
     | '/api/public/handheld/print/custom-cards/$id/publish'
     | '/api/public/handheld/support/conversations/$id/assignment'
@@ -4034,6 +4060,7 @@ export interface RootRouteChildren {
   ApiPublicHandheldItemsSmartCreateRoute: typeof ApiPublicHandheldItemsSmartCreateRoute
   ApiPublicHandheldItemsUploadImageRoute: typeof ApiPublicHandheldItemsUploadImageRouteWithChildren
   ApiPublicHandheldLocationSwitchRoute: typeof ApiPublicHandheldLocationSwitchRoute
+  ApiPublicHandheldMeasurementsTasksRoute: typeof ApiPublicHandheldMeasurementsTasksRouteWithChildren
   ApiPublicHandheldPickupReadyRoute: typeof ApiPublicHandheldPickupReadyRoute
   ApiPublicHandheldPickupRedeemRoute: typeof ApiPublicHandheldPickupRedeemRoute
   ApiPublicHandheldPrintJobsLeaseRoute: typeof ApiPublicHandheldPrintJobsLeaseRoute
@@ -5472,6 +5499,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldLocationSwitchRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/handheld/measurements/tasks': {
+      id: '/api/public/handheld/measurements/tasks'
+      path: '/api/public/handheld/measurements/tasks'
+      fullPath: '/api/public/handheld/measurements/tasks'
+      preLoaderRoute: typeof ApiPublicHandheldMeasurementsTasksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/handheld/notifications/read-all': {
       id: '/api/public/handheld/notifications/read-all'
       path: '/read-all'
@@ -6200,6 +6234,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicStorefrontSupportConversationsIdRouteImport
       parentRoute: typeof ApiPublicStorefrontSupportConversationsRoute
     }
+    '/api/public/handheld/measurements/tasks/$id/claim': {
+      id: '/api/public/handheld/measurements/tasks/$id/claim'
+      path: '/$id/claim'
+      fullPath: '/api/public/handheld/measurements/tasks/$id/claim'
+      preLoaderRoute: typeof ApiPublicHandheldMeasurementsTasksIdClaimRouteImport
+      parentRoute: typeof ApiPublicHandheldMeasurementsTasksRoute
+    }
     '/api/public/handheld/parcels/items/$itemId/pack-pieces': {
       id: '/api/public/handheld/parcels/items/$itemId/pack-pieces'
       path: '/items/$itemId/pack-pieces'
@@ -6892,6 +6933,21 @@ const ApiPublicHandheldItemsUploadImageRouteWithChildren =
     ApiPublicHandheldItemsUploadImageRouteChildren,
   )
 
+interface ApiPublicHandheldMeasurementsTasksRouteChildren {
+  ApiPublicHandheldMeasurementsTasksIdClaimRoute: typeof ApiPublicHandheldMeasurementsTasksIdClaimRoute
+}
+
+const ApiPublicHandheldMeasurementsTasksRouteChildren: ApiPublicHandheldMeasurementsTasksRouteChildren =
+  {
+    ApiPublicHandheldMeasurementsTasksIdClaimRoute:
+      ApiPublicHandheldMeasurementsTasksIdClaimRoute,
+  }
+
+const ApiPublicHandheldMeasurementsTasksRouteWithChildren =
+  ApiPublicHandheldMeasurementsTasksRoute._addFileChildren(
+    ApiPublicHandheldMeasurementsTasksRouteChildren,
+  )
+
 interface ApiPublicHandheldPrintCustomCardsIdRouteChildren {
   ApiPublicHandheldPrintCustomCardsIdPublishRoute: typeof ApiPublicHandheldPrintCustomCardsIdPublishRoute
 }
@@ -7175,6 +7231,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHandheldItemsUploadImageRoute:
     ApiPublicHandheldItemsUploadImageRouteWithChildren,
   ApiPublicHandheldLocationSwitchRoute: ApiPublicHandheldLocationSwitchRoute,
+  ApiPublicHandheldMeasurementsTasksRoute:
+    ApiPublicHandheldMeasurementsTasksRouteWithChildren,
   ApiPublicHandheldPickupReadyRoute: ApiPublicHandheldPickupReadyRoute,
   ApiPublicHandheldPickupRedeemRoute: ApiPublicHandheldPickupRedeemRoute,
   ApiPublicHandheldPrintJobsLeaseRoute: ApiPublicHandheldPrintJobsLeaseRoute,
