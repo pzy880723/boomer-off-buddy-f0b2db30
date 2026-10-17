@@ -224,6 +224,8 @@ export const updateStorefrontListingLifecycle = createServerFn({ method: "POST" 
 
     const payload = {
       status: nextStatus,
+      // 店员显式下架/归档：同时取消“准备完成后自动上架”的意图。
+      ...(nextStatus !== "published" ? { readiness_hold: false } : {}),
       published_at:
         nextStatus === "published"
           ? (row.published_at ?? new Date().toISOString())

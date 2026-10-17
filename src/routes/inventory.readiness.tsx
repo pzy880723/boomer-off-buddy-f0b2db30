@@ -31,6 +31,7 @@ const ERRORS: Record<string, string> = {
   missing_images: "缺少商品图片",
   empty_content: "无法生成图文详情",
   image_failed: "图片处理失败",
+  detail_image_failed: "详情图片处理失败",
 };
 const MODES: Record<string, string> = { template: "自动模板", reused_existing: "沿用已有详情" };
 

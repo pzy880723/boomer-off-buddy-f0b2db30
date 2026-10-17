@@ -134,6 +134,8 @@ async function processContentImageJob(job: ContentImageJob): Promise<string> {
   if (!["succeeded", "retryable_failed", "permanent_failed", "stale", "cancelled"].includes(status)) {
     throw new Error("Unexpected detail image completion status");
   }
+  // 详情图片也属于上架准备：完成/失败后推进一次（门禁会阻断仍在运行或失败的详情图片）。
+  if (status !== "stale") await advanceListingReadinessSafe(job.sku_id);
   return status;
 }
 

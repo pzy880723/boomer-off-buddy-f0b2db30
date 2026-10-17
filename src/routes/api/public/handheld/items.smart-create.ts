@@ -341,6 +341,8 @@ async function handleSmartCreate(request: Request, timing: ReturnType<typeof cre
             aiProcessing = "consent_unavailable";
           }
         }
+        // 只有“已确认排队成功”或“明确不做 AI 修图”才标记图片已定；排队失败/授权读取失败保持未定（fail-closed，不会超时放行原图）。
+        let imagesSettled = aiProcessing === "skipped_by_client" || aiProcessing === "consent_required";
         if (aiProcessing === "queued_or_idle") {
           try {
             imageProcessing = await enqueueListingImageJobs({
@@ -349,6 +351,7 @@ async function handleSmartCreate(request: Request, timing: ReturnType<typeof cre
               aiActorUserId: session.user_id,
               aiPolicyVersion: AI_POLICY_VERSION,
             });
+            imagesSettled = true;
           } catch (e) {
             console.error("[handheld smart-create] 创建图片优化任务失败", e);
             imageProcessing = { status: "retryable_failed", queued: 0 };
@@ -357,7 +360,9 @@ async function handleSmartCreate(request: Request, timing: ReturnType<typeof cre
 
         // 新上架准备：图片任务已入队（或无需排队），标记已定并推进一次；未就绪的上架意图保持隐藏。
         try {
-          await supabaseAdmin.rpc("listing_readiness_mark_images_settled" as never, { p_sku: skuId } as never);
+          if (imagesSettled) {
+            await supabaseAdmin.rpc("listing_readiness_mark_images_settled" as never, { p_sku: skuId } as never);
+          }
           await advanceListingReadiness(skuId);
         } catch (e) {
           console.error("[handheld smart-create] 上架准备推进失败", (e as Error).message);

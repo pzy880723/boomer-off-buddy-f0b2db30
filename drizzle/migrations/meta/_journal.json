@@ -533,6 +533,27 @@
       "when": 1792214787998,
       "tag": "0075_listing_readiness_gate",
       "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "7",
+      "when": 1792216451640,
+      "tag": "0076_listing_readiness_fail_closed",
+      "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1792216634345,
+      "tag": "0077_listing_readiness_fail_closed_functions",
+      "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1792216759949,
+      "tag": "0078_listing_readiness_explicit_settle",
+      "breakpoints": true
     }
   ]
 }
