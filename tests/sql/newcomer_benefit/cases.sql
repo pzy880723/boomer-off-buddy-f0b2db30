@@ -37,14 +37,18 @@ SELECT t(commerce_newcomer_finish(s, tok, 'retry', NULL, 'timeout_before_send')=
   FROM (SELECT slot_id s, claim_token tok FROM c1 ORDER BY slot_id OFFSET 2 LIMIT 1) x;
 
 -- 未知结果只回查：unknown 槽位领取为 reconcile，不是 dispatch
+UPDATE commerce_newcomer_grant_slots SET next_run_at = now() + interval '1 hour' WHERE status = 'pending';
 UPDATE commerce_newcomer_grant_slots SET next_run_at = now() WHERE status = 'unknown';
 CREATE TEMP TABLE c2 AS SELECT * FROM commerce_newcomer_claim(50, 60) WHERE mode = 'reconcile';
 SELECT t((SELECT count(*)=1 FROM c2), 'unknown slot claimed only for reconcile');
 -- 回查找到 → succeeded；不新增写
 SELECT t(commerce_newcomer_finish(slot_id, claim_token, 'succeeded', 'yz-found', NULL)='succeeded', 'reconcile found marks succeeded') FROM c2;
+UPDATE commerce_newcomer_grant_slots SET next_run_at = now() WHERE status = 'pending';
 -- 租约过期的 dispatching → unknown（不会被当作可重发）
 UPDATE commerce_newcomer_grant_slots SET lease_until = now() - interval '1 second' WHERE status = 'dispatching';
+UPDATE commerce_newcomer_grant_slots SET next_run_at = now() + interval '1 hour' WHERE status = 'pending';
 SELECT count(*) FROM commerce_newcomer_claim(0, 60);
+UPDATE commerce_newcomer_grant_slots SET next_run_at = now() WHERE status = 'pending';
 SELECT t((SELECT count(*)=0 FROM commerce_newcomer_grant_slots WHERE status='dispatching' AND lease_until < now()), 'expired lease never stays dispatching');
 SELECT t((SELECT bool_and(status IN ('unknown','reconciling','succeeded','retry_wait','pending','dispatching')) FROM commerce_newcomer_grant_slots), 'states valid');
 UPDATE commerce_newcomer_grant_slots SET status='unknown', claim_token=NULL, lease_until=NULL, next_run_at = now() + interval '1 hour' WHERE status IN ('unknown','reconciling');
