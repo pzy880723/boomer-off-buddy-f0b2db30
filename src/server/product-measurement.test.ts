@@ -39,7 +39,7 @@ test("申请测量：同商品多用户合并为一个活跃任务，重复申�
   assert.equal(b.task_id, a.task_id, "第二个用户应并入同一任务");
   const a2 = await requestMeasurement(store, { customerId: "custA", listingId: "listing1" });
   assert.equal(a2.task_id, a.task_id, "重复申请返回同一任务");
-  assert.equal(store.requesters.size, 2, "只记录两个不同申请人");
+  assert.equal(store.requesters.get(a.task_id!)!.size, 2, "只记录两个不同申请人");
 });
 
 test("已有实测尺寸的商品直接返回 completed，不建任务", async () => {
