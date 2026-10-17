@@ -480,6 +480,7 @@ export type Database = {
           id: string
           kind: string
           order_id: string | null
+          product_id: string | null
           read_at: string | null
           shortage_id: string | null
           title: string
@@ -492,6 +493,7 @@ export type Database = {
           id?: string
           kind?: string
           order_id?: string | null
+          product_id?: string | null
           read_at?: string | null
           shortage_id?: string | null
           title: string
@@ -504,6 +506,7 @@ export type Database = {
           id?: string
           kind?: string
           order_id?: string | null
+          product_id?: string | null
           read_at?: string | null
           shortage_id?: string | null
           title?: string
@@ -7427,11 +7430,14 @@ export type Database = {
           error: string | null
           front_height_px: number | null
           front_width_px: number | null
+          height_cm: number | null
           px_per_cm: number | null
           revision: number
           sku_id: string
           status: string
           updated_at: string
+          verified: boolean
+          width_cm: number | null
         }
         Insert: {
           bbox?: Json | null
@@ -7440,11 +7446,14 @@ export type Database = {
           error?: string | null
           front_height_px?: number | null
           front_width_px?: number | null
+          height_cm?: number | null
           px_per_cm?: number | null
           revision: number
           sku_id: string
           status?: string
           updated_at?: string
+          verified?: boolean
+          width_cm?: number | null
         }
         Update: {
           bbox?: Json | null
@@ -7453,11 +7462,14 @@ export type Database = {
           error?: string | null
           front_height_px?: number | null
           front_width_px?: number | null
+          height_cm?: number | null
           px_per_cm?: number | null
           revision?: number
           sku_id?: string
           status?: string
           updated_at?: string
+          verified?: boolean
+          width_cm?: number | null
         }
         Relationships: [
           {
@@ -7512,6 +7524,7 @@ export type Database = {
         Row: {
           claimed_at: string | null
           claimed_by: string | null
+          client_op_id: string | null
           completed_at: string | null
           completed_by: string | null
           created_at: string
@@ -7525,6 +7538,7 @@ export type Database = {
         Insert: {
           claimed_at?: string | null
           claimed_by?: string | null
+          client_op_id?: string | null
           completed_at?: string | null
           completed_by?: string | null
           created_at?: string
@@ -7538,6 +7552,7 @@ export type Database = {
         Update: {
           claimed_at?: string | null
           claimed_by?: string | null
+          client_op_id?: string | null
           completed_at?: string | null
           completed_by?: string | null
           created_at?: string
@@ -11548,6 +11563,24 @@ export type Database = {
       inv_sku_delete_blocker: { Args: { p_sku_id: string }; Returns: string }
       inv_sku_is_hq_actor: { Args: never; Returns: boolean }
       inventory_delete_unused_sku: { Args: { p_sku_id: string }; Returns: Json }
+      measurement_request: {
+        Args: { p_customer_id: string; p_listing_id: string }
+        Returns: Json
+      }
+      measurement_save: {
+        Args: {
+          p_actor_id: string
+          p_client_op_id: string
+          p_depth: number
+          p_diameter: number
+          p_expected_revision: number
+          p_height: number
+          p_sku_id: string
+          p_task_id: string
+          p_width: number
+        }
+        Returns: Json
+      }
       pos_complete_return: {
         Args: {
           p_authorization_id?: string
