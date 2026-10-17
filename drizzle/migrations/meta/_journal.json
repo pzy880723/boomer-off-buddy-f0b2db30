@@ -505,6 +505,13 @@
       "when": 1792207057264,
       "tag": "0071_measurement_stock_location_fix",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1792207743791,
+      "tag": "0072_measurement_claim_rpc",
+      "breakpoints": true
     }
   ]
 }

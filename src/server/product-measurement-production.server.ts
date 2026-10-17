@@ -127,46 +127,26 @@ export async function saveMeasurementProduction(args: {
   return data as never;
 }
 
-/** 领取任务：UPDATE ... select 核对受影响行，竞态失败不报假成功 */
+/**
+ * 领取任务：唯一出口是 measurement_claim 事务 RPC（锁 task 后重查当前门店、actor 权限、该店正库存）。
+ * 返回受控错误码 not_found / forbidden / no_stock / already_claimed，其他内部错误统一 claim_failed（原文只写日志）。
+ */
+export const CLAIM_ERROR_CODES = ["not_found", "forbidden", "no_stock", "already_claimed"] as const;
 export async function claimTaskProduction(
   taskId: string,
   actorId: string,
-): Promise<MeasurementTaskRow> {
-  const { data: current, error: readError } = await supabaseAdmin
-    .from("product_measurement_tasks" as never)
-    .select("*")
-    .eq("id", taskId)
-    .maybeSingle();
-  if (readError) throw new Error(readError.message);
-  const row = current as unknown as MeasurementTaskRow | null;
-  if (!row || row.status === "completed" || row.status === "cancelled") throw new Error("not_found");
-  if (row.status === "claimed" && row.claimed_by && row.claimed_by !== actorId) {
-    throw new Error("already_claimed");
+): Promise<{ task_id: string; status: "claimed"; replayed: boolean }> {
+  const { data, error } = await supabaseAdmin.rpc("measurement_claim" as never, {
+    p_task_id: taskId,
+    p_actor_id: actorId,
+  } as never);
+  if (error) {
+    const code = (CLAIM_ERROR_CODES as readonly string[]).find((c) => error.message === c);
+    if (code) throw new Error(code);
+    console.error("[measurement_claim]", error.message);
+    throw new Error("claim_failed");
   }
-  const { data, error } = await supabaseAdmin
-    .from("product_measurement_tasks" as never)
-    .update({
-      status: "claimed",
-      claimed_by: actorId,
-      claimed_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    } as never)
-    .eq("id", taskId)
-    .eq("status", "pending")
-    .select("id");
-  if (error) throw new Error(error.message);
-  if (!data || (data as unknown[]).length === 0) {
-    // 已被并发领取：回读确认归属
-    const { data: after } = await supabaseAdmin
-      .from("product_measurement_tasks" as never)
-      .select("claimed_by")
-      .eq("id", taskId)
-      .maybeSingle();
-    const claimedBy = (after as unknown as { claimed_by: string | null } | null)?.claimed_by;
-    if (claimedBy === actorId) return { ...row, status: "claimed", claimed_by: actorId };
-    throw new Error("already_claimed");
-  }
-  return { ...row, status: "claimed", claimed_by: actorId };
+  return data as never;
 }
 
 export async function findActiveTaskProduction(skuId: string): Promise<MeasurementTaskRow | null> {

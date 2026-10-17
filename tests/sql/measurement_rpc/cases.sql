@@ -207,3 +207,42 @@ DO $$ BEGIN
   ASSERT has_function_privilege('service_role', 'public.measurement_save(uuid,uuid,uuid,text,integer,uuid,numeric,numeric,numeric,numeric)', 'EXECUTE'), 'service exec save';
   RAISE NOTICE 'PASS grants service_role only';
 END $$;
+
+-- 14 领取：调拨 A→B 后旧 A 员工拒绝（不泄露新店），B 员工可领；同 actor 幂等也重验；HQ 无货不可绕过
+DO $$ DECLARE r jsonb; t uuid; BEGIN
+  PERFORM test_mk(14,'a','a=1,b=0');
+  t := (measurement_request(l(14), cu(1))->>'task_id')::uuid;
+  r := measurement_claim(t, st('1'));
+  ASSERT r->>'status'='claimed' AND NOT (r->>'replayed')::boolean, 'A claims at A';
+  r := measurement_claim(t, st('1'));
+  ASSERT (r->>'replayed')::boolean, 'same actor idempotent';
+  ASSERT NOT (r ? 'location_id'), 'no store info in result';
+  PERFORM test_expect_err(format('select measurement_claim(%L,%L)', t, st('2')), 'forbidden');
+END $$;
+UPDATE inv_stocks SET qty=0 WHERE sku_id=s(14) AND location_id=loc('a');
+UPDATE inv_stocks SET qty=1 WHERE sku_id=s(14) AND location_id=loc('b');
+DO $$ DECLARE r jsonb; t uuid; BEGIN
+  SELECT id INTO t FROM product_measurement_tasks WHERE sku_id=s(14) AND status IN ('pending','claimed');
+  ASSERT (SELECT location_id FROM product_measurement_tasks WHERE id=t)=loc('b'), 'moved to B, claim cleared';
+  -- 旧 A 员工（包括曾领取者）重试：forbidden，错误不含门店 id
+  BEGIN PERFORM measurement_claim(t, st('1')); RAISE EXCEPTION 'FAIL old A claimed';
+  EXCEPTION WHEN OTHERS THEN
+    ASSERT SQLERRM = 'forbidden', 'old A forbidden without store info: ' || SQLERRM;
+  END;
+  ASSERT (SELECT claimed_by FROM product_measurement_tasks WHERE id=t) IS NULL, 'not claimed by A';
+  r := measurement_claim(t, st('2'));
+  ASSERT r->>'status'='claimed' AND (SELECT claimed_by FROM product_measurement_tasks WHERE id=t)=st('2'), 'B claims';
+  PERFORM test_expect_err(format('select measurement_claim(%L,%L)', t, st('9')), 'already_claimed');
+  RAISE NOTICE 'PASS claim after transfer: old store rejected, new store claims';
+END $$;
+UPDATE inv_stocks SET qty=0 WHERE sku_id=s(14);
+DO $$ DECLARE t uuid; BEGIN
+  SELECT id INTO t FROM product_measurement_tasks WHERE sku_id=s(14) AND status='pending';
+  PERFORM test_expect_err(format('select measurement_claim(%L,%L)', t, st('9')), 'no_stock');
+  PERFORM test_expect_err(format('select measurement_claim(%L,%L)', t, st('2')), 'no_stock');
+  PERFORM test_expect_err(format('select measurement_claim(%L,%L)', gen_random_uuid(), st('9')), 'not_found');
+  UPDATE product_measurement_tasks SET location_id=NULL WHERE id=t;
+  PERFORM test_expect_err(format('select measurement_claim(%L,%L)', t, st('9')), 'forbidden');
+  ASSERT NOT has_function_privilege('authenticated','public.measurement_claim(uuid,uuid)','EXECUTE'), 'claim service only';
+  RAISE NOTICE 'PASS claim no-stock/NULL store not bypassable by HQ';
+END $$;

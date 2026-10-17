@@ -11625,6 +11625,10 @@ export type Database = {
         }
         Returns: Json
       }
+      measurement_claim: {
+        Args: { p_actor_id: string; p_task_id: string }
+        Returns: Json
+      }
       measurement_location_has_stock: {
         Args: { p_location_id: string; p_sku_id: string }
         Returns: boolean

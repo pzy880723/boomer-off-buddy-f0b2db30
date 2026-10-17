@@ -6,10 +6,7 @@ import {
   resolveSessionUser,
 } from "@/server/handheld-auth.server";
 import { errCode } from "@/lib/handheld/errors";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { claimTaskProduction } from "@/server/product-measurement-production.server";
-import { loadMeasurementActor } from "@/server/measurement-actor.server";
-import { actorCanAccessLocation } from "@/server/product-measurement.server";
 
 /** POST /api/public/handheld/measurements/tasks/{id}/claim — 领取尺寸待办 */
 export const Route = createFileRoute("/api/public/handheld/measurements/tasks/$id/claim")({
@@ -22,28 +19,19 @@ export const Route = createFileRoute("/api/public/handheld/measurements/tasks/$i
         const session = await resolveSessionUser(request);
         if (!session) return errCode("unauthorized", "Sign in required");
 
-        const { data: task } = await supabaseAdmin
-          .from("product_measurement_tasks" as never)
-          .select("id, location_id, status")
-          .eq("id", params.id)
-          .maybeSingle();
-        const row = task as unknown as { id: string; location_id: string | null; status: string } | null;
-        if (!row || row.status === "completed" || row.status === "cancelled") {
-          return errCode("not_found", "Task not found");
-        }
-        const actor = await loadMeasurementActor(session.user_id);
-        if (!actorCanAccessLocation(actor, row.location_id)) {
-          return errCode("unauthorized_role", "No access to this location");
-        }
+        // 权限/当前门店/正库存在 measurement_claim RPC 锁内校验；错误不含门店信息
         try {
-          await claimTaskProduction(params.id, session.user_id);
+          const result = await claimTaskProduction(params.id, session.user_id);
+          return ok({ task_id: result.task_id, status: "claimed", replayed: result.replayed });
         } catch (error) {
           const message = (error as Error).message;
           if (message === "already_claimed") return errCode("already_exists", "Task claimed by someone else");
           if (message === "not_found") return errCode("not_found", "Task not found");
-          throw error;
+          if (message === "forbidden" || message === "no_stock") {
+            return errCode("unauthorized_role", "No access to this task");
+          }
+          return errCode("internal_error", "Claim failed");
         }
-        return ok({ task_id: params.id, status: "claimed" });
       },
     },
   },
