@@ -94,7 +94,7 @@ export const Route = createFileRoute("/api/public/storefront/products/$id")({
             .maybeSingle();
           // 只公开来源类型/资料ID/标题/版本，不含提示词或内部字段。
           const detail_content_sources = (
-            ((readiness.data as { content_sources?: unknown } | null)?.content_sources ?? []) as Array<Record<string, unknown>>
+            ((readiness.data as { content_sources?: unknown } | null)?.content_sources ?? content?.auto_sources ?? []) as Array<Record<string, unknown>>
           ).flatMap((s) =>
             s.kind === "official_knowledge"
               ? [{ kind: "official_knowledge", id: String(s.id), type: String(s.type), title: String(s.title ?? ""), version: String(s.version ?? "") }]

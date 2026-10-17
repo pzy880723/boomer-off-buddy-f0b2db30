@@ -36,11 +36,13 @@ async function main() {
     return;
   }
   // 执行前把原内容快照写到报告文件（DB 内另有 auto_backfill_backup）。
+  if (!out) throw new Error("--apply requires --out <report.json> (original-content snapshot is written first)");
+  const report: Record<string, unknown> = { mode: "apply", at: new Date().toISOString(), next_after: plan.next_after,
+    originals: plan.items.map((i) => ({ sku_id: i.sku_id, original: i.original })) };
+  writeFileSync(out, JSON.stringify(report, null, 2));
   const results = await applyBackfill(backfillDb, plan.items);
-  const report = { mode: "apply", at: new Date().toISOString(), next_after: plan.next_after,
-    originals: plan.items.map((i) => ({ sku_id: i.sku_id, original: i.original })), results };
+  writeFileSync(out, JSON.stringify({ ...report, results }, null, 2));
   console.log(JSON.stringify({ mode: "apply", next_after: plan.next_after, results }, null, 2));
-  if (out) writeFileSync(out, JSON.stringify(report, null, 2));
 }
 
 main().catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); });
