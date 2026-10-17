@@ -18,6 +18,8 @@ export const HANDHELD_ERROR_CODES = {
   not_found: { status: 404, message: "Resource not found" },
   unlinked: { status: 404, message: "EPC not bound to any SKU" },
   already_exists: { status: 409, message: "Resource already exists / conflict" },
+  revision_conflict: { status: 409, message: "Resource was updated by someone else, refresh and retry" },
+  op_conflict: { status: 409, message: "client_op_id reused with different content" },
   transfer_required: { status: 409, message: "EPC is in another location, transfer required" },
   rate_limited: { status: 429, message: "AI gateway rate limited" },
   ai_credits_exhausted: { status: 402, message: "AI credits exhausted" },
