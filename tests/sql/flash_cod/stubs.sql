@@ -1,4 +1,7 @@
 -- 闪送到付隔离测试夹具：表结构与真实库关键列/约束一致（0087 的 ALTER 依赖同名约束）。
+-- 底层函数 commerce_create_order_v2 / commerce_mark_ordinary_order_paid 使用从真实库
+-- pg_get_functiondef 导出的原文（real_*.sql），不用简化 stub；仅叶子库存流水 inv_apply_movement
+-- 用忠实最小实现（真实版会调用手持同步链，与被测函数无关）。
 DO $$ BEGIN CREATE ROLE anon NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE ROLE authenticated NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE ROLE service_role NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
@@ -7,12 +10,21 @@ CREATE TABLE public.inv_locations (id uuid PRIMARY KEY, kind text DEFAULT 'shop'
 CREATE TABLE public.user_roles (user_id uuid, role text);
 CREATE TABLE public.user_location_perms (user_id uuid, location_id uuid);
 CREATE TABLE public.commerce_customers (id uuid PRIMARY KEY, status text DEFAULT 'active');
-CREATE TABLE public.inv_skus (id uuid PRIMARY KEY, sale_ownership text DEFAULT 'owned', settlement_party_ref text);
-CREATE TABLE public.commerce_listings (id uuid PRIMARY KEY, location_id uuid, sku_id uuid);
+CREATE TABLE public.inv_skus (id uuid PRIMARY KEY, sale_ownership text DEFAULT 'owned', settlement_party_ref text,
+  status text DEFAULT 'active', is_display boolean DEFAULT true, bundle_items jsonb,
+  inventory_policy text DEFAULT 'tracked', stock_qty int DEFAULT 0, updated_at timestamptz DEFAULT now());
+CREATE TABLE public.inv_stocks (sku_id uuid, location_id uuid, qty int DEFAULT 0, updated_at timestamptz DEFAULT now(),
+  UNIQUE (sku_id, location_id));
+CREATE TABLE public.inv_stock_movements (id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  sku_id uuid, location_id uuid, delta int, balance_after int, ref_type text, ref_id uuid, epc text, note text, created_by uuid);
+CREATE TABLE public.inv_epcs (epc text PRIMARY KEY, status text, current_location_id uuid, last_seen_at timestamptz);
+CREATE TABLE public.commerce_listings (id uuid PRIMARY KEY, location_id uuid, sku_id uuid,
+  status text DEFAULT 'published', product_type text DEFAULT 'custom', epc text, title text,
+  cover_url text, condition_grade text, price numeric DEFAULT 0, sold_at timestamptz, updated_at timestamptz DEFAULT now());
 CREATE TABLE public.pos_customer_coupons (id uuid PRIMARY KEY, customer_id uuid, status text DEFAULT 'active', reserved_order_id uuid, updated_at timestamptz DEFAULT now());
 CREATE TABLE public.commerce_orders (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  customer_id uuid, idempotency_key text, source_channel text DEFAULT 'storefront',
+  user_id uuid, customer_id uuid, idempotency_key text, source_channel text DEFAULT 'storefront',
   payment_status text DEFAULT 'unpaid', order_status text DEFAULT 'pending_payment',
   fulfillment_method text DEFAULT 'shipping',
   courier_provider text, courier_service_code text, courier_service_name text,
@@ -20,23 +32,49 @@ CREATE TABLE public.commerce_orders (
   shipping_fee numeric DEFAULT 0, subtotal numeric DEFAULT 0, discount_total numeric DEFAULT 0,
   discount_snapshot jsonb, total_amount numeric DEFAULT 0, currency text DEFAULT 'CNY',
   payment_route jsonb, customer_note text, courier_quote_snapshot jsonb,
+  reservation_expires_at timestamptz, provider_transaction_id text, paid_at timestamptz,
   created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now(),
+  UNIQUE (user_id, idempotency_key),
   CONSTRAINT commerce_orders_fulfillment_method_check CHECK (fulfillment_method = ANY (ARRAY['shipping','pickup','carryout'])),
   CONSTRAINT commerce_orders_courier_provider_check CHECK (courier_provider = ANY (ARRAY['sf','cainiao','platform']))
 );
 CREATE TABLE public.commerce_order_items (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), order_id uuid, listing_id uuid, location_id uuid,
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), order_id uuid, listing_id uuid, sku_id uuid, location_id uuid,
+  epc text, title_snapshot text, image_snapshot text, condition_snapshot text, unit_price numeric DEFAULT 0,
   quantity int, line_total numeric DEFAULT 0, discount_total numeric DEFAULT 0,
   discount_snapshot jsonb, ownership_snapshot text, settlement_snapshot jsonb);
-CREATE TABLE public.inventory_reservation_lines (order_item_id uuid, stock_sku_id uuid);
-CREATE TABLE public.fulfillments (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), order_id uuid, location_id uuid, status text DEFAULT 'allocated', handed_over_at timestamptz, updated_at timestamptz DEFAULT now());
-CREATE TABLE public.fulfillment_items (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), fulfillment_id uuid, order_item_id uuid, expected_qty int CHECK (expected_qty>0), picked_qty int DEFAULT 0, picked_at timestamptz, CHECK (picked_qty>=0 AND picked_qty<=expected_qty));
+CREATE TABLE public.inventory_reservations (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), order_id uuid, listing_id uuid, sku_id uuid, location_id uuid,
+  quantity int, expires_at timestamptz, status text DEFAULT 'active', consumed_at timestamptz);
+CREATE TABLE public.inventory_reservation_lines (reservation_id uuid, order_item_id uuid, stock_sku_id uuid, location_id uuid, quantity int);
+CREATE TABLE public.commerce_payments (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), order_id uuid,
+  payment_channel text, status text, provider_transaction_id text);
+CREATE TABLE public.fulfillments (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), order_id uuid, location_id uuid,
+  status text DEFAULT 'allocated', handed_over_at timestamptz, updated_at timestamptz DEFAULT now(),
+  UNIQUE (order_id, location_id));
+CREATE TABLE public.fulfillment_items (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), fulfillment_id uuid, order_item_id uuid,
+  sku_id uuid, epc text, expected_qty int CHECK (expected_qty>0), picked_qty int DEFAULT 0, picked_at timestamptz,
+  CHECK (picked_qty>=0 AND picked_qty<=expected_qty),
+  UNIQUE (fulfillment_id, order_item_id, sku_id));
 CREATE TABLE public.fulfillment_shortages (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), fulfillment_id uuid, fulfillment_item_id uuid, quantity int, status text, refund_state text, order_id uuid, refund_intent_id uuid, refund_total_fen int);
 CREATE TABLE public.shipments (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), fulfillment_id uuid UNIQUE, provider text,
   service_code text, status text, tracking_no text, carrier_label text,
   idempotency_key text UNIQUE, request_fingerprint text, booked_at timestamptz,
   created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now());
+
+-- 叶子库存流水：忠实最小实现（真实版额外同步手持端，与被测链路无关）
+CREATE OR REPLACE FUNCTION public.inv_apply_movement(p_sku_id uuid, p_location_id uuid, p_delta int, p_ref_type text, p_ref_id uuid, p_epc text DEFAULT NULL, p_note text DEFAULT NULL)
+RETURNS int LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_new int;
+BEGIN
+  INSERT INTO public.inv_stocks (sku_id, location_id, qty) VALUES (p_sku_id, p_location_id, p_delta)
+    ON CONFLICT (sku_id, location_id) DO UPDATE SET qty = inv_stocks.qty + EXCLUDED.qty, updated_at = now()
+    RETURNING qty INTO v_new;
+  INSERT INTO public.inv_stock_movements (sku_id, location_id, delta, balance_after, ref_type, ref_id, epc, note)
+    VALUES (p_sku_id, p_location_id, p_delta, v_new, p_ref_type, p_ref_id, p_epc, p_note);
+  RETURN v_new;
+END $$;
 
 -- 基础报价夹具：按 items 内容 md5 取回报价 JSON
 CREATE TABLE public.quote_fixtures (items_key text PRIMARY KEY, quote jsonb);
@@ -45,37 +83,12 @@ RETURNS jsonb LANGUAGE sql STABLE SET search_path = public AS $$
   SELECT quote FROM public.quote_fixtures WHERE items_key = md5(p_items::text)
 $$;
 
--- 下单底层夹具：写订单+子单+明细，返回订单行（模拟真实 commerce_create_order_v2 的落库形状）
-CREATE OR REPLACE FUNCTION public.commerce_create_order_v2(
-  p_user_id uuid, p_idempotency_key text, p_items jsonb, p_recipient_name text, p_recipient_phone text,
-  p_shipping_address jsonb, p_courier_provider text, p_courier_service_code text, p_courier_service_name text,
-  p_shipping_fee numeric, p_quote_snapshot jsonb, p_customer_note text)
-RETURNS public.commerce_orders LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE v_order public.commerce_orders; v_item jsonb; v_f uuid; v_oi uuid; v_listing record;
-BEGIN
-  INSERT INTO public.commerce_orders (customer_id, idempotency_key, source_channel, payment_status, order_status,
-      fulfillment_method, courier_provider, courier_service_code, courier_service_name,
-      recipient_name, recipient_phone, shipping_address, shipping_fee,
-      subtotal, total_amount, courier_quote_snapshot, customer_note)
-    VALUES (p_user_id, p_idempotency_key, 'storefront', 'unpaid', 'pending_payment', 'shipping',
-      p_courier_provider, p_courier_service_code, p_courier_service_name,
-      p_recipient_name, p_recipient_phone, p_shipping_address, p_shipping_fee,
-      coalesce((p_quote_snapshot->>'subtotal_fen')::numeric,0)/100,
-      coalesce((p_quote_snapshot->>'total_fen')::numeric,0)/100,
-      p_quote_snapshot, p_customer_note)
-    RETURNING * INTO v_order;
-  FOR v_item IN SELECT * FROM jsonb_array_elements(p_items) LOOP
-    SELECT * INTO v_listing FROM public.commerce_listings WHERE id = (v_item->>'listing_id')::uuid;
-    INSERT INTO public.commerce_order_items (order_id, listing_id, location_id, quantity, line_total)
-      VALUES (v_order.id, v_listing.id, v_listing.location_id, (v_item->>'quantity')::int, 0) RETURNING id INTO v_oi;
-    SELECT id INTO v_f FROM public.fulfillments WHERE order_id = v_order.id AND location_id = v_listing.location_id;
-    IF v_f IS NULL THEN
-      INSERT INTO public.fulfillments (order_id, location_id, status) VALUES (v_order.id, v_listing.location_id, 'allocated') RETURNING id INTO v_f;
-    END IF;
-    INSERT INTO public.fulfillment_items (fulfillment_id, order_item_id, expected_qty) VALUES (v_f, v_oi, (v_item->>'quantity')::int);
-  END LOOP;
-  RETURN v_order;
-END $$;
+-- 真实底层函数（pg_get_functiondef 导出原文，不用 stub）
+\i tests/sql/flash_cod/real_create_order_v2.sql
+\i tests/sql/flash_cod/real_mark_ordinary_order_paid.sql
+\i tests/sql/flash_cod/real_assign_customer_trigger.sql
+CREATE TRIGGER commerce_assign_storefront_customer BEFORE INSERT OR UPDATE OF user_id, customer_id, source_channel
+  ON public.commerce_orders FOR EACH ROW EXECUTE FUNCTION public.commerce_assign_storefront_customer();
 
 -- 结算阻断夹具：与真实语义一致的简化版
 CREATE OR REPLACE FUNCTION public.commerce_order_settlement_block(p_order_id uuid)
