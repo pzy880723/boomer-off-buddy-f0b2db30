@@ -63,3 +63,25 @@ if [ $r1 -eq 0 ] && [ $r2 -eq 0 ] && [ "$loc" = "t" ] && [ "$nn$nb$rq" = "111" ]
 else
   echo "FAIL first-request window loc=$loc nn=$nn nb=$nb rq=$rq r1=$r1 r2=$r2"; cat /tmp/mf_t1.out /tmp/mf_t2.out; exit 1
 fi
+
+# 批量库存反序提交：T1 改 X@A 再 Y@A，T2 改 Y@B 再 X@B（库存行互不冲突）。
+# 测试专用屏障：把 measurement_task_rebalance 包一层 pg_sleep，使每个事务在提交时
+# 取得第一个 SKU 的路由锁后停顿，再处理第二行 → 按 SKU 取锁会确定性成环；全局 routing 锁必须两边都成功。
+q "select test_mk(36,'a','a=1,b=1'); select test_mk(37,'a','a=1,b=1')" >/dev/null
+q "select measurement_request(l(36),cu(1)); select measurement_request(l(37),cu(1))" >/dev/null
+$PSQL -q -c "alter function measurement_task_rebalance(uuid) rename to measurement_task_rebalance_real" \
+  -c "create function measurement_task_rebalance(p uuid) returns text language plpgsql as \$f\$ begin perform pg_sleep(0.8); return measurement_task_rebalance_real(p); end \$f\$" >/dev/null
+$PSQL -qAt -c "begin; update inv_stocks set qty=2 where sku_id=s(36) and location_id=loc('a'); update inv_stocks set qty=2 where sku_id=s(37) and location_id=loc('a'); commit;" >/tmp/mb_t1.out 2>&1 &
+p1=$!
+$PSQL -qAt -c "begin; update inv_stocks set qty=2 where sku_id=s(37) and location_id=loc('b'); update inv_stocks set qty=2 where sku_id=s(36) and location_id=loc('b'); commit;" >/tmp/mb_t2.out 2>&1 &
+p2=$!
+wait $p1; r1=$?; wait $p2; r2=$?
+$PSQL -q -c "drop function measurement_task_rebalance(uuid)" -c "alter function measurement_task_rebalance_real(uuid) rename to measurement_task_rebalance" >/dev/null
+q36=$(q "select sum(qty) from inv_stocks where sku_id in (s(36),s(37))")
+tk=$(q "select count(*) from product_measurement_tasks where sku_id in (s(36),s(37)) and status='pending' and location_id=loc('a')")
+nn=$(q "select count(*) from inv_handheld_notifications where payload->>'sku_id' in (s(36)::text,s(37)::text) and action_status is null")
+if [ $r1 -eq 0 ] && [ $r2 -eq 0 ] && ! grep -qi deadlock /tmp/mb_t1.out /tmp/mb_t2.out && [ "$q36" = "8" ] && [ "$tk$nn" = "22" ]; then
+  echo "PASS reverse-order batch stock commits on two SKUs/different stores: no lock cycle, tasks kept"
+else
+  echo "FAIL batch reverse order r1=$r1 r2=$r2 qty=$q36 tasks=$tk notices=$nn"; cat /tmp/mb_t1.out /tmp/mb_t2.out; exit 1
+fi

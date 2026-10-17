@@ -14,7 +14,7 @@ import {
   replaySaveProduction,
   saveMeasurementProduction,
 } from "@/server/product-measurement-production.server";
-import { loadMeasurementActor } from "@/server/measurement-actor.server";
+import { tryLoadMeasurementActor } from "@/server/measurement-actor.server";
 import {
   measurementLocationAccess,
   validateMeasurementInput,
@@ -57,7 +57,8 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/measurement
 
         const sku = await loadMeasurementSku(params.id);
         if (!sku) return errCode("not_found", "SKU not found");
-        const actor = await loadMeasurementActor(session.user_id);
+        const actor = await tryLoadMeasurementActor(session.user_id);
+        if (!actor) return errCode("internal_error", "Temporarily unavailable");
         // 门店归属以 inv_stocks 为准：正库存可编辑；历史零库存行只读已有尺寸
         const access = measurementLocationAccess(actor, await loadSkuStockRows(sku.id), locationId);
         if (access === "none") return errCode("unauthorized_role", "No access to this location");
@@ -104,6 +105,8 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/measurement
             clientOpId: body.client_op_id,
             expectedRevision: body.expected_revision,
             value: parsed.value,
+            locationId: body.location_id,
+            taskId: null,
           });
           if (replay) {
             return ok({
@@ -120,7 +123,8 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/measurement
           return errCode("internal_error", "Temporarily unavailable");
         }
 
-        const actor = await loadMeasurementActor(session.user_id);
+        const actor = await tryLoadMeasurementActor(session.user_id);
+        if (!actor) return errCode("internal_error", "Temporarily unavailable");
         // 预检（快速失败）；最终以 RPC 在 SKU 锁内重读 inv_stocks 为准
         const access = measurementLocationAccess(actor, await loadSkuStockRows(sku.id), body.location_id);
         if (access === "none") return errCode("unauthorized_role", "No access to this location");

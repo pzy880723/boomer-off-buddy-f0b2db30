@@ -7,7 +7,7 @@ import {
 } from "@/server/handheld-auth.server";
 import { errCode } from "@/lib/handheld/errors";
 import { listMeasurementTasksProduction } from "@/server/product-measurement-production.server";
-import { loadMeasurementActor } from "@/server/measurement-actor.server";
+import { tryLoadMeasurementActor } from "@/server/measurement-actor.server";
 import { actorCanAccessLocation } from "@/server/product-measurement.server";
 
 /**
@@ -27,7 +27,8 @@ export const Route = createFileRoute("/api/public/handheld/measurements/tasks")(
         const locationId = new URL(request.url).searchParams.get("location_id");
         if (!locationId) return errCode("invalid_body", "location_id required");
 
-        const actor = await loadMeasurementActor(session.user_id);
+        const actor = await tryLoadMeasurementActor(session.user_id);
+        if (!actor) return errCode("internal_error", "Temporarily unavailable");
         if (!actorCanAccessLocation(actor, locationId)) {
           return errCode("unauthorized_role", "No access to this location");
         }
