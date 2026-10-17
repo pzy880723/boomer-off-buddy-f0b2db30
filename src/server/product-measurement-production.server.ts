@@ -222,16 +222,118 @@ export async function getMeasurementAssetProduction(
 }
 
 /**
- * 尺寸素材上报：ready 必须 verified + 完整几何 + 实测宽高 + 受控路径
- * （sku-listing 桶 measurements/{sku_id}/ 前缀，拒绝任意外链/他品路径）。
+ * 素材失败上报（failed-only）：绝不写 ready，也绝不把已 ready 的素材降级/覆盖。
+ * ready 只能由 measurement_asset_register RPC（新上传端点）在 sku 行锁内登记。
  */
-export async function upsertMeasurementAssetProduction(
-  row: MeasurementAssetRow & { verified?: boolean; width_cm?: number | null; height_cm?: number | null },
-): Promise<void> {
-  const { error } = await supabaseAdmin
+export async function markMeasurementAssetFailedProduction(args: {
+  skuId: string;
+  revision: number;
+  error: string;
+}): Promise<void> {
+  const now = new Date().toISOString();
+  const { data: updated, error: updateError } = await supabaseAdmin
     .from("product_measurement_assets" as never)
-    .upsert({ ...row, updated_at: new Date().toISOString() } as never, {
-      onConflict: "sku_id,revision",
-    });
-  if (error) throw new Error(error.message);
+    .update({ status: "failed", error: args.error, verified: false, updated_at: now } as never)
+    .eq("sku_id", args.skuId)
+    .eq("revision", args.revision)
+    .neq("status", "ready")
+    .select("sku_id");
+  if (updateError) throw new Error("asset_write_failed");
+  if ((updated as unknown[] | null)?.length) return;
+  const { error: insertError } = await supabaseAdmin
+    .from("product_measurement_assets" as never)
+    .upsert(
+      { sku_id: args.skuId, revision: args.revision, status: "failed", error: args.error, verified: false, updated_at: now } as never,
+      { onConflict: "sku_id,revision", ignoreDuplicates: true },
+    );
+  if (insertError) throw new Error("asset_write_failed");
+}
+
+export type MeasurementAssetRegisterResult = {
+  status: "ready";
+  revision: number;
+  location_id: string;
+  cutout_preview_path: string;
+  width_cm: number;
+  height_cm: number;
+  replayed: boolean;
+};
+
+export const MEASUREMENT_REGISTER_ERRORS = [
+  "revision_conflict",
+  "op_conflict",
+  "image_conflict",
+  "location_mismatch",
+  "unauthorized_role",
+  "not_found",
+  "invalid_asset",
+  "client_op_id_required",
+] as const;
+
+/**
+ * 素材登记：service-role RPC，sku FOR UPDATE 内复核当前 location/revision/实测宽高/actor 权限，
+ * 资产与 op 指纹同事务落库；返回登记结果（HTTP 成功必须基于它）。
+ * 失败只抛受控 code，不外泄 DB 原始错误。
+ */
+export async function registerMeasurementAssetProduction(args: {
+  skuId: string;
+  actorId: string;
+  clientOpId: string;
+  locationId: string;
+  revision: number;
+  heightCm: number;
+  widthCm: number;
+  contentHash: string;
+  previewPath: string;
+  bbox: { x: number; y: number; w: number; h: number };
+  frontWidthPx: number;
+  frontHeightPx: number;
+  pxPerCm: number;
+}): Promise<MeasurementAssetRegisterResult> {
+  const { data, error } = await supabaseAdmin.rpc("measurement_asset_register" as never, {
+    p_sku_id: args.skuId,
+    p_actor_id: args.actorId,
+    p_client_op_id: args.clientOpId,
+    p_location_id: args.locationId,
+    p_revision: args.revision,
+    p_height_cm: args.heightCm,
+    p_width_cm: args.widthCm,
+    p_content_hash: args.contentHash,
+    p_preview_path: args.previewPath,
+    p_bbox: args.bbox,
+    p_front_width_px: args.frontWidthPx,
+    p_front_height_px: args.frontHeightPx,
+    p_px_per_cm: args.pxPerCm,
+  } as never);
+  if (error) {
+    const msg = String((error as { message?: string }).message ?? "");
+    const code = MEASUREMENT_REGISTER_ERRORS.find((c) => msg.includes(c));
+    if (!code) console.error("[measurement_asset_register]", msg);
+    throw new Error(code ?? "register_failed");
+  }
+  const result = data as unknown as MeasurementAssetRegisterResult | null;
+  if (
+    !result ||
+    result.status !== "ready" ||
+    result.revision !== args.revision ||
+    result.location_id !== args.locationId ||
+    result.cutout_preview_path !== args.previewPath
+  ) {
+    throw new Error("register_failed");
+  }
+  return result;
+}
+
+/** 上传受控衍生 PNG 到 sku-listing/measurements/ 前缀；失败只返回受控 code，不外泄存储原始错误 */
+export async function uploadMeasurementDerivativeProduction(path: string, png: Buffer): Promise<void> {
+  if (!/^measurements\/[0-9a-f-]{36}\/\d+-[0-9a-f]{16}-(640|1280)\.png$/.test(path)) {
+    throw new Error("invalid_asset");
+  }
+  const { error } = await supabaseAdmin.storage
+    .from("sku-listing")
+    .upload(path, png, { contentType: "image/png", upsert: true });
+  if (error) {
+    console.error("[measurement upload]", error.message);
+    throw new Error("storage_failed");
+  }
 }
