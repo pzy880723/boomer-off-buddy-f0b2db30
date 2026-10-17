@@ -280,7 +280,7 @@ export const Route = createFileRoute("/api/public/handheld/dashboard")({
         let unreadCount = 0;
         {
           const notificationScope = await resolveNotificationScope({
-            userId: session.user_id,
+            userId: session!.user_id,
             deviceId: auth.device.id,
             deviceLocationId: auth.device.location_id,
           });
