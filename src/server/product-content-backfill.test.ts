@@ -85,10 +85,14 @@ test("dry-run → batch apply → retry → manual-edit CAS → restore, against
   const retry = await applyBackfill(pgDb, (await planBackfill(pgDb, load, { skuIds: [a, b] })).items);
   assert.deepEqual(retry.map((r) => [r.status, r.reason ?? null]), [["skipped", "has_content"], ["filled", null]]);
   assert.equal(q(`SELECT draft_blocks->0->>'text' FROM inv_product_content WHERE sku_id='${b}'`), "草稿");
+  // 真实表 updated_by NOT NULL：系统补齐记系统自动化身份，人工身份留在备份里
+  assert.equal(q(`SELECT updated_by FROM inv_product_content WHERE sku_id='${b}'`), "a0700000-0000-4000-8000-000000000001");
+  assert.equal(q(`SELECT auto_backfill_backup->>'updated_by' FROM inv_product_content WHERE sku_id='${b}'`), "e1000000-0000-0000-0000-0000000000aa");
   assert.equal(q(`SELECT published_blocks->0->>'text' FROM inv_product_content WHERE sku_id='${c}'`), "人工");
 
   const restored = await restoreBackfill(pgDb, [a, b]);
   assert.deepEqual(restored.map((r) => r.status), ["restored", "restored"]);
   assert.equal(q(`SELECT count(*) FROM inv_product_content WHERE sku_id='${a}'`), "0");
   assert.equal(q(`SELECT published_blocks::text || version FROM inv_product_content WHERE sku_id='${b}'`), "[]1");
+  assert.equal(q(`SELECT updated_by FROM inv_product_content WHERE sku_id='${b}'`), "e1000000-0000-0000-0000-0000000000aa", "restore returns manual editor");
 });
