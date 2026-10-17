@@ -12,8 +12,9 @@ export PGDB=readiness_test
 m78=${READINESS_FIX2-$(ls drizzle/migrations/*_listing_readiness_explicit_settle.sql 2>/dev/null | head -1)}
 m80=${READINESS_FIX3-$(ls drizzle/migrations/*_listing_readiness_image_plan_display_fix.sql 2>/dev/null | head -1)}
 m82=${READINESS_FIX4-$(ls drizzle/migrations/*_listing_readiness_ai_raw_guard.sql 2>/dev/null | head -1)}
-for m in "$m75" "$m76" "$m78" "$m80" $m82; do $PSQL -q -v ON_ERROR_STOP=1 -f "$m" >/dev/null || { echo "FAIL migration $m"; exit 1; }; done
-out=$($PSQL -q -v ON_ERROR_STOP=1 -f tests/sql/listing_readiness/cases.sql -f tests/sql/listing_readiness/cases_0076.sql -f tests/sql/listing_readiness/cases_0080.sql 2>&1); rc=$?
+m83=${READINESS_FIX5-$(ls drizzle/migrations/*_listing_readiness_reuse_photos.sql drizzle/migrations/_tmp_0083_reuse.sql 2>/dev/null | head -1)}
+for m in "$m75" "$m76" "$m78" "$m80" $m82 $m83; do $PSQL -q -v ON_ERROR_STOP=1 -f "$m" >/dev/null || { echo "FAIL migration $m"; exit 1; }; done
+out=$($PSQL -q -v ON_ERROR_STOP=1 -f tests/sql/listing_readiness/cases.sql -f tests/sql/listing_readiness/cases_0076.sql -f tests/sql/listing_readiness/cases_0080.sql -f tests/sql/listing_readiness/cases_0083.sql 2>&1); rc=$?
 echo "$out" | grep -o 'PASS .*\|ERROR.*\|FAIL.*'
 n=$(echo "$out" | grep -c 'PASS')
-[ $rc -eq 0 ] && [ "$n" -eq 91 ] && echo "ALL PASS ($n)" || { echo "SOME FAILED ($n/91)"; exit 1; }
+[ $rc -eq 0 ] && [ "$n" -eq 106 ] && echo "ALL PASS ($n)" || { echo "SOME FAILED ($n/106)"; exit 1; }
