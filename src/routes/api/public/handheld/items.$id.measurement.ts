@@ -11,7 +11,6 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   loadMeasurementSku,
   saveMeasurementProduction,
-  findActiveTaskProduction,
 } from "@/server/product-measurement-production.server";
 import { loadMeasurementActor } from "@/lib/measurement.functions";
 import {
