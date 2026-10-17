@@ -24,6 +24,7 @@ import {
   Users,
   ShieldCheck,
   AlertCircle,
+  Ruler,
   Smartphone,
   Plug,
   Globe,
