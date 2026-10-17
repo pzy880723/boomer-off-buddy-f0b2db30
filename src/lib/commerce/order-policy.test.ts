@@ -39,5 +39,9 @@ describe("commerce order policy", () => {
       provider: "platform",
       serviceCode: "PLATFORM_RECOMMENDED",
     });
+    assert.deepEqual(normalizeCourierChoice("shansong_cod"), {
+      provider: "flash",
+      serviceCode: "SHANSONG_COD",
+    });
   });
 });
