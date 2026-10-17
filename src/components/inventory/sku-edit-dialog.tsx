@@ -67,6 +67,22 @@ export function SkuEditDialog({
       });
       setPrice(String(sku.price_tier ?? ""));
       setFankuang(sku.fankuang_override ?? null);
+      setMeasurement({ ...emptyMeasurementFields });
+      setMeasurementRevision(null);
+      getMeasurementFn({ data: { sku_id: sku.id } })
+        .then((res) => {
+          const s = res.sku as unknown as Record<string, unknown>;
+          setMeasurement({
+            height_cm: s.measurement_height_cm != null ? String(s.measurement_height_cm) : "",
+            width_cm: s.measurement_width_cm != null ? String(s.measurement_width_cm) : "",
+            depth_cm: s.measurement_depth_cm != null ? String(s.measurement_depth_cm) : "",
+            diameter_cm: s.measurement_diameter_cm != null ? String(s.measurement_diameter_cm) : "",
+          });
+          setMeasurementRevision((s.measurement_revision as number) ?? 0);
+        })
+        .catch(() => {
+          // 无权限或读取失败：保持空白，不阻塞其他字段编辑
+        });
     }
   }, [sku, open]);
 
