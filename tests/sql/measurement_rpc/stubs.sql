@@ -39,7 +39,6 @@ CREATE TABLE public.product_measurement_tasks (
   claimed_at timestamptz,
   completed_at timestamptz,
   completed_by uuid,
-  client_op_id text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -77,7 +76,6 @@ CREATE TABLE public.commerce_customer_notifications (
   title text,
   body text,
   dedupe_key text,
-  product_id uuid,
   read_at timestamptz,
   created_at timestamptz DEFAULT now()
 );
