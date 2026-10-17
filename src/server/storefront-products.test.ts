@@ -84,6 +84,7 @@ describe("storefront compound taxonomy contract", () => {
       product.facets.map((facet) => facet.code),
       ["origin_japan", "craft_gilt"],
     );
+    assert.deepEqual(product.facets.map((f) => f.dimension_label), ["产地", "工艺"]);
     assert.deepEqual(product.keywords, ["杯碟", "咖啡"]);
     assert.equal(product.stock, 1);
   });

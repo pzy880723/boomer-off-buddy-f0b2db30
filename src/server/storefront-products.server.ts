@@ -1,3 +1,4 @@
+import { labelFacets } from "@/lib/attribute-labels";
 import { supabaseAdmin } from "../integrations/supabase/client.server";
 import { signSkuImagePaths } from "../lib/sku-image-resolver.server";
 import { DERIVATIVE_WIDTHS, signDerivativeUrls } from "./media-derivative.server";
@@ -226,7 +227,8 @@ export function buildStorefrontProduct(input: {
       path: category?.parent_name ? [category.parent_name, categoryName] : [categoryName],
     },
     brand,
-    facets,
+    // 保留 dimension/code，附中文 dimension_label；未知维度整条隐藏，不回退英文键。
+    facets: labelFacets(facets),
     keywords: sku.keywords ?? [],
     price: Number(listing.price) || 0,
     compare_at_price: listing.compare_at_price == null ? null : Number(listing.compare_at_price),
