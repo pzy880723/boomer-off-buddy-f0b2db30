@@ -137,10 +137,10 @@ export const Route = createFileRoute("/api/public/storefront/orders")({
         catch { return storefrontError("支付配置暂不可用", 503); }
         const ordinary = paymentPolicy.mode === "ordinary_wechat";
         if (pickup && paymentPolicy.mode !== "ordinary_wechat") {
-          return storefrontError("门店自提暂未开放，请稍后重试", 503, "checkout_not_enabled");
+          return storefrontError("支付服务暂不可用，请稍后重试", 503, "checkout_not_enabled");
         }
         if (flash && paymentPolicy.mode !== "ordinary_wechat") {
-          return storefrontError("同城闪送暂未开放，请稍后重试", 503, "checkout_not_enabled");
+          return storefrontError("支付服务暂不可用，请稍后重试", 503, "checkout_not_enabled");
         }
         if (!ordinary && body.courier_quote_snapshot?.version === "per_store_99_cross_299_v1") {
           return storefrontError("普通商城结算尚未开放，请稍后重试", 503, "checkout_not_enabled");
@@ -246,7 +246,7 @@ export const Route = createFileRoute("/api/public/storefront/orders")({
         }
         const createdMethod = (data as unknown as { fulfillment_method?: string } | null)?.fulfillment_method;
         const expectedMethod = pickup ? "pickup" : flash ? "flash" : null;
-        if ((expectedMethod && createdMethod !== expectedMethod) || (!expectedMethod && createdMethod === "pickup")) {
+        if ((expectedMethod && createdMethod !== expectedMethod) || (!expectedMethod && (createdMethod === "pickup" || createdMethod === "flash"))) {
           return storefrontError("同一下单请求不能更换配送方式，请重新下单", 409, "fulfillment_method_conflict");
         }
         try {
