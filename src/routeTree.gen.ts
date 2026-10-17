@@ -238,6 +238,7 @@ import { Route as ApiPublicHandheldTransferReceiveScanRouteImport } from './rout
 import { Route as ApiPublicHandheldTransferShipConfirmRouteImport } from './routes/api/public/handheld/transfer.ship-confirm'
 import { Route as ApiPublicHandheldTransferShipScanRouteImport } from './routes/api/public/handheld/transfer.ship-scan'
 import { Route as ApiPublicHandheldTransfersIdRouteImport } from './routes/api/public/handheld/transfers.$id'
+import { Route as ApiPublicMediaMeasurementSplatRouteImport } from './routes/api/public/media/measurement/$'
 import { Route as ApiPublicMediaSkuSplatRouteImport } from './routes/api/public/media/sku/$'
 import { Route as ApiPublicPosCartsIdRouteImport } from './routes/api/public/pos/carts.$id'
 import { Route as ApiPublicPosCartsHeldRouteImport } from './routes/api/public/pos/carts.held'
@@ -279,6 +280,7 @@ import { Route as ApiPublicHandheldFulfillmentsIdTicketRouteImport } from './rou
 import { Route as ApiPublicHandheldFulfillmentsIdWaybillRouteImport } from './routes/api/public/handheld/fulfillments.$id.waybill'
 import { Route as ApiPublicHandheldItemsIdAttachImagesRouteImport } from './routes/api/public/handheld/items.$id.attach-images'
 import { Route as ApiPublicHandheldItemsIdContentRouteImport } from './routes/api/public/handheld/items.$id.content'
+import { Route as ApiPublicHandheldItemsIdMeasurementRouteImport } from './routes/api/public/handheld/items.$id.measurement'
 import { Route as ApiPublicHandheldItemsIdRecommendationCardRouteImport } from './routes/api/public/handheld/items.$id.recommendation-card'
 import { Route as ApiPublicHandheldItemsIdRestockRouteImport } from './routes/api/public/handheld/items.$id.restock'
 import { Route as ApiPublicHandheldItemsIdSetStatusRouteImport } from './routes/api/public/handheld/items.$id.set-status'
@@ -1584,6 +1586,12 @@ const ApiPublicHandheldTransfersIdRoute =
     path: '/$id',
     getParentRoute: () => ApiPublicHandheldTransfersRoute,
   } as any)
+const ApiPublicMediaMeasurementSplatRoute =
+  ApiPublicMediaMeasurementSplatRouteImport.update({
+    id: '/api/public/media/measurement/$',
+    path: '/api/public/media/measurement/$',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicMediaSkuSplatRoute = ApiPublicMediaSkuSplatRouteImport.update({
   id: '/api/public/media/sku/$',
   path: '/api/public/media/sku/$',
@@ -1822,6 +1830,12 @@ const ApiPublicHandheldItemsIdContentRoute =
   ApiPublicHandheldItemsIdContentRouteImport.update({
     id: '/content',
     path: '/content',
+    getParentRoute: () => ApiPublicHandheldItemsIdRoute,
+  } as any)
+const ApiPublicHandheldItemsIdMeasurementRoute =
+  ApiPublicHandheldItemsIdMeasurementRouteImport.update({
+    id: '/measurement',
+    path: '/measurement',
     getParentRoute: () => ApiPublicHandheldItemsIdRoute,
   } as any)
 const ApiPublicHandheldItemsIdRecommendationCardRoute =
@@ -2265,6 +2279,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/transfer/ship-confirm': typeof ApiPublicHandheldTransferShipConfirmRoute
   '/api/public/handheld/transfer/ship-scan': typeof ApiPublicHandheldTransferShipScanRoute
   '/api/public/handheld/transfers/$id': typeof ApiPublicHandheldTransfersIdRouteWithChildren
+  '/api/public/media/measurement/$': typeof ApiPublicMediaMeasurementSplatRoute
   '/api/public/media/sku/$': typeof ApiPublicMediaSkuSplatRoute
   '/api/public/pos/carts/$id': typeof ApiPublicPosCartsIdRouteWithChildren
   '/api/public/pos/carts/held': typeof ApiPublicPosCartsHeldRoute
@@ -2306,6 +2321,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/fulfillments/$id/waybill': typeof ApiPublicHandheldFulfillmentsIdWaybillRoute
   '/api/public/handheld/items/$id/attach-images': typeof ApiPublicHandheldItemsIdAttachImagesRoute
   '/api/public/handheld/items/$id/content': typeof ApiPublicHandheldItemsIdContentRoute
+  '/api/public/handheld/items/$id/measurement': typeof ApiPublicHandheldItemsIdMeasurementRoute
   '/api/public/handheld/items/$id/recommendation-card': typeof ApiPublicHandheldItemsIdRecommendationCardRoute
   '/api/public/handheld/items/$id/restock': typeof ApiPublicHandheldItemsIdRestockRoute
   '/api/public/handheld/items/$id/set-status': typeof ApiPublicHandheldItemsIdSetStatusRoute
@@ -2565,6 +2581,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/transfer/ship-confirm': typeof ApiPublicHandheldTransferShipConfirmRoute
   '/api/public/handheld/transfer/ship-scan': typeof ApiPublicHandheldTransferShipScanRoute
   '/api/public/handheld/transfers/$id': typeof ApiPublicHandheldTransfersIdRouteWithChildren
+  '/api/public/media/measurement/$': typeof ApiPublicMediaMeasurementSplatRoute
   '/api/public/media/sku/$': typeof ApiPublicMediaSkuSplatRoute
   '/api/public/pos/carts/$id': typeof ApiPublicPosCartsIdRouteWithChildren
   '/api/public/pos/carts/held': typeof ApiPublicPosCartsHeldRoute
@@ -2606,6 +2623,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/fulfillments/$id/waybill': typeof ApiPublicHandheldFulfillmentsIdWaybillRoute
   '/api/public/handheld/items/$id/attach-images': typeof ApiPublicHandheldItemsIdAttachImagesRoute
   '/api/public/handheld/items/$id/content': typeof ApiPublicHandheldItemsIdContentRoute
+  '/api/public/handheld/items/$id/measurement': typeof ApiPublicHandheldItemsIdMeasurementRoute
   '/api/public/handheld/items/$id/recommendation-card': typeof ApiPublicHandheldItemsIdRecommendationCardRoute
   '/api/public/handheld/items/$id/restock': typeof ApiPublicHandheldItemsIdRestockRoute
   '/api/public/handheld/items/$id/set-status': typeof ApiPublicHandheldItemsIdSetStatusRoute
@@ -2873,6 +2891,7 @@ export interface FileRoutesById {
   '/api/public/handheld/transfer/ship-confirm': typeof ApiPublicHandheldTransferShipConfirmRoute
   '/api/public/handheld/transfer/ship-scan': typeof ApiPublicHandheldTransferShipScanRoute
   '/api/public/handheld/transfers/$id': typeof ApiPublicHandheldTransfersIdRouteWithChildren
+  '/api/public/media/measurement/$': typeof ApiPublicMediaMeasurementSplatRoute
   '/api/public/media/sku/$': typeof ApiPublicMediaSkuSplatRoute
   '/api/public/pos/carts/$id': typeof ApiPublicPosCartsIdRouteWithChildren
   '/api/public/pos/carts/held': typeof ApiPublicPosCartsHeldRoute
@@ -2914,6 +2933,7 @@ export interface FileRoutesById {
   '/api/public/handheld/fulfillments/$id/waybill': typeof ApiPublicHandheldFulfillmentsIdWaybillRoute
   '/api/public/handheld/items/$id/attach-images': typeof ApiPublicHandheldItemsIdAttachImagesRoute
   '/api/public/handheld/items/$id/content': typeof ApiPublicHandheldItemsIdContentRoute
+  '/api/public/handheld/items/$id/measurement': typeof ApiPublicHandheldItemsIdMeasurementRoute
   '/api/public/handheld/items/$id/recommendation-card': typeof ApiPublicHandheldItemsIdRecommendationCardRoute
   '/api/public/handheld/items/$id/restock': typeof ApiPublicHandheldItemsIdRestockRoute
   '/api/public/handheld/items/$id/set-status': typeof ApiPublicHandheldItemsIdSetStatusRoute
@@ -3182,6 +3202,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/transfer/ship-confirm'
     | '/api/public/handheld/transfer/ship-scan'
     | '/api/public/handheld/transfers/$id'
+    | '/api/public/media/measurement/$'
     | '/api/public/media/sku/$'
     | '/api/public/pos/carts/$id'
     | '/api/public/pos/carts/held'
@@ -3223,6 +3244,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/fulfillments/$id/waybill'
     | '/api/public/handheld/items/$id/attach-images'
     | '/api/public/handheld/items/$id/content'
+    | '/api/public/handheld/items/$id/measurement'
     | '/api/public/handheld/items/$id/recommendation-card'
     | '/api/public/handheld/items/$id/restock'
     | '/api/public/handheld/items/$id/set-status'
@@ -3482,6 +3504,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/transfer/ship-confirm'
     | '/api/public/handheld/transfer/ship-scan'
     | '/api/public/handheld/transfers/$id'
+    | '/api/public/media/measurement/$'
     | '/api/public/media/sku/$'
     | '/api/public/pos/carts/$id'
     | '/api/public/pos/carts/held'
@@ -3523,6 +3546,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/fulfillments/$id/waybill'
     | '/api/public/handheld/items/$id/attach-images'
     | '/api/public/handheld/items/$id/content'
+    | '/api/public/handheld/items/$id/measurement'
     | '/api/public/handheld/items/$id/recommendation-card'
     | '/api/public/handheld/items/$id/restock'
     | '/api/public/handheld/items/$id/set-status'
@@ -3789,6 +3813,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/transfer/ship-confirm'
     | '/api/public/handheld/transfer/ship-scan'
     | '/api/public/handheld/transfers/$id'
+    | '/api/public/media/measurement/$'
     | '/api/public/media/sku/$'
     | '/api/public/pos/carts/$id'
     | '/api/public/pos/carts/held'
@@ -3830,6 +3855,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/fulfillments/$id/waybill'
     | '/api/public/handheld/items/$id/attach-images'
     | '/api/public/handheld/items/$id/content'
+    | '/api/public/handheld/items/$id/measurement'
     | '/api/public/handheld/items/$id/recommendation-card'
     | '/api/public/handheld/items/$id/restock'
     | '/api/public/handheld/items/$id/set-status'
@@ -4032,6 +4058,7 @@ export interface RootRouteChildren {
   ApiPublicHandheldTransferReceiveScanRoute: typeof ApiPublicHandheldTransferReceiveScanRoute
   ApiPublicHandheldTransferShipConfirmRoute: typeof ApiPublicHandheldTransferShipConfirmRoute
   ApiPublicHandheldTransferShipScanRoute: typeof ApiPublicHandheldTransferShipScanRoute
+  ApiPublicMediaMeasurementSplatRoute: typeof ApiPublicMediaMeasurementSplatRoute
   ApiPublicMediaSkuSplatRoute: typeof ApiPublicMediaSkuSplatRoute
   ApiPublicPosCartsIdRoute: typeof ApiPublicPosCartsIdRouteWithChildren
   ApiPublicPosCartsHeldRoute: typeof ApiPublicPosCartsHeldRoute
@@ -5669,6 +5696,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldTransfersIdRouteImport
       parentRoute: typeof ApiPublicHandheldTransfersRoute
     }
+    '/api/public/media/measurement/$': {
+      id: '/api/public/media/measurement/$'
+      path: '/api/public/media/measurement/$'
+      fullPath: '/api/public/media/measurement/$'
+      preLoaderRoute: typeof ApiPublicMediaMeasurementSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/media/sku/$': {
       id: '/api/public/media/sku/$'
       path: '/api/public/media/sku/$'
@@ -5954,6 +5988,13 @@ declare module '@tanstack/react-router' {
       path: '/content'
       fullPath: '/api/public/handheld/items/$id/content'
       preLoaderRoute: typeof ApiPublicHandheldItemsIdContentRouteImport
+      parentRoute: typeof ApiPublicHandheldItemsIdRoute
+    }
+    '/api/public/handheld/items/$id/measurement': {
+      id: '/api/public/handheld/items/$id/measurement'
+      path: '/measurement'
+      fullPath: '/api/public/handheld/items/$id/measurement'
+      preLoaderRoute: typeof ApiPublicHandheldItemsIdMeasurementRouteImport
       parentRoute: typeof ApiPublicHandheldItemsIdRoute
     }
     '/api/public/handheld/items/$id/recommendation-card': {
@@ -6805,6 +6846,7 @@ const ApiPublicStorefrontShortagesRouteWithChildren =
 interface ApiPublicHandheldItemsIdRouteChildren {
   ApiPublicHandheldItemsIdAttachImagesRoute: typeof ApiPublicHandheldItemsIdAttachImagesRoute
   ApiPublicHandheldItemsIdContentRoute: typeof ApiPublicHandheldItemsIdContentRoute
+  ApiPublicHandheldItemsIdMeasurementRoute: typeof ApiPublicHandheldItemsIdMeasurementRoute
   ApiPublicHandheldItemsIdRecommendationCardRoute: typeof ApiPublicHandheldItemsIdRecommendationCardRoute
   ApiPublicHandheldItemsIdRestockRoute: typeof ApiPublicHandheldItemsIdRestockRoute
   ApiPublicHandheldItemsIdSetStatusRoute: typeof ApiPublicHandheldItemsIdSetStatusRoute
@@ -6817,6 +6859,8 @@ const ApiPublicHandheldItemsIdRouteChildren: ApiPublicHandheldItemsIdRouteChildr
     ApiPublicHandheldItemsIdAttachImagesRoute:
       ApiPublicHandheldItemsIdAttachImagesRoute,
     ApiPublicHandheldItemsIdContentRoute: ApiPublicHandheldItemsIdContentRoute,
+    ApiPublicHandheldItemsIdMeasurementRoute:
+      ApiPublicHandheldItemsIdMeasurementRoute,
     ApiPublicHandheldItemsIdRecommendationCardRoute:
       ApiPublicHandheldItemsIdRecommendationCardRoute,
     ApiPublicHandheldItemsIdRestockRoute: ApiPublicHandheldItemsIdRestockRoute,
@@ -7166,6 +7210,7 @@ const rootRouteChildren: RootRouteChildren = {
     ApiPublicHandheldTransferShipConfirmRoute,
   ApiPublicHandheldTransferShipScanRoute:
     ApiPublicHandheldTransferShipScanRoute,
+  ApiPublicMediaMeasurementSplatRoute: ApiPublicMediaMeasurementSplatRoute,
   ApiPublicMediaSkuSplatRoute: ApiPublicMediaSkuSplatRoute,
   ApiPublicPosCartsIdRoute: ApiPublicPosCartsIdRouteWithChildren,
   ApiPublicPosCartsHeldRoute: ApiPublicPosCartsHeldRoute,
