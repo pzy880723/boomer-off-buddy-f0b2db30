@@ -60,29 +60,23 @@ export const listMeasurementTasks = createServerFn({ method: "GET" })
     return { items };
   });
 
-/** 领取任务（受影响行核对，竞态失败报 already_claimed，不报假成功） */
+/** 领取任务：measurement_claim 事务 RPC 为唯一权限与状态出口 */
 export const claimMeasurementTaskFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z.object({ task_id: z.string().uuid() }).strict().parse(input),
   )
   .handler(async ({ data, context }) => {
-    const actor = await loadMeasurementActor(context.userId);
-    const { data: task } = await supabaseAdmin
-      .from("product_measurement_tasks" as never)
-      .select("id, location_id, status")
-      .eq("id", data.task_id)
-      .maybeSingle();
-    const row = task as unknown as { id: string; location_id: string | null; status: string } | null;
-    if (!row) throw new Error("任务不存在或已结束");
-    if (!actorCanAccessLocation(actor, row.location_id)) throw new Error("无该门店权限");
+    // 权限/门店/库存全部在 measurement_claim RPC 锁内校验，不做预读鉴权
     try {
-      await claimTaskProduction(data.task_id, actor.userId);
+      await claimTaskProduction(data.task_id, context.userId);
     } catch (error) {
       const message = (error as Error).message;
       if (message === "already_claimed") throw new Error("任务已被其他同事领取");
       if (message === "not_found") throw new Error("任务不存在或已结束");
-      throw error;
+      if (message === "forbidden") throw new Error("无该门店权限");
+      if (message === "no_stock") throw new Error("该店暂无实物，任务已挂起");
+      throw new Error("服务暂时不可用，请稍后再试");
     }
     return { ok: true };
   });
