@@ -95,6 +95,17 @@ export const Route = createFileRoute("/api/public/storefront/orders")({
         }
         const guard = pickupCreateGuard(body);
         if (guard) return storefrontError("自提订单参数不正确", 422, guard);
+        const flashGuard = flashCreateGuard(body);
+        if (flashGuard) {
+          const msg = flashGuard === "flash_fee_must_be_zero"
+            ? "同城闪送平台运费为 0，配送费由顾客与门店客服约定后到付"
+            : flashGuard === "flash_address_required"
+              ? "同城闪送请填写完整收货地址"
+              : flashGuard === "flash_phone_required"
+                ? "同城闪送请填写收货人手机号"
+                : "闪送订单参数不正确";
+          return storefrontError(msg, 422, flashGuard);
+        }
         const giftParsed = GiftOrderFields.safeParse({
           gift_entitlement_ids: (rawBody as Record<string, unknown>)?.gift_entitlement_ids,
           gift_count: (rawBody as Record<string, unknown>)?.gift_count,
