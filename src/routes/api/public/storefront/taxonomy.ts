@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { labelFacets } from "@/lib/attribute-labels";
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { STOREFRONT_CORS, storefrontJson } from "@/server/storefront-auth.server";
