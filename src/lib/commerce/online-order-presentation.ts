@@ -15,6 +15,13 @@ export function onlineOrderState(order: {order_status: string; payment_status: s
   return {view:"unknown",label:"状态待核对",tone:"warning"};
 }
 
+/** 配送方式展示：闪送必须明确“到付”，绝不显示为普通快递/包邮/待补运费。 */
+export function deliveryMethodLabel(order: {fulfillment_method?: string | null; courier_service_name?: string | null}): string {
+  if (order.fulfillment_method === "pickup") return "门店自提";
+  if (order.fulfillment_method === "flash") return "同城闪送（配送费到付）";
+  return order.courier_service_name?.trim() || "快递配送";
+}
+
 const platformLabels: Record<string, string> = {miniapp:"小程序",app:"APP",web:"网页商城",delivery:"外卖订单"};
 export function orderSourceLabel(order: {source_channel: string; metadata?: unknown}): string {
   const channels: Record<string, string> = {pos:"门店收银",youzan:"有赞",manual:"人工订单",delivery:"外卖订单"};
