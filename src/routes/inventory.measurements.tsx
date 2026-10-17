@@ -40,6 +40,7 @@ type TaskRow = {
   location_name: string | null;
   requester_count: number;
   measurement_revision: number;
+  stock_available?: boolean;
 };
 
 const STATUS_TABS = [
@@ -150,7 +151,8 @@ function MeasurementTasksPage() {
             <div className="min-w-0">
               <p className="truncate text-sm font-medium">{task.sku_name ?? "未知商品"}</p>
               <p className="text-xs text-muted-foreground">
-                {task.location_name ?? "未分配门店"} · {task.requester_count} 人申请 ·{" "}
+                {task.location_name ?? "未分配门店"}
+                {task.stock_available === false ? "（该店暂无实物，已挂起）" : ""} · {task.requester_count} 人申请 ·{" "}
                 {new Date(task.created_at).toLocaleString("zh-CN")}
               </p>
             </div>
