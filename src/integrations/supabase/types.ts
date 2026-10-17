@@ -5886,11 +5886,13 @@ export type Database = {
       }
       listing_readiness: {
         Row: {
+          auto_content_version: number | null
           content_mode: string | null
           content_revision: number | null
           content_sources: Json
           content_status: string
           created_at: string
+          image_input_revision: number
           image_revision: number | null
           image_status: string
           images_settled: boolean
@@ -5902,11 +5904,13 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          auto_content_version?: number | null
           content_mode?: string | null
           content_revision?: number | null
           content_sources?: Json
           content_status?: string
           created_at?: string
+          image_input_revision?: number
           image_revision?: number | null
           image_status?: string
           images_settled?: boolean
@@ -5918,11 +5922,13 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          auto_content_version?: number | null
           content_mode?: string | null
           content_revision?: number | null
           content_sources?: Json
           content_status?: string
           created_at?: string
+          image_input_revision?: number
           image_revision?: number | null
           image_status?: string
           images_settled?: boolean
@@ -11673,6 +11679,18 @@ export type Database = {
       inv_sku_delete_blocker: { Args: { p_sku_id: string }; Returns: string }
       inv_sku_is_hq_actor: { Args: never; Returns: boolean }
       inventory_delete_unused_sku: { Args: { p_sku_id: string }; Returns: Json }
+      listing_readiness_bump: {
+        Args: { p_images: boolean; p_paths: string[]; p_sku: string }
+        Returns: undefined
+      }
+      listing_readiness_detail_images_state: {
+        Args: { p_sku: string }
+        Returns: string
+      }
+      listing_readiness_has_raw: {
+        Args: { p_paths: string[] }
+        Returns: boolean
+      }
       listing_readiness_is_ready: { Args: { p_sku: string }; Returns: boolean }
       listing_readiness_mark_images_settled: {
         Args: { p_sku: string }

@@ -18,17 +18,17 @@ DELETE FROM listing_readiness WHERE sku_id = '10000000-0000-0000-0000-0000000000
 SELECT list('10000000-0000-0000-0000-000000000001');
 SELECT t_assert((SELECT status='published' AND published_at IS NOT NULL AND NOT readiness_hold FROM commerce_listings WHERE sku_id='10000000-0000-0000-0000-000000000001'), 'legacy listing publishes unchanged');
 
--- 2 新自定义商品自动建准备记录；标准品不建
+-- 2 新建商品（含标准品，0076 起）自动建准备记录
 SELECT mk('20000000-0000-0000-0000-000000000002', true);
 INSERT INTO inv_skus (id, category, price_tier, name, epc, is_custom_price) VALUES ('20000000-0000-0000-0000-0000000000f2','c',2,'标','ef2',false);
-SELECT t_assert((SELECT count(*)=1 FROM listing_readiness WHERE sku_id IN ('20000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-0000000000f2')), 'readiness row only for new custom single');
+SELECT t_assert((SELECT count(*)=2 FROM listing_readiness WHERE sku_id IN ('20000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-0000000000f2')), 'readiness row for every new sku (0076)');
 
 -- 3 未就绪上架意图被拦：hidden + hold + published_at 为空（所有公开入口都要求 published / published_at）
 SELECT list('20000000-0000-0000-0000-000000000002');
 SELECT t_assert((SELECT status='hidden' AND readiness_hold AND published_at IS NULL FROM commerce_listings WHERE sku_id='20000000-0000-0000-0000-000000000002'), 'not-ready publish intent held hidden');
 -- 3b 准备中被售出：仍不可读
 UPDATE commerce_listings SET status='sold' WHERE sku_id='20000000-0000-0000-0000-000000000002';
-SELECT t_assert((SELECT published_at IS NULL AND readiness_hold FROM commerce_listings WHERE sku_id='20000000-0000-0000-0000-000000000002'), 'held listing sold stays unreadable');
+SELECT t_assert((SELECT published_at IS NULL AND NOT readiness_hold FROM commerce_listings WHERE sku_id='20000000-0000-0000-0000-000000000002'), 'held listing sold stays unreadable, intent cancelled (0076)');
 UPDATE commerce_listings SET status='published' WHERE sku_id='20000000-0000-0000-0000-000000000002';
 
 -- 4 图片任务运行中 → running，不放行
