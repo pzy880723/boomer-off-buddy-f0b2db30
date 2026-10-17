@@ -12,7 +12,8 @@ import { countUnread, resolveNotificationScope } from "@/server/handheld-notific
 
 type DashboardTask = {
   id: string;
-  type: "transfer_in" | "stocktake" | "transfer_out" | "commerce_pick";
+  type: "transfer_in" | "stocktake" | "transfer_out" | "commerce_pick" | "measurement";
+  sku_id?: string;
   urgency: "normal" | "urgent";
   title: string;
   description: string;
@@ -20,6 +21,8 @@ type DashboardTask = {
   action: string;
   target_id: string;
 };
+
+type MeasureRow = { id: string; sku_id: string; status: string; created_at: string; sku: { name: string } | null };
 
 type DashboardItem = {
   id: string;
@@ -196,6 +199,28 @@ export const Route = createFileRoute("/api/public/handheld/dashboard")({
             meta: fmtTime(f.created_at),
             action: "fulfillment_detail",
             target_id: f.id,
+          });
+        }
+
+        // 顾客尺寸测量申请：本门店未完成任务（完成/取消后自动消失）。
+        const { data: measureRows } = await supabaseAdmin
+          .from("product_measurement_tasks" as never)
+          .select("id, sku_id, status, created_at, sku:inv_skus!sku_id(name)")
+          .eq("location_id", locationId)
+          .in("status", ["pending", "claimed"])
+          .order("created_at", { ascending: true })
+          .limit(20);
+        for (const m of (measureRows as unknown as MeasureRow[] | null) ?? []) {
+          tasks.push({
+            id: m.id,
+            type: "measurement",
+            urgency: "normal",
+            title: `尺寸测量 ${m.sku?.name ?? ""}`.trim(),
+            description: m.status === "claimed" ? "测量中" : "顾客申请测量，待处理",
+            meta: fmtTime(m.created_at),
+            action: "measurement_task",
+            target_id: m.id,
+            sku_id: m.sku_id,
           });
         }
 

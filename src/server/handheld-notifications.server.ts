@@ -18,6 +18,11 @@ export type NotificationItem = {
   location_name: string | null;
   ref_type: string | null;
   ref_id: string | null;
+  /** 原生提醒：未读且未处理的 order_paid / measurement_requested 才为 true。 */
+  should_alert: boolean;
+  alert_kind: "order_paid" | "measurement_requested" | null;
+  measurement_task_id: string | null;
+  sku_id: string | null;
 };
 
 export type NotificationScope = {
