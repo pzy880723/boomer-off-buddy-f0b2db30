@@ -1,7 +1,7 @@
 /**
  * 尺寸素材图（透明 PNG）服务端校验与衍生。
  * 原则：不拉伸、不猜尺寸、不伪造；几何必须与已实测尺寸一致（高宽比误差 ≤3%），
- * alpha 必须真实透明，bbox 由实际像素 trim 得出。失败一律拒绝让重拍。
+ * alpha 必须真实透明，bbox 由 alpha>10 扫描得出，素材按同一 bbox extract。失败一律拒绝让重拍。
  */
 import sharp from "sharp";
 
@@ -74,14 +74,14 @@ export interface ValidatedMeasurementImage {
   frontHeightPx: number;
   /** 实测高（cm）/ bbox 高（px）→ 每厘米像素数 */
   pxPerCm: number;
-  /** trim 后的透明 PNG 原图 buffer */
+  /** 按 alpha bbox extract 的透明 PNG（像素尺寸 = bbox.w×bbox.h） */
   trimmedPng: Buffer;
 }
 
 /**
  * 校验透明 PNG 并提取几何：
  * - 必须是 PNG、≤2000px、有真实 alpha 透明区域；
- * - trim 透明边得前景 bbox；
+ * - alpha>10 扫描得前景 bbox，并按该 bbox extract 素材；
  * - 实测 height 必填，width 缺失时用 diameter 代替；bbox 高宽比与实测比误差 ≤3%。
  */
 export async function validateMeasurementImage(
@@ -114,13 +114,7 @@ export async function validateMeasurementImage(
     return { ok: false, error: "missing_measurement" };
   }
 
-  // trim 透明边（阈值 10，去掉近透明噪点）
-  const trimmed = await sharp(png).trim({ threshold: 10 }).toBuffer();
-  const tMeta = await sharp(trimmed).metadata();
-  if (!tMeta.width || !tMeta.height) return { ok: false, error: "empty_foreground" };
-
-  // bbox 相对原图：用 trim 前后尺寸差计算（trim 居中裁边近似）
-  // 精确 bbox：对 alpha 通道找非零边界
+  // bbox 只由 alpha>10 扫描得出；素材按同一 bbox extract，不做独立颜色 trim
   const { data, info } = await sharp(png)
     .ensureAlpha()
     .extractChannel(3)
@@ -153,7 +147,10 @@ export async function validateMeasurementImage(
       frontWidthPx: bbox.w,
       frontHeightPx: bbox.h,
       pxPerCm: Math.round((bbox.h / measuredHeight) * 1000) / 1000,
-      trimmedPng: trimmed,
+      trimmedPng: await sharp(png)
+        .extract({ left: bbox.x, top: bbox.y, width: bbox.w, height: bbox.h })
+        .png()
+        .toBuffer(),
     },
   };
 }
