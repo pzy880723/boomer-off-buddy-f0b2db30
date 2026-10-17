@@ -188,11 +188,31 @@ async function handleSmartCreate(request: Request, timing: ReturnType<typeof cre
           shopId: loc.shop_id,
         });
 
+        // 图片计划在提交前决定，并随建品同一事务持久化（含可信员工与政策版本）；ai 计划的图片任务同事务入队。
+        // 只有客户端明确不做 AI 或员工授权记录明确为 false 才走原图；授权未明确/读取失败 → pending_consent，由 worker 补决。
+        let aiProcessing: "queued_or_idle" | "skipped_by_client" | "consent_required" | "consent_unavailable" =
+          "queued_or_idle";
+        let imagePlan: "ai" | "raw_declined" | "pending_consent";
+        if (!smartCreateWantsAi(body.ai_processing_allowed)) {
+          aiProcessing = "skipped_by_client";
+          imagePlan = "raw_declined";
+        } else {
+          try {
+            const stored = await dbConsentStore().get(session.user_id, AI_POLICY_VERSION);
+            if (stored === true) imagePlan = "ai";
+            else if (stored === false) { aiProcessing = "consent_required"; imagePlan = "raw_declined"; }
+            else { aiProcessing = "consent_required"; imagePlan = "pending_consent"; }
+          } catch {
+            aiProcessing = "consent_unavailable";
+            imagePlan = "pending_consent";
+          }
+        }
+
         // SKU 建档 + EPC 绑定 + 一次入库 + 有赞发布 outbox + 幂等行：同一数据库事务。
         // 同 (device, client_op_id) 重试只得到原 SKU；user / location / 载荷不同返回 409。
         const firstHttp = incomingPaths.find((p) => /^https?:\/\//i.test(p)) ?? null;
         timing.mark("pre_commit");
-        const commit = await supabaseAdmin.rpc("handheld_smart_create_commit" as never, {
+        const commit = await supabaseAdmin.rpc("handheld_smart_create_commit_v2" as never, {
           p_device_id: auth.device.id,
           p_user_id: session.user_id,
           p_client_op_id: body.client_op_id ?? null,
@@ -228,6 +248,8 @@ async function handleSmartCreate(request: Request, timing: ReturnType<typeof cre
           p_epcs: body.epcs ?? [],
           p_note: `device:${auth.device.device_code} user:${session.email ?? session.user_id}`,
           p_release_shop_id: releaseShopId,
+          p_image_plan: imagePlan,
+          p_ai_policy: AI_POLICY_VERSION,
         } as never);
         if (commit.error) {
           if ((commit.error as { code?: string }).code === "P0409")
@@ -317,52 +339,11 @@ async function handleSmartCreate(request: Request, timing: ReturnType<typeof cre
           if (ipUpdate.error) return err(`Save IP failed: ${ipUpdate.error.message}`, 500);
         }
 
-        let imageProcessing: {
-          status:
-            | "idle"
-            | "queued"
-            | "processing"
-            | "succeeded"
-            | "partial_failed"
-            | "retryable_failed"
-            | "failed"
-            | "partial_failed_terminal";
-          queued: number;
-        } = { status: "idle", queued: 0 };
-        // AI 修图只在客户端未拒绝 且 数据库当前政策版本授权为 true 时排队；原图与商品照常保存。
-        let aiProcessing: "queued_or_idle" | "skipped_by_client" | "consent_required" | "consent_unavailable" =
-          "queued_or_idle";
-        if (!smartCreateWantsAi(body.ai_processing_allowed)) aiProcessing = "skipped_by_client";
-        else {
-          try {
-            if (!(await isAiAllowed(dbConsentStore(), session.user_id, AI_POLICY_VERSION)))
-              aiProcessing = "consent_required";
-          } catch {
-            aiProcessing = "consent_unavailable";
-          }
-        }
-        // 只有“已确认排队成功”或“明确不做 AI 修图”才标记图片已定；排队失败/授权读取失败保持未定（fail-closed，不会超时放行原图）。
-        let imagesSettled = aiProcessing === "skipped_by_client" || aiProcessing === "consent_required";
-        if (aiProcessing === "queued_or_idle") {
-          try {
-            imageProcessing = await enqueueListingImageJobs({
-              skuId,
-              images: body.image_storage_paths ?? [],
-              aiActorUserId: session.user_id,
-              aiPolicyVersion: AI_POLICY_VERSION,
-            });
-            imagesSettled = true;
-          } catch (e) {
-            console.error("[handheld smart-create] 创建图片优化任务失败", e);
-            imageProcessing = { status: "retryable_failed", queued: 0 };
-          }
-        }
-
-        // 新上架准备：图片任务已入队（或无需排队），标记已定并推进一次；未就绪的上架意图保持隐藏。
+        const openJobs = Number((committed as { image_jobs_open?: number }).image_jobs_open ?? 0);
+        const imageProcessing: { status: "idle" | "queued"; queued: number } =
+          openJobs > 0 ? { status: "queued", queued: openJobs } : { status: "idle", queued: 0 };
+        // 图片计划/任务已在建品事务内持久化；这里只推进一次准备状态（失败由 worker 完成回调与 sweep 继续推进）。
         try {
-          if (imagesSettled) {
-            await supabaseAdmin.rpc("listing_readiness_mark_images_settled" as never, { p_sku: skuId } as never);
-          }
           await advanceListingReadiness(skuId);
         } catch (e) {
           console.error("[handheld smart-create] 上架准备推进失败", (e as Error).message);
