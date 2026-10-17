@@ -28,7 +28,7 @@ DECLARE s uuid := ('00000000-0000-0000-0000-0000000001' || lpad(p_n::text,2,'0')
         l uuid := ('00000000-0000-0000-0000-0000000002' || lpad(p_n::text,2,'0'))::uuid;
         kv text;
 BEGIN
-  INSERT INTO inv_skus (id, category, price_tier, name, is_custom_price) VALUES (s, 'test', 10, '商品'||p_n, true);
+  INSERT INTO inv_skus (id, epc, category, price_tier, name, is_custom_price) VALUES (s, 'TESTEPC'||p_n, 'test', 10, '商品'||p_n, true);
   INSERT INTO commerce_listings (id, sku_id, location_id, title, price, status, published_at)
   VALUES (l, s, ('00000000-0000-0000-0000-00000000000' || lower(p_listing_loc))::uuid, '商品'||p_n, 10, 'published', now());
   FOREACH kv IN ARRAY string_to_array(p_stock, ',') LOOP
