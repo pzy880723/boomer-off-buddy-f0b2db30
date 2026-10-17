@@ -13,7 +13,7 @@ import type {
 } from "./product-measurement.server";
 
 const SKU_MEASUREMENT_SELECT =
-  "id, location_id, measurement_height_cm, measurement_width_cm, measurement_depth_cm, measurement_diameter_cm, measured_by, measured_at, measurement_revision";
+  "id, measurement_height_cm, measurement_width_cm, measurement_depth_cm, measurement_diameter_cm, measured_by, measured_at, measurement_revision";
 
 export type MeasurementSkuFull = MeasurementSkuRow & {
   measurement_height_cm: number | null;
@@ -42,14 +42,27 @@ export async function loadMeasurementListing(id: string): Promise<MeasurementLis
   return (data as unknown as MeasurementListingRow | null) ?? null;
 }
 
+export type SkuStockRow = { location_id: string; qty: number };
+
+/** SKU 在各门店的真实库存（inv_stocks；零库存行仍证明历史归属，可读不可改） */
+export async function loadSkuStockRows(skuId: string): Promise<SkuStockRow[]> {
+  const { data, error } = await supabaseAdmin
+    .from("inv_stocks")
+    .select("location_id, qty")
+    .eq("sku_id", skuId);
+  if (error) throw new Error("stock_read_failed");
+  return ((data as SkuStockRow[] | null) ?? []).map((r) => ({ location_id: r.location_id, qty: Number(r.qty) }));
+}
+
 /** 顾客申请测量（事务 RPC：合并任务 + 申请者 + 门店手持提醒原子完成） */
 export async function requestMeasurementProduction(
   listingId: string,
   customerId: string,
 ): Promise<{
-  status: "pending" | "completed";
+  status: "pending" | "completed" | "unavailable";
   task_id: string | null;
   requested_at: string | null;
+  message?: string;
   measurement?: {
     height_cm: number | null;
     width_cm: number | null;
@@ -171,6 +184,8 @@ export type MeasurementTaskListRow = MeasurementTaskRow & {
   location_name: string | null;
   requester_count: number;
   measurement_revision: number;
+  /** 任务所在门店当前确有正库存；false 表示挂起（仅总部可见诊断） */
+  stock_available: boolean;
 };
 
 /** 待办列表：默认 pending+claimed 都返回（claimed 不从页面消失） */
@@ -190,6 +205,21 @@ export async function listMeasurementTasksProduction(args: {
   if (args.locationIds) query = query.in("location_id", args.locationIds);
   const { data, error } = await query;
   if (error) throw new Error(error.message);
+  const rows = (data as unknown as Array<{ sku_id: string; location_id: string | null }>) ?? [];
+  // 以真实正库存过滤：任务所在门店当前确有实物才算可处理（门店员工只看到可处理的；总部看到全部 + 诊断标记）
+  const positive = new Set<string>();
+  const skuIds = [...new Set(rows.map((r) => r.sku_id))];
+  if (skuIds.length) {
+    const { data: stocks, error: stockError } = await supabaseAdmin
+      .from("inv_stocks")
+      .select("sku_id, location_id, qty")
+      .in("sku_id", skuIds)
+      .gt("qty", 0);
+    if (stockError) throw new Error("stock_read_failed");
+    for (const st of (stocks as Array<{ sku_id: string; location_id: string }> | null) ?? []) {
+      positive.add(`${st.sku_id}:${st.location_id}`);
+    }
+  }
   return (
     (data as unknown as Array<
       MeasurementTaskRow & {
@@ -204,7 +234,8 @@ export async function listMeasurementTasksProduction(args: {
     location_name: row.location?.name ?? null,
     requester_count: row.requesters?.[0]?.count ?? 0,
     measurement_revision: row.sku?.measurement_revision ?? 0,
-  }));
+    stock_available: row.location_id != null && positive.has(`${row.sku_id}:${row.location_id}`),
+  })).filter((row) => args.locationIds == null || row.stock_available);
 }
 
 export async function getMeasurementAssetProduction(
