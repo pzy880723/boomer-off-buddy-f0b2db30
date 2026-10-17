@@ -11,6 +11,10 @@ mig=${FLASH_COD_MIGRATION:-}; if [ -n "$mig" ] && [ ! -f "$mig" ]; then mig=; fi
 PGDB=postgres $PSQL -q -c "drop database if exists flash_cod_test" -c "create database flash_cod_test" >/dev/null
 export PGDB=flash_cod_test
 stubs=tests/sql/flash_cod/stubs.sql
+if [ "${SHIPMENTS_PREPATCH:-}" = "1" ]; then
+  sed "s/,'flash']/]/" "$stubs" > /tmp/flash_cod_stubs_red2.sql
+  stubs=/tmp/flash_cod_stubs_red2.sql
+fi
 if [ "${FLASH_V2_PREPATCH:-}" = "1" ]; then
   sed 's/real_create_order_v2\.sql/real_create_order_v2_prepatch.sql/' "$stubs" > /tmp/flash_cod_stubs_red.sql
   stubs=/tmp/flash_cod_stubs_red.sql

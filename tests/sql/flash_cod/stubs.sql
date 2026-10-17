@@ -61,7 +61,10 @@ CREATE TABLE public.shipments (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), fulfillment_id uuid UNIQUE, provider text,
   service_code text, status text, tracking_no text, carrier_label text,
   idempotency_key text UNIQUE, request_fingerprint text, booked_at timestamptz,
-  created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now());
+  created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now(),
+  CONSTRAINT shipments_provider_check CHECK (provider = ANY (ARRAY['sf','cainiao','manual','flash'])),
+  CONSTRAINT shipments_status_check CHECK (status = ANY (ARRAY['not_created','quoting','booked','label_created','picked_up','in_transit','delivered','cancelled','failed'])),
+  CONSTRAINT shipments_manual_label_check CHECK (provider <> 'manual' OR (carrier_label IS NOT NULL AND char_length(carrier_label) BETWEEN 1 AND 40)));
 
 -- 叶子库存流水：忠实最小实现（真实版额外同步手持端，与被测链路无关）
 CREATE OR REPLACE FUNCTION public.inv_apply_movement(p_sku_id uuid, p_location_id uuid, p_delta int, p_ref_type text, p_ref_id uuid, p_epc text DEFAULT NULL, p_note text DEFAULT NULL)

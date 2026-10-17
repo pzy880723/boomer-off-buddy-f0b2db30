@@ -631,6 +631,13 @@
       "when": 1792260692991,
       "tag": "0089_allow_flash_provider_in_create_order_v2",
       "breakpoints": true
+    },
+    {
+      "idx": 90,
+      "version": "7",
+      "when": 1792261074456,
+      "tag": "0090_allow_flash_provider_in_shipments",
+      "breakpoints": true
     }
   ]
 }
