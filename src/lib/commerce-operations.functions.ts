@@ -12,7 +12,7 @@ export type CommerceOrderAdminRow = {
   order_status: string;
   source_channel: "storefront" | "pos" | "youzan" | "manual";
   source_label: string;
-  fulfillment_method: "shipping" | "pickup" | "carryout";
+  fulfillment_method: "shipping" | "pickup" | "carryout" | "flash";
   total_amount: number;
   recipient_name: string;
   recipient_phone: string;
