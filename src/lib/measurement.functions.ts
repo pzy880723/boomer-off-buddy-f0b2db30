@@ -6,6 +6,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { reportMeasurementDiagramInput } from "@/lib/measurement-schemas";
 import {
   actorCanAccessLocation,
   validateMeasurementInput,
@@ -172,15 +173,6 @@ export const saveMeasurement = createServerFn({ method: "POST" })
  * ready 一律拒绝：唯一 ready 入口是 POST /api/public/handheld/items/{id}/measurement-image
  * （服务端 PNG 校验 + measurement_asset_register 行锁 CAS）。failed 也不会覆盖已 ready 素材。
  */
-export const reportMeasurementDiagramInput = z
-  .object({
-    sku_id: z.string().uuid(),
-    revision: z.number().int().min(0),
-    status: z.literal("failed"),
-    error: z.string().max(500).nullable().optional(),
-  })
-  .strict();
-
 export const reportMeasurementDiagram = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => reportMeasurementDiagramInput.parse(input))
