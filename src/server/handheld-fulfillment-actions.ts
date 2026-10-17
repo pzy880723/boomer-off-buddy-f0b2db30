@@ -125,3 +125,29 @@ export async function manualShip(
     },
   };
 }
+
+/** 同城闪送到付：人工登记送达，无快递单号；权限/付款/售后/缺货/明细/幂等全部在数据库同一事务内校验。 */
+export async function flashDeliver(
+  rpc: Rpc,
+  i: {
+    actorUserId: string; locationId: string | null; fulfillmentId: string;
+    lines: Array<{ fulfillmentItemId: string; quantity: number }>; idempotencyKey: string; note?: string | null;
+  },
+): Promise<ActionResponse> {
+  const { data, error } = await rpc("commerce_flash_deliver_fulfillment", {
+    p_actor_user_id: i.actorUserId, p_location_id: i.locationId, p_fulfillment_id: i.fulfillmentId,
+    p_lines: i.lines.map((l) => ({ fulfillment_item_id: l.fulfillmentItemId, quantity: l.quantity })),
+    p_idempotency_key: i.idempotencyKey, p_note: i.note ?? null,
+  });
+  if (error) return rpcFailure();
+  const r = (data ?? {}) as Record<string, unknown>;
+  const result = typeof r.result === "string" ? r.result : "unknown";
+  const ok = r.ok === true;
+  return {
+    status: ok ? 200 : (SHIP_STATUS[result] ?? 409),
+    body: {
+      ok, result, message: SHIP_MESSAGES[result] ?? "登记送达失败",
+      ...(ok ? { replayed: r.replayed === true, shipment: { id: r.shipment_id, fulfillment_id: r.fulfillment_id, provider: r.provider, carrier_label: r.carrier_label ?? null, tracking_no: null, status: "booked" } } : {}),
+    },
+  };
+}
