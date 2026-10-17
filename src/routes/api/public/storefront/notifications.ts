@@ -8,6 +8,7 @@ import {
 
 type Row = {
   id: string;
+  kind: string;
   title: string;
   body: string;
   shortage_id: string | null;
@@ -26,7 +27,7 @@ export const Route = createFileRoute("/api/public/storefront/notifications")({
         if (!auth.ok) return auth.response;
         const { data } = await supabaseAdmin
           .from("commerce_customer_notifications" as never)
-          .select("id, title, body, shortage_id, order_id, product_id, read_at, created_at")
+          .select("id, kind, title, body, shortage_id, order_id, product_id, read_at, created_at")
           .eq("customer_id", auth.customer.id)
           .order("created_at", { ascending: false })
           .limit(100);

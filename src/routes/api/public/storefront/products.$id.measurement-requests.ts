@@ -36,8 +36,10 @@ export const Route = createFileRoute("/api/public/storefront/products/$id/measur
               return storefrontJson({ ok: true, data: result });
             } catch (error) {
               const message = error instanceof Error ? error.message : String(error);
-              if (message === "not_found") return storefrontError("Product not found", 404);
-              return storefrontError(message, 500);
+              if (message === "not_found") return storefrontError("商品不存在或已下架", 404);
+              // 内部错误只进服务端日志，不向顾客回传原始数据库/运行时信息
+              console.error("[measurement-request]", message);
+              return storefrontError("服务暂时不可用，请稍后再试", 500);
             }
           })(),
         ),

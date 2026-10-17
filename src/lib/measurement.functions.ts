@@ -25,22 +25,9 @@ import {
   saveMeasurementProduction,
   markMeasurementAssetFailedProduction,
 } from "@/server/product-measurement-production.server";
-import { loadUserRoles } from "@/server/handheld-auth.server";
+import { loadMeasurementActor } from "@/server/measurement-actor.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-export async function loadMeasurementActor(userId: string): Promise<MeasurementActor> {
-  const roles = await loadUserRoles(userId);
-  const isHq = roles.includes("super_admin") || roles.includes("hq_operator");
-  let locationIds: string[] = [];
-  if (!isHq) {
-    const { data } = await supabaseAdmin
-      .from("user_location_perms" as never)
-      .select("location_id")
-      .eq("user_id", userId);
-    locationIds = ((data as { location_id: string }[] | null) ?? []).map((p) => p.location_id);
-  }
-  return { userId, roles, locationIds };
-}
 
 const measurementInput = z
   .object({

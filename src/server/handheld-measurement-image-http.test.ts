@@ -83,7 +83,7 @@ const stubs: Record<string, string> = {
       globalThis.__mi.registerCalls.push(a);
       return globalThis.__mi.register(a);
     };`,
-  "@/lib/measurement.functions": "export const loadMeasurementActor = async () => globalThis.__mi.actor;",
+  "@/server/measurement-actor.server": "export const loadMeasurementActor = async () => globalThis.__mi.actor;",
 };
 const REAL: Record<string, string> = {
   "@/server/measurement-image.server": path.resolve("src/server/measurement-image.server.ts"),
