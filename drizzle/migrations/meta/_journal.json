@@ -484,6 +484,13 @@
       "when": 1792204774841,
       "tag": "0068_measurement_save_conflict_fix",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1792205354061,
+      "tag": "0069_measurement_mutations_idempotency",
+      "breakpoints": true
     }
   ]
 }

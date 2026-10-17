@@ -5878,6 +5878,50 @@ export type Database = {
           },
         ]
       }
+      measurement_mutations: {
+        Row: {
+          actor_id: string
+          client_op_id: string
+          created_at: string
+          expected_revision: number
+          fingerprint: Json
+          id: string
+          location_id: string | null
+          result: Json
+          sku_id: string
+        }
+        Insert: {
+          actor_id: string
+          client_op_id: string
+          created_at?: string
+          expected_revision: number
+          fingerprint: Json
+          id?: string
+          location_id?: string | null
+          result: Json
+          sku_id: string
+        }
+        Update: {
+          actor_id?: string
+          client_op_id?: string
+          created_at?: string
+          expected_revision?: number
+          fingerprint?: Json
+          id?: string
+          location_id?: string | null
+          result?: Json
+          sku_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "measurement_mutations_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meruki_accounts: {
         Row: {
           cookie_expires_at: string | null
@@ -11575,6 +11619,7 @@ export type Database = {
           p_diameter: number
           p_expected_revision: number
           p_height: number
+          p_location_id: string
           p_sku_id: string
           p_task_id: string
           p_width: number
