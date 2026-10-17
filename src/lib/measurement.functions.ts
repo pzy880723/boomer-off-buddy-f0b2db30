@@ -27,6 +27,15 @@ import {
   markMeasurementAssetFailedProduction,
 } from "@/server/product-measurement-production.server";
 import { loadMeasurementActor } from "@/server/measurement-actor.server";
+
+/** 权限读取失败受控报错，不静默当作无门店/无任务 */
+async function loadActorOrFail(userId: string) {
+  try {
+    return await loadMeasurementActor(userId);
+  } catch {
+    throw new Error("服务暂时不可用，请稍后再试");
+  }
+}
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 
@@ -51,7 +60,7 @@ export const listMeasurementTasks = createServerFn({ method: "GET" })
       .parse(input ?? {}),
   )
   .handler(async ({ data, context }) => {
-    const actor = await loadMeasurementActor(context.userId);
+    const actor = await loadActorOrFail(context.userId);
     const isHq = actor.roles.includes("super_admin") || actor.roles.includes("hq_operator");
     if (!isHq && actor.locationIds.length === 0) return { items: [] };
     const items = await listMeasurementTasksProduction({
@@ -102,7 +111,7 @@ export const saveMeasurement = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const actor = await loadMeasurementActor(context.userId);
+    const actor = await loadActorOrFail(context.userId);
     const parsed = validateMeasurementInput(data.measurement);
     if (!parsed.ok) throw new Error("尺寸需为正的有限数值（cm）");
     if (!hasAnyMeasurement(parsed.value)) throw new Error("至少填写一项尺寸");
@@ -190,7 +199,7 @@ export const reportMeasurementDiagram = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     // 双重拒绝：即便绕过 schema，handler 也只接受 failed
     if ((data as { status: string }).status !== "failed") throw new Error("ready_not_allowed");
-    const actor = await loadMeasurementActor(context.userId);
+    const actor = await loadActorOrFail(context.userId);
     const sku = await loadMeasurementSku(data.sku_id);
     if (!sku) throw new Error("商品不存在");
     if (!actorCanReadSkuMeasurement(actor, await loadSkuStockRows(sku.id))) throw new Error("无该门店权限");
@@ -210,7 +219,7 @@ export const getMeasurement = createServerFn({ method: "GET" })
     z.object({ sku_id: z.string().uuid() }).strict().parse(input),
   )
   .handler(async ({ data, context }) => {
-    const actor = await loadMeasurementActor(context.userId);
+    const actor = await loadActorOrFail(context.userId);
     const sku = await loadMeasurementSku(data.sku_id);
     if (!sku) throw new Error("商品不存在");
     if (!actorCanReadSkuMeasurement(actor, await loadSkuStockRows(sku.id))) throw new Error("无该门店权限");
@@ -225,7 +234,7 @@ export const getMeasurementRevision = createServerFn({ method: "GET" })
     z.object({ sku_id: z.string().uuid() }).strict().parse(input),
   )
   .handler(async ({ data, context }) => {
-    const actor = await loadMeasurementActor(context.userId);
+    const actor = await loadActorOrFail(context.userId);
     const sku = await loadMeasurementSku(data.sku_id);
     if (!sku) throw new Error("商品不存在");
     if (!actorCanReadSkuMeasurement(actor, await loadSkuStockRows(sku.id))) throw new Error("无该门店权限");

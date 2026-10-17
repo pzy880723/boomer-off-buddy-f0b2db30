@@ -30,3 +30,12 @@ export async function loadMeasurementActor(userId: string): Promise<MeasurementA
   }
   return { userId, roles, locationIds };
 }
+
+/** 手持端用：读取失败返回 null，调用方回受控 internal_error（不当作无权限/空列表） */
+export async function tryLoadMeasurementActor(userId: string): Promise<MeasurementActor | null> {
+  try {
+    return await loadMeasurementActor(userId);
+  } catch {
+    return null;
+  }
+}
