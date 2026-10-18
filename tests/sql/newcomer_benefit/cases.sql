@@ -37,13 +37,13 @@ SELECT t(commerce_newcomer_finish((SELECT slot_id FROM c1 ORDER BY slot_id LIMIT
 SELECT t(commerce_newcomer_finish(s, tok, 'succeeded', '', NULL)='receipt_required', 'legacy success without receipt rejected')
   FROM (SELECT slot_id s, claim_token tok FROM c1 ORDER BY slot_id OFFSET 1 LIMIT 1) x;
 SELECT t(commerce_newcomer_finish_success(s, tok, 'yz-a', 'VC-A', now(), now() + interval '90 days', amt, thr, act)='succeeded', 'success recorded with real receipt')
-  FROM (SELECT s.slot_id s, s.claim_token tok, b.amount_fen amt, b.threshold_fen thr, b.youzan_coupon_group_id act
+  FROM (SELECT c1.slot_id s, c1.claim_token tok, b.amount_fen amt, b.threshold_fen thr, b.youzan_coupon_group_id act
           FROM c1 JOIN commerce_newcomer_grant_slots s ON s.id = c1.slot_id
           JOIN commerce_newcomer_grants g ON g.id = s.grant_id
           JOIN commerce_newcomer_benefit_slots b ON b.version_id = g.version_id AND b.slot_no = s.slot_no
          ORDER BY s.slot_id LIMIT 1) x;
 SELECT t(commerce_newcomer_finish_success(s, tok, 'yz-a2', 'VC-A2', now(), now() + interval '90 days', amt, thr, act)='stale', 'duplicate finish stale')
-  FROM (SELECT s.slot_id s, s.claim_token tok, b.amount_fen amt, b.threshold_fen thr, b.youzan_coupon_group_id act
+  FROM (SELECT c1.slot_id s, c1.claim_token tok, b.amount_fen amt, b.threshold_fen thr, b.youzan_coupon_group_id act
           FROM c1 JOIN commerce_newcomer_grant_slots s ON s.id = c1.slot_id
           JOIN commerce_newcomer_grants g ON g.id = s.grant_id
           JOIN commerce_newcomer_benefit_slots b ON b.version_id = g.version_id AND b.slot_no = s.slot_no
@@ -58,7 +58,7 @@ CREATE TEMP TABLE c2 AS SELECT * FROM commerce_newcomer_claim(50, 60) WHERE mode
 SELECT t((SELECT count(*)=1 FROM c2), 'unknown slot claimed only for reconcile');
 -- 回查找到 → 真实回执 succeeded；不新增写
 SELECT t(commerce_newcomer_finish_success(s, tok, 'yz-found', 'VC-F', now(), now() + interval '90 days', amt, thr, act)='succeeded', 'reconcile found marks succeeded')
-  FROM (SELECT s.slot_id s, s.claim_token tok, b.amount_fen amt, b.threshold_fen thr, b.youzan_coupon_group_id act
+  FROM (SELECT c1.slot_id s, c1.claim_token tok, b.amount_fen amt, b.threshold_fen thr, b.youzan_coupon_group_id act
           FROM c2 JOIN commerce_newcomer_grant_slots s ON s.id = c2.slot_id
           JOIN commerce_newcomer_grants g ON g.id = s.grant_id
           JOIN commerce_newcomer_benefit_slots b ON b.version_id = g.version_id AND b.slot_no = s.slot_no) x;
