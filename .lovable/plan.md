@@ -1,39 +1,47 @@
-# 新会员券包与扫码用券：只读现状 + 最小修复方案
+# 只读核查结果与最小方案：尺寸申请改走客户服务（2026-10-18）
 
-当前代码 HEAD：`9679363f`。数据库最新迁移：`20261003140000`。本轮没有任何写入、发券、改积分或改配置。
+本次没有改代码、数据库或线上，也没有发通知、建任务。以下内容来自 Lovable 预览源码和共享库，不代表腾讯正式版 product-marks-sync-20261018。
 
-## 1. 新人券包现状
-- 数据库**没有 100 元券包**。券定义表只有 3 条，全部启用：
-  - `NEWCOMER_4990_500` 新人抵用券：1 张，5 元，满 49.9 元可用，90 天有效，适用档位 free/explorer，来源 `newcomer`。
-  - `EXPLORER_MONTHLY_500` 探索会员月度券：5 元，满 49.9，30 天。
-  - `ADMIN_TEST_20260927_4990_500` 管理员测试券（不公开领取）：5 元，满 49.9，7 天。
-- 表结构允许 `signup_pack` 类型，但没有任何 `signup_pack` 定义。
-- 幂等限制：未发现按“顾客 + 券定义”唯一的发放约束，也没有发放函数。
-- 已发出的券：只有测试券，共 6 张、1 位顾客，状态都是 active。新人券发放 0 张。
-- 有赞代金券永久有效性仍未得到官方确认（沿用之前结论）。
+## 1. 现在的写入情况
+- 顾客申请：`src/routes/api/public/storefront/products.$id.measurement-requests.ts` → `requestMeasurementProduction`（`src/server/product-measurement-production.server.ts`）→ RPC `measurement_request`。
+  - 写 `product_measurement_tasks`：每个 SKU 最多一个进行中任务，状态为 pending/claimed。
+  - 写 `product_measurement_requesters`：按 (task_id, customer_id) 去重。
+  - 只在首次创建任务时写 `inv_handheld_notifications`：kind=`measurement_requested`，按门店 location_id 发送，user_id 为空，所以门店里所有员工都能看到。ref_type=`measurement_task`，payload 含 sku_id、listing_id、product_name。
+  - 不创建 `support_conversations` 或 `support_messages`，也没有模板卡片。
+- 保存尺寸：RPC `measurement_save`（手持端和 PC 的 `/inventory/measurements` 都调用它）。
+  - 写入 SKU 尺寸并更新 revision，完成任务。
+  - 写 `commerce_customer_notifications`：kind=`measurement_completed`，product_id=listing_id，dedupe_key=`measurement:{task}:{customer}`。这是顾客端通知，不是内部消息。
+  - 回填 requesters.notified_at。
+  - 不写入任何客服会话。
 
-## 2. 注册自动领券 / 身份同步
-- 代码和数据库函数里都**没有**新人券自动发放逻辑：`newcomer` 只出现在初始迁移的种子数据里。
-- 后台**没有**微信手机号授权（getPhoneNumber / code2session）接口；现有登录接口是手机号短信验证码（`auth/otp.*`）。
-- 有赞会员资产观察表 0 行；有赞券仍按规则只读，不写入。
-- 当前顾客 8 人，会员码会话 0 条。
+## 2. 客服会话
+- `support_conversations` 没有 product_id 列，商品放在 context/context_key 里。门店由服务端根据订单或商品推断；只有一般咨询才用 location_id；location_id 为空就归总部通用咨询。
+- 尺寸申请目前完全不经过客服会话，因此不会出现在“待接待”里。
 
-## 3. POS 扫码与用券
-- `pos/resolve-code` 能识别商品、**按手机号**匹配会员、按券码匹配 ERP 本地券；**不识别**动态会员码（会员码会话表未接入扫码）。
-- `pos/customers/{id}/benefits` 能列出顾客当前可用的本地券和有赞积分。
-- **核销/退款未接通**：ERP 原生收银没有把券用到订单、标记已用或退款退回券的代码；收银支付记录 0 条。
-- 有赞收银：券和积分以有赞为准，ERP 只读，不能在 ERP 里核销有赞券。
-- 另有小问题：这两个 POS 接口出错时会直接返回数据库原始错误信息。
+## 3. 角标与首页待办现在的规则
+- RPC `handheld_unread_counts`（由 `notifications.unread-counts.ts` 调用）：
+  - customers：统计晚于本人 `support_participants.last_read_at` 的顾客消息条数。它按消息计数，不按会话计数，也就是已读状态，不是待处理状态。
+  - internal/orders/system：按 `handheld_notification_category(kind)` 分类，统计本人未读的手持通知。
+  - `measurement_*` 会被分到 **internal**，所以尺寸申请目前算在公司内部消息里，和你要的不一致。
+- 首页待办（`src/routes/api/public/handheld/dashboard.ts`）只包含调拨、盘点、履约和尺寸任务，**没有“待回复客户会话”**。同一个尺寸任务会同时算进待办和通知 internal 未读，存在重复计数。
 
-## 4. 最小修复方案（需你确认后再做）
-1. **先定规则（阻碍）**：你需要确认 100 元券包的张数、每张面额、门槛、有效期，以及券由 ERP 本地发还是有赞发。当前只有一张 5 元新人券，不能当作 100 元规则上线。
-2. 新迁移：建 `signup_pack` 券定义（金额以你的确认为准）；增加按顾客 + 来源的唯一发放记录；发放 RPC 只允许服务端调用，并显式撤销 PUBLIC/anon/authenticated 权限。
-3. 后台新增微信手机号授权入会接口：服务端换取手机号，建立或匹配顾客，同一事务里幂等发券包，重复授权不重复发。需要配置小程序 AppID/Secret（请在项目密钥里添加）。
-4. 会员码：小程序取动态会员码；`resolve-code` 增加会员码识别（校验未过期、门店营业员权限），返回会员和可用券。
-5. 原生收银用券：下单时锁券并校验门槛/有效期/归属，支付成功标记已用，全额退款恢复券；先写失败测试再实现。如果选有赞发券，则这一步改为只读展示，核销在有赞收银完成。
-6. POS 错误信息改为受控中文提示。
+## 4. 当前数据（只统计数量，不含任何隐私）
+- 尺寸任务：pending 2；申请人记录 2；`measurement_requested` 内部通知 2，两条都已有已读记录。
+- `commerce_customer_notifications` 里没有 measurement_completed。
+- 客服会话：open 5，其中 waiting_since 不为空 2，location 为空（总部）2。
 
-## 验证依据
-- 只读查询：券定义表全部记录、已发券按状态/定义分组、券相关数据库函数源码、顾客/会员码会话/有赞观察/收银支付行数、迁移版本。
-- 代码搜索：`newcomer`、`pos_customer_coupons`、微信手机号接口、`resolve-code` 与 `benefits` 源码。
-- 未部署腾讯、未调用有赞写接口。
+## 5. 最小方案（等你授权后才实施）
+1. 申请时改为在同一事务里，找到或创建该商品的客服会话：context_key=`product:{listing}`，门店规则与商品咨询相同。追加一条固定的系统卡片消息 `kind=measurement_request`，内容为 task_id、listing_id、图片路径、品名，不带顾客正文。同时设置 waiting_since。**不再写** `inv_handheld_notifications`。
+2. ERP 客户通知和手持会话中显示这张卡片，点击后打开现有的尺寸填写表单（复用 `measurement_save`）。首页待办加入“待回复会话”，入口仍然是这个会话。
+3. 区分两种计数：
+   - 未读：按会话里的消息与已读时间计算，打开会话即清除。
+   - 待处理：去重后的集合，即进行中尺寸任务所在的会话加上 waiting_since 不为空的会话，按会话 id 和任务 id 去重。角标显示待处理数量。尺寸任务不再计入 internal。
+4. 状态怎么变：
+   - 读过：只清未读，待处理不变。
+   - 员工回复：清掉 waiting_since。如果尺寸任务还没完成，仍算待处理。
+   - 顾客再次回复：重新设置 waiting_since，未读加 1。
+   - 保存尺寸：任务完成，在会话里写入“尺寸已更新”的卡片，并保留现有的 `commerce_customer_notifications` 顾客通知。尺寸部分不再算待处理；会话里有没有其他待回复，仍由 waiting_since 决定。
+5. 隔离：门店和账号范围沿用 `resolveNotificationScope`、`user_location_perms` 和总部规则，所有接口都在服务端校验。迁移只做增量，旧的 `measurement_requested` 通知保留为历史，不改动。
+6. 测试：每条规则一个测试，包括重复申请只有一张卡片、读过不算处理完成、保存后待处理减 1、跨门店看不到。
+
+腾讯部署另由 Codex 验收，本方案暂不部署。
