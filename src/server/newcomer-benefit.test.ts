@@ -165,8 +165,9 @@ function mirrorDeps(o: Partial<MirrorSyncDeps> = {}) {
   const updates: unknown[] = [];
   const d: MirrorSyncDeps = {
     syncEnabled: () => true,
+    resolveMirrorMember: async () => ({ yzOpenId: "yz" }),
     listMirrorsForSync: async () => [{
-      id: "m1", code: "YZVC001", external_id: "Y1",
+      id: "m1", customer_id: "fake-customer", code: "YZVC001", external_id: "Y1",
       metadata: { activity_id: "35074448", yz_open_id: "yz", verify_code: "ncvaaa" } }],
     queryHeldByVerifyCode: async () => ({ kind: "found", couponId: "Y1", youzanStatus: "3" }),
     applyMirrorStatus: async (...a) => { updates.push(a); return a[2] ? "updated" : "checked"; },
@@ -229,9 +230,10 @@ test("mirror sync stamps every checked row (rotation) and restores frozen->activ
   const applied: unknown[] = [];
   const d: MirrorSyncDeps = {
     syncEnabled: () => true,
+    resolveMirrorMember: async () => ({ yzOpenId: "yz" }),
     listMirrorsForSync: async () => [
-      { id: "m1", code: "c", external_id: "Y1", status: "frozen", metadata: { activity_id: "a", yz_open_id: "yz", verify_code: "v1" } },
-      { id: "m2", code: "c", external_id: "Y2", status: "active", metadata: { activity_id: "a", yz_open_id: "yz", verify_code: "v2" } },
+      { id: "m1", customer_id: "fake-customer", code: "c", external_id: "Y1", status: "frozen", metadata: { activity_id: "a", yz_open_id: "yz", verify_code: "v1" } },
+      { id: "m2", customer_id: "fake-customer", code: "c", external_id: "Y2", status: "active", metadata: { activity_id: "a", yz_open_id: "yz", verify_code: "v2" } },
       { id: "m3", code: "c", external_id: "Y3", status: "active", metadata: {} }],
     queryHeldByVerifyCode: async ({ verifyCode }) => verifyCode === "v1"
       ? { kind: "found", couponId: "Y1", youzanStatus: "1" } : { kind: "found", couponId: "WRONG", youzanStatus: "3" },
@@ -310,4 +312,57 @@ test("parseQueryResponse rejects unsafe-integer numeric coupon_id", () => {
   assert.equal(parseQueryResponse(200, body(UNSAFE_ID), match).kind, "unavailable");
   const r = parseQueryResponse(200, body("9007199254740993"), match);
   assert.equal(r.kind === "found" && r.receipt.couponId, "9007199254740993");
+});
+
+test("0092 finish mirror without yz_open_id queries trusted customer identity and syncs used", async () => {
+  const calls: unknown[] = [];
+  const a = mirrorDeps({
+    listMirrorsForSync: async () => [{ id: "m1", customer_id: "fake-customer", code: "ncvtest0001", external_id: "12",
+      metadata: { activity_id: "35074448", verify_code: "ncvtest0001" } }],
+    resolveMirrorMember: async (customerId) => { calls.push(customerId); return { yzOpenId: "yz" }; },
+    queryHeldByVerifyCode: async (input) => {
+      calls.push(input);
+      const r = parseQueryResponse(200, { code: 200, total: 1, page_num: 1, page_size: 50,
+        data: [holdItem(12, "ncvtest0001", { status: 3 })] }, input);
+      return r.kind === "found" ? { kind: "found", couponId: r.receipt.couponId, youzanStatus: r.youzanStatus ?? "unknown" } : { kind: "unavailable" };
+    },
+  });
+  assert.deepEqual(await syncYouzanCouponMirrors(a.d), { enabled: true, checked: 1, updated: 1 });
+  assert.deepEqual(calls, ["fake-customer", { activityId: "35074448", yzOpenId: "yz", verifyCode: "ncvtest0001" }]);
+  assert.deepEqual(a.updates, [["m1", "12", "used"]]);
+});
+
+for (const reason of ["trusted_member_mapping_missing", "trusted_member_mapping_conflict", "trusted_member_mapping_unavailable"]) {
+  test(`mirror ${reason}: metadata identity cannot bypass trusted mapping`, async () => {
+    let queries = 0;
+    const a = mirrorDeps({ resolveMirrorMember: async () => ({ blocked: reason }),
+      queryHeldByVerifyCode: async () => { queries++; return { kind: "found", couponId: "Y1", youzanStatus: "3" }; } });
+    await syncYouzanCouponMirrors(a.d);
+    assert.equal(queries, 0);
+    assert.deepEqual(a.updates, [["m1", "Y1", null]]);
+  });
+}
+
+test("mirror resolver exception or missing customer never queries provider", async () => {
+  for (const missing of [false, true]) {
+    let queries = 0;
+    const a = mirrorDeps({
+      ...(missing ? { listMirrorsForSync: async () => [{ id: "m1", code: "v", external_id: "Y1",
+        metadata: { activity_id: "a", verify_code: "v", yz_open_id: "untrusted" } }] } : {}),
+      resolveMirrorMember: async () => { throw Error("sqlite unavailable"); },
+      queryHeldByVerifyCode: async () => { queries++; return { kind: "unavailable" }; },
+    });
+    await syncYouzanCouponMirrors(a.d);
+    assert.equal(queries, 0);
+    assert.deepEqual(a.updates, [["m1", "Y1", null]]);
+  }
+});
+
+test("mirror never queries stale metadata yz_open_id belonging to another owner", async () => {
+  let queries = 0;
+  const a = mirrorDeps({ resolveMirrorMember: async () => ({ yzOpenId: "different-trusted-owner" }),
+    queryHeldByVerifyCode: async () => { queries++; return { kind: "unavailable" }; } });
+  await syncYouzanCouponMirrors(a.d);
+  assert.equal(queries, 0);
+  assert.deepEqual(a.updates, [["m1", "Y1", null]]);
 });

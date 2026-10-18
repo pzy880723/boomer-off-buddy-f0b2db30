@@ -197,6 +197,8 @@ export async function queryHeldPagesWith(
 export type MirrorStatus = "active" | "frozen" | "used" | "void";
 export type MirrorSyncDeps = {
   syncEnabled(): boolean;
+  /** Server-only customer + unique active HQ trusted mapping; metadata is never an identity source. */
+  resolveMirrorMember(customerId: string): Promise<{ yzOpenId: string } | { blocked: string }>;
   /** 有界轮转：active/frozen 按 provider_status_checked_at NULLS FIRST 取前 limit 条。 */
   listMirrorsForSync(limit: number): Promise<YouzanMirrorRow[]>;
   queryHeldByVerifyCode(input: { activityId: string; yzOpenId: string; verifyCode: string }):
@@ -205,7 +207,7 @@ export type MirrorSyncDeps = {
   applyMirrorStatus(mirrorId: string, externalId: string, status: MirrorStatus | null): Promise<string>;
 };
 export type YouzanMirrorRow = {
-  id: string; code: string; external_id: string; status?: string;
+  id: string; customer_id?: string; code: string; external_id: string; status?: string;
   metadata: { activity_id?: string; yz_open_id?: string; verify_code?: string } | null;
 };
 
@@ -226,11 +228,15 @@ export async function syncYouzanCouponMirrors(deps: MirrorSyncDeps, limit = 50) 
   for (const m of rows) {
     const meta = m.metadata ?? {};
     let next: MirrorStatus | null = null;
-    if (meta.activity_id && meta.verify_code && meta.yz_open_id) {
+    if (m.customer_id && meta.activity_id && meta.verify_code) {
       try {
-        const r = await deps.queryHeldByVerifyCode({ activityId: meta.activity_id, yzOpenId: meta.yz_open_id, verifyCode: meta.verify_code });
-        // 必须同一券 ID：同 code 误匹配到别的券绝不采用
-        if (r.kind === "found" && r.couponId === m.external_id) next = mapYouzanStatus(r.youzanStatus);
+        const member = await deps.resolveMirrorMember(m.customer_id);
+        // 0092 镜像不存 yz_open_id：只读可信映射补足；旧镜像有身份时还必须一致，冲突不查任何人。
+        if ("yzOpenId" in member && member.yzOpenId && (!meta.yz_open_id || meta.yz_open_id === member.yzOpenId)) {
+          const r = await deps.queryHeldByVerifyCode({ activityId: meta.activity_id, yzOpenId: member.yzOpenId, verifyCode: meta.verify_code });
+          // 必须同一券 ID：同 code 误匹配到别的券绝不采用
+          if (r.kind === "found" && r.couponId === m.external_id) next = mapYouzanStatus(r.youzanStatus);
+        }
       } catch { next = null; }
     }
     // 无论结果都打同步时间戳，下轮轮到后面的镜像，避免前 N 条永久占位饿死后续

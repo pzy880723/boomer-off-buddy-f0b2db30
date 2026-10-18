@@ -61,7 +61,8 @@ async function headquarters() {
   const { data, error } = await supabaseAdmin.from("youzan_shops")
     .select("kdt_id,parent_kdt_id,role,status,access_token,token_expires_at").eq("status", "active");
   if (error) throw Error("shop_lookup_failed");
-  const hq = (data ?? []).find((s) => s.role === "hq");
+  const heads = (data ?? []).filter((s) => s.role === "hq");
+  const hq = heads.length === 1 ? heads[0] : null;
   return hq ? selectPointsHeadquarters(data ?? [], hq.kdt_id) : null;
 }
 
@@ -168,10 +169,12 @@ export function productionNewcomerDeps(): NewcomerDeps {
 export function productionMirrorSyncDeps(): MirrorSyncDeps {
   return {
     syncEnabled: () => env("NEWCOMER_MIRROR_SYNC_ENABLED") === "true",
+    // Reuse the server-owned customer + HQ read-only SQLite mapping and cross-customer uniqueness check.
+    resolveMirrorMember: (customerId) => productionNewcomerDeps().resolveMember(customerId),
     async listMirrorsForSync(limit) {
       const { data, error } = await supabaseAdmin
         .from("pos_customer_coupons" as never)
-        .select("id,code,external_id,status,metadata")
+        .select("id,customer_id,code,external_id,status,metadata")
         .eq("external_provider", "youzan")
         .in("status", ["active", "frozen"])
         .order("provider_status_checked_at" as never, { ascending: true, nullsFirst: true })
