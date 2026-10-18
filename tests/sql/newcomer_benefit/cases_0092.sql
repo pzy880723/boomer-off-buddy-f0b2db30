@@ -85,15 +85,20 @@ END $$;
 SELECT t(EXISTS (SELECT 1 FROM commerce_newcomer_grant_slots s JOIN f6 ON f6.slot_id=s.id
   WHERE s.status='dispatching'), 'rolled-back slot not marked succeeded');
 
--- enroll 拒绝不完整版本：模板未绑定的 active 版本不得发礼包
+-- enroll 拒绝不完整版本：用新草稿版本 v3 模拟"模板未绑全就激活"（v2 已有登记，规则不可变）
+INSERT INTO commerce_newcomer_benefit_versions (id, status, validity_days) VALUES ('newcomer_v3', 'draft', 90);
+INSERT INTO commerce_newcomer_benefit_slots (version_id, slot_no, threshold_fen, amount_fen) VALUES
+  ('newcomer_v3',1,4990,500),('newcomer_v3',2,4990,500),('newcomer_v3',3,4990,500),('newcomer_v3',4,4990,500),
+  ('newcomer_v3',5,9900,1000),('newcomer_v3',6,9900,1000),('newcomer_v3',7,29900,3000),('newcomer_v3',8,29900,3000);
+UPDATE commerce_newcomer_benefit_slots SET youzan_coupon_group_id='35074448' WHERE version_id='newcomer_v3' AND slot_no BETWEEN 1 AND 7;
 UPDATE commerce_newcomer_benefit_versions SET status='draft' WHERE id='newcomer_v2';
-UPDATE commerce_newcomer_benefit_slots SET youzan_coupon_group_id=NULL WHERE version_id='newcomer_v2' AND slot_no=8;
-UPDATE commerce_newcomer_benefit_versions SET status='active' WHERE id='newcomer_v2';
+UPDATE commerce_newcomer_benefit_versions SET status='active' WHERE id='newcomer_v3';
 INSERT INTO commerce_customers (id, external_subject, phone, status) VALUES
   ('a0000000-0000-0000-0000-000000000005','sub-x5','18600000025','active');
 SELECT t(NOT EXISTS (SELECT 1 FROM commerce_newcomer_grants WHERE customer_id='a0000000-0000-0000-0000-000000000005'), 'active version with unbound slot enrolls nothing');
--- 恢复 v2 完整并激活
-UPDATE commerce_newcomer_benefit_slots SET youzan_coupon_group_id='35074452' WHERE version_id='newcomer_v2' AND slot_no=8;
+-- 补全绑定后恢复 v2 激活，登记成功
+UPDATE commerce_newcomer_benefit_versions SET status='draft' WHERE id='newcomer_v3';
+UPDATE commerce_newcomer_benefit_versions SET status='active' WHERE id='newcomer_v2';
 SELECT t((SELECT commerce_newcomer_enroll('a0000000-0000-0000-0000-000000000005', NULL)->>'status')='created', 'complete v2 enrolls');
 
 -- 权限
