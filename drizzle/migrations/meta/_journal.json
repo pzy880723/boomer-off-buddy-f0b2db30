@@ -666,6 +666,13 @@
       "when": 1792296295646,
       "tag": "0094_newcomer_identity_recheck",
       "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1792296997370,
+      "tag": "0095_product_featured_stamp_notice_tags",
+      "breakpoints": true
     }
   ]
 }
