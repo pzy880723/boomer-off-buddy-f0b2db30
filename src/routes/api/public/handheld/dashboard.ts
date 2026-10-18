@@ -8,7 +8,7 @@ import {
   err,
 } from "@/server/handheld-auth.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { countUnread, resolveNotificationScope } from "@/server/handheld-notifications.server";
+import { countUnread, resolveNotificationScope, applyRequestedLocation } from "@/server/handheld-notifications.server";
 import {
   dashboardGate,
   loadMeasurementTasks,
@@ -116,6 +116,7 @@ export const Route = createFileRoute("/api/public/handheld/dashboard")({
           );
         }
 
+        if (!session) return err("Employee session required", 401, { code: "session_required" });
         // ---- 1. stats ----
         // 仓库库存 = SUM(inv_skus.stock_qty)（入库 RPC 只更新 inv_skus.stock_qty）
         // 门店库存 = SUM(inv_stocks.qty where location_id = 门店)
@@ -280,20 +281,27 @@ export const Route = createFileRoute("/api/public/handheld/dashboard")({
         let unreadCount = 0;
         {
           const notificationScope = await resolveNotificationScope({
-            userId: session!.user_id,
+            userId: gate.userId,
             deviceId: auth.device.id,
             deviceLocationId: auth.device.location_id,
           });
           unreadCount = await countUnread(notificationScope);
         }
 
+        const baseScope = await resolveNotificationScope({ userId: session.user_id, deviceId: auth.device.id, deviceLocationId: auth.device.location_id });
+        const scopedWork = applyRequestedLocation(baseScope, locationId);
+        if (!scopedWork.ok) return err('Location not authorized', 403, { code: 'location_forbidden' });
+        let work;
+        try { const {loadWorkItems} = await import('@/server/handheld-work-items.server'); work = await loadWorkItems(scopedWork.scope); }
+        catch { return err('Work items temporarily unavailable', 500, {code:'work_items_unavailable'}); }
         return ok({
           stats: {
             stock_count,
             inventory_accuracy: null,
             in_transit_count: inTransitToHere ?? 0,
           },
-          tasks,
+          tasks: work.items,
+          pending_counts: work.counts,
           recent_items,
           unread_notifications: unreadCount ?? 0,
           measurement_tasks_status: measurement.status,

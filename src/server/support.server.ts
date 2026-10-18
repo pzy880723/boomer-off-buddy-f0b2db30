@@ -19,6 +19,8 @@ import {
   assertConversationLocation,
   type MessageWindow,
 } from "@/lib/support-message-window";
+import { loadMeasurementCards, pendingConversationStates } from '@/server/support-measurement.server';
+import type { MeasurementCard } from '@/lib/measurement-card';
 import { loadConversationThumbnails } from "@/server/support-thumbnails.server";
 import { customerServiceName, toCustomerConversationListItem, type LocationNameMap } from "@/lib/support-customer-dto";
 
@@ -68,6 +70,9 @@ export type SupportConversationSummary = {
   escalated_at: string | null;
   escalation_reason: string | null;
   waiting_since: string | null;
+  needs_reply: boolean;
+  pending_measurement_count: number;
+  pending_action: boolean;
   context_key: string | null;
   context: SupportContext;
   can_reply: boolean;
@@ -88,6 +93,7 @@ export type SupportMessage = SupportSenderPresentation & {
   created_at: string;
   /** 仅员工端：该消息是否由当前登录员工发送。顾客端不返回此字段。 */
   is_mine?: boolean;
+  measurement_card: MeasurementCard | null;
 };
 
 /** 员工名称/可信头像短缓存（进程内 5 分钟），避免详情每 3 秒轮询都调用 admin.getUserById。 */
@@ -268,6 +274,7 @@ async function hydrate(
     }),
   );
 
+  const pending = await pendingConversationStates(ids);
   return rows.map((row) => ({
     id: row.id,
     title: row.title,
@@ -299,6 +306,9 @@ async function hydrate(
     escalated_at: row.escalated_at,
     escalation_reason: row.escalation_reason,
     waiting_since: row.waiting_since,
+    needs_reply: pending.get(row.id)?.needs_reply ?? false,
+    pending_measurement_count: pending.get(row.id)?.pending_measurement_count ?? 0,
+    pending_action: pending.get(row.id)?.pending_action ?? false,
     context_key: row.context_key,
     // 列表只含授权会话；context 仅在授权范围内返回
     context: staffCanAccessConversation(access, row) ? safeContext(row.context) : null,
@@ -407,9 +417,11 @@ export async function loadConversationRow(id: string): Promise<ConversationRow |
   return (data as unknown as ConversationRow) ?? null;
 }
 
-type MessageRow = Omit<SupportMessage, keyof SupportSenderPresentation> & {
+type MessageRow = Omit<SupportMessage, keyof SupportSenderPresentation | 'measurement_card'> & {
   sender_user_id: string | null;
   sender_customer_id: string | null;
+  measurement_task_id?: string | null;
+  card_kind?: string | null;
 };
 
 /** Caller must have authorized this exact conversation before invoking any avatar lookup. */
@@ -445,6 +457,8 @@ async function presentMessages(
   await Promise.all(staffIds.filter((id) => roles.get(id) === "hq_agent").map(async (id) => {
     hqAvatars.set(id, (await loadStaffProfile(id)).hq_avatar_url);
   }));
+  const taskIds = [...new Set(rows.filter(r=>r.sender_type==='system' && !r.internal && r.card_kind && r.measurement_task_id).map(r=>r.measurement_task_id).filter((id):id is string=>!!id))];
+  const cards = await loadMeasurementCards(conversation,taskIds);
   return rows.map((r) => {
     const presentation = senderPresentation({
       sender_type: r.sender_type, sender_customer_id: r.sender_customer_id,
@@ -461,6 +475,7 @@ async function presentMessages(
         : presentation.sender_role === "hq_agent" ? "总部客服"
         : presentation.sender_role === "store_staff" ? `${presentation.sender_location_name ?? "门店"}客服` : "系统",
       body: r.body, internal: r.internal, delivery_status: r.delivery_status ?? "sent", created_at: r.created_at,
+      measurement_card: r.sender_type === 'system' && r.card_kind && r.measurement_task_id ? cards.get(r.measurement_task_id) ?? null : null,
       ...presentation,
       // is_mine 只在员工端返回；顾客端永不暴露 sender_user_id 或其派生字段
       ...(staffView ? { is_mine: !!viewerUserId && r.sender_user_id === viewerUserId } : {}),
@@ -483,7 +498,7 @@ async function loadMessages(
   const asc = window.mode === "after";
   let query = supabaseAdmin
     .from("support_messages" as never)
-    .select("id, sender_name, sender_type, sender_user_id, sender_customer_id, body, internal, delivery_status, created_at")
+    .select("id, sender_name, sender_type, sender_user_id, sender_customer_id, body, internal, delivery_status, created_at, measurement_task_id, card_kind")
     .eq("conversation_id", conversation.id)
     .order("created_at", { ascending: asc })
     .order("id", { ascending: asc })
@@ -596,6 +611,8 @@ function pickMessage(m: Record<string, unknown> | undefined): MessageRow | null 
     internal: Boolean(m.internal),
     delivery_status: (m.delivery_status as SupportMessage["delivery_status"]) ?? "sent",
     created_at: String(m.created_at),
+    measurement_task_id: typeof m.measurement_task_id === "string" ? m.measurement_task_id : null,
+    card_kind: typeof m.card_kind === "string" ? m.card_kind : null,
   };
 }
 
@@ -843,6 +860,7 @@ export async function getCustomerConversation(customerId: string, conversationId
         location_id: conversation.location_id,
         context: safeContext(conversation.context),
         updated_at: conversation.updated_at,
+        ...(await pendingConversationStates([conversation.id])).get(conversation.id),
         service_name: customerServiceName(conversation.location_id,
           await loadCustomerLocationNames([conversation.location_id])),
       },
