@@ -20,10 +20,10 @@ const receipt = (o: Partial<TakeReceipt> = {}): TakeReceipt => ({
 // 真实合同形状（字段取自真实回执结构，值为虚构）：send data 顶层 verify_code + 毫秒起止；voucher_identity 只有 coupon_id/coupon_type
 const START_MS = 1792252800000, END_MS = 1800028799000;
 const sendBody = (o: Record<string, unknown> = {}) => ({ code: 200, success: true, data: {
-  voucher_identity: { coupon_id: 12, coupon_type: 1 }, valid_start_time: START_MS, valid_end_time: END_MS,
+  voucher_identity: { coupon_id: 12, coupon_type: 1 }, valid_start_time: Date.UTC(2026, 9, 17, 16, 0, 0), valid_end_time: Date.UTC(2027, 0, 15, 15, 59, 59),
   verify_code: "ncvtest0001", kdt_id: 1, activity_id: 35074448, value: 500, status: 1, ...o } });
 const holdItem = (id: number | string, code: string, o: Record<string, unknown> = {}) => ({
-  voucher_identity: { coupon_id: id, coupon_type: 1 }, valid_start_time: START_MS, valid_end_time: END_MS,
+  voucher_identity: { coupon_id: id, coupon_type: 1 }, valid_start_time: Date.UTC(2026, 9, 17, 16, 0, 0), valid_end_time: Date.UTC(2027, 0, 15, 15, 59, 59),
   verify_code: code, kdt_id: 1, activity_id: 35074448, value: 500, threshold_amount: 4990, status: 1,
   user_identity: { yz_open_id: "yz" }, ...o });
 
@@ -285,11 +285,9 @@ test("worker claims one slot at a time with its own lease, up to limit, sequenti
 
 // 非安全整数 coupon_id（> Number.MAX_SAFE_INTEGER）已被 JSON 四舍五入，券身份不可信 → 必须拒绝；字符串数字原样保留。
 const UNSAFE_ID = Number.MAX_SAFE_INTEGER + 1;
-const START_MS = Date.UTC(2026, 9, 17, 16, 0, 0);
-const END_MS = Date.UTC(2027, 0, 15, 15, 59, 59);
 const fakeItem = (couponId: unknown) => ({
   voucher_identity: { coupon_id: couponId, coupon_type: 1 },
-  valid_start_time: START_MS, valid_end_time: END_MS,
+  valid_start_time: Date.UTC(2026, 9, 17, 16, 0, 0), valid_end_time: Date.UTC(2027, 0, 15, 15, 59, 59),
   verify_code: "abc123def456ghi", kdt_id: 1, activity_id: 90001,
   value: 500, threshold_amount: 4990, status: 1,
   user_identity: { yz_open_id: "fake_open_id" },
