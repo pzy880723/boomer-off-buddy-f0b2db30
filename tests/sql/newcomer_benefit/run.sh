@@ -18,7 +18,14 @@ CREATE TABLE public.commerce_customers (id uuid DEFAULT gen_random_uuid() PRIMAR
   last_login_at timestamptz, created_at timestamptz DEFAULT now() NOT NULL, updated_at timestamptz DEFAULT now() NOT NULL);
 SQL
 $PSQL -q -v ON_ERROR_STOP=1 < "$mig" >/dev/null || { echo "FAIL migration"; exit 1; }
+[ -n "$mig2" ] && { $PSQL -q -v ON_ERROR_STOP=1 < "$mig2" >/dev/null || { echo "FAIL migration 0091"; exit 1; }; }
 out=$($PSQL -q -v ON_ERROR_STOP=1 < tests/sql/newcomer_benefit/cases.sql 2>&1); rc=$?
 echo "$out" | grep -o 'PASS .*\|ERROR.*\|FAIL.*'
 n=$(echo "$out" | grep -c 'PASS')
 [ $rc -eq 0 ] && [ "$n" -eq 27 ] && echo "ALL PASS ($n)" || { echo "SOME FAILED ($n/27)"; exit 1; }
+if [ -n "$mig2" ]; then
+  out2=$($PSQL -q -v ON_ERROR_STOP=1 < tests/sql/newcomer_benefit/cases_0091.sql 2>&1); rc2=$?
+  echo "$out2" | grep -o 'PASS .*\|ERROR.*\|FAIL.*'
+  n2=$(echo "$out2" | grep -c 'PASS')
+  [ $rc2 -eq 0 ] && [ "$n2" -eq 19 ] && echo "ALL PASS 0091 ($n2)" || { echo "SOME FAILED 0091 ($n2/19)"; exit 1; }
+fi
