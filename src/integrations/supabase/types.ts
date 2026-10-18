@@ -11071,6 +11071,20 @@ export type Database = {
         }
         Returns: string
       }
+      commerce_newcomer_finish_success: {
+        Args: {
+          p_activity_id: string
+          p_amount_fen: number
+          p_coupon_id: string
+          p_slot: string
+          p_threshold_fen: number
+          p_token: string
+          p_valid_end: string
+          p_valid_start: string
+          p_verify_code: string
+        }
+        Returns: string
+      }
       commerce_newcomer_retry: { Args: { p_grant: string }; Returns: number }
       commerce_newcomer_summary: { Args: { p_customer: string }; Returns: Json }
       commerce_newcomer_verify_code: {
