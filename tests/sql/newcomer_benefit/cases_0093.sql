@@ -24,16 +24,16 @@ SELECT t(NOT EXISTS (SELECT 1 FROM commerce_newcomer_grants WHERE customer_id='a
 -- 镜像状态：冻结→解冻可恢复；终态不回写；ID 不符不改；每次都刷新同步时间
 INSERT INTO pos_customer_coupons (id, customer_id, code, name, discount_type, value, min_spend, status, external_provider, external_id)
 VALUES ('b0000000-0000-0000-0000-000000000001','a0000000-0000-0000-0000-000000000031','YZM1','m','amount',5,49.9,'active','youzan','Y-M1');
-SELECT t(commerce_youzan_mirror_apply_status('b0000000-0000-0000-0000-000000000001','OTHER','used')='id_mismatch'
-  AND (SELECT status FROM pos_customer_coupons WHERE id='b0000000-0000-0000-0000-000000000001')='active', 'id mismatch never changes status');
+CREATE TEMP TABLE r_84241 AS SELECT commerce_youzan_mirror_apply_status('b0000000-0000-0000-0000-000000000001','OTHER','used') r;
+SELECT t((SELECT r FROM r_84241)='id_mismatch' AND (SELECT status FROM pos_customer_coupons WHERE id='b0000000-0000-0000-0000-000000000001')='active', 'id mismatch never changes status');
 SELECT t((SELECT provider_status_checked_at IS NOT NULL FROM pos_customer_coupons WHERE id='b0000000-0000-0000-0000-000000000001'), 'check stamps sync time for rotation');
-SELECT t(commerce_youzan_mirror_apply_status('b0000000-0000-0000-0000-000000000001','Y-M1','frozen')='updated'
-  AND (SELECT status FROM pos_customer_coupons WHERE id='b0000000-0000-0000-0000-000000000001')='frozen', 'frozen mirrored as frozen (not void)');
-SELECT t(commerce_youzan_mirror_apply_status('b0000000-0000-0000-0000-000000000001','Y-M1','active')='updated'
-  AND (SELECT status FROM pos_customer_coupons WHERE id='b0000000-0000-0000-0000-000000000001')='active', 'unfrozen coupon returns to active');
+CREATE TEMP TABLE r_57717 AS SELECT commerce_youzan_mirror_apply_status('b0000000-0000-0000-0000-000000000001','Y-M1','frozen') r;
+SELECT t((SELECT r FROM r_57717)='updated' AND (SELECT status FROM pos_customer_coupons WHERE id='b0000000-0000-0000-0000-000000000001')='frozen', 'frozen mirrored as frozen (not void)');
+CREATE TEMP TABLE r_92524 AS SELECT commerce_youzan_mirror_apply_status('b0000000-0000-0000-0000-000000000001','Y-M1','active') r;
+SELECT t((SELECT r FROM r_92524)='updated' AND (SELECT status FROM pos_customer_coupons WHERE id='b0000000-0000-0000-0000-000000000001')='active', 'unfrozen coupon returns to active');
 SELECT t(commerce_youzan_mirror_apply_status('b0000000-0000-0000-0000-000000000001','Y-M1','used')='updated', 'used applied');
-SELECT t(commerce_youzan_mirror_apply_status('b0000000-0000-0000-0000-000000000001','Y-M1','active')='terminal'
-  AND (SELECT status FROM pos_customer_coupons WHERE id='b0000000-0000-0000-0000-000000000001')='used', 'terminal status never rewritten');
+CREATE TEMP TABLE r_72234 AS SELECT commerce_youzan_mirror_apply_status('b0000000-0000-0000-0000-000000000001','Y-M1','active') r;
+SELECT t((SELECT r FROM r_72234)='terminal' AND (SELECT status FROM pos_customer_coupons WHERE id='b0000000-0000-0000-0000-000000000001')='used', 'terminal status never rewritten');
 
 SELECT t(NOT has_function_privilege('authenticated','commerce_newcomer_claim_scoped(integer,integer,uuid[])','EXECUTE')
   AND NOT has_function_privilege('authenticated','commerce_newcomer_backfill_scoped(integer,uuid[])','EXECUTE')
