@@ -82,10 +82,11 @@ SELECT t(commerce_newcomer_retry((SELECT id FROM commerce_newcomer_grants LIMIT 
 SELECT t((SELECT count(*)=2 FROM commerce_newcomer_grant_slots WHERE status='succeeded'), 'succeeded slots untouched');
 -- 全部成功 → completed / issued（逐槽真实回执）
 UPDATE commerce_newcomer_grant_slots SET status='pending', next_run_at=now() WHERE status <> 'succeeded';
+CREATE TEMP TABLE c9 AS SELECT * FROM commerce_newcomer_claim(50, 60);
 SELECT commerce_newcomer_finish_success(s.id, s.claim_token, 'yz-' || s.id, 'VC-' || s.slot_no,
          now(), now() + interval '90 days', b.amount_fen, b.threshold_fen, b.youzan_coupon_group_id)
-  FROM commerce_newcomer_claim(50, 60) cl
-  JOIN commerce_newcomer_grant_slots s ON s.id = cl.slot_id
+  FROM c9
+  JOIN commerce_newcomer_grant_slots s ON s.id = c9.slot_id
   JOIN commerce_newcomer_grants g ON g.id = s.grant_id
   JOIN commerce_newcomer_benefit_slots b ON b.version_id = g.version_id AND b.slot_no = s.slot_no;
 SELECT t((SELECT status='completed' FROM commerce_newcomer_grants LIMIT 1) AND commerce_newcomer_summary('11111111-1111-1111-1111-111111111111')->>'status'='issued', 'all 8 issued completes');
