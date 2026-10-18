@@ -13,6 +13,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FankuangSwitch } from "./fankuang-switch";
+import { ProductMarksFields } from "./product-marks-fields";
+import { readProductMarks, type FeaturedStamp, type NoticeTag } from "@/lib/commerce/product-marks";
 import { SkuMetaFields, emptySkuMeta, type SkuMetaState } from "./sku-meta-fields";
 import {
   MeasurementFields,
@@ -43,6 +45,8 @@ export function SkuEditDialog({
   });
   const [price, setPrice] = useState("");
   const [fankuang, setFankuang] = useState<boolean | null>(null);
+  const [stamp, setStamp] = useState<FeaturedStamp | null>(null);
+  const [tags, setTags] = useState<NoticeTag[]>([]);
   const [measurement, setMeasurement] = useState<MeasurementFieldState>({
     ...emptyMeasurementFields,
   });
@@ -71,6 +75,9 @@ export function SkuEditDialog({
       });
       setPrice(String(sku.price_tier ?? ""));
       setFankuang(sku.fankuang_override ?? null);
+      const marks = readProductMarks(sku);
+      setStamp(marks.featured_stamp);
+      setTags(marks.notice_tags);
       setMeasurement({ ...emptyMeasurementFields });
       setOriginalMeasurement({ ...emptyMeasurementFields });
       setMeasurementRevision(null);
@@ -139,6 +146,10 @@ export function SkuEditDialog({
       if (fankuangEligible && fankuang !== (sku.fankuang_override ?? null)) {
         patch.fankuang_override = fankuang;
       }
+      // 印章/标签同样只在人工改动时提交，不抹掉原值
+      const orig = readProductMarks(sku);
+      if (stamp !== orig.featured_stamp) patch.featured_stamp = stamp;
+      if (tags.join(",") !== orig.notice_tags.join(",")) patch.notice_tags = tags;
       await fn({ data: { id: sku.id, patch: patch as never } });
       // 实测尺寸：仅在内容变化时保存（版本 CAS + client_op_id 幂等，并发冲突会报错）
       if (measurementChanged) {
@@ -196,6 +207,7 @@ export function SkuEditDialog({
           {fankuangEligible && (
             <FankuangSwitch price={price} value={fankuang} onChange={setFankuang} />
           )}
+          <ProductMarksFields stamp={stamp} tags={tags} onStampChange={setStamp} onTagsChange={setTags} />
           <MeasurementFields state={measurement} onChange={setMeasurement} />
         </div>
         <DialogFooter>
