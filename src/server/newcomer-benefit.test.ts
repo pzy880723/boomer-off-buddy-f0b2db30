@@ -10,7 +10,7 @@ import {
   type NewcomerClaim,
   type NewcomerDeps,
   type MirrorSyncDeps,
-} from "./newcomer-benefit.server";
+} from "./newcomer-benefit.server.ts";
 
 const claim = (o: Partial<NewcomerClaim> = {}): NewcomerClaim => ({
   slot_id: "s1", claim_token: "t1", mode: "dispatch", request_key: "nc:g:1", customer_id: "c1",
