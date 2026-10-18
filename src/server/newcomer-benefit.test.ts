@@ -40,7 +40,7 @@ test("dispatch success goes through finishSuccess with real receipt and slot rul
   const { d, succeeded, finished } = deps();
   assert.equal(await processNewcomerSlot(claim(), d), "succeeded");
   assert.equal(finished.length, 0);
-  const [slotId, token, r] = succeeded[0] as [string, string, TakeReceipt & { amountFen: number }];
+  const [slotId, token, r] = succeeded[0] as [string, string, TakeReceipt & { amountFen: number; thresholdFen: number; activityId: string }];
   assert.equal(slotId, "s1"); assert.equal(token, "t1");
   assert.equal(r.couponId, "Y1"); assert.equal(r.verifyCode, "YZVC001");
   assert.equal(r.amountFen, 500); assert.equal(r.thresholdFen, 4990); assert.equal(r.activityId, "35074448");
