@@ -11038,6 +11038,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      commerce_newcomer_backfill: {
+        Args: { p_limit?: number }
+        Returns: number
+      }
       commerce_newcomer_claim: {
         Args: { p_lease_seconds: number; p_limit: number }
         Returns: {
@@ -11069,6 +11073,10 @@ export type Database = {
       }
       commerce_newcomer_retry: { Args: { p_grant: string }; Returns: number }
       commerce_newcomer_summary: { Args: { p_customer: string }; Returns: Json }
+      commerce_newcomer_verify_code: {
+        Args: { p_request_key: string }
+        Returns: string
+      }
       commerce_order_is_refund_closed: {
         Args: { p_order_id: string }
         Returns: boolean

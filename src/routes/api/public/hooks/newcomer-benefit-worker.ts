@@ -22,10 +22,13 @@ export const Route = createFileRoute("/api/public/hooks/newcomer-benefit-worker"
     handlers: {
       POST: async ({ request }) => {
         if (!authorized(request)) return json({ ok: false, error: "unauthorized" }, 401);
-        const { runNewcomerWorker } = await import("@/server/newcomer-benefit.server");
-        const { productionNewcomerDeps } = await import("@/server/newcomer-benefit-production.server");
+        const { runNewcomerWorker, syncYouzanCouponMirrors } = await import("@/server/newcomer-benefit.server");
+        const prod = await import("@/server/newcomer-benefit-production.server");
         try {
-          return json({ ok: true, ...(await runNewcomerWorker(productionNewcomerDeps(), 10)) });
+          const backfill = await prod.backfillNewcomerIfEnabled();
+          const worker = await runNewcomerWorker(prod.productionNewcomerDeps(), 10);
+          const mirror = await syncYouzanCouponMirrors(prod.productionMirrorSyncDeps(), 50);
+          return json({ ok: true, backfill, ...worker, mirror });
         } catch {
           return json({ ok: false, error: "newcomer_worker_failed" }, 500);
         }
