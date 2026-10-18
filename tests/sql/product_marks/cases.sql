@@ -19,7 +19,8 @@ SELECT t(upd(:HQ, '{"notice_tags":["function_uncertain","function_unavailable"]}
 SELECT t(upd(:HQ, '{"featured_stamp":"vintage"}') LIKE 'ERR:validation_error%', 'unknown stamp rejected');
 SELECT t(upd(:HQ, '{"notice_tags":["broken"]}') LIKE 'ERR:validation_error%', 'unknown tag rejected');
 SELECT t(upd(:STAFF, '{"featured_stamp":"new"}') LIKE 'ERR:edit_forbidden%', 'non-manager staff cannot edit');
-SELECT t(upd(:HQ, '{"featured_stamp":null}') = '["featured_stamp"]' AND (SELECT featured_stamp IS NULL AND notice_tags='{flawed,not_edible}' FROM inv_skus), 'stamp clearable, tags kept');
+CREATE TEMP TABLE clr AS SELECT upd(:HQ, '{"featured_stamp":null}') r;
+SELECT t((SELECT r FROM clr) = '["featured_stamp"]' AND (SELECT featured_stamp IS NULL AND notice_tags='{flawed,not_edible}' FROM inv_skus), 'stamp clearable, tags kept');
 DO $$ BEGIN UPDATE inv_skus SET notice_tags='{function_uncertain,function_unavailable}'; RAISE EXCEPTION 'FAIL table check allowed exclusive';
 EXCEPTION WHEN check_violation THEN RAISE NOTICE 'PASS table CHECK guards direct writes'; END $$;
 DO $$ BEGIN UPDATE inv_skus SET featured_stamp='bogus'; RAISE EXCEPTION 'FAIL table check allowed bogus stamp';
