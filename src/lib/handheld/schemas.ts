@@ -9,6 +9,7 @@
  *
  * 改字段：只动这一个文件。CI 的 sdk:check 会检测漂移。
  */
+import { FeaturedStampSchema, NOTICE_TAGS } from "../commerce/product-marks";
 import * as z from "zod";
 import { ItemPriceYuan } from "./item-edit-schemas";
 /// <reference types="zod-openapi" />
@@ -1118,6 +1119,8 @@ export const SkuDetailRes = okEnvelope(
     in_fankuang: z.boolean().meta({
       description: "有效参与翻筐乐；标准/不限量/组包商品恒为 false",
     }),
+    featured_stamp: FeaturedStampSchema.meta({ description: "特色印章：new 全新品/rare 稀有商品/limited 限定版/collectible 收藏级/discontinued 绝版商品；null 无" }),
+    notice_tags: z.array(z.enum(NOTICE_TAGS)).meta({ description: "提示标签：flawed 有瑕疵/function_uncertain 功能不确定/function_unavailable 功能不可用/not_edible 不可食用" }),
     sku_code: z.string().nullable(),
     barcode: z.string().nullable(),
     epc: z.string(),

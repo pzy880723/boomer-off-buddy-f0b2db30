@@ -1,3 +1,4 @@
+import { FeaturedStampSchema, NoticeTagsSchema, normalizeNoticeTags } from "@/lib/commerce/product-marks";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -409,15 +410,19 @@ export const updateSku = createServerFn({ method: "POST" })
             status: z.enum(["active", "archived"]).optional(),
             price_tier: z.number().positive().max(99999.9).optional(),
             fankuang_override: z.boolean().nullable().optional(),
+            featured_stamp: FeaturedStampSchema.optional(),
+            notice_tags: NoticeTagsSchema.optional(),
           })
           .strict(),
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
+    const patch = { ...data.patch } as Record<string, unknown>;
+    if (data.patch.notice_tags !== undefined) patch.notice_tags = normalizeNoticeTags(data.patch.notice_tags);
     const { error } = await context.supabase
       .from("inv_skus")
-      .update(data.patch as never)
+      .update(patch as never)
       .eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };

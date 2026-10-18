@@ -1,0 +1,3 @@
+# Commerce product rules
+- Bargain-basket (翻筐乐) eligibility is computed only by src/lib/commerce/fankuang.ts from inv_skus.fankuang_override (NULL=auto by price threshold, explicit boolean wins); only tracked custom single SKUs qualify; storefront filters before paging. Why: one rule for ERP, handheld and storefront.
+- Product featured stamp / notice tags live only on inv_skus.featured_stamp + notice_tags; the key dictionary and Chinese labels come only from src/lib/commerce/product-marks.ts, mirrored by DB CHECK + handheld_item_update validation (uncertain/unavailable exclusive); storefront/handheld DTOs expose keys via readProductMarks. Why: one whitelist enforced server-side, UI never shows raw keys.

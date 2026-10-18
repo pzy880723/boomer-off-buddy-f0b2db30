@@ -5261,6 +5261,7 @@ export type Database = {
           discount_eligible: boolean
           epc: string
           fankuang_override: boolean | null
+          featured_stamp: string | null
           grade: string | null
           id: string
           image_paths: string[]
@@ -5284,6 +5285,7 @@ export type Database = {
           measurement_width_cm: number | null
           name: string
           notes: string | null
+          notice_tags: string[]
           pack_pieces: number | null
           price_tier: number
           recognition_request_id: string | null
@@ -5315,6 +5317,7 @@ export type Database = {
           discount_eligible?: boolean
           epc: string
           fankuang_override?: boolean | null
+          featured_stamp?: string | null
           grade?: string | null
           id?: string
           image_paths?: string[]
@@ -5338,6 +5341,7 @@ export type Database = {
           measurement_width_cm?: number | null
           name: string
           notes?: string | null
+          notice_tags?: string[]
           pack_pieces?: number | null
           price_tier: number
           recognition_request_id?: string | null
@@ -5369,6 +5373,7 @@ export type Database = {
           discount_eligible?: boolean
           epc?: string
           fankuang_override?: boolean | null
+          featured_stamp?: string | null
           grade?: string | null
           id?: string
           image_paths?: string[]
@@ -5392,6 +5397,7 @@ export type Database = {
           measurement_width_cm?: number | null
           name?: string
           notes?: string | null
+          notice_tags?: string[]
           pack_pieces?: number | null
           price_tier?: number
           recognition_request_id?: string | null
@@ -11986,6 +11992,8 @@ export type Database = {
         Args: { p_delta: number; p_sku_id: string }
         Returns: undefined
       }
+      inv_notice_tags_normalize: { Args: { p: string[] }; Returns: string[] }
+      inv_notice_tags_valid: { Args: { p: string[] }; Returns: boolean }
       inv_revoke_duplicate_sku: {
         Args: {
           p_duplicate_sku_id: string

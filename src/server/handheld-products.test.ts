@@ -804,6 +804,8 @@ test("detail: preserves every existing identity, price, label, image and print f
     id: "a",
     fankuang_override: null,
     in_fankuang: true,
+    featured_stamp: null,
+    notice_tags: [],
     can_edit: false,
     can_delete: false,
     sku_code: "a",

@@ -3,6 +3,7 @@
  * 图片使用稳定存储路径，不接受临时签名 URL；条码、库存、分类等不可改。
  */
 import * as z from "zod";
+import { FeaturedStampSchema, NoticeTagsSchema } from "../commerce/product-marks";
 
 const uuid = z.string().uuid();
 const clientOpId = z.string().min(8).max(128);
@@ -33,6 +34,8 @@ export const ItemPatchReq = z
     fankuang_override: z.boolean().nullable().optional().describe(
       "加入翻筐乐：true/false 人工覆盖，null 恢复按售价自动（<=49.9）；省略保持原值",
     ),
+    featured_stamp: FeaturedStampSchema.optional().describe("特色印章（单选，null 清空；省略保持原值）"),
+    notice_tags: NoticeTagsSchema.optional().describe("提示标签（多选，[] 清空；功能不确定/不可用互斥；省略保持原值）"),
   })
   .strict()
   .refine(
@@ -41,7 +44,7 @@ export const ItemPatchReq = z
       b.price_tier !== undefined ||
       b.description !== undefined ||
       b.condition_grade !== undefined || b.image_paths !== undefined ||
-      b.fankuang_override !== undefined,
+      b.fankuang_override !== undefined || b.featured_stamp !== undefined || b.notice_tags !== undefined,
     { message: "至少修改一个字段" },
   );
 
@@ -59,7 +62,7 @@ export const ItemPatchRes = env(
   z.object({
     sku_id: uuid,
     updated_at: z.string(),
-    changed_fields: z.array(z.enum(["name", "price_tier", "notes", "grade", "image_paths", "fankuang_override"])),
+    changed_fields: z.array(z.enum(["name", "price_tier", "notes", "grade", "image_paths", "fankuang_override", "featured_stamp", "notice_tags"])),
     replayed: z.boolean(),
     youzan_sync_queued: z.number().int().describe("已持久化的有赞改名/改价任务数（异步，由腾讯 worker 执行）"),
   }),
