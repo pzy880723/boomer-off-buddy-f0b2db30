@@ -22,6 +22,7 @@ PYCODE
 $PSQL -q -f /tmp/measurement-support/production-triggers.sql >/dev/null || exit 1
 fix=${SUPPORT_MEASUREMENT_FIX-$(ls drizzle/migrations/*_support_measurement_safe_work_items.sql 2>/dev/null | head -1)}
 if [ -n "$fix" ]; then $PSQL -q -f "$fix" >/dev/null || exit 1; fi
+$PSQL -q -f drizzle/migrations/0098_support_work_items_hq_unlocated.sql >/dev/null || exit 1
 out=$($PSQL -q -f tests/sql/support_measurement/cases.sql 2>&1); rc=$?
 echo "$out" | grep -o 'PASS .*\|ERROR.*'
-n=$(echo "$out" | grep -c PASS); [ $rc -eq 0 ] && [ "$n" -eq 14 ] && echo "ALL PASS ($n)" || { echo "SOME FAILED ($n/14)"; exit 1; }
+n=$(echo "$out" | grep -c PASS); [ $rc -eq 0 ] && [ "$n" -eq 15 ] && echo "ALL PASS ($n)" || { echo "SOME FAILED ($n/15)"; exit 1; }

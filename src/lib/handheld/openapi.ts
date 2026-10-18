@@ -7,6 +7,7 @@ import * as z from "zod";
 import { CustomTransferRequest, CustomTransferResponseSchema } from "../custom-transfer-contract";
 import { ProductContentRequest } from "../product-content";
 import { FlashDeliverBody, ManualShipBody, PickupReadyBody, PickupRedeemBody } from "./fulfillment-actions-schema";
+import { workItemsInput } from './work-items';
 import { UnreadCountsData } from "./unread-counts";
 import {
   ItemDeleteReq,
@@ -981,6 +982,14 @@ X-Session-Token: <操作员 session token>
         responses: { "200": jsonRes("OK", NotificationsSinceRes), ...ERROR_RESPONSES },
       },
     },
+    "/api/public/handheld/work-items": {
+      get: {
+        tags:["通知"],summary:"全部待处理事项（已读不等于处理）",
+        description:"设备token+员工session+门店权限。完整counts独立于分页；会话待回复+测量去重，语音事件不重复计待办。支持客服、测量、履约/自提、调拨、盘点、售后、同步失败。401缺认证，403门店越权，400非法游标，500读取失败。",
+        requestParams:{query:workItemsInput},
+        responses:{"200":jsonRes("OK",z.object({ok:z.literal(true),data:z.object({items:z.array(z.object({id:z.string().uuid(),type:z.string(),title:z.string(),description:z.string(),meta:z.string().nullable(),urgency:z.enum(["normal","urgent"]).optional(),action:z.string(),target_id:z.string().uuid(),sku_id:z.string().uuid().nullable().optional(),conversation_id:z.string().uuid().nullable().optional(),image_url:z.string().nullable().optional()})),next_cursor:z.string().nullable(),counts:UnreadCountsData})})),...ERROR_RESPONSES},
+      },
+    },
     "/api/public/handheld/notifications/unread-counts": {
       get: {
         tags: ["通知"],
@@ -993,7 +1002,7 @@ X-Session-Token: <操作员 session token>
           "计数结果不满足契约时返回 500 code=unread_counts_contract_error，不会以 0 代替。",
         requestParams: { query: z.object({ location_id: z.string().uuid().optional() }) },
         responses: {
-          "200": jsonRes("OK", z.object({ ok: z.literal(true), data: UnreadCountsData })),
+          "200": jsonRes("OK", z.object({ ok: z.literal(true), data: UnreadCountsData.extend({pending_counts:UnreadCountsData}) })),
           ...ERROR_RESPONSES,
         },
       },
@@ -1012,7 +1021,7 @@ X-Session-Token: <操作员 session token>
         tags: ["客服"],
         summary: "客服会话列表（v1.16）",
         description:
-          "门店员工按授权库位、总部客服可见全部会话；协作者可写内部备注，对外回复仅限当前主接待人。返回 data.items 与 next_cursor；服务端先按 queue 和授权范围筛选，再分页。HQ 不传 location_id 表示全部授权门店，传入按该门店过滤；门店员工不传时仍限制在授权库位，传非授权门店返回 403 forbidden_location。items[] 含 unread_count（顾客消息晚于本人 last_read_at 的精确数）、last_customer_message_at:string|null（前台通知去重）、customer_avatar_url、location_id、updated_at。",
+          "门店员工按授权库位、总部客服可见全部会话；协作者可写内部备注，对外回复仅限当前主接待人。返回 data.items 与 next_cursor；服务端先按 queue 和授权范围筛选，再分页。HQ 不传 location_id 表示全部授权门店，传入按该门店过滤；门店员工不传时仍限制在授权库位，传非授权门店返回 403 forbidden_location。items[] 增加 needs_reply:boolean,pending_measurement_count:integer,pending_action:boolean；items[] 含 unread_count（顾客消息晚于本人 last_read_at 的精确数）、last_customer_message_at:string|null（前台通知去重）、customer_avatar_url、location_id、updated_at。",
         parameters: [
           {
             name: "location_id",
@@ -1053,7 +1062,7 @@ X-Session-Token: <操作员 session token>
       get: {
         tags: ["客服"],
         summary: "会话详情与消息（v1.11）",
-        description: "员工可见 internal:true 的内部备注；顾客端接口永不下发内部备注。消息保留旧字段，新增 sender_avatar_url:string|null、sender_role:customer|store_staff|hq_agent|system、sender_location_name:string|null。按历史发言者而非当前主接待人解析；头像仅安全公开 HTTPS，缺图/私桶路径返回 null。conversation 含 customer_avatar_url:string|null、last_customer_message_at:string|null。\n\n分页：不传 limit/before/after 返回最近 500 条（旧客户端兼容）；limit 1–100（带游标默认 50）；before 与 after 互斥（400 cursor_conflict）；游标 \"<created_at>|<uuid>\"。响应 messages 永远正序，并含 has_more（还有更早）、has_newer（after 模式还有更新）、older_cursor、latest_cursor。before 模式 latest_cursor 为 null，不得覆盖增量水位；after 无结果时 latest_cursor 回传请求游标。员工消息含 is_mine（是否当前登录员工发送），顾客端不返回。location_id 不等于会话门店返回 403 location_mismatch。响应头带 X-Request-Id 与 Server-Timing（auth/summary/messages/total，距请求开始毫秒）。",
+        description: "员工可见 internal:true 的内部备注；顾客端接口永不下发内部备注。消息保留旧body文本，新增可空measurement_card:{task_id,sku_id,listing_id,product_name,image_url,status:pending|claimed|completed|cancelled,measurement_revision,measurement?:{height_cm,width_cm,depth_cm,diameter_cm}}，授权后动态投影当前尺寸/状态并签安全预览；系统完成卡不清普通问题waiting。新增 sender_avatar_url:string|null、sender_role:customer|store_staff|hq_agent|system、sender_location_name:string|null。按历史发言者而非当前主接待人解析；头像仅安全公开 HTTPS，缺图/私桶路径返回 null。conversation 含 customer_avatar_url:string|null、last_customer_message_at:string|null。\n\n分页：不传 limit/before/after 返回最近 500 条（旧客户端兼容）；limit 1–100（带游标默认 50）；before 与 after 互斥（400 cursor_conflict）；游标 \"<created_at>|<uuid>\"。响应 messages 永远正序，并含 has_more（还有更早）、has_newer（after 模式还有更新）、older_cursor、latest_cursor。before 模式 latest_cursor 为 null，不得覆盖增量水位；after 无结果时 latest_cursor 回传请求游标。员工消息含 is_mine（是否当前登录员工发送），顾客端不返回。location_id 不等于会话门店返回 403 location_mismatch。响应头带 X-Request-Id 与 Server-Timing（auth/summary/messages/total，距请求开始毫秒）。",
         parameters: [
           { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
           { name: "location_id", in: "query", required: false, description: "可选；必须等于会话门店，否则 403 location_mismatch", schema: { type: "string", format: "uuid" } },

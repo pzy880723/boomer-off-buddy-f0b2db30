@@ -860,7 +860,6 @@ export async function getCustomerConversation(customerId: string, conversationId
         location_id: conversation.location_id,
         context: safeContext(conversation.context),
         updated_at: conversation.updated_at,
-        ...(await pendingConversationStates([conversation.id])).get(conversation.id),
         service_name: customerServiceName(conversation.location_id,
           await loadCustomerLocationNames([conversation.location_id])),
       },
