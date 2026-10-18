@@ -28,6 +28,7 @@ function deps(o: Partial<NewcomerDeps> = {}) {
     claim: async () => [claim()],
     finish: async (...a) => { finished.push(a); return String(a[2]); },
     finishSuccess: async (...a) => { succeeded.push(a); return "succeeded"; },
+    verifyIdentity: async () => ({ ok: true as const }),
     resolveMember: async () => ({ yzOpenId: "yz" }),
     take: async () => { takes++; return { kind: "ok", receipt: receipt() }; },
     queryHeld: async () => ({ kind: "unsupported", reason: "coupon_holding_query_unconfirmed" }),

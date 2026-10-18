@@ -16,7 +16,9 @@ export type TakeResult =
   | { kind: "ok"; receipt: TakeReceipt }
   | { kind: "rejected"; reason: string }
   | { kind: "blocked"; reason: string }
-  | { kind: "unknown"; reason: string };
+  | { kind: "unknown"; reason: string }
+  /** 确定未发出请求（固定出口/HQ token 暂不可用）：可安全重试 */
+  | { kind: "not_sent"; reason: string };
 export type QueryResult =
   | { kind: "found"; receipt: TakeReceipt; youzanStatus?: string }
   | { kind: "not_found" }
@@ -32,6 +34,8 @@ export type NewcomerDeps = {
   finish(slotId: string, token: string, outcome: Outcome, couponId: string | null, error: string | null): Promise<string>;
   /** 成功收口：携带真实回执，DB 逐字段校验并同事务写镜像；返回 succeeded / receipt_mismatch / stale。 */
   finishSuccess(slotId: string, token: string, receipt: TakeReceipt & { amountFen: number; thresholdFen: number; activityId: string }): Promise<string>;
+  /** 发券前复核登记身份（DB：active / phone_key / phone identity / external_subject）；异常视为暂不可用。 */
+  verifyIdentity(slotId: string, token: string): Promise<{ ok: true } | { blocked: string } | { stale: true }>;
   resolveMember(customerId: string): Promise<{ yzOpenId: string } | { blocked: string }>;
   take(input: { groupId: string; yzOpenId: string; requestKey: string; verifyCode: string }): Promise<TakeResult>;
   queryHeld(input: { groupId: string; yzOpenId: string; requestKey: string; verifyCode: string }): Promise<QueryResult>;
@@ -49,11 +53,15 @@ export async function processNewcomerSlot(c: NewcomerClaim, deps: NewcomerDeps):
   if (!c.youzan_coupon_group_id) return finish("blocked", null, "youzan_coupon_template_not_configured");
   // 会员映射解析发生在任何有赞写之前：dispatch 可安全重试；reconcile 槽结果未知，只能保持 unknown 继续回查，绝不转回 dispatch。
   const notYet = (reason: string) => finish(c.mode === "reconcile" ? "unknown" : "retry", null, reason);
+  let idc: Awaited<ReturnType<NewcomerDeps["verifyIdentity"]>>;
+  try { idc = await deps.verifyIdentity(c.slot_id, c.claim_token); } catch { return notYet("identity_check_unavailable"); }
+  if ("stale" in idc) return "stale";
+  if ("blocked" in idc) return c.mode === "reconcile" ? finish("unknown", null, idc.blocked) : finish("blocked", null, idc.blocked);
   let member: Awaited<ReturnType<NewcomerDeps["resolveMember"]>>;
   try { member = await deps.resolveMember(c.customer_id); } catch { return notYet("member_mapping_unavailable"); }
   if ("blocked" in member) {
     // 可信映射缺失/暂不可用：等待 member-sync；冲突绝不合并，保持 blocked。
-    const wait = member.blocked === "trusted_member_mapping_missing" || member.blocked === "trusted_member_mapping_unavailable";
+    const wait = ["trusted_member_mapping_missing", "trusted_member_mapping_unavailable", "headquarters_token_unavailable"].includes(member.blocked);
     if (wait) return notYet(member.blocked);
     return finish("blocked", null, member.blocked);
   }
@@ -71,19 +79,26 @@ export async function processNewcomerSlot(c: NewcomerClaim, deps: NewcomerDeps):
   if (r.kind === "ok") return deps.finishSuccess(c.slot_id, c.claim_token, { ...r.receipt, ...rules });
   if (r.kind === "rejected") return finish("rejected", null, r.reason);
   if (r.kind === "blocked") return finish("blocked", null, r.reason);
+  if (r.kind === "not_sent") return finish("retry", null, r.reason);
   return finish("unknown", null, r.reason);
 }
 
 export async function runNewcomerWorker(deps: NewcomerDeps, limit = 10) {
   if (!deps.workerEnabled()) return { enabled: false, claimed: 0, results: {} as Record<string, number> };
-  const claims = await deps.claim(limit, 120);
+  // 每次只领 1 个槽、各自独立租约后立即处理，避免一批共享租约在慢 provider 下后排过期
   const results: Record<string, number> = {};
-  for (const c of claims) {
-    let s: string;
-    try { s = await processNewcomerSlot(c, deps); } catch { s = "error"; }
-    results[s] = (results[s] ?? 0) + 1;
+  let claimed = 0;
+  for (let i = 0; i < Math.max(1, Math.min(limit, 50)); i++) {
+    const batch = await deps.claim(1, 120);
+    if (batch.length === 0) break;
+    for (const c of batch) {
+      claimed++;
+      let s: string;
+      try { s = await processNewcomerSlot(c, deps); } catch { s = "error"; }
+      results[s] = (results[s] ?? 0) + 1;
+    }
   }
-  return { enabled: true, claimed: claims.length, results };
+  return { enabled: true, claimed, results };
 }
 
 const asTime = (v: unknown): string | null => {
@@ -97,8 +112,9 @@ function extractReceipt(vi: Record<string, unknown>): TakeReceipt | null {
   const verify = vi.verify_code;
   const start = asTime(vi.valid_start_time ?? vi.valid_start);
   const end = asTime(vi.valid_end_time ?? vi.valid_end);
-  if ((typeof id !== "string" && typeof id !== "number") || typeof verify !== "string" || !verify || !start || !end) return null;
-  return { couponId: String(id), verifyCode: verify, validStart: start, validEnd: end };
+  const idStr = typeof id === "number" ? String(id) : typeof id === "string" ? id.trim() : "";
+  if (!idStr || typeof verify !== "string" || !verify.trim() || !start || !end) return null;
+  return { couponId: idStr, verifyCode: verify.trim(), validStart: start, validEnd: end };
 }
 
 /** 有赞 send/3.0.2 响应解析：只有 code 成功且 voucher_identity 带完整真实回执才算 ok；HTTP 5xx/429/超时 → unknown。 */
