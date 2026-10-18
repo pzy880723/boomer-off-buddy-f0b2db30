@@ -36,7 +36,7 @@ SELECT t(NOT EXISTS (SELECT 1 FROM commerce_newcomer_grants WHERE customer_id='d
 -- 有界补漏：存量无 grant 客户登记（aaaa draft 期间未登记 + cases.sql 的 3333），已有 grant/同手机号/inactive 跳过
 INSERT INTO commerce_customers (id, external_subject, phone, status) VALUES
   ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee','e1','18600000014','inactive');
-SELECT t(public.commerce_newcomer_backfill(20) = 2, 'backfill enrolls exactly pending eligible customers');
+SELECT t(public.commerce_newcomer_backfill(20) = 3, 'backfill enrolls exactly pending eligible customers');
 SELECT t(public.commerce_newcomer_backfill(20) = 0, 'backfill idempotent: second run enrolls nothing');
 
 -- 槽位规则不可变：版本已有登记后禁止改门槛/面额/模板
@@ -51,23 +51,10 @@ END $$;
 UPDATE commerce_newcomer_benefit_slots SET youzan_coupon_group_id='35074001' WHERE version_id='newcomer_v2' AND slot_no=1;
 SELECT t((SELECT youzan_coupon_group_id='35074001' FROM commerce_newcomer_benefit_slots WHERE version_id='newcomer_v2' AND slot_no=1), 'draft v2 template binding allowed');
 
--- finish succeeded 同事务写有赞镜像
+-- 旧 finish 的成功路径在 0092 起拒绝（receipt_required），真实回执成功路径见 cases_0092
 CREATE TEMP TABLE c1 AS SELECT * FROM commerce_newcomer_claim(1, 60);
-SELECT t(commerce_newcomer_finish(slot_id, claim_token, 'succeeded', 'yz-coupon-001', NULL)='succeeded', 'finish succeeded') FROM c1;
-SELECT t(EXISTS (SELECT 1 FROM pos_customer_coupons m JOIN commerce_newcomer_grant_slots s ON m.idempotency_key = s.request_key || ':youzan-mirror'
-  WHERE m.external_provider='youzan' AND m.external_id='yz-coupon-001' AND m.status='active'
-    AND m.value=5.00 AND m.min_spend=49.90 AND m.code=public.commerce_newcomer_verify_code(s.request_key)
-    AND m.metadata->>'redemption_authority'='youzan' AND (m.metadata->>'local_checkout_eligible')::boolean=false), 'mirror written with youzan authority, not local-checkout eligible');
-SELECT t((SELECT expires_at > now() + interval '89 days' AND expires_at < now() + interval '91 days' FROM pos_customer_coupons WHERE external_id='yz-coupon-001'), 'mirror validity 90 days');
-
--- 同一外部券 ID 不能落到第二个槽位
-CREATE TEMP TABLE c2 AS SELECT * FROM commerce_newcomer_claim(1, 60);
-DO $$
-BEGIN
-  PERFORM commerce_newcomer_finish(slot_id, claim_token, 'succeeded', 'yz-coupon-001', NULL) FROM c2;
-  RAISE EXCEPTION 'FAIL duplicate external coupon id accepted';
-EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'PASS duplicate youzan coupon id rejected';
-END $$;
+SELECT t(commerce_newcomer_finish(slot_id, claim_token, 'succeeded', 'yz-coupon-001', NULL)='receipt_required', 'legacy finish success rejected without receipt') FROM c1;
+SELECT t(NOT EXISTS (SELECT 1 FROM pos_customer_coupons WHERE external_id='yz-coupon-001'), 'receipt-less success writes no mirror');
 
 -- not_found 在 reconcile 路径保持 unknown，不回到 retry_wait/dispatch
 UPDATE commerce_newcomer_grant_slots SET status='unknown', claim_token=NULL, lease_until=NULL, next_run_at=now()

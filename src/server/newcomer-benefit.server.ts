@@ -1,10 +1,8 @@
 // 新人券包发放作业核心（纯依赖注入，便于隔离测试）。
-// 规则：有赞是可核销券唯一权威；只有有赞明确返回券 id 才记成功；写入结果不明 → unknown，之后只回查、不重发；
+// 规则：有赞是可核销券唯一权威；成功必须携带 provider 真实回执（券ID+verify_code+真实起止时间），
+// 由 DB 的 commerce_newcomer_finish_success 逐字段校验（金额/门槛/活动/日期/唯一性），镜像插入失败整槽回滚；
+// 写入结果不明 → unknown，之后只回查、不重发（not_found 也保持 unknown）；
 // 未确认的接口/模板/会员映射 → blocked（真实失败原因），绝不伪造成功或往本地券表补券。
-// 官方合同（doc4485，腾讯固定出口 8 次真实成功验证）：
-//   发券 youzan.ump.coupon.send/3.0.2：activity_id + yz_open_id + requestId + verify_code；
-//   真实券 ID 只在 data.voucher_identity.coupon_id（verify_code 不是券 ID）；
-//   回查 youzan.ump.voucher.query/3.0.0：data 数组翻页到 total，按 yz_open_id+activity_id+verify_code 精准匹配。
 import { createHash } from "node:crypto";
 
 export type NewcomerClaim = {
@@ -12,36 +10,41 @@ export type NewcomerClaim = {
   customer_id: string; youzan_coupon_group_id: string | null; threshold_fen: number; amount_fen: number;
   validity_days: number; attempts: number;
 };
+/** provider 真实回执：券 ID、核销码、真实生效/失效时间（有赞侧：北京时间当日 00:00 起、第 90 日 23:59:59 止）。 */
+export type TakeReceipt = { couponId: string; verifyCode: string; validStart: string; validEnd: string };
 export type TakeResult =
-  | { kind: "ok"; couponId: string }
+  | { kind: "ok"; receipt: TakeReceipt }
   | { kind: "rejected"; reason: string }
   | { kind: "blocked"; reason: string }
   | { kind: "unknown"; reason: string };
 export type QueryResult =
-  | { kind: "found"; couponId: string; youzanStatus?: string }
+  | { kind: "found"; receipt: TakeReceipt; youzanStatus?: string }
   | { kind: "not_found" }
   | { kind: "unsupported"; reason: string }
   | { kind: "unavailable" };
-export type Outcome = "succeeded" | "retry" | "not_found" | "rejected" | "blocked" | "unknown";
+export type Outcome = "retry" | "not_found" | "rejected" | "blocked" | "unknown";
 
 export type NewcomerDeps = {
   workerEnabled(): boolean;
   customerAllowed(customerId: string): boolean;
   claim(limit: number, leaseSeconds: number): Promise<NewcomerClaim[]>;
+  /** 非成功状态收口（旧 5 参 RPC）；succeeded 一律走 finishSuccess。 */
   finish(slotId: string, token: string, outcome: Outcome, couponId: string | null, error: string | null): Promise<string>;
+  /** 成功收口：携带真实回执，DB 逐字段校验并同事务写镜像；返回 succeeded / receipt_mismatch / stale。 */
+  finishSuccess(slotId: string, token: string, receipt: TakeReceipt & { amountFen: number; thresholdFen: number; activityId: string }): Promise<string>;
   resolveMember(customerId: string): Promise<{ yzOpenId: string } | { blocked: string }>;
   take(input: { groupId: string; yzOpenId: string; requestKey: string; verifyCode: string }): Promise<TakeResult>;
   queryHeld(input: { groupId: string; yzOpenId: string; requestKey: string; verifyCode: string }): Promise<QueryResult>;
 };
 
-/** 稳定 verify_code：'ncv' + sha256(requestKey) 前 12 位 hex = 15 位小写字母数字，不以 ZAN/YZAN 开头。
- *  与 SQL public.commerce_newcomer_verify_code(text) 必须保持一致（同一向量有测试）。 */
+/** verify_code：6–20 位字母数字、不得以 ZAN/YZAN 开头；由 request_key 稳定派生，用于 unknown 精准回查。 */
 export function deriveVerifyCode(requestKey: string): string {
   return "ncv" + createHash("sha256").update(requestKey, "utf8").digest("hex").slice(0, 12);
 }
 
 export async function processNewcomerSlot(c: NewcomerClaim, deps: NewcomerDeps): Promise<string> {
   const finish = (o: Outcome, id: string | null, err: string | null) => deps.finish(c.slot_id, c.claim_token, o, id, err);
+  const rules = { amountFen: c.amount_fen, thresholdFen: c.threshold_fen, activityId: c.youzan_coupon_group_id ?? "" };
   if (!deps.customerAllowed(c.customer_id)) return finish("blocked", null, "canary_not_allowed");
   if (!c.youzan_coupon_group_id) return finish("blocked", null, "youzan_coupon_template_not_configured");
   let member: Awaited<ReturnType<NewcomerDeps["resolveMember"]>>;
@@ -51,21 +54,18 @@ export async function processNewcomerSlot(c: NewcomerClaim, deps: NewcomerDeps):
     const wait = member.blocked === "trusted_member_mapping_missing" || member.blocked === "trusted_member_mapping_unavailable";
     return finish(wait ? "retry" : "blocked", null, member.blocked);
   }
-  const input = {
-    groupId: c.youzan_coupon_group_id, yzOpenId: member.yzOpenId,
-    requestKey: c.request_key, verifyCode: deriveVerifyCode(c.request_key),
-  };
+  const verifyCode = deriveVerifyCode(c.request_key);
+  const input = { groupId: c.youzan_coupon_group_id, yzOpenId: member.yzOpenId, requestKey: c.request_key, verifyCode };
   if (c.mode === "reconcile") {
     let q: QueryResult;
     try { q = await deps.queryHeld(input); } catch { q = { kind: "unavailable" }; }
-    if (q.kind === "found") return finish("succeeded", q.couponId, null);
-    // 回查不到也绝不能回到 dispatch 重发：保持 unknown，资金不明留 attention 可观察。
-    if (q.kind === "not_found") return finish("unknown", null, "reconcile_not_found");
+    if (q.kind === "found") return deps.finishSuccess(c.slot_id, c.claim_token, { ...q.receipt, ...rules });
+    if (q.kind === "not_found") return finish("not_found", null, "reconcile_not_found");
     return finish("unknown", null, q.kind === "unsupported" ? q.reason : "reconcile_unavailable");
   }
   let r: TakeResult;
   try { r = await deps.take(input); } catch { r = { kind: "unknown", reason: "take_exception" }; }
-  if (r.kind === "ok") return finish("succeeded", r.couponId, null);
+  if (r.kind === "ok") return deps.finishSuccess(c.slot_id, c.claim_token, { ...r.receipt, ...rules });
   if (r.kind === "rejected") return finish("rejected", null, r.reason);
   if (r.kind === "blocked") return finish("blocked", null, r.reason);
   return finish("unknown", null, r.reason);
@@ -83,8 +83,22 @@ export async function runNewcomerWorker(deps: NewcomerDeps, limit = 10) {
   return { enabled: true, claimed: claims.length, results };
 }
 
-/** 有赞发券响应解析：只有 code 成功且 data.voucher_identity.coupon_id 存在才算 ok；
- *  顶层 id/verify_code 一律不当券 ID；HTTP 5xx/429 → unknown（可能已发出）。 */
+const asTime = (v: unknown): string | null => {
+  if (typeof v === "number" && v > 1e9) return new Date(v * 1000).toISOString();
+  if (typeof v === "string" && v && !Number.isNaN(Date.parse(v))) return new Date(Date.parse(v)).toISOString();
+  return null;
+};
+/** 从 voucher_identity 提取真实回执；缺任一关键字段返回 null（调用方按 unknown 处理）。 */
+function extractReceipt(vi: Record<string, unknown>): TakeReceipt | null {
+  const id = vi.coupon_id;
+  const verify = vi.verify_code;
+  const start = asTime(vi.valid_start_time ?? vi.valid_start);
+  const end = asTime(vi.valid_end_time ?? vi.valid_end);
+  if ((typeof id !== "string" && typeof id !== "number") || typeof verify !== "string" || !verify || !start || !end) return null;
+  return { couponId: String(id), verifyCode: verify, validStart: start, validEnd: end };
+}
+
+/** 有赞 send/3.0.2 响应解析：只有 code 成功且 voucher_identity 带完整真实回执才算 ok；HTTP 5xx/429/超时 → unknown。 */
 export function parseTakeResponse(status: number, body: unknown): TakeResult {
   if (status >= 500 || status === 429) return { kind: "unknown", reason: `youzan_http_${status}` };
   if (status >= 400) return { kind: "rejected", reason: `youzan_http_${status}` };
@@ -93,16 +107,14 @@ export function parseTakeResponse(status: number, body: unknown): TakeResult {
   if (!ok) return { kind: "rejected", reason: `youzan_code_${String(j.code ?? "unknown")}` };
   const d = (j.data && typeof j.data === "object" ? j.data : {}) as Record<string, unknown>;
   const vi = (d.voucher_identity && typeof d.voucher_identity === "object" ? d.voucher_identity : {}) as Record<string, unknown>;
-  const id = vi.coupon_id;
-  if (typeof id !== "string" && typeof id !== "number") return { kind: "unknown", reason: "youzan_success_without_coupon_id" };
-  return { kind: "ok", couponId: String(id) };
+  const receipt = extractReceipt(vi);
+  if (!receipt) return { kind: "unknown", reason: "youzan_success_receipt_incomplete" };
+  return { kind: "ok", receipt };
 }
 
-/** voucher.query/3.0.0 单页解析：在 data 数组里按 yz_open_id + activity_id + verify_code 精准匹配；
- *  匹配不到返回 not_found（调用方负责继续翻页到 total）；传输/业务错误 → unavailable。 */
+/** 有赞 voucher.query/3.0.0 响应解析：data 数组内按 yz_open_id + activity_id + verify_code 精准匹配；不得拿同活动另一槽的券补。 */
 export function parseQueryResponse(
-  status: number,
-  body: unknown,
+  status: number, body: unknown,
   match: { yzOpenId: string; activityId: string; verifyCode: string },
 ): QueryResult {
   if (status >= 500 || status === 429) return { kind: "unavailable" };
@@ -112,30 +124,21 @@ export function parseQueryResponse(
   if (!ok) return { kind: "unavailable" };
   const d = (j.data && typeof j.data === "object" ? j.data : {}) as Record<string, unknown>;
   const list = Array.isArray(d.vouchers) ? d.vouchers : Array.isArray(d.data) ? d.data : [];
-  for (const item of list as Array<Record<string, unknown>>) {
-    const ui = (item.user_identity ?? {}) as Record<string, unknown>;
-    const vi = (item.voucher_identity ?? {}) as Record<string, unknown>;
-    if (
-      String(ui.yz_open_id ?? "") === match.yzOpenId &&
-      String(item.activity_id ?? "") === match.activityId &&
-      String(item.verify_code ?? "") === match.verifyCode
-    ) {
-      const id = vi.coupon_id;
-      if (typeof id === "string" || typeof id === "number") {
-        return { kind: "found", couponId: String(id), youzanStatus: String(item.status ?? item.voucher_status ?? "unknown") };
-      }
-      return { kind: "unavailable" };
-    }
+  for (const item of list) {
+    const it = (item && typeof item === "object" ? item : {}) as Record<string, unknown>;
+    const ui = (it.user_identity && typeof it.user_identity === "object" ? it.user_identity : {}) as Record<string, unknown>;
+    const vi = (it.voucher_identity && typeof it.voucher_identity === "object" ? it.voucher_identity : {}) as Record<string, unknown>;
+    if (String(ui.yz_open_id ?? "") !== match.yzOpenId) continue;
+    if (String(it.activity_id ?? vi.activity_id ?? "") !== match.activityId) continue;
+    if (String(vi.verify_code ?? it.verify_code ?? "") !== match.verifyCode) continue;
+    const receipt = extractReceipt(vi);
+    if (!receipt) return { kind: "unavailable" };
+    return { kind: "found", receipt, youzanStatus: String(it.status ?? it.voucher_status ?? "unknown") };
   }
   return { kind: "not_found" };
 }
 
-// ---- 有赞持券只读同步：把真实已用/作废/冻结状态映到本地镜像；绝不写积分 projection/ledger/wallet ----
-
-export type YouzanMirrorRow = {
-  id: string; code: string; external_id: string;
-  metadata: { activity_id?: unknown; yz_open_id?: unknown } | null;
-};
+/** 有赞持券只读同步：把真实状态（已用/作废/冻结）镜像到 pos_customer_coupons；绝不触碰积分 projection/ledger/wallet。 */
 export type MirrorSyncDeps = {
   syncEnabled(): boolean;
   listActiveMirrors(limit: number): Promise<YouzanMirrorRow[]>;
@@ -143,30 +146,35 @@ export type MirrorSyncDeps = {
     Promise<{ kind: "found"; couponId: string; youzanStatus: string } | { kind: "not_found" } | { kind: "unavailable" }>;
   updateMirrorStatus(mirrorId: string, status: "used" | "expired" | "void"): Promise<void>;
 };
+export type YouzanMirrorRow = {
+  id: string; code: string; external_id: string;
+  metadata: { activity_id?: string; yz_open_id?: string; verify_code?: string } | null;
+};
 
-const YOUZAN_TO_LOCAL: Record<string, "used" | "expired" | "void"> = {
-  used: "used", verified: "used",
-  expired: "expired",
-  void: "void", invalid: "void", disabled: "void", frozen: "void",
+const mapYouzanStatus = (s: string): "used" | "expired" | "void" | null => {
+  const v = s.toLowerCase();
+  if (["used", "verified", "2"].includes(v)) return "used";
+  if (["expired", "4"].includes(v)) return "expired";
+  if (["void", "cancelled", "canceled", "invalid", "frozen", "3", "5"].includes(v)) return "void";
+  return null; // active/未知：不改镜像
 };
 
 export async function syncYouzanCouponMirrors(deps: MirrorSyncDeps, limit = 50) {
-  if (!deps.syncEnabled()) return { enabled: false, synced: 0, skipped: 0 };
-  const mirrors = await deps.listActiveMirrors(Math.max(1, Math.min(limit, 200)));
-  let synced = 0, skipped = 0;
-  for (const m of mirrors) {
-    const activityId = String(m.metadata?.activity_id ?? "");
-    const yzOpenId = String(m.metadata?.yz_open_id ?? "");
-    if (!activityId || !yzOpenId || !m.code) { skipped++; continue; }
-    let q: Awaited<ReturnType<MirrorSyncDeps["queryHeldByVerifyCode"]>>;
-    try {
-      q = await deps.queryHeldByVerifyCode({ activityId, yzOpenId, verifyCode: m.code });
-    } catch { q = { kind: "unavailable" }; }
-    if (q.kind !== "found") { skipped++; continue; } // 查不到/不可用：不动镜像，下轮再查
-    const local = YOUZAN_TO_LOCAL[q.youzanStatus];
-    if (!local) { skipped++; continue; } // 仍 active：不重复写
-    await deps.updateMirrorStatus(m.id, local);
-    synced++;
+  if (!deps.syncEnabled()) return { enabled: false, checked: 0, updated: 0 };
+  const rows = await deps.listActiveMirrors(limit);
+  let updated = 0;
+  for (const m of rows) {
+    const meta = m.metadata ?? {};
+    if (!meta.activity_id || !meta.verify_code || !meta.yz_open_id) continue; // 缺定位信息不猜
+    let r: Awaited<ReturnType<MirrorSyncDeps["queryHeldByVerifyCode"]>>;
+    try { r = await deps.queryHeldByVerifyCode({ activityId: meta.activity_id, yzOpenId: meta.yz_open_id, verifyCode: meta.verify_code }); }
+    catch { continue; }
+    if (r.kind !== "found") continue; // 查不到/不可用：保持现状，绝不下结论
+    if (r.couponId !== m.external_id) continue; // 券 ID 不一致：不动
+    const mapped = mapYouzanStatus(r.youzanStatus);
+    if (!mapped) continue;
+    await deps.updateMirrorStatus(m.id, mapped);
+    updated++;
   }
-  return { enabled: true, synced, skipped };
+  return { enabled: true, checked: rows.length, updated };
 }

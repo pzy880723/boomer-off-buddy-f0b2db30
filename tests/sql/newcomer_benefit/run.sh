@@ -6,6 +6,7 @@ bash tests/sql/harness/setup.sh >/dev/null
 export PSQL=/tmp/psql.sh
 mig=${NEWCOMER_MIG-$(ls drizzle/migrations/*_newcomer_benefit_pack.sql 2>/dev/null | head -1)}
 mig2=${NEWCOMER_MIG2-$(ls drizzle/migrations/*_newcomer_auto_enroll_and_mirror.sql 2>/dev/null | head -1)}
+mig3=${NEWCOMER_MIG3-$(ls drizzle/migrations/*_newcomer_finish_receipt_and_enroll_hardening.sql 2>/dev/null | head -1)}
 PGDB=postgres $PSQL -q -c "drop database if exists newcomer_test" -c "create database newcomer_test" >/dev/null
 export PGDB=newcomer_test
 $PSQL -q -v ON_ERROR_STOP=1 >/dev/null <<'SQL' || { echo "FAIL stubs"; exit 1; }
@@ -35,6 +36,7 @@ CREATE TABLE public.pos_customer_coupons (
 SQL
 $PSQL -q -v ON_ERROR_STOP=1 < "$mig" >/dev/null || { echo "FAIL migration"; exit 1; }
 [ -n "$mig2" ] && { $PSQL -q -v ON_ERROR_STOP=1 < "$mig2" >/dev/null || { echo "FAIL migration 0091"; exit 1; }; }
+[ -n "$mig3" ] && { $PSQL -q -v ON_ERROR_STOP=1 < "$mig3" >/dev/null || { echo "FAIL migration 0092"; exit 1; }; }
 out=$($PSQL -q -v ON_ERROR_STOP=1 < tests/sql/newcomer_benefit/cases.sql 2>&1); rc=$?
 echo "$out" | grep -o 'PASS .*\|ERROR.*\|FAIL.*'
 n=$(echo "$out" | grep -c 'PASS')
@@ -43,5 +45,11 @@ if [ -n "$mig2" ]; then
   out2=$($PSQL -q -v ON_ERROR_STOP=1 < tests/sql/newcomer_benefit/cases_0091.sql 2>&1); rc2=$?
   echo "$out2" | grep -o 'PASS .*\|ERROR.*\|FAIL.*'
   n2=$(echo "$out2" | grep -c 'PASS')
-  [ $rc2 -eq 0 ] && [ "$n2" -eq 22 ] && echo "ALL PASS 0091 ($n2)" || { echo "SOME FAILED 0091 ($n2/22)"; exit 1; }
+  [ $rc2 -eq 0 ] && [ "$n2" -eq 20 ] && echo "ALL PASS 0091 ($n2)" || { echo "SOME FAILED 0091 ($n2/20)"; exit 1; }
+fi
+if [ -n "$mig3" ]; then
+  out3=$($PSQL -q -v ON_ERROR_STOP=1 < tests/sql/newcomer_benefit/cases_0092.sql 2>&1); rc3=$?
+  echo "$out3" | grep -o 'PASS .*\|ERROR.*\|FAIL.*'
+  n3=$(echo "$out3" | grep -c 'PASS')
+  [ $rc3 -eq 0 ] && [ "$n3" -eq 18 ] && echo "ALL PASS 0092 ($n3)" || { echo "SOME FAILED 0092 ($n3/18)"; exit 1; }
 fi

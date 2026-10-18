@@ -109,6 +109,14 @@ export function productionNewcomerDeps(): NewcomerDeps {
       if (error) throw Error("newcomer_finish_failed");
       return String(data);
     },
+    async finishSuccess(slotId, token, receipt) {
+      const { data, error } = await supabaseAdmin.rpc("commerce_newcomer_finish_success" as never, {
+        p_slot: slotId, p_token: token, p_coupon_id: receipt.couponId, p_verify_code: receipt.verifyCode,
+        p_valid_start: receipt.validStart, p_valid_end: receipt.validEnd,
+        p_amount_fen: receipt.amountFen, p_threshold_fen: receipt.thresholdFen, p_activity_id: receipt.activityId } as never);
+      if (error) throw Error("newcomer_finish_success_failed");
+      return String(data);
+    },
     async resolveMember(customerId) {
       const head = await headquarters();
       if (!head) return { blocked: "headquarters_token_unavailable" };
@@ -170,7 +178,7 @@ export function productionMirrorSyncDeps(): MirrorSyncDeps {
       const r = await queryHeldPages(head.access_token, { yzOpenId, activityId, verifyCode });
       if (r.kind === "found") {
         // 单券状态查询：复用 voucher.query 结果中的 status 字段；缺失时保守不可用。
-        return { kind: "found", couponId: r.couponId, youzanStatus: r.youzanStatus ?? "unknown" };
+        return { kind: "found", couponId: r.receipt.couponId, youzanStatus: r.youzanStatus ?? "unknown" };
       }
       return { kind: r.kind === "not_found" ? "not_found" : "unavailable" };
     },
