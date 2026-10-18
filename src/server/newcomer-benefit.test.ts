@@ -282,3 +282,34 @@ test("worker claims one slot at a time with its own lease, up to limit, sequenti
   const e = deps({ claim: async (l) => { log2.push(`claim:${l}`); return [claim()]; } });
   assert.equal((await runNewcomerWorker(e.d, 2)).claimed, 2); assert.equal(log2.length, 2);
 });
+
+// 非安全整数 coupon_id（> Number.MAX_SAFE_INTEGER）已被 JSON 四舍五入，券身份不可信 → 必须拒绝；字符串数字原样保留。
+const UNSAFE_ID = Number.MAX_SAFE_INTEGER + 1;
+const START_MS = Date.UTC(2026, 9, 17, 16, 0, 0);
+const END_MS = Date.UTC(2027, 0, 15, 15, 59, 59);
+const fakeItem = (couponId: unknown) => ({
+  voucher_identity: { coupon_id: couponId, coupon_type: 1 },
+  valid_start_time: START_MS, valid_end_time: END_MS,
+  verify_code: "abc123def456ghi", kdt_id: 1, activity_id: 90001,
+  value: 500, threshold_amount: 4990, status: 1,
+  user_identity: { yz_open_id: "fake_open_id" },
+});
+
+test("parseTakeResponse rejects unsafe-integer numeric coupon_id, keeps string digits", () => {
+  const bad = parseTakeResponse(200, { code: 200, success: true, data: fakeItem(UNSAFE_ID) });
+  assert.equal(bad.kind, "unknown");
+  const big = "9007199254740993";
+  const ok = parseTakeResponse(200, { code: 200, success: true, data: fakeItem(big) });
+  assert.equal(ok.kind, "ok");
+  assert.equal(ok.kind === "ok" && ok.receipt.couponId, big);
+  const safe = parseTakeResponse(200, { code: 200, success: true, data: fakeItem(123456789) });
+  assert.equal(safe.kind === "ok" && safe.receipt.couponId, "123456789");
+});
+
+test("parseQueryResponse rejects unsafe-integer numeric coupon_id", () => {
+  const match = { yzOpenId: "fake_open_id", activityId: "90001", verifyCode: "abc123def456ghi" };
+  const body = (id: unknown) => ({ code: 200, total: 1, page_num: 1, page_size: 50, data: [fakeItem(id)] });
+  assert.equal(parseQueryResponse(200, body(UNSAFE_ID), match).kind, "unavailable");
+  const r = parseQueryResponse(200, body("9007199254740993"), match);
+  assert.equal(r.kind === "found" && r.receipt.couponId, "9007199254740993");
+});
