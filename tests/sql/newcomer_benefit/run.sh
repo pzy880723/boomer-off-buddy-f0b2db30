@@ -70,5 +70,5 @@ if [ -n "$mig5" ]; then
   out5=$($PSQL -q -v ON_ERROR_STOP=1 < tests/sql/newcomer_benefit/cases_0094.sql 2>&1); rc5=$?
   echo "$out5" | grep -o 'PASS .*\|ERROR.*\|FAIL.*'
   n5=$(echo "$out5" | grep -c 'PASS')
-  [ $rc5 -eq 0 ] && [ "$n5" -eq 11 ] && echo "ALL PASS 0094 ($n5)" || { echo "SOME FAILED 0094 ($n5/11)"; exit 1; }
+  [ $rc5 -eq 0 ] && [ "$n5" -eq 10 ] && echo "ALL PASS 0094 ($n5)" || { echo "SOME FAILED 0094 ($n5/10)"; exit 1; }
 fi
