@@ -3,13 +3,12 @@ CREATE OR REPLACE FUNCTION t(c boolean, label text) RETURNS void LANGUAGE plpgsq
 BEGIN IF NOT c THEN RAISE EXCEPTION 'FAIL %', label; END IF; RAISE NOTICE 'PASS %', label; END $$;
 
 -- 灰度领取：空名单不领、名单外不领、名单内只领该客户
+CREATE TEMP TABLE before_other AS SELECT s.id, s.status, s.attempts FROM commerce_newcomer_grant_slots s JOIN commerce_newcomer_grants g ON g.id=s.grant_id WHERE g.customer_id <> 'a0000000-0000-0000-0000-000000000005';
 SELECT t((SELECT count(*) FROM commerce_newcomer_claim_scoped(50, 60, ARRAY[]::uuid[])) = 0, 'empty allow-list claims nothing');
 SELECT t((SELECT count(*) FROM commerce_newcomer_claim_scoped(50, 60, ARRAY['ffffffff-0000-0000-0000-000000000000']::uuid[])) = 0, 'non-listed customers never claimed');
 CREATE TEMP TABLE sc AS SELECT * FROM commerce_newcomer_claim_scoped(50, 60, ARRAY['a0000000-0000-0000-0000-000000000005']::uuid[]);
 SELECT t((SELECT count(*) FROM sc) > 0 AND NOT EXISTS (SELECT 1 FROM sc WHERE customer_id <> 'a0000000-0000-0000-0000-000000000005'), 'allow-listed claim only returns that customer');
-SELECT t(NOT EXISTS (SELECT 1 FROM commerce_newcomer_grant_slots s JOIN commerce_newcomer_grants g ON g.id=s.grant_id
-  WHERE g.customer_id <> 'a0000000-0000-0000-0000-000000000005' AND s.status='dispatching' AND s.updated_at >= (SELECT max(updated_at) FROM commerce_newcomer_grant_slots s2 JOIN sc ON sc.slot_id=s2.id)
-  AND s.id NOT IN (SELECT slot_id FROM sc) AND s.last_error IS DISTINCT FROM 'lease_expired_result_unknown' AND false), 'other customers untouched');
+SELECT t(NOT EXISTS (SELECT 1 FROM before_other b JOIN commerce_newcomer_grant_slots s ON s.id=b.id WHERE s.attempts <> b.attempts OR (s.status <> b.status AND s.last_error IS DISTINCT FROM 'lease_expired_result_unknown')), 'other customers untouched');
 
 -- 灰度补漏：只登记名单内顾客
 INSERT INTO commerce_customers (id, external_subject, phone, status) VALUES
