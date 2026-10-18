@@ -652,6 +652,13 @@
       "when": 1792294963787,
       "tag": "0092_newcomer_finish_receipt_and_enroll_hardening",
       "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "7",
+      "when": 1792296004950,
+      "tag": "0093_newcomer_scoped_claim_and_mirror_rotation",
+      "breakpoints": true
     }
   ]
 }

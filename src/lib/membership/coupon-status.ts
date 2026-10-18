@@ -7,7 +7,7 @@ export function couponStatus(row: Record<string, unknown>, now = Date.now()): Me
   const status = String(row.status ?? "");
   if (status === "used") return "used";
   if (status === "void" || status === "cancelled") return "void";
-  if (status === "reserved") return "frozen";
+  if (status === "reserved" || status === "frozen") return "frozen";
   if (status === "expired") return "expired";
   if (status !== "active") return "void"; // 未知状态 fail-closed
   const exp = iso(row.expires_at);

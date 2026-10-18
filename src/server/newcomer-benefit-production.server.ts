@@ -12,7 +12,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { youzanFetch } from "@/lib/youzan-http";
 import { selectPointsHeadquarters } from "./youzan-points-query.server";
 import {
-  parseQueryResponse,
+  queryHeldPagesWith,
   parseTakeResponse,
   type MirrorSyncDeps,
   type NewcomerClaim,
@@ -44,7 +44,9 @@ export async function enrollNewcomerIfEnabled(customerId: string, locationId: st
 /** 有界补漏存量已注册未领券者；默认关闭，每次最多 20 个。 */
 export async function backfillNewcomerIfEnabled() {
   if (env("NEWCOMER_BENEFIT_BACKFILL_ENABLED") !== "true") return { enabled: false, enrolled: 0 };
-  const { data, error } = await supabaseAdmin.rpc("commerce_newcomer_backfill" as never, { p_limit: 20 } as never);
+  const scope = newcomerScope();
+  if (scope && scope.length === 0) return { enabled: true, enrolled: 0, skipped: "no_canary_customers" };
+  const { data, error } = await supabaseAdmin.rpc("commerce_newcomer_backfill_scoped" as never, { p_limit: 20, p_customer_ids: scope } as never);
   if (error) return { enabled: true, enrolled: 0, error: "backfill_unavailable" };
   return { enabled: true, enrolled: Number(data ?? 0) };
 }
@@ -70,28 +72,18 @@ async function callYouzan(api: string, version: string, token: string, body: unk
   });
 }
 
-/** voucher.query/3.0.0 翻页到 total，按 yz_open_id+activity_id+verify_code 精准匹配。 */
-async function queryHeldPages(
-  token: string, match: { yzOpenId: string; activityId: string; verifyCode: string },
-): Promise<QueryResult> {
-  const pageSize = 50;
-  for (let page = 1; page <= 20; page++) {
-    let res: Response;
-    try {
-      res = await callYouzan(QUERY_API(), QUERY_VERSION(), token, {
-        yz_open_id: match.yzOpenId, page_no: page, page_size: pageSize });
-    } catch { return { kind: "unavailable" }; }
-    let body: unknown = null;
-    try { body = await res.json(); } catch { return { kind: "unavailable" }; }
-    const parsed = parseQueryResponse(res.status, body, match);
-    if (parsed.kind === "found") return parsed;
-    if (parsed.kind === "unavailable") return parsed;
-    const d = (body as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
-    const total = Number(d?.total ?? 0);
-    const list = Array.isArray(d?.vouchers) ? d.vouchers : Array.isArray(d?.data) ? d.data : [];
-    if (page * pageSize >= total || list.length === 0) return { kind: "not_found" };
-  }
-  return { kind: "unavailable" }; // 页数异常，宁可 unknown 也不下结论
+async function queryHeldPages(token: string, match: { yzOpenId: string; activityId: string; verifyCode: string }): Promise<QueryResult> {
+  return queryHeldPagesWith(async (body) => {
+    const res = await callYouzan(QUERY_API(), QUERY_VERSION(), token, body);
+    return { status: res.status, body: await res.json() };
+  }, match);
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** 灰度范围：全量开关 → null（全部）；否则只取合法 UUID 名单（可能为空数组 → 什么都不领/不补）。 */
+export function newcomerScope(): string[] | null {
+  if (env("NEWCOMER_BENEFIT_ALL_CUSTOMERS") === "true") return null;
+  return canary().filter((id) => UUID.test(id));
 }
 
 export function productionNewcomerDeps(): NewcomerDeps {
@@ -99,7 +91,11 @@ export function productionNewcomerDeps(): NewcomerDeps {
     workerEnabled: () => env("NEWCOMER_BENEFIT_WORKER_ENABLED") === "true",
     customerAllowed: newcomerCustomerAllowed,
     async claim(limit, lease) {
-      const { data, error } = await supabaseAdmin.rpc("commerce_newcomer_claim" as never, { p_limit: limit, p_lease_seconds: lease } as never);
+      const scope = newcomerScope();
+      if (scope && scope.length === 0) return [];
+      // 只领取灰度名单内的槽，绝不把名单外顾客的槽领出来再 blocked
+      const { data, error } = await supabaseAdmin.rpc("commerce_newcomer_claim_scoped" as never,
+        { p_limit: limit, p_lease_seconds: lease, p_customer_ids: scope } as never);
       if (error) throw Error("newcomer_claim_failed");
       return (data ?? []) as unknown as NewcomerClaim[];
     },
@@ -161,14 +157,16 @@ export function productionNewcomerDeps(): NewcomerDeps {
 export function productionMirrorSyncDeps(): MirrorSyncDeps {
   return {
     syncEnabled: () => env("NEWCOMER_MIRROR_SYNC_ENABLED") === "true",
-    async listActiveMirrors(limit) {
+    async listMirrorsForSync(limit) {
       const { data, error } = await supabaseAdmin
         .from("pos_customer_coupons" as never)
-        .select("id,code,external_id,metadata")
+        .select("id,code,external_id,status,metadata")
         .eq("external_provider", "youzan")
-        .eq("status", "active")
+        .in("status", ["active", "frozen"])
+        .order("provider_status_checked_at" as never, { ascending: true, nullsFirst: true })
         .order("created_at", { ascending: true })
-        .limit(limit);
+        .order("id", { ascending: true })
+        .limit(Math.max(1, Math.min(limit, 50)));
       if (error) throw Error("mirror_list_failed");
       return (data ?? []) as unknown as YouzanMirrorRow[];
     },
@@ -182,14 +180,11 @@ export function productionMirrorSyncDeps(): MirrorSyncDeps {
       }
       return { kind: r.kind === "not_found" ? "not_found" : "unavailable" };
     },
-    async updateMirrorStatus(mirrorId, status) {
-      const { error } = await supabaseAdmin
-        .from("pos_customer_coupons" as never)
-        .update({ status, updated_at: new Date().toISOString() } as never)
-        .eq("id", mirrorId)
-        .eq("external_provider", "youzan")
-        .eq("status", "active"); // 只从 active 迁出，绝不回写 active
-      if (error) throw Error("mirror_update_failed");
+    async applyMirrorStatus(mirrorId, externalId, status) {
+      const { data, error } = await supabaseAdmin.rpc("commerce_youzan_mirror_apply_status" as never,
+        { p_mirror: mirrorId, p_external_id: externalId, p_status: status } as never);
+      if (error) throw Error("mirror_apply_failed");
+      return String(data);
     },
   };
 }
