@@ -1,0 +1,10 @@
+[Unit]
+Description=BOOMER newcomer benefit pack worker (Youzan coupon dispatch, switches default off)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/boomer-erp/workers.env
+ExecStart=/opt/boomer-erp/scripts/run-newcomer-benefit-worker.sh
+TimeoutStartSec=60
