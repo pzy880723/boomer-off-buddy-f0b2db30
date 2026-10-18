@@ -45,11 +45,11 @@ if [ -n "$mig2" ]; then
   out2=$($PSQL -q -v ON_ERROR_STOP=1 < tests/sql/newcomer_benefit/cases_0091.sql 2>&1); rc2=$?
   echo "$out2" | grep -o 'PASS .*\|ERROR.*\|FAIL.*'
   n2=$(echo "$out2" | grep -c 'PASS')
-  [ $rc2 -eq 0 ] && [ "$n2" -eq 18 ] && echo "ALL PASS 0091 ($n2)" || { echo "SOME FAILED 0091 ($n2/18)"; exit 1; }
+  [ $rc2 -eq 0 ] && [ "$n2" -eq 20 ] && echo "ALL PASS 0091 ($n2)" || { echo "SOME FAILED 0091 ($n2/20)"; exit 1; }
 fi
 if [ -n "$mig3" ]; then
   out3=$($PSQL -q -v ON_ERROR_STOP=1 < tests/sql/newcomer_benefit/cases_0092.sql 2>&1); rc3=$?
   echo "$out3" | grep -o 'PASS .*\|ERROR.*\|FAIL.*'
   n3=$(echo "$out3" | grep -c 'PASS')
-  [ $rc3 -eq 0 ] && [ "$n3" -eq 17 ] && echo "ALL PASS 0092 ($n3)" || { echo "SOME FAILED 0092 ($n3/17)"; exit 1; }
+  [ $rc3 -eq 0 ] && [ "$n3" -eq 18 ] && echo "ALL PASS 0092 ($n3)" || { echo "SOME FAILED 0092 ($n3/18)"; exit 1; }
 fi
