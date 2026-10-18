@@ -104,7 +104,8 @@ DO $$ DECLARE old_id uuid; new_id uuid; BEGIN
  ('cc000000-0000-4000-8000-000000000001','5c000000-0000-4000-8000-00000000000b','product:1a000000-0000-4000-8000-000000000002','other question') RETURNING id INTO old_id;
  INSERT INTO commerce_listings VALUES ('1a000000-0000-4000-8000-000000000002','5c000000-0000-4000-8000-00000000000b','碗',99,'11111111-0000-4000-8000-000000000001');
  INSERT INTO product_measurement_tasks(id,sku_id,listing_id,location_id) VALUES ('7a000000-0000-4000-8000-000000000009','11111111-0000-4000-8000-000000000001','1a000000-0000-4000-8000-000000000002','5c000000-0000-4000-8000-00000000000a');
- INSERT INTO product_measurement_requesters(task_id,customer_id) VALUES ('7a000000-0000-4000-8000-000000000009','cc000000-0000-4000-8000-000000000001') RETURNING conversation_id INTO new_id;
+ INSERT INTO product_measurement_requesters(task_id,customer_id) VALUES ('7a000000-0000-4000-8000-000000000009','cc000000-0000-4000-8000-000000000001') ;
+ SELECT conversation_id INTO new_id FROM product_measurement_requesters WHERE task_id='7a000000-0000-4000-8000-000000000009' AND customer_id='cc000000-0000-4000-8000-000000000001';
  ASSERT new_id <> old_id, 'SM9 wrong-store reused';
  ASSERT (SELECT location_id FROM support_conversations WHERE id=new_id)='5c000000-0000-4000-8000-00000000000a','SM9 routing';
  ASSERT (SELECT location_id FROM support_conversations WHERE id=old_id)='5c000000-0000-4000-8000-00000000000b','SM9 old question moved';
