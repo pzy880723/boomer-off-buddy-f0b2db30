@@ -1,3 +1,4 @@
+import {PendingWorkItems} from './pending-work-items';
 import { useState } from "react";
 import {
   AlertCircle,
@@ -307,36 +308,8 @@ export function SalesDashboard(props: Props) {
                 按付款日期归属，金额包含运费；已成功退款回扣原订单。售出件数为成交件数，未扣退货。
               </p>
             </details>
-            <section aria-labelledby="dashboard-tasks">
-              <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-                <h2 id="dashboard-tasks" className="font-semibold">
-                  待处理事项
-                </h2>
-                <span className="text-xs text-muted-foreground">当前待办，不受销售日期影响</span>
-              </div>
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
-                {data.tasks.map((task) => (
-                  <a
-                    href={task.href}
-                    key={task.key}
-                    className="group rounded-xl border bg-card p-4 shadow-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <p className="text-xs text-muted-foreground">{task.label}</p>
-                    <div className="mt-3 flex items-center justify-between gap-2">
-                      <span
-                        className={`text-xl font-semibold tabular-nums ${task.count && task.count > 0 ? "text-primary" : ""}`}
-                      >
-                        {displayCount(task.count)}
-                      </span>
-                      <ArrowRight
-                        aria-hidden="true"
-                        className="h-4 w-4 text-muted-foreground group-hover:text-primary"
-                      />
-                    </div>
-                  </a>
-                ))}
-              </div>
-            </section>
+            <PendingWorkItems locationId={props.locationId === 'all' ? undefined : props.locationId || undefined}/>
+
           </>
         )
       )}

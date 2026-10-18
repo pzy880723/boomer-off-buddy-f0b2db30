@@ -53,7 +53,10 @@ export const Route = createFileRoute("/api/public/handheld/notifications/unread-
           console.error(`unread_counts_contract_error: ${parsed.reason}`);
           return err("Unread counts violated contract", 500, { code: "unread_counts_contract_error", reason: parsed.reason });
         }
-        return ok(parsed.data);
+        try {
+          const { loadPendingCounts } = await import('@/server/handheld-work-items.server');
+          return ok({ ...parsed.data, pending_counts: await loadPendingCounts(scope) });
+        } catch { return err('Pending counts temporarily unavailable', 500, { code: 'pending_counts_unavailable' }); }
       },
     },
   },

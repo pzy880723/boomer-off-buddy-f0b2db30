@@ -133,6 +133,7 @@ import { Route as ApiPublicHandheldStocktakesRouteImport } from './routes/api/pu
 import { Route as ApiPublicHandheldSyncRecordsRouteImport } from './routes/api/public/handheld/sync-records'
 import { Route as ApiPublicHandheldTransferPhotoRouteImport } from './routes/api/public/handheld/transfer-photo'
 import { Route as ApiPublicHandheldTransfersRouteImport } from './routes/api/public/handheld/transfers'
+import { Route as ApiPublicHandheldWorkItemsRouteImport } from './routes/api/public/handheld/work-items'
 import { Route as ApiPublicHooksChainProbeVerifyRouteImport } from './routes/api/public/hooks/chain-probe-verify'
 import { Route as ApiPublicHooksChannelSyncWorkerRouteImport } from './routes/api/public/hooks/channel-sync-worker'
 import { Route as ApiPublicHooksCommerceReleaseExpiredRouteImport } from './routes/api/public/hooks/commerce-release-expired'
@@ -971,6 +972,12 @@ const ApiPublicHandheldTransfersRoute =
   ApiPublicHandheldTransfersRouteImport.update({
     id: '/api/public/handheld/transfers',
     path: '/api/public/handheld/transfers',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldWorkItemsRoute =
+  ApiPublicHandheldWorkItemsRouteImport.update({
+    id: '/api/public/handheld/work-items',
+    path: '/api/public/handheld/work-items',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicHooksChainProbeVerifyRoute =
@@ -2222,6 +2229,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
   '/api/public/handheld/transfer-photo': typeof ApiPublicHandheldTransferPhotoRoute
   '/api/public/handheld/transfers': typeof ApiPublicHandheldTransfersRouteWithChildren
+  '/api/public/handheld/work-items': typeof ApiPublicHandheldWorkItemsRoute
   '/api/public/hooks/chain-probe-verify': typeof ApiPublicHooksChainProbeVerifyRoute
   '/api/public/hooks/channel-sync-worker': typeof ApiPublicHooksChannelSyncWorkerRoute
   '/api/public/hooks/commerce-release-expired': typeof ApiPublicHooksCommerceReleaseExpiredRoute
@@ -2531,6 +2539,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
   '/api/public/handheld/transfer-photo': typeof ApiPublicHandheldTransferPhotoRoute
   '/api/public/handheld/transfers': typeof ApiPublicHandheldTransfersRouteWithChildren
+  '/api/public/handheld/work-items': typeof ApiPublicHandheldWorkItemsRoute
   '/api/public/hooks/chain-probe-verify': typeof ApiPublicHooksChainProbeVerifyRoute
   '/api/public/hooks/channel-sync-worker': typeof ApiPublicHooksChannelSyncWorkerRoute
   '/api/public/hooks/commerce-release-expired': typeof ApiPublicHooksCommerceReleaseExpiredRoute
@@ -2848,6 +2857,7 @@ export interface FileRoutesById {
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
   '/api/public/handheld/transfer-photo': typeof ApiPublicHandheldTransferPhotoRoute
   '/api/public/handheld/transfers': typeof ApiPublicHandheldTransfersRouteWithChildren
+  '/api/public/handheld/work-items': typeof ApiPublicHandheldWorkItemsRoute
   '/api/public/hooks/chain-probe-verify': typeof ApiPublicHooksChainProbeVerifyRoute
   '/api/public/hooks/channel-sync-worker': typeof ApiPublicHooksChannelSyncWorkerRoute
   '/api/public/hooks/commerce-release-expired': typeof ApiPublicHooksCommerceReleaseExpiredRoute
@@ -3166,6 +3176,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/sync-records'
     | '/api/public/handheld/transfer-photo'
     | '/api/public/handheld/transfers'
+    | '/api/public/handheld/work-items'
     | '/api/public/hooks/chain-probe-verify'
     | '/api/public/hooks/channel-sync-worker'
     | '/api/public/hooks/commerce-release-expired'
@@ -3475,6 +3486,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/sync-records'
     | '/api/public/handheld/transfer-photo'
     | '/api/public/handheld/transfers'
+    | '/api/public/handheld/work-items'
     | '/api/public/hooks/chain-probe-verify'
     | '/api/public/hooks/channel-sync-worker'
     | '/api/public/hooks/commerce-release-expired'
@@ -3791,6 +3803,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/sync-records'
     | '/api/public/handheld/transfer-photo'
     | '/api/public/handheld/transfers'
+    | '/api/public/handheld/work-items'
     | '/api/public/hooks/chain-probe-verify'
     | '/api/public/hooks/channel-sync-worker'
     | '/api/public/hooks/commerce-release-expired'
@@ -4059,6 +4072,7 @@ export interface RootRouteChildren {
   ApiPublicHandheldSyncRecordsRoute: typeof ApiPublicHandheldSyncRecordsRoute
   ApiPublicHandheldTransferPhotoRoute: typeof ApiPublicHandheldTransferPhotoRoute
   ApiPublicHandheldTransfersRoute: typeof ApiPublicHandheldTransfersRouteWithChildren
+  ApiPublicHandheldWorkItemsRoute: typeof ApiPublicHandheldWorkItemsRoute
   ApiPublicHooksChainProbeVerifyRoute: typeof ApiPublicHooksChainProbeVerifyRoute
   ApiPublicHooksChannelSyncWorkerRoute: typeof ApiPublicHooksChannelSyncWorkerRoute
   ApiPublicHooksCommerceReleaseExpiredRoute: typeof ApiPublicHooksCommerceReleaseExpiredRoute
@@ -5053,6 +5067,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/handheld/transfers'
       fullPath: '/api/public/handheld/transfers'
       preLoaderRoute: typeof ApiPublicHandheldTransfersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/work-items': {
+      id: '/api/public/handheld/work-items'
+      path: '/api/public/handheld/work-items'
+      fullPath: '/api/public/handheld/work-items'
+      preLoaderRoute: typeof ApiPublicHandheldWorkItemsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/chain-probe-verify': {
@@ -7251,6 +7272,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHandheldSyncRecordsRoute: ApiPublicHandheldSyncRecordsRoute,
   ApiPublicHandheldTransferPhotoRoute: ApiPublicHandheldTransferPhotoRoute,
   ApiPublicHandheldTransfersRoute: ApiPublicHandheldTransfersRouteWithChildren,
+  ApiPublicHandheldWorkItemsRoute: ApiPublicHandheldWorkItemsRoute,
   ApiPublicHooksChainProbeVerifyRoute: ApiPublicHooksChainProbeVerifyRoute,
   ApiPublicHooksChannelSyncWorkerRoute: ApiPublicHooksChannelSyncWorkerRoute,
   ApiPublicHooksCommerceReleaseExpiredRoute:

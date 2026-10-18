@@ -4,7 +4,7 @@ do $$ begin create role service_role; exception when duplicate_object then null;
 CREATE TABLE public.inv_skus(id uuid PRIMARY KEY, name text);
 CREATE TABLE public.commerce_customers(id uuid PRIMARY KEY, nickname text);
 CREATE TABLE public.commerce_listings(id uuid PRIMARY KEY, location_id uuid, title text, price numeric, sku_id uuid);
-CREATE TABLE public.commerce_orders(id uuid PRIMARY KEY, order_no text);
+CREATE TABLE public.commerce_orders(id uuid PRIMARY KEY, order_no text, order_status text DEFAULT 'confirmed', payment_status text DEFAULT 'paid', fulfillment_method text DEFAULT 'express');
 CREATE TABLE public.product_measurement_tasks(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), sku_id uuid, listing_id uuid, location_id uuid,
   status text DEFAULT 'pending', created_at timestamptz DEFAULT now());
 CREATE TABLE public.product_measurement_requesters(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), task_id uuid, customer_id uuid,
@@ -22,18 +22,11 @@ CREATE UNIQUE INDEX uq_support_messages_client_op ON public.support_messages(con
 CREATE TABLE public.fulfillments(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), code text DEFAULT 'FF', order_id uuid, location_id uuid,
   status text DEFAULT 'allocated', created_at timestamptz DEFAULT now());
 CREATE TABLE public.stock_transfers(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), code text DEFAULT 'TR', status text, qty int DEFAULT 1,
-  to_location_id uuid, shipped_at timestamptz, created_at timestamptz DEFAULT now());
-CREATE TABLE public.stocktakes(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), code text DEFAULT 'ST', location_id uuid, status text, opened_at timestamptz DEFAULT now());
--- 与生产一致的客服触发器（只读导出）
-CREATE FUNCTION public.tg_support_waiting() RETURNS trigger LANGUAGE plpgsql AS $$
-BEGIN
-  IF NEW.sender_type = 'customer' THEN
-    UPDATE public.support_conversations SET waiting_since = coalesce(waiting_since, NEW.created_at)
-     WHERE id = NEW.conversation_id AND status <> 'closed';
-  ELSIF NEW.sender_type = 'staff' AND NEW.internal = false AND NEW.delivery_status = 'sent' THEN
-    UPDATE public.support_conversations SET waiting_since = NULL, escalated_at = NULL, escalation_reason = NULL
-     WHERE id = NEW.conversation_id AND primary_agent_id = NEW.sender_user_id;
-  END IF;
-  RETURN NEW;
-END; $$;
-CREATE TRIGGER trg_support_waiting AFTER INSERT ON public.support_messages FOR EACH ROW EXECUTE FUNCTION public.tg_support_waiting();
+  from_location_id uuid, to_location_id uuid, shipped_at timestamptz, created_at timestamptz DEFAULT now());
+CREATE TABLE public.inv_locations(id uuid PRIMARY KEY, shop_id uuid);
+CREATE TABLE public.commerce_after_sales(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), location_id uuid, status text, after_sale_no text, created_at timestamptz DEFAULT now());
+CREATE TABLE public.youzan_stock_sync_queue(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), shop_id uuid, status text, created_at timestamptz DEFAULT now());
+CREATE TABLE public.channel_sync_outbox(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), shop_id uuid, status text, created_at timestamptz DEFAULT now());
+CREATE TABLE public.fulfillment_shortages(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), fulfillment_id uuid, status text, created_at timestamptz DEFAULT now());
+CREATE TABLE public.stocktakes(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), code text DEFAULT 'ST', location_id uuid, status text, opened_at timestamptz DEFAULT now(), created_at timestamptz DEFAULT now());
+-- Production trigger definitions loaded verbatim by run.sh.

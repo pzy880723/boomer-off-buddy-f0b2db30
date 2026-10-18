@@ -1,3 +1,5 @@
+import { MeasurementCardView } from '@/components/inventory/measurement-card-view';
+import type { MeasurementCard } from '@/lib/measurement-card';
 import {
   Loader2,
   Lock,
@@ -39,6 +41,9 @@ export type WorkbenchConversation = {
   escalated_at?: string | null;
   order_id?: string | null;
   topic?: string;
+  pending_action?: boolean;
+  pending_measurement_count?: number;
+  needs_reply?: boolean;
   context?: Record<string, unknown> | null;
 };
 
@@ -49,6 +54,7 @@ export type WorkbenchMessage = {
   body: string;
   internal: boolean;
   created_at: string;
+  measurement_card?: MeasurementCard | null;
   delivery_status?: string | null;
   sender_avatar_url?: string | null;
   sender_role?: string;
@@ -89,6 +95,7 @@ export type SupportWorkbenchProps = {
   hasMore?: boolean;
   loadingMore?: boolean;
   onLoadMore?: () => void;
+  onMeasurement?: (card:MeasurementCard)=>void;
 };
 
 function MessageAvatar({ message }: { message: WorkbenchMessage }) {
@@ -362,6 +369,7 @@ export function SupportWorkbench(props: SupportWorkbenchProps) {
                           )}
                         </div>
                         <p className="whitespace-pre-wrap break-words text-sm">{message.body}</p>
+                        {message.measurement_card && <MeasurementCardView card={message.measurement_card} onRecord={props.onMeasurement}/>}
                         {message.sender_type === "staff" &&
                           !message.internal &&
                           message.delivery_status && (

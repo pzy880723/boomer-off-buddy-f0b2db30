@@ -1,3 +1,5 @@
+import { MeasurementRecordDialog } from '@/components/inventory/measurement-record-dialog';
+import type { MeasurementCard } from '@/lib/measurement-card';
 import { createFileRoute } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -19,8 +21,13 @@ export const Route = createFileRoute("/customer-service")({
     meta: [
       { title: "客服工作台 | BOOMER ERP" },
       { name: "description", content: "门店优先接待，总部同会话接管，统一处理顾客咨询。" },
+      { property: "og:title", content: "客服工作台 | BOOMER ERP" },
+      { property: "og:description", content: "顾客咨询与尺寸申请统一接待。" },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
+  validateSearch: (raw:Record<string,unknown>) => ({ conversation_id: typeof raw.conversation_id === "string" && /^[0-9a-f-]{36}$/i.test(raw.conversation_id) ? raw.conversation_id : undefined }),
   component: CustomerServicePage,
 });
 
@@ -45,7 +52,9 @@ function CustomerServiceSession({ userId }: { userId: string }) {
   const sendFn = useServerFn(sendSupportMessageFn);
   const assignmentFn = useServerFn(updateSupportAssignmentFn);
   const queryClient = useQueryClient();
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [measurementCard,setMeasurementCard] = useState<MeasurementCard|null>(null);
+  const search = Route.useSearch();
+  const [activeId, setActiveId] = useState<string | null>(search.conversation_id ?? null);
   const [filter, setFilter] = useState<SupportFilter>("all");
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const pendingReplies = useRef(new Map<string, string>());
@@ -66,13 +75,13 @@ function CustomerServiceSession({ userId }: { userId: string }) {
     return true;
   });
   const currentId =
-    activeId && items.some((item) => item.id === activeId) ? activeId : (items[0]?.id ?? null);
+    activeId ?? (items[0]?.id ?? null);
   const draft = currentId
     ? (drafts[currentId] ?? { body: "", internal: false })
     : { body: "", internal: false };
   const detailQuery = useQuery({
     queryKey: ["support-conversation", userId, currentId],
-    queryFn: () => detailFn({ data: { conversationId: currentId! } }),
+    queryFn: () => {if(!currentId) throw new Error("请选择会话");return detailFn({ data: { conversationId: currentId } });},
     enabled: Boolean(currentId),
     refetchInterval: 5_000,
   });
@@ -127,7 +136,7 @@ function CustomerServiceSession({ userId }: { userId: string }) {
 
   function send() {
     const version = detailQuery.data?.conversation.assignment_version;
-    if (!currentId || !draft.body.trim() || !Number.isInteger(version) || sendMutation.isPending)
+    if (!currentId || !draft.body.trim() || (typeof version !== "number" || !Number.isInteger(version)) || sendMutation.isPending)
       return;
     const key = supportRetryKey(currentId, draft.body, draft.internal);
     // Unknown outcomes retain their operation id, including after close/reopen changes the version.
@@ -135,7 +144,7 @@ function CustomerServiceSession({ userId }: { userId: string }) {
       conversationId: currentId,
       body: draft.body.trim(),
       internal: draft.internal,
-      assignmentVersion: version!,
+      assignmentVersion: version,
       clientOpId: pendingReplies.current.get(key) ?? crypto.randomUUID(),
     };
     pendingReplies.current.set(key, reply.clientOpId);
@@ -144,8 +153,8 @@ function CustomerServiceSession({ userId }: { userId: string }) {
 
   function assignment(action: AssignmentAction) {
     const version = detailQuery.data?.conversation.assignment_version;
-    if (!currentId || !Number.isInteger(version) || assignmentMutation.isPending) return;
-    assignmentMutation.mutate({ conversationId: currentId, action, assignmentVersion: version! });
+    if (!currentId || (typeof version !== "number" || !Number.isInteger(version)) || assignmentMutation.isPending) return;
+    assignmentMutation.mutate({ conversationId: currentId, action, assignmentVersion: version });
   }
 
   return (
@@ -174,6 +183,7 @@ function CustomerServiceSession({ userId }: { userId: string }) {
         refreshing={listQuery.isFetching || detailQuery.isFetching}
         sending={sendMutation.isPending}
         changingAssignment={assignmentMutation.isPending}
+        onMeasurement={setMeasurementCard}
         onFilter={setFilter}
         onSelect={setActiveId}
         onDraft={(body) => updateDraft({ body })}
@@ -185,6 +195,7 @@ function CustomerServiceSession({ userId }: { userId: string }) {
         loadingMore={listQuery.isFetchingNextPage}
         onLoadMore={() => void listQuery.fetchNextPage()}
       />
+      {measurementCard && <MeasurementRecordDialog key={measurementCard.task_id} card={measurementCard} onClose={()=>setMeasurementCard(null)}/>}
     </div>
   );
 }

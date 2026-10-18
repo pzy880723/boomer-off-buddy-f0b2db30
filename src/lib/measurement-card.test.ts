@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { cardAuthorized, safeMeasurementImage } from './measurement-card';
+const t = { id:'task',sku_id:'sku',listing_id:'listing',location_id:'A',status:'pending' };
+const c = {id:'conversation',customer_id:'customer',location_id:'A'};
+const q = [{task_id:'task',customer_id:'customer',conversation_id:'conversation'}];
+test('card requires current task store, not merely old conversation access',()=>assert.equal(cardAuthorized({...t,location_id:'B'},c,q),false));
+test('card requires exact customer requester and linked conversation',()=> { assert.equal(cardAuthorized(t,c,[{...q[0],customer_id:'other'}]),false); assert.equal(cardAuthorized(t,c,[{...q[0],conversation_id:'other'}]),false); });
+test('authorized requester same store can receive current task card',()=>assert.equal(cardAuthorized(t,c,q),true));
+test('image never exposes private object key or unsafe URL',()=> {assert.equal(safeMeasurementImage('sku-listing/private.png'),null);assert.equal(safeMeasurementImage('http://example.com/x'),null);assert.equal(safeMeasurementImage('https://user:pass@example.com/x'),null);assert.equal(safeMeasurementImage('https://example.com/preview.png'),'https://example.com/preview.png');});
