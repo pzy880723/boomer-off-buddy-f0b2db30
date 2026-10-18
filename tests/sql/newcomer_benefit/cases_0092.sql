@@ -29,41 +29,55 @@ INSERT INTO commerce_customers (id, external_subject, phone, status) VALUES
   ('a0000000-0000-0000-0000-00000000000a','sub-xa','18600000024','active');
 SELECT t(EXISTS (SELECT 1 FROM commerce_newcomer_grants WHERE customer_id='a0000000-0000-0000-0000-00000000000a'), 'valid consumer enrolled on v2');
 
+-- 只让 v2 授权（sub-xa）的槽位可领取，避免领到 v1 槽位
+UPDATE commerce_newcomer_grant_slots s SET next_run_at = now() + interval '1 hour'
+  FROM commerce_newcomer_grants g
+ WHERE g.id = s.grant_id AND g.customer_id <> 'a0000000-0000-0000-0000-00000000000a' AND s.status <> 'succeeded';
+-- 领取辅助：带回槽位规则
+CREATE OR REPLACE FUNCTION pg_temp.claim1() RETURNS TABLE(slot_id uuid, claim_token uuid, amt integer, thr integer, act text) LANGUAGE sql AS $$
+  SELECT c.slot_id, c.claim_token, b.amount_fen, b.threshold_fen, b.youzan_coupon_group_id
+    FROM commerce_newcomer_claim(1, 60) c
+    JOIN commerce_newcomer_grant_slots s ON s.id = c.slot_id
+    JOIN commerce_newcomer_grants g ON g.id = s.grant_id
+    JOIN commerce_newcomer_benefit_slots b ON b.version_id = g.version_id AND b.slot_no = s.slot_no
+$$;
+
 -- 旧 5 参 finish 拒绝无真实凭证的成功
-CREATE TEMP TABLE f1 AS SELECT * FROM commerce_newcomer_claim(1, 60);
+CREATE TEMP TABLE f1 AS SELECT * FROM pg_temp.claim1();
 SELECT t(commerce_newcomer_finish(slot_id, claim_token, 'succeeded', 'yz-x', NULL)='receipt_required', 'legacy finish rejects receipt-less success') FROM f1;
 SELECT t(NOT EXISTS (SELECT 1 FROM pos_customer_coupons WHERE external_id='yz-x'), 'legacy success writes no mirror');
 SELECT t(EXISTS (SELECT 1 FROM commerce_newcomer_grant_slots WHERE status='unknown' AND last_error='receipt_required'), 'receipt-less success parked as unknown');
 
 -- 新 RPC：真实回执成功，镜像用真实日期与 provider verify_code
-CREATE TEMP TABLE f2 AS SELECT * FROM commerce_newcomer_claim(1, 60);
+CREATE TEMP TABLE f2 AS SELECT * FROM pg_temp.claim1();
 SELECT t(commerce_newcomer_finish_success(slot_id, claim_token, 'yz-real-001', 'YZVC001',
-  '2026-10-18 00:00:00+08', '2027-01-15 23:59:59+08', 500, 4990, '35074448')='succeeded', 'finish_success with real receipt') FROM f2;
-SELECT t(EXISTS (SELECT 1 FROM pos_customer_coupons m WHERE m.external_provider='youzan' AND m.external_id='yz-real-001'
+  '2026-10-18 00:00:00+08', '2027-01-15 23:59:59+08', amt, thr, act)='succeeded', 'finish_success with real receipt') FROM f2;
+SELECT t(EXISTS (SELECT 1 FROM pos_customer_coupons m JOIN f2 ON m.value = f2.amt / 100.0 AND m.min_spend = f2.thr / 100.0
+  WHERE m.external_provider='youzan' AND m.external_id='yz-real-001'
   AND m.code='YZVC001' AND m.starts_at='2026-10-18 00:00:00+08' AND m.expires_at='2027-01-15 23:59:59+08'
-  AND m.value=5.00 AND m.min_spend=49.90 AND (m.metadata->>'receipt_validated')::boolean=true), 'mirror uses provider dates and verify_code');
+  AND (m.metadata->>'receipt_validated')::boolean=true), 'mirror uses provider dates and verify_code');
 
 -- 回执与槽位规则不符：金额错误 → 拒绝且无镜像
-CREATE TEMP TABLE f3 AS SELECT * FROM commerce_newcomer_claim(1, 60);
+CREATE TEMP TABLE f3 AS SELECT * FROM pg_temp.claim1();
 SELECT t(commerce_newcomer_finish_success(slot_id, claim_token, 'yz-bad-amt', 'YZVC002',
-  '2026-10-18 00:00:00+08', '2027-01-15 23:59:59+08', 1000, 4990, '35074448')='receipt_mismatch', 'wrong amount rejected') FROM f3;
+  '2026-10-18 00:00:00+08', '2027-01-15 23:59:59+08', amt + 1, thr, act)='receipt_mismatch', 'wrong amount rejected') FROM f3;
 SELECT t(NOT EXISTS (SELECT 1 FROM pos_customer_coupons WHERE external_id='yz-bad-amt'), 'mismatch writes no mirror');
 -- 活动不符 → 拒绝
-CREATE TEMP TABLE f4 AS SELECT * FROM commerce_newcomer_claim(1, 60);
+CREATE TEMP TABLE f4 AS SELECT * FROM pg_temp.claim1();
 SELECT t(commerce_newcomer_finish_success(slot_id, claim_token, 'yz-bad-act', 'YZVC003',
-  '2026-10-18 00:00:00+08', '2027-01-15 23:59:59+08', 1000, 9900, '35074448')='receipt_mismatch', 'wrong activity rejected') FROM f4;
+  '2026-10-18 00:00:00+08', '2027-01-15 23:59:59+08', amt, thr, '00000000')='receipt_mismatch', 'wrong activity rejected') FROM f4;
 -- 日期倒置 → 拒绝
-CREATE TEMP TABLE f5 AS SELECT * FROM commerce_newcomer_claim(1, 60);
+CREATE TEMP TABLE f5 AS SELECT * FROM pg_temp.claim1();
 SELECT t(commerce_newcomer_finish_success(slot_id, claim_token, 'yz-bad-date', 'YZVC004',
-  '2027-01-15 23:59:59+08', '2026-10-18 00:00:00+08', 1000, 9900, '35074450')='receipt_mismatch', 'inverted dates rejected') FROM f5;
+  '2027-01-15 23:59:59+08', '2026-10-18 00:00:00+08', amt, thr, act)='receipt_mismatch', 'inverted dates rejected') FROM f5;
 -- 同券 ID 跨槽 → 唯一约束拒绝，整槽回滚（槽位仍可重领）
-CREATE TEMP TABLE f6 AS SELECT * FROM commerce_newcomer_claim(1, 60);
+CREATE TEMP TABLE f6 AS SELECT * FROM pg_temp.claim1();
 DO $$
 DECLARE r record;
 BEGIN
   FOR r IN SELECT * FROM f6 LOOP
     PERFORM commerce_newcomer_finish_success(r.slot_id, r.claim_token, 'yz-real-001', 'YZVC009',
-      '2026-10-18 00:00:00+08', '2027-01-15 23:59:59+08', 500, 4990, '35074448');
+      '2026-10-18 00:00:00+08', '2027-01-15 23:59:59+08', r.amt, r.thr, r.act);
     RAISE EXCEPTION 'FAIL duplicate coupon id across slots accepted';
   END LOOP;
 EXCEPTION WHEN unique_violation THEN RAISE NOTICE 'PASS duplicate coupon id rolls back whole slot';
