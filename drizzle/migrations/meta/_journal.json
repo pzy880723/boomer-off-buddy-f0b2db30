@@ -659,6 +659,13 @@
       "when": 1792296004950,
       "tag": "0093_newcomer_scoped_claim_and_mirror_rotation",
       "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "7",
+      "when": 1792296295646,
+      "tag": "0094_newcomer_identity_recheck",
+      "breakpoints": true
     }
   ]
 }

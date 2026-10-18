@@ -1150,6 +1150,7 @@ export type Database = {
           phone_key: string | null
           source_location_id: string | null
           status: string
+          subject_snapshot: string | null
           updated_at: string
           version_id: string
         }
@@ -1160,6 +1161,7 @@ export type Database = {
           phone_key?: string | null
           source_location_id?: string | null
           status?: string
+          subject_snapshot?: string | null
           updated_at?: string
           version_id: string
         }
@@ -1170,6 +1172,7 @@ export type Database = {
           phone_key?: string | null
           source_location_id?: string | null
           status?: string
+          subject_snapshot?: string | null
           updated_at?: string
           version_id?: string
         }
@@ -11110,6 +11113,10 @@ export type Database = {
           p_verify_code: string
         }
         Returns: string
+      }
+      commerce_newcomer_identity_check: {
+        Args: { p_slot: string; p_token: string }
+        Returns: Json
       }
       commerce_newcomer_retry: { Args: { p_grant: string }; Returns: number }
       commerce_newcomer_summary: { Args: { p_customer: string }; Returns: Json }
