@@ -47,12 +47,15 @@ export async function processNewcomerSlot(c: NewcomerClaim, deps: NewcomerDeps):
   const rules = { amountFen: c.amount_fen, thresholdFen: c.threshold_fen, activityId: c.youzan_coupon_group_id ?? "" };
   if (!deps.customerAllowed(c.customer_id)) return finish("blocked", null, "canary_not_allowed");
   if (!c.youzan_coupon_group_id) return finish("blocked", null, "youzan_coupon_template_not_configured");
+  // 会员映射解析发生在任何有赞写之前：dispatch 可安全重试；reconcile 槽结果未知，只能保持 unknown 继续回查，绝不转回 dispatch。
+  const notYet = (reason: string) => finish(c.mode === "reconcile" ? "unknown" : "retry", null, reason);
   let member: Awaited<ReturnType<NewcomerDeps["resolveMember"]>>;
-  try { member = await deps.resolveMember(c.customer_id); } catch { return finish("unknown", null, "member_mapping_unavailable"); }
+  try { member = await deps.resolveMember(c.customer_id); } catch { return notYet("member_mapping_unavailable"); }
   if ("blocked" in member) {
-    // 可信映射缺失/暂不可用：短暂有界重试，等待 member-sync 补上；冲突绝不合并，保持 blocked。
+    // 可信映射缺失/暂不可用：等待 member-sync；冲突绝不合并，保持 blocked。
     const wait = member.blocked === "trusted_member_mapping_missing" || member.blocked === "trusted_member_mapping_unavailable";
-    return finish(wait ? "retry" : "blocked", null, member.blocked);
+    if (wait) return notYet(member.blocked);
+    return finish("blocked", null, member.blocked);
   }
   const verifyCode = deriveVerifyCode(c.request_key);
   const input = { groupId: c.youzan_coupon_group_id, yzOpenId: member.yzOpenId, requestKey: c.request_key, verifyCode };
@@ -122,8 +125,8 @@ export function parseQueryResponse(
   const j = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
   const ok = j.success !== false && (j.code === 200 || j.code === 0);
   if (!ok) return { kind: "unavailable" };
-  const d = (j.data && typeof j.data === "object" ? j.data : {}) as Record<string, unknown>;
-  const list = Array.isArray(d.vouchers) ? d.vouchers : Array.isArray(d.data) ? d.data : [];
+  // 官方 voucher.query/3.0.0 真实响应：顶层 data 本身是数组，total 在顶层
+  const list = Array.isArray(j.data) ? j.data : [];
   for (const item of list) {
     const it = (item && typeof item === "object" ? item : {}) as Record<string, unknown>;
     const ui = (it.user_identity && typeof it.user_identity === "object" ? it.user_identity : {}) as Record<string, unknown>;
@@ -138,43 +141,73 @@ export function parseQueryResponse(
   return { kind: "not_found" };
 }
 
-/** 有赞持券只读同步：把真实状态（已用/作废/冻结）镜像到 pos_customer_coupons；绝不触碰积分 projection/ledger/wallet。 */
+/** 官方 voucher.query 分页信息：顶层 total + data 数组长度。 */
+export function queryPageInfo(body: unknown): { total: number; count: number } {
+  const j = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
+  return { total: Number(j.total ?? 0) || 0, count: Array.isArray(j.data) ? j.data.length : 0 };
+}
+
+export const QUERY_PAGE_SIZE = 50;
+/** voucher.query/3.0.0 翻页（page_num，activity_type_group=1，status=0 全状态）到 total，精准匹配；异常一律 unavailable。 */
+export async function queryHeldPagesWith(
+  call: (body: Record<string, unknown>) => Promise<{ status: number; body: unknown }>,
+  match: { yzOpenId: string; activityId: string; verifyCode: string },
+): Promise<QueryResult> {
+  for (let page = 1; page <= 20; page++) {
+    let res: { status: number; body: unknown };
+    try {
+      res = await call({ yz_open_id: match.yzOpenId, activity_type_group: 1, status: 0, page_num: page, page_size: QUERY_PAGE_SIZE });
+    } catch { return { kind: "unavailable" }; }
+    const parsed = parseQueryResponse(res.status, res.body, match);
+    if (parsed.kind !== "not_found") return parsed;
+    const { total, count } = queryPageInfo(res.body);
+    if (count === 0 || page * QUERY_PAGE_SIZE >= total) return { kind: "not_found" };
+  }
+  return { kind: "unavailable" }; // 超页数上限：不下结论
+}
+
+/** 有赞持券只读同步：把真实状态（正常/冻结/已用/作废）镜像到 pos_customer_coupons；绝不触碰积分 projection/ledger/wallet。 */
+export type MirrorStatus = "active" | "frozen" | "used" | "void";
 export type MirrorSyncDeps = {
   syncEnabled(): boolean;
-  listActiveMirrors(limit: number): Promise<YouzanMirrorRow[]>;
+  /** 有界轮转：active/frozen 按 provider_status_checked_at NULLS FIRST 取前 limit 条。 */
+  listMirrorsForSync(limit: number): Promise<YouzanMirrorRow[]>;
   queryHeldByVerifyCode(input: { activityId: string; yzOpenId: string; verifyCode: string }):
     Promise<{ kind: "found"; couponId: string; youzanStatus: string } | { kind: "not_found" } | { kind: "unavailable" }>;
-  updateMirrorStatus(mirrorId: string, status: "used" | "expired" | "void"): Promise<void>;
+  /** DB 核对 external_id 后应用；status=null 只刷新同步时间（保证轮转）。终态不回写。 */
+  applyMirrorStatus(mirrorId: string, externalId: string, status: MirrorStatus | null): Promise<string>;
 };
 export type YouzanMirrorRow = {
-  id: string; code: string; external_id: string;
+  id: string; code: string; external_id: string; status?: string;
   metadata: { activity_id?: string; yz_open_id?: string; verify_code?: string } | null;
 };
 
-const mapYouzanStatus = (s: string): "used" | "expired" | "void" | null => {
-  const v = s.toLowerCase();
-  if (["used", "verified", "2"].includes(v)) return "used";
-  if (["expired", "4"].includes(v)) return "expired";
-  if (["void", "cancelled", "canceled", "invalid", "frozen", "3", "5"].includes(v)) return "void";
-  return null; // active/未知：不改镜像
-};
+/** 有赞券状态：1 正常 / 2 冻结 / 3 已使用 / 4 作废 / 5 删除；另兼容英文；未知返回 null（不改状态）。 */
+export function mapYouzanStatus(s: string): MirrorStatus | null {
+  const v = String(s).toLowerCase();
+  if (["1", "normal", "active"].includes(v)) return "active";
+  if (["2", "frozen"].includes(v)) return "frozen";
+  if (["3", "used", "verified"].includes(v)) return "used";
+  if (["4", "5", "void", "deleted", "cancelled", "canceled", "invalid"].includes(v)) return "void";
+  return null;
+}
 
 export async function syncYouzanCouponMirrors(deps: MirrorSyncDeps, limit = 50) {
   if (!deps.syncEnabled()) return { enabled: false, checked: 0, updated: 0 };
-  const rows = await deps.listActiveMirrors(limit);
+  const rows = await deps.listMirrorsForSync(limit);
   let updated = 0;
   for (const m of rows) {
     const meta = m.metadata ?? {};
-    if (!meta.activity_id || !meta.verify_code || !meta.yz_open_id) continue; // 缺定位信息不猜
-    let r: Awaited<ReturnType<MirrorSyncDeps["queryHeldByVerifyCode"]>>;
-    try { r = await deps.queryHeldByVerifyCode({ activityId: meta.activity_id, yzOpenId: meta.yz_open_id, verifyCode: meta.verify_code }); }
-    catch { continue; }
-    if (r.kind !== "found") continue; // 查不到/不可用：保持现状，绝不下结论
-    if (r.couponId !== m.external_id) continue; // 券 ID 不一致：不动
-    const mapped = mapYouzanStatus(r.youzanStatus);
-    if (!mapped) continue;
-    await deps.updateMirrorStatus(m.id, mapped);
-    updated++;
+    let next: MirrorStatus | null = null;
+    if (meta.activity_id && meta.verify_code && meta.yz_open_id) {
+      try {
+        const r = await deps.queryHeldByVerifyCode({ activityId: meta.activity_id, yzOpenId: meta.yz_open_id, verifyCode: meta.verify_code });
+        // 必须同一券 ID：同 code 误匹配到别的券绝不采用
+        if (r.kind === "found" && r.couponId === m.external_id) next = mapYouzanStatus(r.youzanStatus);
+      } catch { next = null; }
+    }
+    // 无论结果都打同步时间戳，下轮轮到后面的镜像，避免前 N 条永久占位饿死后续
+    try { if ((await deps.applyMirrorStatus(m.id, m.external_id, next)) === "updated") updated++; } catch { /* 下轮再试 */ }
   }
   return { enabled: true, checked: rows.length, updated };
 }

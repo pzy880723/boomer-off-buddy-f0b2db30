@@ -121,12 +121,12 @@ test("take response: only nested voucher_identity with full receipt counts as ok
 });
 
 test("query response: exact match on yz_open_id + activity_id + verify_code with full receipt", () => {
-  const page = { code: 200, data: { total: 2, vouchers: [
+  const page = { code: 200, total: 2, data: [
     { user_identity: { yz_open_id: "yz" }, activity_id: 35074448,
       voucher_identity: { coupon_id: "111", verify_code: "ncvaaa", valid_start_time: 1760745600, valid_end_time: 1768521599 } },
     { user_identity: { yz_open_id: "yz" }, activity_id: "35074448",
       voucher_identity: { coupon_id: "222", verify_code: "ncvbbb", valid_start_time: 1760745600, valid_end_time: 1768521599 } },
-  ] } };
+  ] };
   const hit = parseQueryResponse(200, page, { yzOpenId: "yz", activityId: "35074448", verifyCode: "ncvbbb" });
   assert.equal(hit.kind, "found");
   if (hit.kind === "found") assert.equal(hit.receipt.couponId, "222");
@@ -141,30 +141,23 @@ function mirrorDeps(o: Partial<MirrorSyncDeps> = {}) {
   const updates: unknown[] = [];
   const d: MirrorSyncDeps = {
     syncEnabled: () => true,
-    listActiveMirrors: async () => [{
+    listMirrorsForSync: async () => [{
       id: "m1", code: "YZVC001", external_id: "Y1",
       metadata: { activity_id: "35074448", yz_open_id: "yz", verify_code: "ncvaaa" } }],
-    queryHeldByVerifyCode: async () => ({ kind: "found", couponId: "Y1", youzanStatus: "used" }),
-    updateMirrorStatus: async (...a) => { updates.push(a); },
+    queryHeldByVerifyCode: async () => ({ kind: "found", couponId: "Y1", youzanStatus: "3" }),
+    applyMirrorStatus: async (...a) => { updates.push(a); return a[2] ? "updated" : "checked"; },
     ...o,
   };
   return { d, updates };
 }
-
-test("mirror sync maps used/expired/void, skips unknown and active", async () => {
+test("mirror sync maps used, unknown status / unavailable only stamp", async () => {
   const a = mirrorDeps();
   assert.deepEqual(await syncYouzanCouponMirrors(a.d), { enabled: true, checked: 1, updated: 1 });
-  assert.deepEqual(a.updates[0], ["m1", "used"]);
-  const b = mirrorDeps({ queryHeldByVerifyCode: async () => ({ kind: "found", couponId: "Y1", youzanStatus: "active" }) });
-  assert.equal((await syncYouzanCouponMirrors(b.d)).updated, 0);
+  assert.deepEqual(a.updates[0], ["m1", "Y1", "used"]);
+  const b = mirrorDeps({ queryHeldByVerifyCode: async () => ({ kind: "found", couponId: "Y1", youzanStatus: "weird" }) });
+  await syncYouzanCouponMirrors(b.d); assert.deepEqual(b.updates[0], ["m1", "Y1", null]);
   const c = mirrorDeps({ queryHeldByVerifyCode: async () => ({ kind: "unavailable" }) });
-  assert.equal((await syncYouzanCouponMirrors(c.d)).updated, 0);
-});
-test("mirror sync: coupon id mismatch or missing metadata never updates", async () => {
-  const a = mirrorDeps({ queryHeldByVerifyCode: async () => ({ kind: "found", couponId: "OTHER", youzanStatus: "used" }) });
-  assert.equal((await syncYouzanCouponMirrors(a.d)).updated, 0);
-  const b = mirrorDeps({ listActiveMirrors: async () => [{ id: "m2", code: "x", external_id: "Y2", metadata: {} }] });
-  assert.equal((await syncYouzanCouponMirrors(b.d)).updated, 0);
+  await syncYouzanCouponMirrors(c.d); assert.deepEqual(c.updates[0], ["m1", "Y1", null]);
 });
 test("mirror sync disabled does nothing", async () => {
   const { d, updates } = mirrorDeps({ syncEnabled: () => false });
