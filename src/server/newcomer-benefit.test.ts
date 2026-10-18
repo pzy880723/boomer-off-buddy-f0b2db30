@@ -232,8 +232,8 @@ test("mirror sync stamps every checked row (rotation) and restores frozen->activ
     syncEnabled: () => true,
     resolveMirrorMember: async () => ({ yzOpenId: "yz" }),
     listMirrorsForSync: async () => [
-      { id: "m1", code: "c", external_id: "Y1", status: "frozen", metadata: { activity_id: "a", yz_open_id: "yz", verify_code: "v1" } },
-      { id: "m2", code: "c", external_id: "Y2", status: "active", metadata: { activity_id: "a", yz_open_id: "yz", verify_code: "v2" } },
+      { id: "m1", customer_id: "fake-customer", code: "c", external_id: "Y1", status: "frozen", metadata: { activity_id: "a", yz_open_id: "yz", verify_code: "v1" } },
+      { id: "m2", customer_id: "fake-customer", code: "c", external_id: "Y2", status: "active", metadata: { activity_id: "a", yz_open_id: "yz", verify_code: "v2" } },
       { id: "m3", code: "c", external_id: "Y3", status: "active", metadata: {} }],
     queryHeldByVerifyCode: async ({ verifyCode }) => verifyCode === "v1"
       ? { kind: "found", couponId: "Y1", youzanStatus: "1" } : { kind: "found", couponId: "WRONG", youzanStatus: "3" },
