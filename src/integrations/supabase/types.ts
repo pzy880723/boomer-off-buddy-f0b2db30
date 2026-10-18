@@ -6766,6 +6766,7 @@ export type Database = {
           metadata: Json
           min_spend: number
           name: string
+          provider_status_checked_at: string | null
           reserved_order_id: string | null
           scope: string
           source: string
@@ -6789,6 +6790,7 @@ export type Database = {
           metadata?: Json
           min_spend?: number
           name: string
+          provider_status_checked_at?: string | null
           reserved_order_id?: string | null
           scope?: string
           source?: string
@@ -6812,6 +6814,7 @@ export type Database = {
           metadata?: Json
           min_spend?: number
           name?: string
+          provider_status_checked_at?: string | null
           reserved_order_id?: string | null
           scope?: string
           source?: string
@@ -11042,8 +11045,31 @@ export type Database = {
         Args: { p_limit?: number }
         Returns: number
       }
+      commerce_newcomer_backfill_scoped: {
+        Args: { p_customer_ids: string[]; p_limit: number }
+        Returns: number
+      }
       commerce_newcomer_claim: {
         Args: { p_lease_seconds: number; p_limit: number }
+        Returns: {
+          amount_fen: number
+          attempts: number
+          claim_token: string
+          customer_id: string
+          mode: string
+          request_key: string
+          slot_id: string
+          threshold_fen: number
+          validity_days: number
+          youzan_coupon_group_id: string
+        }[]
+      }
+      commerce_newcomer_claim_scoped: {
+        Args: {
+          p_customer_ids: string[]
+          p_lease_seconds: number
+          p_limit: number
+        }
         Returns: {
           amount_fen: number
           attempts: number
@@ -11330,6 +11356,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      commerce_youzan_mirror_apply_status: {
+        Args: { p_external_id: string; p_mirror: string; p_status: string }
+        Returns: string
       }
       commit_sale: {
         Args: {
