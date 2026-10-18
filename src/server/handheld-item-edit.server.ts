@@ -3,6 +3,7 @@
  * 员工身份由设备 + 会话解析后显式传给 RPC；RPC 仅 service_role 可执行，并按 p_user_id 校验角色，
  * 因此服务角色不能冒充员工绕过总部/门店检查。
  */
+import { normalizeNoticeTags } from "@/lib/commerce/product-marks";
 import { createHash } from "node:crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { err, ok, resolveSessionUser } from "@/server/handheld-auth.server";
@@ -70,6 +71,8 @@ export async function handleItemPatch(request: Request, deviceId: string, skuId:
   if (b.condition_grade !== undefined) patch.grade = b.condition_grade;
   if (b.image_paths !== undefined) patch.image_paths = b.image_paths;
   if (b.fankuang_override !== undefined) patch.fankuang_override = b.fankuang_override;
+  if (b.featured_stamp !== undefined) patch.featured_stamp = b.featured_stamp;
+  if (b.notice_tags !== undefined) patch.notice_tags = normalizeNoticeTags(b.notice_tags);
   const { data, error } = await supabaseAdmin.rpc("handheld_item_update" as never, {
     p_device_id: deviceId,
     p_user_id: session.user_id,

@@ -3,6 +3,7 @@ import { supabaseAdmin } from "../integrations/supabase/client.server";
 import { signSkuImagePaths } from "../lib/sku-image-resolver.server";
 import { DERIVATIVE_WIDTHS, signDerivativeUrls } from "./media-derivative.server";
 import { isInFankuang } from "../lib/commerce/fankuang";
+import { readProductMarks } from "../lib/commerce/product-marks";
 
 /** 列表 / 购物车 / 订单默认展示图：真实 480px 衍生图，失败为 null（不回退原图）。 */
 export const thumbnailDerivativeSigner = (paths: readonly string[]) =>
@@ -148,6 +149,8 @@ type StorefrontSku = {
   inventory_policy?: string | null;
   kind?: string | null;
   fankuang_override?: boolean | null;
+  featured_stamp?: string | null;
+  notice_tags?: string[] | null;
 };
 
 type StorefrontBrand = {
@@ -238,6 +241,8 @@ export function buildStorefrontProduct(input: {
     available_qty: Math.max(0, Number(availableQty) || 0),
     stock: Math.max(0, Number(availableQty) || 0),
     in_fankuang: isInFankuang({ ...sku, price_tier: sku.price_tier ?? listing.price }),
+    // 特色印章/提示标签：从 SKU 读取，仅输出字典内存储键；小程序按键自行显示中文
+    ...readProductMarks(sku),
     condition_grade: listing.condition_grade,
     location: listing.location,
     published_at: listing.published_at,
@@ -410,7 +415,7 @@ export async function enrichStorefrontListings(
       // Historical (detail read-only) drops only the display gate; SKU must exist with a known status.
       let skuQuery = supabaseAdmin
         .from("inv_skus")
-        .select("id, category, brand_id, keywords, stock_qty, price_tier, is_custom_price, inventory_policy, kind, fankuang_override")
+        .select("id, category, brand_id, keywords, stock_qty, price_tier, is_custom_price, inventory_policy, kind, fankuang_override, featured_stamp, notice_tags")
         .in("status", historical ? ["active", "archived"] : ["active"]);
       if (!historical) skuQuery = skuQuery.eq("is_display", true);
       return skuQuery.in("id", skuIds);
