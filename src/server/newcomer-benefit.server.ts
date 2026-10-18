@@ -193,6 +193,31 @@ export async function queryHeldPagesWith(
   return { kind: "unavailable" }; // 超页数上限：不下结论
 }
 
+/** 镜像轮转限频：只取 provider_status_checked_at 为空或超过 5 分钟的镜像，防止 30s 定时器反复刷同一批券。 */
+export const MIRROR_SYNC_STALE_MS = 5 * 60 * 1000;
+export function mirrorSyncCutoffIso(nowMs: number): string {
+  return new Date(nowMs - MIRROR_SYNC_STALE_MS).toISOString();
+}
+
+/** 本轮镜像同步的 voucher.query 分页 Promise 缓存：同 owner+page 一轮只查一次。
+ *  缓存只活在单次同步的 deps 实例内；绝不用于 dispatch 后持券确认，下一轮必须重新读。
+ *  失败的 Promise 立即移出缓存，不把失败永远留住。 */
+export function cachedPageCall(
+  call: (body: Record<string, unknown>) => Promise<{ status: number; body: unknown }>,
+): (body: Record<string, unknown>) => Promise<{ status: number; body: unknown }> {
+  const cache = new Map<string, Promise<{ status: number; body: unknown }>>();
+  return (body) => {
+    const key = `${String(body.yz_open_id)}:${String(body.page_num)}`;
+    let p = cache.get(key);
+    if (!p) {
+      p = Promise.resolve().then(() => call(body));
+      cache.set(key, p);
+      p.catch(() => { if (cache.get(key) === p) cache.delete(key); });
+    }
+    return p;
+  };
+}
+
 /** 有赞持券只读同步：把真实状态（正常/冻结/已用/作废）镜像到 pos_customer_coupons；绝不触碰积分 projection/ledger/wallet。 */
 export type MirrorStatus = "active" | "frozen" | "used" | "void";
 export type MirrorSyncDeps = {

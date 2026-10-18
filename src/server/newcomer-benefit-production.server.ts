@@ -73,11 +73,13 @@ async function callYouzan(api: string, version: string, token: string, body: unk
   });
 }
 
-async function queryHeldPages(token: string, match: { yzOpenId: string; activityId: string; verifyCode: string }): Promise<QueryResult> {
-  return queryHeldPagesWith(async (body) => {
+type PageCall = (body: Record<string, unknown>) => Promise<{ status: number; body: unknown }>;
+async function queryHeldPages(token: string, match: { yzOpenId: string; activityId: string; verifyCode: string }, call?: PageCall): Promise<QueryResult> {
+  const raw: PageCall = call ?? (async (body) => {
     const res = await callYouzan(QUERY_API(), QUERY_VERSION(), token, body);
     return { status: res.status, body: await res.json() };
-  }, match);
+  });
+  return queryHeldPagesWith(raw, match);
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
