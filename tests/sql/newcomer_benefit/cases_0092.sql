@@ -18,14 +18,16 @@ SELECT t(NOT EXISTS (SELECT 1 FROM commerce_newcomer_grants WHERE customer_id='a
 INSERT INTO commerce_customers (id, external_subject, phone, status) VALUES
   ('a0000000-0000-0000-0000-000000000002','','18600000021','active');
 SELECT t(NOT EXISTS (SELECT 1 FROM commerce_newcomer_grants WHERE customer_id='a0000000-0000-0000-0000-000000000002'), 'missing external_subject rejected');
--- 同手机号另一 active 消费者拒绝（身份不一致）
+-- 同手机号两个 active 消费者：fail-closed，两个都不发（AFTER 触发器在语句末尾触发，双方互相可见）
 INSERT INTO commerce_customers (id, external_subject, phone, status) VALUES
   ('a0000000-0000-0000-0000-000000000003','sub-x3','18600000022','active'),
   ('a0000000-0000-0000-0000-000000000004','sub-x4','186 0000 0022','active');
-SELECT t((SELECT count(*)=1 FROM commerce_newcomer_grants g JOIN commerce_customers cu ON cu.id=g.customer_id
-  WHERE regexp_replace(cu.phone,'\D','','g')='18600000022'), 'duplicate active phone: exactly one grant');
--- 合法消费者自动登记成功
-SELECT t(EXISTS (SELECT 1 FROM commerce_newcomer_grants WHERE customer_id='a0000000-0000-0000-0000-000000000003'), 'valid consumer enrolled on v2');
+SELECT t(NOT EXISTS (SELECT 1 FROM commerce_newcomer_grants g JOIN commerce_customers cu ON cu.id=g.customer_id
+  WHERE regexp_replace(cu.phone,'\D','','g')='18600000022'), 'duplicate active phone: neither enrolled (fail-closed)');
+-- 手机号唯一的合法消费者自动登记成功
+INSERT INTO commerce_customers (id, external_subject, phone, status) VALUES
+  ('a0000000-0000-0000-0000-00000000000a','sub-xa','18600000024','active');
+SELECT t(EXISTS (SELECT 1 FROM commerce_newcomer_grants WHERE customer_id='a0000000-0000-0000-0000-00000000000a'), 'valid consumer enrolled on v2');
 
 -- 旧 5 参 finish 拒绝无真实凭证的成功
 CREATE TEMP TABLE f1 AS SELECT * FROM commerce_newcomer_claim(1, 60);
