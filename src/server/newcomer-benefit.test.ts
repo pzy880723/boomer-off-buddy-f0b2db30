@@ -4,6 +4,7 @@ import {
   deriveVerifyCode, mapYouzanStatus, queryPageInfo, queryHeldPagesWith,
   parseQueryResponse,
   parseTakeResponse,
+  cachedPageCall, mirrorSyncCutoffIso, MIRROR_SYNC_STALE_MS,
   processNewcomerSlot,
   runNewcomerWorker,
   syncYouzanCouponMirrors,
@@ -365,4 +366,49 @@ test("mirror never queries stale metadata yz_open_id belonging to another owner"
   await syncYouzanCouponMirrors(a.d);
   assert.equal(queries, 0);
   assert.deepEqual(a.updates, [["m1", "Y1", null]]);
+});
+
+// —— 生产限频：轮转只取 checked_at 为空或超过 5 分钟的镜像 ——
+test("mirror sync cutoff is exactly 5 minutes before now", () => {
+  const now = Date.parse("2026-10-18T05:15:00.000Z");
+  assert.equal(mirrorSyncCutoffIso(now), "2026-10-18T05:10:00.000Z");
+  assert.equal(MIRROR_SYNC_STALE_MS, 5 * 60 * 1000);
+});
+
+// —— 本轮 Promise 缓存：同 owner 同页只查一次；不同 owner/页各查；失败不留缓存 ——
+const heldBody = (verifyCode: string, couponId: string) => ({
+  code: 200, total: 1,
+  data: [{ voucher_identity: { coupon_id: couponId, coupon_type: 1 }, verify_code: verifyCode,
+    valid_start_time: 1760745600000, valid_end_time: 1768515199000, status: 1,
+    value: 500, threshold_amount: 4990, user_identity: { yz_open_id: "yz-owner-1" }, activity_id: "35074448" }],
+});
+
+test("cached page call: same owner+page queried once per round, per verify_code match still exact", async () => {
+  let rawCalls = 0;
+  const raw = async () => { rawCalls++; return { status: 200, body: heldBody("code-a", "Y1") }; };
+  const cached = cachedPageCall(raw);
+  const m1 = { yzOpenId: "yz-owner-1", activityId: "35074448", verifyCode: "code-a" };
+  const m2 = { yzOpenId: "yz-owner-1", activityId: "35074448", verifyCode: "code-b" };
+  const r1 = await queryHeldPagesWith(cached, m1);
+  const r2 = await queryHeldPagesWith(cached, m2);
+  assert.equal(r1.kind, "found");
+  assert.equal(r2.kind, "not_found"); // 缓存页内精确匹配，不拿别人的券
+  assert.equal(rawCalls, 1); // 同 owner 同页一轮只查一次
+});
+
+test("cached page call: different owner or page not shared; failure is not pinned", async () => {
+  let rawCalls = 0, failFirst = true;
+  const raw = async (body: Record<string, unknown>) => {
+    rawCalls++;
+    if (failFirst) { failFirst = false; throw Error("transport"); }
+    return { status: 200, body: heldBody("code-a", "Y1") };
+  };
+  const cached = cachedPageCall(raw);
+  const m = { yzOpenId: "yz-owner-1", activityId: "35074448", verifyCode: "code-a" };
+  const r1 = await queryHeldPagesWith(cached, m);
+  assert.equal(r1.kind, "unavailable"); // 第一次失败
+  const r2 = await queryHeldPagesWith(cached, m);
+  assert.equal(r2.kind, "found"); // 失败不留缓存，同轮重试会重新查
+  assert.equal(rawCalls, 2);
+  void failFirst;
 });

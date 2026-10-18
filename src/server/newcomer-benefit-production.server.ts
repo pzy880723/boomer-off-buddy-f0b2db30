@@ -13,6 +13,7 @@ import { youzanFetch } from "@/lib/youzan-http";
 import { selectPointsHeadquarters } from "./youzan-points-query.server";
 import {
   queryHeldPagesWith,
+  cachedPageCall, mirrorSyncCutoffIso,
   parseTakeResponse,
   type MirrorSyncDeps,
   type NewcomerClaim,
@@ -73,11 +74,13 @@ async function callYouzan(api: string, version: string, token: string, body: unk
   });
 }
 
-async function queryHeldPages(token: string, match: { yzOpenId: string; activityId: string; verifyCode: string }): Promise<QueryResult> {
-  return queryHeldPagesWith(async (body) => {
+type PageCall = (body: Record<string, unknown>) => Promise<{ status: number; body: unknown }>;
+async function queryHeldPages(token: string, match: { yzOpenId: string; activityId: string; verifyCode: string }, call?: PageCall): Promise<QueryResult> {
+  const raw: PageCall = call ?? (async (body) => {
     const res = await callYouzan(QUERY_API(), QUERY_VERSION(), token, body);
     return { status: res.status, body: await res.json() };
-  }, match);
+  });
+  return queryHeldPagesWith(raw, match);
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -167,6 +170,14 @@ export function productionNewcomerDeps(): NewcomerDeps {
 
 /** 有赞持券只读同步的生产依赖：只更新 pos_customer_coupons 镜像状态，绝不触碰积分。 */
 export function productionMirrorSyncDeps(): MirrorSyncDeps {
+  // 本轮同步的分页缓存：同一 deps 实例（= 一次镜像同步轮次）内同 owner+page 的 voucher.query 只发一次；
+  // 实例随轮次销毁，下一轮重新读；dispatch 后持券确认走 queryHeldPages 默认路径，不用此缓存。
+  const roundCache = cachedPageCall(async (body) => {
+    const head = await headquarters();
+    if (!head?.access_token) throw Error("headquarters_token_unavailable");
+    const res = await callYouzan(QUERY_API(), QUERY_VERSION(), head.access_token, body);
+    return { status: res.status, body: await res.json() };
+  });
   return {
     syncEnabled: () => env("NEWCOMER_MIRROR_SYNC_ENABLED") === "true",
     // Reuse the server-owned customer + HQ read-only SQLite mapping and cross-customer uniqueness check.
@@ -177,6 +188,8 @@ export function productionMirrorSyncDeps(): MirrorSyncDeps {
         .select("id,customer_id,code,external_id,status,metadata")
         .eq("external_provider", "youzan")
         .in("status", ["active", "frozen"])
+        // 限频：只取从未同步或超过 5 分钟未同步的镜像，active/frozen 均含；30s 定时器不会反复刷同一批券
+        .or(`provider_status_checked_at.is.null,provider_status_checked_at.lt.${mirrorSyncCutoffIso(Date.now())}` as never)
         .order("provider_status_checked_at" as never, { ascending: true, nullsFirst: true })
         .order("created_at", { ascending: true })
         .order("id", { ascending: true })
@@ -187,7 +200,7 @@ export function productionMirrorSyncDeps(): MirrorSyncDeps {
     async queryHeldByVerifyCode({ activityId, yzOpenId, verifyCode }) {
       const head = await headquarters();
       if (!head?.access_token || !proxyConfigured()) return { kind: "unavailable" as const };
-      const r = await queryHeldPages(head.access_token, { yzOpenId, activityId, verifyCode });
+      const r = await queryHeldPages(head.access_token, { yzOpenId, activityId, verifyCode }, roundCache);
       if (r.kind === "found") {
         // 单券状态查询：复用 voucher.query 结果中的 status 字段；缺失时保守不可用。
         return { kind: "found", couponId: r.receipt.couponId, youzanStatus: r.youzanStatus ?? "unknown" };
