@@ -40,9 +40,19 @@ test("missing template blocks without calling Youzan", async () => {
   assert.equal(await processNewcomerSlot(claim({ youzan_coupon_group_id: null }), d), "blocked");
   assert.equal(takes(), 0);
 });
-test("missing trusted mapping blocks", async () => {
-  const { d, takes } = deps({ resolveMember: async () => ({ blocked: "trusted_member_mapping_missing" }) });
-  assert.equal(await processNewcomerSlot(claim(), d), "blocked"); assert.equal(takes(), 0);
+test("mapping missing retries briefly (waits for member-sync), no take", async () => {
+  const { d, takes, finished } = deps({ resolveMember: async () => ({ blocked: "trusted_member_mapping_missing" }) });
+  assert.equal(await processNewcomerSlot(claim(), d), "retry");
+  assert.equal(takes(), 0);
+  assert.equal((finished[0] as unknown[])[4], "trusted_member_mapping_missing");
+});
+test("mapping unavailable retries; mapping conflict stays blocked (never merge)", async () => {
+  const a = deps({ resolveMember: async () => ({ blocked: "trusted_member_mapping_unavailable" }) });
+  assert.equal(await processNewcomerSlot(claim(), a.d), "retry");
+  assert.equal(a.takes(), 0);
+  const b = deps({ resolveMember: async () => ({ blocked: "trusted_member_mapping_conflict" }) });
+  assert.equal(await processNewcomerSlot(claim(), b.d), "blocked");
+  assert.equal(b.takes(), 0);
 });
 test("timeout / 5xx is unknown, never retried as a fresh send", async () => {
   const { d } = deps({ take: async () => { throw new Error("timeout"); } });
