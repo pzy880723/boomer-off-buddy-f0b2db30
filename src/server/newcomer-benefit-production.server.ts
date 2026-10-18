@@ -113,6 +113,16 @@ export function productionNewcomerDeps(): NewcomerDeps {
       if (error) throw Error("newcomer_finish_success_failed");
       return String(data);
     },
+    async verifyIdentity(slotId, token) {
+      const { data, error } = await supabaseAdmin.rpc("commerce_newcomer_identity_check" as never,
+        { p_slot: slotId, p_token: token } as never);
+      if (error) throw Error("identity_check_unavailable");
+      const r = data as unknown as { status: string; reason?: string };
+      if (r?.status === "ok") return { ok: true as const };
+      if (r?.status === "stale") return { stale: true as const };
+      if (r?.status === "blocked") return { blocked: r.reason ?? "identity_blocked" };
+      throw Error("identity_check_unexpected");
+    },
     async resolveMember(customerId) {
       const head = await headquarters();
       if (!head) return { blocked: "headquarters_token_unavailable" };
@@ -131,9 +141,10 @@ export function productionNewcomerDeps(): NewcomerDeps {
       } finally { db.close(); }
     },
     async take({ groupId, yzOpenId, requestKey, verifyCode }) {
-      if (!proxyConfigured()) return { kind: "blocked", reason: "fixed_proxy_not_configured" };
-      const head = await headquarters();
-      if (!head?.access_token) return { kind: "blocked", reason: "headquarters_token_unavailable" };
+      if (!proxyConfigured()) return { kind: "not_sent", reason: "fixed_proxy_not_configured" };
+      let head: Awaited<ReturnType<typeof headquarters>>;
+      try { head = await headquarters(); } catch { return { kind: "not_sent", reason: "headquarters_token_unavailable" }; }
+      if (!head?.access_token) return { kind: "not_sent", reason: "headquarters_token_unavailable" };
       let res: Response;
       try {
         // 官方 send/3.0.2：activity_id + yz_open_id + requestId + verify_code（camelCase requestId）
