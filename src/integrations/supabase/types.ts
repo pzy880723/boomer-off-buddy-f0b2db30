@@ -12587,6 +12587,14 @@ export type Database = {
         }
         Returns: string
       }
+      support_needs_reply: {
+        Args: { p_conversation_id: string }
+        Returns: boolean
+      }
+      support_pending_state: {
+        Args: { p_conversation_id: string }
+        Returns: Json
+      }
       support_staff_post_message: {
         Args: {
           p_actor: string

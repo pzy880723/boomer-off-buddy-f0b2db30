@@ -680,6 +680,13 @@
       "when": 1792304157244,
       "tag": "0096_support_measurement_cards",
       "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1792306229459,
+      "tag": "0097_support_measurement_safe_work_items",
+      "breakpoints": true
     }
   ]
 }
