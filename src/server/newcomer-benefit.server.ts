@@ -121,7 +121,8 @@ const obj = (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? v
 /** 从 send 的 data 或持券列表项提取真实回执；缺任一关键字段返回 null（调用方按 unknown 处理）。 */
 function extractReceipt(d: Record<string, unknown>): TakeReceipt | null {
   const id = obj(d.voucher_identity).coupon_id;
-  const idStr = typeof id === "number" && Number.isFinite(id) ? String(id) : typeof id === "string" ? id.trim() : "";
+  // 数值 coupon_id 必须是安全整数：超过 2^53-1 的值已被 JSON 解析四舍五入，券身份不可信 → 视为回执不完整。字符串原样保留。
+  const idStr = typeof id === "number" ? (Number.isSafeInteger(id) && id > 0 ? String(id) : "") : typeof id === "string" ? id.trim() : "";
   const verify = typeof d.verify_code === "string" ? d.verify_code.trim() : "";
   const start = asTimeMs(d.valid_start_time);
   const end = asTimeMs(d.valid_end_time);
