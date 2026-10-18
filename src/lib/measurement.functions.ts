@@ -67,7 +67,10 @@ export const listMeasurementTasks = createServerFn({ method: "GET" })
       locationIds: isHq ? null : actor.locationIds,
       statuses: data.statuses,
     });
-    return { items };
+    const { loadConversationThumbnails } = await import('@/server/support-thumbnails.server');
+    const { safeMeasurementImage } = await import('@/lib/measurement-card');
+    const images = await loadConversationThumbnails(items.map(t=>({id:t.id,context:{type:'product',id:t.listing_id}})),context.userId);
+    return { items: items.map(t=>({...t,image_url:safeMeasurementImage(images.get(t.id))})) };
   });
 
 /** 领取任务：measurement_claim 事务 RPC 为唯一权限与状态出口 */

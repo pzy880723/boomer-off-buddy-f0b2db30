@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -25,6 +25,7 @@ import {
 } from "@/components/inventory/measurement-fields";
 
 export const Route = createFileRoute("/inventory/measurements")({
+  head: () => ({meta:[{title:"尺寸测量待办 | BOOMER ERP"},{name:"description",content:"授权门店的顾客尺寸申请与测量记录。"},{property:"og:title",content:"尺寸测量待办 | BOOMER ERP"},{property:"og:description",content:"顾客尺寸申请与测量记录。"},{property:"og:type",content:"website"},{name:"twitter:card",content:"summary"}]}),
   component: MeasurementTasksPage,
 });
 
@@ -41,6 +42,7 @@ type TaskRow = {
   requester_count: number;
   measurement_revision: number;
   stock_available?: boolean;
+  image_url?: string|null;
 };
 
 const STATUS_TABS = [
@@ -57,7 +59,8 @@ function MeasurementTasksPage() {
   const [recording, setRecording] = useState<TaskRow | null>(null);
   const [fields, setFields] = useState<MeasurementFieldState>({ ...emptyMeasurementFields });
 
-  const statuses = STATUS_TABS.find((t) => t.key === tab)!.statuses;
+  const attempt = useRef<{fingerprint:string;op:string}|null>(null);
+  const statuses = STATUS_TABS.find((t) => t.key === tab)?.statuses ?? STATUS_TABS[0].statuses;
   const query = useQuery({
     queryKey: ["measurement-tasks", tab],
     queryFn: () => listFn({ data: { statuses: [...statuses] } }),
@@ -78,6 +81,8 @@ function MeasurementTasksPage() {
       const parsed = parseMeasurementFields(fields);
       if (!parsed.ok) throw new Error(parsed.error);
       const v = parsed.value;
+      const fingerprint=JSON.stringify([recording.id,recording.measurement_revision,v]);
+      if(attempt.current?.fingerprint!==fingerprint) attempt.current={fingerprint,op:`erp-measurement:${crypto.randomUUID()}`};
       if (v.height_cm == null && v.width_cm == null && v.depth_cm == null && v.diameter_cm == null) {
         throw new Error("至少填写一项尺寸");
       }
@@ -85,7 +90,7 @@ function MeasurementTasksPage() {
         data: {
           task_id: recording.id,
           expected_revision: recording.measurement_revision,
-          client_op_id: `erp-measurement:${recording.id}:${crypto.randomUUID()}`,
+          client_op_id: attempt.current.op,
           measurement: v,
         },
       });
@@ -148,7 +153,8 @@ function MeasurementTasksPage() {
             key={task.id}
             className="flex items-center justify-between gap-3 rounded-md border px-4 py-3"
           >
-            <div className="min-w-0">
+            {task.image_url && <img src={task.image_url} alt={task.sku_name ?? "商品"} className="h-16 w-16 shrink-0 rounded-md bg-muted object-contain"/>}
+            <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">{task.sku_name ?? "未知商品"}</p>
               <p className="text-xs text-muted-foreground">
                 {task.location_name ?? "未分配门店"}
@@ -191,6 +197,7 @@ function MeasurementTasksPage() {
           <DialogHeader>
             <DialogTitle>录入实测尺寸 · {recording?.sku_name ?? ""}</DialogTitle>
           </DialogHeader>
+          {recording?.image_url && <img src={recording.image_url} alt={recording.sku_name ?? "商品"} className="h-28 w-28 rounded-md bg-muted object-contain"/>}
           <MeasurementFields state={fields} onChange={setFields} />
           <DialogFooter>
             <Button variant="ghost" onClick={() => setRecording(null)}>
