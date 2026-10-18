@@ -73,7 +73,8 @@ END $$;
 
 -- SM7 分页：全量 counts 与分页无关，翻页无重复无遗漏
 DO $$ DECLARE r jsonb; seen int := 0; ts timestamptz; id uuid; total int; BEGIN
-  INSERT INTO fulfillments(location_id,status,created_at) SELECT '5c000000-0000-4000-8000-00000000000a','allocated', now()-g*interval '1 minute' FROM generate_series(1,120) g;
+  INSERT INTO commerce_orders(id,order_no) VALUES ('0a000000-0000-4000-8000-000000000007','test');
+  INSERT INTO fulfillments(order_id,location_id,status,created_at) SELECT '0a000000-0000-4000-8000-000000000007', '5c000000-0000-4000-8000-00000000000a','allocated', now()-g*interval '1 minute' FROM generate_series(1,120) g;
   INSERT INTO stocktakes(location_id,status) VALUES ('5c000000-0000-4000-8000-00000000000a','scanning');
   INSERT INTO stock_transfers(status,to_location_id) VALUES ('shipped','5c000000-0000-4000-8000-00000000000a'),('received','5c000000-0000-4000-8000-00000000000a');
   r := handheld_work_items('5a000000-0000-4000-8000-000000000001', ARRAY['5c000000-0000-4000-8000-00000000000a']::uuid[], false, 50, NULL, NULL);
