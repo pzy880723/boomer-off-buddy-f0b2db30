@@ -218,3 +218,46 @@ test("mirror sync stamps every checked row (rotation) and restores frozen->activ
   assert.deepEqual(applied, [["m1", "Y1", "active"], ["m2", "Y2", null], ["m3", "Y3", null]]);
   assert.equal(r.checked, 3);
 });
+
+// ---- 0094 review fixes ----
+test("empty coupon_id is never ok", () => {
+  assert.equal(parseTakeResponse(200, { code: 200, data: { voucher_identity: {
+    coupon_id: "", verify_code: "ncv1", valid_start_time: 1760745600, valid_end_time: 1768521599 } } }).kind, "unknown");
+  assert.equal(parseTakeResponse(200, { code: 200, data: { voucher_identity: {
+    coupon_id: "  ", verify_code: "ncv1", valid_start_time: 1760745600, valid_end_time: 1768521599 } } }).kind, "unknown");
+});
+test("identity recheck blocks dispatch to changed/inactive identity before any Youzan call", async () => {
+  const { d, takes, finished } = deps({ verifyIdentity: async () => ({ blocked: "phone_changed" }) });
+  assert.equal(await processNewcomerSlot(claim(), d), "blocked"); assert.equal(takes(), 0);
+  assert.equal((finished[0] as unknown[])[4], "phone_changed");
+});
+test("identity recheck unavailable: dispatch retries, reconcile stays unknown", async () => {
+  const a = deps({ verifyIdentity: async () => { throw new Error("db"); } });
+  assert.equal(await processNewcomerSlot(claim(), a.d), "retry"); assert.equal(a.takes(), 0);
+  const b = deps({ verifyIdentity: async () => { throw new Error("db"); } });
+  assert.equal(await processNewcomerSlot(claim({ mode: "reconcile" }), b.d), "unknown");
+});
+test("stale claim stops without sending", async () => {
+  const { d, takes } = deps({ verifyIdentity: async () => ({ stale: true }) });
+  assert.equal(await processNewcomerSlot(claim(), d), "stale"); assert.equal(takes(), 0);
+});
+test("HQ token / proxy unavailable is transient: retry, never permanent blocked", async () => {
+  const a = deps({ resolveMember: async () => ({ blocked: "headquarters_token_unavailable" }) });
+  assert.equal(await processNewcomerSlot(claim(), a.d), "retry");
+  const b = deps({ take: async () => ({ kind: "not_sent", reason: "headquarters_token_unavailable" }) });
+  assert.equal(await processNewcomerSlot(claim(), b.d), "retry");
+});
+test("worker claims one slot at a time with its own lease, up to limit, sequentially", async () => {
+  const log: string[] = []; let n = 0;
+  const { d } = deps({
+    claim: async (limit) => { log.push(`claim:${limit}`); n++; return n <= 3 ? [claim({ slot_id: `s${n}` })] : []; },
+    take: async () => { log.push("take:start"); await new Promise((r) => setTimeout(r, 20)); log.push("take:end");
+      return { kind: "ok", receipt: receipt({ couponId: `Y${n}` }) }; },
+  });
+  const r = await runNewcomerWorker(d, 10);
+  assert.equal(r.claimed, 3);
+  assert.deepEqual(log, ["claim:1", "take:start", "take:end", "claim:1", "take:start", "take:end", "claim:1", "take:start", "take:end", "claim:1"]);
+  n = 0; const log2: string[] = [];
+  const e = deps({ claim: async (l) => { log2.push(`claim:${l}`); return [claim()]; } });
+  assert.equal((await runNewcomerWorker(e.d, 2)).claimed, 2); assert.equal(log2.length, 2);
+});
