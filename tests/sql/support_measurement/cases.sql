@@ -96,3 +96,75 @@ DO $$ BEGIN
   ASSERT handheld_notification_category('transfer_incoming') = 'internal', 'SM8 transfer';
   RAISE NOTICE 'PASS SM8 measurement_requested categorized as customers';
 END $$;
+
+-- SM9 wrong-store old product conversation is immutable; task/card routed to actual store.
+DO $$ DECLARE old_id uuid; new_id uuid; BEGIN
+ INSERT INTO support_conversations(customer_id,location_id,context_key,title) VALUES
+ ('cc000000-0000-4000-8000-000000000001','5c000000-0000-4000-8000-00000000000b','product:1a000000-0000-4000-8000-000000000002','other question') RETURNING id INTO old_id;
+ INSERT INTO commerce_listings VALUES ('1a000000-0000-4000-8000-000000000002','5c000000-0000-4000-8000-00000000000b','碗',99,'11111111-0000-4000-8000-000000000001');
+ INSERT INTO product_measurement_tasks(id,sku_id,listing_id,location_id) VALUES ('7a000000-0000-4000-8000-000000000009','11111111-0000-4000-8000-000000000001','1a000000-0000-4000-8000-000000000002','5c000000-0000-4000-8000-00000000000a');
+ INSERT INTO product_measurement_requesters(task_id,customer_id) VALUES ('7a000000-0000-4000-8000-000000000009','cc000000-0000-4000-8000-000000000001') RETURNING conversation_id INTO new_id;
+ ASSERT new_id <> old_id, 'SM9 wrong-store reused';
+ ASSERT (SELECT location_id FROM support_conversations WHERE id=new_id)='5c000000-0000-4000-8000-00000000000a','SM9 routing';
+ ASSERT (SELECT location_id FROM support_conversations WHERE id=old_id)='5c000000-0000-4000-8000-00000000000b','SM9 old question moved';
+ RAISE NOTICE 'PASS SM9 old store conversation immutable, new measurement correctly routed';
+END $$;
+DO $$ DECLARE n int; BEGIN
+ SELECT count(*) INTO n FROM support_messages;
+ BEGIN
+ PERFORM measurement_attach_support('7a000000-0000-4000-8000-000000000009','cc000000-0000-4000-8000-000000000002');
+ RAISE EXCEPTION 'expected failure';
+ EXCEPTION WHEN OTHERS THEN ASSERT SQLERRM='measurement_requester_required','SM10 wrong customer accepted'; END;
+ ASSERT (SELECT count(*) FROM support_messages)=n,'SM10 partial write';
+ RAISE NOTICE 'PASS SM10 wrong customer rejected without writes';
+END $$;
+DO $$ DECLARE c uuid; BEGIN
+ INSERT INTO support_conversations(location_id,title) VALUES ('5c000000-0000-4000-8000-00000000000a','historical answered') RETURNING id INTO c;
+ INSERT INTO support_messages(conversation_id,sender_type,body,created_at) VALUES (c,'customer','q',now()-interval '2 day'),(c,'staff','a',now()-interval '1 day');
+ UPDATE support_conversations SET waiting_since=NULL WHERE id=c;
+ ASSERT NOT EXISTS(SELECT 1 FROM jsonb_array_elements(handheld_work_items(NULL,ARRAY['5c000000-0000-4000-8000-00000000000a']::uuid[],false,500)->'items') i WHERE i->>'id'=c::text),'SM11 historical answered reenters';
+ RAISE NOTICE 'PASS SM11 historical answered unassigned conversation stays resolved';
+END $$;
+-- Fail after real waiting/touch trigger; statement rollback must retain original retry identity.
+CREATE FUNCTION fail_support_card() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
+ IF NEW.card_kind IS NOT NULL AND current_setting('test.fail_card',true)='on' THEN RAISE EXCEPTION 'injected_support_failure'; END IF; RETURN NEW; END $$;
+CREATE TRIGGER zz_fail_card AFTER INSERT ON support_messages FOR EACH ROW EXECUTE FUNCTION fail_support_card();
+DO $$ DECLARE t uuid := '7a000000-0000-4000-8000-000000000012'; c uuid; BEGIN
+ INSERT INTO product_measurement_tasks(id,sku_id,listing_id,location_id) VALUES(t,'11111111-0000-4000-8000-000000000001','1a000000-0000-4000-8000-000000000001','5c000000-0000-4000-8000-00000000000a');
+ PERFORM set_config('test.fail_card','on',true);
+ BEGIN INSERT INTO product_measurement_requesters(task_id,customer_id) VALUES(t,'cc000000-0000-4000-8000-000000000001');
+ EXCEPTION WHEN OTHERS THEN ASSERT SQLERRM='injected_support_failure'; END;
+ ASSERT NOT EXISTS(SELECT 1 FROM product_measurement_requesters WHERE task_id=t),'SM12 half requester';
+ ASSERT NOT EXISTS(SELECT 1 FROM support_messages WHERE measurement_task_id=t),'SM12 half card';
+ PERFORM set_config('test.fail_card','off',true);
+ INSERT INTO product_measurement_requesters(task_id,customer_id) VALUES(t,'cc000000-0000-4000-8000-000000000001') RETURNING conversation_id INTO c;
+ PERFORM set_config('test.fail_card','on',true);
+ BEGIN UPDATE product_measurement_tasks SET status='completed' WHERE id=t;
+ EXCEPTION WHEN OTHERS THEN ASSERT SQLERRM='injected_support_failure'; END;
+ ASSERT (SELECT status FROM product_measurement_tasks WHERE id=t)='pending','SM12 half completion';
+ ASSERT NOT EXISTS(SELECT 1 FROM support_messages WHERE measurement_task_id=t AND card_kind='measurement_completed'),'SM12 half completion card';
+ PERFORM set_config('test.fail_card','off',true);
+ UPDATE product_measurement_tasks SET status='completed' WHERE id=t;
+ ASSERT (SELECT count(*) FROM support_messages WHERE measurement_task_id=t AND card_kind='measurement_completed')=1,'SM12 retry';
+ RAISE NOTICE 'PASS SM12 both trigger failures roll back; same operation identity retries';
+END $$;
+DO $$ DECLARE r jsonb; BEGIN
+ INSERT INTO inv_locations VALUES ('5c000000-0000-4000-8000-00000000000a','59000000-0000-4000-8000-000000000001');
+ INSERT INTO commerce_orders VALUES ('0a000000-0000-4000-8000-000000000001','test','confirmed','paid','pickup');
+ INSERT INTO fulfillments(order_id,location_id,status) SELECT '0a000000-0000-4000-8000-000000000001','5c000000-0000-4000-8000-00000000000a',s FROM unnest(ARRAY['picked','packing','packed','handover_ready']) s;
+ INSERT INTO commerce_after_sales(location_id,status) VALUES('5c000000-0000-4000-8000-00000000000a','requested');
+ INSERT INTO channel_sync_outbox(shop_id,status) VALUES('59000000-0000-4000-8000-000000000001','failed');
+ INSERT INTO youzan_stock_sync_queue(shop_id,status) VALUES('59000000-0000-4000-8000-000000000001','failed');
+ r:=handheld_work_items(NULL,ARRAY['5c000000-0000-4000-8000-00000000000a']::uuid[],false,1);
+ ASSERT r->'counts'->>'orders'='125','SM13 shipping/pickup/after-sale omitted '||(r->'counts')::text;
+ ASSERT r->'counts'->>'system'='2','SM13 sync omitted';
+ ASSERT jsonb_array_length(r->'items')=1,'SM13 limit';
+ RAISE NOTICE 'PASS SM13 shipping pickup after-sales sync included; total independent of page';
+END $$;
+DO $$ DECLARE c uuid; before_n int; BEGIN
+ SELECT conversation_id INTO c FROM product_measurement_requesters WHERE task_id='7a000000-0000-4000-8000-000000000009';
+ before_n:=(pc('5c000000-0000-4000-8000-00000000000a')->>'customers')::int;
+ UPDATE support_conversations SET status='closed',waiting_since=NULL WHERE id=c;
+ ASSERT (pc('5c000000-0000-4000-8000-00000000000a')->>'customers')::int=before_n,'SM14 closed active measurement lost';
+ RAISE NOTICE 'PASS SM14 closed conversation retains unfinished measurement';
+END $$;
