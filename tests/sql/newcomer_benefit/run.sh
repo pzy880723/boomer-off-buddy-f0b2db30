@@ -27,5 +27,5 @@ if [ -n "$mig2" ]; then
   out2=$($PSQL -q -v ON_ERROR_STOP=1 < tests/sql/newcomer_benefit/cases_0091.sql 2>&1); rc2=$?
   echo "$out2" | grep -o 'PASS .*\|ERROR.*\|FAIL.*'
   n2=$(echo "$out2" | grep -c 'PASS')
-  [ $rc2 -eq 0 ] && [ "$n2" -eq 19 ] && echo "ALL PASS 0091 ($n2)" || { echo "SOME FAILED 0091 ($n2/19)"; exit 1; }
+  [ $rc2 -eq 0 ] && [ "$n2" -eq 22 ] && echo "ALL PASS 0091 ($n2)" || { echo "SOME FAILED 0091 ($n2/22)"; exit 1; }
 fi

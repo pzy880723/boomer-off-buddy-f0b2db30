@@ -24,7 +24,8 @@ CREATE TABLE public.pos_customer_coupons (
 SELECT t(public.commerce_newcomer_verify_code('nc:c39fd499-9345-4906-b829-0f3f80ae4e9d:1') = 'ncv4a2677cae13b', 'verify_code matches TS vector');
 SELECT t(public.commerce_newcomer_verify_code('nc:g:1') ~ '^[a-z0-9]{15}$' AND public.commerce_newcomer_verify_code('nc:g:1') NOT ILIKE 'zan%', 'verify_code format safe');
 
--- 版本 draft 时自动登记不发生
+-- 版本 draft 时自动登记不发生（cases.sql 已激活 v1，先退回 draft 验证）
+UPDATE commerce_newcomer_benefit_versions SET status='draft' WHERE id='newcomer_v1';
 INSERT INTO commerce_customers (id, external_subject, phone, status) VALUES
   ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','a1','18600000011','active');
 SELECT t(NOT EXISTS (SELECT 1 FROM commerce_newcomer_grants WHERE customer_id='aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'), 'draft version: trigger enrolls nothing');
@@ -48,10 +49,11 @@ INSERT INTO commerce_customers (id, external_subject, phone, status) VALUES
   ('dddddddd-dddd-dddd-dddd-dddddddddddd','d1','186 0000 0013','active');
 SELECT t(NOT EXISTS (SELECT 1 FROM commerce_newcomer_grants WHERE customer_id='dddddddd-dddd-dddd-dddd-dddddddddddd'), 'same normalized phone conflict: no grant');
 
--- 有界补漏：存量无 grant 客户登记，已有 grant/同手机号跳过
+-- 有界补漏：存量无 grant 客户登记（aaaa draft 期间未登记 + cases.sql 的 3333），已有 grant/同手机号/inactive 跳过
 INSERT INTO commerce_customers (id, external_subject, phone, status) VALUES
   ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee','e1','18600000014','inactive');
-SELECT t(public.commerce_newcomer_backfill(20) = 0, 'backfill: nothing pending (inactive skipped, rest enrolled)');
+SELECT t(public.commerce_newcomer_backfill(20) = 2, 'backfill enrolls exactly pending eligible customers');
+SELECT t(public.commerce_newcomer_backfill(20) = 0, 'backfill idempotent: second run enrolls nothing');
 
 -- 槽位规则不可变：版本已有登记后禁止改门槛/面额/模板
 DO $$
