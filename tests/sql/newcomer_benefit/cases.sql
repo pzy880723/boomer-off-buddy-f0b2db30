@@ -10,6 +10,11 @@ INSERT INTO commerce_customers (id, external_subject, phone, status) VALUES
 SELECT t(commerce_newcomer_enroll('11111111-1111-1111-1111-111111111111', NULL)->>'status'='disabled', 'draft version issues nothing');
 SELECT t((SELECT count(*)=8 AND sum(amount_fen)=10000 FROM commerce_newcomer_benefit_slots WHERE version_id='newcomer_v1'), 'v1 = 8 slots, 100 yuan');
 SELECT t((SELECT validity_days=90 FROM commerce_newcomer_benefit_versions WHERE id='newcomer_v1'), 'v1 valid 90 days');
+-- 与生产一致：v1 已绑定三个隐藏模板
+UPDATE commerce_newcomer_benefit_slots SET youzan_coupon_group_id = CASE
+  WHEN slot_no BETWEEN 1 AND 4 THEN '35074322'
+  WHEN slot_no BETWEEN 5 AND 6 THEN '35074324' ELSE '35074327' END
+ WHERE version_id='newcomer_v1';
 UPDATE commerce_newcomer_benefit_versions SET status='active' WHERE id='newcomer_v1';
 
 -- 幂等：同会员两次 / 跨门店只一次
