@@ -114,7 +114,7 @@ test("query response: exact match on yz_open_id + activity_id + verify_code", ()
     },
   };
   assert.deepEqual(parseQueryResponse(200, page, { yzOpenId: "yz", activityId: "35074322", verifyCode: "ncvbbb" }),
-    { kind: "found", couponId: "222" });
+    { kind: "found", couponId: "222", youzanStatus: "unknown" });
   // 同一活动另一槽的券不能补未知槽
   assert.deepEqual(parseQueryResponse(200, page, { yzOpenId: "yz", activityId: "35074322", verifyCode: "ncvccc" }),
     { kind: "not_found" });
