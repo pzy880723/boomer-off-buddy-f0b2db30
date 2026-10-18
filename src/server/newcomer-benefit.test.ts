@@ -14,7 +14,7 @@ import {
 } from "./newcomer-benefit.server.ts";
 
 const receipt = (o: Partial<TakeReceipt> = {}): TakeReceipt => ({
-  couponId: "Y1", verifyCode: "ncv0ba25e9d1bbb",
+  couponId: "Y1", verifyCode: "ncv4bdc5aefbc56",
   validStart: "2026-10-17T16:00:00.000Z", validEnd: "2027-01-15T15:59:59.000Z", ...o });
 
 // 真实合同形状（字段取自真实回执结构，值为虚构）：send data 顶层 verify_code + 毫秒起止；voucher_identity 只有 coupon_id/coupon_type
@@ -53,7 +53,7 @@ test("dispatch success goes through finishSuccess with real receipt and slot rul
   assert.equal(finished.length, 0);
   const [slotId, token, r] = succeeded[0] as [string, string, TakeReceipt & { amountFen: number; thresholdFen: number; activityId: string }];
   assert.equal(slotId, "s1"); assert.equal(token, "t1");
-  assert.equal(r.couponId, "Y1"); assert.equal(r.verifyCode, "YZVC001");
+  assert.equal(r.couponId, "Y1"); assert.equal(r.verifyCode, "ncv4bdc5aefbc56");
   assert.equal(r.amountFen, 500); assert.equal(r.thresholdFen, 4990); assert.equal(r.activityId, "35074448");
 });
 test("receipt_mismatch from DB is surfaced, not hidden", async () => {
