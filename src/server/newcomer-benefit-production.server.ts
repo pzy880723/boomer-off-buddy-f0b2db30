@@ -13,6 +13,7 @@ import { youzanFetch } from "@/lib/youzan-http";
 import { selectPointsHeadquarters } from "./youzan-points-query.server";
 import {
   queryHeldPagesWith,
+  cachedPageCall, mirrorSyncCutoffIso,
   parseTakeResponse,
   type MirrorSyncDeps,
   type NewcomerClaim,
