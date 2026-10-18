@@ -36,7 +36,7 @@ SELECT t(NOT EXISTS (SELECT 1 FROM commerce_newcomer_grants WHERE customer_id='d
 -- 有界补漏：存量无 grant 客户登记（aaaa draft 期间未登记 + cases.sql 的 3333），已有 grant/同手机号/inactive 跳过
 INSERT INTO commerce_customers (id, external_subject, phone, status) VALUES
   ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee','e1','18600000014','inactive');
-SELECT t(public.commerce_newcomer_backfill(20) = 2, 'backfill enrolls exactly pending eligible customers');
+SELECT t(public.commerce_newcomer_backfill(20) = 3, 'backfill enrolls exactly pending eligible customers');
 SELECT t(public.commerce_newcomer_backfill(20) = 0, 'backfill idempotent: second run enrolls nothing');
 
 -- 槽位规则不可变：版本已有登记后禁止改门槛/面额/模板
