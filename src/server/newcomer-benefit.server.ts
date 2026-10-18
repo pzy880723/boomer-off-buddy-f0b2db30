@@ -20,7 +20,7 @@ export type TakeResult =
   /** 确定未发出请求（固定出口/HQ token 暂不可用）：可安全重试 */
   | { kind: "not_sent"; reason: string };
 export type QueryResult =
-  | { kind: "found"; receipt: TakeReceipt; youzanStatus?: string }
+  | { kind: "found"; receipt: TakeReceipt; youzanStatus?: string; valueFen?: number | null; thresholdFen?: number | null }
   | { kind: "not_found" }
   | { kind: "unsupported"; reason: string }
   | { kind: "unavailable" };
@@ -67,16 +67,28 @@ export async function processNewcomerSlot(c: NewcomerClaim, deps: NewcomerDeps):
   }
   const verifyCode = deriveVerifyCode(c.request_key);
   const input = { groupId: c.youzan_coupon_group_id, yzOpenId: member.yzOpenId, requestKey: c.request_key, verifyCode };
+  const settleFromHolding = (q: Extract<QueryResult, { kind: "found" }>) => {
+    if (q.valueFen !== c.amount_fen || q.thresholdFen !== c.threshold_fen) return finish("unknown", null, "holding_rules_mismatch");
+    return deps.finishSuccess(c.slot_id, c.claim_token, { ...q.receipt, ...rules });
+  };
   if (c.mode === "reconcile") {
     let q: QueryResult;
     try { q = await deps.queryHeld(input); } catch { q = { kind: "unavailable" }; }
-    if (q.kind === "found") return deps.finishSuccess(c.slot_id, c.claim_token, { ...q.receipt, ...rules });
+    if (q.kind === "found") return settleFromHolding(q);
     if (q.kind === "not_found") return finish("not_found", null, "reconcile_not_found");
     return finish("unknown", null, q.kind === "unsupported" ? q.reason : "reconcile_unavailable");
   }
   let r: TakeResult;
   try { r = await deps.take(input); } catch { r = { kind: "unknown", reason: "take_exception" }; }
-  if (r.kind === "ok") return deps.finishSuccess(c.slot_id, c.claim_token, { ...r.receipt, ...rules });
+  if (r.kind === "ok") {
+    // send 已成功：回执 verify_code 必须是我们派生的；再读持券精确核对归属/面额/门槛/真实日期，任何不符只留 unknown 回查，绝不重发
+    if (r.receipt.verifyCode !== verifyCode) return finish("unknown", null, "send_verify_code_mismatch");
+    let q: QueryResult;
+    try { q = await deps.queryHeld(input); } catch { q = { kind: "unavailable" }; }
+    if (q.kind !== "found") return finish("unknown", null, "post_send_holding_unconfirmed");
+    if (q.receipt.couponId !== r.receipt.couponId) return finish("unknown", null, "post_send_coupon_id_mismatch");
+    return settleFromHolding(q);
+  }
   if (r.kind === "rejected") return finish("rejected", null, r.reason);
   if (r.kind === "blocked") return finish("blocked", null, r.reason);
   if (r.kind === "not_sent") return finish("retry", null, r.reason);
@@ -101,32 +113,30 @@ export async function runNewcomerWorker(deps: NewcomerDeps, limit = 10) {
   return { enabled: true, claimed, results };
 }
 
-const asTime = (v: unknown): string | null => {
-  if (typeof v === "number" && v > 1e9) return new Date(v * 1000).toISOString();
-  if (typeof v === "string" && v && !Number.isNaN(Date.parse(v))) return new Date(Date.parse(v)).toISOString();
-  return null;
-};
-/** 从 voucher_identity 提取真实回执；缺任一关键字段返回 null（调用方按 unknown 处理）。 */
-function extractReceipt(vi: Record<string, unknown>): TakeReceipt | null {
-  const id = vi.coupon_id;
-  const verify = vi.verify_code;
-  const start = asTime(vi.valid_start_time ?? vi.valid_start);
-  const end = asTime(vi.valid_end_time ?? vi.valid_end);
-  const idStr = typeof id === "number" ? String(id) : typeof id === "string" ? id.trim() : "";
-  if (!idStr || typeof verify !== "string" || !verify.trim() || !start || !end) return null;
-  return { couponId: idStr, verifyCode: verify.trim(), validStart: start, validEnd: end };
+// 真实合同（youzan.ump.voucheractivity.send/3.0.2 与 voucher.query/3.0.0 实际回执）：
+// valid_start_time / valid_end_time 是毫秒时间戳，与 verify_code 同在 data（或持券项）顶层；voucher_identity 只有 coupon_id/coupon_type。
+const asTimeMs = (v: unknown): string | null =>
+  typeof v === "number" && Number.isFinite(v) && v > 1e12 ? new Date(v).toISOString() : null;
+const obj = (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? v : {}) as Record<string, unknown>;
+/** 从 send 的 data 或持券列表项提取真实回执；缺任一关键字段返回 null（调用方按 unknown 处理）。 */
+function extractReceipt(d: Record<string, unknown>): TakeReceipt | null {
+  const id = obj(d.voucher_identity).coupon_id;
+  const idStr = typeof id === "number" && Number.isFinite(id) ? String(id) : typeof id === "string" ? id.trim() : "";
+  const verify = typeof d.verify_code === "string" ? d.verify_code.trim() : "";
+  const start = asTimeMs(d.valid_start_time);
+  const end = asTimeMs(d.valid_end_time);
+  if (!idStr || !verify || !start || !end) return null;
+  return { couponId: idStr, verifyCode: verify, validStart: start, validEnd: end };
 }
 
-/** 有赞 send/3.0.2 响应解析：只有 code 成功且 voucher_identity 带完整真实回执才算 ok；HTTP 5xx/429/超时 → unknown。 */
+/** 有赞 voucheractivity.send/3.0.2 响应解析：code 成功且 data 顶层带 voucher_identity.coupon_id + verify_code + 毫秒起止才算 ok；HTTP 5xx/429/超时 → unknown。 */
 export function parseTakeResponse(status: number, body: unknown): TakeResult {
   if (status >= 500 || status === 429) return { kind: "unknown", reason: `youzan_http_${status}` };
   if (status >= 400) return { kind: "rejected", reason: `youzan_http_${status}` };
-  const j = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
+  const j = obj(body);
   const ok = j.success !== false && (j.code === 200 || j.code === 0);
   if (!ok) return { kind: "rejected", reason: `youzan_code_${String(j.code ?? "unknown")}` };
-  const d = (j.data && typeof j.data === "object" ? j.data : {}) as Record<string, unknown>;
-  const vi = (d.voucher_identity && typeof d.voucher_identity === "object" ? d.voucher_identity : {}) as Record<string, unknown>;
-  const receipt = extractReceipt(vi);
+  const receipt = extractReceipt(obj(j.data));
   if (!receipt) return { kind: "unknown", reason: "youzan_success_receipt_incomplete" };
   return { kind: "ok", receipt };
 }
@@ -144,15 +154,15 @@ export function parseQueryResponse(
   // 官方 voucher.query/3.0.0 真实响应：顶层 data 本身是数组，total 在顶层
   const list = Array.isArray(j.data) ? j.data : [];
   for (const item of list) {
-    const it = (item && typeof item === "object" ? item : {}) as Record<string, unknown>;
-    const ui = (it.user_identity && typeof it.user_identity === "object" ? it.user_identity : {}) as Record<string, unknown>;
-    const vi = (it.voucher_identity && typeof it.voucher_identity === "object" ? it.voucher_identity : {}) as Record<string, unknown>;
-    if (String(ui.yz_open_id ?? "") !== match.yzOpenId) continue;
-    if (String(it.activity_id ?? vi.activity_id ?? "") !== match.activityId) continue;
-    if (String(vi.verify_code ?? it.verify_code ?? "") !== match.verifyCode) continue;
-    const receipt = extractReceipt(vi);
+    const it = obj(item);
+    if (String(obj(it.user_identity).yz_open_id ?? "") !== match.yzOpenId) continue;
+    if (String(it.activity_id ?? "") !== match.activityId) continue;
+    if (typeof it.verify_code !== "string" || it.verify_code.trim() !== match.verifyCode) continue;
+    const receipt = extractReceipt(it);
     if (!receipt) return { kind: "unavailable" };
-    return { kind: "found", receipt, youzanStatus: String(it.status ?? it.voucher_status ?? "unknown") };
+    const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+    return { kind: "found", receipt, youzanStatus: String(it.status ?? "unknown"),
+      valueFen: num(it.value), thresholdFen: num(it.threshold_amount) };
   }
   return { kind: "not_found" };
 }

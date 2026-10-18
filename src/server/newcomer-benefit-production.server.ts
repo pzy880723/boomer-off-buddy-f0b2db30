@@ -4,7 +4,7 @@
 //  NEWCOMER_BENEFIT_BACKFILL_ENABLED=true    每轮有界补漏存量已注册未领券者（排除已有 grant 及同手机号）
 //  NEWCOMER_MIRROR_SYNC_ENABLED=true         有赞持券只读同步镜像状态（已用/作废/冻结）
 //  NEWCOMER_BENEFIT_CANARY_CUSTOMER_IDS=a,b  只对这些顾客登记/发放；NEWCOMER_BENEFIT_ALL_CUSTOMERS=true 才放开
-//  YOUZAN_COUPON_SEND_API / _VERSION         默认 youzan.ump.coupon.send / 3.0.2（官方 doc4485 合同）
+//  YOUZAN_COUPON_SEND_API / _VERSION         默认 youzan.ump.voucheractivity.send / 3.0.2（官方 doc4485 合同）
 //  YOUZAN_COUPON_QUERY_API / _VERSION        默认 youzan.ump.voucher.query / 3.0.0
 // 有赞调用只经 youzanFetch 固定出口；会员映射只读腾讯可信映射库。
 import { DatabaseSync } from "node:sqlite";
@@ -27,7 +27,7 @@ export const newcomerCustomerAllowed = (id: string) =>
   env("NEWCOMER_BENEFIT_ALL_CUSTOMERS") === "true" || canary().includes(id);
 const proxyConfigured = () => /^https?:\/\//i.test(env("YOUZAN_PROXY_URL")) && !!env("YOUZAN_PROXY_TOKEN");
 
-const SEND_API = () => env("YOUZAN_COUPON_SEND_API") || "youzan.ump.coupon.send";
+const SEND_API = () => env("YOUZAN_COUPON_SEND_API") || "youzan.ump.voucheractivity.send";
 const SEND_VERSION = () => env("YOUZAN_COUPON_SEND_VERSION") || "3.0.2";
 const QUERY_API = () => env("YOUZAN_COUPON_QUERY_API") || "youzan.ump.voucher.query";
 const QUERY_VERSION = () => env("YOUZAN_COUPON_QUERY_VERSION") || "3.0.0";
