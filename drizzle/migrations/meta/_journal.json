@@ -638,6 +638,13 @@
       "when": 1792261074456,
       "tag": "0090_allow_flash_provider_in_shipments",
       "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1792294575380,
+      "tag": "0091_newcomer_auto_enroll_and_mirror",
+      "breakpoints": true
     }
   ]
 }
