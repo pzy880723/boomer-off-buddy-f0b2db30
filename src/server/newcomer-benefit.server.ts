@@ -46,7 +46,11 @@ export async function processNewcomerSlot(c: NewcomerClaim, deps: NewcomerDeps):
   if (!c.youzan_coupon_group_id) return finish("blocked", null, "youzan_coupon_template_not_configured");
   let member: Awaited<ReturnType<NewcomerDeps["resolveMember"]>>;
   try { member = await deps.resolveMember(c.customer_id); } catch { return finish("unknown", null, "member_mapping_unavailable"); }
-  if ("blocked" in member) return finish("blocked", null, member.blocked);
+  if ("blocked" in member) {
+    // 可信映射缺失/暂不可用：短暂有界重试，等待 member-sync 补上；冲突绝不合并，保持 blocked。
+    const wait = member.blocked === "trusted_member_mapping_missing" || member.blocked === "trusted_member_mapping_unavailable";
+    return finish(wait ? "retry" : "blocked", null, member.blocked);
+  }
   const input = {
     groupId: c.youzan_coupon_group_id, yzOpenId: member.yzOpenId,
     requestKey: c.request_key, verifyCode: deriveVerifyCode(c.request_key),
