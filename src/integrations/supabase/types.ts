@@ -7794,6 +7794,7 @@ export type Database = {
       }
       product_measurement_requesters: {
         Row: {
+          conversation_id: string | null
           created_at: string
           customer_id: string
           id: string
@@ -7801,6 +7802,7 @@ export type Database = {
           task_id: string
         }
         Insert: {
+          conversation_id?: string | null
           created_at?: string
           customer_id: string
           id?: string
@@ -7808,6 +7810,7 @@ export type Database = {
           task_id: string
         }
         Update: {
+          conversation_id?: string | null
           created_at?: string
           customer_id?: string
           id?: string
@@ -7815,6 +7818,13 @@ export type Database = {
           task_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "product_measurement_requesters_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "support_conversations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "product_measurement_requesters_customer_id_fkey"
             columns: ["customer_id"]
@@ -9373,12 +9383,14 @@ export type Database = {
         Row: {
           assignment_version: number | null
           body: string
+          card_kind: string | null
           client_op_id: string | null
           conversation_id: string
           created_at: string
           delivery_status: string
           id: string
           internal: boolean
+          measurement_task_id: string | null
           sender_customer_id: string | null
           sender_name: string
           sender_type: string
@@ -9387,12 +9399,14 @@ export type Database = {
         Insert: {
           assignment_version?: number | null
           body: string
+          card_kind?: string | null
           client_op_id?: string | null
           conversation_id: string
           created_at?: string
           delivery_status?: string
           id?: string
           internal?: boolean
+          measurement_task_id?: string | null
           sender_customer_id?: string | null
           sender_name: string
           sender_type: string
@@ -9401,12 +9415,14 @@ export type Database = {
         Update: {
           assignment_version?: number | null
           body?: string
+          card_kind?: string | null
           client_op_id?: string | null
           conversation_id?: string
           created_at?: string
           delivery_status?: string
           id?: string
           internal?: boolean
+          measurement_task_id?: string | null
           sender_customer_id?: string | null
           sender_name?: string
           sender_type?: string
@@ -9418,6 +9434,13 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "support_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_messages_measurement_task_id_fkey"
+            columns: ["measurement_task_id"]
+            isOneToOne: false
+            referencedRelation: "product_measurement_tasks"
             referencedColumns: ["id"]
           },
           {
@@ -11815,6 +11838,14 @@ export type Database = {
         Args: { p_days?: number; p_limit?: number }
         Returns: number
       }
+      handheld_pending_counts: {
+        Args: {
+          p_include_unlocated?: boolean
+          p_location_ids: string[]
+          p_user_id: string
+        }
+        Returns: Json
+      }
       handheld_product_content:
         | {
             Args: {
@@ -11944,6 +11975,17 @@ export type Database = {
         Args: {
           p_device_id: string
           p_include_unlocated?: boolean
+          p_location_ids: string[]
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      handheld_work_items: {
+        Args: {
+          p_cursor_id?: string
+          p_cursor_ts?: string
+          p_include_unlocated?: boolean
+          p_limit?: number
           p_location_ids: string[]
           p_user_id: string
         }
@@ -12105,6 +12147,14 @@ export type Database = {
           p_sku_id: string
         }
         Returns: Json
+      }
+      measurement_attach_support: {
+        Args: {
+          p_backfill_at?: string
+          p_customer_id: string
+          p_task_id: string
+        }
+        Returns: string
       }
       measurement_claim: {
         Args: { p_actor_id: string; p_task_id: string }
