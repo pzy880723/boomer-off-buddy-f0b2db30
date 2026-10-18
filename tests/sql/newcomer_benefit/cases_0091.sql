@@ -2,23 +2,7 @@
 CREATE OR REPLACE FUNCTION t(c boolean, label text) RETURNS void LANGUAGE plpgsql AS $$
 BEGIN IF NOT c THEN RAISE EXCEPTION 'FAIL %', label; END IF; RAISE NOTICE 'PASS %', label; END $$;
 
--- 夹具：真实 pos_customer_coupons 的关键约束（唯一 code、状态/类型 CHECK、镜像列）
-CREATE TABLE public.pos_customer_coupons (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  customer_id uuid NOT NULL REFERENCES public.commerce_customers(id) ON DELETE CASCADE,
-  code text NOT NULL UNIQUE,
-  name text NOT NULL,
-  discount_type text NOT NULL CHECK (discount_type IN ('amount','percentage')),
-  value numeric NOT NULL CHECK (value > 0),
-  min_spend numeric NOT NULL DEFAULT 0 CHECK (min_spend >= 0),
-  status text NOT NULL DEFAULT 'active' CHECK (status IN ('active','reserved','used','expired','void')),
-  starts_at timestamptz, expires_at timestamptz,
-  metadata jsonb NOT NULL DEFAULT '{}',
-  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
-  definition_id uuid, source text NOT NULL DEFAULT 'erp',
-  external_provider text, external_id text, idempotency_key text,
-  scope text NOT NULL DEFAULT 'platform' CHECK (scope IN ('platform','store')),
-  location_id uuid, reserved_order_id uuid);
+-- pos_customer_coupons 夹具在 run.sh  stub 阶段创建（列定义取自真实库只读结构）。
 
 -- verify_code 与 TS 同一向量
 SELECT t(public.commerce_newcomer_verify_code('nc:c39fd499-9345-4906-b829-0f3f80ae4e9d:1') = 'ncv4a2677cae13b', 'verify_code matches TS vector');
