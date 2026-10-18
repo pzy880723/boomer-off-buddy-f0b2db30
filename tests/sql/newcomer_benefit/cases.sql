@@ -41,13 +41,13 @@ SELECT t(commerce_newcomer_finish_success(s, tok, 'yz-a', 'VC-A', now(), now() +
           FROM c1 JOIN commerce_newcomer_grant_slots s ON s.id = c1.slot_id
           JOIN commerce_newcomer_grants g ON g.id = s.grant_id
           JOIN commerce_newcomer_benefit_slots b ON b.version_id = g.version_id AND b.slot_no = s.slot_no
-         ORDER BY s.slot_id LIMIT 1) x;
+         ORDER BY c1.slot_id LIMIT 1) x;
 SELECT t(commerce_newcomer_finish_success(s, tok, 'yz-a2', 'VC-A2', now(), now() + interval '90 days', amt, thr, act)='stale', 'duplicate finish stale')
   FROM (SELECT c1.slot_id s, c1.claim_token tok, b.amount_fen amt, b.threshold_fen thr, b.youzan_coupon_group_id act
           FROM c1 JOIN commerce_newcomer_grant_slots s ON s.id = c1.slot_id
           JOIN commerce_newcomer_grants g ON g.id = s.grant_id
           JOIN commerce_newcomer_benefit_slots b ON b.version_id = g.version_id AND b.slot_no = s.slot_no
-         ORDER BY s.slot_id LIMIT 1) x;
+         ORDER BY c1.slot_id LIMIT 1) x;
 SELECT t(commerce_newcomer_finish(s, tok, 'retry', NULL, 'timeout_before_send')='retry_wait', 'retryable waits')
   FROM (SELECT slot_id s, claim_token tok FROM c1 ORDER BY slot_id OFFSET 2 LIMIT 1) x;
 
