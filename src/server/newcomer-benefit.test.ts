@@ -14,8 +14,18 @@ import {
 } from "./newcomer-benefit.server.ts";
 
 const receipt = (o: Partial<TakeReceipt> = {}): TakeReceipt => ({
-  couponId: "Y1", verifyCode: "YZVC001",
+  couponId: "Y1", verifyCode: "ncv4bdc5aefbc56",
   validStart: "2026-10-17T16:00:00.000Z", validEnd: "2027-01-15T15:59:59.000Z", ...o });
+
+// 真实合同形状（字段取自真实回执结构，值为虚构）：send data 顶层 verify_code + 毫秒起止；voucher_identity 只有 coupon_id/coupon_type
+const START_MS = 1792252800000, END_MS = 1800028799000;
+const sendBody = (o: Record<string, unknown> = {}) => ({ code: 200, success: true, data: {
+  voucher_identity: { coupon_id: 12, coupon_type: 1 }, valid_start_time: START_MS, valid_end_time: END_MS,
+  verify_code: "ncvtest0001", kdt_id: 1, activity_id: 35074448, value: 500, status: 1, ...o } });
+const holdItem = (id: number | string, code: string, o: Record<string, unknown> = {}) => ({
+  voucher_identity: { coupon_id: id, coupon_type: 1 }, valid_start_time: START_MS, valid_end_time: END_MS,
+  verify_code: code, kdt_id: 1, activity_id: 35074448, value: 500, threshold_amount: 4990, status: 1,
+  user_identity: { yz_open_id: "yz" }, ...o });
 
 const claim = (o: Partial<NewcomerClaim> = {}): NewcomerClaim => ({
   slot_id: "s1", claim_token: "t1", mode: "dispatch", request_key: "nc:g:1", customer_id: "c1",
@@ -31,7 +41,7 @@ function deps(o: Partial<NewcomerDeps> = {}) {
     verifyIdentity: async () => ({ ok: true as const }),
     resolveMember: async () => ({ yzOpenId: "yz" }),
     take: async () => { takes++; return { kind: "ok", receipt: receipt() }; },
-    queryHeld: async () => ({ kind: "unsupported", reason: "coupon_holding_query_unconfirmed" }),
+    queryHeld: async () => ({ kind: "found", receipt: receipt(), youzanStatus: "1", valueFen: 500, thresholdFen: 4990 }),
     ...o,
   };
   return { d, finished, succeeded, takes: () => takes };
@@ -43,7 +53,7 @@ test("dispatch success goes through finishSuccess with real receipt and slot rul
   assert.equal(finished.length, 0);
   const [slotId, token, r] = succeeded[0] as [string, string, TakeReceipt & { amountFen: number; thresholdFen: number; activityId: string }];
   assert.equal(slotId, "s1"); assert.equal(token, "t1");
-  assert.equal(r.couponId, "Y1"); assert.equal(r.verifyCode, "YZVC001");
+  assert.equal(r.couponId, "Y1"); assert.equal(r.verifyCode, "ncv4bdc5aefbc56");
   assert.equal(r.amountFen, 500); assert.equal(r.thresholdFen, 4990); assert.equal(r.activityId, "35074448");
 });
 test("receipt_mismatch from DB is surfaced, not hidden", async () => {
@@ -74,12 +84,12 @@ test("timeout / 5xx is unknown, never retried as a fresh send", async () => {
   assert.equal(await processNewcomerSlot(claim(), d), "unknown");
 });
 test("reconcile never calls take", async () => {
-  const { d, takes } = deps();
+  const { d, takes } = deps({ queryHeld: async () => ({ kind: "unsupported", reason: "x" }) });
   assert.equal(await processNewcomerSlot(claim({ mode: "reconcile" }), d), "unknown");
   assert.equal(takes(), 0);
 });
 test("reconcile found finishes with provider receipt; not_found stays unknown", async () => {
-  const a = deps({ queryHeld: async () => ({ kind: "found", receipt: receipt({ couponId: "Y9" }), youzanStatus: "1" }) });
+  const a = deps({ queryHeld: async () => ({ kind: "found", receipt: receipt({ couponId: "Y9" }), youzanStatus: "1", valueFen: 500, thresholdFen: 4990 }) });
   assert.equal(await processNewcomerSlot(claim({ mode: "reconcile" }), a.d), "succeeded");
   assert.equal((a.succeeded[0] as unknown[])[2] && (a.succeeded[0] as [string, string, TakeReceipt])[2].couponId, "Y9");
   const b = deps({ queryHeld: async () => ({ kind: "not_found" }) });
@@ -103,39 +113,52 @@ test("verify_code derived from request_key: stable, 15 chars, safe prefix", () =
   assert.equal(deriveVerifyCode("nc:g:1"), deriveVerifyCode("nc:g:1"));
 });
 
-test("take response: only nested voucher_identity with full receipt counts as ok", () => {
+test("send response (real shape): coupon_id in voucher_identity, verify_code + ms dates at data top level", () => {
   assert.equal(parseTakeResponse(502, {}).kind, "unknown");
   assert.equal(parseTakeResponse(200, { code: 200, data: {} }).kind, "unknown");
-  assert.equal(parseTakeResponse(200, { code: 200, data: { voucher_identity: { coupon_id: 12 } } }).kind, "unknown");
   assert.equal(parseTakeResponse(200, { code: 141502, success: false }).kind, "rejected");
-  const ok = parseTakeResponse(200, { code: 200, data: { voucher_identity: {
-    coupon_id: 12, verify_code: "YZVC9", valid_start_time: 1760745600, valid_end_time: 1768521599 } } });
+  const ok = parseTakeResponse(200, sendBody());
   assert.equal(ok.kind, "ok");
   if (ok.kind === "ok") {
     assert.equal(ok.receipt.couponId, "12");
-    assert.equal(ok.receipt.verifyCode, "YZVC9");
-    assert.equal(ok.receipt.validStart, "2025-10-18T00:00:00.000Z");
-    assert.equal(ok.receipt.validEnd, "2026-01-15T23:59:59.000Z");
+    assert.equal(ok.receipt.verifyCode, "ncvtest0001");
+    assert.equal(ok.receipt.validStart, "2026-10-17T16:00:00.000Z"); // 北京 10-18 00:00
+    assert.equal(ok.receipt.validEnd, "2027-01-15T15:59:59.000Z");   // 北京 01-15 23:59:59
   }
-  // 顶层 id / verify_code 不再被当作券 ID
-  assert.equal(parseTakeResponse(200, { code: 200, data: { id: 99, verify_code: "X" } }).kind, "unknown");
+  // 日期/verify_code 放在 voucher_identity 里（错误层）不算
+  assert.equal(parseTakeResponse(200, { code: 200, data: { voucher_identity: {
+    coupon_id: 12, verify_code: "x", valid_start_time: START_MS, valid_end_time: END_MS } } }).kind, "unknown");
+  // 秒级时间戳不是合同单位
+  assert.equal(parseTakeResponse(200, sendBody({ valid_start_time: START_MS / 1000, valid_end_time: END_MS / 1000 })).kind, "unknown");
+  assert.equal(parseTakeResponse(200, sendBody({ voucher_identity: { coupon_id: "" } })).kind, "unknown");
 });
 
-test("query response: exact match on yz_open_id + activity_id + verify_code with full receipt", () => {
-  const page = { code: 200, total: 2, data: [
-    { user_identity: { yz_open_id: "yz" }, activity_id: 35074448,
-      voucher_identity: { coupon_id: "111", verify_code: "ncvaaa", valid_start_time: 1760745600, valid_end_time: 1768521599 } },
-    { user_identity: { yz_open_id: "yz" }, activity_id: "35074448",
-      voucher_identity: { coupon_id: "222", verify_code: "ncvbbb", valid_start_time: 1760745600, valid_end_time: 1768521599 } },
-  ] };
+test("holding response (real shape): exact yz_open_id + activity_id + verify_code, value/threshold exposed", () => {
+  const page = { code: 200, total: 2, page_num: 1, page_size: 50, data: [holdItem(111, "ncvaaa"), holdItem(222, "ncvbbb")] };
   const hit = parseQueryResponse(200, page, { yzOpenId: "yz", activityId: "35074448", verifyCode: "ncvbbb" });
   assert.equal(hit.kind, "found");
-  if (hit.kind === "found") assert.equal(hit.receipt.couponId, "222");
-  // 同活动但 verify_code 不同（另一槽的券）不得用来补
+  if (hit.kind === "found") { assert.equal(hit.receipt.couponId, "222"); assert.equal(hit.valueFen, 500); assert.equal(hit.thresholdFen, 4990);
+    assert.equal(hit.receipt.validEnd, "2027-01-15T15:59:59.000Z"); }
   assert.equal(parseQueryResponse(200, page, { yzOpenId: "yz", activityId: "35074448", verifyCode: "ncvccc" }).kind, "not_found");
   assert.equal(parseQueryResponse(200, page, { yzOpenId: "other", activityId: "35074448", verifyCode: "ncvbbb" }).kind, "not_found");
   assert.equal(parseQueryResponse(500, {}, { yzOpenId: "yz", activityId: "a", verifyCode: "v" }).kind, "unavailable");
   assert.equal(parseQueryResponse(200, { code: 12345 }, { yzOpenId: "yz", activityId: "a", verifyCode: "v" }).kind, "unavailable");
+});
+
+test("dispatch: send ok then holding must confirm same coupon/owner/rules; otherwise unknown, never resend", async () => {
+  const a = deps({ queryHeld: async () => ({ kind: "not_found" }) });
+  assert.equal(await processNewcomerSlot(claim(), a.d), "unknown"); assert.equal(a.takes(), 1);
+  const b = deps({ queryHeld: async () => ({ kind: "found", receipt: receipt({ couponId: "OTHER" }), valueFen: 500, thresholdFen: 4990 }) });
+  assert.equal(await processNewcomerSlot(claim(), b.d), "unknown");
+  const c = deps({ queryHeld: async () => ({ kind: "found", receipt: receipt(), valueFen: 500, thresholdFen: 9900 }) });
+  assert.equal(await processNewcomerSlot(claim(), c.d), "unknown");
+  const e = deps({ take: async () => ({ kind: "ok", receipt: receipt({ verifyCode: "notours" }) }) });
+  assert.equal(await processNewcomerSlot(claim(), e.d), "unknown");
+  // holding 的真实日期作为成功回执
+  const hold = receipt({ validStart: "2026-10-17T16:00:00.000Z", validEnd: "2027-01-15T15:59:59.000Z" });
+  const f = deps({ queryHeld: async () => ({ kind: "found", receipt: hold, valueFen: 500, thresholdFen: 4990 }) });
+  assert.equal(await processNewcomerSlot(claim(), f.d), "succeeded");
+  assert.equal((f.succeeded[0] as [string, string, TakeReceipt])[2].validEnd, "2027-01-15T15:59:59.000Z");
 });
 
 function mirrorDeps(o: Partial<MirrorSyncDeps> = {}) {
@@ -168,8 +191,7 @@ test("mirror sync disabled does nothing", async () => {
 
 // ---- 0093 review fixes ----
 const realPage = (items: unknown[], total: number) => ({ code: 200, success: true, total, data: items });
-const v = (id: string, code: string, status = 1) => ({ status, user_identity: { yz_open_id: "yz" }, activity_id: 35074448,
-  voucher_identity: { coupon_id: id, verify_code: code, valid_start_time: 1760745600, valid_end_time: 1768521599 } });
+const v = (id: string, code: string, status = 1) => holdItem(id, code, { status });
 test("query parser reads real top-level data array (not data.vouchers) with numeric status", () => {
   const p2 = realPage([v("901", "ncvzzz", 2), v("902", "ncvyyy", 1)], 52);
   const hit = parseQueryResponse(200, p2, { yzOpenId: "yz", activityId: "35074448", verifyCode: "ncvyyy" });
@@ -222,10 +244,8 @@ test("mirror sync stamps every checked row (rotation) and restores frozen->activ
 
 // ---- 0094 review fixes ----
 test("empty coupon_id is never ok", () => {
-  assert.equal(parseTakeResponse(200, { code: 200, data: { voucher_identity: {
-    coupon_id: "", verify_code: "ncv1", valid_start_time: 1760745600, valid_end_time: 1768521599 } } }).kind, "unknown");
-  assert.equal(parseTakeResponse(200, { code: 200, data: { voucher_identity: {
-    coupon_id: "  ", verify_code: "ncv1", valid_start_time: 1760745600, valid_end_time: 1768521599 } } }).kind, "unknown");
+  assert.equal(parseTakeResponse(200, sendBody({ voucher_identity: { coupon_id: "", coupon_type: 1 } })).kind, "unknown");
+  assert.equal(parseTakeResponse(200, sendBody({ voucher_identity: { coupon_id: "  ", coupon_type: 1 } })).kind, "unknown");
 });
 test("identity recheck blocks dispatch to changed/inactive identity before any Youzan call", async () => {
   const { d, takes, finished } = deps({ verifyIdentity: async () => ({ blocked: "phone_changed" }) });
