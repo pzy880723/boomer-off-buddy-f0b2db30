@@ -687,6 +687,13 @@
       "when": 1792306229459,
       "tag": "0097_support_measurement_safe_work_items",
       "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1792306463136,
+      "tag": "0098_support_work_items_hq_unlocated",
+      "breakpoints": true
     }
   ]
 }
