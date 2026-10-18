@@ -27,6 +27,7 @@ export const Route = createFileRoute("/customer-service")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
+  validateSearch: (raw:Record<string,unknown>) => ({ conversation_id: typeof raw.conversation_id === "string" && /^[0-9a-f-]{36}$/i.test(raw.conversation_id) ? raw.conversation_id : undefined }),
   component: CustomerServicePage,
 });
 
@@ -52,7 +53,8 @@ function CustomerServiceSession({ userId }: { userId: string }) {
   const assignmentFn = useServerFn(updateSupportAssignmentFn);
   const queryClient = useQueryClient();
   const [measurementCard,setMeasurementCard] = useState<MeasurementCard|null>(null);
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const search = Route.useSearch();
+  const [activeId, setActiveId] = useState<string | null>(search.conversation_id ?? null);
   const [filter, setFilter] = useState<SupportFilter>("all");
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const pendingReplies = useRef(new Map<string, string>());
@@ -73,7 +75,7 @@ function CustomerServiceSession({ userId }: { userId: string }) {
     return true;
   });
   const currentId =
-    activeId && items.some((item) => item.id === activeId) ? activeId : (items[0]?.id ?? null);
+    activeId ?? (items[0]?.id ?? null);
   const draft = currentId
     ? (drafts[currentId] ?? { body: "", internal: false })
     : { body: "", internal: false };

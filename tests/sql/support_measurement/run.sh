@@ -20,7 +20,8 @@ for file,fn,trg in [('0033_support_assignment_m1.sql','tg_support_waiting','trg_
 Path('/tmp/measurement-support/production-triggers.sql').write_text('\n'.join(out))
 PYCODE
 $PSQL -q -f /tmp/measurement-support/production-triggers.sql >/dev/null || exit 1
-if [ -n "${SUPPORT_MEASUREMENT_FIX-}" ]; then $PSQL -q -f "$SUPPORT_MEASUREMENT_FIX" >/dev/null || exit 1; fi
+fix=${SUPPORT_MEASUREMENT_FIX-$(ls drizzle/migrations/*_support_measurement_safe_work_items.sql 2>/dev/null | head -1)}
+if [ -n "$fix" ]; then $PSQL -q -f "$fix" >/dev/null || exit 1; fi
 out=$($PSQL -q -f tests/sql/support_measurement/cases.sql 2>&1); rc=$?
 echo "$out" | grep -o 'PASS .*\|ERROR.*'
 n=$(echo "$out" | grep -c PASS); [ $rc -eq 0 ] && [ "$n" -eq 14 ] && echo "ALL PASS ($n)" || { echo "SOME FAILED ($n/14)"; exit 1; }

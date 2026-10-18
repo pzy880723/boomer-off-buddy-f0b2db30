@@ -12,6 +12,7 @@ export const Route = createFileRoute("/dashboard")({
     meta: [
       { title: "仪表盘 · BOOMER OFF" },
       { name: "description", content: "销售概况、待处理事项与常用操作" },
+      {property:"og:title",content:"仪表盘 · BOOMER OFF"},{property:"og:description",content:"销售概况与完整待处理事项。"},{property:"og:type",content:"website"},{name:"twitter:card",content:"summary"},
     ],
   }),
   component: DashboardPage,

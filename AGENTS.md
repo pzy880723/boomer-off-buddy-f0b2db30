@@ -14,3 +14,5 @@
 - Review demo isolation: src/server/review-isolation.mjs (BOOMER_REVIEW_ISOLATED=true) refuses production data/real channels at boot and blocks external writes. Why: review never touches real systems.
 - Listing readiness: readiness row in SKU insert tx; smart-create v2 (also standard-reuse append; route skips image_paths) persists plan+uploader and queues AI jobs in the commit tx; raw photos settle only via queued jobs or explicit decline; worker sweep resolves pending consent; published listings park new images in pending_display until ready; edits bump revision, release SKIP LOCKED. Why: fail-closed, crash-safe, no half-processed public display.
 - Display names for fields/attributes come only from src/lib/attribute-labels.ts; unknown keys hidden. Why: one Chinese dictionary.
+
+- Measurement support cards revalidate task-store and exact requester linkage after conversation authorization; pending work uses one SQL aggregation for handheld and ERP, separate from unread events. Why: old conversations cannot disclose moved-store cards, and multi-entry counts stay consistent.
