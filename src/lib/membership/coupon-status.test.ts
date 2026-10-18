@@ -25,6 +25,16 @@ test("used, frozen/reserved and unknown statuses are not usable", () => {
   assert.equal(mapMembershipCoupon({ ...base, status: "reserved" }, now).status, "frozen");
   assert.equal(mapMembershipCoupon({ ...base, status: "weird" }, now).usable, false);
 });
+test("real frozen row.status maps to frozen, never void", () => {
+  const c = mapMembershipCoupon({ ...base, status: "frozen" }, now);
+  assert.equal(c.status, "frozen");
+  assert.equal(c.usable, false);
+});
+test("frozen then unfrozen returns to available", () => {
+  const unfrozen = mapMembershipCoupon({ ...base, status: "active" }, now);
+  assert.equal(unfrozen.status, "available");
+  assert.equal(unfrozen.usable, true);
+});
 test("not yet started is not usable", () => {
   const c = mapMembershipCoupon({ ...base, status: "active", starts_at: "2026-11-01T00:00:00Z" }, now);
   assert.equal(c.usable, false); assert.equal(c.status, "not_started");
