@@ -19,7 +19,7 @@ test("notice tags: multi-select whitelist, uncertain/unavailable mutually exclus
   assert.equal(NOTICE_TAG_LABELS.not_edible, "不可食用");
 });
 test("handheld patch accepts marks alone and rejects invalid/exclusive", () => {
-  const base = { location_id: "00000000-0000-0000-0000-000000000001", client_op_id: "op-12345678", expected_updated_at: "2026-10-18T00:00:00Z" };
+  const base = { location_id: "11111111-1111-4111-8111-111111111111", client_op_id: "op-12345678", expected_updated_at: "2026-10-18T00:00:00Z" };
   assert.ok(ItemPatchReq.safeParse({ ...base, featured_stamp: "rare" }).success);
   assert.ok(ItemPatchReq.safeParse({ ...base, featured_stamp: null }).success);
   assert.ok(ItemPatchReq.safeParse({ ...base, notice_tags: ["flawed"] }).success);
