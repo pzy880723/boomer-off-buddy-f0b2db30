@@ -170,3 +170,10 @@ DO $$ DECLARE c uuid; before_n int; BEGIN
  ASSERT (pc('5c000000-0000-4000-8000-00000000000a')->>'customers')::int=before_n,'SM14 closed active measurement lost';
  RAISE NOTICE 'PASS SM14 closed conversation retains unfinished measurement';
 END $$;
+
+DO $$ BEGIN
+ INSERT INTO product_measurement_tasks(id,sku_id) VALUES('7a000000-0000-4000-8000-000000000015','11111111-0000-4000-8000-000000000001');
+ ASSERT EXISTS(SELECT 1 FROM jsonb_array_elements(handheld_work_items(NULL,'{}'::uuid[],true,500)->'items') i WHERE i->>'id'='7a000000-0000-4000-8000-000000000015'),'SM15 HQ unlocated missing';
+ ASSERT NOT EXISTS(SELECT 1 FROM jsonb_array_elements(handheld_work_items(NULL,'{}'::uuid[],false,500)->'items') i WHERE i->>'id'='7a000000-0000-4000-8000-000000000015'),'SM15 staff unlocated leaked';
+ RAISE NOTICE 'PASS SM15 HQ unlocated tasks visible only in authorized HQ scope';
+END $$;
