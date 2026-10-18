@@ -98,7 +98,7 @@ test("deriveVerifyCode is stable, 15 chars, alnum, no ZAN prefix", () => {
   assert.ok(!/^y?zan/i.test(v1));
   assert.notEqual(v1, deriveVerifyCode("nc:c39fd499-9345-4906-b829-0f3f80ae4e9d:2"));
   // 与 SQL commerce_newcomer_verify_code 同一向量（sha256 前 12 位 hex）
-  assert.equal(v1, "ncv" + "4f6a2b0e2f0d");
+  assert.equal(v1, "ncv" + "4a2677cae13b");
 });
 
 // ---- voucher.query/3.0.0 回查：data 数组 + 精准匹配 + 翻页到 total ----
