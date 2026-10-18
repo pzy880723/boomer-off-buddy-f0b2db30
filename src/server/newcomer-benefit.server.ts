@@ -18,7 +18,7 @@ export type TakeResult =
   | { kind: "blocked"; reason: string }
   | { kind: "unknown"; reason: string };
 export type QueryResult =
-  | { kind: "found"; couponId: string }
+  | { kind: "found"; couponId: string; youzanStatus?: string }
   | { kind: "not_found" }
   | { kind: "unsupported"; reason: string }
   | { kind: "unavailable" };
@@ -117,7 +117,9 @@ export function parseQueryResponse(
       String(item.verify_code ?? "") === match.verifyCode
     ) {
       const id = vi.coupon_id;
-      if (typeof id === "string" || typeof id === "number") return { kind: "found", couponId: String(id) };
+      if (typeof id === "string" || typeof id === "number") {
+        return { kind: "found", couponId: String(id), youzanStatus: String(item.status ?? item.voucher_status ?? "unknown") };
+      }
       return { kind: "unavailable" };
     }
   }
