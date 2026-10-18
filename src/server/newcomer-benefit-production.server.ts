@@ -168,9 +168,11 @@ export function productionMirrorSyncDeps(): MirrorSyncDeps {
       const head = await headquarters();
       if (!head?.access_token || !proxyConfigured()) return { kind: "unavailable" as const };
       const r = await queryHeldPages(head.access_token, { yzOpenId, activityId, verifyCode });
-      if (r.kind !== "found") return r;
-      // 单券状态查询：复用 voucher.query 结果中的 status 字段；缺失时保守不可用。
-      return { kind: "found", couponId: r.couponId, youzanStatus: r.youzanStatus ?? "unknown" };
+      if (r.kind === "found") {
+        // 单券状态查询：复用 voucher.query 结果中的 status 字段；缺失时保守不可用。
+        return { kind: "found", couponId: r.couponId, youzanStatus: r.youzanStatus ?? "unknown" };
+      }
+      return { kind: r.kind === "not_found" ? "not_found" : "unavailable" };
     },
     async updateMirrorStatus(mirrorId, status) {
       const { error } = await supabaseAdmin
