@@ -84,12 +84,12 @@ test("timeout / 5xx is unknown, never retried as a fresh send", async () => {
   assert.equal(await processNewcomerSlot(claim(), d), "unknown");
 });
 test("reconcile never calls take", async () => {
-  const { d, takes } = deps();
+  const { d, takes } = deps({ queryHeld: async () => ({ kind: "unsupported", reason: "x" }) });
   assert.equal(await processNewcomerSlot(claim({ mode: "reconcile" }), d), "unknown");
   assert.equal(takes(), 0);
 });
 test("reconcile found finishes with provider receipt; not_found stays unknown", async () => {
-  const a = deps({ queryHeld: async () => ({ kind: "found", receipt: receipt({ couponId: "Y9" }), youzanStatus: "1" }) });
+  const a = deps({ queryHeld: async () => ({ kind: "found", receipt: receipt({ couponId: "Y9" }), youzanStatus: "1", valueFen: 500, thresholdFen: 4990 }) });
   assert.equal(await processNewcomerSlot(claim({ mode: "reconcile" }), a.d), "succeeded");
   assert.equal((a.succeeded[0] as unknown[])[2] && (a.succeeded[0] as [string, string, TakeReceipt])[2].couponId, "Y9");
   const b = deps({ queryHeld: async () => ({ kind: "not_found" }) });
