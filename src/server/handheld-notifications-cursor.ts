@@ -3,7 +3,9 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export function parseListCursor(cursor: string): { ts: string; id: string } | null {
   const [ts, id, extra] = cursor.split("|");
   if (extra !== undefined || !ts || !id || !UUID_RE.test(id) || Number.isNaN(Date.parse(ts))) return null;
-  return { ts: new Date(ts).toISOString(), id };
+  // 保留原始时间戳字符串（含微秒）：PostgREST 按文本比较 timestamptz，
+  // 经 Date 往返会截断到毫秒，同一毫秒内不同微秒的行会被跳过。
+  return { ts, id };
 }
 
 /** 变更游标 "v2:<xid>:<seq>"；"latest" 表示从当前水位开始（不回放历史）。 */
