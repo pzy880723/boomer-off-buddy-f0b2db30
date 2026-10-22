@@ -12,7 +12,7 @@ function fixture() {
   let n = 0; const writes: Array<[string, Record<string, unknown>]> = [];
   const deps = {
     loadSkus: async (ids: string[]) => ids.flatMap((id) => (db.get(id) ? [{ ...db.get(id)! }] : [])),
-    skusAtLocation: async (ids: string[], loc: string) => new Set(loc === "L1" ? ids.filter((i) => i !== "other") : []),
+    skusAtLocations: async (ids: string[], locs: string[]) => new Set(locs.includes("L1") ? ids.filter((i) => i !== "other") : []),
     casUpdate: async (id: string, expected: string, patch: Record<string, unknown>) => {
       const row = db.get(id)!;
       if (row.updated_at !== expected) return null;
@@ -42,6 +42,8 @@ test("non-manager or foreign store: nothing written", async () => {
   assert.deepEqual(r, [{ id: "a", result: "skipped", reason: "no_permission" }]);
   const r2 = await runBatchMarks(deps, { hq: false, managerLocationIds: [] }, { op: { kind: "stamp", value: "rare" }, location_id: "L1", items: items("a") });
   assert.equal(r2[0].result, "skipped"); assert.equal(writes.length, 0);
+  const r3 = await runBatchMarks(deps, manager, { op: { kind: "stamp", value: "rare" }, location_id: null, items: items("other") });
+  assert.deepEqual([r3[0].result, r3[0].reason], ["skipped", "no_permission"]); assert.equal(writes.length, 0);
 });
 
 test("CAS: someone else's edit is not overwritten; retry with fresh version succeeds; replay is idempotent", async () => {

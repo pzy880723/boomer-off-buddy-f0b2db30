@@ -14,8 +14,8 @@ export type BatchSkuRow = BatchSkuState & { id: string; updated_at: string };
 
 export type BatchDeps = {
   loadSkus(ids: string[]): Promise<BatchSkuRow[]>;
-  /** 店长：返回在当前门店有库存记录的 SKU id。 */
-  skusAtLocation(ids: string[], locationId: string): Promise<Set<string>>;
+  /** 店长：返回在给定门店（当前店或其全部授权店）有库存记录的 SKU id。 */
+  skusAtLocations(ids: string[], locationIds: string[]): Promise<Set<string>>;
   /** CAS 写入：仅当 updated_at 仍等于 expected 时更新；返回新 updated_at 或 null（冲突）。 */
   casUpdate(id: string, expected: string, patch: Record<string, unknown>): Promise<string | null>;
 };
@@ -29,11 +29,12 @@ export async function runBatchMarks(
 ): Promise<BatchItemResult[]> {
   if (!isValidBatchOp(input.op)) throw new Error("批量操作参数不正确");
   const ids = [...new Set(input.items.map((i) => i.id))];
-  if (!actor.hq && !(input.location_id && actor.managerLocationIds.includes(input.location_id))) {
+  const scope = input.location_id ? [input.location_id] : actor.managerLocationIds;
+  if (!actor.hq && (scope.length === 0 || !scope.every((l) => actor.managerLocationIds.includes(l)))) {
     return ids.map((id) => ({ id, result: "skipped", reason: "no_permission" }));
   }
   const rows = new Map((await deps.loadSkus(ids)).map((r) => [r.id, r]));
-  const allowed = actor.hq ? new Set(ids) : await deps.skusAtLocation(ids, input.location_id!);
+  const allowed = actor.hq ? new Set(ids) : await deps.skusAtLocations(ids, scope);
   const expected = new Map(input.items.map((i) => [i.id, i.expected_updated_at]));
   const out: BatchItemResult[] = [];
   for (const id of ids) {
