@@ -229,6 +229,10 @@ beforeEach(() => {
   omitCount = false;
   skuReadUrls = [];
   tables = {
+    inv_categories: [
+      { id: "cat-root", code: "toys", name: "玩具", parent_id: null },
+      { id: "cat-toy", code: "toy_model", name: "模型", parent_id: "cat-root" },
+    ],
     inv_handheld_devices: [{ id: "device", token: "device", is_active: true, device_code: "test" }],
     user_roles: [
       { user_id: "hq", role: "hq_operator" },
@@ -965,4 +969,15 @@ test("deleted product stays hidden after refresh in store, HQ and barcode lookup
   }
   assert.equal((await call("detail", "scope=all", "hq", id)).status, 404);
   assert.equal((await call("detail", "scope=all&capabilities_only=1", "hq", id)).status, 404);
+});
+
+test("list and detail expose dictionary category name/path while keeping raw code", async () => {
+  const res = await call("list", "/api/public/handheld/products?location_id=" + A, "hq");
+  const body = (await res.json()) as any;
+  const item = body.data.items.find((i: any) => i.category === "toy_model");
+  assert.ok(item, "fixture item present");
+  assert.equal(item.category, "toy_model");
+  assert.equal(item.category_name, "模型");
+  assert.deepEqual(item.category_path, ["玩具", "模型"]);
+  assert.ok(Array.isArray(item.mark_labels));
 });
