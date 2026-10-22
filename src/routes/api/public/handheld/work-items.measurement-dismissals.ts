@@ -32,7 +32,11 @@ async function handle(request: Request, mode: "dismiss" | "undismiss") {
   const result = await applyMeasurementDismissal(
     {
       rpc: async (name, args) => {
-        const { data, error } = await supabaseAdmin.rpc(name as never, args);
+        const rpc = supabaseAdmin.rpc as unknown as (
+          n: string,
+          a: Record<string, unknown>,
+        ) => Promise<{ data: unknown; error: { message: string; code?: string } | null }>;
+        const { data, error } = await rpc(name, args);
         return { data, error: error ? { message: error.message, code: error.code } : null };
       },
     },
