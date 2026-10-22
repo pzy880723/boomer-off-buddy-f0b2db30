@@ -242,6 +242,7 @@ import { Route as ApiPublicHandheldTransferReceiveScanRouteImport } from './rout
 import { Route as ApiPublicHandheldTransferShipConfirmRouteImport } from './routes/api/public/handheld/transfer.ship-confirm'
 import { Route as ApiPublicHandheldTransferShipScanRouteImport } from './routes/api/public/handheld/transfer.ship-scan'
 import { Route as ApiPublicHandheldTransfersIdRouteImport } from './routes/api/public/handheld/transfers.$id'
+import { Route as ApiPublicHandheldWorkItemsMeasurementDismissalsRouteImport } from './routes/api/public/handheld/work-items.measurement-dismissals'
 import { Route as ApiPublicMediaMeasurementSplatRouteImport } from './routes/api/public/media/measurement/$'
 import { Route as ApiPublicMediaSkuSplatRouteImport } from './routes/api/public/media/sku/$'
 import { Route as ApiPublicPosCartsIdRouteImport } from './routes/api/public/pos/carts.$id'
@@ -1617,6 +1618,12 @@ const ApiPublicHandheldTransfersIdRoute =
     path: '/$id',
     getParentRoute: () => ApiPublicHandheldTransfersRoute,
   } as any)
+const ApiPublicHandheldWorkItemsMeasurementDismissalsRoute =
+  ApiPublicHandheldWorkItemsMeasurementDismissalsRouteImport.update({
+    id: '/measurement-dismissals',
+    path: '/measurement-dismissals',
+    getParentRoute: () => ApiPublicHandheldWorkItemsRoute,
+  } as any)
 const ApiPublicMediaMeasurementSplatRoute =
   ApiPublicMediaMeasurementSplatRouteImport.update({
     id: '/api/public/media/measurement/$',
@@ -2229,7 +2236,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
   '/api/public/handheld/transfer-photo': typeof ApiPublicHandheldTransferPhotoRoute
   '/api/public/handheld/transfers': typeof ApiPublicHandheldTransfersRouteWithChildren
-  '/api/public/handheld/work-items': typeof ApiPublicHandheldWorkItemsRoute
+  '/api/public/handheld/work-items': typeof ApiPublicHandheldWorkItemsRouteWithChildren
   '/api/public/hooks/chain-probe-verify': typeof ApiPublicHooksChainProbeVerifyRoute
   '/api/public/hooks/channel-sync-worker': typeof ApiPublicHooksChannelSyncWorkerRoute
   '/api/public/hooks/commerce-release-expired': typeof ApiPublicHooksCommerceReleaseExpiredRoute
@@ -2338,6 +2345,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/transfer/ship-confirm': typeof ApiPublicHandheldTransferShipConfirmRoute
   '/api/public/handheld/transfer/ship-scan': typeof ApiPublicHandheldTransferShipScanRoute
   '/api/public/handheld/transfers/$id': typeof ApiPublicHandheldTransfersIdRouteWithChildren
+  '/api/public/handheld/work-items/measurement-dismissals': typeof ApiPublicHandheldWorkItemsMeasurementDismissalsRoute
   '/api/public/media/measurement/$': typeof ApiPublicMediaMeasurementSplatRoute
   '/api/public/media/sku/$': typeof ApiPublicMediaSkuSplatRoute
   '/api/public/pos/carts/$id': typeof ApiPublicPosCartsIdRouteWithChildren
@@ -2539,7 +2547,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
   '/api/public/handheld/transfer-photo': typeof ApiPublicHandheldTransferPhotoRoute
   '/api/public/handheld/transfers': typeof ApiPublicHandheldTransfersRouteWithChildren
-  '/api/public/handheld/work-items': typeof ApiPublicHandheldWorkItemsRoute
+  '/api/public/handheld/work-items': typeof ApiPublicHandheldWorkItemsRouteWithChildren
   '/api/public/hooks/chain-probe-verify': typeof ApiPublicHooksChainProbeVerifyRoute
   '/api/public/hooks/channel-sync-worker': typeof ApiPublicHooksChannelSyncWorkerRoute
   '/api/public/hooks/commerce-release-expired': typeof ApiPublicHooksCommerceReleaseExpiredRoute
@@ -2648,6 +2656,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/transfer/ship-confirm': typeof ApiPublicHandheldTransferShipConfirmRoute
   '/api/public/handheld/transfer/ship-scan': typeof ApiPublicHandheldTransferShipScanRoute
   '/api/public/handheld/transfers/$id': typeof ApiPublicHandheldTransfersIdRouteWithChildren
+  '/api/public/handheld/work-items/measurement-dismissals': typeof ApiPublicHandheldWorkItemsMeasurementDismissalsRoute
   '/api/public/media/measurement/$': typeof ApiPublicMediaMeasurementSplatRoute
   '/api/public/media/sku/$': typeof ApiPublicMediaSkuSplatRoute
   '/api/public/pos/carts/$id': typeof ApiPublicPosCartsIdRouteWithChildren
@@ -2857,7 +2866,7 @@ export interface FileRoutesById {
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
   '/api/public/handheld/transfer-photo': typeof ApiPublicHandheldTransferPhotoRoute
   '/api/public/handheld/transfers': typeof ApiPublicHandheldTransfersRouteWithChildren
-  '/api/public/handheld/work-items': typeof ApiPublicHandheldWorkItemsRoute
+  '/api/public/handheld/work-items': typeof ApiPublicHandheldWorkItemsRouteWithChildren
   '/api/public/hooks/chain-probe-verify': typeof ApiPublicHooksChainProbeVerifyRoute
   '/api/public/hooks/channel-sync-worker': typeof ApiPublicHooksChannelSyncWorkerRoute
   '/api/public/hooks/commerce-release-expired': typeof ApiPublicHooksCommerceReleaseExpiredRoute
@@ -2966,6 +2975,7 @@ export interface FileRoutesById {
   '/api/public/handheld/transfer/ship-confirm': typeof ApiPublicHandheldTransferShipConfirmRoute
   '/api/public/handheld/transfer/ship-scan': typeof ApiPublicHandheldTransferShipScanRoute
   '/api/public/handheld/transfers/$id': typeof ApiPublicHandheldTransfersIdRouteWithChildren
+  '/api/public/handheld/work-items/measurement-dismissals': typeof ApiPublicHandheldWorkItemsMeasurementDismissalsRoute
   '/api/public/media/measurement/$': typeof ApiPublicMediaMeasurementSplatRoute
   '/api/public/media/sku/$': typeof ApiPublicMediaSkuSplatRoute
   '/api/public/pos/carts/$id': typeof ApiPublicPosCartsIdRouteWithChildren
@@ -3285,6 +3295,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/transfer/ship-confirm'
     | '/api/public/handheld/transfer/ship-scan'
     | '/api/public/handheld/transfers/$id'
+    | '/api/public/handheld/work-items/measurement-dismissals'
     | '/api/public/media/measurement/$'
     | '/api/public/media/sku/$'
     | '/api/public/pos/carts/$id'
@@ -3595,6 +3606,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/transfer/ship-confirm'
     | '/api/public/handheld/transfer/ship-scan'
     | '/api/public/handheld/transfers/$id'
+    | '/api/public/handheld/work-items/measurement-dismissals'
     | '/api/public/media/measurement/$'
     | '/api/public/media/sku/$'
     | '/api/public/pos/carts/$id'
@@ -3912,6 +3924,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/transfer/ship-confirm'
     | '/api/public/handheld/transfer/ship-scan'
     | '/api/public/handheld/transfers/$id'
+    | '/api/public/handheld/work-items/measurement-dismissals'
     | '/api/public/media/measurement/$'
     | '/api/public/media/sku/$'
     | '/api/public/pos/carts/$id'
@@ -4072,7 +4085,7 @@ export interface RootRouteChildren {
   ApiPublicHandheldSyncRecordsRoute: typeof ApiPublicHandheldSyncRecordsRoute
   ApiPublicHandheldTransferPhotoRoute: typeof ApiPublicHandheldTransferPhotoRoute
   ApiPublicHandheldTransfersRoute: typeof ApiPublicHandheldTransfersRouteWithChildren
-  ApiPublicHandheldWorkItemsRoute: typeof ApiPublicHandheldWorkItemsRoute
+  ApiPublicHandheldWorkItemsRoute: typeof ApiPublicHandheldWorkItemsRouteWithChildren
   ApiPublicHooksChainProbeVerifyRoute: typeof ApiPublicHooksChainProbeVerifyRoute
   ApiPublicHooksChannelSyncWorkerRoute: typeof ApiPublicHooksChannelSyncWorkerRoute
   ApiPublicHooksCommerceReleaseExpiredRoute: typeof ApiPublicHooksCommerceReleaseExpiredRoute
@@ -5832,6 +5845,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldTransfersIdRouteImport
       parentRoute: typeof ApiPublicHandheldTransfersRoute
     }
+    '/api/public/handheld/work-items/measurement-dismissals': {
+      id: '/api/public/handheld/work-items/measurement-dismissals'
+      path: '/measurement-dismissals'
+      fullPath: '/api/public/handheld/work-items/measurement-dismissals'
+      preLoaderRoute: typeof ApiPublicHandheldWorkItemsMeasurementDismissalsRouteImport
+      parentRoute: typeof ApiPublicHandheldWorkItemsRoute
+    }
     '/api/public/media/measurement/$': {
       id: '/api/public/media/measurement/$'
       path: '/api/public/media/measurement/$'
@@ -6867,6 +6887,21 @@ const ApiPublicHandheldTransfersRouteWithChildren =
     ApiPublicHandheldTransfersRouteChildren,
   )
 
+interface ApiPublicHandheldWorkItemsRouteChildren {
+  ApiPublicHandheldWorkItemsMeasurementDismissalsRoute: typeof ApiPublicHandheldWorkItemsMeasurementDismissalsRoute
+}
+
+const ApiPublicHandheldWorkItemsRouteChildren: ApiPublicHandheldWorkItemsRouteChildren =
+  {
+    ApiPublicHandheldWorkItemsMeasurementDismissalsRoute:
+      ApiPublicHandheldWorkItemsMeasurementDismissalsRoute,
+  }
+
+const ApiPublicHandheldWorkItemsRouteWithChildren =
+  ApiPublicHandheldWorkItemsRoute._addFileChildren(
+    ApiPublicHandheldWorkItemsRouteChildren,
+  )
+
 interface ApiPublicPosProductsRouteChildren {
   ApiPublicPosProductsLookupRoute: typeof ApiPublicPosProductsLookupRoute
 }
@@ -7272,7 +7307,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHandheldSyncRecordsRoute: ApiPublicHandheldSyncRecordsRoute,
   ApiPublicHandheldTransferPhotoRoute: ApiPublicHandheldTransferPhotoRoute,
   ApiPublicHandheldTransfersRoute: ApiPublicHandheldTransfersRouteWithChildren,
-  ApiPublicHandheldWorkItemsRoute: ApiPublicHandheldWorkItemsRoute,
+  ApiPublicHandheldWorkItemsRoute: ApiPublicHandheldWorkItemsRouteWithChildren,
   ApiPublicHooksChainProbeVerifyRoute: ApiPublicHooksChainProbeVerifyRoute,
   ApiPublicHooksChannelSyncWorkerRoute: ApiPublicHooksChannelSyncWorkerRoute,
   ApiPublicHooksCommerceReleaseExpiredRoute:
