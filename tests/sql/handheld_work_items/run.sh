@@ -23,9 +23,13 @@ $PSQL -q -v ON_ERROR_STOP=1 -f tests/sql/handheld_work_items/scoped_baseline.sql
 scoped=$(ls drizzle/migrations/0102_*scoped_work_items*.sql 2>/dev/null | head -1)
 scoped=${scoped:-tests/sql/handheld_work_items/scoped_ignore.sql}
 $PSQL -q -v ON_ERROR_STOP=1 -f "$scoped" >/dev/null || { echo "FAIL scoped ignore migration"; exit 1; }
+# 0103 投影 recovered 复位：优先用已落地的 drizzle 迁移，否则用本目录逐字副本。
+reset=$(ls drizzle/migrations/0103_*recovered_reset*.sql 2>/dev/null | head -1)
+reset=${reset:-tests/sql/handheld_work_items/projection_recovered_reset.sql}
+$PSQL -q -v ON_ERROR_STOP=1 -f "$reset" >/dev/null || { echo "FAIL recovered reset migration"; exit 1; }
 out=$($PSQL -q -f tests/sql/handheld_work_items/cases.sql 2>&1); rc=$?
 echo "$out" | grep -o 'PASS [0-9]* .*\|ERROR.*\|ASSERT.*'
-n1=$(echo "$out" | grep -c 'PASS '); [ $rc -eq 0 ] && [ "$n1" -eq 17 ] || { echo "SOME FAILED ($n1/17)"; exit 1; }
+n1=$(echo "$out" | grep -c 'PASS '); [ $rc -eq 0 ] && [ "$n1" -eq 19 ] || { echo "SOME FAILED ($n1/19)"; exit 1; }
 out=$($PSQL -q -f tests/sql/support_measurement/support-scope.sql 2>&1); rc=$?
 echo "$out" | grep -o 'PASS .*\|ERROR.*\|ASSERT.*'
 n2=$(echo "$out" | grep -c 'PASS '); [ $rc -eq 0 ] && [ "$n2" -eq 1 ] || { echo "SOME FAILED support-scope"; exit 1; }
