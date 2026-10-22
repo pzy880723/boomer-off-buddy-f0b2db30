@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { listCategories, type CategoryRow } from "@/lib/categories.functions";
-import { INV_CATEGORIES, CATEGORY_LABEL as SEED_LABEL } from "@/lib/inventory.helpers";
+import { INV_CATEGORIES } from "@/lib/inventory.helpers";
+import { resolveCategoryLabel } from "@/lib/commerce/category-labels";
 
 const FALLBACK: CategoryRow[] = INV_CATEGORIES.map((c, i) => ({
   id: c.value,
@@ -28,15 +29,10 @@ export function useCategories() {
         (row) => row.is_active && row.parent_id !== null && activeRootIds.has(row.parent_id),
       )
     : rows.filter((row) => row.is_active);
-  const byId = new Map(rows.map((row) => [row.id, row]));
-  const labelOf = (code: string) =>
-    rows.find((r) => r.code === code)?.name ?? SEED_LABEL[code] ?? code;
-  const displayLabelOf = (code: string) => {
-    const row = rows.find((item) => item.code === code);
-    if (!row) return SEED_LABEL[code] ?? code;
-    const parent = row.parent_id ? byId.get(row.parent_id) : null;
-    return parent ? `${parent.name} / ${row.name}` : row.name;
-  };
+  // 只显示真实字典中文（含内置种子），缺失显示“未归类”，绝不把英文编码当名称。
+  const dictRows = rows.map((r) => ({ id: r.id, code: r.code, name: r.name, parent_id: r.parent_id }));
+  const labelOf = (code: string) => resolveCategoryLabel(code, dictRows).name ?? "未归类";
+  const displayLabelOf = (code: string) => resolveCategoryLabel(code, dictRows).path.join(" / ") || "未归类";
   return {
     rows,
     active,

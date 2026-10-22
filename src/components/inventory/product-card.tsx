@@ -3,7 +3,7 @@ import { Tags, Boxes, Printer, ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CATEGORY_LABEL, formatPrice, type StandardProductGroup, type SkuRow } from "@/lib/inventory.helpers";
+import { formatPrice, type StandardProductGroup, type SkuRow } from "@/lib/inventory.helpers";
 import { toThumbUrl } from "@/lib/image";
 import { isInFankuang } from "@/lib/commerce/fankuang";
 import { ProductStatusPills } from "@/components/inventory/product-mark-pills";
@@ -22,6 +22,7 @@ export function StandardProductCard({
   const visibleTiers = group.tiers.slice(0, 3);
   const remaining = group.tiers.length - visibleTiers.length;
   const cover = coverOverride ?? group.image_url;
+  const { displayLabelOf: categoryText } = useCategories();
   return (
     <div className="relative">
       <Link to="/inventory/products/$code" params={{ code: group.key }} className="block">
@@ -90,6 +91,7 @@ export function SingleSkuCard({
   const isBundle = row.kind === "bundle";
   const bundleItems = Array.isArray(row.bundle_items) ? row.bundle_items : [];
   const cover = coverOverride ?? row.image_url;
+  const { displayLabelOf: categoryText } = useCategories();
   return (
     <div className="relative">
       <Link to="/inventory/skus/$id" params={{ id: row.id }} className="block">
@@ -168,6 +170,7 @@ export function StandardProductRow({
   const visibleTiers = group.tiers.slice(0, 4);
   const remaining = group.tiers.length - visibleTiers.length;
   const cover = coverOverride ?? group.image_url;
+  const { displayLabelOf: categoryText } = useCategories();
   return (
     <div className="flex items-center gap-3 border-b px-3 py-2.5 transition-colors last:border-b-0 hover:bg-muted/60">
       <Link
@@ -225,6 +228,7 @@ export function SingleSkuRow({
   const isBundle = row.kind === "bundle";
   const bundleItems = Array.isArray(row.bundle_items) ? row.bundle_items : [];
   const cover = coverOverride ?? row.image_url;
+  const { displayLabelOf: categoryText } = useCategories();
   return (
     <div className="flex items-center gap-3 border-b px-3 py-2.5 transition-colors last:border-b-0 hover:bg-muted/60">
       <Link

@@ -1,3 +1,4 @@
+import { ProductStatusPills } from "@/components/inventory/product-mark-pills";
 import { useState, useRef } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -121,6 +122,10 @@ function SkuDetailPage() {
                 {isBundle ? ` · 含 ${bundleChildren.length} 种子项` : ""}
               </p>
               <h1 className="mt-1 text-xl font-bold leading-tight sm:text-2xl">{sku.name}</h1>
+              <ProductStatusPills className="mt-2" sku={sku} leading={<>
+                <Badge variant={sku.status === "active" ? "default" : "secondary"} className="text-[10px]">{sku.status === "active" ? "在售" : "已归档"}</Badge>
+                {sku.grade && <Badge variant="outline" className="text-[10px]">成色 {sku.grade}</Badge>}
+              </>} />
             </div>
 
             <div className="rounded-lg bg-muted/50 p-3">
