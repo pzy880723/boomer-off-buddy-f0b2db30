@@ -6,7 +6,7 @@ import {
   isRetryableRecognitionError,
   logRecognitionEvent,
   recognitionErrorKind,
-} from "./product-recognition.server.ts";
+} from "./recognition-reliability.ts";
 /** Per-attempt server budget for the quick title; at most one automatic retry (~25s total). */
 export const PRODUCT_TITLE_TIMEOUT_MS = 12_000;
 export const PRODUCT_TITLE_MAX_ATTEMPTS = 2;
