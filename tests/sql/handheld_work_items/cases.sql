@@ -65,7 +65,8 @@ BEGIN
   BEGIN
     PERFORM measurement_task_dismiss(task, u_b, loc_b, measurement_task_request_version(task));
     ASSERT false, 'cross-store dismiss not rejected';
-  EXCEPTION WHEN raise_exception THEN NULL;
+  EXCEPTION WHEN OTHERS THEN
+    ASSERT SQLERRM = 'task_location_mismatch', 'unexpected error: ' || SQLERRM;
   END;
   RAISE NOTICE 'PASS 7 cross-store rejected';
 
