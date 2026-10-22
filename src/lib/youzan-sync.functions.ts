@@ -1357,7 +1357,7 @@ export async function ensureHqSpuLink(
           }),
           timeoutMs: 20_000,
         });
-        const refreshed = await findHqSpuById(token, Number(existed.yz_item_id), true);
+        const refreshed = await readAfterHqUpdate(() => findHqSpuById(token, Number(existed.yz_item_id), true));
         if (!refreshed) throw new Error("总部商品更新后无法回读关系编码");
         remote.spuCode = refreshed.spuCode;
         remote.skuCode = refreshed.skuCode;
@@ -1469,7 +1469,7 @@ export async function ensureHqSpuLink(
         priceYuan: Number(sku.price_tier), kdtIds, imageUrls: finalImages }),
       timeoutMs: 20_000,
     });
-    const refreshed = await findHqSpuById(token, newSpuId, true);
+    const refreshed = await readAfterHqUpdate(() => findHqSpuById(token, newSpuId, true));
     if (!refreshed) throw new Error("总部商品更新后无法回读关系编码");
     newSpuCode = refreshed.spuCode;
     newSkuCode = refreshed.skuCode;
