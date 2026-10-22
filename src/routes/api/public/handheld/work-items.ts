@@ -13,7 +13,7 @@ export const Route=createFileRoute('/api/public/handheld/work-items')({server:{h
   const base=await resolveNotificationScope({userId:session.user_id,deviceId:auth.device.id,deviceLocationId:auth.device.location_id});
   const scoped=applyRequestedLocation(base,input.data.location_id);
   if(!scoped.ok)return err('Location not authorized',403,{code:'location_forbidden'});
-  try{const {loadWorkItems}=await import('@/server/handheld-work-items.server');return ok(await loadWorkItems(scoped.scope,input.data.limit,input.data.cursor));}
+  try{const {loadWorkItems}=await import('@/server/handheld-work-items.server');return ok(await loadWorkItems(scoped.scope,input.data.limit,input.data.cursor,{includeIgnored:input.data.include_ignored,ignoredOnly:input.data.ignored_only}));}
   catch(error){console.error('[work-items]',error instanceof Error?error.message:'unavailable');return err('Work items temporarily unavailable',500,{code:'work_items_unavailable'});}
  }
 }}});

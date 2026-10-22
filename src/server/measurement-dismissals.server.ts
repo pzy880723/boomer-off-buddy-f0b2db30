@@ -74,13 +74,25 @@ export async function applyMeasurementDismissal(
     },
   );
   if (error) return mapRpcError(error);
-  const row = data as { dismissed?: boolean; task_id?: string; request_version?: string } | null;
+  // 严格校验 RPC 结果：task_id 回显一致、dismissed 为布尔、request_version 为字符串；
+  // 缺失或变形一律 500，绝不用请求参数 fallback 伪成功。
+  const row = data as { dismissed?: unknown; task_id?: unknown; request_version?: unknown } | null;
+  if (
+    !row ||
+    typeof row !== "object" ||
+    row.task_id !== body.task_id ||
+    typeof row.dismissed !== "boolean" ||
+    typeof row.request_version !== "string" ||
+    row.request_version.length === 0
+  ) {
+    return { ok: false, status: 500, code: "dismissal_failed", message: "Dismissal temporarily unavailable" };
+  }
   return {
     ok: true,
     data: {
-      dismissed: row?.dismissed === true,
-      task_id: row?.task_id ?? body.task_id,
-      request_version: row?.request_version ?? body.request_version,
+      dismissed: row.dismissed,
+      task_id: row.task_id,
+      request_version: row.request_version,
     },
   };
 }

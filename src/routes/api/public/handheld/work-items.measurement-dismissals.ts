@@ -32,11 +32,14 @@ async function handle(request: Request, mode: "dismiss" | "undismiss") {
   const result = await applyMeasurementDismissal(
     {
       rpc: async (name, args) => {
-        const rpc = supabaseAdmin.rpc as unknown as (
-          n: string,
-          a: Record<string, unknown>,
-        ) => Promise<{ data: unknown; error: { message: string; code?: string } | null }>;
-        const { data, error } = await rpc(name, args);
+        // 必须以方法调用形式走原 client（rpc 内部依赖 this.rest），不能拆成独立变量。
+        const client = supabaseAdmin as unknown as {
+          rpc: (
+            n: string,
+            a: Record<string, unknown>,
+          ) => Promise<{ data: unknown; error: { message: string; code?: string } | null }>;
+        };
+        const { data, error } = await client.rpc(name, args);
         return { data, error: error ? { message: error.message, code: error.code } : null };
       },
     },

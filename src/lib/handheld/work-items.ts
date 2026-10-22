@@ -19,8 +19,8 @@ export function decodeWorkCursor(cursor?:string): {ts:string;id:string}|null {
 export type WorkItem={
  id:string;type:string;title:string;description:string;meta:string|null;urgency?:'normal'|'urgent';
  action:string;target_id:string;sku_id?:string|null;conversation_id?:string|null;image_url?:string|null;
- /** 测量行专有：任务 id / 请求版本（含微秒的时间戳字符串）/ 当前员工可否忽略 / 是否已被本人忽略。 */
- measurement_task_id?:string|null;measurement_request_version?:string|null;can_ignore?:boolean;ignored?:boolean;
+ /** 测量行专有：任务 id / 请求版本（含微秒的时间戳字符串）/ 当前员工可否忽略 / 是否已被本人忽略 / 可否撤销忽略。 */
+ measurement_task_id?:string|null;measurement_request_version?:string|null;can_ignore?:boolean;ignored?:boolean;can_restore?:boolean;
 };
 export function parseWorkCounts(raw:unknown):UnreadCounts {
  const parsed=parseUnreadCounts(raw); if(!parsed.ok) throw new Error('pending_counts_contract_error'); return parsed.data;
