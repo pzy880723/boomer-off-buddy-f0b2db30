@@ -972,12 +972,14 @@ test("deleted product stays hidden after refresh in store, HQ and barcode lookup
 });
 
 test("list and detail expose dictionary category name/path while keeping raw code", async () => {
-  const res = await call("list", "/api/public/handheld/products?location_id=" + A, "hq");
-  const body = (await res.json()) as any;
-  const item = body.data.items.find((i: any) => i.category === "toy_model");
+  const list = await call("list", `location_id=${A}&status=all`);
+  assert.equal(list.status, 200);
+  const item = list.body.data.items.find((i: Row) => i.category === "toy_model");
   assert.ok(item, "fixture item present");
-  assert.equal(item.category, "toy_model");
   assert.equal(item.category_name, "模型");
   assert.deepEqual(item.category_path, ["玩具", "模型"]);
   assert.ok(Array.isArray(item.mark_labels));
+  const detail = await call("detail", `location_id=${A}`, "hq", item.id);
+  assert.equal(detail.body.data.category, "toy_model");
+  assert.equal(detail.body.data.category_name, "模型");
 });
