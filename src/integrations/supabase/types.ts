@@ -6321,6 +6321,48 @@ export type Database = {
           },
         ]
       }
+      measurement_task_dismissals: {
+        Row: {
+          created_at: string
+          id: string
+          location_id: string
+          request_version: string
+          task_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          location_id: string
+          request_version: string
+          task_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          location_id?: string
+          request_version?: string
+          task_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "measurement_task_dismissals_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "measurement_task_dismissals_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "product_measurement_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meruki_accounts: {
         Row: {
           cookie_expires_at: string | null
@@ -12002,6 +12044,7 @@ export type Database = {
         Args: { p_kind: string }
         Returns: string
       }
+      handheld_notification_kinds: { Args: never; Returns: string[] }
       handheld_notifications_changes: {
         Args: {
           p_after_seq: number
@@ -12180,6 +12223,14 @@ export type Database = {
         Args: { p_op_id: string; p_response: Json }
         Returns: undefined
       }
+      handheld_sync_failure_project: {
+        Args: { p_queue: string; p_row_id: string }
+        Returns: undefined
+      }
+      handheld_sync_failure_reconcile: {
+        Args: { p_days?: number; p_limit?: number }
+        Returns: number
+      }
       handheld_unread_counts: {
         Args: {
           p_device_id: string
@@ -12193,6 +12244,8 @@ export type Database = {
         Args: {
           p_cursor_id?: string
           p_cursor_ts?: string
+          p_ignored_only?: boolean
+          p_include_ignored?: boolean
           p_include_unlocated?: boolean
           p_limit?: number
           p_location_ids: string[]
@@ -12443,9 +12496,31 @@ export type Database = {
         Args: { p_sku_id: string }
         Returns: undefined
       }
+      measurement_task_dismiss: {
+        Args: {
+          p_location_id: string
+          p_request_version: string
+          p_task_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       measurement_task_rebalance: {
         Args: { p_sku_id: string }
         Returns: string
+      }
+      measurement_task_request_version: {
+        Args: { p_task_id: string }
+        Returns: string
+      }
+      measurement_task_undismiss: {
+        Args: {
+          p_location_id: string
+          p_request_version: string
+          p_task_id: string
+          p_user_id: string
+        }
+        Returns: Json
       }
       pos_complete_return: {
         Args: {
