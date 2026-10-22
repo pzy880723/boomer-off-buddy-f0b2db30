@@ -13,3 +13,11 @@ test("parses composite list cursor; legacy ts stays legacy", () => {
   assert.equal(parseListCursor("2026-01-01T00:00:00.000Z"), null);
   assert.equal(parseListCursor("2026-01-01T00:00:00Z|x),or(id.gt.0"), null);
 });
+
+test("list cursor preserves microsecond precision (no Date round-trip)", () => {
+  const c = parseListCursor("2026-10-22T13:44:34.918254+00:00|00000000-0000-0000-0000-0000000000a1");
+  assert.deepEqual(c, { ts: "2026-10-22T13:44:34.918254+00:00", id: "00000000-0000-0000-0000-0000000000a1" });
+  // 同一毫秒内不同微秒的行不能被游标截断丢失
+  const c2 = parseListCursor("2026-10-22T13:44:34.918999Z|00000000-0000-0000-0000-0000000000a2");
+  assert.equal(c2?.ts, "2026-10-22T13:44:34.918999Z");
+});
