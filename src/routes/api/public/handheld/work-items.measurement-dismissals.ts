@@ -6,29 +6,49 @@ import {
   ok,
   err,
 } from "@/server/handheld-auth.server";
-import { resolveNotificationScope } from "@/server/handheld-notifications.server";
-import { applyMeasurementDismissal } from "@/server/measurement-dismissals.server";
+import { resolveWorkScope } from "@/server/handheld-work-items.server";
+import {
+  applyMeasurementDismissal,
+  authorizeMeasurementTaskLocation,
+  dismissalInput,
+} from "@/server/measurement-dismissals.server";
 
 // 测量任务「个人忽略」：POST 忽略 / DELETE 撤销，body 均为
 // { location_id, task_id, request_version }。员工身份只取 session，绝不信任 body user_id；
-// 门店授权在 DB 写之前完成，任务归属/状态/版本由 DB 函数原子复核。
+// 授权按任务真实所属 scope：带有效客服卡的任务可按已授权 support scope（或 general scope），
+// 孤立任务必须 general scope——两个门店数组独立判断，绝不混并扩大业务访问；
+// 任务归属/状态/版本由 DB 函数原子复核。
 async function handle(request: Request, mode: "dismiss" | "undismiss") {
   const auth = await authenticateDevice(request);
   if (!auth.ok) return auth.response;
   const session = await resolveSessionUser(request);
   if (!session) return err("Employee session required", 401, { code: "session_required" });
-  const scope = await resolveNotificationScope({
-    userId: session.user_id,
-    deviceId: auth.device.id,
-    deviceLocationId: auth.device.location_id,
-  });
   let body: unknown;
   try {
     body = await request.json();
   } catch {
     return err("Invalid body", 400, { code: "validation_error" });
   }
+  const parsed = dismissalInput.safeParse(body);
+  if (!parsed.success) return err("Invalid body", 400, { code: "validation_error" });
+  const scope = await resolveWorkScope({
+    userId: session.user_id,
+    deviceId: auth.device.id,
+    deviceLocationId: auth.device.location_id,
+  });
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const authz = await authorizeMeasurementTaskLocation(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    { from: (table: string) => supabaseAdmin.from(table as never) as any },
+    {
+      general_location_ids: scope.location_ids,
+      general_include_unlocated: scope.is_hq,
+      support_location_ids: scope.support_location_ids,
+      support_include_unlocated: scope.support_include_unlocated,
+    },
+    parsed.data.task_id,
+  );
+  if (!authz.ok) return err(authz.message, authz.status, { code: authz.code });
   const result = await applyMeasurementDismissal(
     {
       rpc: async (name, args) => {
@@ -43,7 +63,7 @@ async function handle(request: Request, mode: "dismiss" | "undismiss") {
         return { data, error: error ? { message: error.message, code: error.code } : null };
       },
     },
-    { user_id: session.user_id, location_ids: scope.location_ids },
+    { user_id: session.user_id, location_ids: [authz.location_id] },
     body,
     mode,
   );
