@@ -115,13 +115,18 @@ describe("full recognition", () => {
 });
 
 describe("title budget and naming rules (2026-10-13 follow-up)", () => {
-  test("quick title uses a bounded 12s budget and makes exactly one request on failure", async () => {
+  test("quick title uses a bounded 12s budget and retries a transient failure at most once", async () => {
     const t = await import("./product-title.server.ts");
     assert.equal(t.PRODUCT_TITLE_TIMEOUT_MS, 12_000);
+    assert.equal(t.PRODUCT_TITLE_MAX_ATTEMPTS, 2);
     let calls = 0, signal: AbortSignal | undefined;
     await assert.rejects(t.recognizeProductTitle("YWJj", allow, async (_u, init) => { calls++; signal = init?.signal ?? undefined; return new Response("x", { status: 503 }); }, "gw"), /503/);
-    assert.equal(calls, 1);
+    assert.equal(calls, 2);
     assert.ok(signal && !signal.aborted);
+    // Permanent 4xx still makes exactly one request.
+    let permanentCalls = 0;
+    await assert.rejects(t.recognizeProductTitle("YWJj", allow, async () => { permanentCalls++; return new Response("x", { status: 403 }); }, "gw"), /403/);
+    assert.equal(permanentCalls, 1);
   });
   test("quick + handheld full prompts: role/IP + shape/material + object, no aliases/descriptions/dates", () => {
     const full = rec.buildEraInstruction("handheld");
