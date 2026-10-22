@@ -810,6 +810,7 @@ test("detail: preserves every existing identity, price, label, image and print f
     in_fankuang: true,
     featured_stamp: null,
     notice_tags: [],
+    mark_labels: [],
     can_edit: false,
     can_delete: false,
     sku_code: "a",
@@ -817,6 +818,8 @@ test("detail: preserves every existing identity, price, label, image and print f
     epc: "epc-a",
     name: "Product a",
     category: "toy_model",
+    category_name: "模型",
+    category_path: ["玩具", "模型"],
     facet_codes: ["ceramic", "retro"],
     tags: ["Ceramic", "Retro"],
     facets: [
