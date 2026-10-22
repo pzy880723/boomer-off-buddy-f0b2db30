@@ -722,6 +722,13 @@
       "when": 1792695157914,
       "tag": "0102_handheld_scoped_work_items_ignore",
       "breakpoints": true
+    },
+    {
+      "idx": 103,
+      "version": "7",
+      "when": 1792695691416,
+      "tag": "0103_handheld_sync_project_recovered_reset",
+      "breakpoints": true
     }
   ]
 }
