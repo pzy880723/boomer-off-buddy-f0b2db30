@@ -30,7 +30,8 @@ EXCEPTION WHEN check_violation THEN RAISE NOTICE 'PASS stamp CHECK guards direct
 SELECT t(upd(:HQ, '{"notice_tags":["parts_missing","function_unavailable","flawed"]}') = '["notice_tags"]', 'parts_missing accepted with others');
 SELECT t((SELECT notice_tags='{flawed,function_unavailable,parts_missing}' FROM inv_skus), 'parts_missing normalized last in dictionary order');
 SELECT t(upd(:HQ, '{"notice_tags":["function_uncertain","function_unavailable","parts_missing"]}') LIKE 'ERR:validation_error%', 'exclusivity still enforced with parts_missing');
-SELECT t(upd(:HQ, '{"notice_tags":["flawed","function_unavailable"]}') = '["notice_tags"]'
+CREATE TEMP TABLE rmv AS SELECT upd(:HQ, '{"notice_tags":["flawed","function_unavailable"]}') r;
+SELECT t((SELECT r FROM rmv) = '["notice_tags"]'
   AND (SELECT notice_tags='{flawed,function_unavailable}' AND featured_stamp IS NULL FROM inv_skus), 'removing parts_missing clears it, stamp untouched');
 DO $$ BEGIN
   BEGIN UPDATE inv_skus SET notice_tags='{parts_missing,parts_missing}'; RAISE EXCEPTION 'FAIL duplicate parts_missing allowed';
