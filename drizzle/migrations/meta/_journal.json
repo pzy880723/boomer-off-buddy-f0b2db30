@@ -729,6 +729,13 @@
       "when": 1792695691416,
       "tag": "0103_handheld_sync_project_recovered_reset",
       "breakpoints": true
+    },
+    {
+      "idx": 104,
+      "version": "7",
+      "when": 1792711787609,
+      "tag": "0104_notice_tag_parts_missing",
+      "breakpoints": true
     }
   ]
 }
