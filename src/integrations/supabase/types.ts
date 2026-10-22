@@ -3063,6 +3063,141 @@ export type Database = {
         }
         Relationships: []
       }
+      erp_push_deliveries: {
+        Row: {
+          attempts: number
+          event_id: string
+          install_id: string
+          last_reason: string | null
+          last_status: number | null
+          lease_id: string | null
+          retry_at: string
+          revision: string | null
+          sent_at: string | null
+          state: string
+        }
+        Insert: {
+          attempts?: number
+          event_id: string
+          install_id: string
+          last_reason?: string | null
+          last_status?: number | null
+          lease_id?: string | null
+          retry_at?: string
+          revision?: string | null
+          sent_at?: string | null
+          state?: string
+        }
+        Update: {
+          attempts?: number
+          event_id?: string
+          install_id?: string
+          last_reason?: string | null
+          last_status?: number | null
+          lease_id?: string | null
+          retry_at?: string
+          revision?: string | null
+          sent_at?: string | null
+          state?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "erp_push_deliveries_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "erp_push_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "erp_push_deliveries_install_id_fkey"
+            columns: ["install_id"]
+            isOneToOne: false
+            referencedRelation: "erp_push_installations"
+            referencedColumns: ["install_id"]
+          },
+        ]
+      }
+      erp_push_events: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          source_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind: string
+          source_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          source_id?: string
+        }
+        Relationships: []
+      }
+      erp_push_installations: {
+        Row: {
+          activated_at: string
+          apns_token: string
+          client_sequence: number
+          device_id: string
+          enabled: boolean
+          environment: string
+          install_id: string
+          location_id: string | null
+          revision: string
+          session_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          activated_at?: string
+          apns_token: string
+          client_sequence: number
+          device_id: string
+          enabled?: boolean
+          environment: string
+          install_id: string
+          location_id?: string | null
+          revision?: string
+          session_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          activated_at?: string
+          apns_token?: string
+          client_sequence?: number
+          device_id?: string
+          enabled?: boolean
+          environment?: string
+          install_id?: string
+          location_id?: string | null
+          revision?: string
+          session_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "erp_push_installations_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "inv_handheld_devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "erp_push_installations_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fulfillment_exceptions: {
         Row: {
           created_at: string
@@ -11490,6 +11625,70 @@ export type Database = {
         Args: { p_location: string; p_sku: string }
         Returns: number
       }
+      erp_push_can_deliver: {
+        Args: { p_event: string; p_install: string }
+        Returns: boolean
+      }
+      erp_push_claim: {
+        Args: { p_limit?: number }
+        Returns: {
+          attempts: number
+          event_id: string
+          install_id: string
+          last_reason: string | null
+          last_status: number | null
+          lease_id: string | null
+          retry_at: string
+          revision: string | null
+          sent_at: string | null
+          state: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "erp_push_deliveries"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      erp_push_finish: {
+        Args: {
+          p_disable: boolean
+          p_event: string
+          p_install: string
+          p_lease: string
+          p_reason: string
+          p_revision: string
+          p_state: string
+          p_status: number
+        }
+        Returns: undefined
+      }
+      erp_push_location_allowed: {
+        Args: { p_location: string; p_support?: boolean; p_user: string }
+        Returns: boolean
+      }
+      erp_push_register: {
+        Args: {
+          p_device: string
+          p_enabled: boolean
+          p_install: string
+          p_location: string
+          p_sequence: number
+          p_session: string
+          p_token: string
+          p_user: string
+        }
+        Returns: boolean
+      }
+      erp_push_target: {
+        Args: {
+          p_event: string
+          p_install: string
+          p_lease: string
+          p_revision: string
+        }
+        Returns: Json
+      }
       finish_channel_sync_task: {
         Args: {
           p_error?: string
@@ -11846,6 +12045,16 @@ export type Database = {
         }
         Returns: Json
       }
+      handheld_pending_counts_scoped: {
+        Args: {
+          p_include_unlocated?: boolean
+          p_location_ids: string[]
+          p_support_include_unlocated?: boolean
+          p_support_location_ids?: string[]
+          p_user_id: string
+        }
+        Returns: Json
+      }
       handheld_product_content:
         | {
             Args: {
@@ -11987,6 +12196,19 @@ export type Database = {
           p_include_unlocated?: boolean
           p_limit?: number
           p_location_ids: string[]
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      handheld_work_items_scoped: {
+        Args: {
+          p_cursor_id?: string
+          p_cursor_ts?: string
+          p_include_unlocated?: boolean
+          p_limit?: number
+          p_location_ids: string[]
+          p_support_include_unlocated?: boolean
+          p_support_location_ids?: string[]
           p_user_id: string
         }
         Returns: Json
@@ -12539,6 +12761,15 @@ export type Database = {
         Returns: boolean
       }
       support_actor_is_hq: { Args: { p_actor: string }; Returns: boolean }
+      support_conversation_pending: {
+        Args: { p_conversation_ids: string[] }
+        Returns: {
+          conversation_id: string
+          needs_reply: boolean
+          pending_action: boolean
+          pending_measurement_count: number
+        }[]
+      }
       support_conversation_stats: {
         Args: {
           p_conversation_ids: string[]
