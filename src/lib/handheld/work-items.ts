@@ -1,14 +1,14 @@
 import { z } from 'zod';
 import { parseUnreadCounts, type UnreadCounts } from './unread-counts';
 const uuid = z.string().uuid();
-// include_ignored / ignored_only：测量个人忽略的可选视图参数；只接受字面 "true"，旧客户端不传即 false。
-const trueFlag = z.literal('true').transform(() => true as boolean);
+// include_ignored / ignored_only：测量个人忽略的可选视图参数；只接受字面 "true"/"false"，旧客户端不传即 false。
+const boolFlag = z.enum(['true', 'false']).optional().transform(v => v === 'true');
 export const workItemsInput = z.object({
   location_id: uuid.optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
   cursor: z.string().max(160).optional(),
-  include_ignored: trueFlag.optional().catch(undefined).transform(v => v === true),
-  ignored_only: trueFlag.optional().catch(undefined).transform(v => v === true),
+  include_ignored: boolFlag,
+  ignored_only: boolFlag,
 }).strict();
 export function decodeWorkCursor(cursor?:string): {ts:string;id:string}|null {
  if(!cursor) return null;
