@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { CATEGORY_LABEL, formatPrice, type StandardProductGroup, type SkuRow } from "@/lib/inventory.helpers";
 import { toThumbUrl } from "@/lib/image";
 import { isInFankuang } from "@/lib/commerce/fankuang";
+import { ProductStatusPills } from "@/components/inventory/product-mark-pills";
+import { useCategories } from "@/hooks/use-categories";
 
 /** 标准商品卡：聚合多价格档 */
 export function StandardProductCard({
@@ -56,7 +58,7 @@ export function StandardProductCard({
           </div>
           <div className="p-3">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-              {CATEGORY_LABEL[group.category] ?? group.category} · 标准
+              {categoryText(group.category)} · 标准
             </p>
             <p className="mt-1 line-clamp-1 text-sm font-medium">{group.name}</p>
             <p className="mt-1 text-[10px] text-muted-foreground">
@@ -127,14 +129,17 @@ export function SingleSkuCard({
           </div>
           <div className="p-3">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-              {CATEGORY_LABEL[row.category] ?? row.category} · {isBundle ? "组包" : "自定义"}
+              {categoryText(row.category)} · {isBundle ? "组包" : "自定义"}
             </p>
             <p className="mt-1 line-clamp-1 text-sm font-medium">{row.name}</p>
+            <ProductStatusPills className="mt-1" sku={row} leading={<>
+              {row.grade && <Badge variant="outline" className="text-[10px]">成色 {row.grade}</Badge>}
+              {isInFankuang(row) && <Badge variant="secondary" className="text-[10px]">翻筐乐</Badge>}
+            </>} />
             <p className="mt-1 flex items-center gap-1 font-mono text-[10px] text-muted-foreground">
               <Printer className="h-2.5 w-2.5" />
               {row.epc}
             </p>
-            {isInFankuang(row) && <Badge variant="secondary" className="mt-1 text-[10px]">翻筐乐</Badge>}
             {row.sku_code && (
               <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">编码：{row.sku_code}</p>
             )}
@@ -185,7 +190,7 @@ export function StandardProductRow({
             <Badge variant="outline" className="text-[10px]">标准</Badge>
           </div>
           <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-            {CATEGORY_LABEL[group.category] ?? group.category}
+            {categoryText(group.category)}
             {group.code && <span className="ml-2 font-mono">{group.code}</span>}
           </p>
         </div>
@@ -247,13 +252,16 @@ export function SingleSkuRow({
               <Badge variant="outline" className="text-[10px]">自定义</Badge>
             )}
           </div>
+          <ProductStatusPills className="mt-1" sku={row} leading={<>
+            {row.grade && <Badge variant="outline" className="text-[10px]">成色 {row.grade}</Badge>}
+            {isInFankuang(row) && <Badge variant="secondary" className="text-[10px]">翻筐乐</Badge>}
+          </>} />
           <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-muted-foreground">
-            {CATEGORY_LABEL[row.category] ?? row.category}
+            {categoryText(row.category)}
             <span className="mx-1">·</span>
             <Printer className="h-2.5 w-2.5" />
             <span className="font-mono">{row.epc}</span>
           </p>
-          {isInFankuang(row) && <Badge variant="secondary" className="mt-1 text-[10px]">翻筐乐</Badge>}
         </div>
         <Badge className="bg-primary/90 text-primary-foreground tabular-nums">{formatPrice(row.price_tier)}</Badge>
         <div className="w-20 text-right text-xs tabular-nums">
