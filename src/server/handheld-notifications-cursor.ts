@@ -15,3 +15,14 @@ export function parseChangeCursor(cursor: string): { xid: string; seq: number } 
   return m ? { xid: m[1], seq: Number(m[2]) } : null;
 }
 
+
+/**
+ * 同步失败恢复投影的触发条件：仅通知列表首次页（无游标）且全部分类或 system 分类时
+ * 触发一次 handheld_sync_failure_reconcile；其他分类与后续分页不额外扫描。
+ */
+export function shouldReconcileSyncFailures(
+  cursor: string | null | undefined,
+  category: string | null | undefined,
+): boolean {
+  return !cursor && (!category || category === "system");
+}

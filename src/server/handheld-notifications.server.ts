@@ -2,7 +2,7 @@
 // 可见范围 = 定向给本人 OR 定向给本设备 OR 本人有权限的库位 OR 全局广播。
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { loadUserRoles } from "@/server/handheld-auth.server";
-import { parseListCursor } from "@/server/handheld-notifications-cursor";
+import { parseListCursor, shouldReconcileSyncFailures } from "@/server/handheld-notifications-cursor";
 import { alertFields } from "@/server/handheld-alerts";
 import {
   notificationKindCategory,
@@ -173,6 +173,12 @@ export async function listNotifications(input: {
   unreadOnly?: boolean;
   category?: NotificationCategory;
 }): Promise<{ items: NotificationItem[]; next_cursor: string | null; next_page_cursor: string | null }> {
+  // 同步失败通知的恢复投影：仅首次/系统页触发一次尽力 reconcile（按真实队列终态标记
+  // recovered / 清回过期 recovered）；其他分类与后续分页不额外扫描，失败不阻断读取。
+  if (shouldReconcileSyncFailures(input.cursor, input.category)) {
+    const { error } = await supabaseAdmin.rpc('handheld_sync_failure_reconcile' as never, { p_days: 7, p_limit: 100 } as never);
+    if (error) console.warn('[notifications] sync reconciliation unavailable');
+  }
   let query = supabaseAdmin
     .from("inv_handheld_notifications" as never)
     .select(SELECT)
