@@ -129,17 +129,49 @@ export async function authorizeMeasurementTaskLocation(
   if (!task) {
     return { ok: false, status: 404, code: "task_not_found", message: "Measurement task not found" };
   }
-  // 有效客服卡 = 该任务存在挂在客服会话上的 measurement_request 请求行（卡片与 requester 同一事务写入）。
-  const linkRes = await deps
-    .from("product_measurement_requesters")
+  // 有效客服卡 = 三联全部匹配，仅 requester 非空不算：
+  // 1) support_messages 存在 card_kind='measurement_request' 且 measurement_task_id=本任务 的卡片；
+  // 2) 卡片所在会话 location_id = 任务门店；
+  // 3) requester 行的 conversation_id=该会话 且 customer_id=会话客户。
+  const msgRes = await deps
+    .from("support_messages")
     .select("conversation_id")
-    .eq("task_id", taskId)
-    .not("conversation_id", "is", null)
-    .limit(1);
-  if (linkRes.error) {
+    .eq("card_kind", "measurement_request")
+    .eq("measurement_task_id", taskId);
+  if (msgRes.error) {
     return { ok: false, status: 500, code: "dismissal_failed", message: "Dismissal temporarily unavailable" };
   }
-  const carded = (linkRes.data ?? []).length > 0;
+  const convIds = [...new Set((msgRes.data ?? []).map((m: { conversation_id: string }) => m.conversation_id))];
+  let carded = false;
+  if (convIds.length > 0) {
+    const convRes = await deps
+      .from("support_conversations")
+      .select("id,customer_id,location_id")
+      .in("id", convIds);
+    if (convRes.error) {
+      return { ok: false, status: 500, code: "dismissal_failed", message: "Dismissal temporarily unavailable" };
+    }
+    const convs = (convRes.data ?? []).filter(
+      (c: { id: string; customer_id: string | null; location_id: string | null }) =>
+        c.location_id === task.location_id && c.customer_id,
+    );
+    if (convs.length > 0) {
+      const reqRes = await deps
+        .from("product_measurement_requesters")
+        .select("conversation_id,customer_id")
+        .eq("task_id", taskId)
+        .in("conversation_id", convs.map((c: { id: string }) => c.id));
+      if (reqRes.error) {
+        return { ok: false, status: 500, code: "dismissal_failed", message: "Dismissal temporarily unavailable" };
+      }
+      carded = (reqRes.data ?? []).some((r: { conversation_id: string; customer_id: string | null }) =>
+        convs.some(
+          (c: { id: string; customer_id: string | null }) =>
+            c.id === r.conversation_id && c.customer_id === r.customer_id,
+        ),
+      );
+    }
+  }
   const locationId = task.location_id;
   if (!locationId) {
     const allowed = carded ? scope.support_include_unlocated : scope.general_include_unlocated;
