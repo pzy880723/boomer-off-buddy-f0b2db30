@@ -89,9 +89,7 @@ export async function recognizeProductTitle(
     event: "product_title", request_id: requestId, attempts,
     duration_ms: Date.now() - startedAt, outcome: "failed",
     http_status: extractRecognitionHttpStatus(lastError),
-    error_kind: lastError && isRetryableRecognitionError(lastError)
-      ? (extractRecognitionHttpStatus(lastError) ? "transient" : "timeout")
-      : "permanent_4xx",
+    error_kind: lastError ? recognitionErrorKind(lastError) : null,
   });
   throw lastError ?? new Error("AI title unavailable");
 }
