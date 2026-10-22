@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { NoticeTagsSchema, NOTICE_TAG_LABELS, readProductMarks, productMarkLabels } from "./product-marks.ts";
 import { planMarkChange } from "./product-marks-batch.ts";
-import { resolveCategoryLabel } from "./category-labels.ts";
+import { resolveCategoryLabel, applyCategoryLabels } from "./category-labels.ts";
 import { buildStorefrontProduct } from "../../server/storefront-products.server.ts";
 
 test("parts_missing 零件缺失 is an allowed, combinable notice tag", () => {
@@ -65,4 +65,14 @@ test("storefront unknown category outputs null name, no placeholder", () => {
     category: null, brand: null, facets: [], availableQty: 0,
   }) as { primary_category: { code: string; name: string | null; path: string[] } };
   assert.deepEqual(q.primary_category, { code: "zz_unknown", name: null, path: [] });
+});
+
+test("handheld items keep raw category code and gain dictionary names", () => {
+  const rows = [{ id: "p", code: "ceramics", name: "陶瓷", parent_id: null }, { id: "c", code: "cup", name: "杯", parent_id: "p" }];
+  const [a, b] = applyCategoryLabels([
+    { id: "s1", category: "cup", category_name: null, category_path: [] },
+    { id: "s2", category: "zz", category_name: null, category_path: [] },
+  ], rows);
+  assert.deepEqual(a, { id: "s1", category: "cup", category_name: "杯", category_path: ["陶瓷", "杯"] });
+  assert.deepEqual(b, { id: "s2", category: "zz", category_name: null, category_path: [] });
 });
