@@ -708,6 +708,13 @@
       "when": 1792693152180,
       "tag": "0100_handheld_sync_recovery_masking_workitems_ignore",
       "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1792694278851,
+      "tag": "0101_handheld_sync_project_min_uuid_fix",
+      "breakpoints": true
     }
   ]
 }

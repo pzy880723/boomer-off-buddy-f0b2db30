@@ -16,6 +16,11 @@ export function decodeWorkCursor(cursor?:string): {ts:string;id:string}|null {
  if(parts.length!==2 || !uuid.safeParse(parts[1]).success || !/^\d{4}-\d\d-\d\dT/.test(parts[0]) || !Number.isFinite(Date.parse(parts[0]))) throw new Error('invalid_cursor');
  return {ts:parts[0],id:parts[1]};
 }
+/** 游标编码：RPC jsonb 的 last_ts 已是含微秒的 ISO 文本，必须原样透传；禁止 Date 往返（toISOString 只到毫秒，会吞掉同毫秒不同微秒的行）。 */
+export function encodeWorkCursor(ts:string,id:string):string {
+ const norm=ts.includes('T')?ts:ts.replace(' ','T');
+ return `${norm}|${id}`;
+}
 export type WorkItem={
  id:string;type:string;title:string;description:string;meta:string|null;urgency?:'normal'|'urgent';
  action:string;target_id:string;sku_id?:string|null;conversation_id?:string|null;image_url?:string|null;
