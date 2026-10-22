@@ -19,7 +19,7 @@ DO $$ DECLARE r jsonb; BEGIN
  ASSERT (r->'counts'->>'orders')::int=0 AND (r->'counts'->>'internal')::int=0 AND (r->'counts'->>'system')::int=0,
    'support-only account gained business work';
  ASSERT r->'counts'=handheld_pending_counts_scoped(NULL,'{}'::uuid[],false,ARRAY['5c000000-0000-4000-8000-00000000000b']::uuid[],true), 'count stream mismatch';
- ASSERT NOT has_function_privilege('anon','public.handheld_work_items_scoped(uuid,uuid[],boolean,integer,timestamptz,uuid,uuid[],boolean)','EXECUTE');
+ ASSERT NOT has_function_privilege('anon','public.handheld_work_items_scoped(uuid,uuid[],boolean,integer,timestamptz,uuid,uuid[],boolean,boolean,boolean)','EXECUTE');
  ASSERT NOT has_function_privilege('authenticated','public.handheld_pending_counts_scoped(uuid,uuid[],boolean,uuid[],boolean)','EXECUTE');
  RAISE NOTICE 'PASS independent support and business scopes, HQ-only support, count consistency, service-only grants';
 END $$;
