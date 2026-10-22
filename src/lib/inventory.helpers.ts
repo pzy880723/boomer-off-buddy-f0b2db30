@@ -108,6 +108,7 @@ export type SkuRow = {
   inventory_policy?: string | null;
   fankuang_override?: boolean | null;
   grade?: string | null;
+  updated_at?: string;
   featured_stamp?: string | null;
   notice_tags?: string[] | null;
   kind: string;
