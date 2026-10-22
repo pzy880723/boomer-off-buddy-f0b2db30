@@ -32,11 +32,11 @@ async function handle(request: Request, mode: "dismiss" | "undismiss") {
   const result = await applyMeasurementDismissal(
     {
       rpc: async (name, args) => {
-        const { data, error } = await supabaseAdmin.rpc(name, args);
+        const { data, error } = await supabaseAdmin.rpc(name as never, args);
         return { data, error: error ? { message: error.message, code: error.code } : null };
       },
     },
-    { user_id: session.user_id, location_ids: scope.locationIds },
+    { user_id: session.user_id, location_ids: scope.location_ids },
     body,
     mode,
   );
