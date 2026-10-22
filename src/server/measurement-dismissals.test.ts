@@ -108,3 +108,84 @@ test("unexpected DB error maps to 500 without leaking internals", async () => {
   const res = await applyMeasurementDismissal({ rpc }, scopeA, body, "dismiss");
   assert.deepEqual(res, { ok: false, status: 500, code: "dismissal_failed", message: "Dismissal temporarily unavailable" });
 });
+
+// ===== authorizeMeasurementTaskLocation：有效客服卡三联校验 =====
+// 有效卡 = support_messages(card_kind=measurement_request, measurement_task_id=task)
+//   + 会话 location_id=任务门店 + requester(conversation_id=会话, customer_id=会话客户) 全部匹配。
+import { authorizeMeasurementTaskLocation, type DismissalTaskScope } from "./measurement-dismissals.server";
+
+const CONV = "44444444-4444-4444-8444-444444444444";
+const CUST = "55555555-5555-4555-8555-555555555555";
+
+type Row = Record<string, unknown>;
+function mockFrom(tables: Record<string, Row[]>) {
+  return (table: string) => {
+    const rows = tables[table] ?? [];
+    const filters: Array<(r: Row) => boolean> = [];
+    const chain: Record<string, unknown> = {};
+    const run = () => rows.filter((r) => filters.every((f) => f(r)));
+    chain.select = () => chain;
+    chain.eq = (col: string, val: unknown) => { filters.push((r) => r[col] === val); return chain; };
+    chain.in = (col: string, vals: unknown[]) => { filters.push((r) => vals.includes(r[col])); return chain; };
+    chain.not = (col: string, op: string, val: unknown) => { filters.push((r) => (op === "is" ? r[col] !== val : true)); return chain; };
+    chain.limit = () => chain;
+    chain.maybeSingle = async () => ({ data: run()[0] ?? null, error: null });
+    chain.then = (resolve: (v: { data: Row[]; error: null }) => void) => resolve({ data: run(), error: null });
+    return chain;
+  };
+}
+
+const supportOnlyScope: DismissalTaskScope = {
+  general_location_ids: [], general_include_unlocated: false,
+  support_location_ids: [STORE_A], support_include_unlocated: false,
+};
+const generalScope: DismissalTaskScope = {
+  general_location_ids: [STORE_A], general_include_unlocated: false,
+  support_location_ids: [], support_include_unlocated: false,
+};
+const taskRow = { id: TASK, location_id: STORE_A, status: "pending" };
+
+test("requester row without a real card does not prove carded: support-only account rejected", async () => {
+  const res = await authorizeMeasurementTaskLocation(
+    { from: mockFrom({
+        product_measurement_tasks: [taskRow],
+        support_messages: [],
+        support_conversations: [],
+        product_measurement_requesters: [{ task_id: TASK, conversation_id: CONV, customer_id: CUST }],
+      }) },
+    supportOnlyScope, TASK);
+  assert.deepEqual(res, { ok: false, status: 403, code: "location_forbidden", message: "Location not authorized for this account" });
+});
+
+test("card with wrong conversation customer/location is not valid: support-only account rejected", async () => {
+  const res = await authorizeMeasurementTaskLocation(
+    { from: mockFrom({
+        product_measurement_tasks: [taskRow],
+        support_messages: [{ conversation_id: CONV, card_kind: "measurement_request", measurement_task_id: TASK }],
+        support_conversations: [{ id: CONV, customer_id: OTHER_USER, location_id: STORE_B }],
+        product_measurement_requesters: [{ task_id: TASK, conversation_id: CONV, customer_id: CUST }],
+      }) },
+    supportOnlyScope, TASK);
+  assert.equal(res.ok, false);
+});
+
+test("fully linked card authorizes via support scope; orphan task still dismissible via general scope", async () => {
+  const cardedRes = await authorizeMeasurementTaskLocation(
+    { from: mockFrom({
+        product_measurement_tasks: [taskRow],
+        support_messages: [{ conversation_id: CONV, card_kind: "measurement_request", measurement_task_id: TASK }],
+        support_conversations: [{ id: CONV, customer_id: CUST, location_id: STORE_A }],
+        product_measurement_requesters: [{ task_id: TASK, conversation_id: CONV, customer_id: CUST }],
+      }) },
+    supportOnlyScope, TASK);
+  assert.deepEqual(cardedRes, { ok: true, location_id: STORE_A, carded: true });
+  const orphanRes = await authorizeMeasurementTaskLocation(
+    { from: mockFrom({
+        product_measurement_tasks: [taskRow],
+        support_messages: [],
+        support_conversations: [],
+        product_measurement_requesters: [],
+      }) },
+    generalScope, TASK);
+  assert.deepEqual(orphanRes, { ok: true, location_id: STORE_A, carded: false });
+});
