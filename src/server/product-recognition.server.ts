@@ -80,7 +80,7 @@ export function isRetryableRecognitionError(error: unknown): boolean {
 
 export type RecognitionErrorKind = "timeout" | "permanent_4xx" | "transient" | "parse" | "config" | "consent";
 
-function recognitionErrorKind(error: unknown): RecognitionErrorKind {
+export function recognitionErrorKind(error: unknown): RecognitionErrorKind {
   if (isRecognitionTimeoutError(error)) return "timeout";
   const shape = error as { name?: string; noRetry?: unknown } | null;
   if (shape?.name === "ListingAiTransportConfigError") return "config";
