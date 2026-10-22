@@ -12,6 +12,7 @@ import {
   HANDHELD_RECOGNITION_MAX_ATTEMPTS,
   HANDHELD_RECOGNITION_TIMEOUT_MS,
   PRODUCT_RECOGNITION_PROMPT_VERSION,
+  RECOGNITION_FAILED_WARNING,
   isRecognitionTimeoutError,
   recognitionAttemptPolicy,
   resolveProductRecognitionModel,
