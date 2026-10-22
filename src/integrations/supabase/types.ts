@@ -12365,6 +12365,8 @@ export type Database = {
         Args: {
           p_cursor_id?: string
           p_cursor_ts?: string
+          p_ignored_only?: boolean
+          p_include_ignored?: boolean
           p_include_unlocated?: boolean
           p_limit?: number
           p_location_ids: string[]
