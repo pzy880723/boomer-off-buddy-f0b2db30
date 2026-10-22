@@ -4,6 +4,7 @@ import { signSkuImagePaths } from "../lib/sku-image-resolver.server";
 import { DERIVATIVE_WIDTHS, signDerivativeUrls } from "./media-derivative.server";
 import { isInFankuang } from "../lib/commerce/fankuang";
 import { readProductMarks } from "../lib/commerce/product-marks";
+import { resolveCategoryLabel } from "../lib/commerce/category-labels";
 
 /** 列表 / 购物车 / 订单默认展示图：真实 480px 衍生图，失败为 null（不回退原图）。 */
 export const thumbnailDerivativeSigner = (paths: readonly string[]) =>
@@ -218,7 +219,10 @@ export function buildStorefrontProduct(input: {
 }) {
   const { listing, sku, category, brand, facets, availableQty } = input;
   const categoryCode = category?.code ?? sku.category ?? "uncategorized";
-  const categoryName = category?.name ?? "待归类";
+  // 只用真实字典中文；字典缺失时 name=null、path=[]，绝不输出“待归类”占位或英文编码。
+  const label = category?.name && category.name !== categoryCode
+    ? { name: category.name, path: category.parent_name ? [category.parent_name, category.name] : [category.name] }
+    : resolveCategoryLabel(sku.category, []);
   return {
     id: listing.id,
     sku_id: listing.sku_id,
@@ -226,8 +230,8 @@ export function buildStorefrontProduct(input: {
     description: listing.description,
     primary_category: {
       code: categoryCode,
-      name: categoryName,
-      path: category?.parent_name ? [category.parent_name, categoryName] : [categoryName],
+      name: label.name,
+      path: label.path,
     },
     brand,
     // 保留 dimension/code，附中文 dimension_label；未知维度整条隐藏，不回退英文键。
