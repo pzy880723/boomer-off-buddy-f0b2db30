@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { readAfterHqUpdate } from "./youzan-hq-readback";
+import { readAfterHqUpdate } from "./youzan-hq-readback.ts";
 
 test("写后短暂不可见：迟两次可见仍返回正确原 id", async () => {
   const sleeps: number[] = [];
