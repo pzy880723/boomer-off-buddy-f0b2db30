@@ -152,6 +152,29 @@ BEGIN
   ASSERT (SELECT n.location_id FROM inv_handheld_notifications n JOIN youzan_stock_sync_queue q ON q.id=n.ref_id
           WHERE q.shop_id=shop2 AND q.location_id=loc) IS NULL, 'location/shop mismatch must not project';
   RAISE NOTICE 'PASS 17 location/shop mismatch blocked';
+
+  -- 18 全生命周期 done→failed→running→done：过期 recovered 只在真实 failed 时清回 NULL
+  UPDATE youzan_stock_sync_queue SET status='done' WHERE id=q1;
+  PERFORM handheld_sync_failure_project('stock', q1);
+  ASSERT (SELECT action_status FROM inv_handheld_notifications WHERE ref_id=q1) = 'recovered', 'done not recovered (lifecycle)';
+  UPDATE youzan_stock_sync_queue SET status='failed' WHERE id=q1;
+  PERFORM handheld_sync_failure_project('stock', q1);
+  ASSERT (SELECT action_status FROM inv_handheld_notifications WHERE ref_id=q1) IS NULL, 'stale recovered not cleared on refail';
+  UPDATE youzan_stock_sync_queue SET status='running' WHERE id=q1;
+  PERFORM handheld_sync_failure_project('stock', q1);
+  ASSERT (SELECT action_status FROM inv_handheld_notifications WHERE ref_id=q1) IS NULL, 'running changed action status';
+  UPDATE youzan_stock_sync_queue SET status='done' WHERE id=q1;
+  PERFORM handheld_sync_failure_reconcile(7, 100);
+  ASSERT (SELECT action_status FROM inv_handheld_notifications WHERE ref_id=q1) = 'recovered', 'final done not recovered';
+  RAISE NOTICE 'PASS 18 lifecycle done-failed-running-done resets stale recovered';
+
+  -- 19 reconcile 反向复位：通知已 recovered 但队列当前真实 failed → 清回 NULL（不删行、不碰其他通知）
+  UPDATE youzan_stock_sync_queue SET status='failed' WHERE id=q2;
+  UPDATE inv_handheld_notifications SET action_status='recovered' WHERE ref_id=q2;
+  PERFORM handheld_sync_failure_reconcile(7, 100);
+  ASSERT (SELECT action_status FROM inv_handheld_notifications WHERE ref_id=q2) IS NULL, 'reconcile did not clear stale recovered';
+  ASSERT (SELECT action_status FROM inv_handheld_notifications WHERE ref_id=q1) = 'recovered', 'reconcile cleared a genuinely recovered row';
+  RAISE NOTICE 'PASS 19 reconcile clears stale recovered on real failed';
 END $$;
 
 ROLLBACK;
