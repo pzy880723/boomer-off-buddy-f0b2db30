@@ -1,3 +1,4 @@
+import { useCategories } from "@/hooks/use-categories";
 import { ProductStatusPills } from "@/components/inventory/product-mark-pills";
 import { useState, useRef } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
@@ -41,6 +42,7 @@ export const Route = createFileRoute("/inventory/skus/$id")({
 });
 
 function SkuDetailPage() {
+  const { displayLabelOf: categoryText } = useCategories();
   const { id } = Route.useParams();
   const nav = useNavigate();
   const getFn = useServerFn(getSku);
