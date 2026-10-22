@@ -335,6 +335,19 @@ export async function runProductRecognition(
     created_by: input.created_by,
   });
 
+  // Correlated with the persisted audit id; redacted by construction (no bodies, images or tokens).
+  logRecognitionEvent({
+    event: "product_recognition",
+    request_id: saved.id,
+    source: input.source,
+    model,
+    attempts: attemptsUsed,
+    duration_ms: Date.now() - startedAt,
+    outcome: status,
+    http_status: failed ? extractRecognitionHttpStatus(lastError) : null,
+    error_kind: failed ? recognitionErrorKind(lastError) : null,
+  });
+
   return {
     ...normalized,
     request_id: saved.id,
@@ -444,7 +457,9 @@ ${buildEraInstruction(input.source)}`;
       });
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
-    throw new Error(`AI gateway ${response.status}: ${detail.slice(0, 300)}`);
+    const error = new Error(`AI gateway ${response.status}: ${detail.slice(0, 300)}`);
+    (error as Error & { status?: number }).status = response.status;
+    throw error;
   }
   const payload = (await response.json()) as {
     choices?: Array<{ message?: { content?: unknown } }>;
