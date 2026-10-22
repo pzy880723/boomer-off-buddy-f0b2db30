@@ -46,7 +46,7 @@ test("dismiss uses session user, never body user", async () => {
   assert.equal(res.ok, true);
   assert.equal(calls[0].name, "measurement_task_dismiss");
   assert.equal(calls[0].args.p_user_id, USER);
-  assert.equal("p_user_id" in calls[0].args && calls[0].args.p_user_id === OTHER_USER, false);
+  assert.equal("p_user_id" in calls[0].args && (calls[0].args.p_user_id as string) === OTHER_USER, false);
 });
 
 test("cross-store dismiss is forbidden before any DB write", async () => {

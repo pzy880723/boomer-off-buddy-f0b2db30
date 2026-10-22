@@ -40,7 +40,7 @@ test("normalization: lower-case and . / - fold to _", () => {
 test("prefix boundary: 'stock' alone is not internal, 'stocktake_x' is", () => {
   assert.equal(notificationKindCategory("stock"), "system");
   assert.equal(notificationKindCategory("stocktake"), "internal");
-  assert.equal(notificationKindCategory("stocktake_submitted", "stocktake"), "internal");
+  assert.equal(notificationKindCategory("stocktake_submitted"), "internal");
 });
 
 test("category enum is exactly the four buckets", () => {
