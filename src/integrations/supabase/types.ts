@@ -12040,6 +12040,7 @@ export type Database = {
           status: string
         }[]
       }
+      handheld_mask_error: { Args: { p: string }; Returns: string }
       handheld_notification_category: {
         Args: { p_kind: string }
         Returns: string
