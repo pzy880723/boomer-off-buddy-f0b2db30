@@ -4,6 +4,10 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { loadUserRoles } from "@/server/handheld-auth.server";
 import { parseListCursor } from "@/server/handheld-notifications-cursor";
 import { alertFields } from "@/server/handheld-alerts";
+import {
+  notificationKindCategory,
+  type NotificationCategory,
+} from "@/lib/handheld/notification-category";
 export { parseChangeCursor, parseListCursor } from "@/server/handheld-notifications-cursor";
 
 export type NotificationItem = {
@@ -153,11 +157,21 @@ async function decorate(rows: RawRow[], scope: NotificationScope): Promise<Notif
 const SELECT =
   "id, kind, title, payload, ts, device_id, location_id, user_id, action_status, ref_type, ref_id";
 
+// category 服务端过滤：先取全库 kind 枚举，用与 DB 同规则的 TS 端口归类，
+// 匹配的 kind 集合作为 .in 过滤条件（在 limit 之前生效）；未知 kind 归 system。
+async function resolveCategoryKinds(category: NotificationCategory): Promise<string[]> {
+  const { data, error } = await supabaseAdmin.rpc("handheld_notification_kinds" as never);
+  if (error) throw new Error(error.message);
+  const kinds = (data as unknown as string[]) ?? [];
+  return kinds.filter((k) => notificationKindCategory(k) === category);
+}
+
 export async function listNotifications(input: {
   scope: NotificationScope;
   limit: number;
   cursor?: string | null;
   unreadOnly?: boolean;
+  category?: NotificationCategory;
 }): Promise<{ items: NotificationItem[]; next_cursor: string | null; next_page_cursor: string | null }> {
   let query = supabaseAdmin
     .from("inv_handheld_notifications" as never)
@@ -165,6 +179,11 @@ export async function listNotifications(input: {
     .or(buildVisibilityFilter(input.scope))
     .order("ts", { ascending: false })
     .limit(input.limit + 1);
+  if (input.category) {
+    const kinds = await resolveCategoryKinds(input.category);
+    if (kinds.length === 0) return { items: [], next_cursor: null, next_page_cursor: null };
+    query = query.in("kind", kinds);
+  }
   // 兼容：旧游标=纯 ts（保持原 lt 语义）；新游标 "ts|id" 走 (ts,id) 复合键，同 ts 不漏行。
   const composite = input.cursor ? parseListCursor(input.cursor) : null;
   query = query.order("id", { ascending: false });

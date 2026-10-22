@@ -701,6 +701,13 @@
       "when": 1792691835090,
       "tag": "0099_handheld_todo_notification_fixes",
       "breakpoints": true
+    },
+    {
+      "idx": 100,
+      "version": "7",
+      "when": 1792693152180,
+      "tag": "0100_handheld_sync_recovery_masking_workitems_ignore",
+      "breakpoints": true
     }
   ]
 }

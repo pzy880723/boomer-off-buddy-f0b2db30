@@ -12,6 +12,7 @@ import {
   resolveNotificationScope,
   applyRequestedLocation,
 } from "@/server/handheld-notifications.server";
+import { isNotificationCategory } from "@/lib/handheld/notification-category";
 
 export const Route = createFileRoute("/api/public/handheld/notifications")({
   server: {
@@ -27,6 +28,11 @@ export const Route = createFileRoute("/api/public/handheld/notifications")({
         const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 50), 1), 100);
         const cursor = url.searchParams.get("cursor");
         const unreadOnly = url.searchParams.get("unread_only") === "true";
+        const rawCategory = url.searchParams.get("category");
+        if (rawCategory !== null && !isNotificationCategory(rawCategory)) {
+          return err("Invalid category", 400, { code: "validation_error" });
+        }
+        const category = rawCategory ?? undefined;
         const baseScope = await resolveNotificationScope({
           userId: session.user_id,
           deviceId: auth.device.id,
@@ -40,7 +46,7 @@ export const Route = createFileRoute("/api/public/handheld/notifications")({
         }
         const scope = scoped.scope;
         try {
-          const page = await listNotifications({ scope, limit, cursor, unreadOnly });
+          const page = await listNotifications({ scope, limit, cursor, unreadOnly, category });
           return ok({
             items: page.items,
             next_cursor: page.next_cursor,
