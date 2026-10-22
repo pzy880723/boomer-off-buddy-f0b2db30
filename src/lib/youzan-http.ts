@@ -91,6 +91,32 @@ export function getYouzanOutboundStatus(): YouzanOutboundStatus {
   };
 }
 
+// multipart 请求体上限：3MiB 二进制 + 64KiB 表单框架（boundary/字段头）。
+const MAX_MULTIPART_BYTES = 3 * 1024 * 1024 + 64 * 1024;
+
+/**
+ * 把 FormData 编码成真实 multipart 字节（含 boundary），base64 后经代理 envelope 传输。
+ * 用 new Request 让运行时生成与直接 fetch 完全一致的 multipart 序列化和 boundary。
+ */
+async function encodeMultipartBody(
+  targetUrl: string,
+  init: RequestInit,
+): Promise<{ bodyBase64: string; contentType: string }> {
+  const req = new Request(targetUrl, { method: init.method ?? "POST", body: init.body });
+  const bytes = new Uint8Array(await req.arrayBuffer());
+  if (bytes.byteLength > MAX_MULTIPART_BYTES) {
+    throw new Error("有赞固定出口代理拒绝超过 3MiB 的 multipart 请求体");
+  }
+  let binary = "";
+  for (let i = 0; i < bytes.byteLength; i += 16384) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 16384));
+  }
+  return {
+    bodyBase64: btoa(binary),
+    contentType: req.headers.get("content-type") ?? "multipart/form-data",
+  };
+}
+
 export async function youzanFetch(targetUrl: string, init: RequestInit = {}): Promise<Response> {
   assertNoExternalWrite("youzan");
   assertYouzanUrl(targetUrl);
@@ -98,7 +124,9 @@ export async function youzanFetch(targetUrl: string, init: RequestInit = {}): Pr
   if (!proxyUrl) return fetch(targetUrl, init);
 
   const token = process.env.YOUZAN_PROXY_TOKEN?.trim();
-  const body = await bodyToText(init.body ?? null);
+  const isMultipart = init.body instanceof FormData;
+  const multipart = isMultipart ? await encodeMultipartBody(targetUrl, init) : null;
+  const body = isMultipart ? null : await bodyToText(init.body ?? null);
   const proxyHeaders: Record<string, string> = {
     "Content-Type": "application/json",
   };
@@ -110,8 +138,12 @@ export async function youzanFetch(targetUrl: string, init: RequestInit = {}): Pr
     body: JSON.stringify({
       url: targetUrl,
       method: init.method ?? "GET",
-      headers: headersToRecord(init.headers),
+      headers: {
+        ...headersToRecord(init.headers),
+        ...(multipart ? { "content-type": multipart.contentType } : {}),
+      },
       body,
+      ...(multipart ? { bodyBase64: multipart.bodyBase64 } : {}),
     }),
     signal: init.signal,
   });
