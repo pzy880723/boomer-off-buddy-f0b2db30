@@ -111,10 +111,14 @@ async function encodeMultipartBody(
   for (let i = 0; i < bytes.byteLength; i += 16384) {
     binary += String.fromCharCode(...bytes.subarray(i, i + 16384));
   }
-  return {
-    bodyBase64: btoa(binary),
-    contentType: req.headers.get("content-type") ?? "multipart/form-data",
-  };
+  let contentType = req.headers.get("content-type") ?? "multipart/form-data";
+  if (!contentType.includes("boundary=")) {
+    // 部分运行时不在 header 上暴露 boundary，从序列化首行取回，保证代理按原 boundary 转发。
+    const head = new TextDecoder().decode(bytes.subarray(0, Math.min(bytes.byteLength, 256)));
+    const m = head.match(/^--([^\r\n]+)/);
+    if (m) contentType = `multipart/form-data; boundary=${m[1]}`;
+  }
+  return { bodyBase64: btoa(binary), contentType };
 }
 
 export async function youzanFetch(targetUrl: string, init: RequestInit = {}): Promise<Response> {
