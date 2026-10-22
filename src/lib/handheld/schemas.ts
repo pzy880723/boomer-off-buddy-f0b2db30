@@ -1120,7 +1120,7 @@ export const SkuDetailRes = okEnvelope(
       description: "有效参与翻筐乐；标准/不限量/组包商品恒为 false",
     }),
     featured_stamp: FeaturedStampSchema.meta({ description: "特色印章：new 全新品/rare 稀有商品/limited 限定版/collectible 收藏级/discontinued 绝版商品；null 无" }),
-    notice_tags: z.array(z.enum(NOTICE_TAGS)).meta({ description: "提示标签：flawed 有瑕疵/function_uncertain 功能不确定/function_unavailable 功能不可用/not_edible 不可食用" }),
+    notice_tags: z.array(z.enum(NOTICE_TAGS)).meta({ description: "提示标签：flawed 有瑕疵/function_uncertain 功能不确定/function_unavailable 功能不可用/not_edible 不可食用/parts_missing 零件缺失" }),
     sku_code: z.string().nullable(),
     barcode: z.string().nullable(),
     epc: z.string(),

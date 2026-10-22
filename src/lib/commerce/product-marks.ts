@@ -12,13 +12,14 @@ export const FEATURED_STAMP_LABELS: Record<FeaturedStamp, string> = {
   discontinued: "绝版商品",
 };
 
-export const NOTICE_TAGS = ["flawed", "function_uncertain", "function_unavailable", "not_edible"] as const;
+export const NOTICE_TAGS = ["flawed", "function_uncertain", "function_unavailable", "not_edible", "parts_missing"] as const;
 export type NoticeTag = (typeof NOTICE_TAGS)[number];
 export const NOTICE_TAG_LABELS: Record<NoticeTag, string> = {
   flawed: "有瑕疵",
   function_uncertain: "功能不确定",
   function_unavailable: "功能不可用",
   not_edible: "不可食用",
+  parts_missing: "零件缺失",
 };
 export const EXCLUSIVE_NOTICE_TAGS: readonly [NoticeTag, NoticeTag] = ["function_uncertain", "function_unavailable"];
 
@@ -41,4 +42,14 @@ export function readProductMarks(sku: { featured_stamp?: unknown; notice_tags?: 
   const raw = Array.isArray(sku?.notice_tags) ? sku!.notice_tags as unknown[] : [];
   const tags = normalizeNoticeTags(raw.filter((t): t is NoticeTag => (NOTICE_TAGS as readonly unknown[]).includes(t)));
   return { featured_stamp: stamp, notice_tags: tags };
+}
+
+export type ProductMarkLabel = { kind: "stamp"; key: FeaturedStamp; label: string } | { kind: "notice"; key: NoticeTag; label: string };
+/** 状态胶囊区显示用：特色印章在前，再按字典顺序列出全部提示；只输出字典内项。 */
+export function productMarkLabels(sku: { featured_stamp?: unknown; notice_tags?: unknown } | null | undefined): ProductMarkLabel[] {
+  const m = readProductMarks(sku);
+  const out: ProductMarkLabel[] = [];
+  if (m.featured_stamp) out.push({ kind: "stamp", key: m.featured_stamp, label: FEATURED_STAMP_LABELS[m.featured_stamp] });
+  for (const t of m.notice_tags) out.push({ kind: "notice", key: t, label: NOTICE_TAG_LABELS[t] });
+  return out;
 }
