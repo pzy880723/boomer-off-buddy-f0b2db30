@@ -247,13 +247,25 @@ export async function runProductRecognition(
   const ipPrompt = formatBrandsForPrompt(ips);
   const wait = deps.sleep ?? sleep;
   const { maxAttempts, timeoutMs } = recognitionAttemptPolicy(input.source);
+  const startedAt = Date.now();
+  const localRequestId = crypto.randomUUID();
 
   let model = resolveProductRecognitionModel(input.source);
   let raw: RawProductRecognition | null = null;
   let lastError: Error | null = null;
+  let attemptsUsed = 0;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     // Outside the try: a revoked/unreadable consent must abort, never degrade to a fallback result.
-    await beforeAiOutbound(input.aiGuard, "product_recognition");
+    try {
+      await beforeAiOutbound(input.aiGuard, "product_recognition");
+    } catch (guardError) {
+      logRecognitionEvent({
+        event: "product_recognition", request_id: localRequestId, source: input.source, model,
+        attempts: attemptsUsed, duration_ms: Date.now() - startedAt, outcome: "aborted", error_kind: "consent",
+      });
+      throw guardError;
+    }
+    attemptsUsed += 1;
     try {
       const response = await deps.callModel({
         images,
@@ -270,8 +282,8 @@ export async function runProductRecognition(
       break;
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
-      // 超时不再重复重试：再来一轮只会让店员多等一个超时窗口。
-      if (input.source === "handheld" && isRecognitionTimeoutError(lastError)) break;
+      // Handheld: permanent 4xx / misconfig fails fast; timeouts and transient errors use the remaining attempt.
+      if (input.source === "handheld" && isPermanentRecognitionError(lastError)) break;
       if (attempt < maxAttempts) await wait(200 * attempt);
     }
   }
