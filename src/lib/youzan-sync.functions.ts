@@ -18,6 +18,7 @@ import {
   queryYouzanBranchChannelProduct,
 } from "./youzan-offline-products.server";
 import { getPublicOrigin, resolvePublicSkuImageUrls } from "./sku-media";
+import { readAfterHqUpdate } from "./youzan-hq-readback";
 import { buildHqImageParams, YOUZAN_CHANNEL_IMAGE_LIMIT } from "./youzan-image-media";
 import {
   buildHqSpuLookupParams,

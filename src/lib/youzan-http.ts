@@ -49,7 +49,8 @@ async function bodyToText(body: BodyInit | null | undefined): Promise<string | n
   if (typeof body === "string") return body;
   if (body instanceof URLSearchParams) return body.toString();
   if (body instanceof FormData) {
-    throw new Error("有赞固定出口代理暂不支持 FormData 请求体");
+    // youzanFetch 会在调用本函数前拦截 FormData 走 bodyBase64 通道；到这里说明调用路径异常。
+    throw new Error("有赞固定出口代理 FormData 请求体必须由 youzanFetch 编码");
   }
   if (body instanceof Blob) return await body.text();
   if (body instanceof ArrayBuffer) return new TextDecoder().decode(body);
