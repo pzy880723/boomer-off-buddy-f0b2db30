@@ -12,6 +12,7 @@ import {
   HANDHELD_RECOGNITION_MAX_ATTEMPTS,
   HANDHELD_RECOGNITION_TIMEOUT_MS,
   PRODUCT_RECOGNITION_PROMPT_VERSION,
+  RECOGNITION_FAILED_WARNING,
   isRecognitionTimeoutError,
   recognitionAttemptPolicy,
   resolveProductRecognitionModel,
@@ -185,7 +186,7 @@ describe("shared product recognition core", () => {
     }
   });
 
-  test("handheld stops after a timeout instead of repeating a slow request", async () => {
+  test("handheld retries a timeout once before degrading to the bounded fallback", async () => {
     let attempts = 0;
     const audits: ProductRecognitionAuditInput[] = [];
     const result = await runProductRecognition(
@@ -195,8 +196,9 @@ describe("shared product recognition core", () => {
         throw new DOMException("recognition timed out", "TimeoutError");
       }, audits),
     );
-    assert.equal(attempts, 1);
+    assert.equal(attempts, 2);
     assert.equal(result.status, "fallback");
+    assert.equal(result.recognition_failed, true);
   });
 
   test("handheld retries at most once and forwards the source and every angle", async () => {
@@ -399,7 +401,7 @@ describe("handheld recognition performance policy", () => {
     assert.equal(audits[0].status, "failed");
   });
 
-  test("a timeout is never retried", async () => {
+  test("a timeout is retried at most once and then fails bounded", async () => {
     const audits: ProductRecognitionAuditInput[] = [];
     let attempts = 0;
     const result = await runProductRecognition(
@@ -409,8 +411,8 @@ describe("handheld recognition performance policy", () => {
         throw new Error("AI recognition timed out after 25000ms");
       }, audits),
     );
-    assert.equal(attempts, 1);
-    assert.match(result.warning ?? "", /timed out/);
+    assert.equal(attempts, 2);
+    assert.equal(result.warning, RECOGNITION_FAILED_WARNING);
     assert.equal(audits[0].status, "failed");
     assert.ok(isRecognitionTimeoutError(Object.assign(new Error("x"), { name: "AbortError" })));
     assert.equal(isRecognitionTimeoutError(new Error("gateway unavailable")), false);

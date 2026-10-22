@@ -48,12 +48,23 @@ export function recognitionAttemptPolicy(source: ProductRecognitionSource): {
     : { maxAttempts: 3, timeoutMs: null };
 }
 
-export function isRecognitionTimeoutError(error: unknown): boolean {
-  if (!error) return false;
-  const name = (error as { name?: string }).name ?? "";
-  const message = error instanceof Error ? error.message : String(error);
-  return name === "AbortError" || name === "TimeoutError" || /timed? ?out|aborted/i.test(message);
-}
+// Retry classification and redacted logging live in recognition-reliability.ts (no extensionless
+// imports, so node-run tests can load it through product-title.server.ts); re-exported here.
+export {
+  isRecognitionTimeoutError,
+  extractRecognitionHttpStatus,
+  isPermanentRecognitionError,
+  isRetryableRecognitionError,
+  recognitionErrorKind,
+  logRecognitionEvent,
+  type RecognitionErrorKind,
+} from "./recognition-reliability.ts";
+import {
+  isPermanentRecognitionError,
+  extractRecognitionHttpStatus,
+  recognitionErrorKind,
+  logRecognitionEvent,
+} from "./recognition-reliability.ts";
 
 export type ProductRecognitionInput = {
   /** Required: checked right before every model attempt (no default-allow path). */
@@ -192,13 +203,25 @@ export async function runProductRecognition(
   const ipPrompt = formatBrandsForPrompt(ips);
   const wait = deps.sleep ?? sleep;
   const { maxAttempts, timeoutMs } = recognitionAttemptPolicy(input.source);
+  const startedAt = Date.now();
+  const localRequestId = crypto.randomUUID();
 
   let model = resolveProductRecognitionModel(input.source);
   let raw: RawProductRecognition | null = null;
   let lastError: Error | null = null;
+  let attemptsUsed = 0;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     // Outside the try: a revoked/unreadable consent must abort, never degrade to a fallback result.
-    await beforeAiOutbound(input.aiGuard, "product_recognition");
+    try {
+      await beforeAiOutbound(input.aiGuard, "product_recognition");
+    } catch (guardError) {
+      logRecognitionEvent({
+        event: "product_recognition", request_id: localRequestId, source: input.source, model,
+        attempts: attemptsUsed, duration_ms: Date.now() - startedAt, outcome: "aborted", error_kind: "consent",
+      });
+      throw guardError;
+    }
+    attemptsUsed += 1;
     try {
       const response = await deps.callModel({
         images,
@@ -215,8 +238,8 @@ export async function runProductRecognition(
       break;
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
-      // 超时不再重复重试：再来一轮只会让店员多等一个超时窗口。
-      if (input.source === "handheld" && isRecognitionTimeoutError(lastError)) break;
+      // Handheld: permanent 4xx / misconfig fails fast; timeouts and transient errors use the remaining attempt.
+      if (input.source === "handheld" && isPermanentRecognitionError(lastError)) break;
       if (attempt < maxAttempts) await wait(200 * attempt);
     }
   }
@@ -266,6 +289,19 @@ export async function runProductRecognition(
     attribute_confidence: normalized.attribute_confidence,
     clarification_requests: normalized.clarification_requests,
     created_by: input.created_by,
+  });
+
+  // Correlated with the persisted audit id; redacted by construction (no bodies, images or tokens).
+  logRecognitionEvent({
+    event: "product_recognition",
+    request_id: saved.id,
+    source: input.source,
+    model,
+    attempts: attemptsUsed,
+    duration_ms: Date.now() - startedAt,
+    outcome: status,
+    http_status: failed ? extractRecognitionHttpStatus(lastError) : null,
+    error_kind: failed ? recognitionErrorKind(lastError) : null,
   });
 
   return {
@@ -377,7 +413,9 @@ ${buildEraInstruction(input.source)}`;
       });
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
-    throw new Error(`AI gateway ${response.status}: ${detail.slice(0, 300)}`);
+    const error = new Error(`AI gateway ${response.status}: ${detail.slice(0, 300)}`);
+    (error as Error & { status?: number }).status = response.status;
+    throw error;
   }
   const payload = (await response.json()) as {
     choices?: Array<{ message?: { content?: unknown } }>;
