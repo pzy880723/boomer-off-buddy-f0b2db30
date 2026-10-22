@@ -96,3 +96,62 @@ export async function applyMeasurementDismissal(
     },
   };
 }
+
+// ===== 任务真实所属 scope 授权（scoped 待办对齐） =====
+// 带有效客服卡的测量任务可按已授权 support scope 忽略（也可按 general scope——该行对两域均可见）；
+// 孤立任务必须 general scope。两个门店数组独立判断，绝不混并扩大业务访问。
+export type DismissalTaskScope = {
+  general_location_ids: string[];
+  general_include_unlocated: boolean;
+  support_location_ids: string[];
+  support_include_unlocated: boolean;
+};
+
+export type TaskAuthorization =
+  | { ok: true; location_id: string; carded: boolean }
+  | { ok: false; status: number; code: string; message: string };
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function authorizeMeasurementTaskLocation(
+  deps: { from: (table: string) => any },
+  scope: DismissalTaskScope,
+  taskId: string,
+): Promise<TaskAuthorization> {
+  const taskRes = await deps
+    .from("product_measurement_tasks")
+    .select("id,location_id,status")
+    .eq("id", taskId)
+    .maybeSingle();
+  if (taskRes.error) {
+    return { ok: false, status: 500, code: "dismissal_failed", message: "Dismissal temporarily unavailable" };
+  }
+  const task = taskRes.data as { id: string; location_id: string | null } | null;
+  if (!task) {
+    return { ok: false, status: 404, code: "task_not_found", message: "Measurement task not found" };
+  }
+  // 有效客服卡 = 该任务存在挂在客服会话上的 measurement_request 请求行（卡片与 requester 同一事务写入）。
+  const linkRes = await deps
+    .from("product_measurement_requesters")
+    .select("conversation_id")
+    .eq("task_id", taskId)
+    .not("conversation_id", "is", null)
+    .limit(1);
+  if (linkRes.error) {
+    return { ok: false, status: 500, code: "dismissal_failed", message: "Dismissal temporarily unavailable" };
+  }
+  const carded = (linkRes.data ?? []).length > 0;
+  const locationId = task.location_id;
+  if (!locationId) {
+    const allowed = carded ? scope.support_include_unlocated : scope.general_include_unlocated;
+    return allowed
+      ? { ok: true, location_id: "", carded }
+      : { ok: false, status: 403, code: "location_forbidden", message: "Location not authorized for this account" };
+  }
+  const allowed =
+    scope.general_location_ids.includes(locationId) ||
+    (carded && scope.support_location_ids.includes(locationId));
+  if (!allowed) {
+    return { ok: false, status: 403, code: "location_forbidden", message: "Location not authorized for this account" };
+  }
+  return { ok: true, location_id: locationId, carded };
+}

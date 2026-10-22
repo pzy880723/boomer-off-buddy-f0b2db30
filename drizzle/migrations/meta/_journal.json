@@ -715,6 +715,13 @@
       "when": 1792694278851,
       "tag": "0101_handheld_sync_project_min_uuid_fix",
       "breakpoints": true
+    },
+    {
+      "idx": 102,
+      "version": "7",
+      "when": 1792695157914,
+      "tag": "0102_handheld_scoped_work_items_ignore",
+      "breakpoints": true
     }
   ]
 }

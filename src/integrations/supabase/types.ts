@@ -4383,6 +4383,110 @@ export type Database = {
           },
         ]
       }
+      inv_defect_drafts: {
+        Row: {
+          annotations: Json
+          expected_updated_at: string
+          image_path: string
+          location_id: string
+          requires_retouch: boolean
+          sku_id: string
+          source_path: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          annotations: Json
+          expected_updated_at: string
+          image_path: string
+          location_id: string
+          requires_retouch?: boolean
+          sku_id: string
+          source_path: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          annotations?: Json
+          expected_updated_at?: string
+          image_path?: string
+          location_id?: string
+          requires_retouch?: boolean
+          sku_id?: string
+          source_path?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inv_defect_drafts_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inv_defect_drafts_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inv_defect_presets: {
+        Row: {
+          created_at: string
+          created_by: string
+          explanation: string
+          id: string
+          location_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          explanation: string
+          id?: string
+          location_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          explanation?: string
+          id?: string
+          location_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inv_defect_presets_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inv_defect_retouch_receipts: {
+        Row: {
+          actor_user_id: string | null
+          created_at: string
+          image_path: string
+          source: string
+        }
+        Insert: {
+          actor_user_id?: string | null
+          created_at?: string
+          image_path: string
+          source: string
+        }
+        Update: {
+          actor_user_id?: string | null
+          created_at?: string
+          image_path?: string
+          source?: string
+        }
+        Relationships: []
+      }
       inv_epcs: {
         Row: {
           current_location_id: string | null
@@ -5393,6 +5497,7 @@ export type Database = {
           classification_status: string
           created_at: string
           default_shop_ids: string[]
+          defect_annotations: Json
           discount_eligible: boolean
           epc: string
           fankuang_override: boolean | null
@@ -5449,6 +5554,7 @@ export type Database = {
           classification_status?: string
           created_at?: string
           default_shop_ids?: string[]
+          defect_annotations?: Json
           discount_eligible?: boolean
           epc: string
           fankuang_override?: boolean | null
@@ -5505,6 +5611,7 @@ export type Database = {
           classification_status?: string
           created_at?: string
           default_shop_ids?: string[]
+          defect_annotations?: Json
           discount_eligible?: boolean
           epc?: string
           fankuang_override?: boolean | null
@@ -12258,6 +12365,8 @@ export type Database = {
         Args: {
           p_cursor_id?: string
           p_cursor_ts?: string
+          p_ignored_only?: boolean
+          p_include_ignored?: boolean
           p_include_unlocated?: boolean
           p_limit?: number
           p_location_ids: string[]
@@ -12310,6 +12419,14 @@ export type Database = {
         Args: { p_delta: number; p_sku_id: string }
         Returns: undefined
       }
+      inv_defect_presets_save: {
+        Args: { p_location_id: string; p_texts: Json; p_user_id: string }
+        Returns: undefined
+      }
+      inv_defects_validate: {
+        Args: { p_images: string[]; p_require_ready?: boolean; p_value: Json }
+        Returns: Json
+      }
       inv_notice_tags_normalize: { Args: { p: string[] }; Returns: string[] }
       inv_notice_tags_valid: { Args: { p: string[] }; Returns: boolean }
       inv_revoke_duplicate_sku: {
@@ -12323,6 +12440,16 @@ export type Database = {
       }
       inv_sku_delete_blocker: { Args: { p_sku_id: string }; Returns: string }
       inv_sku_is_hq_actor: { Args: never; Returns: boolean }
+      inventory_defects_update: {
+        Args: {
+          p_expected_updated_at: string
+          p_location_id: string
+          p_patch: Json
+          p_sku_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       inventory_delete_unused_sku: { Args: { p_sku_id: string }; Returns: Json }
       listing_readiness_append_reuse_photos: {
         Args: {

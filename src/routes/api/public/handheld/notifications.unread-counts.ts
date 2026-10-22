@@ -6,12 +6,8 @@ import {
   ok,
   err,
 } from "@/server/handheld-auth.server";
-import {
-  resolveNotificationScope,
-  applyRequestedLocation,
-  effectiveLocationIds,
-} from "@/server/handheld-notifications.server";
 import { parseUnreadCounts } from "@/lib/handheld/unread-counts";
+import { applyWorkLocation, generalWorkLocationIds, loadPendingCounts, resolveWorkScope } from "@/server/handheld-work-items.server";
 
 /**
  * GET /api/public/handheld/notifications/unread-counts?location_id=<当前库位>
@@ -28,12 +24,12 @@ export const Route = createFileRoute("/api/public/handheld/notifications/unread-
         if (!auth.ok) return auth.response;
         const session = await resolveSessionUser(request);
         if (!session) return err("Employee session required", 401, { code: "session_required" });
-        const baseScope = await resolveNotificationScope({
+        const baseScope = await resolveWorkScope({
           userId: session.user_id,
           deviceId: auth.device.id,
           deviceLocationId: auth.device.location_id,
         });
-        const scoped = applyRequestedLocation(baseScope, new URL(request.url).searchParams.get("location_id"));
+        const scoped = applyWorkLocation(baseScope, new URL(request.url).searchParams.get("location_id"));
         if (!scoped.ok) {
           return scoped.code === "validation_error"
             ? err("Invalid location_id", 400, { code: "validation_error" })
@@ -44,7 +40,8 @@ export const Route = createFileRoute("/api/public/handheld/notifications/unread-
         const { data, error } = await supabaseAdmin.rpc("handheld_unread_counts", {
           p_user_id: scope.user_id,
           p_device_id: scope.device_id,
-          p_location_ids: effectiveLocationIds(scope),
+          // A customer-service-only selection must never reach legacy general-business visibility.
+          p_location_ids: generalWorkLocationIds(scope),
           p_include_unlocated: scope.is_hq && !scope.filter_location_id,
         });
         if (error) return err(`unread_counts_failed: ${error.message}`, 500);
@@ -54,9 +51,12 @@ export const Route = createFileRoute("/api/public/handheld/notifications/unread-
           return err("Unread counts violated contract", 500, { code: "unread_counts_contract_error", reason: parsed.reason });
         }
         try {
-          const { loadPendingCounts } = await import('@/server/handheld-work-items.server');
-          return ok({ ...parsed.data, pending_counts: await loadPendingCounts(scope) });
-        } catch { return err('Pending counts temporarily unavailable', 500, { code: 'pending_counts_unavailable' }); }
+          const pending_counts = await loadPendingCounts(scope);
+          // Keep legacy unread fields for old clients; new clients use unhandled counts for badges.
+          return ok({ ...parsed.data, pending_counts });
+        } catch {
+          return err("Pending counts temporarily unavailable", 500, { code: "pending_counts_unavailable" });
+        }
       },
     },
   },

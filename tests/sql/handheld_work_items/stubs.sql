@@ -41,7 +41,9 @@ CREATE OR REPLACE FUNCTION public.tg_stub_noop() RETURNS trigger LANGUAGE plpgsq
 CREATE TRIGGER trg_measurement_requester_support AFTER INSERT ON public.product_measurement_requesters FOR EACH ROW EXECUTE FUNCTION public.tg_stub_noop();
 CREATE TRIGGER trg_measurement_task_completed_support AFTER UPDATE ON public.product_measurement_tasks FOR EACH ROW EXECUTE FUNCTION public.tg_stub_noop();
 
--- work_items 聚合需要的支撑函数（语义同生产：waiting_since 非空即待回复）。
+-- work_items 聚合需要的支撑函数（语义同生产：waiting_since 非空，或最新非内部消息来自顾客，即待回复）。
 CREATE OR REPLACE FUNCTION public.support_needs_reply(p_conversation_id uuid)
 RETURNS boolean LANGUAGE sql STABLE SET search_path TO 'public' AS
-$$ SELECT EXISTS(SELECT 1 FROM public.support_conversations c WHERE c.id = p_conversation_id AND c.waiting_since IS NOT NULL) $$;
+$$ SELECT EXISTS(SELECT 1 FROM public.support_conversations c WHERE c.id = p_conversation_id AND c.waiting_since IS NOT NULL)
+       OR EXISTS(SELECT 1 FROM public.support_messages m
+                  WHERE m.conversation_id = p_conversation_id AND m.sender_type = 'customer' AND NOT m.internal) $$;
