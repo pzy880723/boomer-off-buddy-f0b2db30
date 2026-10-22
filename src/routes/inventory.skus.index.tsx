@@ -31,6 +31,9 @@ import { listSkus, deleteSku, deleteStandardProduct } from "@/lib/inventory.func
 import { groupStandardSkus, type SkuRow, type StandardProductGroup } from "@/lib/inventory.helpers";
 import { useSkuCovers, pickCover } from "@/hooks/use-sku-covers";
 import { isInFankuang } from "@/lib/commerce/fankuang";
+import { BatchMarksPanel } from "@/components/inventory/batch-marks-panel";
+import { Checkbox } from "@/components/ui/checkbox";
+import type { ReactNode } from "react";
 
 export const Route = createFileRoute("/inventory/skus/")({
   head: () => ({
@@ -61,6 +64,17 @@ function SkusPage() {
 
   const [editingGroup, setEditingGroup] = useState<StandardProductGroup | null>(null);
   const [editingSku, setEditingSku] = useState<SkuRow | null>(null);
+  const [batchMode, setBatchMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const selectable = (r: SkuRow, node: ReactNode) =>
+    batchMode ? (
+      <div key={r.id} className="flex items-center gap-2">
+        <Checkbox aria-label={`选择 ${r.name}`} className="ml-2" checked={selected.has(r.id)} onCheckedChange={(c) => {
+          const next = new Set(selected); if (c === true) next.add(r.id); else next.delete(r.id); setSelected(next);
+        }} />
+        <div className="min-w-0 flex-1">{node}</div>
+      </div>
+    ) : node;
 
   const setViewMode = (v: ViewMode) => {
     setView(v);
@@ -150,7 +164,7 @@ function SkusPage() {
 
   return (
     <div className="space-y-4">
-      <Tabs value={tab} onValueChange={(v) => setTab(v as TabKind)}>
+      <Tabs value={tab} onValueChange={(v) => { setTab(v as TabKind); setSelected(new Set()); }}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <TabsList>
             <TabsTrigger value="standard">
@@ -165,6 +179,9 @@ function SkusPage() {
           </TabsList>
 
           <div className="flex items-center gap-2">
+            {tab !== "standard" && !batchMode && (
+              <Button size="sm" variant="outline" onClick={() => { setBatchMode(true); setSelected(new Set()); }}>批量</Button>
+            )}
             <Button size="sm" variant={onlyFankuang ? "default" : "outline"} aria-pressed={onlyFankuang}
               onClick={() => setOnlyFankuang(!onlyFankuang)}>仅翻筐乐</Button>
             <div className="relative w-full max-w-xs">
@@ -197,6 +214,17 @@ function SkusPage() {
           </div>
         </div>
 
+        {batchMode && tab !== "standard" && (
+          <div className="mt-3">
+            <BatchMarksPanel
+              rows={tab === "custom" ? customRows : bundleRows}
+              selected={selected}
+              onSelectedChange={setSelected}
+              onDone={() => { setBatchMode(false); setSelected(new Set()); }}
+              onSaved={() => q.refetch()}
+            />
+          </div>
+        )}
         {q.isFetching && <p className="text-xs text-muted-foreground">正在更新商品筛选…</p>}
         {q.isError && <p role="alert" className="text-xs text-destructive">商品筛选加载失败，当前可能为缓存结果。<Button variant="link" size="sm" onClick={() => q.refetch()}>重试</Button></p>}
 
@@ -233,13 +261,13 @@ function SkusPage() {
             />
           ) : view === "grid" ? (
             <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              {customRows.map((r) => (
+              {customRows.map((r) => selectable(r,
                 <SingleSkuCard key={r.id} row={r} actions={skuActions(r)} coverOverride={pickCover(covers[r.id], r.image_url)} />
               ))}
             </div>
           ) : (
             <Card className="overflow-hidden">
-              {customRows.map((r) => (
+              {customRows.map((r) => selectable(r,
                 <SingleSkuRow key={r.id} row={r} actions={skuActions(r)} coverOverride={pickCover(covers[r.id], r.image_url)} />
               ))}
             </Card>
@@ -256,13 +284,13 @@ function SkusPage() {
             />
           ) : view === "grid" ? (
             <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              {bundleRows.map((r) => (
+              {bundleRows.map((r) => selectable(r,
                 <SingleSkuCard key={r.id} row={r} actions={skuActions(r)} coverOverride={pickCover(covers[r.id], r.image_url)} />
               ))}
             </div>
           ) : (
             <Card className="overflow-hidden">
-              {bundleRows.map((r) => (
+              {bundleRows.map((r) => selectable(r,
                 <SingleSkuRow key={r.id} row={r} actions={skuActions(r)} coverOverride={pickCover(covers[r.id], r.image_url)} />
               ))}
             </Card>

@@ -25,3 +25,18 @@ DO $$ BEGIN UPDATE inv_skus SET notice_tags='{function_uncertain,function_unavai
 EXCEPTION WHEN check_violation THEN RAISE NOTICE 'PASS table CHECK guards direct writes'; END $$;
 DO $$ BEGIN UPDATE inv_skus SET featured_stamp='bogus'; RAISE EXCEPTION 'FAIL table check allowed bogus stamp';
 EXCEPTION WHEN check_violation THEN RAISE NOTICE 'PASS stamp CHECK guards direct writes'; END $$;
+
+-- parts_missing（零件缺失）
+SELECT t(upd(:HQ, '{"notice_tags":["parts_missing","function_unavailable","flawed"]}') = '["notice_tags"]', 'parts_missing accepted with others');
+SELECT t((SELECT notice_tags='{flawed,function_unavailable,parts_missing}' FROM inv_skus), 'parts_missing normalized last in dictionary order');
+SELECT t(upd(:HQ, '{"notice_tags":["function_uncertain","function_unavailable","parts_missing"]}') LIKE 'ERR:validation_error%', 'exclusivity still enforced with parts_missing');
+CREATE TEMP TABLE rmv AS SELECT upd(:HQ, '{"notice_tags":["flawed","function_unavailable"]}') r;
+SELECT t((SELECT r FROM rmv) = '["notice_tags"]'
+  AND (SELECT notice_tags='{flawed,function_unavailable}' AND featured_stamp IS NULL FROM inv_skus), 'removing parts_missing clears it, stamp untouched');
+DO $$ BEGIN
+  BEGIN UPDATE inv_skus SET notice_tags='{parts_missing,parts_missing}'; RAISE EXCEPTION 'FAIL duplicate parts_missing allowed';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE inv_skus SET notice_tags='{parts_missing}';
+  ASSERT (SELECT notice_tags='{parts_missing}' FROM inv_skus), 'direct valid write';
+  RAISE NOTICE 'PASS table CHECK accepts parts_missing, rejects duplicates';
+END $$;

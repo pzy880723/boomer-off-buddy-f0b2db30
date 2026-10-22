@@ -29,7 +29,10 @@ INSERT INTO public.inv_skus (id, name, price_tier, notes, grade, fankuang_overri
   ('10000000-0000-0000-0000-000000000001','old',39,'keep','A',NULL);
 SQL
 $PSQL -q -v ON_ERROR_STOP=1 < "$mig" >/dev/null || { echo "FAIL migration"; exit 1; }
+for extra in ${MARKS_EXTRA_MIGS-$(ls drizzle/migrations/*_notice_tag_parts_missing.sql 2>/dev/null)}; do
+  $PSQL -q -v ON_ERROR_STOP=1 < "$extra" >/dev/null || { echo "FAIL migration $extra"; exit 1; }
+done
 out=$($PSQL -q -v ON_ERROR_STOP=1 < tests/sql/product_marks/cases.sql 2>&1); rc=$?
 echo "$out" | grep -o 'PASS .*\|ERROR.*\|FAIL.*'
 n=$(echo "$out" | grep -c 'PASS')
-[ $rc -eq 0 ] && [ "$n" -eq 12 ] && echo "ALL PASS ($n)" || { echo "SOME FAILED ($n/12)"; exit 1; }
+[ $rc -eq 0 ] && [ "$n" -eq 17 ] && echo "ALL PASS ($n)" || { echo "SOME FAILED ($n/17)"; exit 1; }

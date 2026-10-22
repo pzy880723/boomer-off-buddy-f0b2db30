@@ -229,6 +229,10 @@ beforeEach(() => {
   omitCount = false;
   skuReadUrls = [];
   tables = {
+    inv_categories: [
+      { id: "cat-root", code: "toys", name: "玩具", parent_id: null },
+      { id: "cat-toy", code: "toy_model", name: "模型", parent_id: "cat-root" },
+    ],
     inv_handheld_devices: [{ id: "device", token: "device", is_active: true, device_code: "test" }],
     user_roles: [
       { user_id: "hq", role: "hq_operator" },
@@ -806,6 +810,7 @@ test("detail: preserves every existing identity, price, label, image and print f
     in_fankuang: true,
     featured_stamp: null,
     notice_tags: [],
+    mark_labels: [],
     can_edit: false,
     can_delete: false,
     sku_code: "a",
@@ -813,6 +818,8 @@ test("detail: preserves every existing identity, price, label, image and print f
     epc: "epc-a",
     name: "Product a",
     category: "toy_model",
+    category_name: "模型",
+    category_path: ["玩具", "模型"],
     facet_codes: ["ceramic", "retro"],
     tags: ["Ceramic", "Retro"],
     facets: [
@@ -965,4 +972,17 @@ test("deleted product stays hidden after refresh in store, HQ and barcode lookup
   }
   assert.equal((await call("detail", "scope=all", "hq", id)).status, 404);
   assert.equal((await call("detail", "scope=all&capabilities_only=1", "hq", id)).status, 404);
+});
+
+test("list and detail expose dictionary category name/path while keeping raw code", async () => {
+  const list = await call("list", `location_id=${A}&status=all`);
+  assert.equal(list.status, 200);
+  const item = list.body.data.items.find((i: Row) => i.category === "toy_model");
+  assert.ok(item, "fixture item present");
+  assert.equal(item.category_name, "模型");
+  assert.deepEqual(item.category_path, ["玩具", "模型"]);
+  assert.ok(Array.isArray(item.mark_labels));
+  const detail = await call("detail", `location_id=${A}`, "hq", item.id);
+  assert.equal(detail.body.data.category, "toy_model");
+  assert.equal(detail.body.data.category_name, "模型");
 });

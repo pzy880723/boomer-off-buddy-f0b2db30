@@ -1,4 +1,5 @@
-import { readProductMarks, type FeaturedStamp, type NoticeTag } from "@/lib/commerce/product-marks";
+import { readProductMarks, productMarkLabels, type FeaturedStamp, type NoticeTag, type ProductMarkLabel } from "@/lib/commerce/product-marks";
+import { applyCategoryLabels, resolveCategoryLabel, type CategoryDictRow } from "@/lib/commerce/category-labels";
 import { isInFankuang } from "@/lib/commerce/fankuang";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { err, resolveSessionUser, type DeviceContext } from "@/server/handheld-auth.server";
@@ -37,6 +38,10 @@ export type ProductItem = {
   item_code: string | null;
   name: string;
   category: string | null;
+  /** 分类中文名（真实字典）；字典缺失为 null，绝不回退编码。 */
+  category_name: string | null;
+  /** 分类中文路径（上级→本级）；缺失为 []。 */
+  category_path: string[];
   price: number;
   condition_grade: "N" | "S" | "A" | "B" | "C" | "J" | null;
   image_url: string | null;
@@ -49,6 +54,8 @@ export type ProductItem = {
   in_fankuang: boolean;
   featured_stamp: FeaturedStamp | null;
   notice_tags: NoticeTag[];
+  /** 状态胶囊区展示用中文：特色印章在前，其后全部提示，按字典顺序。 */
+  mark_labels: ProductMarkLabel[];
   total_stock_qty: number;
   stocks: {
     location_id: string;
@@ -319,6 +326,7 @@ export function buildProductItems(skus: Sku[], inventory: Inventory): ProductIte
       item_code: s.sku_code,
       name: s.name,
       category: s.category,
+      ...categoryFields(resolveCategoryLabel(s.category, [])),
       price: Number(s.price_tier) || 0,
       condition_grade: (s.grade as ProductItem["condition_grade"]) ?? null,
       image_url:
@@ -333,6 +341,7 @@ export function buildProductItems(skus: Sku[], inventory: Inventory): ProductIte
       fankuang_override: (s as { fankuang_override?: boolean | null }).fankuang_override ?? null,
       in_fankuang: isInFankuang(s as never),
       ...readProductMarks(s as never),
+      mark_labels: productMarkLabels(s as never),
       total_stock_qty: total,
       stocks,
       status: s.status,
@@ -346,7 +355,31 @@ export function buildProductItems(skus: Sku[], inventory: Inventory): ProductIte
   });
 }
 
-export async function signProductItems(items: ProductItem[]): Promise<ProductItem[]> {
+function categoryFields(label: { name: string | null; path: string[] }) {
+  return { category_name: label.name, category_path: label.path };
+}
+
+/** 一页一次分类字典读取（编码 + 上级），失败时保留内置种子中文，不影响列表。 */
+async function loadCategoryDict(codes: string[]): Promise<CategoryDictRow[]> {
+  if (!codes.length) return [];
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("inv_categories" as never).select("id, code, name, parent_id").in("code", codes);
+    if (error || !Array.isArray(data)) return [];
+    const rows = data as unknown as CategoryDictRow[];
+    const parentIds = [...new Set(rows.map((r) => r.parent_id).filter(Boolean))] as string[];
+    if (!parentIds.length) return rows;
+    const parents = await supabaseAdmin
+      .from("inv_categories" as never).select("id, code, name, parent_id").in("id", parentIds);
+    return parents.error || !Array.isArray(parents.data) ? rows : [...rows, ...(parents.data as unknown as CategoryDictRow[])];
+  } catch {
+    return [];
+  }
+}
+
+export async function signProductItems(input: ProductItem[]): Promise<ProductItem[]> {
+  const codes = [...new Set(input.map((i) => i.category).filter(Boolean))] as string[];
+  const items = applyCategoryLabels(input, await loadCategoryDict(codes));
   const paths = collectUniqueProductImagePaths(items);
   const { parseSkuMediaPath, buildPublicSkuMediaUrl, getPublicOrigin } =
     await import("@/lib/sku-media");

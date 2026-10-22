@@ -1,3 +1,5 @@
+import { useCategories } from "@/hooks/use-categories";
+import { ProductStatusPills } from "@/components/inventory/product-mark-pills";
 import { useState, useRef } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -40,6 +42,7 @@ export const Route = createFileRoute("/inventory/skus/$id")({
 });
 
 function SkuDetailPage() {
+  const { displayLabelOf: categoryText } = useCategories();
   const { id } = Route.useParams();
   const nav = useNavigate();
   const getFn = useServerFn(getSku);
@@ -117,10 +120,14 @@ function SkuDetailPage() {
           <div className="min-w-0 flex-1 space-y-3">
             <div>
               <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                {categoryLabel(sku.category)} · {SKU_KIND_LABEL[sku.kind as SkuKind] ?? sku.kind}
+                {categoryText(sku.category)} · {SKU_KIND_LABEL[sku.kind as SkuKind] ?? sku.kind}
                 {isBundle ? ` · 含 ${bundleChildren.length} 种子项` : ""}
               </p>
               <h1 className="mt-1 text-xl font-bold leading-tight sm:text-2xl">{sku.name}</h1>
+              <ProductStatusPills className="mt-2" sku={sku} leading={<>
+                <Badge variant={sku.status === "active" ? "default" : "secondary"} className="text-[10px]">{sku.status === "active" ? "在售" : "已归档"}</Badge>
+                {sku.grade && <Badge variant="outline" className="text-[10px]">成色 {sku.grade}</Badge>}
+              </>} />
             </div>
 
             <div className="rounded-lg bg-muted/50 p-3">
