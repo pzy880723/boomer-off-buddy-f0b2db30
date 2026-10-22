@@ -79,9 +79,9 @@ BEGIN
   v_ts := v_page1->>'last_ts'; v_id := v_page1->>'last_id';
   ASSERT v_ts IS NOT NULL AND (v_page1->>'has_more')::boolean, 'page1 should have more';
   SELECT handheld_work_items(u_b, ARRAY[loc], false, 50, v_ts::timestamptz, v_id::uuid) INTO v_page2;
-  SELECT count(DISTINCT elem->>'id') INTO v_cnt FROM (
-    SELECT jsonb_array_elements(v_page1->'items') elem
-    UNION ALL SELECT jsonb_array_elements(v_page2->'items') elem) sub;
+  SELECT count(DISTINCT id) INTO v_cnt FROM (
+    SELECT elem->>'id' AS id FROM jsonb_array_elements(v_page1->'items') elem
+    UNION ALL SELECT elem->>'id' AS id FROM jsonb_array_elements(v_page2->'items') elem) sub;
   ASSERT v_cnt = jsonb_array_length(v_res->'items'), 'paged union != full set';
   RAISE NOTICE 'PASS 8 counts/pagination consistent';
 
