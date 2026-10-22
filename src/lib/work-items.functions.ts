@@ -6,5 +6,6 @@ export const getWorkItemsFn=createServerFn({method:'GET'}).middleware([requireSu
  const scope=await dashboardScope(context.userId);
  if(data.locationId && !scope.locations.some(l=>l.id===data.locationId))throw new Error('无该门店权限');
  const {loadWorkItems}=await import('@/server/handheld-work-items.server');
- return loadWorkItems({user_id:context.userId,device_id:'',device_location_id:null,location_ids:scope.locations.map(l=>l.id),is_hq:scope.isHq,filter_location_id:data.locationId},50,data.cursor);
+ return loadWorkItems({user_id:context.userId,device_id:'',device_location_id:null,location_ids:scope.locations.map(l=>l.id),is_hq:scope.isHq,filter_location_id:data.locationId,
+  support_location_ids:scope.locations.map(l=>l.id),support_include_unlocated:scope.isHq && !data.locationId},50,data.cursor);
 });

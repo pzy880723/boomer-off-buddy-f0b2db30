@@ -288,8 +288,9 @@ export const Route = createFileRoute("/api/public/handheld/dashboard")({
           unreadCount = await countUnread(notificationScope);
         }
 
-        const baseScope = await resolveNotificationScope({ userId: session.user_id, deviceId: auth.device.id, deviceLocationId: auth.device.location_id });
-        const scopedWork = applyRequestedLocation(baseScope, locationId);
+        const { resolveWorkScope, applyWorkLocation } = await import('@/server/handheld-work-items.server');
+        const baseScope = await resolveWorkScope({ userId: session.user_id, deviceId: auth.device.id, deviceLocationId: auth.device.location_id });
+        const scopedWork = applyWorkLocation(baseScope, locationId);
         if (!scopedWork.ok) return err('Location not authorized', 403, { code: 'location_forbidden' });
         let work;
         try { const {loadWorkItems} = await import('@/server/handheld-work-items.server'); work = await loadWorkItems(scopedWork.scope); }
