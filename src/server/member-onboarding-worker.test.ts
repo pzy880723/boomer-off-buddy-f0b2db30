@@ -1,0 +1,11 @@
+import {it,expect} from 'vitest';
+import {runMemberOnboarding,type OnboardingWorkerDeps} from './member-onboarding-worker.server';
+const job={shop_id:'target',kdt_id:215098500,parent_kdt_id:153242272,revision:1,claim_token:'token'};
+function deps():OnboardingWorkerDeps{return {claim:async id=>id==='target'?job:null,finish:async()=>true,verifyProvider:async()=>({ownership:true,tokensReadBack:true,rulesSupported:true,rulesEquivalent:true}),mappings:async()=>({eligible:10,mapped:10,missing:0,conflict:0,unavailable:0}),projections:async()=>[],posSafe:async()=>true};}
+it('worker runs target only',async()=>expect((await runMemberOnboarding('other',deps())).status).toBe('not_claimed'));
+it('worker never claims assets end to end',async()=>expect((await runMemberOnboarding('target',deps())).status).toBe('configuration_verified'));
+it('unsupported rule reads cannot pass',async()=>{const d=deps();d.verifyProvider=async()=>({ownership:true,tokensReadBack:true,rulesSupported:false,rulesEquivalent:false});expect((await runMemberOnboarding('target',d)).status).toBe('blocked');});
+it('stale lease receipt rejected',async()=>{const d=deps();d.finish=async()=>false;expect((await runMemberOnboarding('target',d)).status).toBe('superseded');});
+it('provider failure records blocked not fake success',async()=>{const d=deps();d.verifyProvider=async()=>{throw Error('no_permission');};expect((await runMemberOnboarding('target',d)).status).toBe('blocked');});
+it('historical failure does not block later projection success',async()=>{const d=deps();d.projections=async()=>[{balance_synced_at:'2026-10-23T04:50:10Z',balance_failed_at:'2026-10-22T00:00:00Z'}];expect((await runMemberOnboarding('target',d)).status).toBe('configuration_verified');});
+it('current projection failure blocks pass',async()=>{const d=deps();d.projections=async()=>[{balance_synced_at:null,balance_failed_at:'2026-10-23T04:50:10Z'}];expect((await runMemberOnboarding('target',d)).status).toBe('blocked');});
