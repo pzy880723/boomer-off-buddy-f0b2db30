@@ -26,13 +26,13 @@ export function batchPatchReturned(patch: Record<string, unknown>, row: Record<s
   return Object.entries(patch).every(([key, value]) => JSON.stringify(row[key]) === JSON.stringify(value));
 }
 
-/** Compare PostgreSQL timestamptz values without truncating fractional microseconds. */
+/** Normalize offsets at whole-second precision; preserve all fractional digits up to nanoseconds. */
 export function sameBatchVersion(a: string, b: string): boolean {
   const normalize = (s: string) => {
-    const match = /^(.*?)(?:\.(\d{1,6}))?(Z|[+-]\d{2}:\d{2})$/.exec(s);
+    const match = /^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2})(?:\.(\d{1,9}))?(Z|[+-]\d{2}:\d{2})$/.exec(s);
     if (!match) return null;
-    const seconds = Date.parse(`${match[1]}${match[3]}`);
-    return Number.isFinite(seconds) ? `${seconds}:${(match[2] ?? "").padEnd(6, "0")}` : null;
+    const seconds = Date.parse(`${match[1].replace(" ", "T")}${match[3]}`);
+    return Number.isFinite(seconds) ? `${seconds}:${(match[2] ?? "").padEnd(9, "0")}` : null;
   };
   const first = normalize(a);
   return first !== null && first === normalize(b);
