@@ -22,6 +22,10 @@ export class BatchReceiptFence {
   }
 }
 
+export function batchPatchReturned(patch: Record<string, unknown>, row: Record<string, unknown>): boolean {
+  return Object.entries(patch).every(([key, value]) => JSON.stringify(row[key]) === JSON.stringify(value));
+}
+
 /** Compare PostgreSQL timestamptz values without truncating fractional microseconds. */
 export function sameBatchVersion(a: string, b: string): boolean {
   const normalize = (s: string) => {

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { stampOperation, confirmBatch, retryBatch, BatchReceiptFence } from "./batch-confirmation.ts";
+import { stampOperation, confirmBatch, retryBatch, BatchReceiptFence, batchPatchReturned } from "./batch-confirmation.ts";
 
 test("stamp nochange and empty selection do not clear; clear is explicit", () => {
   assert.equal(stampOperation("nochange"), null);
@@ -27,4 +27,11 @@ test("context change, closed sheet and permission failure invalidate late receip
   assert.equal(fence.accept(current, "account1|L2|role|query"), true);
   fence.invalidate();
   assert.equal(fence.accept(current, "account1|L2|role|query"), false);
+});
+
+test("RETURNING must contain the exact target field values, not just a timestamp", () => {
+  assert.equal(batchPatchReturned({ featured_stamp: "rare" }, { updated_at: "new", featured_stamp: "new" }), false);
+  assert.equal(batchPatchReturned({ notice_tags: ["parts_missing"] }, { notice_tags: [] }), false);
+  assert.equal(batchPatchReturned({ featured_stamp: null }, { featured_stamp: null, notice_tags: ["flawed"] }), true);
+  assert.equal(batchPatchReturned({ fankuang_override: false }, { fankuang_override: false }), true);
 });

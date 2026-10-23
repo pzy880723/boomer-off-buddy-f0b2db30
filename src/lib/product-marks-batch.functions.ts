@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { FEATURED_STAMPS, NOTICE_TAGS } from "@/lib/commerce/product-marks";
+import { batchPatchReturned } from "@/lib/commerce/batch-confirmation";
 
 const OpSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("notice"), add: z.array(z.enum(NOTICE_TAGS)).max(10), remove: z.array(z.enum(NOTICE_TAGS)).max(10) }),
@@ -71,7 +72,7 @@ export const batchUpdateProductMarks = createServerFn({ method: "POST" })
           .select("updated_at,featured_stamp,notice_tags,fankuang_override").maybeSingle();
         if (error?.code === "42501") throw new Response("无权保存", { status: 403 });
         if (error) throw new Error("write_failed");
-        if (row && !Object.entries(patch).every(([key, value]) => JSON.stringify(row[key as keyof typeof row]) === JSON.stringify(value)))
+        if (row && !batchPatchReturned(patch, row))
           throw new Error("write_failed");
         return row ? String((row as { updated_at: string }).updated_at) : null;
       },
