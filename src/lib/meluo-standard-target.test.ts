@@ -1,4 +1,4 @@
-import {it,expect} from 'vitest';
+import {it,expect} from 'bun:test';
 import {assertMeluoTarget,buildMeluoChannelAppend,validateMeluoCatalog,MELUO_SHOP_ID} from './meluo-standard-target';
 const s={id:MELUO_SHOP_ID,kdt_id:215098500,parent_kdt_id:153242272,role:'branch',status:'active',warehouse_code:'MD00004'};
 it('only exact verified Meluo target accepted',()=>{expect(()=>assertMeluoTarget(s)).not.toThrow();expect(()=>assertMeluoTarget({...s,kdt_id:212291308})).toThrow('target_mismatch');});

@@ -1,0 +1,17 @@
+[Unit]
+Description=BOOMER member onboarding event worker
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/boomer-off/current
+EnvironmentFile=/etc/boomer-off/erp.env
+Environment=BOOMER_RUNTIME=tencent
+Environment=MEMBER_ONBOARDING_ENABLED=true
+ExecStart=/usr/local/bin/bun scripts/watch-member-onboarding.ts
+Restart=on-failure
+RestartSec=15
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

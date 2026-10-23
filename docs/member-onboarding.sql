@@ -21,6 +21,7 @@ BEGIN
  claim_token=NULL,lease_until=NULL,attempts=0,updated_at=now()
  WHERE p_force OR member_onboarding_jobs.kdt_id IS DISTINCT FROM EXCLUDED.kdt_id
  OR member_onboarding_jobs.parent_kdt_id IS DISTINCT FROM EXCLUDED.parent_kdt_id;
+ IF FOUND THEN PERFORM pg_notify('member_onboarding',s.id::text); END IF;
 END $$;
 
 CREATE FUNCTION public.member_onboarding_shop_changed()
