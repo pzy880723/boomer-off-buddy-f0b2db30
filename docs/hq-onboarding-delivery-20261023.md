@@ -1,5 +1,12 @@
 # HQ统一门店接入：交付与阻断边界
 
+## 集成更新（用户腾讯报告，2026-10-23 05:11 UTC；未独立复验）
+- 用户已通过正常浏览器积分目录读取并保存官方正文：https://doc.youzanyun.com/v2/doc/cloud/token/VzWAwKP1NilN2Hkiy4ncOhLVnuc.md 。其`youzan.ump.pointdeduction.update.openstatus/1.0.0`仅开关，需后台先配置规则，支持店铺类型仅“微商城单店”；禁止当作连锁规则同步接口。
+- 腾讯无Bun、DATABASE_URL或PGHOST，原PG NOTIFY watcher当前不可部署。用户保持已交付服务端/SQL不动，计划独立采用Node22编译run-member-onboarding.ts及腾讯systemd有界REST扫描：每5分钟，仅queued/过期lease，四店串行。该方案尚未作为已部署/验收记录，不是Cloud轮询。
+- 不获取PG凭证、不改依赖/修图、不重启主ERP。下文Bun/PG watcher步骤被此次腾讯部署方案取代，不应继续要求获取PG凭证。
+- 商品由用户腾讯端复用已有goods及MD00004仓库单据：32SKU canary已通过；32条直接quantity被拒任务经实际warehouse+channel9999回读后fenced归档；其余13组进行中，不能写成448SKU全部完成。旧商品dry-run已不需要，不再执行。
+- 以上为用户提供进度，本轮不审计全库、不写代码/数据库、不执行任何商品同步或资产操作。
+
 ## 最新腾讯实证与范围收敛（2026-10-23 05:08 UTC）
 - 用户腾讯逐个`itemdetail.get`核实美罗城已有14组，display=1，每组32价SKU，库存全0，ERP关联0；其他三店镜像包含真实扣减，不得重置。
 - 旧渠道追加路线已不适用于本次任务：不再开发或执行HQ update/create/channel.publish或共享SPU修改；下文商品dry-run/渠道writer步骤仅为历史交付记录，**不得按其继续执行**。
