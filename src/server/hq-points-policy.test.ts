@@ -1,7 +1,7 @@
 import {it} from 'node:test';
 import assert from 'node:assert/strict';
 import {inspectHqPointsPolicy} from './hq-points-policy';
-const payload=()=>({kdt_id:153242272,online_range_type:'all',online_item_ids:[],default_point_deduct:true,content_list:[{plugin_id:5,policy_value:'100'},{plugin_id:6,policy_value:JSON.stringify({status:1,amountType:0,amountLowerLimit:0,deductType:0,deductUpperLimit:0})}]});
+const payload=()=>({kdt_id:153242272,online_range_type:'all',online_item_ids:[] as number[],default_point_deduct:true,content_list:[{plugin_id:5,policy_value:'100'},{plugin_id:6,policy_value:JSON.stringify({status:1,amountType:0,amountLowerLimit:0,deductType:0,deductUpperLimit:0})}]});
 it('verified HQ official schema yields scope fingerprint without copying assets',async()=>{const r=await inspectHqPointsPolicy(payload(),153242272,true);assert.equal(r.supported,true);assert.equal(r.scope,'youzan_chain_hq');assert.match(r.fingerprint,/^[a-f0-9]{64}$/);});
 it('HQ identity or organization mismatch blocks',async()=>{assert.equal((await inspectHqPointsPolicy(payload(),215098500,true)).supported,false);assert.equal((await inspectHqPointsPolicy(payload(),153242272,false)).supported,false);});
 it('branch zero is not a supported HQ policy',async()=>{const p=payload();p.kdt_id=215098500;p.content_list[0].policy_value='0';assert.equal((await inspectHqPointsPolicy(p,153242272,true)).supported,false);});
