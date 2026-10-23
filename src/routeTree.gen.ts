@@ -128,6 +128,7 @@ import { Route as ApiPublicHandheldNotificationsRouteImport } from './routes/api
 import { Route as ApiPublicHandheldOpenapiDotjsonRouteImport } from './routes/api/public/handheld/openapi[.]json'
 import { Route as ApiPublicHandheldOrdersRouteImport } from './routes/api/public/handheld/orders'
 import { Route as ApiPublicHandheldParcelsRouteImport } from './routes/api/public/handheld/parcels'
+import { Route as ApiPublicHandheldProductTaxonomyRouteImport } from './routes/api/public/handheld/product-taxonomy'
 import { Route as ApiPublicHandheldProductsRouteImport } from './routes/api/public/handheld/products'
 import { Route as ApiPublicHandheldStocktakesRouteImport } from './routes/api/public/handheld/stocktakes'
 import { Route as ApiPublicHandheldSyncRecordsRouteImport } from './routes/api/public/handheld/sync-records'
@@ -945,6 +946,12 @@ const ApiPublicHandheldParcelsRoute =
   ApiPublicHandheldParcelsRouteImport.update({
     id: '/api/public/handheld/parcels',
     path: '/api/public/handheld/parcels',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldProductTaxonomyRoute =
+  ApiPublicHandheldProductTaxonomyRouteImport.update({
+    id: '/api/public/handheld/product-taxonomy',
+    path: '/api/public/handheld/product-taxonomy',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicHandheldProductsRoute =
@@ -2245,6 +2252,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/openapi.json': typeof ApiPublicHandheldOpenapiDotjsonRoute
   '/api/public/handheld/orders': typeof ApiPublicHandheldOrdersRouteWithChildren
   '/api/public/handheld/parcels': typeof ApiPublicHandheldParcelsRouteWithChildren
+  '/api/public/handheld/product-taxonomy': typeof ApiPublicHandheldProductTaxonomyRoute
   '/api/public/handheld/products': typeof ApiPublicHandheldProductsRouteWithChildren
   '/api/public/handheld/stocktakes': typeof ApiPublicHandheldStocktakesRoute
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
@@ -2558,6 +2566,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/openapi.json': typeof ApiPublicHandheldOpenapiDotjsonRoute
   '/api/public/handheld/orders': typeof ApiPublicHandheldOrdersRouteWithChildren
   '/api/public/handheld/parcels': typeof ApiPublicHandheldParcelsRouteWithChildren
+  '/api/public/handheld/product-taxonomy': typeof ApiPublicHandheldProductTaxonomyRoute
   '/api/public/handheld/products': typeof ApiPublicHandheldProductsRouteWithChildren
   '/api/public/handheld/stocktakes': typeof ApiPublicHandheldStocktakesRoute
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
@@ -2879,6 +2888,7 @@ export interface FileRoutesById {
   '/api/public/handheld/openapi.json': typeof ApiPublicHandheldOpenapiDotjsonRoute
   '/api/public/handheld/orders': typeof ApiPublicHandheldOrdersRouteWithChildren
   '/api/public/handheld/parcels': typeof ApiPublicHandheldParcelsRouteWithChildren
+  '/api/public/handheld/product-taxonomy': typeof ApiPublicHandheldProductTaxonomyRoute
   '/api/public/handheld/products': typeof ApiPublicHandheldProductsRouteWithChildren
   '/api/public/handheld/stocktakes': typeof ApiPublicHandheldStocktakesRoute
   '/api/public/handheld/sync-records': typeof ApiPublicHandheldSyncRecordsRoute
@@ -3201,6 +3211,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/openapi.json'
     | '/api/public/handheld/orders'
     | '/api/public/handheld/parcels'
+    | '/api/public/handheld/product-taxonomy'
     | '/api/public/handheld/products'
     | '/api/public/handheld/stocktakes'
     | '/api/public/handheld/sync-records'
@@ -3514,6 +3525,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/openapi.json'
     | '/api/public/handheld/orders'
     | '/api/public/handheld/parcels'
+    | '/api/public/handheld/product-taxonomy'
     | '/api/public/handheld/products'
     | '/api/public/handheld/stocktakes'
     | '/api/public/handheld/sync-records'
@@ -3834,6 +3846,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/openapi.json'
     | '/api/public/handheld/orders'
     | '/api/public/handheld/parcels'
+    | '/api/public/handheld/product-taxonomy'
     | '/api/public/handheld/products'
     | '/api/public/handheld/stocktakes'
     | '/api/public/handheld/sync-records'
@@ -4106,6 +4119,7 @@ export interface RootRouteChildren {
   ApiPublicHandheldOpenapiDotjsonRoute: typeof ApiPublicHandheldOpenapiDotjsonRoute
   ApiPublicHandheldOrdersRoute: typeof ApiPublicHandheldOrdersRouteWithChildren
   ApiPublicHandheldParcelsRoute: typeof ApiPublicHandheldParcelsRouteWithChildren
+  ApiPublicHandheldProductTaxonomyRoute: typeof ApiPublicHandheldProductTaxonomyRoute
   ApiPublicHandheldProductsRoute: typeof ApiPublicHandheldProductsRouteWithChildren
   ApiPublicHandheldStocktakesRoute: typeof ApiPublicHandheldStocktakesRoute
   ApiPublicHandheldSyncRecordsRoute: typeof ApiPublicHandheldSyncRecordsRoute
@@ -5072,6 +5086,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/handheld/parcels'
       fullPath: '/api/public/handheld/parcels'
       preLoaderRoute: typeof ApiPublicHandheldParcelsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/product-taxonomy': {
+      id: '/api/public/handheld/product-taxonomy'
+      path: '/api/public/handheld/product-taxonomy'
+      fullPath: '/api/public/handheld/product-taxonomy'
+      preLoaderRoute: typeof ApiPublicHandheldProductTaxonomyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/handheld/products': {
@@ -7358,6 +7379,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHandheldOpenapiDotjsonRoute: ApiPublicHandheldOpenapiDotjsonRoute,
   ApiPublicHandheldOrdersRoute: ApiPublicHandheldOrdersRouteWithChildren,
   ApiPublicHandheldParcelsRoute: ApiPublicHandheldParcelsRouteWithChildren,
+  ApiPublicHandheldProductTaxonomyRoute: ApiPublicHandheldProductTaxonomyRoute,
   ApiPublicHandheldProductsRoute: ApiPublicHandheldProductsRouteWithChildren,
   ApiPublicHandheldStocktakesRoute: ApiPublicHandheldStocktakesRoute,
   ApiPublicHandheldSyncRecordsRoute: ApiPublicHandheldSyncRecordsRoute,
