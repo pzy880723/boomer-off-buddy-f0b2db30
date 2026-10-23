@@ -2,8 +2,8 @@ import { currentProjectionFailure, evaluateOnboarding, type MappingCoverage } fr
 export type OnboardingJob = { shop_id: string; kdt_id: number; parent_kdt_id: number|null; revision: number; claim_token: string };
 export type OnboardingWorkerDeps = {
   claim(shopId: string): Promise<OnboardingJob|null>;
-  finish(job: OnboardingJob,status: string,reason: string,checks: Record<string,boolean|number>): Promise<boolean>;
-  verifyProvider(job: OnboardingJob): Promise<{ ownership: boolean; tokensReadBack: boolean; rulesSupported: boolean; rulesEquivalent: boolean }>;
+  finish(job: OnboardingJob,status: string,reason: string,checks: Record<string,boolean|number|string>): Promise<boolean>;
+  verifyProvider(job: OnboardingJob): Promise<{ ownership: boolean; tokensReadBack: boolean; rulesSupported: boolean; rulesEquivalent: boolean; hqPolicyScope?:string; hqPolicyFingerprint?:string; hqPolicyKdtId?:number; youzanPosInheritanceVerified?:boolean }>;
   mappings(job: OnboardingJob): Promise<MappingCoverage>;
   projections(job: OnboardingJob): Promise<Array<{ balance_synced_at: string|null; balance_failed_at: string|null }>>;
   posSafe(): Promise<boolean>;
@@ -16,8 +16,9 @@ export async function runMemberOnboarding(shopId: string,d: OnboardingWorkerDeps
    const currentFailures=(await d.projections(job)).filter(r=>currentProjectionFailure(r.balance_synced_at,r.balance_failed_at)).length;
    const evidence={ ...provider,mapping,posSafe:await d.posSafe(),assetsEndToEnd:false };
    let result=evaluateOnboarding(evidence);
+   if(provider.youzanPosInheritanceVerified===false && result.status!=='blocked')result={status:'blocked',reason:'assets_not_end_to_end_verified'};
    if(currentFailures>0 && result.status!=='blocked') result={status:'blocked',reason:'worker_unavailable'};
-   const checks={...provider,posSafe:evidence.posSafe,assetsEndToEnd:false,eligible:mapping.eligible,mapped:mapping.mapped,currentProjectionFailures:currentFailures};
+   const checks={...provider,hqConfigurationMirrorVerified:provider.ownership&&provider.rulesSupported&&provider.rulesEquivalent,posSafe:evidence.posSafe,assetsEndToEnd:false,eligible:mapping.eligible,mapped:mapping.mapped,currentProjectionFailures:currentFailures};
    const accepted=await d.finish(job,result.status,result.reason,checks);
    return { status:accepted ? result.status : 'superseded',reason:result.reason,checks };
  } catch {
