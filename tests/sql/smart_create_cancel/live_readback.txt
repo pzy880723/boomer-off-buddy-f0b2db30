@@ -6,3 +6,4 @@ handheld_smart_create_complete(uuid,jsonb) sha256=c1b6c4ecf9962417adf267115ff3ea
 rls=true force=false
 policies=0
 grant sandbox_exec:INSERT,SELECT
+anon=false/false authenticated=false/false service_role=true/true
