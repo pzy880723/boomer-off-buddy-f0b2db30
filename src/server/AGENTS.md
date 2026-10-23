@@ -19,3 +19,4 @@
 
 - Measurement conversations reuse product context only at the task’s current store; a different-store active context uses a task/store-specific key without moving prior questions, under task locks and exact requester validation. Why: transfers cannot leak customer questions to another store.
 - Handheld listing category names come from GET /api/public/handheld/product-taxonomy (all active ERP leaf categories, device + employee session), never from storefront taxonomy or recognition output. Why: storefront taxonomy is stock-filtered and recognize-item returns codes only.
+- Handheld sync-records requires device + employee session; scope = explicit authorized location_id else device location, only HQ role at a warehouse sees all authorized locations; queue rows match by location_id or the location's shop_id; Chinese labels added alongside raw fields, done means task ended, not stock read back. Why: no cross-store leaks and no false completion.
