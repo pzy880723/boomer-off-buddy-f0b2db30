@@ -52,7 +52,8 @@ export async function runBatchMarks(
       out.push(next
         ? { id, result: "success", updated_at: next, changed_fields: Object.keys(plan.patch) }
         : { id, result: "failed", reason: "version_conflict" });
-    } catch {
+    } catch (error) {
+      if (error instanceof Response && (error.status === 401 || error.status === 403)) throw error;
       out.push({ id, result: "failed", reason: "write_failed" });
     }
   }

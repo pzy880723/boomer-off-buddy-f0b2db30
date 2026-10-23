@@ -96,3 +96,29 @@ export const getBatchMarkScope = createServerFn({ method: "GET" })
     const locations = (hq || roles.includes("store_manager")) ? (locRes.data ?? []).filter((l) => hq || ids.has(l.id)) : [];
     return { userId: context.userId, roles, locations };
   });
+
+export const listBatchLocationStocks = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ location_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase;
+    const [rolesRes, permsRes] = await Promise.all([
+      sb.from("user_roles").select("role").eq("user_id", context.userId),
+      sb.from("user_location_perms").select("location_id").eq("user_id", context.userId),
+    ]);
+    if (rolesRes.error || permsRes.error) throw new Response("权限读取失败", { status: 403 });
+    const roles = (rolesRes.data ?? []).map((r) => String(r.role));
+    if (!roles.some((r) => r === "super_admin" || r === "hq_operator") &&
+      !(roles.includes("store_manager") && (permsRes.data ?? []).some((p) => p.location_id === data.location_id)))
+      throw new Response("库位未授权", { status: 403 });
+    const rows: Array<{ sku_id: string; qty: number }> = [];
+    // PostgREST caps each page; do not silently hide later stock records.
+    for (let start = 0; ; start += 1000) {
+      const { data: page, error } = await sb.from("inv_stocks").select("sku_id,qty")
+        .eq("location_id", data.location_id).order("sku_id").range(start, start + 999);
+      if (error) throw new Response("库存读取失败", { status: 403 });
+      rows.push(...(page ?? []));
+      if ((page ?? []).length < 1000) break;
+    }
+    return rows;
+  });
