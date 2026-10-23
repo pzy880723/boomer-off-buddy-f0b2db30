@@ -6,6 +6,7 @@ test("状态/动作/渠道/事件中文，未知值待核对不透传", () => {
   assert.equal(syncStatusLabel("failed"), "失败待处理");
   assert.equal(syncStatusLabel("dead_letter"), "多次失败已停止");
   assert.equal(syncStatusLabel("unmatched"), "未匹配商品");
+  assert.equal(syncStatusLabel("succeeded"), "任务已完成");
   assert.equal(syncActionLabel("set_stock_zero"), "库存归零");
   assert.equal(syncChannelLabel("youzan_offline"), "有赞门店");
   assert.equal(saleEventLabel("paid"), "已支付");

@@ -23,3 +23,11 @@ test("真实页面使用共用中文映射及错误呈现，保留订单号与�
   assert.ok(page.includes('queryKey: ["outbox", status]'));
   assert.ok(page.includes('queryKey: ["sale-events", status]'));
 });
+
+test("销售事件商品呈现使用每行SKU，读取错误不显示暂无记录", () => {
+  const events = page.slice(page.indexOf("function EventsPanel()"));
+  assert.ok(events.includes("productDisplay(r.sku)"));
+  assert.equal(events.includes("productDisplay(undefined)"), false);
+  assert.ok(events.includes("q.isError"));
+  assert.ok(events.includes("商品信息读取失败，请稍后重试"));
+});
