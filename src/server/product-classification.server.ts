@@ -116,7 +116,13 @@ export async function resolveIpCandidate(
 ): Promise<{ id: string | null; name: string; status: "matched" | "review" }> {
   const name = candidate.trim();
   const normalized = normalizeLookupText(name);
-  const ips = await loadActiveProductIps();
+  let ips: Awaited<ReturnType<typeof loadActiveProductIps>>;
+  try {
+    ips = await loadActiveProductIps();
+  } catch {
+    // IP 库只读失败不挡上架：保留原候选待核对，绝不关联或创建 IP。
+    return { id: null, name, status: "review" };
+  }
   const exact = ips.find((ip) =>
     [ip.name, ip.name_original, ...ip.aliases].some((c) => normalizeLookupText(c) === normalized),
   );

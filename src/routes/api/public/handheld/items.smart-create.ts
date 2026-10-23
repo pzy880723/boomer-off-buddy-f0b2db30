@@ -127,7 +127,7 @@ async function handleSmartCreate(request: Request, timing: ReturnType<typeof cre
         let resolvedIp: { id: string | null; name: string | null; status: "empty" | "matched" | "review" };
         const ipCandidate = body.ip_candidate;
         if (ipCandidate !== undefined && (body.ip_confirmed || (body.ip_name ?? "").trim())) {
-          return err("ip_candidate 只能在未填 ip_name 且 ip_confirmed=false 时使用", 400, { code: "validation_error" });
+          return err("待核对 IP 不能与已填写或已确认的 IP 同时提交，请只保留一种", 400, { code: "validation_error" });
         }
         try {
           resolvedIp = ipCandidate !== undefined

@@ -31,4 +31,4 @@ export function resolveSyncLocations(
   return { ok: true, locationIds: [current], current };
 }
 
-export { statusLabel, reasonLabel, nextAction } from "@/lib/sync-record-labels";
+export { statusLabel, reasonLabel, nextAction, errorLabel } from "@/lib/sync-record-labels";

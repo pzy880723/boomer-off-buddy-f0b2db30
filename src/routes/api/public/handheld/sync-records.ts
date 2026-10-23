@@ -3,6 +3,7 @@ import { HANDHELD_CORS, authenticateDevice, ok, err, resolveSessionUser } from "
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { resolveNotificationScope } from "@/server/handheld-notifications.server";
 import {
+  errorLabel,
   nextAction,
   reasonLabel,
   resolveSyncLocations,
@@ -81,6 +82,7 @@ export const Route = createFileRoute("/api/public/handheld/sync-records")({
             status_label: statusLabel(x.status),
             reason_label: reasonLabel(x.reason),
             next_action: nextAction(x.status),
+            error_label: errorLabel(x.last_error),
           };
         });
         return ok({ items, location_id: r.current });
