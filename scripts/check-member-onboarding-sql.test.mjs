@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import { PGlite } from '@electric-sql/pglite';
 
-const sql = await readFile(new URL('../drizzle/migrations/0105_member_onboarding.sql', import.meta.url), 'utf8');
+const sql = await readFile(new URL('../docs/member-onboarding.sql', import.meta.url), 'utf8');
 const A='00000000-0000-0000-0000-000000000001', B='00000000-0000-0000-0000-000000000002', H='00000000-0000-0000-0000-000000000003';
 async function setup() {
  const db=new PGlite();
