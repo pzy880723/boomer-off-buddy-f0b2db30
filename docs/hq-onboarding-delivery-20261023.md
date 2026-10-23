@@ -1,5 +1,12 @@
 # HQ统一门店接入：交付与阻断边界
 
+## 组织分页窄修（2026-10-23 05:17 UTC）
+- 用户腾讯只读canary实证：组织1.0.1空请求返回161400200“页码必须大于0”。read显式接收params并JSON序列化，组织请求从`{page_num:1,page_size:50}`开始逐页读；HQ getter仍显式传`query_request:"{}"`。
+- 1.0.1返回采用有赞官方论坛历史成功响应合同：`data.organization_list/total/page_num/page_size`（https://bbs.youzan.com/thread-691040-1-1.html）；registry的`organizations`不是已验证合同，不用递归猜字段。该论坛不是本轮腾讯实时回包，当前官方文档页仅取得外壳；腾讯复验需确认同一响应schema，若不同则阻断，不猜路径。
+- 校验页码/页大小回显、稳定total、逐页预期条数、唯一kdt与parent正整数；累计条数等于total才返回完整列表，最多100页。重复节点/重复页、非法schema、短页未完整、后续失败、total变化或达到上限均阻断，不依据第一页命中提前通过。只保留两个身份字段，不保存原始响应或PII。
+- 读完再核实唯一目标和parent；仅修查询，不重置或伪造首次`worker_unavailable`任务结果，不新增迁移。腾讯窄更新脚本与`src/server/member-organizations.ts`后正常重新验收，仍沿用租约/版本/通知去重。
+- 商品448linked/448published、仓库与渠道库存及32canary队列done/last_error空是用户腾讯独立实证；本轮没有商品操作。sidecar尚未启用，会员自动接入未通过，POS/资产验收阻碍保持。
+
 ## HQ-only合同修订（2026-10-23 05:14 UTC）
 - 已通过网页读取核实官方正文 https://doc.youzanyun.com/v2/doc/cloud/token/HzjQw3M2tiDUOEkXcmKcl2XTncc.md ：getter支持微商城单店、零售单店及D/L/L高级版总部，**不支持连锁分店**。此前分店0不作为关闭或不同规则依据，也不要求分店写同规则。
 - `run-member-onboarding.ts`仅在组织核实后使用HQ token调用抵扣getter，官方请求`query_request:"{}"`；不再调用分店抵扣getter，也不调用setter。分店token刷新回读仍保留用于授权检查。
