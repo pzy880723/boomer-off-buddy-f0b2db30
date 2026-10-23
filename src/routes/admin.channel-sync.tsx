@@ -29,6 +29,15 @@ import {
   dismissChannelSyncTask,
   listSaleEvents,
 } from "@/lib/omnichannel-ops.functions";
+import {
+  errorLabel,
+  outboxNextAction as nextAction,
+  productDisplay,
+  saleEventLabel,
+  syncActionLabel,
+  syncChannelLabel,
+  syncStatusLabel,
+} from "@/lib/sync-record-labels";
 
 export const Route = createFileRoute("/admin/channel-sync")({
   head: () => ({
@@ -43,7 +52,7 @@ function Page() {
     <div className="p-6 space-y-4">
       <PageHeader
         title="渠道同步异常中心"
-        description="监控 channel_sync_outbox 任务队列和 inventory_sale_events 销售事件，处理失败或未匹配的记录。"
+        description="查看商品同步任务和销售记录，处理失败或未匹配的记录。"
       />
       <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
         <TabsList>
@@ -98,7 +107,7 @@ function OutboxPanel() {
               variant={status === s ? "default" : "outline"}
               onClick={() => setStatus(s)}
             >
-              {s}
+              {syncStatusLabel(s)}
             </Button>
           ))}
           <div className="ml-auto">
@@ -110,7 +119,7 @@ function OutboxPanel() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>SKU</TableHead>
+              <TableHead>商品</TableHead>
               <TableHead>动作 / 渠道</TableHead>
               <TableHead>状态</TableHead>
               <TableHead>重试</TableHead>
@@ -133,28 +142,31 @@ function OutboxPanel() {
                 </TableCell>
               </TableRow>
             ) : (
-              q.data?.items.map((r) => (
+              q.data?.items.map((r) => {
+                const p = productDisplay(r.sku);
+                return (
                 <TableRow key={r.id}>
                   <TableCell>
-                    <div className="font-medium">{r.sku?.name ?? "—"}</div>
-                    <div className="text-xs text-muted-foreground">{r.sku?.sku_code ?? r.sku_id}</div>
+                    <div className="font-medium">{p.name}</div>
+                    {p.code && <div className="text-xs text-muted-foreground">{p.code}</div>}
                   </TableCell>
                   <TableCell>
-                    <div>{r.action}</div>
+                    <div>{syncActionLabel(r.action)}</div>
                     <div className="text-xs text-muted-foreground">
-                      {r.channel} · {r.target_stock ?? "-"}
+                      {syncChannelLabel(r.channel)} · 目标库存 {r.target_stock ?? "-"}
                     </div>
                   </TableCell>
                   <TableCell>
                     <Badge variant={r.status === "retry_wait" || r.status === "dead_letter" ? "destructive" : "secondary"}>
-                      {r.status}
+                      {syncStatusLabel(r.status)}
                     </Badge>
+                    <div className="text-xs text-muted-foreground mt-1">{nextAction(r.status)}</div>
                   </TableCell>
                   <TableCell className="text-xs">
                     {r.attempts}/{r.max_attempts}
                   </TableCell>
-                  <TableCell className="text-xs max-w-xs truncate" title={r.last_error ?? ""}>
-                    {r.last_error ?? "—"}
+                  <TableCell className="text-xs max-w-xs truncate">
+                    {errorLabel(r.last_error) ?? "—"}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
                     {new Date(r.updated_at).toLocaleString()}
@@ -168,7 +180,8 @@ function OutboxPanel() {
                     </Button>
                   </TableCell>
                 </TableRow>
-              ))
+                );
+              })
             )}
           </TableBody>
         </Table>
@@ -197,7 +210,7 @@ function EventsPanel() {
               variant={status === s ? "default" : "outline"}
               onClick={() => setStatus(s)}
             >
-              {s}
+              {syncStatusLabel(s)}
             </Button>
           ))}
           <div className="ml-auto">
@@ -211,7 +224,7 @@ function EventsPanel() {
             <TableRow>
               <TableHead>渠道 / 订单</TableHead>
               <TableHead>类型</TableHead>
-              <TableHead>SKU</TableHead>
+              <TableHead>商品</TableHead>
               <TableHead>状态</TableHead>
               <TableHead>错误</TableHead>
               <TableHead>接收时间</TableHead>
@@ -234,11 +247,11 @@ function EventsPanel() {
               q.data?.items.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell>
-                    <div>{r.source_channel}</div>
+                    <div>{syncChannelLabel(r.source_channel)}</div>
                     <div className="text-xs text-muted-foreground">{r.source_order_id}</div>
                   </TableCell>
-                  <TableCell className="text-xs">{r.event_type}</TableCell>
-                  <TableCell className="text-xs">{r.sku_id ?? "—"}</TableCell>
+                  <TableCell className="text-xs">{saleEventLabel(r.event_type)}</TableCell>
+                  <TableCell className="text-xs">{r.sku_id ? "已关联商品（名称待核对）" : "未匹配商品"}</TableCell>
                   <TableCell>
                     <Badge
                       variant={
@@ -247,11 +260,11 @@ function EventsPanel() {
                           : "secondary"
                       }
                     >
-                      {r.status}
+                      {syncStatusLabel(r.status)}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-xs max-w-xs truncate" title={r.error ?? ""}>
-                    {r.error ?? "—"}
+                  <TableCell className="text-xs max-w-xs truncate">
+                    {errorLabel(r.error) ?? "—"}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
                     {r.received_at ? new Date(r.received_at).toLocaleString() : "—"}
