@@ -14,6 +14,12 @@ async function main(){
  await sql.listen('member_onboarding',payload=>{if(/^[0-9a-f-]{36}$/i.test(payload)){pending.add(payload);void drain().catch(()=>process.exit(1));}});
  const jobs=await sql<{shop_id:string}[]>`SELECT shop_id FROM public.member_onboarding_jobs WHERE status='queued' OR (status='running' AND lease_until<now()) ORDER BY created_at`;
  jobs.forEach(j=>pending.add(j.shop_id));await drain();
- // Expired in-flight leases are recovered on supervisor restart, never by an immortal Cloud poller.
+ // Arm one recovery wake only while a lost lease exists, then drain; no permanent database polling.
+ async function armLostLease(){
+   const leases=await sql<{next_at:Date|null}[]>`SELECT min(lease_until) next_at FROM public.member_onboarding_jobs WHERE status='running'`;
+   const at=leases[0]?.next_at;if(!at)return;
+   setTimeout(()=>{void (async()=>{const expired=await sql<{shop_id:string}[]>`SELECT shop_id FROM public.member_onboarding_jobs WHERE status='running' AND lease_until<now()`;expired.forEach(j=>pending.add(j.shop_id));await drain();await armLostLease();})().catch(()=>process.exit(1));},Math.max(1000,new Date(at).getTime()-Date.now()+1000));
+ }
+ await armLostLease();
 }
 main().catch(()=>{console.error('member_onboarding_watcher_failed');process.exitCode=1;});

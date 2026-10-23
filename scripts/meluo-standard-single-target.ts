@@ -41,4 +41,4 @@ async function main(){
  // then persist a same-digest receipt before all 14 groups. No stock/image/release API is allowed.
 }
 void buildMeluoChannelAppend;
-main().catch(()=>{console.error(JSON.stringify({ok:false,error:'single_target_blocked',writes:0}));process.exitCode=1;});
+main().catch(error=>{const message=error instanceof Error?error.message:'';const safe=/^[a-z0-9_]+$/.test(message)?message:'single_target_blocked';console.error(JSON.stringify({ok:false,error:safe,writes:0}));process.exitCode=1;});
