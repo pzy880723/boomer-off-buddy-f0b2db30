@@ -1,5 +1,24 @@
 # HQ统一门店接入：交付与阻断边界
 
+## 05:30 三项验收漏洞窄修
+- `0108_member_onboarding_acceptance_retry.sql`已应用共享库，仅增加`retry_after`与索引并替换enqueue/claim/finish函数；不回填/重置真实任务，不写会员资产。旧迁移原样保留。SQL测试直接加载已应用0108，不靠另写的模拟函数。
+- 非blocked回执无条件要求HQ scope、64位指纹、正确HQ Kdt、明确镜像true与原生继承JSON boolean true；缺失或字符串true拒绝。blocked无指纹也保存`youzanPosInheritanceVerified:false`，不能借省略字段通过配置验收。
+- 延迟重试仍保存`blocked/worker_unavailable`，仅`checks.transientRetryEligible=true`且`attempts<3`才给`retry_after=now()+15min`。claim原子SKIP LOCKED、同店身份/revision/token/租约fencing；不forceenqueue、不重置attempts、不通知前两次暂态重试；第3次仍失败则终止且沿原通知去重。不重试POS/映射/权限/未知schema安全阻塞。
+- worker仅将TimeoutError、明确HTTP408/429/5xx或网络cause ETIMEDOUT/ECONNRESET/ECONNREFUSED/EAI_AGAIN归类暂态；非成功业务回包/权限/未知错误不自动重试。当前投影失败仅`balance_failure=youzan_read_unavailable`白名单且无其他安全阻碍才可重试，旧失败晚于成功才算当前失败；不刷新或改写投影。
+- `member-keyset.ts`复用于active客户与HQ投影：先读最大ID上界，之后严格`id>cursor AND id<=upper`、100条一页、最多1000页；前页停用/删除不跳过剩余第101行，重复/逆序/越界/上限耗尽均拒绝不完整成功。这不是数据库事务快照，不宣称包含遍历中新激活/新插入客户；仅ERP登记且本次有界遍历的范围。
+- 核心文件：`scripts/run-member-onboarding.ts`、`src/server/member-onboarding-worker.server.ts`、`member-keyset.ts`、`member-onboarding-transient.ts`；其余为测试、0108与交付说明。旧Bun/PG watcher不启用、不改主ERP。
+- 本轮隔离SQL21/21、逻辑48/48通过；红测SQL5项失败及缺keyset模块已重现。共享库只读回读四店仍`blocked/pos_local_wallet_path`、attempts=1、`posSafe=false/assetsEndToEnd=false/retry_after=NULL`；前三店revision1，美罗城revision4。未运行真实worker或商品/资产操作，没有腾讯发布。
+
+### 给腾讯Node22 REST dispatcher的窄合同
+保留每5分钟有界串行扫描、目标4店与原service-only RPC，不获取PG凭据；扫描候选新增第三支：
+```sql
+status='queued'
+OR (status='running' AND lease_until < now())
+OR (status='blocked' AND reason='worker_unavailable' AND attempts<3
+    AND checks->'transientRetryEligible'='true'::jsonb AND retry_after<=now())
+```
+REST对应过滤后仍只能调用`member_onboarding_claim(p_shop_id)`，NULL立即跳过，不能直接改status/attempts或forceenqueue。非到期/第3次/安全阻塞不可触发，重复dispatcher和旧回执由claim/finish锁与token阻断。共享库0108不要重复应用。更新编译CLI及两个新增纯模块和worker；四店现有POS阻塞无需重置重跑，生产sidecar验证由用户部署后完成。
+
 ## 05:24 POS安全适配与腾讯回执
 - 本轮红测先行（缺适配模块/空body helper失败），绿测87逻辑+2真实handler隔离+14 PGlite SQL隔离=103通过。入口测试使用mock授权/DB，不是真实会员交易验收；无新增迁移，腾讯尚未部署本轮窄diff。
 - 用户腾讯回执：ownership/tokens/rules/HQ指纹通过，真实任务仍`blocked/pos_local_wallet_path`，`assetsE2E=false`。总部10/10镜像刷新通过；商品448条渠道9999与其他三店1344变体stock未变为用户独立实证。本轮不重复查询线上，不更新任务或资产；Node22编译CLI/5分钟REST dispatcher由用户部署中。

@@ -757,6 +757,13 @@
       "when": 1792732632715,
       "tag": "0107_member_onboarding_hq_policy_checks",
       "breakpoints": true
+    },
+    {
+      "idx": 108,
+      "version": "7",
+      "when": 1792733706308,
+      "tag": "0108_member_onboarding_acceptance_retry",
+      "breakpoints": true
     }
   ]
 }
