@@ -3977,6 +3977,7 @@ export type Database = {
       handheld_smart_create_ops: {
         Row: {
           bound_epcs: number
+          cancelled_at: string | null
           client_op_id: string
           completed_at: string | null
           created_at: string
@@ -3992,6 +3993,7 @@ export type Database = {
         }
         Insert: {
           bound_epcs?: number
+          cancelled_at?: string | null
           client_op_id: string
           completed_at?: string | null
           created_at?: string
@@ -4007,6 +4009,7 @@ export type Database = {
         }
         Update: {
           bound_epcs?: number
+          cancelled_at?: string | null
           client_op_id?: string
           completed_at?: string | null
           created_at?: string
@@ -12507,6 +12510,16 @@ export type Database = {
           total_count: number
         }[]
       }
+      handheld_smart_create_cancel: {
+        Args: {
+          p_client_op_id: string
+          p_device_id: string
+          p_fingerprint: string
+          p_location_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       handheld_smart_create_commit: {
         Args: {
           p_client_op_id: string
@@ -12531,6 +12544,24 @@ export type Database = {
           p_fingerprint: string
           p_image_plan: string
           p_location_id: string
+          p_note: string
+          p_release_shop_id: string
+          p_reuse: boolean
+          p_sku: Json
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      handheld_smart_create_commit_v3: {
+        Args: {
+          p_ai_policy: string
+          p_client_op_id: string
+          p_device_id: string
+          p_epcs: string[]
+          p_fingerprint: string
+          p_image_plan: string
+          p_location_id: string
+          p_marks?: Json
           p_note: string
           p_release_shop_id: string
           p_reuse: boolean
