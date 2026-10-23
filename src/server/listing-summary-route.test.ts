@@ -27,7 +27,8 @@ const stubs: Record<string, string> = {
     export const generateListingSummary=async(input)=>{ globalThis.__summaryRoute.calls.push(input);
       const r = globalThis.__summaryRoute.summaryResult;
       if (r instanceof Error) throw r;
-      return r; };`,
+      return r; };
+    export const classifySummaryError=(e)=>globalThis.__summaryRoute.classified ?? { code: "ai_unavailable", retryable: true };`,
 };
 const bundle = await build({
   entryPoints: ["src/routes/api/public/handheld/ai.generate-summary.ts"],
@@ -102,6 +103,19 @@ test("生成失败 → 503 简短中文，不泄漏细节", async () => {
   assert.equal(body.ok, false);
   assert.equal(body.error, "简介生成失败，请稍后重试");
   assert.ok(!JSON.stringify(body).includes("xyz"));
+  assert.equal(body.code, "ai_unavailable");
+  assert.equal(body.retryable, true);
+  state.summaryResult = "粉嫩收纳盒，文具小物一盒收好。";
+});
+
+test("拒绝类失败 → 503 + 明确 code，retryable=false，不返回简介", async () => {
+  (globalThis as any).__summaryRoute.classified = { code: "ai_refused", retryable: false };
+  state.summaryResult = new Error("ai_refused");
+  const res = await Route.server.handlers.POST({ request: post() });
+  const body = await res.json();
+  assert.equal(res.status, 503);
+  assert.deepEqual([body.ok, body.code, body.retryable, body.description], [false, "ai_refused", false, undefined]);
+  (globalThis as any).__summaryRoute.classified = undefined;
   state.summaryResult = "粉嫩收纳盒，文具小物一盒收好。";
 });
 

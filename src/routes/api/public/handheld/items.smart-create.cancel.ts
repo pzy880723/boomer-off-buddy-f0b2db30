@@ -42,9 +42,16 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create/ca
           if ((error as { code?: string }).code === "P0409")
             return err("client_op_id belongs to a different payload, user or location", 409, { code: "client_op_id_conflict" });
           // Outcome unknown: keep the lock and retry this same cancel request.
-          return err("Unable to confirm listing operation; retry the same cancel request", 503);
+          return err("Unable to confirm listing operation; retry the same cancel request", 503, { code: "smart_create_cancel_unknown" });
         }
-        const r = data as unknown as { state: "cancelled" | "committed" | "completed"; replayed: boolean; sku_id: string | null; response: unknown };
+        const r = data as { state?: unknown; replayed?: unknown; sku_id?: unknown; response?: unknown } | null;
+        // Malformed/contradictory DB result = outcome unknown: never let the client clear its lock on it.
+        const wellFormed = !!r && typeof r.replayed === "boolean" && (
+          (r.state === "cancelled" && r.sku_id == null)
+          || ((r.state === "committed" || r.state === "completed") && typeof r.sku_id === "string" && r.sku_id.length > 0)
+        ) && (r.state !== "completed" || (!!r.response && typeof r.response === "object"));
+        if (!wellFormed)
+          return err("Unable to confirm listing operation; retry the same cancel request", 503, { code: "smart_create_cancel_unknown" });
         return ok({
           client_op_id: body.client_op_id,
           state: r.state,

@@ -1,0 +1,9 @@
+handheld_smart_create_cancel(uuid,uuid,text,text,uuid) sha256=7bf941d036c52d322ca3581e0992247eb644e8cd48275523c2584ab91902d6d6 secdef=true acl=postgres=X/postgres,service_role=X/postgres
+handheld_smart_create_commit_v2(uuid,uuid,text,text,uuid,boolean,jsonb,text[],text,uuid,text,text) sha256=34d740f51109d6de8de185e4a5318a031d2d3313206372ed70cc4ac3dd72e5b3 secdef=true acl=postgres=X/postgres,service_role=X/postgres
+handheld_smart_create_commit_v3(uuid,uuid,text,text,uuid,boolean,jsonb,text[],text,uuid,text,text,jsonb) sha256=96f62dc124ab1b496610b1b9adfefe3ece5f106b0e5c8c04b054ae2e081f6db4 secdef=true acl=postgres=X/postgres,service_role=X/postgres
+handheld_smart_create_commit(uuid,uuid,text,text,uuid,boolean,jsonb,text[],text,uuid) sha256=ae7b4570c68ffe3b528bde61d1ca5baaa31713c02d0aed553f7d1f4a18de79c9 secdef=true acl=postgres=X/postgres,service_role=X/postgres
+handheld_smart_create_complete(uuid,jsonb) sha256=c1b6c4ecf9962417adf267115ff3eaf960946570395a368e56564dc80f6abb11 secdef=true acl=postgres=X/postgres,service_role=X/postgres
+rls=true force=false
+policies=0
+grant sandbox_exec:INSERT,SELECT
+anon=false/false authenticated=false/false service_role=true/true

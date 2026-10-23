@@ -1,7 +1,7 @@
 # 待办+通知修复（backend only，腾讯用户自验）
 
 ## 总部统一门店接入（2026-10-23）
-- [ ] 07:09 拍照上架：原子 cancel/recover（同 commit_v2 锁、tombstone 拒绝迟到旧 op）、featured_stamp/notice_tags 同事务保存并入指纹（缺省保持旧指纹）、简介包络解析与明确错误码；红测先行，不动抠图/修图
+- [x] 07:09 拍照上架：原子 cancel/recover（同 commit_v2 锁、tombstone 拒绝迟到旧 op）、featured_stamp/notice_tags 同事务保存并入指纹（缺省保持旧指纹）、简介包络解析与明确错误码；红测先行，不动抠图/修图
 - [ ] 07:29 异步扫码：持久 client_op_id 绑定 actor/门店/班次/完整销售指纹 + recover/永久取消（0111 已应用，5 SQL+34 路由测试）；积分接入异步及 close 补分仍待做
 - [ ] 05:57 积分：迁移0109已应用+7隔离测试通过；路由/驱动/对账器未接（用户07:07暂停）
 - [ ] 05:57 四店 POS 总部积分抵扣/取消补回/退款返分：claim 不重发已发出/unknown、只读对账 RPC、冻结意图+v4+return_v2+取消补分，现金+异步扫码；开关默认off，仅隔离测试，不调远端写
