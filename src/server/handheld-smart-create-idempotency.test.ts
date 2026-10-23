@@ -78,7 +78,7 @@ const { Route } = await load("src/routes/api/public/handheld/items.smart-create.
     export const resolveConfirmedListingBrand = async () => null;
     export const persistSmartCreateBrand = async () => {}; export const shouldReuseSmartCreateSku = c => !c;
     export const smartCreateFingerprint = () => 'fp';
-    export const smartCreateRequestFingerprint = () => ({ fingerprint: 'fp', incomingPaths: [], normalizedImageUrl: null });`,
+    export const smartCreateRequestFingerprint = b => ({ fingerprint: 'fp', incomingPaths: (b.image_storage_paths ?? []).map(p => p.storage_path.startsWith(p.bucket + '/') ? p.storage_path : p.bucket + '/' + p.storage_path), normalizedImageUrl: null });`,
   "@/lib/commerce/product-marks": "export const readProductMarks = s => ({ featured_stamp: s?.featured_stamp ?? null, notice_tags: s?.notice_tags ?? [] });",
   "@/server/product-classification.server": `export const assertActiveLeafCategory = async () => {}; export const attachProductClassificationAuditToSku = async () => {};
     export const replaceManualProductFacets = async () => {}; export const resolveOrCreateConfirmedIp = async () => ({ id: null, name: null, status: 'none' });

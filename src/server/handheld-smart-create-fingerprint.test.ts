@@ -8,7 +8,7 @@ const { build } = createRequire(require.resolve("vite"))("esbuild");
 const bundle = await build({
   entryPoints: ["src/server/handheld-smart-create.server.ts"], bundle: true, write: false, platform: "node", format: "esm",
   plugins: [{ name: "stubs", setup(b: any) {
-    b.onResolve({ filter: /^@\/(integrations|server|lib\/product-)/ }, (a: any) => ({ path: a.path, namespace: "stub" }));
+    b.onResolve({ filter: /^@\/(integrations|server|lib\/product-)|product-classification\.server$/ }, (a: any) => ({ path: a.path, namespace: "stub" }));
     b.onResolve({ filter: /^@\/lib\/commerce\/product-marks$/ }, () => ({ path: new URL("../lib/commerce/product-marks.ts", import.meta.url).pathname }));
     b.onLoad({ filter: /.*/, namespace: "stub" }, () => ({ contents: "export const supabaseAdmin={}; export const findSanrioBrandCandidate=()=>null; export const matchBrandCandidate=()=>null; export const normalizeLookupText=s=>s; export const loadActiveProductBrands=async()=>[]; export const loadActiveProductIps=async()=>[];", loader: "js" }));
   } }],
