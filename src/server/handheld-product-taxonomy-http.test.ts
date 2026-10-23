@@ -11,7 +11,7 @@ const stubs: Record<string, string> = {
   "@/server/handheld-auth.server": `export const HANDHELD_CORS={};export const ok=d=>Response.json({ok:true,data:d});export const err=(e,status,x)=>Response.json({ok:false,error:e,...x},{status});export const authenticateDevice=async()=>globalThis.__taxo.device?{ok:true,device:{id:'d'}}:{ok:false,response:new Response(null,{status:401})};export const resolveSessionUser=async()=>globalThis.__taxo.session?{user_id:'u'}:null;`,
   "@/lib/attribute-labels": "export const labelFacets=r=>r;",
   // 模拟 PostgREST：按 eq 条件过滤，证明路由要求 kind=category 且 is_active=true
-  "@/integrations/supabase/client.server": `export const supabaseAdmin={from(t){const s=globalThis.__taxo;s.touched=true;const f=[];const q={select(){return q},eq(k,v){f.push([k,v]);return q},order(){return q},then(res,rej){const rows=(t==='inv_categories'?s.cats:s.facets).filter(r=>f.every(([k,v])=>r[k]===v));const out=t==='inv_categories'&&s.catError?{data:null,error:{message:s.catError}}:{data:rows,error:null};return Promise.resolve(out).then(res,rej)}};return q}};`,
+  "@/integrations/supabase/client.server": `export const supabaseAdmin={from(t){const s=globalThis.__taxo;s.touched=true;(s.tables=s.tables||[]).push(t);const f=[];const q={select(){return q},eq(k,v){f.push([k,v]);return q},order(){return q},then(res,rej){const rows=(t==='inv_categories'?s.cats:s.facets).filter(r=>f.every(([k,v])=>r[k]===v));const out=t==='inv_categories'&&s.catError?{data:null,error:{message:s.catError}}:{data:rows,error:null};return Promise.resolve(out).then(res,rej)}};return q}};`,
 };
 let handler: any;
 async function get() {
@@ -63,4 +63,28 @@ test("DB error never returns empty success", async () => {
   const j = await r.json();
   assert.equal(j.ok, false); assert.equal(j.code, "taxonomy_unavailable");
   state.catError = null;
+});
+
+test("valid device but missing employee session → 401 session_required, no query", async () => {
+  state.device = true; state.session = false;
+  const r = await get();
+  assert.equal(r.status, 401); assert.equal((await r.json()).code, "session_required"); assert.equal(state.touched, false);
+  state.session = true;
+});
+
+test("explicitly inactive leaf is excluded even with an active parent", async () => {
+  state.cats = [cat("p", "toy_model", "玩具模型", null), cat("on", "toy_board_card", "桌游/卡牌", "p"), cat("off", "toy_retired", "已停用", "p", false)];
+  state.facets = [];
+  const j = await (await get()).json();
+  assert.deepEqual(j.data.primary_categories[0].children.map((c: any) => c.code), ["toy_board_card"]);
+});
+
+test("all 89 active leaves returned; no stock/listing table is read", async () => {
+  const roots = Array.from({ length: 9 }, (_, i) => cat(`r${i}`, `root_${i}`, `一级${i}`, null));
+  const leaves = Array.from({ length: 89 }, (_, i) => cat(`l${i}`, `leaf_${i}`, `末级${i}`, `r${i % 9}`));
+  state.cats = [...roots, ...leaves]; state.facets = []; state.tables = [];
+  const j = await (await get()).json();
+  const n = j.data.primary_categories.reduce((a: number, p: any) => a + p.children.length, 0);
+  assert.equal(n, 89);
+  assert.deepEqual([...new Set(state.tables)].sort(), ["inv_categories", "inv_facets"]);
 });
