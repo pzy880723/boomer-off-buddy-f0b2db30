@@ -1,0 +1,9 @@
+import {it} from 'node:test';
+import assert from 'node:assert/strict';
+import {loadMemberOrganizations,hasVerifiedBranch} from './member-organizations';
+const node=(id:number)=>({kdt_id:id,parent_kdt_id:153242272});
+it('mandatory pagination starts at one and reads beyond first full page',async()=>{const calls:unknown[]=[];const rows=await loadMemberOrganizations(async p=>{calls.push(p);return {organizations:p.page_num===1?Array.from({length:50},(_,i)=>node(i+1)):[node(215098500)]};});assert.deepEqual(calls,[{page_num:1,page_size:50},{page_num:2,page_size:50}]);assert.equal(hasVerifiedBranch(rows,215098500,153242272),true);});
+it('even target on first page waits for complete list and later failure rejects',async()=>{await assert.rejects(loadMemberOrganizations(async p=>{if(p.page_num===2)throw Error('rejected');return {organizations:Array.from({length:50},(_,i)=>node(i===0?215098500:i))};}),/rejected/);});
+it('full final page requires empty terminal page',async()=>{let pages=0;const rows=await loadMemberOrganizations(async p=>{pages++;return {organizations:p.page_num===1?Array.from({length:50},(_,i)=>node(i+1)):[]};});assert.equal(pages,2);assert.equal(rows.length,50);});
+it('malformed response, repeated pages and bound exhaustion fail closed',async()=>{await assert.rejects(loadMemberOrganizations(async()=>({unexpected:[]})),/organization/);await assert.rejects(loadMemberOrganizations(async()=>({organizations:Array.from({length:50},(_,i)=>node(i))})),/organization/);});
+it('missing wrong parent and duplicate target do not prove ownership',()=>{assert.equal(hasVerifiedBranch([node(1)],215098500,153242272),false);assert.equal(hasVerifiedBranch([node(215098500)],215098500,1),false);assert.equal(hasVerifiedBranch([node(215098500),node(215098500)],215098500,153242272),false);});
