@@ -2,7 +2,7 @@
 import { runMemberOnboarding } from '../src/server/member-onboarding-worker.server';
 import { resolveTrustedYouzanMember } from '../src/server/youzan-points-projection-production.server';
 import { youzanFetch } from '../src/lib/youzan-http';
-import { inspectHqPointsPolicy } from '../src/server/hq-points-policy';
+import { inspectHqPointsPolicy, readHqDeductionPolicy } from '../src/server/hq-points-policy';
 import { loadMemberOrganizations, hasVerifiedBranch } from '../src/server/member-organizations';
 
 async function main() {
@@ -41,7 +41,7 @@ async function main() {
      const ownership=hasVerifiedBranch(organizations,Number(j.kdt_id),Number(j.parent_kdt_id));
      if(!ownership)return {ownership:false,tokensReadBack:true,rulesSupported:false,rulesEquivalent:false};
      // Chain branches are outside the official deduction getter scope. Never query branch zero or write rules.
-     const policy=await inspectHqPointsPolicy(await read(tokens[0],'youzan.scrm.pointdecution.get','1.0.0',{query_request:'{}'}),Number(j.parent_kdt_id),ownership);
+     const policy=await inspectHqPointsPolicy(await readHqDeductionPolicy((method,version,params)=>read(tokens[0],method,version,params)),Number(j.parent_kdt_id),ownership);
      if(!policy.supported)return {ownership,tokensReadBack:true,rulesSupported:false,rulesEquivalent:false};
      return {ownership,tokensReadBack:true,rulesSupported:policy.supported,rulesEquivalent:policy.supported,
        hqPolicyScope:policy.scope,hqPolicyFingerprint:policy.fingerprint,hqPolicyKdtId:Number(j.parent_kdt_id),youzanPosInheritanceVerified:false};

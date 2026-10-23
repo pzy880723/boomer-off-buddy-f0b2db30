@@ -1,5 +1,20 @@
 # HQ统一门店接入：交付与阻断边界
 
+## 05:24 POS安全适配与腾讯回执
+- 本轮红测先行（缺适配模块/空body helper失败），绿测87逻辑+2真实handler隔离+14 PGlite SQL隔离=103通过。入口测试使用mock授权/DB，不是真实会员交易验收；无新增迁移，腾讯尚未部署本轮窄diff。
+- 用户腾讯回执：ownership/tokens/rules/HQ指纹通过，真实任务仍`blocked/pos_local_wallet_path`，`assetsE2E=false`。总部10/10镜像刷新通过；商品448条渠道9999与其他三店1344变体stock未变为用户独立实证。本轮不重复查询线上，不更新任务或资产；Node22编译CLI/5分钟REST dispatcher由用户部署中。
+- `run-member-onboarding.ts`经受测`readHqDeductionPolicy`发送官方空JSON对象`{}`，删除`query_request`；分页请求保持原规则。此前文档该字段为历史错误，按本节纠正。
+- `points-policy.server.ts`不再读取`pos_points_rules`或本地wallet积分，包括缺RPC fallback。仅调用现有可信resolver、`productionProjectionStore.read`和当前active分店/HQ一致的队列checks；不调用refresh/recordBalance/recordFailure/有赞接口。只读规则指纹来自checks，不能推导转换率或启用ERP付费方案。
+- `hq-read-only.ts`使redemption恒disabled、`available_points:null`、`max_points/applied_points/discount_amount=0`；独立`hq_read_only`展示`balance/last_synced_at/hq_kdt_id/policy_fingerprint/configuration_mirror_verified`，始终`assets_end_to_end:false/redemption_supported:false`。可信映射缺失、客户/HQ/yz身份不一致、未成功或当前失败时balance为null，旧失败晚于新成功才算当前失败；不制造余额0、不读分店getter。
+- POST `/api/public/pos/discounts/preview`与POST `/api/public/pos/sales`完成既有鉴权（sales再验证班次本人）后，非零`points_to_redeem`立即409，`code=pos_points_read_only`，不执行商品报价查询/销售事务。零积分保持原报价及v2交易路径。已有v3 SQL保留但这两个入口不再能到达；不改变支付/库存/优惠/退货事务、不改`posSafe=false`。其他具有数据库直接执行权限的调用者不由此应用层防护覆盖，不能声称数据库旧钱包已删除或全系统实用验收通过。
+- 正积分历史提交的重试也会被入口拦截，不应当重发新订单；应走已有销售查询/恢复入口只读确认原交易。通知仍沿用原blocked去重，无成功状态更改。
+
+### 真正积分扣退后续（本轮未实现、未调用）
+1. 核实有赞连锁HQ正规授权、扣分/返还官方合同及POS实用继承；禁止单店开关setter替代。
+2. 复用可信身份和现有积分operation账本，设计订单/扣退operation_key、租约/幂等、未知回执仅对账、成功读回；不另建分店余额。
+3. 支付成功/取消/退款与扣分/返还的补偿及部分退款精确额度，重试不能重复扣退，先隔离测试再正式授权canary；不把投影余额当扣款锁。
+4. 旧本地wallet事务调用彻底收敛及直接RPC权限审查、真实授权设备端到端验证后才另行修改posSafe和资产验收状态。本轮没有迁移、开关或真实扣退/发券。
+
 ## 组织分页窄修（2026-10-23 05:17 UTC）
 - 用户腾讯只读canary实证：组织1.0.1空请求返回161400200“页码必须大于0”。read显式接收params并JSON序列化，组织请求从`{page_num:1,page_size:50}`开始逐页读；HQ getter仍显式传`query_request:"{}"`。
 - 1.0.1返回采用有赞官方论坛历史成功响应合同：`data.organization_list/total/page_num/page_size`（https://bbs.youzan.com/thread-691040-1-1.html）；registry的`organizations`不是已验证合同，不用递归猜字段。该论坛不是本轮腾讯实时回包，当前官方文档页仅取得外壳；腾讯复验需确认同一响应schema，若不同则阻断，不猜路径。

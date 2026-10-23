@@ -1,11 +1,12 @@
 export type PointsRules = {
   enabled: boolean;
   customer_active: boolean;
-  available_points: number;
+  available_points: number | null;
   cap_rate: number;
   points_per_unit: number | null;
   unit_fen: number | null;
   policy_version: number | null;
+  hq_read_only?: {source:'youzan';scope:'youzan_chain_hq';hq_kdt_id:number|null;balance:number|null;last_synced_at:string|null;configuration_mirror_verified:boolean;policy_fingerprint:string|null;assets_end_to_end:false;redemption_supported:false;reason:'pos_points_read_only'};
 };
 
 function decimalRatio(value: number): [bigint, bigint] {
@@ -70,7 +71,7 @@ export function calculatePointsRedemption(
   const remainderFen = Math.max(0, eligibleFen - moneyFen(totals.discount_total));
   const payableFen = moneyFen(totals.payable_total);
   moneyFen(totals.subtotal);
-  const available = rules && Number.isInteger(rules.available_points) && rules.available_points >= 0
+  const available = rules && rules.available_points!==null && Number.isInteger(rules.available_points) && rules.available_points >= 0
     ? rules.available_points : 0;
   const validUnit = (value: number | null | undefined) =>
     value != null && Number.isInteger(value) && value > 0 && value <= 2147483647;
@@ -86,10 +87,10 @@ export function calculatePointsRedemption(
   ) * rules!.points_per_unit! : 0;
   const applied = enabled ? Math.floor(Math.min(requested, maxPoints) / rules!.points_per_unit!) * rules!.points_per_unit! : 0;
   return {
-    enabled, available_points: available, max_points: maxPoints, requested_points: requested,
+    enabled, available_points: rules?.hq_read_only ? null : available, max_points: maxPoints, requested_points: requested,
     applied_points: applied,
     discount_amount: enabled ? applied / rules!.points_per_unit! * rules!.unit_fen! / 100 : 0,
-    reason: !configured ? "points_rule_not_configured"
+    reason: rules?.hq_read_only ? 'pos_points_read_only' : !configured ? "points_rule_not_configured"
       : !rules!.customer_active ? "customer_inactive"
       : !enabled ? "membership_points_not_allowed"
       : maxPoints === 0 ? "points_unavailable"
@@ -98,5 +99,6 @@ export function calculatePointsRedemption(
     unit_fen: rules?.unit_fen ?? null, policy_version: rules?.policy_version ?? null,
     supported_tenders: ["cash"], async_payment_supported: false,
     cap_basis: "eligible_after_discount", minimum_payable_fen: 1,
+    ...(rules?.hq_read_only ? {hq_read_only:rules.hq_read_only} : {}),
   };
 }
