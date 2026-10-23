@@ -1,4 +1,5 @@
 # Architecture rules
+- Channel-sync exception page display uses the pure dictionaries in src/lib/sync-record-labels.ts; unknown protocol values stay Chinese and product names never fall back to UUIDs. Why: localize the real page without changing task queries or actions.
 - Support, points-earning and measurement rules live in src/server/AGENTS.md; membership/newcomer coupon rules in src/lib/membership/AGENTS.md; commerce product rules (翻筐乐, stamps/tags) in src/lib/commerce/AGENTS.md.
 - PC card printing adapts the native same-origin array manifest and embeds original single-card PDF pages without rasterization; eligibility is rechecked before output. Why: preserves embedded fonts and approved layouts while blocking retired presets.
 - Card spec filtering uses exact manifest dimensions; homogeneous hook-card selections use a dedicated packing branch, mixed selections keep the general packer. Why: avoids orientation-based misclassification.
