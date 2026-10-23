@@ -1,87 +1,87 @@
-# 四店 POS 总部积分抵扣 / 取消补回 / 退款返分 — 只读审计与最小落地方案
+# 四店 POS 总部积分抵扣 / 取消补回 / 退款返分：只读审计（校正版）与最小落地方案
 
-本轮只读：没改代码、数据库和开关，没有操作资产，没有测试点数。
+本轮只读：代码、数据库、开关都没动，也没有操作资产。实际 SQL 用 pg_get_functiondef 读回，本地 canonical 为 `fb2deedbb29af4f9507fbbfbf3fd99cb97e3e192`。
 
-## 一、核对到的现状（本轮只读读取）
+## 一、前提校正（已采纳）
+- 主 ERP 跑在腾讯 PM2 Node（boomer-off-buddy，run-tencent-erp.sh），支持 node:sqlite，所以生产 driver 可以在主进程里调用，只需固定 proxy 加 Node 运行时 gate。后台补偿队列仍单独运行，保证可靠。
+- 现有账本已经具备退款上限和同一会员串行执行，不会重做。
 
-- 本地最新代码版本：`fb2deedbb29af4f9507fbbfbf3fd99cb97e3e192`（和你说的 canonical fb2deedb 一致）。
-- 会员与余额概要：commerce_customers 共 11 名（active 10）；youzan_points_projection 有 10 条，其中 2 条余额大于 0，合计 129 分；本地 pos_customer_wallets 有 1 条非零（points 或 points_debt）。这里不列任何 ID 或联系方式。
-- youzan_points_operations 有 3 条，全部 succeeded（来自旧测试会员 allowlist）。"安全测试账号"只能由 `YOUZAN_POINTS_WRITE_CUSTOMER_IDS` 来认定，本轮没有读取它的值。
-- pos_payment_attempts 有 0 条。
+## 二、实际 SQL 读回结论
 
-### 数据库入口（实际已部署的定义和权限）
-| 函数 | SECURITY DEFINER | 谁可执行 | 积分处理 |
-|---|---|---|---|
-| pos_complete_sale_v2(…10参) | 是 | postgres, service_role | 不处理积分 |
-| pos_complete_sale_v3(…+p_points_to_redeem) | 是 | postgres, service_role | **读写本地 pos_customer_wallets**（旁路） |
-| pos_complete_sale / _without_points | 是 | 仅 postgres | 旧入口 |
-| pos_complete_return(…7参) | 是 | postgres, service_role | **按本地钱包返还，不碰 youzan_points_*** |
-| pos_recover_sale_cancel(shift,operator,client_op_id) | 是 | postgres, service_role | 不碰 youzan_points_operations |
-| pos_points_rules(customer) | 是 | postgres, service_role | 本地规则 |
-| youzan_points_operation_begin / claim / finish | 是 | postgres, service_role | 总部扣退日志 |
-| youzan_points_projection_* | 是 | postgres, service_role | 只读镜像 |
+### youzan_points_operation_begin（已有，复用）
+- 参数校验；按"总部+会员"和"总部+yz 身份"两把 advisory 锁串行。
+- (kdt, operation_key) 相同且 payload 也相同时按幂等返回，payload 不同时报 `operation_key_payload_conflict`。
+- 校验会员为 active、kdt 必须是 active 的 hq，source 必须属于该总部（`source_shop_not_under_head`，防串店）。
+- 会员与 yz 身份必须一一对应（`identity_customer_conflict`）。
+- 同一会员只要还有 pending/processing/unknown/blocked 的操作，就拒绝新操作（`customer_operation_in_flight`）。
+- refund 会锁住父行（FOR UPDATE），要求父行 succeeded 且身份和门店一致，并把所有状态的子退款累加后与 debit.points 比较，超出即拒绝（`refund_exceeds_debit`）。**退款上限已经在数据库层生效**。
 
-### youzan_points_operations 约束（已核对）
-- UNIQUE(kdt_id, operation_key)；kind 只能是 debit/refund；refund 必须有 parent_id，debit 不能有。
-- status 只能是 pending/processing/unknown/succeeded/blocked；points 范围 1..1e8；source_kdt_id、kdt_id 都必须大于 0。
-- **缺口**：数据库没有限制"同一 parent 下累计 refund 不超过 debit.points"，也没有关联 POS 订单。
+### youzan_points_operation_claim（真实缺口）
+- 只跳过 succeeded 和租约未到期的 processing 两种情况。**unknown、blocked、租约过期的 processing，只要 attempts<8 且创建不到 24h，就会被重新 claim 并再次发送远端写**。这与"结果未知不得盲重扣"直接冲突，必须修。
 
-### 应用侧
-- `src/routes/api/public/pos/sales.ts`：points_to_redeem>0 时先走 `assertNoPosPointsSpend`，返回 409 `pos_points_read_only`；之后的代码仍会调用 v3，等于留着本地钱包路径。
-- `src/server/youzan-points-operation-production.server.ts`：扣退驱动。双开关加 allowlist，要求固定出口代理和总部 token；映射从**只读 node:sqlite**（`member_channel_links`）读取，检查唯一性和防冲突；按 begin→claim→execute→finish 执行，重复的 succeeded 直接返回。
-  - **关键缺口**：它依赖 `node:sqlite`，只能在腾讯 Node 环境运行，**主 ERP（Worker 运行时）跑不了**。所以真实扣退只能放在 sidecar 执行，POS 请求本身不能同步调用它。
-- `src/lib/pos/hq-read-only.ts`、`points-policy.server.ts`：只读取总部积分（canonical 里已有，主 APP 尚未部署）。
+### youzan_points_operation_finish（复用）
+- 只能写 succeeded/unknown/blocked，带 claim_token 和租约 fencing。
 
-## 二、真实缺口
-1. 结算前没有"冻结积分意图"，POS 订单也没有和 HQ debit 操作关联。
-2. v3 和退货都在读写本地钱包，违反"总部唯一账本"。
-3. 结果未知（unknown）时没有对账规则，可能被盲目重扣。
-4. 退款累计返分没有数据库硬上限；现金退款和积分返还没有分开记账。
-5. 取消（recover_sale_cancel）后不会补回已扣的分。
-6. 主 APP 不能直接执行扣分，必须交给 sidecar worker 异步执行，执行前再确认一次。
+### driver（`src/server/youzan-points-operation.server.ts`）
+- debit 调 decrease，refund 调 increase，`biz_value = boomer-points:{operation.id}`。这个格式正好能和官方 4.0.2 日志里的 data.items.biz_value 对账。
 
-## 三、最小集成设计
+### POS 入口
+| 入口 | 实际行为 |
+|---|---|
+| pos_complete_sale_v2 | 直接调 v3，p_points=0 |
+| pos_complete_sale_v3 | points>0 时只允许现金 tender（否则 `points_async_not_supported`）；锁本地 pos_customer_wallets；用本地 pos_points_rules；扣本地钱包并写 commerce_points_ledger；按行写 discount_snapshot.points_allocated（行分摊，**可复用**） |
+| pos_complete_return | 按 points_allocated×退货数量÷原数量 计算返分（**算法可复用**）；但返还进了本地钱包和 commerce_points_ledger |
+| pos_recover_sale_cancel | 只按 client_op_id 取消或回放，不处理积分 |
+| 扫码 pos-payment.server.ts | 创建时 points≠0 返回 422；支付成功后的 finalize 也拒绝 points；之后走 v2 |
+| sales.ts | 已有 409 `pos_points_read_only` guard（canonical 有，主 APP 未部署） |
 
-```text
-POS 预结算 ──> pos_points_intent_create (DB, 冻结意图 + 订单草稿 status=points_pending)
-                    │  校验：店员 store scope、location→source_kdt、HQ=parent、会员映射存在、余额镜像≥points、规则指纹
-                    ▼
-sidecar worker ──> youzan_points_operation_begin(debit, key=pos:{order}:debit) → 远端扣分
-                    │  succeeded → pos_points_intent_confirm → 订单可结算（现金部分 = 应付 - 积分抵扣额）
-                    │  blocked   → intent=released，订单不结算，提示换支付
-                    │  unknown   → 仅用总部变更日志/余额对账（按 operation_key / 时间窗）判定，禁止重扣
-                    ▼
-POS 结算 ──> pos_complete_sale_v4：仅接受 intent=confirmed 且金额/会员/门店/指纹一致；不读写 pos_customer_wallets
-取消 ──> 若 debit succeeded：建 refund(parent=debit, key=pos:{order}:cancel, points=全部)
-退款 ──> 按退货行分摊 points_allocated 计算返分；DB 锁 debit 行，
-         SUM(refund succeeded+pending+unknown) + 本次 ≤ debit.points，否则拒绝
-```
+### 数据概要（只读）
+会员 11 名，其中 active 10；总部镜像 10 条，2 条余额大于 0，合计 129 分；本地钱包有 1 条非零，本方案不读也不写它；operations 共 3 条，全部 succeeded。测试会员只认 allowlist，本轮没读取它的值。
 
-### 新增数据库对象（一条 migration，只增不删，全部 service_role-only）
-- 表 `pos_points_intents`：order_id, client_op_id, location_id, source_kdt_id, hq_kdt_id, customer_id, points, deduct_fen, rule_fingerprint, status(pending/dispatched/confirmed/released/unknown/cancelled), debit_operation_id, row_version；unique(location_id, client_op_id)。
-- 表 `pos_points_refund_allocations`：intent_id, return_id 或 cancel 标记, points, refund_operation_id；unique(intent_id, return_id)。
-- RPC：`pos_points_intent_create`、`pos_points_intent_confirm`（带 fencing token）、`pos_points_intent_release`、`pos_points_refund_reserve`（锁定后做累计上限检查）。
-- `pos_complete_sale_v4`：内部复用 v2 的事务，加上 intent 校验，并把积分摊到订单行（写入已有 discount_snapshot 字段 points_allocated_fen/points）。
-- `pos_complete_return_v2`：现金退款照旧；积分部分只登记 reserve，不返还到本地钱包。
-- v3 和旧 pos_complete_return 不删除，但应用侧不再调用它们（停用不删），后续加注释 DEPRECATED。
+## 三、真实缺口（只列这些）
+1. claim 会重发 unknown、blocked 和过期的 processing（盲重扣风险）。
+2. POS 订单和总部 debit 没有关联，也没有"先冻结意图、远端确认后才结算"的流程。
+3. v3 和 return 用的是本地钱包与本地规则；cancel 不会补回积分。
+4. 扫码支付完全不支持积分。
+5. unknown 没有只读对账器。
 
-### 应用和 sidecar 改动
-- `sales.ts`：points>0 时走 intent 流程，返回 202 `points_pending`；之后轮询 intent 状态，confirmed 才调用 v4。409 只读 guard 保留，用新开关 `POS_HQ_POINTS_REDEMPTION_ENABLED` 加门店 allowlist 控制放行。
-- 退货和取消路由：改调 return_v2 / cancel+reserve。
-- sidecar：新增 points dispatcher，复用 `runProductionPointsOperation`，只处理 dispatched intent 和已登记的 refund；unknown 交给对账器，不重试远端写；`unknown` 对账依据只认总部官方变更日志里的 operation_key（备注字段），需先确认官方接口能写入/回读该备注。
+## 四、最小设计
 
-### 状态分离（不混用）
-- `nativeYoutzanPosInherited`：保持 false，不改。
-- `erpPosHqRedemption`：新状态，依次为 disabled → canary_store → verified_store(kdt)，按店单独记录。
-- posSafe 和 assetsEndToEnd 不硬改；只有在某店完成真实"扣→结算→退款返分→对账一致"之后，才单独为该店标记。
+### 4.1 修 claim 与对账（一条 migration，只增不删）
+- claim 改为只领取 `pending`。租约过期的 processing、以及 unknown，一律转入 `reconcile_pending`（新增状态值，CHECK 用 NOT VALID 方式追加），**不再发远端写**。blocked 不领取。
+- 新增 `youzan_points_operation_reconcile(p_id, p_claim_token, p_result, p_evidence)`，service_role-only，带 fencing，按对账结果分三种处理：
+  - matched：日志唯一命中 biz_value，HQ 与 owner 正确，sign 和 amount 精确一致（debit 为负数），且分页完整 → 记为 succeeded。
+  - absent：分页完整、覆盖时间窗、确认没有命中 → 仍保持 unknown，交人工处理，**不自动重发**。是否允许"确认不存在后用同一 key 重发一次"，要等你确认官方 biz_value 的重复语义后再定。
+  - 余额相等、读不到或分页不完整 → 保持 unknown，不判成功也不判失败。
+- 对账器复用 youzanFetch、组织/总部选择和 member-keyset 风格的有界分页，只调用读接口。
 
-## 四、实施前需要你确认 / 外部前置
-1. 有赞积分扣减/增加接口的官方正文：能不能带业务流水号或备注、重复调用的语义、能不能按流水回查。这决定 unknown 怎么对账；查不到就一律人工处理，绝不自动重扣。
-2. 抵扣规则（1 元 = 多少分、单笔上限）以总部 getter 为唯一来源。
-3. 测试会员：沿用旧 allowlist 会员，还是另外指定一名。
-4. canary 顺序：建议美罗城单店 → 其他 3 店。
+### 4.2 冻结意图（新表 + RPC，service_role-only，GRANT 齐全）
+- `pos_points_intents`：location_id, shift_id, client_op_id, customer_id, source_kdt_id, hq_kdt_id, points, deduct_fen, rule_fingerprint（取自总部 getter 指纹）, sale_request_hash, tender_mode(cash|async), status(frozen/debit_pending/confirmed/settled/released/unknown/cancel_refund_pending/cancelled), debit_operation_id, payment_attempt_id, row_version；unique(location_id, client_op_id)。
+- `pos_points_intent_freeze`：校验店员 store scope 和班次，location 必须映射到 source_kdt 且属于总部，规则指纹要与当前一致，会员映射要存在，镜像余额要够；然后在同一事务里调用 begin(debit, key=`pos:{intent}:debit`)，与 operation 一一绑定。
+- `pos_points_intent_mark`：只在 operation=succeeded 时才设为 confirmed；operation blocked 时设为 released；unknown 时同步为 unknown（POS 显示"待确认"，沿用现有的恢复交互）。
+
+### 4.3 结算
+- 新增 `pos_complete_sale_v4`：复用 v3 的金额、上限、授权和行分摊逻辑，但积分来源换成 intent。要求 intent=confirmed，且 hash、会员、门店、点数一致，**不读写 pos_customer_wallets，也不写 commerce_points_ledger**。成功后 intent 设为 settled 并关联 order。
+- 现金：freeze → driver 扣分（主进程同步执行一次，失败或未知交给后台队列）→ confirmed → v4。
+- 扫码：freeze → confirmed → 创建 payment_attempt（金额为扣除积分后的金额，attempt 绑定 intent）→ 支付成功事件 finalize 调 v4（替代 v2）。支付失败、关闭或超时时，intent 转为 cancel_refund_pending。
+- 现金和积分分开：订单 tender 只记录实收金额；积分抵扣额单独记在 benefit_snapshot.points_redemption 并标明来源 hq_ledger。
+
+### 4.4 取消补回 / 退款返分
+- 取消（pos_recover_sale_cancel 新增一个包装 v2，或者扫码关闭时）：如果 debit 是 succeeded，调 begin(refund, parent, key=`pos:{intent}:cancel`, 全额)；如果 debit 是 unknown，先对账，不急着补。
+- 退货：新增 `pos_complete_return_v2`。现金部分沿用原逻辑；积分按现有的行分摊算法计算本次应返分数，调 begin(refund, parent, key=`pos:{return}:refund`)。累计上限由 begin 负责。退货回放读取的是 operation，而不是本地 ledger。
+- 旧 v3 和 pos_complete_return 不删除，应用侧也不再调用，加上 COMMENT DEPRECATED。
+
+### 4.5 开关与状态
+- 新增 `POS_HQ_POINTS_REDEMPTION_ENABLED` 和门店 allowlist；默认 409 guard 保持不变。
+- 每店单独记录 `erpPosHqRedemption`：disabled / canary / verified_cash / verified_async。这个状态与 `nativeYouzanPosInherited`（保持 false）分开记录；posSafe 和 assetsEndToEnd 都不硬改。
+- 只有一家店完成"现金 + 扫码"两条链路，各自都真实走完"扣分→结算→取消补回/退款返分→日志对账一致"，才能把该店标为 verified。四店不能只靠现金链路宣称已全部通过。
 
 ## 五、测试（实施时）
-- SQL 隔离测试：意图唯一、跨店拒绝、未 confirmed 不能结算、累计返分上限、unknown 不重扣、取消全额返还只做一次。
-- 路由合同测试：只读 guard 默认仍是 409；本地钱包不会被读写。
-- 抠图和修图相关的代码、模型、依赖、提示词、调用路径全部不动。
+- 隔离 SQL：claim 不领取 unknown、blocked 和过期 processing；reconcile 的三种结果；freeze 跨店会被拒绝；未 confirmed 的 intent 不能结算；v4 不碰钱包；扫码 finalize 必须绑定 intent；取消和退款的累计上限；幂等回放。
+- 对账单元测试：唯一命中、多条命中、owner 错误、amount 符号错误、分页不完整、余额相等。
+- 路由：默认 409，allowlist 外的门店仍为 409。
+
+## 六、实施前依赖
+1. 你确认实施范围后再动手。真实测试（原测试会员、最多 1 分、四店标注测试单、不实收款、余额恢复）要等你拿到授权回复后才进行。
+2. 官方 biz_value 的重复提交语义（absent 后能否用同一 key 重发）。没有确认之前一律人工处理。
+3. 抠图和修图相关的代码、模型、依赖、提示词、调用路径全部不动。
