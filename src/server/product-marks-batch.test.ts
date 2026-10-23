@@ -145,3 +145,43 @@ test("HQ uses skusAtLocations for the explicit current store, never all selected
   assert.deepEqual(result.map((r) => [r.id, r.result]), [["a", "success"], ["b", "skipped"], ["other", "skipped"]]);
   assert.deepEqual(writes, [["a", { featured_stamp: "rare" }]]);
 });
+
+test("current store stock overrides legacy zero and hidden items never receive an override", async () => {
+  const { db, deps, writes } = fixture();
+  const a = db.get("a"); const b = db.get("b");
+  assert.ok(a); assert.ok(b);
+  db.set("a", { ...a, stock_qty: 0, current_location_qty: 2, is_display: true });
+  db.set("b", { ...b, stock_qty: 99, current_location_qty: 2, is_display: false });
+  const result = await runBatchMarks(deps, manager, { op: { kind: "fankuang", value: true }, location_id: "L1", items: items("a", "b") });
+  assert.deepEqual(result.map((r) => [r.result, r.reason ?? null]), [["success", null], ["skipped", "not_selling"]]);
+  assert.deepEqual(writes, [["a", { fankuang_override: true }]]);
+});
+
+test("unknown old notice is retained with zero writes", async () => {
+  const { db, deps, writes } = fixture();
+  const row = db.get("a"); assert.ok(row);
+  db.set("a", { ...row, notice_tags: ["future_tag", "not_edible"] });
+  const result = await runBatchMarks(deps, manager, { op: { kind: "notice", add: ["parts_missing"], remove: ["not_edible"] }, location_id: "L1", items: items("a") });
+  assert.equal(result[0].reason, "unknown_existing_notice");
+  assert.deepEqual(db.get("a")?.notice_tags, ["future_tag", "not_edible"]);
+  assert.equal(writes.length, 0);
+});
+
+test("same native editing capability denies standard products even for HQ", async () => {
+  const { db, deps, writes } = fixture();
+  const row = db.get("a"); assert.ok(row);
+  db.set("a", { ...row, is_custom_price: false, kind: "single" });
+  const result = await runBatchMarks(deps, { hq: true, managerLocationIds: [] }, { op: { kind: "stamp", value: "rare" }, location_id: "L1", items: items("a") });
+  assert.equal(result[0].reason, "no_permission");
+  assert.equal(writes.length, 0);
+});
+
+test("removing a non-participant preserves null automatic override without a write", async () => {
+  const { db, deps, writes } = fixture();
+  const row = db.get("a"); assert.ok(row);
+  db.set("a", { ...row, price_tier: 99 });
+  const result = await runBatchMarks(deps, manager, { op: { kind: "fankuang", value: false }, location_id: "L1", items: items("a") });
+  assert.equal(result[0].result, "unchanged");
+  assert.equal(db.get("a")?.fankuang_override, null);
+  assert.equal(writes.length, 0);
+});
