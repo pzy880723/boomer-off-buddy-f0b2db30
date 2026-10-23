@@ -1,5 +1,6 @@
 // ERP 批量印章/提示/翻筐乐：逐件授权 + 逐件 CAS（updated_at）只写目标字段；结果逐件返回，不假成功。
 import { isValidBatchOp, planMarkChange, type BatchMarkOp, type BatchSkuState, type SkipReason } from "../lib/commerce/product-marks-batch.ts";
+import { sameBatchVersion } from "../lib/commerce/batch-confirmation.ts";
 
 export type BatchItemInput = { id: string; expected_updated_at: string };
 export type BatchItemResult = {
@@ -20,8 +21,6 @@ export type BatchDeps = {
   casUpdate(id: string, expected: string, patch: Record<string, unknown>): Promise<string | null>;
 };
 
-const sameVersion = (a: string, b: string) => Math.floor(Date.parse(a)) === Math.floor(Date.parse(b));
-
 export async function runBatchMarks(
   deps: BatchDeps,
   actor: BatchActor,
@@ -29,12 +28,12 @@ export async function runBatchMarks(
 ): Promise<BatchItemResult[]> {
   if (!isValidBatchOp(input.op)) throw new Error("批量操作参数不正确");
   const ids = [...new Set(input.items.map((i) => i.id))];
-  const scope = input.location_id ? [input.location_id] : actor.managerLocationIds;
-  if (!actor.hq && (scope.length === 0 || !scope.every((l) => actor.managerLocationIds.includes(l)))) {
+  const scope = input.location_id ? [input.location_id] : [];
+  if (scope.length === 0 || (!actor.hq && !scope.every((l) => actor.managerLocationIds.includes(l)))) {
     return ids.map((id) => ({ id, result: "skipped", reason: "no_permission" }));
   }
   const rows = new Map((await deps.loadSkus(ids)).map((r) => [r.id, r]));
-  const allowed = actor.hq ? new Set(ids) : await deps.skusAtLocations(ids, scope);
+  const allowed = await deps.skusAtLocations(ids, scope);
   const expected = new Map(input.items.map((i) => [i.id, i.expected_updated_at]));
   const out: BatchItemResult[] = [];
   for (const id of ids) {
@@ -44,15 +43,17 @@ export async function runBatchMarks(
     const plan = planMarkChange(row, input.op);
     if (plan.outcome === "skipped") { out.push({ id, result: "skipped", reason: plan.reason, updated_at: row.updated_at }); continue; }
     if (plan.outcome === "unchanged") { out.push({ id, result: "unchanged", updated_at: row.updated_at }); continue; }
-    if (!sameVersion(row.updated_at, expected.get(id)!)) {
+    const version = expected.get(id);
+    if (!version || !sameBatchVersion(row.updated_at, version)) {
       out.push({ id, result: "failed", reason: "version_conflict", updated_at: row.updated_at }); continue;
     }
     try {
-      const next = await deps.casUpdate(id, row.updated_at, plan.patch);
+      const next = await deps.casUpdate(id, version, plan.patch);
       out.push(next
         ? { id, result: "success", updated_at: next, changed_fields: Object.keys(plan.patch) }
         : { id, result: "failed", reason: "version_conflict" });
-    } catch {
+    } catch (error) {
+      if (error instanceof Response && (error.status === 401 || error.status === 403)) throw error;
       out.push({ id, result: "failed", reason: "write_failed" });
     }
   }

@@ -1,191 +1,161 @@
-// 批量修改：翻筐乐 / 提示标签 / 特色印章。逐件结果（成功/未变化/跳过/失败），只重试失败项，保留已选。
-import { useMemo, useState } from "react";
+// Four actions; confirmed writes and retries retain original operation/items/versions.
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { batchUpdateProductMarks } from "@/lib/product-marks-batch.functions";
-import {
-  FEATURED_STAMPS, FEATURED_STAMP_LABELS, NOTICE_TAGS, NOTICE_TAG_LABELS, type FeaturedStamp, type NoticeTag,
-} from "@/lib/commerce/product-marks";
+import { generateWebProductCard } from "@/lib/product-card-web.functions";
+import { FEATURED_STAMPS, FEATURED_STAMP_LABELS, NOTICE_TAGS, NOTICE_TAG_LABELS, type FeaturedStamp, type NoticeTag } from "@/lib/commerce/product-marks";
 import { SKIP_REASON_LABELS, planMarkChange, type BatchMarkOp } from "@/lib/commerce/product-marks-batch";
+import { BatchReceiptFence, confirmBatch, retryBatch, stampOperation, type ConfirmedBatch } from "@/lib/commerce/batch-confirmation";
+import type { RecommendationCard } from "@/lib/recommendation-card";
 import type { SkuRow } from "@/lib/inventory.helpers";
 
-type OpKind = "fankuang_in" | "fankuang_out" | "notice" | "stamp";
+type OpKind = "card" | "fankuang" | "notice" | "stamp";
 type ItemResult = { id: string; result: "success" | "unchanged" | "skipped" | "failed"; reason?: string; updated_at?: string };
-
 const RESULT_LABEL = { success: "已修改", unchanged: "无需修改", skipped: "已跳过", failed: "失败" } as const;
 const EXTRA_REASON: Record<string, string> = {
-  no_permission: "无权限修改该商品（非本店或非总部/店长）",
-  not_found: "商品不存在",
-  version_conflict: "商品刚被他人修改，请重试",
-  write_failed: "保存失败，请重试",
+  no_permission: "无权限修改当前库位商品", not_found: "商品不存在",
+  version_conflict: "商品已被修改；原版本重试不会覆盖，请关闭后重新选择确认",
+  write_failed: "保存或结果核验失败，可按原版本重试",
 };
-const reasonText = (r?: string) => (r ? (SKIP_REASON_LABELS as Record<string, string>)[r] ?? EXTRA_REASON[r] ?? "未知原因" : "");
-
+const reasonText = (r?: string) => r ? (SKIP_REASON_LABELS as Record<string, string>)[r] ?? EXTRA_REASON[r] ?? "未知原因" : "";
+const cards: Array<{ k: OpKind; title: string }> = [
+  { k: "card", title: "生成商品卡" }, { k: "fankuang", title: "翻筐乐" },
+  { k: "notice", title: "提示标签" }, { k: "stamp", title: "特色印章" },
+];
 export function BatchMarksPanel(props: {
-  rows: SkuRow[];
-  selected: Set<string>;
-  onSelectedChange: (next: Set<string>) => void;
-  onDone: () => void;
-  onSaved: () => void;
+  rows: SkuRow[]; selected: Set<string>; locationId: string; locationName: string; contextKey: string;
+  onSelectedChange: (next: Set<string>) => void; onDone: () => void; onSaved: () => void;
 }) {
   const batchFn = useServerFn(batchUpdateProductMarks);
+  const cardFn = useServerFn(generateWebProductCard);
   const [op, setOp] = useState<OpKind | null>(null);
   const [add, setAdd] = useState<NoticeTag[]>([]);
   const [remove, setRemove] = useState<NoticeTag[]>([]);
-  const [stamp, setStamp] = useState<FeaturedStamp | "">("");
+  const [stamp, setStamp] = useState<FeaturedStamp | "nochange" | "clear">("nochange");
+  const [fankuang, setFankuang] = useState<"in" | "out">("in");
   const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
   const [results, setResults] = useState<ItemResult[] | null>(null);
-  const [versions, setVersions] = useState<Record<string, string>>({});
-
+  const [generated, setGenerated] = useState<Record<string, RecommendationCard>>({});
+  const [cardErrors, setCardErrors] = useState<Record<string, string>>({});
+  const confirmed = useRef<ConfirmedBatch | null>(null);
+  const fence = useRef(new BatchReceiptFence());
+  const context = useRef(props.contextKey);
+  context.current = props.contextKey;
+  useEffect(() => () => { fence.current.invalidate(); }, []);
   const selectedRows = useMemo(() => props.rows.filter((r) => props.selected.has(r.id)), [props.rows, props.selected]);
   const allSelected = props.rows.length > 0 && selectedRows.length === props.rows.length;
-
-  const buildOp = (): BatchMarkOp | null => {
-    if (op === "fankuang_in") return { kind: "fankuang", value: true };
-    if (op === "fankuang_out") return { kind: "fankuang", value: false };
-    if (op === "notice") return add.length + remove.length ? { kind: "notice", add, remove } : null;
-    if (op === "stamp") return { kind: "stamp", value: stamp || null };
-    return null;
+  const currentOp: BatchMarkOp | null = op === "stamp" ? stampOperation(stamp)
+    : op === "fankuang" ? { kind: "fankuang", value: fankuang === "in" }
+    : op === "notice" && add.length + remove.length ? { kind: "notice", add, remove } : null;
+  const preview = { apply: 0, unchanged: 0, skipped: 0 };
+  if (currentOp) for (const row of selectedRows) preview[planMarkChange(row, currentOp).outcome]++;
+  const locked = busy || results !== null;
+  const close = () => { if (busyRef.current) return; fence.current.invalidate(); setOp(null); confirmed.current = null; };
+  const open = (kind: OpKind) => {
+    if (busyRef.current) return;
+    fence.current.invalidate(); confirmed.current = null; setOp(kind); setAdd([]); setRemove([]);
+    setStamp("nochange"); setFankuang("in"); setResults(null); setGenerated({}); setCardErrors({});
   };
-  const currentOp = buildOp();
-  const preview = useMemo(() => {
-    const counts = { apply: 0, unchanged: 0, skipped: 0 };
-    if (!currentOp) return counts;
-    for (const r of selectedRows) counts[planMarkChange(r as never, currentOp).outcome] += 1;
-    return counts;
-  }, [selectedRows, currentOp]);
-
-  const open = (k: OpKind) => { setOp(k); setAdd([]); setRemove([]); setStamp(""); setResults(null); };
-  const toggle = (list: NoticeTag[], set: (v: NoticeTag[]) => void, other: NoticeTag[], setOther: (v: NoticeTag[]) => void, t: NoticeTag, on: boolean) => {
-    set(on ? [...list.filter((x) => x !== t), t] : list.filter((x) => x !== t));
-    if (on) setOther(other.filter((x) => x !== t));
+  const toggle = (list: NoticeTag[], set: (v: NoticeTag[]) => void, other: NoticeTag[], setOther: (v: NoticeTag[]) => void, tag: NoticeTag, on: boolean) => {
+    if (locked) return;
+    set(on ? [...list.filter((x) => x !== tag), tag] : list.filter((x) => x !== tag));
+    if (on) setOther(other.filter((x) => x !== tag));
   };
-
-  const submit = async (ids: string[]) => {
-    const opValue = buildOp();
-    if (!opValue || ids.length === 0) return;
-    setBusy(true);
+  const submit = async (retry = false) => {
+    if (busyRef.current) return;
+    const original = confirmed.current;
+    const request = retry && original ? retryBatch(original, results ?? [])
+      : currentOp ? confirmBatch(props.locationId, currentOp, selectedRows.map((r) => ({ id: r.id, expected_updated_at: r.updated_at ?? "" }))) : null;
+    if (!request?.items.length || request.items.some((i) => !i.expected_updated_at)) return;
+    if (!retry) confirmed.current = request;
+    const ticket = fence.current.begin(props.contextKey);
+    busyRef.current = true; setBusy(true);
     try {
-      const rowsById = new Map(props.rows.map((r) => [r.id, r]));
-      const res = await batchFn({ data: {
-        op: opValue, location_id: null,
-        items: ids.map((id) => ({ id, expected_updated_at: versions[id] ?? String((rowsById.get(id) as { updated_at?: string })?.updated_at ?? "") })),
-      } });
+      const response = await batchFn({ data: request });
+      if (!fence.current.accept(ticket, context.current)) return;
       const merged = new Map((results ?? []).map((r) => [r.id, r]));
-      for (const r of res.results as ItemResult[]) merged.set(r.id, r);
+      for (const result of response.results) merged.set(result.id, result);
       setResults([...merged.values()]);
-      setVersions((v) => ({ ...v, ...Object.fromEntries((res.results as ItemResult[]).filter((r) => r.updated_at).map((r) => [r.id, r.updated_at!])) }));
-      const ok = (res.results as ItemResult[]).filter((r) => r.result === "success").length;
-      if (ok) props.onSaved();
-      toast.success(`已处理 ${ids.length} 件，修改成功 ${ok} 件`);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "批量修改失败");
+      if (response.results.some((r) => r.result === "success")) props.onSaved();
+      toast.success(`已核验 ${response.results.length} 件结果`);
+    } catch (error) {
+      if (!fence.current.accept(ticket, context.current)) return;
+      // Fail closed on any request-level auth/network error: no cross-context retry.
+      fence.current.invalidate(); confirmed.current = null; setOp(null); props.onSelectedChange(new Set());
+      toast.error(error instanceof Error ? error.message : "批量操作已停止，请重新确认账号和当前库位");
     } finally {
-      setBusy(false);
+      busyRef.current = false;
+      if (fence.current.accept(ticket, context.current)) setBusy(false);
+      else setBusy(false);
     }
   };
-  const failedIds = (results ?? []).filter((r) => r.result === "failed").map((r) => r.id);
+  const generateCards = async () => {
+    if (busyRef.current) return;
+    const items = selectedRows.map((r) => ({ id: r.id, name: r.name }));
+    const location_id = props.locationId;
+    const ticket = fence.current.begin(props.contextKey);
+    busyRef.current = true; setBusy(true);
+    for (const item of items) {
+      if (!fence.current.accept(ticket, context.current)) break;
+      try {
+        const card = await cardFn({ data: { id: item.id, location_id } });
+        if (!fence.current.accept(ticket, context.current)) break;
+        setGenerated((prev) => ({ ...prev, [item.id]: card }));
+      } catch {
+        if (fence.current.accept(ticket, context.current)) setCardErrors((prev) => ({ ...prev, [item.id]: "生成停止，请确认账号和库位后重新选择" }));
+        // Never continue to another SKU after an authentication/permission failure.
+        break;
+      }
+    }
+    busyRef.current = false;
+    if (fence.current.accept(ticket, context.current)) setBusy(false);
+  };
+  const failed = (results ?? []).filter((r) => r.result === "failed").length;
   const nameOf = (id: string) => props.rows.find((r) => r.id === id)?.name ?? id;
-
-  const cards: Array<{ k: OpKind; title: string; desc: string }> = [
-    { k: "fankuang_in", title: "加入翻筐乐", desc: "仅自定义单件且有库存" },
-    { k: "fankuang_out", title: "移出翻筐乐", desc: "明确不参与" },
-    { k: "notice", title: "提示标签", desc: "默认追加，可明确移除" },
-    { k: "stamp", title: "特色印章", desc: "单选替换或清空" },
-  ];
-
   return (
-    <Card className="space-y-3 p-3">
+    <section className="space-y-3 border-y py-3">
       <div className="flex flex-wrap items-center gap-3">
-        <span className="text-sm font-medium">已选 {selectedRows.length} 件</span>
-        <label className="flex items-center gap-2 text-xs">
-          <Checkbox checked={allSelected} onCheckedChange={(c) => props.onSelectedChange(c === true ? new Set(props.rows.map((r) => r.id)) : new Set())} />
-          全选已加载（{props.rows.length}）
-        </label>
-        <Button size="sm" variant="outline" className="ml-auto" onClick={props.onDone}>完成</Button>
+        <span className="text-sm font-medium">{props.locationName} · 已选 {selectedRows.length} 件</span>
+        <label className="flex items-center gap-2 text-xs"><Checkbox disabled={busy} checked={allSelected} onCheckedChange={(c) => props.onSelectedChange(c === true ? new Set(props.rows.map((r) => r.id)) : new Set())} />全选已加载（{props.rows.length}）</label>
+        <Button disabled={busy} size="sm" variant="outline" className="ml-auto" onClick={props.onDone}>完成</Button>
       </div>
-      <div className="grid gap-2 sm:grid-cols-4">
-        {cards.map((c) => (
-          <button key={c.k} type="button" disabled={selectedRows.length === 0} onClick={() => open(c.k)}
-            className="rounded-md border p-3 text-left transition-colors hover:bg-muted disabled:opacity-50">
-            <p className="text-sm font-medium">{c.title}</p>
-            <p className="text-xs text-muted-foreground">{c.desc}</p>
-          </button>
-        ))}
-      </div>
-
-      <Dialog open={op !== null} onOpenChange={(v) => !v && setOp(null)}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>{cards.find((c) => c.k === op)?.title} · {selectedRows.length} 件</DialogTitle></DialogHeader>
-          {op === "notice" && (
-            <div className="space-y-3 text-sm">
-              <div>
-                <p className="mb-1.5 font-medium">追加</p>
-                <div className="flex flex-wrap gap-x-4 gap-y-2">
-                  {NOTICE_TAGS.map((t) => (
-                    <label key={t} className="flex items-center gap-2">
-                      <Checkbox checked={add.includes(t)} onCheckedChange={(c) => toggle(add, setAdd, remove, setRemove, t, c === true)} />
-                      {NOTICE_TAG_LABELS[t]}
-                    </label>
-                  ))}
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">“有瑕疵”需在商品详情逐件圈选图片，批量不会添加。</p>
-              </div>
-              <div>
-                <p className="mb-1.5 font-medium">移除</p>
-                <div className="flex flex-wrap gap-x-4 gap-y-2">
-                  {NOTICE_TAGS.map((t) => (
-                    <label key={t} className="flex items-center gap-2">
-                      <Checkbox checked={remove.includes(t)} onCheckedChange={(c) => toggle(remove, setRemove, add, setAdd, t, c === true)} />
-                      {NOTICE_TAG_LABELS[t]}
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-          {op === "stamp" && (
-            <ToggleGroup type="single" variant="outline" className="flex flex-wrap justify-start"
-              value={stamp} onValueChange={(v) => setStamp((v as FeaturedStamp) || "")}>
-              {FEATURED_STAMPS.map((s) => <ToggleGroupItem key={s} value={s} size="sm">{FEATURED_STAMP_LABELS[s]}</ToggleGroupItem>)}
-            </ToggleGroup>
-          )}
-          {op === "stamp" && <p className="text-xs text-muted-foreground">{stamp ? `将替换为“${FEATURED_STAMP_LABELS[stamp]}”` : "未选择：将清空特色印章"}</p>}
-
-          {currentOp && !results && (
-            <p className="text-xs text-muted-foreground">预览：将修改 {preview.apply} 件 · 无需修改 {preview.unchanged} 件 · 跳过 {preview.skipped} 件（以服务端最终结果为准）</p>
-          )}
-
-          {results && (
-            <div className="max-h-60 space-y-1 overflow-y-auto rounded border p-2 text-xs">
-              {results.map((r) => (
-                <div key={r.id} className="flex justify-between gap-2">
-                  <span className="truncate">{nameOf(r.id)}</span>
-                  <span className={r.result === "failed" ? "text-destructive" : r.result === "skipped" ? "text-muted-foreground" : ""}>
-                    {RESULT_LABEL[r.result]}{r.reason ? `：${reasonText(r.reason)}` : ""}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-
+      <div className="grid gap-2 sm:grid-cols-4">{cards.map((card) => <Button key={card.k} variant="outline" disabled={busy || selectedRows.length === 0} onClick={() => open(card.k)} className="h-14 justify-start">{card.title}</Button>)}</div>
+      <Dialog open={op !== null} onOpenChange={(value) => { if (!value) close(); }}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto" onEscapeKeyDown={(e) => { if (busy) e.preventDefault(); }} onPointerDownOutside={(e) => { if (busy) e.preventDefault(); }}>
+          <DialogHeader><DialogTitle>{cards.find((c) => c.k === op)?.title} · {props.locationName} · {selectedRows.length} 件</DialogTitle></DialogHeader>
+          {op === "fankuang" && <RadioGroup disabled={locked} value={fankuang} onValueChange={(v) => setFankuang(v === "in" ? "in" : "out")}>
+            <label className="flex items-center gap-2 text-sm"><RadioGroupItem value="in" />加入翻筐乐</label>
+            <label className="flex items-center gap-2 text-sm"><RadioGroupItem value="out" />移出翻筐乐</label>
+          </RadioGroup>}
+          {op === "stamp" && <RadioGroup disabled={locked} value={stamp} onValueChange={(v) => { if (v === "nochange" || v === "clear" || (FEATURED_STAMPS as readonly string[]).includes(v)) setStamp(v as typeof stamp); }}>
+            <label className="flex items-center gap-2 text-sm"><RadioGroupItem value="nochange" />保持不变</label>
+            {FEATURED_STAMPS.map((s) => <label key={s} className="flex items-center gap-2 text-sm"><RadioGroupItem value={s} />替换为{FEATURED_STAMP_LABELS[s]}</label>)}
+            <label className="flex items-center gap-2 text-sm"><RadioGroupItem value="clear" />明确清空特色印章</label>
+          </RadioGroup>}
+          {op === "notice" && <div className="space-y-3 text-sm">{(["add", "remove"] as const).map((mode) => <div key={mode}>
+            <p className="mb-2 font-medium">{mode === "add" ? "追加" : "明确移除"}</p><div className="flex flex-wrap gap-3">{NOTICE_TAGS.map((t) => <label key={t} className="flex items-center gap-2">
+              <Checkbox disabled={locked} checked={(mode === "add" ? add : remove).includes(t)} onCheckedChange={(c) => mode === "add" ? toggle(add, setAdd, remove, setRemove, t, c === true) : toggle(remove, setRemove, add, setAdd, t, c === true)} />{NOTICE_TAG_LABELS[t]}
+            </label>)}</div></div>)}<p className="text-xs text-muted-foreground">“有瑕疵”新增将跳过，须逐件标注；功能冲突须明确移除另一项。</p></div>}
+          {currentOp && !results && <p className="text-xs text-muted-foreground">预览：{op === "stamp" ? stamp === "clear" ? "将清空" : "将替换" : "将修改"} {preview.apply} 件 · 无需修改 {preview.unchanged} 件 · 跳过 {preview.skipped} 件</p>}
+          {results && <div className="max-h-60 space-y-2 overflow-y-auto text-xs">{results.map((r) => <div key={r.id} className="flex justify-between gap-3"><span>{nameOf(r.id)}</span><span className={r.result === "failed" ? "text-destructive" : ""}>{RESULT_LABEL[r.result]}{r.reason ? `：${reasonText(r.reason)}` : ""}</span></div>)}</div>}
+          {op === "card" && <div className="space-y-4">{selectedRows.map((r) => { const card = generated[r.id]; return <div key={r.id} className="border-b pb-3 text-sm">
+            <p className="font-medium">{r.name}</p>{card && <><p className="mt-2 font-semibold">{card.product_name} · {card.headline}</p><p>{card.keywords.join(" · ")}</p><p>{card.intro}</p><p>{card.highlights.join("；")}</p><p className="text-xs text-muted-foreground">60×90mm · {card.image.status === "missing" ? "主图待处理 · " : ""}二维码待配置</p></>}
+            {cardErrors[r.id] && <p role="alert" className="text-destructive">{cardErrors[r.id]}</p>}
+          </div>; })}</div>}
           <DialogFooter>
-            {results && failedIds.length > 0 && (
-              <Button variant="outline" disabled={busy} onClick={() => submit(failedIds)}>重试失败的 {failedIds.length} 件</Button>
-            )}
-            {!results ? (
-              <Button disabled={busy || !currentOp} onClick={() => submit(selectedRows.map((r) => r.id))}>{busy ? "处理中…" : "确认修改"}</Button>
-            ) : (
-              <Button onClick={() => setOp(null)}>关闭</Button>
-            )}
+            {op === "card" ? <Button disabled={busy || Object.keys(generated).length > 0 || Object.keys(cardErrors).length > 0} onClick={generateCards}>{busy ? "生成中…" : "生成商品卡文案"}</Button>
+              : !results ? <Button disabled={busy || !currentOp || selectedRows.some((r) => !r.updated_at)} onClick={() => submit()}>{busy ? "处理中…" : "确认修改"}</Button>
+              : failed > 0 && <Button variant="outline" disabled={busy} onClick={() => submit(true)}>按原确认版本重试失败 {failed} 件</Button>}
+            <Button variant="outline" disabled={busy} onClick={close}>关闭</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Card>
+    </section>
   );
 }

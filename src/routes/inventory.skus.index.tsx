@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Plus, Search, Tags, Package2, ChevronDown, Boxes, Sparkles, LayoutGrid, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -32,12 +32,15 @@ import { groupStandardSkus, type SkuRow, type StandardProductGroup } from "@/lib
 import { useSkuCovers, pickCover } from "@/hooks/use-sku-covers";
 import { isInFankuang } from "@/lib/commerce/fankuang";
 import { BatchMarksPanel } from "@/components/inventory/batch-marks-panel";
+import { getBatchMarkScope, listBatchLocationStocks } from "@/lib/product-marks-batch.functions";
+import { useAuthSession } from "@/hooks/use-auth-session";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { ReactNode } from "react";
 
 export const Route = createFileRoute("/inventory/skus/")({
   head: () => ({
-    meta: [{ title: "商品 SKU · 库存" }, { name: "description", content: "中古杂货 SKU 档案与 RFID 标签" }],
+    meta: [{ title: "BOOMER OFF 商品 SKU · 库存" }, { name: "description", content: "中古商品档案、当前库位批量提示与特色管理" }, { property: "og:title", content: "BOOMER OFF 商品库存" }, { property: "og:description", content: "中古商品档案与当前库位管理" }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }],
   }),
   component: SkusPage,
 });
@@ -51,6 +54,16 @@ function SkusPage() {
   const listFn = useServerFn(listSkus);
   const delSkuFn = useServerFn(deleteSku);
   const delProductFn = useServerFn(deleteStandardProduct);
+  const scopeFn = useServerFn(getBatchMarkScope);
+  const stockFn = useServerFn(listBatchLocationStocks);
+  const { session } = useAuthSession();
+  const accountId = session?.user.id ?? "";
+  const [locationId, setLocationId] = useState("");
+  const scopeQuery = useQuery({ queryKey: ["batch-mark-scope", accountId], queryFn: () => scopeFn(), enabled: Boolean(accountId), refetchInterval: 15000 });
+  const scope = scopeQuery.isError ? undefined : scopeQuery.data;
+  const activeLocation = scope?.locations.find((l) => l.id === locationId);
+  const stockQuery = useQuery({ queryKey: ["batch-location-stocks", accountId, locationId, scope?.roles.join(",")],
+    queryFn: () => stockFn({ data: { location_id: locationId } }), enabled: Boolean(activeLocation && accountId), refetchInterval: 15000 });
 
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
@@ -66,8 +79,13 @@ function SkusPage() {
   const [editingSku, setEditingSku] = useState<SkuRow | null>(null);
   const [batchMode, setBatchMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const contextKey = JSON.stringify([accountId, scope?.roles, scope?.locations, locationId, tab, search, searchInput, onlyFankuang, stockQuery.isError]);
+  const [selectionContext, setSelectionContext] = useState(contextKey);
+  const contextValid = selectionContext === contextKey;
+  useEffect(() => { setSelected(new Set()); setBatchMode(false); setSelectionContext(contextKey); }, [contextKey]);
+  useEffect(() => { if (!activeLocation) setLocationId(""); }, [activeLocation]);
   const selectable = (r: SkuRow, node: ReactNode) =>
-    batchMode ? (
+    batchMode && contextValid ? (
       <div key={r.id} className="flex items-center gap-2">
         <Checkbox aria-label={`选择 ${r.name}`} className="ml-2" checked={selected.has(r.id)} onCheckedChange={(c) => {
           const next = new Set(selected); if (c === true) next.add(r.id); else next.delete(r.id); setSelected(next);
@@ -86,15 +104,20 @@ function SkusPage() {
   };
 
   const q = useQuery({
-    queryKey: ["inv-skus", search, onlyFankuang],
+    queryKey: ["inv-skus", accountId, search, onlyFankuang],
     queryFn: () => listFn({ data: { search: search || undefined, limit: 500, fankuang: onlyFankuang } }),
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
-    placeholderData: keepPreviousData,
+    enabled: Boolean(accountId),
   });
 
   const sourceRows = q.data?.rows;
-  const rows = useMemo(() => ((sourceRows ?? []) as SkuRow[]).filter((r) => !onlyFankuang || isInFankuang(r)), [sourceRows, onlyFankuang]);
+  const rows = useMemo(() => {
+    const stocks = new Map((stockQuery.data ?? []).map((s) => [s.sku_id, s.qty]));
+    return ((sourceRows ?? []) as SkuRow[]).filter((r) => !locationId || (activeLocation && !stockQuery.isError && stocks.has(r.id)))
+      .map((r) => locationId ? { ...r, stock_qty: Number(stocks.get(r.id) ?? 0) } : r)
+      .filter((r) => !onlyFankuang || isInFankuang(r));
+  }, [sourceRows, onlyFankuang, locationId, activeLocation, stockQuery.data, stockQuery.isError]);
   const { standardGroups, customRows, bundleRows } = useMemo(() => {
     const std = rows.filter((r) => r.kind === "single" && !r.is_custom_price);
     const cus = rows.filter((r) => r.kind === "single" && r.is_custom_price);
@@ -179,8 +202,12 @@ function SkusPage() {
           </TabsList>
 
           <div className="flex items-center gap-2">
+            <Select value={locationId || "catalog"} onValueChange={(v) => setLocationId(v === "catalog" ? "" : v)}>
+              <SelectTrigger className="h-8 w-44" aria-label="当前门店或授权库位"><SelectValue placeholder="选择当前库位" /></SelectTrigger>
+              <SelectContent><SelectItem value="catalog">全部商品（仅浏览）</SelectItem>{(scope?.locations ?? []).map((l) => <SelectItem key={l.id} value={l.id}>{l.name}（{l.kind === "warehouse" ? "仓库" : "门店"}）</SelectItem>)}</SelectContent>
+            </Select>
             {tab !== "standard" && !batchMode && (
-              <Button size="sm" variant="outline" onClick={() => { setBatchMode(true); setSelected(new Set()); }}>批量</Button>
+              <Button size="sm" variant="outline" disabled={!activeLocation || stockQuery.isFetching || stockQuery.isError || scopeQuery.isError || q.isFetching || q.isError} onClick={() => { setBatchMode(true); setSelected(new Set()); setSelectionContext(contextKey); }}>批量</Button>
             )}
             <Button size="sm" variant={onlyFankuang ? "default" : "outline"} aria-pressed={onlyFankuang}
               onClick={() => setOnlyFankuang(!onlyFankuang)}>仅翻筐乐</Button>
@@ -214,14 +241,18 @@ function SkusPage() {
           </div>
         </div>
 
-        {batchMode && tab !== "standard" && (
+        {batchMode && contextValid && activeLocation && !scopeQuery.isError && !stockQuery.isError && tab !== "standard" && (
           <div className="mt-3">
             <BatchMarksPanel
+              key={contextKey}
+              contextKey={contextKey}
+              locationId={activeLocation.id}
+              locationName={activeLocation.name}
               rows={tab === "custom" ? customRows : bundleRows}
               selected={selected}
               onSelectedChange={setSelected}
               onDone={() => { setBatchMode(false); setSelected(new Set()); }}
-              onSaved={() => q.refetch()}
+              onSaved={() => { void q.refetch(); void stockQuery.refetch(); }}
             />
           </div>
         )}
