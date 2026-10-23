@@ -200,7 +200,7 @@ export const listSaleEvents = createServerFn({ method: "GET" })
     const { data: rows, error } = await q;
     if (error) throw new Error("销售事件读取失败，请稍后重试");
     const skuIds = Array.from(new Set((rows ?? []).map((r) => r.sku_id).filter((id): id is string => Boolean(id))));
-    const skuMap = new Map<string, { id: string; name: string; sku_code: string }>();
+    const skuMap = new Map<string, { id: string; name: string; sku_code: string | null }>();
     if (skuIds.length) {
       try {
         const { data: skus, error: skuError } = await supabase

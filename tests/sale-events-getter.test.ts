@@ -94,7 +94,7 @@ test("空事件或无SKU不查商品，all不加状态过滤", async () => {
   }
 });
 
-test("保留原员工鉴权：拒绝会话时不读取事件或SKU", async () => {
+test("原鉴权middleware注册合同不变，模拟拒绝时不读取（不宣称真实会话验收）", async () => {
   const h = harness([], [], false, false);
   await assert.rejects(h.read({ data: { status: "all", limit: 100 } }), /员工未登录/);
   assert.deepEqual(h.calls, []);
