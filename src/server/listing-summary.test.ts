@@ -85,7 +85,7 @@ test("输出含年份/绝版等无依据词被拒绝", () => {
 });
 
 test("输出超过 80 字被拒绝；80 字通过", () => {
-  assert.throws(() => parseSummaryOutput(okPayload("长".repeat(81))), /ai_invalid_output/);
+  assert.throws(() => parseSummaryOutput(okPayload("长".repeat(81))), /ai_output_too_long/);
   assert.equal(parseSummaryOutput(okPayload("长".repeat(80))).length, 80);
 });
 
