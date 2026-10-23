@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'bun:test';
+import { describe, it } from 'node:test';
+import { expect } from '../lib/onboarding-test-expect';
 import { evaluateOnboarding, currentProjectionFailure } from './member-onboarding';
 
 const valid = () => ({ ownership: true, tokensReadBack: true, mapping: { eligible: 10, mapped: 10, missing: 0, conflict: 0, unavailable: 0 }, rulesEquivalent: true, rulesSupported: true, posSafe: true, assetsEndToEnd: false });

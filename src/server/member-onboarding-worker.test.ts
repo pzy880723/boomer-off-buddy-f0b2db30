@@ -1,4 +1,5 @@
-import {it,expect} from 'bun:test';
+import {it} from 'node:test';
+import {expect} from '../lib/onboarding-test-expect';
 import {runMemberOnboarding,type OnboardingWorkerDeps} from './member-onboarding-worker.server';
 const job={shop_id:'target',kdt_id:215098500,parent_kdt_id:153242272,revision:1,claim_token:'token'};
 function deps():OnboardingWorkerDeps{return {claim:async id=>id==='target'?job:null,finish:async()=>true,verifyProvider:async()=>({ownership:true,tokensReadBack:true,rulesSupported:true,rulesEquivalent:true}),mappings:async()=>({eligible:10,mapped:10,missing:0,conflict:0,unavailable:0}),projections:async()=>[],posSafe:async()=>true};}
