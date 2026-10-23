@@ -7597,6 +7597,150 @@ export type Database = {
           },
         ]
       }
+      pos_points_intents: {
+        Row: {
+          client_op_id: string
+          created_at: string
+          customer_id: string
+          debit_operation_id: string
+          hq_kdt_id: number
+          id: string
+          location_id: string
+          operator_id: string
+          order_id: string | null
+          payment_attempt_id: string | null
+          points: number
+          points_fen: number
+          points_per_yuan: number
+          quote: Json
+          request: Json
+          row_version: number
+          rule_fingerprint: string
+          shift_id: string
+          source_kdt_id: number
+          status: string
+          tender_mode: string
+          updated_at: string
+        }
+        Insert: {
+          client_op_id: string
+          created_at?: string
+          customer_id: string
+          debit_operation_id: string
+          hq_kdt_id: number
+          id?: string
+          location_id: string
+          operator_id: string
+          order_id?: string | null
+          payment_attempt_id?: string | null
+          points: number
+          points_fen: number
+          points_per_yuan: number
+          quote: Json
+          request: Json
+          row_version?: number
+          rule_fingerprint: string
+          shift_id: string
+          source_kdt_id: number
+          status?: string
+          tender_mode: string
+          updated_at?: string
+        }
+        Update: {
+          client_op_id?: string
+          created_at?: string
+          customer_id?: string
+          debit_operation_id?: string
+          hq_kdt_id?: number
+          id?: string
+          location_id?: string
+          operator_id?: string
+          order_id?: string | null
+          payment_attempt_id?: string | null
+          points?: number
+          points_fen?: number
+          points_per_yuan?: number
+          quote?: Json
+          request?: Json
+          row_version?: number
+          rule_fingerprint?: string
+          shift_id?: string
+          source_kdt_id?: number
+          status?: string
+          tender_mode?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_points_intents_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "commerce_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_points_intents_debit_operation_id_fkey"
+            columns: ["debit_operation_id"]
+            isOneToOne: true
+            referencedRelation: "youzan_points_operations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pos_points_refund_requests: {
+        Row: {
+          attempt: number
+          created_at: string
+          id: string
+          intent_id: string
+          kind: string
+          operation_id: string | null
+          points: number
+          ref_key: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempt?: number
+          created_at?: string
+          id?: string
+          intent_id: string
+          kind: string
+          operation_id?: string | null
+          points: number
+          ref_key: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempt?: number
+          created_at?: string
+          id?: string
+          intent_id?: string
+          kind?: string
+          operation_id?: string | null
+          points?: number
+          ref_key?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_points_refund_requests_intent_id_fkey"
+            columns: ["intent_id"]
+            isOneToOne: false
+            referencedRelation: "pos_points_intents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_points_refund_requests_operation_id_fkey"
+            columns: ["operation_id"]
+            isOneToOne: true
+            referencedRelation: "youzan_points_operations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pos_receipts: {
         Row: {
           created_at: string
@@ -10550,6 +10694,9 @@ export type Database = {
           parent_id: string | null
           points: number
           reason: string | null
+          reconcile_evidence: Json | null
+          remote_sent_at: string | null
+          resolution: string | null
           source_kdt_id: number
           status: string
           updated_at: string
@@ -10568,6 +10715,9 @@ export type Database = {
           parent_id?: string | null
           points: number
           reason?: string | null
+          reconcile_evidence?: Json | null
+          remote_sent_at?: string | null
+          resolution?: string | null
           source_kdt_id: number
           status?: string
           updated_at?: string
@@ -10586,6 +10736,9 @@ export type Database = {
           parent_id?: string | null
           points?: number
           reason?: string | null
+          reconcile_evidence?: Json | null
+          remote_sent_at?: string | null
+          resolution?: string | null
           source_kdt_id?: number
           status?: string
           updated_at?: string
@@ -12737,6 +12890,18 @@ export type Database = {
         }
         Returns: Json
       }
+      pos_complete_return_v2: {
+        Args: {
+          p_authorization_id?: string
+          p_client_op_id: string
+          p_items: Json
+          p_operator_id: string
+          p_order_id: string
+          p_reason: string
+          p_shift_id: string
+        }
+        Returns: Json
+      }
       pos_complete_return_without_points: {
         Args: {
           p_authorization_id?: string
@@ -12792,6 +12957,10 @@ export type Database = {
         }
         Returns: Json
       }
+      pos_complete_sale_v4: {
+        Args: { p_intent_id: string; p_operator_id: string; p_tenders: Json }
+        Returns: Json
+      }
       pos_complete_sale_without_points: {
         Args: {
           p_authorization_id?: string
@@ -12807,6 +12976,61 @@ export type Database = {
         }
         Returns: Json
       }
+      pos_points_check_combined_authorization: {
+        Args: {
+          p_authorization_id: string
+          p_eligible_fen: number
+          p_location_id: string
+          p_operator_id: string
+          p_saving_fen: number
+        }
+        Returns: undefined
+      }
+      pos_points_intent_attach_attempt: {
+        Args: { p_attempt_id: string; p_intent_id: string }
+        Returns: Json
+      }
+      pos_points_intent_cancel: {
+        Args: {
+          p_intent_id: string
+          p_operator_id: string
+          p_provider_final?: boolean
+        }
+        Returns: Json
+      }
+      pos_points_intent_freeze: {
+        Args: {
+          p_authorization_id?: string
+          p_client_op_id: string
+          p_customer_id: string
+          p_discount: Json
+          p_items: Json
+          p_note?: string
+          p_operator_id: string
+          p_points: number
+          p_rule: Json
+          p_shift_id: string
+          p_tender_mode: string
+          p_yz_open_id: string
+        }
+        Returns: Json
+      }
+      pos_points_intent_json: {
+        Args: {
+          i: Database["public"]["Tables"]["pos_points_intents"]["Row"]
+          p_replayed: boolean
+        }
+        Returns: Json
+      }
+      pos_points_intent_sync: { Args: { p_intent_id: string }; Returns: Json }
+      pos_points_quote: {
+        Args: { p_discount: Json; p_items: Json; p_lock: boolean }
+        Returns: Json
+      }
+      pos_points_refund_submit: {
+        Args: { p_request_id: string }
+        Returns: Json
+      }
       pos_points_rules: { Args: { p_customer_id: string }; Returns: Json }
       pos_record_cash_adjustment: {
         Args: {
@@ -12819,6 +13043,14 @@ export type Database = {
         Returns: Json
       }
       pos_recover_sale_cancel: {
+        Args: {
+          p_client_op_id: string
+          p_operator_id: string
+          p_shift_id: string
+        }
+        Returns: Json
+      }
+      pos_recover_sale_cancel_v2: {
         Args: {
           p_client_op_id: string
           p_operator_id: string
@@ -13341,6 +13573,18 @@ export type Database = {
           o: Database["public"]["Tables"]["youzan_points_operations"]["Row"]
           p_idempotent: boolean
         }
+        Returns: Json
+      }
+      youzan_points_operation_mark_sent: {
+        Args: { p_claim_token: string; p_id: string }
+        Returns: boolean
+      }
+      youzan_points_operation_reconcile: {
+        Args: { p_evidence: Json; p_id: string; p_outcome: string }
+        Returns: Json
+      }
+      youzan_points_operation_resolve_absent: {
+        Args: { p_id: string }
         Returns: Json
       }
       youzan_points_projection_lock: {
