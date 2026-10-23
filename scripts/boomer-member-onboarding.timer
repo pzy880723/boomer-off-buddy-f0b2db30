@@ -1,0 +1,11 @@
+[Unit]
+Description=Verify pending branch onboarding every five minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=5min
+AccuracySec=15s
+Unit=boomer-member-onboarding.service
+
+[Install]
+WantedBy=timers.target
