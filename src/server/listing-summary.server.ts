@@ -30,32 +30,87 @@ function charLen(s: string): number {
   return [...s].length;
 }
 
-/** 从网关响应中取出文本并校验：非空、≤80 字、不含禁用词。失败抛错（路由返回 503，不假成功）。 */
-export function parseSummaryOutput(payload: unknown): string {
+type ContentPart = { type?: string; text?: unknown; refusal?: unknown };
+
+/** 取出网关文本：Responses(output_text / output[].content) 与 Chat(choices[].message.content) 包络；显式拒绝抛 ai_refused。 */
+function extractSummaryText(payload: unknown): string {
   const p = payload as {
-    output_text?: string;
-    output?: Array<{ content?: Array<{ type?: string; text?: string }> }>;
-  };
-  let text = typeof p?.output_text === "string" ? p.output_text : "";
-  if (!text && Array.isArray(p?.output)) {
-    for (const item of p.output) {
-      for (const c of item?.content ?? []) {
-        if (c?.type === "output_text" && typeof c.text === "string") text += c.text;
-      }
+    output_text?: unknown;
+    output?: Array<{ content?: ContentPart[] }>;
+    choices?: Array<{ message?: { content?: unknown; refusal?: unknown } }>;
+  } | null;
+  const parts: ContentPart[] = [];
+  for (const item of Array.isArray(p?.output) ? p!.output! : []) {
+    for (const c of Array.isArray(item?.content) ? item.content : []) parts.push(c);
+  }
+  for (const choice of Array.isArray(p?.choices) ? p!.choices! : []) {
+    const m = choice?.message;
+    if (typeof m?.refusal === "string" && m.refusal.trim()) throw new Error("ai_refused");
+    if (typeof m?.content === "string") parts.push({ type: "output_text", text: m.content });
+    else if (Array.isArray(m?.content)) for (const c of m.content as ContentPart[]) parts.push(c);
+  }
+  if (parts.some((c) => c?.type === "refusal" || (typeof c?.refusal === "string" && c.refusal.trim()))) {
+    throw new Error("ai_refused");
+  }
+  if (typeof p?.output_text === "string" && p.output_text.trim()) return p.output_text;
+  return parts
+    .filter((c) => (c?.type === "output_text" || c?.type === "text") && typeof c.text === "string")
+    .map((c) => c.text as string)
+    .join("");
+}
+
+/** 去掉 ```json 围栏；仍不是 JSON 时只取唯一的最外层 {...}。 */
+function parseSummaryJson(text: string): { description?: unknown } {
+  const trimmed = text.trim();
+  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/iu);
+  const body = fenced ? fenced[1] : trimmed;
+  const tryParse = (t: string) => {
+    try {
+      const v = JSON.parse(t);
+      return v && typeof v === "object" && !Array.isArray(v) ? (v as { description?: unknown }) : null;
+    } catch {
+      return null;
     }
-  }
-  let parsed: { description?: unknown };
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    throw new Error("ai_invalid_output");
-  }
+  };
+  const direct = tryParse(body);
+  if (direct) return direct;
+  const start = body.indexOf("{"), end = body.lastIndexOf("}");
+  const inner = start >= 0 && end > start ? tryParse(body.slice(start, end + 1)) : null;
+  if (inner) return inner;
+  throw new Error("ai_invalid_output");
+}
+
+/**
+ * 从网关响应中取出简介并校验：非空、≤80 字、不含禁用词。失败抛明确错误码（路由返回 503，不假成功）：
+ * ai_refused / ai_empty_output / ai_invalid_output / ai_output_too_long / ai_unsupported_claim。
+ */
+export function parseSummaryOutput(payload: unknown): string {
+  const text = extractSummaryText(payload);
+  if (!text.trim()) throw new Error("ai_empty_output");
+  const parsed = parseSummaryJson(text);
   if (typeof parsed.description !== "string") throw new Error("ai_invalid_output");
   const description = parsed.description.replace(/\s+/gu, " ").trim();
   if (!description) throw new Error("ai_empty_output");
-  if (charLen(description) > 80) throw new Error("ai_invalid_output");
+  if (charLen(description) > 80) throw new Error("ai_output_too_long");
   if (BANNED.test(description)) throw new Error("ai_unsupported_claim");
   return description;
+}
+
+const RETRYABLE = new Set(["ai_timeout", "ai_empty_output", "ai_invalid_output", "ai_output_too_long", "ai_unsupported_claim"]);
+
+/** 把生成失败映射为对外错误码；retryable=false 表示重试同一请求无意义（拒绝/未配置/请求被拒）。 */
+export function classifySummaryError(e: unknown): { code: string; retryable: boolean } {
+  const name = (e as { name?: string } | null)?.name;
+  if (name === "TimeoutError" || name === "AbortError") return { code: "ai_timeout", retryable: true };
+  const msg = e instanceof Error ? e.message : "";
+  const http = msg.match(/^ai_http_error_(\d{3})$/u);
+  if (http) {
+    const status = Number(http[1]);
+    return { code: msg, retryable: status === 429 || status >= 500 };
+  }
+  if (msg === "ai_refused" || msg === "ai_not_configured") return { code: msg, retryable: false };
+  if (RETRYABLE.has(msg)) return { code: msg, retryable: true };
+  return { code: "ai_unavailable", retryable: true };
 }
 
 export function buildSummaryUserMessage(input: SummaryInput): string {
