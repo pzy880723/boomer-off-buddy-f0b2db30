@@ -12,7 +12,7 @@ test("native payment bodies do not strip points and reject before contacting pro
   for (const name of ["payments.micropay","payments.qr-order"]) {
     const source = route(name);
     assert.match(source,/points_to_redeem: z.number\(\).int\(\).min\(0\).max\(2147483647\).default\(0\)/);
-    assert.ok(source.indexOf('"points_async_not_supported"') < source.indexOf("await findAttemptByClientOpId"));
+    assert.ok(source.indexOf('"points_async_not_supported"') < source.indexOf("await replayPosPaymentOp"));
     assert.match(source,/points_to_redeem: body.points_to_redeem/);
   }
   const server = readFileSync(new URL("../../server/pos-payment.server.ts",import.meta.url),"utf8");
