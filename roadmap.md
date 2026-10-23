@@ -1,5 +1,11 @@
 # 待办+通知修复（backend only，腾讯用户自验）
 
+## 本轮批量修订
+- [ ] 恢复商品卡入口、翻筐乐合并操作、特色默认不改
+- [ ] 明确当前库位，账号/角色/查询变化清理选择和回执
+- [ ] 冻结提交和原版本重试，精确 CAS 与 returning 核验
+- [ ] 红绿测试及交付实据；不修改真实商品或腾讯独立文件
+
 - [ ] 1. work_items/pending_counts 移除 stock_sync/channel_sync 分支（服务端，非客户端 filter）
 - [ ] 2. 同步失败 → 真实 inv_handheld_notifications（幂等回填 7 天 + 持续投影 failed/恢复；跳过 8 月两条测试队列；location 优先+shop 映射验证，缺/歧义不广播；详情脱敏+商品名+状态+同步中心；成功后 action_status 恢复不再列待处理；unread_counts.system 同源；列表 category=system 服务端过滤+微秒游标+标读 scope；badge_counts 新可选字段合同）
 - [ ] 3. measurement 个人忽略：云端表+RLS+service-role-only 写；POST/DELETE /api/public/handheld/work-items/measurement-dismissals {location_id,task_id,request_version}；session 取 user；校验门店授权、已完成 409；work-item 测量行加 measurement_task_id/request_version/can_ignore；用 requester 事件版本区分复用 task；混合会话只忽略测量；GET include_ignored/ignored_only；不改 completed/cancelled 语义
