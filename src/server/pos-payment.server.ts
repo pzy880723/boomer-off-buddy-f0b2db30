@@ -45,6 +45,7 @@ export type PosPaymentAttempt = {
   paid_at: string | null;
   payment_profile_id: string | null;
   settlement_subject_id: string | null;
+  request_fingerprint?: string | null;
 };
 
 export type PosPaymentFailure = { code: string; message: string; status: number };
@@ -52,7 +53,7 @@ export type PosPaymentFailure = { code: string; message: string; status: number 
 const ATTEMPT_COLUMNS =
   "id,location_id,shift_id,operator_id,provider,mode,out_trade_no,amount,status," +
   "provider_transaction_id,qr_content,code_url,expires_at,client_op_id,customer_id," +
-  "sale_payload,order_id,error_code,error_message,paid_at,payment_profile_id,settlement_subject_id";
+  "sale_payload,order_id,error_code,error_message,paid_at,payment_profile_id,settlement_subject_id,request_fingerprint";
 
 export type StoreMerchant = {
   paymentProfileId: string;
@@ -569,6 +570,10 @@ export async function attemptResponse(attempt: PosPaymentAttempt) {
     order_id: attempt.order_id,
     message: attempt.error_message,
     error_code: attempt.error_code,
+    client_op_id: attempt.client_op_id,
+    // settled 才代表销售已落账、可出小票；settlement_pending=支付方已成功但销售落账待重试，不能当作完成
+    settlement_state: attempt.status === "paid" && attempt.order_id ? "settled"
+      : attempt.error_code === "sale_failed" ? "settlement_pending" : "not_settled",
     ...(receipt ? { receipt } : {}),
   };
 }
