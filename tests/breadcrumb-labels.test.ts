@@ -39,7 +39,22 @@ test("readiness page shows a Chinese breadcrumb label", () => {
   assert.equal(labels.readiness, "上架准备");
 });
 
+test("channel-sync page shows a Chinese breadcrumb label", () => {
+  const labels = readBreadcrumbMap();
+  assert.equal(labels["channel-sync"], "渠道同步");
+});
+
+test("api-integration page shows a Chinese breadcrumb label", () => {
+  const labels = readBreadcrumbMap();
+  assert.equal(labels["api-integration"], "接口管理");
+});
+
 test("both labelled segments are backed by real inventory routes", () => {
   assert.ok(existsSync(join(ROOT, "src/routes/inventory.measurements.tsx")));
   assert.ok(existsSync(join(ROOT, "src/routes/inventory.readiness.tsx")));
+});
+
+test("the two new labelled segments are backed by real admin routes", () => {
+  assert.ok(existsSync(join(ROOT, "src/routes/admin.channel-sync.tsx")));
+  assert.ok(existsSync(join(ROOT, "src/routes/admin.api-integration.tsx")));
 });
