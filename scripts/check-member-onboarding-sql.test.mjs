@@ -19,6 +19,7 @@ async function setup() {
  await db.exec(sql);
  await db.exec(await readFile(new URL('../docs/member-onboarding-hardening.sql',import.meta.url),'utf8'));
  await db.exec(await readFile(new URL('../docs/member-onboarding-hq-policy.sql',import.meta.url),'utf8'));
+ await db.exec(await readFile(new URL('../docs/member-onboarding-acceptance-retry.sql',import.meta.url),'utf8'));
  return db;
 }
 test('one-time active backfill and repeat enqueue idempotency',async()=>{const d=await setup();try{assert.equal((await d.query('SELECT count(*)::int n FROM member_onboarding_jobs')).rows[0].n,2); await d.exec(`SELECT member_onboarding_enqueue('${A}',false); SELECT member_onboarding_enqueue('${A}',false);`);assert.equal((await d.query(`SELECT revision FROM member_onboarding_jobs WHERE shop_id='${A}'`)).rows[0].revision,1);}finally{await d.close();}});
