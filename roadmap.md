@@ -1,7 +1,7 @@
 # 待办+通知修复（backend only，腾讯用户自验）
 
 ## 总部统一门店接入（2026-10-23）
-- [ ] 10:58 真实 /admin/channel-sync 页面中文呈现与纯映射/static contract 红绿测试；不改查询或任务操作，腾讯由 Codex 发布，积分继续暂停
+- [x] 10:58 真实 /admin/channel-sync 页面中文呈现与纯映射/static contract 红绿测试（新增4项+同步回归14项全部通过）；不改查询或任务操作，销售事件接口无商品名则显示“商品信息待核对”，腾讯实页验收/发布由 Codex，积分继续暂停
 - [x] 10:14 员工分类字典 GET /api/public/handheld/product-taxonomy（设备+员工会话，ERP 全量启用末级分类+父中文名+启用 facets，不按库存过滤，DB 错 503）；3 路由测试通过
 - [x] 10:14 只读审计：欧洲瓷器“进出存单据”、美罗城“尚未发布到目标门店”、“门店会员接入遇到阻碍”提醒来源；分类权限/IP 确认建议（原生改动由 Codex）
 - [x] 07:09 拍照上架：原子 cancel/recover（同 commit_v2 锁、tombstone 拒绝迟到旧 op）、featured_stamp/notice_tags 同事务保存并入指纹（缺省保持旧指纹）、简介包络解析与明确错误码；红测先行，不动抠图/修图
