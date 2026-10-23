@@ -15,7 +15,7 @@ export type BatchSkuRow = BatchSkuState & { id: string; updated_at: string };
 
 export type BatchDeps = {
   loadSkus(ids: string[]): Promise<BatchSkuRow[]>;
-  /** 店长：返回在给定门店（当前店或其全部授权店）有库存记录的 SKU id。 */
+  /** 所有角色（含总部）：仅返回明确当前库位有库存记录的 SKU id。 */
   skusAtLocations(ids: string[], locationIds: string[]): Promise<Set<string>>;
   /** CAS 写入：仅当 updated_at 仍等于 expected 时更新；返回新 updated_at 或 null（冲突）。 */
   casUpdate(id: string, expected: string, patch: Record<string, unknown>): Promise<string | null>;
@@ -48,6 +48,7 @@ export async function runBatchMarks(
       out.push({ id, result: "failed", reason: "version_conflict", updated_at: row.updated_at }); continue;
     }
     try {
+      // Keep the client-confirmed token: never substitute the freshly read row.updated_at.
       const next = await deps.casUpdate(id, version, plan.patch);
       out.push(next
         ? { id, result: "success", updated_at: next, changed_fields: Object.keys(plan.patch) }
