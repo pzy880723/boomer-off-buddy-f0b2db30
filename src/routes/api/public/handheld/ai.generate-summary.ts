@@ -10,7 +10,7 @@ import {
   resolveSessionUser,
 } from "@/server/handheld-auth.server";
 import { aiConsentBlock, aiConsentErrorResponse, sessionAiGuard } from "@/server/ai-consent.server";
-import { SummaryInput, generateListingSummary } from "@/server/listing-summary.server";
+import { SummaryInput, classifySummaryError, generateListingSummary } from "@/server/listing-summary.server";
 
 export const Route = createFileRoute("/api/public/handheld/ai/generate-summary")({
   server: {
