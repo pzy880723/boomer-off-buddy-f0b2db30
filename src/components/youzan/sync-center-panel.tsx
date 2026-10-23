@@ -16,7 +16,7 @@ import {
   repairMismatch,
   retryQueueItem,
 } from "@/lib/youzan-sync.functions";
-import { nextAction, reasonLabel, statusLabel } from "@/lib/sync-record-labels";
+import { errorLabel, nextAction, reasonLabel, statusLabel } from "@/lib/sync-record-labels";
 
 const skuName = (r: { sku?: { name?: string | null } | null }) => r.sku?.name?.trim() || "未命名商品";
 
@@ -140,7 +140,7 @@ export function SyncCenterPanel() {
               >
                 <Badge variant="destructive">不一致</Badge>
                 <span className="text-xs font-medium">{skuName(l)}</span>
-                <span>有赞 item {l.yz_item_id}</span>
+                <span>有赞商品编号 {l.yz_item_id}</span>
                 <span className="ml-auto text-muted-foreground">
                   最近推送 {l.last_pushed_stock ?? "—"} / 远端 {l.last_pull_stock ?? "—"}
                 </span>
@@ -172,7 +172,7 @@ export function SyncCenterPanel() {
                 <div className="flex items-center gap-2">
                   <Badge variant="destructive">失败</Badge>
                   <span className="text-xs font-medium">{skuName(l)}</span>
-                  <span>item {l.yz_item_id}</span>
+                  <span>有赞商品编号 {l.yz_item_id}</span>
                   <Button
                     size="sm"
                     variant="outline"
@@ -186,7 +186,7 @@ export function SyncCenterPanel() {
                     重试
                   </Button>
                 </div>
-                <p className="text-xs text-destructive">{l.last_error}</p>
+                <p className="text-xs text-destructive">{errorLabel(l.last_error)}</p>
               </div>
             ))
           )}

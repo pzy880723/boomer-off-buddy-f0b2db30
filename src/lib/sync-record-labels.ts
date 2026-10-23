@@ -46,8 +46,17 @@ export function nextAction(status: string | null | undefined): string {
     case "dead_letter":
       return "已停止自动重试，请联系总部处理";
     case "done":
-      return "无需操作";
+      return "任务已结束；若有赞库存仍异常，请总部核对";
     default:
       return "请联系总部确认";
   }
+}
+
+/** 失败原因中文呈现；原 last_error 字段保留不改。 */
+export function errorLabel(lastError: string | null | undefined): string | null {
+  const e = lastError?.trim();
+  if (!e) return null;
+  if (/进出存|进销存/.test(e)) return "门店开启了库存单管理，需库存单核对";
+  if (/尚未发布|未发布到/.test(e)) return "商品尚未发布到该门店，请先等发布完成";
+  return "同步出错，请总部核对技术记录";
 }
