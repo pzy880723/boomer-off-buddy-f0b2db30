@@ -37,3 +37,12 @@
 - 红阶段新增测试 16 pass / 1 fail：六位实现不支持 `.123456000+00:00` 与六位 Z 等价。绿阶段扩展至九位，整秒时区转换与小数部分分离，不对小数 Date.parse/floor。
 - 新增总部参数捕获测试：当前 L1 只允许 L1 返回的 SKU；即使总部还有 L2 权限，其他所选商品也 skipped，只有目标 SKU 写入。
 - 本轮无数据库迁移或真实商品写入；没有改变公开移动端 API 或腾讯独立文件。
+
+## 追加翻筐乐与旧标签边界
+- `loadSkus` 读取 `is_display`，批次只查询当前 `location_id` 的 `inv_stocks.qty`，传给 planner 的 `current_location_qty` 不取 legacy `stock_qty`。不新增总部遗留库存分摊；没有当前库存记录的商品仍不允许批量编辑。
+- 加入复用 `deriveListingStatus` 与 `isFankuangEligibleSku`：当前店正库存、显示、tracked custom single。native 对遗留 null display 的显示语义保持不变；显式隐藏拒绝。写前再次查当前店库存，加入 UPDATE 限制 display，CAS 仍用原确认版本。
+- 移出先看 `isInFankuang`，原本不参与即 unchanged，保留 null 自动模式，不写 false。
+- notice 操作对原数组先检查未知 key/非法类型，发现即 `skipped:unknown_existing_notice`，不归一删除旧数据；其他目标字段仍不碰 notice_tags。
+- 角色仍只认服务端 user_roles 中 super_admin/hq_operator/store_manager，授权库位和 RLS 不变；按既有 native capability 排除 standard 产品，未引入其他可编辑角色。
+- 首轮新增纯规则红测试 9 pass / 4 fail，后续服务器测试验证目标字段零误写；腾讯独立原生翻筐乐/瑕疵文件未改。
+- 最终相关四文件回归 50/50；自动构建最新记录 build OK。未作登录态真实商品试写，既有账号匹配限制仍在；无迁移、未部署腾讯。

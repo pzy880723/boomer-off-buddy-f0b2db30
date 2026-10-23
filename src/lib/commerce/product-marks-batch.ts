@@ -3,7 +3,8 @@ import {
   EXCLUSIVE_NOTICE_TAGS, FEATURED_STAMPS, NOTICE_TAGS, normalizeNoticeTags, readProductMarks,
   type FeaturedStamp, type NoticeTag,
 } from "./product-marks.ts";
-import { isFankuangEligibleSku } from "./fankuang.ts";
+import { isFankuangEligibleSku, isInFankuang } from "./fankuang.ts";
+import { deriveListingStatus } from "../handheld/listing-status.ts";
 
 export type BatchMarkOp =
   | { kind: "notice"; add: NoticeTag[]; remove: NoticeTag[] }
@@ -16,19 +17,23 @@ export type BatchSkuState = {
   kind?: string | null;
   inventory_policy?: string | null;
   stock_qty?: number | string | null;
+  current_location_qty?: number | string | null;
+  is_display?: boolean | null;
   price_tier?: number | string | null;
   featured_stamp?: unknown;
   notice_tags?: unknown;
   fankuang_override?: boolean | null;
 };
 
-export type SkipReason = "archived" | "flawed_requires_annotation" | "function_conflict" | "fankuang_not_applicable" | "sold_out";
+export type SkipReason = "archived" | "flawed_requires_annotation" | "function_conflict" | "fankuang_not_applicable" | "sold_out" | "not_selling" | "unknown_existing_notice";
 export const SKIP_REASON_LABELS: Record<SkipReason, string> = {
   archived: "商品已归档",
   flawed_requires_annotation: "“有瑕疵”需在商品详情逐件圈选图片后添加",
   function_conflict: "“功能不确定”与“功能不可用”冲突，请同时移除另一项或跳过",
   fankuang_not_applicable: "仅自定义单件商品可参与翻筐乐",
   sold_out: "已售罄",
+  not_selling: "仓库中或隐藏商品不可加入翻筐乐",
+  unknown_existing_notice: "存在未知旧提示，已跳过以保留原标签",
 };
 
 export type MarkPlan =
@@ -51,6 +56,9 @@ export function planMarkChange(sku: BatchSkuState, op: BatchMarkOp): MarkPlan {
   if ((sku.status ?? "active") !== "active") return { outcome: "skipped", reason: "archived" };
   const cur = readProductMarks(sku);
   if (op.kind === "notice") {
+    if (sku.notice_tags != null && (!Array.isArray(sku.notice_tags) ||
+      !sku.notice_tags.every((tag: unknown) => typeof tag === "string" && (NOTICE_TAGS as readonly string[]).includes(tag))))
+      return { outcome: "skipped", reason: "unknown_existing_notice" };
     const adding = op.add.filter((t) => !cur.notice_tags.includes(t));
     if (adding.includes("flawed")) return { outcome: "skipped", reason: "flawed_requires_annotation" };
     const next = normalizeNoticeTags([...cur.notice_tags.filter((t) => !op.remove.includes(t)), ...adding]);
@@ -63,7 +71,12 @@ export function planMarkChange(sku: BatchSkuState, op: BatchMarkOp): MarkPlan {
     return { outcome: "apply", patch: { featured_stamp: op.value } };
   }
   if (!isFankuangEligibleSku(sku)) return { outcome: "skipped", reason: "fankuang_not_applicable" };
-  if (op.value === true && !(Number(sku.stock_qty) > 0)) return { outcome: "skipped", reason: "sold_out" };
+  if (op.value === false && !isInFankuang(sku)) return { outcome: "unchanged" };
+  if (op.value === true) {
+    const status = deriveListingStatus(sku.is_display, Number(sku.current_location_qty) || 0);
+    if (status === "in_warehouse") return { outcome: "skipped", reason: "not_selling" };
+    if (status !== "selling") return { outcome: "skipped", reason: "sold_out" };
+  }
   if ((sku.fankuang_override ?? null) === op.value) return { outcome: "unchanged" };
   return { outcome: "apply", patch: { fankuang_override: op.value } };
 }
