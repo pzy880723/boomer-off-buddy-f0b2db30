@@ -778,6 +778,13 @@
       "when": 1792739604019,
       "tag": "0110_smart_create_cancel_marks",
       "breakpoints": true
+    },
+    {
+      "idx": 111,
+      "version": "7",
+      "when": 1792740731754,
+      "tag": "0111_pos_payment_op_recover",
+      "breakpoints": true
     }
   ]
 }
