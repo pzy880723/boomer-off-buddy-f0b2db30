@@ -76,3 +76,35 @@ test("handheld items keep raw category code and gain dictionary names", () => {
   assert.deepEqual(a, { id: "s1", category: "cup", category_name: "杯", category_path: ["陶瓷", "杯"] });
   assert.deepEqual(b, { id: "s2", category: "zz", category_name: null, category_path: [] });
 });
+
+test("batch fankuang uses current-location stock, never legacy global stock", () => {
+  assert.equal(planMarkChange({ ...sku, is_display: true, current_location_qty: 1, stock_qty: 0 }, { kind: "fankuang", value: true }).outcome, "apply");
+  assert.equal(planMarkChange({ ...sku, is_display: true, current_location_qty: 0, stock_qty: 99 }, { kind: "fankuang", value: true }).reason, "sold_out");
+  assert.equal(planMarkChange({ ...sku, is_display: true, stock_qty: 99 }, { kind: "fankuang", value: true }).reason, "sold_out");
+});
+
+test("batch fankuang rejects hidden and warehouse products", () => {
+  for (const is_display of [false, null, undefined]) {
+    assert.equal(planMarkChange({ ...sku, is_display, current_location_qty: 1 }, { kind: "fankuang", value: true }).reason, "not_selling");
+  }
+});
+
+test("batch fankuang rejects unlimited, standard and non-single items", () => {
+  for (const overrides of [{ inventory_policy: "unlimited" }, { is_custom_price: false }, { kind: "bundle" }]) {
+    assert.equal(planMarkChange({ ...sku, is_display: true, current_location_qty: 1, ...overrides }, { kind: "fankuang", value: true }).reason, "fankuang_not_applicable");
+  }
+});
+
+test("remove non-participant is unchanged and preserves automatic future eligibility", () => {
+  assert.deepEqual(planMarkChange({ ...sku, price_tier: 99, fankuang_override: null }, { kind: "fankuang", value: false }), { outcome: "unchanged" });
+  assert.deepEqual(planMarkChange({ ...sku, price_tier: 39, fankuang_override: null }, { kind: "fankuang", value: false }), { outcome: "apply", patch: { fankuang_override: false } });
+});
+
+test("unknown existing notice tags fail closed rather than normalize away", () => {
+  for (const notice_tags of [["not_edible", "future_tag"], ["parts_missing", 7], "parts_missing"]) {
+    assert.deepEqual(planMarkChange({ ...sku, notice_tags }, { kind: "notice", add: ["parts_missing"], remove: [] }),
+      { outcome: "skipped", reason: "unknown_existing_notice" });
+  }
+  assert.deepEqual(planMarkChange({ ...sku, notice_tags: ["future_tag"] }, { kind: "stamp", value: "rare" }),
+    { outcome: "apply", patch: { featured_stamp: "rare" } });
+});
