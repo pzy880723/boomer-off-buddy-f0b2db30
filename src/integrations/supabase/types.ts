@@ -7494,6 +7494,7 @@ export type Database = {
           provider_response: Json
           provider_transaction_id: string | null
           qr_content: string | null
+          request_fingerprint: string | null
           sale_payload: Json
           settlement_subject_id: string | null
           shift_id: string
@@ -7525,6 +7526,7 @@ export type Database = {
           provider_response?: Json
           provider_transaction_id?: string | null
           qr_content?: string | null
+          request_fingerprint?: string | null
           sale_payload?: Json
           settlement_subject_id?: string | null
           shift_id: string
@@ -7556,6 +7558,7 @@ export type Database = {
           provider_response?: Json
           provider_transaction_id?: string | null
           qr_content?: string | null
+          request_fingerprint?: string | null
           sale_payload?: Json
           settlement_subject_id?: string | null
           shift_id?: string
@@ -7599,6 +7602,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      pos_payment_op_tombstones: {
+        Row: {
+          cancelled_at: string
+          client_op_id: string
+          location_id: string
+          operator_id: string
+          shift_id: string
+        }
+        Insert: {
+          cancelled_at?: string
+          client_op_id: string
+          location_id: string
+          operator_id: string
+          shift_id: string
+        }
+        Update: {
+          cancelled_at?: string
+          client_op_id?: string
+          location_id?: string
+          operator_id?: string
+          shift_id?: string
+        }
+        Relationships: []
       }
       pos_points_intents: {
         Row: {
@@ -13004,6 +13031,17 @@ export type Database = {
           p_operator_id: string
           p_shift_id: string
           p_tenders: Json
+        }
+        Returns: Json
+      }
+      pos_payment_attempt_reserve: { Args: { p: Json }; Returns: Json }
+      pos_payment_op_recover: {
+        Args: {
+          p_cancel_if_absent: boolean
+          p_client_op_id: string
+          p_location_id: string
+          p_operator_id: string
+          p_shift_id: string
         }
         Returns: Json
       }

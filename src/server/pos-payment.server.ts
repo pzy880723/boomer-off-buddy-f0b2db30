@@ -45,6 +45,7 @@ export type PosPaymentAttempt = {
   paid_at: string | null;
   payment_profile_id: string | null;
   settlement_subject_id: string | null;
+  request_fingerprint?: string | null;
 };
 
 export type PosPaymentFailure = { code: string; message: string; status: number };
@@ -52,7 +53,7 @@ export type PosPaymentFailure = { code: string; message: string; status: number 
 const ATTEMPT_COLUMNS =
   "id,location_id,shift_id,operator_id,provider,mode,out_trade_no,amount,status," +
   "provider_transaction_id,qr_content,code_url,expires_at,client_op_id,customer_id," +
-  "sale_payload,order_id,error_code,error_message,paid_at,payment_profile_id,settlement_subject_id";
+  "sale_payload,order_id,error_code,error_message,paid_at,payment_profile_id,settlement_subject_id,request_fingerprint";
 
 export type StoreMerchant = {
   paymentProfileId: string;
@@ -569,6 +570,118 @@ export async function attemptResponse(attempt: PosPaymentAttempt) {
     order_id: attempt.order_id,
     message: attempt.error_message,
     error_code: attempt.error_code,
+    client_op_id: attempt.client_op_id,
+    // settled 才代表销售已落账、可出小票；settlement_pending=支付方已成功但销售落账待重试，不能当作完成
+    settlement_state: attempt.status === "paid" && attempt.order_id ? "settled"
+      : attempt.error_code === "sale_failed" ? "settlement_pending" : "not_settled",
     ...(receipt ? { receipt } : {}),
   };
+}
+
+/** 规范化 JSON（键排序），用于异步支付请求指纹。 */
+function canonicalJson(value: unknown): string {
+  if (value === undefined) return "null";
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  const obj = value as Record<string, unknown>;
+  return `{${Object.keys(obj).filter((k) => obj[k] !== undefined).sort()
+    .map((k) => `${JSON.stringify(k)}:${canonicalJson(obj[k])}`).join(",")}}`;
+}
+
+/**
+ * 异步支付不可变请求指纹：绑定门店/班次/操作员/渠道/模式及完整销售内容。
+ * 付款码不参与（一次性、不落明文），重放同一 client_op_id 换码也只回放原 attempt，不会二次扣款。
+ */
+export async function posPaymentRequestFingerprint(input: {
+  locationId: string; shiftId: string; operatorId: string; provider: PosScanProvider; mode: PosPaymentMode;
+  items: SaleItemInput[]; customerId?: string | null; pointsToRedeem: number;
+  discount?: SaleDiscountInput | null; authorizationId?: string | null; note?: string | null;
+}) {
+  return sha256Hex(canonicalJson({
+    v: 1, location_id: input.locationId, shift_id: input.shiftId, operator_id: input.operatorId,
+    provider: input.provider, mode: input.mode,
+    items: input.items.map((i) => ({ sku_id: i.sku_id, quantity: i.quantity, subcategory_code: i.subcategory_code ?? null,
+      brand_id: i.brand_id ?? null, character_id: i.character_id ?? null })),
+    customer_id: input.customerId ?? null, points_to_redeem: input.pointsToRedeem, discount: input.discount ?? null,
+    authorization_id: input.authorizationId ?? null, note: input.note ?? null,
+  }));
+}
+
+export type PosOpReplay =
+  | { kind: "none" }
+  | { kind: "attempt"; attempt: PosPaymentAttempt }
+  | { kind: "failure"; failure: PosPaymentFailure };
+
+function opRpcFailure(message: string): PosPaymentFailure {
+  if (/client_op_id_conflict/.test(message)) {
+    return { code: "client_op_id_conflict", message: "该收款单号已用于其他班次、员工、门店或不同的销售内容", status: 409 };
+  }
+  return { code: "payment_op_unknown", message: "收款单状态暂时无法确认，请稍后用同一单号重试", status: 503 };
+}
+
+/** 同一 client_op_id 的回放：必须同班次/员工/门店，且渠道/模式/指纹完全一致；已永久取消则拒绝。 */
+export async function replayPosPaymentOp(input: {
+  clientOpId: string; shiftId: string; operatorId: string; locationId: string;
+  provider: PosScanProvider; mode: PosPaymentMode; fingerprint: string;
+}): Promise<PosOpReplay> {
+  const { data, error } = await supabaseAdmin.rpc("pos_payment_op_recover" as never, {
+    p_client_op_id: input.clientOpId, p_shift_id: input.shiftId, p_operator_id: input.operatorId,
+    p_location_id: input.locationId, p_cancel_if_absent: false,
+  } as never);
+  if (error) return { kind: "failure", failure: opRpcFailure(error.message) };
+  const r = data as unknown as { state: string; id?: string };
+  if (r.state === "cancelled") return { kind: "failure", failure: cancelledFailure() };
+  if (r.state !== "attempt" || !r.id) return { kind: "none" };
+  const attempt = await findAttemptById(r.id);
+  if (!attempt) return { kind: "failure", failure: opRpcFailure("unknown") };
+  const fp = (attempt as PosPaymentAttempt & { request_fingerprint?: string | null }).request_fingerprint ?? null;
+  if (attempt.provider !== input.provider || attempt.mode !== input.mode || fp !== input.fingerprint) {
+    return { kind: "failure", failure: opRpcFailure("client_op_id_conflict") };
+  }
+  return { kind: "attempt", attempt };
+}
+
+function cancelledFailure(): PosPaymentFailure {
+  return { code: "client_op_cancelled", message: "该收款单已永久取消，请重新发起收款", status: 409 };
+}
+
+/** 原子创建或回放（与 recover/cancel 共用同一把 per-op 锁）；created=false 表示已存在，调用方不得再次扣款。 */
+export async function reserveAttempt(input: Parameters<typeof createAttempt>[0] & { fingerprint: string }):
+  Promise<{ ok: true; created: boolean; attempt: PosPaymentAttempt } | { ok: false; failure: PosPaymentFailure }> {
+  const { data, error } = await supabaseAdmin.rpc("pos_payment_attempt_reserve" as never, {
+    p: {
+      client_op_id: input.clientOpId, location_id: input.locationId, shift_id: input.shiftId, operator_id: input.operatorId,
+      payment_profile_id: input.merchant.paymentProfileId, settlement_subject_id: input.merchant.subjectId,
+      provider: input.provider, mode: input.mode, out_trade_no: buildOutTradeNo(new Date(), crypto.randomUUID()),
+      amount: input.amount, customer_id: input.customerId ?? null,
+      // 只保存不可逆哈希与后四位，明文付款码仅在内存中传给支付机构
+      auth_code_hash: input.authCode ? await sha256Hex(input.authCode) : null,
+      auth_code_last4: input.authCode ? authCodeLast4(input.authCode) : null,
+      expires_at: input.expiresAt ? input.expiresAt.toISOString() : null,
+      sale_payload: input.salePayload, request_fingerprint: input.fingerprint,
+    },
+  } as never);
+  if (error) return { ok: false, failure: opRpcFailure(error.message) };
+  const r = data as unknown as { state: string; id?: string };
+  if (r.state === "cancelled") return { ok: false, failure: cancelledFailure() };
+  const attempt = r.id ? await findAttemptById(r.id) : null;
+  if (!attempt) return { ok: false, failure: opRpcFailure("unknown") };
+  return { ok: true, created: r.state === "created", attempt };
+}
+
+/** 仅凭原 client_op_id + 班次恢复；cancelIfAbsent 只在原请求从未建单时写永久取消。 */
+export async function recoverPosPaymentOp(input: {
+  clientOpId: string; shiftId: string; operatorId: string; locationId: string; cancelIfAbsent: boolean;
+}): Promise<{ ok: true; state: "none" | "cancelled" } | { ok: true; state: "attempt"; attempt: PosPaymentAttempt }
+  | { ok: false; failure: PosPaymentFailure }> {
+  const { data, error } = await supabaseAdmin.rpc("pos_payment_op_recover" as never, {
+    p_client_op_id: input.clientOpId, p_shift_id: input.shiftId, p_operator_id: input.operatorId,
+    p_location_id: input.locationId, p_cancel_if_absent: input.cancelIfAbsent,
+  } as never);
+  if (error) return { ok: false, failure: opRpcFailure(error.message) };
+  const r = data as unknown as { state: "none" | "cancelled" | "attempt"; id?: string };
+  if (r.state !== "attempt") return { ok: true, state: r.state };
+  const attempt = r.id ? await findAttemptById(r.id) : null;
+  if (!attempt) return { ok: false, failure: opRpcFailure("unknown") };
+  return { ok: true, state: "attempt", attempt };
 }

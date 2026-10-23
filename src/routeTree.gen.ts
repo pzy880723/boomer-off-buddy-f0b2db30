@@ -254,6 +254,7 @@ import { Route as ApiPublicPosOrdersSearchRouteImport } from './routes/api/publi
 import { Route as ApiPublicPosPaymentsIdRouteImport } from './routes/api/public/pos/payments.$id'
 import { Route as ApiPublicPosPaymentsMicropayRouteImport } from './routes/api/public/pos/payments.micropay'
 import { Route as ApiPublicPosPaymentsQrOrderRouteImport } from './routes/api/public/pos/payments.qr-order'
+import { Route as ApiPublicPosPaymentsRecoverRouteImport } from './routes/api/public/pos/payments.recover'
 import { Route as ApiPublicPosProductsLookupRouteImport } from './routes/api/public/pos/products.lookup'
 import { Route as ApiPublicPosShiftsOpenRouteImport } from './routes/api/public/pos/shifts.open'
 import { Route as ApiPublicStorefrontFankuangBasketRouteImport } from './routes/api/public/storefront/fankuang.basket'
@@ -1686,6 +1687,12 @@ const ApiPublicPosPaymentsQrOrderRoute =
     path: '/api/public/pos/payments/qr-order',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicPosPaymentsRecoverRoute =
+  ApiPublicPosPaymentsRecoverRouteImport.update({
+    id: '/api/public/pos/payments/recover',
+    path: '/api/public/pos/payments/recover',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicPosProductsLookupRoute =
   ApiPublicPosProductsLookupRouteImport.update({
     id: '/lookup',
@@ -2364,6 +2371,7 @@ export interface FileRoutesByFullPath {
   '/api/public/pos/payments/$id': typeof ApiPublicPosPaymentsIdRouteWithChildren
   '/api/public/pos/payments/micropay': typeof ApiPublicPosPaymentsMicropayRoute
   '/api/public/pos/payments/qr-order': typeof ApiPublicPosPaymentsQrOrderRoute
+  '/api/public/pos/payments/recover': typeof ApiPublicPosPaymentsRecoverRoute
   '/api/public/pos/products/lookup': typeof ApiPublicPosProductsLookupRoute
   '/api/public/pos/shifts/open': typeof ApiPublicPosShiftsOpenRoute
   '/api/public/storefront/fankuang/basket': typeof ApiPublicStorefrontFankuangBasketRoute
@@ -2676,6 +2684,7 @@ export interface FileRoutesByTo {
   '/api/public/pos/payments/$id': typeof ApiPublicPosPaymentsIdRouteWithChildren
   '/api/public/pos/payments/micropay': typeof ApiPublicPosPaymentsMicropayRoute
   '/api/public/pos/payments/qr-order': typeof ApiPublicPosPaymentsQrOrderRoute
+  '/api/public/pos/payments/recover': typeof ApiPublicPosPaymentsRecoverRoute
   '/api/public/pos/products/lookup': typeof ApiPublicPosProductsLookupRoute
   '/api/public/pos/shifts/open': typeof ApiPublicPosShiftsOpenRoute
   '/api/public/storefront/fankuang/basket': typeof ApiPublicStorefrontFankuangBasketRoute
@@ -2996,6 +3005,7 @@ export interface FileRoutesById {
   '/api/public/pos/payments/$id': typeof ApiPublicPosPaymentsIdRouteWithChildren
   '/api/public/pos/payments/micropay': typeof ApiPublicPosPaymentsMicropayRoute
   '/api/public/pos/payments/qr-order': typeof ApiPublicPosPaymentsQrOrderRoute
+  '/api/public/pos/payments/recover': typeof ApiPublicPosPaymentsRecoverRoute
   '/api/public/pos/products/lookup': typeof ApiPublicPosProductsLookupRoute
   '/api/public/pos/shifts/open': typeof ApiPublicPosShiftsOpenRoute
   '/api/public/storefront/fankuang/basket': typeof ApiPublicStorefrontFankuangBasketRoute
@@ -3317,6 +3327,7 @@ export interface FileRouteTypes {
     | '/api/public/pos/payments/$id'
     | '/api/public/pos/payments/micropay'
     | '/api/public/pos/payments/qr-order'
+    | '/api/public/pos/payments/recover'
     | '/api/public/pos/products/lookup'
     | '/api/public/pos/shifts/open'
     | '/api/public/storefront/fankuang/basket'
@@ -3629,6 +3640,7 @@ export interface FileRouteTypes {
     | '/api/public/pos/payments/$id'
     | '/api/public/pos/payments/micropay'
     | '/api/public/pos/payments/qr-order'
+    | '/api/public/pos/payments/recover'
     | '/api/public/pos/products/lookup'
     | '/api/public/pos/shifts/open'
     | '/api/public/storefront/fankuang/basket'
@@ -3948,6 +3960,7 @@ export interface FileRouteTypes {
     | '/api/public/pos/payments/$id'
     | '/api/public/pos/payments/micropay'
     | '/api/public/pos/payments/qr-order'
+    | '/api/public/pos/payments/recover'
     | '/api/public/pos/products/lookup'
     | '/api/public/pos/shifts/open'
     | '/api/public/storefront/fankuang/basket'
@@ -4202,6 +4215,7 @@ export interface RootRouteChildren {
   ApiPublicPosPaymentsIdRoute: typeof ApiPublicPosPaymentsIdRouteWithChildren
   ApiPublicPosPaymentsMicropayRoute: typeof ApiPublicPosPaymentsMicropayRoute
   ApiPublicPosPaymentsQrOrderRoute: typeof ApiPublicPosPaymentsQrOrderRoute
+  ApiPublicPosPaymentsRecoverRoute: typeof ApiPublicPosPaymentsRecoverRoute
   ApiPublicPosShiftsOpenRoute: typeof ApiPublicPosShiftsOpenRoute
   ApiPublicStorefrontFankuangBasketRoute: typeof ApiPublicStorefrontFankuangBasketRoute
   ApiPublicStorefrontFankuangFlipRoute: typeof ApiPublicStorefrontFankuangFlipRoute
@@ -5942,6 +5956,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicPosPaymentsQrOrderRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/pos/payments/recover': {
+      id: '/api/public/pos/payments/recover'
+      path: '/api/public/pos/payments/recover'
+      fullPath: '/api/public/pos/payments/recover'
+      preLoaderRoute: typeof ApiPublicPosPaymentsRecoverRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/pos/products/lookup': {
       id: '/api/public/pos/products/lookup'
       path: '/lookup'
@@ -7482,6 +7503,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicPosPaymentsIdRoute: ApiPublicPosPaymentsIdRouteWithChildren,
   ApiPublicPosPaymentsMicropayRoute: ApiPublicPosPaymentsMicropayRoute,
   ApiPublicPosPaymentsQrOrderRoute: ApiPublicPosPaymentsQrOrderRoute,
+  ApiPublicPosPaymentsRecoverRoute: ApiPublicPosPaymentsRecoverRoute,
   ApiPublicPosShiftsOpenRoute: ApiPublicPosShiftsOpenRoute,
   ApiPublicStorefrontFankuangBasketRoute:
     ApiPublicStorefrontFankuangBasketRoute,

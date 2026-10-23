@@ -5,9 +5,10 @@ import { detectAuthCodeProvider } from "@/lib/pos/pos-scan-payment";
 import { POS_CORS, authenticatePosUser, posError, posJson } from "@/server/pos-auth.server";
 import {
   attemptResponse,
-  createAttempt,
   finalizePaidAttempt,
-  findAttemptByClientOpId,
+  posPaymentRequestFingerprint,
+  replayPosPaymentOp,
+  reserveAttempt,
   markAttemptStatus,
   recomputePayableAmount,
   resolveStoreMerchant,
@@ -70,8 +71,19 @@ export const Route = createFileRoute("/api/public/pos/payments/micropay")({
         const auth = await authenticatePosUser(request, body.location_id);
         if (!auth.ok) return auth.response;
 
-        const existing = await findAttemptByClientOpId(body.client_op_id);
-        if (existing) return posJson({ ok: true, data: await attemptResponse(existing) });
+        const fingerprint = await posPaymentRequestFingerprint({
+          locationId: body.location_id, shiftId: body.shift_id, operatorId: auth.user.id, provider: body.provider,
+          mode: "merchant_scan", items: body.items, customerId: body.customer_id ?? null, pointsToRedeem: body.points_to_redeem,
+          discount: body.discount ?? null, authorizationId: body.authorization_id ?? null, note: body.note ?? null,
+        });
+        const replay = await replayPosPaymentOp({
+          clientOpId: body.client_op_id, shiftId: body.shift_id, operatorId: auth.user.id, locationId: body.location_id,
+          provider: body.provider, mode: "merchant_scan", fingerprint,
+        });
+        if (replay.kind === "failure") {
+          return posError(replay.failure.message, replay.failure.status, replay.failure.code);
+        }
+        if (replay.kind === "attempt") return posJson({ ok: true, data: await attemptResponse(replay.attempt) });
 
         const { data: shift, error: shiftError } = await supabaseAdmin
           .from("pos_shifts" as never)
@@ -116,7 +128,8 @@ export const Route = createFileRoute("/api/public/pos/payments/micropay")({
           return posError(amount.failure.message, amount.failure.status, amount.failure.code);
         }
 
-        const attempt = await createAttempt({
+        const reserved = await reserveAttempt({
+          fingerprint,
           locationId: body.location_id,
           shiftId: body.shift_id,
           operatorId: auth.user.id,
@@ -135,6 +148,12 @@ export const Route = createFileRoute("/api/public/pos/payments/micropay")({
             note: body.note ?? null,
           },
         });
+        if (!reserved.ok) {
+          return posError(reserved.failure.message, reserved.failure.status, reserved.failure.code);
+        }
+        const attempt = reserved.attempt;
+        // 并发同 op 已建单：只回放，绝不二次调用支付机构
+        if (!reserved.created) return posJson({ ok: true, data: await attemptResponse(attempt) });
 
         const charge =
           body.provider === "wechat"
