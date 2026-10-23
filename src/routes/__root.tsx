@@ -150,6 +150,8 @@ const breadcrumbMap: Record<string, string> = {
   "product-brands": "品牌库",
   "product-facets": "商品标签",
   admin: "管理",
+  "channel-sync": "渠道同步",
+  "api-integration": "接口管理",
   users: "用户",
   orders: "订单",
   dispatch: "发货",
