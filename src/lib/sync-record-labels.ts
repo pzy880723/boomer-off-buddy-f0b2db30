@@ -64,7 +64,7 @@ export function errorLabel(lastError: string | null | undefined): string | null 
 // 渠道同步异常中心（PC /admin/channel-sync）中文呈现；内部协议值不改，未知值不透传。
 const UNKNOWN = "待核对";
 const SYNC_STATUS: Record<string, string> = {
-  failed: "失败待处理", pending: "等待同步", running: "同步中", succeeded: "已完成",
+  failed: "失败待处理", pending: "等待同步", running: "同步中", succeeded: "任务已完成",
   retry_wait: "等待自动重试", dead_letter: "多次失败已停止", superseded: "已被新任务替代",
   cancelled: "已取消", all: "全部",
   unmatched: "未匹配商品", oversold: "库存不足", processed: "已处理", received: "已接收",

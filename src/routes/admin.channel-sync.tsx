@@ -244,6 +244,14 @@ function EventsPanel() {
                   <Loader2 className="h-4 w-4 animate-spin inline" />
                 </TableCell>
               </TableRow>
+            ) : q.isError ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center py-6 text-destructive">
+                  {q.error instanceof Error && q.error.message === "销售事件读取失败，请稍后重试"
+                    ? "销售事件读取失败，请稍后重试"
+                    : "商品信息读取失败，请稍后重试"}
+                </TableCell>
+              </TableRow>
             ) : (q.data?.items ?? []).length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
@@ -251,14 +259,19 @@ function EventsPanel() {
                 </TableCell>
               </TableRow>
             ) : (
-              q.data?.items.map((r) => (
+              q.data?.items.map((r) => {
+                const p = productDisplay(r.sku);
+                return (
                 <TableRow key={r.id}>
                   <TableCell>
                     <div>{syncChannelLabel(r.source_channel)}</div>
                     <div className="text-xs text-muted-foreground">{r.source_order_id}</div>
                   </TableCell>
                   <TableCell className="text-xs">{saleEventLabel(r.event_type)}</TableCell>
-                  <TableCell className="text-xs">{productDisplay(undefined).name}</TableCell>
+                  <TableCell className="text-xs">
+                    <div className="font-medium">{p.name}</div>
+                    {p.code && <div className="text-muted-foreground">{p.code}</div>}
+                  </TableCell>
                   <TableCell>
                     <Badge
                       variant={
@@ -277,7 +290,8 @@ function EventsPanel() {
                     {r.received_at ? new Date(r.received_at).toLocaleString() : "—"}
                   </TableCell>
                 </TableRow>
-              ))
+                );
+              })
             )}
           </TableBody>
         </Table>

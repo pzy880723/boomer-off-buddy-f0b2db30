@@ -198,8 +198,27 @@ export const listSaleEvents = createServerFn({ method: "GET" })
       .limit(data.limit);
     if (data.status !== "all") q = q.eq("status", data.status);
     const { data: rows, error } = await q;
-    if (error) throw new Error(error.message);
-    return { items: rows ?? [] };
+    if (error) throw new Error("销售事件读取失败，请稍后重试");
+    const skuIds = Array.from(new Set((rows ?? []).map((r) => r.sku_id).filter((id): id is string => Boolean(id))));
+    const skuMap = new Map<string, { id: string; name: string; sku_code: string }>();
+    if (skuIds.length) {
+      try {
+        const { data: skus, error: skuError } = await supabase
+          .from("inv_skus")
+          .select("id, name, sku_code")
+          .in("id", skuIds);
+        if (skuError || !skus) throw new Error("SKU metadata unavailable");
+        for (const sku of skus) skuMap.set(sku.id, sku);
+      } catch {
+        throw new Error("商品信息读取失败，请稍后重试");
+      }
+    }
+    return {
+      items: (rows ?? []).map((r) => ({
+        ...r,
+        sku: r.sku_id ? skuMap.get(r.sku_id) ?? null : null,
+      })),
+    };
   });
 
 export const rematchSaleEvent = createServerFn({ method: "POST" })
