@@ -45,3 +45,4 @@
 - notice 操作对原数组先检查未知 key/非法类型，发现即 `skipped:unknown_existing_notice`，不归一删除旧数据；其他目标字段仍不碰 notice_tags。
 - 角色仍只认服务端 user_roles 中 super_admin/hq_operator/store_manager，授权库位和 RLS 不变；按既有 native capability 排除 standard 产品，未引入其他可编辑角色。
 - 首轮新增纯规则红测试 9 pass / 4 fail，后续服务器测试验证目标字段零误写；腾讯独立原生翻筐乐/瑕疵文件未改。
+- 最终相关四文件回归 50/50；自动构建最新记录 build OK。未作登录态真实商品试写，既有账号匹配限制仍在；无迁移、未部署腾讯。
