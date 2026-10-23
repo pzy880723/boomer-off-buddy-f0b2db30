@@ -56,7 +56,11 @@ export function BatchMarksPanel(props: {
   const preview = { apply: 0, unchanged: 0, skipped: 0 };
   if (currentOp) for (const row of selectedRows) preview[planMarkChange(row, currentOp).outcome]++;
   const locked = busy || results !== null;
-  const close = () => { if (busyRef.current) return; fence.current.invalidate(); setOp(null); confirmed.current = null; };
+  const close = () => {
+    if (busyRef.current) return;
+    fence.current.invalidate(); setOp(null); confirmed.current = null;
+    setGenerated({}); setCardErrors({});
+  };
   const open = (kind: OpKind) => {
     if (busyRef.current) return;
     fence.current.invalidate(); confirmed.current = null; setOp(kind); setAdd([]); setRemove([]);
@@ -128,7 +132,7 @@ export function BatchMarksPanel(props: {
       <div className="grid gap-2 sm:grid-cols-4">{cards.map((card) => <Button key={card.k} variant="outline" disabled={busy || selectedRows.length === 0} onClick={() => open(card.k)} className="h-14 justify-start">{card.title}</Button>)}</div>
       <Dialog open={op !== null} onOpenChange={(value) => { if (!value) close(); }}>
         <DialogContent className="max-h-[85vh] overflow-y-auto" onEscapeKeyDown={(e) => { if (busy) e.preventDefault(); }} onPointerDownOutside={(e) => { if (busy) e.preventDefault(); }}>
-          <DialogHeader><DialogTitle>{cards.find((c) => c.k === op)?.title} · {props.locationName} · {selectedRows.length} 件</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{op === "card" ? "商品卡文案预览" : cards.find((c) => c.k === op)?.title} · {props.locationName} · {selectedRows.length} 件</DialogTitle></DialogHeader>
           {op === "fankuang" && <RadioGroup disabled={locked} value={fankuang} onValueChange={(v) => setFankuang(v === "in" ? "in" : "out")}>
             <label className="flex items-center gap-2 text-sm"><RadioGroupItem value="in" />加入翻筐乐</label>
             <label className="flex items-center gap-2 text-sm"><RadioGroupItem value="out" />移出翻筐乐</label>
@@ -144,12 +148,14 @@ export function BatchMarksPanel(props: {
             </label>)}</div></div>)}<p className="text-xs text-muted-foreground">“有瑕疵”新增将跳过，须逐件标注；功能冲突须明确移除另一项。</p></div>}
           {currentOp && !results && <p className="text-xs text-muted-foreground">预览：{op === "stamp" ? stamp === "clear" ? "将清空" : "将替换" : "将修改"} {preview.apply} 件 · 无需修改 {preview.unchanged} 件 · 跳过 {preview.skipped} 件</p>}
           {results && <div className="max-h-60 space-y-2 overflow-y-auto text-xs">{results.map((r) => <div key={r.id} className="flex justify-between gap-3"><span>{nameOf(r.id)}</span><span className={r.result === "failed" ? "text-destructive" : ""}>{RESULT_LABEL[r.result]}{r.reason ? `：${reasonText(r.reason)}` : ""}</span></div>)}</div>}
-          {op === "card" && <div className="space-y-4">{selectedRows.map((r) => { const card = generated[r.id]; return <div key={r.id} className="border-b pb-3 text-sm">
-            <p className="font-medium">{r.name}</p>{card && <><p className="mt-2 font-semibold">{card.product_name} · {card.headline}</p><p>{card.keywords.join(" · ")}</p><p>{card.intro}</p><p>{card.highlights.join("；")}</p><p className="text-xs text-muted-foreground">60×90mm · {card.image.status === "missing" ? "主图待处理 · " : ""}二维码待配置</p></>}
+          {op === "card" && <div className="space-y-4">
+            <p className="text-sm text-muted-foreground" role="note">仅临时文案预览，未生成完整商品卡，未保存到云端或入库；关闭即丢。商品卡制作与 A4 排版打印请使用原生手机现有流程。</p>
+            {selectedRows.map((r) => { const card = generated[r.id]; return <div key={r.id} className="border-b pb-3 text-sm">
+            <p className="font-medium">{r.name}</p>{card && <><p className="mt-2 font-semibold">{card.product_name} · {card.headline}</p><p>{card.keywords.join(" · ")}</p><p>{card.intro}</p><p>{card.highlights.join("；")}</p></>}
             {cardErrors[r.id] && <p role="alert" className="text-destructive">{cardErrors[r.id]}</p>}
           </div>; })}</div>}
           <DialogFooter>
-            {op === "card" ? <Button disabled={busy || Object.keys(generated).length > 0 || Object.keys(cardErrors).length > 0} onClick={generateCards}>{busy ? "生成中…" : "生成商品卡文案"}</Button>
+            {op === "card" ? <Button disabled={busy || Object.keys(generated).length > 0 || Object.keys(cardErrors).length > 0} onClick={generateCards}>{busy ? "文案生成中…" : "生成临时文案"}</Button>
               : !results ? <Button disabled={busy || !currentOp || selectedRows.some((r) => !r.updated_at)} onClick={() => submit()}>{busy ? "处理中…" : "确认修改"}</Button>
               : failed > 0 && <Button variant="outline" disabled={busy} onClick={() => submit(true)}>按原确认版本重试失败 {failed} 件</Button>}
             <Button variant="outline" disabled={busy} onClick={close}>关闭</Button>
