@@ -108,3 +108,40 @@ test("401/403 abort remaining items, never continue after permission failure", a
     assert.equal(writes.length, 0);
   }
 });
+
+test("same-millisecond 123456/123999 preview conflict cannot reach CAS", async () => {
+  const { db, deps, writes } = fixture();
+  const row = db.get("a");
+  assert.ok(row);
+  db.set("a", { ...row, featured_stamp: "limited", updated_at: "2026-10-23T04:07:00.123999Z" });
+  const result = await runBatchMarks(deps, manager, { op: { kind: "stamp", value: "rare" }, location_id: "L1",
+    items: [{ id: "a", expected_updated_at: "2026-10-23T04:07:00.123456Z" }] });
+  assert.equal(result[0].reason, "version_conflict");
+  assert.equal(writes.length, 0);
+  assert.equal(db.get("a")?.featured_stamp, "limited");
+});
+
+test("CAS receives the client-confirmed version, not the equivalent fresh row representation", async () => {
+  const { db, deps } = fixture();
+  const row = db.get("a");
+  assert.ok(row);
+  db.set("a", { ...row, updated_at: "2026-10-23T04:07:00.123456+00:00" });
+  const expected = "2026-10-23T04:07:00.123456Z";
+  const versions: string[] = [];
+  deps.casUpdate = async (_id, version) => { versions.push(version); return null; };
+  const result = await runBatchMarks(deps, manager, { op: { kind: "stamp", value: "rare" }, location_id: "L1",
+    items: [{ id: "a", expected_updated_at: expected }] });
+  assert.deepEqual(versions, [expected]);
+  assert.equal(result[0].reason, "version_conflict");
+});
+
+test("HQ uses skusAtLocations for the explicit current store, never all selected ids", async () => {
+  const { deps, writes } = fixture();
+  const scopes: string[][] = [];
+  deps.skusAtLocations = async (_ids, locations) => { scopes.push(locations); return new Set(["a"]); };
+  const result = await runBatchMarks(deps, { hq: true, managerLocationIds: ["L1", "L2"] },
+    { op: { kind: "stamp", value: "rare" }, location_id: "L1", items: items("a", "b", "other") });
+  assert.deepEqual(scopes, [["L1"]]);
+  assert.deepEqual(result.map((r) => [r.id, r.result]), [["a", "success"], ["b", "skipped"], ["other", "skipped"]]);
+  assert.deepEqual(writes, [["a", { featured_stamp: "rare" }]]);
+});
