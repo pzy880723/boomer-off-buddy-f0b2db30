@@ -81,7 +81,7 @@ const { Route } = await load("src/routes/api/public/handheld/items.smart-create.
     export const smartCreateRequestFingerprint = b => ({ fingerprint: 'fp', incomingPaths: (b.image_storage_paths ?? []).map(p => p.storage_path.startsWith(p.bucket + '/') ? p.storage_path : p.bucket + '/' + p.storage_path), normalizedImageUrl: null });`,
   "@/lib/commerce/product-marks": "export const readProductMarks = s => ({ featured_stamp: s?.featured_stamp ?? null, notice_tags: s?.notice_tags ?? [] });",
   "@/server/product-classification.server": `export const assertActiveLeafCategory = async () => {}; export const attachProductClassificationAuditToSku = async () => {};
-    export const replaceManualProductFacets = async () => {}; export const resolveOrCreateConfirmedIp = async () => ({ id: null, name: null, status: 'none' });
+    export const replaceManualProductFacets = async () => {}; export const resolveOrCreateConfirmedIp = async (i) => { (globalThis.__sc.state.ipCalls ??= []).push(['confirm', i]); if (i.name && !i.confirmed) throw new Error('IP 未确认，请选择已有 IP 或确认新建'); return { id: null, name: null, status: 'empty' }; }; export const resolveIpCandidate = async (n) => { (globalThis.__sc.state.ipCalls ??= []).push(['candidate', n]); return n === '哆啦A梦' ? { id: 'ip1', name: '哆啦A梦', status: 'matched' } : { id: null, name: n, status: 'review' }; };
     export const resolveManualProductFacets = async () => null;`,
   "@/server/handheld-listing-image-jobs.server": "export const enqueueListingImageJobs = async (i) => { globalThis.__sc.state.enqueued.push(i); return { status: 'queued', queued: 1 }; }; export const triggerListingImageWorker = () => {};",
   "@/server/ai-consent.server": "export const dbConsentStore = () => ({ get: async (u, v) => { if (globalThis.__sc.state.consentThrows) throw Error('down'); return globalThis.__sc.state.consent[u + ':' + v] ?? null; } });",
@@ -287,4 +287,38 @@ test("marks are sent to the commit only when the client provided them", async ()
   state.rpcs = [];
   await post({ client_op_id: "c3", category: "toy", name: "屋", price_tier: 159, featured_stamp: null, notice_tags: [] });
   assert.deepEqual(commitArgs().p_marks, { featured_stamp: null, notice_tags: [] });
+});
+
+// ---- ip_candidate（新版未确认 IP 不挡上架） ----
+const ipBase = { client_op_id: "c9", category: "toy", name: "屋", price_tier: 159, ip_confirmed: false };
+test("旧客户端：陌生 ip_name + 未确认仍 422，不建 SKU", async () => {
+  (state as any).ipCalls = [];
+  const res = await post({ ...ipBase, ip_name: "陌生IP" });
+  assert.equal(res.status, 422);
+  assert.equal((await res.json()).code, "ip_confirmation_required");
+  assert.ok(!state.rpcs.some((r) => r.name === "handheld_smart_create_commit_v3"));
+});
+test("ip_candidate 陌生：照常建 SKU，ip_id null，候选原文待核对，不创建全局 IP", async () => {
+  (state as any).ipCalls = [];
+  const res = await post({ ...ipBase, ip_candidate: "陌生IP" });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.data.ip_review_pending, true);
+  const sku = commitArgs().p_sku as any;
+  assert.equal(sku.ip_id, null); assert.equal(sku.ip_candidate_text, "陌生IP");
+  assert.deepEqual((state as any).ipCalls, [["candidate", "陌生IP"]]);
+  assert.ok(!(state as any).updates.some((u: any) => u.table === "inv_brands"));
+});
+test("ip_candidate 命中已启用 IP：关联且不待核对", async () => {
+  const body = await (await post({ ...ipBase, ip_candidate: "哆啦A梦" })).json();
+  assert.equal(body.data.ip_review_pending, false);
+  assert.equal((commitArgs().p_sku as any).ip_id, "ip1");
+});
+test("ip_candidate 与 ip_name 或 ip_confirmed=true 同传 → 400", async () => {
+  assert.equal((await post({ ...ipBase, ip_candidate: "x", ip_name: "y" })).status, 400);
+  assert.equal((await post({ ...ipBase, ip_candidate: "x", ip_confirmed: true })).status, 400);
+});
+test("省略 ip_candidate 时回执不含 ip_review_pending", async () => {
+  const body = await (await post({ ...ipBase })).json();
+  assert.equal("ip_review_pending" in body.data, false);
 });

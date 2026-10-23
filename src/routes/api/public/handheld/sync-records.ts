@@ -46,7 +46,8 @@ export const Route = createFileRoute("/api/public/handheld/sync-records")({
         }
         const shopIds = [...new Set(r.locationIds.map((id) => byId.get(id)?.shop_id).filter((v): v is string => !!v))];
         const ors = [`location_id.in.(${r.locationIds.join(",")})`];
-        if (shopIds.length) ors.push(`shop_id.in.(${shopIds.join(",")})`);
+        // 明确 location_id 优先；只有 location_id 为空的旧记录才按库位对应的有赞门店匹配，避免共享 shop_id 的他店记录漏入。
+        if (shopIds.length) ors.push(`and(location_id.is.null,shop_id.in.(${shopIds.join(",")}))`);
 
         let qb = supabaseAdmin
           .from("youzan_stock_sync_queue")
@@ -71,7 +72,7 @@ export const Route = createFileRoute("/api/public/handheld/sync-records")({
         const locByShop = new Map(locs.filter((l) => l.shop_id).map((l) => [l.shop_id as string, l]));
 
         const items = rows.map((x) => {
-          const loc = (x.location_id && byId.get(x.location_id)) || (x.shop_id ? locByShop.get(x.shop_id) : undefined);
+          const loc = x.location_id ? byId.get(x.location_id) : x.shop_id ? locByShop.get(x.shop_id) : undefined;
           return {
             ...x,
             sku_name: skuName.get(x.sku_id)?.trim() || "未命名商品",

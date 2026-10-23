@@ -16,6 +16,9 @@ import {
   repairMismatch,
   retryQueueItem,
 } from "@/lib/youzan-sync.functions";
+import { nextAction, reasonLabel, statusLabel } from "@/lib/sync-record-labels";
+
+const skuName = (r: { sku?: { name?: string | null } | null }) => r.sku?.name?.trim() || "未命名商品";
 
 // 用在 /youzan 主页 Tabs 里的「数据同步」面板（去掉了 PageHeader）
 export function SyncCenterPanel() {
@@ -136,7 +139,7 @@ export function SyncCenterPanel() {
                 className="flex items-center gap-3 rounded border p-2 text-sm"
               >
                 <Badge variant="destructive">不一致</Badge>
-                <span className="font-mono text-xs">SKU {l.sku_id.slice(0, 8)}…</span>
+                <span className="text-xs font-medium">{skuName(l)}</span>
                 <span>有赞 item {l.yz_item_id}</span>
                 <span className="ml-auto text-muted-foreground">
                   最近推送 {l.last_pushed_stock ?? "—"} / 远端 {l.last_pull_stock ?? "—"}
@@ -168,7 +171,7 @@ export function SyncCenterPanel() {
               >
                 <div className="flex items-center gap-2">
                   <Badge variant="destructive">失败</Badge>
-                  <span className="font-mono text-xs">SKU {l.sku_id.slice(0, 8)}…</span>
+                  <span className="text-xs font-medium">{skuName(l)}</span>
                   <span>item {l.yz_item_id}</span>
                   <Button
                     size="sm"
@@ -204,13 +207,14 @@ export function SyncCenterPanel() {
                       : "outline"
                 }
               >
-                {t.status}
+                {statusLabel(t.status)}
               </Badge>
-              <span className="font-mono">{t.sku_id.slice(0, 8)}…</span>
-              <span>→ {t.target_stock}</span>
-              <span className="text-muted-foreground">{t.reason}</span>
+              <span className="font-medium">{skuName(t)}</span>
+              <span className="text-muted-foreground">{t.shop?.shop_name?.trim() || "未关联有赞门店"}</span>
+              <span>目标库存 {t.target_stock}</span>
+              <span className="text-muted-foreground">{reasonLabel(t.reason)}</span>
               <span className="ml-auto text-muted-foreground">
-                attempts {t.attempts}
+                {nextAction(t.status)} · 已尝试 {t.attempts} 次
               </span>
               {t.status === "failed" && (
                 <Button

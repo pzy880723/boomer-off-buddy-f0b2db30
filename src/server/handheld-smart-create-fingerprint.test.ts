@@ -36,3 +36,10 @@ test("marks are part of the fingerprint; tag order is normalized; changing marks
   assert.notEqual(m.smartCreateFingerprint({ ...base, featured_stamp: "rare" }, "loc"), m.smartCreateFingerprint({ ...base, featured_stamp: null }, "loc"));
   assert.notEqual(m.smartCreateFingerprint({ ...base, notice_tags: [] }, "loc"), m.smartCreateFingerprint({ ...base }, "loc"));
 });
+
+test("ip_candidate omitted keeps legacy fingerprint; present changes it", () => {
+  assert.equal(m.smartCreateFingerprint({ ...base, ip_confirmed: false }, "loc"), legacyFingerprint({ ...base, ip_confirmed: false }, "loc"));
+  assert.equal(m.smartCreateFingerprint({ ...base, ip_candidate: undefined }, "loc"), legacyFingerprint({ ...base }, "loc"));
+  assert.notEqual(m.smartCreateFingerprint({ ...base, ip_candidate: "陌生IP" }, "loc"), m.smartCreateFingerprint({ ...base }, "loc"));
+  assert.notEqual(m.smartCreateFingerprint({ ...base, ip_candidate: "A" }, "loc"), m.smartCreateFingerprint({ ...base, ip_candidate: "B" }, "loc"));
+});

@@ -2560,7 +2560,7 @@ export const listSkuLinks = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     let q = supabase
       .from("sku_youzan_links")
-      .select("*")
+      .select("*, sku:inv_skus(name)")
       .order("updated_at", { ascending: false })
       .limit(data.limit);
     if (data.status !== "all") q = q.eq("status", data.status);
@@ -2583,7 +2583,7 @@ export const listSyncQueue = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     let q = supabase
       .from("youzan_stock_sync_queue")
-      .select("*")
+      .select("*, sku:inv_skus(name), shop:youzan_shops(shop_name)")
       .order("created_at", { ascending: false })
       .limit(data.limit);
     if (data.status !== "all") q = q.eq("status", data.status);
