@@ -19,7 +19,7 @@ test("labels: stamp first then every notice tag in dictionary order", () => {
   assert.deepEqual(productMarkLabels({ featured_stamp: null, notice_tags: [] }), []);
 });
 
-const sku = { status: "active", is_custom_price: true, kind: "single", inventory_policy: "tracked", stock_qty: 1,
+const sku = { status: "active", is_custom_price: true, kind: "single", inventory_policy: "tracked", stock_qty: 1, current_location_qty: 1, is_display: true,
   featured_stamp: null, notice_tags: [] as string[], fankuang_override: null, price_tier: 39 };
 
 test("batch notice: append by default, explicit remove, idempotent", () => {
@@ -46,7 +46,7 @@ test("batch stamp replaces single value; fankuang only for eligible in-stock ite
   assert.equal(planMarkChange({ ...sku, featured_stamp: "rare" }, { kind: "stamp", value: "rare" }).outcome, "unchanged");
   assert.deepEqual(planMarkChange(sku, { kind: "fankuang", value: true }), { outcome: "apply", patch: { fankuang_override: true } });
   assert.equal(planMarkChange({ ...sku, is_custom_price: false }, { kind: "fankuang", value: true }).reason, "fankuang_not_applicable");
-  assert.equal(planMarkChange({ ...sku, stock_qty: 0 }, { kind: "fankuang", value: true }).reason, "sold_out");
+  assert.equal(planMarkChange({ ...sku, current_location_qty: 0 }, { kind: "fankuang", value: true }).reason, "sold_out");
   assert.equal(planMarkChange({ ...sku, status: "archived" }, { kind: "stamp", value: "rare" }).reason, "archived");
 });
 
@@ -80,13 +80,15 @@ test("handheld items keep raw category code and gain dictionary names", () => {
 test("batch fankuang uses current-location stock, never legacy global stock", () => {
   assert.equal(planMarkChange({ ...sku, is_display: true, current_location_qty: 1, stock_qty: 0 }, { kind: "fankuang", value: true }).outcome, "apply");
   assert.equal(planMarkChange({ ...sku, is_display: true, current_location_qty: 0, stock_qty: 99 }, { kind: "fankuang", value: true }).reason, "sold_out");
-  assert.equal(planMarkChange({ ...sku, is_display: true, stock_qty: 99 }, { kind: "fankuang", value: true }).reason, "sold_out");
+  assert.equal(planMarkChange({ ...sku, is_display: true, current_location_qty: undefined, stock_qty: 99 }, { kind: "fankuang", value: true }).reason, "sold_out");
 });
 
 test("batch fankuang rejects hidden and warehouse products", () => {
-  for (const is_display of [false, null, undefined]) {
+  for (const is_display of [false]) {
     assert.equal(planMarkChange({ ...sku, is_display, current_location_qty: 1 }, { kind: "fankuang", value: true }).reason, "not_selling");
   }
+  // Native deriveListingStatus treats legacy null/undefined display as displayed.
+  assert.equal(planMarkChange({ ...sku, is_display: null, current_location_qty: 1 }, { kind: "fankuang", value: true }).outcome, "apply");
 });
 
 test("batch fankuang rejects unlimited, standard and non-single items", () => {

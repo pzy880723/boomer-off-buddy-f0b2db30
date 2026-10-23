@@ -41,10 +41,15 @@ export const batchUpdateProductMarks = createServerFn({ method: "POST" })
     const results = await runBatchMarks({
       async loadSkus(ids) {
         const { data: rows, error } = await sb.from("inv_skus")
-          .select("id, status, is_custom_price, kind, inventory_policy, stock_qty, price_tier, featured_stamp, notice_tags, fankuang_override, updated_at")
+          .select("id, status, is_display, is_custom_price, kind, inventory_policy, stock_qty, price_tier, featured_stamp, notice_tags, fankuang_override, updated_at")
           .in("id", ids);
         if (error) throw new Error("商品读取失败");
-        return (rows ?? []) as never;
+        const { data: stocks, error: stocksError } = await sb.from("inv_stocks").select("sku_id,qty")
+          .in("sku_id", ids).eq("location_id", data.location_id);
+        if (stocksError) throw new Response("门店库存读取失败", { status: 403 });
+        const quantities = new Map((stocks ?? []).map((s) => [s.sku_id, Number(s.qty)]));
+        // No global stock fallback: unallocated legacy HQ cache cannot belong to an arbitrary store.
+        return (rows ?? []).map((row) => ({ ...row, current_location_qty: quantities.get(row.id) ?? 0 })) as never;
       },
       async skusAtLocations(ids, locationIds) {
         const { data: rows, error } = await sb.from("inv_stocks").select("sku_id")
@@ -63,13 +68,15 @@ export const batchUpdateProductMarks = createServerFn({ method: "POST" })
         const hqNow = rolesNow.has("super_admin") || rolesNow.has("hq_operator");
         if (!hqNow && !(rolesNow.has("store_manager") && (livePerms ?? []).some((p) => p.location_id === data.location_id)))
           throw new Response("权限已变化", { status: 403 });
-        const { data: stock, error: stockErr } = await sb.from("inv_stocks").select("sku_id")
+        const { data: stock, error: stockErr } = await sb.from("inv_stocks").select("sku_id,qty")
           .eq("sku_id", id).eq("location_id", data.location_id).maybeSingle();
         if (stockErr || !stock) throw new Response("商品已不属于当前库位", { status: 403 });
-        const { data: row, error } = await sb.from("inv_skus")
+        if (patch.fankuang_override === true && !(Number(stock.qty) > 0)) return null;
+        let update = sb.from("inv_skus")
           .update({ ...patch, updated_at: new Date().toISOString() } as never)
-          .eq("id", id).eq("updated_at", expected).eq("status", "active")
-          .select("updated_at,featured_stamp,notice_tags,fankuang_override").maybeSingle();
+          .eq("id", id).eq("updated_at", expected).eq("status", "active");
+        if (patch.fankuang_override === true) update = update.or("is_display.eq.true,is_display.is.null");
+        const { data: row, error } = await update.select("updated_at,featured_stamp,notice_tags,fankuang_override").maybeSingle();
         if (error?.code === "42501") throw new Response("无权保存", { status: 403 });
         if (error) throw new Error("write_failed");
         if (row && !batchPatchReturned(patch, row))

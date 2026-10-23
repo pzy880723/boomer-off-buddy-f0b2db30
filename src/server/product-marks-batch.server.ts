@@ -40,6 +40,10 @@ export async function runBatchMarks(
     const row = rows.get(id);
     if (!row) { out.push({ id, result: "failed", reason: "not_found" }); continue; }
     if (!allowed.has(id)) { out.push({ id, result: "skipped", reason: "no_permission" }); continue; }
+    // Same active/non-standard capability as native loadItemCapabilities; no new editable product types.
+    if (row.kind !== "bundle" && !row.is_custom_price) {
+      out.push({ id, result: "skipped", reason: "no_permission" }); continue;
+    }
     const plan = planMarkChange(row, input.op);
     if (plan.outcome === "skipped") { out.push({ id, result: "skipped", reason: plan.reason, updated_at: row.updated_at }); continue; }
     if (plan.outcome === "unchanged") { out.push({ id, result: "unchanged", updated_at: row.updated_at }); continue; }

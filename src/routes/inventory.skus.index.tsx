@@ -115,7 +115,7 @@ function SkusPage() {
   const rows = useMemo(() => {
     const stocks = new Map((stockQuery.data ?? []).map((s) => [s.sku_id, s.qty]));
     return ((sourceRows ?? []) as SkuRow[]).filter((r) => !locationId || (activeLocation && !stockQuery.isError && stocks.has(r.id)))
-      .map((r) => locationId ? { ...r, stock_qty: Number(stocks.get(r.id) ?? 0) } : r)
+      .map((r) => locationId ? { ...r, stock_qty: Number(stocks.get(r.id) ?? 0), current_location_qty: Number(stocks.get(r.id) ?? 0) } : r)
       .filter((r) => !onlyFankuang || isInFankuang(r));
   }, [sourceRows, onlyFankuang, locationId, activeLocation, stockQuery.data, stockQuery.isError]);
   const { standardGroups, customRows, bundleRows } = useMemo(() => {
