@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { POS_CORS, authenticatePosUser, posError, posJson } from "@/server/pos-auth.server";
+import {assertNoPosPointsSpend} from '@/lib/pos/hq-read-only';
 
 const SaleBody = z.object({
   shift_id: z.string().uuid(),
@@ -72,6 +73,7 @@ export const Route = createFileRoute("/api/public/pos/sales")({
         if (shiftRow.operator_id !== auth.user.id) {
           return posError("不能使用其他员工的班次", 403, "shift_forbidden");
         }
+        try {assertNoPosPointsSpend(body.points_to_redeem);}catch {return posError('总部积分仅供查看，POS抵扣尚未验收',409,'pos_points_read_only');}
         const { data, error } = await supabaseAdmin.rpc(
           (body.points_to_redeem > 0 ? "pos_complete_sale_v3" : "pos_complete_sale_v2") as never,
           {

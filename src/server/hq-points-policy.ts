@@ -1,4 +1,7 @@
 // Official getter is HQ-scoped for chains, not a branch inheritance proof.
+export function readHqDeductionPolicy(read:(method:string,version:string,params:Record<string,unknown>)=>Promise<unknown>) {
+ return read('youzan.scrm.pointdecution.get','1.0.0',{});
+}
 export async function inspectHqPointsPolicy(input:unknown,hqKdtId:number,organizationVerified:boolean) {
  const invalid={supported:false,scope:'youzan_chain_hq',fingerprint:''};
  if(!organizationVerified||!Number.isSafeInteger(hqKdtId)||hqKdtId<=0||!input||typeof input!=='object')return invalid;

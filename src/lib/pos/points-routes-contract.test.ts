@@ -24,5 +24,5 @@ test("preview totals include points exactly once and missing migration disables 
   assert.match(source,/combinedDiscount > 20/);
   assert.match(source,/moneyFen\(totals.payable_total\) - moneyFen\(points.discount_amount\)/);
   const loader = readFileSync(new URL("./points-policy.server.ts",import.meta.url),"utf8");
-  assert.match(loader,/error\?\.code === "PGRST202"/);
+  assert.match(loader,/loadHqReadOnlyRules/);
 });

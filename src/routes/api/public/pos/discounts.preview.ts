@@ -3,6 +3,7 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { calculatePointsDiscountTotals, calculatePointsRedemption, moneyFen } from "@/lib/pos/points-policy";
 import { loadPointsRules } from "@/lib/pos/points-policy.server";
+import {assertNoPosPointsSpend} from '@/lib/pos/hq-read-only';
 import {
   POS_CORS,
   authenticatePosUser,
@@ -34,6 +35,7 @@ export const Route = createFileRoute("/api/public/pos/discounts/preview")({
         if (!parsed.success) return posError("优惠参数不正确", 400, "invalid_discount");
         const auth = await authenticatePosUser(request, parsed.data.location_id);
         if (!auth.ok) return auth.response;
+        try {assertNoPosPointsSpend(parsed.data.points_to_redeem);}catch {return posError('总部积分仅供查看，POS抵扣尚未验收',409,'pos_points_read_only');}
 
         const skuIds = [...new Set(parsed.data.items.map((item) => item.sku_id))];
         const { data, error } = await supabaseAdmin
