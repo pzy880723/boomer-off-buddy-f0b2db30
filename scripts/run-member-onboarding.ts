@@ -12,7 +12,8 @@ async function main() {
  // New functions are not in the generated types until the migration is applied.
  const rpc=db.rpc.bind(db) as unknown as (name:string,args:Record<string,unknown>)=>Promise<{data:any;error:any}>;
  const read=async(token:string,method:string,version:string)=>{
-   const r=await youzanFetch(`https://open.youzanyun.com/api/${method}/${version}?access_token=${encodeURIComponent(token)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}',signal:AbortSignal.timeout(15000)});
+   const body=method==='youzan.scrm.pointdecution.get'?JSON.stringify({query_request:'{}'}):'{}';
+   const r=await youzanFetch(`https://open.youzanyun.com/api/${method}/${version}?access_token=${encodeURIComponent(token)}`,{method:'POST',headers:{'Content-Type':'application/json'},body,signal:AbortSignal.timeout(15000)});
    const j=await r.json() as {code?:number;success?:boolean;data?:unknown;response?:unknown};
    if(!r.ok || j.success===false || ![0,200].includes(Number(j.code))) throw Error('provider_read_rejected');
    return j.data??j.response;
@@ -43,6 +44,7 @@ async function main() {
      if(!ownership)return {ownership:false,tokensReadBack:true,rulesSupported:false,rulesEquivalent:false};
      // Chain branches are outside the official deduction getter scope. Never query branch zero or write rules.
      const policy=await inspectHqPointsPolicy(await read(tokens[0],'youzan.scrm.pointdecution.get','1.0.0'),Number(j.parent_kdt_id),ownership);
+     if(!policy.supported)return {ownership,tokensReadBack:true,rulesSupported:false,rulesEquivalent:false};
      return {ownership,tokensReadBack:true,rulesSupported:policy.supported,rulesEquivalent:policy.supported,
        hqPolicyScope:policy.scope,hqPolicyFingerprint:policy.fingerprint,hqPolicyKdtId:Number(j.parent_kdt_id),youzanPosInheritanceVerified:false};
    },

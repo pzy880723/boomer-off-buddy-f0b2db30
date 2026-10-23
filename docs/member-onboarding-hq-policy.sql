@@ -23,6 +23,7 @@ BEGIN
  OR (p_status='verified' AND NOT (safe_checks->>'assetsEndToEnd')::boolean)
  OR (p_status='configuration_verified' AND p_reason<>'assets_not_end_to_end_verified')) THEN RAISE EXCEPTION 'evidence_required'; END IF;
  IF p_checks ? 'hqPolicyFingerprint' THEN
+   IF p_status<>'blocked' AND NOT coalesce((p_checks->>'youzanPosInheritanceVerified')::boolean,false) THEN RAISE EXCEPTION 'native_pos_inheritance_unverified'; END IF;
    safe_checks=safe_checks || jsonb_build_object('hqPolicyFingerprint',p_checks->>'hqPolicyFingerprint','hqPolicyScope','youzan_chain_hq','hqPolicyKdtId',(p_checks->>'hqPolicyKdtId')::bigint,'hqConfigurationMirrorVerified',coalesce((p_checks->>'hqConfigurationMirrorVerified')::boolean,false),'youzanPosInheritanceVerified',coalesce((p_checks->>'youzanPosInheritanceVerified')::boolean,false));
  END IF;
  -- Match the shop-trigger lock order; changes fence old receipts.

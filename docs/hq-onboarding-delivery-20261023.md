@@ -1,5 +1,15 @@
 # HQ统一门店接入：交付与阻断边界
 
+## HQ-only合同修订（2026-10-23 05:14 UTC）
+- 已通过网页读取核实官方正文 https://doc.youzanyun.com/v2/doc/cloud/token/HzjQw3M2tiDUOEkXcmKcl2XTncc.md ：getter支持微商城单店、零售单店及D/L/L高级版总部，**不支持连锁分店**。此前分店0不作为关闭或不同规则依据，也不要求分店写同规则。
+- `run-member-onboarding.ts`仅在组织核实后使用HQ token调用抵扣getter，官方请求`query_request:"{}"`；不再调用分店抵扣getter，也不调用setter。分店token刷新回读仍保留用于授权检查。
+- `hq-points-policy.ts`核对返回kdt为HQ、商品范围枚举、列表、默认开关、唯一plugin5比例正数及plugin6状态/门槛/上限枚举。`rulesSupported`依有效HQ schema判定；`rulesEquivalent`仅指分店绑定同一HQ镜像，**不表示原生POS继承已验证**。
+- SHA256策略指纹基于HQ id、scope及规范化语义字段；去重排序商品id，排除更新时间、凭据、PII与资产；不擅自把plugin5的数值换算成UI单位。
+- 增量函数仅扩展队列checks安全投影：`hqPolicyKdtId`、`hqPolicyScope=youzan_chain_hq`、`hqPolicyFingerprint`、`hqConfigurationMirrorVerified`、`youzanPosInheritanceVerified=false`。租约/版本/目标HQ校验沿用；旧worker回执兼容，不重新入队，不修改资产/方案。
+- 有效schema可明确记录“HQ配置镜像已核对”，但当前`posSafe=false`，结果仍`blocked/pos_local_wallet_path`。`youzanPosInheritanceVerified=false`和`assetsEndToEnd=false`明确表示“有赞POS实用未验收”；不得发成功通知。若未来本地安全通过但原生继承未验收，仍blocked，使用既有`assets_not_end_to_end_verified`原因，不新增误导的分店差异。
+- 腾讯先沿用当前部署，窄更新上述脚本/纯校验/worker及新finish函数；共享库本轮应用后不要重复迁移。保持用户Node22编译与REST有界扫描部署方式，不启用旧Bun/PG watcher。
+- 用户报告商品14组448SKU已完成MD00004/channel9999真实回读，最终关联验收进行中；本轮不复查/操作商品，不作独立验收声明。
+
 ## 集成更新（用户腾讯报告，2026-10-23 05:11 UTC；未独立复验）
 - 用户已通过正常浏览器积分目录读取并保存官方正文：https://doc.youzanyun.com/v2/doc/cloud/token/VzWAwKP1NilN2Hkiy4ncOhLVnuc.md 。其`youzan.ump.pointdeduction.update.openstatus/1.0.0`仅开关，需后台先配置规则，支持店铺类型仅“微商城单店”；禁止当作连锁规则同步接口。
 - 腾讯无Bun、DATABASE_URL或PGHOST，原PG NOTIFY watcher当前不可部署。用户保持已交付服务端/SQL不动，计划独立采用Node22编译run-member-onboarding.ts及腾讯systemd有界REST扫描：每5分钟，仅queued/过期lease，四店串行。该方案尚未作为已部署/验收记录，不是Cloud轮询。
@@ -24,7 +34,7 @@
 - `meluo-standard-single-target.ts`：仅指定美罗城，active标准口径+已有HQ链接，14组×32/448精确约束，组织API独立读取channel；dry-run保存摘要计划且不写数据库/有赞。
 
 ## 未完成且保持阻断
-1. 官方连锁积分抵扣继承语义和可写规则合同没有核实。worker可以读取两套现有真实接口，但`rulesSupported/rulesEquivalent=false`；没有规则writer，不猜API。
+1. 本段为前次交付记录：最新HQ-only合同与动态schema门禁见顶部05:14修订；原生POS实用继承仍未验收，没有规则writer。
 2. 既有POS预览/现金积分路径仍依赖本地wallet。本轮不改支付事务；`posSafe=false`，所以不得通知验收成功。
 3. 资产端到端验收不通过本轮人工交易制造；worker总是`assetsEndToEnd=false`，至多未来配置验收，绝不是全部会员资产同步。
 4. 单店渠道追加：existing `spu.update` 的`is_partial=1`精确追加语义/权限尚无本轮官方合同实证。脚本canary/all无环境override，返回`official_partial_channel_append_contract_required`，不会执行writes。未交付可执行的canary/full writer。
