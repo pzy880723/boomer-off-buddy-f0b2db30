@@ -736,6 +736,20 @@
       "when": 1792711787609,
       "tag": "0104_notice_tag_parts_missing",
       "breakpoints": true
+    },
+    {
+      "idx": 105,
+      "version": "7",
+      "when": 1792731823803,
+      "tag": "0105_member_onboarding",
+      "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "7",
+      "when": 1792731928585,
+      "tag": "0106_member_onboarding_explicit_grants",
+      "breakpoints": true
     }
   ]
 }

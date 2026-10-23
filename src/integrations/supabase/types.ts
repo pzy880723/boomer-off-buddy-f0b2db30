@@ -6470,6 +6470,62 @@ export type Database = {
           },
         ]
       }
+      member_onboarding_jobs: {
+        Row: {
+          attempts: number
+          checks: Json
+          claim_token: string | null
+          created_at: string
+          kdt_id: number
+          last_notice_key: string | null
+          lease_until: string | null
+          parent_kdt_id: number | null
+          reason: string | null
+          revision: number
+          shop_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          checks?: Json
+          claim_token?: string | null
+          created_at?: string
+          kdt_id: number
+          last_notice_key?: string | null
+          lease_until?: string | null
+          parent_kdt_id?: number | null
+          reason?: string | null
+          revision?: number
+          shop_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          checks?: Json
+          claim_token?: string | null
+          created_at?: string
+          kdt_id?: number
+          last_notice_key?: string | null
+          lease_until?: string | null
+          parent_kdt_id?: number | null
+          reason?: string | null
+          revision?: number
+          shop_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_onboarding_jobs_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: true
+            referencedRelation: "youzan_shops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meruki_accounts: {
         Row: {
           cookie_expires_at: string | null
@@ -12649,6 +12705,22 @@ export type Database = {
           p_user_id: string
         }
         Returns: Json
+      }
+      member_onboarding_claim: { Args: { p_shop_id: string }; Returns: Json }
+      member_onboarding_enqueue: {
+        Args: { p_force?: boolean; p_shop_id: string }
+        Returns: undefined
+      }
+      member_onboarding_finish: {
+        Args: {
+          p_checks: Json
+          p_reason: string
+          p_revision: number
+          p_shop_id: string
+          p_status: string
+          p_token: string
+        }
+        Returns: boolean
       }
       pos_complete_return: {
         Args: {
