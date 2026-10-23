@@ -3,6 +3,7 @@ import { runMemberOnboarding } from '../src/server/member-onboarding-worker.serv
 import { resolveTrustedYouzanMember } from '../src/server/youzan-points-projection-production.server';
 import { youzanFetch } from '../src/lib/youzan-http';
 import { inspectHqPointsPolicy } from '../src/server/hq-points-policy';
+import { loadMemberOrganizations, hasVerifiedBranch } from '../src/server/member-organizations';
 
 async function main() {
  const shopId=process.argv[2];
@@ -11,8 +12,8 @@ async function main() {
  const {supabaseAdmin:db}=await import('../src/integrations/supabase/client.server');
  // New functions are not in the generated types until the migration is applied.
  const rpc=db.rpc.bind(db) as unknown as (name:string,args:Record<string,unknown>)=>Promise<{data:any;error:any}>;
- const read=async(token:string,method:string,version:string)=>{
-   const body=method==='youzan.scrm.pointdecution.get'?JSON.stringify({query_request:'{}'}):'{}';
+ const read=async(token:string,method:string,version:string,params:Record<string,unknown>={})=>{
+   const body=JSON.stringify(params);
    const r=await youzanFetch(`https://open.youzanyun.com/api/${method}/${version}?access_token=${encodeURIComponent(token)}`,{method:'POST',headers:{'Content-Type':'application/json'},body,signal:AbortSignal.timeout(15000)});
    const j=await r.json() as {code?:number;success?:boolean;data?:unknown;response?:unknown};
    if(!r.ok || j.success===false || ![0,200].includes(Number(j.code))) throw Error('provider_read_rejected');
@@ -36,14 +37,11 @@ async function main() {
        if(saved.error || saved.data?.access_token!==fresh.access_token)throw Error('token_readback_failed');
        tokens.push(fresh.access_token);
      }
-     let ownership=false;
-     const organizations=await read(tokens[0],'youzan.shop.chain.descendent.organization.list','1.0.1');
-     const nodes:Array<Record<string,unknown>>=[];
-     const walk=(v:unknown)=>{if(Array.isArray(v)){v.forEach(walk);}else if(v&&typeof v==='object'){const n=v as Record<string,unknown>;if(Number(n.kdt_id)===Number(j.kdt_id))nodes.push(n);Object.values(n).forEach(walk);}};walk(organizations);
-     ownership=nodes.length===1 && Number(nodes[0].parent_kdt_id)===Number(j.parent_kdt_id);
+     const organizations=await loadMemberOrganizations(params=>read(tokens[0],'youzan.shop.chain.descendent.organization.list','1.0.1',params));
+     const ownership=hasVerifiedBranch(organizations,Number(j.kdt_id),Number(j.parent_kdt_id));
      if(!ownership)return {ownership:false,tokensReadBack:true,rulesSupported:false,rulesEquivalent:false};
      // Chain branches are outside the official deduction getter scope. Never query branch zero or write rules.
-     const policy=await inspectHqPointsPolicy(await read(tokens[0],'youzan.scrm.pointdecution.get','1.0.0'),Number(j.parent_kdt_id),ownership);
+     const policy=await inspectHqPointsPolicy(await read(tokens[0],'youzan.scrm.pointdecution.get','1.0.0',{query_request:'{}'}),Number(j.parent_kdt_id),ownership);
      if(!policy.supported)return {ownership,tokensReadBack:true,rulesSupported:false,rulesEquivalent:false};
      return {ownership,tokensReadBack:true,rulesSupported:policy.supported,rulesEquivalent:policy.supported,
        hqPolicyScope:policy.scope,hqPolicyFingerprint:policy.fingerprint,hqPolicyKdtId:Number(j.parent_kdt_id),youzanPosInheritanceVerified:false};
