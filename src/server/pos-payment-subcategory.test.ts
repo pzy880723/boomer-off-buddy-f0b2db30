@@ -64,6 +64,12 @@ const supabaseAdmin = {
   },
   rpc: async (name: string, args: any) => {
     if (name === "sales_sku_available_qty") return { data: 100, error: null };
+    if (name === "pos_payment_op_recover") return { data: { state: "none" }, error: null };
+    if (name === "pos_payment_attempt_reserve") {
+      (tables.pos_payment_attempts ??= []).push({ id: id(10), status: "pending", currency: "CNY", order_id: null,
+        error_code: null, ...structuredClone(args.p) });
+      return { data: { state: "created", id: id(10) }, error: null };
+    }
     assert.equal(name, "pos_complete_sale_v2");
     saleCalls.push(structuredClone(args));
     return { data: { order_id: id(11) }, error: null };
