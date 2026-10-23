@@ -9,7 +9,7 @@
  *
  * 改字段：只动这一个文件。CI 的 sdk:check 会检测漂移。
  */
-import { FeaturedStampSchema, NOTICE_TAGS } from "../commerce/product-marks";
+import { FeaturedStampSchema, NOTICE_TAGS, NoticeTagsSchema } from "../commerce/product-marks";
 import * as z from "zod";
 import { ItemPriceYuan } from "./item-edit-schemas";
 /// <reference types="zod-openapi" />
@@ -903,6 +903,12 @@ export const SmartCreateReq = z
         description:
           "false：只保存原图与商品，不排队 AI 修图；true/缺省：仍以服务端 /privacy/ai-consent 当前政策版本授权为准。不参与幂等指纹。",
       }),
+    featured_stamp: FeaturedStampSchema.optional().meta({
+      description: "特色印章（单选，null=不设）；省略时与旧版完全一致（不参与幂等指纹）。仅新建商品时同事务保存",
+    }),
+    notice_tags: NoticeTagsSchema.optional().meta({
+      description: "提示标签（多选，功能不确定/不可用互斥，含 parts_missing）；省略时与旧版一致。按字典顺序规范化后参与指纹",
+    }),
     client_op_id: ClientOpId.optional(),
   })
   .meta({ id: "SmartCreateReq" });
