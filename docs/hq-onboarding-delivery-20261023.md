@@ -14,6 +14,8 @@
 3. 资产端到端验收不通过本轮人工交易制造；worker总是`assetsEndToEnd=false`，至多未来配置验收，绝不是全部会员资产同步。
 4. 单店渠道追加：existing `spu.update` 的`is_partial=1`精确追加语义/权限尚无本轮官方合同实证。脚本canary/all无环境override，返回`official_partial_channel_append_contract_required`，不会执行writes。未交付可执行的canary/full writer。
 5. 腾讯服务未部署；本轮没有真实有赞调用、token刷新、会员worker或铺货执行。
+6. 用户补充腾讯浏览器美罗城积分编辑提示“当前角色没有操作权限”：不得以silent token可用或更换API绕过此限制；仅正常总部有权限入口可执行，否则blocked等待正常权限配置。当前没有规则writer，阻断保持。
+7. 渠道请求构造必须提供已确认官方语义与完整现有渠道证据，保留全部旧渠道并union独立核实的新渠道；完整读回必须含旧渠道与新渠道，否则blocked。不能把215098500直接当渠道号。本轮只修防误用辅助函数，不解除canary/all写门禁。
 
 ## 官方与实测证据区分
 - silent token：现有源码引用 https://doc.youzanyun.com/detail/API/0/906 ，真实payload使用authorize_type=silent/grant_id/refresh=false。沿用现有函数，不新增版本猜测。

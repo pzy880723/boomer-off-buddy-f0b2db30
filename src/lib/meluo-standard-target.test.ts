@@ -1,12 +1,13 @@
 import {it} from 'node:test';
 import {expect} from './onboarding-test-expect';
-import {assertMeluoTarget,buildMeluoChannelAppend,validateMeluoCatalog,MELUO_SHOP_ID} from './meluo-standard-target';
+import {assertMeluoTarget,buildMeluoChannelAppend,assertMeluoChannelReadback,validateMeluoCatalog,MELUO_SHOP_ID} from './meluo-standard-target';
 const s={id:MELUO_SHOP_ID,kdt_id:215098500,parent_kdt_id:153242272,role:'branch',status:'active',warehouse_code:'MD00004'};
 it('only exact verified Meluo target accepted',()=>{expect(()=>assertMeluoTarget(s)).not.toThrow();expect(()=>assertMeluoTarget({...s,kdt_id:212291308})).toThrow('target_mismatch');});
 it('warehouse mismatch blocks',()=>expect(()=>assertMeluoTarget({...s,warehouse_code:null})).toThrow());
 it('channel plan preserves every current channel without shared fields',()=>expect(buildMeluoChannelAppend(17,99,{officialSemanticsVerified:true,currentChannelsComplete:true,currentChannelIds:[10,20,10]})).toEqual({spu_id:17,sell_channel_setting_request:{is_partial:1,sell_channel_ids:[10,20,99]}}));
 it('channel plan blocks without official semantics or full current read',()=>{expect(()=>buildMeluoChannelAppend(17,99)).toThrow();expect(()=>buildMeluoChannelAppend(17,99,{officialSemanticsVerified:false,currentChannelsComplete:true,currentChannelIds:[10]})).toThrow();expect(()=>buildMeluoChannelAppend(17,99,{officialSemanticsVerified:true,currentChannelsComplete:false,currentChannelIds:[10]})).toThrow();});
 it('missing verified channel cannot be guessed from kdt',()=>expect(()=>buildMeluoChannelAppend(17,0)).toThrow());
+it('readback must retain old channels and new target with a complete response',()=>{expect(()=>assertMeluoChannelReadback([10,20,99],[10,20,99],true)).not.toThrow();expect(()=>assertMeluoChannelReadback([10,20,99],[99],true)).toThrow();expect(()=>assertMeluoChannelReadback([10,20,99],[10,20],true)).toThrow();expect(()=>assertMeluoChannelReadback([10,20,99],[10,20,99],false)).toThrow();});
 const groups=()=>Array.from({length:14},(_,g)=>({spuIds:Array(32).fill(g+1),skus:Array.from({length:32},(_,i)=>({id:`${g}:${i}`,barcode:`${g}:${i}`}))}));
 it('exact 14 groups 448 skus accepted',()=>expect(()=>validateMeluoCatalog(groups())).not.toThrow());
 it('unlinked or extra groups blocked',()=>{expect(()=>validateMeluoCatalog(groups().slice(1))).toThrow();const g=groups();g[0].spuIds[0]=99;expect(()=>validateMeluoCatalog(g)).toThrow();});
