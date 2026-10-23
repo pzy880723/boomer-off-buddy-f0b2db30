@@ -1,5 +1,13 @@
 # HQ统一门店接入：交付与阻断边界
 
+## 最新腾讯实证与范围收敛（2026-10-23 05:08 UTC）
+- 用户腾讯逐个`itemdetail.get`核实美罗城已有14组，display=1，每组32价SKU，库存全0，ERP关联0；其他三店镜像包含真实扣减，不得重置。
+- 旧渠道追加路线已不适用于本次任务：不再开发或执行HQ update/create/channel.publish或共享SPU修改；下文商品dry-run/渠道writer步骤仅为历史交付记录，**不得按其继续执行**。
+- 商品由用户腾讯端复用目标已有goods，核对448条码/价格后仅补美罗城链接与mirror9999，单组canary后14组；本项目当前只负责会员自动接入/验收，不并发商品同步。
+- 用户UI实证HQ与美罗城等级相同：白银无门槛、钻石消费300、黄金500。此为有赞等级，不是ERP free/explorer付费计划；不覆盖计划、权益或资产。
+- HQ UI积分100分=1元、all/default=true；branch UI无换算比例、无编辑权限。已确认UI读数不等于官方继承语义已验收；规则writer仍不存在，不换API绕权限。
+- 本次仅合并用户实证，不重新跑全库审计或调用有赞；尚无新增资产写入证据，不能宣称全量会员覆盖/资产端到端通过。
+
 ## 已实现
 - `0105_member_onboarding.sql`：独立service-role任务表；新active分店/身份或总部变更入队，HQ身份/状态变化重验；四个存量分店一次bootstrap。凭据刷新不触发任务。
 - `0106_member_onboarding_explicit_grants.sql`：撤销环境默认继承的anon/authenticated表权限；无公共RLS策略，RPC仅service_role。
