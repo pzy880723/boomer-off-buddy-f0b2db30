@@ -1,6 +1,8 @@
 # 待办+通知修复（backend only，腾讯用户自验）
 
 ## 总部统一门店接入（2026-10-23）
+- [x] 10:14 员工分类字典 GET /api/public/handheld/product-taxonomy（设备+员工会话，ERP 全量启用末级分类+父中文名+启用 facets，不按库存过滤，DB 错 503）；3 路由测试通过
+- [x] 10:14 只读审计：欧洲瓷器“进出存单据”、美罗城“尚未发布到目标门店”、“门店会员接入遇到阻碍”提醒来源；分类权限/IP 确认建议（原生改动由 Codex）
 - [x] 07:09 拍照上架：原子 cancel/recover（同 commit_v2 锁、tombstone 拒绝迟到旧 op）、featured_stamp/notice_tags 同事务保存并入指纹（缺省保持旧指纹）、简介包络解析与明确错误码；红测先行，不动抠图/修图
   - 07:51 Codex 独立隔离验收（腾讯临时 PG16 cluster，线上 base/v2 全文 hash 一致）：8 项真并发通过；本项目 PGlite 测试为单连接顺序模拟，非真并发
 - [ ] 07:29 异步扫码：持久 client_op_id 绑定 actor/门店/班次/完整销售指纹 + recover/永久取消（0111 已应用，5 SQL+34 路由测试）；积分接入异步及 close 补分仍待做
