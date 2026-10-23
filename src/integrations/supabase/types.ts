@@ -6481,6 +6481,7 @@ export type Database = {
           lease_until: string | null
           parent_kdt_id: number | null
           reason: string | null
+          retry_after: string | null
           revision: number
           shop_id: string
           status: string
@@ -6496,6 +6497,7 @@ export type Database = {
           lease_until?: string | null
           parent_kdt_id?: number | null
           reason?: string | null
+          retry_after?: string | null
           revision?: number
           shop_id: string
           status?: string
@@ -6511,6 +6513,7 @@ export type Database = {
           lease_until?: string | null
           parent_kdt_id?: number | null
           reason?: string | null
+          retry_after?: string | null
           revision?: number
           shop_id?: string
           status?: string
