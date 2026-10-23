@@ -750,6 +750,13 @@
       "when": 1792731928585,
       "tag": "0106_member_onboarding_explicit_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "7",
+      "when": 1792732632715,
+      "tag": "0107_member_onboarding_hq_policy_checks",
+      "breakpoints": true
     }
   ]
 }
