@@ -2,6 +2,7 @@
 import { runMemberOnboarding } from '../src/server/member-onboarding-worker.server';
 import { resolveTrustedYouzanMember } from '../src/server/youzan-points-projection-production.server';
 import { youzanFetch } from '../src/lib/youzan-http';
+import { inspectHqPointsPolicy } from '../src/server/hq-points-policy';
 
 async function main() {
  const shopId=process.argv[2];
@@ -39,13 +40,11 @@ async function main() {
      const nodes:Array<Record<string,unknown>>=[];
      const walk=(v:unknown)=>{if(Array.isArray(v)){v.forEach(walk);}else if(v&&typeof v==='object'){const n=v as Record<string,unknown>;if(Number(n.kdt_id)===Number(j.kdt_id))nodes.push(n);Object.values(n).forEach(walk);}};walk(organizations);
      ownership=nodes.length===1 && Number(nodes[0].parent_kdt_id)===Number(j.parent_kdt_id);
-     for(const token of tokens){
-       await read(token,'youzan.scrm.customer.points.rule.list','1.0.0');
-       await read(token,'youzan.scrm.pointdecution.get','1.0.0');
-     }
-     // No documented chain-inheritance contract / rule write API has been verified.
-     // Do not compare opaque JSON or map branch zero to HQ enabled. Read success is not semantic success.
-     return {ownership,tokensReadBack:true,rulesSupported:false,rulesEquivalent:false};
+     if(!ownership)return {ownership:false,tokensReadBack:true,rulesSupported:false,rulesEquivalent:false};
+     // Chain branches are outside the official deduction getter scope. Never query branch zero or write rules.
+     const policy=await inspectHqPointsPolicy(await read(tokens[0],'youzan.scrm.pointdecution.get','1.0.0'),Number(j.parent_kdt_id),ownership);
+     return {ownership,tokensReadBack:true,rulesSupported:policy.supported,rulesEquivalent:policy.supported,
+       hqPolicyScope:policy.scope,hqPolicyFingerprint:policy.fingerprint,hqPolicyKdtId:Number(j.parent_kdt_id),youzanPosInheritanceVerified:false};
    },
    async mappings(j){
      const counts={eligible:0,mapped:0,missing:0,conflict:0,unavailable:0};
