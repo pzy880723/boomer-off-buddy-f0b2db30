@@ -764,6 +764,13 @@
       "when": 1792733706308,
       "tag": "0108_member_onboarding_acceptance_retry",
       "breakpoints": true
+    },
+    {
+      "idx": 109,
+      "version": "7",
+      "when": 1792735799720,
+      "tag": "0109_pos_hq_points_redemption",
+      "breakpoints": true
     }
   ]
 }

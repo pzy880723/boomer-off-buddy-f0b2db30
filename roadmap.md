@@ -1,6 +1,7 @@
 # 待办+通知修复（backend only，腾讯用户自验）
 
 ## 总部统一门店接入（2026-10-23）
+- [ ] 05:57 四店 POS 总部积分抵扣/取消补回/退款返分：claim 不重发已发出/unknown、只读对账 RPC、冻结意图+v4+return_v2+取消补分，现金+异步扫码；开关默认off，仅隔离测试，不调远端写
 - [x] 05:42 按腾讯回执归档Node22 dispatcher/test/service/timer，保留Bun源码；四店POS阻塞、主APP只读guard未部署边界记录，不调线上
 - [x] 05:30 三项漏洞：finish无条件HQ/native证据、15分钟且最多3次瞬态重试、客户及投影有界keyset；红绿48逻辑+21 SQL隔离、0108已应用回读，四店POS阻塞保留；腾讯sidecar待用户窄更新
 - [x] 05:24 HQ getter空body；POS总部只读余额/配置状态及quote/cash正积分显式拦截；87逻辑+2入口隔离+14 SQL隔离通过，保留posSafe/资产验收阻碍，无迁移或线上执行
