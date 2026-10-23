@@ -35,6 +35,7 @@ import {
   assertActiveLeafCategory,
   attachProductClassificationAuditToSku,
   replaceManualProductFacets,
+  resolveIpCandidate,
   resolveOrCreateConfirmedIp,
   resolveManualProductFacets,
 } from "@/server/product-classification.server";
@@ -123,12 +124,18 @@ async function handleSmartCreate(request: Request, timing: ReturnType<typeof cre
         const manualFacets = facetsR.value;
         const confirmedBrand = brandR.value;
         // IP 可能新建记录，保持在只读校验全部通过之后串行执行。
-        let resolvedIp: Awaited<ReturnType<typeof resolveOrCreateConfirmedIp>>;
+        let resolvedIp: { id: string | null; name: string | null; status: "empty" | "matched" | "review" };
+        const ipCandidate = body.ip_candidate;
+        if (ipCandidate !== undefined && (body.ip_confirmed || (body.ip_name ?? "").trim())) {
+          return err("ip_candidate 只能在未填 ip_name 且 ip_confirmed=false 时使用", 400, { code: "validation_error" });
+        }
         try {
-          resolvedIp = await resolveOrCreateConfirmedIp({
-            name: body.ip_name,
-            confirmed: body.ip_confirmed,
-          });
+          resolvedIp = ipCandidate !== undefined
+            ? await resolveIpCandidate(ipCandidate)
+            : await resolveOrCreateConfirmedIp({
+                name: body.ip_name,
+                confirmed: body.ip_confirmed,
+              });
         } catch (e) {
           return err((e as Error).message, existingOp ? 500 : 422, { code: "ip_confirmation_required" });
         }
@@ -376,6 +383,7 @@ async function handleSmartCreate(request: Request, timing: ReturnType<typeof cre
           storefront_listing_id: storefrontListingId,
           storefront_status: storefrontStatus,
           ...readProductMarks(finalSku as { featured_stamp?: unknown; notice_tags?: unknown } | null),
+          ...(ipCandidate !== undefined ? { ip_review_pending: resolvedIp.status === "review" } : {}),
         };
         const successBody = { ok: true, data: responseBody };
         if (committed.op_id) {

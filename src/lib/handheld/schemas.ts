@@ -909,6 +909,9 @@ export const SmartCreateReq = z
     notice_tags: NoticeTagsSchema.optional().meta({
       description: "提示标签（多选，功能不确定/不可用互斥，含 parts_missing）；省略时与旧版一致。按字典顺序规范化后参与指纹",
     }),
+    ip_candidate: z.string().trim().min(1).max(120).optional().meta({
+      description: "新版 APP：未确认的识别 IP 候选。不挡上架、不创建全局 IP；仅在 ip_name 为空且 ip_confirmed=false 时可传，原文存为待核对。省略时与旧版完全一致",
+    }),
     client_op_id: ClientOpId.optional(),
   })
   .meta({ id: "SmartCreateReq" });

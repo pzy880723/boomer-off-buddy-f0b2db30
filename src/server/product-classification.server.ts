@@ -110,6 +110,19 @@ export async function loadActiveProductIps(): Promise<BrandCandidate[]> {
   return (data ?? []) as unknown as BrandCandidate[];
 }
 
+/** 新版未确认 IP 候选：仅匹配已启用 IP；不匹配则返回待核对，绝不创建 IP 记录。 */
+export async function resolveIpCandidate(
+  candidate: string,
+): Promise<{ id: string | null; name: string; status: "matched" | "review" }> {
+  const name = candidate.trim();
+  const normalized = normalizeLookupText(name);
+  const ips = await loadActiveProductIps();
+  const exact = ips.find((ip) =>
+    [ip.name, ip.name_original, ...ip.aliases].some((c) => normalizeLookupText(c) === normalized),
+  );
+  return exact ? { id: exact.id, name: exact.name, status: "matched" } : { id: null, name, status: "review" };
+}
+
 export async function resolveOrCreateConfirmedIp(input: {
   name?: string | null;
   confirmed: boolean;
