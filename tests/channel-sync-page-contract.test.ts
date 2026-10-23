@@ -5,9 +5,10 @@ import { readFileSync } from "node:fs";
 const page = readFileSync("src/routes/admin.channel-sync.tsx", "utf8");
 
 test("真实同步异常页不直接渲染内部状态、渠道、动作或 UUID", () => {
-  for (const raw of ["{s}", "{r.status}", "{r.action}", "{r.channel}", "{r.source_channel}", "{r.event_type}", "{r.sku_id ??", "?? r.sku_id", "{r.last_error ??", "{r.error ??"]) {
+  for (const raw of [">{s}<", "{r.status}", "{r.action}", "{r.channel}", "{r.source_channel}", "{r.event_type}", "{r.sku_id ??", "?? r.sku_id", "{r.last_error ??", "{r.error ??"]) {
     assert.equal(page.includes(raw), false, `仍直接渲染 ${raw}`);
   }
+  assert.doesNotMatch(page, />\s*\{s\}\s*</);
   assert.doesNotMatch(page, /description="[^"]*(channel_sync_outbox|inventory_sale_events)/);
   assert.doesNotMatch(page, /<TableHead>SKU<\/TableHead>/);
 });

@@ -77,15 +77,16 @@ const SYNC_ACTION: Record<string, string> = {
 };
 const SYNC_CHANNEL: Record<string, string> = {
   youzan: "有赞", youzan_hq: "有赞总部", youzan_offline: "有赞门店", youzan_online: "有赞网店",
+  youzan_branch_offline: "有赞门店",
   pos: "门店收银", commerce: "自营商城", storefront: "自营商城", handheld: "手机端",
 };
-const SALE_EVENT: Record<string, string> = { paid: "已支付", refunded: "已退款", refund: "退款", cancelled: "已取消" };
+const SALE_EVENT: Record<string, string> = { sale: "售出", paid: "已支付", refunded: "已退款", refund: "退款", cancelled: "已取消" };
 
-const pick = (dict: Record<string, string>, v: string | null | undefined) => (v && dict[v]) || UNKNOWN;
-export const syncStatusLabel = (v: string | null | undefined) => (v ? pick(SYNC_STATUS, v) : UNKNOWN);
-export const syncActionLabel = (v: string | null | undefined) => (v ? `${pick(SYNC_ACTION, v)}` : UNKNOWN);
-export const syncChannelLabel = (v: string | null | undefined) => (v ? pick(SYNC_CHANNEL, v) : UNKNOWN);
-export const saleEventLabel = (v: string | null | undefined) => (v ? pick(SALE_EVENT, v) : UNKNOWN);
+const pick = (dict: Record<string, string>, v: string | null | undefined) => (v && Object.hasOwn(dict, v) ? dict[v] : UNKNOWN);
+export const syncStatusLabel = (v: string | null | undefined) => pick(SYNC_STATUS, v);
+export const syncActionLabel = (v: string | null | undefined) => pick(SYNC_ACTION, v);
+export const syncChannelLabel = (v: string | null | undefined) => pick(SYNC_CHANNEL, v);
+export const saleEventLabel = (v: string | null | undefined) => pick(SALE_EVENT, v);
 
 /** 商品主文案只用名称；编码仅作辅助；绝不回退 UUID。 */
 export function productDisplay(sku: { name?: string | null; sku_code?: string | null } | null | undefined) {

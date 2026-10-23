@@ -41,7 +41,14 @@ import {
 
 export const Route = createFileRoute("/admin/channel-sync")({
   head: () => ({
-    meta: [{ title: "渠道同步异常中心 · ERP" }],
+    meta: [
+      { title: "渠道同步异常中心 · BOOMER OFF ERP" },
+      { name: "description", content: "BOOMER OFF ERP 商品同步任务与销售异常记录。" },
+      { property: "og:title", content: "渠道同步异常中心 · BOOMER OFF ERP" },
+      { property: "og:description", content: "查看商品同步任务、中文状态及销售异常记录。" },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
   }),
   component: Page,
 });
@@ -86,7 +93,7 @@ function OutboxPanel() {
       toast.success("已重新入队");
       qc.invalidateQueries({ queryKey: ["outbox"] });
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+    onError: (e) => toast.error(errorLabel(e instanceof Error ? e.message : String(e)) ?? "操作失败，请总部核对技术记录"),
   });
   const dismiss = useMutation({
     mutationFn: (id: string) => dismissFn({ data: { id } }),
@@ -94,7 +101,7 @@ function OutboxPanel() {
       toast.success("已丢弃");
       qc.invalidateQueries({ queryKey: ["outbox"] });
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : String(e)),
+    onError: (e) => toast.error(errorLabel(e instanceof Error ? e.message : String(e)) ?? "操作失败，请总部核对技术记录"),
   });
   return (
     <Card className="mt-4">
@@ -251,7 +258,7 @@ function EventsPanel() {
                     <div className="text-xs text-muted-foreground">{r.source_order_id}</div>
                   </TableCell>
                   <TableCell className="text-xs">{saleEventLabel(r.event_type)}</TableCell>
-                  <TableCell className="text-xs">{r.sku_id ? "已关联商品（名称待核对）" : "未匹配商品"}</TableCell>
+                  <TableCell className="text-xs">{productDisplay(undefined).name}</TableCell>
                   <TableCell>
                     <Badge
                       variant={
