@@ -771,6 +771,13 @@
       "when": 1792735799720,
       "tag": "0109_pos_hq_points_redemption",
       "breakpoints": true
+    },
+    {
+      "idx": 110,
+      "version": "7",
+      "when": 1792739604019,
+      "tag": "0110_smart_create_cancel_marks",
+      "breakpoints": true
     }
   ]
 }

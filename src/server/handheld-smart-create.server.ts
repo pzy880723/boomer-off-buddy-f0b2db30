@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { normalizeNoticeTags, type NoticeTag } from "@/lib/commerce/product-marks";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { findSanrioBrandCandidate } from "@/lib/product-classification";
 import { matchBrandCandidate, normalizeLookupText } from "@/lib/product-taxonomy";
@@ -106,7 +107,8 @@ export async function persistSmartCreateBrand(input: {
 export type SmartCreateCommitResult = {
   op_id: string | null;
   replayed: boolean;
-  op_status: "committed" | "completed";
+  op_status: "committed" | "completed" | "cancelled";
+  marks_applied?: boolean;
   sku_id: string;
   sku_code: string | null;
   epc: string;
@@ -131,7 +133,71 @@ function canonical(value: unknown): unknown {
 /** 载荷指纹：排除 client_op_id 与 ai_processing_allowed（AI 开关不改变商品业务身份），键排序，含目标库位；签名 URL 需先规范化再传入。 */
 export function smartCreateFingerprint(body: Record<string, unknown>, locationId: string): string {
   const { client_op_id: _ignored, ai_processing_allowed: _aiFlag, ...rest } = body;
+  // Omitted marks stay absent (legacy fingerprints unchanged); present tags are order-normalized.
+  if (Array.isArray(rest.notice_tags)) rest.notice_tags = normalizeNoticeTags(rest.notice_tags as NoticeTag[]);
   return createHash("sha256")
     .update(JSON.stringify(canonical({ ...rest, location_id: locationId })))
     .digest("hex");
+}
+
+
+// Shared by smart-create and smart-create/cancel so both compute the identical fingerprint.
+const SKU_IMAGE_BUCKETS = new Set(["sku-raw", "sku-listing"]);
+
+export function normalizeBucketPath(
+  bucket: "sku-raw" | "sku-listing",
+  storagePath: string,
+): string | null {
+  const clean = storagePath.trim().replace(/^\/+/, "");
+  if (!clean) return null;
+  if (clean.startsWith(`${bucket}/`)) return clean;
+  return `${bucket}/${clean}`;
+}
+
+function parseStorageObjectUrl(rawUrl: string): string | null {
+  try {
+    const url = new URL(rawUrl);
+    const markers = [
+      "/storage/v1/object/sign/",
+      "/storage/v1/object/public/",
+      "/storage/v1/object/authenticated/",
+      "/storage/v1/object/upload/sign/",
+    ];
+    for (const marker of markers) {
+      const idx = url.pathname.indexOf(marker);
+      if (idx < 0) continue;
+      const rest = url.pathname.slice(idx + marker.length).replace(/^\/+/, "");
+      const parts = rest.split("/").map((part) => decodeURIComponent(part));
+      const bucket = parts.shift();
+      const path = parts.join("/");
+      if (bucket && SKU_IMAGE_BUCKETS.has(bucket) && path) return `${bucket}/${path}`;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+export function normalizeIncomingImageUrl(imageUrl?: string | null): string | null {
+  const raw = imageUrl?.trim();
+  if (!raw) return null;
+  const storagePath = parseStorageObjectUrl(raw);
+  if (storagePath) return storagePath;
+  // 只有稳定外链才直接存 image_url；signed URL 会过期，不能落库。
+  if (/^https?:\/\//i.test(raw) && !raw.includes("token=")) return raw;
+  return null;
+}
+
+
+export function smartCreateRequestFingerprint(
+  body: Record<string, unknown> & { image_url?: string | null }, locationId: string,
+): { fingerprint: string; incomingPaths: string[]; normalizedImageUrl: string | null } {
+  const incomingPaths: string[] = [];
+  for (const p of (body.image_storage_paths as Array<{ bucket: "sku-raw" | "sku-listing"; storage_path: string }> | undefined) ?? []) {
+    const normalized = normalizeBucketPath(p.bucket, p.storage_path);
+    if (normalized) incomingPaths.push(normalized);
+  }
+  const normalizedImageUrl = normalizeIncomingImageUrl(body.image_url);
+  if (normalizedImageUrl) incomingPaths.push(normalizedImageUrl);
+  return { fingerprint: smartCreateFingerprint({ ...body, image_url: normalizedImageUrl }, locationId), incomingPaths, normalizedImageUrl };
 }

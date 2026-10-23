@@ -11,6 +11,15 @@ import {
 } from "@/server/handheld-auth.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { SmartCreateReq } from "@/lib/handheld/schemas";
+import { readProductMarks } from "@/lib/commerce/product-marks";
+
+/** Marks only when the client sent them; omitted keys keep the legacy commit path unchanged. */
+function smartCreateMarks(body: { featured_stamp?: unknown; notice_tags?: unknown }) {
+  const marks: Record<string, unknown> = {};
+  if (body.featured_stamp !== undefined) marks.featured_stamp = body.featured_stamp;
+  if (body.notice_tags !== undefined) marks.notice_tags = body.notice_tags;
+  return Object.keys(marks).length ? marks : null;
+}
 import { generateEpc, generateSkuCode } from "@/lib/inventory.helpers";
 import { buildPrintPayload } from "@/server/handheld-print.server";
 import { replayIfPresent, jsonReplay } from "@/server/handheld-idempotency.server";
@@ -19,7 +28,7 @@ import {
   persistSmartCreateBrand,
   resolveConfirmedListingBrand,
   shouldReuseSmartCreateSku,
-  smartCreateFingerprint,
+  smartCreateRequestFingerprint,
   type SmartCreateCommitResult,
 } from "@/server/handheld-smart-create.server";
 import {
@@ -32,52 +41,6 @@ import {
 import { dbConsentStore } from "@/server/ai-consent.server";
 import { AI_POLICY_VERSION, smartCreateWantsAi } from "@/server/ai-consent-core";
 import { triggerListingImageWorker } from "@/server/handheld-listing-image-jobs.server";
-
-const SKU_IMAGE_BUCKETS = new Set(["sku-raw", "sku-listing"]);
-
-function normalizeBucketPath(
-  bucket: "sku-raw" | "sku-listing",
-  storagePath: string,
-): string | null {
-  const clean = storagePath.trim().replace(/^\/+/, "");
-  if (!clean) return null;
-  if (clean.startsWith(`${bucket}/`)) return clean;
-  return `${bucket}/${clean}`;
-}
-
-function parseStorageObjectUrl(rawUrl: string): string | null {
-  try {
-    const url = new URL(rawUrl);
-    const markers = [
-      "/storage/v1/object/sign/",
-      "/storage/v1/object/public/",
-      "/storage/v1/object/authenticated/",
-      "/storage/v1/object/upload/sign/",
-    ];
-    for (const marker of markers) {
-      const idx = url.pathname.indexOf(marker);
-      if (idx < 0) continue;
-      const rest = url.pathname.slice(idx + marker.length).replace(/^\/+/, "");
-      const parts = rest.split("/").map((part) => decodeURIComponent(part));
-      const bucket = parts.shift();
-      const path = parts.join("/");
-      if (bucket && SKU_IMAGE_BUCKETS.has(bucket) && path) return `${bucket}/${path}`;
-    }
-  } catch {
-    return null;
-  }
-  return null;
-}
-
-function normalizeIncomingImageUrl(imageUrl?: string | null): string | null {
-  const raw = imageUrl?.trim();
-  if (!raw) return null;
-  const storagePath = parseStorageObjectUrl(raw);
-  if (storagePath) return storagePath;
-  // 只有稳定外链才直接存 image_url；signed URL 会过期，不能落库。
-  if (/^https?:\/\//i.test(raw) && !raw.includes("token=")) return raw;
-  return null;
-}
 
 export const Route = createFileRoute("/api/public/handheld/items/smart-create")({
   server: {
@@ -110,18 +73,11 @@ async function handleSmartCreate(request: Request, timing: ReturnType<typeof cre
           return err("Location not accessible", 403, { code: "location_forbidden" });
         timing.mark("auth");
 
-        const incomingPaths: string[] = [];
-        for (const p of body.image_storage_paths ?? []) {
-          const normalized = normalizeBucketPath(p.bucket, p.storage_path);
-          if (normalized) incomingPaths.push(normalized);
-        }
-        const normalizedImageUrl = normalizeIncomingImageUrl(body.image_url);
-        if (normalizedImageUrl) incomingPaths.push(normalizedImageUrl);
-        const fingerprint = smartCreateFingerprint({ ...body, image_url: normalizedImageUrl }, locationId);
+        const { fingerprint, incomingPaths } = smartCreateRequestFingerprint(body, locationId);
         let existingOp = false;
         if (body.client_op_id) {
           const prior = await supabaseAdmin.from("handheld_smart_create_ops")
-            .select("user_id,location_id,payload_fingerprint,response_json")
+            .select("user_id,location_id,payload_fingerprint,response_json,status")
             .eq("device_id", auth.device.id).eq("client_op_id", body.client_op_id).maybeSingle();
           if (prior.error) return err("Unable to check listing operation; retry with the same client_op_id", 503);
           existingOp = !!prior.data;
@@ -129,6 +85,9 @@ async function handleSmartCreate(request: Request, timing: ReturnType<typeof cre
             if (prior.data.user_id !== session.user_id || prior.data.location_id !== locationId ||
                 prior.data.payload_fingerprint !== fingerprint) {
               return err("client_op_id reused with a different payload, user or location", 409, { code: "client_op_id_conflict" });
+            }
+            if (prior.data.status === "cancelled") {
+              return err("This listing operation was cancelled; start a new operation", 409, { code: "client_op_cancelled" });
             }
             if (prior.data.response_json) return jsonReplay({ response_status: 200, response_json: prior.data.response_json });
           } else {
@@ -209,7 +168,7 @@ async function handleSmartCreate(request: Request, timing: ReturnType<typeof cre
         // 同 (device, client_op_id) 重试只得到原 SKU；user / location / 载荷不同返回 409。
         const firstHttp = incomingPaths.find((p) => /^https?:\/\//i.test(p)) ?? null;
         timing.mark("pre_commit");
-        const commit = await supabaseAdmin.rpc("handheld_smart_create_commit_v2" as never, {
+        const commit = await supabaseAdmin.rpc("handheld_smart_create_commit_v3" as never, {
           p_device_id: auth.device.id,
           p_user_id: session.user_id,
           p_client_op_id: body.client_op_id ?? null,
@@ -247,8 +206,11 @@ async function handleSmartCreate(request: Request, timing: ReturnType<typeof cre
           p_release_shop_id: releaseShopId,
           p_image_plan: imagePlan,
           p_ai_policy: AI_POLICY_VERSION,
+          p_marks: smartCreateMarks(body),
         } as never);
         if (commit.error) {
+          if ((commit.error as { code?: string }).code === "P0410")
+            return err("This listing operation was cancelled; start a new operation", 409, { code: "client_op_cancelled" });
           if ((commit.error as { code?: string }).code === "P0409")
             return err("client_op_id reused with a different payload, user or location", 409, {
               code: "client_op_id_conflict",
@@ -365,7 +327,7 @@ async function handleSmartCreate(request: Request, timing: ReturnType<typeof cre
 
         const { data: finalSku, error: finalSkuError } = await supabaseAdmin
           .from("inv_skus")
-          .select("stock_qty, barcode, grade")
+          .select("stock_qty, barcode, grade, featured_stamp, notice_tags")
           .eq("id", skuId)
           .maybeSingle();
         if (finalSkuError || !finalSku?.barcode) return err("Unable to confirm product barcode; retry the same operation", 503);
@@ -413,6 +375,7 @@ async function handleSmartCreate(request: Request, timing: ReturnType<typeof cre
           ai_processing: aiProcessing === "queued_or_idle" ? "allowed" : aiProcessing,
           storefront_listing_id: storefrontListingId,
           storefront_status: storefrontStatus,
+          ...readProductMarks(finalSku as { featured_stamp?: unknown; notice_tags?: unknown } | null),
         };
         const successBody = { ok: true, data: responseBody };
         if (committed.op_id) {

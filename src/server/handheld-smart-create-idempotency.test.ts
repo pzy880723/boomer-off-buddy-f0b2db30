@@ -31,7 +31,7 @@ const admin = {
   from: (t: string) => chain(t),
   rpc: async (name: string, args: Record<string, unknown>) => {
     state.rpcs.push({ name, args });
-    if (name === "handheld_smart_create_commit_v2") return state.commit();
+    if (name === "handheld_smart_create_commit_v3") return state.commit();
     if (name === "handheld_release_outbox_claim")
       return { data: [{ id: "o1", sku_id: "s1", shop_id: "shop", location_id: "loc", claim_token: "t", attempts: 1 }], error: null };
     if (name === "handheld_release_outbox_finish") {
@@ -77,7 +77,9 @@ const { Route } = await load("src/routes/api/public/handheld/items.smart-create.
   "@/server/handheld-smart-create.server": `export const getSmartCreateReleaseTarget = i => i.autoPushYouzan && i.locationKind === 'shop' ? i.shopId : null;
     export const resolveConfirmedListingBrand = async () => null;
     export const persistSmartCreateBrand = async () => {}; export const shouldReuseSmartCreateSku = c => !c;
-    export const smartCreateFingerprint = () => 'fp';`,
+    export const smartCreateFingerprint = () => 'fp';
+    export const smartCreateRequestFingerprint = b => ({ fingerprint: 'fp', incomingPaths: (b.image_storage_paths ?? []).map(p => p.storage_path.startsWith(p.bucket + '/') ? p.storage_path : p.bucket + '/' + p.storage_path), normalizedImageUrl: null });`,
+  "@/lib/commerce/product-marks": "export const readProductMarks = s => ({ featured_stamp: s?.featured_stamp ?? null, notice_tags: s?.notice_tags ?? [] });",
   "@/server/product-classification.server": `export const assertActiveLeafCategory = async () => {}; export const attachProductClassificationAuditToSku = async () => {};
     export const replaceManualProductFacets = async () => {}; export const resolveOrCreateConfirmedIp = async () => ({ id: null, name: null, status: 'none' });
     export const resolveManualProductFacets = async () => null;`,
@@ -109,7 +111,7 @@ test("first submit commits atomically, queues Youzan release and returns without
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.equal(body.data.youzan_sync_status, "queued");
-  const commit = state.rpcs.find((r) => r.name === "handheld_smart_create_commit_v2")!;
+  const commit = state.rpcs.find((r) => r.name === "handheld_smart_create_commit_v3")!;
   assert.equal(commit.args.p_release_shop_id, "shop");
   assert.equal(commit.args.p_user_id, "u1");
   assert.equal(commit.args.p_location_id, "loc");
@@ -175,7 +177,7 @@ test("temporary database read failure retries rather than permanently cancelling
 const withImage = (extra: object = {}) => ({ client_op_id: "c2", category: "toy", name: "屋", price_tier: 159,
   image_storage_paths: [{ bucket: "sku-raw", storage_path: "2026-10-09/dev/a.jpg" }], ...extra });
 
-const commitArgs = () => state.rpcs.find((r) => r.name === "handheld_smart_create_commit_v2")!.args;
+const commitArgs = () => state.rpcs.find((r) => r.name === "handheld_smart_create_commit_v3")!.args;
 const noPostCommitSettle = () =>
   assert.ok(!state.rpcs.some((r) => r.name === "listing_readiness_mark_images_settled"), "no implicit raw settle after commit");
 
@@ -259,4 +261,30 @@ test("standard reuse after worker finished: HTTP follow-up does not resurrect ra
   state.tables.inv_skus = { status: "active", image_paths: ["sku-listing/old.png", "sku-listing/gallery/a.png"], barcode: "200" };
   await post(withImage({ is_custom_price: false, recognition_request_id: "11111111-1111-4111-8111-111111111111" }));
   assert.equal(skuImageWrites().length, 0);
+});
+
+test("tombstoned op: stored cancelled row returns 409 client_op_cancelled and never commits", async () => {
+  state.tables.handheld_smart_create_ops = { user_id: "u1", location_id: "loc", payload_fingerprint: "fp", response_json: null, status: "cancelled" };
+  const res = await post();
+  assert.equal(res.status, 409);
+  assert.equal((await res.json()).code, "client_op_cancelled");
+  assert.equal(state.rpcs.some((r) => r.name === "handheld_smart_create_commit_v3"), false);
+});
+
+test("late original request racing a cancel: DB P0410 maps to 409 client_op_cancelled", async () => {
+  state.commit = () => ({ error: { code: "P0410", message: "client_op_cancelled" } });
+  const res = await post();
+  assert.equal(res.status, 409);
+  assert.equal((await res.json()).code, "client_op_cancelled");
+});
+
+test("marks are sent to the commit only when the client provided them", async () => {
+  await post();
+  assert.equal(commitArgs().p_marks, null);
+  state.rpcs = [];
+  await post({ client_op_id: "c2", category: "toy", name: "屋", price_tier: 159, featured_stamp: "rare", notice_tags: ["parts_missing"] });
+  assert.deepEqual(commitArgs().p_marks, { featured_stamp: "rare", notice_tags: ["parts_missing"] });
+  state.rpcs = [];
+  await post({ client_op_id: "c3", category: "toy", name: "屋", price_tier: 159, featured_stamp: null, notice_tags: [] });
+  assert.deepEqual(commitArgs().p_marks, { featured_stamp: null, notice_tags: [] });
 });

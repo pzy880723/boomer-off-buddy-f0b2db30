@@ -37,7 +37,7 @@ const db = createClient("https://smart-create-tests.invalid", "unit-test-only-ke
         return Response.json({ message: "brand update denied" }, { status: 403 });
       }
       if (method !== "GET") writes.push({ table, method, body: structuredClone(body) });
-      if (table === "handheld_smart_create_commit") {
+      if (table === "handheld_smart_create_commit" || table === "handheld_smart_create_commit_v3") {
         const existing = body.p_reuse ? tables.inv_skus.find(row => row.name === body.p_sku.name && row.category === body.p_sku.category && row.price_tier === body.p_sku.price_tier) : null;
         const saved: Row = existing ?? { id: "saved-sku", barcode: "test-barcode", ...body.p_sku };
         if (!existing) {
