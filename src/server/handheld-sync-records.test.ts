@@ -35,3 +35,11 @@ test("中文状态/原因/下一步，不回显内部编码", () => {
   assert.equal(nextAction("failed"), "系统会自动重试；多次仍失败请联系总部");
   for (const s of [statusLabel("zz_q"), reasonLabel("zz_q"), nextAction("zz_q")]) assert.doesNotMatch(s, /[a-z_]{3,}/);
 });
+import { errorLabel } from "@/server/handheld-sync-records";
+test("失败原因中文呈现；done 下一步不绝对", () => {
+  assert.equal(nextAction("done"), "任务已结束；若有赞库存仍异常，请总部核对");
+  assert.equal(errorLabel(null), null);
+  assert.equal(errorLabel("开启了进出存单据管理库存，修改库存不会生效"), "门店开启了库存单管理，需库存单核对");
+  assert.equal(errorLabel("商品尚未发布到目标门店，请重试"), "商品尚未发布到该门店，请先等发布完成");
+  assert.equal(errorLabel("HTTP 500 upstream timeout"), "同步出错，请总部核对技术记录");
+});
