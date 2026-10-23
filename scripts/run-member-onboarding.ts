@@ -4,6 +4,7 @@ import { resolveTrustedYouzanMember } from '../src/server/youzan-points-projecti
 import { youzanFetch } from '../src/lib/youzan-http';
 import { inspectHqPointsPolicy, readHqDeductionPolicy } from '../src/server/hq-points-policy';
 import { loadMemberOrganizations, hasVerifiedBranch } from '../src/server/member-organizations';
+import { traverseMemberKeyset } from '../src/server/member-keyset';
 
 async function main() {
  const shopId=process.argv[2];
@@ -15,6 +16,7 @@ async function main() {
  const read=async(token:string,method:string,version:string,params:Record<string,unknown>={})=>{
    const body=JSON.stringify(params);
    const r=await youzanFetch(`https://open.youzanyun.com/api/${method}/${version}?access_token=${encodeURIComponent(token)}`,{method:'POST',headers:{'Content-Type':'application/json'},body,signal:AbortSignal.timeout(15000)});
+   if(r.status===408 || r.status===429 || r.status>=500)throw Error('provider_temporarily_unavailable');
    const j=await r.json() as {code?:number;success?:boolean;data?:unknown;response?:unknown};
    if(!r.ok || j.success===false || ![0,200].includes(Number(j.code))) throw Error('provider_read_rejected');
    return j.data??j.response;
@@ -48,17 +50,22 @@ async function main() {
    },
    async mappings(j){
      const counts={eligible:0,mapped:0,missing:0,conflict:0,unavailable:0};
-     for(let offset=0;;offset+=100){
-       const {data,error}=await db.from('commerce_customers').select('id').eq('status','active').order('id').range(offset,offset+99);
-       if(error)throw Error('cohort_read_failed');
-       for(const c of data??[]){counts.eligible++;const m=await resolveTrustedYouzanMember(c.id);if(m.kind==='found'&&Number(m.kdtId)===Number(j.parent_kdt_id))counts.mapped++;else if(m.kind==='conflict')counts.conflict++;else if(m.kind==='missing')counts.missing++;else counts.unavailable++;}
-       if((data?.length??0)<100)break;
-     }
+     await traverseMemberKeyset({
+       async upperBound(){const r=await db.from('commerce_customers').select('id').eq('status','active').order('id',{ascending:false}).limit(1);if(r.error)throw Error('cohort_read_failed');return r.data?.[0]?.id??null;},
+       async page(after,upper,limit){let q=db.from('commerce_customers').select('id').eq('status','active').lte('id',upper).order('id').limit(limit);if(after!==null)q=q.gt('id',after);const r=await q;if(r.error)throw Error('cohort_read_failed');return r.data??[];},
+       key:(c:{id:string})=>c.id,
+       async visit(c){counts.eligible++;const m=await resolveTrustedYouzanMember(c.id);if(m.kind==='found'&&Number(m.kdtId)===Number(j.parent_kdt_id))counts.mapped++;else if(m.kind==='conflict')counts.conflict++;else if(m.kind==='missing')counts.missing++;else counts.unavailable++;},
+     });
      return counts;
    },
    async projections(j){
-     const rows:Array<{balance_synced_at:string|null;balance_failed_at:string|null}>=[];
-     for(let offset=0;;offset+=100){const r=await db.from('youzan_points_projection').select('balance_synced_at,balance_failed_at').eq('kdt_id',Number(j.parent_kdt_id)).order('customer_id').range(offset,offset+99);if(r.error)throw Error('projection_read_failed');rows.push(...r.data??[]);if((r.data?.length??0)<100)break;}return rows;
+     const rows:Array<{balance_synced_at:string|null;balance_failed_at:string|null;balance_failure:string|null}>=[];
+     await traverseMemberKeyset({
+       async upperBound(){const r=await db.from('youzan_points_projection').select('customer_id').eq('kdt_id',Number(j.parent_kdt_id)).order('customer_id',{ascending:false}).limit(1);if(r.error)throw Error('projection_read_failed');return r.data?.[0]?.customer_id??null;},
+       async page(after,upper,limit){let q=db.from('youzan_points_projection').select('customer_id,balance_synced_at,balance_failed_at,balance_failure').eq('kdt_id',Number(j.parent_kdt_id)).lte('customer_id',upper).order('customer_id').limit(limit);if(after!==null)q=q.gt('customer_id',after);const r=await q;if(r.error)throw Error('projection_read_failed');return r.data??[];},
+       key:(r:{customer_id:string})=>r.customer_id,
+       async visit(r){rows.push(r);},
+     });return rows;
    },
    async posSafe(){
      const r=await db.from('commerce_membership_plans').select('id').eq('points_redemption_enabled',true).limit(1);if(r.error)throw Error('pos_policy_read_failed');
