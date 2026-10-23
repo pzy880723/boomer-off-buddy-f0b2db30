@@ -80,8 +80,8 @@ test("P0409 conflict → 409 client_op_id_conflict; other DB error → 503 unkno
 test("committed / completed recovery returns the original SKU and receipt", async () => {
   S.result = () => ({ data: { state: "committed", replayed: true, sku_id: "sku1", response: null }, error: null });
   assert.deepEqual((await (await post()).json()).data, { client_op_id: "op-000001", state: "committed", replayed: true, sku_id: "sku1", receipt: null });
-  S.result = () => ({ data: { state: "completed", replayed: true, sku_id: "sku1", response: { sku_id: "sku1", ok: true } }, error: null });
-  assert.deepEqual((await (await post()).json()).data.receipt, { sku_id: "sku1", ok: true });
+  S.result = () => ({ data: { state: "completed", replayed: true, sku_id: "sku1", response: { ok: true, data: { sku_id: "sku1", barcode: "200001" } } }, error: null });
+  assert.deepEqual((await (await post()).json()).data.receipt, { ok: true, data: { sku_id: "sku1", barcode: "200001" } });
 });
 
 test("malformed or contradictory DB results are 503 unknown, never cancelled", async () => {
@@ -93,4 +93,28 @@ test("malformed or contradictory DB results are 503 unknown, never cancelled", a
     assert.equal(r.status, 503, JSON.stringify(data));
     assert.equal((await r.json()).code, "smart_create_cancel_unknown");
   }
+});
+
+test("strict: cancelled needs sku_id===null and response===null; completed needs full matching success receipt", async () => {
+  const bad = [
+    { state: "cancelled", replayed: false },
+    { state: "cancelled", replayed: false, sku_id: null },
+    { state: "cancelled", replayed: false, response: null },
+    { state: "cancelled", replayed: false, sku_id: null, response: { ok: true } },
+    { state: "completed", replayed: true, sku_id: "sku1", response: [] },
+    { state: "completed", replayed: true, sku_id: "sku1", response: {} },
+    { state: "completed", replayed: true, sku_id: "sku1", response: { ok: false, data: { sku_id: "sku1", barcode: "200001" } } },
+    { state: "completed", replayed: true, sku_id: "sku1", response: { ok: true, data: { sku_id: "sku2", barcode: "200001" } } },
+    { state: "completed", replayed: true, sku_id: "sku1", response: { ok: true, data: { sku_id: "sku1" } } },
+    { state: "completed", replayed: true, sku_id: "sku1", response: { ok: true, data: { sku_id: "sku1", barcode: "" } } },
+    { state: "completed", replayed: true, sku_id: "sku1", response: { ok: true, data: [] } },
+  ];
+  for (const data of bad) {
+    S.result = () => ({ data, error: null });
+    const r = await post();
+    assert.equal(r.status, 503, JSON.stringify(data));
+    assert.equal((await r.json()).code, "smart_create_cancel_unknown");
+  }
+  S.result = () => ({ data: { state: "cancelled", replayed: true, sku_id: null, response: null }, error: null });
+  assert.equal((await post()).status, 200);
 });

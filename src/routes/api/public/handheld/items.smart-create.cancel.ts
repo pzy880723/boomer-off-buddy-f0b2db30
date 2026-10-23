@@ -46,10 +46,19 @@ export const Route = createFileRoute("/api/public/handheld/items/smart-create/ca
         }
         const r = data as { state?: unknown; replayed?: unknown; sku_id?: unknown; response?: unknown } | null;
         // Malformed/contradictory DB result = outcome unknown: never let the client clear its lock on it.
-        const wellFormed = !!r && typeof r.replayed === "boolean" && (
-          (r.state === "cancelled" && r.sku_id == null)
-          || ((r.state === "committed" || r.state === "completed") && typeof r.sku_id === "string" && r.sku_id.length > 0)
-        ) && (r.state !== "completed" || (!!r.response && typeof r.response === "object"));
+        const own = (o: object, k: string) => Object.prototype.hasOwnProperty.call(o, k);
+        const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
+        const receipt = r && isObj(r.response) ? r.response : null;
+        const receiptData = receipt && isObj(receipt.data) ? receipt.data : null;
+        const wellFormed = isObj(r) && typeof r.replayed === "boolean" && (
+          // cancelled: both keys present and strictly null
+          (r.state === "cancelled" && own(r, "sku_id") && r.sku_id === null && own(r, "response") && r.response === null)
+          || (r.state === "committed" && typeof r.sku_id === "string" && r.sku_id.length > 0)
+          // completed: full stored success receipt for the same SKU with a confirmed barcode
+          || (r.state === "completed" && typeof r.sku_id === "string" && r.sku_id.length > 0
+            && receipt?.ok === true && !!receiptData && receiptData.sku_id === r.sku_id
+            && typeof receiptData.barcode === "string" && receiptData.barcode.length > 0)
+        );
         if (!wellFormed)
           return err("Unable to confirm listing operation; retry the same cancel request", 503, { code: "smart_create_cancel_unknown" });
         return ok({
