@@ -140,7 +140,7 @@ test("错误码分类：超时/429/5xx 可重试，拒绝/未配置/4xx 不可�
 
 test("未配置密钥 → ai_not_configured，且不发请求、不过 guard", async () => {
   let sent = 0;
-  await assert.rejects(generateListingSummary(SummaryInput.parse({ name: "x" }), allowHandheldGuard(),
+  await assert.rejects(generateListingSummary(SummaryInput.parse({ name: "x" }), allowHandheldGuard,
     (async () => { sent++; return new Response("{}"); }) as never, ""), /ai_not_configured/);
   assert.equal(sent, 0);
 });
