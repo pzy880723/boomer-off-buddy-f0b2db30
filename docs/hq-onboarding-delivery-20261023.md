@@ -1,5 +1,11 @@
 # HQ统一门店接入：交付与阻断边界
 
+## 05:42 腾讯部署回执与归档（用户独立实证，本轮未调线上）
+- 腾讯`f4cccb5`最终7个source编译至`/opt/boomer-member-onboarding/releases/20261023-f4cccb5`；canonical空body，无本地覆盖。四店ownership/tokens/HQ指纹一致、mapped10/eligible10、currentProjectionFailures0，仍`blocked/pos_local_wallet_path`，nativePOS/E2E=false。
+- 美罗城单店canary后其他三店dispatcher attempted3/failed0，后续空队列attempted0，timer active/enabled。用户测试48逻辑+21canonical SQL+6审查SQL+11operational guards通过，真实runner keyset访问第101未映射账号；11protectedhash全部OK。
+- 主ERP保持`product-marks-batch-20261023`，未重启；**POS只读guard源码未部署主APP，不能称线上启用**。所有资产/规则writes0，无新增业务数据；会员完整验收尚未通过。
+- 本轮仅原样归档用户提供的`member-onboarding-dispatch.mjs`与6项Node测试、替换同名service为Node22 oneshot并新增5分钟timer。保留旧Bun watcher源码但不启用；不改backend/SQL/业务/deps，不重复线上查询或部署。入口realpath支持release symlink，REST仅选到期暂态且attempts1..2，最终claim仍由0108原子fencing。
+
 ## 05:30 三项验收漏洞窄修
 - `0108_member_onboarding_acceptance_retry.sql`已应用共享库，仅增加`retry_after`与索引并替换enqueue/claim/finish函数；不回填/重置真实任务，不写会员资产。旧迁移原样保留。SQL测试直接加载已应用0108，不靠另写的模拟函数。
 - 非blocked回执无条件要求HQ scope、64位指纹、正确HQ Kdt、明确镜像true与原生继承JSON boolean true；缺失或字符串true拒绝。blocked无指纹也保存`youzanPosInheritanceVerified:false`，不能借省略字段通过配置验收。
