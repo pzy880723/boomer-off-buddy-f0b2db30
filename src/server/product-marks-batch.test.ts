@@ -66,3 +66,33 @@ test("invalid op rejected; flawed add skipped not faked", async () => {
   const r = await runBatchMarks(deps, { hq: true, managerLocationIds: [] }, { op: { kind: "notice", add: ["flawed"], remove: [] }, location_id: null, items: items("a") });
   assert.deepEqual([r[0].result, r[0].reason], ["skipped", "flawed_requires_annotation"]);
 });
+
+test("HQ also requires one explicit location and cannot edit foreign-location SKUs", async () => {
+  const { deps, writes } = fixture();
+  const actor = { hq: true, managerLocationIds: [] };
+  const noScope = await runBatchMarks(deps, actor, { op: { kind: "stamp", value: "rare" }, location_id: null, items: items("a") });
+  assert.equal(noScope[0].reason, "no_permission");
+  const scoped = await runBatchMarks(deps, actor, { op: { kind: "stamp", value: "rare" }, location_id: "L1", items: items("other") });
+  assert.equal(scoped[0].reason, "no_permission");
+  assert.equal(writes.length, 0);
+});
+
+test("CAS rejects a one-microsecond difference without a write", async () => {
+  const { db, deps, writes } = fixture();
+  db.set("a", { ...db.get("a"), id: "a", updated_at: "2026-10-22T10:00:00.000001Z" });
+  const r = await runBatchMarks(deps, manager, { op: { kind: "stamp", value: "rare" }, location_id: "L1", items: items("a") });
+  assert.equal(r[0].reason, "version_conflict");
+  assert.equal(writes.length, 0);
+});
+
+test("retry keeps original confirmed version and never overwrites another edit", async () => {
+  const { db, deps, writes } = fixture();
+  db.set("a", { ...db.get("a"), id: "a", featured_stamp: "limited", updated_at: "2026-10-22T11:00:00Z" });
+  const input = { op: { kind: "stamp" as const, value: "rare" as const }, location_id: "L1", items: items("a") };
+  const first = await runBatchMarks(deps, manager, input);
+  const retry = await runBatchMarks(deps, manager, input);
+  assert.equal(first[0].reason, "version_conflict");
+  assert.equal(retry[0].reason, "version_conflict");
+  assert.equal(db.get("a")?.featured_stamp, "limited");
+  assert.equal(writes.length, 0);
+});
