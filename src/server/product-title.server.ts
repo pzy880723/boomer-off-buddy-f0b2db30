@@ -6,10 +6,13 @@ import {
   isRetryableRecognitionError,
   logRecognitionEvent,
   recognitionErrorKind,
+  type RecognitionOutputDiagnostics,
 } from "./recognition-reliability.ts";
 /** Per-attempt server budget for the quick title; at most one automatic retry (~25s total). */
 export const PRODUCT_TITLE_TIMEOUT_MS = 12_000;
 export const PRODUCT_TITLE_MAX_ATTEMPTS = 2;
+/** Output budget incl. hidden reasoning: the resolved model spent ~240 reasoning tokens, so 256 truncated every title. */
+export const PRODUCT_TITLE_MAX_TOKENS = 1024;
 export const PRODUCT_TITLE_PROMPT = `你是 BOOMER-OFF 中古杂货命名助手。只返回 JSON {"name":"标题"}。
 根据照片写一个中文商品标题，目标 12-20 个字，最多不超过 24 个字；优先写出照片可确认的 IP/角色、物件名或型号，再补一个可见的造型、色彩或功能，简短鲜活有吸引力，不要官方参数堆砌。
 命名规则：标题=可确认的角色/IP + 显著造型/颜色/材质 + 物件名或可核实型号，例如“Hello Kitty橘色挂件”“美乐蒂粉色抽拉包”。同一名称不要重复中英文别名；不要写“可爱”“适合…”等描述，不要罗列配件或组件；日期、年代与故事写进简介，不进标题。
@@ -20,9 +23,30 @@ const transportSend = (apiKey: string): typeof fetch =>
   (async (_url: unknown, init?: RequestInit) =>
     listingAiFetch(String(init?.body ?? ""), apiKey, init?.signal ?? undefined)) as typeof fetch;
 
-/** Parse/empty-title failures are model-output problems: they fail fast instead of burning another 12s round. */
+/** Parse/empty/truncated-title failures are model-output problems: they fail fast instead of burning another 12s round. */
 const fatalTitleError = (message: string): Error =>
   Object.assign(new Error(message), { noRetry: true });
+
+const FINISH_REASONS = new Set(["stop", "length", "content_filter", "tool_calls"]);
+const SAFE_MODEL = /^[a-z0-9][a-z0-9._-]{0,40}\/[a-z0-9][a-z0-9._-]{0,60}$/i;
+const intOrNull = (v: unknown): number | null => (Number.isInteger(v) && (v as number) >= 0 ? (v as number) : null);
+
+/** Safe, content-free diagnostics only: enum finish reason, allowlisted model id, token integers, content length. */
+function outputDiagnostics(payload: unknown, content: unknown): RecognitionOutputDiagnostics {
+  const p = (payload ?? {}) as {
+    model?: unknown;
+    choices?: Array<{ finish_reason?: unknown }>;
+    usage?: { completion_tokens?: unknown; completion_tokens_details?: { reasoning_tokens?: unknown } };
+  };
+  const fr = p.choices?.[0]?.finish_reason;
+  return {
+    finish_reason: typeof fr === "string" ? (FINISH_REASONS.has(fr) ? fr : "other") : null,
+    resolved_model: typeof p.model === "string" && SAFE_MODEL.test(p.model) ? p.model : null,
+    completion_tokens: intOrNull(p.usage?.completion_tokens),
+    reasoning_tokens: intOrNull(p.usage?.completion_tokens_details?.reasoning_tokens),
+    content_length: typeof content === "string" ? content.length : null,
+  };
+}
 
 export async function recognizeProductTitle(
   imageBase64: string,
@@ -32,7 +56,7 @@ export async function recognizeProductTitle(
 ): Promise<string> {
   if (!apiKey) throw new Error("AI unavailable");
   const body = JSON.stringify({ model: process.env.HANDHELD_PRODUCT_RECOGNITION_MODEL || "google/gemini-2.5-flash",
-    max_tokens: 256, response_format: { type: "json_object" },
+    max_tokens: PRODUCT_TITLE_MAX_TOKENS, reasoning: { effort: "low" }, response_format: { type: "json_object" },
     messages: [{ role: "system", content: PRODUCT_TITLE_PROMPT },
       { role: "user", content: [{ type: "image_url", image_url: {
         url: imageBase64.startsWith("data:") ? imageBase64 : `data:image/jpeg;base64,${imageBase64}`,
@@ -43,6 +67,7 @@ export async function recognizeProductTitle(
   const startedAt = Date.now();
   let attempts = 0;
   let lastError: Error | null = null;
+  let diag: RecognitionOutputDiagnostics | null = null;
   for (let attempt = 1; attempt <= PRODUCT_TITLE_MAX_ATTEMPTS; attempt += 1) {
     // Guard re-checked before every attempt; a revocation between attempts stops the next send.
     try {
@@ -55,6 +80,7 @@ export async function recognizeProductTitle(
       throw guardError;
     }
     attempts += 1;
+    diag = null;
     try {
       const response = await doSend(LISTING_AI_DIRECT_URL, {
         method: "POST", signal: AbortSignal.timeout(PRODUCT_TITLE_TIMEOUT_MS),
@@ -65,18 +91,22 @@ export async function recognizeProductTitle(
         throw Object.assign(new Error(`AI title unavailable (${response.status})`), { status: response.status });
       }
       const payload = await response.json();
+      const content = payload?.choices?.[0]?.message?.content;
+      diag = outputDiagnostics(payload, content);
+      // Truncated output is never salvaged into a partial title, even if it happens to parse.
+      if (diag.finish_reason === "length") throw fatalTitleError("AI title truncated");
       let parsed: { name?: unknown };
       try {
-        parsed = JSON.parse(payload.choices?.[0]?.message?.content ?? "{}");
+        parsed = JSON.parse(typeof content === "string" ? content : "{}");
       } catch {
         throw fatalTitleError("AI title missing");
       }
-      if (typeof parsed.name !== "string" || !parsed.name.trim()) throw fatalTitleError("AI title missing");
+      if (typeof parsed?.name !== "string" || !parsed.name.trim()) throw fatalTitleError("AI title missing");
       const title = normalizeAutoProductTitle(parsed.name);
       if (!title) throw fatalTitleError("AI title missing");
       logRecognitionEvent({
         event: "product_title", request_id: requestId, attempts,
-        duration_ms: Date.now() - startedAt, outcome: "completed",
+        duration_ms: Date.now() - startedAt, outcome: "completed", ...diag,
       });
       return title;
     } catch (error) {
@@ -90,6 +120,7 @@ export async function recognizeProductTitle(
     duration_ms: Date.now() - startedAt, outcome: "failed",
     http_status: extractRecognitionHttpStatus(lastError),
     error_kind: lastError ? recognitionErrorKind(lastError) : null,
+    ...(diag ?? {}),
   });
   throw lastError ?? new Error("AI title unavailable");
 }

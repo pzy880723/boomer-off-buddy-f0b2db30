@@ -44,6 +44,15 @@ export function recognitionErrorKind(error: unknown): RecognitionErrorKind {
   return "transient";
 }
 
+/** Optional content-free output diagnostics (enum finish reason, allowlisted model id, integers, length). */
+export type RecognitionOutputDiagnostics = {
+  finish_reason: string | null;
+  resolved_model: string | null;
+  completion_tokens: number | null;
+  reasoning_tokens: number | null;
+  content_length: number | null;
+};
+
 /**
  * Structured, redacted recognition log line. By construction it carries only ids, counts,
  * durations and status codes — never request bodies, images, base64, tokens or upstream text.
@@ -58,7 +67,7 @@ export function logRecognitionEvent(event: {
   outcome: "completed" | "fallback" | "failed" | "aborted";
   http_status?: number | null;
   error_kind?: RecognitionErrorKind | null;
-}): void {
+} & Partial<RecognitionOutputDiagnostics>): void {
   const line = JSON.stringify(event);
   if (event.outcome === "completed") console.info(line);
   else console.warn(line);
