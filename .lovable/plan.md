@@ -1,85 +1,32 @@
-# 只读核对结果：安卓移植所需四项后台契约（不改代码、不迁移、不部署）
+# 只读核对结果：其他门店是否混入别店自定义商品（不改代码、不写、不部署）
 
-只读核对基线：当前 HEAD c53b83ad（da8c785e 在仓库中存在）。本文只说明代码里的契约，不代表腾讯已经部署。图片处理的提示词、模型和调用路径都没有读，也没有改。
+## 1. 四家启用分店与库位（youzan_shops + inv_locations，一店一库位）
+| 门店 | kdt_id | warehouse_code | 库位 id |
+|---|---|---|---|
+| 中信泰富店 | 187395218 | MD00001 | 7111b585-7d7f-4777-b4ae-61ce2b868f78 |
+| 温州朔门古港店 | 178113306 | MD00002 | 8f0d9f93-eb49-40e8-8ec6-65f3770196bb |
+| 新天地店 | 212291308 | MD00003 | 2df58305-57c1-4792-9920-3c3aa49890bc |
+| 徐汇美罗城店 | 215098500 | MD00004 | e393a259-8318-44ec-b0b1-7be3d885436e |
+| 总部（hq） | 153242272 | 无 | 673f674c-55ad-45d8-8175-53f7044d7014 |
 
-## 1. GET /api/public/handheld/product-taxonomy
-文件：src/routes/api/public/handheld/product-taxonomy.ts
-- 认证：先验设备，再验员工会话。缺员工会话返回 401 `{code:"session_required"}`。
-- 成功返回 `ok({ primary_categories, facets })`：
-  - `primary_categories[]`：`{ code, name, children[] }`
-  - `children[]`：`{ code, name, parent_code, parent_name }`
-  - 只返回 `kind=category` 且 `is_active=true` 的分类。name 为空或与 code 相同的行会被排除。只挂在启用根分类下，不按库存过滤。
-  - `facets`：取启用的 inv_facets（id, code, name, dimension, aliases, category_codes, sort_order），经 labelFacets 输出。
-- 数据库读失败返回 503 `{code:"taxonomy_unavailable"}`，不会返回假的空列表。
-- 测试：src/server/handheld-product-taxonomy-http.test.ts，覆盖 401 时不查库、停用项排除、89 个叶分类全量返回、只读两张字典表、503。
+youzan_shops 没有 is_active 字段，“启用”只能按 role=branch 判断。
 
-## 2. POST items/smart-create 的可选字段
-文件：src/routes/api/public/handheld/items.smart-create.ts、src/lib/handheld/schemas.ts（SmartCreateReq）、src/lib/commerce/product-marks.ts、src/server/product-classification.server.ts
-- `featured_stamp`：取值 `new|rare|limited|collectible|discontinued|null`，可省略。省略时与旧版一致，不参与幂等指纹。只在新建商品时同事务保存。
-- `notice_tags`：数组，取值 `flawed|function_uncertain|function_unavailable|not_edible|parts_missing`。function_uncertain 与 function_unavailable 互斥。按字典顺序规范化后参与指纹；省略时用旧指纹。
-- `ip_candidate`：字符串，trim 后 1–120 字，可省略。
-  - 与 `ip_confirmed=true` 或非空 `ip_name` 同时提交时，返回 400 `validation_error`（中文提示）。
-  - resolveIpCandidate 用名称、原名或别名精确匹配启用 IP，匹配上就关联该 ip_id。
-  - 匹配不上，或 IP 库读取失败：ip_id 为 null，原文存入 SKU 的 `ip_candidate_text`。不创建全局 IP，也不挡上架。
-  - 只有请求里带了 ip_candidate，响应才多一个 `ip_review_pending: boolean`。
-  - 响应同时回读 `featured_stamp` 和 `notice_tags`。
-- 测试：src/lib/handheld/smart-create-ip-candidate.test.ts、src/server/resolve-ip-candidate.test.ts、src/server/handheld-smart-create-fingerprint.test.ts、src/server/handheld-smart-create-cancel-route.test.ts / -cancel-sql.test.ts、src/server/handheld-smart-create-idempotency.test.ts
+## 2. 跨店保留意图
+- inv_skus.default_shop_ids（uuid[]）：自定义品（sku_scope='custom'）指向任何一家店的数量都是 0。
+- 正库存的自定义品（inv_stocks.qty>0）：新天地 79、美罗城 6、中信泰富 3、温州 0；其中有 default_shop_ids 的都是 0。
+- 结论：数据库里没有任何明确的“跨店保留”标记。合法归属只能是正库存所在的那家店（inv_stocks.location_id → inv_locations.shop_id）。
 
-## 3. 测量待办与个人忽略
-文件：src/lib/handheld/work-items.ts、src/server/handheld-work-items.server.ts、src/routes/api/public/handheld/work-items.ts、src/routes/api/public/handheld/work-items.measurement-dismissals.ts、src/server/measurement-dismissals.server.ts
+## 3. 进行中的调拨（stock_transfers）
+- 相关字段：kind、status、from_shop_id/to_shop_id、from_location_id/to_location_id、from_sku_id/to_sku_id、from_youzan_item_id/to_youzan_item_id、qty、shipped_at、received_at、youzan_sync_status。
+- 全表只有 1 条记录：kind=custom、status=received，同店（from_shop_id=to_shop_id）。
+- 目前没有在途的跨店调拨，不需要排除。执行前请 Codex 再查一次：status 不是 received/cancelled、且 from_shop_id≠to_shop_id 的记录，目标店要排除。
 
-### GET work-items
-- 查询参数：`location_id?`（uuid）、`limit`（1–100，默认 50）、`cursor?`、`include_ignored?`、`ignored_only?`。
-- 两个布尔参数只接受字面 `"true"`/`"false"`，其余值返回 400 `validation_error`。参数校验是 strict，传未知参数也返回 400。
-- 返回 `{ items, counts, next_cursor }`。
-  - `next_cursor` 格式为 `"<ts含微秒>|<uuid>"`，要原样回传；格式错误返回 400 `invalid_cursor`。
-  - 越权的 location_id 返回 403 `location_forbidden`；服务异常返回 500 `work_items_unavailable`。
-- 测量行字段：`measurement_task_id`（任务 UUID）、`measurement_request_version`（含微秒的时间戳字符串，要原样保存）、`can_ignore`、`ignored`、`can_restore`，另有通用字段 id/type/title/description/meta/urgency/action/target_id 等。
+## 4. youzan.retail.open.offline.spu.query 3.0.0（只看代码，没有响应日志）
+- 注册表（youzan-api-registry.ts:520-533）写的是 token_scope=hq、scope=hq，说明是“查询总部或指定 warehouse_code 下的门店商品”。代码只用总部 token 加 warehouse_code 调用，没有用分店 token 调用的先例，所以分店 token 能否列出商品无法确认。
+- 请求参数（server.ts:122-138）：page_no（≥1）、page_size（1-50，默认 20）、show_display、warehouse_code、name_or_sku_no、item_ids；另有 page_no×page_size≤3300 的限制。
+- 响应解析（server.ts:236-258）：只读 data.offline_spus[]（item_id、title、spu_no、is_display、sku_models[].sku_id）。代码不读 total 或任何分页总数字段，所以总数字段名代码里查不到，只能看第一次真实响应。单店超过 3300 件时这个接口列不全，需要按 name_or_sku_no 或 item_ids 分段。
 
-### POST（忽略）/ DELETE（撤销）work-items/measurement-dismissals
-- 请求体是 strict JSON：`{ location_id: uuid, task_id: uuid, request_version: string(1–120) }`。
-- 员工身份只取会话，不读 body 里的 user_id。
-- 成功返回 `{ dismissed: boolean, task_id, request_version }`。数据库回执缺字段或变形时返回 500 `dismissal_failed`，不会拿请求参数冒充成功。
-- 错误码：
-
-| 状态码 | code | 含义 |
-|---|---|---|
-| 401 | session_required | 缺员工会话 |
-| 400 | validation_error | 请求体不合规 |
-| 403 | location_forbidden | 库位越权 |
-| 403 | task_location_mismatch | 任务属于其他门店 |
-| 404 | task_not_found | 任务不存在 |
-| 409 | task_closed | 任务已完成或已取消 |
-| 409 | stale_request_version | 版本已变，可能附带 `current_version` |
-| 500 | dismissal_failed | 服务异常 |
-
-- 授权规则：带有效客服卡的任务按 support 范围或 general 范围授权；孤立任务只能按 general 范围。
-- 测试：src/server/measurement-dismissals.test.ts、src/server/handheld-work-items-http.test.ts、src/lib/handheld/work-items.test.ts、tests/handheld-work-cursor.test.ts
-
-## 4. GET /api/public/handheld/sync-records
-文件：src/routes/api/public/handheld/sync-records.ts、src/server/handheld-sync-records.ts、src/lib/sync-record-labels.ts
-- 查询参数：`status?`（pending|done|failed）、`limit`（1–200，默认 50）、`location_id?`。
-- 库位规则：
-  - 有显式 location_id 时必须在授权范围内，否则 403 `location_forbidden`；格式不对返回 400 `validation_error`。
-  - 不传时用设备当前库位；设备也没有库位时返回 400 `location_required`。
-  - 只有总部账号且当前在总部仓，才能看到全部授权库位。
-- 匹配规则：先按 location_id 匹配。只有 location_id 为空的旧记录，才按库位对应的有赞门店 shop_id 补充匹配，避免把他店记录带进来。
-- 返回 `{ items[], location_id }`。每条 item 包含：
-  - 原始字段：id, sku_id, shop_id, location_id, target_stock, reason, status, attempts, last_error, created_at, updated_at
-  - 展示字段：`sku_name`（缺失时为"未命名商品"）、`shop_name`（缺失时为"未关联有赞门店"）、`location_name`（缺失时为"未关联库位"）、`status_label`、`reason_label`、`next_action`、`error_label`（没有错误时为 null）
-- 任何读取失败（包括商品名、门店名）都返回 503 `sync_records_unavailable`。
-- `status_label` 对 done 显示"同步任务已结束"，不代表有赞库存已经读回。
-- 测试：src/server/handheld-sync-records.test.ts、src/server/handheld-sync-records-http.test.ts
-
-## 本次测试证据（只运行，没有改动）
-- 用 node --test 跑了 8 个文件，共 28 项：25 项通过，另外 3 个文件在 node 下解析不了 `@/` 路径别名，属于运行环境问题。
-- 这 3 个文件改用 bun test 重跑，19/19 通过：smart-create-ip-candidate、handheld-sync-records、measurement-dismissals。
-- 本次没有单独重跑以下测试：src/server/handheld-smart-create-idempotency.test.ts、src/server/handheld-smart-create-cancel-route.test.ts、src/server/handheld-smart-create-cancel-sql.test.ts、src/lib/handheld/work-items.test.ts、tests/handheld-work-cursor.test.ts。
-
-## 是否需要新迁移
-四项契约都不需要新迁移。
-- notice_tags 与 featured_stamp：0095；parts_missing：0104；取消与标签同事务：0110。
-- ip_candidate_text 列：0012 / 0045。
-- 测量忽略函数与 scoped 待办：0099 / 0100 / 0102。
-
-以上只核对了迁移文件存在，没有查询线上数据库。腾讯生产是否已经部署这些迁移和代码，需要 Codex 读回确认。
+## 边界
+- 上面的数据库结果只说明我方记录的状态，不能排除在有赞那边发生的串店（美罗城就是例子）。最终证据以 Codex 逐件精确 item_code 调用 itemdetail.get（kdt/channel=1）为准。
+- 撤销候选 = 某店 channel=1 有该商品，但该店库位在 ERP 没有正库存，且没有在途调拨到这家店。标准品（unlimited）和已清理的 44 件不在范围内。
+- 本轮没有任何写入、部署或代码改动。
