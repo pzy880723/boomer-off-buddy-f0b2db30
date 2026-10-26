@@ -13,6 +13,9 @@ import {
 
 // ---- Round B：SKU 建好后，后台 fire-and-forget 建 HQ SPU + 铺货到默认分店 ----
 // 失败不阻塞主流程；错误落到 sku_youzan_links.last_error，UI 有"上架失败·点重试"的红标。
+// 防复发（2026-10-26 美罗城事故）：自定义品绝不兜底"全部启用分店"——
+// 空 default_shop_ids 时只铺有正库存的库位所属分店，推导不出就跳过不写有赞；
+// 标准品维持全店共享不变。
 async function autoDistributeInBackground(sku_ids: string[], default_shop_ids: string[]) {
   if (sku_ids.length === 0) return;
   void (async () => {
@@ -21,45 +24,65 @@ async function autoDistributeInBackground(sku_ids: string[], default_shop_ids: s
       const { releaseSkuToOfflineShopsCore } = await import("./youzan-offline-products.functions");
       const { syncStandardSkuToAllYouzanBranchesCore } =
         await import("./standard-catalog-youzan.server");
+      const { planAutoDistributeTargets } = await import("./auto-distribute-targets");
       const { data: skuKinds } = await supabaseAdmin
         .from("inv_skus")
         .select("id, kind, is_custom_price, inventory_policy")
         .in("id", sku_ids);
-      const standardIds = new Set(
-        (skuKinds ?? [])
-          .filter(
-            (sku) =>
-              sku.kind === "single" &&
-              sku.is_custom_price === false &&
-              sku.inventory_policy === "unlimited",
-          )
-          .map((sku) => String(sku.id)),
-      );
-      // 若 default_shop_ids 为空 → 铺给所有 branch 门店
-      let targetShopIds = default_shop_ids;
-      if (targetShopIds.length === 0) {
-        const { data: branches } = await supabaseAdmin
-          .from("youzan_shops")
-          .select("id")
-          .eq("role", "branch")
-          .eq("status", "active");
-        targetShopIds = (branches ?? []).map((r) => r.id as string);
+      // 仅在未明确指定门店时，按正库存库位推导自定义品的所属分店（限启用分店）
+      const stockShopIdsBySku = new Map<string, string[]>();
+      if (default_shop_ids.length === 0) {
+        const [{ data: stockRows }, { data: branchShops }] = await Promise.all([
+          supabaseAdmin
+            .from("inv_stocks")
+            .select("sku_id, qty, inv_locations!inner(shop_id)")
+            .in("sku_id", sku_ids)
+            .gt("qty", 0),
+          supabaseAdmin
+            .from("youzan_shops")
+            .select("id")
+            .eq("role", "branch")
+            .eq("status", "active"),
+        ]);
+        const activeBranchIds = new Set((branchShops ?? []).map((r) => String(r.id)));
+        for (const row of stockRows ?? []) {
+          const shopId = String(
+            (row.inv_locations as { shop_id?: string } | null)?.shop_id ?? "",
+          );
+          if (!shopId || !activeBranchIds.has(shopId)) continue;
+          const skuId = String(row.sku_id);
+          const list = stockShopIdsBySku.get(skuId) ?? [];
+          if (!list.includes(shopId)) list.push(shopId);
+          stockShopIdsBySku.set(skuId, list);
+        }
       }
+      const plan = planAutoDistributeTargets({
+        skus: (skuKinds ?? []).map((sku) => ({
+          id: String(sku.id),
+          kind: sku.kind,
+          is_custom_price: sku.is_custom_price,
+          inventory_policy: sku.inventory_policy,
+        })),
+        defaultShopIds: default_shop_ids,
+        stockShopIdsBySku,
+      });
       for (const sid of sku_ids) {
         try {
-          if (standardIds.has(sid)) {
+          if (plan.standardIds.has(sid)) {
             await syncStandardSkuToAllYouzanBranchesCore(sid, 9999);
           } else {
+            const targets = plan.customTargets.get(sid) ?? [];
+            if (targets.length === 0) continue; // 无明确所属店：不铺货、不写有赞
             await releaseSkuToOfflineShopsCore({
               sku_id: sid,
-              shop_ids: targetShopIds,
+              shop_ids: targets,
             });
           }
         } catch {
           /* 保留错误在 link 里 */
         }
       }
-      if (targetShopIds.length > 0) {
+      if (plan.standardIds.size > 0 || plan.customTargets.size > 0) {
         triggerStockWorker({ sku_ids });
       }
     } catch {
