@@ -98,8 +98,10 @@ test("总部/非库存映射身份不会自动变成目标：只认传入的正�
 test("静态合同：inventory.functions 不再有“空默认→全部分店”的兜底", () => {
   const src = readFileSync("src/lib/inventory.functions.ts", "utf8");
   assert.ok(
-    !src.includes('.eq("role", "branch")'),
-    "autoDistributeInBackground 不得再查询全部 branch 门店作为兜底目标",
+    !src.includes("targetShopIds = (branches ?? [])"),
+    "不得再把全部 branch 门店赋值给铺货目标",
   );
   assert.match(src, /planAutoDistributeTargets/);
+  // 启用分店查询只允许作为库存推导的过滤器存在
+  assert.match(src, /activeBranchIds/);
 });
