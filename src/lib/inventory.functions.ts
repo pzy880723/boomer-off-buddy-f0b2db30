@@ -104,7 +104,7 @@ const MetaInput = z.object({
   category_confidence: z.number().min(0).max(1).nullable().optional(),
   classification_status: z.enum(["auto_classified", "fallback", "corrected"]).nullable().optional(),
   ai_suggested_price: z.number().nonnegative().nullable().optional(),
-  // 默认铺货门店（空数组 = 铺给所有 branch）；Round B 铺货 worker 消费
+  // 默认铺货门店（空数组 = 自定义品仅铺正库存所属分店，推导不出则不铺；标准品仍全店共享）
   default_shop_ids: z.array(z.string().uuid()).max(200).optional(),
 });
 
