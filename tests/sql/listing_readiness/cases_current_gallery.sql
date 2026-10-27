@@ -15,7 +15,7 @@ SELECT strict_assert(listing_readiness_detail_images_state('b2700000-0000-0000-0
 SELECT strict_assert((SELECT count(*)=0 FROM inv_product_content_image_jobs WHERE sku_id='b2700000-0000-0000-0000-000000000004'),'proof creates no fake detail jobs');
 SELECT strict_assert((listing_readiness_publish_content('b2700000-0000-0000-0000-000000000004',(SELECT input_revision FROM listing_readiness WHERE sku_id='b2700000-0000-0000-0000-000000000004'),'[]','[]','template')->>'status')='replayed','content replay preserves gate');
 SELECT strict_assert(listing_readiness_is_ready('b2700000-0000-0000-0000-000000000004'),'content replay allows proven gallery');
-UPDATE listing_readiness SET input_revision=input_revision+1 WHERE sku_id='b2700000-0000-0000-000000000004';
+UPDATE listing_readiness SET input_revision=input_revision+1 WHERE sku_id='b2700000-0000-0000-0000-000000000004';
 SELECT strict_assert(NOT listing_readiness_is_ready('b2700000-0000-0000-0000-000000000004'),'new revision remains blocked');
 SELECT strict_assert((listing_readiness_publish_content('b2700000-0000-0000-0000-000000000004',1,'[]','[]','template')->>'status')='stale','old content publish revision rejected');
 UPDATE listing_readiness SET recognition_revision=input_revision,image_revision=input_revision,content_revision=input_revision WHERE sku_id='b2700000-0000-0000-0000-000000000004';
