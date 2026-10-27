@@ -13,6 +13,11 @@ VALUES ('b2700000-0000-0000-0000-000000000001',1,1,'00000000-0000-0000-0000-0000
 SELECT strict_assert(NOT listing_readiness_is_ready('b2700000-0000-0000-0000-000000000001'),'raw_declined never ready');
 DELETE FROM listing_readiness WHERE sku_id='b2700000-0000-0000-0000-000000000002';
 SELECT strict_assert(NOT listing_readiness_is_ready('b2700000-0000-0000-0000-000000000002'),'missing legacy custom readiness blocks');
+UPDATE listing_readiness SET images_settled=true,recognition_status='succeeded',recognition_revision=input_revision,
+image_status='succeeded',image_revision=input_revision,content_status='succeeded',content_revision=input_revision
+WHERE sku_id='b2700000-0000-0000-0000-000000000003';
+INSERT INTO inv_product_content(sku_id,version,published_version,updated_by,published_blocks)
+VALUES ('b2700000-0000-0000-0000-000000000003',1,1,'00000000-0000-0000-0000-000000000001','[{"type":"text","text":"facts"}]');
 SELECT strict_assert(listing_readiness_is_ready('b2700000-0000-0000-0000-000000000003'),'standard raw unchanged');
 INSERT INTO commerce_listings(sku_id,location_id,title,price,status,published_at)
 VALUES ('b2700000-0000-0000-0000-000000000002','00000000-0000-0000-0000-00000000000a','legacy',1,'published',now());
