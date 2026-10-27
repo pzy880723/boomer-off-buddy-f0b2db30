@@ -53,6 +53,14 @@ test("系统提示：年代在独立字段展示，简介不输出具体年份�
   assert.match(SUMMARY_PROMPT, /版权年份/);
 });
 
+test("系统提示：静态屏显不等于功能检测，未经检测记录不得声称实测/功能正常", () => {
+  assert.match(SUMMARY_PROMPT, /静态照片里的屏幕显示不等于功能检测/);
+  assert.match(SUMMARY_PROMPT, /"实测"/);
+  assert.match(SUMMARY_PROMPT, /"测试通过"/);
+  assert.match(SUMMARY_PROMPT, /"功能正常"/);
+  assert.match(SUMMARY_PROMPT, /"可正常通电"/);
+});
+
 test("parseSummaryOutput：160 字通过，161 字拒绝", () => {
   assert.equal(parseSummaryOutput(okPayload("长".repeat(160))).length, 160);
   assert.throws(() => parseSummaryOutput(okPayload("长".repeat(161))), /ai_output_too_long/);

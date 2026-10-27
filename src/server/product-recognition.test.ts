@@ -439,6 +439,9 @@ describe("handheld recognition performance policy", () => {
     assert.match(handheld, /CCD[\s\S]{0,80}冷白皮/);
     assert.match(handheld, /CCD[\s\S]{0,120}实拍效果/);
     assert.match(handheld, /CCD[\s\S]{0,160}具体参数/);
+    assert.match(handheld, /静态照片只能说明可见外观或屏显/);
+    assert.match(handheld, /不等于实际通电或功能检测/);
+    assert.match(handheld, /不得写“实测”“测试通过”“功能正常”“可正常通电”/);
     const erp = buildEraInstruction("erp");
     assert.match(erp, /禁止把版权年/);
     assert.equal(/60~120 字/.test(erp), false);
