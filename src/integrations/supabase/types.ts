@@ -4479,21 +4479,30 @@ export type Database = {
       inv_defect_retouch_receipts: {
         Row: {
           actor_user_id: string | null
+          bound_sku_id: string | null
           created_at: string
+          device_id: string | null
           image_path: string
           source: string
+          validation_version: number
         }
         Insert: {
           actor_user_id?: string | null
+          bound_sku_id?: string | null
           created_at?: string
+          device_id?: string | null
           image_path: string
           source: string
+          validation_version?: number
         }
         Update: {
           actor_user_id?: string | null
+          bound_sku_id?: string | null
           created_at?: string
+          device_id?: string | null
           image_path?: string
           source?: string
+          validation_version?: number
         }
         Relationships: []
       }
@@ -12857,6 +12866,10 @@ export type Database = {
         Returns: Json
       }
       inventory_delete_unused_sku: { Args: { p_sku_id: string }; Returns: Json }
+      listing_image_has_success_receipt: {
+        Args: { p_path: string; p_sku: string }
+        Returns: boolean
+      }
       listing_readiness_append_reuse_photos: {
         Args: {
           p_actor: string
