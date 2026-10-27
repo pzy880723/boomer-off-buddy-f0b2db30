@@ -1,4 +1,5 @@
 # Architecture rules
+- Handheld smart-create allows omitted category and all descriptive metadata; the existing NOT NULL category stores blank as unclassified and commit validates title/price before atomic work. Present category still validates against active leaf taxonomy, absent category skips taxonomy-dependent writes; current readiness gates remain independent. Why: ERP drafts must save without fabricated taxonomy or storefront exposure.
 - Channel-sync exception page display uses the pure dictionaries in src/lib/sync-record-labels.ts; unknown protocol values stay Chinese and product names never fall back to UUIDs. Why: localize the real page without changing task queries or actions.
 - Support, points-earning and measurement rules live in src/server/AGENTS.md; membership/newcomer coupon rules in src/lib/membership/AGENTS.md; commerce product rules (翻筐乐, stamps/tags) in src/lib/commerce/AGENTS.md.
 - PC card printing adapts the native same-origin array manifest and embeds original single-card PDF pages without rasterization; eligibility is rechecked before output. Why: preserves embedded fonts and approved layouts while blocking retired presets.
