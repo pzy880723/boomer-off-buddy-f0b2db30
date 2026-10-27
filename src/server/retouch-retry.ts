@@ -9,7 +9,9 @@ export function retouchRetryDelay(error: unknown, attempts: number): number | nu
     if (e.status === 429) return 15 * 60_000;
     return e.status >= 500 && e.status <= 599 ? 30_000 * 2 ** (attempts - 1) : null;
   }
-  if (e.name === "TypeError" || e.name === "TimeoutError" || /HTTP (429|5\d\d)|AI gateway (429|5\d\d)|未返回图片（stop）|修图检查未通过/.test(text))
+  if ((e.name === "TypeError" && /fetch failed|failed to fetch|network error|load failed/i.test(text)) ||
+    (e.name === "TimeoutError" && /timeout|timed out/i.test(text)) ||
+    /HTTP (429|5\d\d)|AI gateway (429|5\d\d)|未返回图片（stop）|修图检查未通过/.test(text))
     return /429/.test(text) ? 15 * 60_000 : 30_000 * 2 ** (attempts - 1);
   return null;
 }
