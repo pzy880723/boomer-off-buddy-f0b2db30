@@ -22,3 +22,7 @@ SELECT strict_assert(listing_readiness_is_ready('b2700000-0000-0000-0000-0000000
 INSERT INTO commerce_listings(sku_id,location_id,title,price,status,published_at)
 VALUES ('b2700000-0000-0000-0000-000000000002','00000000-0000-0000-0000-00000000000a','legacy',1,'published',now());
 SELECT strict_assert((SELECT status='hidden' AND readiness_hold AND published_at IS NULL FROM commerce_listings WHERE sku_id='b2700000-0000-0000-0000-000000000002'),'manual legacy publication held');
+SELECT strict_assert(NOT EXISTS(SELECT 1 FROM storefront_ready_listings WHERE sku_id='b2700000-0000-0000-0000-000000000002'),'legacy excluded from DB public read view');
+SELECT strict_assert(published_product_content('b2700000-0000-0000-0000-000000000001') IS NULL,'raw decline content not public');
+SELECT strict_assert(NOT has_function_privilege('authenticated','storefront_ready_skus(uuid[])','EXECUTE'),'eligibility helper service-only');
+SELECT strict_assert((SELECT count(*)=0 FROM storefront_ready_skus(ARRAY['b2700000-0000-0000-0000-000000000001'::uuid,'b2700000-0000-0000-0000-000000000002'::uuid])),'batch eligibility excludes declined and missing receipts');
