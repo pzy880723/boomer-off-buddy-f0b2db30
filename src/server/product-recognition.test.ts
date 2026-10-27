@@ -173,7 +173,7 @@ describe("shared product recognition core", () => {
       const erpBody = JSON.parse(requests[1].body as string);
       assert.equal(erpBody.reasoning, undefined);
       assert.equal(erpBody.max_tokens, undefined);
-      assert.match(body.messages[0].content, /20-30 字/);
+      assert.match(body.messages[0].content, /60~120 字/);
       assert.match(body.messages[0].content, /禁止把版权年/);
       assert.match(body.messages[0].content, /Hello Kitty/);
       assert.match(body.messages[0].content, /attributes\.brand[^\n]*三丽鸥/);
@@ -435,11 +435,11 @@ describe("handheld recognition performance policy", () => {
     assert.match(handheld, /约1990—2000年代（推测）/);
     assert.match(handheld, /年代待确认/);
     assert.match(handheld, /禁止把版权年/);
-    assert.match(handheld, /20-30 字/);
+    assert.match(handheld, /60~120 字/);
     const erp = buildEraInstruction("erp");
     assert.match(erp, /禁止把版权年/);
-    assert.equal(/20-30 字/.test(erp), false);
-    assert.equal(PRODUCT_RECOGNITION_PROMPT_VERSION, "boomer-product-v7-era-estimate");
+    assert.equal(/60~120 字/.test(erp), false);
+    assert.equal(PRODUCT_RECOGNITION_PROMPT_VERSION, "boomer-product-v8-description");
   });
 
   test("estimated decades stay qualified in the handheld description and use one model request", async () => {
