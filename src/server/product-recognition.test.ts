@@ -169,6 +169,10 @@ describe("shared product recognition core", () => {
       assert.equal(requests[1].signal, undefined);
       const body = JSON.parse(requests[0].body as string);
       assert.equal(body.max_tokens, 4096);
+      assert.deepEqual(body.reasoning, { effort: "low" });
+      const erpBody = JSON.parse(requests[1].body as string);
+      assert.equal(erpBody.reasoning, undefined);
+      assert.equal(erpBody.max_tokens, undefined);
       assert.match(body.messages[0].content, /20-30 字/);
       assert.match(body.messages[0].content, /禁止把版权年/);
       assert.match(body.messages[0].content, /Hello Kitty/);
