@@ -4,6 +4,7 @@ set -euo pipefail
 bash tests/sql/listing_readiness/run_current_gallery.sh
 export PGDB=readiness_test
 /tmp/psql.sh -q -c "DROP TABLE handheld_smart_create_ops CASCADE; CREATE TABLE inv_stock_movements(id uuid DEFAULT gen_random_uuid(),sku_id uuid,location_id uuid,delta integer,balance_after integer,ref_type text,ref_id uuid,epc text,note text,created_by uuid);"
+/tmp/psql.sh -q -f tests/sql/smart_create/optional_movement_stub.sql
 /tmp/psql.sh -q -f drizzle/migrations/0012_handheld_smart_create_idempotency.sql
 # Exact reviewed live base commit includes fankuang_override; no production writes.
 /tmp/psql.sh -q -f tests/sql/smart_create_cancel/live_handheld_smart_create_commit.def.sql
