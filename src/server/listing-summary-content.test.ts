@@ -33,6 +33,26 @@ test("系统提示保留防注入与禁止虚构，并要求保留明确风险�
   assert.match(SUMMARY_PROMPT, /冷白皮/);
 });
 
+test("系统提示要求省略未填写的规格，不罗列未核实/待确认；明确风险仍保留", () => {
+  assert.match(SUMMARY_PROMPT, /没填写/);
+  assert.match(SUMMARY_PROMPT, /直接省略/);
+  assert.match(SUMMARY_PROMPT, /未核实/);
+  assert.match(SUMMARY_PROMPT, /待确认/);
+  assert.match(SUMMARY_PROMPT, /风险必须保留/);
+});
+
+test("系统提示：有明确归属的样片结论或可靠型号依据时可写色彩风格，CCD 统称仍禁止编造", () => {
+  assert.match(SUMMARY_PROMPT, /明确归属的样片结论/);
+  assert.match(SUMMARY_PROMPT, /可靠依据的特点要准确保留/);
+  assert.match(SUMMARY_PROMPT, /不能凭"CCD"统称编造/);
+});
+
+test("系统提示：年代在独立字段展示，简介不输出具体年份数字或稀缺性称号", () => {
+  assert.match(SUMMARY_PROMPT, /年代在独立字段展示/);
+  assert.match(SUMMARY_PROMPT, /不输出具体年份数字/);
+  assert.match(SUMMARY_PROMPT, /版权年份/);
+});
+
 test("parseSummaryOutput：160 字通过，161 字拒绝", () => {
   assert.equal(parseSummaryOutput(okPayload("长".repeat(160))).length, 160);
   assert.throws(() => parseSummaryOutput(okPayload("长".repeat(161))), /ai_output_too_long/);
