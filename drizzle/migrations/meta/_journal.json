@@ -799,6 +799,13 @@
       "when": 1793075245344,
       "tag": "0113_validated_retouch_receipt_gate",
       "breakpoints": true
+    },
+    {
+      "idx": 114,
+      "version": "7",
+      "when": 1793075527974,
+      "tag": "0114_legacy_proven_storefront_read_gate",
+      "breakpoints": true
     }
   ]
 }

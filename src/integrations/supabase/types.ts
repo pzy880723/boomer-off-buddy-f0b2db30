@@ -13466,6 +13466,10 @@ export type Database = {
         }[]
       }
       storefront_image_ready: { Args: { p_sku: string }; Returns: boolean }
+      storefront_legacy_image_ready: {
+        Args: { p_sku: string }
+        Returns: boolean
+      }
       storefront_product_engagement_counts: {
         Args: { p_listing_ids: string[] }
         Returns: {
