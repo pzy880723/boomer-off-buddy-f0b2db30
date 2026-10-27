@@ -987,3 +987,60 @@ test("list and detail expose dictionary category name/path while keeping raw cod
   assert.equal(detail.body.data.category, "toy_model");
   assert.equal(detail.body.data.category_name, "模型");
 });
+
+// ---- listed_desc / listed_asc：只认本店 commerce_listings.published_at，缺失回退 created_at ----
+function seedListed() {
+  for (const s of tables.inv_skus) { s.created_at = "2026-01-01T00:00:00Z"; s.updated_at = "2026-12-31T00:00:00Z"; }
+  tables.inv_skus.find((s) => s.id === "a")!.created_at = "2026-05-01T00:00:00Z";
+  tables.inv_skus.find((s) => s.id === "sold-a")!.created_at = "2026-09-01T00:00:00Z";
+  tables.inv_skus.find((s) => s.id === "down-a")!.updated_at = "2027-06-01T00:00:00Z";
+  tables.commerce_listings = [
+    { sku_id: "a", location_id: A, published_at: "2026-10-20T00:00:00Z" },
+    { sku_id: "a", location_id: B, published_at: "2026-10-26T00:00:00Z" },
+    { sku_id: "down-a", location_id: B, published_at: "2026-10-27T00:00:00Z" },
+    { sku_id: "bundle-a", location_id: A, published_at: "not-a-date" },
+  ];
+}
+test("listed_desc uses this store's publish time, not another store, updated_at or created_at", async () => {
+  seedListed();
+  const { status, body } = await call("list", `location_id=${A}&sort=listed_desc`);
+  assert.equal(status, 200);
+  const items = body.data.items;
+  assert.deepEqual(items.map((i: Row) => i.id), ["a", "sold-a", "bundle-a", "down-a", "standard"]);
+  const a = items.find((i: Row) => i.id === "a");
+  assert.equal(a.listed_at, "2026-10-20T00:00:00.000Z");
+  assert.equal(a.listed_at_source, "store_listing_published_at");
+  const downA = items.find((i: Row) => i.id === "down-a");
+  assert.equal(downA.listed_at, "2026-01-01T00:00:00.000Z");
+  assert.equal(downA.listed_at_source, "sku_created_at_fallback");
+  assert.equal(items.find((i: Row) => i.id === "bundle-a").listed_at_source, "sku_created_at_fallback");
+  assert.ok(requests.includes("commerce_listings"));
+});
+test("listed sort happens before paging with stable id ties", async () => {
+  seedListed();
+  const p1 = await call("list", `location_id=${A}&sort=listed_asc&page_size=2&page=1`);
+  const p2 = await call("list", `location_id=${A}&sort=listed_asc&page_size=2&page=2`);
+  assert.deepEqual(p1.body.data.items.map((i: Row) => i.id), ["bundle-a", "down-a"]);
+  assert.deepEqual(p2.body.data.items.map((i: Row) => i.id), ["standard", "sold-a"]);
+  assert.equal(p1.body.data.total, 5);
+  assert.deepEqual(p1.body.data.counts, { custom: 3, bundle: 1, standard: 1, all: 5 });
+});
+test("price sort unchanged by listed fields", async () => {
+  seedListed();
+  tables.inv_skus.find((s) => s.id === "a")!.price_tier = 99;
+  const { body } = await call("list", `location_id=${A}&sort=price_desc`);
+  assert.equal(body.data.items[0].id, "a");
+});
+test("HQ all scope never borrows any store's publish time", async () => {
+  seedListed();
+  const { status, body } = await call("list", "scope=all&sort=listed_desc");
+  assert.equal(status, 200);
+  assert.ok(body.data.items.every((i: Row) => i.listed_at_source !== "store_listing_published_at"));
+  assert.ok(!requests.includes("commerce_listings"));
+});
+test("commerce_listings read failure is not an empty success", async () => {
+  seedListed();
+  failures.add("commerce_listings");
+  const { status } = await call("list", `location_id=${A}&sort=listed_desc`);
+  assert.equal(status, 500);
+});
