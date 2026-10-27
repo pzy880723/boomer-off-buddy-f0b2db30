@@ -100,8 +100,8 @@ async function handleSmartCreate(request: Request, timing: ReturnType<typeof cre
         timing.mark("idempotency");
         // 只读校验并行（类目 / 标签 / 品牌 / 库位）；报错优先级与原串行顺序一致。
         const [catR, facetsR, brandR, locR] = await Promise.allSettled([
-          assertActiveLeafCategory(body.category),
-          body.facet_codes !== undefined || body.tags !== undefined
+          body.category ? assertActiveLeafCategory(body.category) : Promise.resolve(),
+          body.category && (body.facet_codes !== undefined || body.tags !== undefined)
             ? resolveManualProductFacets({
                 categoryCode: body.category,
                 facetCodes: body.facet_codes,
@@ -183,15 +183,16 @@ async function handleSmartCreate(request: Request, timing: ReturnType<typeof cre
           p_location_id: locationId,
           p_reuse: shouldReuseSmartCreateSku(body.is_custom_price),
           p_sku: {
-            category: body.category,
+            // Existing NOT NULL text column uses blank for genuinely unclassified, never an invented taxonomy code.
+            category: body.category ?? "",
             name: body.name,
             price_tier: body.price_tier,
             is_custom_price: body.is_custom_price,
             inventory_policy: body.is_custom_price ? "tracked" : "unlimited",
             // 标准商品不参与翻筐乐：忽略客户端值；省略/null 表示按售价自动。
             fankuang_override: body.is_custom_price ? (body.fankuang_override ?? null) : null,
-            epc: generateEpc(body.category, body.price_tier),
-            sku_code: generateSkuCode(body.category, "single"),
+            epc: generateEpc(body.category ?? "", body.price_tier),
+            sku_code: generateSkuCode(body.category ?? "", "single"),
             image_paths: incomingPaths,
             image_url: firstHttp,
             weight_g: body.weight_g ?? null,
@@ -252,7 +253,7 @@ async function handleSmartCreate(request: Request, timing: ReturnType<typeof cre
           if (upd.error) return err(`Save SKU attributes failed: ${upd.error.message}`, 500);
         }
 
-        if (body.recognition_request_id) {
+        if (body.recognition_request_id && body.category) {
           try {
             await attachProductClassificationAuditToSku({
               requestId: body.recognition_request_id,
