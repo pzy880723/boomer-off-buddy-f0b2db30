@@ -834,8 +834,9 @@ export const AttachImagesRes = okEnvelope(
 export const SmartCreateReq = z
   .object({
     location_id: uuidSchema.optional().meta({ description: "默认用当前设备库位" }),
-    name: z.string().min(1).max(120),
-    category: ProductCategoryCode,
+    name: z.string().min(1).max(120).refine((v) => v.trim().length > 0, { message: "标题不能为空" }),
+    category: z.preprocess((v) => v === null || (typeof v === "string" && !v.trim()) ? undefined : v,
+      ProductCategoryCode.optional()).meta({ description: "可选ERP分类；省略/null/空串保存为未分类，不阻塞ERP建档，不代表小程序就绪" }),
     facet_codes: z
       .array(z.string().trim().min(1).max(80))
       .max(20)

@@ -813,6 +813,13 @@
       "when": 1793077218918,
       "tag": "0115_current_gallery_detail_proof",
       "breakpoints": true
+    },
+    {
+      "idx": 116,
+      "version": "7",
+      "when": 1793078201859,
+      "tag": "0116_smart_create_optional_category",
+      "breakpoints": true
     }
   ]
 }

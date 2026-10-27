@@ -80,7 +80,7 @@ const { Route } = await load("src/routes/api/public/handheld/items.smart-create.
     export const smartCreateFingerprint = () => 'fp';
     export const smartCreateRequestFingerprint = b => ({ fingerprint: 'fp', incomingPaths: (b.image_storage_paths ?? []).map(p => p.storage_path.startsWith(p.bucket + '/') ? p.storage_path : p.bucket + '/' + p.storage_path), normalizedImageUrl: null });`,
   "@/lib/commerce/product-marks": "export const readProductMarks = s => ({ featured_stamp: s?.featured_stamp ?? null, notice_tags: s?.notice_tags ?? [] });",
-  "@/server/product-classification.server": `export const assertActiveLeafCategory = async () => {}; export const attachProductClassificationAuditToSku = async () => {};
+  "@/server/product-classification.server": `export const assertActiveLeafCategory = async code => { if (!code) throw Error('category required'); }; export const attachProductClassificationAuditToSku = async () => {};
     export const replaceManualProductFacets = async () => {}; export const resolveOrCreateConfirmedIp = async (i) => { (globalThis.__sc.state.ipCalls ??= []).push(['confirm', i]); if (i.name && !i.confirmed) throw new Error('IP 未确认，请选择已有 IP 或确认新建'); return { id: null, name: null, status: 'empty' }; }; export const resolveIpCandidate = async (n) => { (globalThis.__sc.state.ipCalls ??= []).push(['candidate', n]); return n === '哆啦A梦' ? { id: 'ip1', name: '哆啦A梦', status: 'matched' } : { id: null, name: n, status: 'review' }; };
     export const resolveManualProductFacets = async () => null;`,
   "@/server/handheld-listing-image-jobs.server": "export const enqueueListingImageJobs = async (i) => { globalThis.__sc.state.enqueued.push(i); return { status: 'queued', queued: 1 }; }; export const triggerListingImageWorker = () => {};",
@@ -321,4 +321,20 @@ test("ip_candidate 与 ip_name 或 ip_confirmed=true 同传 → 400", async () =
 test("省略 ip_candidate 时回执不含 ip_review_pending", async () => {
   const body = await (await post({ ...ipBase })).json();
   assert.equal("ip_review_pending" in body.data, false);
+});
+
+test("title and price only: uncategorized ERP save retains raw and held storefront", async () => {
+  state.tables.commerce_listings = { id: 'listing', status: 'hidden', readiness_hold: true };
+  const res = await post({ client_op_id: 'minimal-01', name: '未分类商品', price_tier: 59.9, is_custom_price: true,
+    image_storage_paths: [{ bucket: 'sku-raw', storage_path: 'device/original.jpg' }], ai_processing_allowed: false });
+  assert.equal(res.status, 200);
+  const data = (await res.json()).data;
+  assert.equal(data.sku_id, 's1');
+  assert.equal(data.storefront_status, 'processing');
+  const sku = commitArgs().p_sku as Record<string, unknown>;
+  assert.equal(sku.category, '');
+  assert.deepEqual(sku.image_paths, ['sku-raw/device/original.jpg']);
+  assert.deepEqual(sku.attributes, {});
+  assert.equal(commitArgs().p_image_plan, 'raw_declined');
+  assert.equal(skuImageWrites().length, 0);
 });

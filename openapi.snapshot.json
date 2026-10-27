@@ -1963,6 +1963,21 @@
           },
           {
             "in": "query",
+            "name": "fankuang",
+            "schema": {
+              "description": "1/true 仅翻筐乐商品，分页前过滤；与库位、状态和搜索共同生效",
+              "type": "string",
+              "enum": [
+                "0",
+                "1",
+                "true",
+                "false"
+              ]
+            },
+            "description": "1/true 仅翻筐乐商品，分页前过滤；与库位、状态和搜索共同生效"
+          },
+          {
+            "in": "query",
             "name": "sort",
             "schema": {
               "default": "updated_desc",
@@ -2069,7 +2084,7 @@
                             "all"
                           ],
                           "additionalProperties": false,
-                          "description": "当前库位范围内各 type 的角标计数（受 q/category/status/has_image 过滤影响，不受 type 影响）"
+                          "description": "当前库位范围内各 type 的角标计数（受 q/category/status/has_image/fankuang 过滤影响，不受 type 影响）"
                         }
                       },
                       "required": [
@@ -2650,7 +2665,9 @@
                             "processing",
                             "succeeded",
                             "partial_failed",
-                            "retryable_failed"
+                            "retryable_failed",
+                            "failed",
+                            "partial_failed_terminal"
                           ]
                         },
                         "notes": {
@@ -3194,7 +3211,7 @@
           "盘点"
         ],
         "summary": "上传盘点扫描",
-        "description": "可多次调用，按 (stocktake_id, epc) 去重。未识别的 EPC 在返回里单独列出。",
+        "description": "需员工会话且有设备库位权限、盘点单 scanning。按 (stocktake_id, epc) 去重；accepted 只计本次 EPC 中已持久化且关联有效 SKU 的行，旧空 SKU 记录在 EPC 已绑定后补关联；未关联 EPC 列入 unknown。",
         "requestBody": {
           "content": {
             "application/json": {
@@ -3222,7 +3239,14 @@
                         "received": {
                           "type": "integer",
                           "minimum": -9007199254740991,
-                          "maximum": 9007199254740991
+                          "maximum": 9007199254740991,
+                          "description": "本次去重后的 EPC 数"
+                        },
+                        "accepted": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "本次 EPC 中已持久化且关联有效 SKU 的数量"
                         },
                         "unknown_count": {
                           "type": "integer",
@@ -3236,7 +3260,8 @@
                             "minLength": 1,
                             "description": "RFID EPC 编码",
                             "example": "E2000017220C00000000A1B2"
-                          }
+                          },
+                          "description": "未持久化或未关联 SKU 的 EPC（含 inv_epcs 存在但 sku_id 为空）"
                         },
                         "participants": {
                           "default": [],
@@ -3248,6 +3273,7 @@
                       },
                       "required": [
                         "received",
+                        "accepted",
                         "unknown_count",
                         "unknown",
                         "participants"
@@ -6514,6 +6540,11 @@
                         "taxonomy_version": {
                           "type": "string"
                         },
+                        "recognition_failed": {
+                          "default": false,
+                          "description": "仅模型执行失败时为 true（返回的是安全兜底名，不能当作识别完成）；低置信度成功为 false",
+                          "type": "boolean"
+                        },
                         "raw": {}
                       },
                       "required": [
@@ -6544,7 +6575,8 @@
                         "evidence",
                         "model",
                         "prompt_version",
-                        "taxonomy_version"
+                        "taxonomy_version",
+                        "recognition_failed"
                       ],
                       "additionalProperties": false
                     }
@@ -7297,7 +7329,9 @@
                                 "processing",
                                 "succeeded",
                                 "partial_failed",
-                                "retryable_failed"
+                                "retryable_failed",
+                                "failed",
+                                "partial_failed_terminal"
                               ]
                             },
                             "queued": {
@@ -9216,6 +9250,38 @@
                               "type": "boolean",
                               "description": "有效参与翻筐乐；标准/不限量/组包商品恒为 false"
                             },
+                            "featured_stamp": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "new",
+                                    "rare",
+                                    "limited",
+                                    "collectible",
+                                    "discontinued"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "特色印章：new 全新品/rare 稀有商品/limited 限定版/collectible 收藏级/discontinued 绝版商品；null 无"
+                            },
+                            "notice_tags": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "flawed",
+                                  "function_uncertain",
+                                  "function_unavailable",
+                                  "not_edible",
+                                  "parts_missing"
+                                ]
+                              },
+                              "description": "提示标签：flawed 有瑕疵/function_uncertain 功能不确定/function_unavailable 功能不可用/not_edible 不可食用/parts_missing 零件缺失"
+                            },
                             "sku_code": {
                               "anyOf": [
                                 {
@@ -9409,7 +9475,9 @@
                                 "processing",
                                 "succeeded",
                                 "partial_failed",
-                                "retryable_failed"
+                                "retryable_failed",
+                                "failed",
+                                "partial_failed_terminal"
                               ]
                             },
                             "notes": {
@@ -9522,6 +9590,8 @@
                             "is_unlimited_stock",
                             "fankuang_override",
                             "in_fankuang",
+                            "featured_stamp",
+                            "notice_tags",
                             "sku_code",
                             "barcode",
                             "epc",
@@ -9789,6 +9859,39 @@
                         "type": "null"
                       }
                     ]
+                  },
+                  "featured_stamp": {
+                    "description": "特色印章（单选，null 清空；省略保持原值）",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "new",
+                          "rare",
+                          "limited",
+                          "collectible",
+                          "discontinued"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "notice_tags": {
+                    "description": "提示标签（多选，[] 清空；功能不确定/不可用互斥；省略保持原值）",
+                    "maxItems": 5,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "flawed",
+                        "function_uncertain",
+                        "function_unavailable",
+                        "not_edible",
+                        "parts_missing"
+                      ]
+                    }
                   }
                 },
                 "required": [
@@ -9834,7 +9937,9 @@
                               "notes",
                               "grade",
                               "image_paths",
-                              "fankuang_override"
+                              "fankuang_override",
+                              "featured_stamp",
+                              "notice_tags"
                             ]
                           }
                         },
@@ -10953,12 +11058,21 @@
             "in": "query",
             "name": "ts",
             "schema": {
-              "description": "上次拉取的 server_ts；空=最近 50 条",
+              "description": "旧模式：上次拉取的 server_ts；空=最近 50 条（不含状态变更，可能漏同 ts/晚提交）",
               "type": "string",
               "format": "date-time",
               "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
             },
-            "description": "上次拉取的 server_ts；空=最近 50 条"
+            "description": "旧模式：上次拉取的 server_ts；空=最近 50 条（不含状态变更，可能漏同 ts/晚提交）"
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "description": "可靠增量模式：'latest' 取起始游标，之后传回 next_cursor（v2:<xid>:<seq>）；优先于 ts",
+              "type": "string"
+            },
+            "description": "可靠增量模式：'latest' 取起始游标，之后传回 next_cursor（v2:<xid>:<seq>）；优先于 ts"
           },
           {
             "in": "query",
@@ -10996,12 +11110,533 @@
                           "type": "string",
                           "format": "date-time",
                           "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
-                          "description": "下次请求把它当成 ts"
+                          "description": "旧模式：下次请求把它当成 ts"
+                        },
+                        "next_cursor": {
+                          "description": "cursor 模式：下次原样传回",
+                          "type": "string"
+                        },
+                        "has_more": {
+                          "description": "cursor 模式：true 时立即继续拉取",
+                          "type": "boolean"
                         }
                       },
                       "required": [
                         "items",
                         "server_ts"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/handheld/work-items": {
+      "get": {
+        "tags": [
+          "通知"
+        ],
+        "summary": "全部待处理事项（已读不等于处理）",
+        "description": "设备token+员工session+门店权限。完整counts独立于分页；会话待回复+测量去重，语音事件不重复计待办。支持客服、测量、履约/自提、调拨、盘点、售后、同步失败。401缺认证，403门店越权，400非法游标，500读取失败。",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "location_id",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string",
+              "maxLength": 160
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_ignored",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "ignored_only",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "type": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "description": {
+                                "type": "string"
+                              },
+                              "meta": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "urgency": {
+                                "type": "string",
+                                "enum": [
+                                  "normal",
+                                  "urgent"
+                                ]
+                              },
+                              "action": {
+                                "type": "string"
+                              },
+                              "target_id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "sku_id": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "conversation_id": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "image_url": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "type",
+                              "title",
+                              "description",
+                              "meta",
+                              "action",
+                              "target_id"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "next_cursor": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "counts": {
+                          "type": "object",
+                          "properties": {
+                            "customers": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "internal": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "orders": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "system": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "total": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "required": [
+                            "customers",
+                            "internal",
+                            "orders",
+                            "system",
+                            "total"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "next_cursor",
+                        "counts"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/handheld/notifications/unread-counts": {
+      "get": {
+        "tags": [
+          "通知"
+        ],
+        "summary": "未读角标数字（全量数据库计数）",
+        "description": "需要设备 token + 员工 session。query `location_id` 可选，必须在账号授权门店内（格式错 400 validation_error，越权 403 location_forbidden）；不传时为账号全部授权门店，总部另含无门店通用咨询。data:{customers,internal,orders,system,total} 均为非负整数，total=四类之和。customers=该店全部客服会话中晚于本人 support participant last_read_at 的顾客消息数（打开会话 GET 即自然更新）。其余三类=本人可见且未读的 inv_handheld_notifications；kind 先 lowercase 并把 . - 转为 _，按精确或 `前缀_` 分类：customer/conversation/support/inquiry→不计（避免与 customers 重复）；order/refund/fulfillment/shipment/shortage/pickup→orders；internal/announcement/transfer/stocktake→internal；其余→system。单条 POST notifications/{id}/read 只减对应类别。计数结果不满足契约时返回 500 code=unread_counts_contract_error，不会以 0 代替。",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "location_id",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "customers": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "internal": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "orders": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "system": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "total": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "pending_counts": {
+                          "type": "object",
+                          "properties": {
+                            "customers": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "internal": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "orders": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "system": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "total": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "required": [
+                            "customers",
+                            "internal",
+                            "orders",
+                            "system",
+                            "total"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "customers",
+                        "internal",
+                        "orders",
+                        "system",
+                        "total",
+                        "pending_counts"
                       ],
                       "additionalProperties": false
                     }
@@ -11217,7 +11852,7 @@
           "客服"
         ],
         "summary": "客服会话列表（v1.16）",
-        "description": "门店员工按授权库位、总部客服可见全部会话；协作者可写内部备注，对外回复仅限当前主接待人。返回 data.items 与 next_cursor；服务端先按 queue 和授权范围筛选，再分页。HQ 不传 location_id 表示全部授权门店，传入按该门店过滤；门店员工不传时仍限制在授权库位，传非授权门店返回 403 forbidden_location。items[] 含 unread_count（顾客消息晚于本人 last_read_at 的精确数）、last_customer_message_at:string|null（前台通知去重）、customer_avatar_url、location_id、updated_at。",
+        "description": "门店员工按授权库位、总部客服可见全部会话；协作者可写内部备注，对外回复仅限当前主接待人。返回 data.items 与 next_cursor；服务端先按 queue 和授权范围筛选，再分页。HQ 不传 location_id 表示全部授权门店，传入按该门店过滤；门店员工不传时仍限制在授权库位，传非授权门店返回 403 forbidden_location。items[] 增加 needs_reply:boolean,pending_measurement_count:integer,pending_action:boolean；items[] 含 unread_count（顾客消息晚于本人 last_read_at 的精确数）、last_customer_message_at:string|null（前台通知去重）、customer_avatar_url、location_id、updated_at。",
         "parameters": [
           {
             "name": "location_id",
@@ -11550,7 +12185,7 @@
           "客服"
         ],
         "summary": "会话详情与消息（v1.11）",
-        "description": "员工可见 internal:true 的内部备注；顾客端接口永不下发内部备注。消息保留旧字段，新增 sender_avatar_url:string|null、sender_role:customer|store_staff|hq_agent|system、sender_location_name:string|null。按历史发言者而非当前主接待人解析；头像仅安全公开 HTTPS，缺图/私桶路径返回 null。conversation 含 customer_avatar_url:string|null、last_customer_message_at:string|null。\n\n分页：不传 limit/before/after 返回最近 500 条（旧客户端兼容）；limit 1–100（带游标默认 50）；before 与 after 互斥（400 cursor_conflict）；游标 \"<created_at>|<uuid>\"。响应 messages 永远正序，并含 has_more（还有更早）、has_newer（after 模式还有更新）、older_cursor、latest_cursor。before 模式 latest_cursor 为 null，不得覆盖增量水位；after 无结果时 latest_cursor 回传请求游标。员工消息含 is_mine（是否当前登录员工发送），顾客端不返回。location_id 不等于会话门店返回 403 location_mismatch。响应头带 X-Request-Id 与 Server-Timing（auth/summary/messages/total，距请求开始毫秒）。",
+        "description": "员工可见 internal:true 的内部备注；顾客端接口永不下发内部备注。消息保留旧body文本，新增可空measurement_card:{task_id,sku_id,listing_id,product_name,image_url,status:pending|claimed|completed|cancelled,measurement_revision,measurement?:{height_cm,width_cm,depth_cm,diameter_cm}}，授权后动态投影当前尺寸/状态并签安全预览；系统完成卡不清普通问题waiting。新增 sender_avatar_url:string|null、sender_role:customer|store_staff|hq_agent|system、sender_location_name:string|null。按历史发言者而非当前主接待人解析；头像仅安全公开 HTTPS，缺图/私桶路径返回 null。conversation 含 customer_avatar_url:string|null、last_customer_message_at:string|null。\n\n分页：不传 limit/before/after 返回最近 500 条（旧客户端兼容）；limit 1–100（带游标默认 50）；before 与 after 互斥（400 cursor_conflict）；游标 \"<created_at>|<uuid>\"。响应 messages 永远正序，并含 has_more（还有更早）、has_newer（after 模式还有更新）、older_cursor、latest_cursor。before 模式 latest_cursor 为 null，不得覆盖增量水位；after 无结果时 latest_cursor 回传请求游标。员工消息含 is_mine（是否当前登录员工发送），顾客端不返回。location_id 不等于会话门店返回 403 location_mismatch。响应头带 X-Request-Id 与 Server-Timing（auth/summary/messages/total，距请求开始毫秒）。",
         "parameters": [
           {
             "name": "id",
@@ -13290,6 +13925,494 @@
         ],
         "summary": "申请面单（v1.11，未接入 provider）",
         "description": "当前返回 `carrier_not_configured` 或 `carrier_not_implemented`，均带 `waybill_available:false`；同样按目标子单库位授权且订单取消/关闭禁止写。",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {}
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/handheld/fulfillments/{id}/manual-ship": {
+      "post": {
+        "tags": [
+          "履约"
+        ],
+        "summary": "手工登记快递单号（v1.14，与 ERP 网页同一事务）",
+        "description": "需设备 token + 员工会话；子单必须属于设备库位且员工有该库位权限（否则 403 `forbidden`/`location_forbidden`）。仅已付款快递订单：`pickup_order`/`unpaid`/`refund_blocked`/`cancelled`/`after_sale_blocked`/`invalid_status` 均 409。同 `client_op_id` 同内容重放返回 `replayed:true`；同编号不同内容 409 `idempotency_conflict`；子单已登记 409 `already_shipped`；明细不符/超量 422 `invalid_lines`/`qty_exceeded`；404 `not_found`；503 结果未知请用同一 `client_op_id` 重试。只记录运单号，不生成物流轨迹。\n\n**0053 整单合同**：`lines` 必须一次覆盖子单全部应发行，每行 `quantity` = expected_qty − 已核准缺货（customer_accepted 且退款 refund_completed/not_required），缺/少行 422 `lines_incomplete`，重复行或他单行 422 `invalid_lines`；存在待顾客确认/退款未完成的缺货 409 `shortage_blocked`；全部核减为 0 时 409 `nothing_to_ship`。已拣数量不会重复累加（只补齐到应发量）。任一校验失败不写任何数量/单号/状态。幂等指纹 = provider + carrier_label + 单号(大写) + 按行排序后的明细数量，乱序同内容可重放。`provider`: `sf`/`cainiao`（电子面单承运商名称固定）或 `manual`（必须带 `carrier_label` 1–40 字，如“中通快递”，仅手工登记，不代表已接电子面单）；缺名称 400 `invalid_carrier_label`。成功返回 `shipment.carrier_label`。",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandheldManualShipReq"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {}
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/handheld/fulfillments/{id}/flash-deliver": {
+      "post": {
+        "tags": [
+          "履约"
+        ],
+        "summary": "同城闪送到付登记送达（v1.15，与 ERP 网页同一事务）",
+        "description": "仅 `fulfillment_method='flash'` 的子单：人工登记送达，**不需要也不接受快递单号**；配送费由顾客与门店客服约定后到付，系统不代收。授权/付款/售后/缺货/明细/幂等与 manual-ship 同一套数据库内校验：403 `forbidden`/`location_forbidden`；409 `not_flash_order`（非闪送单请用 manual-ship）/`unpaid`/`refund_blocked`/`cancelled`/`after_sale_blocked`/`invalid_status`/`already_shipped`/`idempotency_conflict`/`nothing_to_ship`/`shortage_blocked`；422 `invalid_lines`/`qty_exceeded`/`lines_incomplete`；400 `invalid_idempotency_key`/`invalid_note`。同 `client_op_id` 同内容重放 `replayed:true`。成功返回 `delivered` 与 `shipment`（provider=`flash`、service_code=`SHANSONG_COD`、tracking_no=null）。快递订单反过来：manual-ship 对闪送单返回 409 `flash_order`，禁止伪造快递单号。",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandheldFlashDeliverReq"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {}
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/handheld/pickup/redeem": {
+      "post": {
+        "tags": [
+          "自提"
+        ],
+        "summary": "自提核销（扫码或4位码，v1.14）",
+        "description": "`input` 为 `BOOMER_PICKUP:<64位hex>` 二维码或 4 位数字码；库位取设备绑定，权限/状态/锁全部在数据库内校验。200 `redeemed`（重放 `replayed:true`）；400 `invalid_input`；403 `forbidden`/`wrong_location`；404 `not_found`；409 `already_redeemed`/`not_ready`/`refund_blocked`/`shortage_blocked`/`after_sale_blocked`/`cancelled`/`unpaid`/`fulfillment_mismatch`；429 `rate_limited`（4位码连续错误锁定，扫码不受限）；503 结果未知请用同一 `idempotency_key` 重试。",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandheldPickupRedeemReq"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {}
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "入参不合法（code: invalid_body / validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少 / 无效 token（code: unauthorized）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "设备被停用 / 库位/角色不匹配（code: unauthorized_location）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在（code: not_found / unlinked）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "状态冲突（code: already_exists / transfer_required）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "校验失败（数量不一致等，code: validation_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "限流（code: rate_limited / ai_credits_exhausted）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务端错误（code: internal_error）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/public/handheld/pickup/ready": {
+      "post": {
+        "tags": [
+          "自提"
+        ],
+        "summary": "自提备货完成（v1.14）",
+        "description": "200 `ready`/`already_ready`；403 `forbidden`；404 `not_found`；409 `not_pickup`/`exception`/`refund_blocked`/`shortage_blocked`/`cancelled`/`unpaid`；503 可用同一 `idempotency_key` 重试。",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandheldPickupReadyReq"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -19037,10 +20160,10 @@
             "maxLength": 120
           },
           "category": {
+            "description": "可选ERP分类；省略/null/空串保存为未分类，不阻塞ERP建档，不代表小程序就绪",
             "type": "string",
             "minLength": 1,
-            "maxLength": 64,
-            "description": "ERP 当前启用的二级商品分类 code"
+            "maxLength": 64
           },
           "facet_codes": {
             "description": "ERP 商品标签 code；仅接受当前启用且适用于所选分类的标签",
@@ -19272,6 +20395,49 @@
             "description": "默认 false，APP 给开关；true 时入库存同步队列",
             "type": "boolean"
           },
+          "ai_processing_allowed": {
+            "description": "false：只保存原图与商品，不排队 AI 修图；true/缺省：仍以服务端 /privacy/ai-consent 当前政策版本授权为准。不参与幂等指纹。",
+            "type": "boolean"
+          },
+          "featured_stamp": {
+            "description": "特色印章（单选，null=不设）；省略时与旧版完全一致（不参与幂等指纹）。仅新建商品时同事务保存",
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "new",
+                  "rare",
+                  "limited",
+                  "collectible",
+                  "discontinued"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notice_tags": {
+            "description": "提示标签（多选，功能不确定/不可用互斥，含 parts_missing）；省略时与旧版一致。按字典顺序规范化后参与指纹",
+            "maxItems": 5,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "flawed",
+                "function_uncertain",
+                "function_unavailable",
+                "not_edible",
+                "parts_missing"
+              ]
+            }
+          },
+          "ip_candidate": {
+            "description": "新版 APP：未确认的识别 IP 候选。不挡上架、不创建全局 IP；仅在 ip_name 为空且 ip_confirmed=false 时可传，原文存为待核对。省略时与旧版完全一致",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
           "client_op_id": {
             "type": "string",
             "minLength": 8,
@@ -19281,7 +20447,6 @@
         },
         "required": [
           "name",
-          "category",
           "price_tier"
         ]
       },
@@ -19578,6 +20743,149 @@
         "required": [
           "ops"
         ]
+      },
+      "HandheldManualShipReq": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "sf",
+              "cainiao",
+              "manual"
+            ]
+          },
+          "carrier_label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "tracking_no": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9-]{4,64}$"
+          },
+          "client_op_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{6,80}$"
+          },
+          "lines": {
+            "minItems": 1,
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "fulfillment_item_id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 99999
+                }
+              },
+              "required": [
+                "fulfillment_item_id",
+                "quantity"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "provider",
+          "tracking_no",
+          "client_op_id",
+          "lines"
+        ],
+        "additionalProperties": false
+      },
+      "HandheldFlashDeliverReq": {
+        "type": "object",
+        "properties": {
+          "client_op_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{6,80}$"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "lines": {
+            "minItems": 1,
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "fulfillment_item_id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 99999
+                }
+              },
+              "required": [
+                "fulfillment_item_id",
+                "quantity"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "client_op_id",
+          "lines"
+        ],
+        "additionalProperties": false
+      },
+      "HandheldPickupRedeemReq": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "idempotency_key": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{8,100}$"
+          },
+          "expected_fulfillment_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "input",
+          "idempotency_key"
+        ],
+        "additionalProperties": false
+      },
+      "HandheldPickupReadyReq": {
+        "type": "object",
+        "properties": {
+          "fulfillment_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{8,100}$"
+          }
+        },
+        "required": [
+          "fulfillment_id",
+          "idempotency_key"
+        ],
+        "additionalProperties": false
       },
       "DiagReportReq": {
         "type": "object",
@@ -20918,7 +22226,9 @@
               "processing",
               "succeeded",
               "partial_failed",
-              "retryable_failed"
+              "retryable_failed",
+              "failed",
+              "partial_failed_terminal"
             ]
           },
           "notes": {
@@ -21773,7 +23083,8 @@
               "transfer_incoming",
               "youzan_sync_failed",
               "unclaimed_epc_pending",
-              "system"
+              "system",
+              "order_paid"
             ]
           },
           "title": {
