@@ -269,6 +269,32 @@ export async function loadScopedProductSkus(
   return [...new Map(rows.map((s) => [s.id, s])).values()];
 }
 
+/** 当前已授权单门店（kind=shop）自身的发布记录；全部范围/仓库返回空，不取别店。 */
+export async function loadStorePublishedAt(
+  inventory: Inventory,
+  skuIds: string[],
+): Promise<{ storeLocationId: string | null; rows: { sku_id: string; location_id: string; published_at: string | null }[] }> {
+  const store =
+    inventory.scope !== "all" && inventory.locations.length === 1 && inventory.locations[0].kind === "shop"
+      ? inventory.locations[0].id
+      : null;
+  if (!store || skuIds.length === 0) return { storeLocationId: store, rows: [] };
+  const rows: { sku_id: string; location_id: string; published_at: string | null }[] = [];
+  for (let offset = 0; offset < skuIds.length; offset += 100) {
+    rows.push(
+      ...(await readRows<{ sku_id: string; location_id: string; published_at: string | null }>(() =>
+        supabaseAdmin
+          .from("commerce_listings")
+          .select("sku_id, location_id, published_at", { count: "exact" })
+          .eq("location_id", store)
+          .in("sku_id", skuIds.slice(offset, offset + 100))
+          .order("sku_id"),
+      )),
+    );
+  }
+  return { storeLocationId: store, rows };
+}
+
 export function filterProductSearch(query: SkuQuery, keyword: string): SkuQuery {
   if (!keyword) return query;
   const like = JSON.stringify(`%${keyword.replace(/[\\%_]/g, (m) => `\\${m}`)}%`);
