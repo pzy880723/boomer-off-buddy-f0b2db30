@@ -1,0 +1,21 @@
+# 微调预览持久任务：待实现接口契约（不是已上线 API）
+
+## 同步预算证据
+- 原生档案 `deployments/fankuang-list-20261009/native-source.tar.gz`：Android `HandheldApiClient.kt:398–400` read/write=90s，connect=20s；iOS `APIClient.swift:121–129` ai请求=180s，但`:166–167` resource=120s。
+- 当前生成核单次120s（下载/检测12s/主生成40s/已有fallback60s/校验20s共用预算）。不能在90s内保证第二次完整处理，不降低核预算或阈值。
+- 这些是归档证据，不是0.3.14安装包实测。现有同步POST和成功响应保持不变；本轮没有把重试helper接到同步端点，避免叠加收费调用。
+
+## 最小新契约（Codex原生与后端需一起实现后才可用）
+- POST `/api/public/handheld/ai/retouch-preview-tasks`：`{client_op_id,location_id,sku_id?,expected_updated_at?,source_storage_path,instruction?}`；源图必须先使用现有上传接口保存，不能提交任意远程URL。已存SKU必须提供版本；新建草稿以actor/device/client_op_id+source hash绑定。
+- 202 `{ok:true,data:{task_id,status:"queued",next_run_at}}`；同actor/device/op和相同指纹重放，同op不同输入409。actor/policy从设备+员工会话及现行AI授权取，不接受body伪造。
+- GET 同路径`/$id`：`{task_id,status,attempts,max_attempts:3,next_run_at,error_code,storage_path?,signed_url?,mime_type?}`；结果仅对原actor/device及当前授权库位可见；失败不带图片。已完成只读签名，不重跑。
+- DELETE 同路径`/$id`：原actor取消，持久tombstone；返回`cancelled`，processing迟到finish须token/lease/status fencing丢弃。
+- Worker沿用`aiPrepareListingImage`和原guard/质量核，独立任务最多3次；`retouchRetryDelay`仅白名单网络/429/5xx/空stop/质量失败：30s、60s，429至少15min；全局并发与已上架队列共享6槽。auth/consent/invalid source/refusal立即终止；unknown fail-closed。
+- 每次执行、完成、确认分别检查source hash/存在、SKU版本、原actor当前授权。成功只写预览和versioned receipt，不更新SKU/listing。Native须仍展示预览，用户确认再走现有有版本/权限检查的保存接口；原图版本变了不能确认旧结果。
+- 无SKU草稿预览不允许绕过取消或关联到第二SKU。已上架后台任务仍用0112持久队列，不能转用预览路径强制published。
+
+## 当前已实现回执门禁
+- prepare-listing-image有效校验和上传后写version1/source validated_retouch/原actor/device；preserved_original不写。
+- `handheld_item_audit`和`handheld_smart_create_ops`现有受控事务确认后一次性绑定SKU；不通过attach-images或客户端直写绑定；旧version0不能升级。
+- 门禁仍要求真实输出文件、当前SKU引用、全部图片证明、识别/内容当前修订就绪；不批量建立历史readiness。
+- 未实现以上新任务接口/worker/native，因此不声称同步微调已自动恢复。

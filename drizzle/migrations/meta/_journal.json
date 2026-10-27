@@ -792,6 +792,13 @@
       "when": 1793074624153,
       "tag": "0112_durable_image_retry_strict_readiness",
       "breakpoints": true
+    },
+    {
+      "idx": 113,
+      "version": "7",
+      "when": 1793075245344,
+      "tag": "0113_validated_retouch_receipt_gate",
+      "breakpoints": true
     }
   ]
 }

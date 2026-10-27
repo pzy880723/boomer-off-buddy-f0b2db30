@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { AiListingImageReq } from "@/lib/handheld/schemas";
 import { aiPrepareListingImage } from "@/server/handheld-ai.server";
 import { safeImageJobError } from "@/server/listing-image-safety.server";
+import { recordValidatedRetouch } from "@/server/retouch-receipt.server";
 
 const PRESERVED_ORIGINAL_WARNING = "检测到测量尺子/刻度，为保护测量证据仅补边为正方形，没有进行 AI 重修";
 
@@ -33,6 +34,12 @@ export const Route = createFileRoute("/api/public/handheld/ai/prepare-listing-im
             upsert: false,
           });
           if (up.error) return err(`Storage upload failed: ${up.error.message}`, 500);
+          await auth.guard.check("retouch_receipt");
+          await recordValidatedRetouch({ preserved_original }, async () =>
+            await supabaseAdmin.from("inv_defect_retouch_receipts").insert({
+              image_path: `sku-listing/${path}`, source: "validated_retouch",
+              actor_user_id: auth.userId, device_id: auth.device.id, validation_version: 1,
+            }));
           const signed = await supabaseAdmin.storage
             .from("sku-listing")
             .createSignedUrl(path, 60 * 60 * 24 * 7);
