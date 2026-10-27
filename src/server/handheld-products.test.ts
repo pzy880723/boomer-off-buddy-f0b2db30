@@ -274,6 +274,7 @@ beforeEach(() => {
       { sku_id: "bundle-b", location_id: B, qty: 2 },
       { sku_id: "warehouse", location_id: W, qty: 3 },
     ],
+    commerce_listings: [],
     inv_sku_facets: [
       {
         sku_id: "a",
