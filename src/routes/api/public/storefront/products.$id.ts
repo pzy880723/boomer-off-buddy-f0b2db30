@@ -65,7 +65,7 @@ export const Route = createFileRoute("/api/public/storefront/products/$id")({
       OPTIONS: async () => new Response(null, { status: 204, headers: STOREFRONT_CORS }),
       GET: async ({ params }) => {
         const { data, error } = await supabaseAdmin
-          .from("commerce_listings" as never)
+          .from("storefront_ready_listings" as never)
           .select(
             "id, sku_id, location_id, status, title, description, cover_url, image_urls, image_paths, price, compare_at_price, condition_grade, product_type, published_at, location:inv_locations!location_id(id,name,kind)",
           )

@@ -5,6 +5,7 @@ import { DERIVATIVE_WIDTHS, signDerivativeUrls } from "./media-derivative.server
 import { isInFankuang } from "../lib/commerce/fankuang";
 import { readProductMarks } from "../lib/commerce/product-marks";
 import { resolveCategoryLabel } from "../lib/commerce/category-labels";
+import { filterImageReadyListings } from "./storefront-readiness.server";
 
 /** 列表 / 购物车 / 订单默认展示图：真实 480px 衍生图，失败为 null（不回退原图）。 */
 export const thumbnailDerivativeSigner = (paths: readonly string[]) =>
@@ -407,6 +408,7 @@ export async function enrichStorefrontListings(
   options: { signImages?: boolean; historical?: boolean } = {},
 ) {
   const historical = options.historical === true;
+  listings = await filterImageReadyListings(listings);
   if (options.signImages !== false) {
     listings = await resolveStorefrontListingsImagesBatch(listings);
   }

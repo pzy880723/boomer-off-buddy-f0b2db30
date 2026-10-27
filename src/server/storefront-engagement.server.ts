@@ -88,7 +88,7 @@ export async function loadAvailableProductsForDiscovery(db: Db = supabaseAdmin) 
   const listings: unknown[] = [];
   for (let from = 0; ; from += LISTING_PAGE) {
     // Paged reads so counting never truncates at the default 1000-row cap.
-    const { data, error } = await db.from("commerce_listings" as never)
+    const { data, error } = await db.from("storefront_ready_listings" as never)
       .select("id, sku_id, location_id, title, description, cover_url, image_urls, image_paths, price, compare_at_price, condition_grade, product_type, published_at, location:inv_locations!location_id(id,name,kind)")
       .eq("status", "published").order("id").range(from, from + LISTING_PAGE - 1);
     if (error) throw new Error(error.message);
