@@ -436,9 +436,13 @@ describe("handheld recognition performance policy", () => {
     assert.match(handheld, /年代待确认/);
     assert.match(handheld, /禁止把版权年/);
     assert.match(handheld, /60~120 字/);
+    assert.match(handheld, /CCD[\s\S]{0,80}冷白皮/);
+    assert.match(handheld, /CCD[\s\S]{0,120}实拍效果/);
+    assert.match(handheld, /CCD[\s\S]{0,160}具体参数/);
     const erp = buildEraInstruction("erp");
     assert.match(erp, /禁止把版权年/);
     assert.equal(/60~120 字/.test(erp), false);
+    assert.equal(/CCD/.test(erp), false);
     assert.equal(PRODUCT_RECOGNITION_PROMPT_VERSION, "boomer-product-v8-description");
   });
 
