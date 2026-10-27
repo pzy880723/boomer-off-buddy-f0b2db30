@@ -19,3 +19,5 @@ SELECT retry_assert(image_job_permanent_error('ai_consent_missing: denied'),'den
 SELECT retry_assert(NOT image_job_permanent_error('ai_consent_unavailable: read failed'),'consent read failure remains retryable');
 SELECT retry_assert(image_job_permanent_error('Unsupported original image format'),'invalid original remains permanent');
 SELECT retry_assert(NOT image_job_permanent_error('[image_validation] quality check failed'),'quality failure retries without weakening checks');
+SELECT retry_assert(image_job_permanent_error('[image_generation] 图像生成服务未返回图片（content_filter），原图保留'),'provider refusal never retries');
+SELECT retry_assert(NOT image_job_permanent_error('[image_generation] 图像生成服务未返回图片（stop），原图保留'),'ordinary empty output stays retryable');
