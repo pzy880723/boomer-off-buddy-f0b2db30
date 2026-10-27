@@ -35,7 +35,7 @@ SELECT strict_assert(NOT listing_readiness_is_ready('b2700000-0000-0000-0000-000
 UPDATE inv_defect_retouch_receipts SET bound_sku_id='b2700000-0000-0000-0000-000000000004',source='preserved_original' WHERE image_path='sku-listing/test/reuse-detail.png';
 SELECT strict_assert(NOT listing_readiness_is_ready('b2700000-0000-0000-0000-000000000004'),'preserved original rejected');
 UPDATE inv_listing_image_jobs SET status='succeeded' WHERE target_path='test/reuse-detail.png';
-UPDATE inv_skus SET image_paths=ARRAY['sku-listing/test/reuse-cover.png'] WHERE id='b2700000-0000-0000-000000000004';
+UPDATE inv_skus SET image_paths=ARRAY['sku-listing/test/reuse-cover.png'] WHERE id='b2700000-0000-0000-0000-000000000004';
 SELECT strict_assert(NOT listing_readiness_is_ready('b2700000-0000-0000-0000-000000000004'),'historical gallery not currently referenced rejected');
 INSERT INTO inv_product_content_image_jobs(sku_id,block_id,source_path,target_path,status) VALUES('b2700000-0000-0000-0000-000000000004','auto-detail-1','sku-raw/test/detail-src.jpg','sku-listing/test/reuse-detail.png','succeeded');
 SELECT strict_assert(listing_readiness_is_ready('b2700000-0000-0000-0000-000000000004'),'independent detail success with object accepted');
