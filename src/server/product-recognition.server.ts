@@ -394,7 +394,7 @@ ${buildEraInstruction(input.source)}`;
   ];
   const body = JSON.stringify({
       model,
-      ...(handheld ? { max_tokens: HANDHELD_RECOGNITION_MAX_TOKENS } : {}),
+      ...(handheld ? { max_tokens: HANDHELD_RECOGNITION_MAX_TOKENS, reasoning: { effort: "low" } } : {}),
       messages: [
         { role: "system", content: system },
         { role: "user", content: userContent },
