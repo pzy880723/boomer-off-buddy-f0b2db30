@@ -9,8 +9,10 @@ import {
   buildProductItems,
   signProductItems,
   productReadError,
+  loadStorePublishedAt,
   type ProductItem,
 } from "@/server/handheld-products.server";
+import { compareListed, resolveListedAt, storePublishedAtMap } from "@/lib/handheld/listed-at";
 export type { ProductItem } from "@/server/handheld-products.server";
 
 export const Route = createFileRoute("/api/public/handheld/products")({
