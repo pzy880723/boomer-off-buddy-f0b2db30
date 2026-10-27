@@ -16,7 +16,7 @@ import {
 } from "../lib/product-classification";
 import type { BrandCandidate, FacetTerm } from "../lib/product-taxonomy";
 
-export const PRODUCT_RECOGNITION_PROMPT_VERSION = "boomer-product-v7-era-estimate";
+export const PRODUCT_RECOGNITION_PROMPT_VERSION = "boomer-product-v8-description";
 export const DEFAULT_PRODUCT_RECOGNITION_MODEL = "google/gemini-2.5-pro";
 export const DEFAULT_HANDHELD_PRODUCT_RECOGNITION_MODEL = "google/gemini-2.5-flash";
 export const HANDHELD_RECOGNITION_TIMEOUT_MS = 25_000;
@@ -340,7 +340,7 @@ attributes.era、description、evidence 与 date_markings 必须一致，简介�
   if (source !== "handheld") return shared;
   return `${shared}
 手持端 name 目标 12-20 个字、最多 24 个字。命名规则：标题=可确认的角色/IP + 显著造型/颜色/材质 + 物件名或可核实型号，例如“Hello Kitty橘色挂件”“美乐蒂粉色抽拉包”。同一名称不要重复中英文别名；不要写“可爱”“适合…”等描述，不要罗列配件或组件；日期、年代与故事写进简介，不进标题。
-手持端输出请精简：description 控制在 20-30 字的一句话介绍，日期若出现须保留生产/版权/标签性质；evidence 最多 3 条、keywords 最多 5 个、alternative_categories 最多 2 个、clarification_requests 最多 2 条。不要输出任何多余解释。`;
+手持端输出请精简：description 写 2~3 句简短介绍，目标 60~120 字、最多 160 字，先写可确认的具体特点（造型/图案/结构/可靠型号特性）再写适用场景或购买理由，不重复商品全名、不写泛泛空话；日期若出现须保留生产/版权/标签性质，资料中明确的功能不确定/不可用/零件缺失等风险必须保留、不得写成完好；只有实物照片没有样片时不声称本机实拍效果，无法核实的内容不写。evidence 最多 3 条、keywords 最多 5 个、alternative_categories 最多 2 个、clarification_requests 最多 2 条。不要输出任何多余解释。`;
 }
 
 export async function callLovableProductModel(input: {
