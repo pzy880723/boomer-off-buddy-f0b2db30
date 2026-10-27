@@ -85,9 +85,9 @@ test("输出含年份/绝版等无依据词被拒绝", () => {
   assert.throws(() => parseSummaryOutput(okPayload("绝版好物，错过再无")), /ai_unsupported_claim/);
 });
 
-test("输出超过 80 字被拒绝；80 字通过", () => {
-  assert.throws(() => parseSummaryOutput(okPayload("长".repeat(81))), /ai_output_too_long/);
-  assert.equal(parseSummaryOutput(okPayload("长".repeat(80))).length, 80);
+test("输出超过 160 字被拒绝；160 字通过", () => {
+  assert.throws(() => parseSummaryOutput(okPayload("长".repeat(161))), /ai_output_too_long/);
+  assert.equal(parseSummaryOutput(okPayload("长".repeat(160))).length, 160);
 });
 
 test("description 素材中的指令性内容只作为素材传入，不进系统提示", () => {
@@ -111,9 +111,9 @@ test("包络：Responses output_text / content / fenced JSON / Chat 字符串与
   ]) assert.equal(parseSummaryOutput(payload), D);
 });
 
-test("80 字边界：80 通过，81 → ai_output_too_long", () => {
-  assert.equal(parseSummaryOutput(okPayload("长".repeat(80))), "长".repeat(80));
-  assert.throws(() => parseSummaryOutput(okPayload("长".repeat(81))), /ai_output_too_long/);
+test("160 字边界：160 通过，161 → ai_output_too_long", () => {
+  assert.equal(parseSummaryOutput(okPayload("长".repeat(160))), "长".repeat(160));
+  assert.throws(() => parseSummaryOutput(okPayload("长".repeat(161))), /ai_output_too_long/);
 });
 
 test("拒绝/空/非 JSON/缺字段 均明确失败，不假成功", () => {
