@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { retouchRetryDelay } from "./retouch-retry.ts";
 for (const error of [new TypeError("fetch failed"), {status:429}, {status:503}, new Error("图像生成服务未返回图片（stop），原图保留"), new Error("修图检查未通过（fields=product_present; confidence=0.80），原图保留，请重修")]) {
   test("classified temporary preview failure has bounded delay", () => {
-    assert.equal(typeof retouchRetryDelay(error, 1), "number");
+    assert.equal(retouchRetryDelay(error, 1), (error as {status?:number}).status === 429 ? 900_000 : 30_000);
+    assert.equal(retouchRetryDelay(error, 2), (error as {status?:number}).status === 429 ? 900_000 : 60_000);
     assert.equal(retouchRetryDelay(error, 3), null);
   });
 }
