@@ -806,6 +806,13 @@
       "when": 1793075527974,
       "tag": "0114_legacy_proven_storefront_read_gate",
       "breakpoints": true
+    },
+    {
+      "idx": 115,
+      "version": "7",
+      "when": 1793077218918,
+      "tag": "0115_current_gallery_detail_proof",
+      "breakpoints": true
     }
   ]
 }

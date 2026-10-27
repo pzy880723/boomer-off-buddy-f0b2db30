@@ -12866,6 +12866,10 @@ export type Database = {
         Returns: Json
       }
       inventory_delete_unused_sku: { Args: { p_sku_id: string }; Returns: Json }
+      listing_detail_image_has_success_receipt: {
+        Args: { p_block: string; p_path: string; p_sku: string }
+        Returns: boolean
+      }
       listing_image_has_success_receipt: {
         Args: { p_path: string; p_sku: string }
         Returns: boolean
