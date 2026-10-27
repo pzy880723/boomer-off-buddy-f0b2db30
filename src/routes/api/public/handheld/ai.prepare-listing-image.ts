@@ -6,6 +6,7 @@ import { AiListingImageReq } from "@/lib/handheld/schemas";
 import { aiPrepareListingImage } from "@/server/handheld-ai.server";
 import { safeImageJobError } from "@/server/listing-image-safety.server";
 import { recordValidatedRetouch } from "@/server/retouch-receipt.server";
+import { retouchRetryDelay } from "@/server/retouch-retry";
 
 const PRESERVED_ORIGINAL_WARNING = "检测到测量尺子/刻度，为保护测量证据仅补边为正方形，没有进行 AI 重修";
 
@@ -23,8 +24,10 @@ export const Route = createFileRoute("/api/public/handheld/ai/prepare-listing-im
           return err("Invalid body", 400, { detail: String(e) });
         }
 
+        let prepared = false;
         try {
           const { b64, mime, preserved_original } = await aiPrepareListingImage(body, auth.guard);
+          prepared = true; // Subsequent persistence/signing errors must never request another generation.
           const buf = Buffer.from(b64, "base64");
           const ext = mime.includes("png") ? "png" : mime.includes("webp") ? "webp" : "jpg";
           const path = `${new Date().toISOString().slice(0, 10)}/${auth.device.id}/${crypto.randomUUID()}.${ext}`;
@@ -51,6 +54,12 @@ export const Route = createFileRoute("/api/public/handheld/ai/prepare-listing-im
         } catch (e) {
           const denied = aiConsentErrorResponse(e);
           if (denied) return denied;
+          const stage = e && typeof e === "object" ? (e as { stage?: unknown }).stage : undefined;
+          const retryDelay = !prepared && (stage === "image_generation" || stage === "measurement_detection" || stage === "image_validation")
+            ? retouchRetryDelay(e, 1) : null;
+          if (retryDelay !== null) return err("本次修图未完成，请稍后重试，原图已保留", 502, {
+            code: "retouch_retryable", retry_after_seconds: retryDelay / 1000,
+          });
           return err(`AI image edit failed: ${safeImageJobError(e)}`, 502);
         }
       },

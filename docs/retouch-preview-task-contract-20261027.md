@@ -1,9 +1,17 @@
-# 微调预览持久任务：待实现接口契约（不是已上线 API）
+# 微调预览：现有API外层顺序重试（2026-10-27更新）
+
+## 当前方案（替代下方未实施的持久任务草案）
+- 不新增preview任务API/worker。现有POST `/api/public/handheld/ai/prepare-listing-image` 单次预算、请求及成功响应保持不变。
+- 仅明确结束的生成/分类/质量暂时失败返回HTTP502：`{ok:false,error:"本次修图未完成，请稍后重试，原图已保留",code:"retouch_retryable",retry_after_seconds:30或900}`。沿用现有err格式，code在顶层，不是error.code。
+- 原生最多3次顺序请求，每次独立现有90/120s；普通失败等待max(服务端delay,30/60s)，429等待至少900s。保持existingbusy文本和预览确认，不自动替换。
+- 超时/断网/非JSON错误结果不确定不自动复制调用；auth/consent/refusal/invalid source/unknown以及生成完成后的上传/回执/签名错误均不发重试码。
+- 关闭或scope/原图变化取消下一次，迟到预览不覆盖新版本；离页微调不承诺持久恢复。上架修图仍为0112持久队列。
+- 下方新任务草案仅历史记录，已被替代，不交付实施。
 
 ## 同步预算证据
 - 原生档案 `deployments/fankuang-list-20261009/native-source.tar.gz`：Android `HandheldApiClient.kt:398–400` read/write=90s，connect=20s；iOS `APIClient.swift:121–129` ai请求=180s，但`:166–167` resource=120s。
 - 当前生成核单次120s（下载/检测12s/主生成40s/已有fallback60s/校验20s共用预算）。不能在90s内保证第二次完整处理，不降低核预算或阈值。
-- 这些是归档证据，不是0.3.14安装包实测。现有同步POST和成功响应保持不变；本轮没有把重试helper接到同步端点，避免叠加收费调用。
+- 这些是归档证据，不是0.3.14安装包实测。现有同步POST和成功响应保持不变；helper仅分类已结束失败并提示下一次独立请求，不在单次端点叠加调用。
 
 ## 最小新契约（Codex原生与后端需一起实现后才可用）
 - POST `/api/public/handheld/ai/retouch-preview-tasks`：`{client_op_id,location_id,sku_id?,expected_updated_at?,source_storage_path,instruction?}`；源图必须先使用现有上传接口保存，不能提交任意远程URL。已存SKU必须提供版本；新建草稿以actor/device/client_op_id+source hash绑定。
@@ -18,4 +26,4 @@
 - prepare-listing-image有效校验和上传后写version1/source validated_retouch/原actor/device；preserved_original不写。
 - `handheld_item_audit`和`handheld_smart_create_ops`现有受控事务确认后一次性绑定SKU；不通过attach-images或客户端直写绑定；旧version0不能升级。
 - 门禁仍要求真实输出文件、当前SKU引用、全部图片证明、识别/内容当前修订就绪；不批量建立历史readiness。
-- 未实现以上新任务接口/worker/native，因此不声称同步微调已自动恢复。
+- 未实现以上已废弃的新任务接口/worker；原生顺序重试及腾讯部署由Codex实现验收，不声称微调离页自动恢复。
