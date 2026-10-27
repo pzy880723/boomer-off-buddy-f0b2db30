@@ -1304,6 +1304,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "commerce_order_items_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "storefront_ready_listings"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "commerce_order_items_location_id_fkey"
             columns: ["location_id"]
             isOneToOne: false
@@ -5916,6 +5923,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "inventory_reservations_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "storefront_ready_listings"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "inventory_reservations_location_id_fkey"
             columns: ["location_id"]
             isOneToOne: false
@@ -8410,6 +8424,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "product_measurement_tasks_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "storefront_ready_listings"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "product_measurement_tasks_location_id_fkey"
             columns: ["location_id"]
             isOneToOne: false
@@ -9672,6 +9693,13 @@ export type Database = {
             referencedRelation: "commerce_listings"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "storefront_product_favorites_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "storefront_ready_listings"
+            referencedColumns: ["id"]
+          },
         ]
       }
       storefront_product_opens: {
@@ -9706,6 +9734,13 @@ export type Database = {
             columns: ["listing_id"]
             isOneToOne: false
             referencedRelation: "commerce_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "storefront_product_opens_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "storefront_ready_listings"
             referencedColumns: ["id"]
           },
         ]
@@ -11093,7 +11128,103 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      storefront_ready_listings: {
+        Row: {
+          category: string | null
+          compare_at_price: number | null
+          condition_grade: string | null
+          cover_url: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          epc: string | null
+          id: string | null
+          image_paths: Json | null
+          image_urls: Json | null
+          location_id: string | null
+          pending_display: Json | null
+          price: number | null
+          product_type: string | null
+          published_at: string | null
+          readiness_hold: boolean | null
+          sku_id: string | null
+          sold_at: string | null
+          status: string | null
+          title: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          category?: string | null
+          compare_at_price?: number | null
+          condition_grade?: string | null
+          cover_url?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          epc?: string | null
+          id?: string | null
+          image_paths?: Json | null
+          image_urls?: Json | null
+          location_id?: string | null
+          pending_display?: Json | null
+          price?: number | null
+          product_type?: string | null
+          published_at?: string | null
+          readiness_hold?: boolean | null
+          sku_id?: string | null
+          sold_at?: string | null
+          status?: string | null
+          title?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string | null
+          compare_at_price?: number | null
+          condition_grade?: string | null
+          cover_url?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          epc?: string | null
+          id?: string | null
+          image_paths?: Json | null
+          image_urls?: Json | null
+          location_id?: string | null
+          pending_display?: Json | null
+          price?: number | null
+          product_type?: string | null
+          published_at?: string | null
+          readiness_hold?: boolean | null
+          sku_id?: string | null
+          sold_at?: string | null
+          status?: string | null
+          title?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_listings_epc_fkey"
+            columns: ["epc"]
+            isOneToOne: false
+            referencedRelation: "inv_epcs"
+            referencedColumns: ["epc"]
+          },
+          {
+            foreignKeyName: "commerce_listings_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_listings_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       aigc_sso_cleanup_expired: { Args: never; Returns: undefined }
@@ -12653,6 +12784,11 @@ export type Database = {
         }
         Returns: boolean
       }
+      image_job_permanent_error: { Args: { p_error: string }; Returns: boolean }
+      image_retry_delay: {
+        Args: { p_attempts: number; p_error?: string }
+        Returns: string
+      }
       increment_editorial_content_share: {
         Args: { p_content_id: string }
         Returns: number
@@ -13316,12 +13452,19 @@ export type Database = {
           term_key: string
         }[]
       }
+      storefront_image_ready: { Args: { p_sku: string }; Returns: boolean }
       storefront_product_engagement_counts: {
         Args: { p_listing_ids: string[] }
         Returns: {
           favorite_count: number
           listing_id: string
           view_count: number
+        }[]
+      }
+      storefront_ready_skus: {
+        Args: { p_ids: string[] }
+        Returns: {
+          sku_id: string
         }[]
       }
       storefront_record_engagement: {

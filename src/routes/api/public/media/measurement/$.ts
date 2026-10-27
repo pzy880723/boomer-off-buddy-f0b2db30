@@ -51,7 +51,7 @@ export const Route = createFileRoute("/api/public/media/measurement/$")({
 
         // 商品必须处于公开可读的 listing 状态
         const { data: listing } = await supabaseAdmin
-          .from("commerce_listings" as never)
+          .from("storefront_ready_listings" as never)
           .select("id, status, published_at")
           .eq("sku_id", skuId)
           .in("status", ["published", "reserved", "sold", "archived"])
