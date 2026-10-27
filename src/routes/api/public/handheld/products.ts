@@ -53,8 +53,16 @@ export const Route = createFileRoute("/api/public/handheld/products")({
           for (const item of items) counts[item.product_type] += 1;
           if (type !== "all") items = items.filter((item) => item.product_type === type);
 
+          // 上架时间：仅本店 commerce_listings.published_at，缺失回退 SKU created_at；排序在分页前。
+          const listings = await loadStorePublishedAt(inventory, items.map((i) => i.id));
+          const published = storePublishedAtMap(listings.rows, listings.storeLocationId);
+          const listedItems = items.map((item) => ({ ...item, ...resolveListedAt(item, published) }));
+          type ListedItem = (typeof listedItems)[number];
+
           const rank = { custom: 0, bundle: 1, standard: 2 };
-          const compare = (a: ProductItem, b: ProductItem): number => {
+          const compare = (a: ListedItem, b: ListedItem): number => {
+            if (sort === "listed_desc") return compareListed(a, b, "desc");
+            if (sort === "listed_asc") return compareListed(a, b, "asc");
             if (sort === "created_desc") return b.created_at.localeCompare(a.created_at);
             if (sort === "created_asc") return a.created_at.localeCompare(b.created_at);
             if (sort === "price_desc") return b.price - a.price;
@@ -65,7 +73,8 @@ export const Route = createFileRoute("/api/public/handheld/products")({
               b.updated_at.localeCompare(a.updated_at)
             );
           };
-          items.sort((a, b) => compare(a, b) || a.id.localeCompare(b.id));
+          listedItems.sort((a, b) => compare(a, b) || a.id.localeCompare(b.id));
+          items = listedItems;
           const total = items.length;
           const from = (page - 1) * pageSize;
           const responseItems = await signProductItems(items.slice(from, from + pageSize));
