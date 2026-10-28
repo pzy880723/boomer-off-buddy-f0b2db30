@@ -3,7 +3,7 @@ SET search_path=public,extensions;
 -- 0119 回归（真实结构隔离库，虚构数据，结束整体回滚）：共享有赞商品阻断、每件原子、不同商品可部分成功。
 DO $$
 DECLARE a uuid:='55555555-5555-5555-5555-555555555555'; l uuid:='11111111-1111-1111-1111-111111111111';
-  shop uuid:='77777777-7777-7777-7777-777777777777';
+  shop uuid:='7a7a7a7a-0000-0000-0000-000000000119';
   s uuid:='22222222-2222-2222-2222-222222222222';   -- 单一映射（标准/孤品均可）
   s3 uuid:='33333333-0000-0000-0000-000000000003';  -- 与 s4 共享同一有赞 item
   s4 uuid:='33333333-0000-0000-0000-000000000004';
@@ -13,7 +13,7 @@ BEGIN
   INSERT INTO auth.users(id) VALUES (a);
   INSERT INTO user_roles(user_id, role) VALUES (a,'store_manager');
   INSERT INTO user_location_perms(user_id, location_id) VALUES (a,l);
-  INSERT INTO youzan_shops(id,kdt_id,shop_name,role,status,access_token) VALUES (shop,990001,'测试分店','branch','active','x');
+  INSERT INTO youzan_shops(id,kdt_id,shop_name,role,status,access_token) VALUES (shop,990119,'测试分店','branch','active','x');
   UPDATE inv_locations SET shop_id=shop WHERE id=l;
   INSERT INTO inv_skus(id,category,epc,name,price_tier,sales_state,sale_ownership,status,kind,sku_scope,inventory_policy,is_display)
   SELECT x,'toy','EPC'||right(x::text,4),'测试共享',100,'active','owned','active','single','standard','tracked',true FROM unnest(ARRAY[s3,s4,s5]) x;
