@@ -35,7 +35,7 @@ const Body = z.object({
   action: z.string().regex(/^[a-z_]{1,40}$/).optional(),
 }).strict();
 
-type OutboxTask = {
+export type OutboxTask = {
   id: string;
   sku_id: string;
   channel_listing_id: string | null;
@@ -51,7 +51,7 @@ type OutboxTask = {
 };
 type Admin = Awaited<typeof import("@/integrations/supabase/client.server")>["supabaseAdmin"];
 
-class TaskBlocked extends Error {}
+export class TaskBlocked extends Error {}
 
 type BranchListingRow = { external_spu_id: string | null; external_item_id: string | null };
 
@@ -213,10 +213,16 @@ async function loadZeroingFacts(task: OutboxTask, sb: Admin) {
   };
 }
 
-async function recheckBeforeWrite(task: OutboxTask, sb: Admin) {
+/**
+ * 有赞写入前复核。mode 区分实际写入类型：
+ *  - shelf：上架/下架写入 —— 意图任务全量复核；旧 shelf/restore 上架检查本店是否关闭有赞渠道。
+ *  - stock：纯库存写入 —— 不做上架检查（关闭渠道仍允许退货验货回补库存，不重新上架）。
+ */
+export async function recheckBeforeWrite(task: OutboxTask, sb: Admin, mode: "shelf" | "stock") {
   const intentTask = isSalesIntentTask(task);
-  const legacyShelf = !intentTask && (task.action === "shelf" || task.action === "restore_after_return");
-  if (!intentTask && !legacyShelf && !ZEROING_ACTIONS.has(task.action)) return;
+  const legacyShelf = !intentTask && mode === "shelf" && (task.action === "shelf" || task.action === "restore_after_return");
+  const stockOnlyRestore = !intentTask && mode === "stock" && task.action === "restore_after_return";
+  if (!intentTask && !legacyShelf && !stockOnlyRestore && !ZEROING_ACTIONS.has(task.action)) return;
   const { data: lease, error } = await sb.from("channel_sync_outbox")
     .select("worker_id,status,lease_expires_at").eq("id", task.id).single();
   const expiry = Date.parse(lease?.lease_expires_at ?? "");
@@ -231,6 +237,7 @@ async function recheckBeforeWrite(task: OutboxTask, sb: Admin) {
     if (await youzanIntentDisabledForShop(sb, task.sku_id, task.shop_id)) throw new TaskBlocked("本店已关闭有赞渠道");
     return;
   }
+  if (stockOnlyRestore) return;
   const decision = evaluateZeroingTask(task, await loadZeroingFacts(task, sb));
   if (decision.verdict !== "proceed") throw new TaskBlocked(decision.reason);
 }
@@ -343,7 +350,7 @@ async function handleSetStock(
     .eq("sku_id", task.sku_id).eq("shop_id", l.shop_id).single();
   if (linkError || !link) throw new Error("渠道商品缺少对应门店库存映射");
   await pushStockToYouzan(link as LinkRow, target, `channel-task:${task.id}`,
-    () => recheckBeforeWrite(task, sb));
+    () => recheckBeforeWrite(task, sb, "stock"));
 
 
 
@@ -392,7 +399,7 @@ async function handleShelfChange(
     itemId: Number(l.external_item_id),
     online,
   });
-  await recheckBeforeWrite(task, sb);
+  await recheckBeforeWrite(task, sb, "shelf");
   await callYouzanApiVerbose({
     accessToken: branchToken,
     ...request,
