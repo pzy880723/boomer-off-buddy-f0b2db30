@@ -7,6 +7,7 @@ import {
   signStorefrontProductImages,
   type StorefrontListing,
 } from "@/server/storefront-products.server";
+import { filterListingsForConsumerChannel, resolveRequestConsumerChannel } from "@/server/sales-channels.server";
 
 // GET：当前冻结快照的商品卡（按快照顺序）；已售/下架项 available=false，不展示赠礼 SKU。
 export const Route = createFileRoute("/api/public/storefront/fankuang/basket")({
@@ -29,13 +30,24 @@ export const Route = createFileRoute("/api/public/storefront/fankuang/basket")({
           )
           .in("id", session.listing_ids);
         if (error) return storefrontError("商品加载失败", 500);
-        const listings = (data ?? []) as unknown as StorefrontListing[];
+        const ready = (data ?? []) as unknown as StorefrontListing[];
+        // 渠道展示过滤与商品列表一致：当前来源被显式关闭的商品在筐内显示为不可购（不展示商品卡）。
+        let listings: StorefrontListing[];
+        try {
+          listings = await filterListingsForConsumerChannel(ready, await resolveRequestConsumerChannel(request));
+        } catch {
+          return storefrontError("商品渠道策略暂不可用", 503);
+        }
+        const channelVisible = new Set(listings.map((l) => l.id));
         try {
           const enriched = await enrichStorefrontListings(listings, { signImages: false });
           const byId = new Map(listings.map((l) => [l.id, l]));
           const signed = await signStorefrontProductImages(enriched, byId, { thumbnail: true });
           const productById = new Map(signed.map((p) => [p.id, p]));
-          const unavailable = new Set(session.unavailable_listing_ids);
+          const unavailable = new Set([
+            ...session.unavailable_listing_ids,
+            ...ready.filter((l) => !channelVisible.has(l.id)).map((l) => l.id),
+          ]);
           const flipped = new Set(session.flipped_listing_ids);
           const items = session.listing_ids.map((id) => ({
             listing_id: id,
