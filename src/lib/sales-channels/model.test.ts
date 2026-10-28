@@ -106,15 +106,58 @@ test("consumer channel only from signed claims; unknown is conservative", () => 
 });
 
 test("worker recheck: stale version / sold / no stock superseded; read failure blocks", () => {
-  const task = { action: "shelf", request_payload: { source: "sales_channel_intent", intent_version: 2, location_id: "L" } };
-  const ok = { intent: { enabled: true, version: 2 }, salesState: "active", stockQty: 1 };
+  const own = { sku_id: "S", shop_id: "SH", channel: "youzan_branch_offline", channel_listing_id: "CL" };
+  const task = { ...own, action: "shelf", request_payload: { source: "sales_channel_intent", intent_version: 2, location_id: "L" } };
+  const ok = { intent: { enabled: true, version: 2 }, salesState: "active", stockQty: 1,
+    location: { shop_id: "SH", is_active: true, kind: "shop" }, shopActive: true,
+    listing: { sku_id: "S", shop_id: "SH", channel: "youzan_branch_offline", external_item_id: "1" } };
   assert.equal(evaluateSalesIntentTask(task, ok).verdict, "proceed");
   assert.equal(evaluateSalesIntentTask(task, { ...ok, intent: { enabled: true, version: 3 } }).verdict, "supersede");
   assert.equal(evaluateSalesIntentTask(task, { ...ok, salesState: "sold" }).verdict, "supersede");
   assert.equal(evaluateSalesIntentTask(task, { ...ok, stockQty: 0 }).verdict, "supersede");
   assert.equal(evaluateSalesIntentTask(task, { ...ok, readFailed: true }).verdict, "block");
-  const delist = { action: "delist", request_payload: { source: "sales_channel_intent", intent_version: 2 } };
+  const delist = { ...own, action: "delist", request_payload: { source: "sales_channel_intent", intent_version: 2 } };
   assert.equal(evaluateSalesIntentTask(delist, { ...ok, intent: { enabled: false, version: 2 }, salesState: "sold", stockQty: 0 }).verdict, "proceed");
+});
+
+test("0119 worker ownership: location/task/listing shop, sku, channel and active shop must all match", () => {
+  const own = { sku_id: "S", shop_id: "SH", channel: "youzan_branch_offline", channel_listing_id: "CL" };
+  const task = { ...own, action: "shelf", request_payload: { source: "sales_channel_intent", intent_version: 1, location_id: "L" } };
+  const ok = { intent: { enabled: true, version: 1 }, salesState: "active", stockQty: 1,
+    location: { shop_id: "SH", is_active: true, kind: "shop" }, shopActive: true,
+    listing: { sku_id: "S", shop_id: "SH", channel: "youzan_branch_offline", external_item_id: "1" } };
+  assert.equal(evaluateSalesIntentTask(task, ok).verdict, "proceed");
+  // 库位已改绑到新店：旧店任务不得写新店
+  assert.equal(evaluateSalesIntentTask(task, { ...ok, location: { ...ok.location, shop_id: "NEW" } }).verdict, "block");
+  assert.equal(evaluateSalesIntentTask(task, { ...ok, listing: { ...ok.listing, shop_id: "NEW" } }).verdict, "block");
+  assert.equal(evaluateSalesIntentTask(task, { ...ok, listing: { ...ok.listing, sku_id: "OTHER" } }).verdict, "block");
+  assert.equal(evaluateSalesIntentTask(task, { ...ok, listing: { ...ok.listing, channel: "youzan_hq" } }).verdict, "block");
+  assert.equal(evaluateSalesIntentTask(task, { ...ok, location: { ...ok.location, is_active: false } }).verdict, "block");
+  assert.equal(evaluateSalesIntentTask(task, { ...ok, shopActive: false }).verdict, "block");
+  assert.equal(evaluateSalesIntentTask(task, { ...ok, listing: null }).verdict, "block");
+  assert.equal(evaluateSalesIntentTask({ ...task, channel_listing_id: null }, ok).verdict, "block");
+  // 共享 item：不写
+  assert.equal(evaluateSalesIntentTask(task, { ...ok, shared: true }).verdict, "supersede");
+});
+
+test("0119 shared youzan item blocks both directions with Chinese reason; single mapping unaffected", () => {
+  const f = { stockQty: 1, salesState: "active", listing: null, shop: { bound: true, authorized: true },
+    youzan: { external_item_id: "9", listing_status: "published", last_verified_at: null }, youzanPending: false, intents: [] };
+  assert.deepEqual(channelBlocks("youzan", { ...f, youzanShared: true }), { enable: "youzan_shared_item", disable: "youzan_shared_item" });
+  assert.deepEqual(channelBlocks("youzan", f), { enable: null, disable: null });
+  assert.equal(reasonLabel("youzan_shared_item"), "该商品为多规格共享收银商品，暂不能单独设置有赞渠道");
+  const plan = planSkuChanges({ ...f, youzanShared: true }, [], ["app", "youzan"]);
+  assert.equal(plan.skipReason, "youzan_shared_item");
+  assert.deepEqual(plan.changes, {});
+});
+
+test("0119 aggregate: atomic SKU failure reports the real reason plus not-modified", () => {
+  const r = aggregateBySku(["a"], [
+    { sku_id: "a", channel: "app", success: false, reason: "sku_not_modified" },
+    { sku_id: "a", channel: "youzan", success: false, reason: "version_conflict" },
+  ]);
+  assert.equal(r[0].success, false);
+  assert.equal(r[0].reason, "商品渠道已被他人修改，请刷新后重试；该商品未修改");
 });
 
 test("batch aggregate per sku and fingerprint is order independent", () => {
