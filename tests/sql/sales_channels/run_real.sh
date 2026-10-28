@@ -5,7 +5,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../../.."
 W=/tmp/sc; mkdir -p $W; chmod 777 $W
 pg_dump --schema-only --no-owner --no-privileges --schema=public > $W/public.sql
-cp tests/sql/sales_channels/real_pre.sql tests/sql/sales_channels/real_fixture.sql tests/sql/sales_channels/real_orders.sql $W/
+cp tests/sql/sales_channels/real_pre.sql tests/sql/sales_channels/real_fixture.sql tests/sql/sales_channels/real_orders.sql tests/sql/sales_channels/real_apply.sql $W/
 cp drizzle/migrations/0118_*.sql $W/0118.sql 2>/dev/null || true
 chmod 644 $W/*.sql
 bash tests/sql/harness/setup.sh >/dev/null
@@ -19,3 +19,4 @@ if grep ERROR $W/load.log | grep -v 'schema "public" already exists'; then echo 
 [ -s $W/0118.sql ] && run $P -v ON_ERROR_STOP=1 -f $W/0118.sql >/dev/null
 run $P -v ON_ERROR_STOP=1 -f $W/real_fixture.sql >/dev/null
 run psql -h /tmp -p 55432 -U postgres -d sc_real -v ON_ERROR_STOP=1 -At -f $W/real_orders.sql 2>&1 | sed 's/^psql:[^ ]* NOTICE:  //'
+run psql -h /tmp -p 55432 -U postgres -d sc_real -v ON_ERROR_STOP=1 -At -f $W/real_apply.sql 2>&1 | sed "s/^psql:[^ ]* NOTICE:  //"
