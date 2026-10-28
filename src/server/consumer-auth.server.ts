@@ -10,6 +10,8 @@ export type ConsumerIdentity = {
   nickname: string | null;
   avatarUrl: string | null;
   providers: Array<"phone" | "wechat">;
+  /** 签发方签名的客户端类型；缺失表示旧会话（不推断为 app）。 */
+  clientKind: "miniapp" | "app" | null;
 };
 
 type ConsumerJwtConfig = {
@@ -32,6 +34,7 @@ type JwtPayload = {
   nickname?: string;
   avatar_url?: string;
   providers?: string[];
+  client_kind?: string;
 };
 
 function decodePart<T>(value: string): T {
@@ -98,6 +101,7 @@ export async function verifyConsumerJwt(
     nickname: payload.nickname ?? null,
     avatarUrl: payload.avatar_url ?? null,
     providers,
+    clientKind: payload.client_kind === "miniapp" || payload.client_kind === "app" ? payload.client_kind : null,
   };
 }
 
