@@ -148,7 +148,28 @@ test("retry of a committed-but-unfinished op resumes post steps with the origina
   assert.ok(state.rpcs.some((r) => r.name === "handheld_smart_create_complete"));
 });
 
-const deps = { release: async () => { state.releaseCalls++; return state.release(); }, assignGroups: async () => {} };
+const deps = { release: async () => { state.releaseCalls++; return state.release(); }, assignGroups: async () => {},
+  channelDisabled: async () => { if ((state as any).channelRead === "fail") throw new Error("渠道策略读取失败"); return (state as any).channelRead === "disabled"; } };
+test("0119 worker: store closed Youzan channel → release cancelled, never called", async () => {
+  (state as any).channelRead = "disabled";
+  const r = await runHandheldReleaseWorker(1, deps);
+  (state as any).channelRead = undefined;
+  assert.equal(state.releaseCalls, 0);
+  assert.deepEqual(r.outcomes.map((o: any) => o.status), ["cancelled"]);
+  assert.match(state.finish[0], /sales_channel_disabled/);
+});
+test("0119 worker: channel intent read failure retries, does not publish", async () => {
+  (state as any).channelRead = "fail";
+  const r = await runHandheldReleaseWorker(1, deps);
+  (state as any).channelRead = undefined;
+  assert.equal(state.releaseCalls, 0);
+  assert.deepEqual(r.outcomes.map((o: any) => o.status), ["failed"]);
+});
+test("0119 worker: final-boundary channel block inside release is cancelled, not retried", async () => {
+  state.release = async () => ({ ok: false, results: [{ shop_id: "shop", ok: false, channel_disabled: true }] });
+  const r = await runHandheldReleaseWorker(1, deps);
+  assert.deepEqual(r.outcomes.map((o: any) => o.status), ["cancelled"]);
+});
 test("worker marks success done", async () => {
   const r = await runHandheldReleaseWorker(1, deps);
   assert.deepEqual(r.outcomes.map((o: any) => o.status), ["done"]);
