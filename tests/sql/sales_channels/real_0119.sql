@@ -17,7 +17,7 @@ BEGIN
   UPDATE inv_locations SET shop_id=NULL WHERE shop_id=shop AND id<>l;  -- 建店触发器自动建的库位让位给测试库位
   UPDATE inv_locations SET shop_id=shop WHERE id=l;
   INSERT INTO inv_skus(id,category,epc,name,price_tier,sales_state,sale_ownership,status,kind,sku_scope,inventory_policy,is_display)
-  SELECT x,'toy','EPC'||right(x::text,4),'测试共享',100,'active','owned','active','single','standard','tracked',true FROM unnest(ARRAY[s3,s4,s5]) x;
+  SELECT x,'toy','EPC'||right(x::text,4),'测试共享'||right(x::text,1),100+right(x::text,1)::int,'active','owned','active','single','standard','tracked',true FROM unnest(ARRAY[s3,s4,s5]) x;
   INSERT INTO inv_stocks(sku_id,location_id,qty) SELECT x,l,1 FROM unnest(ARRAY[s3,s4,s5]) x;
   INSERT INTO sku_channel_listings(sku_id,channel,shop_id,external_item_id,listing_status,updated_at) VALUES
     (s,'youzan_branch_offline',shop,'9001','published',now()),
