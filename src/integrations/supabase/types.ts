@@ -11360,6 +11360,10 @@ export type Database = {
     }
     Functions: {
       aigc_sso_cleanup_expired: { Args: never; Returns: undefined }
+      channel_sync_outbox_row_visible: {
+        Args: { p_payload: Json }
+        Returns: boolean
+      }
       claim_channel_sync_tasks: {
         Args: {
           p_lease_seconds?: number
@@ -13527,6 +13531,10 @@ export type Database = {
           p_token: string
         }
         Returns: Json
+      }
+      sales_channel_youzan_item_shared: {
+        Args: { p_item: string; p_shop: string; p_sku: string }
+        Returns: boolean
       }
       sales_dashboard_report: {
         Args: {
