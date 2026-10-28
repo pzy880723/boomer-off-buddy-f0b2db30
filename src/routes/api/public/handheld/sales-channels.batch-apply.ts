@@ -7,7 +7,6 @@ import {
   SalesChannelError,
   authorizeSalesChannelStaff,
   callApplyRpc,
-  loadPreviewSkuIds,
 } from "@/server/sales-channels.server";
 import { aggregateBySku } from "@/lib/sales-channels/model";
 
@@ -31,8 +30,9 @@ export const Route = createFileRoute("/api/public/handheld/sales-channels/batch-
           const data = await callApplyRpc("sales_channel_apply_preview", {
             p_actor: ctx.userId, p_location: ctx.locationId, p_op_id: body.op_id, p_token: body.preview_token,
           });
-          const skuIds = await loadPreviewSkuIds(body.preview_token);
-          const results = aggregateBySku(skuIds, data.results);
+          // 返回全部最初选择的 SKU（含预览跳过）；重放来自同一份持久结果。
+          const skuIds = data.sku_ids ?? [...new Set(data.results.map((r) => r.sku_id))];
+          const results = aggregateBySku(skuIds, data.results, data.skipped ?? []);
           const succeeded = results.filter((r) => r.success).length;
           return ok({ total: results.length, succeeded, failed: results.length - succeeded, replayed: !!data.replayed, results });
         } catch (e) {

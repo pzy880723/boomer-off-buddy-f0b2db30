@@ -1191,7 +1191,7 @@ async function findCreatedHqSpu(token: string, code: string, name: string) {
 
 let hqSpuIdentityCache: { expiresAt: number; byId: Map<number, HqSpuRemoteIdentity> } | null = null;
 
-async function findHqSpuById(
+export async function findHqSpuById(
   token: string,
   spuId: number,
   forceRefresh = false,
@@ -1881,6 +1881,13 @@ async function runStockSyncWorkerCore(opts: {
 
       if (action === "push_is_display") {
         const targetIsDisplay = Boolean((t as { target_is_display?: boolean }).target_is_display);
+        // 紧贴真实 API 调用前再复核：期间若本店关闭了有赞渠道，不得再上架。
+        if (targetIsDisplay && await (await import("@/server/sales-channel-guard.server"))
+            .youzanIntentDisabledForShop(supabase, t.sku_id, t.shop_id ?? (link as { shop_id?: string } | null)?.shop_id ?? null)) {
+          if (!await finishClaim({ status: "done", last_error: "blocked: 本店已关闭有赞渠道", attempts: (t.attempts ?? 0) + 1 })) continue;
+          ok += 1;
+          continue;
+        }
         await pushIsDisplayToYouzan(link as LinkRow, targetIsDisplay);
         if (!await finishClaim({
           status: "done",

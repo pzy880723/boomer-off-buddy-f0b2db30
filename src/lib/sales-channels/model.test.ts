@@ -2,6 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   aggregateBySku,
+  assertShelfReadback,
+  reasonLabel,
+  summarizeSingle,
   buildChannelViews,
   consumerChannelAllowed,
   evaluateSalesIntentTask,
@@ -68,6 +71,24 @@ test("batch plan: store-only removes consumer channels, never youzan; skips not-
   assert.equal(planSkuChanges(base({ youzan: null }), ["youzan"], []).skipReason, "youzan_not_mapped");
 });
 
+test("batch plan: one blocked channel skips the whole SKU (never silently dropped)", () => {
+  const p = planSkuChanges(base({ youzan: null }), [], ["app", "youzan"]);
+  assert.deepEqual(p.changes, {});
+  assert.equal(p.skipReason, "youzan_not_mapped");
+  assert.equal(p.blockedChannel, "youzan");
+});
+
+test("reason labels never leak raw codes; readback must reach target", () => {
+  assert.equal(reasonLabel("something_new"), "操作未完成，请刷新后重试");
+  assert.throws(() => assertShelfReadback(null, true, 1), /未找到/);
+  assert.throws(() => assertShelfReadback({ itemId: 2, isDisplay: true }, true, 1), /不一致/);
+  assert.throws(() => assertShelfReadback({ itemId: 1, isDisplay: false }, true, 1), /未达到目标/);
+  assert.doesNotThrow(() => assertShelfReadback({ itemId: 1, isDisplay: false }, false, 1));
+  assert.deepEqual(summarizeSingle([{ sku_id: "s", channel: "app", success: true }, { sku_id: "s", channel: "youzan", success: false }]),
+    { all_succeeded: false, succeeded: 1, failed: 1 });
+  assert.equal(view(base({ youzanFailed: true }), "youzan").platform_status, "error");
+});
+
 test("consumer channel only from signed claims; unknown is conservative", () => {
   assert.equal(resolveConsumerChannel(null), "unknown");
   // 绑定历史不是会话来源：有 mini 绑定的 APP 会话不能被认成小程序
@@ -102,6 +123,8 @@ test("batch aggregate per sku and fingerprint is order independent", () => {
     { sku_id: "b", channel: "app", success: false, reason: "version_conflict" },
   ]);
   assert.deepEqual(r[0], { sku_id: "a", success: true, status: "applied" });
+  const withSkip = aggregateBySku(["a", "z"], [{ sku_id: "a", channel: "app", success: true, status: "applied" }], [{ sku_id: "z", reason: "not_in_store" }]);
+  assert.deepEqual(withSkip.map((x) => [x.sku_id, x.success, x.status]), [["a", true, "applied"], ["z", false, "skipped"]]);
   assert.match(r[1].reason!, /刷新/);
   assert.equal(
     singleRequestFingerprint("s", [{ channel: "app", enabled: true, expected_version: 0 }, { channel: "miniapp", enabled: false, expected_version: 1 }]),

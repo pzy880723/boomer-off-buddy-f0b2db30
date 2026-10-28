@@ -21,11 +21,15 @@ export const REASON_LABELS: Record<string, string> = {
   no_stock: "本店无库存，不能在收银台上架",
   version_conflict: "商品渠道已被他人修改，请刷新后重试",
   invalid_change: "渠道参数不正确",
+  duplicate_change: "同一商品同一渠道重复提交",
+  not_in_preview: "该商品不在本次预览中",
 };
+
+export const UNKNOWN_REASON = "操作未完成，请刷新后重试";
 
 export function reasonLabel(code: string | null | undefined): string | null {
   if (!code) return null;
-  return REASON_LABELS[code] ?? code;
+  return REASON_LABELS[code] ?? UNKNOWN_REASON;
 }
 
 /** 只认验签后 payload.client_kind（会话级）；绑定历史（wechat_mini_*）不代表当前来源。 */
@@ -62,6 +66,8 @@ export type ChannelFacts = {
     last_verified_at: string | null;
   } | null;
   youzanPending: boolean;
+  /** 最近一次本意图版本的有赞任务已终止失败（凭据过期/无权限/回查不达标等） */
+  youzanFailed?: boolean;
   intents: IntentFact[];
 };
 
@@ -111,7 +117,7 @@ export function buildChannelView(channel: SalesChannel, f: ChannelFacts): Channe
   const block = selected ? blocks.disable : blocks.enable;
   let platform: string;
   if (channel === "youzan") {
-    platform = f.youzanPending ? "syncing" : f.youzan?.listing_status ?? "not_mapped";
+    platform = f.youzanPending ? "syncing" : f.youzanFailed ? "error" : f.youzan?.listing_status ?? "not_mapped";
   } else if (!f.listing) platform = "not_listed";
   else if (f.listing.status === "sold" || f.listing.status === "archived") platform = f.listing.status;
   else if (!selected) platform = "disabled";
@@ -135,31 +141,39 @@ export function buildChannelViews(f: ChannelFacts): ChannelView[] {
   return SALES_CHANNELS.map((c) => buildChannelView(c, f));
 }
 
-/** 批量预览：按方向检查每个变更，返回可执行变更或跳过原因。 */
+/** 批量预览：一件商品所请求的渠道必须**全部**可执行才算 eligible；任一被阻断则整件跳过并给出原因，绝不静默丢弃。 */
 export function planSkuChanges(
   f: ChannelFacts,
   add: readonly SalesChannel[],
   remove: readonly SalesChannel[],
-): { changes: Record<string, { enabled: boolean; expected_version: number }>; skipReason: string | null } {
-  if (f.stockQty === null) return { changes: {}, skipReason: "not_in_store" };
+): { changes: Record<string, { enabled: boolean; expected_version: number }>; skipReason: string | null; blockedChannel: SalesChannel | null } {
+  if (f.stockQty === null) return { changes: {}, skipReason: "not_in_store", blockedChannel: null };
   const changes: Record<string, { enabled: boolean; expected_version: number }> = {};
-  let firstBlock: string | null = null;
   for (const [list, enabled] of [[add, true], [remove, false]] as const) {
     for (const ch of list) {
       const b = channelBlocks(ch, f);
       const block = enabled ? b.enable : b.disable;
-      if (block) { firstBlock ??= block; continue; }
+      if (block) return { changes: {}, skipReason: block, blockedChannel: ch };
       changes[ch] = { enabled, expected_version: f.intents.find((i) => i.channel === ch)?.version ?? 0 };
     }
   }
-  return { changes, skipReason: Object.keys(changes).length ? null : firstBlock ?? "invalid_change" };
+  return { changes, skipReason: Object.keys(changes).length ? null : "invalid_change", blockedChannel: null };
 }
 
 export type ApplyResult = { sku_id: string; channel: string; success: boolean; reason?: string; status?: string };
 
-/** 每个 SKU 一条：全部渠道成功才算成功；首个失败原因中文化。 */
-export function aggregateBySku(skuIds: readonly string[], results: readonly ApplyResult[]) {
+/**
+ * 每个**最初选择的** SKU 一条：预览跳过的按跳过原因记失败；其余全部渠道成功才算成功。
+ * 顺序与原始选择一致，total = 原始选择数。
+ */
+export function aggregateBySku(
+  skuIds: readonly string[],
+  results: readonly ApplyResult[],
+  skipped: ReadonlyArray<{ sku_id: string; reason: string }> = [],
+) {
   return skuIds.map((sku_id) => {
+    const skip = skipped.find((s) => s.sku_id === sku_id);
+    if (skip) return { sku_id, success: false, reason: reasonLabel(skip.reason)!, status: "skipped" };
     const rows = results.filter((r) => r.sku_id === sku_id);
     const fail = rows.find((r) => !r.success);
     if (!rows.length) return { sku_id, success: false, reason: reasonLabel("invalid_change")! };
@@ -167,6 +181,23 @@ export function aggregateBySku(skuIds: readonly string[], results: readonly Appl
     const status = rows.some((r) => r.status === "queued") ? "queued" : rows.every((r) => r.status === "unchanged") ? "unchanged" : "applied";
     return { sku_id, success: true, status };
   });
+}
+
+/** 单件结果汇总：HTTP 200 也可能部分失败，客户端据此展示，不可当作全部完成。 */
+export function summarizeSingle(results: readonly ApplyResult[]) {
+  const failed = results.filter((r) => !r.success).length;
+  return { all_succeeded: failed === 0 && results.length > 0, succeeded: results.length - failed, failed };
+}
+
+/** 有赞回查：必须找到同一分店商品且 display 达到目标，否则抛错（任务重试，不标成功）。 */
+export function assertShelfReadback(
+  seen: { itemId: number; isDisplay: boolean } | null,
+  online: boolean,
+  expectedItemId: number,
+) {
+  if (!seen) throw new Error("有赞回查未找到本店商品，暂不标记生效");
+  if (seen.itemId !== expectedItemId) throw new Error("有赞回查商品与本店映射不一致，暂不标记生效");
+  if (seen.isDisplay !== online) throw new Error(`有赞回查状态未达到目标（${online ? "上架" : "下架"}），稍后重试`);
 }
 
 // ---- worker 执行前复核（有赞写入前） ----

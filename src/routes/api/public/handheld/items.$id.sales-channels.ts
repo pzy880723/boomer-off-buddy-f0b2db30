@@ -9,7 +9,7 @@ import {
   callApplyRpc,
   channelStateResponse,
 } from "@/server/sales-channels.server";
-import { reasonLabel, sha256Hex, singleRequestFingerprint } from "@/lib/sales-channels/model";
+import { reasonLabel, sha256Hex, singleRequestFingerprint, summarizeSingle } from "@/lib/sales-channels/model";
 
 const Uuid = z.string().uuid();
 const Body = z.object({
@@ -33,14 +33,14 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/sales-chann
       OPTIONS: async () => new Response(null, { status: 204, headers: HANDHELD_CORS }),
       GET: async ({ request, params }) => {
         try {
-          if (!Uuid.safeParse(params.id).success) return err("Invalid id", 400, { code: "invalid_id" });
+          if (!Uuid.safeParse(params.id).success) return err("商品编号不正确", 400, { code: "invalid_id" });
           const ctx = await authorizeSalesChannelStaff(request, new URL(request.url).searchParams.get("location_id"));
           return ok(await channelStateResponse(ctx, params.id));
         } catch (e) { return fail(e); }
       },
       POST: async ({ request, params }) => {
         try {
-          if (!Uuid.safeParse(params.id).success) return err("Invalid id", 400, { code: "invalid_id" });
+          if (!Uuid.safeParse(params.id).success) return err("商品编号不正确", 400, { code: "invalid_id" });
           let body: z.infer<typeof Body>;
           try { body = Body.parse(await request.json()); }
           catch { return err("请求参数不正确", 400, { code: "invalid_body" }); }
@@ -56,6 +56,8 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/sales-chann
           return ok({
             ...state,
             replayed: !!data.replayed,
+            // HTTP 200 也可能部分失败：客户端以 all_succeeded / results 为准
+            ...summarizeSingle(data.results),
             results: data.results.map((r) => ({
               sku_id: r.sku_id, channel: r.channel, success: r.success,
               ...(r.reason ? { reason: reasonLabel(r.reason), reason_code: r.reason } : {}),
