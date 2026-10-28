@@ -20,7 +20,7 @@ import { verifyListingCore } from "@/lib/omnichannel-publish.functions";
 import { canMarkSold, evaluateZeroingTask, isServiceBearer, ZEROING_ACTIONS } from "@/lib/channel-sync-guard";
 import { z } from "zod";
 import { pushStockToYouzan, type LinkRow } from "@/lib/youzan-sync.functions";
-import { evaluateSalesIntentTask, isSalesIntentTask } from "@/lib/sales-channels/model";
+import { assertShelfReadback, evaluateSalesIntentTask, isSalesIntentTask } from "@/lib/sales-channels/model";
 import { loadIntentTaskFacts, youzanIntentDisabledForShop } from "@/server/sales-channel-guard.server";
 
 const DEFAULT_LEASE_SECONDS = 300;
@@ -52,6 +52,21 @@ type OutboxTask = {
 type Admin = Awaited<typeof import("@/integrations/supabase/client.server")>["supabaseAdmin"];
 
 class TaskBlocked extends Error {}
+
+type BranchListingRow = { external_spu_id: string | null; external_item_id: string | null };
+
+/** 经固定出口回查分店渠道商品真实 display 状态（itemdetail.get channel=1，按总部 spuCode 精确匹配）。 */
+async function readBackBranchShelf(_sb: Admin, l: BranchListingRow, branchKdtId: number) {
+  if (!l.external_spu_id) return null;
+  const { getHqShop } = await import("@/lib/youzan.functions");
+  const { findHqSpuById } = await import("@/lib/youzan-sync.functions");
+  const { queryYouzanBranchChannelProduct } = await import("@/lib/youzan-offline-products.server");
+  const hqToken = await ensureAccessToken(await getHqShop());
+  const master = await findHqSpuById(hqToken, Number(l.external_spu_id));
+  if (!master) return null;
+  const remote = await queryYouzanBranchChannelProduct({ accessToken: hqToken, kdtId: branchKdtId, itemCode: master.spuCode });
+  return remote ? { itemId: remote.itemId, isDisplay: remote.isDisplay } : null;
+}
 
 export const Route = createFileRoute("/api/public/hooks/channel-sync-worker")({
   server: {
@@ -138,8 +153,6 @@ export const Route = createFileRoute("/api/public/hooks/channel-sync-worker")({
               throw new TaskBlocked("租约不足或已失效，未执行渠道写入");
             }
             await dispatch(task, supabaseAdmin, { skipShelf });
-            // 回查平台真实状态后才算生效
-            if (intentTask && task.channel_listing_id) await verifyListingCore(task.channel_listing_id);
             if (task.action === "restore_after_return") {
               const { error: ue } = await supabaseAdmin.from("inv_skus")
                 .update({ sales_state: "active", updated_at: new Date().toISOString() } as never).eq("id", task.sku_id);
@@ -385,12 +398,21 @@ async function handleShelfChange(
     ...request,
     timeoutMs: 20_000,
   });
+  // 渠道意图任务：必须回查分店真实上下架状态达到目标后才写平台状态/完成任务；
+  // 回查失败或未达目标 → 抛错进入重试，平台状态保持原值。
+  let verifiedAt: string | null = null;
+  if (isSalesIntentTask(task)) {
+    const seen = await readBackBranchShelf(sb, listing as BranchListingRow, Number((branch as { kdt_id: number }).kdt_id));
+    assertShelfReadback(seen, online, Number(l.external_item_id));
+    verifiedAt = new Date().toISOString();
+  }
   const { error: sErr } = await sb
     .from("sku_channel_listings")
     .update({
       listing_status: online ? "published" : "unshelved",
       last_error: null,
       updated_at: new Date().toISOString(),
+      ...(verifiedAt ? { last_verified_at: verifiedAt } : {}),
     } as never)
     .eq("id", task.channel_listing_id);
   if (sErr) throw new Error(`上下架结果写入失败：${sErr.message}`);
