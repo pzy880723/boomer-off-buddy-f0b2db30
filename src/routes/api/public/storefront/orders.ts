@@ -205,7 +205,6 @@ export const Route = createFileRoute("/api/public/storefront/orders")({
         if (withGifts) {
           return storefrontError("赠礼结算暂未开放", 503, "gift_checkout_not_enabled");
         }
-        void requestedGiftCount;
         // 渠道策略在原下单事务内由订单行触发器校验；渠道只来自验签会话。
         const { data, error } = await supabaseAdmin.rpc("commerce_create_order_in_channel" as never, {
               p_channel: resolveConsumerChannel(auth.customer),

@@ -147,7 +147,7 @@ export function planSkuChanges(
   add: readonly SalesChannel[],
   remove: readonly SalesChannel[],
 ): { changes: Record<string, { enabled: boolean; expected_version: number }>; skipReason: string | null; blockedChannel: SalesChannel | null } {
-  if (f.stockQty === null) return { changes: {}, skipReason: "not_in_store" };
+  if (f.stockQty === null) return { changes: {}, skipReason: "not_in_store", blockedChannel: null };
   const changes: Record<string, { enabled: boolean; expected_version: number }> = {};
   for (const [list, enabled] of [[add, true], [remove, false]] as const) {
     for (const ch of list) {
