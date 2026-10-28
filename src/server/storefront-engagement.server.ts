@@ -7,6 +7,8 @@ import {
 } from "@/lib/commerce/storefront-engagement";
 import { buildDiscoveryTerms, countAvailableTags } from "@/lib/commerce/storefront-discovery";
 
+import type { ConsumerChannel } from "@/lib/sales-channels/model";
+
 export type EngagementCounts = { view_count: number; favorite_count: number };
 type Db = typeof supabaseAdmin;
 
@@ -83,8 +85,9 @@ export function withCounts<T extends { id: string }>(items: readonly T[], counts
 const LISTING_PAGE = 1000;
 
 /** All currently purchasable products, using the same published + enrich + stock>0 path as the list. */
-export async function loadAvailableProductsForDiscovery(db: Db = supabaseAdmin) {
+export async function loadAvailableProductsForDiscovery(db: Db = supabaseAdmin, channel: ConsumerChannel = "unknown") {
   const { enrichStorefrontListings } = await import("./storefront-products.server");
+  const { filterListingsForConsumerChannel } = await import("./sales-channels.server");
   const listings: unknown[] = [];
   for (let from = 0; ; from += LISTING_PAGE) {
     // Paged reads so counting never truncates at the default 1000-row cap.
@@ -96,14 +99,17 @@ export async function loadAvailableProductsForDiscovery(db: Db = supabaseAdmin) 
     if (!data || data.length < LISTING_PAGE) break;
   }
   if (!listings.length) return [];
-  const enriched = await enrichStorefrontListings(listings as never, { signImages: false });
+  // 与商品列表同一渠道展示过滤：当前来源被显式关闭的商品不计入发现/标签计数（未知来源取两渠道交集）。
+  const visible = await filterListingsForConsumerChannel(listings as Array<{ sku_id: string; location_id: string | null }>, channel);
+  if (!visible.length) return [];
+  const enriched = await enrichStorefrontListings(visible as never, { signImages: false });
   return enriched.filter((product) => product.stock > 0);
 }
 
-export async function loadDiscovery(db: Db = supabaseAdmin) {
+export async function loadDiscovery(db: Db = supabaseAdmin, channel: ConsumerChannel = "unknown") {
   const [hotRes, products, catRes] = await Promise.all([
     db.rpc("storefront_hot_search_terms" as never, { p_window_days: ENGAGEMENT_WINDOW_DAYS, p_limit: 20 } as never),
-    loadAvailableProductsForDiscovery(db),
+    loadAvailableProductsForDiscovery(db, channel),
     db.from("inv_categories" as never).select("code, parent:inv_categories!parent_id(code)"),
   ]);
   if (hotRes.error) throw new Error(hotRes.error.message);

@@ -59,6 +59,25 @@ export async function authorizeSalesChannelStaff(request: Request, locationId: u
   return { userId: session.user_id, locationId, shopId: loc.shop_id ?? null, canManage: roles.some((r) => MANAGE_ROLES.includes(r)) };
 }
 
+/** PostgREST 单次最多返回 max_rows（默认 1000）行：所有可能超出的读取都用稳定排序 + range 分页取全。 */
+export const PAGE_SIZE = 1000;
+export async function fetchAllPages<T>(
+  build: () => any, // eslint-disable-line @typescript-eslint/no-explicit-any
+  orderBy: string[],
+  onError: () => Error = () => new SalesChannelError("渠道资料读取失败", 500, "channel_query_failed"),
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    let q = build();
+    for (const col of orderBy) q = q.order(col, { ascending: true });
+    const { data, error } = await q.range(from, from + PAGE_SIZE - 1);
+    if (error) throw onError();
+    const rows = (data ?? []) as T[];
+    out.push(...rows);
+    if (rows.length < PAGE_SIZE) return out;
+  }
+}
+
 function must<T>(r: { data: T; error: { message: string } | null }): T {
   if (r.error) throw new SalesChannelError("渠道资料读取失败", 500, "channel_query_failed");
   return r.data;
@@ -83,13 +102,38 @@ export async function loadChannelFacts(ctx: Pick<StaffContext, "locationId" | "s
   const yzRows = (must(yz) ?? []) as Array<{ id: string; sku_id: string; external_item_id: string | null; listing_status: string | null; last_verified_at: string | null; updated_at: string }>;
   const yzIds = yzRows.map((r) => r.id);
   // 每个映射取最近一条意图任务：进行中 = syncing；终止失败（凭据过期/无权限/回查不达标）= error
+  // 待处理事实分页取全：未读到 ≠ 没有任务（否则会把进行中误显示为默认状态）。
   const tasks = yzIds.length
-    ? (must(await db.from("channel_sync_outbox").select("channel_listing_id, status, created_at")
-        .in("channel_listing_id", yzIds).eq("request_payload->>source", "sales_channel_intent")
-        .order("created_at", { ascending: false }).limit(500)) ?? []) as Array<{ channel_listing_id: string; status: string }>
+    ? await fetchAllPages<{ id: string; channel_listing_id: string; status: string; created_at: string }>(
+        () => db.from("channel_sync_outbox").select("id, channel_listing_id, status, created_at")
+          .in("channel_listing_id", yzIds).eq("request_payload->>source", "sales_channel_intent"),
+        ["created_at", "id"])
     : [];
-  const latestTask = new Map<string, string>();
-  for (const t of tasks) if (!latestTask.has(t.channel_listing_id)) latestTask.set(t.channel_listing_id, t.status);
+  const latestTask = new Map<string, { status: string; at: string; id: string }>();
+  for (const t of tasks) {
+    const cur = latestTask.get(t.channel_listing_id);
+    if (!cur || t.created_at > cur.at || (t.created_at === cur.at && t.id > cur.id)) {
+      latestTask.set(t.channel_listing_id, { status: t.status, at: t.created_at, id: t.id });
+    }
+  }
+  // 共享有赞 item：同店同 external_item_id 关联其他 SKU（多规格/价格档共享收银商品）→ 单 SKU 不能开关
+  const itemIds = [...new Set(yzRows.map((r) => r.external_item_id).filter((v): v is string => !!v))];
+  const sharedOwners = new Map<string, Set<string>>();
+  if (ctx.shopId && itemIds.length) {
+    const [byListing, byLink] = await Promise.all([
+      fetchAllPages<{ id: string; sku_id: string; external_item_id: string }>(
+        () => db.from("sku_channel_listings").select("id, sku_id, external_item_id")
+          .eq("channel", "youzan_branch_offline").eq("shop_id", ctx.shopId).in("external_item_id", itemIds), ["id"]),
+      fetchAllPages<{ id: string; sku_id: string; yz_item_id: number | string }>(
+        () => db.from("sku_youzan_links").select("id, sku_id, yz_item_id")
+          .eq("shop_id", ctx.shopId).in("yz_item_id", itemIds.filter((v) => /^\d+$/.test(v)).map(Number)), ["id"]),
+    ]);
+    for (const r of [...byListing.map((x) => [x.external_item_id, x.sku_id]), ...byLink.map((x) => [String(x.yz_item_id), x.sku_id])]) {
+      const set = sharedOwners.get(r[0]) ?? new Set<string>();
+      set.add(r[1]);
+      sharedOwners.set(r[0], set);
+    }
+  }
   const shopRow = must(shop) as { id: string; expires_at: string | null; access_token: string | null } | null;
   const shopFacts = {
     bound: !!shopRow,
@@ -109,8 +153,9 @@ export async function loadChannelFacts(ctx: Pick<StaffContext, "locationId" | "s
       listing: listingRows.find((l) => l.sku_id === id) ?? null,
       shop: shopFacts,
       youzan: y,
-      youzanPending: !!y && ["pending", "running", "retry_wait"].includes(latestTask.get(y.id) ?? ""),
-      youzanFailed: !!y && latestTask.get(y.id) === "dead_letter",
+      youzanPending: !!y && ["pending", "running", "retry_wait"].includes(latestTask.get(y.id)?.status ?? ""),
+      youzanFailed: !!y && latestTask.get(y.id)?.status === "dead_letter",
+      youzanShared: !!y?.external_item_id && [...(sharedOwners.get(y.external_item_id) ?? [])].some((sku) => sku !== id),
       intents: intentRows.filter((i) => i.sku_id === id).map((i) => ({ channel: i.channel, enabled: i.enabled, version: Number(i.version) })),
     });
   }
@@ -192,21 +237,31 @@ export async function resolveRequestConsumerChannel(request: Request): Promise<C
   }
 }
 
-/** 在分页前移除当前来源被显式关闭的商品；读取失败即报错（不放行）。 */
+/**
+ * 在分页前移除当前来源被显式关闭的商品；读取失败即报错（不放行）。
+ * 按实际 listing 门店 + SKU 分块查询，并稳定分页取全（不受 PostgREST max_rows 截断）。
+ */
 export async function filterListingsForConsumerChannel<T extends { sku_id: string; location_id: string | null }>(
   listings: T[],
   channel: ConsumerChannel,
 ): Promise<T[]> {
   if (!listings.length) return listings;
   const skuIds = [...new Set(listings.map((l) => l.sku_id))];
-  const disabled: Array<{ sku_id: string; location_id: string; channel: string }> = [];
+  const locationIds = [...new Set(listings.map((l) => l.location_id).filter((v): v is string => !!v))];
+  if (!locationIds.length) return listings;
+  const disabled = new Map<string, Array<{ channel: string }>>();
   for (let i = 0; i < skuIds.length; i += 200) {
-    const { data, error } = await db.from("sku_sales_channel_intents").select("sku_id, location_id, channel")
-      .eq("enabled", false).in("channel", ["miniapp", "app"]).in("sku_id", skuIds.slice(i, i + 200));
-    if (error) throw new Error("渠道策略读取失败");
-    disabled.push(...((data ?? []) as typeof disabled));
+    const chunk = skuIds.slice(i, i + 200);
+    const rows = await fetchAllPages<{ sku_id: string; location_id: string; channel: string }>(
+      () => db.from("sku_sales_channel_intents").select("sku_id, location_id, channel")
+        .eq("enabled", false).in("channel", ["miniapp", "app"]).in("location_id", locationIds).in("sku_id", chunk),
+      ["sku_id", "location_id", "channel"],
+      () => new Error("渠道策略读取失败"));
+    for (const d of rows) {
+      const k = `${d.sku_id}:${d.location_id}`;
+      disabled.set(k, [...(disabled.get(k) ?? []), { channel: d.channel }]);
+    }
   }
-  if (!disabled.length) return listings;
-  return listings.filter((l) =>
-    consumerChannelAllowed(disabled.filter((d) => d.sku_id === l.sku_id && d.location_id === l.location_id), channel));
+  if (!disabled.size) return listings;
+  return listings.filter((l) => consumerChannelAllowed(disabled.get(`${l.sku_id}:${l.location_id}`) ?? [], channel));
 }

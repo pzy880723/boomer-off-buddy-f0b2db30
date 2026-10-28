@@ -20,7 +20,7 @@ import { verifyListingCore } from "@/lib/omnichannel-publish.functions";
 import { canMarkSold, evaluateZeroingTask, isServiceBearer, ZEROING_ACTIONS } from "@/lib/channel-sync-guard";
 import { z } from "zod";
 import { pushStockToYouzan, type LinkRow } from "@/lib/youzan-sync.functions";
-import { assertShelfReadback, evaluateSalesIntentTask, isSalesIntentTask } from "@/lib/sales-channels/model";
+import { assertShelfReadback, evaluateSalesIntentTask, isSalesIntentTask, writeRecheckPlan } from "@/lib/sales-channels/model";
 import { loadIntentTaskFacts, youzanIntentDisabledForShop } from "@/server/sales-channel-guard.server";
 
 const DEFAULT_LEASE_SECONDS = 300;
@@ -213,24 +213,29 @@ async function loadZeroingFacts(task: OutboxTask, sb: Admin) {
   };
 }
 
-async function recheckBeforeWrite(task: OutboxTask, sb: Admin) {
-  const intentTask = isSalesIntentTask(task);
-  const legacyShelf = !intentTask && (task.action === "shelf" || task.action === "restore_after_return");
-  if (!intentTask && !legacyShelf && !ZEROING_ACTIONS.has(task.action)) return;
+/**
+ * 有赞写入前复核。mode 区分实际写入类型：
+ *  - shelf：上架/下架写入 —— 意图任务全量复核；旧 shelf/restore 上架检查本店是否关闭有赞渠道。
+ *  - stock：纯库存写入 —— 不做上架检查（关闭渠道仍允许退货验货回补库存，不重新上架）。
+ */
+async function recheckBeforeWrite(task: OutboxTask, sb: Admin, mode: "shelf" | "stock") {
+  const plan = writeRecheckPlan(task, mode, ZEROING_ACTIONS.has(task.action));
+  if (plan === "none") return;
   const { data: lease, error } = await sb.from("channel_sync_outbox")
     .select("worker_id,status,lease_expires_at").eq("id", task.id).single();
   const expiry = Date.parse(lease?.lease_expires_at ?? "");
   if (error || lease?.worker_id !== task.worker_id || lease.status !== "running" ||
       !Number.isFinite(expiry) || expiry < Date.now() + 25_000) throw new TaskBlocked("渠道写入前租约已失效或不足");
-  if (intentTask) {
+  if (plan === "intent") {
     const d = evaluateSalesIntentTask(task, await loadIntentTaskFacts(sb, task));
     if (d.verdict !== "proceed") throw new TaskBlocked(d.reason);
     return;
   }
-  if (legacyShelf) {
+  if (plan === "legacy_shelf") {
     if (await youzanIntentDisabledForShop(sb, task.sku_id, task.shop_id)) throw new TaskBlocked("本店已关闭有赞渠道");
     return;
   }
+  if (plan === "stock_only") return;
   const decision = evaluateZeroingTask(task, await loadZeroingFacts(task, sb));
   if (decision.verdict !== "proceed") throw new TaskBlocked(decision.reason);
 }
@@ -343,7 +348,7 @@ async function handleSetStock(
     .eq("sku_id", task.sku_id).eq("shop_id", l.shop_id).single();
   if (linkError || !link) throw new Error("渠道商品缺少对应门店库存映射");
   await pushStockToYouzan(link as LinkRow, target, `channel-task:${task.id}`,
-    () => recheckBeforeWrite(task, sb));
+    () => recheckBeforeWrite(task, sb, "stock"));
 
 
 
@@ -392,7 +397,7 @@ async function handleShelfChange(
     itemId: Number(l.external_item_id),
     online,
   });
-  await recheckBeforeWrite(task, sb);
+  await recheckBeforeWrite(task, sb, "shelf");
   await callYouzanApiVerbose({
     accessToken: branchToken,
     ...request,

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { supabaseAdmin as supabase } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { ensureAccessToken, getHqShop } from "./youzan.functions";
+import { YouzanChannelDisabledError, youzanIntentDisabledForShop } from "@/server/sales-channel-guard.server";
 import { getPublicOrigin } from "./sku-media";
 import {
   buildOfflineSkuIdentity,
@@ -37,6 +38,8 @@ type OfflineReleaseResult = {
   sku_id: number | null;
   recovered: boolean;
   error: string | null;
+  /** 本店已显式关闭有赞渠道，未发布 */
+  channel_disabled?: boolean;
 };
 
 async function findExistingOfflineProduct(args: {
@@ -380,7 +383,16 @@ export async function releaseSkuToOfflineShopsCore(args: {
       barcode: posBarcode,
       name: remoteIdentity.name,
     });
+    // 多渠道销售：本店显式关闭有赞渠道时，任何调用方（延迟重试/自动铺货/手动同步）都不得在此发布。
+    // 紧贴实际有赞写入前读取本 SKU 当前门店意图；读取失败抛错（不放行）。
+    const channelBlocked = async () => {
+      if (!(await youzanIntentDisabledForShop(supabase, args.sku_id, branch.id))) return false;
+      results.push({ shop_id: branch.id, ok: false, item_id: null, sku_id: null, recovered: false,
+        error: new YouzanChannelDisabledError().message, channel_disabled: true });
+      return true;
+    };
     if (remoteExisting) {
+      if (await channelBlocked()) continue;
       try {
         if (isCustom && !hqChannel) throw new Error("有赞总部渠道商品尚未就绪，不能使用分店 ID 更新总部商品");
         await updateYouzanOfflineProduct({
@@ -423,6 +435,7 @@ export async function releaseSkuToOfflineShopsCore(args: {
       }
     }
 
+    if (await channelBlocked()) continue;
     try {
       const released = await releaseYouzanOfflineProduct({
         accessToken,

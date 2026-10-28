@@ -834,6 +834,13 @@
       "when": 1793180378470,
       "tag": "0118_sales_channel_hardening",
       "breakpoints": true
+    },
+    {
+      "idx": 119,
+      "version": "7",
+      "when": 1793187413259,
+      "tag": "0119_sales_channel_review_fixes",
+      "breakpoints": true
     }
   ]
 }
