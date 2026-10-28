@@ -36,7 +36,8 @@ function query(table) {
     select() { return chain; },
     eq(k, v) { if (!k.includes("->>")) rows = rows.filter((r) => r[k] === v); return chain; },
     in(k, vs) { rows = rows.filter((r) => vs.includes(r[k])); return chain; },
-    order() { return chain; }, limit() { return chain; },
+    order() { return chain; }, limit() { return chain; }, neq(k, v) { rows = rows.filter((r) => r[k] !== v); return chain; },
+    range(a, b) { const page = rows.slice(a, Math.min(b + 1, a + 1000)); return Promise.resolve({ data: page, error: null }); },
     insert(row) { inserted = { token: TOKEN, ...row }; tables[table].push(inserted); return chain; },
     maybeSingle() { return Promise.resolve({ data: inserted ?? rows[0] ?? null, error: null }); },
     single() { return Promise.resolve({ data: inserted ?? rows[0] ?? null, error: null }); },
@@ -155,4 +156,30 @@ test("batch apply: expired/foreign preview errors are Chinese", async () => {
   const r = await call(apply.POST, req("/a", { location_id: LOC, op_id: OP, preview_token: TOKEN }));
   expect(r.status).toBe(410);
   expect(r.body.error).toBe("预览已过期，请重新预览");
+});
+
+test("0119 consumer filter: max_rows=1000, 6 stores × 2400 policies, 200 products all filtered correctly", async () => {
+  const { filterListingsForConsumerChannel } = await import("@/server/sales-channels.server");
+  const locs = Array.from({ length: 6 }, (_, i) => `00000000-0000-4000-8000-00000000000${i}`);
+  const skus = Array.from({ length: 200 }, (_, i) => `s${String(i).padStart(4, "0")}`);
+  tables.sku_sales_channel_intents = [];
+  for (const sku of skus) for (const loc of locs) for (const ch of ["miniapp", "app"])
+    tables.sku_sales_channel_intents.push({ sku_id: sku, location_id: loc, channel: ch, enabled: false });
+  const listings = skus.map((sku, i) => ({ sku_id: sku, location_id: locs[i % 6] }));
+  expect(tables.sku_sales_channel_intents.length).toBe(2400);
+  expect((await filterListingsForConsumerChannel(listings, "app")).length).toBe(0);
+  tables.sku_sales_channel_intents = tables.sku_sales_channel_intents.filter((d) => d.channel === "miniapp");
+  expect((await filterListingsForConsumerChannel(listings, "app")).length).toBe(200);
+  expect((await filterListingsForConsumerChannel(listings, "unknown")).length).toBe(0);
+});
+
+test("0119 GET: shared Youzan item is blocked with Chinese reason; single mapping unaffected", async () => {
+  tables.sku_channel_listings.push({ id: "yz-b", sku_id: SKU_B, shop_id: "shop-1", channel: "youzan_branch_offline", external_item_id: "1", listing_status: "published", updated_at: "2026-10-01" });
+  const { body } = await call(single.GET, req(`/i?location_id=${LOC}`), { id: SKU_A });
+  const yz = body.data.channels.find((c) => c.channel === "youzan");
+  expect(yz.available).toBe(false);
+  expect(yz.blocked_reason).toBe("该商品为多规格共享收银商品，暂不能单独设置有赞渠道");
+  tables.sku_channel_listings.pop();
+  const again = await call(single.GET, req(`/i?location_id=${LOC}`), { id: SKU_A });
+  expect(again.body.data.channels.find((c) => c.channel === "youzan").available).toBe(true);
 });
