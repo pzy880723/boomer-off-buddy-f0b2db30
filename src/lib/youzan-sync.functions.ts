@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin as supabase } from "@/integrations/supabase/client.server";
+import { youzanIntentDisabledForShop } from "@/server/sales-channel-guard.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   callYouzanApiVerbose,
@@ -1838,6 +1839,16 @@ async function runStockSyncWorkerCore(opts: {
             .eq("id", clearedLinkId);
           if (error) throw error;
         }
+        ok += 1;
+        continue;
+      }
+      // 多渠道销售：本店显式关闭有赞渠道时，旧队列不得自动建品或推上架（库存推送不受影响）。
+      const queueAction = (t as { action?: string }).action ?? "push_stock";
+      const wantsShelf = queueAction === "push_is_display"
+        && Boolean((t as { target_is_display?: boolean }).target_is_display);
+      if ((needsListing || wantsShelf)
+          && await youzanIntentDisabledForShop(supabase, t.sku_id, t.shop_id ?? link?.shop_id ?? null)) {
+        if (!await finishClaim({ status: "done", last_error: "blocked: 本店已关闭有赞渠道", attempts: (t.attempts ?? 0) + 1 })) continue;
         ok += 1;
         continue;
       }

@@ -10,6 +10,7 @@ import {
 import { filterFankuangBeforePaging } from "@/lib/commerce/fankuang";
 import { sortByPopular } from "@/lib/commerce/storefront-engagement";
 import { loadEngagementCounts, withCounts } from "@/server/storefront-engagement.server";
+import { filterListingsForConsumerChannel, resolveRequestConsumerChannel } from "@/server/sales-channels.server";
 
 export const Route = createFileRoute("/api/public/storefront/products")({
   server: {
@@ -59,7 +60,17 @@ export const Route = createFileRoute("/api/public/storefront/products")({
         if (error) return storefrontJson({ ok: false, error: error.message }, { status: 500 });
 
         const rank = new Map(ranked.map((item) => [item.sku_id, item.search_rank]));
-        const listings = ((data ?? []) as unknown as StorefrontListing[]).sort((left, right) => {
+        // 渠道策略在分页前执行；来源只认服务端验签会话，未知来源保守拦截任一消费端关闭的商品。
+        let channelScoped: StorefrontListing[];
+        try {
+          channelScoped = await filterListingsForConsumerChannel(
+            (data ?? []) as unknown as StorefrontListing[],
+            await resolveRequestConsumerChannel(request),
+          );
+        } catch {
+          return storefrontJson({ ok: false, error: "商品渠道策略暂不可用" }, { status: 503 });
+        }
+        const listings = channelScoped.sort((left, right) => {
           if (query.sort === "price_asc") return Number(left.price) - Number(right.price);
           if (query.sort === "price_desc") return Number(right.price) - Number(left.price);
           if (query.sort === "relevance") {

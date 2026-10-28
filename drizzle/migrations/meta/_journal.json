@@ -820,6 +820,13 @@
       "when": 1793078201859,
       "tag": "0116_smart_create_optional_category",
       "breakpoints": true
+    },
+    {
+      "idx": 117,
+      "version": "7",
+      "when": 1793178824075,
+      "tag": "0117_sales_channel_intents",
+      "breakpoints": true
     }
   ]
 }

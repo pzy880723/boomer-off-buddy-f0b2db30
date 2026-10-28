@@ -42,6 +42,7 @@ export async function authenticateStorefrontCustomer(request: Request): Promise<
         nickname: string | null;
         wechatMiniOpenId: string | null;
         wechatMiniAppId: string | null;
+        clientKind: "miniapp" | "app" | null;
       };
     }
   | { ok: false; response: Response }
@@ -125,6 +126,7 @@ export async function authenticateStorefrontCustomer(request: Request): Promise<
       // Server-only payment identity from the verified JWT, never from client_context.
       wechatMiniOpenId: identity.wechatMiniOpenId,
       wechatMiniAppId: identity.wechatMiniAppId,
+      clientKind: identity.clientKind,
     },
   };
 }

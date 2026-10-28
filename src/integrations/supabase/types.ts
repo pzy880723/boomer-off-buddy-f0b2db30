@@ -8742,6 +8742,123 @@ export type Database = {
           },
         ]
       }
+      sku_sales_channel_intents: {
+        Row: {
+          channel: string
+          created_at: string
+          enabled: boolean
+          location_id: string
+          op_id: string
+          sku_id: string
+          updated_at: string
+          updated_by: string
+          version: number
+        }
+        Insert: {
+          channel: string
+          created_at?: string
+          enabled: boolean
+          location_id: string
+          op_id: string
+          sku_id: string
+          updated_at?: string
+          updated_by: string
+          version?: number
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          enabled?: boolean
+          location_id?: string
+          op_id?: string
+          sku_id?: string
+          updated_at?: string
+          updated_by?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sku_sales_channel_intents_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "inv_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sku_sales_channel_intents_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "inv_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sku_sales_channel_ops: {
+        Row: {
+          actor_user_id: string
+          created_at: string
+          kind: string
+          location_id: string
+          op_id: string
+          request_hash: string
+          result: Json
+        }
+        Insert: {
+          actor_user_id: string
+          created_at?: string
+          kind: string
+          location_id: string
+          op_id: string
+          request_hash: string
+          result: Json
+        }
+        Update: {
+          actor_user_id?: string
+          created_at?: string
+          kind?: string
+          location_id?: string
+          op_id?: string
+          request_hash?: string
+          result?: Json
+        }
+        Relationships: []
+      }
+      sku_sales_channel_previews: {
+        Row: {
+          actor_user_id: string
+          add_channels: string[]
+          consumed_op_id: string | null
+          created_at: string
+          expires_at: string
+          items: Json
+          location_id: string
+          remove_channels: string[]
+          token: string
+        }
+        Insert: {
+          actor_user_id: string
+          add_channels: string[]
+          consumed_op_id?: string | null
+          created_at?: string
+          expires_at: string
+          items: Json
+          location_id: string
+          remove_channels: string[]
+          token?: string
+        }
+        Update: {
+          actor_user_id?: string
+          add_channels?: string[]
+          consumed_op_id?: string | null
+          created_at?: string
+          expires_at?: string
+          items?: Json
+          location_id?: string
+          remove_channels?: string[]
+          token?: string
+        }
+        Relationships: []
+      }
       sku_youzan_links: {
         Row: {
           created_at: string
@@ -11466,6 +11583,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      commerce_create_order_in_channel: {
+        Args: { p_args: Json; p_channel: string; p_function: string }
+        Returns: Json
+      }
       commerce_create_order_v2: {
         Args: {
           p_courier_provider: string
@@ -13374,6 +13495,30 @@ export type Database = {
           p_inspection_id: string
           p_location_id: string
           p_notes?: string
+        }
+        Returns: Json
+      }
+      sales_channel_allowed: {
+        Args: { p_channel: string; p_location: string; p_sku: string }
+        Returns: boolean
+      }
+      sales_channel_apply: {
+        Args: {
+          p_actor: string
+          p_changes: Json
+          p_kind: string
+          p_location: string
+          p_op_id: string
+          p_request_hash: string
+        }
+        Returns: Json
+      }
+      sales_channel_apply_preview: {
+        Args: {
+          p_actor: string
+          p_location: string
+          p_op_id: string
+          p_token: string
         }
         Returns: Json
       }

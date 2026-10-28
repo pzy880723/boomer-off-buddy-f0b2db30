@@ -20,6 +20,8 @@ import { verifyListingCore } from "@/lib/omnichannel-publish.functions";
 import { canMarkSold, evaluateZeroingTask, isServiceBearer, ZEROING_ACTIONS } from "@/lib/channel-sync-guard";
 import { z } from "zod";
 import { pushStockToYouzan, type LinkRow } from "@/lib/youzan-sync.functions";
+import { evaluateSalesIntentTask, isSalesIntentTask } from "@/lib/sales-channels/model";
+import { loadIntentTaskFacts, youzanIntentDisabledForShop } from "@/server/sales-channel-guard.server";
 
 const DEFAULT_LEASE_SECONDS = 300;
 const DEFAULT_LIMIT = 5;
@@ -88,7 +90,28 @@ export const Route = createFileRoute("/api/public/hooks/channel-sync-worker")({
 
         for (const task of list) {
           try {
-            if (ZEROING_ACTIONS.has(task.action)) {
+            // 多渠道销售意图任务：执行前重读最新意图/售出状态/本店库存；旧版本或已售一律作废。
+            const intentTask = isSalesIntentTask(task);
+            let skipShelf = false;
+            if (intentTask) {
+              const iv = evaluateSalesIntentTask(task, await loadIntentTaskFacts(supabaseAdmin, task));
+              if (iv.verdict === "supersede") {
+                await finish(task, "superseded", `superseded: ${iv.reason}`);
+                results.push({ id: task.id, action: task.action, ok: true, status: "superseded", error: iv.reason });
+                continue;
+              }
+              if (iv.verdict === "block") throw new TaskBlocked(iv.reason);
+            } else if (task.action === "shelf" || task.action === "restore_after_return") {
+              // 旧上架路径不得绕过显式关闭的有赞渠道（回补只补库存，不上架）。
+              const disabled = await youzanIntentDisabledForShop(supabaseAdmin, task.sku_id, task.shop_id);
+              if (disabled && task.action === "shelf") {
+                await finish(task, "superseded", "superseded: 本店已关闭有赞渠道");
+                results.push({ id: task.id, action: task.action, ok: true, status: "superseded" });
+                continue;
+              }
+              skipShelf = disabled;
+            }
+            if (!intentTask && ZEROING_ACTIONS.has(task.action)) {
               const v = evaluateZeroingTask(task, await loadZeroingFacts(task, supabaseAdmin));
               if (v.verdict === "supersede") {
                 await finish(task, "superseded", `superseded: ${v.reason}`);
@@ -114,7 +137,9 @@ export const Route = createFileRoute("/api/public/hooks/channel-sync-worker")({
                 !Number.isFinite(expiresAt) || expiresAt < Date.now() + 40_000) {
               throw new TaskBlocked("租约不足或已失效，未执行渠道写入");
             }
-            await dispatch(task, supabaseAdmin);
+            await dispatch(task, supabaseAdmin, { skipShelf });
+            // 回查平台真实状态后才算生效
+            if (intentTask && task.channel_listing_id) await verifyListingCore(task.channel_listing_id);
             if (task.action === "restore_after_return") {
               const { error: ue } = await supabaseAdmin.from("inv_skus")
                 .update({ sales_state: "active", updated_at: new Date().toISOString() } as never).eq("id", task.sku_id);
@@ -128,7 +153,7 @@ export const Route = createFileRoute("/api/public/hooks/channel-sync-worker")({
               if (le) throw new Error(`listing 版本写入失败：${le.message}`);
             }
             await finish(task, "succeeded", null);
-            if (ZEROING_ACTIONS.has(task.action)) await maybeMarkSold(task.sku_id, supabaseAdmin);
+            if (!intentTask && ZEROING_ACTIONS.has(task.action)) await maybeMarkSold(task.sku_id, supabaseAdmin);
             results.push({ id: task.id, action: task.action, ok: true, status: "succeeded" });
           } catch (e) {
             const msg = e instanceof TaskBlocked ? `blocked: ${e.message}` : explainYouzanError(e);
@@ -176,12 +201,23 @@ async function loadZeroingFacts(task: OutboxTask, sb: Admin) {
 }
 
 async function recheckBeforeWrite(task: OutboxTask, sb: Admin) {
-  if (!ZEROING_ACTIONS.has(task.action)) return;
+  const intentTask = isSalesIntentTask(task);
+  const legacyShelf = !intentTask && (task.action === "shelf" || task.action === "restore_after_return");
+  if (!intentTask && !legacyShelf && !ZEROING_ACTIONS.has(task.action)) return;
   const { data: lease, error } = await sb.from("channel_sync_outbox")
     .select("worker_id,status,lease_expires_at").eq("id", task.id).single();
   const expiry = Date.parse(lease?.lease_expires_at ?? "");
   if (error || lease?.worker_id !== task.worker_id || lease.status !== "running" ||
       !Number.isFinite(expiry) || expiry < Date.now() + 25_000) throw new TaskBlocked("渠道写入前租约已失效或不足");
+  if (intentTask) {
+    const d = evaluateSalesIntentTask(task, await loadIntentTaskFacts(sb, task));
+    if (d.verdict !== "proceed") throw new TaskBlocked(d.reason);
+    return;
+  }
+  if (legacyShelf) {
+    if (await youzanIntentDisabledForShop(sb, task.sku_id, task.shop_id)) throw new TaskBlocked("本店已关闭有赞渠道");
+    return;
+  }
   const decision = evaluateZeroingTask(task, await loadZeroingFacts(task, sb));
   if (decision.verdict !== "proceed") throw new TaskBlocked(decision.reason);
 }
@@ -189,7 +225,8 @@ async function recheckBeforeWrite(task: OutboxTask, sb: Admin) {
 // 售出闭环：清零与下架均成功、无未完成或 dead_letter 任务、sku 仍 sold_syncing 且库存 0。
 async function maybeMarkSold(skuId: string, sb: Admin) {
   const { data: tasks, error } = await sb.from("channel_sync_outbox").select("action, status").eq("sku_id", skuId)
-    .in("action", ["set_stock_zero", "delist"]);
+    .in("action", ["set_stock_zero", "delist"])
+    .or("request_payload->>source.is.null,request_payload->>source.neq.sales_channel_intent");
   if (error) throw new Error(`读取售出任务失败：${error.message}`);
   if (!canMarkSold((tasks ?? []) as { action: string; status: string }[])) return;
   const { data: sku, error: se } = await sb.from("inv_skus").select("inventory_version, sales_state, is_display").eq("id", skuId).maybeSingle();
@@ -210,6 +247,7 @@ async function maybeMarkSold(skuId: string, sb: Admin) {
 async function dispatch(
   task: OutboxTask,
   sb: Admin,
+  opts: { skipShelf?: boolean } = {},
 ) {
   switch (task.action) {
     case "set_stock":
@@ -224,7 +262,7 @@ async function dispatch(
       await verifyListingCore(task.channel_listing_id);
       return;
     case "restore_after_return":
-      return handleRestoreAfterReturn(task, sb);
+      return handleRestoreAfterReturn(task, sb, !!opts.skipShelf);
     case "reconcile":
       return handleReconcile(task, sb);
     case "create_hq_spu":
@@ -362,11 +400,12 @@ async function handleShelfChange(
 async function handleRestoreAfterReturn(
   task: OutboxTask,
   sb: Admin,
+  skipShelf = false,
 ) {
   // HQ 侧不参与直销，跳过（restore RPC 会为所有 listing 建任务）
   if (task.channel === "youzan_hq" || !task.shop_id) return;
   // 回补 = 上架 + 覆盖库存到 1（单件模型）
-  await handleShelfChange(task, sb, true);
+  if (!skipShelf) await handleShelfChange(task, sb, true);
   const t2 = { ...task, target_stock: task.target_stock ?? 1 } as OutboxTask;
   await handleSetStock(t2, sb);
 }

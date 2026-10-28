@@ -229,6 +229,8 @@ import { Route as ApiPublicHandheldRfidBatchStockInRouteImport } from './routes/
 import { Route as ApiPublicHandheldRfidBindItemRouteImport } from './routes/api/public/handheld/rfid.bind-item'
 import { Route as ApiPublicHandheldRfidStockInRouteImport } from './routes/api/public/handheld/rfid.stock-in'
 import { Route as ApiPublicHandheldRfidTransferLocationRouteImport } from './routes/api/public/handheld/rfid.transfer-location'
+import { Route as ApiPublicHandheldSalesChannelsBatchApplyRouteImport } from './routes/api/public/handheld/sales-channels.batch-apply'
+import { Route as ApiPublicHandheldSalesChannelsBatchPreviewRouteImport } from './routes/api/public/handheld/sales-channels.batch-preview'
 import { Route as ApiPublicHandheldSkuByEpcRouteImport } from './routes/api/public/handheld/sku.by-epc'
 import { Route as ApiPublicHandheldSkuSearchRouteImport } from './routes/api/public/handheld/sku.search'
 import { Route as ApiPublicHandheldStocktakeOpenRouteImport } from './routes/api/public/handheld/stocktake.open'
@@ -293,6 +295,7 @@ import { Route as ApiPublicHandheldItemsIdMeasurementRouteImport } from './route
 import { Route as ApiPublicHandheldItemsIdMeasurementImageRouteImport } from './routes/api/public/handheld/items.$id.measurement-image'
 import { Route as ApiPublicHandheldItemsIdRecommendationCardRouteImport } from './routes/api/public/handheld/items.$id.recommendation-card'
 import { Route as ApiPublicHandheldItemsIdRestockRouteImport } from './routes/api/public/handheld/items.$id.restock'
+import { Route as ApiPublicHandheldItemsIdSalesChannelsRouteImport } from './routes/api/public/handheld/items.$id.sales-channels'
 import { Route as ApiPublicHandheldItemsIdSetStatusRouteImport } from './routes/api/public/handheld/items.$id.set-status'
 import { Route as ApiPublicHandheldItemsIdSyncStatusRouteImport } from './routes/api/public/handheld/items.$id.sync-status'
 import { Route as ApiPublicHandheldItemsIdSyncYouzanRouteImport } from './routes/api/public/handheld/items.$id.sync-youzan'
@@ -1543,6 +1546,18 @@ const ApiPublicHandheldRfidTransferLocationRoute =
     path: '/api/public/handheld/rfid/transfer-location',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHandheldSalesChannelsBatchApplyRoute =
+  ApiPublicHandheldSalesChannelsBatchApplyRouteImport.update({
+    id: '/api/public/handheld/sales-channels/batch-apply',
+    path: '/api/public/handheld/sales-channels/batch-apply',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHandheldSalesChannelsBatchPreviewRoute =
+  ApiPublicHandheldSalesChannelsBatchPreviewRouteImport.update({
+    id: '/api/public/handheld/sales-channels/batch-preview',
+    path: '/api/public/handheld/sales-channels/batch-preview',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHandheldSkuByEpcRoute =
   ApiPublicHandheldSkuByEpcRouteImport.update({
     id: '/api/public/handheld/sku/by-epc',
@@ -1919,6 +1934,12 @@ const ApiPublicHandheldItemsIdRestockRoute =
   ApiPublicHandheldItemsIdRestockRouteImport.update({
     id: '/restock',
     path: '/restock',
+    getParentRoute: () => ApiPublicHandheldItemsIdRoute,
+  } as any)
+const ApiPublicHandheldItemsIdSalesChannelsRoute =
+  ApiPublicHandheldItemsIdSalesChannelsRouteImport.update({
+    id: '/sales-channels',
+    path: '/sales-channels',
     getParentRoute: () => ApiPublicHandheldItemsIdRoute,
   } as any)
 const ApiPublicHandheldItemsIdSetStatusRoute =
@@ -2353,6 +2374,8 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/rfid/bind-item': typeof ApiPublicHandheldRfidBindItemRoute
   '/api/public/handheld/rfid/stock-in': typeof ApiPublicHandheldRfidStockInRoute
   '/api/public/handheld/rfid/transfer-location': typeof ApiPublicHandheldRfidTransferLocationRoute
+  '/api/public/handheld/sales-channels/batch-apply': typeof ApiPublicHandheldSalesChannelsBatchApplyRoute
+  '/api/public/handheld/sales-channels/batch-preview': typeof ApiPublicHandheldSalesChannelsBatchPreviewRoute
   '/api/public/handheld/sku/by-epc': typeof ApiPublicHandheldSkuByEpcRoute
   '/api/public/handheld/sku/search': typeof ApiPublicHandheldSkuSearchRoute
   '/api/public/handheld/stocktake/open': typeof ApiPublicHandheldStocktakeOpenRoute
@@ -2417,6 +2440,7 @@ export interface FileRoutesByFullPath {
   '/api/public/handheld/items/$id/measurement-image': typeof ApiPublicHandheldItemsIdMeasurementImageRoute
   '/api/public/handheld/items/$id/recommendation-card': typeof ApiPublicHandheldItemsIdRecommendationCardRoute
   '/api/public/handheld/items/$id/restock': typeof ApiPublicHandheldItemsIdRestockRoute
+  '/api/public/handheld/items/$id/sales-channels': typeof ApiPublicHandheldItemsIdSalesChannelsRoute
   '/api/public/handheld/items/$id/set-status': typeof ApiPublicHandheldItemsIdSetStatusRoute
   '/api/public/handheld/items/$id/sync-status': typeof ApiPublicHandheldItemsIdSyncStatusRoute
   '/api/public/handheld/items/$id/sync-youzan': typeof ApiPublicHandheldItemsIdSyncYouzanRoute
@@ -2667,6 +2691,8 @@ export interface FileRoutesByTo {
   '/api/public/handheld/rfid/bind-item': typeof ApiPublicHandheldRfidBindItemRoute
   '/api/public/handheld/rfid/stock-in': typeof ApiPublicHandheldRfidStockInRoute
   '/api/public/handheld/rfid/transfer-location': typeof ApiPublicHandheldRfidTransferLocationRoute
+  '/api/public/handheld/sales-channels/batch-apply': typeof ApiPublicHandheldSalesChannelsBatchApplyRoute
+  '/api/public/handheld/sales-channels/batch-preview': typeof ApiPublicHandheldSalesChannelsBatchPreviewRoute
   '/api/public/handheld/sku/by-epc': typeof ApiPublicHandheldSkuByEpcRoute
   '/api/public/handheld/sku/search': typeof ApiPublicHandheldSkuSearchRoute
   '/api/public/handheld/stocktake/open': typeof ApiPublicHandheldStocktakeOpenRoute
@@ -2731,6 +2757,7 @@ export interface FileRoutesByTo {
   '/api/public/handheld/items/$id/measurement-image': typeof ApiPublicHandheldItemsIdMeasurementImageRoute
   '/api/public/handheld/items/$id/recommendation-card': typeof ApiPublicHandheldItemsIdRecommendationCardRoute
   '/api/public/handheld/items/$id/restock': typeof ApiPublicHandheldItemsIdRestockRoute
+  '/api/public/handheld/items/$id/sales-channels': typeof ApiPublicHandheldItemsIdSalesChannelsRoute
   '/api/public/handheld/items/$id/set-status': typeof ApiPublicHandheldItemsIdSetStatusRoute
   '/api/public/handheld/items/$id/sync-status': typeof ApiPublicHandheldItemsIdSyncStatusRoute
   '/api/public/handheld/items/$id/sync-youzan': typeof ApiPublicHandheldItemsIdSyncYouzanRoute
@@ -2989,6 +3016,8 @@ export interface FileRoutesById {
   '/api/public/handheld/rfid/bind-item': typeof ApiPublicHandheldRfidBindItemRoute
   '/api/public/handheld/rfid/stock-in': typeof ApiPublicHandheldRfidStockInRoute
   '/api/public/handheld/rfid/transfer-location': typeof ApiPublicHandheldRfidTransferLocationRoute
+  '/api/public/handheld/sales-channels/batch-apply': typeof ApiPublicHandheldSalesChannelsBatchApplyRoute
+  '/api/public/handheld/sales-channels/batch-preview': typeof ApiPublicHandheldSalesChannelsBatchPreviewRoute
   '/api/public/handheld/sku/by-epc': typeof ApiPublicHandheldSkuByEpcRoute
   '/api/public/handheld/sku/search': typeof ApiPublicHandheldSkuSearchRoute
   '/api/public/handheld/stocktake/open': typeof ApiPublicHandheldStocktakeOpenRoute
@@ -3053,6 +3082,7 @@ export interface FileRoutesById {
   '/api/public/handheld/items/$id/measurement-image': typeof ApiPublicHandheldItemsIdMeasurementImageRoute
   '/api/public/handheld/items/$id/recommendation-card': typeof ApiPublicHandheldItemsIdRecommendationCardRoute
   '/api/public/handheld/items/$id/restock': typeof ApiPublicHandheldItemsIdRestockRoute
+  '/api/public/handheld/items/$id/sales-channels': typeof ApiPublicHandheldItemsIdSalesChannelsRoute
   '/api/public/handheld/items/$id/set-status': typeof ApiPublicHandheldItemsIdSetStatusRoute
   '/api/public/handheld/items/$id/sync-status': typeof ApiPublicHandheldItemsIdSyncStatusRoute
   '/api/public/handheld/items/$id/sync-youzan': typeof ApiPublicHandheldItemsIdSyncYouzanRoute
@@ -3312,6 +3342,8 @@ export interface FileRouteTypes {
     | '/api/public/handheld/rfid/bind-item'
     | '/api/public/handheld/rfid/stock-in'
     | '/api/public/handheld/rfid/transfer-location'
+    | '/api/public/handheld/sales-channels/batch-apply'
+    | '/api/public/handheld/sales-channels/batch-preview'
     | '/api/public/handheld/sku/by-epc'
     | '/api/public/handheld/sku/search'
     | '/api/public/handheld/stocktake/open'
@@ -3376,6 +3408,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/items/$id/measurement-image'
     | '/api/public/handheld/items/$id/recommendation-card'
     | '/api/public/handheld/items/$id/restock'
+    | '/api/public/handheld/items/$id/sales-channels'
     | '/api/public/handheld/items/$id/set-status'
     | '/api/public/handheld/items/$id/sync-status'
     | '/api/public/handheld/items/$id/sync-youzan'
@@ -3626,6 +3659,8 @@ export interface FileRouteTypes {
     | '/api/public/handheld/rfid/bind-item'
     | '/api/public/handheld/rfid/stock-in'
     | '/api/public/handheld/rfid/transfer-location'
+    | '/api/public/handheld/sales-channels/batch-apply'
+    | '/api/public/handheld/sales-channels/batch-preview'
     | '/api/public/handheld/sku/by-epc'
     | '/api/public/handheld/sku/search'
     | '/api/public/handheld/stocktake/open'
@@ -3690,6 +3725,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/items/$id/measurement-image'
     | '/api/public/handheld/items/$id/recommendation-card'
     | '/api/public/handheld/items/$id/restock'
+    | '/api/public/handheld/items/$id/sales-channels'
     | '/api/public/handheld/items/$id/set-status'
     | '/api/public/handheld/items/$id/sync-status'
     | '/api/public/handheld/items/$id/sync-youzan'
@@ -3947,6 +3983,8 @@ export interface FileRouteTypes {
     | '/api/public/handheld/rfid/bind-item'
     | '/api/public/handheld/rfid/stock-in'
     | '/api/public/handheld/rfid/transfer-location'
+    | '/api/public/handheld/sales-channels/batch-apply'
+    | '/api/public/handheld/sales-channels/batch-preview'
     | '/api/public/handheld/sku/by-epc'
     | '/api/public/handheld/sku/search'
     | '/api/public/handheld/stocktake/open'
@@ -4011,6 +4049,7 @@ export interface FileRouteTypes {
     | '/api/public/handheld/items/$id/measurement-image'
     | '/api/public/handheld/items/$id/recommendation-card'
     | '/api/public/handheld/items/$id/restock'
+    | '/api/public/handheld/items/$id/sales-channels'
     | '/api/public/handheld/items/$id/set-status'
     | '/api/public/handheld/items/$id/sync-status'
     | '/api/public/handheld/items/$id/sync-youzan'
@@ -4205,6 +4244,8 @@ export interface RootRouteChildren {
   ApiPublicHandheldRfidBindItemRoute: typeof ApiPublicHandheldRfidBindItemRoute
   ApiPublicHandheldRfidStockInRoute: typeof ApiPublicHandheldRfidStockInRoute
   ApiPublicHandheldRfidTransferLocationRoute: typeof ApiPublicHandheldRfidTransferLocationRoute
+  ApiPublicHandheldSalesChannelsBatchApplyRoute: typeof ApiPublicHandheldSalesChannelsBatchApplyRoute
+  ApiPublicHandheldSalesChannelsBatchPreviewRoute: typeof ApiPublicHandheldSalesChannelsBatchPreviewRoute
   ApiPublicHandheldSkuByEpcRoute: typeof ApiPublicHandheldSkuByEpcRoute
   ApiPublicHandheldSkuSearchRoute: typeof ApiPublicHandheldSkuSearchRoute
   ApiPublicHandheldStocktakeOpenRoute: typeof ApiPublicHandheldStocktakeOpenRoute
@@ -5795,6 +5836,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHandheldRfidTransferLocationRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/handheld/sales-channels/batch-apply': {
+      id: '/api/public/handheld/sales-channels/batch-apply'
+      path: '/api/public/handheld/sales-channels/batch-apply'
+      fullPath: '/api/public/handheld/sales-channels/batch-apply'
+      preLoaderRoute: typeof ApiPublicHandheldSalesChannelsBatchApplyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/handheld/sales-channels/batch-preview': {
+      id: '/api/public/handheld/sales-channels/batch-preview'
+      path: '/api/public/handheld/sales-channels/batch-preview'
+      fullPath: '/api/public/handheld/sales-channels/batch-preview'
+      preLoaderRoute: typeof ApiPublicHandheldSalesChannelsBatchPreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/handheld/sku/by-epc': {
       id: '/api/public/handheld/sku/by-epc'
       path: '/api/public/handheld/sku/by-epc'
@@ -6241,6 +6296,13 @@ declare module '@tanstack/react-router' {
       path: '/restock'
       fullPath: '/api/public/handheld/items/$id/restock'
       preLoaderRoute: typeof ApiPublicHandheldItemsIdRestockRouteImport
+      parentRoute: typeof ApiPublicHandheldItemsIdRoute
+    }
+    '/api/public/handheld/items/$id/sales-channels': {
+      id: '/api/public/handheld/items/$id/sales-channels'
+      path: '/sales-channels'
+      fullPath: '/api/public/handheld/items/$id/sales-channels'
+      preLoaderRoute: typeof ApiPublicHandheldItemsIdSalesChannelsRouteImport
       parentRoute: typeof ApiPublicHandheldItemsIdRoute
     }
     '/api/public/handheld/items/$id/set-status': {
@@ -7114,6 +7176,7 @@ interface ApiPublicHandheldItemsIdRouteChildren {
   ApiPublicHandheldItemsIdMeasurementImageRoute: typeof ApiPublicHandheldItemsIdMeasurementImageRoute
   ApiPublicHandheldItemsIdRecommendationCardRoute: typeof ApiPublicHandheldItemsIdRecommendationCardRoute
   ApiPublicHandheldItemsIdRestockRoute: typeof ApiPublicHandheldItemsIdRestockRoute
+  ApiPublicHandheldItemsIdSalesChannelsRoute: typeof ApiPublicHandheldItemsIdSalesChannelsRoute
   ApiPublicHandheldItemsIdSetStatusRoute: typeof ApiPublicHandheldItemsIdSetStatusRoute
   ApiPublicHandheldItemsIdSyncStatusRoute: typeof ApiPublicHandheldItemsIdSyncStatusRoute
   ApiPublicHandheldItemsIdSyncYouzanRoute: typeof ApiPublicHandheldItemsIdSyncYouzanRoute
@@ -7131,6 +7194,8 @@ const ApiPublicHandheldItemsIdRouteChildren: ApiPublicHandheldItemsIdRouteChildr
     ApiPublicHandheldItemsIdRecommendationCardRoute:
       ApiPublicHandheldItemsIdRecommendationCardRoute,
     ApiPublicHandheldItemsIdRestockRoute: ApiPublicHandheldItemsIdRestockRoute,
+    ApiPublicHandheldItemsIdSalesChannelsRoute:
+      ApiPublicHandheldItemsIdSalesChannelsRoute,
     ApiPublicHandheldItemsIdSetStatusRoute:
       ApiPublicHandheldItemsIdSetStatusRoute,
     ApiPublicHandheldItemsIdSyncStatusRoute:
@@ -7494,6 +7559,10 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHandheldRfidStockInRoute: ApiPublicHandheldRfidStockInRoute,
   ApiPublicHandheldRfidTransferLocationRoute:
     ApiPublicHandheldRfidTransferLocationRoute,
+  ApiPublicHandheldSalesChannelsBatchApplyRoute:
+    ApiPublicHandheldSalesChannelsBatchApplyRoute,
+  ApiPublicHandheldSalesChannelsBatchPreviewRoute:
+    ApiPublicHandheldSalesChannelsBatchPreviewRoute,
   ApiPublicHandheldSkuByEpcRoute: ApiPublicHandheldSkuByEpcRoute,
   ApiPublicHandheldSkuSearchRoute: ApiPublicHandheldSkuSearchRoute,
   ApiPublicHandheldStocktakeOpenRoute: ApiPublicHandheldStocktakeOpenRoute,

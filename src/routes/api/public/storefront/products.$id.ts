@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { STOREFRONT_CORS, storefrontError, storefrontJson } from "@/server/storefront-auth.server";
+import { filterListingsForConsumerChannel, resolveRequestConsumerChannel } from "@/server/sales-channels.server";
 import { loadPublishedProductContent } from "@/server/product-content.server";
 import { loadEngagementCounts } from "@/server/storefront-engagement.server";
 import { buildMeasurementPayload } from "@/server/product-measurement.server";
@@ -63,7 +64,7 @@ export const Route = createFileRoute("/api/public/storefront/products/$id")({
   server: {
     handlers: {
       OPTIONS: async () => new Response(null, { status: 204, headers: STOREFRONT_CORS }),
-      GET: async ({ params }) => {
+      GET: async ({ params, request }) => {
         const { data, error } = await supabaseAdmin
           .from("storefront_ready_listings" as never)
           .select(
@@ -77,6 +78,15 @@ export const Route = createFileRoute("/api/public/storefront/products/$id")({
           .maybeSingle();
         if (error) return storefrontError(error.message, 500);
         if (!data) return storefrontError("Product not found", 404);
+        try {
+          const scoped = await filterListingsForConsumerChannel(
+            [data as unknown as { sku_id: string; location_id: string }],
+            await resolveRequestConsumerChannel(request),
+          );
+          if (!scoped.length) return storefrontError("Product not found", 404);
+        } catch {
+          return storefrontError("商品渠道策略暂不可用", 503);
+        }
         try {
           const product = await buildStorefrontProductDetail(
             data as unknown as StorefrontListing,
