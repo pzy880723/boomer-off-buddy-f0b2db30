@@ -14,6 +14,7 @@ BEGIN
   INSERT INTO user_roles(user_id, role) VALUES (a,'store_manager');
   INSERT INTO user_location_perms(user_id, location_id) VALUES (a,l);
   INSERT INTO youzan_shops(id,kdt_id,shop_name,role,status,access_token) VALUES (shop,990119,'测试分店','branch','active','x');
+  UPDATE inv_locations SET shop_id=NULL WHERE shop_id=shop AND id<>l;  -- 建店触发器自动建的库位让位给测试库位
   UPDATE inv_locations SET shop_id=shop WHERE id=l;
   INSERT INTO inv_skus(id,category,epc,name,price_tier,sales_state,sale_ownership,status,kind,sku_scope,inventory_policy,is_display)
   SELECT x,'toy','EPC'||right(x::text,4),'测试共享',100,'active','owned','active','single','standard','tracked',true FROM unnest(ARRAY[s3,s4,s5]) x;
