@@ -12,6 +12,7 @@ import {
 } from "@/lib/commerce/fankuang-gift";
 import { ordinaryPaymentPolicy } from "@/server/ordinary-payment-config";
 import { recordOrderOrigin } from "@/server/order-origin.server";
+import { resolveConsumerChannel } from "@/lib/sales-channels/model";
 import {
   STOREFRONT_CORS,
   authenticateStorefrontCustomer,
@@ -207,8 +208,16 @@ export const Route = createFileRoute("/api/public/storefront/orders")({
               p_gift_entitlement_ids: gifts.gift_entitlement_ids ?? null,
               p_gift_count: requestedGiftCount(gifts),
             } as never)
-          : await supabaseAdmin.rpc(createFn as never, createArgs as never);
+          // 渠道策略在原下单事务内由订单行触发器校验；渠道只来自验签会话。
+          : await supabaseAdmin.rpc("commerce_create_order_in_channel" as never, {
+              p_channel: resolveConsumerChannel(auth.customer),
+              p_function: createFn,
+              p_args: createArgs,
+            } as never);
         if (error) {
+          if (/sales channel disabled/i.test(error.message)) {
+            return storefrontError("该商品当前渠道暂不销售", 409, "channel_disabled");
+          }
           const giftError = mapFankuangDbError(error.message);
           if (giftError) {
             const hint = giftError.code === "gift_exceeds_paid_items"
