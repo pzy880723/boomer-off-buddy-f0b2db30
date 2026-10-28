@@ -23,6 +23,8 @@ export const REASON_LABELS: Record<string, string> = {
   invalid_change: "渠道参数不正确",
   duplicate_change: "同一商品同一渠道重复提交",
   not_in_preview: "该商品不在本次预览中",
+  youzan_shared_item: "该商品为多规格共享收银商品，暂不能单独设置有赞渠道",
+  sku_not_modified: "该商品未修改",
 };
 
 export const UNKNOWN_REASON = "操作未完成，请刷新后重试";
@@ -68,6 +70,8 @@ export type ChannelFacts = {
   youzanPending: boolean;
   /** 最近一次本意图版本的有赞任务已终止失败（凭据过期/无权限/回查不达标等） */
   youzanFailed?: boolean;
+  /** 同店同一有赞 item 关联多个 ERP SKU（多规格/价格档共享收银商品）：单 SKU 不能开关 */
+  youzanShared?: boolean;
   intents: IntentFact[];
 };
 
@@ -99,7 +103,9 @@ export function channelBlocks(channel: SalesChannel, f: ChannelFacts): { enable:
       ? "youzan_auth_expired"
       : !f.youzan?.external_item_id
         ? "youzan_not_mapped"
-        : null;
+        : f.youzanShared
+          ? "youzan_shared_item"
+          : null;
   if (mapping) return { enable: mapping, disable: mapping };
   if (sold) return { enable: "sold_locked", disable: null };
   if (f.stockQty <= 0) return { enable: "no_stock", disable: null };
@@ -175,9 +181,13 @@ export function aggregateBySku(
     const skip = skipped.find((s) => s.sku_id === sku_id);
     if (skip) return { sku_id, success: false, reason: reasonLabel(skip.reason)!, status: "skipped" };
     const rows = results.filter((r) => r.sku_id === sku_id);
-    const fail = rows.find((r) => !r.success);
+    const fail = rows.find((r) => !r.success && r.reason !== "sku_not_modified") ?? rows.find((r) => !r.success);
     if (!rows.length) return { sku_id, success: false, reason: reasonLabel("invalid_change")! };
-    if (fail) return { sku_id, success: false, reason: reasonLabel(fail.reason) ?? "失败" };
+    if (fail) {
+      // DB 每件原子：任一渠道失败则该件全部渠道未修改，结果需明确告知。
+      const label = reasonLabel(fail.reason) ?? "失败";
+      return { sku_id, success: false, reason: fail.reason === "sku_not_modified" ? label : `${label}；该商品未修改`, status: "not_modified" };
+    }
     const status = rows.some((r) => r.status === "queued") ? "queued" : rows.every((r) => r.status === "unchanged") ? "unchanged" : "applied";
     return { sku_id, success: true, status };
   });
@@ -207,13 +217,45 @@ export function isSalesIntentTask(task: { request_payload?: unknown }): boolean 
   return (task.request_payload as IntentTaskPayload | null)?.source === "sales_channel_intent";
 }
 
+export type IntentTaskFacts = {
+  intent: { enabled: boolean; version: number } | null;
+  salesState: string | null;
+  stockQty: number | null;
+  readFailed?: boolean;
+  /** 任务门店库位（payload.location_id）当前状态 */
+  location?: { shop_id: string | null; is_active: boolean; kind: string } | null;
+  /** task.channel_listing_id 指向的映射 */
+  listing?: { sku_id: string; shop_id: string | null; channel: string; external_item_id: string | null } | null;
+  /** 有赞分店是否启用 */
+  shopActive?: boolean;
+  shared?: boolean;
+};
+
+/** 归属：库位.shop_id == task.shop_id == listing.shop_id，listing.sku_id == task.sku_id，渠道一致且门店启用。失配返回原因。 */
+export function checkIntentTaskOwnership(
+  task: { sku_id?: string; shop_id?: string | null; channel?: string; channel_listing_id?: string | null },
+  f: IntentTaskFacts,
+): string | null {
+  if (!task.channel_listing_id || !task.shop_id) return "任务缺少门店或映射";
+  if (!f.location || !f.location.is_active || f.location.kind !== "shop") return "任务门店已停用或不是门店";
+  if (!f.listing) return "任务映射不存在";
+  if (f.location.shop_id !== task.shop_id || f.listing.shop_id !== task.shop_id) return "门店归属不一致，已阻断";
+  if (f.listing.sku_id !== task.sku_id) return "映射商品与任务不一致，已阻断";
+  if (f.listing.channel !== "youzan_branch_offline" || (task.channel && task.channel !== f.listing.channel)) return "渠道不一致，已阻断";
+  if (!f.shopActive) return "有赞门店未启用";
+  return null;
+}
+
 export function evaluateSalesIntentTask(
-  task: { action: string; request_payload?: unknown },
-  facts: { intent: { enabled: boolean; version: number } | null; salesState: string | null; stockQty: number | null; readFailed?: boolean },
+  task: { action: string; request_payload?: unknown; sku_id?: string; shop_id?: string | null; channel?: string; channel_listing_id?: string | null },
+  facts: IntentTaskFacts,
 ): { verdict: "proceed" | "supersede" | "block"; reason: string } {
   const p = (task.request_payload ?? {}) as IntentTaskPayload;
   if (typeof p.intent_version !== "number") return { verdict: "block", reason: "任务缺少渠道意图版本" };
   if (facts.readFailed) return { verdict: "block", reason: "渠道意图或库存读取失败" };
+  const own = checkIntentTaskOwnership(task, facts);
+  if (own) return { verdict: "block", reason: own };
+  if (facts.shared) return { verdict: "supersede", reason: "多规格共享收银商品，不能单独上下架" };
   if (!facts.intent || facts.intent.version !== p.intent_version) return { verdict: "supersede", reason: "已有更新的渠道设置" };
   const wantOn = task.action === "shelf";
   if (facts.intent.enabled !== wantOn) return { verdict: "supersede", reason: "渠道设置与任务方向不一致" };
