@@ -93,6 +93,7 @@ const { runHandheldReleaseWorker } = await load("src/server/handheld-release-out
   "@/integrations/supabase/client.server": adminStub,
   "@/lib/youzan-offline-products.functions": "export const releaseSkuToOfflineShopsCore = () => { throw Error('use injected deps'); };",
   "@/lib/youzan-category-groups.server": "export const assignSkuToYouzanCategoryGroups = async () => {};",
+  "@/server/sales-channel-guard.server": "export const youzanIntentDisabledForShop = async () => { throw Error('use injected deps'); };",
 });
 
 beforeEach(() => {
