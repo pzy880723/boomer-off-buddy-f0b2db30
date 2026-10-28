@@ -4,6 +4,7 @@ import {
   aggregateBySku,
   assertShelfReadback,
   reasonLabel,
+  channelBlocks,
   summarizeSingle,
   buildChannelViews,
   consumerChannelAllowed,
