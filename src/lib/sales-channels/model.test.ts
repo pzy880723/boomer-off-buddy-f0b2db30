@@ -5,6 +5,7 @@ import {
   assertShelfReadback,
   reasonLabel,
   channelBlocks,
+  writeRecheckPlan,
   summarizeSingle,
   buildChannelViews,
   consumerChannelAllowed,
@@ -159,6 +160,16 @@ test("0119 aggregate: atomic SKU failure reports the real reason plus not-modifi
   ]);
   assert.equal(r[0].success, false);
   assert.equal(r[0].reason, "商品渠道已被他人修改，请刷新后重试；该商品未修改");
+});
+
+test("0119 return restore: stock-only write is not a shelf check; shelf write still checks closed channel", () => {
+  const restore = { action: "restore_after_return", request_payload: {} };
+  assert.equal(writeRecheckPlan(restore, "stock", false), "stock_only");
+  assert.equal(writeRecheckPlan(restore, "shelf", false), "legacy_shelf");
+  assert.equal(writeRecheckPlan({ action: "shelf" }, "shelf", false), "legacy_shelf");
+  assert.equal(writeRecheckPlan({ action: "set_stock_zero" }, "stock", true), "zeroing");
+  assert.equal(writeRecheckPlan({ action: "set_stock" }, "stock", false), "none");
+  assert.equal(writeRecheckPlan({ action: "delist", request_payload: { source: "sales_channel_intent" } }, "shelf", false), "intent");
 });
 
 test("batch aggregate per sku and fingerprint is order independent", () => {

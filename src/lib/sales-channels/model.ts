@@ -280,3 +280,19 @@ export function singleRequestFingerprint(
   const sorted = [...changes].sort((a, b) => a.channel.localeCompare(b.channel));
   return JSON.stringify({ sku: skuId, changes: sorted.map((c) => [c.channel, c.enabled, c.expected_version]) });
 }
+
+/**
+ * 有赞写入前复核类型。上下架写入与纯库存写入分开：
+ * 退货验货回补（restore_after_return）在本店关闭有赞渠道时只跳过上架，库存同步仍按原业务执行。
+ */
+export function writeRecheckPlan(
+  task: { action: string; request_payload?: unknown },
+  mode: "shelf" | "stock",
+  isZeroing: boolean,
+): "intent" | "legacy_shelf" | "stock_only" | "zeroing" | "none" {
+  if (isSalesIntentTask(task)) return "intent";
+  if (task.action === "restore_after_return") return mode === "shelf" ? "legacy_shelf" : "stock_only";
+  if (task.action === "shelf") return mode === "shelf" ? "legacy_shelf" : "none";
+  if (isZeroing) return "zeroing";
+  return "none";
+}
