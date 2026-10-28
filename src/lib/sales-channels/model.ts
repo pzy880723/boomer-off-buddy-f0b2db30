@@ -28,14 +28,17 @@ export function reasonLabel(code: string | null | undefined): string | null {
   return REASON_LABELS[code] ?? code;
 }
 
-/** 只认服务端已验签的会话字段；任何 header/body 都不参与。 */
+/** 只认验签后 payload.client_kind（会话级）；绑定历史（wechat_mini_*）不代表当前来源。 */
 export function resolveConsumerChannel(
-  identity: { clientKind?: string | null; wechatMiniAppId?: string | null } | null | undefined,
+  identity: { clientKind?: string | null } | null | undefined,
 ): ConsumerChannel {
-  if (!identity) return "unknown";
-  if (identity.clientKind === "miniapp" || identity.clientKind === "app") return identity.clientKind;
-  if (identity.wechatMiniAppId) return "miniapp";
-  return "unknown";
+  const k = identity?.clientKind;
+  return k === "miniapp" || k === "app" ? k : "unknown";
+}
+
+/** 匿名目录的 storefront_channel 仅作展示上下文，不是授权；不能用于下单。 */
+export function catalogDisplayChannel(param: string | null | undefined): ConsumerChannel {
+  return param === "miniapp" || param === "app" ? param : "unknown";
 }
 
 /** 与 DB sales_channel_allowed 相同：仅显式关闭才拦截；未知来源任一消费端关闭即拦截。 */

@@ -5,6 +5,7 @@ import { authenticateDevice, resolveSessionUser } from "@/server/handheld-auth.s
 import { consumerAuthEnvironment, verifyConsumerJwt } from "@/server/consumer-auth.server";
 import {
   buildChannelViews,
+  catalogDisplayChannel,
   consumerChannelAllowed,
   resolveConsumerChannel,
   type ChannelFacts,
@@ -166,10 +167,13 @@ export async function loadPreviewSkuIds(token: string): Promise<string[]> {
 
 // ---------------- 消费端 ----------------
 
-/** 匿名或任意会话：仅以服务端验签 JWT 判断来源；无效/缺失 = unknown（保守）。 */
+/**
+ * 目录展示来源：有 Bearer 时只认验签 client_kind（无效/旧会话 = unknown，取两渠道交集）；
+ * 无 Bearer 时才采用 storefront_channel 查询参数（仅展示，下单另由签名会话 gate）。
+ */
 export async function resolveRequestConsumerChannel(request: Request): Promise<ConsumerChannel> {
   const token = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
-  if (!token) return "unknown";
+  if (!token) return catalogDisplayChannel(new URL(request.url).searchParams.get("storefront_channel"));
   const config = consumerAuthEnvironment();
   if (!config) return "unknown";
   try {

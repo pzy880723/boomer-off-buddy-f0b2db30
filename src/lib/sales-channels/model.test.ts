@@ -7,6 +7,7 @@ import {
   evaluateSalesIntentTask,
   planSkuChanges,
   resolveConsumerChannel,
+  catalogDisplayChannel,
   singleRequestFingerprint,
   type ChannelFacts,
 } from "./model";
@@ -69,7 +70,11 @@ test("batch plan: store-only removes consumer channels, never youzan; skips not-
 
 test("consumer channel only from signed claims; unknown is conservative", () => {
   assert.equal(resolveConsumerChannel(null), "unknown");
-  assert.equal(resolveConsumerChannel({ clientKind: null, wechatMiniAppId: "wx1" }), "miniapp");
+  // 绑定历史不是会话来源：有 mini 绑定的 APP 会话不能被认成小程序
+  assert.equal(resolveConsumerChannel({ clientKind: null, wechatMiniAppId: "wx1" } as never), "unknown");
+  assert.equal(resolveConsumerChannel({ clientKind: "app", wechatMiniAppId: "wx1" } as never), "app");
+  assert.equal(catalogDisplayChannel("miniapp"), "miniapp");
+  assert.equal(catalogDisplayChannel("pos"), "unknown");
   assert.equal(resolveConsumerChannel({ clientKind: "app" }), "app");
   assert.equal(resolveConsumerChannel({ clientKind: "web" as never }), "unknown");
   const off = [{ channel: "miniapp" }];
