@@ -180,7 +180,7 @@ export async function resolveRequestConsumerChannel(request: Request): Promise<C
 }
 
 /** 在分页前移除当前来源被显式关闭的商品；读取失败即报错（不放行）。 */
-export async function filterListingsForConsumerChannel<T extends { sku_id: string; location_id: string }>(
+export async function filterListingsForConsumerChannel<T extends { sku_id: string; location_id: string | null }>(
   listings: T[],
   channel: ConsumerChannel,
 ): Promise<T[]> {
