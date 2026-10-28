@@ -82,11 +82,14 @@ export async function loadChannelFacts(ctx: Pick<StaffContext, "locationId" | "s
   ]);
   const yzRows = (must(yz) ?? []) as Array<{ id: string; sku_id: string; external_item_id: string | null; listing_status: string | null; last_verified_at: string | null; updated_at: string }>;
   const yzIds = yzRows.map((r) => r.id);
-  const pending = yzIds.length
-    ? (must(await db.from("channel_sync_outbox").select("channel_listing_id")
-        .in("channel_listing_id", yzIds).in("status", ["pending", "running", "retry_wait"])
-        .eq("request_payload->>source", "sales_channel_intent")) ?? []) as Array<{ channel_listing_id: string }>
+  // 每个映射取最近一条意图任务：进行中 = syncing；终止失败（凭据过期/无权限/回查不达标）= error
+  const tasks = yzIds.length
+    ? (must(await db.from("channel_sync_outbox").select("channel_listing_id, status, created_at")
+        .in("channel_listing_id", yzIds).eq("request_payload->>source", "sales_channel_intent")
+        .order("created_at", { ascending: false }).limit(500)) ?? []) as Array<{ channel_listing_id: string; status: string }>
     : [];
+  const latestTask = new Map<string, string>();
+  for (const t of tasks) if (!latestTask.has(t.channel_listing_id)) latestTask.set(t.channel_listing_id, t.status);
   const shopRow = must(shop) as { id: string; expires_at: string | null; access_token: string | null } | null;
   const shopFacts = {
     bound: !!shopRow,
@@ -106,7 +109,8 @@ export async function loadChannelFacts(ctx: Pick<StaffContext, "locationId" | "s
       listing: listingRows.find((l) => l.sku_id === id) ?? null,
       shop: shopFacts,
       youzan: y,
-      youzanPending: !!y && pending.some((p) => p.channel_listing_id === y.id),
+      youzanPending: !!y && ["pending", "running", "retry_wait"].includes(latestTask.get(y.id) ?? ""),
+      youzanFailed: !!y && latestTask.get(y.id) === "dead_letter",
       intents: intentRows.filter((i) => i.sku_id === id).map((i) => ({ channel: i.channel, enabled: i.enabled, version: Number(i.version) })),
     });
   }
@@ -134,6 +138,7 @@ const DB_ERRORS: Record<string, [number, string, string]> = {
   preview_expired: [410, "preview_expired", "预览已过期，请重新预览"],
   preview_empty: [422, "preview_empty", "预览中没有可执行的变更"],
   invalid_request: [400, "invalid_body", "请求参数不正确"],
+  duplicate_change: [400, "duplicate_change", "同一商品同一渠道不能重复提交"],
 };
 
 export async function callApplyRpc(fn: string, args: Record<string, unknown>) {
@@ -146,24 +151,28 @@ export async function callApplyRpc(fn: string, args: Record<string, unknown>) {
     }
     throw new SalesChannelError("渠道保存失败", 500, "channel_apply_failed");
   }
-  return data as { results: Array<{ sku_id: string; channel: string; success: boolean; reason?: string; status?: string; version?: number }>; replayed?: boolean };
+  return data as {
+    results: Array<{ sku_id: string; channel: string; success: boolean; reason?: string; status?: string; version?: number }>;
+    replayed?: boolean;
+    sku_ids?: string[];
+    skipped?: Array<{ sku_id: string; reason: string }>;
+  };
 }
 
-export async function createPreview(ctx: StaffContext, add: SalesChannel[], remove: SalesChannel[], items: unknown[]) {
+export async function createPreview(
+  ctx: StaffContext, add: SalesChannel[], remove: SalesChannel[], items: unknown[],
+  skipped: Array<{ sku_id: string; reason: string }>, skuIds: string[],
+) {
   const expires = new Date(Date.now() + 10 * 60_000).toISOString();
   const { data, error } = await db.from("sku_sales_channel_previews").insert({
     actor_user_id: ctx.userId, location_id: ctx.locationId, add_channels: add, remove_channels: remove,
-    items, expires_at: expires,
+    items, skipped, sku_ids: skuIds, expires_at: expires,
   }).select("token, expires_at").single();
   if (error || !data) throw new SalesChannelError("预览保存失败", 500, "preview_failed");
   return data as { token: string; expires_at: string };
 }
 
-export async function loadPreviewSkuIds(token: string): Promise<string[]> {
-  const { data, error } = await db.from("sku_sales_channel_previews").select("items").eq("token", token).maybeSingle();
-  if (error) throw new SalesChannelError("预览读取失败", 500, "preview_failed");
-  return ((data?.items ?? []) as Array<{ sku_id: string }>).map((i) => i.sku_id);
-}
+
 
 // ---------------- 消费端 ----------------
 

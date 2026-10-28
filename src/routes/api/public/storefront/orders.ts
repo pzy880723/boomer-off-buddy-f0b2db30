@@ -201,20 +201,24 @@ export const Route = createFileRoute("/api/public/storefront/orders")({
         if (withGifts && !ordinary) {
           return storefrontError("赠礼结算暂未开放", 503, "gift_checkout_not_enabled");
         }
-        const { data, error } = withGifts
-          ? await supabaseAdmin.rpc("commerce_create_order_with_fankuang_gifts" as never, {
-              p_create_function: createFn,
-              p_args: createArgs,
-              p_gift_entitlement_ids: gifts.gift_entitlement_ids ?? null,
-              p_gift_count: requestedGiftCount(gifts),
-            } as never)
-          // 渠道策略在原下单事务内由订单行触发器校验；渠道只来自验签会话。
-          : await supabaseAdmin.rpc("commerce_create_order_in_channel" as never, {
+        // 赠礼下单函数在线上库未部署：直接明确“暂未开放”，不调用、不绕过渠道校验。
+        if (withGifts) {
+          return storefrontError("赠礼结算暂未开放", 503, "gift_checkout_not_enabled");
+        }
+        void requestedGiftCount;
+        // 渠道策略在原下单事务内由订单行触发器校验；渠道只来自验签会话。
+        const { data, error } = await supabaseAdmin.rpc("commerce_create_order_in_channel" as never, {
               p_channel: resolveConsumerChannel(auth.customer),
               p_function: createFn,
               p_args: createArgs,
             } as never);
         if (error) {
+          if (/gift_order_unavailable/i.test(error.message)) {
+            return storefrontError("赠礼结算暂未开放", 503, "gift_checkout_not_enabled");
+          }
+          if (/invalid sales channel/i.test(error.message)) {
+            return storefrontError("下单来源无法识别，请刷新后重试", 400, "channel_invalid");
+          }
           if (/sales channel disabled/i.test(error.message)) {
             return storefrontError("该商品当前渠道暂不销售", 409, "channel_disabled");
           }

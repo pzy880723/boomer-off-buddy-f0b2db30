@@ -11,6 +11,9 @@ import {
 } from "@/server/sales-channels.server";
 import { planSkuChanges, reasonLabel } from "@/lib/sales-channels/model";
 
+const labelSkipped = (rows: Array<{ sku_id: string; reason: string }>) =>
+  rows.map((r) => ({ sku_id: r.sku_id, reason: reasonLabel(r.reason)!, reason_code: r.reason }));
+
 const Channel = z.enum(["miniapp", "app", "youzan"]);
 const Body = z.object({
   location_id: z.string().uuid(),
@@ -41,18 +44,20 @@ export const Route = createFileRoute("/api/public/handheld/sales-channels/batch-
           const skipped: Array<{ sku_id: string; reason: string }> = [];
           for (const id of body.sku_ids) {
             const plan = planSkuChanges(facts.get(id)!, add, remove);
-            if (plan.skipReason) skipped.push({ sku_id: id, reason: reasonLabel(plan.skipReason)! });
+            if (plan.skipReason) skipped.push({ sku_id: id, reason: plan.skipReason });
             else items.push({ sku_id: id, changes: plan.changes });
           }
           if (!items.length) {
-            return err("所选商品都不能执行该变更", 422, { code: "no_eligible_items", total: body.sku_ids.length, eligible: 0, skipped });
+            return err("所选商品都不能执行该变更", 422, {
+              code: "no_eligible_items", total: body.sku_ids.length, eligible: 0, skipped: labelSkipped(skipped),
+            });
           }
-          const preview = await createPreview(ctx, add, remove, items);
+          const preview = await createPreview(ctx, add, remove, items, skipped, body.sku_ids);
           return ok({
             preview_token: preview.token,
             total: body.sku_ids.length,
             eligible: items.length,
-            skipped,
+            skipped: labelSkipped(skipped),
             expires_at: preview.expires_at,
           });
         } catch (e) {

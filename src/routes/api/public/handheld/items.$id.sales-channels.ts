@@ -9,7 +9,7 @@ import {
   callApplyRpc,
   channelStateResponse,
 } from "@/server/sales-channels.server";
-import { reasonLabel, sha256Hex, singleRequestFingerprint } from "@/lib/sales-channels/model";
+import { reasonLabel, sha256Hex, singleRequestFingerprint, summarizeSingle } from "@/lib/sales-channels/model";
 
 const Uuid = z.string().uuid();
 const Body = z.object({
@@ -56,6 +56,8 @@ export const Route = createFileRoute("/api/public/handheld/items/$id/sales-chann
           return ok({
             ...state,
             replayed: !!data.replayed,
+            // HTTP 200 也可能部分失败：客户端以 all_succeeded / results 为准
+            ...summarizeSingle(data.results),
             results: data.results.map((r) => ({
               sku_id: r.sku_id, channel: r.channel, success: r.success,
               ...(r.reason ? { reason: reasonLabel(r.reason), reason_code: r.reason } : {}),
