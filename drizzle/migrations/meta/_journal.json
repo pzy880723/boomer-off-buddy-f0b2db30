@@ -827,6 +827,13 @@
       "when": 1793178824075,
       "tag": "0117_sales_channel_intents",
       "breakpoints": true
+    },
+    {
+      "idx": 118,
+      "version": "7",
+      "when": 1793180378470,
+      "tag": "0118_sales_channel_hardening",
+      "breakpoints": true
     }
   ]
 }

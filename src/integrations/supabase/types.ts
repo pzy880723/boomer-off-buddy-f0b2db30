@@ -8833,6 +8833,8 @@ export type Database = {
           items: Json
           location_id: string
           remove_channels: string[]
+          skipped: Json
+          sku_ids: string[] | null
           token: string
         }
         Insert: {
@@ -8844,6 +8846,8 @@ export type Database = {
           items: Json
           location_id: string
           remove_channels: string[]
+          skipped?: Json
+          sku_ids?: string[] | null
           token?: string
         }
         Update: {
@@ -8855,6 +8859,8 @@ export type Database = {
           items?: Json
           location_id?: string
           remove_channels?: string[]
+          skipped?: Json
+          sku_ids?: string[] | null
           token?: string
         }
         Relationships: []
