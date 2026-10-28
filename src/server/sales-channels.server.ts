@@ -34,25 +34,25 @@ export type StaffContext = { userId: string; locationId: string; shopId: string 
 /** 设备 + 员工会话 + 角色 + 门店（总部可访问任一门店，其余须显式授权；仅 kind=shop）。 */
 export async function authorizeSalesChannelStaff(request: Request, locationId: unknown): Promise<StaffContext> {
   const device = await authenticateDevice(request);
-  if (!device.ok) throw new SalesChannelError("Device unauthorized", 401, "device_unauthorized");
+  if (!device.ok) throw new SalesChannelError("设备未授权", 401, "device_unauthorized");
   const session = await resolveSessionUser(request);
-  if (!session) throw new SalesChannelError("Employee session required", 401, "session_required");
+  if (!session) throw new SalesChannelError("请先登录员工账号", 401, "session_required");
   if (typeof locationId !== "string" || !UUID.test(locationId)) {
-    throw new SalesChannelError("location_id required", 400, "location_required");
+    throw new SalesChannelError("缺少门店参数", 400, "location_required");
   }
   const { data: roleRows, error: roleError } = await db.from("user_roles").select("role").eq("user_id", session.user_id);
-  if (roleError) throw new SalesChannelError("Unable to load access", 500, "access_query_failed");
+  if (roleError) throw new SalesChannelError("权限读取失败，请稍后重试", 500, "access_query_failed");
   const roles = ((roleRows ?? []) as Array<{ role: string }>).map((r) => r.role);
   const isHq = roles.some((r) => HQ_ROLES.includes(r));
   if (!isHq) {
     const { data: perm, error } = await db.from("user_location_perms").select("location_id")
       .eq("user_id", session.user_id).eq("location_id", locationId).maybeSingle();
-    if (error) throw new SalesChannelError("Unable to load access", 500, "access_query_failed");
-    if (!perm) throw new SalesChannelError("Location not accessible", 403, "location_forbidden");
+    if (error) throw new SalesChannelError("权限读取失败，请稍后重试", 500, "access_query_failed");
+    if (!perm) throw new SalesChannelError("无权操作该门店", 403, "location_forbidden");
   }
   const { data: loc, error: locError } = await db.from("inv_locations").select("id, kind, shop_id, is_active")
     .eq("id", locationId).maybeSingle();
-  if (locError) throw new SalesChannelError("Unable to load location", 500, "access_query_failed");
+  if (locError) throw new SalesChannelError("门店读取失败，请稍后重试", 500, "access_query_failed");
   if (!loc || !loc.is_active || loc.kind !== "shop") {
     throw new SalesChannelError("仅门店可设置销售渠道", 403, "location_forbidden");
   }
