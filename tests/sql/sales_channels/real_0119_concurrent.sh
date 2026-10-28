@@ -3,7 +3,7 @@
 set -euo pipefail
 P="$1"   # psql 命令前缀（含连接参数）
 A=55555555-5555-5555-5555-555555555555; L=11111111-1111-1111-1111-111111111111
-S=22222222-2222-2222-2222-222222222222; OP=$(cat /proc/sys/kernel/random/uuid); TOK=$(cat /proc/sys/kernel/random/uuid)
+S=22222222-2222-2222-2222-222222222222; OP=$(python3 -c "import uuid;print(uuid.uuid4())"); TOK=$(python3 -c "import uuid;print(uuid.uuid4())")
 $P -v ON_ERROR_STOP=1 -c "SET search_path=public,extensions;
  INSERT INTO auth.users(id) VALUES ('$A') ON CONFLICT DO NOTHING;
  INSERT INTO user_roles(user_id,role) VALUES ('$A','store_manager') ON CONFLICT DO NOTHING;
