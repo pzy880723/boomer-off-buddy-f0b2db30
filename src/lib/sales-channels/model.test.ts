@@ -186,3 +186,30 @@ test("batch aggregate per sku and fingerprint is order independent", () => {
     singleRequestFingerprint("s", [{ channel: "miniapp", enabled: false, expected_version: 1 }, { channel: "app", enabled: true, expected_version: 0 }]),
   );
 });
+
+test("direction capabilities: shared item both false", () => {
+  const y = view(base({ youzanShared: true }), "youzan");
+  assert.deepEqual([y.can_enable, y.can_disable], [false, false]);
+  assert.match(y.blocked_reason!, /共享收银商品/);
+});
+
+test("direction capabilities: sold / no stock can disable only", () => {
+  const s = view(base({ salesState: "sold" }), "youzan");
+  assert.deepEqual([s.can_enable, s.can_disable], [false, true]);
+  const z = view(base({ stockQty: 0 }), "youzan");
+  assert.deepEqual([z.can_enable, z.can_disable], [false, true]);
+  const m = view(base({ salesState: "sold" }), "miniapp");
+  assert.deepEqual([m.can_enable, m.can_disable], [false, true]);
+});
+
+test("direction capabilities: auth expired cannot disable", () => {
+  const y = view(base({ shop: { bound: true, authorized: false } }), "youzan");
+  assert.deepEqual([y.can_enable, y.can_disable, y.available], [false, false, false]);
+});
+
+test("direction capabilities: normal item both true", () => {
+  for (const c of ["miniapp", "app", "youzan"]) {
+    const v = view(base(), c);
+    assert.deepEqual([v.can_enable, v.can_disable], [true, true]);
+  }
+});

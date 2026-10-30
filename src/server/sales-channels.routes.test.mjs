@@ -178,6 +178,8 @@ test("0119 GET: shared Youzan item is blocked with Chinese reason; single mappin
   const { body } = await call(single.GET, req(`/i?location_id=${LOC}`), { id: SKU_A });
   const yz = body.data.channels.find((c) => c.channel === "youzan");
   expect(yz.available).toBe(false);
+  expect(yz.can_enable).toBe(false);
+  expect(yz.can_disable).toBe(false);
   expect(yz.blocked_reason).toBe("该商品为多规格共享收银商品，暂不能单独设置有赞渠道");
   tables.sku_channel_listings.pop();
   const again = await call(single.GET, req(`/i?location_id=${LOC}`), { id: SKU_A });

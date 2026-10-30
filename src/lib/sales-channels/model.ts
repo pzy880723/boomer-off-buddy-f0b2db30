@@ -82,6 +82,8 @@ export type ChannelView = {
   selection_source: "explicit" | "default";
   version: number;
   available: boolean;
+  can_enable: boolean;
+  can_disable: boolean;
   platform_status: string;
   blocked_reason: string | null;
   is_store_channel: boolean;
@@ -136,6 +138,9 @@ export function buildChannelView(channel: SalesChannel, f: ChannelFacts): Channe
     selection_source: intent ? "explicit" : "default",
     version: intent?.version ?? 0,
     available: block === null,
+    // 明确方向能力：与 DB sales_channel_apply 的开启/关闭阻断一致（共享/授权过期/未映射两方向均为 false）。
+    can_enable: blocks.enable === null,
+    can_disable: blocks.disable === null,
     platform_status: platform,
     blocked_reason: reasonLabel(block),
     is_store_channel: channel === "youzan",
