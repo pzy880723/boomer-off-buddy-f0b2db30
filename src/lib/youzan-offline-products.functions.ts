@@ -309,7 +309,7 @@ export async function releaseSkuToOfflineShopsCore(args: {
   const accessToken = await ensureAccessToken(hq);
   const category = await ensureAutoYouzanDefaultCategory();
   const imageUrls = await Promise.all(
-    rawImages.map((url) =>
+    rawImages.filter((url): url is string => typeof url === "string" && url.length > 0).map((url) =>
       url.endsWith("/m-icon-512.png")
         ? Promise.resolve(url)
         : uploadImageToYouzanMaterial(accessToken, url, {

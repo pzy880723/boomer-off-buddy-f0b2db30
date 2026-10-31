@@ -59,3 +59,11 @@ test("同组其余行的待履约数量要扣掉已确认缺货/已退的数量"
     2,
   );
 });
+
+import { isLiveRefund } from "./reserved";
+test("失败的退款不占退款额度", () => {
+  assert.equal(isLiveRefund({ status: "failed" }), false);
+  assert.equal(isLiveRefund({ status: "cancelled" }), false);
+  assert.equal(isLiveRefund({ status: "succeeded" }), true);
+  assert.equal(isLiveRefund({ status: "pending" }), true);
+});

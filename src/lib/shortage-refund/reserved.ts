@@ -21,9 +21,9 @@ export type IntentRowLite = {
   amount_fen: number;
 };
 
-/** 已取消的退款不占额度。 */
+/** 只有进行中/已成功的退款占额度；已取消、失败（钱未退回）不占。 */
 export function isLiveRefund(row: { status: string }): boolean {
-  return row.status !== "cancelled";
+  return row.status === "pending" || row.status === "processing" || row.status === "succeeded";
 }
 
 /** 失败的意图不占额度。 */
