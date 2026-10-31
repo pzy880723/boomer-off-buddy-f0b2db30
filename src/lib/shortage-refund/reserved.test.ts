@@ -60,11 +60,10 @@ test("同组其余行的待履约数量要扣掉已确认缺货/已退的数量"
   );
 });
 
-import { isLiveRefund as _isLive } from "./reserved";
-import { test as _t, expect as _e } from "vitest";
-_t("失败的退款不占退款额度", () => {
-  _e(_isLive({ status: "failed" })).toBe(false);
-  _e(_isLive({ status: "cancelled" })).toBe(false);
-  _e(_isLive({ status: "succeeded" })).toBe(true);
-  _e(_isLive({ status: "pending" })).toBe(true);
+import { isLiveRefund } from "./reserved";
+test("失败的退款不占退款额度", () => {
+  assert.equal(isLiveRefund({ status: "failed" }), false);
+  assert.equal(isLiveRefund({ status: "cancelled" }), false);
+  assert.equal(isLiveRefund({ status: "succeeded" }), true);
+  assert.equal(isLiveRefund({ status: "pending" }), true);
 });
