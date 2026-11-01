@@ -12287,6 +12287,218 @@ export type Database = {
         Args: { p_location: string; p_sku: string }
         Returns: number
       }
+      erp_ai_budget_finish: {
+        Args: {
+          p_actor: string
+          p_actual_nano: number
+          p_attempt: string
+          p_budget: string
+          p_location: string
+          p_receipt: Json
+        }
+        Returns: Json
+      }
+      erp_ai_budget_open: {
+        Args: { p_actor: string; p_budget: string; p_location: string }
+        Returns: Json
+      }
+      erp_ai_budget_reserve: {
+        Args: {
+          p_actor: string
+          p_attempt: string
+          p_budget: string
+          p_location: string
+          p_quote_nano: number
+          p_request_sha: string
+          p_stage: string
+        }
+        Returns: Json
+      }
+      erp_ai_content_job_budget: { Args: { p_job_id: string }; Returns: Json }
+      erp_ai_image_plan_begin: {
+        Args: {
+          p_image_attempt: string
+          p_image_sha: string
+          p_plan: string
+          p_scope: Json
+        }
+        Returns: Json
+      }
+      erp_ai_image_plan_cancel: {
+        Args: { p_plan: string; p_scope: Json }
+        Returns: Json
+      }
+      erp_ai_image_plan_quality: {
+        Args: {
+          p_attempt: string
+          p_plan: string
+          p_quote_nano: number
+          p_request_sha: string
+          p_scope: Json
+        }
+        Returns: Json
+      }
+      erp_ai_listing_job_budget: { Args: { p_job_id: string }; Returns: Json }
+      erp_ai_product_budget_finish: {
+        Args: {
+          p_actor: string
+          p_actual_nano: number
+          p_attempt: string
+          p_budget: string
+          p_location: string
+          p_operation: string
+          p_operation_location: string
+          p_operator: string
+          p_receipt: Json
+        }
+        Returns: Json
+      }
+      erp_ai_product_budget_open: {
+        Args: {
+          p_actor: string
+          p_budget: string
+          p_location: string
+          p_operation: string
+          p_operation_location: string
+          p_operator: string
+        }
+        Returns: Json
+      }
+      erp_ai_product_budget_reserve: {
+        Args: {
+          p_actor: string
+          p_attempt: string
+          p_budget: string
+          p_location: string
+          p_operation: string
+          p_operation_location: string
+          p_operator: string
+          p_quote_nano: number
+          p_request_sha: string
+          p_stage: string
+        }
+        Returns: Json
+      }
+      erp_ai_product_content_save: {
+        Args: {
+          p_device: string
+          p_location: string
+          p_operation: string
+          p_operator: string
+          p_policy: string
+          p_request: Json
+          p_sku: string
+        }
+        Returns: Json
+      }
+      erp_ai_product_operation_open: {
+        Args: {
+          p_device: string
+          p_kind: string
+          p_location: string
+          p_operation: string
+          p_operator: string
+          p_policy: string
+          p_sku: string
+          p_source_path: string
+        }
+        Returns: Json
+      }
+      erp_ai_web_budget_finish: {
+        Args: {
+          p_actor: string
+          p_actual_nano: number
+          p_attempt: string
+          p_budget: string
+          p_draft: string
+          p_receipt: Json
+        }
+        Returns: Json
+      }
+      erp_ai_web_budget_open: {
+        Args: { p_actor: string; p_budget: string; p_draft: string }
+        Returns: Json
+      }
+      erp_ai_web_budget_reserve: {
+        Args: {
+          p_actor: string
+          p_attempt: string
+          p_budget: string
+          p_draft: string
+          p_quote_nano: number
+          p_request_sha: string
+          p_stage: string
+        }
+        Returns: Json
+      }
+      erp_ai_web_draft_finish_save: {
+        Args: { p_actor: string; p_draft: string; p_fingerprint: string }
+        Returns: Json
+      }
+      erp_ai_web_draft_open: {
+        Args: { p_actor: string; p_draft: string; p_policy: string }
+        Returns: Json
+      }
+      erp_ai_web_draft_prepare_save: {
+        Args: {
+          p_actor: string
+          p_draft: string
+          p_fingerprint: string
+          p_payload: Json
+        }
+        Returns: Json
+      }
+      erp_ai_web_product_budget_finish: {
+        Args: {
+          p_actor: string
+          p_actual_nano: number
+          p_attempt: string
+          p_budget: string
+          p_draft: string
+          p_operation: string
+          p_operation_location: string
+          p_operator: string
+          p_receipt: Json
+        }
+        Returns: Json
+      }
+      erp_ai_web_product_budget_open: {
+        Args: {
+          p_actor: string
+          p_budget: string
+          p_draft: string
+          p_operation: string
+          p_operation_location: string
+          p_operator: string
+        }
+        Returns: Json
+      }
+      erp_ai_web_product_budget_reserve: {
+        Args: {
+          p_actor: string
+          p_attempt: string
+          p_budget: string
+          p_draft: string
+          p_operation: string
+          p_operation_location: string
+          p_operator: string
+          p_quote_nano: number
+          p_request_sha: string
+          p_stage: string
+        }
+        Returns: Json
+      }
+      erp_ai_web_retouch_operation_open: {
+        Args: {
+          p_location: string
+          p_operation: string
+          p_operator: string
+          p_policy: string
+          p_sku: string
+          p_source_path: string
+        }
+        Returns: Json
+      }
       erp_push_can_deliver: {
         Args: { p_event: string; p_install: string }
         Returns: boolean
@@ -12852,6 +13064,44 @@ export type Database = {
       }
       handheld_smart_create_commit_v3: {
         Args: {
+          p_ai_policy: string
+          p_client_op_id: string
+          p_device_id: string
+          p_epcs: string[]
+          p_fingerprint: string
+          p_image_plan: string
+          p_location_id: string
+          p_marks?: Json
+          p_note: string
+          p_release_shop_id: string
+          p_reuse: boolean
+          p_sku: Json
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      handheld_smart_create_commit_v4: {
+        Args: {
+          p_ai_budget_id: string
+          p_ai_policy: string
+          p_client_op_id: string
+          p_device_id: string
+          p_epcs: string[]
+          p_fingerprint: string
+          p_image_plan: string
+          p_location_id: string
+          p_marks?: Json
+          p_note: string
+          p_release_shop_id: string
+          p_reuse: boolean
+          p_sku: Json
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      handheld_smart_create_commit_v5: {
+        Args: {
+          p_ai_budget_id: string
           p_ai_policy: string
           p_client_op_id: string
           p_device_id: string
