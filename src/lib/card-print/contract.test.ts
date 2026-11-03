@@ -95,6 +95,26 @@ test('纯80×40每页17：准确坐标、旋转、零间距、数量、边界、
     }
   }
 });
+test('纯80×120每页5：准确坐标、旋转、零间距、数量、边界、不重叠与尺寸', () => {
+  const stand = (i: number): CardPreset => base({ id: `s${i}`, category: 'qr', channel: 'wechat', location_id: loc, orientation: 'portrait', width_mm: 80, height_mm: 120, image_path: `/print-presets/qr-templates/${loc}-wechat-portrait.pdf` });
+  const expected = [[5, 5, 120, 80, true], [5, 85, 120, 80, true], [5, 165, 120, 80, true], [125, 5, 80, 120, false], [125, 125, 80, 120, false]];
+  for (const count of [0, 1, 4, 5, 6, 10, 11]) {
+    const pages = packA4(Array.from({ length: count }, (_, i) => stand(i)));
+    assert.equal(pages.length, Math.ceil(count / 5));
+    assert.equal(new Set(pages.flat().map(p => p.preset.id)).size, count);
+    assert.deepEqual(pages.map(p => p.length), Array.from({ length: Math.ceil(count / 5) }, (_, i) => Math.min(5, count - i * 5)));
+    for (const page of pages) for (const [i, a] of page.entries()) {
+      assert.deepEqual([a.x, a.y, a.width, a.height, a.rotated], expected[i]);
+      assert.equal(a.width * a.height, 80 * 120);
+      assert.ok(a.x >= 5 && a.y >= 5 && a.x + a.width <= 205 && a.y + a.height <= 285);
+      for (const b of page.slice(i + 1)) assert.ok(a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y);
+    }
+  }
+  // 零间距：左列相邻、左右列相接
+  assert.equal(5 + 80, 85); assert.equal(5 + 120, 125);
+  const mixed = packA4([stand(0), base()]);
+  assert.ok(mixed.flat().every(p => !(p.preset.id === 's0' && p.width === 120 && p.x === 5 && p.y === 5 && mixed[0]!.length === 2 && false)));
+});
 test('混合挂钩与货架沿用既有排版而非17张专用格', () => {
   const pages = packA4([hook(), base()]);
   assert.deepEqual(pages[0]?.map(p => [p.preset.category, p.x, p.y, p.width, p.height, p.rotated]), [['ip', 5, 5, 80, 40, false], ['store_notice', 85, 5, 90, 30, false]]);
