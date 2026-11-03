@@ -42,11 +42,16 @@ export const QR_TEMPLATE_MANIFEST_PATH = '/print-presets/qr-templates.json';
 export function parseQrTemplateManifest(input: unknown): CardPreset[] {
   const presets = Manifest.parse(input).presets;
   for (const p of presets) {
-    const base = `/print-presets/qr-templates/${p.location_id}-${p.channel}`;
+    const base = qrTemplateBase(p);
     if (p.category !== 'qr' || !p.location_id || p.image_path !== `${base}.pdf` || (p.thumbnail_path && p.thumbnail_path !== `${base}.png`)) throw new Error('扫码模板路径或门店不符');
   }
-  return presets.map(p => ({ ...p, thumbnail_path: p.thumbnail_path ?? `/print-presets/qr-templates/${p.location_id}-${p.channel}.png` }));
+  return presets.map(p => ({ ...p, thumbnail_path: p.thumbnail_path ?? `${qrTemplateBase(p)}.png` }));
 }
+function qrTemplateBase(p: CardPreset): string {
+  return `/print-presets/qr-templates/${p.location_id}-${p.channel}${p.orientation === 'portrait' ? '-portrait' : ''}`;
+}
+export const QR_PORTRAIT_CHANNELS: readonly PrintChannel[] = ['wechat', 'xiaohongshu', 'dianping_checkin', 'dianping_review'];
+const STORE_NOTICE_PORTRAIT_IDS = new Set(['notice-basket-surprise-portrait']);
 export function mergeCatalog(statics: CardPreset[], qr: CardPreset[]): CardPreset[] {
   const all = [...statics, ...qr];
   if (new Set(all.map(p => p.id)).size !== all.length) throw new Error('预设 ID 重复');
@@ -69,7 +74,10 @@ export const Manifest = z.object({ version: z.literal(1), presets: z.array(Prese
 });
 export function permitted(p: CardPreset): boolean {
   if (!p.enabled) return false;
-  if (p.category === 'qr' || p.category === 'store_notice') return p.orientation === 'landscape' && p.width_mm === 90 && p.height_mm === 30;
+  const shelf = p.orientation === 'landscape' && p.width_mm === 90 && p.height_mm === 30;
+  const standing = p.orientation === 'portrait' && p.width_mm === 80 && p.height_mm === 120;
+  if (p.category === 'qr') return shelf || (standing && !!p.channel && QR_PORTRAIT_CHANNELS.includes(p.channel));
+  if (p.category === 'store_notice') return shelf || (standing && STORE_NOTICE_PORTRAIT_IDS.has(p.id));
   if (p.category === 'product') return p.width_mm === 60 && p.height_mm === 90 && p.orientation === 'portrait';
   if (p.width_mm === 80 && p.height_mm === 40) return p.orientation === 'landscape' && (p.category === 'ip' || p.category === 'category');
   return p.orientation === (p.width_mm >= p.height_mm ? 'landscape' : 'portrait');
