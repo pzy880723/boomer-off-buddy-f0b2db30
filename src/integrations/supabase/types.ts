@@ -12315,6 +12315,83 @@ export type Database = {
         Returns: Json
       }
       erp_ai_content_job_budget: { Args: { p_job_id: string }; Returns: Json }
+      erp_ai_image_cost_pro_plan_begin: {
+        Args: {
+          p_image: string
+          p_image_attempt: string
+          p_plan: string
+          p_request_sha: string
+          p_scope: Json
+        }
+        Returns: Json
+      }
+      erp_ai_image_cost_pro_plan_quality: {
+        Args: {
+          p_attempt: string
+          p_plan: string
+          p_quote_nano: number
+          p_request_sha: string
+          p_scope: Json
+        }
+        Returns: Json
+      }
+      erp_ai_image_cost_reserve: {
+        Args: {
+          p_attempt: string
+          p_images: string[]
+          p_quote_nano: number
+          p_request_sha: string
+          p_scope: Json
+          p_stage: string
+        }
+        Returns: Json
+      }
+      erp_ai_image_cost_snapshot: { Args: { p_scope: Json }; Returns: Json }
+      erp_ai_image_cost_v2_finish: {
+        Args: {
+          p_actual_nano: number
+          p_attempt: string
+          p_receipt: Json
+          p_scope: Json
+        }
+        Returns: Json
+      }
+      erp_ai_image_cost_v2_open: { Args: { p_scope: Json }; Returns: Json }
+      erp_ai_image_cost_v2_plan_begin: {
+        Args: {
+          p_image: string
+          p_image_attempt: string
+          p_plan: string
+          p_request_sha: string
+          p_scope: Json
+        }
+        Returns: Json
+      }
+      erp_ai_image_cost_v2_plan_cancel: {
+        Args: { p_plan: string; p_scope: Json }
+        Returns: Json
+      }
+      erp_ai_image_cost_v2_plan_quality: {
+        Args: {
+          p_attempt: string
+          p_plan: string
+          p_quote_nano: number
+          p_request_sha: string
+          p_scope: Json
+        }
+        Returns: Json
+      }
+      erp_ai_image_cost_v2_reserve: {
+        Args: {
+          p_attempt: string
+          p_images: string[]
+          p_quote_nano: number
+          p_request_sha: string
+          p_scope: Json
+          p_stage: string
+        }
+        Returns: Json
+      }
       erp_ai_image_plan_begin: {
         Args: {
           p_image_attempt: string
@@ -12339,6 +12416,25 @@ export type Database = {
         Returns: Json
       }
       erp_ai_listing_job_budget: { Args: { p_job_id: string }; Returns: Json }
+      erp_ai_pro_image_plan_begin: {
+        Args: {
+          p_image_attempt: string
+          p_image_sha: string
+          p_plan: string
+          p_scope: Json
+        }
+        Returns: Json
+      }
+      erp_ai_pro_image_plan_quality: {
+        Args: {
+          p_attempt: string
+          p_plan: string
+          p_quote_nano: number
+          p_request_sha: string
+          p_scope: Json
+        }
+        Returns: Json
+      }
       erp_ai_product_budget_finish: {
         Args: {
           p_actor: string
@@ -12401,6 +12497,26 @@ export type Database = {
           p_policy: string
           p_sku: string
           p_source_path: string
+        }
+        Returns: Json
+      }
+      erp_ai_shared_cost_finish: {
+        Args: {
+          p_actual_nano: number
+          p_attempt: string
+          p_receipt: Json
+          p_scope: Json
+        }
+        Returns: Json
+      }
+      erp_ai_shared_cost_open: { Args: { p_scope: Json }; Returns: Json }
+      erp_ai_shared_cost_reserve: {
+        Args: {
+          p_attempt: string
+          p_quote_nano: number
+          p_request_sha: string
+          p_scope: Json
+          p_stage: string
         }
         Returns: Json
       }
@@ -12560,6 +12676,97 @@ export type Database = {
           p_install: string
           p_lease: string
           p_revision: string
+        }
+        Returns: Json
+      }
+      erp_rapid_listing_cancel: {
+        Args: {
+          p_actor: string
+          p_batch: string
+          p_capture: string
+          p_device: string
+          p_location: string
+        }
+        Returns: Json
+      }
+      erp_rapid_listing_check:
+        | { Args: { p_claim: string; p_job: string }; Returns: boolean }
+        | {
+            Args: { p_claim: string; p_job: string; p_run_revision: number }
+            Returns: boolean
+          }
+      erp_rapid_listing_claim: { Args: never; Returns: Json }
+      erp_rapid_listing_enqueue: {
+        Args: {
+          p_actor: string
+          p_batch: string
+          p_budget: string
+          p_capture: string
+          p_device: string
+          p_location: string
+          p_ordinal: number
+          p_policy: string
+          p_source: string
+        }
+        Returns: Json
+      }
+      erp_rapid_listing_finish:
+        | {
+            Args: {
+              p_claim: string
+              p_error: string
+              p_job: string
+              p_result: Json
+              p_status: string
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              p_claim: string
+              p_error: string
+              p_job: string
+              p_result: Json
+              p_run_revision: number
+              p_status: string
+            }
+            Returns: boolean
+          }
+      erp_rapid_listing_intake: {
+        Args: {
+          p_actor: string
+          p_batch: string
+          p_budget: string
+          p_capture: string
+          p_device: string
+          p_location: string
+          p_md5: string
+          p_ordinal: number
+          p_sha256: string
+          p_size: number
+        }
+        Returns: Json
+      }
+      erp_rapid_listing_list: {
+        Args: {
+          p_actor: string
+          p_batch: string
+          p_device: string
+          p_location: string
+        }
+        Returns: Json
+      }
+      erp_rapid_listing_retry: {
+        Args: {
+          p_actor: string
+          p_batch: string
+          p_capture: string
+          p_device: string
+          p_expected_job: string
+          p_expected_revision: number
+          p_location: string
+          p_request: string
+          p_sha256: string
         }
         Returns: Json
       }
