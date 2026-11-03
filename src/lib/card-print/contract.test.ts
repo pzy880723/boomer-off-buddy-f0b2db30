@@ -115,7 +115,6 @@ test('纯80×120每页5：准确坐标、旋转、零间距、数量、边界、
       assert.equal(a!.x + a!.width, d!.x); assert.equal(d!.y + d!.height, e!.y);
     }
   }
-  }
   const mixed = packA4([stand(0), base()]);
   assert.equal(mixed.flat().length, 2);
 });
