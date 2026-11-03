@@ -16,7 +16,7 @@ test('原生数组清单保留PDF和缩略图路径，提示竖版拒绝，非�
   assert.throws(() => assertQrLocation('other', loc));
   assertQrLocation(loc, loc);
 });
-test('扫码六用途和提示仅90×30，历史停用和竖牌在输出时同样拒绝', () => {
+test('扫码六用途和提示横卡90×30；未特批或无渠道竖牌、停用、错尺寸拒绝', () => {
   for (const category of ['qr', 'store_notice'] as const) {
     for (const p of [base({ category, orientation: 'portrait', width_mm: 80, height_mm: 120 }), base({ category, enabled: false }), base({ category, width_mm: 91 })]) {
       assert.equal(permitted(p), false);
