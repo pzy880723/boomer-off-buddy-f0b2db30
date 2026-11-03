@@ -110,10 +110,14 @@ test('纯80×120每页5：准确坐标、旋转、零间距、数量、边界、
       for (const b of page.slice(i + 1)) assert.ok(a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y);
     }
   }
-  // 零间距：左列相邻、左右列相接
-  assert.equal(5 + 80, 85); assert.equal(5 + 120, 125);
+    if (pages[0]?.length === 5) {
+      const [a, b, c, d, e] = pages[0];
+      assert.equal(a!.y + a!.height, b!.y); assert.equal(b!.y + b!.height, c!.y);
+      assert.equal(a!.x + a!.width, d!.x); assert.equal(d!.y + d!.height, e!.y);
+    }
+  }
   const mixed = packA4([stand(0), base()]);
-  assert.ok(mixed.flat().every(p => !(p.preset.id === 's0' && p.width === 120 && p.x === 5 && p.y === 5 && mixed[0]!.length === 2 && false)));
+  assert.equal(mixed.flat().length, 2);
 });
 test('混合挂钩与货架沿用既有排版而非17张专用格', () => {
   const pages = packA4([hook(), base()]);
