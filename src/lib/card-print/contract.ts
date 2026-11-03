@@ -121,6 +121,17 @@ export function packA4(cards: CardPreset[]): Placement[][] {
     }
     return pages;
   }
+  // 纯80×120立牌每页5张零间距：左列3张旋转为120×80，右列2张竖放。
+  if (cards.length && cards.every(p => p.width_mm === 80 && p.height_mm === 120)) {
+    if (cards.some(p => !permitted(p))) throw new Error('禁止输出停用卡片');
+    const pages: Placement[][] = [];
+    for (let offset = 0; offset < cards.length; offset += 5) {
+      pages.push(cards.slice(offset, offset + 5).map((preset, index) => index < 3
+        ? { preset, x: 5, y: 5 + index * 80, width: 120, height: 80, rotated: true }
+        : { preset, x: 125, y: 5 + (index - 3) * 120, width: 80, height: 120, rotated: false }));
+    }
+    return pages;
+  }
   // Integer millimetres are not assumed: all positions remain in physical mm.
   const pages: Placement[][] = [];
   const pending = [...cards].sort((a, b) => b.width_mm * b.height_mm - a.width_mm * a.height_mm);
