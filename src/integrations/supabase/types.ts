@@ -12696,6 +12696,16 @@ export type Database = {
             Returns: boolean
           }
       erp_rapid_listing_claim: { Args: never; Returns: Json }
+      erp_rapid_listing_discard: {
+        Args: {
+          p_actor: string
+          p_batch: string
+          p_captures: string[]
+          p_device: string
+          p_location: string
+        }
+        Returns: Json
+      }
       erp_rapid_listing_enqueue: {
         Args: {
           p_actor: string
