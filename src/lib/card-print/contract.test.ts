@@ -125,23 +125,30 @@ test('私桶原码路径正则匹配普通 .png/.jpg，拒绝伪扩展', async (
     assert.equal((await projectQr([mk(path)], loc, async () => 'u')).length, ok, path);
 });
 
-test('扫码立牌80×120仅四类渠道，路径带-portrait，横卡路径兼容', async () => {
+test('扫码立牌80×120六用途均可，实际可选仍受本店二维码限制', async () => {
   const { parseQrTemplateManifest } = await import('./contract');
   const loc = '11111111-1111-4111-8111-111111111111', other = '22222222-2222-4222-8222-222222222222';
   const box = { x_mm: 20, y_mm: 60, size_mm: 40 };
   const row = (channel: typeof channels[number], extra: Record<string, unknown> = {}) => ({ id: `qr-${loc}-${channel}-portrait`, type_id: `qr-${channel}-portrait`, name: channel, category: 'qr', enabled: true, orientation: 'portrait', width_mm: 80, height_mm: 120, image_path: `/print-presets/qr-templates/${loc}-${channel}-portrait.pdf`, thumbnail_path: `/print-presets/qr-templates/${loc}-${channel}-portrait.png`, channel, location_id: loc, qr_box: box, ...extra });
-  const four = ['wechat', 'xiaohongshu', 'dianping_checkin', 'dianping_review'] as const;
-  const parsed = parseQrTemplateManifest({ version: 1, presets: four.map(c => row(c)) });
-  assert.equal(parsed.filter(permitted).length, 4);
-  const noThumb = parseQrTemplateManifest({ version: 1, presets: [{ ...row('wechat'), thumbnail_path: undefined }] });
-  assert.equal(noThumb[0]?.thumbnail_path, `/print-presets/qr-templates/${loc}-wechat-portrait.png`);
+  const parsed = parseQrTemplateManifest({ version: 1, presets: channels.map(c => row(c)) });
+  assert.equal(parsed.length, 6);
+  assert.equal(parsed.filter(permitted).length, 6);
+  const noThumb = parseQrTemplateManifest({ version: 1, presets: [{ ...row('identify'), thumbnail_path: undefined }] });
+  assert.equal(noThumb[0]?.thumbnail_path, `/print-presets/qr-templates/${loc}-identify-portrait.png`);
   // 横卡仍用无后缀路径；竖牌不得使用横卡路径
   assert.throws(() => parseQrTemplateManifest({ version: 1, presets: [row('wechat', { image_path: `/print-presets/qr-templates/${loc}-wechat.pdf` })] }));
   assert.throws(() => parseQrTemplateManifest({ version: 1, presets: [row('wechat', { image_path: `/print-presets/qr-templates/${other}-wechat-portrait.pdf` })] }), '跨店路径');
   assert.throws(() => parseQrTemplateManifest({ version: 1, presets: [row('wechat', { image_path: `/print-presets/qr-templates/${loc}-xiaohongshu-portrait.pdf` })] }), '跨渠道路径');
-  for (const c of ['identify', 'miniprogram'] as const) assert.equal(permitted(base({ category: 'qr', channel: c, orientation: 'portrait', width_mm: 80, height_mm: 120, qr_box: box })), false);
-  for (const [w, h] of [[80, 121], [90, 120], [60, 90]]) assert.equal(permitted(base({ category: 'qr', channel: 'wechat', orientation: 'portrait', width_mm: w, height_mm: h, qr_box: { x_mm: 1, y_mm: 1, size_mm: 20 } })), false);
-  assert.equal(permitted(base({ category: 'qr', channel: 'wechat', orientation: 'landscape', width_mm: 80, height_mm: 120, qr_box: box })), false);
+  // 识别码立牌：本店有识别码才可选
+  assert.equal(resolveSelection(parsed, [{ id: `qr-${loc}-identify-portrait`, quantity: 1 }], loc, ['identify']).length, 1);
+  // 未发布小程序/缺识别码的门店：立牌同样不可选，也不借用别的码
+  assert.throws(() => resolveSelection(parsed, [{ id: `qr-${loc}-miniprogram-portrait`, quantity: 1 }], loc, [...channels.filter(c => c !== 'miniprogram')]));
+  assert.throws(() => resolveSelection(parsed, [{ id: `qr-${loc}-identify-portrait`, quantity: 1 }], loc, ['wechat', 'xiaohongshu', 'dianping_checkin', 'dianping_review']));
+  // 跨店、错尺寸、横版80×120、无渠道仍拒绝
+  assert.throws(() => resolveSelection(parsed, [{ id: `qr-${loc}-identify-portrait`, quantity: 1 }], other, ['identify']));
+  for (const [w, h] of [[80, 121], [90, 120], [60, 90]]) assert.equal(permitted(base({ category: 'qr', channel: 'identify', orientation: 'portrait', width_mm: w, height_mm: h, qr_box: { x_mm: 1, y_mm: 1, size_mm: 20 } })), false);
+  assert.equal(permitted(base({ category: 'qr', channel: 'identify', orientation: 'landscape', width_mm: 80, height_mm: 120, qr_box: box })), false);
+  assert.throws(() => Preset.parse(base({ category: 'qr', orientation: 'portrait', width_mm: 80, height_mm: 120, qr_box: box })));
 });
 test('店铺提示仅特批 notice-basket-surprise-portrait 可用80×120', () => {
   assert.ok(permitted(base({ id: 'notice-basket-surprise-portrait', orientation: 'portrait', width_mm: 80, height_mm: 120 })));

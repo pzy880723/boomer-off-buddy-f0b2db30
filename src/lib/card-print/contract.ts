@@ -50,7 +50,6 @@ export function parseQrTemplateManifest(input: unknown): CardPreset[] {
 function qrTemplateBase(p: CardPreset): string {
   return `/print-presets/qr-templates/${p.location_id}-${p.channel}${p.orientation === 'portrait' ? '-portrait' : ''}`;
 }
-export const QR_PORTRAIT_CHANNELS: readonly PrintChannel[] = ['wechat', 'xiaohongshu', 'dianping_checkin', 'dianping_review'];
 const STORE_NOTICE_PORTRAIT_IDS = new Set(['notice-basket-surprise-portrait']);
 export function mergeCatalog(statics: CardPreset[], qr: CardPreset[]): CardPreset[] {
   const all = [...statics, ...qr];
@@ -76,7 +75,8 @@ export function permitted(p: CardPreset): boolean {
   if (!p.enabled) return false;
   const shelf = p.orientation === 'landscape' && p.width_mm === 90 && p.height_mm === 30;
   const standing = p.orientation === 'portrait' && p.width_mm === 80 && p.height_mm === 120;
-  if (p.category === 'qr') return shelf || (standing && !!p.channel && QR_PORTRAIT_CHANNELS.includes(p.channel));
+  // 六用途扫码卡均可 90×30 横卡或 80×120 立牌；实际可选性由本店二维码配置决定
+  if (p.category === 'qr') return shelf || (standing && !!p.channel);
   if (p.category === 'store_notice') return shelf || (standing && STORE_NOTICE_PORTRAIT_IDS.has(p.id));
   if (p.category === 'product') return p.width_mm === 60 && p.height_mm === 90 && p.orientation === 'portrait';
   if (p.width_mm === 80 && p.height_mm === 40) return p.orientation === 'landscape' && (p.category === 'ip' || p.category === 'category');
