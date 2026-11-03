@@ -109,12 +109,12 @@ test('纯80×120每页5：准确坐标、旋转、零间距、数量、边界、
       assert.ok(a.x >= 5 && a.y >= 5 && a.x + a.width <= 205 && a.y + a.height <= 285);
       for (const b of page.slice(i + 1)) assert.ok(a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y);
     }
-  }
     if (pages[0]?.length === 5) {
       const [a, b, c, d, e] = pages[0];
       assert.equal(a!.y + a!.height, b!.y); assert.equal(b!.y + b!.height, c!.y);
       assert.equal(a!.x + a!.width, d!.x); assert.equal(d!.y + d!.height, e!.y);
     }
+  }
   }
   const mixed = packA4([stand(0), base()]);
   assert.equal(mixed.flat().length, 2);
