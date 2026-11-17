@@ -1,16 +1,33 @@
-# 只读核对结论：Android 对齐 iPhone 1.1.95(117) 契约
+# 只读核对：商品编辑字段（本仓库 + Lovable Cloud 源库）
 
-范围：本仓库 HEAD `b4447f3228ea6bd5b1fd5da729faa98cf6b109b3`。本仓库不含腾讯最新代码，以下结论只说明本仓库，不能推断腾讯生产缺失。未改代码、数据库或配置，未调用 AI。
+本轮没有改代码、数据库、配置或密钥，没有发布，也没有调用模型或有赞。腾讯不是我部署的，以下也不推断腾讯状态。
 
-## 1. items/rapid-listing（image_enqueue / image_redo / GET image_batch_id、image_parent_id）
-- 搜索 `src/`、`supabase/`：没有 `rapid-listing` 路由，也没有 `image_enqueue`、`image_redo`、`image_batch_id`、`image_parent_id`。
-- 只有自动生成的 `src/integrations/supabase/types.ts:12682-12769` 列出共用数据库里的 RPC：`erp_rapid_listing_cancel/check/claim/discard/enqueue/finish/intake/list/retry`。这说明数据库里有快速上架函数（可能由腾讯迁移创建），但本仓库没有调用它们的路由。
-- 结论：幂等、库存/上架字段无副作用、GET 不启动生成，这几项在本仓库都无法核实，应以腾讯源码为准。
+## 1. 当前标识
+- 本仓库 HEAD：`cca2b7d689b4eb0e93eb29683470ed1b752b7f2b`（2026-11-13T17:28:28Z）。
+- 仓库里搜不到 A1804、A1806、A1808，这些是腾讯/本地流水，本仓库没有记录。
 
-## 2. privacy/ai-consent 版本
-- `src/server/ai-guard.ts:2` 只有 `AI_POLICY_VERSION = "2026-10-09-v1"`，由 `custom-print-cards.server.ts` 等使用。
-- 搜索不到 `2026-11-01-v4`、`2026-11-08-v5`、`2026-11-11-v7`，也没有区分图片授权和 Kimi 文字授权的独立策略。
-- 结论：本仓库没有实现 v4/v5/v7 授权体系，独立授权也无从核实。
+## 2. 商品编辑接口 GET/PATCH（`src/routes/api/public/handheld/items.$id.ts`）
+- **GET**（第31行起）返回 `category`、`category_name`、`category_path`、`brand`、`era`（从 attributes 读取），以及 `brand_id`、`ip_name`、`facet_codes`。只读，不写数据。
+- **PATCH**（第163行）调用 `handleItemPatch`，位于 `src/server/handheld-item-edit.server.ts:60`。
+  - 字段定义 `ItemPatchReq` 在 `src/lib/handheld/item-edit-schemas.ts:24`，使用 `.strict()`。
+  - 允许保存的字段只有：name、price_tier、description、condition_grade、image_paths、fankuang_override、featured_stamp、notice_tags。
+  - 请求里带 `category`、`brand`、`ip_name`、`era`、`facet_codes` 会被拒绝，返回 422 validation_error。
+  - **结论：本仓库 PATCH 不支持这5个字段。** 所以“省略不改、空数组清标签”在本仓库无从实现，也无从核实。
+- 现有字段的保存机制：
+  - 原子保存：通过单个数据库函数 `handheld_item_update` 完成。
+  - CAS：用 `expected_updated_at` 防止覆盖别人的修改。
+  - 幂等：用 `client_op_id` 加请求指纹，重复提交会标记 `replayed`。
+  - 省略的字段不写入，因为第68–75行只拷贝请求里实际带了的字段。
 
-## 建议
-Android 对齐时以腾讯源码和 iOS 1.1.95 为唯一依据。本仓库不需要做任何改动。
+## 3. 迁移与部署证据
+- Lovable Cloud 源库实际只读结果：
+  - `public.handheld_item_update` 只有一个版本，参数为 `(device_id, user_id, client_op_id, location_id, sku_id, expected_updated_at, patch jsonb, fingerprint)`。
+  - 函数签名里没有单独的分类、标签参数，但 `patch jsonb` 内部是否处理这些键，这次没有读函数正文。
+- 迁移历史表无权限读取（permission denied）。仓库 `supabase/migrations` 共169个文件，最新一个是 `20261003140000_pos_optional_subcategory_completion.sql`。
+- **没有验证的部分：**
+  - 腾讯主库和腾讯路由（A1808）
+  - 真机 1.1.104(126)
+  - `handheld_item_update` 函数正文
+  - 线上迁移历史
+
+如果腾讯版已支持这5个字段，应以腾讯源码和 A1806 验证为准；本仓库与之不一致，不代表腾讯缺失。
